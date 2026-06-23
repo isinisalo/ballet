@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-server/
+
+# Local runtime data
+data/
+
+# Generated audit artifacts
+audit/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Caches and temporary files
+.vite/
+.cache/
+.tmp/
+tmp/
+temp/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
