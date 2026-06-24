@@ -1,7 +1,8 @@
 ---
 id: adr-008
 title: backend-arkkitehtuurimalli
-date: '2026-06-06'
+created_date: '2026-06-06 07:19'
+updated_date: '2026-06-23 07:19'
 status: accepted
 ---
 ## Context

@@ -1,7 +1,8 @@
 ---
 id: adr-001
 title: AWS serverless-alustaksi
-date: '2026-06-06'
+created_date: '2026-06-06 07:19'
+updated_date: '2026-06-23'
 status: accepted
 ---
 ## Context

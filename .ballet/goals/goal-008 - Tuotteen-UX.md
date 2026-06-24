@@ -1,18 +1,15 @@
 ---
 id: goal-008
+status: accepted
 title: Tuotteen UX
 created_date: '2026-06-22'
 updated_date: '2026-06-23'
-status: accepted
-owner: human
-version: 1
-supersedes: []
-decision_authority: human
 tags:
   - intent
   - goal
   - ux
   - frontend
+version: 1
 ---
 # Tuotteen UX
 

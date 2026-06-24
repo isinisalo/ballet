@@ -1,16 +1,13 @@
 ---
 id: goal-001
+status: accepted
 title: Projektin tavoite
 created_date: '2026-06-06 07:19'
 updated_date: '2026-06-23'
-status: accepted
-owner: human
-version: 1
-supersedes: []
-decision_authority: human
 tags:
   - intent
   - goal
+version: 1
 ---
 # Projektin tavoite
 

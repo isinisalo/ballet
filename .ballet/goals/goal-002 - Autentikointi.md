@@ -1,17 +1,14 @@
 ---
 id: goal-002
+status: accepted
 title: Autentikointi
 created_date: '2026-06-07 12:35'
 updated_date: '2026-06-23'
-status: accepted
-owner: human
-version: 1
-supersedes: []
-decision_authority: human
 tags:
   - intent
   - goal
   - auth
+version: 1
 ---
 # Autentikointi
 

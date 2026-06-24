@@ -2,7 +2,7 @@ import express from "express";
 import type { CollectionName } from "./shared/domain.js";
 import { store } from "./store.js";
 
-const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "runtimes", "policies", "events"];
+const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "skills", "runtimes", "policies", "events"];
 const collectionSet = new Set(collections);
 
 export const apiRouter = express.Router();
@@ -22,6 +22,28 @@ apiRouter.get("/data", async (_req, res, next) => {
 apiRouter.post("/reset", async (_req, res, next) => {
   try {
     res.json(await store.reset());
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.post("/project-documents", async (req, res, next) => {
+  try {
+    const { relativePath, frontmatter, body } = req.body as {
+      relativePath?: unknown;
+      frontmatter?: unknown;
+      body?: unknown;
+    };
+
+    if (typeof relativePath !== "string" || !frontmatter || typeof frontmatter !== "object" || Array.isArray(frontmatter) || typeof body !== "string") {
+      return res.status(400).json({ error: "relativePath, frontmatter object, and body are required." });
+    }
+
+    res.json(await store.saveProjectDocument({
+      relativePath,
+      frontmatter: frontmatter as Record<string, unknown>,
+      body
+    }));
   } catch (error) {
     next(error);
   }

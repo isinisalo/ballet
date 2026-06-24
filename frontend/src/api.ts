@@ -1,4 +1,4 @@
-import type { AppData, CollectionName, EventRecord } from "../../backend/shared/domain";
+import type { AppData, CollectionName, EventRecord, MarkdownDocument } from "../../backend/shared/domain";
 
 const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {
@@ -22,6 +22,11 @@ export const api = {
     request<AppData[T][number]>(`/api/${collection}`, {
       method: "POST",
       body: JSON.stringify(item)
+    }),
+  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) =>
+    request<MarkdownDocument>("/api/project-documents", {
+      method: "POST",
+      body: JSON.stringify(document)
     }),
   remove: (collection: CollectionName, id: string) =>
     request<void>(`/api/${collection}/${id}`, { method: "DELETE" }),

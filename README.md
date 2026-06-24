@@ -6,7 +6,7 @@ Minimal TypeScript web application for managing projects, goals, ADRs, agents, s
 
 - React + Vite for the app UI.
 - Express for the local API, including `/api/events/intake`.
-- Project-local Markdown persistence under `.codex/agents` and `.ballet/*`.
+- Project-local TOML/Markdown persistence under `.codex/agents`, `.agents/skills`, and `.ballet/*`.
 - Vitest for policy interpreter tests.
 
 The repository was empty, so this stack was chosen as a small full-stack TypeScript default that supports both browser workflows and API event intake without external services.
@@ -25,14 +25,15 @@ Start Ballet from the project folder you want to inspect. The current working di
 
 Loaded collections:
 
-- `.codex/agents/*.md|*.mdx`
+- `.codex/agents/*.toml`
+- `.agents/skills/**/SKILL.md`
 - `.ballet/project.md`
 - `.ballet/adr/*.md|*.mdx`
 - `.ballet/goals/*.md|*.mdx`
 - `.ballet/events/*.md|*.mdx`
 - `.ballet/policies/*.md|*.mdx`
 
-Files use YAML Frontmatter plus Markdown body content. Frontmatter is shown as metadata and the body is shown as long-form preview content. Existing create/edit flows write Markdown back to the relevant project-local location.
+Project files and skills use YAML Frontmatter plus Markdown body content. Agent files use Codex custom-agent TOML. Metadata is shown in the frontmatter-style preview, and existing create/edit flows write back to the relevant project-local location.
 
 ## Run
 

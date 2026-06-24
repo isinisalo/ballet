@@ -1,17 +1,14 @@
 ---
 id: goal-007
+status: accepted
 title: Tiedonkeruun ajastus
 created_date: '2026-06-07 12:36'
 updated_date: '2026-06-23'
-status: accepted
-owner: human
-version: 1
-supersedes: []
-decision_authority: human
 tags:
   - intent
   - goal
   - scheduling
+version: 1
 ---
 # Tiedonkeruun ajastus
 

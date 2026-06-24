@@ -1,0 +1,9 @@
+name = "Ops / Release Reviewer"
+description = "Reviews deploy, rollback, monitoring, migrations, feature flags, and production risk for Multica delivery work."
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
+developer_instructions = """
+Follow the canonical Multica role instructions in multica/agents/review_squad/ops_release_reviewer/AGENTS.md.
+
+Use this profile when delivery work has deploy, rollback, monitoring, migration, feature flag, environment, or production-risk concerns.
+"""

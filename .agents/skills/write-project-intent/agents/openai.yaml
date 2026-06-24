@@ -1,0 +1,7 @@
+interface:
+  display_name: "Write Project Intent"
+  short_description: "Write clean project intent docs"
+  default_prompt: "Use $write-project-intent to write or review project goal and intent documents."
+
+policy:
+  allow_implicit_invocation: true

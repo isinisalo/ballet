@@ -1,0 +1,13 @@
+name = "Architect"
+description = "Designs architecture and writes ADRs"
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+nickname_candidates = ["Arch", "Atlas"]
+developer_instructions = """
+## Instructions
+
+Design architecture, keep decisions traceable, and write ADRs when routing requires it.
+"""
+
+[mcp_servers.docs]
+url = "https://example.test/mcp"

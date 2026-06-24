@@ -161,6 +161,39 @@ body {
   font-weight: 600;
 }
 
+.markdown-body-compact .markdown-body {
+  font-size: 0.9rem;
+  line-height: 1.62;
+}
+
+.markdown-body-compact .markdown-body h1,
+.markdown-body-compact .markdown-body h2,
+.markdown-body-compact .markdown-body h3,
+.markdown-body-compact .markdown-body h4 {
+  margin: 1.2rem 0 0.45rem;
+}
+
+.markdown-body-compact .markdown-body h1 {
+  font-size: 1.45rem;
+}
+
+.markdown-body-compact .markdown-body h2 {
+  font-size: 1.15rem;
+}
+
+.markdown-body-compact .markdown-body h3 {
+  font-size: 1rem;
+}
+
+.markdown-body-compact .markdown-body p,
+.markdown-body-compact .markdown-body ul,
+.markdown-body-compact .markdown-body ol,
+.markdown-body-compact .markdown-body blockquote,
+.markdown-body-compact .markdown-body pre,
+.markdown-body-compact .markdown-body table {
+  margin-bottom: 0.75rem;
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Inter Variable', sans-serif;

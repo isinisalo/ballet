@@ -1,11 +1,17 @@
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 import { isMap, parseDocument, stringify } from "yaml";
-import type { MarkdownDocument } from "./shared/domain.js";
+import type { MarkdownDocument, ProjectDocumentTreeNode } from "./shared/domain.js";
 
 export interface ParsedMarkdownDocument {
   frontmatter: Record<string, unknown>;
   body: string;
+  errors?: string[];
+}
+
+export interface ParsedTomlDocument {
+  frontmatter: Record<string, unknown>;
   errors?: string[];
 }
 
@@ -25,6 +31,8 @@ export interface ReadMarkdownDocumentOptions {
 export const getProjectRoot = (): string => path.resolve(process.cwd());
 
 const defaultExtensions = [".md", ".mdx"];
+const projectTreeExtensions = [".md"];
+const agentExtensions = [".toml"];
 
 const slugify = (value: string): string =>
   value
@@ -35,6 +43,19 @@ const slugify = (value: string): string =>
     .replace(/^-+|-+$/g, "") || "document";
 
 const normalizeRelativePath = (relativePath: string): string => relativePath.split(path.sep).join("/");
+
+const projectDocumentLabel = (document: MarkdownDocument): string =>
+  document.title
+  || (typeof document.frontmatter.title === "string" ? document.frontmatter.title : undefined)
+  || (typeof document.frontmatter.name === "string" ? document.frontmatter.name : undefined)
+  || document.slug
+  || document.id;
+
+const skillDocumentLabel = (document: MarkdownDocument): string =>
+  (typeof document.frontmatter.name === "string" ? document.frontmatter.name : undefined)
+  || document.title
+  || document.slug
+  || document.id;
 
 export const assertInsideRoot = (root: string, target: string): string => {
   const resolvedRoot = path.resolve(root);
@@ -74,6 +95,17 @@ export const parseMarkdownDocument = (source: string): ParsedMarkdownDocument =>
   return { frontmatter: toPlainFrontmatter(parsed), body };
 };
 
+export const parseTomlDocument = (source: string): ParsedTomlDocument => {
+  try {
+    return { frontmatter: toPlainFrontmatter(parseToml(source)) };
+  } catch (error) {
+    return {
+      frontmatter: {},
+      errors: [error instanceof Error ? error.message : "Invalid TOML document."]
+    };
+  }
+};
+
 export const readMarkdownDocument = async ({ root, relativePath, collection }: ReadMarkdownDocumentOptions): Promise<MarkdownDocument> => {
   const absolutePath = assertInsideRoot(root, relativePath);
   if (!defaultExtensions.includes(path.extname(relativePath).toLowerCase())) {
@@ -97,6 +129,34 @@ export const readMarkdownDocument = async ({ root, relativePath, collection }: R
     title,
     frontmatter: parsed.frontmatter,
     body: parsed.body,
+    absolutePath,
+    relativePath: normalizedRelativePath,
+    slug,
+    errors: parsed.errors
+  };
+};
+
+export const readTomlDocument = async ({ root, relativePath, collection }: ReadMarkdownDocumentOptions): Promise<MarkdownDocument> => {
+  const absolutePath = assertInsideRoot(root, relativePath);
+  if (!agentExtensions.includes(path.extname(relativePath).toLowerCase())) {
+    throw new Error(`Unsupported TOML extension for ${relativePath}`);
+  }
+
+  const source = await readFile(absolutePath, "utf8");
+  const parsed = parseTomlDocument(source);
+  const normalizedRelativePath = normalizeRelativePath(path.relative(path.resolve(root), absolutePath));
+  const slug = slugify(path.basename(normalizedRelativePath, path.extname(normalizedRelativePath)));
+  const title = typeof parsed.frontmatter.name === "string" ? parsed.frontmatter.name : undefined;
+  const body = typeof parsed.frontmatter.developer_instructions === "string"
+    ? parsed.frontmatter.developer_instructions
+    : "";
+
+  return {
+    id: slug,
+    collection: collection ?? normalizedRelativePath.split("/").slice(0, -1).join("/"),
+    title,
+    frontmatter: parsed.frontmatter,
+    body,
     absolutePath,
     relativePath: normalizedRelativePath,
     slug,
@@ -133,7 +193,117 @@ export const readMarkdownCollection = async ({
   return Promise.all(files.map((relativePath) => readMarkdownDocument({ root, relativePath, collection })));
 };
 
-export const loadAgents = (root: string) => readMarkdownCollection({ root, collectionPath: ".codex/agents", collection: "agents" });
+const readSkillDirectory = async (root: string, relativePath: string): Promise<string[]> => {
+  const absolutePath = assertInsideRoot(root, relativePath);
+
+  try {
+    const stats = await stat(absolutePath);
+    if (!stats.isDirectory()) return [];
+  } catch {
+    return [];
+  }
+
+  const entries = await readdir(absolutePath, { withFileTypes: true });
+  const skillFile = entries.find((entry) => entry.isFile() && entry.name === "SKILL.md")
+    ? [normalizeRelativePath(path.join(relativePath, "SKILL.md"))]
+    : [];
+  const nestedSkillFiles = await Promise.all(entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => readSkillDirectory(root, normalizeRelativePath(path.join(relativePath, entry.name)))));
+
+  return [...skillFile, ...nestedSkillFiles.flat()].sort((a, b) => a.localeCompare(b));
+};
+
+const readSkillDocument = async (root: string, relativePath: string): Promise<MarkdownDocument> => {
+  const document = await readMarkdownDocument({ root, relativePath, collection: "skills" });
+  const skillPath = normalizeRelativePath(path.dirname(relativePath).replace(/^\.agents\/skills\/?/, ""));
+  const stableId = slugify(skillPath || document.slug);
+
+  return {
+    ...document,
+    id: typeof document.frontmatter.id === "string" ? document.frontmatter.id : stableId,
+    title: skillDocumentLabel(document),
+    slug: stableId
+  };
+};
+
+const sortProjectEntries = (a: string, b: string): number => {
+  if (a === ".ballet/project.md") return -1;
+  if (b === ".ballet/project.md") return 1;
+  return a.localeCompare(b);
+};
+
+const readBalletProjectDirectory = async (
+  root: string,
+  relativePath: string,
+  depth: number
+): Promise<ProjectDocumentTreeNode[]> => {
+  const absolutePath = assertInsideRoot(root, relativePath);
+
+  try {
+    const stats = await stat(absolutePath);
+    if (!stats.isDirectory()) return [];
+  } catch {
+    return [];
+  }
+
+  const entries = await readdir(absolutePath, { withFileTypes: true });
+  const files = entries
+    .filter((entry) => entry.isFile() && projectTreeExtensions.includes(path.extname(entry.name).toLowerCase()))
+    .map((entry) => normalizeRelativePath(path.join(relativePath, entry.name)))
+    .sort(sortProjectEntries);
+  const directories = depth < 2
+    ? entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({
+        label: entry.name,
+        relativePath: normalizeRelativePath(path.join(relativePath, entry.name))
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+    : [];
+
+  const fileNodes = await Promise.all(files.map(async (filePath): Promise<ProjectDocumentTreeNode> => {
+    const document = await readMarkdownDocument({ root, relativePath: filePath, collection: "project" });
+    return {
+      type: "file",
+      label: projectDocumentLabel(document),
+      document
+    };
+  }));
+
+  const directoryNodes = await Promise.all(directories.map(async (directory): Promise<ProjectDocumentTreeNode> => ({
+    type: "directory",
+    label: directory.label,
+    relativePath: directory.relativePath,
+    children: await readBalletProjectDirectory(root, directory.relativePath, depth + 1)
+  })));
+
+  return [...fileNodes, ...directoryNodes];
+};
+
+export const loadAgents = async (root: string): Promise<MarkdownDocument[]> => {
+  const absoluteCollectionPath = assertInsideRoot(root, ".codex/agents");
+
+  try {
+    const stats = await stat(absoluteCollectionPath);
+    if (!stats.isDirectory()) return [];
+  } catch {
+    return [];
+  }
+
+  const entries = await readdir(absoluteCollectionPath, { withFileTypes: true });
+  const files = entries
+    .filter((entry) => entry.isFile() && agentExtensions.includes(path.extname(entry.name).toLowerCase()))
+    .map((entry) => normalizeRelativePath(path.join(".codex/agents", entry.name)))
+    .sort((a, b) => a.localeCompare(b));
+
+  return Promise.all(files.map((relativePath) => readTomlDocument({ root, relativePath, collection: "agents" })));
+};
+export const loadSkills = async (root: string): Promise<MarkdownDocument[]> => {
+  const skillFiles = await readSkillDirectory(root, ".agents/skills");
+  return Promise.all(skillFiles.map((relativePath) => readSkillDocument(root, relativePath)));
+};
+export const loadBalletProjectTree = (root: string): Promise<ProjectDocumentTreeNode[]> => readBalletProjectDirectory(root, ".ballet", 0);
 export const loadBalletProject = async (root: string): Promise<MarkdownDocument[]> => {
   try {
     return [await readMarkdownDocument({ root, relativePath: ".ballet/project.md", collection: "project" })];
@@ -154,6 +324,8 @@ export const markdownSource = (frontmatter: Record<string, unknown>, body: strin
   return `---\n${yaml}\n---\n\n${body.trimStart()}`;
 };
 
+export const tomlSource = (frontmatter: Record<string, unknown>): string => `${stringifyToml(frontmatter).trimEnd()}\n`;
+
 export const writeMarkdownDocument = async ({
   root,
   relativePath,
@@ -171,4 +343,21 @@ export const writeMarkdownDocument = async ({
   }
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, markdownSource(frontmatter, body), "utf8");
+};
+
+export const writeTomlDocument = async ({
+  root,
+  relativePath,
+  frontmatter
+}: {
+  root: string;
+  relativePath: string;
+  frontmatter: Record<string, unknown>;
+}): Promise<void> => {
+  const absolutePath = assertInsideRoot(root, relativePath);
+  if (!agentExtensions.includes(path.extname(relativePath).toLowerCase())) {
+    throw new Error(`Unsupported TOML extension for ${relativePath}`);
+  }
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  await writeFile(absolutePath, tomlSource(frontmatter), "utf8");
 };

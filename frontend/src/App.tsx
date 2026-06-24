@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { isMap, parseDocument, stringify as stringifyYaml } from "yaml";
 import {
   Archive,
   Bot,
+  CalendarDays,
   CheckCircle2,
   ChevronDown,
   Code2,
+  Eye,
+  FileKey2,
   GitBranch,
+  Hash,
   Inbox,
   Layers3,
   Menu,
@@ -17,10 +22,12 @@ import {
   Route,
   Save,
   Sun,
+  Tags,
   Trash2,
+  UserRound,
   type LucideIcon
 } from "lucide-react";
-import type { Adr, Agent, AppData, EventRecord, Goal, Policy, Project, Runtime, Skill } from "../../backend/shared/domain";
+import type { Adr, Agent, AppData, EventRecord, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -57,12 +64,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
 
-type View = "projects" | "project-goals" | "project-adrs" | "agents" | "runtimes" | "policies" | "events";
-type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "runtimes" | "policies";
+type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
+type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies";
 
 interface RouteState {
   view: View;
   projectId?: string;
+  documentPath?: string;
 }
 
 const emptyData: AppData = {
@@ -70,13 +78,17 @@ const emptyData: AppData = {
   goals: [],
   adrs: [],
   agents: [],
+  skills: [],
   runtimes: [],
   policies: [],
-  events: []
+  events: [],
+  projectDocumentTree: []
 };
 
 const toCsv = (values: string[]) => values.join(", ");
 const fromCsv = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
+const toListText = (values?: string[]) => (values ?? []).join("\n");
+const fromListText = (value: string) => value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
 const toKeyValueLines = (values: Record<string, string>) => Object.entries(values).map(([key, item]) => `${key}=${item}`).join("\n");
 const fromKeyValueLines = (value: string) =>
   Object.fromEntries(
@@ -100,6 +112,23 @@ const parsePayload = (value: string): Record<string, unknown> => {
 };
 
 const readJson = (value: unknown) => JSON.stringify(value, null, 2);
+const frontmatterToYaml = (frontmatter?: Record<string, unknown>) => stringifyYaml(frontmatter ?? {}).trimEnd();
+const parseFrontmatterYaml = (value: string): Record<string, unknown> => {
+  if (!value.trim()) return {};
+
+  const document = parseDocument(value, { prettyErrors: false });
+  if (document.errors.length > 0) {
+    throw new Error(document.errors[0]?.message ?? "Invalid YAML frontmatter.");
+  }
+
+  const parsed = document.toJSON();
+  if (parsed === null) return {};
+  if (!isMap(document.contents) || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Frontmatter must be a YAML mapping/object.");
+  }
+
+  return parsed as Record<string, unknown>;
+};
 
 const agentTemplate = (): Partial<Agent> => ({
   name: "",
@@ -107,6 +136,13 @@ const agentTemplate = (): Partial<Agent> => ({
   instructions: "",
   enabled: true,
   skills: []
+});
+
+const skillTemplate = (): Partial<Skill> => ({
+  name: "",
+  description: "",
+  metadata: {},
+  body: ""
 });
 
 const runtimeTemplate = (): Partial<Runtime> => ({
@@ -139,25 +175,29 @@ const eventTemplate = (projectId: string): Partial<EventRecord> & Pick<EventReco
 });
 
 const routeFromPath = (path: string): RouteState => {
-  const goalsMatch = path.match(/^\/projects\/([^/]+)\/goals\/?$/);
+  const url = new URL(path, "http://localhost");
+  const goalsMatch = url.pathname.match(/^\/projects\/([^/]+)\/goals\/?$/);
   if (goalsMatch) return { view: "project-goals", projectId: decodeURIComponent(goalsMatch[1]) };
 
-  const adrsMatch = path.match(/^\/projects\/([^/]+)\/adrs\/?$/);
+  const adrsMatch = url.pathname.match(/^\/projects\/([^/]+)\/adrs\/?$/);
   if (adrsMatch) return { view: "project-adrs", projectId: decodeURIComponent(adrsMatch[1]) };
 
-  if (path === "/agents") return { view: "agents" };
-  if (path === "/runtimes") return { view: "runtimes" };
-  if (path === "/policies") return { view: "policies" };
-  if (path === "/events") return { view: "events" };
+  if (url.pathname === "/projects/document") {
+    const documentPath = url.searchParams.get("path") ?? undefined;
+    return documentPath ? { view: "project-document", documentPath } : { view: "projects" };
+  }
+
+  if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
+  if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
+  if (url.pathname === "/runtimes") return { view: "runtimes" };
+  if (url.pathname === "/policies") return { view: "policies" };
+  if (url.pathname === "/events") return { view: "events" };
   return { view: "projects" };
 };
 
-const routePath = (view: View, projectId?: string) => {
-  if (view === "project-goals") return `/projects/${encodeURIComponent(projectId ?? "")}/goals`;
-  if (view === "project-adrs") return `/projects/${encodeURIComponent(projectId ?? "")}/adrs`;
-  if (view === "projects") return "/projects";
-  return `/${view}`;
-};
+const projectDocumentPath = (relativePath: string) => `/projects/document?path=${encodeURIComponent(relativePath)}`;
+const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
+const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
 
 const statusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
   if (["unassigned", "at-risk", "rejected"].includes(status)) return "destructive";
@@ -235,7 +275,9 @@ function BodyPreview({ body }: { body?: string }) {
   return <span className="line-clamp-2 text-muted-foreground">{preview}</span>;
 }
 
-type MarkdownEntity = Pick<Project | Goal | Adr, "id" | "frontmatter" | "body" | "relativePath" | "errors" | "createdAt" | "updatedAt"> & {
+type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skill, "id" | "frontmatter" | "body" | "relativePath" | "errors"> & {
+  createdAt?: string;
+  updatedAt?: string;
   name?: string;
   title?: string;
   status?: string;
@@ -246,11 +288,36 @@ type MarkdownEntity = Pick<Project | Goal | Adr, "id" | "frontmatter" | "body" |
 const documentTitle = (document: MarkdownEntity) =>
   document.title || document.name || (typeof document.frontmatter?.title === "string" ? document.frontmatter.title : undefined) || document.id;
 
-const documentStatus = (document: MarkdownEntity): string =>
-  typeof document.frontmatter?.status === "string" ? document.frontmatter.status : document.status ?? "";
+const projectTreeContainsPath = (nodes: ProjectDocumentTreeNode[], relativePath?: string): boolean =>
+  Boolean(relativePath) && nodes.some((node) =>
+    node.type === "file"
+      ? node.document.relativePath === relativePath
+      : projectTreeContainsPath(node.children, relativePath)
+  );
+
+const findProjectTreeDocument = (nodes: ProjectDocumentTreeNode[], relativePath?: string): MarkdownDocument | undefined => {
+  if (!relativePath) return undefined;
+  for (const node of nodes) {
+    if (node.type === "file" && node.document.relativePath === relativePath) return node.document;
+    if (node.type === "directory") {
+      const document = findProjectTreeDocument(node.children, relativePath);
+      if (document) return document;
+    }
+  }
+  return undefined;
+};
 
 const isSimpleFrontmatterValue = (value: unknown) => value === null || ["string", "number", "boolean", "undefined"].includes(typeof value);
 const isSimpleFrontmatterArray = (value: unknown[]) => value.every(isSimpleFrontmatterValue);
+
+const frontmatterIcon = (fieldKey: string): LucideIcon => {
+  if (fieldKey === "id") return Hash;
+  if (["date", "created_date", "updated_date", "createdAt", "updatedAt"].includes(fieldKey)) return CalendarDays;
+  if (fieldKey === "status") return CheckCircle2;
+  if (["owner", "decision_authority"].includes(fieldKey)) return UserRound;
+  if (fieldKey === "tags") return Tags;
+  return FileKey2;
+};
 
 function FrontmatterValue({ fieldKey, value }: { fieldKey: string; value: unknown }) {
   if (Array.isArray(value)) {
@@ -259,7 +326,11 @@ function FrontmatterValue({ fieldKey, value }: { fieldKey: string; value: unknow
       return (
         <span className="flex flex-wrap gap-1.5">
           {value.map((item, index) => (
-            <Badge key={`${String(item)}-${index}`} variant={fieldKey === "tags" ? "outline" : "secondary"}>
+            <Badge
+              key={`${String(item)}-${index}`}
+              variant={fieldKey === "tags" ? "outline" : "secondary"}
+              className="h-4 rounded px-1.5 font-mono text-[0.6rem] uppercase"
+            >
               {String(item)}
             </Badge>
           ))}
@@ -277,42 +348,64 @@ function FrontmatterValue({ fieldKey, value }: { fieldKey: string; value: unknow
   }
 
   if (value === null || value === undefined || value === "") return <span className="text-muted-foreground">empty</span>;
-  if (fieldKey === "status") return <StatusBadge status={String(value)} />;
-  return <span>{String(value)}</span>;
+  if (fieldKey === "status") {
+    return (
+      <Badge variant={statusVariant(String(value))} className="h-5 rounded px-2 font-mono text-[0.65rem] uppercase">
+        {String(value)}
+      </Badge>
+    );
+  }
+  return <span className="font-medium">{String(value)}</span>;
 }
 
 function FrontmatterPanel({ frontmatter }: { frontmatter?: Record<string, unknown> }) {
-  const entries = Object.entries(frontmatter ?? {});
+  const entries = Object.entries(frontmatter ?? {}).filter(([key]) => key !== "id");
 
   return (
-    <aside className="rounded-lg border bg-card p-3">
-      <h2 className="text-xs font-semibold uppercase text-muted-foreground">Frontmatter</h2>
+    <aside className="rounded-lg border bg-card/95 px-3 py-2.5 shadow-sm ring-1 ring-foreground/5">
       {entries.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">No frontmatter.</p>
+        <p className="text-sm text-muted-foreground">No frontmatter.</p>
       ) : (
-        <dl className="mt-2 flex flex-wrap gap-2">
-          {entries.map(([key, value]) => (
-            <div
-              key={key}
-              className={cn(
-                "min-w-0 rounded-md border bg-background px-2.5 py-1.5",
-                value && typeof value === "object" && !Array.isArray(value) ? "basis-full" : "max-w-full"
-              )}
-            >
-              <dt className="mb-1 font-mono text-[0.65rem] uppercase leading-none text-muted-foreground">{key}</dt>
-              <dd className="min-w-0 break-words text-sm leading-snug">
-                <FrontmatterValue fieldKey={key} value={value} />
-              </dd>
-            </div>
-          ))}
+        <dl className="flex flex-wrap">
+          {entries.map(([key, value], index) => {
+            const Icon = frontmatterIcon(key);
+            const isComplexObject = Boolean(value && typeof value === "object" && !Array.isArray(value));
+            return (
+              <div
+                key={key}
+                className={cn(
+                  "min-w-36 flex-1 border-border/70 py-1.5 pr-5",
+                  index > 0 && "border-l pl-5",
+                  isComplexObject && "basis-full"
+                )}
+              >
+                <dt className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.65rem] font-semibold uppercase leading-none text-muted-foreground">
+                  <Icon className="size-3" />
+                  {key}
+                </dt>
+                <dd className="min-w-0 break-words text-sm leading-snug text-foreground">
+                  <FrontmatterValue fieldKey={key} value={value} />
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       )}
     </aside>
   );
 }
 
-function MarkdownBody({ source }: { source?: string }) {
-  const body = source?.trim();
+const normalizeHeadingText = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+
+const removeMatchingLeadingH1 = (source: string, title?: string) => {
+  if (!title) return source;
+  return source.replace(/^#\s+(.+?)\s*\n+/, (match, heading: string) =>
+    normalizeHeadingText(heading) === normalizeHeadingText(title) ? "" : match
+  );
+};
+
+function MarkdownBody({ source, title }: { source?: string; title?: string }) {
+  const body = removeMatchingLeadingH1(source?.trim() ?? "", title).trim();
   if (!body) return <p className="text-muted-foreground">No Markdown body.</p>;
 
   return (
@@ -322,59 +415,152 @@ function MarkdownBody({ source }: { source?: string }) {
   );
 }
 
-function MarkdownDocumentView({ document, emptyTitle }: { document?: MarkdownEntity; emptyTitle: string }) {
+function MarkdownDocumentView({ document, emptyTitle, compact = false, embedded = false }: { document?: MarkdownEntity; emptyTitle: string; compact?: boolean; embedded?: boolean }) {
   if (!document) return <EmptyState title={emptyTitle} />;
-  const status = documentStatus(document);
+  const title = documentTitle(document);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid auto-rows-min gap-4 self-start">
       <FrontmatterPanel frontmatter={document.frontmatter} />
-      <article className="min-w-0 rounded-lg border bg-card p-5 md:p-8">
-        <header className="mb-6 grid gap-3 border-b pb-5">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            {status ? <StatusBadge status={status} /> : null}
-            {document.relativePath ? <Badge variant="outline" className="min-w-0 max-w-full shrink truncate">{document.relativePath}</Badge> : null}
-          </div>
-          <h2 className="text-2xl font-semibold tracking-tight">{documentTitle(document)}</h2>
-          {document.errors?.length ? <ErrorPreview errors={document.errors} /> : null}
-        </header>
-        <MarkdownBody source={document.body} />
+      <article className={cn("min-w-0", embedded ? "p-0" : "rounded-lg border bg-card p-5 md:p-8")}>
+        {document.errors?.length ? (
+          <header className="mb-6 flex min-w-0 flex-wrap items-center gap-2 border-b pb-5">
+            <ErrorPreview errors={document.errors} />
+          </header>
+        ) : null}
+        <div className={cn(compact && "markdown-body-compact")}>
+          <MarkdownBody source={document.body} title={title} />
+        </div>
       </article>
     </div>
   );
 }
 
-function SidebarDocumentLinks({
-  documents,
-  selectedId,
-  onSelect,
-  path
+function ProjectDocumentTree({
+  nodes,
+  activePath,
+  navigate,
+  level = 0
 }: {
-  documents: MarkdownEntity[];
-  selectedId?: string;
-  onSelect: (id: string) => void;
-  path: string;
+  nodes: ProjectDocumentTreeNode[];
+  activePath?: string;
+  navigate: (path: string) => void;
+  level?: number;
+}) {
+  if (nodes.length === 0) return null;
+
+  return (
+    <SidebarMenuSub className={cn(level > 0 && "mx-2 mt-1 gap-0.5 border-sidebar-border/60 px-2 py-1")}>
+      {nodes.map((node) => (
+        node.type === "file" ? (
+          <SidebarMenuSubItem key={node.document.relativePath}>
+            <SidebarMenuSubButton
+              href={projectDocumentPath(node.document.relativePath)}
+              size="sm"
+              isActive={node.document.relativePath === activePath}
+              className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+              onClick={(event) => {
+                event.preventDefault();
+                navigate(projectDocumentPath(node.document.relativePath));
+              }}
+            >
+              <span>{node.label}</span>
+            </SidebarMenuSubButton>
+          </SidebarMenuSubItem>
+        ) : (
+          <ProjectDocumentTreeDirectory
+            key={node.relativePath}
+            node={node}
+            activePath={activePath}
+            navigate={navigate}
+            level={level}
+          />
+        )
+      ))}
+    </SidebarMenuSub>
+  );
+}
+
+function ProjectDocumentTreeDirectory({
+  node,
+  activePath,
+  navigate,
+  level
+}: {
+  node: Extract<ProjectDocumentTreeNode, { type: "directory" }>;
+  activePath?: string;
+  navigate: (path: string) => void;
+  level: number;
+}) {
+  const containsActive = projectTreeContainsPath(node.children, activePath);
+  const [open, setOpen] = useState(containsActive);
+
+  useEffect(() => {
+    if (containsActive) setOpen(true);
+  }, [containsActive]);
+
+  return (
+    <SidebarMenuSubItem>
+      <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
+        <CollapsibleTrigger asChild>
+          <SidebarMenuSubButton
+            asChild
+            size="sm"
+            isActive={containsActive}
+            className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+          >
+            <button type="button">
+              <span>{node.label}</span>
+              <ChevronDown className={cn("ml-auto transition-transform", open && "rotate-180")} />
+            </button>
+          </SidebarMenuSubButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ProjectDocumentTree nodes={node.children} activePath={activePath} navigate={navigate} level={level + 1} />
+        </CollapsibleContent>
+      </Collapsible>
+    </SidebarMenuSubItem>
+  );
+}
+
+type SidebarDocumentEntity = Pick<Agent | Skill, "id" | "name" | "relativePath">;
+
+function SidebarDocumentList({
+  documents,
+  activePath,
+  pathFor,
+  navigate
+}: {
+  documents: SidebarDocumentEntity[];
+  activePath?: string;
+  pathFor: (relativePath: string) => string;
+  navigate: (path: string) => void;
 }) {
   if (documents.length === 0) return null;
 
   return (
-    <SidebarMenuSub className="mx-2 mt-1 gap-0.5 border-sidebar-border/60 px-2 py-1">
-      {documents.map((document) => (
-        <SidebarMenuSubItem key={document.id}>
-          <SidebarMenuSubButton
-            href={path}
-            size="sm"
-            isActive={document.id === selectedId}
-            className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
-            onClick={(event) => {
-              event.preventDefault();
-              onSelect(document.id);
-            }}
-          >
-            <span>{documentTitle(document)}</span>
-          </SidebarMenuSubButton>
-        </SidebarMenuSubItem>
-      ))}
+    <SidebarMenuSub>
+      {documents.map((document) => {
+        const relativePath = document.relativePath;
+        if (!relativePath) return null;
+        const path = pathFor(relativePath);
+        return (
+          <SidebarMenuSubItem key={document.id}>
+            <SidebarMenuSubButton
+              href={path}
+              size="sm"
+              isActive={relativePath === activePath}
+              className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+              onClick={(event) => {
+                event.preventDefault();
+                navigate(path);
+              }}
+            >
+              <span>{document.name}</span>
+            </SidebarMenuSubButton>
+          </SidebarMenuSubItem>
+        );
+      })}
     </SidebarMenuSub>
   );
 }
@@ -412,18 +598,20 @@ function TextAreaField({
   value,
   onChange,
   rows = 3,
-  required = false
+  required = false,
+  className
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   rows?: number;
   required?: boolean;
+  className?: string;
 }) {
   return (
     <Field>
       <FieldLabel>{label}</FieldLabel>
-      <Textarea value={value} rows={rows} required={required} onChange={(event) => onChange(event.target.value)} />
+      <Textarea className={className} value={value} rows={rows} required={required} onChange={(event) => onChange(event.target.value)} />
     </Field>
   );
 }
@@ -481,18 +669,18 @@ function EmptyState({ title, action }: { title: string; action?: string }) {
   );
 }
 
-function Panel({ title, description, icon, children, action }: { title: string; description?: string; icon: ReactNode; children: ReactNode; action?: ReactNode }) {
+function Panel({ title, description, icon, children, action, compact = false }: { title: string; description?: string; icon: ReactNode; children: ReactNode; action?: ReactNode; compact?: boolean }) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className={cn(compact && "gap-1.5 px-4 py-3")}>
+        <CardTitle className={cn("flex items-center gap-2", compact && "text-base")}>
           {icon}
           {title}
         </CardTitle>
-        {description ? <CardDescription>{description}</CardDescription> : null}
+        {description ? <CardDescription className={cn(compact && "text-xs")}>{description}</CardDescription> : null}
         {action ? <CardAction>{action}</CardAction> : null}
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className={cn(compact && "px-4 pb-4")}>{children}</CardContent>
     </Card>
   );
 }
@@ -537,32 +725,24 @@ function DataTable({
 
 function AppSidebar({
   route,
-  selectedProjectId,
-  goals,
-  adrs,
-  selectedGoalId,
-  selectedAdrId,
-  onSelectGoal,
-  onSelectAdr,
+  projectDocumentTree,
+  agents,
+  skills,
   navigate,
   themeMode,
   onThemeModeChange
 }: {
   route: RouteState;
-  selectedProjectId: string;
-  goals: MarkdownEntity[];
-  adrs: MarkdownEntity[];
-  selectedGoalId?: string;
-  selectedAdrId?: string;
-  onSelectGoal: (id: string) => void;
-  onSelectAdr: (id: string) => void;
+  projectDocumentTree: ProjectDocumentTreeNode[];
+  agents: Agent[];
+  skills: Skill[];
   navigate: (path: string) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
 }) {
-  const projectGoalsPath = selectedProjectId ? routePath("project-goals", selectedProjectId) : "/projects";
-  const projectAdrsPath = selectedProjectId ? routePath("project-adrs", selectedProjectId) : "/projects";
-  const projectsOpen = route.view === "projects" || route.view === "project-goals" || route.view === "project-adrs";
+  const projectsOpen = route.view === "projects" || route.view === "project-document" || route.view === "project-goals" || route.view === "project-adrs";
+  const agentsOpen = route.view === "agents";
+  const skillsOpen = route.view === "skills";
   const item = (label: string, icon: ReactNode, path: string, active: boolean) => (
     <SidebarMenuItem key={label}>
       <SidebarMenuButton asChild isActive={active} tooltip={label}>
@@ -603,61 +783,38 @@ function AppSidebar({
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarMenuSub>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton
-                          href="/projects"
-                          isActive={route.view === "projects"}
-                          onClick={(event) => { event.preventDefault(); navigate("/projects"); }}
-                        >
-                          <span>Overview</span>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton
-                          href={projectGoalsPath}
-                          isActive={route.view === "project-goals"}
-                          onClick={(event) => { event.preventDefault(); navigate(projectGoalsPath); }}
-                        >
-                          <span>GOALS</span>
-                        </SidebarMenuSubButton>
-                        {route.view === "project-goals" ? (
-                          <SidebarDocumentLinks
-                            documents={goals}
-                            selectedId={selectedGoalId}
-                            path={projectGoalsPath}
-                            onSelect={(id) => {
-                              onSelectGoal(id);
-                              navigate(projectGoalsPath);
-                            }}
-                          />
-                        ) : null}
-                      </SidebarMenuSubItem>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton
-                          href={projectAdrsPath}
-                          isActive={route.view === "project-adrs"}
-                          onClick={(event) => { event.preventDefault(); navigate(projectAdrsPath); }}
-                        >
-                          <span>ADR</span>
-                        </SidebarMenuSubButton>
-                        {route.view === "project-adrs" ? (
-                          <SidebarDocumentLinks
-                            documents={adrs}
-                            selectedId={selectedAdrId}
-                            path={projectAdrsPath}
-                            onSelect={(id) => {
-                              onSelectAdr(id);
-                              navigate(projectAdrsPath);
-                            }}
-                          />
-                        ) : null}
-                      </SidebarMenuSubItem>
-                    </SidebarMenuSub>
+                    <ProjectDocumentTree nodes={projectDocumentTree} activePath={route.documentPath} navigate={navigate} />
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
-              {item("Agents", <Bot />, "/agents", route.view === "agents")}
+              <Collapsible defaultOpen={agentsOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={agentsOpen} tooltip="Agents">
+                      <Bot />
+                      <span>Agents</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarDocumentList documents={agents} activePath={agentsOpen ? route.documentPath : undefined} pathFor={agentDocumentPath} navigate={navigate} />
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+              <Collapsible defaultOpen={skillsOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={skillsOpen} tooltip="Skills">
+                      <FileKey2 />
+                      <span>Skills</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarDocumentList documents={skills} activePath={skillsOpen ? route.documentPath : undefined} pathFor={skillDocumentPath} navigate={navigate} />
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
               {item("Runtimes", <Code2 />, "/runtimes", route.view === "runtimes")}
               {item("Policies", <GitBranch />, "/policies", route.view === "policies")}
               {item("Events", <Inbox />, "/events", route.view === "events")}
@@ -679,16 +836,29 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [route, setRoute] = useState<RouteState>(() => routeFromPath(window.location.pathname));
+  const [route, setRoute] = useState<RouteState>(() => routeFromPath(`${window.location.pathname}${window.location.search}`));
   const [selectedProjectId, setSelectedProjectId] = useState(seedData.projects[0]?.id ?? "");
-  const [selectedGoalId, setSelectedGoalId] = useState("");
-  const [selectedAdrId, setSelectedAdrId] = useState("");
+  const [selectedGoalId] = useState("");
+  const [selectedAdrId] = useState("");
 
   const project = data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId)) ?? data.projects.find((item) => item.id === selectedProjectId) ?? data.projects[0];
   const goals = useMemo(() => data.goals.filter((goal) => goal.projectId === project?.id), [data.goals, project?.id]);
   const adrs = useMemo(() => data.adrs.filter((adr) => adr.projectId === project?.id), [data.adrs, project?.id]);
   const selectedGoal = goals.find((goal) => goal.id === selectedGoalId) ?? goals[0];
   const selectedAdr = adrs.find((adr) => adr.id === selectedAdrId) ?? adrs[0];
+  const projectDocumentTree = data.projectDocumentTree ?? [];
+  const selectedProjectDocument = useMemo(
+    () => findProjectTreeDocument(projectDocumentTree, route.documentPath),
+    [projectDocumentTree, route.documentPath]
+  );
+  const selectedAgent = useMemo(
+    () => data.agents.find((agent) => agent.relativePath === route.documentPath) ?? data.agents[0],
+    [data.agents, route.documentPath]
+  );
+  const selectedSkill = useMemo(
+    () => data.skills.find((skill) => skill.relativePath === route.documentPath) ?? data.skills[0],
+    [data.skills, route.documentPath]
+  );
 
   const navigate = (path: string) => {
     window.history.pushState({}, "", path);
@@ -715,7 +885,7 @@ export function App() {
   };
 
   useEffect(() => {
-    const onPopState = () => setRoute(routeFromPath(window.location.pathname));
+    const onPopState = () => setRoute(routeFromPath(`${window.location.pathname}${window.location.search}`));
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -735,6 +905,13 @@ export function App() {
     return saved;
   };
 
+  const saveProjectDocument = async (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => {
+    const saved = await api.saveProjectDocument(document);
+    await refresh();
+    setNotice("Saved.");
+    return saved;
+  };
+
   const remove = async (collection: SaveCollection | "events", id: string) => {
     await api.remove(collection, id);
     await refresh();
@@ -746,21 +923,17 @@ export function App() {
       <SidebarProvider>
         <AppSidebar
           route={route}
-          selectedProjectId={selectedProjectId}
-          goals={goals}
-          adrs={adrs}
-          selectedGoalId={selectedGoal?.id}
-          selectedAdrId={selectedAdr?.id}
-          onSelectGoal={setSelectedGoalId}
-          onSelectAdr={setSelectedAdrId}
+          projectDocumentTree={projectDocumentTree}
+          agents={data.agents}
+          skills={data.skills}
           navigate={navigate}
           themeMode={themeMode}
           onThemeModeChange={setThemeMode}
         />
         <SidebarInset>
           <ScrollArea className="h-svh">
-            <main className="flex min-h-svh flex-col gap-5 bg-muted/30 p-4 md:p-6">
-              <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <main className="flex min-h-svh flex-col gap-4 bg-muted/30 p-3 md:p-4">
+              <header className="flex flex-col gap-4 md:hidden">
                 <div className="flex items-start gap-2">
                   <SidebarTrigger className="md:hidden">
                     <Menu />
@@ -775,11 +948,14 @@ export function App() {
               {route.view === "projects" ? (
                 <ProjectsOverview
                   project={project}
+                  saveProjectDocument={saveProjectDocument}
                 />
               ) : null}
+              {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} /> : null}
               {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} /> : null}
               {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} /> : null}
-              {route.view === "agents" ? <AgentsView data={data} save={save} remove={remove} /> : null}
+              {route.view === "agents" ? <AgentsView agent={selectedAgent} save={save} remove={remove} navigate={navigate} /> : null}
+              {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView data={data} save={save} remove={remove} /> : null}
               {route.view === "policies" ? <PoliciesView data={data} project={project} save={save} remove={remove} /> : null}
               {route.view === "events" ? <EventsView data={data} project={project} refresh={refresh} remove={remove} /> : null}
@@ -791,9 +967,88 @@ export function App() {
   );
 }
 
-function ProjectsOverview({ project }: { project?: Project }) {
+function ProjectsOverview({
+  project,
+  saveProjectDocument
+}: {
+  project?: Project;
+  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+}) {
   return (
-    <MarkdownDocumentView document={project} emptyTitle="No project document found." />
+    <ProjectMarkdownEditorView document={project} emptyTitle="No project document found." saveProjectDocument={saveProjectDocument} />
+  );
+}
+
+function ProjectDocumentPage({
+  document,
+  saveProjectDocument
+}: {
+  document?: MarkdownDocument;
+  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+}) {
+  return (
+    <ProjectMarkdownEditorView document={document} emptyTitle="No project document selected." saveProjectDocument={saveProjectDocument} />
+  );
+}
+
+function ProjectMarkdownEditorView({
+  document,
+  emptyTitle,
+  saveProjectDocument
+}: {
+  document?: MarkdownEntity;
+  emptyTitle: string;
+  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+}) {
+  const [frontmatterText, setFrontmatterText] = useState(frontmatterToYaml(document?.frontmatter));
+  const [bodyText, setBodyText] = useState(document?.body ?? "");
+  const [validationError, setValidationError] = useState("");
+
+  useEffect(() => {
+    setFrontmatterText(frontmatterToYaml(document?.frontmatter));
+    setBodyText(document?.body ?? "");
+    setValidationError("");
+  }, [document]);
+
+  const handleSave = async () => {
+    if (!document?.relativePath) return;
+
+    try {
+      const frontmatter = parseFrontmatterYaml(frontmatterText);
+      setValidationError("");
+      await saveProjectDocument({
+        relativePath: document.relativePath,
+        frontmatter,
+        body: bodyText
+      });
+    } catch (err) {
+      setValidationError(err instanceof Error ? err.message : "Invalid project document.");
+    }
+  };
+
+  if (!document) return <EmptyState title={emptyTitle} />;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <Panel title="Edit Markdown" icon={<FileKey2 data-icon="inline-start" />} compact>
+        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
+          {validationError ? <Alert variant="destructive"><AlertDescription>{validationError}</AlertDescription></Alert> : null}
+          <FieldGroup>
+            <TextAreaField label="Frontmatter" rows={10} value={frontmatterText} onChange={setFrontmatterText} className="font-mono text-xs leading-relaxed" />
+            <TextAreaField label="Markdown" rows={18} value={bodyText} onChange={setBodyText} className="font-mono text-xs leading-relaxed" />
+          </FieldGroup>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="submit">
+              <Save data-icon="inline-start" />
+              Save Markdown
+            </Button>
+          </div>
+        </form>
+      </Panel>
+      <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
+        <MarkdownDocumentView document={document} emptyTitle={emptyTitle} compact embedded />
+      </Panel>
+    </div>
   );
 }
 
@@ -809,58 +1064,137 @@ function AdrsPage({ project, selectedAdr }: { project?: Project; selectedAdr?: A
   return <MarkdownDocumentView document={selectedAdr} emptyTitle="No ADR document selected." />;
 }
 
-function AgentsView({ data, save, remove }: ViewProps) {
-  const [form, setForm] = useState<Partial<Agent>>(agentTemplate());
-  const [skillsText, setSkillsText] = useState("");
-
-  const editAgent = (agent: Agent) => {
-    setForm(agent);
-    setSkillsText(agent.skills.map((skill) => `${skill.name} | ${skill.description} | ${toKeyValueLines(skill.metadata).replace(/\n/g, "; ")}`).join("\n"));
+const agentFrontmatterPreview = (agent?: Agent): Record<string, unknown> | undefined => {
+  if (!agent) return undefined;
+  return {
+    name: agent.frontmatter?.name ?? agent.name,
+    model: agent.frontmatter?.model ?? agent.model,
+    model_reasoning_effort: agent.frontmatter?.model_reasoning_effort ?? agent.modelReasoningEffort,
+    nickname_candidates: agent.frontmatter?.nickname_candidates ?? agent.nicknameCandidates
   };
+};
 
-  const parseSkills = (): Skill[] =>
-    skillsText.split("\n").map((line, index) => {
-      const [name = "", description = "", metadataText = ""] = line.split("|").map((part) => part.trim());
-      return {
-        id: form.skills?.[index]?.id ?? `skill-${Date.now()}-${index}`,
-        name,
-        description,
-        metadata: fromKeyValueLines(metadataText.replace(/;/g, "\n"))
-      };
-    }).filter((skill) => skill.name);
+function AgentDocumentView({ agent }: { agent?: Agent }) {
+  if (!agent) return <EmptyState title="No agent selected." />;
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(520px,1fr)_minmax(420px,1fr)]">
-      <Panel title="Agents" icon={<Bot data-icon="inline-start" />}>
-        <DataTable
-          empty="No agents yet."
-          columns={["Name", "Enabled", "Errors", "Skills", "Metadata", "Body"]}
-          rows={data.agents.map((agent) => ({
-            id: agent.id,
-            cells: [
-              agent.name,
-              agent.enabled ? "enabled" : "disabled",
-              <ErrorPreview errors={agent.errors} />,
-              String(agent.skills.length),
-              <MetadataPreview frontmatter={agent.frontmatter} />,
-              <BodyPreview body={agent.body} />
-            ],
-            onClick: () => editAgent(agent)
-          }))}
-        />
-      </Panel>
+    <div className="grid auto-rows-min gap-4 self-start">
+      <FrontmatterPanel frontmatter={agentFrontmatterPreview(agent)} />
+      <article className="min-w-0 rounded-lg border bg-card p-5 md:p-8">
+        {agent.errors?.length ? (
+          <header className="mb-6 flex min-w-0 flex-wrap items-center gap-2 border-b pb-5">
+            <ErrorPreview errors={agent.errors} />
+          </header>
+        ) : null}
+        <div className="flex flex-col gap-8">
+          <section className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold uppercase text-muted-foreground">description</h2>
+            {agent.description ? <p className="leading-relaxed">{agent.description}</p> : <p className="text-muted-foreground">empty</p>}
+          </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase text-muted-foreground">developer_instructions</h2>
+            <MarkdownBody source={agent.instructions} title={agent.name} />
+          </section>
+        </div>
+      </article>
+    </div>
+  );
+}
+
+function AgentsView({
+  agent,
+  save,
+  remove,
+  navigate
+}: {
+  agent?: Agent;
+  save: ViewProps["save"];
+  remove: ViewProps["remove"];
+  navigate: (path: string) => void;
+}) {
+  const [form, setForm] = useState<Partial<Agent>>(agent ?? agentTemplate());
+  const [nicknameText, setNicknameText] = useState(toListText(agent?.nicknameCandidates));
+
+  useEffect(() => {
+    setForm(agent ?? agentTemplate());
+    setNicknameText(toListText(agent?.nicknameCandidates));
+  }, [agent]);
+
+  const handleSave = async () => {
+    const saved = await save("agents", {
+      ...form,
+      nicknameCandidates: fromListText(nicknameText)
+    });
+    if (saved.relativePath) navigate(agentDocumentPath(saved.relativePath));
+  };
+
+  const handleDelete = async () => {
+    if (!form.id) return;
+    await remove("agents", form.id);
+    navigate("/agents");
+  };
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <Panel title={form.id ? "Update agent" : "Create agent"} icon={<Bot data-icon="inline-start" />}>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void save("agents", { ...form, skills: parseSkills() }); }}>
+        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
           <FieldGroup>
             <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
-            <SwitchField label="Enabled" checked={form.enabled ?? true} onChange={(enabled) => setForm({ ...form, enabled })} />
-            <TextAreaField label="Description" value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
-            <TextAreaField label="Instructions" rows={6} required value={form.instructions ?? ""} onChange={(instructions) => setForm({ ...form, instructions })} />
-            <TextAreaField label="Skills (name | description | key=value; key=value)" rows={6} value={skillsText} onChange={setSkillsText} />
+            <TextField label="Model" value={form.model ?? ""} onChange={(model) => setForm({ ...form, model })} />
+            <TextField label="Model reasoning effort" value={form.modelReasoningEffort ?? ""} onChange={(modelReasoningEffort) => setForm({ ...form, modelReasoningEffort })} />
+            <TextAreaField label="Nickname candidates" rows={4} value={nicknameText} onChange={setNicknameText} />
+            <TextAreaField label="Description" required value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
+            <TextAreaField label="Developer instructions" rows={10} required value={form.instructions ?? ""} onChange={(instructions) => setForm({ ...form, instructions })} />
           </FieldGroup>
-          <CrudActions newLabel="New" saveLabel="Save agent" id={form.id} onNew={() => { setForm(agentTemplate()); setSkillsText(""); }} onDelete={() => void remove("agents", form.id!)} />
+          <CrudActions newLabel="New" saveLabel="Save agent" id={form.id} onNew={() => { setForm(agentTemplate()); setNicknameText(""); }} onDelete={handleDelete} />
         </form>
       </Panel>
+      <AgentDocumentView agent={agent} />
+    </div>
+  );
+}
+
+function SkillsView({
+  skill,
+  save,
+  remove,
+  navigate
+}: {
+  skill?: Skill;
+  save: ViewProps["save"];
+  remove: ViewProps["remove"];
+  navigate: (path: string) => void;
+}) {
+  const [form, setForm] = useState<Partial<Skill>>(skill ?? skillTemplate());
+
+  useEffect(() => {
+    setForm(skill ?? skillTemplate());
+  }, [skill]);
+
+  const handleSave = async () => {
+    const saved = await save("skills", form);
+    if (saved.relativePath) navigate(skillDocumentPath(saved.relativePath));
+  };
+
+  const handleDelete = async () => {
+    if (!form.id) return;
+    await remove("skills", form.id);
+    navigate("/skills");
+  };
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <Panel title={form.id ? "Update skill" : "Create skill"} icon={<FileKey2 data-icon="inline-start" />}>
+        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
+          <FieldGroup>
+            <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
+            <TextAreaField label="Description" required value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
+            <TextAreaField label="Markdown" rows={14} value={form.body ?? ""} onChange={(body) => setForm({ ...form, body })} />
+          </FieldGroup>
+          <CrudActions newLabel="New" saveLabel="Save skill" id={form.id} onNew={() => setForm(skillTemplate())} onDelete={handleDelete} />
+        </form>
+      </Panel>
+      <MarkdownDocumentView document={skill} emptyTitle="No skill selected." />
     </div>
   );
 }

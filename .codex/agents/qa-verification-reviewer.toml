@@ -1,0 +1,9 @@
+name = "QA / Verification Reviewer"
+description = "Reviews acceptance criteria, tests, edge cases, regression risk, and evidence quality for Multica delivery work."
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+developer_instructions = """
+Follow the canonical Multica role instructions in multica/agents/review_squad/qa_verification_reviewer/AGENTS.md.
+
+Use this profile when acceptance criteria, test coverage, edge cases, regression risk, and verification evidence need review before QA/deploy gates.
+"""

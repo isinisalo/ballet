@@ -3,13 +3,18 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  loadBalletProjectTree,
+  loadSkills,
   markdownSource,
   parseMarkdownDocument,
+  parseTomlDocument,
   readMarkdownCollection,
   readMarkdownDocument,
+  readTomlDocument,
+  tomlSource,
   writeMarkdownDocument
 } from "../markdown.js";
-import { loadMarkdownAppData, writeEntityMarkdown } from "../markdown-adapter.js";
+import { loadMarkdownAppData, writeEntityMarkdown, writeProjectMarkdownDocument } from "../markdown-adapter.js";
 
 const fixtureRoot = path.resolve(process.cwd(), ".fixture-ballet-project");
 const tempRoots: string[] = [];
@@ -50,12 +55,37 @@ describe("Markdown parsing", () => {
   });
 });
 
+describe("TOML parsing", () => {
+  it("parses TOML agent config", () => {
+    const parsed = parseTomlDocument(`name = "Reviewer"\nmodel = "gpt-5.5"\nnickname_candidates = ["Atlas"]\n`);
+
+    expect(parsed.frontmatter.name).toBe("Reviewer");
+    expect(parsed.frontmatter.model).toBe("gpt-5.5");
+    expect(parsed.frontmatter.nickname_candidates).toEqual(["Atlas"]);
+    expect(parsed.errors).toBeUndefined();
+  });
+
+  it("serializes TOML config", () => {
+    const source = tomlSource({ name: "Reviewer", model: "gpt-5.5" });
+
+    expect(source).toContain('name = "Reviewer"');
+    expect(source).toContain('model = "gpt-5.5"');
+  });
+});
+
 describe("Markdown collection loading", () => {
   it("loads fixture collections from project-local .codex and .ballet folders", async () => {
     const data = await loadMarkdownAppData(fixtureRoot);
 
     expect(data.projectRoot).toBe(fixtureRoot);
     expect(data.agents.map((agent) => agent.id).sort()).toEqual(["architect", "reviewer"]);
+    expect(data.agents.find((agent) => agent.id === "architect")?.model).toBe("gpt-5.5");
+    expect(data.agents.find((agent) => agent.id === "architect")?.modelReasoningEffort).toBe("high");
+    expect(data.agents.find((agent) => agent.id === "architect")?.nicknameCandidates).toEqual(["Arch", "Atlas"]);
+    expect(data.agents.find((agent) => agent.id === "architect")?.instructions).toContain("Design architecture");
+    expect(data.skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
+    expect(data.skills[0]?.name).toBe("fixture-skill");
+    expect(data.skills[0]?.relativePath).toBe(".agents/skills/fixture-skill/SKILL.md");
     expect(data.projects[0]?.id).toBe("fixture-project");
     expect(data.projects[0]).not.toHaveProperty("key");
     expect(data.projects[0]?.name).toBe("Fixture Ballet Project");
@@ -74,13 +104,51 @@ describe("Markdown collection loading", () => {
     expect(data.documents?.project[0]?.relativePath).toBe(".ballet/project.md");
   });
 
-  it("supports .md and .mdx files", async () => {
-    const agents = await readMarkdownCollection({ root: fixtureRoot, collectionPath: ".codex/agents", collection: "agents" });
+  it("loads custom agents from .toml files", async () => {
+    const agent = await readTomlDocument({ root: fixtureRoot, relativePath: ".codex/agents/architect.toml", collection: "agents" });
 
-    expect(agents.map((agent) => agent.relativePath).sort()).toEqual([
-      ".codex/agents/architect.md",
-      ".codex/agents/reviewer.mdx"
-    ]);
+    expect(agent.id).toBe("architect");
+    expect(agent.title).toBe("Architect");
+    expect(agent.body).toContain("Design architecture");
+  });
+
+  it("loads repo skills from SKILL.md files with stable folder ids", async () => {
+    const skills = await loadSkills(fixtureRoot);
+
+    expect(skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
+    expect(skills[0]?.title).toBe("fixture-skill");
+  });
+
+  it("loads the .ballet project document tree up to two directory levels", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".ballet/adr/backend/deep"), { recursive: true });
+    await mkdir(path.join(root, ".ballet/goals"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/project.md"), "---\ntitle: Root Project\n---\n\nProject body", "utf8");
+    await writeFile(path.join(root, ".ballet/other.mdx"), "---\ntitle: Ignored MDX\n---\n\nBody", "utf8");
+    await writeFile(path.join(root, ".ballet/index.yaml"), "title: Ignored YAML\n", "utf8");
+    await writeFile(path.join(root, ".ballet/goals/goal.md"), "---\ntitle: Goal Title\n---\n\nGoal body", "utf8");
+    await writeFile(path.join(root, ".ballet/adr/root.md"), "---\ntitle: ADR Root\n---\n\nADR body", "utf8");
+    await writeFile(path.join(root, ".ballet/adr/backend/accepted.md"), "---\ntitle: Backend ADR\n---\n\nBackend body", "utf8");
+    await writeFile(path.join(root, ".ballet/adr/backend/deep/hidden.md"), "---\ntitle: Hidden ADR\n---\n\nHidden body", "utf8");
+
+    const tree = await loadBalletProjectTree(root);
+    const project = tree[0];
+    const adr = tree.find((node) => node.type === "directory" && node.label === "adr");
+    const goals = tree.find((node) => node.type === "directory" && node.label === "goals");
+    const backend = adr?.type === "directory"
+      ? adr.children.find((node) => node.type === "directory" && node.label === "backend")
+      : undefined;
+
+    expect(project?.type).toBe("file");
+    expect(project?.label).toBe("Root Project");
+    expect(tree.some((node) => node.type === "file" && node.label === "Ignored MDX")).toBe(false);
+    expect(tree.some((node) => node.type === "file" && node.label === "Ignored YAML")).toBe(false);
+    expect(goals?.type).toBe("directory");
+    expect(goals?.type === "directory" ? goals.children.map((node) => node.label) : []).toContain("Goal Title");
+    expect(adr?.type).toBe("directory");
+    expect(backend?.type).toBe("directory");
+    expect(backend?.type === "directory" ? backend.children.map((node) => node.label) : []).toContain("Backend ADR");
+    expect(backend?.type === "directory" ? backend.children.map((node) => node.label) : []).not.toContain("deep");
   });
 
   it("returns empty collections for missing directories", async () => {
@@ -114,7 +182,10 @@ describe("Markdown collection loading", () => {
   it("blocks path traversal outside the project root", async () => {
     await expect(readMarkdownDocument({ root: fixtureRoot, relativePath: "../package.json" })).rejects.toThrow("Path traversal blocked");
     await expect(readMarkdownDocument({ root: fixtureRoot, relativePath: "../outside.md" })).rejects.toThrow("Path traversal blocked");
+    await expect(readTomlDocument({ root: fixtureRoot, relativePath: "../outside.toml" })).rejects.toThrow("Path traversal blocked");
     await expect(writeMarkdownDocument({ root: fixtureRoot, relativePath: "../outside.md", frontmatter: {}, body: "" })).rejects.toThrow("Path traversal blocked");
+    await expect(writeEntityMarkdown(fixtureRoot, "agents", { relativePath: "../outside.toml", name: "Bad", description: "Bad", instructions: "Bad" })).rejects.toThrow("Path traversal blocked");
+    await expect(writeEntityMarkdown(fixtureRoot, "skills", { relativePath: "../SKILL.md", name: "Bad", description: "Bad", body: "Bad" })).rejects.toThrow("Path traversal blocked");
   });
 
   it("writes Markdown inside the active project root", async () => {
@@ -159,5 +230,122 @@ describe("Markdown collection loading", () => {
     expect(source).not.toContain("title:");
     expect(source).not.toContain("description:");
     expect(source).toContain("---\n\nMarkdown project description.");
+  });
+
+  it("saves the root Ballet project Markdown document in place", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".ballet"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\ncustom: kept\n---\n\nOld body", "utf8");
+
+    const saved = await writeProjectMarkdownDocument(root, {
+      relativePath: ".ballet/project.md",
+      frontmatter: { id: "project", title: "Updated Project", custom: "kept" },
+      body: "Updated body"
+    });
+    const source = await readFile(path.join(root, ".ballet/project.md"), "utf8");
+
+    expect(saved.relativePath).toBe(".ballet/project.md");
+    expect(saved.frontmatter.title).toBe("Updated Project");
+    expect(source).toContain("custom: kept");
+    expect(source).toContain("title: Updated Project");
+    expect(source).toContain("Updated body");
+  });
+
+  it("saves nested Ballet project tree Markdown documents in place", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".ballet/goals"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/goals/goal.md"), "---\ntitle: Old Goal\nowner: team\n---\n\nOld goal", "utf8");
+
+    const saved = await writeProjectMarkdownDocument(root, {
+      relativePath: ".ballet/goals/goal.md",
+      frontmatter: { title: "Updated Goal", owner: "team" },
+      body: "Updated goal"
+    });
+
+    expect(saved.relativePath).toBe(".ballet/goals/goal.md");
+    expect(saved.title).toBe("Updated Goal");
+    expect(saved.frontmatter.owner).toBe("team");
+    expect(saved.body).toContain("Updated goal");
+  });
+
+  it("rejects non-project or non-markdown project document writes", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".ballet"), { recursive: true });
+    await mkdir(path.join(root, ".agents/skills/test"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/project.md"), "---\ntitle: Project\n---\n\nBody", "utf8");
+    await writeFile(path.join(root, ".ballet/project.mdx"), "---\ntitle: Project\n---\n\nBody", "utf8");
+    await writeFile(path.join(root, ".agents/skills/test/SKILL.md"), "---\nname: test\n---\n\nBody", "utf8");
+
+    await expect(writeProjectMarkdownDocument(root, {
+      relativePath: "../outside.md",
+      frontmatter: {},
+      body: ""
+    })).rejects.toThrow("Path traversal blocked");
+    await expect(writeProjectMarkdownDocument(root, {
+      relativePath: ".agents/skills/test/SKILL.md",
+      frontmatter: {},
+      body: ""
+    })).rejects.toThrow("Project document must be inside .ballet.");
+    await expect(writeProjectMarkdownDocument(root, {
+      relativePath: ".ballet/project.mdx",
+      frontmatter: {},
+      body: ""
+    })).rejects.toThrow("Project document must be a .md file.");
+    await expect(writeProjectMarkdownDocument(root, {
+      relativePath: ".ballet/missing.md",
+      frontmatter: {},
+      body: ""
+    })).rejects.toThrow();
+  });
+
+  it("writes TOML agents while preserving unknown nested config", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".codex/agents"), { recursive: true });
+    await writeFile(path.join(root, ".codex/agents/reviewer.toml"), "name = \"Reviewer\"\ndescription = \"Old\"\ndeveloper_instructions = \"Old instructions\"\n\n[mcp_servers.docs]\nurl = \"https://example.test/mcp\"\n", "utf8");
+
+    await writeEntityMarkdown(root, "agents", {
+      id: "reviewer",
+      name: "Reviewer",
+      description: "Updated",
+      instructions: "Updated instructions",
+      model: "gpt-5.5",
+      modelReasoningEffort: "high",
+      nicknameCandidates: ["Atlas"],
+      relativePath: ".codex/agents/reviewer.toml",
+      frontmatter: {
+        name: "Reviewer",
+        description: "Old",
+        developer_instructions: "Old instructions",
+        mcp_servers: { docs: { url: "https://example.test/mcp" } }
+      }
+    });
+
+    const source = await readFile(path.join(root, ".codex/agents/reviewer.toml"), "utf8");
+
+    expect(source).toContain('description = "Updated"');
+    expect(source).toContain('model = "gpt-5.5"');
+    expect(source).toContain('model_reasoning_effort = "high"');
+    expect(source).toContain('nickname_candidates = [ "Atlas" ]');
+    expect(source).toContain("[mcp_servers.docs]");
+    expect(source).toContain('url = "https://example.test/mcp"');
+  });
+
+  it("writes skills while preserving unrelated frontmatter", async () => {
+    const root = await tempRoot();
+
+    await writeEntityMarkdown(root, "skills", {
+      id: "fixture-skill",
+      name: "fixture-skill",
+      description: "Updated skill",
+      body: "# Updated\n\nInstructions.",
+      frontmatter: { name: "fixture-skill", description: "Old", category: "fixture" }
+    });
+
+    const source = await readFile(path.join(root, ".agents/skills/fixture-skill/SKILL.md"), "utf8");
+
+    expect(source).toContain("name: fixture-skill");
+    expect(source).toContain("description: Updated skill");
+    expect(source).toContain("category: fixture");
+    expect(source).toContain("# Updated");
   });
 });

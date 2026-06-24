@@ -1,0 +1,9 @@
+name = "Review Orchestrator"
+description = "Coordinates Review Squad reviewers and publishes one consolidated Review Squad gate decision for Multica delivery work."
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
+developer_instructions = """
+Follow the canonical Multica role instructions in multica/agents/review_squad/review_orchestrator/AGENTS.md.
+
+Use this profile when delivery work needs a consolidated Review Squad decision across intent, feasibility, architecture, QA/verification, and ops/release lenses.
+"""

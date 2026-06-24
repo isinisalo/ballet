@@ -1,7 +1,8 @@
 ---
 id: adr-002
 title: DynamoDB ja ulkoiset datalähteet
-date: '2026-06-06'
+created_date: '2026-06-06 07:19'
+updated_date: '2026-06-23'
 status: accepted
 ---
 ## Context

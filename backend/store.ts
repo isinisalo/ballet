@@ -1,15 +1,15 @@
 import { v4 as uuid } from "uuid";
-import type { AppData, CollectionName, EventRecord, Runtime } from "./shared/domain.js";
+import type { AppData, CollectionName, EventRecord, MarkdownDocument, Runtime } from "./shared/domain.js";
 import { routeEvent } from "./shared/policy.js";
 import { getProjectRoot } from "./markdown.js";
-import { loadMarkdownAppData, removeEntityMarkdown, runtimeDefaults, writeEntityMarkdown } from "./markdown-adapter.js";
+import { loadMarkdownAppData, removeEntityMarkdown, runtimeDefaults, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
 
 const timestamp = () => new Date().toISOString();
 const cloneData = (data: AppData): AppData => JSON.parse(JSON.stringify(data)) as AppData;
 
 type MutableMarkdownCollection = Exclude<CollectionName, "runtimes">;
 
-const markdownCollections = new Set<CollectionName>(["projects", "goals", "adrs", "agents", "policies", "events"]);
+const markdownCollections = new Set<CollectionName>(["projects", "goals", "adrs", "agents", "skills", "policies", "events"]);
 
 export class MarkdownStore {
   private runtimes: Runtime[] = runtimeDefaults();
@@ -71,6 +71,14 @@ export class MarkdownStore {
     const relativePath = typeof target?.relativePath === "string" ? target.relativePath : undefined;
     if (!relativePath) return;
     await removeEntityMarkdown(this.root, relativePath);
+  }
+
+  async saveProjectDocument(input: {
+    relativePath: string;
+    frontmatter: Record<string, unknown>;
+    body: string;
+  }): Promise<MarkdownDocument> {
+    return writeProjectMarkdownDocument(this.root, input);
   }
 
   async createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {

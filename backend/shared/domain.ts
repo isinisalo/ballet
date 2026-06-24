@@ -15,6 +15,19 @@ export interface MarkdownDocument {
   errors?: string[];
 }
 
+export type ProjectDocumentTreeNode =
+  | {
+    type: "file";
+    label: string;
+    document: MarkdownDocument;
+  }
+  | {
+    type: "directory";
+    label: string;
+    relativePath: string;
+    children: ProjectDocumentTreeNode[];
+  };
+
 export interface MarkdownBackedEntity {
   frontmatter?: Record<string, unknown>;
   body?: string;
@@ -76,6 +89,11 @@ export interface Skill {
   name: string;
   description: string;
   metadata: Record<string, string>;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
 }
 
 export interface Agent {
@@ -87,6 +105,9 @@ export interface Agent {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+  model?: string;
+  modelReasoningEffort?: string;
+  nicknameCandidates?: string[];
   frontmatter?: Record<string, unknown>;
   body?: string;
   relativePath?: string;
@@ -150,21 +171,24 @@ export interface AppData {
   goals: Goal[];
   adrs: Adr[];
   agents: Agent[];
+  skills: Skill[];
   runtimes: Runtime[];
   policies: Policy[];
   events: EventRecord[];
+  projectDocumentTree?: ProjectDocumentTreeNode[];
   documents?: {
     project: MarkdownDocument[];
     goals: MarkdownDocument[];
     adr: MarkdownDocument[];
     agents: MarkdownDocument[];
+    skills: MarkdownDocument[];
     events: MarkdownDocument[];
     policies: MarkdownDocument[];
   };
   projectRoot?: string;
 }
 
-export type CollectionName = "projects" | "goals" | "adrs" | "agents" | "runtimes" | "policies" | "events";
+export type CollectionName = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
 
 export interface RouteResult {
   status: EventStatus;

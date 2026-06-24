@@ -1,6 +1,6 @@
 ---
 id: ballet
-name: Ballet
+title: Ballet
 status: active
 createdAt: 2026-06-24
 tags:

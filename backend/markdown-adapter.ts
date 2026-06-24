@@ -1,7 +1,7 @@
 import path from "node:path";
-import { unlink } from "node:fs/promises";
+import { stat, unlink } from "node:fs/promises";
 import type { Adr, AdrStatus, Agent, AppData, EntityStatus, EventRecord, EventStatus, Goal, MarkdownDocument, Policy, Project, Runtime, Skill } from "./shared/domain.js";
-import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadEvents, loadGoals, loadPolicies, safeSlug, writeMarkdownDocument } from "./markdown.js";
+import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadEvents, loadGoals, loadPolicies, loadSkills, readMarkdownDocument, safeSlug, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
 
 const now = () => new Date().toISOString();
 
@@ -92,11 +92,24 @@ const agentFromDocument = (doc: MarkdownDocument): Agent => {
     id: doc.id,
     name: stringValue(fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
     description: stringValue(fm.description, bodyPreview(doc.body)),
-    instructions: stringValue(fm.instructions, doc.body),
+    instructions: stringValue(fm.developer_instructions ?? fm.instructions, doc.body),
     skills,
     enabled: booleanValue(fm.enabled, true),
     createdAt: dateValue(fm.createdAt),
-    updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
+    updatedAt: dateValue(fm.updatedAt ?? fm.createdAt),
+    model: stringValue(fm.model) || undefined,
+    modelReasoningEffort: stringValue(fm.model_reasoning_effort) || undefined,
+    nicknameCandidates: stringArray(fm.nickname_candidates)
+  }, doc);
+};
+
+const skillDocumentFromDocument = (doc: MarkdownDocument): Skill => {
+  const fm = doc.frontmatter;
+  return attachDocument({
+    id: doc.id,
+    name: stringValue(fm.name, doc.title ?? doc.slug),
+    description: stringValue(fm.description, bodyPreview(doc.body)),
+    metadata: Object.fromEntries(Object.entries(fm).filter(([key]) => !["id", "name", "description"].includes(key)).map(([key, value]) => [key, stringValue(value)]))
   }, doc);
 };
 
@@ -151,9 +164,11 @@ export const runtimeDefaults = (): Runtime[] => [
 ];
 
 export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
-  const [projectDocs, agentDocs, adrDocs, goalDocs, eventDocs, policyDocs] = await Promise.all([
+  const [projectDocs, projectDocumentTree, agentDocs, skillDocs, adrDocs, goalDocs, eventDocs, policyDocs] = await Promise.all([
     loadBalletProject(root),
+    loadBalletProjectTree(root),
     loadAgents(root),
+    loadSkills(root),
     loadAdr(root),
     loadGoals(root),
     loadEvents(root),
@@ -171,12 +186,15 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
     goals: goalDocs.map((doc) => goalFromDocument(doc, defaultProjectId)),
     adrs: adrDocs.map((doc) => adrFromDocument(doc, defaultProjectId)),
     agents,
+    skills: skillDocs.map(skillDocumentFromDocument),
     runtimes: runtimeDefaults(),
     policies: policyDocs.map((doc) => policyFromDocument(doc, defaultProjectId, firstAgentId)),
     events: eventDocs.map((doc) => eventFromDocument(doc, defaultProjectId)),
+    projectDocumentTree,
     documents: {
       project: projectDocs,
       agents: agentDocs,
+      skills: skillDocs,
       adr: adrDocs,
       goals: goalDocs,
       events: eventDocs,
@@ -190,6 +208,7 @@ const collectionFolder: Record<string, string> = {
   goals: ".ballet/goals",
   adrs: ".ballet/adr",
   agents: ".codex/agents",
+  skills: ".agents/skills",
   policies: ".ballet/policies",
   events: ".ballet/events"
 };
@@ -199,6 +218,7 @@ const collectionName: Record<string, string> = {
   goals: "goals",
   adrs: "adr",
   agents: "agents",
+  skills: "skills",
   policies: "policies",
   events: "events"
 };
@@ -226,18 +246,109 @@ const projectFrontmatter = (item: Record<string, unknown>, id: string): Record<s
   return frontmatter;
 };
 
+const agentFrontmatter = (item: Record<string, unknown>): Record<string, unknown> => {
+  const base = isRecord(item.frontmatter) ? { ...item.frontmatter } : {};
+  const model = stringValue(item.model ?? base.model);
+  const modelReasoningEffort = stringValue(item.model_reasoning_effort ?? item.modelReasoningEffort ?? base.model_reasoning_effort);
+  const nicknameCandidates = Array.isArray(item.nickname_candidates)
+    ? stringArray(item.nickname_candidates)
+    : Array.isArray(item.nicknameCandidates)
+      ? stringArray(item.nicknameCandidates)
+      : stringArray(base.nickname_candidates);
+
+  const next: Record<string, unknown> = {
+    ...base,
+    name: stringValue(item.name ?? base.name),
+    description: stringValue(item.description ?? base.description),
+    developer_instructions: stringValue(item.developer_instructions ?? item.instructions ?? base.developer_instructions)
+  };
+
+  if (model) next.model = model;
+  else delete next.model;
+  if (modelReasoningEffort) next.model_reasoning_effort = modelReasoningEffort;
+  else delete next.model_reasoning_effort;
+  if (nicknameCandidates.length > 0) next.nickname_candidates = nicknameCandidates;
+  else delete next.nickname_candidates;
+
+  return next;
+};
+
+const skillFrontmatter = (item: Record<string, unknown>): Record<string, unknown> => {
+  const base = isRecord(item.frontmatter) ? { ...item.frontmatter } : {};
+  return {
+    ...base,
+    name: stringValue(item.name ?? base.name),
+    description: stringValue(item.description ?? base.description)
+  };
+};
+
 export const writeEntityMarkdown = async (root: string, collection: keyof typeof collectionFolder, item: Record<string, unknown>): Promise<Record<string, unknown>> => {
   const id = stringValue(item.id, safeSlug(stringValue(item.title ?? item.name, collectionName[collection])));
   const existingPath = stringValue(item.relativePath);
-  const filename = `${safeSlug(id)}.md`;
-  const relativePath = collection === "projects" ? ".ballet/project.md" : existingPath || path.posix.join(collectionFolder[collection], filename);
-  const frontmatter = collection === "projects" ? projectFrontmatter(item, id) : entityFrontmatter(item, id);
+  const markdownFilename = `${safeSlug(id)}.md`;
+  const relativePath = collection === "projects"
+    ? ".ballet/project.md"
+    : collection === "agents"
+      ? existingPath || path.posix.join(collectionFolder[collection], `${safeSlug(stringValue(item.name, id))}.toml`)
+      : collection === "skills"
+        ? existingPath || path.posix.join(collectionFolder[collection], safeSlug(stringValue(item.name, id)), "SKILL.md")
+        : existingPath || path.posix.join(collectionFolder[collection], markdownFilename);
+  const frontmatter = collection === "projects"
+    ? projectFrontmatter(item, id)
+    : collection === "agents"
+      ? agentFrontmatter(item)
+      : collection === "skills"
+        ? skillFrontmatter(item)
+        : entityFrontmatter(item, id);
   const body = collection === "projects" ? projectBody(item) : entityBody(item);
-  await writeMarkdownDocument({ root, relativePath, frontmatter, body });
+  if (collection === "agents") {
+    await writeTomlDocument({ root, relativePath, frontmatter });
+  } else {
+    await writeMarkdownDocument({ root, relativePath, frontmatter, body });
+  }
   return { ...item, id, frontmatter, relativePath, slug: safeSlug(path.basename(relativePath, path.extname(relativePath))) };
 };
 
 export const removeEntityMarkdown = async (root: string, relativePath: string): Promise<void> => {
   const absolutePath = assertInsideRoot(root, relativePath);
   await unlink(absolutePath);
+};
+
+export const writeProjectMarkdownDocument = async (
+  root: string,
+  input: {
+    relativePath: string;
+    frontmatter: Record<string, unknown>;
+    body: string;
+  }
+): Promise<MarkdownDocument> => {
+  const absolutePath = assertInsideRoot(root, input.relativePath);
+  const balletRoot = assertInsideRoot(root, ".ballet");
+  const relativeToBallet = path.relative(balletRoot, absolutePath);
+
+  if (relativeToBallet.startsWith("..") || path.isAbsolute(relativeToBallet)) {
+    throw new Error("Project document must be inside .ballet.");
+  }
+
+  if (path.extname(absolutePath).toLowerCase() !== ".md") {
+    throw new Error("Project document must be a .md file.");
+  }
+
+  const existing = await stat(absolutePath);
+  if (!existing.isFile()) {
+    throw new Error("Project document must be an existing file.");
+  }
+
+  await writeMarkdownDocument({
+    root,
+    relativePath: input.relativePath,
+    frontmatter: input.frontmatter,
+    body: input.body
+  });
+
+  return readProjectMarkdownDocument(root, input.relativePath);
+};
+
+const readProjectMarkdownDocument = async (root: string, relativePath: string): Promise<MarkdownDocument> => {
+  return readMarkdownDocument({ root, relativePath, collection: "project" });
 };

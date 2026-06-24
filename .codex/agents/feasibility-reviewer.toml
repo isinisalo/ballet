@@ -1,0 +1,9 @@
+name = "Feasibility Reviewer"
+description = "Reviews feasibility, dependencies, risks, work size, and unclear assumptions for Multica plans and delivery work."
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+developer_instructions = """
+Follow the canonical Multica role instructions in multica/agents/review_squad/feasibility_reviewer/AGENTS.md.
+
+Use this profile when a proposal, implementation plan, or implementation evidence needs feasibility, dependency, risk, effort, or assumption review.
+"""

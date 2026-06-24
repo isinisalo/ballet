@@ -92,6 +92,7 @@ export const seedData: AppData = {
       ]
     }
   ],
+  skills: [],
   runtimes: [
     {
       id: "runtime-codex",
