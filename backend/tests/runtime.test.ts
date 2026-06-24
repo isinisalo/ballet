@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, AgentOutcome, Policy } from "../shared/domain.js";
+import type { Agent, AgentOutcome, EventDefinition, Policy } from "../shared/domain.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
 import { checksPassRequiredGate, mapOutcomeToDomainEvent, parseAgentOutcomeText } from "../runtime-policy.js";
 import { policyVersion } from "../shared/policy.js";
@@ -100,6 +100,39 @@ const readyOutcome: AgentOutcome = {
     changed_files: ["backend/runtime-db.ts"]
   },
   checks: [{ name: "unit-tests", status: "passed" }]
+};
+
+const changeImplementedDefinition: EventDefinition = {
+  id: "change-implemented-v1",
+  name: "Change implemented",
+  description: "Developer agent completed an implementation.",
+  active: true,
+  eventType: "change.implemented.v1",
+  source: "agentd",
+  tags: ["delivery"],
+  producers: [{
+    agentRole: "developer-agent",
+    outcomes: ["ready"],
+    requires: {
+      gitCommitExists: true,
+      requiredChecksPassed: true
+    }
+  }],
+  payloadExample: {},
+  createdAt: "2026-06-24T08:00:00.000Z",
+  updatedAt: "2026-06-24T08:00:00.000Z"
+};
+
+const reviewApprovedDefinition: EventDefinition = {
+  ...changeImplementedDefinition,
+  id: "review-approved-v1",
+  name: "Review approved",
+  description: "Reviewer approved a change.",
+  eventType: "review.approved.v1",
+  producers: [{
+    agentRole: "architecture-reviewer",
+    outcomes: ["approved"]
+  }]
 };
 
 describe("runtime database", () => {
@@ -297,14 +330,18 @@ describe("runtime outcome policy", () => {
     expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
       gitCommitExists: false,
       requiredChecksPassed: true
-    })).toBeUndefined();
+    }, [changeImplementedDefinition])).toBeUndefined();
     expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
       gitCommitExists: true,
       requiredChecksPassed: true
-    })?.type).toBe("change.implemented.v1");
+    }, [])).toBeUndefined();
+    expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
+      gitCommitExists: true,
+      requiredChecksPassed: true
+    }, [changeImplementedDefinition])?.type).toBe("change.implemented.v1");
   });
 
-  it("prevents reviewer roles from producing implemented change events", () => {
+  it("maps reviewer roles only through matching event definitions", () => {
     const mapping = mapOutcomeToDomainEvent("architecture-reviewer", {
       outcome: "approved",
       summary: "Looks good.",
@@ -312,7 +349,7 @@ describe("runtime outcome policy", () => {
     }, {
       gitCommitExists: true,
       requiredChecksPassed: true
-    });
+    }, [changeImplementedDefinition, reviewApprovedDefinition]);
 
     expect(mapping?.type).toBe("review.approved.v1");
   });

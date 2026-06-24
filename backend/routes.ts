@@ -1,9 +1,9 @@
 import express from "express";
 import type { CollectionName } from "./shared/domain.js";
-import { store } from "./store.js";
+import { EventValidationError, store } from "./store.js";
 import { onRuntimeChanged } from "./runtime-events.js";
 
-const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "skills", "runtimes", "policies", "events"];
+const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "skills", "runtimes", "policies"];
 const collectionSet = new Set(collections);
 
 export const apiRouter = express.Router();
@@ -90,6 +90,32 @@ apiRouter.get("/events", async (_req, res, next) => {
   }
 });
 
+apiRouter.get("/event-definitions", async (_req, res, next) => {
+  try {
+    res.json(await store.listEventDefinitions());
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.post("/event-definitions", async (req, res, next) => {
+  try {
+    const saved = await store.saveEventDefinition(req.body);
+    res.status(req.body.id ? 200 : 201).json(saved);
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.delete("/event-definitions/:id", async (req, res, next) => {
+  try {
+    await store.removeEventDefinition(req.params.id);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 apiRouter.get("/agent-runs", (_req, res, next) => {
   try {
     res.json(store.listAgentRuns());
@@ -133,6 +159,18 @@ apiRouter.post("/events/intake", async (req, res, next) => {
 
     const event = await store.createEvent(req.body);
     res.status(201).json(event);
+  } catch (error) {
+    if (error instanceof EventValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+apiRouter.delete("/events/:id", async (req, res, next) => {
+  try {
+    await store.remove("events", req.params.id);
+    res.status(204).end();
   } catch (error) {
     next(error);
   }

@@ -1,19 +1,21 @@
-import { v4 as uuid } from "uuid";
-import type { AgentRunLog, AppData, CollectionName, EventRecord, MarkdownDocument, Runtime } from "./shared/domain.js";
+import type { AgentRunLog, AppData, CollectionName, EventDefinition, EventRecord, MarkdownDocument } from "./shared/domain.js";
 import { getProjectRoot } from "./markdown.js";
-import { loadMarkdownAppData, removeEntityMarkdown, runtimeDefaults, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
+import { loadMarkdownAppData, removeEntityMarkdown, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
 import { RuntimeDatabase, resolveRuntimeDbPath } from "./runtime-db.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 
-const timestamp = () => new Date().toISOString();
-const cloneData = (data: AppData): AppData => JSON.parse(JSON.stringify(data)) as AppData;
+type MutableMarkdownCollection = Exclude<CollectionName, "events"> | "eventDefinitions";
 
-type MutableMarkdownCollection = Exclude<CollectionName, "runtimes">;
+const markdownCollections = new Set<MutableMarkdownCollection>(["projects", "goals", "adrs", "agents", "skills", "runtimes", "policies", "eventDefinitions"]);
 
-const markdownCollections = new Set<CollectionName>(["projects", "goals", "adrs", "agents", "skills", "policies", "events"]);
+export class EventValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EventValidationError";
+  }
+}
 
 export class MarkdownStore {
-  private runtimes: Runtime[] = runtimeDefaults();
   private runtimeDb?: RuntimeDatabase;
   private runtimeDbPath?: string;
 
@@ -23,7 +25,6 @@ export class MarkdownStore {
 
   async read(): Promise<AppData> {
     const data = await loadMarkdownAppData(this.root);
-    data.runtimes = cloneData({ ...data, runtimes: this.runtimes }).runtimes;
     data.events = this.db().listEventRecords();
     data.agentRuns = this.db().listRuns();
     return data;
@@ -38,22 +39,16 @@ export class MarkdownStore {
     return data[collection];
   }
 
+  async listEventDefinitions(): Promise<EventDefinition[]> {
+    const data = await this.read();
+    return data.eventDefinitions;
+  }
+
   async upsert<T extends CollectionName>(
     collection: T,
     item: Partial<AppData[T][number]> & { id?: string }
   ): Promise<AppData[T][number]> {
-    if (collection === "runtimes") {
-      const id = item.id ?? uuid();
-      const now = timestamp();
-      const index = this.runtimes.findIndex((runtime) => runtime.id === id);
-      const existing = index >= 0 ? this.runtimes[index] : { id, createdAt: now };
-      const next = { ...existing, ...item, id, updatedAt: now, createdAt: existing.createdAt ?? now } as Runtime;
-      if (index >= 0) this.runtimes[index] = next;
-      else this.runtimes.unshift(next);
-      return next as AppData[T][number];
-    }
-
-    if (!markdownCollections.has(collection)) {
+    if (!markdownCollections.has(collection as MutableMarkdownCollection)) {
       throw new Error(`Unsupported collection: ${collection}`);
     }
 
@@ -66,22 +61,10 @@ export class MarkdownStore {
   }
 
   async remove(collection: CollectionName, id: string): Promise<void> {
-    if (collection === "runtimes") {
-      this.runtimes = this.runtimes.filter((runtime) => runtime.id !== id);
-      return;
-    }
-
     if (collection === "events") {
-      const markdownData = await loadMarkdownAppData(this.root);
-      const markdownEvent = markdownData.events.find((item) => item.id === id);
-      if (markdownEvent?.relativePath) {
-        await removeEntityMarkdown(this.root, markdownEvent.relativePath);
-        return;
-      } else {
-        this.db().deleteEvent(id);
-        notifyRuntimeChanged("events");
-        return;
-      }
+      this.db().deleteEvent(id);
+      notifyRuntimeChanged("events");
+      return;
     }
 
     const data = await this.read();
@@ -89,6 +72,22 @@ export class MarkdownStore {
     const relativePath = typeof target?.relativePath === "string" ? target.relativePath : undefined;
     if (!relativePath) return;
     await removeEntityMarkdown(this.root, relativePath);
+  }
+
+  async saveEventDefinition(item: Partial<EventDefinition> & { id?: string }): Promise<EventDefinition> {
+    const data = await this.read();
+    const existing = data.eventDefinitions.find((candidate) => candidate.id === item.id);
+    const nextInput = { ...existing, ...item } as Record<string, unknown>;
+    const saved = await writeEntityMarkdown(this.root, "eventDefinitions", nextInput);
+    const refreshed = await this.read();
+    return refreshed.eventDefinitions.find((candidate) => candidate.id === saved.id) ?? (saved as unknown as EventDefinition);
+  }
+
+  async removeEventDefinition(id: string): Promise<void> {
+    const data = await this.read();
+    const target = data.eventDefinitions.find((item) => item.id === id);
+    if (!target?.relativePath) return;
+    await removeEntityMarkdown(this.root, target.relativePath);
   }
 
   async saveProjectDocument(input: {
@@ -101,6 +100,12 @@ export class MarkdownStore {
 
   async createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {
     const data = await this.read();
+    const hasActiveDefinition = data.eventDefinitions.some((definition) =>
+      definition.active && definition.eventType === input.eventType
+    );
+    if (!hasActiveDefinition) {
+      throw new EventValidationError(`Unknown or inactive event type: ${input.eventType}`);
+    }
     const result = this.db().intakeEvent({
       projectId: input.projectId,
       eventType: input.eventType,

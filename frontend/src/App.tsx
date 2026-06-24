@@ -29,7 +29,7 @@ import {
   UserRound,
   type LucideIcon
 } from "lucide-react";
-import type { Adr, Agent, AgentRun, AgentRunLog, AppData, EventRecord, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
+import type { Adr, Agent, AgentRun, AgentRunLog, AppData, EventDefinition, EventRecord, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -67,7 +67,7 @@ import { cn } from "@/lib/utils";
 import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
 
 type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "agents" | "skills" | "runtimes" | "policies" | "events" | "agent-runs";
-type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
+type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies";
 
 interface RouteState {
   view: View;
@@ -83,13 +83,12 @@ const emptyData: AppData = {
   skills: [],
   runtimes: [],
   policies: [],
+  eventDefinitions: [],
   events: [],
   agentRuns: [],
   projectDocumentTree: []
 };
 
-const toCsv = (values: string[]) => values.join(", ");
-const fromCsv = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 const toKeyValueLines = (values: Record<string, string>) => Object.entries(values).map(([key, item]) => `${key}=${item}`).join("\n");
 const fromKeyValueLines = (value: string) =>
   Object.fromEntries(
@@ -104,12 +103,38 @@ const fromKeyValueLines = (value: string) =>
       .filter(([key]) => key)
   );
 
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
 const parsePayload = (value: string): Record<string, unknown> => {
   const parsed = JSON.parse(value) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Payload must be a JSON object.");
   }
   return parsed as Record<string, unknown>;
+};
+
+const parseJsonArray = (value: string): unknown[] => {
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("Value must be a JSON array.");
+  }
+  return parsed;
+};
+
+const parseEventProducers = (value: string): EventDefinition["producers"] => {
+  const producers = parseJsonArray(value);
+  return producers.map((producer) => {
+    if (!isPlainRecord(producer) || typeof producer.agentRole !== "string" || !Array.isArray(producer.outcomes)) {
+      throw new Error("Each producer must include agentRole and outcomes.");
+    }
+
+    return {
+      agentRole: producer.agentRole,
+      outcomes: producer.outcomes.map(String) as EventDefinition["producers"][number]["outcomes"],
+      requires: isPlainRecord(producer.requires) ? producer.requires as EventDefinition["producers"][number]["requires"] : undefined
+    };
+  });
 };
 
 const readJson = (value: unknown) => JSON.stringify(value, null, 2);
@@ -180,6 +205,18 @@ const policyTemplate = (targetAgentId: string): Partial<Policy> => ({
   targetAgentId
 });
 
+const eventDefinitionTemplate = (): Partial<EventDefinition> => ({
+  name: "",
+  description: "",
+  active: true,
+  eventType: "",
+  source: "agentd",
+  tags: [],
+  producers: [],
+  payloadExample: {},
+  body: ""
+});
+
 const payloadMetadataToMatchPayload = (metadata?: Record<string, string>) =>
   Object.fromEntries(Object.entries(metadata ?? {}).map(([key, value]) => [key, { operator: "equals" as const, value }]));
 
@@ -202,16 +239,15 @@ const parsePolicyMatch = (value: string): NonNullable<Policy["match"]> => {
   return parsed as NonNullable<Policy["match"]>;
 };
 
-const eventTemplate = (projectId: string): Partial<EventRecord> & Pick<EventRecord, "projectId" | "eventType"> => ({
+const eventTemplate = (
+  projectId: string,
+  definition?: EventDefinition
+): Partial<EventRecord> & Pick<EventRecord, "projectId" | "eventType"> => ({
   projectId,
-  source: "runtime-codex",
-  eventType: "plan.approved.v1",
-  tags: ["delivery"],
-  payload: {
-    work_item_id: "work-1",
-    plan_id: "plan-1",
-    summary: "Approved change plan."
-  }
+  source: definition?.source && definition.source !== "*" ? definition.source : "manual-dashboard",
+  eventType: definition?.eventType ?? "",
+  tags: definition?.tags ?? [],
+  payload: definition?.payloadExample ?? {}
 });
 
 const routeFromPath = (path: string): RouteState => {
@@ -229,9 +265,9 @@ const routeFromPath = (path: string): RouteState => {
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
-  if (url.pathname === "/runtimes") return { view: "runtimes" };
+  if (url.pathname === "/runtimes") return { view: "runtimes", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/policies") return { view: "policies", documentPath: url.searchParams.get("path") ?? undefined };
-  if (url.pathname === "/events") return { view: "events" };
+  if (url.pathname === "/events") return { view: "events", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/agent-runs") return { view: "agent-runs" };
   return { view: "projects" };
 };
@@ -239,7 +275,9 @@ const routeFromPath = (path: string): RouteState => {
 const projectDocumentPath = (relativePath: string) => `/projects/document?path=${encodeURIComponent(relativePath)}`;
 const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
 const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
+const runtimeDocumentPath = (relativePath: string) => `/runtimes?path=${encodeURIComponent(relativePath)}`;
 const policyDocumentPath = (relativePath: string) => `/policies?path=${encodeURIComponent(relativePath)}`;
+const eventDefinitionDocumentPath = (relativePath: string) => `/events?path=${encodeURIComponent(relativePath)}`;
 
 const statusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
   if (["unassigned", "at-risk", "rejected"].includes(status)) return "destructive";
@@ -301,7 +339,7 @@ function ThemeSelector({ mode, onChange }: { mode: ThemeMode; onChange: (mode: T
   );
 }
 
-type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skill, "id" | "frontmatter" | "body" | "relativePath" | "errors"> & {
+type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skill | Runtime | EventDefinition, "id" | "frontmatter" | "body" | "relativePath" | "errors"> & {
   createdAt?: string;
   updatedAt?: string;
   name?: string;
@@ -549,7 +587,7 @@ function ProjectDocumentTreeDirectory({
   );
 }
 
-type SidebarDocumentEntity = Pick<Agent | Skill | Policy, "id" | "name" | "relativePath">;
+type SidebarDocumentEntity = Pick<Agent | Skill | Runtime | Policy | EventDefinition, "id" | "name" | "relativePath">;
 type SidebarAgentEntity = Pick<Agent, "id" | "name" | "relativePath" | "status">;
 
 function SidebarDocumentList({
@@ -829,7 +867,9 @@ function AppSidebar({
   projectDocumentTree,
   agents,
   skills,
+  runtimes,
   policies,
+  eventDefinitions,
   navigate,
   themeMode,
   onThemeModeChange
@@ -838,7 +878,9 @@ function AppSidebar({
   projectDocumentTree: ProjectDocumentTreeNode[];
   agents: Agent[];
   skills: Skill[];
+  runtimes: Runtime[];
   policies: Policy[];
+  eventDefinitions: EventDefinition[];
   navigate: (path: string) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
@@ -846,7 +888,9 @@ function AppSidebar({
   const projectsOpen = route.view === "projects" || route.view === "project-document" || route.view === "project-goals" || route.view === "project-adrs";
   const agentsOpen = route.view === "agents";
   const skillsOpen = route.view === "skills";
+  const runtimesOpen = route.view === "runtimes";
   const policiesOpen = route.view === "policies";
+  const eventsOpen = route.view === "events";
   const item = (label: string, icon: ReactNode, path: string, active: boolean) => (
     <SidebarMenuItem key={label}>
       <SidebarMenuButton asChild isActive={active} tooltip={label}>
@@ -919,7 +963,20 @@ function AppSidebar({
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
-              {item("Runtimes", <Code2 />, "/runtimes", route.view === "runtimes")}
+              <Collapsible defaultOpen={runtimesOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={runtimesOpen} tooltip="Runtimes">
+                      <Code2 />
+                      <span>Runtimes</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarDocumentList documents={runtimes} activePath={runtimesOpen ? route.documentPath : undefined} pathFor={runtimeDocumentPath} navigate={navigate} />
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
               <Collapsible defaultOpen={policiesOpen} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
@@ -934,7 +991,20 @@ function AppSidebar({
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
-              {item("Events", <Inbox />, "/events", route.view === "events")}
+              <Collapsible defaultOpen={eventsOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={eventsOpen} tooltip="Events">
+                      <Inbox />
+                      <span>Events</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarDocumentList documents={eventDefinitions} activePath={eventsOpen ? route.documentPath : undefined} pathFor={eventDefinitionDocumentPath} navigate={navigate} />
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
               {item("Agent runs", <Activity />, "/agent-runs", route.view === "agent-runs")}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -977,9 +1047,17 @@ export function App() {
     () => data.skills.find((skill) => skill.relativePath === route.documentPath) ?? data.skills[0],
     [data.skills, route.documentPath]
   );
+  const selectedRuntime = useMemo(
+    () => data.runtimes.find((runtime) => runtime.relativePath === route.documentPath) ?? data.runtimes[0],
+    [data.runtimes, route.documentPath]
+  );
   const selectedPolicy = useMemo(
     () => data.policies.find((policy) => policy.relativePath === route.documentPath) ?? data.policies[0],
     [data.policies, route.documentPath]
+  );
+  const selectedEventDefinition = useMemo(
+    () => data.eventDefinitions.find((definition) => definition.relativePath === route.documentPath) ?? data.eventDefinitions[0],
+    [data.eventDefinitions, route.documentPath]
   );
 
   const navigate = (path: string) => {
@@ -1055,6 +1133,19 @@ export function App() {
     setNotice("Deleted.");
   };
 
+  const saveEventDefinition = async (eventDefinition: Partial<EventDefinition>) => {
+    const saved = await api.saveEventDefinition(eventDefinition);
+    await refresh();
+    setNotice("Saved.");
+    return saved;
+  };
+
+  const removeEventDefinition = async (id: string) => {
+    await api.removeEventDefinition(id);
+    await refresh();
+    setNotice("Deleted.");
+  };
+
   return (
     <TooltipProvider>
       <SidebarProvider>
@@ -1063,7 +1154,9 @@ export function App() {
           projectDocumentTree={projectDocumentTree}
           agents={data.agents}
           skills={data.skills}
+          runtimes={data.runtimes}
           policies={data.policies}
+          eventDefinitions={data.eventDefinitions}
           navigate={navigate}
           themeMode={themeMode}
           onThemeModeChange={setThemeMode}
@@ -1094,9 +1187,20 @@ export function App() {
               {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} /> : null}
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
-              {route.view === "runtimes" ? <RuntimesView data={data} save={save} remove={remove} /> : null}
+              {route.view === "runtimes" ? <RuntimesView data={data} runtime={selectedRuntime} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "policies" ? <PoliciesView data={data} project={project} policy={selectedPolicy} save={save} remove={remove} /> : null}
-              {route.view === "events" ? <EventsView data={data} project={project} refresh={refresh} remove={remove} /> : null}
+              {route.view === "events" ? (
+                <EventsView
+                  data={data}
+                  eventDefinition={selectedEventDefinition}
+                  project={project}
+                  refresh={refresh}
+                  remove={remove}
+                  saveEventDefinition={saveEventDefinition}
+                  removeEventDefinition={removeEventDefinition}
+                  navigate={navigate}
+                />
+              ) : null}
               {route.view === "agent-runs" ? <AgentRunsView data={data} refresh={refresh} /> : null}
             </main>
           </ScrollArea>
@@ -1473,13 +1577,42 @@ function SkillsView({
   );
 }
 
-function RuntimesView({ data, save, remove }: ViewProps) {
-  const [form, setForm] = useState<Partial<Runtime>>(runtimeTemplate());
-  const [configText, setConfigText] = useState(toKeyValueLines(runtimeTemplate().config ?? {}));
+function RuntimesView({
+  data,
+  runtime,
+  save,
+  remove,
+  navigate
+}: ViewProps & {
+  runtime?: Runtime;
+  navigate: (path: string) => void;
+}) {
+  const [form, setForm] = useState<Partial<Runtime>>(runtime ?? runtimeTemplate());
+  const [configText, setConfigText] = useState(toKeyValueLines((runtime ?? runtimeTemplate()).config ?? {}));
 
   const editRuntime = (runtime: Runtime) => {
-    setForm(runtime);
-    setConfigText(toKeyValueLines(runtime.config));
+    if (runtime.relativePath) navigate(runtimeDocumentPath(runtime.relativePath));
+    else {
+      setForm(runtime);
+      setConfigText(toKeyValueLines(runtime.config));
+    }
+  };
+
+  useEffect(() => {
+    const next = runtime ?? runtimeTemplate();
+    setForm(next);
+    setConfigText(toKeyValueLines(next.config ?? {}));
+  }, [runtime]);
+
+  const handleSave = async () => {
+    const saved = await save("runtimes", { ...form, config: fromKeyValueLines(configText) });
+    if (saved.relativePath) navigate(runtimeDocumentPath(saved.relativePath));
+  };
+
+  const handleDelete = async () => {
+    if (!form.id) return;
+    await remove("runtimes", form.id);
+    navigate("/runtimes");
   };
 
   return (
@@ -1496,7 +1629,7 @@ function RuntimesView({ data, save, remove }: ViewProps) {
         />
       </Panel>
       <Panel title={form.id ? "Update runtime" : "Create runtime"} icon={<Code2 data-icon="inline-start" />}>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void save("runtimes", { ...form, config: fromKeyValueLines(configText) }); }}>
+        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
           <FieldGroup>
             <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
             <SelectField
@@ -1514,7 +1647,7 @@ function RuntimesView({ data, save, remove }: ViewProps) {
             saveLabel="Save runtime"
             id={form.id}
             onNew={() => { setForm(runtimeTemplate()); setConfigText(toKeyValueLines(runtimeTemplate().config ?? {})); }}
-            onDelete={() => void remove("runtimes", form.id!)}
+            onDelete={handleDelete}
           />
         </form>
       </Panel>
@@ -1591,16 +1724,82 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
   );
 }
 
-function EventsView({ data, project, refresh, remove }: { data: AppData; project?: Project; refresh: () => Promise<void>; remove: (collection: SaveCollection, id: string) => Promise<void> }) {
-  const [form, setForm] = useState(eventTemplate(project?.id ?? ""));
+function EventsView({
+  data,
+  eventDefinition,
+  project,
+  refresh,
+  remove,
+  saveEventDefinition,
+  removeEventDefinition,
+  navigate
+}: {
+  data: AppData;
+  eventDefinition?: EventDefinition;
+  project?: Project;
+  refresh: () => Promise<void>;
+  remove: (collection: SaveCollection | "events", id: string) => Promise<void>;
+  saveEventDefinition: (eventDefinition: Partial<EventDefinition>) => Promise<EventDefinition>;
+  removeEventDefinition: (id: string) => Promise<void>;
+  navigate: (path: string) => void;
+}) {
+  const activeDefinitions = useMemo(
+    () => data.eventDefinitions.filter((definition) => definition.active && definition.eventType),
+    [data.eventDefinitions]
+  );
+  const [definitionForm, setDefinitionForm] = useState<Partial<EventDefinition>>(eventDefinition ?? eventDefinitionTemplate());
+  const [producersText, setProducersText] = useState(readJson(definitionForm.producers ?? []));
+  const [payloadExampleText, setPayloadExampleText] = useState(readJson(definitionForm.payloadExample ?? {}));
+  const [definitionError, setDefinitionError] = useState("");
+  const [form, setForm] = useState(eventTemplate(project?.id ?? "", activeDefinitions[0]));
   const [payloadText, setPayloadText] = useState(readJson(form.payload));
   const [error, setError] = useState("");
 
+  const activeEventTypes = useMemo(
+    () => new Set(activeDefinitions.map((definition) => definition.eventType)),
+    [activeDefinitions]
+  );
+  const missingPolicyEventTypes = useMemo(() => {
+    const policyTypes = data.policies.flatMap((policy) => policy.match?.eventTypes ?? policy.eventTypes ?? []);
+    return [...new Set(policyTypes)].filter((eventType) => eventType && !activeEventTypes.has(eventType));
+  }, [activeEventTypes, data.policies]);
+
   useEffect(() => {
-    const next = eventTemplate(project?.id ?? "");
+    const next = eventDefinition ?? eventDefinitionTemplate();
+    setDefinitionForm(next);
+    setProducersText(readJson(next.producers ?? []));
+    setPayloadExampleText(readJson(next.payloadExample ?? {}));
+    setDefinitionError("");
+  }, [eventDefinition]);
+
+  useEffect(() => {
+    const next = eventTemplate(project?.id ?? "", activeDefinitions[0]);
     setForm(next);
     setPayloadText(readJson(next.payload));
-  }, [project?.id]);
+    setError("");
+  }, [activeDefinitions, project?.id]);
+
+  const selectDefinitionForIntake = (eventType: string) => {
+    const definition = activeDefinitions.find((item) => item.eventType === eventType);
+    const next = eventTemplate(form.projectId, definition);
+    setForm(next);
+    setPayloadText(readJson(next.payload));
+  };
+
+  const saveDefinition = async () => {
+    setDefinitionError("");
+    try {
+      const saved = await saveEventDefinition({
+        ...definitionForm,
+        tags: definitionForm.tags ?? [],
+        producers: parseEventProducers(producersText),
+        payloadExample: parsePayload(payloadExampleText)
+      });
+      if (saved.relativePath) navigate(eventDefinitionDocumentPath(saved.relativePath));
+    } catch (err) {
+      setDefinitionError(err instanceof Error ? err.message : "Unable to save event definition.");
+    }
+  };
 
   const submit = async () => {
     setError("");
@@ -1617,37 +1816,89 @@ function EventsView({ data, project, refresh, remove }: { data: AppData; project
     }
   };
 
-  return (
-    <div className="grid gap-4 2xl:grid-cols-[minmax(420px,0.8fr)_minmax(620px,1.2fr)]">
-      <Panel title="Event intake" icon={<Inbox data-icon="inline-start" />}>
-        {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-        <form className="mt-4 flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-          <FieldGroup>
-            <SelectField
-              label="Project"
-              value={form.projectId}
-              options={data.projects.map((item) => ({ value: item.id, label: item.name }))}
-              onChange={(projectId) => setForm({ ...form, projectId })}
-            />
-            <TextField label="Event type" required value={form.eventType} onChange={(eventType) => setForm({ ...form, eventType })} />
-            <TextField label="Source agent/runtime" value={form.source ?? ""} onChange={(source) => setForm({ ...form, source })} />
-            <TextField label="Tags" value={toCsv(form.tags ?? [])} onChange={(value) => setForm({ ...form, tags: fromCsv(value) })} />
-            <TextAreaField label="Payload JSON" rows={9} value={payloadText} onChange={setPayloadText} />
-          </FieldGroup>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => { const next = eventTemplate(project?.id ?? ""); setForm(next); setPayloadText(readJson(next.payload)); }}>
-              <Plus data-icon="inline-start" />
-              Seed matching event
-            </Button>
-            <Button type="submit">
-              <Save data-icon="inline-start" />
-              Submit event
-            </Button>
-          </div>
-        </form>
-      </Panel>
+  const newDefinition = () => {
+    const next = eventDefinitionTemplate();
+    setDefinitionForm(next);
+    setProducersText(readJson(next.producers ?? []));
+    setPayloadExampleText(readJson(next.payloadExample ?? {}));
+    setDefinitionError("");
+    navigate("/events");
+  };
 
-      <Panel title="Event inbox" icon={<CheckCircle2 data-icon="inline-start" />}>
+  return (
+    <div className="grid gap-4">
+      {missingPolicyEventTypes.length > 0 ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Missing active event definitions for policy event types: {missingPolicyEventTypes.join(", ")}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="grid gap-4 2xl:grid-cols-[minmax(420px,0.8fr)_minmax(520px,0.9fr)]">
+        <Panel title={definitionForm.id ? "Update event definition" : "Create event definition"} icon={<Inbox data-icon="inline-start" />}>
+          {definitionForm.errors?.length ? <ErrorPreview errors={definitionForm.errors} /> : null}
+          {definitionError ? <Alert variant="destructive"><AlertDescription>{definitionError}</AlertDescription></Alert> : null}
+          <form className="mt-4 flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void saveDefinition(); }}>
+            <FieldGroup>
+              <TextField label="Name" required value={definitionForm.name ?? ""} onChange={(name) => setDefinitionForm({ ...definitionForm, name })} />
+              <TextAreaField label="Description" value={definitionForm.description ?? ""} onChange={(description) => setDefinitionForm({ ...definitionForm, description })} />
+              <TextField label="Event type" required value={definitionForm.eventType ?? ""} onChange={(eventType) => setDefinitionForm({ ...definitionForm, eventType })} />
+              <SwitchField label="Active" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />
+              <TextAreaField label="Producers JSON" rows={7} value={producersText} onChange={setProducersText} />
+              <TextAreaField label="Payload example JSON" rows={7} value={payloadExampleText} onChange={setPayloadExampleText} />
+              <TextAreaField label="Body" rows={4} value={definitionForm.body ?? ""} onChange={(body) => setDefinitionForm({ ...definitionForm, body })} />
+            </FieldGroup>
+            <CrudActions
+              newLabel="New"
+              saveLabel="Save definition"
+              id={definitionForm.id}
+              onNew={newDefinition}
+              onDelete={() => {
+                if (!definitionForm.id) return;
+                void removeEventDefinition(definitionForm.id).then(() => navigate("/events"));
+              }}
+            />
+          </form>
+        </Panel>
+
+        <Panel title="Event intake" icon={<Save data-icon="inline-start" />}>
+          {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+          <form className="mt-4 flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+            <FieldGroup>
+              <SelectField
+                label="Event type"
+                value={form.eventType}
+                options={activeDefinitions.map((definition) => ({ value: definition.eventType, label: definition.eventType }))}
+                onChange={selectDefinitionForIntake}
+              />
+              <TextField label="Source agent/runtime" value={form.source ?? ""} onChange={(source) => setForm({ ...form, source })} />
+              <TextAreaField label="Payload JSON" rows={10} value={payloadText} onChange={setPayloadText} />
+            </FieldGroup>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={activeDefinitions.length === 0}
+                onClick={() => {
+                  const next = eventTemplate(project?.id ?? "", activeDefinitions[0]);
+                  setForm(next);
+                  setPayloadText(readJson(next.payload));
+                }}
+              >
+                <Plus data-icon="inline-start" />
+                Seed from definition
+              </Button>
+              <Button type="submit" disabled={activeDefinitions.length === 0 || !form.eventType}>
+                <Save data-icon="inline-start" />
+                Submit event
+              </Button>
+            </div>
+          </form>
+        </Panel>
+      </div>
+
+      <Panel title="Runtime event inbox" icon={<CheckCircle2 data-icon="inline-start" />}>
         <DataTable
           empty="No events received."
           columns={["Seq", "Created", "Type", "Status", "Subject", "Correlation", "Policy", "Runs", "Result"]}

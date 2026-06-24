@@ -1,13 +1,17 @@
 ---
 id: test-event
+name: Test event
+description: Fixture event definition for markdown loading tests.
+active: true
 eventType: adr.created
 source: architect
-status: received
 tags:
   - architecture
-payload:
+producers: []
+payloadExample:
   severity: low
 createdAt: 2026-06-23
+updatedAt: 2026-06-23
 ---
 
-An ADR event was emitted by the architect agent.
+An ADR event definition emitted by the architect agent.

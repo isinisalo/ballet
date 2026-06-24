@@ -65,6 +65,7 @@ const completeWithOutcome = (
   trigger: RuntimeEvent,
   outcome: AgentOutcome,
   policies: AppData["policies"],
+  eventDefinitions: AppData["eventDefinitions"],
   agents: AppData["agents"],
   threadId?: string,
   turnId?: string
@@ -73,13 +74,13 @@ const completeWithOutcome = (
     gitCommitExists: gitCommitExists(store.root, outcome.artifacts?.git_sha),
     requiredChecksPassed: checksPassRequiredGate(outcome.checks)
   };
-  const mapping = mapOutcomeToDomainEvent(run.agentRole, outcome, validation);
+  const mapping = mapOutcomeToDomainEvent(run.agentRole, outcome, validation, eventDefinitions);
   let status = outcomeToRunStatus(outcome);
   let error: string | undefined;
 
   if (["ready", "approved", "changes_requested"].includes(outcome.outcome) && !mapping) {
     status = "failed";
-    error = "Agent outcome did not satisfy Ballet domain event mapping and validation rules.";
+    error = "Agent outcome did not match an active Ballet event definition and validation rules.";
   }
 
   const result = store.runtimeDatabase().completeRun({
@@ -138,7 +139,7 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
       onLog: (level, message, details) => runtime.appendRunLog(run.runId, level, message, details)
     });
 
-    completeWithOutcome(run, trigger, result.outcome, data.policies, data.agents, result.threadId, result.turnId);
+    completeWithOutcome(run, trigger, result.outcome, data.policies, data.eventDefinitions, data.agents, result.threadId, result.turnId);
   } catch (error) {
     completeFailed(run, error);
   }

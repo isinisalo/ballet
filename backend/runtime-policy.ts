@@ -1,4 +1,4 @@
-import type { AgentOutcome, AgentRunStatus, RunCheck } from "./shared/domain.js";
+import type { AgentOutcome, AgentOutcomeStatus, AgentRunStatus, EventDefinition, EventProducerDefinition, RunCheck } from "./shared/domain.js";
 
 export const agentOutcomeSchema = {
   type: "object",
@@ -39,27 +39,6 @@ export const agentOutcomeSchema = {
 
 const outcomeStatuses = new Set(["ready", "blocked", "needs_input", "approved", "changes_requested", "failed"]);
 const checkStatuses = new Set(["passed", "failed", "skipped"]);
-
-const reviewRoles = new Set([
-  "architecture-reviewer",
-  "feasibility-reviewer",
-  "intent-reviewer",
-  "ops-release-reviewer",
-  "qa-verification-reviewer",
-  "review-orchestrator"
-]);
-
-const readyEventByRole: Record<string, string> = {
-  "developer-agent": "change.implemented.v1",
-  "qa-agent": "qa.ready.v1",
-  "devops-agent": "deployment.ready.v1",
-  "release-designer": "release_plan.ready.v1",
-  "roadmap-designer": "roadmap.ready.v1",
-  "ux-designer": "ux_design.ready.v1",
-  "delivery-orchestrator": "delivery.ready.v1",
-  "product-orchestrator": "product.routing.ready.v1",
-  "project-orchestrator": "project.routing.ready.v1"
-};
 
 export interface OutcomeValidation {
   gitCommitExists: boolean;
@@ -121,11 +100,49 @@ export const outcomeToRunStatus = (outcome: AgentOutcome): AgentRunStatus => {
 export const checksPassRequiredGate = (checks: RunCheck[]): boolean =>
   checks.length > 0 && checks.every((check) => check.status !== "failed");
 
+const textMatches = (ruleValue: string, actualValue: string): boolean => {
+  if (!ruleValue || ruleValue === "*") return true;
+  return ruleValue.trim().toLowerCase() === actualValue.trim().toLowerCase();
+};
+
+const producerAllowsOutcome = (producer: EventProducerDefinition, outcome: AgentOutcomeStatus): boolean =>
+  producer.outcomes.includes(outcome);
+
+const producerRequirementsPass = (producer: EventProducerDefinition, validation: OutcomeValidation): boolean => {
+  const requires = producer.requires;
+  if (!requires) return true;
+  if (requires.gitCommitExists !== undefined && requires.gitCommitExists !== validation.gitCommitExists) return false;
+  if (requires.requiredChecksPassed !== undefined && requires.requiredChecksPassed !== validation.requiredChecksPassed) return false;
+  return true;
+};
+
+const matchingDefinition = (
+  agentRole: string,
+  outcome: AgentOutcome,
+  validation: OutcomeValidation,
+  eventDefinitions: EventDefinition[],
+  source: string
+): EventDefinition | undefined =>
+  eventDefinitions.find((definition) =>
+    definition.active &&
+    textMatches(definition.source, source) &&
+    definition.producers.some((producer) =>
+      producer.agentRole === agentRole &&
+      producerAllowsOutcome(producer, outcome.outcome) &&
+      producerRequirementsPass(producer, validation)
+    )
+  );
+
 export const mapOutcomeToDomainEvent = (
   agentRole: string,
   outcome: AgentOutcome,
-  validation: OutcomeValidation
+  validation: OutcomeValidation,
+  eventDefinitions: EventDefinition[],
+  source = "agentd"
 ): DomainEventMapping | undefined => {
+  const definition = matchingDefinition(agentRole, outcome, validation, eventDefinitions, source);
+  if (!definition) return undefined;
+
   const basePayload = {
     agent_role: agentRole,
     outcome: outcome.outcome,
@@ -134,27 +151,5 @@ export const mapOutcomeToDomainEvent = (
     checks: outcome.checks
   };
 
-  if (reviewRoles.has(agentRole)) {
-    if (outcome.outcome === "approved") return { type: "review.approved.v1", payload: basePayload };
-    if (outcome.outcome === "changes_requested") return { type: "review.changes_requested.v1", payload: basePayload };
-    if (outcome.outcome === "blocked") return { type: "review.blocked.v1", payload: basePayload };
-    if (outcome.outcome === "needs_input") return { type: "review.needs_input.v1", payload: basePayload };
-    if (outcome.outcome === "failed") return { type: "review.failed.v1", payload: basePayload };
-    return undefined;
-  }
-
-  if (outcome.outcome === "blocked") return { type: "agent.blocked.v1", payload: basePayload };
-  if (outcome.outcome === "needs_input") return { type: "agent.needs_input.v1", payload: basePayload };
-  if (outcome.outcome === "failed") return { type: "agent.failed.v1", payload: basePayload };
-
-  if (outcome.outcome !== "ready") return undefined;
-
-  const eventType = readyEventByRole[agentRole];
-  if (!eventType) return undefined;
-
-  if (agentRole === "developer-agent" && (!validation.gitCommitExists || !validation.requiredChecksPassed)) {
-    return undefined;
-  }
-
-  return { type: eventType, payload: basePayload };
+  return { type: definition.eventType, payload: basePayload };
 };

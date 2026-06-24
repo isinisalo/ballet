@@ -1,7 +1,7 @@
 import path from "node:path";
 import { stat, unlink } from "node:fs/promises";
-import type { Adr, AdrStatus, Agent, AgentStatus, AppData, EntityStatus, EventRecord, EventStatus, Goal, MarkdownDocument, Policy, Project, Runtime, Skill } from "./shared/domain.js";
-import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadEvents, loadGoals, loadPolicies, loadSkills, readMarkdownDocument, safeSlug, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
+import type { Adr, AdrStatus, Agent, AgentOutcomeStatus, AgentStatus, AppData, EntityStatus, EventDefinition, EventProducerDefinition, Goal, MarkdownDocument, Policy, Project, Runtime, Skill } from "./shared/domain.js";
+import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadEvents, loadGoals, loadPolicies, loadRuntimes, loadSkills, readMarkdownDocument, safeSlug, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
 
 const now = () => new Date().toISOString();
 
@@ -14,8 +14,11 @@ const cloneRecord = (value: unknown): Record<string, unknown> | undefined => isR
 const validEntityStatus = (value: unknown): EntityStatus => ["active", "paused", "archived"].includes(stringValue(value)) ? stringValue(value) as EntityStatus : "active";
 const validGoalStatus = (value: unknown): Goal["status"] => ["not-started", "in-progress", "at-risk", "done"].includes(stringValue(value)) ? stringValue(value) as Goal["status"] : "not-started";
 const validAdrStatus = (value: unknown): AdrStatus => ["proposed", "accepted", "superseded", "rejected"].includes(stringValue(value)) ? stringValue(value) as AdrStatus : "proposed";
-const validEventStatus = (value: unknown): EventStatus => ["received", "routed", "unassigned", "handled"].includes(stringValue(value)) ? stringValue(value) as EventStatus : "received";
 const validAgentStatus = (value: unknown): AgentStatus => ["online", "offline"].includes(stringValue(value)) ? stringValue(value) as AgentStatus : "offline";
+const validAgentOutcomeStatus = (value: unknown): AgentOutcomeStatus | undefined =>
+  ["ready", "blocked", "needs_input", "approved", "changes_requested", "failed"].includes(stringValue(value))
+    ? stringValue(value) as AgentOutcomeStatus
+    : undefined;
 const dateValue = (value: unknown): string => stringValue(value, now());
 
 const bodyPreview = (body: string): string => body.replace(/^#+\s+/gm, "").split(/\n{2,}/)[0]?.trim() ?? "";
@@ -176,6 +179,24 @@ const skillDocumentFromDocument = (doc: MarkdownDocument): Skill => {
   }, doc);
 };
 
+const runtimeFromDocument = (doc: MarkdownDocument): Runtime => {
+  const fm = doc.frontmatter;
+  const config = isRecord(fm.config)
+    ? Object.fromEntries(Object.entries(fm.config).map(([key, value]) => [key, stringValue(value)]))
+    : {};
+  const type = stringValue(fm.type) === "custom" ? "custom" : "codex-cli";
+  return attachDocument({
+    id: doc.id,
+    name: stringValue(fm.name, doc.title ?? doc.slug),
+    type,
+    command: stringValue(fm.command),
+    config,
+    enabled: booleanValue(fm.enabled, true),
+    createdAt: dateValue(fm.createdAt),
+    updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
+  }, doc);
+};
+
 const policyFromDocument = (doc: MarkdownDocument, defaultProjectId: string, firstAgentId: string): Policy => {
   const fm = doc.frontmatter;
   const action = cloneRecord(fm.action) as Policy["action"] | undefined;
@@ -201,50 +222,56 @@ const policyFromDocument = (doc: MarkdownDocument, defaultProjectId: string, fir
   }, doc);
 };
 
-const eventFromDocument = (doc: MarkdownDocument, defaultProjectId: string): EventRecord => {
+const producerFromUnknown = (value: unknown): EventProducerDefinition | undefined => {
+  if (!isRecord(value)) return undefined;
+  const agentRole = stringValue(value.agentRole ?? value.agent_role);
+  if (!agentRole) return undefined;
+  const outcomes = stringArray(value.outcomes ?? value.outcome)
+    .map(validAgentOutcomeStatus)
+    .filter((outcome): outcome is AgentOutcomeStatus => Boolean(outcome));
+  if (outcomes.length === 0) return undefined;
+
+  return {
+    agentRole,
+    outcomes,
+    requires: isRecord(value.requires) ? {
+      ...(value.requires.gitCommitExists !== undefined ? { gitCommitExists: booleanValue(value.requires.gitCommitExists) } : {}),
+      ...(value.requires.requiredChecksPassed !== undefined ? { requiredChecksPassed: booleanValue(value.requires.requiredChecksPassed) } : {})
+    } : undefined
+  };
+};
+
+const producersFromUnknown = (value: unknown): EventProducerDefinition[] =>
+  Array.isArray(value)
+    ? value.map(producerFromUnknown).filter((producer): producer is EventProducerDefinition => Boolean(producer))
+    : [];
+
+const eventDefinitionFromDocument = (doc: MarkdownDocument): EventDefinition => {
   const fm = doc.frontmatter;
   return attachDocument({
     id: doc.id,
-    projectId: stringValue(fm.projectId, defaultProjectId),
-    source: stringValue(fm.source, "unknown"),
+    name: stringValue(fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
+    description: stringValue(fm.description, bodyPreview(doc.body)),
+    active: booleanValue(fm.active, true),
     eventType: stringValue(fm.eventType ?? fm.type, doc.slug),
-    subject: stringValue(fm.subject) || undefined,
-    correlationId: stringValue(fm.correlationId) || undefined,
-    causationId: stringValue(fm.causationId) || undefined,
-    dedupeKey: stringValue(fm.dedupeKey) || undefined,
-    correlationDepth: Number.isFinite(Number(fm.correlationDepth)) ? Number(fm.correlationDepth) : undefined,
+    source: stringValue(fm.source, "*"),
     tags: stringArray(fm.tags),
-    payload: isRecord(fm.payload) ? fm.payload : {},
-    status: validEventStatus(fm.status),
-    matchedPolicyId: stringValue(fm.matchedPolicyId) || undefined,
-    assignedAgentId: stringValue(fm.assignedAgentId) || undefined,
-    routing: isRecord(fm.routing) ? fm.routing as unknown as EventRecord["routing"] : undefined,
-    handlingResult: stringValue(fm.handlingResult) || bodyPreview(doc.body),
-    createdAt: dateValue(fm.createdAt)
+    producers: producersFromUnknown(fm.producers),
+    payloadExample: isRecord(fm.payloadExample) ? fm.payloadExample : isRecord(fm.payload) ? fm.payload : {},
+    createdAt: dateValue(fm.createdAt),
+    updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
   }, doc);
 };
 
-export const runtimeDefaults = (): Runtime[] => [
-  {
-    id: "runtime-codex",
-    name: "codex-cli",
-    type: "codex-cli",
-    command: "codex",
-    config: { cwd: ".", approvalPolicy: "never" },
-    enabled: true,
-    createdAt: now(),
-    updatedAt: now()
-  }
-];
-
 export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
-  const [projectDocs, projectDocumentTree, agentDocs, skillDocs, adrDocs, goalDocs, eventDocs, policyDocs] = await Promise.all([
+  const [projectDocs, projectDocumentTree, agentDocs, skillDocs, adrDocs, goalDocs, runtimeDocs, eventDocs, policyDocs] = await Promise.all([
     loadBalletProject(root),
     loadBalletProjectTree(root),
     loadAgents(root),
     loadSkills(root),
     loadAdr(root),
     loadGoals(root),
+    loadRuntimes(root),
     loadEvents(root),
     loadPolicies(root)
   ]);
@@ -263,15 +290,17 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
     adrs: adrDocs.map((doc) => adrFromDocument(doc, defaultProjectId)),
     agents,
     skills,
-    runtimes: runtimeDefaults(),
+    runtimes: runtimeDocs.map(runtimeFromDocument),
     policies: policyDocs.map((doc) => policyFromDocument(doc, defaultProjectId, firstAgentId)),
-    events: eventDocs.map((doc) => eventFromDocument(doc, defaultProjectId)),
+    eventDefinitions: eventDocs.map(eventDefinitionFromDocument),
+    events: [],
     agentRuns: [],
     projectDocumentTree,
     documents: {
       project: projectDocs,
       agents: agentDocs,
       skills: skillDocs,
+      runtimes: runtimeDocs,
       adr: adrDocs,
       goals: goalDocs,
       events: eventDocs,
@@ -286,8 +315,9 @@ const collectionFolder: Record<string, string> = {
   adrs: ".ballet/adr",
   agents: ".codex/agents",
   skills: ".agents/skills",
+  runtimes: ".ballet/runtimes",
   policies: ".ballet/policies",
-  events: ".ballet/events"
+  eventDefinitions: ".ballet/events"
 };
 
 const collectionName: Record<string, string> = {
@@ -296,8 +326,9 @@ const collectionName: Record<string, string> = {
   adrs: "adr",
   agents: "agents",
   skills: "skills",
+  runtimes: "runtimes",
   policies: "policies",
-  events: "events"
+  eventDefinitions: "events"
 };
 
 const entityBody = (item: Record<string, unknown>): string => stringValue(item.body);

@@ -30,6 +30,7 @@ Loaded collections:
 - `.ballet/project.md`
 - `.ballet/adr/*.md|*.mdx`
 - `.ballet/goals/*.md|*.mdx`
+- `.ballet/runtimes/*.md|*.mdx`
 - `.ballet/events/*.md|*.mdx`
 - `.ballet/policies/*.md|*.mdx`
 

@@ -94,8 +94,17 @@ describe("Markdown collection loading", () => {
     expect(data.projects[0]?.relativePath).toBe(".ballet/project.md");
     expect(data.adrs[0]?.id).toBe("0001-test-adr");
     expect(data.goals.some((goal) => goal.id === "test-goal")).toBe(true);
-    expect(data.events[0]?.id).toBe("test-event");
-    expect(data.events[0]?.relativePath).toBe(".ballet/events/test-event.md");
+    expect(data.events).toEqual([]);
+    expect(data.eventDefinitions[0]?.id).toBe("test-event");
+    expect(data.eventDefinitions[0]?.eventType).toBe("adr.created");
+    expect(data.eventDefinitions[0]?.active).toBe(true);
+    expect(data.eventDefinitions[0]?.relativePath).toBe(".ballet/events/test-event.md");
+    expect(data.runtimes[0]?.id).toBe("test-runtime");
+    expect(data.runtimes[0]?.name).toBe("Test Runtime");
+    expect(data.runtimes[0]?.type).toBe("custom");
+    expect(data.runtimes[0]?.enabled).toBe(false);
+    expect(data.runtimes[0]?.config).toEqual({ cwd: ".", mode: "fixture" });
+    expect(data.runtimes[0]?.relativePath).toBe(".ballet/runtimes/test-runtime.md");
     expect(data.policies[0]?.id).toBe("test-policy");
     expect(data.policies[0]?.relativePath).toBe(".ballet/policies/test-policy.md");
     expect(data.policies[0]).not.toHaveProperty("priority");
@@ -431,6 +440,29 @@ path = "../.agents/skills/missing-skill"
     expect(source).toContain("# Updated");
   });
 
+  it("writes runtimes under .ballet/runtimes", async () => {
+    const root = await tempRoot();
+
+    await writeEntityMarkdown(root, "runtimes", {
+      id: "runtime-codex",
+      name: "codex-cli",
+      type: "codex-cli",
+      command: "codex",
+      enabled: true,
+      config: { cwd: ".", approvalPolicy: "never" },
+      body: "Default Codex CLI runtime."
+    });
+
+    const source = await readFile(path.join(root, ".ballet/runtimes/runtime-codex.md"), "utf8");
+
+    expect(source).toContain("name: codex-cli");
+    expect(source).toContain("type: codex-cli");
+    expect(source).toContain("command: codex");
+    expect(source).toContain("config:");
+    expect(source).toContain("approvalPolicy: never");
+    expect(source).toContain("Default Codex CLI runtime.");
+  });
+
   it("writes policies under .ballet/policies and strips removed policy frontmatter", async () => {
     const root = await tempRoot();
 
@@ -470,24 +502,29 @@ path = "../.agents/skills/missing-skill"
     expect(source).not.toContain("payloadMetadata:");
   });
 
-  it("writes events under .ballet/events", async () => {
+  it("writes event definitions under .ballet/events", async () => {
     const root = await tempRoot();
 
-    await writeEntityMarkdown(root, "events", {
-      id: "event-1",
-      projectId: "project",
+    await writeEntityMarkdown(root, "eventDefinitions", {
+      id: "plan-approved-v1",
+      name: "Plan approved",
+      description: "An implementation plan was approved.",
+      active: true,
       eventType: "plan.approved.v1",
       source: "test",
       tags: ["delivery"],
-      payload: { work_item_id: "work-1" },
-      status: "received",
-      body: "Incoming approved plan event."
+      producers: [],
+      payloadExample: { work_item_id: "work-1" },
+      body: "Allowed approved plan event."
     });
 
-    const source = await readFile(path.join(root, ".ballet/events/event-1.md"), "utf8");
+    const source = await readFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "utf8");
 
+    expect(source).toContain("name: Plan approved");
+    expect(source).toContain("active: true");
     expect(source).toContain("eventType: plan.approved.v1");
     expect(source).toContain("tags:");
-    expect(source).toContain("Incoming approved plan event.");
+    expect(source).toContain("payloadExample:");
+    expect(source).toContain("Allowed approved plan event.");
   });
 });

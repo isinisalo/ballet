@@ -122,6 +122,23 @@ export const seedData: AppData = {
       updatedAt: now
     }
   ],
+  eventDefinitions: [
+    {
+      id: "deployment-failed",
+      name: "Deployment failed",
+      description: "A deployment failed and can be routed to an operator.",
+      active: true,
+      eventType: "deployment.failed",
+      source: "*",
+      tags: ["kubernetes"],
+      producers: [],
+      payloadExample: {
+        metadata: { severity: "high", service: "checkout-service" }
+      },
+      createdAt: now,
+      updatedAt: now
+    }
+  ],
   events: [
     {
       id: "event-seed-routed",

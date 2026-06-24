@@ -9,6 +9,17 @@ export type RunCheckStatus = "passed" | "failed" | "skipped";
 export type PolicyPredicateOperator = "equals" | "in" | "exists";
 export type PolicyPredicateScalar = string | number | boolean | null;
 
+export interface EventProducerRequirements {
+  gitCommitExists?: boolean;
+  requiredChecksPassed?: boolean;
+}
+
+export interface EventProducerDefinition {
+  agentRole: string;
+  outcomes: AgentOutcomeStatus[];
+  requires?: EventProducerRequirements;
+}
+
 export interface PolicyPredicate {
   operator: PolicyPredicateOperator;
   value?: PolicyPredicateScalar | PolicyPredicateScalar[];
@@ -169,6 +180,11 @@ export interface Runtime {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
 }
 
 export interface Policy {
@@ -183,6 +199,25 @@ export interface Policy {
   source: string;
   payloadMetadata: Record<string, string>;
   targetAgentId: string;
+  createdAt: string;
+  updatedAt: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
+}
+
+export interface EventDefinition {
+  id: string;
+  name: string;
+  description: string;
+  active: boolean;
+  eventType: string;
+  source: string;
+  tags: string[];
+  producers: EventProducerDefinition[];
+  payloadExample: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   frontmatter?: Record<string, unknown>;
@@ -296,6 +331,7 @@ export interface AppData {
   skills: Skill[];
   runtimes: Runtime[];
   policies: Policy[];
+  eventDefinitions: EventDefinition[];
   events: EventRecord[];
   agentRuns: AgentRun[];
   projectDocumentTree?: ProjectDocumentTreeNode[];
@@ -305,6 +341,7 @@ export interface AppData {
     adr: MarkdownDocument[];
     agents: MarkdownDocument[];
     skills: MarkdownDocument[];
+    runtimes: MarkdownDocument[];
     events: MarkdownDocument[];
     policies: MarkdownDocument[];
   };

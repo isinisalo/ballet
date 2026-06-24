@@ -314,6 +314,7 @@ export const loadBalletProject = async (root: string): Promise<MarkdownDocument[
 };
 export const loadAdr = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/adr", collection: "adr" });
 export const loadGoals = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/goals", collection: "goals" });
+export const loadRuntimes = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/runtimes", collection: "runtimes" });
 export const loadEvents = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/events", collection: "events" });
 export const loadPolicies = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/policies", collection: "policies" });
 

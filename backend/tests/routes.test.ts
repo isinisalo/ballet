@@ -150,10 +150,17 @@ describe("API routes", () => {
       const response = await fetch(`${url}/api/data`);
       expect(response.status).toBe(200);
       const data = await response.json() as {
+        eventDefinitions: Array<{ id: string; eventType: string; relativePath?: string }>;
         events: Array<{ id: string; eventType: string; relativePath?: string; routing?: { matchedPolicies: number } }>;
         documents?: { events: Array<{ id: string; relativePath?: string }> };
       };
 
+      expect(data.eventDefinitions).toHaveLength(1);
+      expect(data.eventDefinitions[0]).toMatchObject({
+        id: "markdown-event",
+        eventType: "markdown.event",
+        relativePath: ".ballet/events/markdown-event.md"
+      });
       expect(data.events).toHaveLength(1);
       expect(data.events[0]).toMatchObject({
         eventType: "runtime.event",
@@ -164,6 +171,50 @@ describe("API routes", () => {
         id: "markdown-event",
         relativePath: ".ballet/events/markdown-event.md"
       });
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  it("validates intake event types against active Markdown event definitions", async () => {
+    const root = await tempRoot();
+    process.env.BALLET_PROJECT_ROOT = root;
+    process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
+    await mkdir(path.join(root, ".ballet/events"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
+    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api", apiRouter);
+    const { server, url } = await listen(app);
+
+    try {
+      const allowed = await fetch(`${url}/api/events/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: "project",
+          eventType: "plan.approved.v1",
+          source: "test",
+          payload: {}
+        })
+      });
+      expect(allowed.status).toBe(201);
+      expect(await allowed.json()).toMatchObject({ eventType: "plan.approved.v1" });
+
+      const blocked = await fetch(`${url}/api/events/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: "project",
+          eventType: "unknown.event.v1",
+          source: "test",
+          payload: {}
+        })
+      });
+      expect(blocked.status).toBe(400);
+      expect(await blocked.json()).toMatchObject({ error: "Unknown or inactive event type: unknown.event.v1" });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     }
