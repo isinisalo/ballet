@@ -87,8 +87,6 @@ const emptyData: AppData = {
 
 const toCsv = (values: string[]) => values.join(", ");
 const fromCsv = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
-const toListText = (values?: string[]) => (values ?? []).join("\n");
-const fromListText = (value: string) => value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
 const toKeyValueLines = (values: Record<string, string>) => Object.entries(values).map(([key, item]) => `${key}=${item}`).join("\n");
 const fromKeyValueLines = (value: string) =>
   Object.fromEntries(
@@ -130,13 +128,19 @@ const parseFrontmatterYaml = (value: string): Record<string, unknown> => {
   return parsed as Record<string, unknown>;
 };
 
-const agentTemplate = (): Partial<Agent> => ({
-  name: "",
-  description: "",
-  instructions: "",
-  enabled: true,
-  skills: []
-});
+const codexModelOptions = [
+  { value: "gpt-5.5", label: "GPT-5.5" },
+  { value: "gpt-5.4", label: "GPT-5.4" },
+  { value: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+  { value: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark" }
+];
+
+const reasoningEffortOptions = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "xhigh", label: "Extra High" }
+];
 
 const skillTemplate = (): Partial<Skill> => ({
   name: "",
@@ -954,7 +958,7 @@ export function App() {
               {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} /> : null}
               {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} /> : null}
               {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} /> : null}
-              {route.view === "agents" ? <AgentsView agent={selectedAgent} save={save} remove={remove} navigate={navigate} /> : null}
+              {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView data={data} save={save} remove={remove} /> : null}
               {route.view === "policies" ? <PoliciesView data={data} project={project} save={save} remove={remove} /> : null}
@@ -1064,94 +1068,172 @@ function AdrsPage({ project, selectedAdr }: { project?: Project; selectedAdr?: A
   return <MarkdownDocumentView document={selectedAdr} emptyTitle="No ADR document selected." />;
 }
 
-const agentFrontmatterPreview = (agent?: Agent): Record<string, unknown> | undefined => {
-  if (!agent) return undefined;
-  return {
-    name: agent.frontmatter?.name ?? agent.name,
-    model: agent.frontmatter?.model ?? agent.model,
-    model_reasoning_effort: agent.frontmatter?.model_reasoning_effort ?? agent.modelReasoningEffort,
-    nickname_candidates: agent.frontmatter?.nickname_candidates ?? agent.nicknameCandidates
-  };
-};
+function AgentsView({
+  agent,
+  runtimes,
+  save
+}: {
+  agent?: Agent;
+  runtimes: Runtime[];
+  save: ViewProps["save"];
+}) {
+  const [savingSetting, setSavingSetting] = useState<"model" | "reasoning" | null>(null);
 
-function AgentDocumentView({ agent, embedded = false }: { agent?: Agent; embedded?: boolean }) {
   if (!agent) return <EmptyState title="No agent selected." />;
 
+  const runtime = runtimes.find((candidate) => candidate.enabled) ?? runtimes[0];
+  const runtimeLabel = runtime?.name || runtime?.type || "Codex";
+  const modelValue = agent.model || (typeof agent.frontmatter?.model === "string" ? agent.frontmatter.model : "") || "gpt-5.5";
+  const reasoningValue = agent.modelReasoningEffort || (typeof agent.frontmatter?.model_reasoning_effort === "string" ? agent.frontmatter.model_reasoning_effort : "") || "medium";
+  const modelOptions = codexModelOptions.some((option) => option.value === modelValue)
+    ? codexModelOptions
+    : [{ value: modelValue, label: modelValue }, ...codexModelOptions];
+  const reasoningOptions = reasoningEffortOptions.some((option) => option.value === reasoningValue)
+    ? reasoningEffortOptions
+    : [{ value: reasoningValue, label: reasoningValue }, ...reasoningEffortOptions];
+
+  const updateAgentSetting = async (setting: "model" | "reasoning", patch: Partial<Agent>) => {
+    setSavingSetting(setting);
+    try {
+      await save("agents", { ...agent, ...patch });
+    } finally {
+      setSavingSetting(null);
+    }
+  };
+
   return (
-    <div className="grid auto-rows-min gap-4 self-start">
-      <FrontmatterPanel frontmatter={agentFrontmatterPreview(agent)} />
-      <article className={cn("min-w-0", embedded ? "p-0" : "rounded-lg border bg-card p-5 md:p-8")}>
-        {agent.errors?.length ? (
-          <header className="mb-6 flex min-w-0 flex-wrap items-center gap-2 border-b pb-5">
-            <ErrorPreview errors={agent.errors} />
-          </header>
-        ) : null}
-        <div className="flex flex-col gap-8">
-          <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold uppercase text-muted-foreground">description</h2>
-            {agent.description ? <p className="leading-relaxed">{agent.description}</p> : <p className="text-muted-foreground">empty</p>}
+    <div className="grid min-h-[calc(100svh-2rem)] gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
+      <Card className="self-start overflow-hidden">
+        <CardHeader className="gap-4 p-5">
+          <div className="flex size-14 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Bot className="size-7" aria-hidden="true" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <CardTitle className="text-lg leading-tight">{agent.name}</CardTitle>
+            <CardDescription className="text-sm leading-relaxed">{agent.description || "No description."}</CardDescription>
+            <Badge variant={agent.enabled ? "secondary" : "outline"} className="w-fit">
+              {agent.enabled ? "Enabled" : "Offline"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-0 p-0">
+          {agent.errors?.length ? (
+            <section className="border-t px-5 py-4">
+              <h2 className="mb-3 font-mono text-xs font-medium uppercase text-muted-foreground">Errors</h2>
+              <ErrorPreview errors={agent.errors} />
+            </section>
+          ) : null}
+          <section className="border-t px-5 py-4">
+            <h2 className="mb-4 font-mono text-xs font-medium uppercase text-muted-foreground">Properties</h2>
+            <dl className="flex flex-col gap-3">
+              <AgentProperty label="Runtime" value={runtimeLabel} icon={<Monitor aria-hidden="true" />} />
+              <AgentSelectProperty
+                label="Model"
+                value={modelValue}
+                options={modelOptions}
+                icon={<Code2 aria-hidden="true" />}
+                disabled={savingSetting !== null}
+                onChange={(model) => void updateAgentSetting("model", { model })}
+              />
+              <AgentSelectProperty
+                label="Reasoning effort"
+                value={reasoningValue}
+                options={reasoningOptions}
+                icon={<Layers3 aria-hidden="true" />}
+                disabled={savingSetting !== null}
+                onChange={(modelReasoningEffort) => void updateAgentSetting("reasoning", { modelReasoningEffort })}
+              />
+            </dl>
           </section>
-          <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold uppercase text-muted-foreground">developer_instructions</h2>
-            <MarkdownBody source={agent.instructions} title={agent.name} />
+          <section className="border-t px-5 py-4">
+            <h2 className="mb-4 flex items-center gap-2 font-mono text-xs font-medium uppercase text-muted-foreground">
+              Skills
+              <span className="font-sans text-[0.7rem] font-normal">{agent.skills.length}</span>
+            </h2>
+            {agent.skills.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {agent.skills.map((skill) => (
+                  <Badge key={skill.id} variant="secondary" className="max-w-full justify-start rounded-md font-mono text-[0.68rem] font-normal">
+                    <span className="truncate">{skill.name}</span>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No skills attached.</p>
+            )}
           </section>
-        </div>
-      </article>
+        </CardContent>
+      </Card>
+
+      <Card className="min-w-0">
+        <CardHeader className="border-b p-5">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileKey2 data-icon="inline-start" />
+            Instructions
+          </CardTitle>
+          <CardDescription>
+            Define this agent's identity and working style. Markdown is rendered as preview.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
+          <ScrollArea className="h-[min(68svh,44rem)] rounded-lg border bg-background">
+            <div className="agent-instructions-preview min-w-0 p-5 md:p-6">
+              <MarkdownBody source={agent.instructions} title={agent.name} />
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function AgentsView({
-  agent,
-  save,
-  remove,
-  navigate
-}: {
-  agent?: Agent;
-  save: ViewProps["save"];
-  remove: ViewProps["remove"];
-  navigate: (path: string) => void;
-}) {
-  const [form, setForm] = useState<Partial<Agent>>(agent ?? agentTemplate());
-  const [nicknameText, setNicknameText] = useState(toListText(agent?.nicknameCandidates));
-
-  useEffect(() => {
-    setForm(agent ?? agentTemplate());
-    setNicknameText(toListText(agent?.nicknameCandidates));
-  }, [agent]);
-
-  const handleSave = async () => {
-    const saved = await save("agents", {
-      ...form,
-      nicknameCandidates: fromListText(nicknameText)
-    });
-    if (saved.relativePath) navigate(agentDocumentPath(saved.relativePath));
-  };
-
-  const handleDelete = async () => {
-    if (!form.id) return;
-    await remove("agents", form.id);
-    navigate("/agents");
-  };
-
+function AgentProperty({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <Panel title={form.id ? "Update agent" : "Create agent"} icon={<Bot data-icon="inline-start" />}>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
-          <FieldGroup>
-            <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
-            <TextField label="Model" value={form.model ?? ""} onChange={(model) => setForm({ ...form, model })} />
-            <TextField label="Model reasoning effort" value={form.modelReasoningEffort ?? ""} onChange={(modelReasoningEffort) => setForm({ ...form, modelReasoningEffort })} />
-            <TextAreaField label="Nickname candidates" rows={4} value={nicknameText} onChange={setNicknameText} />
-            <TextAreaField label="Description" required value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
-            <TextAreaField label="Developer instructions" rows={10} required value={form.instructions ?? ""} onChange={(instructions) => setForm({ ...form, instructions })} />
-          </FieldGroup>
-          <CrudActions newLabel="New" saveLabel="Save agent" id={form.id} onNew={() => { setForm(agentTemplate()); setNicknameText(""); }} onDelete={handleDelete} />
-        </form>
-      </Panel>
-      <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
-        <AgentDocumentView agent={agent} embedded />
-      </Panel>
+    <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3 text-sm">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="flex min-w-0 items-center gap-2 text-foreground">
+        <span className="text-muted-foreground [&>svg]:size-3.5">{icon}</span>
+        <span className="truncate">{value}</span>
+      </dd>
+    </div>
+  );
+}
+
+function AgentSelectProperty({
+  label,
+  value,
+  options,
+  icon,
+  disabled,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  icon: ReactNode;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3 text-sm">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="flex min-w-0 items-center gap-2 text-foreground">
+        <span className="text-muted-foreground [&>svg]:size-3.5">{icon}</span>
+        <Select value={value} onValueChange={onChange} disabled={disabled}>
+          <SelectTrigger size="sm" className="h-7 min-w-0 max-w-full flex-1 justify-between">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectGroup>
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </dd>
     </div>
   );
 }

@@ -194,6 +194,31 @@ body {
   margin-bottom: 0.75rem;
 }
 
+.agent-instructions-preview .markdown-body {
+  font-size: 0.95rem;
+  line-height: 1.68;
+  overflow-wrap: anywhere;
+}
+
+.agent-instructions-preview .markdown-body h1 {
+  font-size: 1.55rem;
+}
+
+.agent-instructions-preview .markdown-body h2 {
+  font-size: 1.18rem;
+}
+
+.agent-instructions-preview .markdown-body h3 {
+  font-size: 1.02rem;
+}
+
+.agent-instructions-preview .markdown-body h1,
+.agent-instructions-preview .markdown-body h2,
+.agent-instructions-preview .markdown-body h3,
+.agent-instructions-preview .markdown-body h4 {
+  margin-top: 1.35rem;
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Inter Variable', sans-serif;
