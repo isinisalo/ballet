@@ -205,9 +205,13 @@ const parsePolicyMatch = (value: string): NonNullable<Policy["match"]> => {
 const eventTemplate = (projectId: string): Partial<EventRecord> & Pick<EventRecord, "projectId" | "eventType"> => ({
   projectId,
   source: "runtime-codex",
-  eventType: "deployment.failed",
-  tags: ["kubernetes"],
-  payload: { metadata: { severity: "high", service: "checkout-service" } }
+  eventType: "plan.approved.v1",
+  tags: ["delivery"],
+  payload: {
+    work_item_id: "work-1",
+    plan_id: "plan-1",
+    summary: "Approved change plan."
+  }
 });
 
 const routeFromPath = (path: string): RouteState => {

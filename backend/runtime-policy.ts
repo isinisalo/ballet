@@ -50,7 +50,7 @@ const reviewRoles = new Set([
 ]);
 
 const readyEventByRole: Record<string, string> = {
-  "developer-agent": "implementation.ready.v1",
+  "developer-agent": "change.implemented.v1",
   "qa-agent": "qa.ready.v1",
   "devops-agent": "deployment.ready.v1",
   "release-designer": "release_plan.ready.v1",

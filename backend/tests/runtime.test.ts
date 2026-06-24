@@ -32,12 +32,12 @@ const agent: Agent = {
 };
 
 const policy: Policy = {
-  id: "policy-implementation-review",
-  name: "Implementation review",
-  description: "Route implementation work.",
+  id: "on_plan_approved_then_start_developer_agent_run",
+  name: "on_plan_approved_then_start_developer_agent_run",
+  description: "Start development when a plan is approved.",
   active: true,
   projectId: "project",
-  eventTypes: ["implementation.requested.v1"],
+  eventTypes: ["plan.approved.v1"],
   source: "*",
   payloadMetadata: {},
   targetAgentId: "developer-agent",
@@ -60,12 +60,12 @@ const qaAgent: Agent = {
 };
 
 const architectureReviewPolicy: Policy = {
-  id: "policy-architecture-review",
-  name: "Architecture review",
-  description: "Route ready implementations to architecture review.",
+  id: "on_change_implemented_then_start_architecture_reviewer_agent_run",
+  name: "on_change_implemented_then_start_architecture_reviewer_agent_run",
+  description: "Route implemented change facts to architecture review.",
   active: true,
   match: {
-    eventTypes: ["implementation.ready.v1"],
+    eventTypes: ["change.implemented.v1"],
     source: "agentd"
   },
   action: {
@@ -73,7 +73,7 @@ const architectureReviewPolicy: Policy = {
     targetAgentId: "architecture-reviewer"
   },
   projectId: "*",
-  eventTypes: ["implementation.ready.v1"],
+  eventTypes: ["change.implemented.v1"],
   source: "*",
   payloadMetadata: {},
   targetAgentId: "architecture-reviewer",
@@ -83,8 +83,8 @@ const architectureReviewPolicy: Policy = {
 
 const qaReviewPolicy: Policy = {
   ...architectureReviewPolicy,
-  id: "policy-qa-review",
-  name: "QA review",
+  id: "on_change_implemented_then_start_qa_verification_reviewer_agent_run",
+  name: "on_change_implemented_then_start_qa_verification_reviewer_agent_run",
   action: {
     type: "start_agent_run",
     targetAgentId: "qa-verification-reviewer"
@@ -94,7 +94,7 @@ const qaReviewPolicy: Policy = {
 
 const readyOutcome: AgentOutcome = {
   outcome: "ready",
-  summary: "Implementation is ready.",
+  summary: "Change is implemented.",
   artifacts: {
     git_sha: "4f28dbd",
     changed_files: ["backend/runtime-db.ts"]
@@ -116,7 +116,7 @@ describe("runtime database", () => {
 
     const result = db.intakeEvent({
       projectId: "project",
-      eventType: "implementation.requested.v1",
+      eventType: "plan.approved.v1",
       source: "test",
       tags: ["delivery"],
       payload: { work_item_id: "work-1" }
@@ -125,7 +125,7 @@ describe("runtime database", () => {
     expect(result.event.status).toBe("routed");
     expect(result.event.subject).toBe("work-1");
     expect(result.run).toMatchObject({
-      policyId: "policy-implementation-review",
+      policyId: "on_plan_approved_then_start_developer_agent_run",
       policyVersion: policyVersion(policy),
       agentRole: "developer-agent",
       status: "queued"
@@ -142,7 +142,7 @@ describe("runtime database", () => {
 
     const result = db.intakeEvent({
       projectId: "project",
-      eventType: "implementation.ready.v1",
+      eventType: "change.implemented.v1",
       source: "agentd",
       subject: "work-1",
       payload: { artifacts: { git_sha: "4f28dbd" } }
@@ -164,7 +164,7 @@ describe("runtime database", () => {
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     db.intakeEvent({
       projectId: "project",
-      eventType: "implementation.requested.v1",
+      eventType: "plan.approved.v1",
       source: "test",
       subject: "work-1",
       tags: ["delivery"],
@@ -179,13 +179,13 @@ describe("runtime database", () => {
       status: "completed",
       outcome: readyOutcome,
       domainEvent: {
-        type: "implementation.ready.v1",
+        type: "change.implemented.v1",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       }
     });
 
     expect(completed.run.status).toBe("completed");
-    expect(completed.event?.type).toBe("implementation.ready.v1");
+    expect(completed.event?.type).toBe("change.implemented.v1");
     expect(db.listRuntimeEvents()).toHaveLength(2);
 
     expect(() => db.retryRun(leased!.runId)).toThrow("cannot be retried");
@@ -197,7 +197,7 @@ describe("runtime database", () => {
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     const intake = db.intakeEvent({
       projectId: "project",
-      eventType: "implementation.requested.v1",
+      eventType: "plan.approved.v1",
       source: "test",
       subject: "work-1",
       payload: {}
@@ -209,7 +209,7 @@ describe("runtime database", () => {
       status: "completed",
       outcome: readyOutcome,
       domainEvent: {
-        type: "implementation.ready.v1",
+        type: "change.implemented.v1",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
       policies: [policy, architectureReviewPolicy, qaReviewPolicy],
@@ -218,7 +218,7 @@ describe("runtime database", () => {
 
     expect(completed.run.status).toBe("completed");
     expect(completed.event).toMatchObject({
-      type: "implementation.ready.v1",
+      type: "change.implemented.v1",
       correlationId: intake.event.correlationId,
       causationId: intake.event.eventId,
       correlationDepth: 1,
@@ -235,10 +235,10 @@ describe("runtime database", () => {
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     const input = {
       projectId: "project",
-      eventType: "implementation.requested.v1",
+      eventType: "plan.approved.v1",
       source: "test",
       subject: "work-1",
-      dedupeKey: "external:work-1:implementation-requested",
+      dedupeKey: "external:work-1:plan-approved",
       payload: {}
     };
 
@@ -258,7 +258,7 @@ describe("runtime database", () => {
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     db.intakeEvent({
       projectId: "project",
-      eventType: "implementation.requested.v1",
+      eventType: "plan.approved.v1",
       source: "test",
       subject: "work-1",
       correlationDepth: 20,
@@ -271,7 +271,7 @@ describe("runtime database", () => {
       status: "completed",
       outcome: readyOutcome,
       domainEvent: {
-        type: "implementation.ready.v1",
+        type: "change.implemented.v1",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
       policies: [architectureReviewPolicy],
@@ -301,10 +301,10 @@ describe("runtime outcome policy", () => {
     expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
       gitCommitExists: true,
       requiredChecksPassed: true
-    })?.type).toBe("implementation.ready.v1");
+    })?.type).toBe("change.implemented.v1");
   });
 
-  it("prevents reviewer roles from producing implementation events", () => {
+  it("prevents reviewer roles from producing implemented change events", () => {
     const mapping = mapOutcomeToDomainEvent("architecture-reviewer", {
       outcome: "approved",
       summary: "Looks good.",

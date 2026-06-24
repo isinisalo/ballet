@@ -435,18 +435,18 @@ path = "../.agents/skills/missing-skill"
     const root = await tempRoot();
 
     await writeEntityMarkdown(root, "policies", {
-      id: "route-implementation",
-      name: "Route implementation",
-      description: "Route implementation events.",
+      id: "plan-approved-development",
+      name: "Plan approved development",
+      description: "Start development from approved plan facts.",
       active: true,
       projectId: "*",
-      eventTypes: ["implementation.requested.v1"],
+      eventTypes: ["plan.approved.v1"],
       source: "*",
       payloadMetadata: { severity: "high" },
       targetAgentId: "developer-agent",
-      body: "Route implementation events.",
+      body: "Start development from approved plan facts.",
       frontmatter: {
-        id: "route-implementation",
+        id: "plan-approved-development",
         name: "Old policy",
         priority: 100,
         version: 7,
@@ -454,9 +454,9 @@ path = "../.agents/skills/missing-skill"
       }
     });
 
-    const source = await readFile(path.join(root, ".ballet/policies/route-implementation.md"), "utf8");
+    const source = await readFile(path.join(root, ".ballet/policies/plan-approved-development.md"), "utf8");
 
-    expect(source).toContain("name: Route implementation");
+    expect(source).toContain("name: Plan approved development");
     expect(source).toContain("match:");
     expect(source).toContain("eventTypes:");
     expect(source).toContain("projectId: \"*\"");
@@ -476,18 +476,18 @@ path = "../.agents/skills/missing-skill"
     await writeEntityMarkdown(root, "events", {
       id: "event-1",
       projectId: "project",
-      eventType: "implementation.requested.v1",
+      eventType: "plan.approved.v1",
       source: "test",
       tags: ["delivery"],
       payload: { work_item_id: "work-1" },
       status: "received",
-      body: "Incoming implementation event."
+      body: "Incoming approved plan event."
     });
 
     const source = await readFile(path.join(root, ".ballet/events/event-1.md"), "utf8");
 
-    expect(source).toContain("eventType: implementation.requested.v1");
+    expect(source).toContain("eventType: plan.approved.v1");
     expect(source).toContain("tags:");
-    expect(source).toContain("Incoming implementation event.");
+    expect(source).toContain("Incoming approved plan event.");
   });
 });
