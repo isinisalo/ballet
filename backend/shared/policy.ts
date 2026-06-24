@@ -91,8 +91,8 @@ const fieldMatches = (rule: string | PolicyPredicate | undefined, actualValue: s
 
 const eventTypeMatches = (policy: Policy, event: EventRecord): boolean => {
   const eventTypes = policy.match?.eventTypes ?? policy.eventTypes;
-  if (eventTypes.length === 0) return true;
-  return eventTypes.some((value) => textMatches(value, event.eventType));
+  if (eventTypes.length !== 1) return false;
+  return textMatches(eventTypes[0] ?? "", event.eventType);
 };
 
 const tagsMatch = (rule: string[] | PolicyPredicate | undefined, tags: string[]): boolean => {

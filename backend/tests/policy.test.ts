@@ -66,6 +66,34 @@ describe("policy interpreter", () => {
     expect(result).toEqual([]);
   });
 
+  it("does not match policies without exactly one explicit event type", () => {
+    const wildcardPolicy = {
+      ...policy,
+      eventTypes: [],
+      match: {
+        projectId: "*",
+        source: "*",
+        eventTypes: []
+      }
+    };
+
+    expect(policyMatchesEvent(wildcardPolicy, event)).toBe(false);
+    expect(routeEvent(event, [wildcardPolicy], [agent])).toEqual([]);
+
+    const multiEventPolicy = {
+      ...policy,
+      eventTypes: ["deployment.failed", "deployment.succeeded"],
+      match: {
+        projectId: "*",
+        source: "*",
+        eventTypes: ["deployment.failed", "deployment.succeeded"]
+      }
+    };
+
+    expect(policyMatchesEvent(multiEventPolicy, event)).toBe(false);
+    expect(routeEvent(event, [multiEventPolicy], [agent])).toEqual([]);
+  });
+
   it("explains when a matching policy points to a disabled agent", () => {
     const result = routeEvent(event, [policy], [{ ...agent, enabled: false }]);
 

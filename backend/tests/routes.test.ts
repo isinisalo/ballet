@@ -220,6 +220,142 @@ describe("API routes", () => {
     }
   });
 
+  it("rejects policies that do not handle active event catalog types", async () => {
+    const root = await tempRoot();
+    process.env.BALLET_PROJECT_ROOT = root;
+    process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
+    await mkdir(path.join(root, ".ballet/events"), { recursive: true });
+    await mkdir(path.join(root, ".ballet/policies"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
+    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api", apiRouter);
+    const { server, url } = await listen(app);
+
+    try {
+      const unknown = await fetch(`${url}/api/policies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Unknown event policy",
+          description: "Invalid.",
+          active: true,
+          match: { eventTypes: ["unknown.event.v1"], projectId: "*", source: "*" },
+          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
+        })
+      });
+      expect(unknown.status).toBe(400);
+      expect(await unknown.json()).toMatchObject({ error: "Policy references unknown or inactive event type: unknown.event.v1" });
+
+      const empty = await fetch(`${url}/api/policies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Empty event policy",
+          description: "Invalid.",
+          active: true,
+          match: { eventTypes: [], projectId: "*", source: "*" },
+          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
+        })
+      });
+      expect(empty.status).toBe(400);
+      expect(await empty.json()).toMatchObject({ error: "Policy must handle exactly one active event type." });
+
+      const multiple = await fetch(`${url}/api/policies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Multiple event policy",
+          description: "Invalid.",
+          active: true,
+          match: { eventTypes: ["plan.approved.v1", "plan.rejected.v1"], projectId: "*", source: "*" },
+          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
+        })
+      });
+      expect(multiple.status).toBe(400);
+      expect(await multiple.json()).toMatchObject({ error: "Policy must handle exactly one active event type." });
+
+      const valid = await fetch(`${url}/api/policies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Plan approved policy",
+          description: "Valid.",
+          active: true,
+          match: { eventTypes: ["plan.approved.v1"], projectId: "*", source: "*" },
+          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
+        })
+      });
+      expect(valid.status).toBe(201);
+      expect(await valid.json()).toMatchObject({
+        name: "Plan approved policy",
+        match: { eventTypes: ["plan.approved.v1"] }
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  it("protects event definitions that are consumed by policies", async () => {
+    const root = await tempRoot();
+    process.env.BALLET_PROJECT_ROOT = root;
+    process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
+    await mkdir(path.join(root, ".ballet/events"), { recursive: true });
+    await mkdir(path.join(root, ".ballet/policies"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
+    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
+    await writeFile(path.join(root, ".ballet/policies/on-plan-approved.md"), "---\nid: on-plan-approved\nname: On plan approved\ndescription: Route approved plans.\nactive: true\nmatch:\n  eventTypes:\n    - plan.approved.v1\n  projectId: \"*\"\n  source: \"*\"\naction:\n  type: start_agent_run\n  targetAgentId: developer-agent\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nPolicy body.", "utf8");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api", apiRouter);
+    const { server, url } = await listen(app);
+
+    try {
+      const deactivate = await fetch(`${url}/api/event-definitions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "plan-approved-v1",
+          name: "Plan approved",
+          description: "Allowed event.",
+          active: false,
+          eventType: "plan.approved.v1",
+          source: "*",
+          producers: [],
+          payloadExample: {}
+        })
+      });
+      expect(deactivate.status).toBe(400);
+      expect(await deactivate.json()).toMatchObject({ error: "Event type plan.approved.v1 is used by policies: On plan approved" });
+
+      const rename = await fetch(`${url}/api/event-definitions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "plan-approved-v1",
+          name: "Plan approved",
+          description: "Allowed event.",
+          active: true,
+          eventType: "plan.accepted.v1",
+          source: "*",
+          producers: [],
+          payloadExample: {}
+        })
+      });
+      expect(rename.status).toBe(400);
+      expect(await rename.json()).toMatchObject({ error: "Event type plan.approved.v1 cannot be renamed because it is used by policies: On plan approved" });
+
+      const deleteResponse = await fetch(`${url}/api/event-definitions/plan-approved-v1`, { method: "DELETE" });
+      expect(deleteResponse.status).toBe(400);
+      expect(await deleteResponse.json()).toMatchObject({ error: "Event type plan.approved.v1 is used by policies: On plan approved" });
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
   it("streams runtime changes over SSE", async () => {
     const app = express();
     app.use(express.json());

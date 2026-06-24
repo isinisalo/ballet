@@ -8,6 +8,14 @@ const collectionSet = new Set(collections);
 
 export const apiRouter = express.Router();
 
+const handleEventValidationError = (error: unknown, res: express.Response): boolean => {
+  if (error instanceof EventValidationError) {
+    res.status(400).json({ error: error.message });
+    return true;
+  }
+  return false;
+};
+
 apiRouter.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
@@ -103,6 +111,7 @@ apiRouter.post("/event-definitions", async (req, res, next) => {
     const saved = await store.saveEventDefinition(req.body);
     res.status(req.body.id ? 200 : 201).json(saved);
   } catch (error) {
+    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });
@@ -112,6 +121,7 @@ apiRouter.delete("/event-definitions/:id", async (req, res, next) => {
     await store.removeEventDefinition(req.params.id);
     res.status(204).end();
   } catch (error) {
+    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });
@@ -160,9 +170,7 @@ apiRouter.post("/events/intake", async (req, res, next) => {
     const event = await store.createEvent(req.body);
     res.status(201).json(event);
   } catch (error) {
-    if (error instanceof EventValidationError) {
-      return res.status(400).json({ error: error.message });
-    }
+    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });
@@ -186,6 +194,7 @@ apiRouter.post("/:collection", async (req, res, next) => {
     const saved = await store.upsert(collection, req.body);
     res.status(req.body.id ? 200 : 201).json(saved);
   } catch (error) {
+    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });

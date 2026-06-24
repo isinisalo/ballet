@@ -29,7 +29,7 @@ import {
   UserRound,
   type LucideIcon
 } from "lucide-react";
-import type { Adr, Agent, AgentRun, AgentRunLog, AppData, EventDefinition, EventRecord, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
+import type { Adr, Agent, AgentRun, AgentRunLog, AppData, EventDefinition, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -239,16 +239,13 @@ const parsePolicyMatch = (value: string): NonNullable<Policy["match"]> => {
   return parsed as NonNullable<Policy["match"]>;
 };
 
-const eventTemplate = (
-  projectId: string,
-  definition?: EventDefinition
-): Partial<EventRecord> & Pick<EventRecord, "projectId" | "eventType"> => ({
-  projectId,
-  source: definition?.source && definition.source !== "*" ? definition.source : "manual-dashboard",
-  eventType: definition?.eventType ?? "",
-  tags: definition?.tags ?? [],
-  payload: definition?.payloadExample ?? {}
-});
+const eventTypesForPolicy = (policy: Partial<Policy>): string[] => policy.match?.eventTypes ?? policy.eventTypes ?? [];
+
+const advancedPolicyMatchForForm = (policy: Partial<Policy>): NonNullable<Policy["match"]> => {
+  const advancedMatch = { ...policyMatchForForm(policy) };
+  delete advancedMatch.eventTypes;
+  return advancedMatch;
+};
 
 const routeFromPath = (path: string): RouteState => {
   const url = new URL(path, "http://localhost");
@@ -1193,9 +1190,6 @@ export function App() {
                 <EventsView
                   data={data}
                   eventDefinition={selectedEventDefinition}
-                  project={project}
-                  refresh={refresh}
-                  remove={remove}
                   saveEventDefinition={saveEventDefinition}
                   removeEventDefinition={removeEventDefinition}
                   navigate={navigate}
@@ -1656,21 +1650,33 @@ function RuntimesView({
 }
 
 function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Project; policy?: Policy }) {
+  const activeDefinitions = useMemo(
+    () => data.eventDefinitions.filter((definition) => definition.active && definition.eventType),
+    [data.eventDefinitions]
+  );
   const [form, setForm] = useState<Partial<Policy>>(policy ?? policyTemplate(data.agents[0]?.id ?? ""));
-  const [matchText, setMatchText] = useState("");
+  const [selectedEventType, setSelectedEventType] = useState(eventTypesForPolicy(policy ?? {})[0] ?? "");
+  const [advancedMatchText, setAdvancedMatchText] = useState("");
   const [error, setError] = useState("");
+  const activeEventTypeSet = useMemo(() => new Set(activeDefinitions.map((definition) => definition.eventType)), [activeDefinitions]);
+  const invalidSelectedEventType = selectedEventType && !activeEventTypeSet.has(selectedEventType) ? selectedEventType : "";
 
   useEffect(() => {
     const next = policy ?? policyTemplate(data.agents[0]?.id ?? "");
+    const nextEventTypes = eventTypesForPolicy(next);
     setForm(next);
-    setMatchText(readJson(policyMatchForForm(next)));
+    setSelectedEventType(nextEventTypes[0] ?? activeDefinitions[0]?.eventType ?? "");
+    setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
     setError("");
-  }, [data.agents, policy]);
+  }, [activeDefinitions, data.agents, policy]);
 
   const submit = async () => {
     setError("");
     try {
-      const match = parsePolicyMatch(matchText);
+      if (!selectedEventType) throw new Error("Select exactly one event type for this policy.");
+      const advancedMatch = parsePolicyMatch(advancedMatchText);
+      delete advancedMatch.eventTypes;
+      const match = { ...advancedMatch, eventTypes: [selectedEventType] };
       const targetAgentId = policyTargetForForm(form, data.agents[0]?.id ?? "");
       await save("policies", {
         ...form,
@@ -1691,6 +1697,13 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
     <div className="grid gap-4 xl:max-w-3xl">
       <Panel title={form.id ? "Update policy" : "Create policy"} icon={<GitBranch data-icon="inline-start" />}>
         {form.errors?.length ? <ErrorPreview errors={form.errors} /> : null}
+        {invalidSelectedEventType ? (
+          <Alert variant="destructive">
+            <AlertDescription>
+              Policy references an event type that is not active in the event catalog: {invalidSelectedEventType}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
         <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
           <FieldGroup>
@@ -1703,17 +1716,31 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
               onChange={(targetAgentId) => setForm({ ...form, targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
             />
             <SwitchField label="Active" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />
-            <TextAreaField label="Match JSON" rows={10} value={matchText} onChange={setMatchText} />
+            {activeDefinitions.length === 0 ? (
+              <EmptyState title="No active event definitions." action="Create an active event before saving policies." />
+            ) : (
+              <SelectField
+                label="Handled event type"
+                value={selectedEventType}
+                options={[
+                  ...activeDefinitions.map((definition) => ({ value: definition.eventType, label: `${definition.eventType} · ${definition.name}` })),
+                  ...(invalidSelectedEventType ? [{ value: invalidSelectedEventType, label: `${invalidSelectedEventType} · unavailable` }] : [])
+                ]}
+                onChange={setSelectedEventType}
+              />
+            )}
+            <TextAreaField label="Advanced match JSON" rows={8} value={advancedMatchText} onChange={setAdvancedMatchText} />
           </FieldGroup>
           <CrudActions
             newLabel="New"
             saveLabel="Save policy"
             id={form.id}
-            disabled={data.agents.length === 0}
+            disabled={data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType)}
             onNew={() => {
               const next = policyTemplate(data.agents[0]?.id ?? "");
               setForm(next);
-              setMatchText(readJson(policyMatchForForm(next)));
+              setSelectedEventType(activeDefinitions[0]?.eventType ?? "");
+              setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
               setError("");
             }}
             onDelete={() => void remove("policies", form.id!)}
@@ -1724,40 +1751,52 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
   );
 }
 
+function ProducerRules({ definition }: { definition: EventDefinition }) {
+  if (definition.producers.length === 0) {
+    return <EmptyState title="No agent-run producers." action="This event can be published externally or by system integration." />;
+  }
+
+  return (
+    <div className="grid gap-2">
+      {definition.producers.map((producer, index) => (
+        <div key={`${producer.agentRole}-${index}`} className="rounded-md border bg-card px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="rounded-md">{producer.agentRole}</Badge>
+            {producer.outcomes.map((outcome) => (
+              <Badge key={outcome} variant="outline" className="rounded-md">{outcome}</Badge>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span>Git commit: {producer.requires?.gitCommitExists === true ? "required" : "not required"}</span>
+            <span>Checks: {producer.requires?.requiredChecksPassed === true ? "must pass" : "not required"}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EventsView({
   data,
   eventDefinition,
-  project,
-  refresh,
-  remove,
   saveEventDefinition,
   removeEventDefinition,
   navigate
 }: {
   data: AppData;
   eventDefinition?: EventDefinition;
-  project?: Project;
-  refresh: () => Promise<void>;
-  remove: (collection: SaveCollection | "events", id: string) => Promise<void>;
   saveEventDefinition: (eventDefinition: Partial<EventDefinition>) => Promise<EventDefinition>;
   removeEventDefinition: (id: string) => Promise<void>;
   navigate: (path: string) => void;
 }) {
-  const activeDefinitions = useMemo(
-    () => data.eventDefinitions.filter((definition) => definition.active && definition.eventType),
-    [data.eventDefinitions]
-  );
   const [definitionForm, setDefinitionForm] = useState<Partial<EventDefinition>>(eventDefinition ?? eventDefinitionTemplate());
   const [producersText, setProducersText] = useState(readJson(definitionForm.producers ?? []));
   const [payloadExampleText, setPayloadExampleText] = useState(readJson(definitionForm.payloadExample ?? {}));
   const [definitionError, setDefinitionError] = useState("");
-  const [form, setForm] = useState(eventTemplate(project?.id ?? "", activeDefinitions[0]));
-  const [payloadText, setPayloadText] = useState(readJson(form.payload));
-  const [error, setError] = useState("");
 
   const activeEventTypes = useMemo(
-    () => new Set(activeDefinitions.map((definition) => definition.eventType)),
-    [activeDefinitions]
+    () => new Set(data.eventDefinitions.filter((definition) => definition.active).map((definition) => definition.eventType)),
+    [data.eventDefinitions]
   );
   const missingPolicyEventTypes = useMemo(() => {
     const policyTypes = data.policies.flatMap((policy) => policy.match?.eventTypes ?? policy.eventTypes ?? []);
@@ -1772,20 +1811,6 @@ function EventsView({
     setDefinitionError("");
   }, [eventDefinition]);
 
-  useEffect(() => {
-    const next = eventTemplate(project?.id ?? "", activeDefinitions[0]);
-    setForm(next);
-    setPayloadText(readJson(next.payload));
-    setError("");
-  }, [activeDefinitions, project?.id]);
-
-  const selectDefinitionForIntake = (eventType: string) => {
-    const definition = activeDefinitions.find((item) => item.eventType === eventType);
-    const next = eventTemplate(form.projectId, definition);
-    setForm(next);
-    setPayloadText(readJson(next.payload));
-  };
-
   const saveDefinition = async () => {
     setDefinitionError("");
     try {
@@ -1798,21 +1823,6 @@ function EventsView({
       if (saved.relativePath) navigate(eventDefinitionDocumentPath(saved.relativePath));
     } catch (err) {
       setDefinitionError(err instanceof Error ? err.message : "Unable to save event definition.");
-    }
-  };
-
-  const submit = async () => {
-    setError("");
-    try {
-      await api.intakeEvent({
-        ...form,
-        payload: parsePayload(payloadText),
-        tags: form.tags ?? [],
-        body: form.body ?? "Event submitted from the dashboard."
-      });
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to submit event.");
     }
   };
 
@@ -1844,6 +1854,7 @@ function EventsView({
               <TextField label="Name" required value={definitionForm.name ?? ""} onChange={(name) => setDefinitionForm({ ...definitionForm, name })} />
               <TextAreaField label="Description" value={definitionForm.description ?? ""} onChange={(description) => setDefinitionForm({ ...definitionForm, description })} />
               <TextField label="Event type" required value={definitionForm.eventType ?? ""} onChange={(eventType) => setDefinitionForm({ ...definitionForm, eventType })} />
+              <TextField label="Source" required value={definitionForm.source ?? ""} onChange={(source) => setDefinitionForm({ ...definitionForm, source })} />
               <SwitchField label="Active" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />
               <TextAreaField label="Producers JSON" rows={7} value={producersText} onChange={setProducersText} />
               <TextAreaField label="Payload example JSON" rows={7} value={payloadExampleText} onChange={setPayloadExampleText} />
@@ -1862,69 +1873,12 @@ function EventsView({
           </form>
         </Panel>
 
-        <Panel title="Event intake" icon={<Save data-icon="inline-start" />}>
-          {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-          <form className="mt-4 flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-            <FieldGroup>
-              <SelectField
-                label="Event type"
-                value={form.eventType}
-                options={activeDefinitions.map((definition) => ({ value: definition.eventType, label: definition.eventType }))}
-                onChange={selectDefinitionForIntake}
-              />
-              <TextField label="Source agent/runtime" value={form.source ?? ""} onChange={(source) => setForm({ ...form, source })} />
-              <TextAreaField label="Payload JSON" rows={10} value={payloadText} onChange={setPayloadText} />
-            </FieldGroup>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={activeDefinitions.length === 0}
-                onClick={() => {
-                  const next = eventTemplate(project?.id ?? "", activeDefinitions[0]);
-                  setForm(next);
-                  setPayloadText(readJson(next.payload));
-                }}
-              >
-                <Plus data-icon="inline-start" />
-                Seed from definition
-              </Button>
-              <Button type="submit" disabled={activeDefinitions.length === 0 || !form.eventType}>
-                <Save data-icon="inline-start" />
-                Submit event
-              </Button>
-            </div>
-          </form>
-        </Panel>
+        <div className="grid gap-4">
+          <Panel title="Agent-run production rules" icon={<Route data-icon="inline-start" />} compact>
+            {eventDefinition ? <ProducerRules definition={eventDefinition} /> : <EmptyState title="No event definition selected." />}
+          </Panel>
+        </div>
       </div>
-
-      <Panel title="Runtime event inbox" icon={<CheckCircle2 data-icon="inline-start" />}>
-        <DataTable
-          empty="No events received."
-          columns={["Seq", "Created", "Type", "Status", "Subject", "Correlation", "Policy", "Runs", "Result"]}
-          rows={data.events.map((event) => ({
-            id: event.id,
-            cells: [
-              event.seq ? String(event.seq) : "-",
-              new Date(event.createdAt).toLocaleString(),
-              event.eventType,
-              <StatusBadge status={event.status} />,
-              event.subject ?? event.projectId,
-              event.correlationId ? <span className="font-mono text-xs">{event.correlationId}</span> : "-",
-              data.policies.find((policy) => policy.id === event.matchedPolicyId)?.name ?? "none",
-              event.routing?.decisions.filter((decision) => decision.status === "routed").map((decision) =>
-                data.agents.find((agent) => agent.id === decision.targetAgentId)?.name ?? decision.targetAgentId
-              ).join(", ") || data.agents.find((agent) => agent.id === event.assignedAgentId)?.name || "unassigned",
-              event.handlingResult ?? "No handler result."
-            ],
-            action: (
-              <Button size="icon-sm" variant="destructive" title="Delete event" onClick={() => void remove("events", event.id)}>
-                <Trash2 />
-              </Button>
-            )
-          }))}
-        />
-      </Panel>
     </div>
   );
 }

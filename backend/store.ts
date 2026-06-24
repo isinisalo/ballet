@@ -15,6 +15,18 @@ export class EventValidationError extends Error {
   }
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const eventTypesForPolicy = (policy: unknown): string[] => {
+  if (!isRecord(policy)) return [];
+  const match = isRecord(policy.match) ? policy.match : undefined;
+  const rawEventTypes = match?.eventTypes ?? policy.eventTypes;
+  if (Array.isArray(rawEventTypes)) return rawEventTypes.map(String).filter(Boolean);
+  if (typeof rawEventTypes === "string") return rawEventTypes ? [rawEventTypes] : [];
+  return [];
+};
+
 export class MarkdownStore {
   private runtimeDb?: RuntimeDatabase;
   private runtimeDbPath?: string;
@@ -55,6 +67,7 @@ export class MarkdownStore {
     const data = await this.read();
     const existing = (data[collection] as unknown as Array<Record<string, unknown>>).find((candidate) => candidate.id === item.id);
     const nextInput = { ...existing, ...item } as Record<string, unknown>;
+    if (collection === "policies") this.validatePolicyInput(nextInput, data.eventDefinitions);
     const saved = await writeEntityMarkdown(this.root, collection as MutableMarkdownCollection, nextInput);
     const refreshed = await this.read();
     return ((refreshed[collection] as unknown as Array<Record<string, unknown>>).find((candidate) => candidate.id === saved.id) ?? saved) as unknown as AppData[T][number];
@@ -78,6 +91,7 @@ export class MarkdownStore {
     const data = await this.read();
     const existing = data.eventDefinitions.find((candidate) => candidate.id === item.id);
     const nextInput = { ...existing, ...item } as Record<string, unknown>;
+    if (existing) this.validateEventDefinitionChange(existing, nextInput, data.policies);
     const saved = await writeEntityMarkdown(this.root, "eventDefinitions", nextInput);
     const refreshed = await this.read();
     return refreshed.eventDefinitions.find((candidate) => candidate.id === saved.id) ?? (saved as unknown as EventDefinition);
@@ -87,6 +101,7 @@ export class MarkdownStore {
     const data = await this.read();
     const target = data.eventDefinitions.find((item) => item.id === id);
     if (!target?.relativePath) return;
+    this.validateEventDefinitionRemoval(target, data.policies);
     await removeEntityMarkdown(this.root, target.relativePath);
   }
 
@@ -154,6 +169,52 @@ export class MarkdownStore {
       this.runtimeDbPath = dbPath;
     }
     return this.runtimeDb;
+  }
+
+  private validatePolicyInput(input: Record<string, unknown>, eventDefinitions: EventDefinition[]) {
+    const eventTypes = eventTypesForPolicy(input);
+    if (eventTypes.length === 0) {
+      throw new EventValidationError("Policy must handle exactly one active event type.");
+    }
+    if (eventTypes.length > 1) {
+      throw new EventValidationError("Policy must handle exactly one active event type.");
+    }
+
+    const activeEventTypes = new Set(eventDefinitions.filter((definition) => definition.active).map((definition) => definition.eventType));
+    const missing = eventTypes.filter((eventType) => !activeEventTypes.has(eventType));
+    if (missing.length > 0) {
+      throw new EventValidationError(`Policy references unknown or inactive event type: ${missing.join(", ")}`);
+    }
+  }
+
+  private policiesUsingEventType(eventType: string, policies: unknown[]): string[] {
+    return policies
+      .filter((policy) => eventTypesForPolicy(policy).includes(eventType))
+      .map((policy) => {
+        if (!isRecord(policy)) return "unknown-policy";
+        return typeof policy.name === "string" && policy.name ? policy.name : String(policy.id ?? "unknown-policy");
+      });
+  }
+
+  private validateEventDefinitionChange(existing: EventDefinition, nextInput: Record<string, unknown>, policies: AppData["policies"]) {
+    const nextEventType = typeof nextInput.eventType === "string" ? nextInput.eventType : existing.eventType;
+    const nextActive = typeof nextInput.active === "boolean" ? nextInput.active : existing.active;
+    const referencedBy = this.policiesUsingEventType(existing.eventType, policies);
+    if (referencedBy.length === 0) return;
+
+    if (!nextActive) {
+      throw new EventValidationError(`Event type ${existing.eventType} is used by policies: ${referencedBy.join(", ")}`);
+    }
+    if (nextEventType !== existing.eventType) {
+      throw new EventValidationError(`Event type ${existing.eventType} cannot be renamed because it is used by policies: ${referencedBy.join(", ")}`);
+    }
+  }
+
+  private validateEventDefinitionRemoval(definition: EventDefinition, policies: AppData["policies"]) {
+    const referencedBy = this.policiesUsingEventType(definition.eventType, policies);
+    if (referencedBy.length > 0) {
+      throw new EventValidationError(`Event type ${definition.eventType} is used by policies: ${referencedBy.join(", ")}`);
+    }
   }
 }
 
