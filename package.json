@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"tsx watch backend/index.ts\"",
     "server": "tsx backend/index.ts",
-    "build": "tsc -b && vite build",
+    "build": "rm -rf dist dist-server && tsc -b --force && vite build",
     "test": "vitest run",
     "lint": "eslint .",
     "preview": "npm run build && node dist-server/index.js"

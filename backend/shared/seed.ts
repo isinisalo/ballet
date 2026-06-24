@@ -57,6 +57,7 @@ export const seedData: AppData = {
       description: "Handles Kubernetes deployment and readiness failures.",
       instructions: "Inspect deployment payloads, identify failing service and namespace, then recommend remediation steps.",
       enabled: true,
+      status: "offline",
       createdAt: now,
       updatedAt: now,
       skills: [
@@ -80,6 +81,7 @@ export const seedData: AppData = {
       description: "Reviews architectural decisions and policy-impacting events.",
       instructions: "Connect events back to project goals and ADRs, then propose a decision record when needed.",
       enabled: true,
+      status: "offline",
       createdAt: now,
       updatedAt: now,
       skills: [

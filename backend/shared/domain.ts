@@ -1,6 +1,7 @@
 export type EntityStatus = "active" | "paused" | "archived";
 export type AdrStatus = "proposed" | "accepted" | "superseded" | "rejected";
 export type EventStatus = "received" | "routed" | "unassigned" | "handled";
+export type AgentStatus = "online" | "offline";
 export type RuntimeType = "codex-cli" | "custom";
 
 export interface MarkdownDocument {
@@ -103,6 +104,7 @@ export interface Agent {
   instructions: string;
   skills: Skill[];
   enabled: boolean;
+  status: AgentStatus;
   createdAt: string;
   updatedAt: string;
   model?: string;

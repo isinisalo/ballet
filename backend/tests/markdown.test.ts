@@ -81,6 +81,7 @@ describe("Markdown collection loading", () => {
     expect(data.agents.map((agent) => agent.id).sort()).toEqual(["architect", "reviewer"]);
     expect(data.agents.find((agent) => agent.id === "architect")?.model).toBe("gpt-5.5");
     expect(data.agents.find((agent) => agent.id === "architect")?.modelReasoningEffort).toBe("high");
+    expect(data.agents.find((agent) => agent.id === "architect")?.status).toBe("offline");
     expect(data.agents.find((agent) => agent.id === "architect")?.nicknameCandidates).toEqual(["Arch", "Atlas"]);
     expect(data.agents.find((agent) => agent.id === "architect")?.instructions).toContain("Design architecture");
     expect(data.skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
@@ -308,6 +309,7 @@ describe("Markdown collection loading", () => {
       name: "Reviewer",
       description: "Updated",
       instructions: "Updated instructions",
+      status: "online",
       model: "gpt-5.5",
       modelReasoningEffort: "high",
       nicknameCandidates: ["Atlas"],
@@ -323,6 +325,7 @@ describe("Markdown collection loading", () => {
     const source = await readFile(path.join(root, ".codex/agents/reviewer.toml"), "utf8");
 
     expect(source).toContain('description = "Updated"');
+    expect(source).toContain('status = "online"');
     expect(source).toContain('model = "gpt-5.5"');
     expect(source).toContain('model_reasoning_effort = "high"');
     expect(source).toContain('nickname_candidates = [ "Atlas" ]');

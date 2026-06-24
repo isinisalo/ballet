@@ -528,6 +528,7 @@ function ProjectDocumentTreeDirectory({
 }
 
 type SidebarDocumentEntity = Pick<Agent | Skill, "id" | "name" | "relativePath">;
+type SidebarAgentEntity = Pick<Agent, "id" | "name" | "relativePath" | "status">;
 
 function SidebarDocumentList({
   documents,
@@ -561,6 +562,45 @@ function SidebarDocumentList({
               }}
             >
               <span>{document.name}</span>
+            </SidebarMenuSubButton>
+          </SidebarMenuSubItem>
+        );
+      })}
+    </SidebarMenuSub>
+  );
+}
+
+function SidebarAgentList({
+  agents,
+  activePath,
+  navigate
+}: {
+  agents: SidebarAgentEntity[];
+  activePath?: string;
+  navigate: (path: string) => void;
+}) {
+  if (agents.length === 0) return null;
+
+  return (
+    <SidebarMenuSub>
+      {agents.map((agent) => {
+        const relativePath = agent.relativePath;
+        if (!relativePath) return null;
+        const path = agentDocumentPath(relativePath);
+        return (
+          <SidebarMenuSubItem key={agent.id}>
+            <SidebarMenuSubButton
+              href={path}
+              size="sm"
+              isActive={relativePath === activePath}
+              className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+              onClick={(event) => {
+                event.preventDefault();
+                navigate(path);
+              }}
+            >
+              <AgentStatusDot status={agent.status} />
+              <span>{agent.name}</span>
             </SidebarMenuSubButton>
           </SidebarMenuSubItem>
         );
@@ -670,6 +710,41 @@ function EmptyState({ title, action }: { title: string; action?: string }) {
         {action ? <span className="ml-2 text-muted-foreground">{action}</span> : null}
       </AlertDescription>
     </Alert>
+  );
+}
+
+function AgentStatusDot({ status }: { status: Agent["status"] }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "size-2 shrink-0 rounded-full",
+        status === "online" ? "bg-emerald-500 shadow-[0_0_0_3px] shadow-emerald-500/15" : "bg-muted-foreground/45"
+      )}
+    />
+  );
+}
+
+function AgentStatusBadge({ status }: { status: Agent["status"] }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "w-fit gap-1.5 rounded-md px-2 font-normal",
+        status === "online" ? "border-emerald-500/35 text-emerald-500" : "text-muted-foreground"
+      )}
+    >
+      <AgentStatusDot status={status} />
+      {status === "online" ? "Online" : "Offline"}
+    </Badge>
+  );
+}
+
+function AgentEnabledBadge({ enabled }: { enabled: boolean }) {
+  return (
+    <Badge variant={enabled ? "secondary" : "outline"} className="w-fit rounded-md px-2 font-normal">
+      {enabled ? "Enabled" : "Disabled"}
+    </Badge>
   );
 }
 
@@ -801,7 +876,7 @@ function AppSidebar({
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarDocumentList documents={agents} activePath={agentsOpen ? route.documentPath : undefined} pathFor={agentDocumentPath} navigate={navigate} />
+                    <SidebarAgentList agents={agents} activePath={agentsOpen ? route.documentPath : undefined} navigate={navigate} />
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
@@ -1078,6 +1153,13 @@ function AgentsView({
   save: ViewProps["save"];
 }) {
   const [savingSetting, setSavingSetting] = useState<"model" | "reasoning" | null>(null);
+  const [instructionsText, setInstructionsText] = useState(agent?.instructions ?? "");
+  const [savingInstructions, setSavingInstructions] = useState(false);
+
+  useEffect(() => {
+    setInstructionsText(agent?.instructions ?? "");
+    setSavingInstructions(false);
+  }, [agent?.id, agent?.instructions]);
 
   if (!agent) return <EmptyState title="No agent selected." />;
 
@@ -1101,6 +1183,15 @@ function AgentsView({
     }
   };
 
+  const saveInstructions = async () => {
+    setSavingInstructions(true);
+    try {
+      await save("agents", { ...agent, instructions: instructionsText });
+    } finally {
+      setSavingInstructions(false);
+    }
+  };
+
   return (
     <div className="grid min-h-[calc(100svh-2rem)] gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
       <Card className="self-start overflow-hidden">
@@ -1111,9 +1202,7 @@ function AgentsView({
           <div className="flex flex-col gap-2">
             <CardTitle className="text-lg leading-tight">{agent.name}</CardTitle>
             <CardDescription className="text-sm leading-relaxed">{agent.description || "No description."}</CardDescription>
-            <Badge variant={agent.enabled ? "secondary" : "outline"} className="w-fit">
-              {agent.enabled ? "Enabled" : "Offline"}
-            </Badge>
+            <AgentStatusBadge status={agent.status} />
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-0 p-0">
@@ -1126,6 +1215,9 @@ function AgentsView({
           <section className="border-t px-5 py-4">
             <h2 className="mb-4 font-mono text-xs font-medium uppercase text-muted-foreground">Properties</h2>
             <dl className="flex flex-col gap-3">
+              <AgentBadgeProperty label="Enabled">
+                <AgentEnabledBadge enabled={agent.enabled} />
+              </AgentBadgeProperty>
               <AgentProperty label="Runtime" value={runtimeLabel} icon={<Monitor aria-hidden="true" />} />
               <AgentSelectProperty
                 label="Model"
@@ -1166,21 +1258,40 @@ function AgentsView({
       </Card>
 
       <Card className="min-w-0">
-        <CardHeader className="border-b p-5">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <FileKey2 data-icon="inline-start" />
+        <CardHeader className="border-b px-5 py-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <FileKey2 className="size-3.5" aria-hidden="true" />
             Instructions
           </CardTitle>
-          <CardDescription>
-            Define this agent's identity and working style. Markdown is rendered as preview.
-          </CardDescription>
         </CardHeader>
         <CardContent className="p-5">
-          <ScrollArea className="h-[min(68svh,44rem)] rounded-lg border bg-background">
-            <div className="agent-instructions-preview min-w-0 p-5 md:p-6">
-              <MarkdownBody source={agent.instructions} title={agent.name} />
+          <form className="flex flex-col gap-5" onSubmit={(event) => { event.preventDefault(); void saveInstructions(); }}>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Markdown</FieldLabel>
+                <Textarea
+                  className="min-h-72 resize-y font-mono text-sm leading-relaxed"
+                  value={instructionsText}
+                  required
+                  onChange={(event) => setInstructionsText(event.target.value)}
+                />
+              </Field>
+            </FieldGroup>
+            <div className="flex justify-end">
+              <Button type="submit" disabled={savingInstructions || instructionsText === agent.instructions}>
+                <Save data-icon="inline-start" />
+                {savingInstructions ? "Saving..." : "Save instructions"}
+              </Button>
             </div>
-          </ScrollArea>
+            <section className="flex flex-col gap-3">
+              <h2 className="font-mono text-xs font-medium uppercase text-muted-foreground">Preview</h2>
+              <ScrollArea className="h-[min(36svh,24rem)] rounded-lg border bg-background">
+                <div className="agent-instructions-preview min-w-0 p-5 md:p-6">
+                  <MarkdownBody source={instructionsText} title={agent.name} />
+                </div>
+              </ScrollArea>
+            </section>
+          </form>
         </CardContent>
       </Card>
     </div>
@@ -1195,6 +1306,15 @@ function AgentProperty({ label, value, icon }: { label: string; value: string; i
         <span className="text-muted-foreground [&>svg]:size-3.5">{icon}</span>
         <span className="truncate">{value}</span>
       </dd>
+    </div>
+  );
+}
+
+function AgentBadgeProperty({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3 text-sm">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
     </div>
   );
 }

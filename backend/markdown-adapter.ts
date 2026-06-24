@@ -1,6 +1,6 @@
 import path from "node:path";
 import { stat, unlink } from "node:fs/promises";
-import type { Adr, AdrStatus, Agent, AppData, EntityStatus, EventRecord, EventStatus, Goal, MarkdownDocument, Policy, Project, Runtime, Skill } from "./shared/domain.js";
+import type { Adr, AdrStatus, Agent, AgentStatus, AppData, EntityStatus, EventRecord, EventStatus, Goal, MarkdownDocument, Policy, Project, Runtime, Skill } from "./shared/domain.js";
 import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadEvents, loadGoals, loadPolicies, loadSkills, readMarkdownDocument, safeSlug, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
 
 const now = () => new Date().toISOString();
@@ -15,6 +15,7 @@ const validEntityStatus = (value: unknown): EntityStatus => ["active", "paused",
 const validGoalStatus = (value: unknown): Goal["status"] => ["not-started", "in-progress", "at-risk", "done"].includes(stringValue(value)) ? stringValue(value) as Goal["status"] : "not-started";
 const validAdrStatus = (value: unknown): AdrStatus => ["proposed", "accepted", "superseded", "rejected"].includes(stringValue(value)) ? stringValue(value) as AdrStatus : "proposed";
 const validEventStatus = (value: unknown): EventStatus => ["received", "routed", "unassigned", "handled"].includes(stringValue(value)) ? stringValue(value) as EventStatus : "received";
+const validAgentStatus = (value: unknown): AgentStatus => ["online", "offline"].includes(stringValue(value)) ? stringValue(value) as AgentStatus : "offline";
 const dateValue = (value: unknown): string => stringValue(value, now());
 
 const bodyPreview = (body: string): string => body.replace(/^#+\s+/gm, "").split(/\n{2,}/)[0]?.trim() ?? "";
@@ -95,6 +96,7 @@ const agentFromDocument = (doc: MarkdownDocument): Agent => {
     instructions: stringValue(fm.developer_instructions ?? fm.instructions, doc.body),
     skills,
     enabled: booleanValue(fm.enabled, true),
+    status: validAgentStatus(fm.status),
     createdAt: dateValue(fm.createdAt),
     updatedAt: dateValue(fm.updatedAt ?? fm.createdAt),
     model: stringValue(fm.model) || undefined,
@@ -250,6 +252,7 @@ const agentFrontmatter = (item: Record<string, unknown>): Record<string, unknown
   const base = isRecord(item.frontmatter) ? { ...item.frontmatter } : {};
   const model = stringValue(item.model ?? base.model);
   const modelReasoningEffort = stringValue(item.model_reasoning_effort ?? item.modelReasoningEffort ?? base.model_reasoning_effort);
+  const status = validAgentStatus(item.status ?? base.status);
   const nicknameCandidates = Array.isArray(item.nickname_candidates)
     ? stringArray(item.nickname_candidates)
     : Array.isArray(item.nicknameCandidates)
@@ -259,6 +262,7 @@ const agentFrontmatter = (item: Record<string, unknown>): Record<string, unknown
   const next: Record<string, unknown> = {
     ...base,
     name: stringValue(item.name ?? base.name),
+    status,
     description: stringValue(item.description ?? base.description),
     developer_instructions: stringValue(item.developer_instructions ?? item.instructions ?? base.developer_instructions)
   };
