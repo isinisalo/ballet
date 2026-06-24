@@ -3,6 +3,48 @@ export type AdrStatus = "proposed" | "accepted" | "superseded" | "rejected";
 export type EventStatus = "received" | "routed" | "unassigned" | "handled";
 export type AgentStatus = "online" | "offline";
 export type RuntimeType = "codex-cli" | "custom";
+export type AgentRunStatus = "queued" | "running" | "completed" | "failed" | "blocked" | "needs_input" | "cancelled";
+export type AgentOutcomeStatus = "ready" | "blocked" | "needs_input" | "approved" | "changes_requested" | "failed";
+export type RunCheckStatus = "passed" | "failed" | "skipped";
+export type PolicyPredicateOperator = "equals" | "in" | "exists";
+export type PolicyPredicateScalar = string | number | boolean | null;
+
+export interface PolicyPredicate {
+  operator: PolicyPredicateOperator;
+  value?: PolicyPredicateScalar | PolicyPredicateScalar[];
+}
+
+export interface PolicyMatch {
+  eventTypes?: string[];
+  projectId?: string | PolicyPredicate;
+  source?: string | PolicyPredicate;
+  subject?: string | PolicyPredicate;
+  tags?: string[] | PolicyPredicate;
+  payload?: Record<string, PolicyPredicate | PolicyPredicateScalar | PolicyPredicateScalar[]>;
+}
+
+export interface PolicyAction {
+  type: "start_agent_run";
+  targetAgentId: string;
+}
+
+export interface EventRoutingPolicyDecision {
+  policyId: string;
+  policyName: string;
+  policyVersion: number;
+  targetAgentId: string;
+  status: "routed" | "skipped";
+  runId?: string;
+  reason: string;
+}
+
+export interface EventRoutingSummary {
+  matchedPolicies: number;
+  routedRuns: number;
+  skippedPolicies: number;
+  decisions: EventRoutingPolicyDecision[];
+  message: string;
+}
 
 export interface MarkdownDocument {
   id: string;
@@ -90,6 +132,7 @@ export interface Skill {
   name: string;
   description: string;
   metadata: Record<string, string>;
+  enabled?: boolean;
   frontmatter?: Record<string, unknown>;
   body?: string;
   relativePath?: string;
@@ -133,10 +176,10 @@ export interface Policy {
   name: string;
   description: string;
   active: boolean;
-  priority: number;
+  match?: PolicyMatch;
+  action?: PolicyAction;
   projectId: string | "*";
   eventTypes: string[];
-  tags: string[];
   source: string;
   payloadMetadata: Record<string, string>;
   targetAgentId: string;
@@ -150,15 +193,25 @@ export interface Policy {
 }
 
 export interface EventRecord {
+  seq?: number;
   id: string;
+  eventId?: string;
   projectId: string;
   source: string;
+  type?: string;
   eventType: string;
+  subject?: string;
+  correlationId?: string;
+  causationId?: string;
+  dedupeKey?: string;
+  correlationDepth?: number;
+  occurredAt?: string;
   tags: string[];
   payload: Record<string, unknown>;
   status: EventStatus;
   matchedPolicyId?: string;
   assignedAgentId?: string;
+  routing?: EventRoutingSummary;
   handlingResult?: string;
   createdAt: string;
   frontmatter?: Record<string, unknown>;
@@ -166,6 +219,73 @@ export interface EventRecord {
   relativePath?: string;
   slug?: string;
   errors?: string[];
+}
+
+export interface RuntimeEvent {
+  seq: number;
+  eventId: string;
+  type: string;
+  source: string;
+  subject: string;
+  correlationId: string;
+  causationId?: string;
+  dedupeKey?: string;
+  correlationDepth: number;
+  occurredAt: string;
+  projectId: string;
+  tags: string[];
+  payload: Record<string, unknown>;
+  status: EventStatus;
+  matchedPolicyId?: string;
+  assignedAgentId?: string;
+  routing?: EventRoutingSummary;
+  handlingResult?: string;
+}
+
+export interface RunCheck {
+  name: string;
+  status: RunCheckStatus;
+  details?: string;
+}
+
+export interface AgentOutcome {
+  outcome: AgentOutcomeStatus;
+  summary: string;
+  artifacts?: {
+    git_sha?: string;
+    changed_files?: string[];
+    [key: string]: unknown;
+  };
+  checks: RunCheck[];
+}
+
+export interface AgentRun {
+  runId: string;
+  triggerEventId: string;
+  triggerEventSeq?: number;
+  policyId: string;
+  policyVersion: number;
+  agentRole: string;
+  status: AgentRunStatus;
+  attempt: number;
+  leaseOwner?: string;
+  leaseUntil?: string;
+  threadId?: string;
+  turnId?: string;
+  outcome?: AgentOutcome;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface AgentRunLog {
+  id: number;
+  runId: string;
+  level: "info" | "warn" | "error";
+  message: string;
+  data?: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface AppData {
@@ -177,6 +297,7 @@ export interface AppData {
   runtimes: Runtime[];
   policies: Policy[];
   events: EventRecord[];
+  agentRuns: AgentRun[];
   projectDocumentTree?: ProjectDocumentTreeNode[];
   documents?: {
     project: MarkdownDocument[];
@@ -192,9 +313,12 @@ export interface AppData {
 
 export type CollectionName = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
 
-export interface RouteResult {
-  status: EventStatus;
-  matchedPolicyId?: string;
-  assignedAgentId?: string;
-  handlingResult: string;
+export interface RouteDecision {
+  policyId: string;
+  policyName: string;
+  policyVersion: number;
+  targetAgentId: string;
+  status: "routed" | "skipped";
+  runId?: string;
+  reason: string;
 }

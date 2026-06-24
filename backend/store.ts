@@ -1,8 +1,9 @@
 import { v4 as uuid } from "uuid";
-import type { AppData, CollectionName, EventRecord, MarkdownDocument, Runtime } from "./shared/domain.js";
-import { routeEvent } from "./shared/policy.js";
+import type { AgentRunLog, AppData, CollectionName, EventRecord, MarkdownDocument, Runtime } from "./shared/domain.js";
 import { getProjectRoot } from "./markdown.js";
 import { loadMarkdownAppData, removeEntityMarkdown, runtimeDefaults, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
+import { RuntimeDatabase, resolveRuntimeDbPath } from "./runtime-db.js";
+import { notifyRuntimeChanged } from "./runtime-events.js";
 
 const timestamp = () => new Date().toISOString();
 const cloneData = (data: AppData): AppData => JSON.parse(JSON.stringify(data)) as AppData;
@@ -13,6 +14,8 @@ const markdownCollections = new Set<CollectionName>(["projects", "goals", "adrs"
 
 export class MarkdownStore {
   private runtimes: Runtime[] = runtimeDefaults();
+  private runtimeDb?: RuntimeDatabase;
+  private runtimeDbPath?: string;
 
   get root(): string {
     return getProjectRoot();
@@ -21,6 +24,8 @@ export class MarkdownStore {
   async read(): Promise<AppData> {
     const data = await loadMarkdownAppData(this.root);
     data.runtimes = cloneData({ ...data, runtimes: this.runtimes }).runtimes;
+    data.events = this.db().listEventRecords();
+    data.agentRuns = this.db().listRuns();
     return data;
   }
 
@@ -66,6 +71,19 @@ export class MarkdownStore {
       return;
     }
 
+    if (collection === "events") {
+      const markdownData = await loadMarkdownAppData(this.root);
+      const markdownEvent = markdownData.events.find((item) => item.id === id);
+      if (markdownEvent?.relativePath) {
+        await removeEntityMarkdown(this.root, markdownEvent.relativePath);
+        return;
+      } else {
+        this.db().deleteEvent(id);
+        notifyRuntimeChanged("events");
+        return;
+      }
+    }
+
     const data = await this.read();
     const target = (data[collection] as unknown as Array<Record<string, unknown>>).find((item) => item.id === id);
     const relativePath = typeof target?.relativePath === "string" ? target.relativePath : undefined;
@@ -83,30 +101,54 @@ export class MarkdownStore {
 
   async createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {
     const data = await this.read();
-    const event: EventRecord = {
-      id: uuid(),
+    const result = this.db().intakeEvent({
       projectId: input.projectId,
-      source: input.source ?? "unknown",
       eventType: input.eventType,
-      tags: input.tags ?? [],
-      payload: input.payload ?? {},
-      status: "received",
-      body: input.body ?? "",
-      createdAt: timestamp()
-    };
+      source: input.source,
+      subject: typeof input.subject === "string" ? input.subject : undefined,
+      correlationId: typeof input.correlationId === "string" ? input.correlationId : undefined,
+      causationId: typeof input.causationId === "string" ? input.causationId : undefined,
+      dedupeKey: typeof input.dedupeKey === "string" ? input.dedupeKey : undefined,
+      correlationDepth: typeof input.correlationDepth === "number" ? input.correlationDepth : undefined,
+      tags: input.tags,
+      payload: input.payload,
+      body: input.body
+    }, data.policies, data.agents);
+    notifyRuntimeChanged("events");
+    if (result.runs.length > 0) notifyRuntimeChanged("agent-runs");
+    return result.event;
+  }
 
-    const route = routeEvent(event, data.policies, data.agents);
-    const routedEvent: EventRecord = {
-      ...event,
-      status: route.status,
-      matchedPolicyId: route.matchedPolicyId,
-      assignedAgentId: route.assignedAgentId,
-      handlingResult: route.handlingResult
-    };
+  listAgentRuns() {
+    return this.db().listRuns();
+  }
 
-    await writeEntityMarkdown(this.root, "events", routedEvent as unknown as Record<string, unknown>);
-    const refreshed = await this.read();
-    return refreshed.events.find((candidate) => candidate.id === routedEvent.id) ?? routedEvent;
+  retryAgentRun(runId: string) {
+    const run = this.db().retryRun(runId);
+    notifyRuntimeChanged("agent-runs");
+    return run;
+  }
+
+  listRunLogs(runId?: string): AgentRunLog[] {
+    return this.db().listRunLogs(runId);
+  }
+
+  runtimeHealth() {
+    return this.db().health();
+  }
+
+  runtimeDatabase(): RuntimeDatabase {
+    return this.db();
+  }
+
+  private db(): RuntimeDatabase {
+    const dbPath = resolveRuntimeDbPath(this.root);
+    if (!this.runtimeDb || this.runtimeDbPath !== dbPath) {
+      this.runtimeDb?.close();
+      this.runtimeDb = new RuntimeDatabase(dbPath);
+      this.runtimeDbPath = dbPath;
+    }
+    return this.runtimeDb;
   }
 }
 

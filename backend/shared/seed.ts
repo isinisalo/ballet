@@ -113,10 +113,8 @@ export const seedData: AppData = {
       name: "Deployment failures to k8s operator",
       description: "Route Kubernetes deployment failures to the operator agent.",
       active: true,
-      priority: 100,
       projectId: "project-platform",
       eventTypes: ["deployment.failed"],
-      tags: ["kubernetes"],
       source: "*",
       payloadMetadata: { severity: "high" },
       targetAgentId: "agent-k8s",
@@ -153,5 +151,6 @@ export const seedData: AppData = {
       handlingResult: "No active policy matched project, event type, tags, source, and payload metadata.",
       createdAt: now
     }
-  ]
+  ],
+  agentRuns: []
 };

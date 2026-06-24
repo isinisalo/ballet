@@ -1,6 +1,7 @@
 import express from "express";
 import type { CollectionName } from "./shared/domain.js";
 import { store } from "./store.js";
+import { onRuntimeChanged } from "./runtime-events.js";
 
 const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "skills", "runtimes", "policies", "events"];
 const collectionSet = new Set(collections);
@@ -49,6 +50,70 @@ apiRouter.post("/project-documents", async (req, res, next) => {
   }
 });
 
+apiRouter.get("/runtime/health", (_req, res, next) => {
+  try {
+    res.json(store.runtimeHealth());
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/runtime/stream", (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no"
+  });
+
+  const send = (type: string, payload: Record<string, unknown>) => {
+    res.write(`event: ${type}\n`);
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  send("ready", { ok: true, at: new Date().toISOString() });
+  const unsubscribe = onRuntimeChanged((signal) => send("change", { signal, at: new Date().toISOString() }));
+  const heartbeat = setInterval(() => send("heartbeat", { at: new Date().toISOString() }), 30000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+    res.end();
+  });
+});
+
+apiRouter.get("/events", async (_req, res, next) => {
+  try {
+    res.json(await store.list("events"));
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/agent-runs", (_req, res, next) => {
+  try {
+    res.json(store.listAgentRuns());
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/agent-runs/:id/logs", (req, res, next) => {
+  try {
+    res.json(store.listRunLogs(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.post("/agent-runs/:id/retry", (req, res, next) => {
+  try {
+    res.json(store.retryAgentRun(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
 apiRouter.get("/:collection", async (req, res, next) => {
   try {
     const collection = req.params.collection as CollectionName;
@@ -76,7 +141,7 @@ apiRouter.post("/events/intake", async (req, res, next) => {
 apiRouter.post("/:collection", async (req, res, next) => {
   try {
     const collection = req.params.collection as CollectionName;
-    if (!collectionSet.has(collection) || collection === "events") {
+    if (!collectionSet.has(collection)) {
       return res.status(404).json({ error: "Unknown mutable collection." });
     }
 

@@ -28,7 +28,7 @@ export interface ReadMarkdownDocumentOptions {
   collection?: string;
 }
 
-export const getProjectRoot = (): string => path.resolve(process.cwd());
+export const getProjectRoot = (): string => path.resolve(process.env.BALLET_PROJECT_ROOT ?? process.cwd());
 
 const defaultExtensions = [".md", ".mdx"];
 const projectTreeExtensions = [".md"];

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isMap, parseDocument, stringify as stringifyYaml } from "yaml";
 import {
   Archive,
+  Activity,
   Bot,
   CalendarDays,
   CheckCircle2,
@@ -19,6 +20,7 @@ import {
   Monitor,
   Moon,
   Plus,
+  RefreshCw,
   Route,
   Save,
   Sun,
@@ -27,7 +29,7 @@ import {
   UserRound,
   type LucideIcon
 } from "lucide-react";
-import type { Adr, Agent, AppData, EventRecord, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
+import type { Adr, Agent, AgentRun, AgentRunLog, AppData, EventRecord, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -64,8 +66,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
 
-type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
-type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies";
+type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "agents" | "skills" | "runtimes" | "policies" | "events" | "agent-runs";
+type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
 
 interface RouteState {
   view: View;
@@ -82,6 +84,7 @@ const emptyData: AppData = {
   runtimes: [],
   policies: [],
   events: [],
+  agentRuns: [],
   projectDocumentTree: []
 };
 
@@ -157,18 +160,47 @@ const runtimeTemplate = (): Partial<Runtime> => ({
   config: { cwd: ".", approvalPolicy: "never" }
 });
 
-const policyTemplate = (projectId: string, targetAgentId: string): Partial<Policy> => ({
+const policyTemplate = (targetAgentId: string): Partial<Policy> => ({
   name: "",
   description: "",
   active: true,
-  priority: 10,
-  projectId,
+  match: {
+    eventTypes: [],
+    projectId: "*",
+    source: "*"
+  },
+  action: {
+    type: "start_agent_run",
+    targetAgentId
+  },
+  projectId: "*",
   eventTypes: [],
-  tags: [],
   source: "*",
   payloadMetadata: {},
   targetAgentId
 });
+
+const payloadMetadataToMatchPayload = (metadata?: Record<string, string>) =>
+  Object.fromEntries(Object.entries(metadata ?? {}).map(([key, value]) => [key, { operator: "equals" as const, value }]));
+
+const policyMatchForForm = (policy: Partial<Policy>): NonNullable<Policy["match"]> => {
+  if (policy.match) return policy.match;
+  const payload = payloadMetadataToMatchPayload(policy.payloadMetadata);
+  return {
+    eventTypes: policy.eventTypes ?? [],
+    projectId: policy.projectId ?? "*",
+    source: policy.source ?? "*",
+    ...(Object.keys(payload).length > 0 ? { payload } : {})
+  };
+};
+
+const policyTargetForForm = (policy: Partial<Policy>, fallback: string) =>
+  policy.action?.type === "start_agent_run" && policy.action.targetAgentId ? policy.action.targetAgentId : policy.targetAgentId ?? fallback;
+
+const parsePolicyMatch = (value: string): NonNullable<Policy["match"]> => {
+  const parsed = parsePayload(value);
+  return parsed as NonNullable<Policy["match"]>;
+};
 
 const eventTemplate = (projectId: string): Partial<EventRecord> & Pick<EventRecord, "projectId" | "eventType"> => ({
   projectId,
@@ -194,14 +226,16 @@ const routeFromPath = (path: string): RouteState => {
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/runtimes") return { view: "runtimes" };
-  if (url.pathname === "/policies") return { view: "policies" };
+  if (url.pathname === "/policies") return { view: "policies", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/events") return { view: "events" };
+  if (url.pathname === "/agent-runs") return { view: "agent-runs" };
   return { view: "projects" };
 };
 
 const projectDocumentPath = (relativePath: string) => `/projects/document?path=${encodeURIComponent(relativePath)}`;
 const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
 const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
+const policyDocumentPath = (relativePath: string) => `/policies?path=${encodeURIComponent(relativePath)}`;
 
 const statusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
   if (["unassigned", "at-risk", "rejected"].includes(status)) return "destructive";
@@ -261,22 +295,6 @@ function ThemeSelector({ mode, onChange }: { mode: ThemeMode; onChange: (mode: T
       })}
     </div>
   );
-}
-
-function MetadataPreview({ frontmatter }: { frontmatter?: Record<string, unknown> }) {
-  const keys = Object.keys(frontmatter ?? {}).filter((key) => !["id", "title", "name", "description", "status", "createdAt", "updatedAt"].includes(key));
-  if (keys.length === 0) return <span className="text-muted-foreground">No extra metadata</span>;
-  return (
-    <span className="text-xs text-muted-foreground">
-      {keys.slice(0, 4).map((key) => `${key}: ${JSON.stringify(frontmatter?.[key])}`).join(" · ")}
-    </span>
-  );
-}
-
-function BodyPreview({ body }: { body?: string }) {
-  const preview = (body ?? "").replace(/^#+\s+/gm, "").trim();
-  if (!preview) return <span className="text-muted-foreground">No Markdown body</span>;
-  return <span className="line-clamp-2 text-muted-foreground">{preview}</span>;
 }
 
 type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skill, "id" | "frontmatter" | "body" | "relativePath" | "errors"> & {
@@ -527,7 +545,7 @@ function ProjectDocumentTreeDirectory({
   );
 }
 
-type SidebarDocumentEntity = Pick<Agent | Skill, "id" | "name" | "relativePath">;
+type SidebarDocumentEntity = Pick<Agent | Skill | Policy, "id" | "name" | "relativePath">;
 type SidebarAgentEntity = Pick<Agent, "id" | "name" | "relativePath" | "status">;
 
 function SidebarDocumentList({
@@ -807,6 +825,7 @@ function AppSidebar({
   projectDocumentTree,
   agents,
   skills,
+  policies,
   navigate,
   themeMode,
   onThemeModeChange
@@ -815,6 +834,7 @@ function AppSidebar({
   projectDocumentTree: ProjectDocumentTreeNode[];
   agents: Agent[];
   skills: Skill[];
+  policies: Policy[];
   navigate: (path: string) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
@@ -822,6 +842,7 @@ function AppSidebar({
   const projectsOpen = route.view === "projects" || route.view === "project-document" || route.view === "project-goals" || route.view === "project-adrs";
   const agentsOpen = route.view === "agents";
   const skillsOpen = route.view === "skills";
+  const policiesOpen = route.view === "policies";
   const item = (label: string, icon: ReactNode, path: string, active: boolean) => (
     <SidebarMenuItem key={label}>
       <SidebarMenuButton asChild isActive={active} tooltip={label}>
@@ -895,8 +916,22 @@ function AppSidebar({
                 </SidebarMenuItem>
               </Collapsible>
               {item("Runtimes", <Code2 />, "/runtimes", route.view === "runtimes")}
-              {item("Policies", <GitBranch />, "/policies", route.view === "policies")}
+              <Collapsible defaultOpen={policiesOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={policiesOpen} tooltip="Policies">
+                      <GitBranch />
+                      <span>Policies</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarDocumentList documents={policies} activePath={policiesOpen ? route.documentPath : undefined} pathFor={policyDocumentPath} navigate={navigate} />
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
               {item("Events", <Inbox />, "/events", route.view === "events")}
+              {item("Agent runs", <Activity />, "/agent-runs", route.view === "agent-runs")}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -938,13 +973,17 @@ export function App() {
     () => data.skills.find((skill) => skill.relativePath === route.documentPath) ?? data.skills[0],
     [data.skills, route.documentPath]
   );
+  const selectedPolicy = useMemo(
+    () => data.policies.find((policy) => policy.relativePath === route.documentPath) ?? data.policies[0],
+    [data.policies, route.documentPath]
+  );
 
   const navigate = (path: string) => {
     window.history.pushState({}, "", path);
     setRoute(routeFromPath(path));
   };
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -961,7 +1000,7 @@ export function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [route.projectId, selectedProjectId]);
 
   useEffect(() => {
     const onPopState = () => setRoute(routeFromPath(`${window.location.pathname}${window.location.search}`));
@@ -971,7 +1010,22 @@ export function App() {
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refresh]);
+
+  useEffect(() => {
+    const source = new EventSource("/api/runtime/stream");
+    const handleChange = () => {
+      void refresh();
+    };
+    source.addEventListener("change", handleChange);
+    source.onerror = () => {
+      source.close();
+    };
+    return () => {
+      source.removeEventListener("change", handleChange);
+      source.close();
+    };
+  }, [refresh]);
 
   useEffect(() => {
     if (route.projectId) setSelectedProjectId(route.projectId);
@@ -1005,6 +1059,7 @@ export function App() {
           projectDocumentTree={projectDocumentTree}
           agents={data.agents}
           skills={data.skills}
+          policies={data.policies}
           navigate={navigate}
           themeMode={themeMode}
           onThemeModeChange={setThemeMode}
@@ -1036,8 +1091,9 @@ export function App() {
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView data={data} save={save} remove={remove} /> : null}
-              {route.view === "policies" ? <PoliciesView data={data} project={project} save={save} remove={remove} /> : null}
+              {route.view === "policies" ? <PoliciesView data={data} project={project} policy={selectedPolicy} save={save} remove={remove} /> : null}
               {route.view === "events" ? <EventsView data={data} project={project} refresh={refresh} remove={remove} /> : null}
+              {route.view === "agent-runs" ? <AgentRunsView data={data} refresh={refresh} /> : null}
             </main>
           </ScrollArea>
         </SidebarInset>
@@ -1245,7 +1301,15 @@ function AgentsView({
             {agent.skills.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {agent.skills.map((skill) => (
-                  <Badge key={skill.id} variant="secondary" className="max-w-full justify-start rounded-md font-mono text-[0.68rem] font-normal">
+                  <Badge
+                    key={`${skill.id}-${skill.metadata.path ?? ""}`}
+                    variant="secondary"
+                    className={cn(
+                      "max-w-full justify-start rounded-md font-mono text-[0.68rem] font-normal",
+                      skill.enabled === false && "border-border bg-transparent text-muted-foreground opacity-60"
+                    )}
+                    title={skill.enabled === false ? `${skill.name} disabled` : skill.name}
+                  >
                     <span className="truncate">{skill.name}</span>
                   </Badge>
                 ))}
@@ -1454,71 +1518,67 @@ function RuntimesView({ data, save, remove }: ViewProps) {
   );
 }
 
-function PoliciesView({ data, project, save, remove }: ViewProps & { project?: Project }) {
-  const [form, setForm] = useState<Partial<Policy>>(policyTemplate(project?.id ?? "*", data.agents[0]?.id ?? ""));
-  const [eventTypes, setEventTypes] = useState("");
-  const [tags, setTags] = useState("");
-  const [metadata, setMetadata] = useState("");
+function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Project; policy?: Policy }) {
+  const [form, setForm] = useState<Partial<Policy>>(policy ?? policyTemplate(data.agents[0]?.id ?? ""));
+  const [matchText, setMatchText] = useState("");
+  const [error, setError] = useState("");
 
-  const editPolicy = (policy: Policy) => {
-    setForm(policy);
-    setEventTypes(toCsv(policy.eventTypes));
-    setTags(toCsv(policy.tags));
-    setMetadata(toKeyValueLines(policy.payloadMetadata));
+  useEffect(() => {
+    const next = policy ?? policyTemplate(data.agents[0]?.id ?? "");
+    setForm(next);
+    setMatchText(readJson(policyMatchForForm(next)));
+    setError("");
+  }, [data.agents, policy]);
+
+  const submit = async () => {
+    setError("");
+    try {
+      const match = parsePolicyMatch(matchText);
+      const targetAgentId = policyTargetForForm(form, data.agents[0]?.id ?? "");
+      await save("policies", {
+        ...form,
+        match,
+        action: { type: "start_agent_run", targetAgentId },
+        targetAgentId,
+        projectId: typeof match.projectId === "string" ? match.projectId : "*",
+        source: typeof match.source === "string" ? match.source : "*",
+        eventTypes: match.eventTypes ?? [],
+        payloadMetadata: {}
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save policy.");
+    }
   };
 
-  const submit = () => save("policies", { ...form, eventTypes: fromCsv(eventTypes), tags: fromCsv(tags), payloadMetadata: fromKeyValueLines(metadata) });
-
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(520px,1fr)_minmax(420px,1fr)]">
-      <Panel title="Policies" icon={<GitBranch data-icon="inline-start" />}>
-        <DataTable
-          empty="No policies yet."
-          columns={["Name", "Errors", "Matches", "Target", "Metadata", "Body"]}
-          rows={data.policies.map((policy) => ({
-            id: policy.id,
-            cells: [
-              policy.name,
-              <ErrorPreview errors={policy.errors} />,
-              policy.eventTypes.join(", ") || "*",
-              data.agents.find((agent) => agent.id === policy.targetAgentId)?.name ?? "missing agent",
-              <MetadataPreview frontmatter={policy.frontmatter} />,
-              <BodyPreview body={policy.body} />
-            ],
-            onClick: () => editPolicy(policy)
-          }))}
-        />
-      </Panel>
+    <div className="grid gap-4 xl:max-w-3xl">
       <Panel title={form.id ? "Update policy" : "Create policy"} icon={<GitBranch data-icon="inline-start" />}>
+        {form.errors?.length ? <ErrorPreview errors={form.errors} /> : null}
+        {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
         <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
           <FieldGroup>
             <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
-            <TextField label="Priority" type="number" value={form.priority ?? 10} onChange={(priority) => setForm({ ...form, priority: Number(priority) })} />
             <TextAreaField label="Description" value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
             <SelectField
-              label="Project match"
-              value={form.projectId ?? project?.id ?? "*"}
-              options={[{ value: "*", label: "Any project" }, ...data.projects.map((item) => ({ value: item.id, label: item.name }))]}
-              onChange={(projectId) => setForm({ ...form, projectId })}
-            />
-            <SelectField
               label="Target agent"
-              value={form.targetAgentId ?? data.agents[0]?.id ?? ""}
+              value={policyTargetForForm(form, data.agents[0]?.id ?? "")}
               options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
-              onChange={(targetAgentId) => setForm({ ...form, targetAgentId })}
+              onChange={(targetAgentId) => setForm({ ...form, targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
             />
-            <TextField label="Event types" value={eventTypes} placeholder="deployment.failed, adr.created" onChange={setEventTypes} />
-            <TextField label="Required tags" value={tags} placeholder="architecture, high-priority" onChange={setTags} />
-            <TextField label="Source" value={form.source ?? "*"} onChange={(source) => setForm({ ...form, source })} />
             <SwitchField label="Active" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />
-            <TextAreaField label="Payload metadata match (key=value)" rows={4} value={metadata} onChange={setMetadata} />
+            <TextAreaField label="Match JSON" rows={10} value={matchText} onChange={setMatchText} />
           </FieldGroup>
           <CrudActions
             newLabel="New"
             saveLabel="Save policy"
             id={form.id}
             disabled={data.agents.length === 0}
-            onNew={() => { setForm(policyTemplate(project?.id ?? "*", data.agents[0]?.id ?? "")); setEventTypes(""); setTags(""); setMetadata(""); }}
+            onNew={() => {
+              const next = policyTemplate(data.agents[0]?.id ?? "");
+              setForm(next);
+              setMatchText(readJson(policyMatchForForm(next)));
+              setError("");
+            }}
             onDelete={() => void remove("policies", form.id!)}
           />
         </form>
@@ -1527,7 +1587,7 @@ function PoliciesView({ data, project, save, remove }: ViewProps & { project?: P
   );
 }
 
-function EventsView({ data, project, refresh, remove }: { data: AppData; project?: Project; refresh: () => Promise<void>; remove: (collection: SaveCollection | "events", id: string) => Promise<void> }) {
+function EventsView({ data, project, refresh, remove }: { data: AppData; project?: Project; refresh: () => Promise<void>; remove: (collection: SaveCollection, id: string) => Promise<void> }) {
   const [form, setForm] = useState(eventTemplate(project?.id ?? ""));
   const [payloadText, setPayloadText] = useState(readJson(form.payload));
   const [error, setError] = useState("");
@@ -1541,7 +1601,12 @@ function EventsView({ data, project, refresh, remove }: { data: AppData; project
   const submit = async () => {
     setError("");
     try {
-      await api.intakeEvent({ ...form, payload: parsePayload(payloadText), tags: form.tags ?? [] });
+      await api.intakeEvent({
+        ...form,
+        payload: parsePayload(payloadText),
+        tags: form.tags ?? [],
+        body: form.body ?? "Event submitted from the dashboard."
+      });
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to submit event.");
@@ -1581,18 +1646,20 @@ function EventsView({ data, project, refresh, remove }: { data: AppData; project
       <Panel title="Event inbox" icon={<CheckCircle2 data-icon="inline-start" />}>
         <DataTable
           empty="No events received."
-          columns={["Created", "Type", "Status", "Errors", "Policy", "Agent", "Metadata", "Body", "Result"]}
+          columns={["Seq", "Created", "Type", "Status", "Subject", "Correlation", "Policy", "Runs", "Result"]}
           rows={data.events.map((event) => ({
             id: event.id,
             cells: [
+              event.seq ? String(event.seq) : "-",
               new Date(event.createdAt).toLocaleString(),
               event.eventType,
               <StatusBadge status={event.status} />,
-              <ErrorPreview errors={event.errors} />,
+              event.subject ?? event.projectId,
+              event.correlationId ? <span className="font-mono text-xs">{event.correlationId}</span> : "-",
               data.policies.find((policy) => policy.id === event.matchedPolicyId)?.name ?? "none",
-              data.agents.find((agent) => agent.id === event.assignedAgentId)?.name ?? "unassigned",
-              <MetadataPreview frontmatter={event.frontmatter} />,
-              <BodyPreview body={event.body} />,
+              event.routing?.decisions.filter((decision) => decision.status === "routed").map((decision) =>
+                data.agents.find((agent) => agent.id === decision.targetAgentId)?.name ?? decision.targetAgentId
+              ).join(", ") || data.agents.find((agent) => agent.id === event.assignedAgentId)?.name || "unassigned",
               event.handlingResult ?? "No handler result."
             ],
             action: (
@@ -1602,6 +1669,135 @@ function EventsView({ data, project, refresh, remove }: { data: AppData; project
             )
           }))}
         />
+      </Panel>
+    </div>
+  );
+}
+
+const retryableRunStatuses = new Set(["failed", "blocked", "needs_input", "cancelled"]);
+
+function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promise<void> }) {
+  const [selectedRunId, setSelectedRunId] = useState<string | undefined>(data.agentRuns[0]?.runId);
+  const [logs, setLogs] = useState<AgentRunLog[]>([]);
+  const [error, setError] = useState("");
+  const selectedRun = data.agentRuns.find((run) => run.runId === selectedRunId) ?? data.agentRuns[0];
+
+  useEffect(() => {
+    if (!selectedRun?.runId) {
+      setLogs([]);
+      return;
+    }
+
+    api.getAgentRunLogs(selectedRun.runId)
+      .then(setLogs)
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load run logs."));
+  }, [selectedRun?.runId]);
+
+  useEffect(() => {
+    if (!selectedRunId && data.agentRuns[0]?.runId) setSelectedRunId(data.agentRuns[0].runId);
+  }, [data.agentRuns, selectedRunId]);
+
+  const retry = async (run: AgentRun) => {
+    setError("");
+    try {
+      await api.retryAgentRun(run.runId);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to retry run.");
+    }
+  };
+
+  const policyName = (run: AgentRun) => data.policies.find((policy) => policy.id === run.policyId)?.name ?? run.policyId;
+  const agentName = (run: AgentRun) => data.agents.find((agent) => agent.id === run.agentRole)?.name ?? run.agentRole;
+
+  return (
+    <div className="grid gap-4 2xl:grid-cols-[minmax(720px,1.25fr)_minmax(420px,0.75fr)]">
+      <Panel
+        title="Agent runs"
+        description="Durable worker queue and completed outcomes."
+        icon={<Activity data-icon="inline-start" />}
+        action={(
+          <Button type="button" size="sm" variant="outline" onClick={() => void refresh()}>
+            <RefreshCw data-icon="inline-start" />
+            Refresh
+          </Button>
+        )}
+      >
+        {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+        <DataTable
+          empty="No agent runs queued."
+          columns={["Created", "Agent", "Status", "Attempt", "Policy", "Thread", "Turn", "Error"]}
+          rows={data.agentRuns.map((run) => ({
+            id: run.runId,
+            onClick: () => setSelectedRunId(run.runId),
+            cells: [
+              new Date(run.createdAt).toLocaleString(),
+              agentName(run),
+              <StatusBadge status={run.status} />,
+              String(run.attempt),
+              policyName(run),
+              run.threadId ? <span className="font-mono text-xs">{run.threadId}</span> : "none",
+              run.turnId ? <span className="font-mono text-xs">{run.turnId}</span> : "none",
+              run.error ? <span className="text-destructive">{run.error}</span> : "none"
+            ],
+            action: retryableRunStatuses.has(run.status) ? (
+              <Button
+                size="icon-sm"
+                variant="outline"
+                title="Retry run"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void retry(run);
+                }}
+              >
+                <RefreshCw />
+              </Button>
+            ) : undefined
+          }))}
+        />
+      </Panel>
+
+      <Panel title="Run detail" icon={<CheckCircle2 data-icon="inline-start" />}>
+        {selectedRun ? (
+          <div className="grid gap-4">
+            <div className="grid gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge status={selectedRun.status} />
+                <Badge variant="outline" className="rounded-md font-mono">{selectedRun.agentRole}</Badge>
+              </div>
+              <div className="font-mono text-xs text-muted-foreground break-all">{selectedRun.runId}</div>
+            </div>
+            <div className="grid gap-2">
+              <h3 className="text-sm font-medium">Outcome</h3>
+              <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
+                {selectedRun.outcome ? readJson(selectedRun.outcome) : "No outcome yet."}
+              </pre>
+            </div>
+            <div className="grid gap-2">
+              <h3 className="text-sm font-medium">Logs</h3>
+              {logs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No logs recorded.</p>
+              ) : (
+                <div className="grid max-h-96 gap-2 overflow-auto">
+                  {logs.map((log) => (
+                    <div key={log.id} className="rounded-md border p-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={log.level === "error" ? "destructive" : "outline"} className="rounded-md">{log.level}</Badge>
+                        <span className="text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</span>
+                      </div>
+                      <p className="mt-1 text-sm">{log.message}</p>
+                      {log.data ? (
+                        <pre className="mt-2 overflow-auto rounded bg-muted p-2 leading-relaxed">{readJson(log.data)}</pre>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <EmptyState title="No run selected." />
+        )}
       </Panel>
     </div>
   );

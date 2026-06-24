@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Agent, EventRecord, Policy } from "../shared/domain.js";
-import { policyMatchesEvent, routeEvent } from "../shared/policy.js";
+import { policyMatchesEvent, policyVersion, routeEvent } from "../shared/policy.js";
 
 const event: EventRecord = {
   id: "event-1",
@@ -18,10 +18,8 @@ const policy: Policy = {
   name: "Kubernetes deployment failures",
   description: "Route failed Kubernetes deployments.",
   active: true,
-  priority: 10,
   projectId: "project-1",
   eventTypes: ["deployment.failed"],
-  tags: ["kubernetes"],
   source: "*",
   payloadMetadata: { severity: "high" },
   targetAgentId: "agent-1",
@@ -42,30 +40,75 @@ const agent: Agent = {
 };
 
 describe("policy interpreter", () => {
-  it("matches active policies by project, event type, tag, source, and payload metadata", () => {
+  it("matches active policies by project, event type, source, and payload metadata", () => {
     expect(policyMatchesEvent(policy, event)).toBe(true);
   });
 
-  it("routes to the highest-priority enabled target agent", () => {
-    const lowerPriority = { ...policy, id: "policy-2", name: "lower", priority: 1 };
-    const result = routeEvent(event, [lowerPriority, policy], [agent]);
+  it("does not require event tags for policy matching", () => {
+    expect(policyMatchesEvent(policy, { ...event, tags: [] })).toBe(true);
+  });
 
-    expect(result.status).toBe("routed");
-    expect(result.matchedPolicyId).toBe("policy-1");
-    expect(result.assignedAgentId).toBe("agent-1");
+  it("routes deterministically by policy name without priority", () => {
+    const laterPolicy = { ...policy, id: "policy-2", name: "Zulu policy" };
+    const result = routeEvent(event, [laterPolicy, policy], [agent]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      status: "routed",
+      policyId: "policy-1",
+      targetAgentId: "agent-1"
+    });
   });
 
   it("marks events unassigned when no policy matches", () => {
     const result = routeEvent({ ...event, eventType: "cost.anomaly" }, [policy], [agent]);
 
-    expect(result.status).toBe("unassigned");
-    expect(result.handlingResult).toContain("No active policy matched");
+    expect(result).toEqual([]);
   });
 
   it("explains when a matching policy points to a disabled agent", () => {
     const result = routeEvent(event, [policy], [{ ...agent, enabled: false }]);
 
-    expect(result.status).toBe("unassigned");
-    expect(result.handlingResult).toContain("disabled or missing");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      status: "skipped",
+      policyId: "policy-1",
+      targetAgentId: "agent-1"
+    });
+    expect(result[0]?.reason).toContain("disabled or missing");
+  });
+
+  it("matches typed predicates across envelope, tags, and payload paths", () => {
+    const typedPolicy: Policy = {
+      ...policy,
+      payloadMetadata: {},
+      match: {
+        eventTypes: ["deployment.failed"],
+        projectId: { operator: "equals", value: "project-1" },
+        source: { operator: "in", value: ["runtime-codex", "agentd"] },
+        subject: { operator: "exists" },
+        tags: { operator: "in", value: ["kubernetes"] },
+        payload: {
+          "metadata.severity": { operator: "equals", value: "high" },
+          "metadata.service": { operator: "exists" }
+        }
+      }
+    };
+
+    expect(policyMatchesEvent(typedPolicy, { ...event, subject: "checkout" })).toBe(true);
+    expect(policyMatchesEvent(typedPolicy, { ...event, subject: "checkout", tags: ["finops"] })).toBe(false);
+  });
+
+  it("changes policy version when match content changes", () => {
+    const baseVersion = policyVersion(policy);
+    const nextVersion = policyVersion({
+      ...policy,
+      match: {
+        eventTypes: ["deployment.failed"],
+        payload: { "metadata.severity": { operator: "equals", value: "critical" } }
+      }
+    });
+
+    expect(nextVersion).not.toBe(baseVersion);
   });
 });

@@ -95,7 +95,12 @@ describe("Markdown collection loading", () => {
     expect(data.adrs[0]?.id).toBe("0001-test-adr");
     expect(data.goals.some((goal) => goal.id === "test-goal")).toBe(true);
     expect(data.events[0]?.id).toBe("test-event");
+    expect(data.events[0]?.relativePath).toBe(".ballet/events/test-event.md");
     expect(data.policies[0]?.id).toBe("test-policy");
+    expect(data.policies[0]?.relativePath).toBe(".ballet/policies/test-policy.md");
+    expect(data.policies[0]).not.toHaveProperty("priority");
+    expect(data.policies[0]).not.toHaveProperty("version");
+    expect(data.policies[0]).not.toHaveProperty("tags");
   });
 
   it("loads only .ballet/project.md for the project document", async () => {
@@ -118,6 +123,76 @@ describe("Markdown collection loading", () => {
 
     expect(skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
     expect(skills[0]?.title).toBe("fixture-skill");
+  });
+
+  it("loads agent TOML skills.config entries with resolved SKILL.md names and disabled state", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".codex/agents"), { recursive: true });
+    await mkdir(path.join(root, ".agents/skills/docs-editor"), { recursive: true });
+    await mkdir(path.join(root, ".agents/skills/deprecated-review"), { recursive: true });
+    await writeFile(path.join(root, ".agents/skills/docs-editor/SKILL.md"), "---\nname: Docs Editor\ndescription: Edits docs.\n---\n\nDocs body.", "utf8");
+    await writeFile(path.join(root, ".agents/skills/deprecated-review/SKILL.md"), "---\nname: Deprecated Review\ndescription: Old review flow.\n---\n\nDeprecated body.", "utf8");
+    await writeFile(path.join(root, ".codex/agents/reviewer.toml"), `name = "Reviewer"
+description = "Reviews docs"
+developer_instructions = "Review docs."
+
+[[skills.config]]
+path = "../.agents/skills/docs-editor"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/deprecated-review/SKILL.md"
+enabled = false
+
+[[skills.config]]
+enabled = true
+`, "utf8");
+
+    const data = await loadMarkdownAppData(root);
+    const agent = data.agents.find((candidate) => candidate.id === "reviewer");
+
+    expect(agent?.skills).toHaveLength(2);
+    expect(agent?.skills[0]).toMatchObject({
+      id: "docs-editor",
+      name: "Docs Editor",
+      description: "Edits docs.",
+      enabled: true,
+      metadata: { path: "../.agents/skills/docs-editor" },
+      relativePath: ".agents/skills/docs-editor/SKILL.md"
+    });
+    expect(agent?.skills[1]).toMatchObject({
+      id: "deprecated-review",
+      name: "Deprecated Review",
+      description: "Old review flow.",
+      enabled: false,
+      metadata: { path: "../.agents/skills/deprecated-review/SKILL.md" },
+      relativePath: ".agents/skills/deprecated-review/SKILL.md"
+    });
+  });
+
+  it("falls back to the skills.config path basename when no SKILL.md matches", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".codex/agents"), { recursive: true });
+    await writeFile(path.join(root, ".codex/agents/reviewer.toml"), `name = "Reviewer"
+description = "Reviews docs"
+developer_instructions = "Review docs."
+
+[[skills.config]]
+path = "../.agents/skills/missing-skill"
+`, "utf8");
+
+    const data = await loadMarkdownAppData(root);
+    const agent = data.agents.find((candidate) => candidate.id === "reviewer");
+
+    expect(agent?.skills).toEqual([
+      {
+        id: "missing-skill",
+        name: "missing-skill",
+        description: "",
+        metadata: { path: "../.agents/skills/missing-skill" },
+        enabled: true
+      }
+    ]);
   });
 
   it("loads the .ballet project document tree up to two directory levels", async () => {
@@ -318,7 +393,8 @@ describe("Markdown collection loading", () => {
         name: "Reviewer",
         description: "Old",
         developer_instructions: "Old instructions",
-        mcp_servers: { docs: { url: "https://example.test/mcp" } }
+        mcp_servers: { docs: { url: "https://example.test/mcp" } },
+        skills: { config: [{ path: "../.agents/skills/docs-editor", enabled: true }] }
       }
     });
 
@@ -331,6 +407,9 @@ describe("Markdown collection loading", () => {
     expect(source).toContain('nickname_candidates = [ "Atlas" ]');
     expect(source).toContain("[mcp_servers.docs]");
     expect(source).toContain('url = "https://example.test/mcp"');
+    expect(source).toContain("[[skills.config]]");
+    expect(source).toContain('path = "../.agents/skills/docs-editor"');
+    expect(source).toContain("enabled = true");
   });
 
   it("writes skills while preserving unrelated frontmatter", async () => {
@@ -350,5 +429,65 @@ describe("Markdown collection loading", () => {
     expect(source).toContain("description: Updated skill");
     expect(source).toContain("category: fixture");
     expect(source).toContain("# Updated");
+  });
+
+  it("writes policies under .ballet/policies and strips removed policy frontmatter", async () => {
+    const root = await tempRoot();
+
+    await writeEntityMarkdown(root, "policies", {
+      id: "route-implementation",
+      name: "Route implementation",
+      description: "Route implementation events.",
+      active: true,
+      projectId: "*",
+      eventTypes: ["implementation.requested.v1"],
+      source: "*",
+      payloadMetadata: { severity: "high" },
+      targetAgentId: "developer-agent",
+      body: "Route implementation events.",
+      frontmatter: {
+        id: "route-implementation",
+        name: "Old policy",
+        priority: 100,
+        version: 7,
+        tags: ["legacy"]
+      }
+    });
+
+    const source = await readFile(path.join(root, ".ballet/policies/route-implementation.md"), "utf8");
+
+    expect(source).toContain("name: Route implementation");
+    expect(source).toContain("match:");
+    expect(source).toContain("eventTypes:");
+    expect(source).toContain("projectId: \"*\"");
+    expect(source).toContain("source: \"*\"");
+    expect(source).toContain("payload:");
+    expect(source).toContain("action:");
+    expect(source).toContain("targetAgentId: developer-agent");
+    expect(source).not.toContain("priority:");
+    expect(source).not.toContain("version:");
+    expect(source).not.toContain("tags:");
+    expect(source).not.toContain("payloadMetadata:");
+  });
+
+  it("writes events under .ballet/events", async () => {
+    const root = await tempRoot();
+
+    await writeEntityMarkdown(root, "events", {
+      id: "event-1",
+      projectId: "project",
+      eventType: "implementation.requested.v1",
+      source: "test",
+      tags: ["delivery"],
+      payload: { work_item_id: "work-1" },
+      status: "received",
+      body: "Incoming implementation event."
+    });
+
+    const source = await readFile(path.join(root, ".ballet/events/event-1.md"), "utf8");
+
+    expect(source).toContain("eventType: implementation.requested.v1");
+    expect(source).toContain("tags:");
+    expect(source).toContain("Incoming implementation event.");
   });
 });

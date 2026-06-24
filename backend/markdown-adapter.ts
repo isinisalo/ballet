@@ -8,8 +8,8 @@ const now = () => new Date().toISOString();
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const stringValue = (value: unknown, fallback = ""): string => typeof value === "string" ? value : value === undefined || value === null ? fallback : String(value);
 const booleanValue = (value: unknown, fallback = false): boolean => typeof value === "boolean" ? value : typeof value === "string" ? value.toLowerCase() === "true" : fallback;
-const numberValue = (value: unknown, fallback = 0): number => typeof value === "number" ? value : Number.isFinite(Number(value)) ? Number(value) : fallback;
 const stringArray = (value: unknown): string[] => Array.isArray(value) ? value.map((item) => stringValue(item)).filter(Boolean) : typeof value === "string" ? value.split(",").map((item) => item.trim()).filter(Boolean) : [];
+const cloneRecord = (value: unknown): Record<string, unknown> | undefined => isRecord(value) ? JSON.parse(JSON.stringify(value)) as Record<string, unknown> : undefined;
 
 const validEntityStatus = (value: unknown): EntityStatus => ["active", "paused", "archived"].includes(stringValue(value)) ? stringValue(value) as EntityStatus : "active";
 const validGoalStatus = (value: unknown): Goal["status"] => ["not-started", "in-progress", "at-risk", "done"].includes(stringValue(value)) ? stringValue(value) as Goal["status"] : "not-started";
@@ -74,27 +74,88 @@ const adrFromDocument = (doc: MarkdownDocument, defaultProjectId: string): Adr =
 const skillFromUnknown = (value: unknown, index: number): Skill => {
   if (isRecord(value)) {
     const name = stringValue(value.name ?? value.id, `skill-${index + 1}`);
-    const metadata = Object.fromEntries(Object.entries(value).filter(([key]) => !["id", "name", "description"].includes(key)).map(([key, item]) => [key, stringValue(item)]));
+    const metadata = Object.fromEntries(Object.entries(value).filter(([key]) => !["id", "name", "description", "enabled"].includes(key)).map(([key, item]) => [key, stringValue(item)]));
     return {
       id: stringValue(value.id, safeSlug(name)),
       name,
       description: stringValue(value.description),
-      metadata
+      metadata,
+      enabled: booleanValue(value.enabled, true)
     };
   }
   const name = stringValue(value, `skill-${index + 1}`);
-  return { id: safeSlug(name), name, description: "", metadata: {} };
+  return { id: safeSlug(name), name, description: "", metadata: {}, enabled: true };
 };
 
-const agentFromDocument = (doc: MarkdownDocument): Agent => {
+const normalizeSkillConfigPath = (value: string): string => {
+  const trimmed = value.trim().replaceAll("\\", "/").replace(/\/SKILL\.md$/i, "");
+  const segments = trimmed.split("/").filter(Boolean);
+  const agentsSkillsIndex = segments.findIndex((segment, index) => segment === ".agents" && segments[index + 1] === "skills");
+  if (agentsSkillsIndex >= 0) return segments.slice(agentsSkillsIndex).join("/");
+  return path.posix.normalize(trimmed).replace(/^\.\//, "");
+};
+
+const skillLookupKeys = (skill: Skill): string[] => {
+  const keys = [skill.id, skill.slug].filter(Boolean) as string[];
+  if (skill.relativePath) {
+    const normalized = normalizeSkillConfigPath(skill.relativePath);
+    keys.push(normalized, normalized.replace(/\/SKILL\.md$/i, ""), path.posix.basename(normalized.replace(/\/SKILL\.md$/i, "")));
+  }
+  return [...new Set(keys)];
+};
+
+const buildSkillLookup = (skills: Skill[]): Map<string, Skill> => {
+  const lookup = new Map<string, Skill>();
+  for (const skill of skills) {
+    for (const key of skillLookupKeys(skill)) {
+      lookup.set(key, skill);
+    }
+  }
+  return lookup;
+};
+
+const skillFromConfig = (value: unknown, index: number, skillLookup: Map<string, Skill>): Skill | undefined => {
+  if (!isRecord(value)) return undefined;
+  const rawPath = stringValue(value.path).trim();
+  if (!rawPath) return undefined;
+
+  const normalizedPath = normalizeSkillConfigPath(rawPath);
+  const name = path.posix.basename(normalizedPath) || `skill-${index + 1}`;
+  const enabled = booleanValue(value.enabled, true);
+  const matchedSkill = skillLookup.get(normalizedPath) ?? skillLookup.get(name) ?? skillLookup.get(safeSlug(name));
+  const metadata = { ...(matchedSkill?.metadata ?? {}), path: rawPath };
+
+  return matchedSkill
+    ? { ...matchedSkill, metadata, enabled }
+    : {
+      id: safeSlug(name),
+      name,
+      description: "",
+      metadata,
+      enabled
+    };
+};
+
+const agentSkillsFromFrontmatter = (fm: Record<string, unknown>, skillLookup: Map<string, Skill>): Skill[] => {
+  if (Array.isArray(fm.skills)) return fm.skills.map(skillFromUnknown);
+
+  if (isRecord(fm.skills) && Array.isArray(fm.skills.config)) {
+    return fm.skills.config
+      .map((skill, index) => skillFromConfig(skill, index, skillLookup))
+      .filter((skill): skill is Skill => Boolean(skill));
+  }
+
+  return [];
+};
+
+const agentFromDocument = (doc: MarkdownDocument, skillLookup: Map<string, Skill>): Agent => {
   const fm = doc.frontmatter;
-  const skills = Array.isArray(fm.skills) ? fm.skills.map(skillFromUnknown) : [];
   return attachDocument({
     id: doc.id,
     name: stringValue(fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
     description: stringValue(fm.description, bodyPreview(doc.body)),
     instructions: stringValue(fm.developer_instructions ?? fm.instructions, doc.body),
-    skills,
+    skills: agentSkillsFromFrontmatter(fm, skillLookup),
     enabled: booleanValue(fm.enabled, true),
     status: validAgentStatus(fm.status),
     createdAt: dateValue(fm.createdAt),
@@ -117,19 +178,24 @@ const skillDocumentFromDocument = (doc: MarkdownDocument): Skill => {
 
 const policyFromDocument = (doc: MarkdownDocument, defaultProjectId: string, firstAgentId: string): Policy => {
   const fm = doc.frontmatter;
+  const action = cloneRecord(fm.action) as Policy["action"] | undefined;
+  const match = cloneRecord(fm.match) as Policy["match"] | undefined;
   const payloadMetadata = isRecord(fm.payloadMetadata) ? Object.fromEntries(Object.entries(fm.payloadMetadata).map(([key, value]) => [key, stringValue(value)])) : {};
+  const targetAgentId = action?.type === "start_agent_run" && action.targetAgentId
+    ? action.targetAgentId
+    : stringValue(fm.targetAgentId ?? fm.agentId, firstAgentId);
   return attachDocument({
     id: doc.id,
     name: stringValue(fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
     description: stringValue(fm.description, bodyPreview(doc.body)),
     active: booleanValue(fm.active, true),
-    priority: numberValue(fm.priority, 0),
-    projectId: stringValue(fm.projectId, defaultProjectId || "*") as Policy["projectId"],
-    eventTypes: stringArray(fm.eventTypes ?? fm.eventType),
-    tags: stringArray(fm.tags),
+    match,
+    action,
+    projectId: stringValue(fm.projectId, "*") as Policy["projectId"],
+    eventTypes: stringArray(fm.eventTypes ?? fm.eventType ?? match?.eventTypes),
     source: stringValue(fm.source, "*"),
     payloadMetadata,
-    targetAgentId: stringValue(fm.targetAgentId ?? fm.agentId, firstAgentId),
+    targetAgentId,
     createdAt: dateValue(fm.createdAt),
     updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
   }, doc);
@@ -142,11 +208,17 @@ const eventFromDocument = (doc: MarkdownDocument, defaultProjectId: string): Eve
     projectId: stringValue(fm.projectId, defaultProjectId),
     source: stringValue(fm.source, "unknown"),
     eventType: stringValue(fm.eventType ?? fm.type, doc.slug),
+    subject: stringValue(fm.subject) || undefined,
+    correlationId: stringValue(fm.correlationId) || undefined,
+    causationId: stringValue(fm.causationId) || undefined,
+    dedupeKey: stringValue(fm.dedupeKey) || undefined,
+    correlationDepth: Number.isFinite(Number(fm.correlationDepth)) ? Number(fm.correlationDepth) : undefined,
     tags: stringArray(fm.tags),
     payload: isRecord(fm.payload) ? fm.payload : {},
     status: validEventStatus(fm.status),
     matchedPolicyId: stringValue(fm.matchedPolicyId) || undefined,
     assignedAgentId: stringValue(fm.assignedAgentId) || undefined,
+    routing: isRecord(fm.routing) ? fm.routing as unknown as EventRecord["routing"] : undefined,
     handlingResult: stringValue(fm.handlingResult) || bodyPreview(doc.body),
     createdAt: dateValue(fm.createdAt)
   }, doc);
@@ -179,7 +251,9 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
 
   const projects = projectDocs.map(projectFromDocument);
   const defaultProjectId = projects[0]?.id ?? "project";
-  const agents = agentDocs.map(agentFromDocument);
+  const skills = skillDocs.map(skillDocumentFromDocument);
+  const skillLookup = buildSkillLookup(skills);
+  const agents = agentDocs.map((doc) => agentFromDocument(doc, skillLookup));
   const firstAgentId = agents[0]?.id ?? "";
 
   return {
@@ -188,10 +262,11 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
     goals: goalDocs.map((doc) => goalFromDocument(doc, defaultProjectId)),
     adrs: adrDocs.map((doc) => adrFromDocument(doc, defaultProjectId)),
     agents,
-    skills: skillDocs.map(skillDocumentFromDocument),
+    skills,
     runtimes: runtimeDefaults(),
     policies: policyDocs.map((doc) => policyFromDocument(doc, defaultProjectId, firstAgentId)),
     events: eventDocs.map((doc) => eventFromDocument(doc, defaultProjectId)),
+    agentRuns: [],
     projectDocumentTree,
     documents: {
       project: projectDocs,
@@ -286,6 +361,44 @@ const skillFrontmatter = (item: Record<string, unknown>): Record<string, unknown
   };
 };
 
+const policyFrontmatter = (item: Record<string, unknown>, id: string): Record<string, unknown> => {
+  const frontmatter = entityFrontmatter(item, id);
+  const existingMatch = cloneRecord(frontmatter.match);
+  const legacyPayloadMetadata = isRecord(frontmatter.payloadMetadata) ? frontmatter.payloadMetadata : {};
+  const payload = {
+    ...Object.fromEntries(Object.entries(legacyPayloadMetadata).map(([key, value]) => [key, { operator: "equals", value }])),
+    ...(isRecord(existingMatch?.payload) ? existingMatch.payload : {})
+  };
+  const eventTypes = stringArray(existingMatch?.eventTypes ?? frontmatter.eventTypes ?? frontmatter.eventType);
+  const match: Record<string, unknown> = {
+    ...existingMatch,
+    eventTypes,
+    projectId: existingMatch?.projectId ?? frontmatter.projectId ?? "*",
+    source: existingMatch?.source ?? frontmatter.source ?? "*"
+  };
+  if (Object.keys(payload).length > 0) match.payload = payload;
+  else delete match.payload;
+
+  const existingAction = cloneRecord(frontmatter.action);
+  const targetAgentId = stringValue(existingAction?.targetAgentId ?? frontmatter.targetAgentId ?? frontmatter.agentId);
+  frontmatter.match = match;
+  frontmatter.action = {
+    type: "start_agent_run",
+    targetAgentId
+  };
+  delete frontmatter.priority;
+  delete frontmatter.version;
+  delete frontmatter.tags;
+  delete frontmatter.projectId;
+  delete frontmatter.source;
+  delete frontmatter.eventType;
+  delete frontmatter.eventTypes;
+  delete frontmatter.payloadMetadata;
+  delete frontmatter.targetAgentId;
+  delete frontmatter.agentId;
+  return frontmatter;
+};
+
 export const writeEntityMarkdown = async (root: string, collection: keyof typeof collectionFolder, item: Record<string, unknown>): Promise<Record<string, unknown>> => {
   const id = stringValue(item.id, safeSlug(stringValue(item.title ?? item.name, collectionName[collection])));
   const existingPath = stringValue(item.relativePath);
@@ -303,7 +416,9 @@ export const writeEntityMarkdown = async (root: string, collection: keyof typeof
       ? agentFrontmatter(item)
       : collection === "skills"
         ? skillFrontmatter(item)
-        : entityFrontmatter(item, id);
+        : collection === "policies"
+          ? policyFrontmatter(item, id)
+          : entityFrontmatter(item, id);
   const body = collection === "projects" ? projectBody(item) : entityBody(item);
   if (collection === "agents") {
     await writeTomlDocument({ root, relativePath, frontmatter });
