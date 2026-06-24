@@ -1074,13 +1074,13 @@ const agentFrontmatterPreview = (agent?: Agent): Record<string, unknown> | undef
   };
 };
 
-function AgentDocumentView({ agent }: { agent?: Agent }) {
+function AgentDocumentView({ agent, embedded = false }: { agent?: Agent; embedded?: boolean }) {
   if (!agent) return <EmptyState title="No agent selected." />;
 
   return (
     <div className="grid auto-rows-min gap-4 self-start">
       <FrontmatterPanel frontmatter={agentFrontmatterPreview(agent)} />
-      <article className="min-w-0 rounded-lg border bg-card p-5 md:p-8">
+      <article className={cn("min-w-0", embedded ? "p-0" : "rounded-lg border bg-card p-5 md:p-8")}>
         {agent.errors?.length ? (
           <header className="mb-6 flex min-w-0 flex-wrap items-center gap-2 border-b pb-5">
             <ErrorPreview errors={agent.errors} />
@@ -1149,7 +1149,9 @@ function AgentsView({
           <CrudActions newLabel="New" saveLabel="Save agent" id={form.id} onNew={() => { setForm(agentTemplate()); setNicknameText(""); }} onDelete={handleDelete} />
         </form>
       </Panel>
-      <AgentDocumentView agent={agent} />
+      <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
+        <AgentDocumentView agent={agent} embedded />
+      </Panel>
     </div>
   );
 }
@@ -1194,7 +1196,9 @@ function SkillsView({
           <CrudActions newLabel="New" saveLabel="Save skill" id={form.id} onNew={() => setForm(skillTemplate())} onDelete={handleDelete} />
         </form>
       </Panel>
-      <MarkdownDocumentView document={skill} emptyTitle="No skill selected." />
+      <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
+        <MarkdownDocumentView document={skill} emptyTitle="No skill selected." embedded />
+      </Panel>
     </div>
   );
 }
