@@ -690,7 +690,7 @@ function TextField({
   placeholder?: string;
 }) {
   return (
-    <Field>
+    <Field className="gap-1.5">
       <FieldLabel>{label}</FieldLabel>
       <Input value={value} type={type} required={required} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </Field>
@@ -713,7 +713,7 @@ function TextAreaField({
   className?: string;
 }) {
   return (
-    <Field>
+    <Field className="gap-1.5">
       <FieldLabel>{label}</FieldLabel>
       <Textarea className={className} value={value} rows={rows} required={required} onChange={(event) => onChange(event.target.value)} />
     </Field>
@@ -732,7 +732,7 @@ function SelectField({
   onChange: (value: string) => void;
 }) {
   return (
-    <Field>
+    <Field className="gap-1.5">
       <FieldLabel>{label}</FieldLabel>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="w-full">
@@ -754,9 +754,9 @@ function SelectField({
 
 function SwitchField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
-    <Field orientation="horizontal" className="items-center justify-between rounded-lg border p-3">
+    <Field orientation="horizontal" className="w-fit items-center gap-2 rounded-md border border-divider-strong bg-panel-section px-2.5 py-1.5">
       <FieldLabel>{label}</FieldLabel>
-      <Switch checked={checked} onCheckedChange={onChange} />
+      <Switch size="sm" checked={checked} onCheckedChange={onChange} />
     </Field>
   );
 }
@@ -811,7 +811,7 @@ function AgentEnabledBadge({ enabled }: { enabled: boolean }) {
 function Panel({ title, description, icon, children, action, compact = false }: { title: string; description?: string; icon: ReactNode; children: ReactNode; action?: ReactNode; compact?: boolean }) {
   return (
     <Card>
-      <CardHeader className={cn(compact && "gap-1.5 px-4 py-3")}>
+      <CardHeader className={cn("px-4 py-3", compact && "gap-1.5")}>
         <CardTitle className={cn("flex items-center gap-2", compact && "text-base")}>
           {icon}
           {title}
@@ -819,7 +819,7 @@ function Panel({ title, description, icon, children, action, compact = false }: 
         {description ? <CardDescription className={cn(compact && "text-xs")}>{description}</CardDescription> : null}
         {action ? <CardAction>{action}</CardAction> : null}
       </CardHeader>
-      <CardContent className={cn(compact && "px-4 pb-4")}>{children}</CardContent>
+      <CardContent className={cn("px-4 py-4", compact && "py-3")}>{children}</CardContent>
     </Card>
   );
 }
@@ -1360,7 +1360,7 @@ function AgentsView({
     <div className="grid min-h-[calc(100svh-2rem)] gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
       <Card className="self-start overflow-hidden">
         <CardHeader className="gap-4 p-5">
-          <div className="flex size-14 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <div className="flex size-14 items-center justify-center rounded-lg bg-accent text-muted-foreground ring-1 ring-divider-strong">
             <Bot className="size-7" aria-hidden="true" />
           </div>
           <div className="flex flex-col gap-2">
@@ -1371,14 +1371,14 @@ function AgentsView({
         </CardHeader>
         <CardContent className="flex flex-col gap-0 p-0">
           {agent.errors?.length ? (
-            <section className="border-t px-5 py-4">
-              <h2 className="mb-3 font-mono text-xs font-medium uppercase text-muted-foreground">Errors</h2>
+            <section className="border-t border-divider-strong px-5 py-4 first:border-t-0">
+              <h2 className="mb-3 font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Errors</h2>
               <ErrorPreview errors={agent.errors} />
             </section>
           ) : null}
-          <section className="border-t px-5 py-4">
-            <h2 className="mb-4 font-mono text-xs font-medium uppercase text-muted-foreground">Properties</h2>
-            <dl className="flex flex-col gap-3">
+          <section className="border-t border-divider-strong px-5 py-4 first:border-t-0">
+            <h2 className="mb-3.5 font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Properties</h2>
+            <dl className="flex flex-col gap-2.5">
               <AgentBadgeProperty label="Enabled">
                 <AgentEnabledBadge enabled={agent.enabled} />
               </AgentBadgeProperty>
@@ -1401,10 +1401,10 @@ function AgentsView({
               />
             </dl>
           </section>
-          <section className="border-t px-5 py-4">
-            <h2 className="mb-4 flex items-center gap-2 font-mono text-xs font-medium uppercase text-muted-foreground">
+          <section className="border-t border-divider-strong px-5 py-4 first:border-t-0">
+            <h2 className="mb-3.5 flex items-center gap-2 font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">
               Skills
-              <span className="font-sans text-[0.7rem] font-normal">{agent.skills.length}</span>
+              <span className="font-sans text-[0.7rem] font-normal text-muted-foreground">{agent.skills.length}</span>
             </h2>
             {agent.skills.length > 0 ? (
               <div className="flex flex-wrap gap-2">
@@ -1430,14 +1430,14 @@ function AgentsView({
       </Card>
 
       <Card className="min-w-0">
-        <CardHeader className="border-b px-5 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        <CardHeader className="px-5 py-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
             <FileKey2 className="size-3.5" aria-hidden="true" />
             Instructions
           </CardTitle>
         </CardHeader>
         <CardContent className="p-5">
-          <form className="flex flex-col gap-5" onSubmit={(event) => { event.preventDefault(); void saveInstructions(); }}>
+          <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void saveInstructions(); }}>
             <FieldGroup>
               <Field>
                 <FieldLabel>Markdown</FieldLabel>
@@ -1455,8 +1455,8 @@ function AgentsView({
                 {savingInstructions ? "Saving..." : "Save instructions"}
               </Button>
             </div>
-            <section className="flex flex-col gap-3">
-              <h2 className="font-mono text-xs font-medium uppercase text-muted-foreground">Preview</h2>
+            <section className="flex flex-col gap-2.5">
+              <h2 className="font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Preview</h2>
               <ScrollArea className="h-[min(36svh,24rem)] rounded-lg border bg-background">
                 <div className="agent-instructions-preview min-w-0 p-5 md:p-6">
                   <MarkdownBody source={instructionsText} title={agent.name} />
