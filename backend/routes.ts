@@ -1,5 +1,5 @@
 import express from "express";
-import type { CollectionName } from "../shared/domain.js";
+import type { CollectionName } from "./shared/domain.js";
 import { store } from "./store.js";
 
 const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "runtimes", "policies", "events"];

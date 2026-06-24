@@ -7,7 +7,6 @@ export const seedData: AppData = {
     {
       id: "project-platform",
       name: "Acme Platform Migration",
-      key: "APM",
       description: "Modernize the application platform while recording goals, decisions, and routed operational events.",
       status: "active",
       createdAt: now,

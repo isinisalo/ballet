@@ -15,7 +15,7 @@
     "moduleResolution": "Bundler",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./frontend/src/*"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -23,5 +23,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "shared"]
+  "include": ["frontend/src", "backend/shared"]
 }

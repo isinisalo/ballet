@@ -3,14 +3,38 @@ export type AdrStatus = "proposed" | "accepted" | "superseded" | "rejected";
 export type EventStatus = "received" | "routed" | "unassigned" | "handled";
 export type RuntimeType = "codex-cli" | "custom";
 
+export interface MarkdownDocument {
+  id: string;
+  collection: string;
+  title?: string;
+  frontmatter: Record<string, unknown>;
+  body: string;
+  absolutePath: string;
+  relativePath: string;
+  slug: string;
+  errors?: string[];
+}
+
+export interface MarkdownBackedEntity {
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
+}
+
 export interface Project {
   id: string;
   name: string;
-  key: string;
   description: string;
   status: EntityStatus;
   createdAt: string;
   updatedAt: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
 }
 
 export interface Goal {
@@ -23,6 +47,11 @@ export interface Goal {
   owner: string;
   createdAt: string;
   updatedAt: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
 }
 
 export interface Adr {
@@ -35,6 +64,11 @@ export interface Adr {
   status: AdrStatus;
   createdAt: string;
   updatedAt: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
 }
 
 export interface Skill {
@@ -53,6 +87,11 @@ export interface Agent {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
 }
 
 export interface Runtime {
@@ -80,6 +119,11 @@ export interface Policy {
   targetAgentId: string;
   createdAt: string;
   updatedAt: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
 }
 
 export interface EventRecord {
@@ -94,6 +138,11 @@ export interface EventRecord {
   assignedAgentId?: string;
   handlingResult?: string;
   createdAt: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  slug?: string;
+  errors?: string[];
 }
 
 export interface AppData {
@@ -104,9 +153,18 @@ export interface AppData {
   runtimes: Runtime[];
   policies: Policy[];
   events: EventRecord[];
+  documents?: {
+    project: MarkdownDocument[];
+    goals: MarkdownDocument[];
+    adr: MarkdownDocument[];
+    agents: MarkdownDocument[];
+    events: MarkdownDocument[];
+    policies: MarkdownDocument[];
+  };
+  projectRoot?: string;
 }
 
-export type CollectionName = keyof AppData;
+export type CollectionName = "projects" | "goals" | "adrs" | "agents" | "runtimes" | "policies" | "events";
 
 export interface RouteResult {
   status: EventStatus;

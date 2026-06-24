@@ -1,24 +1,27 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Archive,
   Bot,
   CheckCircle2,
   ChevronDown,
-  ClipboardList,
   Code2,
-  FileText,
   GitBranch,
   Inbox,
   Layers3,
   Menu,
+  Monitor,
+  Moon,
   Plus,
-  RefreshCw,
   Route,
   Save,
-  Trash2
+  Sun,
+  Trash2,
+  type LucideIcon
 } from "lucide-react";
-import type { Adr, Agent, AppData, EventRecord, Goal, Policy, Project, Runtime, Skill } from "../shared/domain";
-import { seedData } from "../shared/seed";
+import type { Adr, Agent, AppData, EventRecord, Goal, Policy, Project, Runtime, Skill } from "../../backend/shared/domain";
+import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +55,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
 
 type View = "projects" | "project-goals" | "project-adrs" | "agents" | "runtimes" | "policies" | "events";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "runtimes" | "policies";
@@ -96,31 +100,6 @@ const parsePayload = (value: string): Record<string, unknown> => {
 };
 
 const readJson = (value: unknown) => JSON.stringify(value, null, 2);
-
-const projectTemplate = (): Partial<Project> => ({
-  name: "",
-  key: "",
-  description: "",
-  status: "active"
-});
-
-const goalTemplate = (projectId: string): Partial<Goal> => ({
-  projectId,
-  title: "",
-  description: "",
-  status: "not-started",
-  targetDate: "",
-  owner: ""
-});
-
-const adrTemplate = (projectId: string): Partial<Adr> => ({
-  projectId,
-  title: "",
-  context: "",
-  decision: "",
-  consequences: "",
-  status: "proposed"
-});
 
 const agentTemplate = (): Partial<Agent> => ({
   name: "",
@@ -189,6 +168,220 @@ const statusVariant = (status: string): "default" | "secondary" | "destructive" 
 
 function StatusBadge({ status }: { status: string }) {
   return <Badge variant={statusVariant(status)}>{status}</Badge>;
+}
+
+const themeOptions: Array<{ mode: ThemeMode; label: string; icon: LucideIcon }> = [
+  { mode: "light", label: "Light theme", icon: Sun },
+  { mode: "dark", label: "Dark theme", icon: Moon },
+  { mode: "system", label: "System theme", icon: Monitor }
+];
+
+function useThemeMode() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredThemeMode());
+
+  useEffect(() => {
+    persistThemeMode(themeMode);
+    applyThemeMode(themeMode);
+
+    if (themeMode !== "system") return undefined;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => applyThemeMode("system");
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [themeMode]);
+
+  return [themeMode, setThemeMode] as const;
+}
+
+function ThemeSelector({ mode, onChange }: { mode: ThemeMode; onChange: (mode: ThemeMode) => void }) {
+  return (
+    <div className="flex w-fit items-center gap-1 self-start rounded-lg border bg-card p-1" aria-label="Theme selector">
+      {themeOptions.map((option) => {
+        const Icon = option.icon;
+        return (
+          <Button
+            key={option.mode}
+            type="button"
+            size="icon-sm"
+            variant={mode === option.mode ? "default" : "ghost"}
+            aria-pressed={mode === option.mode}
+            title={option.label}
+            onClick={() => onChange(option.mode)}
+          >
+            <Icon data-icon="inline-start" />
+            <span className="sr-only">{option.label}</span>
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MetadataPreview({ frontmatter }: { frontmatter?: Record<string, unknown> }) {
+  const keys = Object.keys(frontmatter ?? {}).filter((key) => !["id", "title", "name", "description", "status", "createdAt", "updatedAt"].includes(key));
+  if (keys.length === 0) return <span className="text-muted-foreground">No extra metadata</span>;
+  return (
+    <span className="text-xs text-muted-foreground">
+      {keys.slice(0, 4).map((key) => `${key}: ${JSON.stringify(frontmatter?.[key])}`).join(" · ")}
+    </span>
+  );
+}
+
+function BodyPreview({ body }: { body?: string }) {
+  const preview = (body ?? "").replace(/^#+\s+/gm, "").trim();
+  if (!preview) return <span className="text-muted-foreground">No Markdown body</span>;
+  return <span className="line-clamp-2 text-muted-foreground">{preview}</span>;
+}
+
+type MarkdownEntity = Pick<Project | Goal | Adr, "id" | "frontmatter" | "body" | "relativePath" | "errors" | "createdAt" | "updatedAt"> & {
+  name?: string;
+  title?: string;
+  status?: string;
+  targetDate?: string;
+  owner?: string;
+};
+
+const documentTitle = (document: MarkdownEntity) =>
+  document.title || document.name || (typeof document.frontmatter?.title === "string" ? document.frontmatter.title : undefined) || document.id;
+
+const documentStatus = (document: MarkdownEntity): string =>
+  typeof document.frontmatter?.status === "string" ? document.frontmatter.status : document.status ?? "";
+
+const isSimpleFrontmatterValue = (value: unknown) => value === null || ["string", "number", "boolean", "undefined"].includes(typeof value);
+const isSimpleFrontmatterArray = (value: unknown[]) => value.every(isSimpleFrontmatterValue);
+
+function FrontmatterValue({ fieldKey, value }: { fieldKey: string; value: unknown }) {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="text-muted-foreground">[]</span>;
+    if (isSimpleFrontmatterArray(value)) {
+      return (
+        <span className="flex flex-wrap gap-1.5">
+          {value.map((item, index) => (
+            <Badge key={`${String(item)}-${index}`} variant={fieldKey === "tags" ? "outline" : "secondary"}>
+              {String(item)}
+            </Badge>
+          ))}
+        </span>
+      );
+    }
+  }
+
+  if (value && typeof value === "object") {
+    return (
+      <pre className="max-h-32 overflow-x-auto rounded-md bg-muted/60 p-2 text-xs leading-relaxed text-foreground">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    );
+  }
+
+  if (value === null || value === undefined || value === "") return <span className="text-muted-foreground">empty</span>;
+  if (fieldKey === "status") return <StatusBadge status={String(value)} />;
+  return <span>{String(value)}</span>;
+}
+
+function FrontmatterPanel({ frontmatter }: { frontmatter?: Record<string, unknown> }) {
+  const entries = Object.entries(frontmatter ?? {});
+
+  return (
+    <aside className="rounded-lg border bg-card p-3">
+      <h2 className="text-xs font-semibold uppercase text-muted-foreground">Frontmatter</h2>
+      {entries.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">No frontmatter.</p>
+      ) : (
+        <dl className="mt-2 flex flex-wrap gap-2">
+          {entries.map(([key, value]) => (
+            <div
+              key={key}
+              className={cn(
+                "min-w-0 rounded-md border bg-background px-2.5 py-1.5",
+                value && typeof value === "object" && !Array.isArray(value) ? "basis-full" : "max-w-full"
+              )}
+            >
+              <dt className="mb-1 font-mono text-[0.65rem] uppercase leading-none text-muted-foreground">{key}</dt>
+              <dd className="min-w-0 break-words text-sm leading-snug">
+                <FrontmatterValue fieldKey={key} value={value} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </aside>
+  );
+}
+
+function MarkdownBody({ source }: { source?: string }) {
+  const body = source?.trim();
+  if (!body) return <p className="text-muted-foreground">No Markdown body.</p>;
+
+  return (
+    <div className="markdown-body">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
+    </div>
+  );
+}
+
+function MarkdownDocumentView({ document, emptyTitle }: { document?: MarkdownEntity; emptyTitle: string }) {
+  if (!document) return <EmptyState title={emptyTitle} />;
+  const status = documentStatus(document);
+
+  return (
+    <div className="grid gap-4">
+      <FrontmatterPanel frontmatter={document.frontmatter} />
+      <article className="min-w-0 rounded-lg border bg-card p-5 md:p-8">
+        <header className="mb-6 grid gap-3 border-b pb-5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {status ? <StatusBadge status={status} /> : null}
+            {document.relativePath ? <Badge variant="outline" className="min-w-0 max-w-full shrink truncate">{document.relativePath}</Badge> : null}
+          </div>
+          <h2 className="text-2xl font-semibold tracking-tight">{documentTitle(document)}</h2>
+          {document.errors?.length ? <ErrorPreview errors={document.errors} /> : null}
+        </header>
+        <MarkdownBody source={document.body} />
+      </article>
+    </div>
+  );
+}
+
+function SidebarDocumentLinks({
+  documents,
+  selectedId,
+  onSelect,
+  path
+}: {
+  documents: MarkdownEntity[];
+  selectedId?: string;
+  onSelect: (id: string) => void;
+  path: string;
+}) {
+  if (documents.length === 0) return null;
+
+  return (
+    <SidebarMenuSub className="mx-2 mt-1 gap-0.5 border-sidebar-border/60 px-2 py-1">
+      {documents.map((document) => (
+        <SidebarMenuSubItem key={document.id}>
+          <SidebarMenuSubButton
+            href={path}
+            size="sm"
+            isActive={document.id === selectedId}
+            className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+            onClick={(event) => {
+              event.preventDefault();
+              onSelect(document.id);
+            }}
+          >
+            <span>{documentTitle(document)}</span>
+          </SidebarMenuSubButton>
+        </SidebarMenuSubItem>
+      ))}
+    </SidebarMenuSub>
+  );
+}
+
+function ErrorPreview({ errors }: { errors?: string[] }) {
+  if (!errors?.length) return <span className="text-muted-foreground">None</span>;
+  return <span className="text-destructive">{errors.join("; ")}</span>;
 }
 
 function TextField({
@@ -304,30 +497,6 @@ function Panel({ title, description, icon, children, action }: { title: string; 
   );
 }
 
-function SummaryTiles({ data }: { data: AppData }) {
-  const routed = data.events.filter((event) => event.status === "routed").length;
-  const unassigned = data.events.filter((event) => event.status === "unassigned").length;
-  const tiles = [
-    { label: "Projects", value: data.projects.length },
-    { label: "Agents", value: data.agents.length },
-    { label: "Active policies", value: data.policies.filter((policy) => policy.active).length },
-    { label: "Routed / unassigned", value: `${routed}/${unassigned}` }
-  ];
-
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {tiles.map((tile) => (
-        <Card key={tile.label} size="sm">
-          <CardHeader>
-            <CardTitle className="text-2xl">{tile.value}</CardTitle>
-            <CardDescription className="font-medium uppercase">{tile.label}</CardDescription>
-          </CardHeader>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
 function DataTable({
   columns,
   rows,
@@ -366,23 +535,30 @@ function DataTable({
   );
 }
 
-function PageHeader({ title, description }: { title: string; description: string }) {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
 function AppSidebar({
   route,
   selectedProjectId,
-  navigate
+  goals,
+  adrs,
+  selectedGoalId,
+  selectedAdrId,
+  onSelectGoal,
+  onSelectAdr,
+  navigate,
+  themeMode,
+  onThemeModeChange
 }: {
   route: RouteState;
   selectedProjectId: string;
+  goals: MarkdownEntity[];
+  adrs: MarkdownEntity[];
+  selectedGoalId?: string;
+  selectedAdrId?: string;
+  onSelectGoal: (id: string) => void;
+  onSelectAdr: (id: string) => void;
   navigate: (path: string) => void;
+  themeMode: ThemeMode;
+  onThemeModeChange: (mode: ThemeMode) => void;
 }) {
   const projectGoalsPath = selectedProjectId ? routePath("project-goals", selectedProjectId) : "/projects";
   const projectAdrsPath = selectedProjectId ? routePath("project-adrs", selectedProjectId) : "/projects";
@@ -420,9 +596,9 @@ function AppSidebar({
               <Collapsible defaultOpen={projectsOpen} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={projectsOpen} tooltip="Projects">
+                    <SidebarMenuButton isActive={projectsOpen} tooltip="Project">
                       <Layers3 />
-                      <span>Projects</span>
+                      <span>Project</span>
                       <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -445,6 +621,17 @@ function AppSidebar({
                         >
                           <span>GOALS</span>
                         </SidebarMenuSubButton>
+                        {route.view === "project-goals" ? (
+                          <SidebarDocumentLinks
+                            documents={goals}
+                            selectedId={selectedGoalId}
+                            path={projectGoalsPath}
+                            onSelect={(id) => {
+                              onSelectGoal(id);
+                              navigate(projectGoalsPath);
+                            }}
+                          />
+                        ) : null}
                       </SidebarMenuSubItem>
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton
@@ -454,6 +641,17 @@ function AppSidebar({
                         >
                           <span>ADR</span>
                         </SidebarMenuSubButton>
+                        {route.view === "project-adrs" ? (
+                          <SidebarDocumentLinks
+                            documents={adrs}
+                            selectedId={selectedAdrId}
+                            path={projectAdrsPath}
+                            onSelect={(id) => {
+                              onSelectAdr(id);
+                              navigate(projectAdrsPath);
+                            }}
+                          />
+                        ) : null}
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
                   </CollapsibleContent>
@@ -468,14 +666,7 @@ function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Build verified">
-              <CheckCircle2 />
-              <span>Build verified</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <ThemeSelector mode={themeMode} onChange={onThemeModeChange} />
       </SidebarFooter>
       <SidebarRail />
     </ShadcnSidebar>
@@ -483,14 +674,21 @@ function AppSidebar({
 }
 
 export function App() {
+  const [themeMode, setThemeMode] = useThemeMode();
   const [data, setData] = useState<AppData>(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [route, setRoute] = useState<RouteState>(() => routeFromPath(window.location.pathname));
   const [selectedProjectId, setSelectedProjectId] = useState(seedData.projects[0]?.id ?? "");
+  const [selectedGoalId, setSelectedGoalId] = useState("");
+  const [selectedAdrId, setSelectedAdrId] = useState("");
 
   const project = data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId)) ?? data.projects.find((item) => item.id === selectedProjectId) ?? data.projects[0];
+  const goals = useMemo(() => data.goals.filter((goal) => goal.projectId === project?.id), [data.goals, project?.id]);
+  const adrs = useMemo(() => data.adrs.filter((adr) => adr.projectId === project?.id), [data.adrs, project?.id]);
+  const selectedGoal = goals.find((goal) => goal.id === selectedGoalId) ?? goals[0];
+  const selectedAdr = adrs.find((adr) => adr.id === selectedAdrId) ?? adrs[0];
 
   const navigate = (path: string) => {
     window.history.pushState({}, "", path);
@@ -543,26 +741,22 @@ export function App() {
     setNotice("Deleted.");
   };
 
-  const reset = async () => {
-    const next = await api.reset();
-    setData(next);
-    const firstProjectId = next.projects[0]?.id ?? "";
-    setSelectedProjectId(firstProjectId);
-    setNotice("Seed data restored.");
-    if (route.view === "project-goals") navigate(routePath("project-goals", firstProjectId));
-    if (route.view === "project-adrs") navigate(routePath("project-adrs", firstProjectId));
-  };
-
-  const handleProjectSelect = (projectId: string) => {
-    setSelectedProjectId(projectId);
-    if (route.view === "project-goals") navigate(routePath("project-goals", projectId));
-    if (route.view === "project-adrs") navigate(routePath("project-adrs", projectId));
-  };
-
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <AppSidebar route={route} selectedProjectId={selectedProjectId} navigate={navigate} />
+        <AppSidebar
+          route={route}
+          selectedProjectId={selectedProjectId}
+          goals={goals}
+          adrs={adrs}
+          selectedGoalId={selectedGoal?.id}
+          selectedAdrId={selectedAdr?.id}
+          onSelectGoal={setSelectedGoalId}
+          onSelectAdr={setSelectedAdrId}
+          navigate={navigate}
+          themeMode={themeMode}
+          onThemeModeChange={setThemeMode}
+        />
         <SidebarInset>
           <ScrollArea className="h-svh">
             <main className="flex min-h-svh flex-col gap-5 bg-muted/30 p-4 md:p-6">
@@ -571,52 +765,20 @@ export function App() {
                   <SidebarTrigger className="md:hidden">
                     <Menu />
                   </SidebarTrigger>
-                  <PageHeader title="Project operations" description="Projects, decisions, agents, runtimes, policies, and routed event intake." />
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
-                  <Select value={selectedProjectId} onValueChange={handleProjectSelect}>
-                    <SelectTrigger className="w-full sm:w-[22rem]">
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {data.projects.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.key} · {item.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={() => navigate("/events")}>
-                    <Inbox data-icon="inline-start" />
-                    Event intake
-                  </Button>
-                  <Button variant="outline" onClick={reset}>
-                    <RefreshCw data-icon="inline-start" />
-                    Reset seed
-                  </Button>
                 </div>
               </header>
 
               {loading ? <Alert><AlertDescription>Loading workspace data...</AlertDescription></Alert> : null}
               {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
               {notice ? <Alert><AlertDescription>{notice}</AlertDescription></Alert> : null}
-              <SummaryTiles data={data} />
 
               {route.view === "projects" ? (
                 <ProjectsOverview
-                  data={data}
                   project={project}
-                  selectedProjectId={selectedProjectId}
-                  setSelectedProjectId={setSelectedProjectId}
-                  navigate={navigate}
-                  save={save}
-                  remove={remove}
                 />
               ) : null}
-              {route.view === "project-goals" ? <GoalsPage data={data} project={project} save={save} remove={remove} /> : null}
-              {route.view === "project-adrs" ? <AdrsPage data={data} project={project} save={save} remove={remove} /> : null}
+              {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} /> : null}
+              {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} /> : null}
               {route.view === "agents" ? <AgentsView data={data} save={save} remove={remove} /> : null}
               {route.view === "runtimes" ? <RuntimesView data={data} save={save} remove={remove} /> : null}
               {route.view === "policies" ? <PoliciesView data={data} project={project} save={save} remove={remove} /> : null}
@@ -629,211 +791,22 @@ export function App() {
   );
 }
 
-function ProjectsOverview({
-  data,
-  project,
-  selectedProjectId,
-  setSelectedProjectId,
-  navigate,
-  save,
-  remove
-}: {
-  data: AppData;
-  project?: Project;
-  selectedProjectId: string;
-  setSelectedProjectId: (id: string) => void;
-  navigate: (path: string) => void;
-  save: <T extends SaveCollection>(collection: T, item: Partial<AppData[T][number]>) => Promise<AppData[T][number]>;
-  remove: (collection: SaveCollection | "events", id: string) => Promise<void>;
-}) {
-  const [projectForm, setProjectForm] = useState<Partial<Project>>(projectTemplate());
-
-  useEffect(() => {
-    setProjectForm(project ?? projectTemplate());
-  }, [project?.id]);
-
+function ProjectsOverview({ project }: { project?: Project }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]">
-      <Panel title="Projects Overview" description="Select the project used by the GOALS and ADR pages." icon={<Layers3 data-icon="inline-start" />}>
-        <DataTable
-          empty="No projects yet."
-          columns={["Key", "Name", "Status", "Goals", "ADRs"]}
-          rows={data.projects.map((item) => ({
-            id: item.id,
-            cells: [
-              <span className="font-medium">{item.key}</span>,
-              item.name,
-              <StatusBadge status={item.status} />,
-              data.goals.filter((goal) => goal.projectId === item.id).length,
-              data.adrs.filter((adr) => adr.projectId === item.id).length
-            ],
-            onClick: () => {
-              setSelectedProjectId(item.id);
-              setProjectForm(item);
-            }
-          }))}
-        />
-      </Panel>
-
-      <Panel title={projectForm.id ? "Update project" : "Create project"} icon={<Layers3 data-icon="inline-start" />}>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void save("projects", projectForm); }}>
-          <FieldGroup className="grid gap-4 md:grid-cols-2">
-            <TextField label="Name" required value={projectForm.name ?? ""} onChange={(name) => setProjectForm({ ...projectForm, name })} />
-            <TextField label="Key" required value={projectForm.key ?? ""} onChange={(key) => setProjectForm({ ...projectForm, key })} />
-            <SelectField
-              label="Status"
-              value={projectForm.status ?? "active"}
-              options={["active", "paused", "archived"].map((value) => ({ value, label: value }))}
-              onChange={(status) => setProjectForm({ ...projectForm, status: status as Project["status"] })}
-            />
-          </FieldGroup>
-          <TextAreaField label="Description" value={projectForm.description ?? ""} onChange={(description) => setProjectForm({ ...projectForm, description })} />
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setProjectForm(projectTemplate())}>
-              <Plus data-icon="inline-start" />
-              New
-            </Button>
-            {selectedProjectId ? (
-              <>
-                <Button type="button" variant="secondary" onClick={() => navigate(routePath("project-goals", selectedProjectId))}>Open GOALS</Button>
-                <Button type="button" variant="secondary" onClick={() => navigate(routePath("project-adrs", selectedProjectId))}>Open ADR</Button>
-              </>
-            ) : null}
-            <Button type="submit">
-              <Save data-icon="inline-start" />
-              Save project
-            </Button>
-            {projectForm.id ? (
-              <Button type="button" variant="destructive" onClick={() => void remove("projects", projectForm.id!)}>
-                <Trash2 data-icon="inline-start" />
-                Delete
-              </Button>
-            ) : null}
-          </div>
-        </form>
-      </Panel>
-    </div>
+    <MarkdownDocumentView document={project} emptyTitle="No project document found." />
   );
 }
 
-function GoalsPage({ data, project, save, remove }: ViewProps & { project?: Project }) {
-  const [goalForm, setGoalForm] = useState<Partial<Goal>>(goalTemplate(project?.id ?? ""));
-  const goals = useMemo(() => data.goals.filter((goal) => goal.projectId === project?.id), [data.goals, project?.id]);
+function GoalsPage({ project, selectedGoal }: { project?: Project; selectedGoal?: Goal }) {
+  if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading GOALS." />;
 
-  useEffect(() => {
-    setGoalForm(goalTemplate(project?.id ?? ""));
-  }, [project?.id]);
-
-  if (!project) return <EmptyState title="No project selected." action="Select or create a Project before managing GOALS." />;
-
-  return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(520px,1.1fr)_minmax(360px,0.9fr)]">
-      <Panel title="Project GOALS" description={`Goals for ${project.key} · ${project.name}.`} icon={<ClipboardList data-icon="inline-start" />}>
-        <DataTable
-          empty="No Goals exist for this Project."
-          columns={["Title", "Status", "Owner", "Target"]}
-          rows={goals.map((goal) => ({
-            id: goal.id,
-            cells: [goal.title, <StatusBadge status={goal.status} />, goal.owner || "Unassigned", goal.targetDate || "Not set"],
-            onClick: () => setGoalForm(goal)
-          }))}
-        />
-      </Panel>
-
-      <Panel title={goalForm.id ? "Update goal" : "Add goal"} icon={<ClipboardList data-icon="inline-start" />}>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void save("goals", { ...goalForm, projectId: project.id }); }}>
-          <FieldGroup>
-            <TextField label="Title" required value={goalForm.title ?? ""} onChange={(title) => setGoalForm({ ...goalForm, title })} />
-            <SelectField
-              label="Status"
-              value={goalForm.status ?? "not-started"}
-              options={["not-started", "in-progress", "at-risk", "done"].map((value) => ({ value, label: value }))}
-              onChange={(status) => setGoalForm({ ...goalForm, status: status as Goal["status"] })}
-            />
-            <TextField label="Owner" value={goalForm.owner ?? ""} onChange={(owner) => setGoalForm({ ...goalForm, owner })} />
-            <TextField label="Target date" type="date" value={goalForm.targetDate ?? ""} onChange={(targetDate) => setGoalForm({ ...goalForm, targetDate })} />
-            <TextAreaField label="Description" value={goalForm.description ?? ""} onChange={(description) => setGoalForm({ ...goalForm, description })} />
-          </FieldGroup>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setGoalForm(goalTemplate(project.id))}>
-              <Plus data-icon="inline-start" />
-              New
-            </Button>
-            <Button type="submit">
-              <Save data-icon="inline-start" />
-              Save goal
-            </Button>
-            {goalForm.id ? (
-              <Button type="button" variant="destructive" onClick={() => void remove("goals", goalForm.id!)}>
-                <Trash2 data-icon="inline-start" />
-                Delete
-              </Button>
-            ) : null}
-          </div>
-        </form>
-      </Panel>
-    </div>
-  );
+  return <MarkdownDocumentView document={selectedGoal} emptyTitle="No Goal document selected." />;
 }
 
-function AdrsPage({ data, project, save, remove }: ViewProps & { project?: Project }) {
-  const [adrForm, setAdrForm] = useState<Partial<Adr>>(adrTemplate(project?.id ?? ""));
-  const adrs = useMemo(() => data.adrs.filter((adr) => adr.projectId === project?.id), [data.adrs, project?.id]);
+function AdrsPage({ project, selectedAdr }: { project?: Project; selectedAdr?: Adr }) {
+  if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading ADRs." />;
 
-  useEffect(() => {
-    setAdrForm(adrTemplate(project?.id ?? ""));
-  }, [project?.id]);
-
-  if (!project) return <EmptyState title="No project selected." action="Select or create a Project before managing ADRs." />;
-
-  return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(520px,1.1fr)_minmax(360px,0.9fr)]">
-      <Panel title="Project ADR" description={`Architecture Decision Records for ${project.key} · ${project.name}.`} icon={<FileText data-icon="inline-start" />}>
-        <DataTable
-          empty="No ADRs exist for this Project."
-          columns={["Title", "Status", "Updated"]}
-          rows={adrs.map((adr) => ({
-            id: adr.id,
-            cells: [adr.title, <StatusBadge status={adr.status} />, new Date(adr.updatedAt).toLocaleDateString()],
-            onClick: () => setAdrForm(adr)
-          }))}
-        />
-      </Panel>
-
-      <Panel title={adrForm.id ? "Update ADR" : "Add ADR"} icon={<FileText data-icon="inline-start" />}>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void save("adrs", { ...adrForm, projectId: project.id }); }}>
-          <FieldGroup>
-            <TextField label="Title" required value={adrForm.title ?? ""} onChange={(title) => setAdrForm({ ...adrForm, title })} />
-            <SelectField
-              label="Status"
-              value={adrForm.status ?? "proposed"}
-              options={["proposed", "accepted", "superseded", "rejected"].map((value) => ({ value, label: value }))}
-              onChange={(status) => setAdrForm({ ...adrForm, status: status as Adr["status"] })}
-            />
-            <TextAreaField label="Context" required value={adrForm.context ?? ""} onChange={(context) => setAdrForm({ ...adrForm, context })} />
-            <TextAreaField label="Decision" required value={adrForm.decision ?? ""} onChange={(decision) => setAdrForm({ ...adrForm, decision })} />
-            <TextAreaField label="Consequences" required value={adrForm.consequences ?? ""} onChange={(consequences) => setAdrForm({ ...adrForm, consequences })} />
-          </FieldGroup>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setAdrForm(adrTemplate(project.id))}>
-              <Plus data-icon="inline-start" />
-              New
-            </Button>
-            <Button type="submit">
-              <Save data-icon="inline-start" />
-              Save ADR
-            </Button>
-            {adrForm.id ? (
-              <Button type="button" variant="destructive" onClick={() => void remove("adrs", adrForm.id!)}>
-                <Trash2 data-icon="inline-start" />
-                Delete
-              </Button>
-            ) : null}
-          </div>
-        </form>
-      </Panel>
-    </div>
-  );
+  return <MarkdownDocumentView document={selectedAdr} emptyTitle="No ADR document selected." />;
 }
 
 function AgentsView({ data, save, remove }: ViewProps) {
@@ -861,10 +834,17 @@ function AgentsView({ data, save, remove }: ViewProps) {
       <Panel title="Agents" icon={<Bot data-icon="inline-start" />}>
         <DataTable
           empty="No agents yet."
-          columns={["Name", "Enabled", "Skills"]}
+          columns={["Name", "Enabled", "Errors", "Skills", "Metadata", "Body"]}
           rows={data.agents.map((agent) => ({
             id: agent.id,
-            cells: [agent.name, agent.enabled ? "enabled" : "disabled", String(agent.skills.length)],
+            cells: [
+              agent.name,
+              agent.enabled ? "enabled" : "disabled",
+              <ErrorPreview errors={agent.errors} />,
+              String(agent.skills.length),
+              <MetadataPreview frontmatter={agent.frontmatter} />,
+              <BodyPreview body={agent.body} />
+            ],
             onClick: () => editAgent(agent)
           }))}
         />
@@ -954,13 +934,16 @@ function PoliciesView({ data, project, save, remove }: ViewProps & { project?: P
       <Panel title="Policies" icon={<GitBranch data-icon="inline-start" />}>
         <DataTable
           empty="No policies yet."
-          columns={["Name", "Matches", "Target"]}
+          columns={["Name", "Errors", "Matches", "Target", "Metadata", "Body"]}
           rows={data.policies.map((policy) => ({
             id: policy.id,
             cells: [
               policy.name,
+              <ErrorPreview errors={policy.errors} />,
               policy.eventTypes.join(", ") || "*",
-              data.agents.find((agent) => agent.id === policy.targetAgentId)?.name ?? "missing agent"
+              data.agents.find((agent) => agent.id === policy.targetAgentId)?.name ?? "missing agent",
+              <MetadataPreview frontmatter={policy.frontmatter} />,
+              <BodyPreview body={policy.body} />
             ],
             onClick: () => editPolicy(policy)
           }))}
@@ -970,11 +953,12 @@ function PoliciesView({ data, project, save, remove }: ViewProps & { project?: P
         <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
           <FieldGroup>
             <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
+            <TextField label="Priority" type="number" value={form.priority ?? 10} onChange={(priority) => setForm({ ...form, priority: Number(priority) })} />
             <TextAreaField label="Description" value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
             <SelectField
               label="Project match"
               value={form.projectId ?? project?.id ?? "*"}
-              options={[{ value: "*", label: "Any project" }, ...data.projects.map((item) => ({ value: item.id, label: `${item.key} · ${item.name}` }))]}
+              options={[{ value: "*", label: "Any project" }, ...data.projects.map((item) => ({ value: item.id, label: item.name }))]}
               onChange={(projectId) => setForm({ ...form, projectId })}
             />
             <SelectField
@@ -984,6 +968,7 @@ function PoliciesView({ data, project, save, remove }: ViewProps & { project?: P
               onChange={(targetAgentId) => setForm({ ...form, targetAgentId })}
             />
             <TextField label="Event types" value={eventTypes} placeholder="deployment.failed, adr.created" onChange={setEventTypes} />
+            <TextField label="Required tags" value={tags} placeholder="architecture, high-priority" onChange={setTags} />
             <TextField label="Source" value={form.source ?? "*"} onChange={(source) => setForm({ ...form, source })} />
             <SwitchField label="Active" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />
             <TextAreaField label="Payload metadata match (key=value)" rows={4} value={metadata} onChange={setMetadata} />
@@ -1032,11 +1017,12 @@ function EventsView({ data, project, refresh, remove }: { data: AppData; project
             <SelectField
               label="Project"
               value={form.projectId}
-              options={data.projects.map((item) => ({ value: item.id, label: `${item.key} · ${item.name}` }))}
+              options={data.projects.map((item) => ({ value: item.id, label: item.name }))}
               onChange={(projectId) => setForm({ ...form, projectId })}
             />
             <TextField label="Event type" required value={form.eventType} onChange={(eventType) => setForm({ ...form, eventType })} />
             <TextField label="Source agent/runtime" value={form.source ?? ""} onChange={(source) => setForm({ ...form, source })} />
+            <TextField label="Tags" value={toCsv(form.tags ?? [])} onChange={(value) => setForm({ ...form, tags: fromCsv(value) })} />
             <TextAreaField label="Payload JSON" rows={9} value={payloadText} onChange={setPayloadText} />
           </FieldGroup>
           <div className="flex flex-wrap justify-end gap-2">
@@ -1055,15 +1041,18 @@ function EventsView({ data, project, refresh, remove }: { data: AppData; project
       <Panel title="Event inbox" icon={<CheckCircle2 data-icon="inline-start" />}>
         <DataTable
           empty="No events received."
-          columns={["Created", "Type", "Status", "Policy", "Agent", "Result"]}
+          columns={["Created", "Type", "Status", "Errors", "Policy", "Agent", "Metadata", "Body", "Result"]}
           rows={data.events.map((event) => ({
             id: event.id,
             cells: [
               new Date(event.createdAt).toLocaleString(),
               event.eventType,
               <StatusBadge status={event.status} />,
+              <ErrorPreview errors={event.errors} />,
               data.policies.find((policy) => policy.id === event.matchedPolicyId)?.name ?? "none",
               data.agents.find((agent) => agent.id === event.assignedAgentId)?.name ?? "unassigned",
+              <MetadataPreview frontmatter={event.frontmatter} />,
+              <BodyPreview body={event.body} />,
               event.handlingResult ?? "No handler result."
             ],
             action: (

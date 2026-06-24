@@ -1,4 +1,4 @@
-import type { AppData, CollectionName, EventRecord } from "../shared/domain";
+import type { AppData, CollectionName, EventRecord } from "../../backend/shared/domain";
 
 const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {

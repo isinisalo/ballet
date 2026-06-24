@@ -1,0 +1,33 @@
+goals:
+  - id: goal-001
+    title: Projektin tavoite
+    status: accepted
+    path: "specs/goals/goal-001 - Projektin-tavoite.md"
+  - id: goal-002
+    title: Autentikointi
+    status: accepted
+    path: "specs/goals/goal-002 - Autentikointi.md"
+  - id: goal-003
+    title: Viestintä
+    status: accepted
+    path: "specs/goals/goal-003 - Viestinta.md"
+  - id: goal-004
+    title: Yritysseuranta
+    status: accepted
+    path: "specs/goals/goal-004 - Yritysseuranta.md"
+  - id: goal-005
+    title: Markkinadata
+    status: accepted
+    path: "specs/goals/goal-005 - Markkinadata.md"
+  - id: goal-006
+    title: Keskusteluaineisto
+    status: accepted
+    path: "specs/goals/goal-006 - Keskusteluaineisto.md"
+  - id: goal-007
+    title: Tiedonkeruun ajastus
+    status: accepted
+    path: "specs/goals/goal-007 - Tiedonkeruun-ajastus.md"
+  - id: goal-008
+    title: Tuotteen UX
+    status: accepted
+    path: "specs/goals/goal-008 - Tuotteen-UX.md"

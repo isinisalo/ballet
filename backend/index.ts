@@ -1,4 +1,5 @@
 import express from "express";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { apiRouter } from "./routes.js";
@@ -10,7 +11,11 @@ const port = Number(process.env.PORT ?? 4174);
 app.use(express.json({ limit: "1mb" }));
 app.use("/api", apiRouter);
 
-const clientDist = path.resolve(__dirname, "../dist");
+const clientDistCandidates = [
+  path.resolve(__dirname, "../dist"),
+  path.resolve(process.cwd(), "dist")
+];
+const clientDist = clientDistCandidates.find((candidate) => existsSync(path.join(candidate, "index.html"))) ?? clientDistCandidates[0];
 app.use(express.static(clientDist));
 app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDist, "index.html"));

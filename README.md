@@ -6,10 +6,33 @@ Minimal TypeScript web application for managing projects, goals, ADRs, agents, s
 
 - React + Vite for the app UI.
 - Express for the local API, including `/api/events/intake`.
-- JSON-file persistence at `data/db.json` for local development.
+- Project-local Markdown persistence under `.codex/agents` and `.ballet/*`.
 - Vitest for policy interpreter tests.
 
 The repository was empty, so this stack was chosen as a small full-stack TypeScript default that supports both browser workflows and API event intake without external services.
+
+## Repository Structure
+
+- `frontend/` contains the React + Vite UI.
+- `backend/` contains the Express API server.
+- `backend/shared/` contains domain types, policies, and seed data shared by the UI and API.
+- `backend/tests/` contains Vitest tests for backend and shared behavior.
+- `data/`, `audit/`, and `.fixture-ballet-project/` contain project data, visual audit artifacts, and fixtures.
+
+## Project-Local Data
+
+Start Ballet from the project folder you want to inspect. The current working directory becomes the active project root.
+
+Loaded collections:
+
+- `.codex/agents/*.md|*.mdx`
+- `.ballet/project.md`
+- `.ballet/adr/*.md|*.mdx`
+- `.ballet/goals/*.md|*.mdx`
+- `.ballet/events/*.md|*.mdx`
+- `.ballet/policies/*.md|*.mdx`
+
+Files use YAML Frontmatter plus Markdown body content. Frontmatter is shown as metadata and the body is shown as long-form preview content. Existing create/edit flows write Markdown back to the relevant project-local location.
 
 ## Run
 
@@ -41,3 +64,5 @@ The seed data includes:
 - Policy: `Deployment failures to k8s operator`
 - Routed event: `deployment.failed`
 - Unassigned event: `cost.anomaly`
+
+The Markdown fixture project is at `.fixture-ballet-project`.
