@@ -1,7 +1,14 @@
 import path from "node:path";
 import { stat, unlink } from "node:fs/promises";
 import type { Adr, AdrStatus, Agent, AgentOutcomeStatus, AgentStatus, AppData, EntityStatus, EventDefinition, EventProducerDefinition, Goal, MarkdownDocument, Policy, Project, Runtime, Skill } from "./shared/domain.js";
-import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadEvents, loadGoals, loadPolicies, loadRuntimes, loadSkills, readMarkdownDocument, safeSlug, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
+import type { ContractDefinition, ContractKind } from "./shared/contracts.js";
+import type { EmissionPolicy } from "./shared/emission-policy.js";
+import type { LoopDefinition } from "./shared/loop.js";
+import type { AgentOperation } from "./shared/operations.js";
+import type { RoutingPolicy } from "./shared/routing-policy.js";
+import type { MappingExpression } from "./shared/mapping.js";
+import type { VersionedRef } from "./shared/json.js";
+import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadContracts, loadEmissionPolicies, loadEvents, loadGoals, loadLoopDefinitions, loadOperations, loadPolicies, loadRuntimes, loadSkills, readMarkdownDocument, safeSlug, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
 
 const now = () => new Date().toISOString();
 
@@ -10,6 +17,16 @@ const stringValue = (value: unknown, fallback = ""): string => typeof value === 
 const booleanValue = (value: unknown, fallback = false): boolean => typeof value === "boolean" ? value : typeof value === "string" ? value.toLowerCase() === "true" : fallback;
 const stringArray = (value: unknown): string[] => Array.isArray(value) ? value.map((item) => stringValue(item)).filter(Boolean) : typeof value === "string" ? value.split(",").map((item) => item.trim()).filter(Boolean) : [];
 const cloneRecord = (value: unknown): Record<string, unknown> | undefined => isRecord(value) ? JSON.parse(JSON.stringify(value)) as Record<string, unknown> : undefined;
+const numberValue = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+};
+const recordValue = (value: unknown): Record<string, unknown> => cloneRecord(value) ?? {};
+const arrayValue = <T = unknown>(value: unknown): T[] => Array.isArray(value) ? JSON.parse(JSON.stringify(value)) as T[] : [];
 
 const validEntityStatus = (value: unknown): EntityStatus => ["active", "paused", "archived"].includes(stringValue(value)) ? stringValue(value) as EntityStatus : "active";
 const validGoalStatus = (value: unknown): Goal["status"] => ["not-started", "in-progress", "at-risk", "done"].includes(stringValue(value)) ? stringValue(value) as Goal["status"] : "not-started";
@@ -22,6 +39,31 @@ const validAgentOutcomeStatus = (value: unknown): AgentOutcomeStatus | undefined
 const dateValue = (value: unknown): string => stringValue(value, now());
 
 const bodyPreview = (body: string): string => body.replace(/^#+\s+/gm, "").split(/\n{2,}/)[0]?.trim() ?? "";
+
+const metadataFromDocument = (doc: MarkdownDocument): Record<string, unknown> =>
+  isRecord(doc.frontmatter.metadata) ? doc.frontmatter.metadata : {};
+
+const metadataFromItem = (item: Record<string, unknown>): Record<string, unknown> =>
+  isRecord(item.frontmatter) && isRecord(item.frontmatter.metadata) ? item.frontmatter.metadata : {};
+
+const specFromDocument = (doc: MarkdownDocument): Record<string, unknown> =>
+  isRecord(doc.frontmatter.spec) ? doc.frontmatter.spec : doc.frontmatter;
+
+const documentId = (doc: MarkdownDocument): string => stringValue(metadataFromDocument(doc).id ?? doc.frontmatter.id, doc.id);
+
+const documentVersion = (doc: MarkdownDocument, fallback = 1): number =>
+  numberValue(metadataFromDocument(doc).version ?? doc.frontmatter.version ?? specFromDocument(doc).version, fallback);
+
+const versionedRef = (value: unknown, fallbackId = "", fallbackVersion = 1): VersionedRef => {
+  const record = isRecord(value) ? value : {};
+  return {
+    id: stringValue(record.id, fallbackId),
+    version: numberValue(record.version, fallbackVersion)
+  };
+};
+
+const mappingExpression = (value: unknown, fallback: MappingExpression = { object: {} }): MappingExpression =>
+  (isRecord(value) ? JSON.parse(JSON.stringify(value)) : fallback) as MappingExpression;
 
 const attachDocument = <T extends object>(entity: T, doc: MarkdownDocument): T => ({
   ...entity,
@@ -197,28 +239,81 @@ const runtimeFromDocument = (doc: MarkdownDocument): Runtime => {
   }, doc);
 };
 
-const policyFromDocument = (doc: MarkdownDocument, defaultProjectId: string, firstAgentId: string): Policy => {
+const validContractKind = (value: unknown): ContractKind =>
+  ["event-data", "agent-input", "agent-output"].includes(stringValue(value))
+    ? stringValue(value) as ContractKind
+    : "event-data";
+
+const contractFromDocument = (doc: MarkdownDocument): ContractDefinition => {
+  const spec = specFromDocument(doc);
+  return attachDocument({
+    id: documentId(doc),
+    version: documentVersion(doc),
+    name: stringValue(spec.name ?? metadataFromDocument(doc).name ?? doc.title, doc.slug),
+    description: stringValue(spec.description ?? doc.frontmatter.description, bodyPreview(doc.body)),
+    kind: validContractKind(spec.kind),
+    active: booleanValue(spec.active, true),
+    schema: recordValue(spec.schema),
+    examples: arrayValue(spec.examples),
+    createdAt: dateValue(spec.createdAt ?? doc.frontmatter.createdAt),
+    updatedAt: dateValue(spec.updatedAt ?? doc.frontmatter.updatedAt ?? doc.frontmatter.createdAt)
+  }, doc);
+};
+
+const operationFromDocument = (doc: MarkdownDocument): AgentOperation => {
+  const spec = specFromDocument(doc);
+  return attachDocument({
+    id: documentId(doc),
+    version: documentVersion(doc),
+    name: stringValue(spec.name ?? metadataFromDocument(doc).name ?? doc.title, doc.slug),
+    description: stringValue(spec.description ?? doc.frontmatter.description, bodyPreview(doc.body)),
+    active: booleanValue(spec.active, true),
+    agentId: stringValue(spec.agentId),
+    instructions: stringValue(spec.instructions, doc.body),
+    inputContract: versionedRef(spec.inputContract),
+    outputContract: versionedRef(spec.outputContract),
+    emissionRequired: booleanValue(spec.emissionRequired, false),
+    createdAt: dateValue(spec.createdAt ?? doc.frontmatter.createdAt),
+    updatedAt: dateValue(spec.updatedAt ?? doc.frontmatter.updatedAt ?? doc.frontmatter.createdAt)
+  }, doc);
+};
+
+const legacyOperationForPolicy = (doc: MarkdownDocument): VersionedRef => {
   const fm = doc.frontmatter;
   const action = cloneRecord(fm.action) as Policy["action"] | undefined;
-  const match = cloneRecord(fm.match) as Policy["match"] | undefined;
-  const payloadMetadata = isRecord(fm.payloadMetadata) ? Object.fromEntries(Object.entries(fm.payloadMetadata).map(([key, value]) => [key, stringValue(value)])) : {};
   const targetAgentId = action?.type === "start_agent_run" && action.targetAgentId
     ? action.targetAgentId
-    : stringValue(fm.targetAgentId ?? fm.agentId, firstAgentId);
+    : stringValue(fm.targetAgentId ?? fm.agentId);
+  return { id: targetAgentId, version: 1 };
+};
+
+const routingPolicyFromDocument = (doc: MarkdownDocument): RoutingPolicy => {
+  const fm = doc.frontmatter;
+  const spec = specFromDocument(doc);
+  const legacyMatch = cloneRecord(fm.match);
+  const consumes = isRecord(spec.consumes)
+    ? { eventType: stringValue(spec.consumes.eventType) }
+    : { eventType: stringArray(legacyMatch?.eventTypes ?? fm.eventTypes ?? fm.eventType)[0] ?? "" };
+  const dispatch = isRecord(spec.dispatch) && isRecord(spec.dispatch.operation)
+    ? { operation: versionedRef(spec.dispatch.operation) }
+    : { operation: legacyOperationForPolicy(doc) };
   return attachDocument({
-    id: doc.id,
-    name: stringValue(fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
-    description: stringValue(fm.description, bodyPreview(doc.body)),
-    active: booleanValue(fm.active, true),
-    match,
-    action,
-    projectId: stringValue(fm.projectId, "*") as Policy["projectId"],
-    eventTypes: stringArray(fm.eventTypes ?? fm.eventType ?? match?.eventTypes),
-    source: stringValue(fm.source, "*"),
-    payloadMetadata,
-    targetAgentId,
-    createdAt: dateValue(fm.createdAt),
-    updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
+    id: documentId(doc),
+    name: stringValue(spec.name ?? metadataFromDocument(doc).name ?? fm.name, doc.title ?? doc.slug),
+    description: stringValue(spec.description ?? fm.description, bodyPreview(doc.body)),
+    active: booleanValue(spec.active, true),
+    consumes,
+    when: cloneRecord(spec.when) as RoutingPolicy["when"],
+    dispatch,
+    input: mappingExpression(spec.input, { object: {} }),
+    priority: spec.priority === undefined ? undefined : numberValue(spec.priority),
+    selection: isRecord(spec.selection) ? {
+      mode: spec.selection.mode === "exclusive" ? "exclusive" : "fanout",
+      group: stringValue(spec.selection.group) || undefined
+    } : undefined,
+    onInvalidInput: spec.onInvalidInput === "reject-event" ? "reject-event" : "skip",
+    createdAt: dateValue(spec.createdAt ?? fm.createdAt),
+    updatedAt: dateValue(spec.updatedAt ?? fm.updatedAt ?? fm.createdAt)
   }, doc);
 };
 
@@ -248,23 +343,86 @@ const producersFromUnknown = (value: unknown): EventProducerDefinition[] =>
 
 const eventDefinitionFromDocument = (doc: MarkdownDocument): EventDefinition => {
   const fm = doc.frontmatter;
+  const spec = specFromDocument(doc);
   return attachDocument({
-    id: doc.id,
-    name: stringValue(fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
-    description: stringValue(fm.description, bodyPreview(doc.body)),
-    active: booleanValue(fm.active, true),
-    eventType: stringValue(fm.eventType ?? fm.type, doc.slug),
-    source: stringValue(fm.source, "*"),
-    tags: stringArray(fm.tags),
+    id: documentId(doc),
+    name: stringValue(spec.name ?? metadataFromDocument(doc).name ?? fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
+    description: stringValue(spec.description ?? fm.description, bodyPreview(doc.body)),
+    active: booleanValue(spec.active, true),
+    eventType: stringValue(spec.eventType ?? fm.eventType ?? fm.type, doc.slug),
+    source: stringValue(spec.source ?? fm.source) || undefined,
+    tags: stringArray(spec.tags ?? fm.tags),
+    dataContract: isRecord(spec.dataContract) ? versionedRef(spec.dataContract) : undefined,
+    examples: arrayValue<Record<string, unknown>>(spec.examples ?? fm.examples ?? (isRecord(fm.payloadExample) ? [fm.payloadExample] : [])),
     producers: producersFromUnknown(fm.producers),
-    payloadExample: isRecord(fm.payloadExample) ? fm.payloadExample : isRecord(fm.payload) ? fm.payload : {},
-    createdAt: dateValue(fm.createdAt),
-    updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
+    payloadExample: isRecord(fm.payloadExample) ? fm.payloadExample : isRecord(fm.payload) ? fm.payload : undefined,
+    createdAt: dateValue(spec.createdAt ?? fm.createdAt),
+    updatedAt: dateValue(spec.updatedAt ?? fm.updatedAt ?? fm.createdAt)
+  }, doc);
+};
+
+const emissionPolicyFromDocument = (doc: MarkdownDocument): EmissionPolicy => {
+  const spec = specFromDocument(doc);
+  return attachDocument({
+    id: documentId(doc),
+    version: documentVersion(doc),
+    name: stringValue(spec.name ?? metadataFromDocument(doc).name ?? doc.title, doc.slug),
+    description: stringValue(spec.description ?? doc.frontmatter.description, bodyPreview(doc.body)),
+    active: booleanValue(spec.active, true),
+    observes: {
+      operation: versionedRef(isRecord(spec.observes) ? spec.observes.operation : undefined)
+    },
+    when: cloneRecord(spec.when) as EmissionPolicy["when"],
+    gates: arrayValue(spec.gates) as EmissionPolicy["gates"],
+    emissions: arrayValue(spec.emissions) as EmissionPolicy["emissions"],
+    onGateFailure: spec.onGateFailure === "fail_run" ? "fail_run" : "skip",
+    priority: spec.priority === undefined ? undefined : numberValue(spec.priority),
+    createdAt: dateValue(spec.createdAt ?? doc.frontmatter.createdAt),
+    updatedAt: dateValue(spec.updatedAt ?? doc.frontmatter.updatedAt ?? doc.frontmatter.createdAt)
+  }, doc);
+};
+
+const loopDefinitionFromDocument = (doc: MarkdownDocument): LoopDefinition => {
+  const spec = specFromDocument(doc);
+  const limits = isRecord(spec.limits) ? spec.limits : {};
+  return attachDocument({
+    id: documentId(doc),
+    version: documentVersion(doc),
+    name: stringValue(spec.name ?? metadataFromDocument(doc).name ?? doc.title, doc.slug),
+    description: stringValue(spec.description ?? doc.frontmatter.description, bodyPreview(doc.body)),
+    active: booleanValue(spec.active, true),
+    entryEventTypes: stringArray(spec.entryEventTypes),
+    terminalEventTypes: stringArray(spec.terminalEventTypes),
+    routingPolicyIds: stringArray(spec.routingPolicyIds),
+    emissionPolicyIds: stringArray(spec.emissionPolicyIds),
+    limits: {
+      maxHops: numberValue(limits.maxHops, 20),
+      maxRuns: numberValue(limits.maxRuns, 50),
+      maxIterationsPerStep: numberValue(limits.maxIterationsPerStep, 5),
+      deadlineSeconds: limits.deadlineSeconds === undefined ? undefined : numberValue(limits.deadlineSeconds)
+    },
+    onLimitExceeded: isRecord(spec.onLimitExceeded) ? { eventType: stringValue(spec.onLimitExceeded.eventType) || undefined } : undefined,
+    createdAt: dateValue(spec.createdAt ?? doc.frontmatter.createdAt),
+    updatedAt: dateValue(spec.updatedAt ?? doc.frontmatter.updatedAt ?? doc.frontmatter.createdAt)
   }, doc);
 };
 
 export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
-  const [projectDocs, projectDocumentTree, agentDocs, skillDocs, adrDocs, goalDocs, runtimeDocs, eventDocs, policyDocs] = await Promise.all([
+  const [
+    projectDocs,
+    projectDocumentTree,
+    agentDocs,
+    skillDocs,
+    adrDocs,
+    goalDocs,
+    runtimeDocs,
+    contractDocs,
+    operationDocs,
+    eventDocs,
+    policyDocs,
+    emissionPolicyDocs,
+    loopDefinitionDocs
+  ] = await Promise.all([
     loadBalletProject(root),
     loadBalletProjectTree(root),
     loadAgents(root),
@@ -272,8 +430,12 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
     loadAdr(root),
     loadGoals(root),
     loadRuntimes(root),
+    loadContracts(root),
+    loadOperations(root),
     loadEvents(root),
-    loadPolicies(root)
+    loadPolicies(root),
+    loadEmissionPolicies(root),
+    loadLoopDefinitions(root)
   ]);
 
   const projects = projectDocs.map(projectFromDocument);
@@ -281,7 +443,6 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
   const skills = skillDocs.map(skillDocumentFromDocument);
   const skillLookup = buildSkillLookup(skills);
   const agents = agentDocs.map((doc) => agentFromDocument(doc, skillLookup));
-  const firstAgentId = agents[0]?.id ?? "";
 
   return {
     projectRoot: root,
@@ -291,20 +452,29 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
     agents,
     skills,
     runtimes: runtimeDocs.map(runtimeFromDocument),
-    policies: policyDocs.map((doc) => policyFromDocument(doc, defaultProjectId, firstAgentId)),
+    contracts: contractDocs.map(contractFromDocument),
+    operations: operationDocs.map(operationFromDocument),
+    policies: policyDocs.map(routingPolicyFromDocument),
+    emissionPolicies: emissionPolicyDocs.map(emissionPolicyFromDocument),
+    loopDefinitions: loopDefinitionDocs.map(loopDefinitionFromDocument),
     eventDefinitions: eventDocs.map(eventDefinitionFromDocument),
     events: [],
     agentRuns: [],
+    loopInstances: [],
     projectDocumentTree,
     documents: {
       project: projectDocs,
       agents: agentDocs,
       skills: skillDocs,
       runtimes: runtimeDocs,
+      contracts: contractDocs,
+      operations: operationDocs,
       adr: adrDocs,
       goals: goalDocs,
       events: eventDocs,
-      policies: policyDocs
+      policies: policyDocs,
+      emissionPolicies: emissionPolicyDocs,
+      loopDefinitions: loopDefinitionDocs
     }
   };
 };
@@ -316,7 +486,11 @@ const collectionFolder: Record<string, string> = {
   agents: ".codex/agents",
   skills: ".agents/skills",
   runtimes: ".ballet/runtimes",
+  contracts: ".ballet/contracts",
+  operations: ".ballet/operations",
   policies: ".ballet/policies",
+  emissionPolicies: ".ballet/emissions",
+  loopDefinitions: ".ballet/loops",
   eventDefinitions: ".ballet/events"
 };
 
@@ -327,7 +501,11 @@ const collectionName: Record<string, string> = {
   agents: "agents",
   skills: "skills",
   runtimes: "runtimes",
+  contracts: "contracts",
+  operations: "operations",
   policies: "policies",
+  emissionPolicies: "emissions",
+  loopDefinitions: "loops",
   eventDefinitions: "events"
 };
 
@@ -392,42 +570,110 @@ const skillFrontmatter = (item: Record<string, unknown>): Record<string, unknown
   };
 };
 
-const policyFrontmatter = (item: Record<string, unknown>, id: string): Record<string, unknown> => {
-  const frontmatter = entityFrontmatter(item, id);
-  const existingMatch = cloneRecord(frontmatter.match);
-  const legacyPayloadMetadata = isRecord(frontmatter.payloadMetadata) ? frontmatter.payloadMetadata : {};
-  const payload = {
-    ...Object.fromEntries(Object.entries(legacyPayloadMetadata).map(([key, value]) => [key, { operator: "equals", value }])),
-    ...(isRecord(existingMatch?.payload) ? existingMatch.payload : {})
+const metadataSpecFrontmatter = (
+  item: Record<string, unknown>,
+  id: string,
+  kind: string,
+  spec: Record<string, unknown>,
+  version?: number
+): Record<string, unknown> => {
+  const base = isRecord(item.frontmatter) ? { ...item.frontmatter } : {};
+  const baseMetadata = isRecord(base.metadata) ? base.metadata : {};
+  const updatedAt = now();
+  return {
+    apiVersion: stringValue(base.apiVersion, "ballet.dev/v1"),
+    kind,
+    metadata: {
+      ...baseMetadata,
+      id,
+      ...(version !== undefined ? { version } : {}),
+      ...(item.createdAt ?? base.createdAt ? { createdAt: item.createdAt ?? base.createdAt } : { createdAt: updatedAt }),
+      updatedAt
+    },
+    spec
   };
-  const eventTypes = stringArray(existingMatch?.eventTypes ?? frontmatter.eventTypes ?? frontmatter.eventType);
-  const match: Record<string, unknown> = {
-    ...existingMatch,
-    eventTypes,
-    projectId: existingMatch?.projectId ?? frontmatter.projectId ?? "*",
-    source: existingMatch?.source ?? frontmatter.source ?? "*"
-  };
-  if (Object.keys(payload).length > 0) match.payload = payload;
-  else delete match.payload;
+};
 
-  const existingAction = cloneRecord(frontmatter.action);
-  const targetAgentId = stringValue(existingAction?.targetAgentId ?? frontmatter.targetAgentId ?? frontmatter.agentId);
-  frontmatter.match = match;
-  frontmatter.action = {
-    type: "start_agent_run",
-    targetAgentId
-  };
-  delete frontmatter.priority;
-  delete frontmatter.version;
-  delete frontmatter.tags;
-  delete frontmatter.projectId;
-  delete frontmatter.source;
-  delete frontmatter.eventType;
-  delete frontmatter.eventTypes;
-  delete frontmatter.payloadMetadata;
-  delete frontmatter.targetAgentId;
-  delete frontmatter.agentId;
-  return frontmatter;
+const contractFrontmatter = (item: Record<string, unknown>, id: string): Record<string, unknown> => {
+  const version = numberValue(item.version ?? metadataFromItem(item).version, 1);
+  return metadataSpecFrontmatter(item, id, "ContractDefinition", {
+    name: stringValue(item.name),
+    description: stringValue(item.description),
+    kind: stringValue(item.kind, "event-data"),
+    active: booleanValue(item.active, true),
+    schema: recordValue(item.schema),
+    examples: arrayValue(item.examples)
+  }, version);
+};
+
+const operationFrontmatter = (item: Record<string, unknown>, id: string): Record<string, unknown> => {
+  const version = numberValue(item.version ?? metadataFromItem(item).version, 1);
+  return metadataSpecFrontmatter(item, id, "AgentOperation", {
+    name: stringValue(item.name),
+    description: stringValue(item.description),
+    active: booleanValue(item.active, true),
+    agentId: stringValue(item.agentId),
+    instructions: stringValue(item.instructions),
+    inputContract: recordValue(item.inputContract),
+    outputContract: recordValue(item.outputContract),
+    emissionRequired: booleanValue(item.emissionRequired, false)
+  }, version);
+};
+
+const routingPolicyFrontmatter = (item: Record<string, unknown>, id: string): Record<string, unknown> =>
+  metadataSpecFrontmatter(item, id, "RoutingPolicy", {
+    name: stringValue(item.name),
+    description: stringValue(item.description),
+    active: booleanValue(item.active, true),
+    consumes: recordValue(item.consumes),
+    ...(item.when !== undefined ? { when: item.when } : {}),
+    dispatch: recordValue(item.dispatch),
+    input: item.input ?? { object: {} },
+    ...(item.priority !== undefined ? { priority: item.priority } : {}),
+    ...(item.selection !== undefined ? { selection: item.selection } : {}),
+    onInvalidInput: stringValue(item.onInvalidInput, "skip")
+  });
+
+const eventDefinitionFrontmatter = (item: Record<string, unknown>, id: string): Record<string, unknown> =>
+  metadataSpecFrontmatter(item, id, "EventDefinition", {
+    name: stringValue(item.name),
+    description: stringValue(item.description),
+    active: booleanValue(item.active, true),
+    eventType: stringValue(item.eventType),
+    ...(item.source !== undefined ? { source: item.source } : {}),
+    tags: stringArray(item.tags),
+    dataContract: recordValue(item.dataContract),
+    examples: arrayValue(item.examples)
+  });
+
+const emissionPolicyFrontmatter = (item: Record<string, unknown>, id: string): Record<string, unknown> => {
+  const version = numberValue(item.version ?? metadataFromItem(item).version, 1);
+  return metadataSpecFrontmatter(item, id, "EmissionPolicy", {
+    name: stringValue(item.name),
+    description: stringValue(item.description),
+    active: booleanValue(item.active, true),
+    observes: recordValue(item.observes),
+    ...(item.when !== undefined ? { when: item.when } : {}),
+    gates: arrayValue(item.gates),
+    emissions: arrayValue(item.emissions),
+    onGateFailure: stringValue(item.onGateFailure, "skip"),
+    ...(item.priority !== undefined ? { priority: item.priority } : {})
+  }, version);
+};
+
+const loopDefinitionFrontmatter = (item: Record<string, unknown>, id: string): Record<string, unknown> => {
+  const version = numberValue(item.version ?? metadataFromItem(item).version, 1);
+  return metadataSpecFrontmatter(item, id, "LoopDefinition", {
+    name: stringValue(item.name),
+    description: stringValue(item.description),
+    active: booleanValue(item.active, true),
+    entryEventTypes: stringArray(item.entryEventTypes),
+    terminalEventTypes: stringArray(item.terminalEventTypes),
+    routingPolicyIds: stringArray(item.routingPolicyIds),
+    emissionPolicyIds: stringArray(item.emissionPolicyIds),
+    limits: recordValue(item.limits),
+    ...(item.onLimitExceeded !== undefined ? { onLimitExceeded: item.onLimitExceeded } : {})
+  }, version);
 };
 
 export const writeEntityMarkdown = async (root: string, collection: keyof typeof collectionFolder, item: Record<string, unknown>): Promise<Record<string, unknown>> => {
@@ -447,9 +693,19 @@ export const writeEntityMarkdown = async (root: string, collection: keyof typeof
       ? agentFrontmatter(item)
       : collection === "skills"
         ? skillFrontmatter(item)
+        : collection === "contracts"
+          ? contractFrontmatter(item, id)
+          : collection === "operations"
+            ? operationFrontmatter(item, id)
         : collection === "policies"
-          ? policyFrontmatter(item, id)
-          : entityFrontmatter(item, id);
+          ? routingPolicyFrontmatter(item, id)
+          : collection === "eventDefinitions"
+            ? eventDefinitionFrontmatter(item, id)
+            : collection === "emissionPolicies"
+              ? emissionPolicyFrontmatter(item, id)
+              : collection === "loopDefinitions"
+                ? loopDefinitionFrontmatter(item, id)
+                : entityFrontmatter(item, id);
   const body = collection === "projects" ? projectBody(item) : entityBody(item);
   if (collection === "agents") {
     await writeTomlDocument({ root, relativePath, frontmatter });

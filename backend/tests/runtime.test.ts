@@ -1,11 +1,15 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, AgentOutcome, EventDefinition, Policy } from "../shared/domain.js";
+import type { Agent, AgentOutcome, EventDefinition } from "../shared/domain.js";
+import type { ContractDefinition } from "../shared/contracts.js";
+import type { AgentOperation } from "../shared/operations.js";
+import type { RoutingPolicy } from "../shared/routing-policy.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
 import { checksPassRequiredGate, mapOutcomeToDomainEvent, parseAgentOutcomeText } from "../runtime-policy.js";
-import { policyVersion } from "../shared/policy.js";
+import { routingPolicyVersion } from "../routing-engine.js";
 
 const tempRoots: string[] = [];
 
@@ -31,18 +35,91 @@ const agent: Agent = {
   updatedAt: "2026-06-24T08:00:00.000Z"
 };
 
-const policy: Policy = {
+const at = "2026-06-24T08:00:00.000Z";
+
+const contract = (id: string, kind: ContractDefinition["kind"], schema: Record<string, unknown>): ContractDefinition => ({
+  id,
+  version: 1,
+  name: id,
+  description: id,
+  kind,
+  active: true,
+  schema,
+  examples: [],
+  createdAt: at,
+  updatedAt: at
+});
+
+const looseInputSchema = {
+  type: "object",
+  additionalProperties: true
+};
+
+const agentOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["status", "summary"],
+  properties: {
+    status: { type: "string", enum: ["completed", "blocked", "needs_input", "failed"] },
+    summary: { type: "string" },
+    result: { type: "object", additionalProperties: true },
+    evidence: { type: "object", additionalProperties: true }
+  }
+};
+
+const contracts = [
+  contract("plan-approved-data", "event-data", looseInputSchema),
+  contract("change-implemented-data", "event-data", looseInputSchema),
+  contract("developer-input", "agent-input", looseInputSchema),
+  contract("review-input", "agent-input", looseInputSchema),
+  contract("agent-output", "agent-output", agentOutputSchema)
+];
+
+const developerOperation: AgentOperation = {
+  id: "developer-agent/implement-change",
+  version: 1,
+  name: "Implement change",
+  description: "Implement an approved plan.",
+  active: true,
+  agentId: "developer-agent",
+  instructions: "Implement the mapped change.",
+  inputContract: { id: "developer-input", version: 1 },
+  outputContract: { id: "agent-output", version: 1 },
+  emissionRequired: false,
+  createdAt: at,
+  updatedAt: at
+};
+
+const architectureOperation: AgentOperation = {
+  ...developerOperation,
+  id: "architecture-reviewer/review-change",
+  name: "Review architecture",
+  agentId: "architecture-reviewer",
+  inputContract: { id: "review-input", version: 1 }
+};
+
+const qaOperation: AgentOperation = {
+  ...architectureOperation,
+  id: "qa-verification-reviewer/verify-change",
+  name: "Verify QA",
+  agentId: "qa-verification-reviewer"
+};
+
+const policy: RoutingPolicy = {
   id: "on_plan_approved_then_start_developer_agent_run",
   name: "on_plan_approved_then_start_developer_agent_run",
   description: "Start development when a plan is approved.",
   active: true,
-  projectId: "project",
-  eventTypes: ["plan.approved.v1"],
-  source: "*",
-  payloadMetadata: {},
-  targetAgentId: "developer-agent",
-  createdAt: "2026-06-24T08:00:00.000Z",
-  updatedAt: "2026-06-24T08:00:00.000Z"
+  consumes: { eventType: "plan.approved.v1" },
+  dispatch: { operation: { id: "developer-agent/implement-change", version: 1 } },
+  input: {
+    object: {
+      workItemId: { from: "/event/subject" },
+      goal: { from: "/event/data/goal", default: "No goal supplied" }
+    }
+  },
+  createdAt: at,
+  updatedAt: at
 };
 
 const architectureAgent: Agent = {
@@ -59,38 +136,43 @@ const qaAgent: Agent = {
   description: "Reviews verification evidence."
 };
 
-const architectureReviewPolicy: Policy = {
+const architectureReviewPolicy: RoutingPolicy = {
   id: "on_change_implemented_then_start_architecture_reviewer_agent_run",
   name: "on_change_implemented_then_start_architecture_reviewer_agent_run",
   description: "Route implemented change facts to architecture review.",
   active: true,
-  match: {
-    eventTypes: ["change.implemented.v1"],
-    source: "agentd"
+  consumes: { eventType: "change.implemented.v1" },
+  dispatch: { operation: { id: "architecture-reviewer/review-change", version: 1 } },
+  input: {
+    object: {
+      summary: { from: "/event/data/summary", default: "" },
+      gitSha: { from: "/event/data/artifacts/git_sha", default: "" }
+    }
   },
-  action: {
-    type: "start_agent_run",
-    targetAgentId: "architecture-reviewer"
-  },
-  projectId: "*",
-  eventTypes: ["change.implemented.v1"],
-  source: "*",
-  payloadMetadata: {},
-  targetAgentId: "architecture-reviewer",
-  createdAt: "2026-06-24T08:00:00.000Z",
-  updatedAt: "2026-06-24T08:00:00.000Z"
+  createdAt: at,
+  updatedAt: at
 };
 
-const qaReviewPolicy: Policy = {
+const qaReviewPolicy: RoutingPolicy = {
   ...architectureReviewPolicy,
   id: "on_change_implemented_then_start_qa_verification_reviewer_agent_run",
   name: "on_change_implemented_then_start_qa_verification_reviewer_agent_run",
-  action: {
-    type: "start_agent_run",
-    targetAgentId: "qa-verification-reviewer"
-  },
-  targetAgentId: "qa-verification-reviewer"
+  dispatch: { operation: { id: "qa-verification-reviewer/verify-change", version: 1 } }
 };
+
+const runtimeDefinitions = (
+  routingPolicies: RoutingPolicy[],
+  agents: Agent[],
+  operations: AgentOperation[] = [developerOperation, architectureOperation, qaOperation]
+) => ({
+  agents,
+  contracts,
+  operations,
+  routingPolicies,
+  emissionPolicies: [],
+  eventDefinitions: [],
+  loopDefinitions: []
+});
 
 const readyOutcome: AgentOutcome = {
   outcome: "ready",
@@ -110,6 +192,8 @@ const changeImplementedDefinition: EventDefinition = {
   eventType: "change.implemented.v1",
   source: "agentd",
   tags: ["delivery"],
+  dataContract: { id: "change-implemented-data", version: 1 },
+  examples: [],
   producers: [{
     agentRole: "developer-agent",
     outcomes: ["ready"],
@@ -143,6 +227,51 @@ describe("runtime database", () => {
     expect(isPatchedSqliteVersion("3.51.2")).toBe(false);
   });
 
+  it("migrates a pre-operation agent_runs table before creating new indexes", async () => {
+    const root = await tempRoot();
+    const dbPath = path.join(root, "runtime.sqlite");
+    const legacy = new Database(dbPath);
+    legacy.exec(`
+      CREATE TABLE agent_runs (
+        run_id TEXT PRIMARY KEY,
+        trigger_event_id TEXT NOT NULL,
+        trigger_event_seq INTEGER,
+        policy_id TEXT NOT NULL,
+        policy_version INTEGER NOT NULL,
+        agent_role TEXT NOT NULL,
+        status TEXT NOT NULL,
+        attempt INTEGER NOT NULL DEFAULT 0,
+        lease_owner TEXT,
+        lease_until TEXT,
+        thread_id TEXT,
+        turn_id TEXT,
+        outcome_json TEXT,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT
+      );
+    `);
+    legacy.close();
+
+    const db = new RuntimeDatabase(dbPath);
+    expect(() => db.listRuns()).not.toThrow();
+    db.close();
+
+    const migrated = new Database(dbPath, { readonly: true });
+    const columns = new Set((migrated.prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>).map((column) => column.name));
+    expect(columns.has("operation_id")).toBe(true);
+    expect(columns.has("operation_version")).toBe(true);
+    expect(columns.has("correlation_id")).toBe(true);
+    expect(columns.has("loop_instance_id")).toBe(true);
+
+    const indexes = new Set((migrated.prepare("PRAGMA index_list(agent_runs)").all() as Array<{ name: string }>).map((index) => index.name));
+    expect(indexes.has("idx_agent_runs_operation")).toBe(true);
+    expect(indexes.has("idx_agent_runs_correlation")).toBe(true);
+    expect(indexes.has("idx_agent_runs_loop_instance")).toBe(true);
+    migrated.close();
+  });
+
   it("writes an intake event and queues one deduplicated agent run", async () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
@@ -153,14 +282,16 @@ describe("runtime database", () => {
       source: "test",
       tags: ["delivery"],
       payload: { work_item_id: "work-1" }
-    }, [policy], [agent]);
+    }, runtimeDefinitions([policy], [agent]));
 
     expect(result.event.status).toBe("routed");
     expect(result.event.subject).toBe("work-1");
     expect(result.run).toMatchObject({
       policyId: "on_plan_approved_then_start_developer_agent_run",
-      policyVersion: policyVersion(policy),
+      policyVersion: routingPolicyVersion(policy),
       agentRole: "developer-agent",
+      operationId: "developer-agent/implement-change",
+      inputJson: { workItemId: "work-1", goal: "No goal supplied" },
       status: "queued"
     });
     expect(result.runs).toHaveLength(1);
@@ -179,7 +310,7 @@ describe("runtime database", () => {
       source: "agentd",
       subject: "work-1",
       payload: { artifacts: { git_sha: "4f28dbd" } }
-    }, [qaReviewPolicy, architectureReviewPolicy], [agent, architectureAgent, qaAgent]);
+    }, runtimeDefinitions([qaReviewPolicy, architectureReviewPolicy], [agent, architectureAgent, qaAgent]));
 
     expect(result.event.status).toBe("routed");
     expect(result.event.routing).toMatchObject({
@@ -202,7 +333,7 @@ describe("runtime database", () => {
       subject: "work-1",
       tags: ["delivery"],
       payload: {}
-    }, [policy], [agent]);
+    }, runtimeDefinitions([policy], [agent]));
 
     const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
     expect(leased).toMatchObject({ status: "running", attempt: 1 });
@@ -214,7 +345,8 @@ describe("runtime database", () => {
       domainEvent: {
         type: "change.implemented.v1",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
-      }
+      },
+      definitions: runtimeDefinitions([], [])
     });
 
     expect(completed.run.status).toBe("completed");
@@ -234,7 +366,7 @@ describe("runtime database", () => {
       source: "test",
       subject: "work-1",
       payload: {}
-    }, [policy, architectureReviewPolicy, qaReviewPolicy], [agent, architectureAgent, qaAgent]);
+    }, runtimeDefinitions([policy, architectureReviewPolicy, qaReviewPolicy], [agent, architectureAgent, qaAgent]));
 
     const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
     const completed = db.completeRun({
@@ -245,8 +377,7 @@ describe("runtime database", () => {
         type: "change.implemented.v1",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
-      policies: [policy, architectureReviewPolicy, qaReviewPolicy],
-      agents: [agent, architectureAgent, qaAgent]
+      definitions: runtimeDefinitions([policy, architectureReviewPolicy, qaReviewPolicy], [agent, architectureAgent, qaAgent])
     });
 
     expect(completed.run.status).toBe("completed");
@@ -275,8 +406,8 @@ describe("runtime database", () => {
       payload: {}
     };
 
-    const first = db.intakeEvent(input, [policy], [agent]);
-    const second = db.intakeEvent(input, [policy], [agent]);
+    const first = db.intakeEvent(input, runtimeDefinitions([policy], [agent]));
+    const second = db.intakeEvent(input, runtimeDefinitions([policy], [agent]));
 
     expect(first.duplicate).toBe(false);
     expect(second.duplicate).toBe(true);
@@ -296,7 +427,7 @@ describe("runtime database", () => {
       subject: "work-1",
       correlationDepth: 20,
       payload: {}
-    }, [policy], [agent]);
+    }, runtimeDefinitions([policy], [agent]));
 
     const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
     const completed = db.completeRun({
@@ -307,8 +438,7 @@ describe("runtime database", () => {
         type: "change.implemented.v1",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
-      policies: [architectureReviewPolicy],
-      agents: [architectureAgent]
+      definitions: runtimeDefinitions([architectureReviewPolicy], [architectureAgent])
     });
 
     expect(completed.event).toBeUndefined();

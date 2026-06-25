@@ -1,15 +1,31 @@
 import type { AgentRunLog, AppData, CollectionName, EventDefinition, EventRecord, MarkdownDocument } from "./shared/domain.js";
+import { ContractRegistry, ContractRegistryError } from "./shared/contracts.js";
 import { getProjectRoot } from "./markdown.js";
 import { loadMarkdownAppData, removeEntityMarkdown, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
 import { RuntimeDatabase, resolveRuntimeDbPath } from "./runtime-db.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
+import { routeEventToOperations } from "./routing-engine.js";
+import { evaluateEmissionPolicies } from "./emission-engine.js";
 
 type MutableMarkdownCollection = Exclude<CollectionName, "events"> | "eventDefinitions";
 
-const markdownCollections = new Set<MutableMarkdownCollection>(["projects", "goals", "adrs", "agents", "skills", "runtimes", "policies", "eventDefinitions"]);
+const markdownCollections = new Set<MutableMarkdownCollection>([
+  "projects",
+  "goals",
+  "adrs",
+  "agents",
+  "skills",
+  "runtimes",
+  "contracts",
+  "operations",
+  "policies",
+  "emissionPolicies",
+  "loopDefinitions",
+  "eventDefinitions"
+]);
 
 export class EventValidationError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly details?: unknown) {
     super(message);
     this.name = "EventValidationError";
   }
@@ -20,11 +36,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const eventTypesForPolicy = (policy: unknown): string[] => {
   if (!isRecord(policy)) return [];
-  const match = isRecord(policy.match) ? policy.match : undefined;
-  const rawEventTypes = match?.eventTypes ?? policy.eventTypes;
-  if (Array.isArray(rawEventTypes)) return rawEventTypes.map(String).filter(Boolean);
-  if (typeof rawEventTypes === "string") return rawEventTypes ? [rawEventTypes] : [];
-  return [];
+  const consumes = isRecord(policy.consumes) ? policy.consumes : undefined;
+  const eventType = consumes?.eventType;
+  return typeof eventType === "string" && eventType ? [eventType] : [];
 };
 
 export class MarkdownStore {
@@ -39,6 +53,7 @@ export class MarkdownStore {
     const data = await loadMarkdownAppData(this.root);
     data.events = this.db().listEventRecords();
     data.agentRuns = this.db().listRuns();
+    data.loopInstances = this.db().listLoopInstances();
     return data;
   }
 
@@ -115,11 +130,44 @@ export class MarkdownStore {
 
   async createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {
     const data = await this.read();
-    const hasActiveDefinition = data.eventDefinitions.some((definition) =>
-      definition.active && definition.eventType === input.eventType
+    const definition = data.eventDefinitions.find((candidate) =>
+      candidate.active && candidate.eventType === input.eventType
     );
-    if (!hasActiveDefinition) {
+    const hasActiveDefinition = Boolean(definition);
+    if (!hasActiveDefinition || !definition) {
       throw new EventValidationError(`Unknown or inactive event type: ${input.eventType}`);
+    }
+    if (!definition.dataContract) {
+      throw new EventValidationError(`Event type ${input.eventType} does not declare a data contract.`);
+    }
+    try {
+      const registry = new ContractRegistry(data.contracts);
+      const validation = registry.validate(definition.dataContract, input.payload ?? {}, "event-data");
+      if (!validation.valid) {
+        throw new EventValidationError(`Event data failed contract ${validation.contractId}@${validation.contractVersion} validation.`, validation.errors);
+      }
+    } catch (error) {
+      if (error instanceof EventValidationError) throw error;
+      if (error instanceof ContractRegistryError) throw new EventValidationError(error.message, error.details);
+      throw error;
+    }
+
+    const inputWithLoop = input as unknown as { loopDefinitionId?: unknown };
+    let activeLoopId = typeof inputWithLoop.loopDefinitionId === "string"
+      ? inputWithLoop.loopDefinitionId
+      : undefined;
+    if (activeLoopId) {
+      const loop = data.loopDefinitions.find((candidate) => candidate.active && candidate.id === activeLoopId);
+      if (!loop) throw new EventValidationError(`Unknown or inactive loop definition: ${activeLoopId}`);
+      if (!loop.entryEventTypes.includes(input.eventType)) {
+        throw new EventValidationError(`Event type ${input.eventType} is not an entry event for loop ${activeLoopId}.`);
+      }
+    } else {
+      const matchingLoops = data.loopDefinitions.filter((loop) => loop.active && loop.entryEventTypes.includes(input.eventType));
+      if (matchingLoops.length > 1) {
+        throw new EventValidationError(`Ambiguous loop selection for event type ${input.eventType}: ${matchingLoops.map((loop) => loop.id).join(", ")}`);
+      }
+      activeLoopId = matchingLoops[0]?.id;
     }
     const result = this.db().intakeEvent({
       projectId: input.projectId,
@@ -132,8 +180,9 @@ export class MarkdownStore {
       correlationDepth: typeof input.correlationDepth === "number" ? input.correlationDepth : undefined,
       tags: input.tags,
       payload: input.payload,
-      body: input.body
-    }, data.policies, data.agents);
+      body: input.body,
+      loopDefinitionId: activeLoopId
+    }, this.runtimeDefinitions(data));
     notifyRuntimeChanged("events");
     if (result.runs.length > 0) notifyRuntimeChanged("agent-runs");
     return result.event;
@@ -153,12 +202,108 @@ export class MarkdownStore {
     return this.db().listRunLogs(runId);
   }
 
+  listLoopInstances() {
+    return this.db().listLoopInstances();
+  }
+
   runtimeHealth() {
     return this.db().health();
   }
 
   runtimeDatabase(): RuntimeDatabase {
     return this.db();
+  }
+
+  runtimeDefinitions(data: AppData) {
+    return {
+      agents: data.agents,
+      contracts: data.contracts,
+      operations: data.operations,
+      routingPolicies: data.policies,
+      emissionPolicies: data.emissionPolicies,
+      eventDefinitions: data.eventDefinitions,
+      loopDefinitions: data.loopDefinitions
+    };
+  }
+
+  async dryRunRoutingPolicy(policyId: string, event: Partial<EventRecord> & Pick<EventRecord, "eventType">) {
+    const data = await this.read();
+    const policy = data.policies.find((candidate) => candidate.id === policyId);
+    if (!policy) throw new EventValidationError(`Routing policy not found: ${policyId}`);
+    const registry = new ContractRegistry(data.contracts);
+    const now = new Date().toISOString();
+    return routeEventToOperations({
+      event: {
+        id: "dry-run-event",
+        eventId: "dry-run-event",
+        projectId: event.projectId ?? data.projects[0]?.id ?? "project",
+        source: event.source ?? "dry-run",
+        type: event.eventType,
+        eventType: event.eventType,
+        subject: event.subject ?? "dry-run",
+        correlationId: event.correlationId ?? "dry-run-correlation",
+        correlationDepth: event.correlationDepth ?? 0,
+        occurredAt: now,
+        tags: event.tags ?? [],
+        payload: event.payload ?? {},
+        data: event.payload ?? {},
+        status: "received",
+        createdAt: now
+      },
+      policies: [policy],
+      operations: data.operations,
+      agents: data.agents,
+      contracts: registry
+    });
+  }
+
+  async dryRunEmissionPolicy(policyId: string, input: { operationInput?: unknown; operationOutput?: unknown }) {
+    const data = await this.read();
+    const policy = data.emissionPolicies.find((candidate) => candidate.id === policyId);
+    if (!policy) throw new EventValidationError(`Emission policy not found: ${policyId}`);
+    const operation = data.operations.find((candidate) =>
+      candidate.id === policy.observes.operation.id &&
+      candidate.version === policy.observes.operation.version
+    );
+    if (!operation) throw new EventValidationError(`Observed operation not found for emission policy: ${policyId}`);
+    const now = new Date().toISOString();
+    return evaluateEmissionPolicies({
+      projectRoot: this.root,
+      operation,
+      run: {
+        runId: "dry-run",
+        triggerEventId: "dry-run-event",
+        policyId: "dry-run-routing-policy",
+        policyVersion: 1,
+        agentRole: operation.agentId,
+        operationId: operation.id,
+        operationVersion: operation.version,
+        inputJson: input.operationInput as never,
+        status: "running",
+        attempt: 1,
+        createdAt: now,
+        updatedAt: now
+      },
+      trigger: {
+        seq: 0,
+        eventId: "dry-run-event",
+        type: "dry-run.event",
+        source: "dry-run",
+        subject: "dry-run",
+        correlationId: "dry-run-correlation",
+        correlationDepth: 0,
+        occurredAt: now,
+        projectId: data.projects[0]?.id ?? "project",
+        tags: [],
+        payload: {},
+        status: "received"
+      },
+      input: input.operationInput as never,
+      output: input.operationOutput as never,
+      policies: [policy],
+      eventDefinitions: data.eventDefinitions,
+      contracts: new ContractRegistry(data.contracts)
+    });
   }
 
   private db(): RuntimeDatabase {

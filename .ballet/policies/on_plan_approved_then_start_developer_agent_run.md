@@ -1,18 +1,36 @@
 ---
-id: on_plan_approved_then_start_developer_agent_run
-name: on_plan_approved_then_start_developer_agent_run
-description: Start development work when an approved plan fact is published.
-active: true
-match:
-  eventTypes:
-    - plan.approved.v1
-  projectId: "*"
-  source: "*"
-action:
-  type: start_agent_run
-  targetAgentId: developer-agent
-createdAt: 2026-06-24T00:00:00.000Z
-updatedAt: 2026-06-24T00:00:00.000Z
+apiVersion: ballet.dev/v1
+kind: RoutingPolicy
+metadata:
+  id: on_plan_approved_then_start_developer_agent_run
+spec:
+  name: on_plan_approved_start_developer_implement_change_operation
+  description: Start implementation when an approved plan fact is published.
+  active: true
+  consumes:
+    eventType: plan.approved.v1
+  when:
+    path: /event/data/approvalStatus
+    op: eq
+    value: approved
+  dispatch:
+    operation:
+      id: developer-agent/implement-change
+      version: 1
+  input:
+    object:
+      workItemId:
+        from: /event/subject
+      goal:
+        from: /event/data/goal
+      acceptanceCriteria:
+        from: /event/data/acceptanceCriteria
+      constraints:
+        from: /event/data/constraints
+        default: []
+  selection:
+    mode: fanout
+  onInvalidInput: reject-event
 ---
 
-When a plan is approved, this policy creates a durable developer-agent `agent_run`. The event remains a domain fact; the policy owns the runtime action.
+Maps approved plan data into developer operation input.

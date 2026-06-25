@@ -1,3 +1,10 @@
+import type { ContractDefinition } from "./contracts.js";
+import type { EmissionPolicy } from "./emission-policy.js";
+import type { LoopDefinition, LoopInstance } from "./loop.js";
+import type { AgentOperation, AgentExecutionOutput } from "./operations.js";
+import type { RoutingPolicy } from "./routing-policy.js";
+import type { JsonValue, VersionedRef } from "./json.js";
+
 export type EntityStatus = "active" | "paused" | "archived";
 export type AdrStatus = "proposed" | "accepted" | "superseded" | "rejected";
 export type EventStatus = "received" | "routed" | "unassigned" | "handled";
@@ -43,10 +50,19 @@ export interface EventRoutingPolicyDecision {
   policyId: string;
   policyName: string;
   policyVersion: number;
-  targetAgentId: string;
-  status: "routed" | "skipped";
+  policyHash?: string;
+  targetAgentId?: string;
+  agentId?: string;
+  operationId?: string;
+  operationVersion?: number;
+  inputContractId?: string;
+  inputContractVersion?: number;
+  inputContractHash?: string;
+  status: "routed" | "skipped" | "condition_not_matched" | "invalid_input" | "configuration_error" | "exclusive_conflict" | "matched";
   runId?: string;
   reason: string;
+  conditionTrace?: unknown;
+  validationErrors?: unknown[];
 }
 
 export interface EventRoutingSummary {
@@ -214,10 +230,12 @@ export interface EventDefinition {
   description: string;
   active: boolean;
   eventType: string;
-  source: string;
+  source?: string;
   tags: string[];
-  producers: EventProducerDefinition[];
-  payloadExample: Record<string, unknown>;
+  dataContract?: VersionedRef;
+  examples: Record<string, unknown>[];
+  producers?: EventProducerDefinition[];
+  payloadExample?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   frontmatter?: Record<string, unknown>;
@@ -243,6 +261,7 @@ export interface EventRecord {
   occurredAt?: string;
   tags: string[];
   payload: Record<string, unknown>;
+  data?: Record<string, unknown>;
   status: EventStatus;
   matchedPolicyId?: string;
   assignedAgentId?: string;
@@ -270,6 +289,7 @@ export interface RuntimeEvent {
   projectId: string;
   tags: string[];
   payload: Record<string, unknown>;
+  data?: Record<string, unknown>;
   status: EventStatus;
   matchedPolicyId?: string;
   assignedAgentId?: string;
@@ -301,6 +321,25 @@ export interface AgentRun {
   policyId: string;
   policyVersion: number;
   agentRole: string;
+  correlationId?: string;
+  operationId?: string;
+  operationVersion?: number;
+  inputJson?: JsonValue;
+  inputContractId?: string;
+  inputContractVersion?: number;
+  inputContractHash?: string;
+  outputJson?: AgentExecutionOutput | JsonValue;
+  outputContractId?: string;
+  outputContractVersion?: number;
+  outputContractHash?: string;
+  routingPolicyHash?: string;
+  routingDecisionJson?: Record<string, unknown>;
+  emissionDecisionsJson?: Record<string, unknown>[];
+  loopInstanceId?: string;
+  loopDefinitionId?: string;
+  loopDefinitionVersion?: number;
+  stepId?: string;
+  iteration?: number;
   status: AgentRunStatus;
   attempt: number;
   leaseOwner?: string;
@@ -330,7 +369,12 @@ export interface AppData {
   agents: Agent[];
   skills: Skill[];
   runtimes: Runtime[];
-  policies: Policy[];
+  contracts: ContractDefinition[];
+  operations: AgentOperation[];
+  policies: RoutingPolicy[];
+  emissionPolicies: EmissionPolicy[];
+  loopDefinitions: LoopDefinition[];
+  loopInstances: LoopInstance[];
   eventDefinitions: EventDefinition[];
   events: EventRecord[];
   agentRuns: AgentRun[];
@@ -342,13 +386,29 @@ export interface AppData {
     agents: MarkdownDocument[];
     skills: MarkdownDocument[];
     runtimes: MarkdownDocument[];
+    contracts: MarkdownDocument[];
+    operations: MarkdownDocument[];
     events: MarkdownDocument[];
     policies: MarkdownDocument[];
+    emissionPolicies: MarkdownDocument[];
+    loopDefinitions: MarkdownDocument[];
   };
   projectRoot?: string;
 }
 
-export type CollectionName = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
+export type CollectionName =
+  | "projects"
+  | "goals"
+  | "adrs"
+  | "agents"
+  | "skills"
+  | "runtimes"
+  | "contracts"
+  | "operations"
+  | "policies"
+  | "emissionPolicies"
+  | "loopDefinitions"
+  | "events";
 
 export interface RouteDecision {
   policyId: string;

@@ -3,14 +3,26 @@ import type { CollectionName } from "./shared/domain.js";
 import { EventValidationError, store } from "./store.js";
 import { onRuntimeChanged } from "./runtime-events.js";
 
-const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "skills", "runtimes", "policies"];
+const collections: CollectionName[] = [
+  "projects",
+  "goals",
+  "adrs",
+  "agents",
+  "skills",
+  "runtimes",
+  "contracts",
+  "operations",
+  "policies",
+  "emissionPolicies",
+  "loopDefinitions"
+];
 const collectionSet = new Set(collections);
 
 export const apiRouter = express.Router();
 
 const handleEventValidationError = (error: unknown, res: express.Response): boolean => {
   if (error instanceof EventValidationError) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: error.message, details: error.details });
     return true;
   }
   return false;
@@ -142,10 +154,36 @@ apiRouter.get("/agent-runs/:id/logs", (req, res, next) => {
   }
 });
 
+apiRouter.get("/loop-instances", (_req, res, next) => {
+  try {
+    res.json(store.listLoopInstances());
+  } catch (error) {
+    next(error);
+  }
+});
+
 apiRouter.post("/agent-runs/:id/retry", (req, res, next) => {
   try {
     res.json(store.retryAgentRun(req.params.id));
   } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.post("/routing-policies/:id/dry-run", async (req, res, next) => {
+  try {
+    res.json(await store.dryRunRoutingPolicy(req.params.id, req.body));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
+    next(error);
+  }
+});
+
+apiRouter.post("/emission-policies/:id/dry-run", async (req, res, next) => {
+  try {
+    res.json(await store.dryRunEmissionPolicy(req.params.id, req.body));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });

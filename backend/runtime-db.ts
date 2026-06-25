@@ -3,13 +3,30 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { v4 as uuid } from "uuid";
-import type { Agent, AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus, EventRecord, EventRoutingSummary, EventStatus, Policy, RouteDecision, RuntimeEvent } from "./shared/domain.js";
-import { routeEvent } from "./shared/policy.js";
+import type { Agent, AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus, EventDefinition, EventRecord, EventRoutingSummary, EventStatus, RuntimeEvent } from "./shared/domain.js";
+import type { ContractDefinition } from "./shared/contracts.js";
+import type { EmissionPolicy } from "./shared/emission-policy.js";
+import type { LoopDefinition, LoopInstance } from "./shared/loop.js";
+import type { AgentOperation } from "./shared/operations.js";
+import type { RoutingPolicy } from "./shared/routing-policy.js";
+import type { JsonValue } from "./shared/json.js";
+import { ContractRegistry } from "./shared/contracts.js";
+import { routeEventToOperations, routingDecisionSnapshot, type OperationRoutingDecision } from "./routing-engine.js";
 
 const PROJECTOR_CONSUMER = "policy-projector";
 const MAX_CORRELATION_DEPTH = 20;
 
 const now = () => new Date().toISOString();
+
+const emptyRuntimeDefinitions = (): RuntimeDefinitions => ({
+  agents: [],
+  contracts: [],
+  operations: [],
+  routingPolicies: [],
+  emissionPolicies: [],
+  eventDefinitions: [],
+  loopDefinitions: []
+});
 
 export const resolveRuntimeDbPath = (root: string): string => {
   const configured = process.env.BALLET_DB_PATH?.trim();
@@ -57,6 +74,23 @@ const parseJsonArray = (value: string): string[] => {
   return Array.isArray(parsed) ? parsed.map((item) => String(item)).filter(Boolean) : [];
 };
 
+const parseJsonValue = (value: string | null): JsonValue | undefined => {
+  if (!value) return undefined;
+  return JSON.parse(value) as JsonValue;
+};
+
+const parseJsonRecord = (value: string | null): Record<string, unknown> | undefined => {
+  if (!value) return undefined;
+  const parsed = JSON.parse(value) as unknown;
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined;
+};
+
+const parseJsonRecordArray = (value: string | null): Record<string, unknown>[] | undefined => {
+  if (!value) return undefined;
+  const parsed = JSON.parse(value) as unknown;
+  return Array.isArray(parsed) ? parsed.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item)) : undefined;
+};
+
 const parseRoutingSummary = (value: string | null): EventRoutingSummary | undefined => {
   if (!value) return undefined;
   const parsed = JSON.parse(value) as unknown;
@@ -91,6 +125,25 @@ interface AgentRunRow {
   policy_id: string;
   policy_version: number;
   agent_role: string;
+  correlation_id: string | null;
+  operation_id: string | null;
+  operation_version: number | null;
+  input_json: string | null;
+  input_contract_id: string | null;
+  input_contract_version: number | null;
+  input_contract_hash: string | null;
+  output_json: string | null;
+  output_contract_id: string | null;
+  output_contract_version: number | null;
+  output_contract_hash: string | null;
+  routing_policy_hash: string | null;
+  routing_decision_json: string | null;
+  emission_decisions_json: string | null;
+  loop_instance_id: string | null;
+  loop_definition_id: string | null;
+  loop_definition_version: number | null;
+  step_id: string | null;
+  iteration: number | null;
   status: AgentRunStatus;
   attempt: number;
   lease_owner: string | null;
@@ -113,6 +166,22 @@ interface AgentRunLogRow {
   created_at: string;
 }
 
+interface LoopInstanceRow {
+  loop_instance_id: string;
+  loop_definition_id: string;
+  loop_definition_version: number;
+  correlation_id: string;
+  status: "running" | "completed" | "exhausted" | "failed";
+  hop_count: number;
+  run_count: number;
+  step_iterations_json: string;
+  started_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  terminal_event_id: string | null;
+  failure_reason: string | null;
+}
+
 export interface IntakeEventInput {
   projectId: string;
   eventType: string;
@@ -125,6 +194,11 @@ export interface IntakeEventInput {
   tags?: string[];
   payload?: Record<string, unknown>;
   body?: string;
+  loopDefinitionId?: string;
+  loopDefinitionVersion?: number;
+  loopInstanceId?: string;
+  stepId?: string;
+  iteration?: number;
 }
 
 export interface LeaseOptions {
@@ -136,6 +210,11 @@ export interface CompleteRunInput {
   runId: string;
   status: AgentRunStatus;
   outcome?: AgentOutcome;
+  output?: JsonValue;
+  outputContractId?: string;
+  outputContractVersion?: number;
+  outputContractHash?: string;
+  emissionDecisions?: Record<string, unknown>[];
   error?: string;
   threadId?: string;
   turnId?: string;
@@ -143,8 +222,25 @@ export interface CompleteRunInput {
     type: string;
     payload: Record<string, unknown>;
   };
-  policies?: Policy[];
-  agents?: Agent[];
+  domainEvents?: Array<{
+    type: string;
+    subject?: string;
+    tags?: string[];
+    payload: Record<string, unknown>;
+    dedupeKey?: string;
+    body?: string;
+  }>;
+  definitions?: RuntimeDefinitions;
+}
+
+export interface RuntimeDefinitions {
+  agents: Agent[];
+  contracts: ContractDefinition[];
+  operations: AgentOperation[];
+  routingPolicies: RoutingPolicy[];
+  emissionPolicies: EmissionPolicy[];
+  eventDefinitions: EventDefinition[];
+  loopDefinitions: LoopDefinition[];
 }
 
 export interface PublishEventResult {
@@ -208,13 +304,13 @@ export class RuntimeDatabase {
     };
   }
 
-  intakeEvent(input: IntakeEventInput, policies: Policy[], agents: Agent[]): PublishEventResult {
-    return this.publishEventAndProjectPolicies(input, policies, agents);
+  intakeEvent(input: IntakeEventInput, definitions: RuntimeDefinitions): PublishEventResult {
+    return this.publishEventAndProjectPolicies(input, definitions);
   }
 
-  publishEventAndProjectPolicies(input: IntakeEventInput, policies: Policy[], agents: Agent[]): PublishEventResult {
+  publishEventAndProjectPolicies(input: IntakeEventInput, definitions: RuntimeDefinitions): PublishEventResult {
     const db = this.connection();
-    const transaction = db.transaction(() => this.insertEventAndProjectPolicies(input, policies, agents));
+    const transaction = db.transaction(() => this.insertEventAndProjectPolicies(input, definitions));
     return transaction() as PublishEventResult;
   }
 
@@ -315,6 +411,11 @@ export class RuntimeDatabase {
             thread_id = COALESCE(@threadId, thread_id),
             turn_id = COALESCE(@turnId, turn_id),
             outcome_json = @outcomeJson,
+            output_json = @outputJson,
+            output_contract_id = COALESCE(@outputContractId, output_contract_id),
+            output_contract_version = COALESCE(@outputContractVersion, output_contract_version),
+            output_contract_hash = COALESCE(@outputContractHash, output_contract_hash),
+            emission_decisions_json = @emissionDecisionsJson,
             error = @error,
             completed_at = @completedAt,
             updated_at = @updatedAt
@@ -325,6 +426,11 @@ export class RuntimeDatabase {
         threadId: input.threadId ?? null,
         turnId: input.turnId ?? null,
         outcomeJson: input.outcome ? stringifyJson(input.outcome) : null,
+        outputJson: input.output ? stringifyJson(input.output) : null,
+        outputContractId: input.outputContractId ?? null,
+        outputContractVersion: input.outputContractVersion ?? null,
+        outputContractHash: input.outputContractHash ?? null,
+        emissionDecisionsJson: input.emissionDecisions ? stringifyJson(input.emissionDecisions) : null,
         error: input.error ?? null,
         completedAt: completedAt ?? null,
         updatedAt: now()
@@ -332,7 +438,11 @@ export class RuntimeDatabase {
 
       let event: RuntimeEvent | undefined;
       let runs: AgentRun[] = [];
-      if (input.domainEvent) {
+      const domainEvents = [
+        ...(input.domainEvents ?? []),
+        ...(input.domainEvent ? [{ type: input.domainEvent.type, payload: input.domainEvent.payload }] : [])
+      ];
+      if (domainEvents.length > 0) {
         const run = this.getRun(input.runId);
         if (!run) throw new Error("Agent run not found after update.");
         const trigger = this.getEventById(run.triggerEventId);
@@ -340,33 +450,32 @@ export class RuntimeDatabase {
         const nextDepth = trigger.correlation_depth + 1;
         if (nextDepth > MAX_CORRELATION_DEPTH) {
           this.appendRunLog(run.runId, "warn", "Domain event publication skipped because correlation depth exceeded the runtime limit.", {
-            event_type: input.domainEvent.type,
+            event_types: domainEvents.map((domainEvent) => domainEvent.type),
             max_correlation_depth: MAX_CORRELATION_DEPTH,
             next_correlation_depth: nextDepth
           });
         } else {
-          const published = this.insertEventAndProjectPolicies({
-            projectId: trigger.project_id,
-            eventType: input.domainEvent.type,
-            source: "agentd",
-            subject: trigger.subject,
-            correlationId: trigger.correlation_id,
-            causationId: trigger.event_id,
-            dedupeKey: `domain:${run.runId}:${input.domainEvent.type}`,
-            correlationDepth: nextDepth,
-            tags: [],
-            payload: {
-              ...input.domainEvent.payload,
-              run_id: run.runId,
-              trigger_event_id: run.triggerEventId,
-              policy_id: run.policyId,
-              policy_version: run.policyVersion
-            },
-            body: `Agent run ${run.runId} produced ${input.domainEvent.type}.`
-          }, input.policies ?? [], input.agents ?? []);
-          const publishedRow = this.getEventById(published.event.eventId ?? published.event.id);
-          event = publishedRow ? this.toRuntimeEvent(publishedRow) : undefined;
-          runs = published.runs;
+          for (const domainEvent of domainEvents) {
+            const published = this.insertEventAndProjectPolicies({
+              projectId: trigger.project_id,
+              eventType: domainEvent.type,
+              source: "agentd",
+              subject: domainEvent.subject ?? trigger.subject,
+              correlationId: trigger.correlation_id,
+              causationId: trigger.event_id,
+              dedupeKey: domainEvent.dedupeKey ?? `domain:${run.runId}:${domainEvent.type}`,
+              correlationDepth: nextDepth,
+              tags: domainEvent.tags ?? [],
+              payload: domainEvent.payload,
+              body: domainEvent.body ?? `Agent run ${run.runId} produced ${domainEvent.type}.`,
+              loopInstanceId: run.loopInstanceId,
+              loopDefinitionId: run.loopDefinitionId,
+              loopDefinitionVersion: run.loopDefinitionVersion
+            }, input.definitions ?? emptyRuntimeDefinitions());
+            const publishedRow = this.getEventById(published.event.eventId ?? published.event.id);
+            event = publishedRow ? this.toRuntimeEvent(publishedRow) : event;
+            runs = [...runs, ...published.runs];
+          }
         }
       }
 
@@ -434,12 +543,35 @@ export class RuntimeDatabase {
     }));
   }
 
+  listLoopInstances(limit = 500): LoopInstance[] {
+    const rows = this.connection().prepare(`
+      SELECT *
+      FROM loop_instances
+      ORDER BY updated_at DESC
+      LIMIT ?
+    `).all(limit) as LoopInstanceRow[];
+    return rows.map((row) => ({
+      loopInstanceId: row.loop_instance_id,
+      loopDefinitionId: row.loop_definition_id,
+      loopDefinitionVersion: row.loop_definition_version,
+      correlationId: row.correlation_id,
+      status: row.status,
+      hopCount: row.hop_count,
+      runCount: row.run_count,
+      startedAt: row.started_at,
+      updatedAt: row.updated_at,
+      completedAt: row.completed_at ?? undefined,
+      terminalEventId: row.terminal_event_id ?? undefined,
+      failureReason: row.failure_reason ?? undefined
+    }));
+  }
+
   getTriggerEvent(run: AgentRun): RuntimeEvent | undefined {
     const row = this.getEventById(run.triggerEventId);
     return row ? this.toRuntimeEvent(row) : undefined;
   }
 
-  private insertEventAndProjectPolicies(input: IntakeEventInput, policies: Policy[], agents: Agent[]): PublishEventResult {
+  private insertEventAndProjectPolicies(input: IntakeEventInput, definitions: RuntimeDefinitions): PublishEventResult {
     const createdAt = now();
     const eventId = uuid();
     const payload = input.payload ?? {};
@@ -454,7 +586,6 @@ export class RuntimeDatabase {
     if (correlationDepth > MAX_CORRELATION_DEPTH) {
       throw new Error(`Event correlation depth ${correlationDepth} exceeds the runtime limit ${MAX_CORRELATION_DEPTH}.`);
     }
-
     const dedupeKey = input.dedupeKey ?? `event:${hashDedupeKey({
       projectId: input.projectId,
       eventType: input.eventType,
@@ -469,6 +600,56 @@ export class RuntimeDatabase {
     if (duplicate) {
       const runs = this.getRunsForTrigger(duplicate.event_id);
       return { event: this.toEventRecord(duplicate), run: runs[0], runs, duplicate: true };
+    }
+    const loopDefinition = input.loopDefinitionId
+      ? definitions.loopDefinitions.find((loop) =>
+        loop.active &&
+        loop.id === input.loopDefinitionId &&
+        (input.loopDefinitionVersion === undefined || loop.version === input.loopDefinitionVersion)
+      )
+      : undefined;
+    const loopInstanceId = input.loopInstanceId ?? (loopDefinition ? uuid() : undefined);
+    if (loopDefinition && loopInstanceId && !input.loopInstanceId) {
+      this.connection().prepare(`
+        INSERT INTO loop_instances (
+          loop_instance_id, loop_definition_id, loop_definition_version, correlation_id,
+          status, hop_count, run_count, step_iterations_json, started_at, updated_at
+        )
+        VALUES (
+          @loopInstanceId, @loopDefinitionId, @loopDefinitionVersion, @correlationId,
+          'running', 0, 0, '{}', @startedAt, @updatedAt
+        )
+      `).run({
+        loopInstanceId,
+        loopDefinitionId: loopDefinition.id,
+        loopDefinitionVersion: loopDefinition.version,
+        correlationId,
+        startedAt: createdAt,
+        updatedAt: createdAt
+      });
+    }
+    const inheritedLoop = loopInstanceId ? this.getLoopInstance(loopInstanceId) : undefined;
+    const effectiveLoopDefinition = loopDefinition ?? (inheritedLoop
+      ? definitions.loopDefinitions.find((loop) => loop.id === inheritedLoop.loop_definition_id && loop.version === inheritedLoop.loop_definition_version)
+      : undefined);
+    if (inheritedLoop?.status && inheritedLoop.status !== "running") {
+      throw new Error(`Loop instance ${loopInstanceId} is ${inheritedLoop.status} and cannot accept more events.`);
+    }
+    if (input.loopInstanceId && inheritedLoop && effectiveLoopDefinition && this.loopDeadlineExceeded(inheritedLoop, effectiveLoopDefinition)) {
+      this.markLoopExhausted(input.loopInstanceId, `deadline ${effectiveLoopDefinition.limits.deadlineSeconds}s exceeded`);
+      throw new Error(`Loop ${input.loopInstanceId} exceeded deadlineSeconds=${effectiveLoopDefinition.limits.deadlineSeconds}.`);
+    }
+    if (input.loopInstanceId && inheritedLoop && effectiveLoopDefinition && input.causationId) {
+      if (inheritedLoop.hop_count + 1 > effectiveLoopDefinition.limits.maxHops) {
+        this.markLoopExhausted(input.loopInstanceId, `maxHops ${effectiveLoopDefinition.limits.maxHops} exceeded`);
+        throw new Error(`Loop ${input.loopInstanceId} exceeded maxHops=${effectiveLoopDefinition.limits.maxHops}.`);
+      }
+      this.connection().prepare(`
+        UPDATE loop_instances
+        SET hop_count = hop_count + 1,
+            updated_at = @updatedAt
+        WHERE loop_instance_id = @loopInstanceId AND status = 'running'
+      `).run({ loopInstanceId: input.loopInstanceId, updatedAt: now() });
     }
 
     const baseEvent: EventRecord = {
@@ -486,16 +667,71 @@ export class RuntimeDatabase {
       occurredAt: createdAt,
       tags,
       payload,
+      data: payload,
       status: "received",
       handlingResult: input.body,
       createdAt
     };
-    const decisions = routeEvent(baseEvent, policies, agents);
-    const routedDecisions = decisions.filter((decision) => decision.status === "routed");
+    const contracts = new ContractRegistry(definitions.contracts);
+    const terminalLoopEvent = Boolean(effectiveLoopDefinition?.terminalEventTypes.includes(input.eventType));
+    const routingPolicies = terminalLoopEvent && effectiveLoopDefinition
+      ? definitions.routingPolicies.filter((policy) => !effectiveLoopDefinition.routingPolicyIds.includes(policy.id))
+      : definitions.routingPolicies;
+    const decisions = routeEventToOperations({
+      event: baseEvent,
+      policies: routingPolicies,
+      operations: definitions.operations,
+      agents: definitions.agents,
+      contracts
+    });
+    let routedDecisions = decisions.filter((decision) => decision.status === "routed");
+    const plannedIterations = new Map<OperationRoutingDecision, number>();
+    let plannedStepIterations: Record<string, number> | undefined;
+    if (loopInstanceId && effectiveLoopDefinition && routedDecisions.length > 0) {
+      const loopRow = this.getLoopInstance(loopInstanceId);
+      if (loopRow && this.loopDeadlineExceeded(loopRow, effectiveLoopDefinition)) {
+        for (const decision of routedDecisions) {
+          decision.status = "skipped";
+          decision.reason = `Loop ${loopInstanceId} exhausted deadlineSeconds=${effectiveLoopDefinition.limits.deadlineSeconds}.`;
+        }
+        this.markLoopExhausted(loopInstanceId, `deadline ${effectiveLoopDefinition.limits.deadlineSeconds}s exceeded`);
+        routedDecisions = [];
+      } else if (loopRow && loopRow.run_count + routedDecisions.length > effectiveLoopDefinition.limits.maxRuns) {
+        for (const decision of routedDecisions) {
+          decision.status = "skipped";
+          decision.reason = `Loop ${loopInstanceId} exhausted maxRuns=${effectiveLoopDefinition.limits.maxRuns}.`;
+        }
+        this.markLoopExhausted(loopInstanceId, `maxRuns ${effectiveLoopDefinition.limits.maxRuns} exceeded`);
+        routedDecisions = [];
+      } else if (loopRow) {
+        const nextIterations = this.parseLoopStepIterations(loopRow);
+        let exceededStepId = "";
+        for (const decision of routedDecisions) {
+          const stepId = decision.policyId;
+          const nextIteration = (nextIterations[stepId] ?? 0) + 1;
+          if (nextIteration > effectiveLoopDefinition.limits.maxIterationsPerStep) {
+            exceededStepId = stepId;
+            break;
+          }
+          nextIterations[stepId] = nextIteration;
+          plannedIterations.set(decision, nextIteration);
+        }
+        if (exceededStepId) {
+          for (const decision of routedDecisions) {
+            decision.status = "skipped";
+            decision.reason = `Loop ${loopInstanceId} exhausted maxIterationsPerStep=${effectiveLoopDefinition.limits.maxIterationsPerStep} for step ${exceededStepId}.`;
+          }
+          this.markLoopExhausted(loopInstanceId, `maxIterationsPerStep ${effectiveLoopDefinition.limits.maxIterationsPerStep} exceeded for ${exceededStepId}`);
+          routedDecisions = [];
+        } else {
+          plannedStepIterations = nextIterations;
+        }
+      }
+    }
     let routing = this.routingSummary(decisions);
     const status: EventStatus = routedDecisions.length > 0 ? "routed" : "unassigned";
     const matchedPolicyId = routedDecisions[0]?.policyId ?? decisions[0]?.policyId;
-    const assignedAgentId = routedDecisions[0]?.targetAgentId;
+    const assignedAgentId = routedDecisions[0]?.agentId;
     const handlingResult = input.body ? `${input.body}\n\n${routing.message}` : routing.message;
 
     this.connection().prepare(`
@@ -538,11 +774,17 @@ export class RuntimeDatabase {
       this.connection().prepare(`
         INSERT OR IGNORE INTO agent_runs (
           run_id, trigger_event_id, trigger_event_seq, policy_id, policy_version,
-          agent_role, status, attempt, created_at, updated_at
+          agent_role, correlation_id, operation_id, operation_version, input_json, input_contract_id,
+          input_contract_version, input_contract_hash, routing_policy_hash, routing_decision_json,
+          loop_instance_id, loop_definition_id, loop_definition_version, step_id, iteration,
+          status, attempt, created_at, updated_at
         )
         VALUES (
           @runId, @triggerEventId, @triggerEventSeq, @policyId, @policyVersion,
-          @agentRole, 'queued', 0, @createdAt, @updatedAt
+          @agentRole, @correlationId, @operationId, @operationVersion, @inputJson, @inputContractId,
+          @inputContractVersion, @inputContractHash, @routingPolicyHash, @routingDecisionJson,
+          @loopInstanceId, @loopDefinitionId, @loopDefinitionVersion, @stepId, @iteration,
+          'queued', 0, @createdAt, @updatedAt
         )
       `).run({
         runId,
@@ -550,11 +792,26 @@ export class RuntimeDatabase {
         triggerEventSeq: inserted.seq,
         policyId: decision.policyId,
         policyVersion: decision.policyVersion,
-        agentRole: decision.targetAgentId,
+        agentRole: decision.agentId,
+        correlationId: inserted.correlation_id,
+        operationId: decision.operationId ?? null,
+        operationVersion: decision.operationVersion ?? null,
+        inputJson: decision.input ? stringifyJson(decision.input) : null,
+        inputContractId: decision.inputContractId ?? null,
+        inputContractVersion: decision.inputContractVersion ?? null,
+        inputContractHash: decision.inputContractHash ?? null,
+        routingPolicyHash: decision.policyHash,
+        routingDecisionJson: stringifyJson(routingDecisionSnapshot(decision)),
+        loopInstanceId: loopInstanceId ?? null,
+        loopDefinitionId: effectiveLoopDefinition?.id ?? null,
+        loopDefinitionVersion: effectiveLoopDefinition?.version ?? null,
+        stepId: decision.policyId,
+        iteration: plannedIterations.get(decision) ?? input.iteration ?? null,
         createdAt,
         updatedAt: createdAt
       });
-      const run = this.getRunByDedupe(inserted.event_id, decision.policyId, decision.policyVersion, decision.targetAgentId);
+      if (loopInstanceId) this.incrementLoopRunCount(loopInstanceId, 1);
+      const run = this.getRunByDedupe(inserted.event_id, decision.policyId, decision.policyVersion, decision.agentId ?? "");
       if (run) {
         decision.runId = run.runId;
         runs.push(run);
@@ -581,10 +838,16 @@ export class RuntimeDatabase {
 
     const updated = this.getEventById(eventId);
     if (!updated) throw new Error("Failed to read updated event.");
+    if (loopInstanceId && plannedStepIterations) {
+      this.updateLoopStepIterations(loopInstanceId, plannedStepIterations);
+    }
+    if (loopInstanceId && effectiveLoopDefinition && terminalLoopEvent) {
+      this.markLoopCompleted(loopInstanceId, eventId);
+    }
     return { event: this.toEventRecord(updated), run: runs[0], runs, duplicate: false };
   }
 
-  private routingSummary(decisions: RouteDecision[]): EventRoutingSummary {
+  private routingSummary(decisions: OperationRoutingDecision[]): EventRoutingSummary {
     const routedRuns = decisions.filter((decision) => decision.status === "routed").length;
     const skippedPolicies = decisions.filter((decision) => decision.status === "skipped").length;
     let message = "No active policy matched project, event type, source, subject, tags, and payload predicates.";
@@ -592,6 +855,10 @@ export class RuntimeDatabase {
       message = `Routed to ${routedRuns} agent run${routedRuns === 1 ? "" : "s"} by ${decisions.length} matching polic${decisions.length === 1 ? "y" : "ies"}.`;
     } else if (skippedPolicies > 0) {
       message = `${skippedPolicies} matching polic${skippedPolicies === 1 ? "y was" : "ies were"} skipped because target agents were disabled or missing.`;
+    } else if (decisions.some((decision) => decision.status === "invalid_input")) {
+      message = "One or more routing policies matched but produced invalid operation input.";
+    } else if (decisions.some((decision) => decision.status === "configuration_error")) {
+      message = "One or more routing policies matched but had configuration errors.";
     }
 
     return {
@@ -638,6 +905,25 @@ export class RuntimeDatabase {
         policy_id TEXT NOT NULL,
         policy_version INTEGER NOT NULL,
         agent_role TEXT NOT NULL,
+        correlation_id TEXT,
+        operation_id TEXT,
+        operation_version INTEGER,
+        input_json TEXT,
+        input_contract_id TEXT,
+        input_contract_version INTEGER,
+        input_contract_hash TEXT,
+        output_json TEXT,
+        output_contract_id TEXT,
+        output_contract_version INTEGER,
+        output_contract_hash TEXT,
+        routing_policy_hash TEXT,
+        routing_decision_json TEXT,
+        emission_decisions_json TEXT,
+        loop_instance_id TEXT,
+        loop_definition_id TEXT,
+        loop_definition_version INTEGER,
+        step_id TEXT,
+        iteration INTEGER,
         status TEXT NOT NULL,
         attempt INTEGER NOT NULL DEFAULT 0,
         lease_owner TEXT,
@@ -671,10 +957,27 @@ export class RuntimeDatabase {
         PRIMARY KEY(work_item_id, agent_role)
       );
 
+      CREATE TABLE IF NOT EXISTS loop_instances (
+        loop_instance_id TEXT PRIMARY KEY,
+        loop_definition_id TEXT NOT NULL,
+        loop_definition_version INTEGER NOT NULL,
+        correlation_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        hop_count INTEGER NOT NULL DEFAULT 0,
+        run_count INTEGER NOT NULL DEFAULT 0,
+        step_iterations_json TEXT NOT NULL DEFAULT '{}',
+        started_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        terminal_event_id TEXT,
+        failure_reason TEXT
+      );
+
       CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
       CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_id);
       CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status, lease_until);
       CREATE INDEX IF NOT EXISTS idx_agent_runs_trigger ON agent_runs(trigger_event_id);
+      CREATE INDEX IF NOT EXISTS idx_loop_instances_correlation ON loop_instances(correlation_id);
     `);
 
     const eventColumns = new Set((db.prepare("PRAGMA table_info(events)").all() as Array<{ name: string }>).map((column) => column.name));
@@ -682,6 +985,33 @@ export class RuntimeDatabase {
     if (!eventColumns.has("correlation_depth")) db.exec("ALTER TABLE events ADD COLUMN correlation_depth INTEGER NOT NULL DEFAULT 0");
     if (!eventColumns.has("routing_json")) db.exec("ALTER TABLE events ADD COLUMN routing_json TEXT");
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedupe_key ON events(dedupe_key) WHERE dedupe_key IS NOT NULL");
+
+    const runColumns = new Set((db.prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>).map((column) => column.name));
+    const addRunColumn = (name: string, sql: string) => {
+      if (!runColumns.has(name)) db.exec(`ALTER TABLE agent_runs ADD COLUMN ${name} ${sql}`);
+    };
+    addRunColumn("correlation_id", "TEXT");
+    addRunColumn("operation_id", "TEXT");
+    addRunColumn("operation_version", "INTEGER");
+    addRunColumn("input_json", "TEXT");
+    addRunColumn("input_contract_id", "TEXT");
+    addRunColumn("input_contract_version", "INTEGER");
+    addRunColumn("input_contract_hash", "TEXT");
+    addRunColumn("output_json", "TEXT");
+    addRunColumn("output_contract_id", "TEXT");
+    addRunColumn("output_contract_version", "INTEGER");
+    addRunColumn("output_contract_hash", "TEXT");
+    addRunColumn("routing_policy_hash", "TEXT");
+    addRunColumn("routing_decision_json", "TEXT");
+    addRunColumn("emission_decisions_json", "TEXT");
+    addRunColumn("loop_instance_id", "TEXT");
+    addRunColumn("loop_definition_id", "TEXT");
+    addRunColumn("loop_definition_version", "INTEGER");
+    addRunColumn("step_id", "TEXT");
+    addRunColumn("iteration", "INTEGER");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_agent_runs_operation ON agent_runs(operation_id, operation_version)");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_agent_runs_correlation ON agent_runs(correlation_id)");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_agent_runs_loop_instance ON agent_runs(loop_instance_id)");
   }
 
   private getEventById(eventId: string): EventRow | undefined {
@@ -700,6 +1030,76 @@ export class RuntimeDatabase {
       ORDER BY created_at ASC, run_id ASC
     `).all(triggerEventId) as AgentRunRow[];
     return rows.map((row) => this.toAgentRun(row));
+  }
+
+  private getLoopInstance(loopInstanceId: string): LoopInstanceRow | undefined {
+    return this.connection().prepare(`
+      SELECT *
+      FROM loop_instances
+      WHERE loop_instance_id = ?
+    `).get(loopInstanceId) as LoopInstanceRow | undefined;
+  }
+
+  private incrementLoopRunCount(loopInstanceId: string, increment: number): void {
+    this.connection().prepare(`
+      UPDATE loop_instances
+      SET run_count = run_count + @increment,
+          updated_at = @updatedAt
+      WHERE loop_instance_id = @loopInstanceId AND status = 'running'
+    `).run({ loopInstanceId, increment, updatedAt: now() });
+  }
+
+  private markLoopCompleted(loopInstanceId: string, terminalEventId: string): void {
+    this.connection().prepare(`
+      UPDATE loop_instances
+      SET status = 'completed',
+          terminal_event_id = @terminalEventId,
+          completed_at = @completedAt,
+          updated_at = @completedAt
+      WHERE loop_instance_id = @loopInstanceId AND status = 'running'
+    `).run({ loopInstanceId, terminalEventId, completedAt: now() });
+  }
+
+  private markLoopExhausted(loopInstanceId: string, failureReason: string): void {
+    this.connection().prepare(`
+      UPDATE loop_instances
+      SET status = 'exhausted',
+          failure_reason = @failureReason,
+          completed_at = @completedAt,
+          updated_at = @completedAt
+      WHERE loop_instance_id = @loopInstanceId AND status = 'running'
+    `).run({ loopInstanceId, failureReason, completedAt: now() });
+  }
+
+  private loopDeadlineExceeded(row: LoopInstanceRow, loop: LoopDefinition): boolean {
+    if (!loop.limits.deadlineSeconds) return false;
+    const startedAt = Date.parse(row.started_at);
+    if (!Number.isFinite(startedAt)) return false;
+    return Date.now() > startedAt + loop.limits.deadlineSeconds * 1000;
+  }
+
+  private parseLoopStepIterations(row: LoopInstanceRow): Record<string, number> {
+    const parsed = parseJsonObject(row.step_iterations_json);
+    const iterations: Record<string, number> = {};
+    for (const [stepId, count] of Object.entries(parsed)) {
+      if (typeof count === "number" && Number.isFinite(count) && count >= 0) {
+        iterations[stepId] = Math.floor(count);
+      }
+    }
+    return iterations;
+  }
+
+  private updateLoopStepIterations(loopInstanceId: string, stepIterations: Record<string, number>): void {
+    this.connection().prepare(`
+      UPDATE loop_instances
+      SET step_iterations_json = @stepIterationsJson,
+          updated_at = @updatedAt
+      WHERE loop_instance_id = @loopInstanceId AND status = 'running'
+    `).run({
+      loopInstanceId,
+      stepIterationsJson: stringifyJson(stepIterations),
+      updatedAt: now()
+    });
   }
 
   private getRunByDedupe(triggerEventId: string, policyId: string, policyVersion: number, agentRole: string): AgentRun | undefined {
@@ -726,6 +1126,7 @@ export class RuntimeDatabase {
       projectId: row.project_id,
       tags: parseJsonArray(row.tags_json),
       payload: parseJsonObject(row.payload_json),
+      data: parseJsonObject(row.payload_json),
       status: row.status,
       matchedPolicyId: row.matched_policy_id ?? undefined,
       assignedAgentId: row.assigned_agent_id ?? undefined,
@@ -751,6 +1152,7 @@ export class RuntimeDatabase {
       occurredAt: event.occurredAt,
       tags: event.tags,
       payload: event.payload,
+      data: event.data ?? event.payload,
       status: event.status,
       matchedPolicyId: event.matchedPolicyId,
       assignedAgentId: event.assignedAgentId,
@@ -772,6 +1174,25 @@ export class RuntimeDatabase {
       policyId: row.policy_id,
       policyVersion: row.policy_version,
       agentRole: row.agent_role,
+      correlationId: row.correlation_id ?? undefined,
+      operationId: row.operation_id ?? undefined,
+      operationVersion: row.operation_version ?? undefined,
+      inputJson: parseJsonValue(row.input_json),
+      inputContractId: row.input_contract_id ?? undefined,
+      inputContractVersion: row.input_contract_version ?? undefined,
+      inputContractHash: row.input_contract_hash ?? undefined,
+      outputJson: parseJsonValue(row.output_json),
+      outputContractId: row.output_contract_id ?? undefined,
+      outputContractVersion: row.output_contract_version ?? undefined,
+      outputContractHash: row.output_contract_hash ?? undefined,
+      routingPolicyHash: row.routing_policy_hash ?? undefined,
+      routingDecisionJson: parseJsonRecord(row.routing_decision_json),
+      emissionDecisionsJson: parseJsonRecordArray(row.emission_decisions_json),
+      loopInstanceId: row.loop_instance_id ?? undefined,
+      loopDefinitionId: row.loop_definition_id ?? undefined,
+      loopDefinitionVersion: row.loop_definition_version ?? undefined,
+      stepId: row.step_id ?? undefined,
+      iteration: row.iteration ?? undefined,
       status: row.status,
       attempt: row.attempt,
       leaseOwner: row.lease_owner ?? undefined,

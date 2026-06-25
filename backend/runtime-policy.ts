@@ -125,8 +125,8 @@ const matchingDefinition = (
 ): EventDefinition | undefined =>
   eventDefinitions.find((definition) =>
     definition.active &&
-    textMatches(definition.source, source) &&
-    definition.producers.some((producer) =>
+    textMatches(definition.source ?? "*", source) &&
+    (definition.producers ?? []).some((producer) =>
       producer.agentRole === agentRole &&
       producerAllowsOutcome(producer, outcome.outcome) &&
       producerRequirementsPass(producer, validation)

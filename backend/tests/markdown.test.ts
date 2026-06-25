@@ -97,8 +97,15 @@ describe("Markdown collection loading", () => {
     expect(data.events).toEqual([]);
     expect(data.eventDefinitions[0]?.id).toBe("test-event");
     expect(data.eventDefinitions[0]?.eventType).toBe("adr.created");
+    expect(data.eventDefinitions[0]?.dataContract).toEqual({ id: "adr-created-data", version: 1 });
     expect(data.eventDefinitions[0]?.active).toBe(true);
     expect(data.eventDefinitions[0]?.relativePath).toBe(".ballet/events/test-event.md");
+    expect(data.contracts.map((contract) => contract.id).sort()).toEqual(["adr-created-data", "reviewer-input", "reviewer-output"]);
+    expect(data.operations[0]).toMatchObject({
+      id: "reviewer/review-adr",
+      agentId: "reviewer",
+      inputContract: { id: "reviewer-input", version: 1 }
+    });
     expect(data.runtimes[0]?.id).toBe("test-runtime");
     expect(data.runtimes[0]?.name).toBe("Test Runtime");
     expect(data.runtimes[0]?.type).toBe("custom");
@@ -107,9 +114,11 @@ describe("Markdown collection loading", () => {
     expect(data.runtimes[0]?.relativePath).toBe(".ballet/runtimes/test-runtime.md");
     expect(data.policies[0]?.id).toBe("test-policy");
     expect(data.policies[0]?.relativePath).toBe(".ballet/policies/test-policy.md");
-    expect(data.policies[0]).not.toHaveProperty("priority");
-    expect(data.policies[0]).not.toHaveProperty("version");
-    expect(data.policies[0]).not.toHaveProperty("tags");
+    expect(data.policies[0]).toMatchObject({
+      consumes: { eventType: "adr.created" },
+      dispatch: { operation: { id: "reviewer/review-adr", version: 1 } },
+      priority: 10
+    });
   });
 
   it("loads only .ballet/project.md for the project document", async () => {
@@ -471,11 +480,15 @@ path = "../.agents/skills/missing-skill"
       name: "Plan approved development",
       description: "Start development from approved plan facts.",
       active: true,
-      projectId: "*",
-      eventTypes: ["plan.approved.v1"],
-      source: "*",
-      payloadMetadata: { severity: "high" },
-      targetAgentId: "developer-agent",
+      consumes: { eventType: "plan.approved.v1" },
+      dispatch: { operation: { id: "developer-agent/implement-change", version: 1 } },
+      input: {
+        object: {
+          severity: { from: "/event/data/severity" }
+        }
+      },
+      selection: { mode: "fanout" },
+      onInvalidInput: "reject-event",
       body: "Start development from approved plan facts.",
       frontmatter: {
         id: "plan-approved-development",
@@ -489,15 +502,13 @@ path = "../.agents/skills/missing-skill"
     const source = await readFile(path.join(root, ".ballet/policies/plan-approved-development.md"), "utf8");
 
     expect(source).toContain("name: Plan approved development");
-    expect(source).toContain("match:");
-    expect(source).toContain("eventTypes:");
-    expect(source).toContain("projectId: \"*\"");
-    expect(source).toContain("source: \"*\"");
-    expect(source).toContain("payload:");
-    expect(source).toContain("action:");
-    expect(source).toContain("targetAgentId: developer-agent");
+    expect(source).toContain("kind: RoutingPolicy");
+    expect(source).toContain("consumes:");
+    expect(source).toContain("eventType: plan.approved.v1");
+    expect(source).toContain("dispatch:");
+    expect(source).toContain("developer-agent/implement-change");
+    expect(source).toContain("onInvalidInput: reject-event");
     expect(source).not.toContain("priority:");
-    expect(source).not.toContain("version:");
     expect(source).not.toContain("tags:");
     expect(source).not.toContain("payloadMetadata:");
   });
@@ -513,8 +524,8 @@ path = "../.agents/skills/missing-skill"
       eventType: "plan.approved.v1",
       source: "test",
       tags: ["delivery"],
-      producers: [],
-      payloadExample: { work_item_id: "work-1" },
+      dataContract: { id: "plan-approved-data", version: 1 },
+      examples: [{ work_item_id: "work-1" }],
       body: "Allowed approved plan event."
     });
 
@@ -524,7 +535,8 @@ path = "../.agents/skills/missing-skill"
     expect(source).toContain("active: true");
     expect(source).toContain("eventType: plan.approved.v1");
     expect(source).toContain("tags:");
-    expect(source).toContain("payloadExample:");
+    expect(source).toContain("dataContract:");
+    expect(source).toContain("examples:");
     expect(source).toContain("Allowed approved plan event.");
   });
 });

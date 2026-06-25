@@ -107,21 +107,93 @@ export const seedData: AppData = {
       updatedAt: now
     }
   ],
+  contracts: [
+    {
+      id: "deployment-failed-data",
+      version: 1,
+      name: "Deployment failed data",
+      description: "Deployment failure event data.",
+      kind: "event-data",
+      active: true,
+      schema: { type: "object", additionalProperties: true },
+      examples: [{ metadata: { severity: "high", service: "checkout-service" } }],
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "k8s-remediation-input",
+      version: 1,
+      name: "Kubernetes remediation input",
+      description: "Mapped input for Kubernetes remediation.",
+      kind: "agent-input",
+      active: true,
+      schema: { type: "object", additionalProperties: true },
+      examples: [{ severity: "high", service: "checkout-service" }],
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "k8s-remediation-output",
+      version: 1,
+      name: "Kubernetes remediation output",
+      description: "Generic operation output.",
+      kind: "agent-output",
+      active: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["status", "summary"],
+        properties: {
+          status: { type: "string", enum: ["completed", "blocked", "needs_input", "failed"] },
+          summary: { type: "string" },
+          result: { type: "object", additionalProperties: true }
+        }
+      },
+      examples: [{ status: "completed", summary: "Remediation drafted." }],
+      createdAt: now,
+      updatedAt: now
+    }
+  ],
+  operations: [
+    {
+      id: "agent-k8s/remediate-deployment",
+      version: 1,
+      name: "Remediate deployment failure",
+      description: "Investigate and remediate a failed deployment.",
+      active: true,
+      agentId: "agent-k8s",
+      instructions: "Inspect mapped deployment failure input and return remediation output.",
+      inputContract: { id: "k8s-remediation-input", version: 1 },
+      outputContract: { id: "k8s-remediation-output", version: 1 },
+      emissionRequired: false,
+      createdAt: now,
+      updatedAt: now
+    }
+  ],
   policies: [
     {
       id: "policy-deploy-fail",
       name: "Deployment failures to k8s operator",
       description: "Route Kubernetes deployment failures to the operator agent.",
       active: true,
-      projectId: "project-platform",
-      eventTypes: ["deployment.failed"],
-      source: "*",
-      payloadMetadata: { severity: "high" },
-      targetAgentId: "agent-k8s",
+      consumes: { eventType: "deployment.failed" },
+      when: { path: "/event/data/metadata/severity", op: "eq", value: "high" },
+      dispatch: { operation: { id: "agent-k8s/remediate-deployment", version: 1 } },
+      input: {
+        object: {
+          severity: { from: "/event/data/metadata/severity" },
+          service: { from: "/event/data/metadata/service" },
+          namespace: { from: "/event/data/namespace", default: "" },
+          pod: { from: "/event/data/pod", default: "" }
+        }
+      },
       createdAt: now,
       updatedAt: now
     }
   ],
+  emissionPolicies: [],
+  loopDefinitions: [],
+  loopInstances: [],
   eventDefinitions: [
     {
       id: "deployment-failed",
@@ -131,6 +203,8 @@ export const seedData: AppData = {
       eventType: "deployment.failed",
       source: "*",
       tags: ["kubernetes"],
+      dataContract: { id: "deployment-failed-data", version: 1 },
+      examples: [{ metadata: { severity: "high", service: "checkout-service" } }],
       producers: [],
       payloadExample: {
         metadata: { severity: "high", service: "checkout-service" }

@@ -1,51 +1,38 @@
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Agent, AgentOutcome, AgentRun, AppData, RuntimeEvent } from "./shared/domain.js";
+import type { Agent, AgentRun, AppData, RuntimeEvent } from "./shared/domain.js";
+import type { AgentOperation } from "./shared/operations.js";
+import type { JsonValue } from "./shared/json.js";
+import { ContractRegistry, ContractRegistryError } from "./shared/contracts.js";
 import { store } from "./store.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 import { runCodexAgent } from "./codex-adapter.js";
-import { checksPassRequiredGate, mapOutcomeToDomainEvent, outcomeToRunStatus } from "./runtime-policy.js";
+import { EmissionEngineError, evaluateEmissionPolicies } from "./emission-engine.js";
 
 const workerId = process.env.BALLET_AGENTD_WORKER_ID ?? `agentd-${process.pid}`;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const gitCommitExists = (cwd: string, sha?: string): boolean => {
-  if (!sha) return false;
-  try {
-    execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd, stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 const findAgent = (data: AppData, role: string): Agent | undefined => data.agents.find((agent) => agent.id === role);
+const findOperation = (data: AppData, run: AgentRun): AgentOperation | undefined =>
+  run.operationId && run.operationVersion
+    ? data.operations.find((operation) => operation.active && operation.id === run.operationId && operation.version === run.operationVersion)
+    : undefined;
 
-const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): string => {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+export const buildRunPrompt = (operation: AgentOperation, input: JsonValue): string => {
   return [
-    "Käsittele seuraava Ballet runtime -agent_run.",
+    `You are executing the operation "${operation.name}".`,
     "",
-    "Toimi vain oman roolisi mukaisesti. Älä julkaise eventtejä itse, älä muokkaa event streamia, älä käynnistä Codex native subagentteja, äläkä valitse domain event typeä.",
-    "Palauta lopuksi vain JSON, joka täyttää annetun outputSchema-rakenteen.",
+    "Operation instructions:",
+    operation.instructions,
     "",
-    `agent_role: ${run.agentRole}`,
-    `agent_name: ${agent.name}`,
-    `run_id: ${run.runId}`,
-    `attempt: ${run.attempt}`,
-    `policy_id: ${run.policyId}`,
-    `policy_version: ${run.policyVersion}`,
+    "Input:",
+    JSON.stringify(input, null, 2),
     "",
-    "Trigger event:",
-    JSON.stringify(trigger, null, 2),
-    "",
-    "Outcome-ohje:",
-    "- Käytä outcome=ready vain, kun työ on valmis ja olet validoinut olennaiset tarkistukset.",
-    "- Käytä outcome=blocked, kun eteneminen ei ole mahdollista ilman ulkoista muutosta.",
-    "- Käytä outcome=needs_input, kun tarvitset käyttäjältä tai ylläpidolta päätöksen.",
-    "- Review-roolit käyttävät outcome=approved tai outcome=changes_requested varsinaiseen review-päätökseen.",
-    "- checks-listassa pitää näkyä ajamasi tai perustellusti skippaamasi tarkistukset."
+    "Return only JSON matching the required output schema."
   ].join("\n");
 };
 
@@ -60,47 +47,97 @@ const completeFailed = (run: AgentRun, error: unknown) => {
   notifyRuntimeChanged("agent-runs");
 };
 
-const completeWithOutcome = (
+const runStatusFromOutput = (output: JsonValue): "completed" | "blocked" | "needs_input" | "failed" => {
+  if (!isRecord(output) || typeof output.status !== "string") return "failed";
+  if (["completed", "blocked", "needs_input", "failed"].includes(output.status)) {
+    return output.status as "completed" | "blocked" | "needs_input" | "failed";
+  }
+  return "failed";
+};
+
+const completeWithOutput = (
   run: AgentRun,
   trigger: RuntimeEvent,
-  outcome: AgentOutcome,
-  policies: AppData["policies"],
-  eventDefinitions: AppData["eventDefinitions"],
-  agents: AppData["agents"],
+  operation: AgentOperation,
+  output: JsonValue,
+  data: AppData,
   threadId?: string,
   turnId?: string
 ) => {
-  const validation = {
-    gitCommitExists: gitCommitExists(store.root, outcome.artifacts?.git_sha),
-    requiredChecksPassed: checksPassRequiredGate(outcome.checks)
-  };
-  const mapping = mapOutcomeToDomainEvent(run.agentRole, outcome, validation, eventDefinitions);
-  let status = outcomeToRunStatus(outcome);
-  let error: string | undefined;
-
-  if (["ready", "approved", "changes_requested"].includes(outcome.outcome) && !mapping) {
-    status = "failed";
-    error = "Agent outcome did not match an active Ballet event definition and validation rules.";
+  const registry = new ContractRegistry(data.contracts);
+  const outputValidation = registry.validate(operation.outputContract, output, "agent-output");
+  if (!outputValidation.valid) {
+    const message = `Agent output failed contract ${outputValidation.contractId}@${outputValidation.contractVersion} validation.`;
+    store.runtimeDatabase().completeRun({
+      runId: run.runId,
+      status: "failed",
+      output,
+      outputContractId: outputValidation.contractId,
+      outputContractVersion: outputValidation.contractVersion,
+      outputContractHash: outputValidation.contractHash,
+      error: message,
+      threadId,
+      turnId
+    });
+    store.runtimeDatabase().appendRunLog(run.runId, "error", message, { errors: outputValidation.errors });
+    notifyRuntimeChanged("agent-runs");
+    return;
   }
 
+  let emissions;
+  try {
+    emissions = evaluateEmissionPolicies({
+      projectRoot: store.root,
+      operation,
+      run,
+      trigger,
+      input: run.inputJson ?? {},
+      output,
+      policies: data.emissionPolicies,
+      eventDefinitions: data.eventDefinitions,
+      contracts: registry
+    });
+  } catch (error) {
+    const decisions = error instanceof EmissionEngineError ? error.decisions : [];
+    const message = error instanceof Error ? error.message : String(error);
+    store.runtimeDatabase().completeRun({
+      runId: run.runId,
+      status: "failed",
+      output,
+      outputContractId: outputValidation.contractId,
+      outputContractVersion: outputValidation.contractVersion,
+      outputContractHash: outputValidation.contractHash,
+      emissionDecisions: decisions as unknown as Record<string, unknown>[],
+      error: message,
+      threadId,
+      turnId
+    });
+    store.runtimeDatabase().appendRunLog(run.runId, "error", message);
+    notifyRuntimeChanged("agent-runs");
+    return;
+  }
+
+  const status = runStatusFromOutput(output);
   const result = store.runtimeDatabase().completeRun({
     runId: run.runId,
     status,
-    outcome,
-    error,
+    output,
+    outputContractId: outputValidation.contractId,
+    outputContractVersion: outputValidation.contractVersion,
+    outputContractHash: outputValidation.contractHash,
+    emissionDecisions: emissions.decisions as unknown as Record<string, unknown>[],
     threadId,
     turnId,
-    domainEvent: error ? undefined : mapping,
-    policies,
-    agents
+    domainEvents: emissions.events,
+    definitions: store.runtimeDefinitions(data)
   });
 
   if (threadId) {
     store.runtimeDatabase().upsertThreadBinding(trigger.subject, run.agentRole, threadId);
   }
-  store.runtimeDatabase().appendRunLog(run.runId, error ? "error" : "info", error ?? `Run completed with outcome ${outcome.outcome}.`, {
-    validation,
-    domain_event_type: result.event?.type
+  store.runtimeDatabase().appendRunLog(run.runId, "info", `Run completed with operation status ${status}.`, {
+    emitted_events: emissions.events.map((event) => event.type),
+    last_domain_event_type: result.event?.type
   });
   notifyRuntimeChanged("agent-runs");
   if (result.event) notifyRuntimeChanged("events");
@@ -115,13 +152,18 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
 
   try {
     const data = await store.read();
-    const agent = findAgent(data, run.agentRole);
-    if (!agent) throw new Error(`Agent role ${run.agentRole} was not found in .codex/agents.`);
+    const operation = findOperation(data, run);
+    if (!operation) throw new Error(`Operation ${run.operationId ?? "unknown"}@${run.operationVersion ?? "unknown"} was not found.`);
+    const agent = findAgent(data, operation.agentId);
+    if (!agent) throw new Error(`Agent ${operation.agentId} was not found in .codex/agents.`);
     if (!agent.enabled) throw new Error(`Agent role ${run.agentRole} is disabled.`);
     const trigger = runtime.getTriggerEvent(run);
     if (!trigger) throw new Error(`Trigger event ${run.triggerEventId} was not found.`);
     const resumeThreadId = runtime.getThreadBinding(trigger.subject, run.agentRole) ?? run.threadId;
-    const prompt = buildRunPrompt(run, trigger, agent);
+    const registry = new ContractRegistry(data.contracts);
+    const outputContract = registry.require(operation.outputContract, "agent-output");
+    if (run.inputJson === undefined) throw new Error(`Run ${run.runId} does not have persisted operation input.`);
+    const prompt = buildRunPrompt(operation, run.inputJson);
 
     const result = await runCodexAgent({
       runId: run.runId,
@@ -129,6 +171,7 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
       agentRole: run.agentRole,
       agent,
       prompt,
+      outputSchema: outputContract.schema,
       projectRoot: store.root,
       resumeThreadId,
       timeoutMs: Number(process.env.BALLET_AGENTD_CODEX_TIMEOUT_MS ?? 30 * 60 * 1000),
@@ -139,8 +182,14 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
       onLog: (level, message, details) => runtime.appendRunLog(run.runId, level, message, details)
     });
 
-    completeWithOutcome(run, trigger, result.outcome, data.policies, data.eventDefinitions, data.agents, result.threadId, result.turnId);
+    completeWithOutput(run, trigger, operation, result.output, data, result.threadId, result.turnId);
   } catch (error) {
+    if (error instanceof ContractRegistryError) {
+      runtime.appendRunLog(run.runId, "error", error.message, { details: error.details });
+      runtime.completeRun({ runId: run.runId, status: "failed", error: error.message });
+      notifyRuntimeChanged("agent-runs");
+      return true;
+    }
     completeFailed(run, error);
   }
 

@@ -317,6 +317,10 @@ export const loadGoals = (root: string) => readMarkdownCollection({ root, collec
 export const loadRuntimes = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/runtimes", collection: "runtimes" });
 export const loadEvents = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/events", collection: "events" });
 export const loadPolicies = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/policies", collection: "policies" });
+export const loadContracts = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/contracts", collection: "contracts" });
+export const loadOperations = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/operations", collection: "operations" });
+export const loadEmissionPolicies = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/emissions", collection: "emissionPolicies" });
+export const loadLoopDefinitions = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/loops", collection: "loopDefinitions" });
 
 export const safeSlug = slugify;
 

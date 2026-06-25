@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, AgentOutcomeStatus } from "../shared/domain.js";
+import type { Agent } from "../shared/domain.js";
 import { runCodexAgent } from "../codex-adapter.js";
 
 const tempRoots: string[] = [];
@@ -46,16 +46,25 @@ describe.skipIf(process.env.RUN_CODEX_SMOKE !== "1")("Codex app-server smoke", (
       agent,
       projectRoot: root,
       timeoutMs: 120000,
+      outputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["status", "summary"],
+        properties: {
+          status: { type: "string", enum: ["completed", "blocked", "needs_input", "failed"] },
+          summary: { type: "string" },
+          evidence: { type: "object", additionalProperties: true }
+        }
+      },
       prompt: [
         "Tämä on Ballet runtime smoke test.",
         "Älä tee tiedostomuutoksia.",
-        "Palauta outcome=blocked ja summary, jossa kerrot että smoke toimii ilman domain-event julkaisua.",
-        "Lisää checks-listaan yksi check nimellä smoke ja status passed."
+        "Palauta status=blocked ja summary, jossa kerrot että smoke toimii ilman domain-event julkaisua."
       ].join("\n")
     });
 
-    expect(["ready", "blocked", "needs_input", "approved", "changes_requested", "failed"] satisfies AgentOutcomeStatus[]).toContain(result.outcome.outcome);
+    expect(["completed", "blocked", "needs_input", "failed"]).toContain((result.output as { status?: string }).status);
     expect(result.threadId).toBeTruthy();
-    expect(result.outcome.summary).toBeTruthy();
+    expect((result.output as { summary?: string }).summary).toBeTruthy();
   });
 });

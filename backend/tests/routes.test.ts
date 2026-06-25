@@ -139,7 +139,15 @@ describe("API routes", () => {
       eventType: "runtime.event",
       source: "runtime",
       payload: {}
-    }, [], []);
+    }, {
+      agents: [],
+      contracts: [],
+      operations: [],
+      routingPolicies: [],
+      emissionPolicies: [],
+      eventDefinitions: [],
+      loopDefinitions: []
+    });
 
     const app = express();
     app.use(express.json());
@@ -181,8 +189,10 @@ describe("API routes", () => {
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
     await mkdir(path.join(root, ".ballet/events"), { recursive: true });
+    await mkdir(path.join(root, ".ballet/contracts"), { recursive: true });
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
-    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
+    await writeFile(path.join(root, ".ballet/contracts/plan-approved-data.md"), "---\napiVersion: ballet.dev/v1\nkind: ContractDefinition\nmetadata:\n  id: plan-approved-data\n  version: 1\nspec:\n  name: Plan approved data\n  description: Plan approved data.\n  kind: event-data\n  active: true\n  schema:\n    type: object\n    additionalProperties: true\n  examples:\n    - {}\n---\n\nContract.", "utf8");
+    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\napiVersion: ballet.dev/v1\nkind: EventDefinition\nmetadata:\n  id: plan-approved-v1\nspec:\n  name: Plan approved\n  active: true\n  eventType: plan.approved.v1\n  source: \"*\"\n  dataContract:\n    id: plan-approved-data\n    version: 1\n  examples:\n    - {}\n---\n\nAllowed event.", "utf8");
 
     const app = express();
     app.use(express.json());
@@ -227,7 +237,7 @@ describe("API routes", () => {
     await mkdir(path.join(root, ".ballet/events"), { recursive: true });
     await mkdir(path.join(root, ".ballet/policies"), { recursive: true });
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
-    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
+    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\napiVersion: ballet.dev/v1\nkind: EventDefinition\nmetadata:\n  id: plan-approved-v1\nspec:\n  name: Plan approved\n  active: true\n  eventType: plan.approved.v1\n  dataContract:\n    id: plan-approved-data\n    version: 1\n---\n\nAllowed event.", "utf8");
 
     const app = express();
     app.use(express.json());
@@ -242,8 +252,9 @@ describe("API routes", () => {
           name: "Unknown event policy",
           description: "Invalid.",
           active: true,
-          match: { eventTypes: ["unknown.event.v1"], projectId: "*", source: "*" },
-          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
+          consumes: { eventType: "unknown.event.v1" },
+          dispatch: { operation: { id: "developer-agent/implement-change", version: 1 } },
+          input: { object: {} }
         })
       });
       expect(unknown.status).toBe(400);
@@ -256,8 +267,9 @@ describe("API routes", () => {
           name: "Empty event policy",
           description: "Invalid.",
           active: true,
-          match: { eventTypes: [], projectId: "*", source: "*" },
-          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
+          consumes: { eventType: "" },
+          dispatch: { operation: { id: "developer-agent/implement-change", version: 1 } },
+          input: { object: {} }
         })
       });
       expect(empty.status).toBe(400);
@@ -270,8 +282,9 @@ describe("API routes", () => {
           name: "Multiple event policy",
           description: "Invalid.",
           active: true,
-          match: { eventTypes: ["plan.approved.v1", "plan.rejected.v1"], projectId: "*", source: "*" },
-          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
+          consumes: {},
+          dispatch: { operation: { id: "developer-agent/implement-change", version: 1 } },
+          input: { object: {} }
         })
       });
       expect(multiple.status).toBe(400);
@@ -284,14 +297,15 @@ describe("API routes", () => {
           name: "Plan approved policy",
           description: "Valid.",
           active: true,
-          match: { eventTypes: ["plan.approved.v1"], projectId: "*", source: "*" },
-          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
+          consumes: { eventType: "plan.approved.v1" },
+          dispatch: { operation: { id: "developer-agent/implement-change", version: 1 } },
+          input: { object: {} }
         })
       });
       expect(valid.status).toBe(201);
       expect(await valid.json()).toMatchObject({
         name: "Plan approved policy",
-        match: { eventTypes: ["plan.approved.v1"] }
+        consumes: { eventType: "plan.approved.v1" }
       });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
@@ -305,8 +319,8 @@ describe("API routes", () => {
     await mkdir(path.join(root, ".ballet/events"), { recursive: true });
     await mkdir(path.join(root, ".ballet/policies"), { recursive: true });
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
-    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
-    await writeFile(path.join(root, ".ballet/policies/on-plan-approved.md"), "---\nid: on-plan-approved\nname: On plan approved\ndescription: Route approved plans.\nactive: true\nmatch:\n  eventTypes:\n    - plan.approved.v1\n  projectId: \"*\"\n  source: \"*\"\naction:\n  type: start_agent_run\n  targetAgentId: developer-agent\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nPolicy body.", "utf8");
+    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\napiVersion: ballet.dev/v1\nkind: EventDefinition\nmetadata:\n  id: plan-approved-v1\nspec:\n  name: Plan approved\n  active: true\n  eventType: plan.approved.v1\n  dataContract:\n    id: plan-approved-data\n    version: 1\n---\n\nAllowed event.", "utf8");
+    await writeFile(path.join(root, ".ballet/policies/on-plan-approved.md"), "---\napiVersion: ballet.dev/v1\nkind: RoutingPolicy\nmetadata:\n  id: on-plan-approved\nspec:\n  name: On plan approved\n  description: Route approved plans.\n  active: true\n  consumes:\n    eventType: plan.approved.v1\n  dispatch:\n    operation:\n      id: developer-agent/implement-change\n      version: 1\n  input:\n    object: {}\n---\n\nPolicy body.", "utf8");
 
     const app = express();
     app.use(express.json());
@@ -324,8 +338,8 @@ describe("API routes", () => {
           active: false,
           eventType: "plan.approved.v1",
           source: "*",
-          producers: [],
-          payloadExample: {}
+          dataContract: { id: "plan-approved-data", version: 1 },
+          examples: []
         })
       });
       expect(deactivate.status).toBe(400);
@@ -341,8 +355,8 @@ describe("API routes", () => {
           active: true,
           eventType: "plan.accepted.v1",
           source: "*",
-          producers: [],
-          payloadExample: {}
+          dataContract: { id: "plan-approved-data", version: 1 },
+          examples: []
         })
       });
       expect(rename.status).toBe(400);

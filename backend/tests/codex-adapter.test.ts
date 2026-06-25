@@ -156,6 +156,10 @@ const runFixture = async (scenario: string, resumeThreadId?: string) => {
     agentRole: "developer-agent",
     agent,
     prompt: "Return schema JSON.",
+    outputSchema: {
+      type: "object",
+      additionalProperties: true
+    },
     projectRoot: root,
     resumeThreadId,
     timeoutMs: 5000,
@@ -173,7 +177,7 @@ describe("Codex app-server adapter", () => {
 
     expect(result.threadId).toBe("thread-1");
     expect(result.turnId).toBe("turn-1");
-    expect(result.outcome).toMatchObject({ outcome: "ready", summary: "Fixture completed." });
+    expect(result.output).toMatchObject({ outcome: "ready", summary: "Fixture completed." });
     expect(threads).toContainEqual({ threadId: "thread-1", turnId: "turn-1" });
   });
 
@@ -187,7 +191,7 @@ describe("Codex app-server adapter", () => {
   it("answers app-server approval requests deterministically", async () => {
     const { result } = await runFixture("approval-request");
 
-    expect(result.outcome.outcome).toBe("ready");
+    expect(result.output).toMatchObject({ outcome: "ready" });
   });
 
   it("fails when turn/completed reports a failed status", async () => {

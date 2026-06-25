@@ -3,8 +3,8 @@ import { createInterface } from "node:readline";
 import { copyFile, mkdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Agent, AgentOutcome } from "./shared/domain.js";
-import { agentOutcomeSchema, parseAgentOutcomeText } from "./runtime-policy.js";
+import type { Agent } from "./shared/domain.js";
+import type { JsonValue } from "./shared/json.js";
 
 type JsonRpcId = string | number;
 
@@ -30,6 +30,7 @@ export interface CodexRunOptions {
   agentRole: string;
   agent: Agent;
   prompt: string;
+  outputSchema: Record<string, unknown>;
   projectRoot: string;
   resumeThreadId?: string;
   timeoutMs?: number;
@@ -41,7 +42,7 @@ export interface CodexRunOptions {
 export interface CodexRunResult {
   threadId: string;
   turnId?: string;
-  outcome: AgentOutcome;
+  output: JsonValue;
 }
 
 class JsonLineRpcClient {
@@ -227,6 +228,25 @@ const turnStatusFromNotification = (message: JsonRpcMessage): { id?: string; sta
   };
 };
 
+export const parseAgentJsonText = (text: string): JsonValue => {
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (error) {
+    throw new Error(`Agent output was not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (
+    parsed === undefined ||
+    typeof parsed === "function" ||
+    typeof parsed === "symbol" ||
+    typeof parsed === "bigint"
+  ) {
+    throw new Error("Agent output was not a JSON value.");
+  }
+  return parsed as JsonValue;
+};
+
 export const runCodexAgent = async (options: CodexRunOptions): Promise<CodexRunResult> => {
   const onLog = options.onLog ?? (() => undefined);
   const codexHome = await prepareCodexHome(options.projectRoot, options.workItemId, options.agentRole);
@@ -349,7 +369,7 @@ export const runCodexAgent = async (options: CodexRunOptions): Promise<CodexRunR
       permissionProfile: { type: "disabled" },
       model: options.agent.model ?? undefined,
       effort: options.agent.modelReasoningEffort ?? undefined,
-      outputSchema: agentOutcomeSchema
+      outputSchema: options.outputSchema
     });
     turnId = turnIdFromResult(turnResult) ?? turnId;
     options.onThread?.(threadId, turnId);
@@ -359,7 +379,7 @@ export const runCodexAgent = async (options: CodexRunOptions): Promise<CodexRunR
     return {
       threadId,
       turnId,
-      outcome: parseAgentOutcomeText(finalAgentMessage)
+      output: parseAgentJsonText(finalAgentMessage)
     };
   } finally {
     clearTimeout(timeout);

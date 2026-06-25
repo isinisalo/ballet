@@ -1,6 +1,5 @@
-import type { AgentOutcomeStatus, EventDefinition, Policy } from "../../backend/shared/domain";
-
-export const workflowOutputOutcome = "ready" satisfies AgentOutcomeStatus;
+import type { EventDefinition } from "../../backend/shared/domain";
+import type { RoutingPolicy } from "../../backend/shared/routing-policy";
 
 export interface WorkflowDraft {
   inputEventType: string;
@@ -10,20 +9,18 @@ export interface WorkflowDraft {
 
 export interface PolicyWorkflow {
   id: string;
-  policy: Policy;
+  policy: RoutingPolicy;
   inputEventType: string;
   targetAgentId: string;
   outputEventDefinition?: EventDefinition;
   outputEventType?: string;
 }
 
-export const eventTypesForWorkflowPolicy = (policy: Pick<Policy, "match" | "eventTypes">): string[] =>
-  policy.match?.eventTypes ?? policy.eventTypes ?? [];
+export const eventTypesForWorkflowPolicy = (policy: Partial<RoutingPolicy>): string[] =>
+  policy.consumes?.eventType ? [policy.consumes.eventType] : [];
 
-export const targetAgentIdForWorkflowPolicy = (policy: Pick<Policy, "action" | "targetAgentId">): string =>
-  policy.action?.type === "start_agent_run" && policy.action.targetAgentId
-    ? policy.action.targetAgentId
-    : policy.targetAgentId;
+export const targetAgentIdForWorkflowPolicy = (policy: Partial<RoutingPolicy>): string =>
+  policy.dispatch?.operation?.id ?? "";
 
 const normalizePolicyNamePart = (value: string): string =>
   value
@@ -36,27 +33,20 @@ const normalizePolicyNamePart = (value: string): string =>
 export const buildPolicyName = (eventType: string, targetAgentId: string): string => {
   const eventName = normalizePolicyNamePart(eventType.replace(/\.v\d+$/i, ""));
   const agentName = normalizePolicyNamePart(targetAgentId).replace(/_agent$/, "");
-  return `on_${eventName}_start_${agentName}_agent`;
+  return `on_${eventName}_start_${agentName}_operation`;
 };
-
-const producerHasNoRequirements = (producer: EventDefinition["producers"][number]): boolean =>
-  !producer.requires || Object.keys(producer.requires).length === 0;
 
 export const findOutputEventDefinition = (
   targetAgentId: string,
-  eventDefinitions: EventDefinition[],
-  outcome: AgentOutcomeStatus = workflowOutputOutcome
-): EventDefinition | undefined =>
-  eventDefinitions.find((definition) =>
-    definition.active &&
-    definition.producers.some((producer) =>
-      producer.agentRole === targetAgentId &&
-      producer.outcomes.includes(outcome)
-    )
-  );
+  eventDefinitions: EventDefinition[]
+): EventDefinition | undefined => {
+  void targetAgentId;
+  void eventDefinitions;
+  return undefined;
+};
 
 export const derivePolicyWorkflows = (
-  policies: Policy[],
+  policies: RoutingPolicy[],
   eventDefinitions: EventDefinition[]
 ): PolicyWorkflow[] =>
   policies.map((policy) => {
@@ -74,62 +64,22 @@ export const derivePolicyWorkflows = (
   });
 
 export const applyWorkflowToPolicy = (
-  policy: Partial<Policy>,
+  policy: Partial<RoutingPolicy>,
   draft: WorkflowDraft
-): Partial<Policy> => {
-  const match = {
-    ...(policy.match ?? {}),
-    eventTypes: [draft.inputEventType],
-    projectId: policy.match?.projectId ?? policy.projectId ?? "*",
-    source: policy.match?.source ?? policy.source ?? "*"
-  };
-
-  return {
-    ...policy,
-    name: buildPolicyName(draft.inputEventType, draft.targetAgentId),
-    active: policy.active ?? true,
-    match,
-    action: {
-      type: "start_agent_run",
-      targetAgentId: draft.targetAgentId
-    },
-    targetAgentId: draft.targetAgentId,
-    eventTypes: [draft.inputEventType],
-    projectId: typeof match.projectId === "string" ? match.projectId : policy.projectId ?? "*",
-    source: typeof match.source === "string" ? match.source : policy.source ?? "*",
-    payloadMetadata: policy.payloadMetadata ?? {}
-  };
-};
-
-export const mergeReadyProducer = (
-  definition: EventDefinition,
-  agentRole: string
-): EventDefinition => {
-  const producers = definition.producers.map((producer) => ({
-    ...producer,
-    outcomes: [...producer.outcomes]
-  }));
-  const existingIndex = producers.findIndex((producer) =>
-    producer.agentRole === agentRole &&
-    producerHasNoRequirements(producer)
-  );
-
-  if (existingIndex >= 0) {
-    const existing = producers[existingIndex];
-    if (!existing.outcomes.includes(workflowOutputOutcome)) {
-      existing.outcomes = [...existing.outcomes, workflowOutputOutcome];
+): Partial<RoutingPolicy> => ({
+  ...policy,
+  name: buildPolicyName(draft.inputEventType, draft.targetAgentId),
+  active: policy.active ?? true,
+  consumes: { eventType: draft.inputEventType },
+  dispatch: {
+    operation: {
+      id: draft.targetAgentId,
+      version: policy.dispatch?.operation?.version ?? 1
     }
-    return { ...definition, producers };
-  }
+  },
+  input: policy.input ?? { object: {} },
+  selection: policy.selection ?? { mode: "fanout" },
+  onInvalidInput: policy.onInvalidInput ?? "skip"
+});
 
-  return {
-    ...definition,
-    producers: [
-      ...producers,
-      {
-        agentRole,
-        outcomes: [workflowOutputOutcome]
-      }
-    ]
-  };
-};
+export const mergeReadyProducer = (definition: EventDefinition): EventDefinition => definition;

@@ -42,6 +42,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify(event)
     }),
+  dryRunRoutingPolicy: (policyId: string, event: Partial<EventRecord> & Pick<EventRecord, "eventType">) =>
+    request<unknown>(`/api/routing-policies/${encodeURIComponent(policyId)}/dry-run`, {
+      method: "POST",
+      body: JSON.stringify(event)
+    }),
+  dryRunEmissionPolicy: (policyId: string, input: { operationInput?: unknown; operationOutput?: unknown }) =>
+    request<unknown>(`/api/emission-policies/${encodeURIComponent(policyId)}/dry-run`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
   getAgentRuns: () => request<AgentRun[]>("/api/agent-runs"),
   retryAgentRun: (runId: string) => request<AgentRun>(`/api/agent-runs/${runId}/retry`, { method: "POST" }),
   getAgentRunLogs: (runId: string) => request<AgentRunLog[]>(`/api/agent-runs/${runId}/logs`),

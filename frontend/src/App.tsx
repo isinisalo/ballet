@@ -33,7 +33,8 @@ import {
   Workflow,
   type LucideIcon
 } from "lucide-react";
-import type { Adr, Agent, AgentRun, AgentRunLog, AppData, EventDefinition, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
+import type { Adr, Agent, AgentRun, AgentRunLog, AppData, CollectionName, EventDefinition, Goal, MarkdownDocument, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
+import type { RoutingPolicy as Policy } from "../../backend/shared/routing-policy";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -81,8 +82,24 @@ import {
   type WorkflowDraft
 } from "./workflow-orchestrator";
 
-type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "workflow" | "agents" | "skills" | "runtimes" | "policies" | "events" | "agent-runs";
-type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies";
+type View =
+  | "projects"
+  | "project-document"
+  | "project-goals"
+  | "project-adrs"
+  | "workflow"
+  | "contracts"
+  | "operations"
+  | "emissions"
+  | "loops"
+  | "loop-instances"
+  | "agents"
+  | "skills"
+  | "runtimes"
+  | "policies"
+  | "events"
+  | "agent-runs";
+type SaveCollection = CollectionName;
 
 interface RouteState {
   view: View;
@@ -97,7 +114,12 @@ const emptyData: AppData = {
   agents: [],
   skills: [],
   runtimes: [],
+  contracts: [],
+  operations: [],
   policies: [],
+  emissionPolicies: [],
+  loopDefinitions: [],
+  loopInstances: [],
   eventDefinitions: [],
   events: [],
   agentRuns: [],
@@ -137,22 +159,27 @@ const parseJsonArray = (value: string): unknown[] => {
   return parsed;
 };
 
-const parseEventProducers = (value: string): EventDefinition["producers"] => {
-  const producers = parseJsonArray(value);
-  return producers.map((producer) => {
-    if (!isPlainRecord(producer) || typeof producer.agentRole !== "string" || !Array.isArray(producer.outcomes)) {
-      throw new Error("Each producer must include agentRole and outcomes.");
-    }
+const parseJsonValue = (value: string): unknown => JSON.parse(value) as unknown;
 
-    return {
-      agentRole: producer.agentRole,
-      outcomes: producer.outcomes.map(String) as EventDefinition["producers"][number]["outcomes"],
-      requires: isPlainRecord(producer.requires) ? producer.requires as EventDefinition["producers"][number]["requires"] : undefined
-    };
+const parseEventExamples = (value: string): Record<string, unknown>[] => {
+  const examples = parseJsonArray(value);
+  return examples.map((example) => {
+    if (!isPlainRecord(example)) throw new Error("Each example must be a JSON object.");
+    return example;
   });
 };
 
 const readJson = (value: unknown) => JSON.stringify(value, null, 2);
+const noneValue = "__none__";
+const versionedRefKey = (ref?: { id: string; version: number }) => ref ? `${ref.id}@${ref.version}` : noneValue;
+const parseVersionedRefKey = (value: string) => {
+  if (!value || value === noneValue) return undefined;
+  const separatorIndex = value.lastIndexOf("@");
+  if (separatorIndex <= 0) return undefined;
+  const id = value.slice(0, separatorIndex);
+  const version = Number(value.slice(separatorIndex + 1));
+  return Number.isFinite(version) ? { id, version } : undefined;
+};
 const frontmatterToYaml = (frontmatter?: Record<string, unknown>) => stringifyYaml(frontmatter ?? {}).trimEnd();
 const parseFrontmatterYaml = (value: string): Record<string, unknown> => {
   if (!value.trim()) return {};
@@ -229,20 +256,16 @@ const policyTemplate = (targetAgentId: string): Partial<Policy> => ({
   name: "",
   description: "",
   active: true,
-  match: {
-    eventTypes: [],
-    projectId: "*",
-    source: "*"
+  consumes: { eventType: "" },
+  dispatch: {
+    operation: {
+      id: targetAgentId,
+      version: 1
+    }
   },
-  action: {
-    type: "start_agent_run",
-    targetAgentId
-  },
-  projectId: "*",
-  eventTypes: [],
-  source: "*",
-  payloadMetadata: {},
-  targetAgentId
+  input: { object: {} },
+  selection: { mode: "fanout" },
+  onInvalidInput: "skip"
 });
 
 const eventDefinitionTemplate = (): Partial<EventDefinition> => ({
@@ -252,35 +275,14 @@ const eventDefinitionTemplate = (): Partial<EventDefinition> => ({
   eventType: "",
   source: "agentd",
   tags: [],
-  producers: [],
-  payloadExample: {},
+  examples: [],
   body: ""
 });
 
-const payloadMetadataToMatchPayload = (metadata?: Record<string, string>) =>
-  Object.fromEntries(Object.entries(metadata ?? {}).map(([key, value]) => [key, { operator: "equals" as const, value }]));
-
-const policyMatchForForm = (policy: Partial<Policy>): NonNullable<Policy["match"]> => {
-  if (policy.match) return policy.match;
-  const payload = payloadMetadataToMatchPayload(policy.payloadMetadata);
-  return {
-    eventTypes: policy.eventTypes ?? [],
-    projectId: policy.projectId ?? "*",
-    source: policy.source ?? "*",
-    ...(Object.keys(payload).length > 0 ? { payload } : {})
-  };
-};
-
 const policyTargetForForm = (policy: Partial<Policy>, fallback: string) =>
-  policy.action?.type === "start_agent_run" && policy.action.targetAgentId ? policy.action.targetAgentId : policy.targetAgentId ?? fallback;
+  policy.dispatch?.operation?.id ?? fallback;
 
-const eventTypesForPolicy = (policy: Partial<Policy>): string[] => policy.match?.eventTypes ?? policy.eventTypes ?? [];
-
-const advancedPolicyMatchForForm = (policy: Partial<Policy>): NonNullable<Policy["match"]> => {
-  const advancedMatch = { ...policyMatchForForm(policy) };
-  delete advancedMatch.eventTypes;
-  return advancedMatch;
-};
+const eventTypesForPolicy = (policy: Partial<Policy>): string[] => policy.consumes?.eventType ? [policy.consumes.eventType] : [];
 
 const routeFromPath = (path: string): RouteState => {
   const url = new URL(path, "http://localhost");
@@ -297,6 +299,11 @@ const routeFromPath = (path: string): RouteState => {
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/workflow") return { view: "workflow" };
+  if (url.pathname === "/contracts") return { view: "contracts" };
+  if (url.pathname === "/operations") return { view: "operations" };
+  if (url.pathname === "/emissions") return { view: "emissions" };
+  if (url.pathname === "/loops") return { view: "loops" };
+  if (url.pathname === "/loop-instances") return { view: "loop-instances" };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/runtimes") return { view: "runtimes", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/policies") return { view: "policies", documentPath: url.searchParams.get("path") ?? undefined };
@@ -996,6 +1003,10 @@ function AppSidebar({
   agents,
   skills,
   runtimes,
+  contracts,
+  operations,
+  emissionPolicies,
+  loopDefinitions,
   policies,
   eventDefinitions,
   workflows,
@@ -1013,6 +1024,10 @@ function AppSidebar({
   agents: Agent[];
   skills: Skill[];
   runtimes: Runtime[];
+  contracts: AppData["contracts"];
+  operations: AppData["operations"];
+  emissionPolicies: AppData["emissionPolicies"];
+  loopDefinitions: AppData["loopDefinitions"];
   policies: Policy[];
   eventDefinitions: EventDefinition[];
   workflows: PolicyWorkflow[];
@@ -1103,6 +1118,11 @@ function AppSidebar({
                 </SidebarMenuItem>
               </Collapsible>
               {item("Agent runs", <Activity />, "/agent-runs", route.view === "agent-runs")}
+              {item(`Contracts (${contracts.length})`, <FileKey2 />, "/contracts", route.view === "contracts")}
+              {item(`Operations (${operations.length})`, <Bot />, "/operations", route.view === "operations")}
+              {item(`Emissions (${emissionPolicies.length})`, <ArrowRight />, "/emissions", route.view === "emissions")}
+              {item(`Loops (${loopDefinitions.length})`, <RefreshCw />, "/loops", route.view === "loops")}
+              {item("Loop instances", <Activity />, "/loop-instances", route.view === "loop-instances")}
               <Collapsible defaultOpen={agentsOpen} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
@@ -1334,7 +1354,7 @@ export function App() {
     return saved;
   };
 
-  const remove = async (collection: SaveCollection | "events", id: string) => {
+  const remove = async (collection: SaveCollection, id: string) => {
     await api.remove(collection, id);
     await refresh();
     setNotice("Deleted.");
@@ -1366,6 +1386,10 @@ export function App() {
           agents={data.agents}
           skills={data.skills}
           runtimes={data.runtimes}
+          contracts={data.contracts}
+          operations={data.operations}
+          emissionPolicies={data.emissionPolicies}
+          loopDefinitions={data.loopDefinitions}
           policies={data.policies}
           eventDefinitions={data.eventDefinitions}
           workflows={workflows}
@@ -1418,6 +1442,11 @@ export function App() {
                 />
               ) : null}
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
+              {route.view === "contracts" ? <ContractsView data={data} save={save} remove={remove} /> : null}
+              {route.view === "operations" ? <OperationsView data={data} save={save} remove={remove} /> : null}
+              {route.view === "emissions" ? <EmissionPoliciesView data={data} save={save} remove={remove} /> : null}
+              {route.view === "loops" ? <LoopDefinitionsView data={data} save={save} remove={remove} /> : null}
+              {route.view === "loop-instances" ? <ResourceSummaryView title="Loop instances" items={data.loopInstances} columns={["loopInstanceId", "loopDefinitionId", "status", "runCount", "hopCount"]} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView runtime={selectedRuntime} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "policies" ? <PoliciesView data={data} project={project} policy={selectedPolicy} save={save} remove={remove} navigate={navigate} /> : null}
@@ -1436,6 +1465,442 @@ export function App() {
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
+  );
+}
+
+function ResourceSummaryView({
+  title,
+  items,
+  columns
+}: {
+  title: string;
+  items: object[];
+  columns: string[];
+}) {
+  return (
+    <Panel title={title} icon={<FileKey2 data-icon="inline-start" />}>
+      {items.length === 0 ? (
+        <EmptyState title={`No ${title.toLowerCase()}.`} action="Create Markdown-backed resources in the project collection." />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((column) => <TableHead key={column}>{column}</TableHead>)}
+              <TableHead>Name</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((rawItem, index) => {
+              const item = rawItem as Record<string, unknown>;
+              return (
+              <TableRow key={String(item.id ?? item.loopInstanceId ?? index)}>
+                {columns.map((column) => (
+                  <TableCell key={column} className="font-mono text-xs">
+                    {String(item[column] ?? "")}
+                  </TableCell>
+                ))}
+                <TableCell>{String(item.name ?? item.description ?? "")}</TableCell>
+              </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </Panel>
+  );
+}
+
+const contractKindOptions = [
+  { value: "event-data", label: "Event data" },
+  { value: "agent-input", label: "Agent input" },
+  { value: "agent-output", label: "Agent output" }
+];
+
+const contractTemplate = (): Partial<AppData["contracts"][number]> => ({
+  id: "",
+  version: 1,
+  name: "",
+  description: "",
+  kind: "event-data",
+  active: true,
+  schema: {
+    type: "object",
+    additionalProperties: false
+  },
+  examples: []
+});
+
+const operationTemplate = (data: AppData): Partial<AppData["operations"][number]> => ({
+  id: "",
+  version: 1,
+  name: "",
+  description: "",
+  active: true,
+  agentId: data.agents[0]?.id ?? "",
+  instructions: "",
+  inputContract: data.contracts.find((contract) => contract.kind === "agent-input" && contract.active),
+  outputContract: data.contracts.find((contract) => contract.kind === "agent-output" && contract.active),
+  emissionRequired: false
+});
+
+const emissionPolicyTemplate = (data: AppData): Partial<AppData["emissionPolicies"][number]> => ({
+  id: "",
+  version: 1,
+  name: "",
+  description: "",
+  active: true,
+  observes: {
+    operation: data.operations[0] ? { id: data.operations[0].id, version: data.operations[0].version } : { id: "", version: 1 }
+  },
+  emissions: [],
+  onGateFailure: "skip"
+});
+
+const loopDefinitionTemplate = (): Partial<AppData["loopDefinitions"][number]> => ({
+  id: "",
+  version: 1,
+  name: "",
+  description: "",
+  active: true,
+  entryEventTypes: [],
+  terminalEventTypes: [],
+  routingPolicyIds: [],
+  emissionPolicyIds: [],
+  limits: {
+    maxHops: 30,
+    maxRuns: 50,
+    maxIterationsPerStep: 5
+  }
+});
+
+const contractRefOptions = (contracts: AppData["contracts"], kind: AppData["contracts"][number]["kind"]) =>
+  contracts
+    .filter((contract) => contract.kind === kind && contract.active)
+    .map((contract) => ({
+      value: versionedRefKey(contract),
+      label: `${contract.name} · ${contract.id}@${contract.version}`
+    }));
+
+const contractDisplay = (ref?: { id: string; version: number }) => ref ? `${ref.id}@${ref.version}` : "none";
+
+function ContractsView({ data, save, remove }: ViewProps) {
+  const [selectedId, setSelectedId] = useState(data.contracts[0]?.id ?? "");
+  const selected = data.contracts.find((contract) => contract.id === selectedId) ?? data.contracts[0];
+  const [form, setForm] = useState<Partial<AppData["contracts"][number]>>(selected ?? contractTemplate());
+  const [schemaText, setSchemaText] = useState(readJson(form.schema ?? contractTemplate().schema));
+  const [examplesText, setExamplesText] = useState(readJson(form.examples ?? []));
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const next = selected ?? contractTemplate();
+    setForm(next);
+    setSchemaText(readJson(next.schema ?? contractTemplate().schema));
+    setExamplesText(readJson(next.examples ?? []));
+    setError("");
+  }, [selected]);
+
+  const submit = async () => {
+    setError("");
+    try {
+      const schema = parseJsonValue(schemaText);
+      if (!isPlainRecord(schema)) throw new Error("Schema must be a JSON object.");
+      await save("contracts", {
+        ...form,
+        version: Number(form.version ?? 1),
+        schema,
+        examples: parseJsonArray(examplesText)
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save contract.");
+    }
+  };
+
+  const deleteContract = () => {
+    if (form.id) void remove("contracts", form.id);
+  };
+
+  const formId = useId();
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(420px,0.8fr)_minmax(520px,1.2fr)]">
+      <Panel title="Contracts" icon={<FileKey2 data-icon="inline-start" />}>
+        <DataTable
+          empty="No contracts configured."
+          columns={["ID", "Version", "Kind", "Active"]}
+          rows={data.contracts.map((contract) => ({
+            id: `${contract.id}@${contract.version}`,
+            onClick: () => setSelectedId(contract.id),
+            cells: [
+              <span className="font-mono text-xs">{contract.id}</span>,
+              String(contract.version),
+              contract.kind,
+              String(contract.active)
+            ]
+          }))}
+        />
+      </Panel>
+
+      <Panel
+        title={form.id ? "Edit contract" : "Create contract"}
+        icon={<FileKey2 data-icon="inline-start" />}
+        action={<CrudActions formId={formId} newLabel="New contract" saveLabel="Save contract" id={form.id} leading={<SwitchField label="Enabled" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />} onNew={() => { setSelectedId(""); setForm(contractTemplate()); }} onDelete={deleteContract} />}
+      >
+        {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+        {form.errors?.length ? <ErrorPreview errors={form.errors} /> : null}
+        <form id={formId} className="grid gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+          <FieldGroup>
+            <TextField label="ID" required value={form.id ?? ""} onChange={(id) => setForm({ ...form, id })} />
+            <TextField label="Version" required type="number" value={form.version ?? 1} onChange={(version) => setForm({ ...form, version: Number(version) })} />
+            <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
+            <TextAreaField label="Description" rows={3} value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
+            <SelectField label="Kind" value={form.kind ?? "event-data"} options={contractKindOptions} onChange={(kind) => setForm({ ...form, kind: kind as AppData["contracts"][number]["kind"] })} />
+            <TextAreaField label="JSON Schema" rows={12} value={schemaText} onChange={setSchemaText} />
+            <TextAreaField label="Examples JSON" rows={6} value={examplesText} onChange={setExamplesText} />
+          </FieldGroup>
+        </form>
+      </Panel>
+    </div>
+  );
+}
+
+function OperationsView({ data, save, remove }: ViewProps) {
+  const [selectedId, setSelectedId] = useState(data.operations[0]?.id ?? "");
+  const selected = data.operations.find((operation) => operation.id === selectedId) ?? data.operations[0];
+  const [form, setForm] = useState<Partial<AppData["operations"][number]>>(selected ?? operationTemplate(data));
+  const [error, setError] = useState("");
+  const formId = useId();
+
+  useEffect(() => {
+    setForm(selected ?? operationTemplate(data));
+    setError("");
+  }, [data, selected]);
+
+  const submit = async () => {
+    setError("");
+    try {
+      if (!form.inputContract?.id || !form.outputContract?.id) throw new Error("Select input and output contracts.");
+      await save("operations", {
+        ...form,
+        version: Number(form.version ?? 1),
+        emissionRequired: Boolean(form.emissionRequired)
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save operation.");
+    }
+  };
+
+  const deleteOperation = () => {
+    if (form.id) void remove("operations", form.id);
+  };
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(420px,0.8fr)_minmax(520px,1.2fr)]">
+      <Panel title="Operations" icon={<Bot data-icon="inline-start" />}>
+        <DataTable
+          empty="No operations configured."
+          columns={["ID", "Version", "Agent", "Contracts"]}
+          rows={data.operations.map((operation) => ({
+            id: `${operation.id}@${operation.version}`,
+            onClick: () => setSelectedId(operation.id),
+            cells: [
+              <span className="font-mono text-xs">{operation.id}</span>,
+              String(operation.version),
+              operation.agentId,
+              <span className="font-mono text-xs">{contractDisplay(operation.inputContract)} {"->"} {contractDisplay(operation.outputContract)}</span>
+            ]
+          }))}
+        />
+      </Panel>
+
+      <Panel
+        title={form.id ? "Edit operation" : "Create operation"}
+        icon={<Bot data-icon="inline-start" />}
+        action={<CrudActions formId={formId} newLabel="New operation" saveLabel="Save operation" id={form.id} leading={<SwitchField label="Enabled" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />} onNew={() => { setSelectedId(""); setForm(operationTemplate(data)); }} onDelete={deleteOperation} />}
+      >
+        {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+        {form.errors?.length ? <ErrorPreview errors={form.errors} /> : null}
+        <form id={formId} className="grid gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+          <FieldGroup>
+            <TextField label="ID" required value={form.id ?? ""} onChange={(id) => setForm({ ...form, id })} />
+            <TextField label="Version" required type="number" value={form.version ?? 1} onChange={(version) => setForm({ ...form, version: Number(version) })} />
+            <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
+            <TextAreaField label="Description" rows={3} value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
+            <SelectField label="Agent" value={form.agentId || noneValue} options={[{ value: noneValue, label: "No agent" }, ...data.agents.map((agent) => ({ value: agent.id, label: agent.name }))]} onChange={(agentId) => setForm({ ...form, agentId: agentId === noneValue ? "" : agentId })} />
+            <SelectField label="Input contract" value={versionedRefKey(form.inputContract)} options={[{ value: noneValue, label: "No input contract" }, ...contractRefOptions(data.contracts, "agent-input")]} onChange={(value) => setForm({ ...form, inputContract: parseVersionedRefKey(value) })} />
+            <SelectField label="Output contract" value={versionedRefKey(form.outputContract)} options={[{ value: noneValue, label: "No output contract" }, ...contractRefOptions(data.contracts, "agent-output")]} onChange={(value) => setForm({ ...form, outputContract: parseVersionedRefKey(value) })} />
+            <SwitchField label="Emission required" checked={form.emissionRequired ?? false} onChange={(emissionRequired) => setForm({ ...form, emissionRequired })} />
+            <TextAreaField label="Instructions" rows={10} value={form.instructions ?? ""} onChange={(instructions) => setForm({ ...form, instructions })} />
+          </FieldGroup>
+        </form>
+      </Panel>
+    </div>
+  );
+}
+
+function JsonResourceEditor<T extends "emissionPolicies" | "loopDefinitions">({
+  title,
+  collection,
+  item,
+  template,
+  save,
+  remove,
+  children
+}: {
+  title: string;
+  collection: T;
+  item?: AppData[T][number];
+  template: Partial<AppData[T][number]>;
+  save: ViewProps["save"];
+  remove: ViewProps["remove"];
+  children?: ReactNode;
+}) {
+  const formId = useId();
+  const [text, setText] = useState(readJson(item ?? template));
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setText(readJson(item ?? template));
+    setError("");
+  }, [item, template]);
+
+  const submit = async () => {
+    setError("");
+    try {
+      const parsed = parseJsonValue(text);
+      if (!isPlainRecord(parsed)) throw new Error(`${title} must be a JSON object.`);
+      await save(collection, parsed as Partial<AppData[T][number]>);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Unable to save ${title.toLowerCase()}.`);
+    }
+  };
+
+  const deleteItem = () => {
+    const id = isPlainRecord(item) && typeof item.id === "string" ? item.id : "";
+    if (id) void remove(collection, id);
+  };
+
+  return (
+    <Panel
+      title={title}
+      icon={<Code2 data-icon="inline-start" />}
+      action={<CrudActions formId={formId} newLabel="New" saveLabel={`Save ${title}`} id={isPlainRecord(item) && typeof item.id === "string" ? item.id : undefined} onNew={() => setText(readJson(template))} onDelete={deleteItem} />}
+    >
+      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {children}
+      <form id={formId} className="mt-4 grid gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <TextAreaField label={`${title} JSON`} rows={18} value={text} onChange={setText} />
+      </form>
+    </Panel>
+  );
+}
+
+function EmissionPoliciesView({ data, save, remove }: ViewProps) {
+  const [selectedId, setSelectedId] = useState(data.emissionPolicies[0]?.id ?? "");
+  const selected = data.emissionPolicies.find((policy) => policy.id === selectedId) ?? data.emissionPolicies[0];
+  const template = useMemo(() => emissionPolicyTemplate(data), [data]);
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(420px,0.8fr)_minmax(520px,1.2fr)]">
+      <Panel title="Emission policies" icon={<Route data-icon="inline-start" />}>
+        <DataTable
+          empty="No emission policies configured."
+          columns={["ID", "Version", "Operation", "Active"]}
+          rows={data.emissionPolicies.map((policy) => ({
+            id: `${policy.id}@${policy.version}`,
+            onClick: () => setSelectedId(policy.id),
+            cells: [
+              <span className="font-mono text-xs">{policy.id}</span>,
+              String(policy.version),
+              <span className="font-mono text-xs">{contractDisplay(policy.observes.operation)}</span>,
+              String(policy.active)
+            ]
+          }))}
+        />
+      </Panel>
+      <JsonResourceEditor
+        title="Emission policy"
+        collection="emissionPolicies"
+        item={selected}
+        template={template}
+        save={save}
+        remove={remove}
+      >
+        {selected ? <EmissionPolicyDryRunPanel policy={selected} /> : null}
+      </JsonResourceEditor>
+    </div>
+  );
+}
+
+function EmissionPolicyDryRunPanel({ policy }: { policy: AppData["emissionPolicies"][number] }) {
+  const [inputText, setInputText] = useState("{}");
+  const [outputText, setOutputText] = useState(readJson({ status: "completed", summary: "Dry-run output" }));
+  const [result, setResult] = useState<unknown>();
+  const [error, setError] = useState("");
+
+  const run = async () => {
+    setError("");
+    setResult(undefined);
+    try {
+      const response = await api.dryRunEmissionPolicy(policy.id, {
+        operationInput: parseJsonValue(inputText),
+        operationOutput: parseJsonValue(outputText)
+      });
+      setResult(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to run emission policy test.");
+    }
+  };
+
+  return (
+    <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">Dry-run emission</h3>
+        <Button type="button" size="sm" variant="outline" onClick={() => void run()}>
+          <Eye data-icon="inline-start" />
+          Run
+        </Button>
+      </div>
+      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      <TextAreaField label="Operation input JSON" rows={5} value={inputText} onChange={setInputText} compact />
+      <TextAreaField label="Operation output JSON" rows={6} value={outputText} onChange={setOutputText} compact />
+      {result !== undefined ? (
+        <pre className="max-h-72 overflow-auto rounded-md bg-background p-3 text-xs leading-relaxed">{readJson(result)}</pre>
+      ) : null}
+    </div>
+  );
+}
+
+function LoopDefinitionsView({ data, save, remove }: ViewProps) {
+  const [selectedId, setSelectedId] = useState(data.loopDefinitions[0]?.id ?? "");
+  const selected = data.loopDefinitions.find((loop) => loop.id === selectedId) ?? data.loopDefinitions[0];
+  const template = useMemo(() => loopDefinitionTemplate(), []);
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(420px,0.8fr)_minmax(520px,1.2fr)]">
+      <Panel title="Loop Engineering" icon={<RefreshCw data-icon="inline-start" />}>
+        <DataTable
+          empty="No loop definitions configured."
+          columns={["ID", "Version", "Entry events", "Terminal events"]}
+          rows={data.loopDefinitions.map((loop) => ({
+            id: `${loop.id}@${loop.version}`,
+            onClick: () => setSelectedId(loop.id),
+            cells: [
+              <span className="font-mono text-xs">{loop.id}</span>,
+              String(loop.version),
+              loop.entryEventTypes.join(", "),
+              loop.terminalEventTypes.join(", ")
+            ]
+          }))}
+        />
+      </Panel>
+      <JsonResourceEditor
+        title="Loop definition"
+        collection="loopDefinitions"
+        item={selected}
+        template={template}
+        save={save}
+        remove={remove}
+      />
+    </div>
   );
 }
 
@@ -2128,13 +2593,14 @@ function WorkflowOrchestratorView({
   const selectedPolicy = data.policies.find((policy) => policy.id === selectedPolicyId);
   const defaultPolicyId = workflows.find((workflow) => workflow.outputEventType)?.policy.id ?? data.policies[0]?.id ?? newWorkflowId;
   const agentById = useMemo(() => new Map(data.agents.map((agent) => [agent.id, agent])), [data.agents]);
+  const operationById = useMemo(() => new Map(data.operations.map((operation) => [operation.id, operation])), [data.operations]);
   const definitionByEventType = useMemo(
     () => new Map(data.eventDefinitions.map((definition) => [definition.eventType, definition])),
     [data.eventDefinitions]
   );
 
   const buildDraft = useCallback((policy?: Policy): WorkflowDraftState => {
-    const targetAgentId = policy ? targetAgentIdForWorkflowPolicy(policy) : data.agents[0]?.id ?? "";
+    const targetAgentId = policy ? targetAgentIdForWorkflowPolicy(policy) : data.operations[0]?.id ?? "";
     const inputEventType = policy
       ? eventTypesForWorkflowPolicy(policy)[0] ?? activeDefinitions[0]?.eventType ?? ""
       : activeDefinitions[0]?.eventType ?? "";
@@ -2151,7 +2617,7 @@ function WorkflowOrchestratorView({
       targetAgentId,
       outputEventType
     };
-  }, [activeDefinitions, data.agents]);
+  }, [activeDefinitions, data.operations]);
 
   const [draft, setDraft] = useState<WorkflowDraftState>(() => buildDraft(data.policies[0]));
 
@@ -2181,7 +2647,8 @@ function WorkflowOrchestratorView({
   }, [buildDraft, creatingWorkflow, selectedPolicy, selectedPolicyId]);
 
   const outputDefinition = definitionByEventType.get(draft.outputEventType);
-  const targetAgent = agentById.get(draft.targetAgentId);
+  const targetOperation = operationById.get(draft.targetAgentId);
+  const targetAgent = agentById.get(targetOperation?.agentId ?? draft.targetAgentId);
   const canSave = Boolean(draft.inputEventType && draft.targetAgentId && draft.outputEventType);
   const eventOptions = workflowEventOptions(activeDefinitions);
   const policyValue = policyDisplayName(draft.inputEventType, draft.targetAgentId);
@@ -2213,7 +2680,7 @@ function WorkflowOrchestratorView({
   };
 
   const buildWorkflowPolicyDraft = useCallback((): Partial<Policy> => {
-    const agentName = agentById.get(draft.targetAgentId)?.name ?? draft.targetAgentId;
+    const agentName = operationById.get(draft.targetAgentId)?.name ?? draft.targetAgentId;
     const fallbackDescription = draft.inputEventType && agentName ? `Route ${draft.inputEventType} to ${agentName}.` : "";
 
     return applyWorkflowToPolicy({
@@ -2222,7 +2689,7 @@ function WorkflowOrchestratorView({
       description: draft.policyDescription.trim() || fallbackDescription,
       active: draft.policyActive
     }, draft);
-  }, [agentById, draft]);
+  }, [draft, operationById]);
 
   const embeddedPolicy = useMemo<Partial<Policy>>(() => {
     if (selectedPolicyId === newWorkflowId || !selectedPolicy) return buildWorkflowPolicyDraft();
@@ -2249,17 +2716,14 @@ function WorkflowOrchestratorView({
   };
 
   const handleEmbeddedPolicyDraftChange = (policyDraft: Partial<Policy>, selectedEventType: string) => {
-    const nextTargetAgentId = policyTargetForForm(policyDraft, data.agents[0]?.id ?? "");
-    const nextOutputEventType = nextTargetAgentId !== draft.targetAgentId
-      ? findOutputEventDefinition(nextTargetAgentId, activeDefinitions)?.eventType ?? draft.outputEventType
-      : draft.outputEventType;
+    const nextTargetAgentId = policyTargetForForm(policyDraft, data.operations[0]?.id ?? "");
 
     updateDraft({
       policyDescription: policyDraft.description ?? "",
       policyActive: policyDraft.active ?? true,
       inputEventType: selectedEventType,
       targetAgentId: nextTargetAgentId,
-      outputEventType: nextOutputEventType
+      outputEventType: draft.outputEventType
     });
   };
 
@@ -2268,17 +2732,18 @@ function WorkflowOrchestratorView({
   };
 
   const handleAgentSaved = (agent: Agent) => {
+    const operation = data.operations.find((candidate) => candidate.agentId === agent.id);
     updateDraft({
-      targetAgentId: agent.id,
-      outputEventType: findOutputEventDefinition(agent.id, activeDefinitions)?.eventType ?? draft.outputEventType
+      targetAgentId: operation?.id ?? draft.targetAgentId,
+      outputEventType: draft.outputEventType
     });
   };
 
   const handleAgentDeleted = (agentId: string) => {
-    const nextAgent = data.agents.find((candidate) => candidate.id !== agentId);
+    const nextAgent = data.operations.find((candidate) => candidate.agentId !== agentId);
     updateDraft({
       targetAgentId: nextAgent?.id ?? "",
-      outputEventType: nextAgent ? findOutputEventDefinition(nextAgent.id, activeDefinitions)?.eventType ?? draft.outputEventType : draft.outputEventType
+      outputEventType: draft.outputEventType
     });
   };
 
@@ -2292,7 +2757,7 @@ function WorkflowOrchestratorView({
       const output = definitionByEventType.get(draft.outputEventType);
       if (!output) throw new Error("Selected output event is not available.");
 
-      const agentName = agentById.get(draft.targetAgentId)?.name ?? draft.targetAgentId;
+      const agentName = operationById.get(draft.targetAgentId)?.name ?? draft.targetAgentId;
       const fallbackDescription = `Route ${draft.inputEventType} to ${agentName}.`;
       const isNewWorkflow = selectedPolicyId === newWorkflowId || !selectedPolicy;
       const basePolicy = selectedPolicyId === newWorkflowId || !selectedPolicy
@@ -2305,7 +2770,7 @@ function WorkflowOrchestratorView({
         active: draft.policyActive
       }, draft));
 
-      await saveEventDefinition(mergeReadyProducer(output, draft.targetAgentId));
+      await saveEventDefinition(mergeReadyProducer(output));
       setCreatingWorkflow(false);
       setSelectedPolicyId(savedPolicy.id);
       setDraft((current) => ({
@@ -2437,6 +2902,119 @@ function WorkflowOrchestratorView({
           </div>
         </CardContent>
       </Card>
+      <DerivedWorkflowGraph data={data} />
+    </div>
+  );
+}
+
+type DerivedWorkflowGraphRow = {
+  id: string;
+  inputEventType: string;
+  inputContract?: EventDefinition["dataContract"];
+  routingPolicy: Policy;
+  operation?: AppData["operations"][number];
+  emissionPolicy?: AppData["emissionPolicies"][number];
+  outputEventType: string;
+  outputContract?: EventDefinition["dataContract"];
+};
+
+function DerivedWorkflowGraph({ data }: { data: AppData }) {
+  const operationByKey = useMemo(
+    () => new Map(data.operations.map((operation) => [versionedRefKey(operation), operation])),
+    [data.operations]
+  );
+  const eventByType = useMemo(
+    () => new Map(data.eventDefinitions.map((definition) => [definition.eventType, definition])),
+    [data.eventDefinitions]
+  );
+  const rows = useMemo<DerivedWorkflowGraphRow[]>(() => data.policies.flatMap((policy): DerivedWorkflowGraphRow[] => {
+    const operation = operationByKey.get(versionedRefKey(policy.dispatch.operation));
+    const emissions = data.emissionPolicies.filter((emission) =>
+      emission.observes.operation.id === policy.dispatch.operation.id &&
+      emission.observes.operation.version === policy.dispatch.operation.version
+    );
+    if (emissions.length === 0) {
+      return [{
+        id: `${policy.id}:none`,
+        inputEventType: policy.consumes.eventType,
+        inputContract: eventByType.get(policy.consumes.eventType)?.dataContract,
+        routingPolicy: policy,
+        operation,
+        emissionPolicy: undefined,
+        outputEventType: "",
+        outputContract: undefined
+      }];
+    }
+    return emissions.flatMap((emission) => emission.emissions.map((slot) => ({
+      id: `${policy.id}:${emission.id}:${slot.slot}`,
+      inputEventType: policy.consumes.eventType,
+      inputContract: eventByType.get(policy.consumes.eventType)?.dataContract,
+      routingPolicy: policy,
+      operation,
+      emissionPolicy: emission,
+      outputEventType: slot.eventType,
+      outputContract: eventByType.get(slot.eventType)?.dataContract
+    })));
+  }), [data.emissionPolicies, data.policies, eventByType, operationByKey]);
+
+  return (
+    <Panel title="Derived workflow graph" description="Built from event definitions, routing policies, operations, and emission policies." icon={<Workflow data-icon="inline-start" />}>
+      {rows.length === 0 ? (
+        <EmptyState title="No workflow edges derived." action="Create routing and emission policies to populate the graph." />
+      ) : (
+        <div className="grid gap-3">
+          {rows.map((row) => (
+            <div key={row.id} className="grid gap-2 rounded-md border bg-background p-3 text-sm xl:grid-cols-[1fr_auto_1fr_auto_1fr] xl:items-center">
+              <WorkflowGraphNode
+                label="Event"
+                title={row.inputEventType}
+                detail={row.inputContract ? `contract ${contractDisplay(row.inputContract)}` : "no data contract"}
+                active={eventByType.get(row.inputEventType)?.active}
+              />
+              <WorkflowGraphEdge label="Routing" title={row.routingPolicy.name || row.routingPolicy.id} active={row.routingPolicy.active} />
+              <WorkflowGraphNode
+                label="Operation"
+                title={row.operation?.name ?? row.routingPolicy.dispatch.operation.id}
+                detail={`${row.routingPolicy.dispatch.operation.id}@${row.routingPolicy.dispatch.operation.version} · ${row.operation ? `${contractDisplay(row.operation.inputContract)} / ${contractDisplay(row.operation.outputContract)}` : "missing operation"}`}
+                active={row.operation?.active}
+              />
+              <WorkflowGraphEdge label="Emission" title={row.emissionPolicy?.name ?? "No emission policy"} active={row.emissionPolicy?.active} />
+              <WorkflowGraphNode
+                label="Event"
+                title={row.outputEventType || "No emitted event"}
+                detail={row.outputContract ? `contract ${contractDisplay(row.outputContract)}` : "no data contract"}
+                active={row.outputEventType ? eventByType.get(row.outputEventType)?.active : false}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function WorkflowGraphNode({ label, title, detail, active }: { label: string; title: string; detail: string; active?: boolean }) {
+  return (
+    <div className="grid min-w-0 gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline" className="rounded-md">{label}</Badge>
+        {active === false ? <Badge variant="destructive" className="rounded-md">disabled</Badge> : null}
+      </div>
+      <div className="truncate font-medium">{title}</div>
+      <div className="truncate font-mono text-xs text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function WorkflowGraphEdge({ label, title, active }: { label: string; title: string; active?: boolean }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-muted-foreground xl:justify-center">
+      <ArrowRight className="size-4 shrink-0" />
+      <div className="min-w-0">
+        <div className="text-xs">{label}</div>
+        <div className="truncate text-xs font-medium text-foreground">{title}</div>
+        {active === false ? <div className="text-xs text-destructive">disabled</div> : null}
+      </div>
     </div>
   );
 }
@@ -2472,7 +3050,7 @@ function PoliciesView(props: ViewProps & {
           <WorkflowNode
             node="policy"
             selected
-            value={policyDisplayName(eventTypesForPolicy(form)[0] ?? "", policyTargetForForm(form, data.agents[0]?.id ?? ""))}
+            value={policyDisplayName(eventTypesForPolicy(form)[0] ?? "", policyTargetForForm(form, data.operations[0]?.id ?? ""))}
             onSelect={() => undefined}
             headerActions={headerActions}
             showSummaryLabel={false}
@@ -2522,15 +3100,15 @@ function PolicyEditor({
     [data.eventDefinitions]
   );
   const createPolicyTemplate = useCallback(
-    () => newPolicyTemplate ? newPolicyTemplate() : policyTemplate(data.agents[0]?.id ?? ""),
-    [data.agents, newPolicyTemplate]
+    () => newPolicyTemplate ? newPolicyTemplate() : policyTemplate(data.operations[0]?.id ?? ""),
+    [data.operations, newPolicyTemplate]
   );
   const [form, setForm] = useState<Partial<Policy>>(policy ?? createPolicyTemplate());
   const [selectedEventType, setSelectedEventType] = useState(eventTypesForPolicy(policy ?? {})[0] ?? "");
   const [error, setError] = useState("");
   const activeEventTypeSet = useMemo(() => new Set(activeDefinitions.map((definition) => definition.eventType)), [activeDefinitions]);
   const invalidSelectedEventType = selectedEventType && !activeEventTypeSet.has(selectedEventType) ? selectedEventType : "";
-  const targetAgentId = policyTargetForForm(form, data.agents[0]?.id ?? "");
+  const targetAgentId = policyTargetForForm(form, data.operations[0]?.id ?? "");
   const automaticPolicyName = buildPolicyName(selectedEventType, targetAgentId);
 
   useEffect(() => {
@@ -2579,20 +3157,15 @@ function PolicyEditor({
     setError("");
     try {
       if (!selectedEventType) throw new Error("Select exactly one event type for this policy.");
-      if (!targetAgentId) throw new Error("Select an agent.");
-      const advancedMatch = advancedPolicyMatchForForm(form);
-      delete advancedMatch.eventTypes;
-      const match = { ...advancedMatch, eventTypes: [selectedEventType] };
+      if (!targetAgentId) throw new Error("Select an operation.");
       const saved = await save("policies", {
         ...form,
         name: automaticPolicyName,
-        match,
-        action: { type: "start_agent_run", targetAgentId },
-        targetAgentId,
-        projectId: typeof match.projectId === "string" ? match.projectId : "*",
-        source: typeof match.source === "string" ? match.source : "*",
-        eventTypes: match.eventTypes ?? [],
-        payloadMetadata: {}
+        consumes: { eventType: selectedEventType },
+        dispatch: { operation: { id: targetAgentId, version: form.dispatch?.operation?.version ?? 1 } },
+        input: form.input ?? { object: {} },
+        selection: form.selection ?? { mode: "fanout" },
+        onInvalidInput: form.onInvalidInput ?? "skip"
       });
       onSaved?.(saved);
     } catch (err) {
@@ -2600,7 +3173,7 @@ function PolicyEditor({
     }
   };
 
-  const saveDisabled = data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType);
+  const saveDisabled = data.operations.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType);
   const actions = (
     <CrudActions
       formId={formId}
@@ -2654,13 +3227,21 @@ function PolicyEditor({
             />
           )}
           <SelectField
-            label="Target agent"
+            label="Target operation"
             value={targetAgentId}
-            options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
-            onChange={(targetAgentId) => updateForm({ targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
+            options={data.operations.map((operation) => ({ value: operation.id, label: operation.name }))}
+            onChange={(targetAgentId) => updateForm({ dispatch: { operation: { id: targetAgentId, version: form.dispatch?.operation?.version ?? 1 } } })}
             compact={embedded}
           />
         </FieldGroup>
+        {form.id ? (
+          <RoutingPolicyDryRunPanel
+            policy={form}
+            eventType={selectedEventType}
+            data={data}
+            compact={embedded}
+          />
+        ) : null}
       </form>
     </>
   );
@@ -2681,6 +3262,70 @@ function PolicyEditor({
       <Panel title={form.id ? "Update policy" : "Create policy"} icon={<GitBranch data-icon="inline-start" />} action={actions}>
         {content}
       </Panel>
+    </div>
+  );
+}
+
+function RoutingPolicyDryRunPanel({
+  policy,
+  eventType,
+  data,
+  compact = false
+}: {
+  policy: Partial<Policy>;
+  eventType: string;
+  data: AppData;
+  compact?: boolean;
+}) {
+  const eventDefinition = data.eventDefinitions.find((definition) => definition.eventType === eventType);
+  const sampleData = eventDefinition?.examples?.[0] ?? eventDefinition?.payloadExample ?? {};
+  const [subject, setSubject] = useState("dry-run");
+  const [dataText, setDataText] = useState(readJson(sampleData));
+  const [result, setResult] = useState<unknown>();
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setDataText(readJson(sampleData));
+    setResult(undefined);
+    setError("");
+  }, [eventType, sampleData]);
+
+  const run = async () => {
+    setError("");
+    setResult(undefined);
+    try {
+      if (!policy.id) throw new Error("Save the routing policy before running a dry-run.");
+      if (!eventType) throw new Error("Select an event type.");
+      const payload = parsePayload(dataText);
+      const response = await api.dryRunRoutingPolicy(policy.id, {
+        projectId: data.projects[0]?.id ?? "project",
+        eventType,
+        source: "dry-run",
+        subject,
+        payload,
+        tags: []
+      });
+      setResult(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to run routing policy test.");
+    }
+  };
+
+  return (
+    <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">Dry-run routing</h3>
+        <Button type="button" size="sm" variant="outline" onClick={() => void run()}>
+          <Eye data-icon="inline-start" />
+          Run
+        </Button>
+      </div>
+      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      <TextField label="Subject" compact={compact} value={subject} onChange={setSubject} />
+      <TextAreaField label="Event data JSON" rows={compact ? 5 : 8} compact={compact} value={dataText} onChange={setDataText} />
+      {result !== undefined ? (
+        <pre className="max-h-72 overflow-auto rounded-md bg-background p-3 text-xs leading-relaxed">{readJson(result)}</pre>
+      ) : null}
     </div>
   );
 }
@@ -2773,24 +3418,29 @@ function EventDefinitionEditor({
   const embedded = variant === "embedded";
   const enabledActionVisible = showEnabledAction ?? !embedded;
   const [definitionForm, setDefinitionForm] = useState<Partial<EventDefinition>>(eventDefinition ?? eventDefinitionTemplate());
-  const [producersText, setProducersText] = useState(readJson(definitionForm.producers ?? []));
-  const [payloadExampleText, setPayloadExampleText] = useState(readJson(definitionForm.payloadExample ?? {}));
+  const initialExamples = definitionForm.examples?.length
+    ? definitionForm.examples
+    : definitionForm.payloadExample ? [definitionForm.payloadExample] : [];
+  const [examplesText, setExamplesText] = useState(readJson(initialExamples));
   const [definitionError, setDefinitionError] = useState("");
+  const eventDataContracts = useMemo(
+    () => data.contracts.filter((contract) => contract.kind === "event-data" && contract.active),
+    [data.contracts]
+  );
 
   const activeEventTypes = useMemo(
     () => new Set(data.eventDefinitions.filter((definition) => definition.active).map((definition) => definition.eventType)),
     [data.eventDefinitions]
   );
   const missingPolicyEventTypes = useMemo(() => {
-    const policyTypes = data.policies.flatMap((policy) => policy.match?.eventTypes ?? policy.eventTypes ?? []);
+    const policyTypes = data.policies.flatMap((policy) => policy.consumes?.eventType ? [policy.consumes.eventType] : []);
     return [...new Set(policyTypes)].filter((eventType) => eventType && !activeEventTypes.has(eventType));
   }, [activeEventTypes, data.policies]);
 
   useEffect(() => {
     const next = eventDefinition ?? eventDefinitionTemplate();
     setDefinitionForm(next);
-    setProducersText(readJson(next.producers ?? []));
-    setPayloadExampleText(readJson(next.payloadExample ?? {}));
+    setExamplesText(readJson(next.examples?.length ? next.examples : next.payloadExample ? [next.payloadExample] : []));
     setDefinitionError("");
   }, [eventDefinition]);
 
@@ -2801,8 +3451,9 @@ function EventDefinitionEditor({
         ...definitionForm,
         source: definitionForm.source ?? eventDefinition?.source ?? eventDefinitionTemplate().source,
         tags: definitionForm.tags ?? [],
-        producers: parseEventProducers(producersText),
-        payloadExample: parsePayload(payloadExampleText)
+        examples: parseEventExamples(examplesText),
+        producers: undefined,
+        payloadExample: undefined
       });
       onSaved?.(saved);
       if (!onSaved && saved.relativePath) navigate?.(eventDefinitionDocumentPath(saved.relativePath));
@@ -2814,8 +3465,7 @@ function EventDefinitionEditor({
   const newDefinition = () => {
     const next = eventDefinitionTemplate();
     setDefinitionForm(next);
-    setProducersText(readJson(next.producers ?? []));
-    setPayloadExampleText(readJson(next.payloadExample ?? {}));
+    setExamplesText(readJson(next.examples ?? []));
     setDefinitionError("");
     if (onNew) onNew();
     else navigate?.("/events");
@@ -2868,8 +3518,22 @@ function EventDefinitionEditor({
           <TextField label="Name" required compact={embedded} value={definitionForm.name ?? ""} onChange={(name) => setDefinitionForm({ ...definitionForm, name })} />
           <TextAreaField label="Description" rows={embedded ? 2 : 3} compact={embedded} value={definitionForm.description ?? ""} onChange={(description) => setDefinitionForm({ ...definitionForm, description })} />
           <TextField label="Event type" required compact={embedded} value={definitionForm.eventType ?? ""} onChange={(eventType) => setDefinitionForm({ ...definitionForm, eventType })} />
-          <TextAreaField label="Producers JSON" rows={embedded ? 5 : 7} compact={embedded} value={producersText} onChange={setProducersText} />
-          <TextAreaField label="Payload example JSON" rows={embedded ? 5 : 7} compact={embedded} value={payloadExampleText} onChange={setPayloadExampleText} />
+          <TextField label="Source" compact={embedded} value={definitionForm.source ?? ""} onChange={(source) => setDefinitionForm({ ...definitionForm, source })} />
+          <TextField label="Tags" compact={embedded} value={(definitionForm.tags ?? []).join(", ")} onChange={(value) => setDefinitionForm({ ...definitionForm, tags: value.split(",").map((tag) => tag.trim()).filter(Boolean) })} />
+          <SelectField
+            label="Data contract"
+            value={versionedRefKey(definitionForm.dataContract)}
+            options={[
+              { value: noneValue, label: "No contract" },
+              ...eventDataContracts.map((contract) => ({
+                value: versionedRefKey(contract),
+                label: `${contract.name} · ${contract.id}@${contract.version}`
+              }))
+            ]}
+            onChange={(value) => setDefinitionForm({ ...definitionForm, dataContract: parseVersionedRefKey(value) })}
+            compact={embedded}
+          />
+          <TextAreaField label="Examples JSON" rows={embedded ? 5 : 7} compact={embedded} value={examplesText} onChange={setExamplesText} />
           <TextAreaField label="Body" rows={embedded ? 3 : 4} compact={embedded} value={definitionForm.body ?? ""} onChange={(body) => setDefinitionForm({ ...definitionForm, body })} />
         </FieldGroup>
       </form>
@@ -2985,13 +3649,59 @@ function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promis
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={selectedRun.status} />
                 <Badge variant="outline" className="rounded-md font-mono">{selectedRun.agentRole}</Badge>
+                {selectedRun.operationId ? (
+                  <Badge variant="outline" className="rounded-md font-mono">{selectedRun.operationId}@{selectedRun.operationVersion ?? "?"}</Badge>
+                ) : null}
               </div>
               <div className="font-mono text-xs text-muted-foreground break-all">{selectedRun.runId}</div>
+              <div className="grid gap-1 text-xs text-muted-foreground">
+                <div>Trigger: <span className="font-mono">{selectedRun.triggerEventId}</span></div>
+                <div>Correlation: <span className="font-mono">{selectedRun.correlationId ?? "none"}</span></div>
+                <div>Policy: <span className="font-mono">{selectedRun.policyId}@{selectedRun.policyVersion}</span></div>
+              </div>
             </div>
             <div className="grid gap-2">
-              <h3 className="text-sm font-medium">Outcome</h3>
+              <h3 className="text-sm font-medium">Input</h3>
+              <div className="text-xs text-muted-foreground">
+                Contract <span className="font-mono">{selectedRun.inputContractId ?? "none"}@{selectedRun.inputContractVersion ?? "?"}</span>
+                {selectedRun.inputContractHash ? <span className="ml-2 font-mono">{selectedRun.inputContractHash}</span> : null}
+              </div>
               <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
-                {selectedRun.outcome ? readJson(selectedRun.outcome) : "No outcome yet."}
+                {selectedRun.inputJson ? readJson(selectedRun.inputJson) : "No input snapshot."}
+              </pre>
+            </div>
+            <div className="grid gap-2">
+              <h3 className="text-sm font-medium">Output</h3>
+              <div className="text-xs text-muted-foreground">
+                Contract <span className="font-mono">{selectedRun.outputContractId ?? "none"}@{selectedRun.outputContractVersion ?? "?"}</span>
+                {selectedRun.outputContractHash ? <span className="ml-2 font-mono">{selectedRun.outputContractHash}</span> : null}
+              </div>
+              <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
+                {selectedRun.outputJson ? readJson(selectedRun.outputJson) : selectedRun.outcome ? readJson(selectedRun.outcome) : "No output yet."}
+              </pre>
+            </div>
+            <div className="grid gap-2">
+              <h3 className="text-sm font-medium">Routing decision</h3>
+              <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
+                {selectedRun.routingDecisionJson ? readJson(selectedRun.routingDecisionJson) : "No routing decision snapshot."}
+              </pre>
+            </div>
+            <div className="grid gap-2">
+              <h3 className="text-sm font-medium">Emission decisions</h3>
+              <pre className="max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
+                {selectedRun.emissionDecisionsJson ? readJson(selectedRun.emissionDecisionsJson) : "No emission decisions."}
+              </pre>
+            </div>
+            <div className="grid gap-2">
+              <h3 className="text-sm font-medium">Loop context</h3>
+              <pre className="max-h-48 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
+                {readJson({
+                  loopInstanceId: selectedRun.loopInstanceId,
+                  loopDefinitionId: selectedRun.loopDefinitionId,
+                  loopDefinitionVersion: selectedRun.loopDefinitionVersion,
+                  stepId: selectedRun.stepId,
+                  iteration: selectedRun.iteration
+                })}
               </pre>
             </div>
             <div className="grid gap-2">
@@ -3193,5 +3903,5 @@ type ViewProps = {
   data: AppData;
   project?: Project;
   save: <T extends SaveCollection>(collection: T, item: Partial<AppData[T][number]>) => Promise<AppData[T][number]>;
-  remove: (collection: SaveCollection | "events", id: string) => Promise<void>;
+  remove: (collection: SaveCollection, id: string) => Promise<void>;
 };
