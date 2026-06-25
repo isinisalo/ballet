@@ -272,11 +272,6 @@ const policyMatchForForm = (policy: Partial<Policy>): NonNullable<Policy["match"
 const policyTargetForForm = (policy: Partial<Policy>, fallback: string) =>
   policy.action?.type === "start_agent_run" && policy.action.targetAgentId ? policy.action.targetAgentId : policy.targetAgentId ?? fallback;
 
-const parsePolicyMatch = (value: string): NonNullable<Policy["match"]> => {
-  const parsed = parsePayload(value);
-  return parsed as NonNullable<Policy["match"]>;
-};
-
 const eventTypesForPolicy = (policy: Partial<Policy>): string[] => policy.match?.eventTypes ?? policy.eventTypes ?? [];
 
 const advancedPolicyMatchForForm = (policy: Partial<Policy>): NonNullable<Policy["match"]> => {
@@ -2557,7 +2552,6 @@ function PolicyEditor({
   );
   const [form, setForm] = useState<Partial<Policy>>(policy ?? createPolicyTemplate());
   const [selectedEventType, setSelectedEventType] = useState(eventTypesForPolicy(policy ?? {})[0] ?? "");
-  const [advancedMatchText, setAdvancedMatchText] = useState("");
   const [error, setError] = useState("");
   const activeEventTypeSet = useMemo(() => new Set(activeDefinitions.map((definition) => definition.eventType)), [activeDefinitions]);
   const invalidSelectedEventType = selectedEventType && !activeEventTypeSet.has(selectedEventType) ? selectedEventType : "";
@@ -2567,7 +2561,6 @@ function PolicyEditor({
     const nextEventTypes = eventTypesForPolicy(next);
     setForm(next);
     setSelectedEventType(nextEventTypes[0] ?? activeDefinitions[0]?.eventType ?? "");
-    setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
     setError("");
   }, [activeDefinitions, createPolicyTemplate, policy]);
 
@@ -2587,7 +2580,6 @@ function PolicyEditor({
     const nextSelectedEventType = eventTypesForPolicy(next)[0] ?? activeDefinitions[0]?.eventType ?? "";
     setForm(next);
     setSelectedEventType(nextSelectedEventType);
-    setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
     setError("");
     onDraftChange?.(next, nextSelectedEventType);
     onNew?.();
@@ -2601,7 +2593,6 @@ function PolicyEditor({
     const nextSelectedEventType = eventTypesForPolicy(next)[0] ?? activeDefinitions[0]?.eventType ?? "";
     setForm(next);
     setSelectedEventType(nextSelectedEventType);
-    setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
     setError("");
     onDraftChange?.(next, nextSelectedEventType);
     onDeleted?.(deletedId);
@@ -2611,7 +2602,7 @@ function PolicyEditor({
     setError("");
     try {
       if (!selectedEventType) throw new Error("Select exactly one event type for this policy.");
-      const advancedMatch = parsePolicyMatch(advancedMatchText);
+      const advancedMatch = advancedPolicyMatchForForm(form);
       delete advancedMatch.eventTypes;
       const match = { ...advancedMatch, eventTypes: [selectedEventType] };
       const targetAgentId = policyTargetForForm(form, data.agents[0]?.id ?? "");
@@ -2680,7 +2671,6 @@ function PolicyEditor({
               compact={embedded}
             />
           )}
-          <TextAreaField label="Advanced match JSON" rows={embedded ? 5 : 8} compact={embedded} value={advancedMatchText} onChange={setAdvancedMatchText} />
         </FieldGroup>
       </form>
     </>
