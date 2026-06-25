@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isMap, parseDocument, stringify as stringifyYaml } from "yaml";
@@ -648,7 +649,7 @@ function SidebarInlineAction({
     <span
       role="button"
       tabIndex={0}
-      className="ml-1 inline-flex size-5 shrink-0 items-center justify-center rounded-sm bg-emerald-500/15 text-emerald-600 opacity-95 hover:bg-emerald-500/25 hover:text-emerald-700 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:text-emerald-400 dark:hover:text-emerald-300 group-data-[collapsible=icon]:hidden"
+      className="ml-1 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm bg-emerald-500/15 text-emerald-600 opacity-95 hover:bg-emerald-500/25 hover:text-emerald-700 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:text-emerald-400 dark:hover:text-emerald-300 group-data-[collapsible=icon]:hidden"
       aria-label={label}
       title={label}
       onClick={(event) => {
@@ -2005,7 +2006,16 @@ function WorkflowAgentEditor({
     />
   );
   const saveAction = <SaveAction formId={formId} label="Save agent" disabled={!form.name?.trim()} />;
-  const headerActions = <HeaderCrudActions saveAction={saveAction} deleteLabel="Delete agent" canDelete={Boolean(form.id)} onDelete={() => void deleteAgent()} />;
+  const headerActions = (
+    <HeaderCrudActions
+      saveAction={saveAction}
+      deleteLabel="Delete agent"
+      deleteType="agent"
+      resourceName={form.name}
+      canDelete={Boolean(form.id)}
+      onDelete={() => void deleteAgent()}
+    />
+  );
 
   const content = (
     <div className="grid gap-3">
@@ -2604,7 +2614,16 @@ function PolicyEditor({
     />
   );
   const saveAction = <SaveAction formId={formId} label="Save policy" disabled={saveDisabled} />;
-  const headerActions = <HeaderCrudActions saveAction={saveAction} deleteLabel="Delete policy" canDelete={Boolean(form.id)} onDelete={() => void deletePolicy()} />;
+  const headerActions = (
+    <HeaderCrudActions
+      saveAction={saveAction}
+      deleteLabel="Delete policy"
+      deleteType="policy"
+      resourceName={automaticPolicyName}
+      canDelete={Boolean(form.id)}
+      onDelete={() => void deletePolicy()}
+    />
+  );
 
   const content = (
     <>
@@ -2822,7 +2841,16 @@ function EventDefinitionEditor({
     />
   );
   const saveAction = <SaveAction formId={formId} label="Save definition" />;
-  const headerActions = <HeaderCrudActions saveAction={saveAction} deleteLabel="Delete event definition" canDelete={Boolean(definitionForm.id)} onDelete={deleteDefinition} />;
+  const headerActions = (
+    <HeaderCrudActions
+      saveAction={saveAction}
+      deleteLabel="Delete event definition"
+      deleteType="event definition"
+      resourceName={definitionForm.name || definitionForm.eventType}
+      canDelete={Boolean(definitionForm.id)}
+      onDelete={deleteDefinition}
+    />
+  );
 
   const content = (
     <>
@@ -3001,7 +3029,7 @@ function SaveAction({ formId, label, disabled = false }: { formId: string; label
     <Button
       type="submit"
       size="icon-sm"
-      className="bg-primary text-primary-foreground hover:bg-emerald-600 hover:text-white focus-visible:border-emerald-500/60 focus-visible:ring-emerald-500/30 dark:hover:bg-emerald-500"
+      className="cursor-pointer bg-primary text-primary-foreground hover:bg-emerald-600 hover:text-white focus-visible:border-emerald-500/60 focus-visible:ring-emerald-500/30 dark:hover:bg-emerald-500"
       form={formId}
       disabled={disabled}
       aria-label={label}
@@ -3016,34 +3044,109 @@ function SaveAction({ formId, label, disabled = false }: { formId: string; label
 function HeaderCrudActions({
   saveAction,
   deleteLabel,
+  deleteType,
+  resourceName,
   canDelete,
   onDelete
 }: {
   saveAction: ReactNode;
   deleteLabel: string;
+  deleteType: string;
+  resourceName?: string;
   canDelete: boolean;
   onDelete: () => void;
 }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   return (
     <div className="flex items-center justify-end gap-2">
       {saveAction}
       {canDelete ? (
-        <Button
-          type="button"
-          size="icon-sm"
-          variant="destructive"
-          aria-label={deleteLabel}
-          title={deleteLabel}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onDelete();
-          }}
-        >
-          <Trash2 data-icon="inline-start" />
-        </Button>
+        <>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="destructive"
+            className="cursor-pointer"
+            aria-label={deleteLabel}
+            title={deleteLabel}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setConfirmOpen(true);
+            }}
+          >
+            <Trash2 data-icon="inline-start" />
+          </Button>
+          <DeleteConfirmDialog
+            open={confirmOpen}
+            onOpenChange={setConfirmOpen}
+            deleteType={deleteType}
+            resourceName={resourceName}
+            onConfirm={onDelete}
+          />
+        </>
       ) : null}
     </div>
+  );
+}
+
+function DeleteConfirmDialog({
+  open,
+  onOpenChange,
+  deleteType,
+  resourceName,
+  onConfirm
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  deleteType: string;
+  resourceName?: string;
+  onConfirm: () => void;
+}) {
+  const trimmedResourceName = resourceName?.trim();
+  const fallbackName = `this ${deleteType}`;
+  const displayedName = trimmedResourceName || fallbackName;
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <DialogPrimitive.Content
+          className="fixed left-1/2 top-1/2 z-50 grid w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-divider-strong bg-card p-4 text-card-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="grid gap-1.5">
+            <DialogPrimitive.Title className="text-sm font-semibold text-foreground">
+              Delete {deleteType}?
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Description className="text-sm leading-relaxed text-muted-foreground">
+              Delete <span className="font-medium text-foreground">{displayedName}</span>? This action cannot be undone.
+            </DialogPrimitive.Description>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <DialogPrimitive.Close asChild>
+              <Button type="button" variant="outline" className="cursor-pointer">
+                Cancel
+              </Button>
+            </DialogPrimitive.Close>
+            <Button
+              type="button"
+              variant="destructive"
+              className="cursor-pointer"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onOpenChange(false);
+                onConfirm();
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
