@@ -1359,7 +1359,7 @@ export function App() {
                   removeEventDefinition={removeEventDefinition}
                 />
               ) : null}
-              {route.view === "agents" ? <AgentsView agent={selectedAgent} agents={data.agents} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
+              {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView runtime={selectedRuntime} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "policies" ? <PoliciesView data={data} project={project} policy={selectedPolicy} save={save} remove={remove} navigate={navigate} /> : null}
@@ -1484,25 +1484,17 @@ function AdrsPage({ project, selectedAdr }: { project?: Project; selectedAdr?: A
 
 function AgentsView({
   agent,
-  agents,
   runtimes,
   save,
   remove,
   navigate
 }: {
   agent?: Agent;
-  agents: Agent[];
   runtimes: Runtime[];
   save: ViewProps["save"];
   remove: ViewProps["remove"];
   navigate: (path: string) => void;
 }) {
-  const agentOptions = workflowAgentOptions(agents);
-  const selectAgent = (agentId: string) => {
-    const selectedAgent = agents.find((candidate) => candidate.id === agentId);
-    if (selectedAgent?.relativePath) navigate(agentDocumentPath(selectedAgent.relativePath));
-  };
-
   return (
     <div className="grid gap-4 xl:max-w-3xl">
       <WorkflowAgentEditor
@@ -1518,16 +1510,14 @@ function AgentsView({
           <WorkflowNode
             node="agent"
             selected
-            value={form.id ?? ""}
-            options={agentOptions}
-            onChange={selectAgent}
+            value={form.name ?? form.id ?? ""}
             onSelect={() => undefined}
             footerActions={actions}
             showSummaryLabel={false}
+            showEditorValue={false}
             showEditorHeader={false}
             compactSummary
             inlineSummary
-            summarySelect
           >
             {content}
           </WorkflowNode>
@@ -1675,12 +1665,6 @@ const workflowEventOptions = (definitions: EventDefinition[]) =>
   definitions.map((definition) => ({
     value: definition.eventType,
     label: `${definition.eventType} · ${definition.name}`
-  }));
-
-const workflowAgentOptions = (agents: Agent[]) =>
-  agents.map((agent) => ({
-    value: agent.id,
-    label: `${agent.name}${agent.enabled ? "" : " · disabled"}`
   }));
 
 const workflowOptionLabel = (options: Array<{ value: string; label: string }>, value: string) =>
