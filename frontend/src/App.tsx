@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isMap, parseDocument, stringify as stringifyYaml } from "yaml";
@@ -1195,12 +1195,16 @@ export function App() {
     [data.runtimes, route.documentPath]
   );
   const selectedPolicy = useMemo(
-    () => data.policies.find((policy) => policy.relativePath === route.documentPath) ?? data.policies[0],
-    [data.policies, route.documentPath]
+    () => route.view === "policies" && !route.documentPath
+      ? undefined
+      : data.policies.find((policy) => policy.relativePath === route.documentPath) ?? data.policies[0],
+    [data.policies, route.documentPath, route.view]
   );
   const selectedEventDefinition = useMemo(
-    () => data.eventDefinitions.find((definition) => definition.relativePath === route.documentPath) ?? data.eventDefinitions[0],
-    [data.eventDefinitions, route.documentPath]
+    () => route.view === "events" && !route.documentPath
+      ? undefined
+      : data.eventDefinitions.find((definition) => definition.relativePath === route.documentPath) ?? data.eventDefinitions[0],
+    [data.eventDefinitions, route.documentPath, route.view]
   );
 
   useEffect(() => {
@@ -1363,7 +1367,7 @@ export function App() {
               {route.view === "agents" ? <AgentsView agent={selectedAgent} agents={data.agents} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView runtime={selectedRuntime} save={save} remove={remove} navigate={navigate} /> : null}
-              {route.view === "policies" ? <PoliciesView data={data} project={project} policy={selectedPolicy} save={save} remove={remove} /> : null}
+              {route.view === "policies" ? <PoliciesView data={data} project={project} policy={selectedPolicy} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "events" ? (
                 <EventsView
                   data={data}
@@ -1528,6 +1532,7 @@ function AgentsView({
             showEditorHeader={false}
             compactSummary
             inlineSummary
+            summarySelect
           >
             {content}
           </WorkflowNode>
@@ -1716,6 +1721,7 @@ function WorkflowNode({
   showEditorHeader = true,
   compactSummary = false,
   inlineSummary = false,
+  summarySelect = false,
   children
 }: {
   node: WorkflowNodeId;
@@ -1730,44 +1736,96 @@ function WorkflowNode({
   showEditorHeader?: boolean;
   compactSummary?: boolean;
   inlineSummary?: boolean;
+  summarySelect?: boolean;
   children?: ReactNode;
 }) {
   const config = workflowNodeConfig[node];
   const Icon = config.icon;
   const hasSelect = Boolean(options && onChange);
+  const renderSelect = (className?: string) => {
+    if (!hasSelect || !options) return null;
+    if (options.length === 0) {
+      return (
+        <span className={cn("flex h-8 w-full min-w-0 items-center justify-center rounded-md border border-border bg-background px-2 text-xs text-muted-foreground", className)}>
+          No options
+        </span>
+      );
+    }
+
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className={cn("h-8 min-w-0 px-2 text-xs shadow-none [&>span]:truncate", className)}>
+          <SelectValue placeholder="Not selected" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    );
+  };
 
   return (
     <div
+      data-workflow-node="true"
       className={cn(
         "flex min-w-0 flex-col rounded-lg border border-border bg-card text-card-foreground transition md:basis-0 md:grow md:shrink",
         selected && "border-ring bg-accent/40 ring-2 ring-ring/30 md:grow-[2]"
       )}
     >
       <div className="relative">
-        <button
-          type="button"
-          className={cn(
-            "flex w-full min-w-0 rounded-lg px-3 outline-none transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40",
-            inlineSummary
-              ? "min-h-12 flex-row items-center justify-start gap-2 py-2 text-left"
-              : "flex-col items-center justify-center gap-2 text-center",
-            !inlineSummary && (compactSummary ? "min-h-20 py-3" : "min-h-24 py-4")
-          )}
-          aria-controls={workflowEditorId(node)}
-          aria-expanded={selected}
-          aria-pressed={selected}
-          onClick={onSelect}
-        >
-          <Icon className={cn("shrink-0 text-muted-foreground", inlineSummary ? "size-4" : "size-5")} aria-hidden="true" />
-          {showSummaryLabel ? (
-            <span className="max-w-full truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">
-              {config.label}
+        {summarySelect && hasSelect && selected ? (
+          <div
+            className={cn(
+              "flex w-full min-w-0 rounded-lg px-3 outline-none transition hover:bg-accent",
+              inlineSummary
+                ? "min-h-12 flex-row items-center justify-start gap-2 py-2 text-left"
+                : "flex-col items-center justify-center gap-2 text-center",
+              !inlineSummary && (compactSummary ? "min-h-20 py-3" : "min-h-24 py-4")
+            )}
+            aria-controls={workflowEditorId(node)}
+            aria-expanded={selected}
+            onClick={onSelect}
+          >
+            <Icon className={cn("shrink-0 text-muted-foreground", inlineSummary ? "size-4" : "size-5")} aria-hidden="true" />
+            {showSummaryLabel ? (
+              <span className="max-w-full truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">
+                {config.label}
+              </span>
+            ) : null}
+            {renderSelect("w-full flex-1 bg-background")}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={cn(
+              "flex w-full min-w-0 rounded-lg px-3 outline-none transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40",
+              inlineSummary
+                ? "min-h-12 flex-row items-center justify-start gap-2 py-2 text-left"
+                : "flex-col items-center justify-center gap-2 text-center",
+              !inlineSummary && (compactSummary ? "min-h-20 py-3" : "min-h-24 py-4")
+            )}
+            aria-controls={workflowEditorId(node)}
+            aria-expanded={selected}
+            aria-pressed={selected}
+            onClick={onSelect}
+          >
+            <Icon className={cn("shrink-0 text-muted-foreground", inlineSummary ? "size-4" : "size-5")} aria-hidden="true" />
+            {showSummaryLabel ? (
+              <span className="max-w-full truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">
+                {config.label}
+              </span>
+            ) : null}
+            <span className={cn("max-w-full truncate font-mono leading-none text-muted-foreground", inlineSummary ? "text-xs" : "text-[0.68rem]")}>
+              {workflowOptionLabel(options ?? [], value) || "Not selected"}
             </span>
-          ) : null}
-          <span className={cn("max-w-full truncate font-mono leading-none text-muted-foreground", inlineSummary ? "text-xs" : "text-[0.68rem]")}>
-            {workflowOptionLabel(options ?? [], value) || "Not selected"}
-          </span>
-        </button>
+          </button>
+        )}
       </div>
 
       <div
@@ -1785,31 +1843,12 @@ function WorkflowNode({
           </div>
         ) : null}
         <div className={cn("grid gap-3", showEditorHeader && "mt-3")}>
-          {hasSelect && options ? (
-            options.length > 0 ? (
-              <Select value={value} onValueChange={onChange}>
-                <SelectTrigger className="h-8 w-full min-w-0 px-2 text-xs shadow-none [&>span]:truncate">
-                  <SelectValue placeholder="Not selected" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            ) : (
-              <span className="flex h-8 w-full items-center justify-center rounded-md border border-border bg-background px-2 text-xs text-muted-foreground">
-                No options
-              </span>
-            )
+          {summarySelect ? null : hasSelect && options ? (
+            renderSelect("w-full")
           ) : (
             <span className="max-w-full truncate font-mono text-[0.68rem] leading-none text-muted-foreground">{value || "Not selected"}</span>
           )}
-          {children ? <div className="min-w-0 border-t border-divider-strong pt-3">{children}</div> : null}
+          {children ? <div className={cn("min-w-0", !summarySelect && "border-t border-divider-strong pt-3")}>{children}</div> : null}
         </div>
       </div>
       {selected && footerActions ? (
@@ -1823,7 +1862,7 @@ function WorkflowNode({
 
 function WorkflowConnector() {
   return (
-    <div className="flex h-6 shrink-0 items-center justify-center text-muted-foreground md:h-24 md:w-8" aria-hidden="true" data-workflow-connector="true">
+    <div className="flex h-6 shrink-0 items-center justify-center text-muted-foreground md:h-12 md:w-8" aria-hidden="true" data-workflow-connector="true">
       <ArrowDown className="size-5 md:hidden" />
       <ArrowRight className="hidden size-6 md:block" />
     </div>
@@ -2036,6 +2075,7 @@ function WorkflowOrchestratorView({
 }) {
   const [selectedNode, setSelectedNode] = useState<WorkflowNodeId | null>(null);
   const [error, setError] = useState("");
+  const selectedNodeRef = useRef<WorkflowNodeId | null>(null);
 
   const selectedPolicy = data.policies.find((policy) => policy.id === selectedPolicyId);
   const defaultPolicyId = workflows.find((workflow) => workflow.outputEventType)?.policy.id ?? data.policies[0]?.id ?? newWorkflowId;
@@ -2101,6 +2141,23 @@ function WorkflowOrchestratorView({
   const policyOptions = workflowPolicyOptions(data.policies);
   const agentOptions = workflowAgentOptions(data.agents);
   const policyValue = draft.policyId ?? selectedPolicyId;
+
+  useEffect(() => {
+    selectedNodeRef.current = selectedNode;
+  }, [selectedNode]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!selectedNodeRef.current) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('[data-workflow-node="true"], [data-radix-popper-content-wrapper], [role="listbox"]')) return;
+      setSelectedNode(null);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
 
   const updateDraft = (patch: Partial<WorkflowDraftState>) => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -2297,7 +2354,12 @@ function WorkflowOrchestratorView({
                     options={eventOptions}
                     onChange={selectInputEvent}
                     onSelect={() => setSelectedNode("input")}
-                    headerActions={actions}
+                    footerActions={actions}
+                    showSummaryLabel={false}
+                    showEditorHeader={false}
+                    compactSummary
+                    inlineSummary
+                    summarySelect
                   >
                     {content}
                   </WorkflowNode>
@@ -2321,7 +2383,12 @@ function WorkflowOrchestratorView({
                     options={policyOptions}
                     onChange={selectPolicy}
                     onSelect={() => setSelectedNode("policy")}
-                    headerActions={actions}
+                    footerActions={actions}
+                    showSummaryLabel={false}
+                    showEditorHeader={false}
+                    compactSummary
+                    inlineSummary
+                    summarySelect
                   >
                     {content}
                   </WorkflowNode>
@@ -2374,7 +2441,12 @@ function WorkflowOrchestratorView({
                     options={eventOptions}
                     onChange={selectOutputEvent}
                     onSelect={() => setSelectedNode("output")}
-                    headerActions={actions}
+                    footerActions={actions}
+                    showSummaryLabel={false}
+                    showEditorHeader={false}
+                    compactSummary
+                    inlineSummary
+                    summarySelect
                   >
                     {content}
                   </WorkflowNode>
@@ -2391,11 +2463,60 @@ function WorkflowOrchestratorView({
 function PoliciesView(props: ViewProps & {
   project?: Project;
   policy?: Partial<Policy>;
+  navigate: (path: string) => void;
   newPolicyTemplate?: () => Partial<Policy>;
   onSaved?: (policy: Policy) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
+  onDeleted?: (id: string) => void;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<Policy> }) => ReactNode;
 }) {
-  return <PolicyEditor {...props} />;
+  const { data, policy, navigate, onSaved, onDeleted, ...editorProps } = props;
+  const policyOptions = workflowPolicyOptions(data.policies);
+  const selectPolicy = (policyId: string) => {
+    if (policyId === newWorkflowId) {
+      navigate("/policies");
+      return;
+    }
+    const selectedPolicy = data.policies.find((candidate) => candidate.id === policyId);
+    if (selectedPolicy?.relativePath) navigate(policyDocumentPath(selectedPolicy.relativePath));
+  };
+
+  return (
+    <div className="grid gap-4 xl:max-w-3xl">
+      <PolicyEditor
+        {...editorProps}
+        data={data}
+        policy={policy}
+        variant="embedded"
+        onNew={() => navigate("/policies")}
+        onSaved={(saved) => {
+          onSaved?.(saved);
+          if (saved.relativePath) navigate(policyDocumentPath(saved.relativePath));
+        }}
+        onDeleted={(id) => {
+          onDeleted?.(id);
+          navigate("/policies");
+        }}
+        renderEmbedded={({ actions, content, form }) => (
+          <WorkflowNode
+            node="policy"
+            selected
+            value={form.id ?? newWorkflowId}
+            options={policyOptions}
+            onChange={selectPolicy}
+            onSelect={() => undefined}
+            footerActions={actions}
+            showSummaryLabel={false}
+            showEditorHeader={false}
+            compactSummary
+            inlineSummary
+            summarySelect
+          >
+            {content}
+          </WorkflowNode>
+        )}
+      />
+    </div>
+  );
 }
 
 function PolicyEditor({
@@ -2404,21 +2525,28 @@ function PolicyEditor({
   save,
   remove,
   newPolicyTemplate,
+  onNew,
   onSaved,
+  onDeleted,
   onDraftChange,
   renderEmbedded,
-  variant = "panel"
+  variant = "panel",
+  showEnabledAction
 }: ViewProps & {
   project?: Project;
   policy?: Partial<Policy>;
   newPolicyTemplate?: () => Partial<Policy>;
+  onNew?: () => void;
   onSaved?: (policy: Policy) => void;
+  onDeleted?: (id: string) => void;
   onDraftChange?: (policy: Partial<Policy>, selectedEventType: string) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<Policy> }) => ReactNode;
   variant?: "panel" | "embedded";
+  showEnabledAction?: boolean;
 }) {
   const formId = useId();
   const embedded = variant === "embedded";
+  const enabledActionVisible = showEnabledAction ?? !embedded;
   const activeDefinitions = useMemo(
     () => data.eventDefinitions.filter((definition) => definition.active && definition.eventType),
     [data.eventDefinitions]
@@ -2462,6 +2590,21 @@ function PolicyEditor({
     setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
     setError("");
     onDraftChange?.(next, nextSelectedEventType);
+    onNew?.();
+  };
+
+  const deletePolicy = async () => {
+    if (!form.id) return;
+    const deletedId = form.id;
+    await remove("policies", deletedId);
+    const next = createPolicyTemplate();
+    const nextSelectedEventType = eventTypesForPolicy(next)[0] ?? activeDefinitions[0]?.eventType ?? "";
+    setForm(next);
+    setSelectedEventType(nextSelectedEventType);
+    setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
+    setError("");
+    onDraftChange?.(next, nextSelectedEventType);
+    onDeleted?.(deletedId);
   };
 
   const submit = async () => {
@@ -2495,9 +2638,9 @@ function PolicyEditor({
       saveLabel="Save policy"
       id={form.id}
       disabled={data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType)}
-      leading={embedded ? undefined : <SwitchField label="Enabled" checked={form.active ?? true} onChange={(active) => updateForm({ active })} />}
+      leading={enabledActionVisible ? <SwitchField label="Enabled" checked={form.active ?? true} onChange={(active) => updateForm({ active })} /> : undefined}
       onNew={newPolicy}
-      onDelete={() => void remove("policies", form.id!)}
+      onDelete={() => void deletePolicy()}
     />
   );
 
@@ -2544,7 +2687,7 @@ function PolicyEditor({
   );
 
   if (embedded) {
-    if (renderEmbedded) return renderEmbedded({ actions, content });
+    if (renderEmbedded) return renderEmbedded({ actions, content, form });
 
     return (
       <div className="grid gap-3">
@@ -2572,9 +2715,52 @@ function EventsView(props: {
   onSaved?: (eventDefinition: EventDefinition) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<EventDefinition> }) => ReactNode;
 }) {
-  return <EventDefinitionEditor {...props} />;
+  const { data, eventDefinition, navigate, onSaved, onDeleted, ...editorProps } = props;
+  const eventOptions = workflowEventOptions(data.eventDefinitions);
+  const selectEvent = (eventType: string) => {
+    const selectedEventDefinition = data.eventDefinitions.find((candidate) => candidate.eventType === eventType);
+    if (selectedEventDefinition?.relativePath) navigate?.(eventDefinitionDocumentPath(selectedEventDefinition.relativePath));
+  };
+
+  return (
+    <div className="grid gap-4 xl:max-w-3xl">
+      <EventDefinitionEditor
+        {...editorProps}
+        data={data}
+        eventDefinition={eventDefinition}
+        navigate={navigate}
+        variant="embedded"
+        onSaved={(saved) => {
+          onSaved?.(saved);
+          if (saved.relativePath) navigate?.(eventDefinitionDocumentPath(saved.relativePath));
+        }}
+        onDeleted={(id) => {
+          onDeleted?.(id);
+          navigate?.("/events");
+        }}
+        renderEmbedded={({ actions, content, form }) => (
+          <WorkflowNode
+            node="output"
+            selected
+            value={form.eventType ?? ""}
+            options={eventOptions}
+            onChange={selectEvent}
+            onSelect={() => undefined}
+            footerActions={actions}
+            showSummaryLabel={false}
+            showEditorHeader={false}
+            compactSummary
+            inlineSummary
+            summarySelect
+          >
+            {content}
+          </WorkflowNode>
+        )}
+      />
+    </div>
+  );
 }
 
 function EventDefinitionEditor({
@@ -2588,7 +2774,8 @@ function EventDefinitionEditor({
   onDeleted,
   renderEmbedded,
   variant = "panel",
-  showCatalogWarnings = true
+  showCatalogWarnings = true,
+  showEnabledAction
 }: {
   data: AppData;
   eventDefinition?: EventDefinition;
@@ -2598,12 +2785,14 @@ function EventDefinitionEditor({
   onSaved?: (eventDefinition: EventDefinition) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<EventDefinition> }) => ReactNode;
   variant?: "panel" | "embedded";
   showCatalogWarnings?: boolean;
+  showEnabledAction?: boolean;
 }) {
   const formId = useId();
   const embedded = variant === "embedded";
+  const enabledActionVisible = showEnabledAction ?? !embedded;
   const [definitionForm, setDefinitionForm] = useState<Partial<EventDefinition>>(eventDefinition ?? eventDefinitionTemplate());
   const [producersText, setProducersText] = useState(readJson(definitionForm.producers ?? []));
   const [payloadExampleText, setPayloadExampleText] = useState(readJson(definitionForm.payloadExample ?? {}));
@@ -2659,7 +2848,7 @@ function EventDefinitionEditor({
       newLabel="New"
       saveLabel="Save definition"
       id={definitionForm.id}
-      leading={embedded ? undefined : <SwitchField label="Enabled" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />}
+      leading={enabledActionVisible ? <SwitchField label="Enabled" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} /> : undefined}
       onNew={newDefinition}
       onDelete={() => {
         if (!definitionForm.id) return;
@@ -2673,6 +2862,13 @@ function EventDefinitionEditor({
 
   const content = (
     <>
+      {showCatalogWarnings && missingPolicyEventTypes.length > 0 ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Missing active event definitions for policy event types: {missingPolicyEventTypes.join(", ")}
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {definitionForm.errors?.length ? <ErrorPreview errors={definitionForm.errors} /> : null}
       {definitionError ? <Alert variant="destructive"><AlertDescription>{definitionError}</AlertDescription></Alert> : null}
       <form id={formId} className={cn("flex flex-col gap-4", embedded ? "gap-3" : "mt-4")} onSubmit={(event) => { event.preventDefault(); void saveDefinition(); }}>
@@ -2689,7 +2885,7 @@ function EventDefinitionEditor({
   );
 
   if (embedded) {
-    if (renderEmbedded) return renderEmbedded({ actions, content });
+    if (renderEmbedded) return renderEmbedded({ actions, content, form: definitionForm });
 
     return (
       <div className="grid gap-3">
@@ -2700,20 +2896,10 @@ function EventDefinitionEditor({
   }
 
   return (
-    <div className="grid gap-4">
-      {showCatalogWarnings && missingPolicyEventTypes.length > 0 ? (
-        <Alert variant="destructive">
-          <AlertDescription>
-            Missing active event definitions for policy event types: {missingPolicyEventTypes.join(", ")}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="grid gap-4 xl:max-w-3xl">
-        <Panel title={definitionForm.id ? "Update event definition" : "Create event definition"} icon={<Inbox data-icon="inline-start" />} action={actions}>
-          {content}
-        </Panel>
-      </div>
+    <div className="grid gap-4 xl:max-w-3xl">
+      <Panel title={definitionForm.id ? "Update event definition" : "Create event definition"} icon={<Inbox data-icon="inline-start" />} action={actions}>
+        {content}
+      </Panel>
     </div>
   );
 }
