@@ -38,7 +38,7 @@ import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -931,6 +931,8 @@ type WorkflowNodeId = "input" | "policy" | "agent" | "output";
 type WorkflowDraftState = WorkflowDraft & {
   policyId?: string;
   policyName: string;
+  policyDescription: string;
+  policyActive: boolean;
 };
 
 function AppSidebar({
@@ -1782,37 +1784,22 @@ function RuntimesView({
 const workflowNodeConfig: Record<WorkflowNodeId, {
   label: string;
   icon: LucideIcon;
-  borderClass: string;
-  iconClass: string;
-  selectedClass: string;
 }> = {
   input: {
     label: "INPUT EVENT",
-    icon: Inbox,
-    borderClass: "border-blue-500/55",
-    iconClass: "text-blue-400",
-    selectedClass: "border-blue-400 bg-blue-500/10 shadow-[0_0_32px_rgba(59,130,246,0.42)]"
+    icon: Inbox
   },
   policy: {
     label: "POLICY",
-    icon: GitBranch,
-    borderClass: "border-indigo-400/35",
-    iconClass: "text-indigo-300",
-    selectedClass: "border-indigo-300 bg-indigo-500/10 shadow-[0_0_28px_rgba(129,140,248,0.28)]"
+    icon: GitBranch
   },
   agent: {
     label: "AGENT",
-    icon: Bot,
-    borderClass: "border-emerald-400/35",
-    iconClass: "text-emerald-400",
-    selectedClass: "border-emerald-300 bg-emerald-500/10 shadow-[0_0_28px_rgba(52,211,153,0.26)]"
+    icon: Bot
   },
   output: {
     label: "OUTPUT EVENT",
-    icon: Route,
-    borderClass: "border-amber-400/40",
-    iconClass: "text-amber-300",
-    selectedClass: "border-amber-300 bg-amber-500/10 shadow-[0_0_28px_rgba(251,191,36,0.24)]"
+    icon: Route
   }
 };
 
@@ -1863,9 +1850,8 @@ function WorkflowNode({
       role="button"
       tabIndex={0}
       className={cn(
-        "flex min-h-24 w-full min-w-0 flex-col items-center justify-center gap-2 rounded-lg border bg-slate-950/55 px-3 py-4 text-center transition hover:bg-slate-900/80 md:min-h-28",
-        config.borderClass,
-        selected && config.selectedClass
+        "flex min-h-20 w-full min-w-0 flex-col justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-card-foreground transition hover:bg-accent md:min-h-[5.75rem]",
+        selected && "border-ring bg-accent ring-2 ring-ring/30"
       )}
       aria-pressed={selected}
       onClick={onSelect}
@@ -1876,13 +1862,15 @@ function WorkflowNode({
         }
       }}
     >
-      <Icon className={cn("size-7", config.iconClass)} />
-      <span className="text-[0.72rem] font-semibold uppercase leading-none tracking-normal text-slate-100">{config.label}</span>
+      <div className="flex min-w-0 items-center justify-center gap-2 text-muted-foreground">
+        <Icon className="size-4 shrink-0" aria-hidden="true" />
+        <span className="truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">{config.label}</span>
+      </div>
       {hasSelect && options ? (
         options.length > 0 ? (
           <Select value={value} onValueChange={onChange}>
             <SelectTrigger
-              className="h-8 w-full min-w-0 border-slate-700/80 bg-slate-950/80 px-2 text-xs text-slate-100 shadow-none [&>span]:truncate"
+              className="h-8 w-full min-w-0 px-2 text-xs shadow-none [&>span]:truncate"
               onClick={(event) => event.stopPropagation()}
             >
               <SelectValue placeholder="Not selected" />
@@ -1898,12 +1886,12 @@ function WorkflowNode({
             </SelectContent>
           </Select>
         ) : (
-          <span className="flex h-8 w-full items-center justify-center rounded-md border border-slate-700/80 bg-slate-950/80 px-2 text-xs text-slate-500">
+          <span className="flex h-8 w-full items-center justify-center rounded-md border border-border bg-background px-2 text-xs text-muted-foreground">
             No options
           </span>
         )
       ) : (
-        <span className="max-w-full truncate font-mono text-[0.68rem] leading-none text-slate-400">{value || "Not selected"}</span>
+        <span className="max-w-full truncate font-mono text-[0.68rem] leading-none text-muted-foreground">{value || "Not selected"}</span>
       )}
     </div>
   );
@@ -1911,9 +1899,9 @@ function WorkflowNode({
 
 function WorkflowConnector() {
   return (
-    <div className="relative flex items-center justify-center text-slate-500 md:min-w-12">
-      <span className="h-10 w-px bg-slate-700 md:h-px md:w-full" aria-hidden="true" />
-      <ArrowRight className="absolute size-5 rotate-90 text-slate-500 md:relative md:-ml-4 md:rotate-0" aria-hidden="true" />
+    <div className="relative flex items-center justify-center text-muted-foreground md:min-w-10">
+      <span className="h-8 w-px bg-border md:h-px md:w-full" aria-hidden="true" />
+      <ArrowRight className="absolute size-4 rotate-90 text-muted-foreground md:relative md:-ml-3 md:rotate-0" aria-hidden="true" />
     </div>
   );
 }
@@ -1967,6 +1955,8 @@ function WorkflowOrchestratorView({
     return {
       policyId: policy?.id,
       policyName: policy?.name ?? "",
+      policyDescription: policy?.description ?? "",
+      policyActive: policy?.active ?? true,
       inputEventType,
       targetAgentId,
       outputEventType
@@ -2045,17 +2035,24 @@ function WorkflowOrchestratorView({
 
   const buildWorkflowPolicyDraft = useCallback((): Partial<Policy> => {
     const agentName = agentById.get(draft.targetAgentId)?.name ?? draft.targetAgentId;
+    const fallbackDescription = draft.inputEventType && agentName ? `Route ${draft.inputEventType} to ${agentName}.` : "";
 
     return applyWorkflowToPolicy({
       ...policyTemplate(draft.targetAgentId),
       name: draft.policyName.trim() || workflowFallbackPolicyName(draft.inputEventType, agentName),
-      description: draft.inputEventType && agentName ? `Route ${draft.inputEventType} to ${agentName}.` : ""
+      description: draft.policyDescription.trim() || fallbackDescription,
+      active: draft.policyActive
     }, draft);
   }, [agentById, draft]);
 
   const embeddedPolicy = useMemo<Partial<Policy>>(() => {
     if (selectedPolicyId === newWorkflowId || !selectedPolicy) return buildWorkflowPolicyDraft();
-    return applyWorkflowToPolicy(selectedPolicy, draft);
+    return applyWorkflowToPolicy({
+      ...selectedPolicy,
+      name: draft.policyName.trim() || selectedPolicy.name,
+      description: draft.policyDescription,
+      active: draft.policyActive
+    }, draft);
   }, [buildWorkflowPolicyDraft, draft, selectedPolicy, selectedPolicyId]);
 
   const handleEmbeddedPolicySaved = (policy: Policy) => {
@@ -2066,6 +2063,8 @@ function WorkflowOrchestratorView({
       ...current,
       policyId: policy.id,
       policyName: policy.name,
+      policyDescription: policy.description,
+      policyActive: policy.active,
       inputEventType: eventTypesForWorkflowPolicy(policy)[0] ?? current.inputEventType,
       targetAgentId: nextTargetAgentId || current.targetAgentId
     }));
@@ -2102,13 +2101,16 @@ function WorkflowOrchestratorView({
       if (!output) throw new Error("Selected output event is not available.");
 
       const agentName = agentById.get(draft.targetAgentId)?.name ?? draft.targetAgentId;
+      const fallbackDescription = `Route ${draft.inputEventType} to ${agentName}.`;
+      const isNewWorkflow = selectedPolicyId === newWorkflowId || !selectedPolicy;
       const basePolicy = selectedPolicyId === newWorkflowId || !selectedPolicy
         ? policyTemplate(draft.targetAgentId)
         : selectedPolicy;
       const savedPolicy = await save("policies", applyWorkflowToPolicy({
         ...basePolicy,
         name: draft.policyName.trim() || basePolicy.name || workflowFallbackPolicyName(draft.inputEventType, agentName),
-        description: basePolicy.description || `Route ${draft.inputEventType} to ${agentName}.`
+        description: isNewWorkflow ? draft.policyDescription.trim() || fallbackDescription : draft.policyDescription,
+        active: draft.policyActive
       }, draft));
 
       await saveEventDefinition(mergeReadyProducer(output, draft.targetAgentId));
@@ -2117,7 +2119,9 @@ function WorkflowOrchestratorView({
       setDraft((current) => ({
         ...current,
         policyId: savedPolicy.id,
-        policyName: savedPolicy.name
+        policyName: savedPolicy.name,
+        policyDescription: savedPolicy.description,
+        policyActive: savedPolicy.active
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save workflow.");
@@ -2126,95 +2130,111 @@ function WorkflowOrchestratorView({
 
   return (
     <div className="grid gap-4">
-      <section className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-slate-100 shadow-sm">
-        <header className="border-b border-slate-800 px-4 py-3 md:px-5">
-          <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold leading-tight tracking-normal text-slate-50">Workflows</h1>
-            <p className="mt-1 truncate text-sm text-slate-400">{detailTitle}</p>
-          </div>
-        </header>
-
-        <div className="relative overflow-hidden bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.16)_1px,transparent_0)] [background-size:18px_18px]">
-          <div className="absolute left-4 top-4 hidden flex-col gap-2 rounded-lg border border-slate-800 bg-slate-950/80 p-2 shadow-lg shadow-black/20 md:flex">
-            {[
-              { node: "input" as const, icon: Inbox, label: "Input event" },
-              { node: "policy" as const, icon: Link2, label: "Policy link" },
-              { node: "agent" as const, icon: Bot, label: "Agent" },
-              { node: "output" as const, icon: Route, label: "Output event" }
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.node}
-                  type="button"
-                  size="icon-sm"
-                  variant={selectedNode === item.node ? "default" : "ghost"}
-                  title={item.label}
-                  onClick={() => setSelectedNode(item.node)}
-                >
-                  <Icon />
-                  <span className="sr-only">{item.label}</span>
-                </Button>
-              );
-            })}
-          </div>
-
-          <div className="grid min-h-[16rem] items-center gap-3 px-4 py-5 md:grid-cols-[minmax(8rem,1fr)_2.5rem_minmax(8rem,0.95fr)_2.5rem_minmax(8rem,0.95fr)_2.5rem_minmax(8rem,0.95fr)] md:px-20 xl:px-28">
-            <WorkflowNode
-              node="input"
-              selected={selectedNode === "input"}
-              value={draft.inputEventType}
-              options={eventOptions}
-              onChange={selectInputEvent}
-              onSelect={() => setSelectedNode("input")}
-            />
-            <WorkflowConnector />
-            <WorkflowNode
-              node="policy"
-              selected={selectedNode === "policy"}
-              value={draft.policyId ?? selectedPolicyId}
-              options={policyOptions}
-              onChange={selectPolicy}
-              onSelect={() => setSelectedNode("policy")}
-            />
-            <WorkflowConnector />
-            <WorkflowNode
-              node="agent"
-              selected={selectedNode === "agent"}
-              value={draft.targetAgentId}
-              options={agentOptions}
-              onChange={selectAgent}
-              onSelect={() => setSelectedNode("agent")}
-            />
-            <WorkflowConnector />
-            <WorkflowNode
-              node="output"
-              selected={selectedNode === "output"}
-              value={draft.outputEventType}
-              options={eventOptions}
-              onChange={selectOutputEvent}
-              onSelect={() => setSelectedNode("output")}
-            />
-          </div>
-        </div>
-
-        <form
-          className="flex flex-col gap-3 border-t border-slate-800 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5"
-          onSubmit={(event) => { event.preventDefault(); void saveWorkflow(); }}
-        >
-          <div className="min-w-0 text-sm">
-            <div className="font-medium text-slate-100">Policy-backed route</div>
-            <div className="mt-1 truncate text-slate-400">
-              {inputDefinition?.name ?? "Input event"} to {targetAgent?.name ?? "agent"} with {outputDefinition?.name ?? "output event"}.
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <Card className="min-w-0 self-start">
+          <CardHeader className="px-4 py-3 md:px-5">
+            <div className="min-w-0">
+              <CardTitle className="truncate text-2xl leading-tight tracking-normal">Workflows</CardTitle>
+              <CardDescription className="mt-1 truncate">{detailTitle}</CardDescription>
             </div>
-            {error ? <div className="mt-2 text-sm text-red-300">{error}</div> : null}
-          </div>
-          <Button type="submit" disabled={!canSave} className="shrink-0">
-            <Save data-icon="inline-start" />
-            Save workflow
-          </Button>
-        </form>
-      </section>
+          </CardHeader>
+
+          <CardContent className="relative overflow-hidden p-0 bg-[radial-gradient(circle_at_1px_1px,var(--divider-strong)_1px,transparent_0)] [background-size:18px_18px]">
+            <div className="absolute left-3 top-3 hidden flex-col gap-2 rounded-lg border border-divider-strong bg-panel/90 p-2 shadow-sm md:flex">
+              {[
+                { node: "input" as const, icon: Inbox, label: "Input event" },
+                { node: "policy" as const, icon: Link2, label: "Policy link" },
+                { node: "agent" as const, icon: Bot, label: "Agent" },
+                { node: "output" as const, icon: Route, label: "Output event" }
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Button
+                    key={item.node}
+                    type="button"
+                    size="icon-sm"
+                    variant={selectedNode === item.node ? "default" : "ghost"}
+                    title={item.label}
+                    onClick={() => setSelectedNode(item.node)}
+                  >
+                    <Icon data-icon="inline-start" />
+                    <span className="sr-only">{item.label}</span>
+                  </Button>
+                );
+              })}
+            </div>
+
+            <div className="grid min-h-[11rem] items-center gap-2 px-4 py-4 md:grid-cols-[minmax(6.5rem,1fr)_1.5rem_minmax(6.5rem,0.95fr)_1.5rem_minmax(6.5rem,0.95fr)_1.5rem_minmax(6.5rem,0.95fr)] md:pl-20 md:pr-4 xl:px-16">
+              <WorkflowNode
+                node="input"
+                selected={selectedNode === "input"}
+                value={draft.inputEventType}
+                options={eventOptions}
+                onChange={selectInputEvent}
+                onSelect={() => setSelectedNode("input")}
+              />
+              <WorkflowConnector />
+              <WorkflowNode
+                node="policy"
+                selected={selectedNode === "policy"}
+                value={draft.policyId ?? selectedPolicyId}
+                options={policyOptions}
+                onChange={selectPolicy}
+                onSelect={() => setSelectedNode("policy")}
+              />
+              <WorkflowConnector />
+              <WorkflowNode
+                node="agent"
+                selected={selectedNode === "agent"}
+                value={draft.targetAgentId}
+                options={agentOptions}
+                onChange={selectAgent}
+                onSelect={() => setSelectedNode("agent")}
+              />
+              <WorkflowConnector />
+              <WorkflowNode
+                node="output"
+                selected={selectedNode === "output"}
+                value={draft.outputEventType}
+                options={eventOptions}
+                onChange={selectOutputEvent}
+                onSelect={() => setSelectedNode("output")}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="self-start">
+          <form className="flex flex-col" onSubmit={(event) => { event.preventDefault(); void saveWorkflow(); }}>
+            <CardHeader className="px-5 py-4">
+              <CardTitle className="text-sm">Properties</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 p-5">
+              {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+              <FieldGroup>
+                <Field className="gap-1.5">
+                  <FieldLabel htmlFor="workflow-name">Name</FieldLabel>
+                  <Input id="workflow-name" value={draft.policyName} onChange={(event) => updateDraft({ policyName: event.target.value })} />
+                </Field>
+                <Field className="gap-1.5">
+                  <FieldLabel htmlFor="workflow-description">Description</FieldLabel>
+                  <Textarea id="workflow-description" rows={4} value={draft.policyDescription} onChange={(event) => updateDraft({ policyDescription: event.target.value })} />
+                </Field>
+                <Field orientation="horizontal" className="items-center justify-between gap-3 rounded-md border border-divider-strong bg-panel-section px-3 py-2">
+                  <FieldLabel htmlFor="workflow-enabled">Enabled</FieldLabel>
+                  <Switch id="workflow-enabled" size="sm" checked={draft.policyActive} onCheckedChange={(policyActive) => updateDraft({ policyActive })} />
+                </Field>
+              </FieldGroup>
+            </CardContent>
+            <CardFooter className="justify-end p-5">
+              <Button type="submit" disabled={!canSave} className="shrink-0">
+                <Save data-icon="inline-start" />
+                Save workflow
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
 
       {selectedNode === "agent" ? (
         <AgentsView agent={targetAgent} runtimes={data.runtimes} save={save} />
