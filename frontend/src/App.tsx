@@ -635,6 +635,39 @@ function ProjectDocumentTreeDirectory({
 type SidebarDocumentEntity = Pick<Agent | Skill | Runtime | Policy | EventDefinition, "id" | "name" | "relativePath">;
 type SidebarAgentEntity = Pick<Agent, "id" | "name" | "relativePath" | "status">;
 
+function SidebarInlineAction({
+  label,
+  children,
+  onClick
+}: {
+  label: string;
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      className="ml-1 inline-flex size-5 shrink-0 items-center justify-center rounded-sm bg-emerald-500/15 text-emerald-600 opacity-95 hover:bg-emerald-500/25 hover:text-emerald-700 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:text-emerald-400 dark:hover:text-emerald-300 group-data-[collapsible=icon]:hidden"
+      aria-label={label}
+      title={label}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 function SidebarDocumentList({
   documents,
   activePath,
@@ -660,13 +693,13 @@ function SidebarDocumentList({
               href={path}
               size="sm"
               isActive={relativePath === activePath}
-              className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+              className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
               onClick={(event) => {
                 event.preventDefault();
                 navigate(path);
               }}
             >
-              <span>{document.name}</span>
+              <span className="truncate">{document.name}</span>
             </SidebarMenuSubButton>
           </SidebarMenuSubItem>
         );
@@ -698,14 +731,14 @@ function SidebarAgentList({
               href={path}
               size="sm"
               isActive={relativePath === activePath}
-              className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+              className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
               onClick={(event) => {
                 event.preventDefault();
                 navigate(path);
               }}
             >
               <AgentStatusDot status={agent.status} />
-              <span>{agent.name}</span>
+              <span className="truncate">{agent.name}</span>
             </SidebarMenuSubButton>
           </SidebarMenuSubItem>
         );
@@ -969,7 +1002,10 @@ function AppSidebar({
   selectWorkflow,
   navigate,
   themeMode,
-  onThemeModeChange
+  onThemeModeChange,
+  onNewAgent,
+  onNewEventDefinition,
+  onNewPolicy
 }: {
   route: RouteState;
   projectDocumentTree: ProjectDocumentTreeNode[];
@@ -984,6 +1020,9 @@ function AppSidebar({
   navigate: (path: string) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
+  onNewAgent: () => void;
+  onNewEventDefinition: () => void;
+  onNewPolicy: () => void;
 }) {
   const agentsOpen = route.view === "agents";
   const skillsOpen = route.view === "skills";
@@ -1069,6 +1108,9 @@ function AppSidebar({
                     <SidebarMenuButton isActive={agentsOpen} tooltip="Agents">
                       <Bot />
                       <span>Agents</span>
+                      <SidebarInlineAction label="New agent" onClick={onNewAgent}>
+                        <Plus data-icon="inline-start" />
+                      </SidebarInlineAction>
                       <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -1083,6 +1125,9 @@ function AppSidebar({
                     <SidebarMenuButton isActive={eventsOpen} tooltip="Events">
                       <Inbox />
                       <span>Events</span>
+                      <SidebarInlineAction label="New event definition" onClick={onNewEventDefinition}>
+                        <Plus data-icon="inline-start" />
+                      </SidebarInlineAction>
                       <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -1098,6 +1143,9 @@ function AppSidebar({
                     <SidebarMenuButton isActive={policiesOpen} tooltip="Policies">
                       <GitBranch />
                       <span>Policies</span>
+                      <SidebarInlineAction label="New policy" onClick={onNewPolicy}>
+                        <Plus data-icon="inline-start" />
+                      </SidebarInlineAction>
                       <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -1178,8 +1226,10 @@ export function App() {
     [projectDocumentTree, route.documentPath]
   );
   const selectedAgent = useMemo(
-    () => data.agents.find((agent) => agent.relativePath === route.documentPath) ?? data.agents[0],
-    [data.agents, route.documentPath]
+    () => route.view === "agents" && !route.documentPath
+      ? undefined
+      : data.agents.find((agent) => agent.relativePath === route.documentPath) ?? data.agents[0],
+    [data.agents, route.documentPath, route.view]
   );
   const selectedSkill = useMemo(
     () => data.skills.find((skill) => skill.relativePath === route.documentPath) ?? data.skills[0],
@@ -1302,6 +1352,10 @@ export function App() {
     setNotice("Deleted.");
   };
 
+  const newAgent = () => navigate("/agents");
+  const newEventDefinition = () => navigate("/events");
+  const newPolicy = () => navigate("/policies");
+
   return (
     <TooltipProvider>
       <SidebarProvider>
@@ -1319,6 +1373,9 @@ export function App() {
           navigate={navigate}
           themeMode={themeMode}
           onThemeModeChange={setThemeMode}
+          onNewAgent={newAgent}
+          onNewEventDefinition={newEventDefinition}
+          onNewPolicy={newPolicy}
         />
         <SidebarInset>
           <ScrollArea className="h-svh">
@@ -1506,13 +1563,13 @@ function AgentsView({
           if (saved.relativePath) navigate(agentDocumentPath(saved.relativePath));
         }}
         onDeleted={() => navigate("/agents")}
-        renderEmbedded={({ actions, content, form }) => (
+        renderEmbedded={({ headerActions, content, form }) => (
           <WorkflowNode
             node="agent"
             selected
             value={form.name ?? form.id ?? ""}
             onSelect={() => undefined}
-            footerActions={actions}
+            headerActions={headerActions}
             showSummaryLabel={false}
             showEditorValue={false}
             showEditorHeader={false}
@@ -1711,6 +1768,7 @@ function WorkflowNode({
   const config = workflowNodeConfig[node];
   const Icon = config.icon;
   const hasSelect = Boolean(options && onChange);
+  const summaryActions = showEditorHeader ? null : headerActions;
   const renderSelect = (className?: string) => {
     if (!hasSelect || !options) return null;
     if (options.length === 0) {
@@ -1755,7 +1813,8 @@ function WorkflowNode({
               inlineSummary
                 ? "min-h-12 flex-row items-center justify-start gap-2 py-2 text-left"
                 : "flex-col items-center justify-center gap-2 text-center",
-              !inlineSummary && (compactSummary ? "min-h-20 py-3" : "min-h-24 py-4")
+              !inlineSummary && (compactSummary ? "min-h-20 py-3" : "min-h-24 py-4"),
+              summaryActions && "pr-12"
             )}
             aria-controls={workflowEditorId(node)}
             aria-expanded={selected}
@@ -1777,7 +1836,8 @@ function WorkflowNode({
               inlineSummary
                 ? "min-h-12 flex-row items-center justify-start gap-2 py-2 text-left"
                 : "flex-col items-center justify-center gap-2 text-center",
-              !inlineSummary && (compactSummary ? "min-h-20 py-3" : "min-h-24 py-4")
+              !inlineSummary && (compactSummary ? "min-h-20 py-3" : "min-h-24 py-4"),
+              summaryActions && "pr-12"
             )}
             aria-controls={workflowEditorId(node)}
             aria-expanded={selected}
@@ -1795,6 +1855,11 @@ function WorkflowNode({
             </span>
           </button>
         )}
+        {summaryActions ? (
+          <div className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
+            {summaryActions}
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -1857,7 +1922,7 @@ function WorkflowAgentEditor({
   onNew?: () => void;
   onDeleted?: (id: string) => void;
   showNameField?: boolean;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<Agent> }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; headerActions: ReactNode; content: ReactNode; form: Partial<Agent> }) => ReactNode;
 }) {
   const formId = useId();
   const instructionsId = useId();
@@ -1939,6 +2004,8 @@ function WorkflowAgentEditor({
       onDelete={() => void deleteAgent()}
     />
   );
+  const saveAction = <SaveAction formId={formId} label="Save agent" disabled={!form.name?.trim()} />;
+  const headerActions = <HeaderCrudActions saveAction={saveAction} deleteLabel="Delete agent" canDelete={Boolean(form.id)} onDelete={() => void deleteAgent()} />;
 
   const content = (
     <div className="grid gap-3">
@@ -2006,7 +2073,7 @@ function WorkflowAgentEditor({
     </div>
   );
 
-  if (renderEmbedded) return renderEmbedded({ actions, content, form });
+  if (renderEmbedded) return renderEmbedded({ actions, headerActions, content, form });
 
   return (
     <Panel
@@ -2371,7 +2438,7 @@ function PoliciesView(props: ViewProps & {
   newPolicyTemplate?: () => Partial<Policy>;
   onSaved?: (policy: Policy) => void;
   onDeleted?: (id: string) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<Policy> }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; headerActions: ReactNode; content: ReactNode; form: Partial<Policy> }) => ReactNode;
 }) {
   const { data, policy, navigate, onSaved, onDeleted, ...editorProps } = props;
 
@@ -2391,13 +2458,13 @@ function PoliciesView(props: ViewProps & {
           onDeleted?.(id);
           navigate("/policies");
         }}
-        renderEmbedded={({ actions, content, form }) => (
+        renderEmbedded={({ headerActions, content, form }) => (
           <WorkflowNode
             node="policy"
             selected
             value={policyDisplayName(eventTypesForPolicy(form)[0] ?? "", policyTargetForForm(form, data.agents[0]?.id ?? ""))}
             onSelect={() => undefined}
-            footerActions={actions}
+            headerActions={headerActions}
             showSummaryLabel={false}
             showEditorValue={false}
             showEditorHeader={false}
@@ -2433,7 +2500,7 @@ function PolicyEditor({
   onSaved?: (policy: Policy) => void;
   onDeleted?: (id: string) => void;
   onDraftChange?: (policy: Partial<Policy>, selectedEventType: string) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<Policy> }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; headerActions: ReactNode; content: ReactNode; form: Partial<Policy> }) => ReactNode;
   variant?: "panel" | "embedded";
   showEnabledAction?: boolean;
 }) {
@@ -2523,18 +2590,21 @@ function PolicyEditor({
     }
   };
 
+  const saveDisabled = data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType);
   const actions = (
     <CrudActions
       formId={formId}
       newLabel="New"
       saveLabel="Save policy"
       id={form.id}
-      disabled={data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType)}
+      disabled={saveDisabled}
       leading={enabledActionVisible ? <SwitchField label="Enabled" checked={form.active ?? true} onChange={(active) => updateForm({ active })} /> : undefined}
       onNew={newPolicy}
       onDelete={() => void deletePolicy()}
     />
   );
+  const saveAction = <SaveAction formId={formId} label="Save policy" disabled={saveDisabled} />;
+  const headerActions = <HeaderCrudActions saveAction={saveAction} deleteLabel="Delete policy" canDelete={Boolean(form.id)} onDelete={() => void deletePolicy()} />;
 
   const content = (
     <>
@@ -2577,7 +2647,7 @@ function PolicyEditor({
   );
 
   if (embedded) {
-    if (renderEmbedded) return renderEmbedded({ actions, content, form });
+    if (renderEmbedded) return renderEmbedded({ actions, headerActions, content, form });
 
     return (
       <div className="grid gap-3">
@@ -2605,7 +2675,7 @@ function EventsView(props: {
   onSaved?: (eventDefinition: EventDefinition) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<EventDefinition> }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; headerActions: ReactNode; content: ReactNode; form: Partial<EventDefinition> }) => ReactNode;
 }) {
   const { data, eventDefinition, navigate, onSaved, onDeleted, ...editorProps } = props;
   const eventOptions = workflowEventOptions(data.eventDefinitions);
@@ -2630,7 +2700,7 @@ function EventsView(props: {
           onDeleted?.(id);
           navigate?.("/events");
         }}
-        renderEmbedded={({ actions, content, form }) => (
+        renderEmbedded={({ headerActions, content, form }) => (
           <WorkflowNode
             node="output"
             selected
@@ -2638,7 +2708,7 @@ function EventsView(props: {
             options={eventOptions}
             onChange={selectEvent}
             onSelect={() => undefined}
-            footerActions={actions}
+            headerActions={headerActions}
             showSummaryLabel={false}
             showEditorHeader={false}
             compactSummary
@@ -2675,7 +2745,7 @@ function EventDefinitionEditor({
   onSaved?: (eventDefinition: EventDefinition) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<EventDefinition> }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; headerActions: ReactNode; content: ReactNode; form: Partial<EventDefinition> }) => ReactNode;
   variant?: "panel" | "embedded";
   showCatalogWarnings?: boolean;
   showEnabledAction?: boolean;
@@ -2732,6 +2802,14 @@ function EventDefinitionEditor({
     else navigate?.("/events");
   };
 
+  const deleteDefinition = () => {
+    if (!definitionForm.id) return;
+    void removeEventDefinition(definitionForm.id).then(() => {
+      onDeleted?.(definitionForm.id!);
+      if (!onDeleted) navigate?.("/events");
+    });
+  };
+
   const actions = (
     <CrudActions
       formId={formId}
@@ -2740,15 +2818,11 @@ function EventDefinitionEditor({
       id={definitionForm.id}
       leading={enabledActionVisible ? <SwitchField label="Enabled" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} /> : undefined}
       onNew={newDefinition}
-      onDelete={() => {
-        if (!definitionForm.id) return;
-        void removeEventDefinition(definitionForm.id).then(() => {
-          onDeleted?.(definitionForm.id!);
-          if (!onDeleted) navigate?.("/events");
-        });
-      }}
+      onDelete={deleteDefinition}
     />
   );
+  const saveAction = <SaveAction formId={formId} label="Save definition" />;
+  const headerActions = <HeaderCrudActions saveAction={saveAction} deleteLabel="Delete event definition" canDelete={Boolean(definitionForm.id)} onDelete={deleteDefinition} />;
 
   const content = (
     <>
@@ -2775,7 +2849,7 @@ function EventDefinitionEditor({
   );
 
   if (embedded) {
-    if (renderEmbedded) return renderEmbedded({ actions, content, form: definitionForm });
+    if (renderEmbedded) return renderEmbedded({ actions, headerActions, content, form: definitionForm });
 
     return (
       <div className="grid gap-3">
@@ -2918,6 +2992,57 @@ function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promis
           <EmptyState title="No run selected." />
         )}
       </Panel>
+    </div>
+  );
+}
+
+function SaveAction({ formId, label, disabled = false }: { formId: string; label: string; disabled?: boolean }) {
+  return (
+    <Button
+      type="submit"
+      size="icon-sm"
+      className="bg-primary text-primary-foreground hover:bg-emerald-600 hover:text-white focus-visible:border-emerald-500/60 focus-visible:ring-emerald-500/30 dark:hover:bg-emerald-500"
+      form={formId}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <Save data-icon="inline-start" />
+    </Button>
+  );
+}
+
+function HeaderCrudActions({
+  saveAction,
+  deleteLabel,
+  canDelete,
+  onDelete
+}: {
+  saveAction: ReactNode;
+  deleteLabel: string;
+  canDelete: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-end gap-2">
+      {saveAction}
+      {canDelete ? (
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="destructive"
+          aria-label={deleteLabel}
+          title={deleteLabel}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onDelete();
+          }}
+        >
+          <Trash2 data-icon="inline-start" />
+        </Button>
+      ) : null}
     </div>
   );
 }
