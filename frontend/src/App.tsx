@@ -38,7 +38,7 @@ import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -1994,7 +1994,6 @@ function WorkflowOrchestratorView({
   const inputDefinition = definitionByEventType.get(draft.inputEventType);
   const outputDefinition = definitionByEventType.get(draft.outputEventType);
   const targetAgent = agentById.get(draft.targetAgentId);
-  const detailTitle = draft.policyName || selectedPolicy?.name || workflowFallbackPolicyName(draft.inputEventType, targetAgent?.name ?? "");
   const selectedEventDefinition = selectedNode === "output" ? outputDefinition : inputDefinition;
   const canSave = Boolean(draft.inputEventType && draft.targetAgentId && draft.outputEventType);
   const eventOptions = workflowEventOptions(activeDefinitions);
@@ -2130,111 +2129,118 @@ function WorkflowOrchestratorView({
 
   return (
     <div className="grid gap-4">
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <Card className="min-w-0 self-start">
-          <CardHeader className="px-4 py-3 md:px-5">
-            <div className="min-w-0">
-              <CardTitle className="truncate text-2xl leading-tight tracking-normal">Workflows</CardTitle>
-              <CardDescription className="mt-1 truncate">{detailTitle}</CardDescription>
-            </div>
-          </CardHeader>
+      <Card>
+        <CardHeader className="gap-1.5 px-4 py-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Workflow data-icon="inline-start" />
+            Workflows
+          </CardTitle>
+        </CardHeader>
 
-          <CardContent className="relative overflow-hidden p-0 bg-[radial-gradient(circle_at_1px_1px,var(--divider-strong)_1px,transparent_0)] [background-size:18px_18px]">
-            <div className="absolute left-3 top-3 hidden flex-col gap-2 rounded-lg border border-divider-strong bg-panel/90 p-2 shadow-sm md:flex">
-              {[
-                { node: "input" as const, icon: Inbox, label: "Input event" },
-                { node: "policy" as const, icon: Link2, label: "Policy link" },
-                { node: "agent" as const, icon: Bot, label: "Agent" },
-                { node: "output" as const, icon: Route, label: "Output event" }
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Button
-                    key={item.node}
-                    type="button"
-                    size="icon-sm"
-                    variant={selectedNode === item.node ? "default" : "ghost"}
-                    title={item.label}
-                    onClick={() => setSelectedNode(item.node)}
-                  >
-                    <Icon data-icon="inline-start" />
-                    <span className="sr-only">{item.label}</span>
-                  </Button>
-                );
-              })}
+        <CardContent className="p-0">
+          <form
+            className="grid min-h-[18rem] lg:grid-cols-[minmax(0,1fr)_20rem]"
+            onSubmit={(event) => { event.preventDefault(); void saveWorkflow(); }}
+          >
+            <div className="relative min-w-0 overflow-hidden">
+              <div className="absolute left-3 top-3 hidden flex-col gap-2 rounded-lg border border-divider-strong bg-panel/90 p-2 shadow-sm md:flex">
+                {[
+                  { node: "input" as const, icon: Inbox, label: "Input event" },
+                  { node: "policy" as const, icon: Link2, label: "Policy link" },
+                  { node: "agent" as const, icon: Bot, label: "Agent" },
+                  { node: "output" as const, icon: Route, label: "Output event" }
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Button
+                      key={item.node}
+                      type="button"
+                      size="icon-sm"
+                      variant={selectedNode === item.node ? "default" : "ghost"}
+                      title={item.label}
+                      onClick={() => setSelectedNode(item.node)}
+                    >
+                      <Icon data-icon="inline-start" />
+                      <span className="sr-only">{item.label}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+
+              <div className="grid min-h-[11rem] items-center gap-2 px-4 py-4 md:grid-cols-[minmax(6.5rem,1fr)_1.5rem_minmax(6.5rem,0.95fr)_1.5rem_minmax(6.5rem,0.95fr)_1.5rem_minmax(6.5rem,0.95fr)] md:pl-20 md:pr-4 xl:px-16">
+                <WorkflowNode
+                  node="input"
+                  selected={selectedNode === "input"}
+                  value={draft.inputEventType}
+                  options={eventOptions}
+                  onChange={selectInputEvent}
+                  onSelect={() => setSelectedNode("input")}
+                />
+                <WorkflowConnector />
+                <WorkflowNode
+                  node="policy"
+                  selected={selectedNode === "policy"}
+                  value={draft.policyId ?? selectedPolicyId}
+                  options={policyOptions}
+                  onChange={selectPolicy}
+                  onSelect={() => setSelectedNode("policy")}
+                />
+                <WorkflowConnector />
+                <WorkflowNode
+                  node="agent"
+                  selected={selectedNode === "agent"}
+                  value={draft.targetAgentId}
+                  options={agentOptions}
+                  onChange={selectAgent}
+                  onSelect={() => setSelectedNode("agent")}
+                />
+                <WorkflowConnector />
+                <WorkflowNode
+                  node="output"
+                  selected={selectedNode === "output"}
+                  value={draft.outputEventType}
+                  options={eventOptions}
+                  onChange={selectOutputEvent}
+                  onSelect={() => setSelectedNode("output")}
+                />
+              </div>
             </div>
 
-            <div className="grid min-h-[11rem] items-center gap-2 px-4 py-4 md:grid-cols-[minmax(6.5rem,1fr)_1.5rem_minmax(6.5rem,0.95fr)_1.5rem_minmax(6.5rem,0.95fr)_1.5rem_minmax(6.5rem,0.95fr)] md:pl-20 md:pr-4 xl:px-16">
-              <WorkflowNode
-                node="input"
-                selected={selectedNode === "input"}
-                value={draft.inputEventType}
-                options={eventOptions}
-                onChange={selectInputEvent}
-                onSelect={() => setSelectedNode("input")}
-              />
-              <WorkflowConnector />
-              <WorkflowNode
-                node="policy"
-                selected={selectedNode === "policy"}
-                value={draft.policyId ?? selectedPolicyId}
-                options={policyOptions}
-                onChange={selectPolicy}
-                onSelect={() => setSelectedNode("policy")}
-              />
-              <WorkflowConnector />
-              <WorkflowNode
-                node="agent"
-                selected={selectedNode === "agent"}
-                value={draft.targetAgentId}
-                options={agentOptions}
-                onChange={selectAgent}
-                onSelect={() => setSelectedNode("agent")}
-              />
-              <WorkflowConnector />
-              <WorkflowNode
-                node="output"
-                selected={selectedNode === "output"}
-                value={draft.outputEventType}
-                options={eventOptions}
-                onChange={selectOutputEvent}
-                onSelect={() => setSelectedNode("output")}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="self-start">
-          <form className="flex flex-col" onSubmit={(event) => { event.preventDefault(); void saveWorkflow(); }}>
-            <CardHeader className="px-5 py-4">
-              <CardTitle className="text-sm">Properties</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4 p-5">
-              {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-              <FieldGroup>
-                <Field className="gap-1.5">
-                  <FieldLabel htmlFor="workflow-name">Name</FieldLabel>
-                  <Input id="workflow-name" value={draft.policyName} onChange={(event) => updateDraft({ policyName: event.target.value })} />
-                </Field>
-                <Field className="gap-1.5">
-                  <FieldLabel htmlFor="workflow-description">Description</FieldLabel>
-                  <Textarea id="workflow-description" rows={4} value={draft.policyDescription} onChange={(event) => updateDraft({ policyDescription: event.target.value })} />
-                </Field>
-                <Field orientation="horizontal" className="items-center justify-between gap-3 rounded-md border border-divider-strong bg-panel-section px-3 py-2">
+            <div className="flex min-w-0 flex-col border-t border-divider-strong lg:border-l lg:border-t-0">
+              <div className="flex flex-1 flex-col gap-4 p-5">
+                <h2 className="font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Properties</h2>
+                {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+                <FieldGroup>
+                  <Field className="gap-1.5">
+                    <FieldLabel htmlFor="workflow-name">Name</FieldLabel>
+                    <Input id="workflow-name" value={draft.policyName} onChange={(event) => updateDraft({ policyName: event.target.value })} />
+                  </Field>
+                  <Field className="gap-1.5">
+                    <FieldLabel htmlFor="workflow-description">Description</FieldLabel>
+                    <Textarea
+                      id="workflow-description"
+                      rows={6}
+                      className="min-h-32 resize-y"
+                      value={draft.policyDescription}
+                      onChange={(event) => updateDraft({ policyDescription: event.target.value })}
+                    />
+                  </Field>
+                </FieldGroup>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-divider-strong p-5">
+                <Field orientation="horizontal" className="w-fit shrink-0 items-center gap-3 rounded-md border border-divider-strong bg-panel-section px-3 py-2">
                   <FieldLabel htmlFor="workflow-enabled">Enabled</FieldLabel>
                   <Switch id="workflow-enabled" size="sm" checked={draft.policyActive} onCheckedChange={(policyActive) => updateDraft({ policyActive })} />
                 </Field>
-              </FieldGroup>
-            </CardContent>
-            <CardFooter className="justify-end p-5">
-              <Button type="submit" disabled={!canSave} className="shrink-0">
-                <Save data-icon="inline-start" />
-                Save workflow
-              </Button>
-            </CardFooter>
+                <Button type="submit" disabled={!canSave} className="shrink-0">
+                  <Save data-icon="inline-start" />
+                  Save workflow
+                </Button>
+              </div>
+            </div>
           </form>
-        </Card>
-      </div>
+        </CardContent>
+      </Card>
 
       {selectedNode === "agent" ? (
         <AgentsView agent={targetAgent} runtimes={data.runtimes} save={save} />
