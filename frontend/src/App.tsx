@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isMap, parseDocument, stringify as stringifyYaml } from "yaml";
 import {
   Archive,
   Activity,
-  ArrowRight,
   Bot,
   CalendarDays,
   CheckCircle2,
@@ -17,7 +16,6 @@ import {
   Hash,
   Inbox,
   Layers3,
-  Link2,
   Menu,
   Monitor,
   Moon,
@@ -875,13 +873,27 @@ function AgentEnabledBadge({ enabled }: { enabled: boolean }) {
 function Panel({ title, description, icon, children, action, compact = false }: { title: string; description?: string; icon: ReactNode; children: ReactNode; action?: ReactNode; compact?: boolean }) {
   return (
     <Card>
-      <CardHeader className={cn("px-4 py-3", compact && "gap-1.5")}>
+      <CardHeader
+        className={cn(
+          "px-4 py-3 has-data-[slot=card-action]:grid-cols-1 sm:has-data-[slot=card-action]:grid-cols-[1fr_auto]",
+          compact && "gap-1.5"
+        )}
+      >
         <CardTitle className={cn("flex items-center gap-2", compact && "text-base")}>
           {icon}
           {title}
         </CardTitle>
         {description ? <CardDescription className={cn(compact && "text-xs")}>{description}</CardDescription> : null}
-        {action ? <CardAction>{action}</CardAction> : null}
+        {action ? (
+          <CardAction
+            className={cn(
+              "col-start-1 row-span-1 justify-self-start self-start sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end sm:self-center",
+              description ? "row-start-3" : "row-start-2"
+            )}
+          >
+            {action}
+          </CardAction>
+        ) : null}
       </CardHeader>
       <CardContent className={cn("px-4 py-4", compact && "py-3")}>{children}</CardContent>
     </Card>
@@ -1389,6 +1401,7 @@ function ProjectMarkdownEditorView({
   emptyTitle: string;
   saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
 }) {
+  const formId = useId();
   const [frontmatterText, setFrontmatterText] = useState(frontmatterToYaml(document?.frontmatter));
   const [bodyText, setBodyText] = useState(document?.body ?? "");
   const [validationError, setValidationError] = useState("");
@@ -1419,19 +1432,22 @@ function ProjectMarkdownEditorView({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <Panel title="Edit Markdown" icon={<FileKey2 data-icon="inline-start" />} compact>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
+      <Panel
+        title="Edit Markdown"
+        icon={<FileKey2 data-icon="inline-start" />}
+        compact
+        action={(
+          <Button type="submit" size="icon-sm" form={formId} aria-label="Save Markdown" title="Save Markdown">
+            <Save data-icon="inline-start" />
+          </Button>
+        )}
+      >
+        <form id={formId} className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
           {validationError ? <Alert variant="destructive"><AlertDescription>{validationError}</AlertDescription></Alert> : null}
           <FieldGroup>
             <TextAreaField label="Frontmatter" rows={10} value={frontmatterText} onChange={setFrontmatterText} className="font-mono text-xs leading-relaxed" />
             <TextAreaField label="Markdown" rows={18} value={bodyText} onChange={setBodyText} className="font-mono text-xs leading-relaxed" />
           </FieldGroup>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="submit">
-              <Save data-icon="inline-start" />
-              Save Markdown
-            </Button>
-          </div>
         </form>
       </Panel>
       <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
@@ -1462,6 +1478,7 @@ function AgentsView({
   runtimes: Runtime[];
   save: ViewProps["save"];
 }) {
+  const instructionsFormId = useId();
   const [savingSetting, setSavingSetting] = useState<"model" | "reasoning" | null>(null);
   const [instructionsText, setInstructionsText] = useState(agent?.instructions ?? "");
   const [savingInstructions, setSavingInstructions] = useState(false);
@@ -1576,14 +1593,26 @@ function AgentsView({
       </Card>
 
       <Card className="min-w-0">
-        <CardHeader className="px-5 py-3">
+        <CardHeader className="px-5 py-3 has-data-[slot=card-action]:grid-cols-1 sm:has-data-[slot=card-action]:grid-cols-[1fr_auto]">
           <CardTitle className="flex items-center gap-2 text-sm">
             <FileKey2 className="size-3.5" aria-hidden="true" />
             Instructions
           </CardTitle>
+          <CardAction className="col-start-1 row-span-1 row-start-2 justify-self-start self-start sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end sm:self-center">
+            <Button
+              type="submit"
+              size="icon-sm"
+              form={instructionsFormId}
+              disabled={savingInstructions || instructionsText === agent.instructions}
+              aria-label={savingInstructions ? "Saving instructions" : "Save instructions"}
+              title={savingInstructions ? "Saving instructions" : "Save instructions"}
+            >
+              <Save data-icon="inline-start" />
+            </Button>
+          </CardAction>
         </CardHeader>
         <CardContent className="p-5">
-          <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void saveInstructions(); }}>
+          <form id={instructionsFormId} className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void saveInstructions(); }}>
             <FieldGroup>
               <Field>
                 <FieldLabel>Markdown</FieldLabel>
@@ -1595,12 +1624,6 @@ function AgentsView({
                 />
               </Field>
             </FieldGroup>
-            <div className="flex justify-end">
-              <Button type="submit" disabled={savingInstructions || instructionsText === agent.instructions}>
-                <Save data-icon="inline-start" />
-                {savingInstructions ? "Saving..." : "Save instructions"}
-              </Button>
-            </div>
             <section className="flex flex-col gap-2.5">
               <h2 className="font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Preview</h2>
               <ScrollArea className="h-[min(36svh,24rem)] rounded-lg border bg-background">
@@ -1687,6 +1710,7 @@ function SkillsView({
   remove: ViewProps["remove"];
   navigate: (path: string) => void;
 }) {
+  const formId = useId();
   const [form, setForm] = useState<Partial<Skill>>(skill ?? skillTemplate());
 
   useEffect(() => {
@@ -1706,14 +1730,17 @@ function SkillsView({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <Panel title={form.id ? "Update skill" : "Create skill"} icon={<FileKey2 data-icon="inline-start" />}>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
+      <Panel
+        title={form.id ? "Update skill" : "Create skill"}
+        icon={<FileKey2 data-icon="inline-start" />}
+        action={<CrudActions formId={formId} newLabel="New" saveLabel="Save skill" id={form.id} onNew={() => setForm(skillTemplate())} onDelete={handleDelete} />}
+      >
+        <form id={formId} className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
           <FieldGroup>
             <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
             <TextAreaField label="Description" required value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
             <TextAreaField label="Markdown" rows={14} value={form.body ?? ""} onChange={(body) => setForm({ ...form, body })} />
           </FieldGroup>
-          <CrudActions newLabel="New" saveLabel="Save skill" id={form.id} onNew={() => setForm(skillTemplate())} onDelete={handleDelete} />
         </form>
       </Panel>
       <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
@@ -1732,6 +1759,7 @@ function RuntimesView({
   runtime?: Runtime;
   navigate: (path: string) => void;
 }) {
+  const formId = useId();
   const [form, setForm] = useState<Partial<Runtime>>(runtime ?? runtimeTemplate());
   const [configText, setConfigText] = useState(toKeyValueLines((runtime ?? runtimeTemplate()).config ?? {}));
 
@@ -1754,8 +1782,22 @@ function RuntimesView({
 
   return (
     <div className="grid gap-4 xl:max-w-3xl">
-      <Panel title={form.id ? "Update runtime" : "Create runtime"} icon={<Code2 data-icon="inline-start" />}>
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
+      <Panel
+        title={form.id ? "Update runtime" : "Create runtime"}
+        icon={<Code2 data-icon="inline-start" />}
+        action={(
+          <CrudActions
+            formId={formId}
+            newLabel="New Codex CLI runtime"
+            saveLabel="Save runtime"
+            id={form.id}
+            leading={<SwitchField label="Enabled" checked={form.enabled ?? true} onChange={(enabled) => setForm({ ...form, enabled })} />}
+            onNew={() => { setForm(runtimeTemplate()); setConfigText(toKeyValueLines(runtimeTemplate().config ?? {})); }}
+            onDelete={handleDelete}
+          />
+        )}
+      >
+        <form id={formId} className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
           <FieldGroup>
             <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
             <SelectField
@@ -1767,14 +1809,6 @@ function RuntimesView({
             <TextField label="Command" required value={form.command ?? ""} onChange={(command) => setForm({ ...form, command })} />
             <TextAreaField label="Config (key=value)" rows={6} value={configText} onChange={setConfigText} />
           </FieldGroup>
-          <CrudActions
-            newLabel="New Codex CLI runtime"
-            saveLabel="Save runtime"
-            id={form.id}
-            leading={<SwitchField label="Enabled" checked={form.enabled ?? true} onChange={(enabled) => setForm({ ...form, enabled })} />}
-            onNew={() => { setForm(runtimeTemplate()); setConfigText(toKeyValueLines(runtimeTemplate().config ?? {})); }}
-            onDelete={handleDelete}
-          />
         </form>
       </Panel>
     </div>
@@ -1832,7 +1866,8 @@ function WorkflowNode({
   value,
   options,
   onChange,
-  onSelect
+  onSelect,
+  children
 }: {
   node: WorkflowNodeId;
   selected: boolean;
@@ -1840,6 +1875,7 @@ function WorkflowNode({
   options?: Array<{ value: string; label: string }>;
   onChange?: (value: string) => void;
   onSelect: () => void;
+  children?: ReactNode;
 }) {
   const config = workflowNodeConfig[node];
   const Icon = config.icon;
@@ -1847,32 +1883,24 @@ function WorkflowNode({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
       className={cn(
-        "flex min-h-20 w-full min-w-0 flex-col justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-card-foreground transition hover:bg-accent md:min-h-[5.75rem]",
+        "flex min-h-20 w-full min-w-0 flex-col gap-3 rounded-lg border border-border bg-card px-3 py-3 text-card-foreground transition",
         selected && "border-ring bg-accent ring-2 ring-ring/30"
       )}
-      aria-pressed={selected}
-      onClick={onSelect}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onSelect();
-        }
-      }}
     >
-      <div className="flex min-w-0 items-center justify-center gap-2 text-muted-foreground">
+      <button
+        type="button"
+        className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+        aria-pressed={selected}
+        onClick={onSelect}
+      >
         <Icon className="size-4 shrink-0" aria-hidden="true" />
         <span className="truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">{config.label}</span>
-      </div>
+      </button>
       {hasSelect && options ? (
         options.length > 0 ? (
           <Select value={value} onValueChange={onChange}>
-            <SelectTrigger
-              className="h-8 w-full min-w-0 px-2 text-xs shadow-none [&>span]:truncate"
-              onClick={(event) => event.stopPropagation()}
-            >
+            <SelectTrigger className="h-8 w-full min-w-0 px-2 text-xs shadow-none [&>span]:truncate">
               <SelectValue placeholder="Not selected" />
             </SelectTrigger>
             <SelectContent>
@@ -1893,15 +1921,120 @@ function WorkflowNode({
       ) : (
         <span className="max-w-full truncate font-mono text-[0.68rem] leading-none text-muted-foreground">{value || "Not selected"}</span>
       )}
+      {children ? <div className="min-w-0 border-t border-divider-strong pt-3">{children}</div> : null}
     </div>
   );
 }
 
-function WorkflowConnector() {
+function WorkflowAgentEditor({
+  agent,
+  runtimes,
+  save
+}: {
+  agent?: Agent;
+  runtimes: Runtime[];
+  save: ViewProps["save"];
+}) {
+  const instructionsFormId = useId();
+  const instructionsId = useId();
+  const [savingSetting, setSavingSetting] = useState<"model" | "reasoning" | null>(null);
+  const [instructionsText, setInstructionsText] = useState(agent?.instructions ?? "");
+  const [savingInstructions, setSavingInstructions] = useState(false);
+
+  useEffect(() => {
+    setInstructionsText(agent?.instructions ?? "");
+    setSavingInstructions(false);
+  }, [agent?.id, agent?.instructions]);
+
+  if (!agent) return <EmptyState title="No agent selected." />;
+
+  const runtime = runtimes.find((candidate) => candidate.enabled) ?? runtimes[0];
+  const runtimeLabel = runtime?.name || runtime?.type || "Codex";
+  const modelValue = agent.model || (typeof agent.frontmatter?.model === "string" ? agent.frontmatter.model : "") || "gpt-5.5";
+  const reasoningValue = agent.modelReasoningEffort || (typeof agent.frontmatter?.model_reasoning_effort === "string" ? agent.frontmatter.model_reasoning_effort : "") || "medium";
+  const modelOptions = codexModelOptions.some((option) => option.value === modelValue)
+    ? codexModelOptions
+    : [{ value: modelValue, label: modelValue }, ...codexModelOptions];
+  const reasoningOptions = reasoningEffortOptions.some((option) => option.value === reasoningValue)
+    ? reasoningEffortOptions
+    : [{ value: reasoningValue, label: reasoningValue }, ...reasoningEffortOptions];
+
+  const updateAgentSetting = async (setting: "model" | "reasoning", patch: Partial<Agent>) => {
+    setSavingSetting(setting);
+    try {
+      await save("agents", { ...agent, ...patch });
+    } finally {
+      setSavingSetting(null);
+    }
+  };
+
+  const saveInstructions = async () => {
+    setSavingInstructions(true);
+    try {
+      await save("agents", { ...agent, instructions: instructionsText });
+    } finally {
+      setSavingInstructions(false);
+    }
+  };
+
   return (
-    <div className="relative flex items-center justify-center text-muted-foreground md:min-w-10">
-      <span className="h-8 w-px bg-border md:h-px md:w-full" aria-hidden="true" />
-      <ArrowRight className="absolute size-4 rotate-90 text-muted-foreground md:relative md:-ml-3 md:rotate-0" aria-hidden="true" />
+    <div className="grid gap-3">
+      {agent.errors?.length ? <ErrorPreview errors={agent.errors} /> : null}
+      <div className="grid gap-2 text-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <AgentStatusBadge status={agent.status} />
+          <span className="truncate font-medium">{agent.name}</span>
+        </div>
+        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{agent.description || "No description."}</p>
+      </div>
+      <dl className="grid gap-2">
+        <AgentBadgeProperty label="Enabled">
+          <AgentEnabledBadge enabled={agent.enabled} />
+        </AgentBadgeProperty>
+        <AgentProperty label="Runtime" value={runtimeLabel} icon={<Monitor aria-hidden="true" />} />
+        <AgentSelectProperty
+          label="Model"
+          value={modelValue}
+          options={modelOptions}
+          icon={<Code2 aria-hidden="true" />}
+          disabled={savingSetting !== null}
+          onChange={(model) => void updateAgentSetting("model", { model })}
+        />
+        <AgentSelectProperty
+          label="Reasoning"
+          value={reasoningValue}
+          options={reasoningOptions}
+          icon={<Layers3 aria-hidden="true" />}
+          disabled={savingSetting !== null}
+          onChange={(modelReasoningEffort) => void updateAgentSetting("reasoning", { modelReasoningEffort })}
+        />
+      </dl>
+      <form id={instructionsFormId} className="grid gap-2" onSubmit={(event) => { event.preventDefault(); void saveInstructions(); }}>
+        <FieldGroup>
+          <Field className="gap-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <FieldLabel htmlFor={instructionsId}>Instructions</FieldLabel>
+              <Button
+                type="submit"
+                size="icon-sm"
+                form={instructionsFormId}
+                disabled={savingInstructions || instructionsText === agent.instructions}
+                aria-label={savingInstructions ? "Saving instructions" : "Save instructions"}
+                title={savingInstructions ? "Saving instructions" : "Save instructions"}
+              >
+                <Save data-icon="inline-start" />
+              </Button>
+            </div>
+            <Textarea
+              id={instructionsId}
+              className="min-h-40 resize-y font-mono text-xs leading-relaxed"
+              value={instructionsText}
+              required
+              onChange={(event) => setInstructionsText(event.target.value)}
+            />
+          </Field>
+        </FieldGroup>
+      </form>
     </div>
   );
 }
@@ -1994,7 +2127,6 @@ function WorkflowOrchestratorView({
   const inputDefinition = definitionByEventType.get(draft.inputEventType);
   const outputDefinition = definitionByEventType.get(draft.outputEventType);
   const targetAgent = agentById.get(draft.targetAgentId);
-  const selectedEventDefinition = selectedNode === "output" ? outputDefinition : inputDefinition;
   const canSave = Boolean(draft.inputEventType && draft.targetAgentId && draft.outputEventType);
   const eventOptions = workflowEventOptions(activeDefinitions);
   const policyOptions = workflowPolicyOptions(data.policies);
@@ -2069,24 +2201,28 @@ function WorkflowOrchestratorView({
     }));
   };
 
-  const handleEmbeddedEventSaved = (definition: EventDefinition) => {
-    if (selectedNode === "output") {
-      updateDraft({ outputEventType: definition.eventType });
-      return;
-    }
+  const handleEmbeddedPolicyDraftChange = (policyDraft: Partial<Policy>, selectedEventType: string) => {
+    const nextTargetAgentId = policyTargetForForm(policyDraft, data.agents[0]?.id ?? "");
+    const nextOutputEventType = nextTargetAgentId !== draft.targetAgentId
+      ? findOutputEventDefinition(nextTargetAgentId, activeDefinitions)?.eventType ?? draft.outputEventType
+      : draft.outputEventType;
+
+    updateDraft({
+      policyName: policyDraft.name ?? "",
+      policyDescription: policyDraft.description ?? "",
+      policyActive: policyDraft.active ?? true,
+      inputEventType: selectedEventType,
+      targetAgentId: nextTargetAgentId,
+      outputEventType: nextOutputEventType
+    });
+  };
+
+  const handleInputEventSaved = (definition: EventDefinition) => {
     updateDraft({ inputEventType: definition.eventType });
   };
 
-  const handleEmbeddedEventNew = () => {
-    if (selectedNode === "output") {
-      updateDraft({ outputEventType: "" });
-      return;
-    }
-    updateDraft({ inputEventType: "" });
-  };
-
-  const handleEmbeddedEventDeleted = () => {
-    handleEmbeddedEventNew();
+  const handleOutputEventSaved = (definition: EventDefinition) => {
+    updateDraft({ outputEventType: definition.eventType });
   };
 
   const saveWorkflow = async () => {
@@ -2130,160 +2266,143 @@ function WorkflowOrchestratorView({
   return (
     <div className="grid gap-4">
       <Card>
-        <CardHeader className="gap-1.5 px-4 py-3">
+        <CardHeader className="gap-1.5 px-4 py-3 has-data-[slot=card-action]:grid-cols-1 sm:has-data-[slot=card-action]:grid-cols-[1fr_auto]">
           <CardTitle className="flex items-center gap-2 text-base">
             <Workflow data-icon="inline-start" />
             Workflows
           </CardTitle>
+          <CardAction className="col-start-1 row-span-1 row-start-2 justify-self-start self-start sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end sm:self-center">
+            <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+              <Field orientation="horizontal" className="w-fit shrink-0 items-center gap-3 rounded-md border border-divider-strong bg-panel-section px-2.5 py-1.5">
+                <FieldLabel htmlFor="workflow-enabled">Enabled</FieldLabel>
+                <Switch id="workflow-enabled" size="sm" checked={draft.policyActive} onCheckedChange={(policyActive) => updateDraft({ policyActive })} />
+              </Field>
+              <Button
+                type="button"
+                size="icon-sm"
+                disabled={!canSave}
+                className="shrink-0"
+                aria-label="Save workflow"
+                title="Save workflow"
+                onClick={() => void saveWorkflow()}
+              >
+                <Save data-icon="inline-start" />
+              </Button>
+            </div>
+          </CardAction>
         </CardHeader>
 
         <CardContent className="p-0">
-          <form
-            className="grid min-h-[18rem] lg:grid-cols-[minmax(0,1fr)_20rem]"
-            onSubmit={(event) => { event.preventDefault(); void saveWorkflow(); }}
-          >
-            <div className="relative min-w-0 overflow-hidden">
-              <div className="absolute left-3 top-3 hidden flex-col gap-2 rounded-lg border border-divider-strong bg-panel/90 p-2 shadow-sm md:flex">
-                {[
-                  { node: "input" as const, icon: Inbox, label: "Input event" },
-                  { node: "policy" as const, icon: Link2, label: "Policy link" },
-                  { node: "agent" as const, icon: Bot, label: "Agent" },
-                  { node: "output" as const, icon: Route, label: "Output event" }
-                ].map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Button
-                      key={item.node}
-                      type="button"
-                      size="icon-sm"
-                      variant={selectedNode === item.node ? "default" : "ghost"}
-                      title={item.label}
-                      onClick={() => setSelectedNode(item.node)}
-                    >
-                      <Icon data-icon="inline-start" />
-                      <span className="sr-only">{item.label}</span>
-                    </Button>
-                  );
-                })}
-              </div>
-
-              <div className="grid min-h-[11rem] items-center gap-2 px-4 py-4 md:grid-cols-[minmax(6.5rem,1fr)_1.5rem_minmax(6.5rem,0.95fr)_1.5rem_minmax(6.5rem,0.95fr)_1.5rem_minmax(6.5rem,0.95fr)] md:pl-20 md:pr-4 xl:px-16">
-                <WorkflowNode
-                  node="input"
-                  selected={selectedNode === "input"}
-                  value={draft.inputEventType}
-                  options={eventOptions}
-                  onChange={selectInputEvent}
-                  onSelect={() => setSelectedNode("input")}
+          <div className="grid gap-4 p-4">
+            {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+              <WorkflowNode
+                node="input"
+                selected={selectedNode === "input"}
+                value={draft.inputEventType}
+                options={eventOptions}
+                onChange={selectInputEvent}
+                onSelect={() => setSelectedNode("input")}
+              >
+                <EventDefinitionEditor
+                  key={`workflow-input-${inputDefinition?.id ?? "new"}`}
+                  variant="embedded"
+                  showCatalogWarnings={false}
+                  data={data}
+                  eventDefinition={inputDefinition}
+                  saveEventDefinition={saveEventDefinition}
+                  removeEventDefinition={removeEventDefinition}
+                  onSaved={handleInputEventSaved}
+                  onNew={() => updateDraft({ inputEventType: "" })}
+                  onDeleted={() => updateDraft({ inputEventType: "" })}
                 />
-                <WorkflowConnector />
-                <WorkflowNode
-                  node="policy"
-                  selected={selectedNode === "policy"}
-                  value={draft.policyId ?? selectedPolicyId}
-                  options={policyOptions}
-                  onChange={selectPolicy}
-                  onSelect={() => setSelectedNode("policy")}
+              </WorkflowNode>
+              <WorkflowNode
+                node="policy"
+                selected={selectedNode === "policy"}
+                value={draft.policyId ?? selectedPolicyId}
+                options={policyOptions}
+                onChange={selectPolicy}
+                onSelect={() => setSelectedNode("policy")}
+              >
+                <PolicyEditor
+                  variant="embedded"
+                  data={data}
+                  policy={embeddedPolicy}
+                  save={save}
+                  remove={remove}
+                  newPolicyTemplate={buildWorkflowPolicyDraft}
+                  onSaved={handleEmbeddedPolicySaved}
+                  onDraftChange={handleEmbeddedPolicyDraftChange}
                 />
-                <WorkflowConnector />
-                <WorkflowNode
-                  node="agent"
-                  selected={selectedNode === "agent"}
-                  value={draft.targetAgentId}
-                  options={agentOptions}
-                  onChange={selectAgent}
-                  onSelect={() => setSelectedNode("agent")}
+              </WorkflowNode>
+              <WorkflowNode
+                node="agent"
+                selected={selectedNode === "agent"}
+                value={draft.targetAgentId}
+                options={agentOptions}
+                onChange={selectAgent}
+                onSelect={() => setSelectedNode("agent")}
+              >
+                <WorkflowAgentEditor agent={targetAgent} runtimes={data.runtimes} save={save} />
+              </WorkflowNode>
+              <WorkflowNode
+                node="output"
+                selected={selectedNode === "output"}
+                value={draft.outputEventType}
+                options={eventOptions}
+                onChange={selectOutputEvent}
+                onSelect={() => setSelectedNode("output")}
+              >
+                <EventDefinitionEditor
+                  key={`workflow-output-${outputDefinition?.id ?? "new"}`}
+                  variant="embedded"
+                  showCatalogWarnings={false}
+                  data={data}
+                  eventDefinition={outputDefinition}
+                  saveEventDefinition={saveEventDefinition}
+                  removeEventDefinition={removeEventDefinition}
+                  onSaved={handleOutputEventSaved}
+                  onNew={() => updateDraft({ outputEventType: "" })}
+                  onDeleted={() => updateDraft({ outputEventType: "" })}
                 />
-                <WorkflowConnector />
-                <WorkflowNode
-                  node="output"
-                  selected={selectedNode === "output"}
-                  value={draft.outputEventType}
-                  options={eventOptions}
-                  onChange={selectOutputEvent}
-                  onSelect={() => setSelectedNode("output")}
-                />
-              </div>
+              </WorkflowNode>
             </div>
-
-            <div className="flex min-w-0 flex-col border-t border-divider-strong lg:border-l lg:border-t-0">
-              <div className="flex flex-1 flex-col gap-4 p-5">
-                <h2 className="font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Properties</h2>
-                {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-                <FieldGroup>
-                  <Field className="gap-1.5">
-                    <FieldLabel htmlFor="workflow-name">Name</FieldLabel>
-                    <Input id="workflow-name" value={draft.policyName} onChange={(event) => updateDraft({ policyName: event.target.value })} />
-                  </Field>
-                  <Field className="gap-1.5">
-                    <FieldLabel htmlFor="workflow-description">Description</FieldLabel>
-                    <Textarea
-                      id="workflow-description"
-                      rows={6}
-                      className="min-h-32 resize-y"
-                      value={draft.policyDescription}
-                      onChange={(event) => updateDraft({ policyDescription: event.target.value })}
-                    />
-                  </Field>
-                </FieldGroup>
-              </div>
-              <div className="flex items-center justify-between gap-3 border-t border-divider-strong p-5">
-                <Field orientation="horizontal" className="w-fit shrink-0 items-center gap-3 rounded-md border border-divider-strong bg-panel-section px-3 py-2">
-                  <FieldLabel htmlFor="workflow-enabled">Enabled</FieldLabel>
-                  <Switch id="workflow-enabled" size="sm" checked={draft.policyActive} onCheckedChange={(policyActive) => updateDraft({ policyActive })} />
-                </Field>
-                <Button type="submit" disabled={!canSave} className="shrink-0">
-                  <Save data-icon="inline-start" />
-                  Save workflow
-                </Button>
-              </div>
-            </div>
-          </form>
+          </div>
         </CardContent>
       </Card>
-
-      {selectedNode === "agent" ? (
-        <AgentsView agent={targetAgent} runtimes={data.runtimes} save={save} />
-      ) : null}
-      {selectedNode === "policy" ? (
-        <PoliciesView
-          data={data}
-          policy={embeddedPolicy}
-          save={save}
-          remove={remove}
-          newPolicyTemplate={buildWorkflowPolicyDraft}
-          onSaved={handleEmbeddedPolicySaved}
-        />
-      ) : null}
-      {selectedNode === "input" || selectedNode === "output" ? (
-        <EventsView
-          key={`workflow-${selectedNode}-${selectedEventDefinition?.id ?? "new"}`}
-          data={data}
-          eventDefinition={selectedEventDefinition}
-          saveEventDefinition={saveEventDefinition}
-          removeEventDefinition={removeEventDefinition}
-          onSaved={handleEmbeddedEventSaved}
-          onNew={handleEmbeddedEventNew}
-          onDeleted={handleEmbeddedEventDeleted}
-        />
-      ) : null}
     </div>
   );
 }
 
-function PoliciesView({
-  data,
-  policy,
-  save,
-  remove,
-  newPolicyTemplate,
-  onSaved
-}: ViewProps & {
+function PoliciesView(props: ViewProps & {
   project?: Project;
   policy?: Partial<Policy>;
   newPolicyTemplate?: () => Partial<Policy>;
   onSaved?: (policy: Policy) => void;
 }) {
+  return <PolicyEditor {...props} />;
+}
+
+function PolicyEditor({
+  data,
+  policy,
+  save,
+  remove,
+  newPolicyTemplate,
+  onSaved,
+  onDraftChange,
+  variant = "panel"
+}: ViewProps & {
+  project?: Project;
+  policy?: Partial<Policy>;
+  newPolicyTemplate?: () => Partial<Policy>;
+  onSaved?: (policy: Policy) => void;
+  onDraftChange?: (policy: Partial<Policy>, selectedEventType: string) => void;
+  variant?: "panel" | "embedded";
+}) {
+  const formId = useId();
+  const embedded = variant === "embedded";
   const activeDefinitions = useMemo(
     () => data.eventDefinitions.filter((definition) => definition.active && definition.eventType),
     [data.eventDefinitions]
@@ -2307,6 +2426,27 @@ function PoliciesView({
     setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
     setError("");
   }, [activeDefinitions, createPolicyTemplate, policy]);
+
+  const updateForm = (patch: Partial<Policy>, nextSelectedEventType = selectedEventType) => {
+    const next = { ...form, ...patch };
+    setForm(next);
+    onDraftChange?.(next, nextSelectedEventType);
+  };
+
+  const updateSelectedEventType = (nextSelectedEventType: string) => {
+    setSelectedEventType(nextSelectedEventType);
+    onDraftChange?.(form, nextSelectedEventType);
+  };
+
+  const newPolicy = () => {
+    const next = createPolicyTemplate();
+    const nextSelectedEventType = eventTypesForPolicy(next)[0] ?? activeDefinitions[0]?.eventType ?? "";
+    setForm(next);
+    setSelectedEventType(nextSelectedEventType);
+    setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
+    setError("");
+    onDraftChange?.(next, nextSelectedEventType);
+  };
 
   const submit = async () => {
     setError("");
@@ -2332,99 +2472,78 @@ function PoliciesView({
     }
   };
 
+  const actions = (
+    <CrudActions
+      formId={formId}
+      newLabel="New"
+      saveLabel="Save policy"
+      id={form.id}
+      disabled={data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType)}
+      leading={<SwitchField label="Active" checked={form.active ?? true} onChange={(active) => updateForm({ active })} />}
+      onNew={newPolicy}
+      onDelete={() => void remove("policies", form.id!)}
+    />
+  );
+
+  const content = (
+    <>
+      {form.errors?.length ? <ErrorPreview errors={form.errors} /> : null}
+      {invalidSelectedEventType ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Policy references an event type that is not active in the event catalog: {invalidSelectedEventType}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      <form id={formId} className={cn("flex flex-col gap-4", embedded && "gap-3")} onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <FieldGroup>
+          <TextField label="Name" required value={form.name ?? ""} onChange={(name) => updateForm({ name })} />
+          <TextAreaField label="Description" rows={embedded ? 2 : 3} value={form.description ?? ""} onChange={(description) => updateForm({ description })} />
+          <SelectField
+            label="Target agent"
+            value={policyTargetForForm(form, data.agents[0]?.id ?? "")}
+            options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
+            onChange={(targetAgentId) => updateForm({ targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
+          />
+          {activeDefinitions.length === 0 ? (
+            <EmptyState title="No active event definitions." action="Create an active event before saving policies." />
+          ) : (
+            <SelectField
+              label="Handled event type"
+              value={selectedEventType}
+              options={[
+                ...activeDefinitions.map((definition) => ({ value: definition.eventType, label: `${definition.eventType} · ${definition.name}` })),
+                ...(invalidSelectedEventType ? [{ value: invalidSelectedEventType, label: `${invalidSelectedEventType} · unavailable` }] : [])
+              ]}
+              onChange={updateSelectedEventType}
+            />
+          )}
+          <TextAreaField label="Advanced match JSON" rows={embedded ? 5 : 8} value={advancedMatchText} onChange={setAdvancedMatchText} />
+        </FieldGroup>
+      </form>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="grid gap-3">
+        {actions}
+        {content}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 xl:max-w-3xl">
-      <Panel title={form.id ? "Update policy" : "Create policy"} icon={<GitBranch data-icon="inline-start" />}>
-        {form.errors?.length ? <ErrorPreview errors={form.errors} /> : null}
-        {invalidSelectedEventType ? (
-          <Alert variant="destructive">
-            <AlertDescription>
-              Policy references an event type that is not active in the event catalog: {invalidSelectedEventType}
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-        <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-          <FieldGroup>
-            <TextField label="Name" required value={form.name ?? ""} onChange={(name) => setForm({ ...form, name })} />
-            <TextAreaField label="Description" value={form.description ?? ""} onChange={(description) => setForm({ ...form, description })} />
-            <SelectField
-              label="Target agent"
-              value={policyTargetForForm(form, data.agents[0]?.id ?? "")}
-              options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
-              onChange={(targetAgentId) => setForm({ ...form, targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
-            />
-            {activeDefinitions.length === 0 ? (
-              <EmptyState title="No active event definitions." action="Create an active event before saving policies." />
-            ) : (
-              <SelectField
-                label="Handled event type"
-                value={selectedEventType}
-                options={[
-                  ...activeDefinitions.map((definition) => ({ value: definition.eventType, label: `${definition.eventType} · ${definition.name}` })),
-                  ...(invalidSelectedEventType ? [{ value: invalidSelectedEventType, label: `${invalidSelectedEventType} · unavailable` }] : [])
-                ]}
-                onChange={setSelectedEventType}
-              />
-            )}
-            <TextAreaField label="Advanced match JSON" rows={8} value={advancedMatchText} onChange={setAdvancedMatchText} />
-          </FieldGroup>
-          <CrudActions
-            newLabel="New"
-            saveLabel="Save policy"
-            id={form.id}
-            disabled={data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType)}
-            leading={<SwitchField label="Active" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />}
-            onNew={() => {
-              const next = createPolicyTemplate();
-              setForm(next);
-              setSelectedEventType(eventTypesForPolicy(next)[0] ?? activeDefinitions[0]?.eventType ?? "");
-              setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
-              setError("");
-            }}
-            onDelete={() => void remove("policies", form.id!)}
-          />
-        </form>
+      <Panel title={form.id ? "Update policy" : "Create policy"} icon={<GitBranch data-icon="inline-start" />} action={actions}>
+        {content}
       </Panel>
     </div>
   );
 }
 
-function ProducerRules({ definition }: { definition: EventDefinition }) {
-  if (definition.producers.length === 0) {
-    return <EmptyState title="No agent-run producers." action="This event can be published externally or by system integration." />;
-  }
-
-  return (
-    <div className="grid gap-2">
-      {definition.producers.map((producer, index) => (
-        <div key={`${producer.agentRole}-${index}`} className="rounded-md border bg-card px-3 py-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="rounded-md">{producer.agentRole}</Badge>
-            {producer.outcomes.map((outcome) => (
-              <Badge key={outcome} variant="outline" className="rounded-md">{outcome}</Badge>
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span>Git commit: {producer.requires?.gitCommitExists === true ? "required" : "not required"}</span>
-            <span>Checks: {producer.requires?.requiredChecksPassed === true ? "must pass" : "not required"}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function EventsView({
-  data,
-  eventDefinition,
-  saveEventDefinition,
-  removeEventDefinition,
-  navigate,
-  onSaved,
-  onNew,
-  onDeleted
-}: {
+function EventsView(props: {
   data: AppData;
   eventDefinition?: EventDefinition;
   saveEventDefinition: (eventDefinition: Partial<EventDefinition>) => Promise<EventDefinition>;
@@ -2434,6 +2553,34 @@ function EventsView({
   onNew?: () => void;
   onDeleted?: (id: string) => void;
 }) {
+  return <EventDefinitionEditor {...props} />;
+}
+
+function EventDefinitionEditor({
+  data,
+  eventDefinition,
+  saveEventDefinition,
+  removeEventDefinition,
+  navigate,
+  onSaved,
+  onNew,
+  onDeleted,
+  variant = "panel",
+  showCatalogWarnings = true
+}: {
+  data: AppData;
+  eventDefinition?: EventDefinition;
+  saveEventDefinition: (eventDefinition: Partial<EventDefinition>) => Promise<EventDefinition>;
+  removeEventDefinition: (id: string) => Promise<void>;
+  navigate?: (path: string) => void;
+  onSaved?: (eventDefinition: EventDefinition) => void;
+  onNew?: () => void;
+  onDeleted?: (id: string) => void;
+  variant?: "panel" | "embedded";
+  showCatalogWarnings?: boolean;
+}) {
+  const formId = useId();
+  const embedded = variant === "embedded";
   const [definitionForm, setDefinitionForm] = useState<Partial<EventDefinition>>(eventDefinition ?? eventDefinitionTemplate());
   const [producersText, setProducersText] = useState(readJson(definitionForm.producers ?? []));
   const [payloadExampleText, setPayloadExampleText] = useState(readJson(definitionForm.payloadExample ?? {}));
@@ -2483,9 +2630,53 @@ function EventsView({
     else navigate?.("/events");
   };
 
+  const actions = (
+    <CrudActions
+      formId={formId}
+      newLabel="New"
+      saveLabel="Save definition"
+      id={definitionForm.id}
+      leading={<SwitchField label="Active" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />}
+      onNew={newDefinition}
+      onDelete={() => {
+        if (!definitionForm.id) return;
+        void removeEventDefinition(definitionForm.id).then(() => {
+          onDeleted?.(definitionForm.id!);
+          if (!onDeleted) navigate?.("/events");
+        });
+      }}
+    />
+  );
+
+  const content = (
+    <>
+      {definitionForm.errors?.length ? <ErrorPreview errors={definitionForm.errors} /> : null}
+      {definitionError ? <Alert variant="destructive"><AlertDescription>{definitionError}</AlertDescription></Alert> : null}
+      <form id={formId} className={cn("flex flex-col gap-4", embedded ? "gap-3" : "mt-4")} onSubmit={(event) => { event.preventDefault(); void saveDefinition(); }}>
+        <FieldGroup>
+          <TextField label="Name" required value={definitionForm.name ?? ""} onChange={(name) => setDefinitionForm({ ...definitionForm, name })} />
+          <TextAreaField label="Description" rows={embedded ? 2 : 3} value={definitionForm.description ?? ""} onChange={(description) => setDefinitionForm({ ...definitionForm, description })} />
+          <TextField label="Event type" required value={definitionForm.eventType ?? ""} onChange={(eventType) => setDefinitionForm({ ...definitionForm, eventType })} />
+          <TextAreaField label="Producers JSON" rows={embedded ? 5 : 7} value={producersText} onChange={setProducersText} />
+          <TextAreaField label="Payload example JSON" rows={embedded ? 5 : 7} value={payloadExampleText} onChange={setPayloadExampleText} />
+          <TextAreaField label="Body" rows={embedded ? 3 : 4} value={definitionForm.body ?? ""} onChange={(body) => setDefinitionForm({ ...definitionForm, body })} />
+        </FieldGroup>
+      </form>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="grid gap-3">
+        {actions}
+        {content}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4">
-      {missingPolicyEventTypes.length > 0 ? (
+      {showCatalogWarnings && missingPolicyEventTypes.length > 0 ? (
         <Alert variant="destructive">
           <AlertDescription>
             Missing active event definitions for policy event types: {missingPolicyEventTypes.join(", ")}
@@ -2493,41 +2684,10 @@ function EventsView({
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 2xl:grid-cols-[minmax(420px,0.8fr)_minmax(520px,0.9fr)]">
-        <Panel title={definitionForm.id ? "Update event definition" : "Create event definition"} icon={<Inbox data-icon="inline-start" />}>
-          {definitionForm.errors?.length ? <ErrorPreview errors={definitionForm.errors} /> : null}
-          {definitionError ? <Alert variant="destructive"><AlertDescription>{definitionError}</AlertDescription></Alert> : null}
-          <form className="mt-4 flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void saveDefinition(); }}>
-            <FieldGroup>
-              <TextField label="Name" required value={definitionForm.name ?? ""} onChange={(name) => setDefinitionForm({ ...definitionForm, name })} />
-              <TextAreaField label="Description" value={definitionForm.description ?? ""} onChange={(description) => setDefinitionForm({ ...definitionForm, description })} />
-              <TextField label="Event type" required value={definitionForm.eventType ?? ""} onChange={(eventType) => setDefinitionForm({ ...definitionForm, eventType })} />
-              <TextAreaField label="Producers JSON" rows={7} value={producersText} onChange={setProducersText} />
-              <TextAreaField label="Payload example JSON" rows={7} value={payloadExampleText} onChange={setPayloadExampleText} />
-              <TextAreaField label="Body" rows={4} value={definitionForm.body ?? ""} onChange={(body) => setDefinitionForm({ ...definitionForm, body })} />
-            </FieldGroup>
-            <CrudActions
-              newLabel="New"
-              saveLabel="Save definition"
-              id={definitionForm.id}
-              leading={<SwitchField label="Active" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />}
-              onNew={newDefinition}
-              onDelete={() => {
-                if (!definitionForm.id) return;
-                void removeEventDefinition(definitionForm.id).then(() => {
-                  onDeleted?.(definitionForm.id!);
-                  if (!onDeleted) navigate?.("/events");
-                });
-              }}
-            />
-          </form>
+      <div className="grid gap-4 xl:max-w-3xl">
+        <Panel title={definitionForm.id ? "Update event definition" : "Create event definition"} icon={<Inbox data-icon="inline-start" />} action={actions}>
+          {content}
         </Panel>
-
-        <div className="grid gap-4">
-          <Panel title="Agent-run production rules" icon={<Route data-icon="inline-start" />} compact>
-            {eventDefinition ? <ProducerRules definition={eventDefinition} /> : <EmptyState title="No event definition selected." />}
-          </Panel>
-        </div>
       </div>
     </div>
   );
@@ -2576,9 +2736,8 @@ function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promis
         description="Durable worker queue and completed outcomes."
         icon={<Activity data-icon="inline-start" />}
         action={(
-          <Button type="button" size="sm" variant="outline" onClick={() => void refresh()}>
+          <Button type="button" size="icon-sm" variant="outline" aria-label="Refresh" title="Refresh" onClick={() => void refresh()}>
             <RefreshCw data-icon="inline-start" />
-            Refresh
           </Button>
         )}
       >
@@ -2665,6 +2824,7 @@ function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promis
 function CrudActions({
   newLabel,
   saveLabel,
+  formId,
   id,
   disabled = false,
   leading,
@@ -2673,6 +2833,7 @@ function CrudActions({
 }: {
   newLabel: string;
   saveLabel: string;
+  formId: string;
   id?: string;
   disabled?: boolean;
   leading?: ReactNode;
@@ -2680,21 +2841,18 @@ function CrudActions({
   onDelete: () => void;
 }) {
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", leading ? "justify-between" : "justify-end")}>
-      {leading ? <div className="mr-auto">{leading}</div> : null}
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onNew}>
+    <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+      {leading}
+      <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
+        <Button type="button" size="icon-sm" variant="outline" aria-label={newLabel} title={newLabel} onClick={onNew}>
           <Plus data-icon="inline-start" />
-          {newLabel}
         </Button>
-        <Button type="submit" disabled={disabled}>
+        <Button type="submit" size="icon-sm" form={formId} disabled={disabled} aria-label={saveLabel} title={saveLabel}>
           <Save data-icon="inline-start" />
-          {saveLabel}
         </Button>
         {id ? (
-          <Button type="button" variant="destructive" onClick={onDelete}>
+          <Button type="button" size="icon-sm" variant="destructive" aria-label="Delete" title="Delete" onClick={onDelete}>
             <Trash2 data-icon="inline-start" />
-            Delete
           </Button>
         ) : null}
       </div>
