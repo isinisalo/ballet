@@ -5,6 +5,8 @@ import { isMap, parseDocument, stringify as stringifyYaml } from "yaml";
 import {
   Archive,
   Activity,
+  ArrowDown,
+  ArrowRight,
   Bot,
   CalendarDays,
   CheckCircle2,
@@ -16,7 +18,6 @@ import {
   GitBranch,
   Hash,
   Inbox,
-  Layers3,
   Menu,
   Monitor,
   Moon,
@@ -883,29 +884,6 @@ function AgentStatusDot({ status }: { status: Agent["status"] }) {
   );
 }
 
-function AgentStatusBadge({ status }: { status: Agent["status"] }) {
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "w-fit gap-1.5 rounded-md px-2 font-normal",
-        status === "online" ? "border-emerald-500/35 text-emerald-500" : "text-muted-foreground"
-      )}
-    >
-      <AgentStatusDot status={status} />
-      {status === "online" ? "Online" : "Offline"}
-    </Badge>
-  );
-}
-
-function AgentEnabledBadge({ enabled }: { enabled: boolean }) {
-  return (
-    <Badge variant={enabled ? "secondary" : "outline"} className="w-fit rounded-md px-2 font-normal">
-      {enabled ? "Enabled" : "Disabled"}
-    </Badge>
-  );
-}
-
 function Panel({ title, description, icon, children, action, compact = false }: { title: string; description?: string; icon: ReactNode; children: ReactNode; action?: ReactNode; compact?: boolean }) {
   return (
     <Card>
@@ -1382,7 +1360,7 @@ export function App() {
                   removeEventDefinition={removeEventDefinition}
                 />
               ) : null}
-              {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} /> : null}
+              {route.view === "agents" ? <AgentsView agent={selectedAgent} agents={data.agents} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView runtime={selectedRuntime} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "policies" ? <PoliciesView data={data} project={project} policy={selectedPolicy} save={save} remove={remove} /> : null}
@@ -1507,230 +1485,54 @@ function AdrsPage({ project, selectedAdr }: { project?: Project; selectedAdr?: A
 
 function AgentsView({
   agent,
+  agents,
   runtimes,
-  save
+  save,
+  remove,
+  navigate
 }: {
   agent?: Agent;
+  agents: Agent[];
   runtimes: Runtime[];
   save: ViewProps["save"];
+  remove: ViewProps["remove"];
+  navigate: (path: string) => void;
 }) {
-  const instructionsFormId = useId();
-  const [savingSetting, setSavingSetting] = useState<"model" | "reasoning" | null>(null);
-  const [instructionsText, setInstructionsText] = useState(agent?.instructions ?? "");
-  const [savingInstructions, setSavingInstructions] = useState(false);
-
-  useEffect(() => {
-    setInstructionsText(agent?.instructions ?? "");
-    setSavingInstructions(false);
-  }, [agent?.id, agent?.instructions]);
-
-  if (!agent) return <EmptyState title="No agent selected." />;
-
-  const runtime = runtimes.find((candidate) => candidate.enabled) ?? runtimes[0];
-  const runtimeLabel = runtime?.name || runtime?.type || "Codex";
-  const modelValue = agent.model || (typeof agent.frontmatter?.model === "string" ? agent.frontmatter.model : "") || "gpt-5.5";
-  const reasoningValue = agent.modelReasoningEffort || (typeof agent.frontmatter?.model_reasoning_effort === "string" ? agent.frontmatter.model_reasoning_effort : "") || "medium";
-  const modelOptions = codexModelOptions.some((option) => option.value === modelValue)
-    ? codexModelOptions
-    : [{ value: modelValue, label: modelValue }, ...codexModelOptions];
-  const reasoningOptions = reasoningEffortOptions.some((option) => option.value === reasoningValue)
-    ? reasoningEffortOptions
-    : [{ value: reasoningValue, label: reasoningValue }, ...reasoningEffortOptions];
-
-  const updateAgentSetting = async (setting: "model" | "reasoning", patch: Partial<Agent>) => {
-    setSavingSetting(setting);
-    try {
-      await save("agents", { ...agent, ...patch });
-    } finally {
-      setSavingSetting(null);
-    }
-  };
-
-  const saveInstructions = async () => {
-    setSavingInstructions(true);
-    try {
-      await save("agents", { ...agent, instructions: instructionsText });
-    } finally {
-      setSavingInstructions(false);
-    }
+  const agentOptions = workflowAgentOptions(agents);
+  const selectAgent = (agentId: string) => {
+    const selectedAgent = agents.find((candidate) => candidate.id === agentId);
+    if (selectedAgent?.relativePath) navigate(agentDocumentPath(selectedAgent.relativePath));
   };
 
   return (
-    <div className="grid min-h-[calc(100svh-2rem)] gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
-      <Card className="self-start overflow-hidden">
-        <CardHeader className="gap-4 p-5">
-          <div className="flex size-14 items-center justify-center rounded-lg bg-accent text-muted-foreground ring-1 ring-divider-strong">
-            <Bot className="size-7" aria-hidden="true" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <CardTitle className="text-lg leading-tight">{agent.name}</CardTitle>
-            <CardDescription className="text-sm leading-relaxed">{agent.description || "No description."}</CardDescription>
-            <AgentStatusBadge status={agent.status} />
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-0 p-0">
-          {agent.errors?.length ? (
-            <section className="border-t border-divider-strong px-5 py-4 first:border-t-0">
-              <h2 className="mb-3 font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Errors</h2>
-              <ErrorPreview errors={agent.errors} />
-            </section>
-          ) : null}
-          <section className="border-t border-divider-strong px-5 py-4 first:border-t-0">
-            <h2 className="mb-3.5 font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Properties</h2>
-            <dl className="flex flex-col gap-2.5">
-              <AgentBadgeProperty label="Enabled">
-                <AgentEnabledBadge enabled={agent.enabled} />
-              </AgentBadgeProperty>
-              <AgentProperty label="Runtime" value={runtimeLabel} icon={<Monitor aria-hidden="true" />} />
-              <AgentSelectProperty
-                label="Model"
-                value={modelValue}
-                options={modelOptions}
-                icon={<Code2 aria-hidden="true" />}
-                disabled={savingSetting !== null}
-                onChange={(model) => void updateAgentSetting("model", { model })}
-              />
-              <AgentSelectProperty
-                label="Reasoning effort"
-                value={reasoningValue}
-                options={reasoningOptions}
-                icon={<Layers3 aria-hidden="true" />}
-                disabled={savingSetting !== null}
-                onChange={(modelReasoningEffort) => void updateAgentSetting("reasoning", { modelReasoningEffort })}
-              />
-            </dl>
-          </section>
-          <section className="border-t border-divider-strong px-5 py-4 first:border-t-0">
-            <h2 className="mb-3.5 flex items-center gap-2 font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">
-              Skills
-              <span className="font-sans text-[0.7rem] font-normal text-muted-foreground">{agent.skills.length}</span>
-            </h2>
-            {agent.skills.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {agent.skills.map((skill) => (
-                  <Badge
-                    key={`${skill.id}-${skill.metadata.path ?? ""}`}
-                    variant="secondary"
-                    className={cn(
-                      "max-w-full justify-start rounded-md font-mono text-[0.68rem] font-normal",
-                      skill.enabled === false && "border-border bg-transparent text-muted-foreground opacity-60"
-                    )}
-                    title={skill.enabled === false ? `${skill.name} disabled` : skill.name}
-                  >
-                    <span className="truncate">{skill.name}</span>
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No skills attached.</p>
-            )}
-          </section>
-        </CardContent>
-      </Card>
-
-      <Card className="min-w-0">
-        <CardHeader className="px-5 py-3 has-data-[slot=card-action]:grid-cols-1 sm:has-data-[slot=card-action]:grid-cols-[1fr_auto]">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <FileKey2 className="size-3.5" aria-hidden="true" />
-            Instructions
-          </CardTitle>
-          <CardAction className="col-start-1 row-span-1 row-start-2 justify-self-start self-start sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end sm:self-center">
-            <Button
-              type="submit"
-              size="icon-sm"
-              form={instructionsFormId}
-              disabled={savingInstructions || instructionsText === agent.instructions}
-              aria-label={savingInstructions ? "Saving instructions" : "Save instructions"}
-              title={savingInstructions ? "Saving instructions" : "Save instructions"}
-            >
-              <Save data-icon="inline-start" />
-            </Button>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="p-5">
-          <form id={instructionsFormId} className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void saveInstructions(); }}>
-            <FieldGroup>
-              <Field>
-                <FieldLabel>Markdown</FieldLabel>
-                <Textarea
-                  className="min-h-72 resize-y font-mono text-sm leading-relaxed"
-                  value={instructionsText}
-                  required
-                  onChange={(event) => setInstructionsText(event.target.value)}
-                />
-              </Field>
-            </FieldGroup>
-            <section className="flex flex-col gap-2.5">
-              <h2 className="font-mono text-[0.7rem] font-semibold uppercase leading-none text-section-heading">Preview</h2>
-              <ScrollArea className="h-[min(36svh,24rem)] rounded-lg border bg-background">
-                <div className="agent-instructions-preview min-w-0 p-5 md:p-6">
-                  <MarkdownBody source={instructionsText} title={agent.name} />
-                </div>
-              </ScrollArea>
-            </section>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function AgentProperty({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3 text-sm">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="flex min-w-0 items-center gap-2 text-foreground">
-        <span className="text-muted-foreground [&>svg]:size-3.5">{icon}</span>
-        <span className="truncate">{value}</span>
-      </dd>
-    </div>
-  );
-}
-
-function AgentBadgeProperty({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3 text-sm">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="min-w-0">{children}</dd>
-    </div>
-  );
-}
-
-function AgentSelectProperty({
-  label,
-  value,
-  options,
-  icon,
-  disabled,
-  onChange
-}: {
-  label: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  icon: ReactNode;
-  disabled?: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3 text-sm">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="flex min-w-0 items-center gap-2 text-foreground">
-        <span className="text-muted-foreground [&>svg]:size-3.5">{icon}</span>
-        <Select value={value} onValueChange={onChange} disabled={disabled}>
-          <SelectTrigger size="sm" className="h-7 min-w-0 max-w-full flex-1 justify-between">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="start">
-            <SelectGroup>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </dd>
+    <div className="grid gap-4 xl:max-w-3xl">
+      <WorkflowAgentEditor
+        agent={agent}
+        runtimes={runtimes}
+        save={save}
+        remove={remove}
+        onSaved={(saved) => {
+          if (saved.relativePath) navigate(agentDocumentPath(saved.relativePath));
+        }}
+        onDeleted={() => navigate("/agents")}
+        renderEmbedded={({ actions, content, form }) => (
+          <WorkflowNode
+            node="agent"
+            selected
+            value={form.id ?? ""}
+            options={agentOptions}
+            onChange={selectAgent}
+            onSelect={() => undefined}
+            footerActions={actions}
+            showSummaryLabel={false}
+            showEditorHeader={false}
+            compactSummary
+            inlineSummary
+          >
+            {content}
+          </WorkflowNode>
+        )}
+      />
     </div>
   );
 }
@@ -1896,6 +1698,11 @@ const workflowPolicyOptions = (policies: Policy[]) => [
 const workflowFallbackPolicyName = (inputEventType: string, agentName: string) =>
   inputEventType && agentName ? `Route ${inputEventType} to ${agentName}` : "New workflow policy";
 
+const workflowOptionLabel = (options: Array<{ value: string; label: string }>, value: string) =>
+  options.find((option) => option.value === value)?.label ?? value;
+
+const workflowEditorId = (node: WorkflowNodeId) => `workflow-${node}-editor`;
+
 function WorkflowNode({
   node,
   selected,
@@ -1904,6 +1711,11 @@ function WorkflowNode({
   onChange,
   onSelect,
   headerActions,
+  footerActions,
+  showSummaryLabel = true,
+  showEditorHeader = true,
+  compactSummary = false,
+  inlineSummary = false,
   children
 }: {
   node: WorkflowNodeId;
@@ -1913,6 +1725,11 @@ function WorkflowNode({
   onChange?: (value: string) => void;
   onSelect: () => void;
   headerActions?: ReactNode;
+  footerActions?: ReactNode;
+  showSummaryLabel?: boolean;
+  showEditorHeader?: boolean;
+  compactSummary?: boolean;
+  inlineSummary?: boolean;
   children?: ReactNode;
 }) {
   const config = workflowNodeConfig[node];
@@ -1922,47 +1739,93 @@ function WorkflowNode({
   return (
     <div
       className={cn(
-        "flex min-h-20 w-full min-w-0 flex-col gap-3 rounded-lg border border-border bg-card px-3 py-3 text-card-foreground transition",
-        selected && "border-ring bg-accent ring-2 ring-ring/30"
+        "flex min-w-0 flex-col rounded-lg border border-border bg-card text-card-foreground transition md:basis-0 md:grow md:shrink",
+        selected && "border-ring bg-accent/40 ring-2 ring-ring/30 md:grow-[2]"
       )}
     >
-      <div className={cn("grid items-start gap-2", headerActions ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1")}>
+      <div className="relative">
         <button
           type="button"
-          className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+          className={cn(
+            "flex w-full min-w-0 rounded-lg px-3 outline-none transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40",
+            inlineSummary
+              ? "min-h-12 flex-row items-center justify-start gap-2 py-2 text-left"
+              : "flex-col items-center justify-center gap-2 text-center",
+            !inlineSummary && (compactSummary ? "min-h-20 py-3" : "min-h-24 py-4")
+          )}
+          aria-controls={workflowEditorId(node)}
+          aria-expanded={selected}
           aria-pressed={selected}
           onClick={onSelect}
         >
-          <Icon className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">{config.label}</span>
-        </button>
-        {headerActions ? <div className="shrink-0 justify-self-end">{headerActions}</div> : null}
-      </div>
-      {hasSelect && options ? (
-        options.length > 0 ? (
-          <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className="h-8 w-full min-w-0 px-2 text-xs shadow-none [&>span]:truncate">
-              <SelectValue placeholder="Not selected" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {options.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        ) : (
-          <span className="flex h-8 w-full items-center justify-center rounded-md border border-border bg-background px-2 text-xs text-muted-foreground">
-            No options
+          <Icon className={cn("shrink-0 text-muted-foreground", inlineSummary ? "size-4" : "size-5")} aria-hidden="true" />
+          {showSummaryLabel ? (
+            <span className="max-w-full truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">
+              {config.label}
+            </span>
+          ) : null}
+          <span className={cn("max-w-full truncate font-mono leading-none text-muted-foreground", inlineSummary ? "text-xs" : "text-[0.68rem]")}>
+            {workflowOptionLabel(options ?? [], value) || "Not selected"}
           </span>
-        )
-      ) : (
-        <span className="max-w-full truncate font-mono text-[0.68rem] leading-none text-muted-foreground">{value || "Not selected"}</span>
-      )}
-      {children ? <div className="min-w-0 border-t border-divider-strong pt-3">{children}</div> : null}
+        </button>
+      </div>
+
+      <div
+        id={workflowEditorId(node)}
+        hidden={!selected}
+        className={cn("min-w-0 border-t border-divider-strong p-3 pt-3", !selected && "hidden")}
+      >
+        {showEditorHeader ? (
+          <div className={cn("grid items-start gap-3", headerActions ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1")}>
+            <div className="flex min-w-0 items-center gap-2">
+              <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="truncate text-xs font-semibold uppercase leading-none tracking-normal text-foreground">{config.label}</span>
+            </div>
+            {headerActions ? <div className="shrink-0 justify-self-end">{headerActions}</div> : null}
+          </div>
+        ) : null}
+        <div className={cn("grid gap-3", showEditorHeader && "mt-3")}>
+          {hasSelect && options ? (
+            options.length > 0 ? (
+              <Select value={value} onValueChange={onChange}>
+                <SelectTrigger className="h-8 w-full min-w-0 px-2 text-xs shadow-none [&>span]:truncate">
+                  <SelectValue placeholder="Not selected" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            ) : (
+              <span className="flex h-8 w-full items-center justify-center rounded-md border border-border bg-background px-2 text-xs text-muted-foreground">
+                No options
+              </span>
+            )
+          ) : (
+            <span className="max-w-full truncate font-mono text-[0.68rem] leading-none text-muted-foreground">{value || "Not selected"}</span>
+          )}
+          {children ? <div className="min-w-0 border-t border-divider-strong pt-3">{children}</div> : null}
+        </div>
+      </div>
+      {selected && footerActions ? (
+        <div className="flex min-h-12 items-center justify-end border-t border-divider-strong px-3 py-2">
+          {footerActions}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function WorkflowConnector() {
+  return (
+    <div className="flex h-6 shrink-0 items-center justify-center text-muted-foreground md:h-24 md:w-8" aria-hidden="true" data-workflow-connector="true">
+      <ArrowDown className="size-5 md:hidden" />
+      <ArrowRight className="hidden size-6 md:block" />
     </div>
   );
 }
@@ -1984,7 +1847,7 @@ function WorkflowAgentEditor({
   onSaved?: (agent: Agent) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
-  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<Agent> }) => ReactNode;
 }) {
   const formId = useId();
   const instructionsId = useId();
@@ -2133,13 +1996,16 @@ function WorkflowAgentEditor({
     </div>
   );
 
-  if (renderEmbedded) return renderEmbedded({ actions, content });
+  if (renderEmbedded) return renderEmbedded({ actions, content, form });
 
   return (
-    <div className="grid gap-3">
-      {actions}
+    <Panel
+      title={form.id ? "Update agent" : "Create agent"}
+      icon={<Bot data-icon="inline-start" />}
+      action={actions}
+    >
       {content}
-    </div>
+    </Panel>
   );
 }
 
@@ -2168,7 +2034,7 @@ function WorkflowOrchestratorView({
   saveEventDefinition: (eventDefinition: Partial<EventDefinition>) => Promise<EventDefinition>;
   removeEventDefinition: (id: string) => Promise<void>;
 }) {
-  const [selectedNode, setSelectedNode] = useState<WorkflowNodeId>("input");
+  const [selectedNode, setSelectedNode] = useState<WorkflowNodeId | null>(null);
   const [error, setError] = useState("");
 
   const selectedPolicy = data.policies.find((policy) => policy.id === selectedPolicyId);
@@ -2219,7 +2085,6 @@ function WorkflowOrchestratorView({
   useEffect(() => {
     if (selectedPolicyId === newWorkflowId && creatingWorkflow) {
       setDraft(buildDraft());
-      setSelectedNode("input");
       setError("");
       return;
     }
@@ -2235,6 +2100,7 @@ function WorkflowOrchestratorView({
   const eventOptions = workflowEventOptions(activeDefinitions);
   const policyOptions = workflowPolicyOptions(data.policies);
   const agentOptions = workflowAgentOptions(data.agents);
+  const policyValue = draft.policyId ?? selectedPolicyId;
 
   const updateDraft = (patch: Partial<WorkflowDraftState>) => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -2411,7 +2277,7 @@ function WorkflowOrchestratorView({
         <CardContent className="p-0">
           <div className="grid gap-4 p-4">
             {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+            <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:items-start">
               <EventDefinitionEditor
                 key={`workflow-input-${inputDefinition?.id ?? "new"}`}
                 variant="embedded"
@@ -2437,6 +2303,7 @@ function WorkflowOrchestratorView({
                   </WorkflowNode>
                 )}
               />
+              <WorkflowConnector />
               <PolicyEditor
                 variant="embedded"
                 data={data}
@@ -2450,7 +2317,7 @@ function WorkflowOrchestratorView({
                   <WorkflowNode
                     node="policy"
                     selected={selectedNode === "policy"}
-                    value={draft.policyId ?? selectedPolicyId}
+                    value={policyValue}
                     options={policyOptions}
                     onChange={selectPolicy}
                     onSelect={() => setSelectedNode("policy")}
@@ -2460,6 +2327,7 @@ function WorkflowOrchestratorView({
                   </WorkflowNode>
                 )}
               />
+              <WorkflowConnector />
               <WorkflowAgentEditor
                 agent={targetAgent}
                 runtimes={data.runtimes}
@@ -2476,12 +2344,17 @@ function WorkflowOrchestratorView({
                     options={agentOptions}
                     onChange={selectAgent}
                     onSelect={() => setSelectedNode("agent")}
-                    headerActions={actions}
+                    footerActions={actions}
+                    showSummaryLabel={false}
+                    showEditorHeader={false}
+                    compactSummary
+                    inlineSummary
                   >
                     {content}
                   </WorkflowNode>
                 )}
               />
+              <WorkflowConnector />
               <EventDefinitionEditor
                 key={`workflow-output-${outputDefinition?.id ?? "new"}`}
                 variant="embedded"
