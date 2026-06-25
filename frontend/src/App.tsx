@@ -79,7 +79,7 @@ import {
   type WorkflowDraft
 } from "./workflow-orchestrator";
 
-type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "workflow-orchestrator" | "agents" | "skills" | "runtimes" | "policies" | "events" | "agent-runs";
+type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "workflow" | "agents" | "skills" | "runtimes" | "policies" | "events" | "agent-runs";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies";
 
 interface RouteState {
@@ -294,7 +294,7 @@ const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  if (url.pathname === "/workflow-orchestrator") return { view: "workflow-orchestrator" };
+  if (url.pathname === "/workflow") return { view: "workflow" };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/runtimes") return { view: "runtimes", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/policies") return { view: "policies", documentPath: url.searchParams.get("path") ?? undefined };
@@ -948,7 +948,7 @@ function DataTable({
 }
 
 const newWorkflowId = "__new_workflow__";
-type WorkflowNodeId = "input" | "policy" | "agent" | "output";
+type WorkflowNodeId = "policy" | "agent" | "output";
 type WorkflowDraftState = WorkflowDraft & {
   policyId?: string;
   policyName: string;
@@ -990,7 +990,7 @@ function AppSidebar({
   const runtimesOpen = route.view === "runtimes";
   const policiesOpen = route.view === "policies";
   const eventsOpen = route.view === "events";
-  const workflowOpen = route.view === "workflow-orchestrator";
+  const workflowOpen = route.view === "workflow";
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const item = (label: string, icon: ReactNode, path: string, active: boolean) => (
@@ -1218,7 +1218,7 @@ export function App() {
   const selectWorkflow = (policyId: string) => {
     setCreatingWorkflow(policyId === newWorkflowId);
     setSelectedWorkflowPolicyId(policyId);
-    navigate("/workflow-orchestrator");
+    navigate("/workflow");
   };
 
   const refresh = useCallback(async () => {
@@ -1344,7 +1344,7 @@ export function App() {
               {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} /> : null}
               {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} /> : null}
               {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} /> : null}
-              {route.view === "workflow-orchestrator" ? (
+              {route.view === "workflow" ? (
                 <WorkflowOrchestratorView
                   data={data}
                   activeDefinitions={activeWorkflowDefinitions}
@@ -1657,10 +1657,6 @@ const workflowNodeConfig: Record<WorkflowNodeId, {
   label: string;
   icon: LucideIcon;
 }> = {
-  input: {
-    label: "INPUT EVENT",
-    icon: Inbox
-  },
   policy: {
     label: "POLICY",
     icon: GitBranch
@@ -1714,6 +1710,7 @@ function WorkflowNode({
   footerActions,
   showSummaryLabel = true,
   showEditorHeader = true,
+  showEditorValue = true,
   compactSummary = false,
   inlineSummary = false,
   summarySelect = false,
@@ -1729,6 +1726,7 @@ function WorkflowNode({
   footerActions?: ReactNode;
   showSummaryLabel?: boolean;
   showEditorHeader?: boolean;
+  showEditorValue?: boolean;
   compactSummary?: boolean;
   inlineSummary?: boolean;
   summarySelect?: boolean;
@@ -1838,12 +1836,12 @@ function WorkflowNode({
           </div>
         ) : null}
         <div className={cn("grid gap-3", showEditorHeader && "mt-3")}>
-          {summarySelect ? null : hasSelect && options ? (
+          {summarySelect || !showEditorValue ? null : hasSelect && options ? (
             renderSelect("w-full")
           ) : (
             <span className="max-w-full truncate font-mono text-[0.68rem] leading-none text-muted-foreground">{value || "Not selected"}</span>
           )}
-          {children ? <div className={cn("min-w-0", !summarySelect && "border-t border-divider-strong pt-3")}>{children}</div> : null}
+          {children ? <div className={cn("min-w-0", !summarySelect && showEditorValue && "border-t border-divider-strong pt-3")}>{children}</div> : null}
         </div>
       </div>
       {selected && footerActions ? (
@@ -1872,6 +1870,7 @@ function WorkflowAgentEditor({
   onSaved,
   onNew,
   onDeleted,
+  showNameField = true,
   renderEmbedded
 }: {
   agent?: Agent;
@@ -1881,6 +1880,7 @@ function WorkflowAgentEditor({
   onSaved?: (agent: Agent) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
+  showNameField?: boolean;
   renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<Agent> }) => ReactNode;
 }) {
   const formId = useId();
@@ -2011,7 +2011,7 @@ function WorkflowAgentEditor({
             </Button>
         </div>
         <FieldGroup>
-          <TextField label="Name" required compact value={form.name ?? ""} onChange={(name) => updateForm({ name })} />
+          {showNameField ? <TextField label="Name" required compact value={form.name ?? ""} onChange={(name) => updateForm({ name })} /> : null}
           <TextAreaField label="Description" rows={2} compact value={form.description ?? ""} onChange={(description) => updateForm({ description })} />
         </FieldGroup>
         <FieldGroup>
@@ -2128,13 +2128,11 @@ function WorkflowOrchestratorView({
     setError("");
   }, [buildDraft, creatingWorkflow, selectedPolicy, selectedPolicyId]);
 
-  const inputDefinition = definitionByEventType.get(draft.inputEventType);
   const outputDefinition = definitionByEventType.get(draft.outputEventType);
   const targetAgent = agentById.get(draft.targetAgentId);
   const canSave = Boolean(draft.inputEventType && draft.targetAgentId && draft.outputEventType);
   const eventOptions = workflowEventOptions(activeDefinitions);
   const policyOptions = workflowPolicyOptions(data.policies);
-  const agentOptions = workflowAgentOptions(data.agents);
   const policyValue = draft.policyId ?? selectedPolicyId;
 
   useEffect(() => {
@@ -2158,11 +2156,6 @@ function WorkflowOrchestratorView({
     setDraft((current) => ({ ...current, ...patch }));
   };
 
-  const selectInputEvent = (inputEventType: string) => {
-    setSelectedNode("input");
-    updateDraft({ inputEventType });
-  };
-
   const selectPolicy = (policyId: string) => {
     setSelectedPolicyId(policyId);
     setSelectedNode("policy");
@@ -2173,12 +2166,6 @@ function WorkflowOrchestratorView({
     } else {
       setCreatingWorkflow(false);
     }
-  };
-
-  const selectAgent = (targetAgentId: string) => {
-    setSelectedNode("agent");
-    const nextOutput = findOutputEventDefinition(targetAgentId, activeDefinitions)?.eventType ?? draft.outputEventType;
-    updateDraft({ targetAgentId, outputEventType: nextOutput });
   };
 
   const selectOutputEvent = (outputEventType: string) => {
@@ -2239,10 +2226,6 @@ function WorkflowOrchestratorView({
     });
   };
 
-  const handleInputEventSaved = (definition: EventDefinition) => {
-    updateDraft({ inputEventType: definition.eventType });
-  };
-
   const handleOutputEventSaved = (definition: EventDefinition) => {
     updateDraft({ outputEventType: definition.eventType });
   };
@@ -2265,7 +2248,7 @@ function WorkflowOrchestratorView({
   const saveWorkflow = async () => {
     setError("");
     try {
-      if (!draft.inputEventType) throw new Error("Select an input event.");
+      if (!draft.inputEventType) throw new Error("Select a handled event type.");
       if (!draft.targetAgentId) throw new Error("Select an agent.");
       if (!draft.outputEventType) throw new Error("Select an output event.");
 
@@ -2330,37 +2313,6 @@ function WorkflowOrchestratorView({
           <div className="grid gap-4 p-4">
             {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
             <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:items-start">
-              <EventDefinitionEditor
-                key={`workflow-input-${inputDefinition?.id ?? "new"}`}
-                variant="embedded"
-                showCatalogWarnings={false}
-                data={data}
-                eventDefinition={inputDefinition}
-                saveEventDefinition={saveEventDefinition}
-                removeEventDefinition={removeEventDefinition}
-                onSaved={handleInputEventSaved}
-                onNew={() => updateDraft({ inputEventType: "" })}
-                onDeleted={() => updateDraft({ inputEventType: "" })}
-                renderEmbedded={({ actions, content }) => (
-                  <WorkflowNode
-                    node="input"
-                    selected={selectedNode === "input"}
-                    value={draft.inputEventType}
-                    options={eventOptions}
-                    onChange={selectInputEvent}
-                    onSelect={() => setSelectedNode("input")}
-                    footerActions={actions}
-                    showSummaryLabel={false}
-                    showEditorHeader={false}
-                    compactSummary
-                    inlineSummary
-                    summarySelect
-                  >
-                    {content}
-                  </WorkflowNode>
-                )}
-              />
-              <WorkflowConnector />
               <PolicyEditor
                 variant="embedded"
                 data={data}
@@ -2380,6 +2332,7 @@ function WorkflowOrchestratorView({
                     onSelect={() => setSelectedNode("policy")}
                     footerActions={actions}
                     showSummaryLabel={false}
+                    showEditorValue={false}
                     showEditorHeader={false}
                     compactSummary
                     inlineSummary
@@ -2398,16 +2351,16 @@ function WorkflowOrchestratorView({
                 onSaved={handleAgentSaved}
                 onNew={() => updateDraft({ targetAgentId: "" })}
                 onDeleted={handleAgentDeleted}
+                showNameField={false}
                 renderEmbedded={({ actions, content }) => (
                   <WorkflowNode
                     node="agent"
                     selected={selectedNode === "agent"}
-                    value={draft.targetAgentId}
-                    options={agentOptions}
-                    onChange={selectAgent}
+                    value={targetAgent?.name ?? draft.targetAgentId}
                     onSelect={() => setSelectedNode("agent")}
                     footerActions={actions}
                     showSummaryLabel={false}
+                    showEditorValue={false}
                     showEditorHeader={false}
                     compactSummary
                     inlineSummary
@@ -2650,13 +2603,6 @@ function PolicyEditor({
         <FieldGroup>
           <TextField label="Name" required compact={embedded} value={form.name ?? ""} onChange={(name) => updateForm({ name })} />
           <TextAreaField label="Description" rows={embedded ? 2 : 3} compact={embedded} value={form.description ?? ""} onChange={(description) => updateForm({ description })} />
-          <SelectField
-            label="Target agent"
-            value={policyTargetForForm(form, data.agents[0]?.id ?? "")}
-            options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
-            onChange={(targetAgentId) => updateForm({ targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
-            compact={embedded}
-          />
           {activeDefinitions.length === 0 ? (
             <EmptyState title="No active event definitions." action="Create an active event before saving policies." />
           ) : (
@@ -2671,6 +2617,13 @@ function PolicyEditor({
               compact={embedded}
             />
           )}
+          <SelectField
+            label="Target agent"
+            value={policyTargetForForm(form, data.agents[0]?.id ?? "")}
+            options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
+            onChange={(targetAgentId) => updateForm({ targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
+            compact={embedded}
+          />
         </FieldGroup>
       </form>
     </>
