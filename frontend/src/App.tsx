@@ -8,6 +8,7 @@ import {
   Bot,
   CalendarDays,
   CheckCircle2,
+  ChartNoAxesColumnIncreasing,
   ChevronDown,
   Code2,
   Eye,
@@ -181,6 +182,20 @@ const reasoningEffortOptions = [
   { value: "xhigh", label: "Extra High" }
 ];
 
+const reasoningEffortOrder = reasoningEffortOptions.map((option) => option.value);
+
+const reasoningEffortTone = (value: string) => {
+  if (value === "low") return "border-sky-500/30 bg-sky-500/10 text-sky-400 hover:bg-sky-500/15";
+  if (value === "medium") return "border-yellow-500/30 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/15";
+  if (value === "high") return "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/15";
+  return "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/15";
+};
+
+const nextReasoningEffort = (value: string) => {
+  const currentIndex = reasoningEffortOrder.indexOf(value);
+  return reasoningEffortOrder[(currentIndex + 1) % reasoningEffortOrder.length] ?? reasoningEffortOptions[0].value;
+};
+
 const skillTemplate = (): Partial<Skill> => ({
   name: "",
   description: "",
@@ -194,6 +209,17 @@ const runtimeTemplate = (): Partial<Runtime> => ({
   command: "codex",
   enabled: true,
   config: { cwd: ".", approvalPolicy: "never" }
+});
+
+const agentTemplate = (): Partial<Agent> => ({
+  name: "",
+  description: "",
+  instructions: "",
+  skills: [],
+  enabled: true,
+  status: "offline",
+  model: codexModelOptions[0]?.value ?? "gpt-5.5",
+  modelReasoningEffort: "medium"
 });
 
 const policyTemplate = (targetAgentId: string): Partial<Policy> => ({
@@ -742,7 +768,8 @@ function TextField({
   onChange,
   type = "text",
   required = false,
-  placeholder
+  placeholder,
+  compact = false
 }: {
   label: string;
   value: string | number;
@@ -750,11 +777,12 @@ function TextField({
   type?: string;
   required?: boolean;
   placeholder?: string;
+  compact?: boolean;
 }) {
   return (
-    <Field className="gap-1.5">
-      <FieldLabel>{label}</FieldLabel>
-      <Input value={value} type={type} required={required} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+    <Field className={compact ? "grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3" : "gap-1.5"}>
+      <FieldLabel className={compact ? "text-muted-foreground" : undefined}>{label}</FieldLabel>
+      <Input className={compact ? "min-w-0" : undefined} value={value} type={type} required={required} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </Field>
   );
 }
@@ -765,7 +793,8 @@ function TextAreaField({
   onChange,
   rows = 3,
   required = false,
-  className
+  className,
+  compact = false
 }: {
   label: string;
   value: string;
@@ -773,10 +802,11 @@ function TextAreaField({
   rows?: number;
   required?: boolean;
   className?: string;
+  compact?: boolean;
 }) {
   return (
     <Field className="gap-1.5">
-      <FieldLabel>{label}</FieldLabel>
+      <FieldLabel className={compact ? "text-muted-foreground" : undefined}>{label}</FieldLabel>
       <Textarea className={className} value={value} rows={rows} required={required} onChange={(event) => onChange(event.target.value)} />
     </Field>
   );
@@ -786,18 +816,20 @@ function SelectField({
   label,
   value,
   options,
-  onChange
+  onChange,
+  compact = false
 }: {
   label: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
+  compact?: boolean;
 }) {
   return (
-    <Field className="gap-1.5">
-      <FieldLabel>{label}</FieldLabel>
+    <Field className={compact ? "grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3" : "gap-1.5"}>
+      <FieldLabel className={compact ? "text-muted-foreground" : undefined}>{label}</FieldLabel>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="min-w-0 w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -816,10 +848,14 @@ function SelectField({
 
 function SwitchField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
-    <Field orientation="horizontal" className="w-fit items-center gap-2 rounded-md border border-divider-strong bg-panel-section px-2.5 py-1.5">
-      <FieldLabel>{label}</FieldLabel>
-      <Switch size="sm" checked={checked} onCheckedChange={onChange} />
-    </Field>
+    <Switch
+      size="default"
+      checked={checked}
+      aria-label={label}
+      title={label}
+      className="data-checked:bg-emerald-500 data-unchecked:bg-muted-foreground/40 dark:data-unchecked:bg-muted-foreground/45"
+      onCheckedChange={onChange}
+    />
   );
 }
 
@@ -1867,6 +1903,7 @@ function WorkflowNode({
   options,
   onChange,
   onSelect,
+  headerActions,
   children
 }: {
   node: WorkflowNodeId;
@@ -1875,6 +1912,7 @@ function WorkflowNode({
   options?: Array<{ value: string; label: string }>;
   onChange?: (value: string) => void;
   onSelect: () => void;
+  headerActions?: ReactNode;
   children?: ReactNode;
 }) {
   const config = workflowNodeConfig[node];
@@ -1888,15 +1926,18 @@ function WorkflowNode({
         selected && "border-ring bg-accent ring-2 ring-ring/30"
       )}
     >
-      <button
-        type="button"
-        className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
-        aria-pressed={selected}
-        onClick={onSelect}
-      >
-        <Icon className="size-4 shrink-0" aria-hidden="true" />
-        <span className="truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">{config.label}</span>
-      </button>
+      <div className={cn("grid items-start gap-2", headerActions ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1")}>
+        <button
+          type="button"
+          className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-md text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+          aria-pressed={selected}
+          onClick={onSelect}
+        >
+          <Icon className="size-4 shrink-0" aria-hidden="true" />
+          <span className="truncate text-[0.7rem] font-semibold uppercase leading-none tracking-normal text-foreground">{config.label}</span>
+        </button>
+        {headerActions ? <div className="shrink-0 justify-self-end">{headerActions}</div> : null}
+      </div>
       {hasSelect && options ? (
         options.length > 0 ? (
           <Select value={value} onValueChange={onChange}>
@@ -1929,29 +1970,38 @@ function WorkflowNode({
 function WorkflowAgentEditor({
   agent,
   runtimes,
-  save
+  save,
+  remove,
+  onSaved,
+  onNew,
+  onDeleted,
+  renderEmbedded
 }: {
   agent?: Agent;
   runtimes: Runtime[];
   save: ViewProps["save"];
+  remove: ViewProps["remove"];
+  onSaved?: (agent: Agent) => void;
+  onNew?: () => void;
+  onDeleted?: (id: string) => void;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
 }) {
-  const instructionsFormId = useId();
+  const formId = useId();
   const instructionsId = useId();
-  const [savingSetting, setSavingSetting] = useState<"model" | "reasoning" | null>(null);
-  const [instructionsText, setInstructionsText] = useState(agent?.instructions ?? "");
-  const [savingInstructions, setSavingInstructions] = useState(false);
+  const [form, setForm] = useState<Partial<Agent>>(agent ?? agentTemplate());
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    setInstructionsText(agent?.instructions ?? "");
-    setSavingInstructions(false);
-  }, [agent?.id, agent?.instructions]);
+    setForm(agent ?? agentTemplate());
+    setError("");
+  }, [agent]);
 
-  if (!agent) return <EmptyState title="No agent selected." />;
-
-  const runtime = runtimes.find((candidate) => candidate.enabled) ?? runtimes[0];
-  const runtimeLabel = runtime?.name || runtime?.type || "Codex";
-  const modelValue = agent.model || (typeof agent.frontmatter?.model === "string" ? agent.frontmatter.model : "") || "gpt-5.5";
-  const reasoningValue = agent.modelReasoningEffort || (typeof agent.frontmatter?.model_reasoning_effort === "string" ? agent.frontmatter.model_reasoning_effort : "") || "medium";
+  const frontmatterRuntime = typeof form.frontmatter?.runtime === "string" ? form.frontmatter.runtime : "";
+  const runtime = runtimes.find((candidate) => candidate.id === frontmatterRuntime || candidate.name === frontmatterRuntime) ?? runtimes.find((candidate) => candidate.enabled) ?? runtimes[0];
+  const runtimeValue = runtime?.id ?? "";
+  const runtimeOptions = runtimes.map((candidate) => ({ value: candidate.id, label: candidate.name || candidate.type }));
+  const modelValue = form.model || (typeof form.frontmatter?.model === "string" ? form.frontmatter.model : "") || "gpt-5.5";
+  const reasoningValue = form.modelReasoningEffort || (typeof form.frontmatter?.model_reasoning_effort === "string" ? form.frontmatter.model_reasoning_effort : "") || "medium";
   const modelOptions = codexModelOptions.some((option) => option.value === modelValue)
     ? codexModelOptions
     : [{ value: modelValue, label: modelValue }, ...codexModelOptions];
@@ -1959,82 +2009,139 @@ function WorkflowAgentEditor({
     ? reasoningEffortOptions
     : [{ value: reasoningValue, label: reasoningValue }, ...reasoningEffortOptions];
 
-  const updateAgentSetting = async (setting: "model" | "reasoning", patch: Partial<Agent>) => {
-    setSavingSetting(setting);
+  const updateForm = (patch: Partial<Agent>) => {
+    setForm((current) => ({ ...current, ...patch }));
+  };
+
+  const updateRuntime = (runtimeId: string) => {
+    updateForm({ frontmatter: { ...form.frontmatter, runtime: runtimeId } });
+  };
+
+  const newAgent = () => {
+    setForm(agentTemplate());
+    setError("");
+    onNew?.();
+  };
+
+  const submit = async () => {
+    setError("");
     try {
-      await save("agents", { ...agent, ...patch });
-    } finally {
-      setSavingSetting(null);
+      const name = form.name?.trim();
+      if (!name) throw new Error("Agent name is required.");
+      const saved = await save("agents", {
+        ...form,
+        name,
+        description: form.description ?? "",
+        instructions: form.instructions ?? "",
+        skills: form.skills ?? [],
+        enabled: form.enabled ?? true,
+        status: form.status ?? "offline",
+        model: modelValue,
+        modelReasoningEffort: reasoningValue
+      });
+      setForm(saved);
+      onSaved?.(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save agent.");
     }
   };
 
-  const saveInstructions = async () => {
-    setSavingInstructions(true);
-    try {
-      await save("agents", { ...agent, instructions: instructionsText });
-    } finally {
-      setSavingInstructions(false);
-    }
+  const deleteAgent = async () => {
+    if (!form.id) return;
+    const deletedId = form.id;
+    await remove("agents", deletedId);
+    setForm(agentTemplate());
+    setError("");
+    onDeleted?.(deletedId);
   };
 
-  return (
+  const actions = (
+    <CrudActions
+      formId={formId}
+      newLabel="New"
+      saveLabel="Save agent"
+      id={form.id}
+      disabled={!form.name?.trim()}
+      onNew={newAgent}
+      onDelete={() => void deleteAgent()}
+    />
+  );
+
+  const content = (
     <div className="grid gap-3">
-      {agent.errors?.length ? <ErrorPreview errors={agent.errors} /> : null}
-      <div className="grid gap-2 text-sm">
-        <div className="flex min-w-0 items-center gap-2">
-          <AgentStatusBadge status={agent.status} />
-          <span className="truncate font-medium">{agent.name}</span>
+      {form.errors?.length ? <ErrorPreview errors={form.errors} /> : null}
+      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      <form id={formId} className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3 text-sm">
+          <span className="text-muted-foreground">Runtime</span>
+          <div className="flex min-w-0 items-center gap-1.5 text-foreground">
+            <Select value={runtimeValue} onValueChange={updateRuntime} disabled={runtimeOptions.length === 0}>
+              <SelectTrigger size="sm" className="h-7 min-w-0 flex-[1_1_5.5rem] justify-between px-2">
+                <SelectValue placeholder="No runtime" />
+              </SelectTrigger>
+              <SelectContent align="start">
+                <SelectGroup>
+                  {runtimeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select value={modelValue} onValueChange={(model) => updateForm({ model })}>
+              <SelectTrigger size="sm" className="h-7 min-w-0 flex-[1_1_4.75rem] justify-between px-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="start">
+                <SelectGroup>
+                  {modelOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="outline"
+              className={cn("shrink-0", reasoningEffortTone(reasoningValue))}
+              aria-label={`Reasoning effort: ${reasoningOptions.find((option) => option.value === reasoningValue)?.label ?? reasoningValue}`}
+              title={`Reasoning effort: ${reasoningOptions.find((option) => option.value === reasoningValue)?.label ?? reasoningValue}`}
+              onClick={() => updateForm({ modelReasoningEffort: nextReasoningEffort(reasoningValue) })}
+            >
+              <ChartNoAxesColumnIncreasing data-icon="inline-start" />
+            </Button>
+          </div>
         </div>
-        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{agent.description || "No description."}</p>
-      </div>
-      <dl className="grid gap-2">
-        <AgentBadgeProperty label="Enabled">
-          <AgentEnabledBadge enabled={agent.enabled} />
-        </AgentBadgeProperty>
-        <AgentProperty label="Runtime" value={runtimeLabel} icon={<Monitor aria-hidden="true" />} />
-        <AgentSelectProperty
-          label="Model"
-          value={modelValue}
-          options={modelOptions}
-          icon={<Code2 aria-hidden="true" />}
-          disabled={savingSetting !== null}
-          onChange={(model) => void updateAgentSetting("model", { model })}
-        />
-        <AgentSelectProperty
-          label="Reasoning"
-          value={reasoningValue}
-          options={reasoningOptions}
-          icon={<Layers3 aria-hidden="true" />}
-          disabled={savingSetting !== null}
-          onChange={(modelReasoningEffort) => void updateAgentSetting("reasoning", { modelReasoningEffort })}
-        />
-      </dl>
-      <form id={instructionsFormId} className="grid gap-2" onSubmit={(event) => { event.preventDefault(); void saveInstructions(); }}>
+        <FieldGroup>
+          <TextField label="Name" required compact value={form.name ?? ""} onChange={(name) => updateForm({ name })} />
+          <TextAreaField label="Description" rows={2} compact value={form.description ?? ""} onChange={(description) => updateForm({ description })} />
+        </FieldGroup>
         <FieldGroup>
           <Field className="gap-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <FieldLabel htmlFor={instructionsId}>Instructions</FieldLabel>
-              <Button
-                type="submit"
-                size="icon-sm"
-                form={instructionsFormId}
-                disabled={savingInstructions || instructionsText === agent.instructions}
-                aria-label={savingInstructions ? "Saving instructions" : "Save instructions"}
-                title={savingInstructions ? "Saving instructions" : "Save instructions"}
-              >
-                <Save data-icon="inline-start" />
-              </Button>
-            </div>
+            <FieldLabel htmlFor={instructionsId} className="text-muted-foreground">Instructions</FieldLabel>
             <Textarea
               id={instructionsId}
               className="min-h-40 resize-y font-mono text-xs leading-relaxed"
-              value={instructionsText}
+              value={form.instructions ?? ""}
               required
-              onChange={(event) => setInstructionsText(event.target.value)}
+              onChange={(event) => updateForm({ instructions: event.target.value })}
             />
           </Field>
         </FieldGroup>
       </form>
+    </div>
+  );
+
+  if (renderEmbedded) return renderEmbedded({ actions, content });
+
+  return (
+    <div className="grid gap-3">
+      {actions}
+      {content}
     </div>
   );
 }
@@ -2225,6 +2332,21 @@ function WorkflowOrchestratorView({
     updateDraft({ outputEventType: definition.eventType });
   };
 
+  const handleAgentSaved = (agent: Agent) => {
+    updateDraft({
+      targetAgentId: agent.id,
+      outputEventType: findOutputEventDefinition(agent.id, activeDefinitions)?.eventType ?? draft.outputEventType
+    });
+  };
+
+  const handleAgentDeleted = (agentId: string) => {
+    const nextAgent = data.agents.find((candidate) => candidate.id !== agentId);
+    updateDraft({
+      targetAgentId: nextAgent?.id ?? "",
+      outputEventType: nextAgent ? findOutputEventDefinition(nextAgent.id, activeDefinitions)?.eventType ?? draft.outputEventType : draft.outputEventType
+    });
+  };
+
   const saveWorkflow = async () => {
     setError("");
     try {
@@ -2272,11 +2394,8 @@ function WorkflowOrchestratorView({
             Workflows
           </CardTitle>
           <CardAction className="col-start-1 row-span-1 row-start-2 justify-self-start self-start sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end sm:self-center">
-            <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
-              <Field orientation="horizontal" className="w-fit shrink-0 items-center gap-3 rounded-md border border-divider-strong bg-panel-section px-2.5 py-1.5">
-                <FieldLabel htmlFor="workflow-enabled">Enabled</FieldLabel>
-                <Switch id="workflow-enabled" size="sm" checked={draft.policyActive} onCheckedChange={(policyActive) => updateDraft({ policyActive })} />
-              </Field>
+            <div className="flex items-center justify-start gap-2 sm:justify-end">
+              <SwitchField label="Enabled" checked={draft.policyActive} onChange={(policyActive) => updateDraft({ policyActive })} />
               <Button
                 type="button"
                 size="icon-sm"
@@ -2296,77 +2415,101 @@ function WorkflowOrchestratorView({
           <div className="grid gap-4 p-4">
             {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
             <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
-              <WorkflowNode
-                node="input"
-                selected={selectedNode === "input"}
-                value={draft.inputEventType}
-                options={eventOptions}
-                onChange={selectInputEvent}
-                onSelect={() => setSelectedNode("input")}
-              >
-                <EventDefinitionEditor
-                  key={`workflow-input-${inputDefinition?.id ?? "new"}`}
-                  variant="embedded"
-                  showCatalogWarnings={false}
-                  data={data}
-                  eventDefinition={inputDefinition}
-                  saveEventDefinition={saveEventDefinition}
-                  removeEventDefinition={removeEventDefinition}
-                  onSaved={handleInputEventSaved}
-                  onNew={() => updateDraft({ inputEventType: "" })}
-                  onDeleted={() => updateDraft({ inputEventType: "" })}
-                />
-              </WorkflowNode>
-              <WorkflowNode
-                node="policy"
-                selected={selectedNode === "policy"}
-                value={draft.policyId ?? selectedPolicyId}
-                options={policyOptions}
-                onChange={selectPolicy}
-                onSelect={() => setSelectedNode("policy")}
-              >
-                <PolicyEditor
-                  variant="embedded"
-                  data={data}
-                  policy={embeddedPolicy}
-                  save={save}
-                  remove={remove}
-                  newPolicyTemplate={buildWorkflowPolicyDraft}
-                  onSaved={handleEmbeddedPolicySaved}
-                  onDraftChange={handleEmbeddedPolicyDraftChange}
-                />
-              </WorkflowNode>
-              <WorkflowNode
-                node="agent"
-                selected={selectedNode === "agent"}
-                value={draft.targetAgentId}
-                options={agentOptions}
-                onChange={selectAgent}
-                onSelect={() => setSelectedNode("agent")}
-              >
-                <WorkflowAgentEditor agent={targetAgent} runtimes={data.runtimes} save={save} />
-              </WorkflowNode>
-              <WorkflowNode
-                node="output"
-                selected={selectedNode === "output"}
-                value={draft.outputEventType}
-                options={eventOptions}
-                onChange={selectOutputEvent}
-                onSelect={() => setSelectedNode("output")}
-              >
-                <EventDefinitionEditor
-                  key={`workflow-output-${outputDefinition?.id ?? "new"}`}
-                  variant="embedded"
-                  showCatalogWarnings={false}
-                  data={data}
-                  eventDefinition={outputDefinition}
-                  saveEventDefinition={saveEventDefinition}
-                  removeEventDefinition={removeEventDefinition}
-                  onSaved={handleOutputEventSaved}
-                  onNew={() => updateDraft({ outputEventType: "" })}
-                  onDeleted={() => updateDraft({ outputEventType: "" })}
-                />
-              </WorkflowNode>
+              <EventDefinitionEditor
+                key={`workflow-input-${inputDefinition?.id ?? "new"}`}
+                variant="embedded"
+                showCatalogWarnings={false}
+                data={data}
+                eventDefinition={inputDefinition}
+                saveEventDefinition={saveEventDefinition}
+                removeEventDefinition={removeEventDefinition}
+                onSaved={handleInputEventSaved}
+                onNew={() => updateDraft({ inputEventType: "" })}
+                onDeleted={() => updateDraft({ inputEventType: "" })}
+                renderEmbedded={({ actions, content }) => (
+                  <WorkflowNode
+                    node="input"
+                    selected={selectedNode === "input"}
+                    value={draft.inputEventType}
+                    options={eventOptions}
+                    onChange={selectInputEvent}
+                    onSelect={() => setSelectedNode("input")}
+                    headerActions={actions}
+                  >
+                    {content}
+                  </WorkflowNode>
+                )}
+              />
+              <PolicyEditor
+                variant="embedded"
+                data={data}
+                policy={embeddedPolicy}
+                save={save}
+                remove={remove}
+                newPolicyTemplate={buildWorkflowPolicyDraft}
+                onSaved={handleEmbeddedPolicySaved}
+                onDraftChange={handleEmbeddedPolicyDraftChange}
+                renderEmbedded={({ actions, content }) => (
+                  <WorkflowNode
+                    node="policy"
+                    selected={selectedNode === "policy"}
+                    value={draft.policyId ?? selectedPolicyId}
+                    options={policyOptions}
+                    onChange={selectPolicy}
+                    onSelect={() => setSelectedNode("policy")}
+                    headerActions={actions}
+                  >
+                    {content}
+                  </WorkflowNode>
+                )}
+              />
+              <WorkflowAgentEditor
+                agent={targetAgent}
+                runtimes={data.runtimes}
+                save={save}
+                remove={remove}
+                onSaved={handleAgentSaved}
+                onNew={() => updateDraft({ targetAgentId: "" })}
+                onDeleted={handleAgentDeleted}
+                renderEmbedded={({ actions, content }) => (
+                  <WorkflowNode
+                    node="agent"
+                    selected={selectedNode === "agent"}
+                    value={draft.targetAgentId}
+                    options={agentOptions}
+                    onChange={selectAgent}
+                    onSelect={() => setSelectedNode("agent")}
+                    headerActions={actions}
+                  >
+                    {content}
+                  </WorkflowNode>
+                )}
+              />
+              <EventDefinitionEditor
+                key={`workflow-output-${outputDefinition?.id ?? "new"}`}
+                variant="embedded"
+                showCatalogWarnings={false}
+                data={data}
+                eventDefinition={outputDefinition}
+                saveEventDefinition={saveEventDefinition}
+                removeEventDefinition={removeEventDefinition}
+                onSaved={handleOutputEventSaved}
+                onNew={() => updateDraft({ outputEventType: "" })}
+                onDeleted={() => updateDraft({ outputEventType: "" })}
+                renderEmbedded={({ actions, content }) => (
+                  <WorkflowNode
+                    node="output"
+                    selected={selectedNode === "output"}
+                    value={draft.outputEventType}
+                    options={eventOptions}
+                    onChange={selectOutputEvent}
+                    onSelect={() => setSelectedNode("output")}
+                    headerActions={actions}
+                  >
+                    {content}
+                  </WorkflowNode>
+                )}
+              />
             </div>
           </div>
         </CardContent>
@@ -2380,6 +2523,7 @@ function PoliciesView(props: ViewProps & {
   policy?: Partial<Policy>;
   newPolicyTemplate?: () => Partial<Policy>;
   onSaved?: (policy: Policy) => void;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
 }) {
   return <PolicyEditor {...props} />;
 }
@@ -2392,6 +2536,7 @@ function PolicyEditor({
   newPolicyTemplate,
   onSaved,
   onDraftChange,
+  renderEmbedded,
   variant = "panel"
 }: ViewProps & {
   project?: Project;
@@ -2399,6 +2544,7 @@ function PolicyEditor({
   newPolicyTemplate?: () => Partial<Policy>;
   onSaved?: (policy: Policy) => void;
   onDraftChange?: (policy: Partial<Policy>, selectedEventType: string) => void;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
   variant?: "panel" | "embedded";
 }) {
   const formId = useId();
@@ -2479,7 +2625,7 @@ function PolicyEditor({
       saveLabel="Save policy"
       id={form.id}
       disabled={data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType)}
-      leading={<SwitchField label="Active" checked={form.active ?? true} onChange={(active) => updateForm({ active })} />}
+      leading={embedded ? undefined : <SwitchField label="Enabled" checked={form.active ?? true} onChange={(active) => updateForm({ active })} />}
       onNew={newPolicy}
       onDelete={() => void remove("policies", form.id!)}
     />
@@ -2498,13 +2644,14 @@ function PolicyEditor({
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <form id={formId} className={cn("flex flex-col gap-4", embedded && "gap-3")} onSubmit={(event) => { event.preventDefault(); void submit(); }}>
         <FieldGroup>
-          <TextField label="Name" required value={form.name ?? ""} onChange={(name) => updateForm({ name })} />
-          <TextAreaField label="Description" rows={embedded ? 2 : 3} value={form.description ?? ""} onChange={(description) => updateForm({ description })} />
+          <TextField label="Name" required compact={embedded} value={form.name ?? ""} onChange={(name) => updateForm({ name })} />
+          <TextAreaField label="Description" rows={embedded ? 2 : 3} compact={embedded} value={form.description ?? ""} onChange={(description) => updateForm({ description })} />
           <SelectField
             label="Target agent"
             value={policyTargetForForm(form, data.agents[0]?.id ?? "")}
             options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
             onChange={(targetAgentId) => updateForm({ targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
+            compact={embedded}
           />
           {activeDefinitions.length === 0 ? (
             <EmptyState title="No active event definitions." action="Create an active event before saving policies." />
@@ -2517,15 +2664,18 @@ function PolicyEditor({
                 ...(invalidSelectedEventType ? [{ value: invalidSelectedEventType, label: `${invalidSelectedEventType} · unavailable` }] : [])
               ]}
               onChange={updateSelectedEventType}
+              compact={embedded}
             />
           )}
-          <TextAreaField label="Advanced match JSON" rows={embedded ? 5 : 8} value={advancedMatchText} onChange={setAdvancedMatchText} />
+          <TextAreaField label="Advanced match JSON" rows={embedded ? 5 : 8} compact={embedded} value={advancedMatchText} onChange={setAdvancedMatchText} />
         </FieldGroup>
       </form>
     </>
   );
 
   if (embedded) {
+    if (renderEmbedded) return renderEmbedded({ actions, content });
+
     return (
       <div className="grid gap-3">
         {actions}
@@ -2552,6 +2702,7 @@ function EventsView(props: {
   onSaved?: (eventDefinition: EventDefinition) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
 }) {
   return <EventDefinitionEditor {...props} />;
 }
@@ -2565,6 +2716,7 @@ function EventDefinitionEditor({
   onSaved,
   onNew,
   onDeleted,
+  renderEmbedded,
   variant = "panel",
   showCatalogWarnings = true
 }: {
@@ -2576,6 +2728,7 @@ function EventDefinitionEditor({
   onSaved?: (eventDefinition: EventDefinition) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
+  renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode }) => ReactNode;
   variant?: "panel" | "embedded";
   showCatalogWarnings?: boolean;
 }) {
@@ -2636,7 +2789,7 @@ function EventDefinitionEditor({
       newLabel="New"
       saveLabel="Save definition"
       id={definitionForm.id}
-      leading={<SwitchField label="Active" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />}
+      leading={embedded ? undefined : <SwitchField label="Enabled" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />}
       onNew={newDefinition}
       onDelete={() => {
         if (!definitionForm.id) return;
@@ -2654,18 +2807,20 @@ function EventDefinitionEditor({
       {definitionError ? <Alert variant="destructive"><AlertDescription>{definitionError}</AlertDescription></Alert> : null}
       <form id={formId} className={cn("flex flex-col gap-4", embedded ? "gap-3" : "mt-4")} onSubmit={(event) => { event.preventDefault(); void saveDefinition(); }}>
         <FieldGroup>
-          <TextField label="Name" required value={definitionForm.name ?? ""} onChange={(name) => setDefinitionForm({ ...definitionForm, name })} />
-          <TextAreaField label="Description" rows={embedded ? 2 : 3} value={definitionForm.description ?? ""} onChange={(description) => setDefinitionForm({ ...definitionForm, description })} />
-          <TextField label="Event type" required value={definitionForm.eventType ?? ""} onChange={(eventType) => setDefinitionForm({ ...definitionForm, eventType })} />
-          <TextAreaField label="Producers JSON" rows={embedded ? 5 : 7} value={producersText} onChange={setProducersText} />
-          <TextAreaField label="Payload example JSON" rows={embedded ? 5 : 7} value={payloadExampleText} onChange={setPayloadExampleText} />
-          <TextAreaField label="Body" rows={embedded ? 3 : 4} value={definitionForm.body ?? ""} onChange={(body) => setDefinitionForm({ ...definitionForm, body })} />
+          <TextField label="Name" required compact={embedded} value={definitionForm.name ?? ""} onChange={(name) => setDefinitionForm({ ...definitionForm, name })} />
+          <TextAreaField label="Description" rows={embedded ? 2 : 3} compact={embedded} value={definitionForm.description ?? ""} onChange={(description) => setDefinitionForm({ ...definitionForm, description })} />
+          <TextField label="Event type" required compact={embedded} value={definitionForm.eventType ?? ""} onChange={(eventType) => setDefinitionForm({ ...definitionForm, eventType })} />
+          <TextAreaField label="Producers JSON" rows={embedded ? 5 : 7} compact={embedded} value={producersText} onChange={setProducersText} />
+          <TextAreaField label="Payload example JSON" rows={embedded ? 5 : 7} compact={embedded} value={payloadExampleText} onChange={setPayloadExampleText} />
+          <TextAreaField label="Body" rows={embedded ? 3 : 4} compact={embedded} value={definitionForm.body ?? ""} onChange={(body) => setDefinitionForm({ ...definitionForm, body })} />
         </FieldGroup>
       </form>
     </>
   );
 
   if (embedded) {
+    if (renderEmbedded) return renderEmbedded({ actions, content });
+
     return (
       <div className="grid gap-3">
         {actions}
