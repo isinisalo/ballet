@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EventDefinition, Policy } from "../../backend/shared/domain";
 import {
   applyWorkflowToPolicy,
+  buildPolicyName,
   derivePolicyWorkflows,
   mergeReadyProducer
 } from "../src/workflow-orchestrator";
@@ -54,6 +55,12 @@ const outputDefinition: EventDefinition = {
 };
 
 describe("workflow orchestrator helpers", () => {
+  it("builds automatic policy names from event type and target agent", () => {
+    expect(buildPolicyName("change.implemented.v1", "architecture-reviewer")).toBe("on_change_implemented_start_architecture_reviewer_agent");
+    expect(buildPolicyName("plan.approved.v1", "developer-agent")).toBe("on_plan_approved_start_developer_agent");
+    expect(buildPolicyName("review-approved.v12", "qa.verification--reviewer_agent")).toBe("on_review_approved_start_qa_verification_reviewer_agent");
+  });
+
   it("derives policy workflows from policy routing and event producers", () => {
     const workflows = derivePolicyWorkflows([basePolicy], [outputDefinition]);
 
@@ -84,6 +91,7 @@ describe("workflow orchestrator helpers", () => {
       }
     });
     expect(next.action).toEqual({ type: "start_agent_run", targetAgentId: "qa-agent" });
+    expect(next.name).toBe("on_review_approved_start_qa_agent");
     expect(next.targetAgentId).toBe("qa-agent");
   });
 

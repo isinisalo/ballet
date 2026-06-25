@@ -70,6 +70,7 @@ import { cn } from "@/lib/utils";
 import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
 import {
   applyWorkflowToPolicy,
+  buildPolicyName,
   derivePolicyWorkflows,
   eventTypesForWorkflowPolicy,
   findOutputEventDefinition,
@@ -951,7 +952,6 @@ const newWorkflowId = "__new_workflow__";
 type WorkflowNodeId = "policy" | "agent" | "output";
 type WorkflowDraftState = WorkflowDraft & {
   policyId?: string;
-  policyName: string;
   policyDescription: string;
   policyActive: boolean;
 };
@@ -1683,19 +1683,11 @@ const workflowAgentOptions = (agents: Agent[]) =>
     label: `${agent.name}${agent.enabled ? "" : " · disabled"}`
   }));
 
-const workflowPolicyOptions = (policies: Policy[]) => [
-  { value: newWorkflowId, label: "Create new policy" },
-  ...policies.map((policy) => ({
-    value: policy.id,
-    label: policy.name
-  }))
-];
-
-const workflowFallbackPolicyName = (inputEventType: string, agentName: string) =>
-  inputEventType && agentName ? `Route ${inputEventType} to ${agentName}` : "New workflow policy";
-
 const workflowOptionLabel = (options: Array<{ value: string; label: string }>, value: string) =>
   options.find((option) => option.value === value)?.label ?? value;
+
+const policyDisplayName = (eventType: string, targetAgentId: string) =>
+  eventType && targetAgentId ? buildPolicyName(eventType, targetAgentId) : "Policy name will be generated";
 
 const workflowEditorId = (node: WorkflowNodeId) => `workflow-${node}-editor`;
 
@@ -2092,7 +2084,6 @@ function WorkflowOrchestratorView({
 
     return {
       policyId: policy?.id,
-      policyName: policy?.name ?? "",
       policyDescription: policy?.description ?? "",
       policyActive: policy?.active ?? true,
       inputEventType,
@@ -2132,8 +2123,7 @@ function WorkflowOrchestratorView({
   const targetAgent = agentById.get(draft.targetAgentId);
   const canSave = Boolean(draft.inputEventType && draft.targetAgentId && draft.outputEventType);
   const eventOptions = workflowEventOptions(activeDefinitions);
-  const policyOptions = workflowPolicyOptions(data.policies);
-  const policyValue = draft.policyId ?? selectedPolicyId;
+  const policyValue = policyDisplayName(draft.inputEventType, draft.targetAgentId);
 
   useEffect(() => {
     selectedNodeRef.current = selectedNode;
@@ -2156,18 +2146,6 @@ function WorkflowOrchestratorView({
     setDraft((current) => ({ ...current, ...patch }));
   };
 
-  const selectPolicy = (policyId: string) => {
-    setSelectedPolicyId(policyId);
-    setSelectedNode("policy");
-    if (policyId === newWorkflowId) {
-      setCreatingWorkflow(true);
-      setDraft(buildDraft());
-      setError("");
-    } else {
-      setCreatingWorkflow(false);
-    }
-  };
-
   const selectOutputEvent = (outputEventType: string) => {
     setSelectedNode("output");
     updateDraft({ outputEventType });
@@ -2179,7 +2157,7 @@ function WorkflowOrchestratorView({
 
     return applyWorkflowToPolicy({
       ...policyTemplate(draft.targetAgentId),
-      name: draft.policyName.trim() || workflowFallbackPolicyName(draft.inputEventType, agentName),
+      name: buildPolicyName(draft.inputEventType, draft.targetAgentId),
       description: draft.policyDescription.trim() || fallbackDescription,
       active: draft.policyActive
     }, draft);
@@ -2189,7 +2167,7 @@ function WorkflowOrchestratorView({
     if (selectedPolicyId === newWorkflowId || !selectedPolicy) return buildWorkflowPolicyDraft();
     return applyWorkflowToPolicy({
       ...selectedPolicy,
-      name: draft.policyName.trim() || selectedPolicy.name,
+      name: buildPolicyName(draft.inputEventType, draft.targetAgentId),
       description: draft.policyDescription,
       active: draft.policyActive
     }, draft);
@@ -2202,7 +2180,6 @@ function WorkflowOrchestratorView({
     setDraft((current) => ({
       ...current,
       policyId: policy.id,
-      policyName: policy.name,
       policyDescription: policy.description,
       policyActive: policy.active,
       inputEventType: eventTypesForWorkflowPolicy(policy)[0] ?? current.inputEventType,
@@ -2217,7 +2194,6 @@ function WorkflowOrchestratorView({
       : draft.outputEventType;
 
     updateDraft({
-      policyName: policyDraft.name ?? "",
       policyDescription: policyDraft.description ?? "",
       policyActive: policyDraft.active ?? true,
       inputEventType: selectedEventType,
@@ -2263,7 +2239,7 @@ function WorkflowOrchestratorView({
         : selectedPolicy;
       const savedPolicy = await save("policies", applyWorkflowToPolicy({
         ...basePolicy,
-        name: draft.policyName.trim() || basePolicy.name || workflowFallbackPolicyName(draft.inputEventType, agentName),
+        name: buildPolicyName(draft.inputEventType, draft.targetAgentId),
         description: isNewWorkflow ? draft.policyDescription.trim() || fallbackDescription : draft.policyDescription,
         active: draft.policyActive
       }, draft));
@@ -2274,7 +2250,6 @@ function WorkflowOrchestratorView({
       setDraft((current) => ({
         ...current,
         policyId: savedPolicy.id,
-        policyName: savedPolicy.name,
         policyDescription: savedPolicy.description,
         policyActive: savedPolicy.active
       }));
@@ -2327,8 +2302,6 @@ function WorkflowOrchestratorView({
                     node="policy"
                     selected={selectedNode === "policy"}
                     value={policyValue}
-                    options={policyOptions}
-                    onChange={selectPolicy}
                     onSelect={() => setSelectedNode("policy")}
                     footerActions={actions}
                     showSummaryLabel={false}
@@ -2336,7 +2309,6 @@ function WorkflowOrchestratorView({
                     showEditorHeader={false}
                     compactSummary
                     inlineSummary
-                    summarySelect
                   >
                     {content}
                   </WorkflowNode>
@@ -2418,15 +2390,6 @@ function PoliciesView(props: ViewProps & {
   renderEmbedded?: (parts: { actions: ReactNode; content: ReactNode; form: Partial<Policy> }) => ReactNode;
 }) {
   const { data, policy, navigate, onSaved, onDeleted, ...editorProps } = props;
-  const policyOptions = workflowPolicyOptions(data.policies);
-  const selectPolicy = (policyId: string) => {
-    if (policyId === newWorkflowId) {
-      navigate("/policies");
-      return;
-    }
-    const selectedPolicy = data.policies.find((candidate) => candidate.id === policyId);
-    if (selectedPolicy?.relativePath) navigate(policyDocumentPath(selectedPolicy.relativePath));
-  };
 
   return (
     <div className="grid gap-4 xl:max-w-3xl">
@@ -2448,16 +2411,14 @@ function PoliciesView(props: ViewProps & {
           <WorkflowNode
             node="policy"
             selected
-            value={form.id ?? newWorkflowId}
-            options={policyOptions}
-            onChange={selectPolicy}
+            value={policyDisplayName(eventTypesForPolicy(form)[0] ?? "", policyTargetForForm(form, data.agents[0]?.id ?? ""))}
             onSelect={() => undefined}
             footerActions={actions}
             showSummaryLabel={false}
+            showEditorValue={false}
             showEditorHeader={false}
             compactSummary
             inlineSummary
-            summarySelect
           >
             {content}
           </WorkflowNode>
@@ -2508,6 +2469,8 @@ function PolicyEditor({
   const [error, setError] = useState("");
   const activeEventTypeSet = useMemo(() => new Set(activeDefinitions.map((definition) => definition.eventType)), [activeDefinitions]);
   const invalidSelectedEventType = selectedEventType && !activeEventTypeSet.has(selectedEventType) ? selectedEventType : "";
+  const targetAgentId = policyTargetForForm(form, data.agents[0]?.id ?? "");
+  const automaticPolicyName = buildPolicyName(selectedEventType, targetAgentId);
 
   useEffect(() => {
     const next = policy ?? createPolicyTemplate();
@@ -2555,12 +2518,13 @@ function PolicyEditor({
     setError("");
     try {
       if (!selectedEventType) throw new Error("Select exactly one event type for this policy.");
+      if (!targetAgentId) throw new Error("Select an agent.");
       const advancedMatch = advancedPolicyMatchForForm(form);
       delete advancedMatch.eventTypes;
       const match = { ...advancedMatch, eventTypes: [selectedEventType] };
-      const targetAgentId = policyTargetForForm(form, data.agents[0]?.id ?? "");
       const saved = await save("policies", {
         ...form,
+        name: automaticPolicyName,
         match,
         action: { type: "start_agent_run", targetAgentId },
         targetAgentId,
@@ -2601,7 +2565,6 @@ function PolicyEditor({
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <form id={formId} className={cn("flex flex-col gap-4", embedded && "gap-3")} onSubmit={(event) => { event.preventDefault(); void submit(); }}>
         <FieldGroup>
-          <TextField label="Name" required compact={embedded} value={form.name ?? ""} onChange={(name) => updateForm({ name })} />
           <TextAreaField label="Description" rows={embedded ? 2 : 3} compact={embedded} value={form.description ?? ""} onChange={(description) => updateForm({ description })} />
           {activeDefinitions.length === 0 ? (
             <EmptyState title="No active event definitions." action="Create an active event before saving policies." />
@@ -2619,7 +2582,7 @@ function PolicyEditor({
           )}
           <SelectField
             label="Target agent"
-            value={policyTargetForForm(form, data.agents[0]?.id ?? "")}
+            value={targetAgentId}
             options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
             onChange={(targetAgentId) => updateForm({ targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
             compact={embedded}

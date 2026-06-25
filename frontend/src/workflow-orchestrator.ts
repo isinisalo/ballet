@@ -25,6 +25,20 @@ export const targetAgentIdForWorkflowPolicy = (policy: Pick<Policy, "action" | "
     ? policy.action.targetAgentId
     : policy.targetAgentId;
 
+const normalizePolicyNamePart = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_");
+
+export const buildPolicyName = (eventType: string, targetAgentId: string): string => {
+  const eventName = normalizePolicyNamePart(eventType.replace(/\.v\d+$/i, ""));
+  const agentName = normalizePolicyNamePart(targetAgentId).replace(/_agent$/, "");
+  return `on_${eventName}_start_${agentName}_agent`;
+};
+
 const producerHasNoRequirements = (producer: EventDefinition["producers"][number]): boolean =>
   !producer.requires || Object.keys(producer.requires).length === 0;
 
@@ -72,6 +86,7 @@ export const applyWorkflowToPolicy = (
 
   return {
     ...policy,
+    name: buildPolicyName(draft.inputEventType, draft.targetAgentId),
     active: policy.active ?? true,
     match,
     action: {
