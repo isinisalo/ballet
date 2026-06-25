@@ -356,6 +356,19 @@ const projectTreeContainsPath = (nodes: ProjectDocumentTreeNode[], relativePath?
       : projectTreeContainsPath(node.children, relativePath)
   );
 
+type ProjectTreeDirectory = Extract<ProjectDocumentTreeNode, { type: "directory" }>;
+
+const findProjectTreeDirectory = (nodes: ProjectDocumentTreeNode[], relativePath: string): ProjectTreeDirectory | undefined => {
+  for (const node of nodes) {
+    if (node.type === "directory") {
+      if (node.relativePath === relativePath) return node;
+      const directory = findProjectTreeDirectory(node.children, relativePath);
+      if (directory) return directory;
+    }
+  }
+  return undefined;
+};
+
 const findProjectTreeDocument = (nodes: ProjectDocumentTreeNode[], relativePath?: string): MarkdownDocument | undefined => {
   if (!relativePath) return undefined;
   for (const node of nodes) {
@@ -666,6 +679,46 @@ function SidebarAgentList({
   );
 }
 
+function SidebarProjectDirectoryMenu({
+  label,
+  icon,
+  node,
+  activePath,
+  navigate
+}: {
+  label: string;
+  icon: ReactNode;
+  node?: ProjectTreeDirectory;
+  activePath?: string;
+  navigate: (path: string) => void;
+}) {
+  const active = projectTreeContainsPath(node?.children ?? [], activePath);
+  const [open, setOpen] = useState(active);
+
+  useEffect(() => {
+    if (active) setOpen(true);
+  }, [active]);
+
+  if (!node) return null;
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton isActive={active} tooltip={label}>
+            {icon}
+            <span>{label}</span>
+            <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ProjectDocumentTree nodes={node.children} activePath={activePath} navigate={navigate} />
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
 function ErrorPreview({ errors }: { errors?: string[] }) {
   if (!errors?.length) return <span className="text-muted-foreground">None</span>;
   return <span className="text-destructive">{errors.join("; ")}</span>;
@@ -882,12 +935,13 @@ function AppSidebar({
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
 }) {
-  const projectsOpen = route.view === "projects" || route.view === "project-document" || route.view === "project-goals" || route.view === "project-adrs";
   const agentsOpen = route.view === "agents";
   const skillsOpen = route.view === "skills";
   const runtimesOpen = route.view === "runtimes";
   const policiesOpen = route.view === "policies";
   const eventsOpen = route.view === "events";
+  const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
+  const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const item = (label: string, icon: ReactNode, path: string, active: boolean) => (
     <SidebarMenuItem key={label}>
       <SidebarMenuButton asChild isActive={active} tooltip={label}>
@@ -918,20 +972,8 @@ function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <Collapsible defaultOpen={projectsOpen} className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={projectsOpen} tooltip="Project">
-                      <Layers3 />
-                      <span>Project</span>
-                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <ProjectDocumentTree nodes={projectDocumentTree} activePath={route.documentPath} navigate={navigate} />
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
+              <SidebarProjectDirectoryMenu label="ADR" icon={<Archive />} node={adrDirectory} activePath={route.documentPath} navigate={navigate} />
+              {item("Agent runs", <Activity />, "/agent-runs", route.view === "agent-runs")}
               <Collapsible defaultOpen={agentsOpen} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
@@ -943,48 +985,6 @@ function AppSidebar({
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarAgentList agents={agents} activePath={agentsOpen ? route.documentPath : undefined} navigate={navigate} />
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-              <Collapsible defaultOpen={skillsOpen} className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={skillsOpen} tooltip="Skills">
-                      <FileKey2 />
-                      <span>Skills</span>
-                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarDocumentList documents={skills} activePath={skillsOpen ? route.documentPath : undefined} pathFor={skillDocumentPath} navigate={navigate} />
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-              <Collapsible defaultOpen={runtimesOpen} className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={runtimesOpen} tooltip="Runtimes">
-                      <Code2 />
-                      <span>Runtimes</span>
-                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarDocumentList documents={runtimes} activePath={runtimesOpen ? route.documentPath : undefined} pathFor={runtimeDocumentPath} navigate={navigate} />
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-              <Collapsible defaultOpen={policiesOpen} className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={policiesOpen} tooltip="Policies">
-                      <GitBranch />
-                      <span>Policies</span>
-                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarDocumentList documents={policies} activePath={policiesOpen ? route.documentPath : undefined} pathFor={policyDocumentPath} navigate={navigate} />
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
@@ -1002,7 +1002,49 @@ function AppSidebar({
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
-              {item("Agent runs", <Activity />, "/agent-runs", route.view === "agent-runs")}
+              <SidebarProjectDirectoryMenu label="Goals" icon={<CheckCircle2 />} node={goalsDirectory} activePath={route.documentPath} navigate={navigate} />
+              <Collapsible defaultOpen={policiesOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={policiesOpen} tooltip="Policies">
+                      <GitBranch />
+                      <span>Policies</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarDocumentList documents={policies} activePath={policiesOpen ? route.documentPath : undefined} pathFor={policyDocumentPath} navigate={navigate} />
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+              <Collapsible defaultOpen={runtimesOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={runtimesOpen} tooltip="Runtimes">
+                      <Code2 />
+                      <span>Runtimes</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarDocumentList documents={runtimes} activePath={runtimesOpen ? route.documentPath : undefined} pathFor={runtimeDocumentPath} navigate={navigate} />
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+              <Collapsible defaultOpen={skillsOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={skillsOpen} tooltip="Skills">
+                      <FileKey2 />
+                      <span>Skills</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarDocumentList documents={skills} activePath={skillsOpen ? route.documentPath : undefined} pathFor={skillDocumentPath} navigate={navigate} />
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -1715,7 +1757,6 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
               options={data.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
               onChange={(targetAgentId) => setForm({ ...form, targetAgentId, action: { type: "start_agent_run", targetAgentId } })}
             />
-            <SwitchField label="Active" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />
             {activeDefinitions.length === 0 ? (
               <EmptyState title="No active event definitions." action="Create an active event before saving policies." />
             ) : (
@@ -1736,6 +1777,7 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
             saveLabel="Save policy"
             id={form.id}
             disabled={data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType)}
+            leading={<SwitchField label="Active" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />}
             onNew={() => {
               const next = policyTemplate(data.agents[0]?.id ?? "");
               setForm(next);
@@ -1816,6 +1858,7 @@ function EventsView({
     try {
       const saved = await saveEventDefinition({
         ...definitionForm,
+        source: definitionForm.source ?? eventDefinition?.source ?? eventDefinitionTemplate().source,
         tags: definitionForm.tags ?? [],
         producers: parseEventProducers(producersText),
         payloadExample: parsePayload(payloadExampleText)
@@ -1854,8 +1897,6 @@ function EventsView({
               <TextField label="Name" required value={definitionForm.name ?? ""} onChange={(name) => setDefinitionForm({ ...definitionForm, name })} />
               <TextAreaField label="Description" value={definitionForm.description ?? ""} onChange={(description) => setDefinitionForm({ ...definitionForm, description })} />
               <TextField label="Event type" required value={definitionForm.eventType ?? ""} onChange={(eventType) => setDefinitionForm({ ...definitionForm, eventType })} />
-              <TextField label="Source" required value={definitionForm.source ?? ""} onChange={(source) => setDefinitionForm({ ...definitionForm, source })} />
-              <SwitchField label="Active" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />
               <TextAreaField label="Producers JSON" rows={7} value={producersText} onChange={setProducersText} />
               <TextAreaField label="Payload example JSON" rows={7} value={payloadExampleText} onChange={setPayloadExampleText} />
               <TextAreaField label="Body" rows={4} value={definitionForm.body ?? ""} onChange={(body) => setDefinitionForm({ ...definitionForm, body })} />
@@ -1864,6 +1905,7 @@ function EventsView({
               newLabel="New"
               saveLabel="Save definition"
               id={definitionForm.id}
+              leading={<SwitchField label="Active" checked={definitionForm.active ?? true} onChange={(active) => setDefinitionForm({ ...definitionForm, active })} />}
               onNew={newDefinition}
               onDelete={() => {
                 if (!definitionForm.id) return;
@@ -2017,6 +2059,7 @@ function CrudActions({
   saveLabel,
   id,
   disabled = false,
+  leading,
   onNew,
   onDelete
 }: {
@@ -2024,25 +2067,29 @@ function CrudActions({
   saveLabel: string;
   id?: string;
   disabled?: boolean;
+  leading?: ReactNode;
   onNew: () => void;
   onDelete: () => void;
 }) {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
-      <Button type="button" variant="outline" onClick={onNew}>
-        <Plus data-icon="inline-start" />
-        {newLabel}
-      </Button>
-      <Button type="submit" disabled={disabled}>
-        <Save data-icon="inline-start" />
-        {saveLabel}
-      </Button>
-      {id ? (
-        <Button type="button" variant="destructive" onClick={onDelete}>
-          <Trash2 data-icon="inline-start" />
-          Delete
+    <div className={cn("flex flex-wrap items-center gap-2", leading ? "justify-between" : "justify-end")}>
+      {leading ? <div className="mr-auto">{leading}</div> : null}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onNew}>
+          <Plus data-icon="inline-start" />
+          {newLabel}
         </Button>
-      ) : null}
+        <Button type="submit" disabled={disabled}>
+          <Save data-icon="inline-start" />
+          {saveLabel}
+        </Button>
+        {id ? (
+          <Button type="button" variant="destructive" onClick={onDelete}>
+            <Trash2 data-icon="inline-start" />
+            Delete
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
