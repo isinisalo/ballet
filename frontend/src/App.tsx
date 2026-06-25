@@ -5,6 +5,7 @@ import { isMap, parseDocument, stringify as stringifyYaml } from "yaml";
 import {
   Archive,
   Activity,
+  ArrowRight,
   Bot,
   CalendarDays,
   CheckCircle2,
@@ -16,6 +17,7 @@ import {
   Hash,
   Inbox,
   Layers3,
+  Link2,
   Menu,
   Monitor,
   Moon,
@@ -27,6 +29,7 @@ import {
   Tags,
   Trash2,
   UserRound,
+  Workflow,
   type LucideIcon
 } from "lucide-react";
 import type { Adr, Agent, AgentRun, AgentRunLog, AppData, EventDefinition, Goal, MarkdownDocument, Policy, Project, ProjectDocumentTreeNode, Runtime, Skill } from "../../backend/shared/domain";
@@ -65,8 +68,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
+import {
+  applyWorkflowToPolicy,
+  derivePolicyWorkflows,
+  eventTypesForWorkflowPolicy,
+  findOutputEventDefinition,
+  mergeReadyProducer,
+  targetAgentIdForWorkflowPolicy,
+  type PolicyWorkflow,
+  type WorkflowDraft
+} from "./workflow-orchestrator";
 
-type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "agents" | "skills" | "runtimes" | "policies" | "events" | "agent-runs";
+type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "workflow-orchestrator" | "agents" | "skills" | "runtimes" | "policies" | "events" | "agent-runs";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies";
 
 interface RouteState {
@@ -261,6 +274,7 @@ const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
+  if (url.pathname === "/workflow-orchestrator") return { view: "workflow-orchestrator" };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/runtimes") return { view: "runtimes", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/policies") return { view: "policies", documentPath: url.searchParams.get("path") ?? undefined };
@@ -912,6 +926,13 @@ function DataTable({
   );
 }
 
+const newWorkflowId = "__new_workflow__";
+type WorkflowNodeId = "input" | "policy" | "agent" | "output";
+type WorkflowDraftState = WorkflowDraft & {
+  policyId?: string;
+  policyName: string;
+};
+
 function AppSidebar({
   route,
   projectDocumentTree,
@@ -920,6 +941,9 @@ function AppSidebar({
   runtimes,
   policies,
   eventDefinitions,
+  workflows,
+  selectedWorkflowPolicyId,
+  selectWorkflow,
   navigate,
   themeMode,
   onThemeModeChange
@@ -931,6 +955,9 @@ function AppSidebar({
   runtimes: Runtime[];
   policies: Policy[];
   eventDefinitions: EventDefinition[];
+  workflows: PolicyWorkflow[];
+  selectedWorkflowPolicyId: string;
+  selectWorkflow: (policyId: string) => void;
   navigate: (path: string) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
@@ -940,6 +967,7 @@ function AppSidebar({
   const runtimesOpen = route.view === "runtimes";
   const policiesOpen = route.view === "policies";
   const eventsOpen = route.view === "events";
+  const workflowOpen = route.view === "workflow-orchestrator";
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const item = (label: string, icon: ReactNode, path: string, active: boolean) => (
@@ -973,6 +1001,44 @@ function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarProjectDirectoryMenu label="ADR" icon={<Archive />} node={adrDirectory} activePath={route.documentPath} navigate={navigate} />
+              <Collapsible defaultOpen={workflowOpen} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={workflowOpen} tooltip="Workflows">
+                      <Workflow />
+                      <span>Workflows</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {workflows.length === 0 ? (
+                        <SidebarMenuSubItem>
+                          <span className="block px-2 py-1.5 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                            No workflows.
+                          </span>
+                        </SidebarMenuSubItem>
+                      ) : (
+                        workflows.map((workflow) => {
+                          const active = workflow.policy.id === selectedWorkflowPolicyId;
+                          return (
+                            <SidebarMenuSubItem key={workflow.id}>
+                              <SidebarMenuSubButton
+                                size="sm"
+                                isActive={active}
+                                className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+                                onClick={() => selectWorkflow(workflow.policy.id)}
+                              >
+                                <span>{workflow.policy.name}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })
+                      )}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
               {item("Agent runs", <Activity />, "/agent-runs", route.view === "agent-runs")}
               <Collapsible defaultOpen={agentsOpen} className="group/collapsible">
                 <SidebarMenuItem>
@@ -1071,6 +1137,16 @@ export function App() {
   const project = data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId)) ?? data.projects.find((item) => item.id === selectedProjectId) ?? data.projects[0];
   const goals = useMemo(() => data.goals.filter((goal) => goal.projectId === project?.id), [data.goals, project?.id]);
   const adrs = useMemo(() => data.adrs.filter((adr) => adr.projectId === project?.id), [data.adrs, project?.id]);
+  const activeWorkflowDefinitions = useMemo(
+    () => data.eventDefinitions.filter((definition) => definition.active && definition.eventType),
+    [data.eventDefinitions]
+  );
+  const workflows = useMemo(
+    () => derivePolicyWorkflows(data.policies, activeWorkflowDefinitions),
+    [activeWorkflowDefinitions, data.policies]
+  );
+  const [selectedWorkflowPolicyId, setSelectedWorkflowPolicyId] = useState("");
+  const [creatingWorkflow, setCreatingWorkflow] = useState(false);
   const selectedGoal = goals.find((goal) => goal.id === selectedGoalId) ?? goals[0];
   const selectedAdr = adrs.find((adr) => adr.id === selectedAdrId) ?? adrs[0];
   const projectDocumentTree = data.projectDocumentTree ?? [];
@@ -1099,9 +1175,23 @@ export function App() {
     [data.eventDefinitions, route.documentPath]
   );
 
+  useEffect(() => {
+    if (creatingWorkflow) return;
+    const defaultWorkflowId = workflows.find((workflow) => workflow.outputEventType)?.policy.id ?? data.policies[0]?.id ?? "";
+    if (!defaultWorkflowId) return;
+    if (selectedWorkflowPolicyId && data.policies.some((policy) => policy.id === selectedWorkflowPolicyId)) return;
+    setSelectedWorkflowPolicyId(defaultWorkflowId);
+  }, [creatingWorkflow, data.policies, selectedWorkflowPolicyId, workflows]);
+
   const navigate = (path: string) => {
     window.history.pushState({}, "", path);
     setRoute(routeFromPath(path));
+  };
+
+  const selectWorkflow = (policyId: string) => {
+    setCreatingWorkflow(policyId === newWorkflowId);
+    setSelectedWorkflowPolicyId(policyId);
+    navigate("/workflow-orchestrator");
   };
 
   const refresh = useCallback(async () => {
@@ -1196,6 +1286,9 @@ export function App() {
           runtimes={data.runtimes}
           policies={data.policies}
           eventDefinitions={data.eventDefinitions}
+          workflows={workflows}
+          selectedWorkflowPolicyId={selectedWorkflowPolicyId}
+          selectWorkflow={selectWorkflow}
           navigate={navigate}
           themeMode={themeMode}
           onThemeModeChange={setThemeMode}
@@ -1224,9 +1317,24 @@ export function App() {
               {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} /> : null}
               {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} /> : null}
               {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} /> : null}
+              {route.view === "workflow-orchestrator" ? (
+                <WorkflowOrchestratorView
+                  data={data}
+                  activeDefinitions={activeWorkflowDefinitions}
+                  workflows={workflows}
+                  selectedPolicyId={selectedWorkflowPolicyId}
+                  setSelectedPolicyId={setSelectedWorkflowPolicyId}
+                  creatingWorkflow={creatingWorkflow}
+                  setCreatingWorkflow={setCreatingWorkflow}
+                  save={save}
+                  remove={remove}
+                  saveEventDefinition={saveEventDefinition}
+                  removeEventDefinition={removeEventDefinition}
+                />
+              ) : null}
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
-              {route.view === "runtimes" ? <RuntimesView data={data} runtime={selectedRuntime} save={save} remove={remove} navigate={navigate} /> : null}
+              {route.view === "runtimes" ? <RuntimesView runtime={selectedRuntime} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "policies" ? <PoliciesView data={data} project={project} policy={selectedPolicy} save={save} remove={remove} /> : null}
               {route.view === "events" ? (
                 <EventsView
@@ -1614,25 +1722,16 @@ function SkillsView({
 }
 
 function RuntimesView({
-  data,
   runtime,
   save,
   remove,
   navigate
-}: ViewProps & {
+}: Omit<ViewProps, "data"> & {
   runtime?: Runtime;
   navigate: (path: string) => void;
 }) {
   const [form, setForm] = useState<Partial<Runtime>>(runtime ?? runtimeTemplate());
   const [configText, setConfigText] = useState(toKeyValueLines((runtime ?? runtimeTemplate()).config ?? {}));
-
-  const editRuntime = (runtime: Runtime) => {
-    if (runtime.relativePath) navigate(runtimeDocumentPath(runtime.relativePath));
-    else {
-      setForm(runtime);
-      setConfigText(toKeyValueLines(runtime.config));
-    }
-  };
 
   useEffect(() => {
     const next = runtime ?? runtimeTemplate();
@@ -1652,18 +1751,7 @@ function RuntimesView({
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(520px,1fr)_minmax(420px,1fr)]">
-      <Panel title="Runtimes" icon={<Code2 data-icon="inline-start" />}>
-        <DataTable
-          empty="No runtimes configured."
-          columns={["Name", "Type", "Command", "Enabled"]}
-          rows={data.runtimes.map((runtime) => ({
-            id: runtime.id,
-            cells: [runtime.name, runtime.type, runtime.command, runtime.enabled ? "enabled" : "disabled"],
-            onClick: () => editRuntime(runtime)
-          }))}
-        />
-      </Panel>
+    <div className="grid gap-4 xl:max-w-3xl">
       <Panel title={form.id ? "Update runtime" : "Create runtime"} icon={<Code2 data-icon="inline-start" />}>
         <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
           <FieldGroup>
@@ -1675,13 +1763,13 @@ function RuntimesView({
               onChange={(type) => setForm({ ...form, type: type as Runtime["type"] })}
             />
             <TextField label="Command" required value={form.command ?? ""} onChange={(command) => setForm({ ...form, command })} />
-            <SwitchField label="Enabled" checked={form.enabled ?? true} onChange={(enabled) => setForm({ ...form, enabled })} />
             <TextAreaField label="Config (key=value)" rows={6} value={configText} onChange={setConfigText} />
           </FieldGroup>
           <CrudActions
             newLabel="New Codex CLI runtime"
             saveLabel="Save runtime"
             id={form.id}
+            leading={<SwitchField label="Enabled" checked={form.enabled ?? true} onChange={(enabled) => setForm({ ...form, enabled })} />}
             onNew={() => { setForm(runtimeTemplate()); setConfigText(toKeyValueLines(runtimeTemplate().config ?? {})); }}
             onDelete={handleDelete}
           />
@@ -1691,12 +1779,494 @@ function RuntimesView({
   );
 }
 
-function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Project; policy?: Policy }) {
+const workflowNodeConfig: Record<WorkflowNodeId, {
+  label: string;
+  icon: LucideIcon;
+  borderClass: string;
+  iconClass: string;
+  selectedClass: string;
+}> = {
+  input: {
+    label: "INPUT EVENT",
+    icon: Inbox,
+    borderClass: "border-blue-500/55",
+    iconClass: "text-blue-400",
+    selectedClass: "border-blue-400 bg-blue-500/10 shadow-[0_0_32px_rgba(59,130,246,0.42)]"
+  },
+  policy: {
+    label: "POLICY",
+    icon: GitBranch,
+    borderClass: "border-indigo-400/35",
+    iconClass: "text-indigo-300",
+    selectedClass: "border-indigo-300 bg-indigo-500/10 shadow-[0_0_28px_rgba(129,140,248,0.28)]"
+  },
+  agent: {
+    label: "AGENT",
+    icon: Bot,
+    borderClass: "border-emerald-400/35",
+    iconClass: "text-emerald-400",
+    selectedClass: "border-emerald-300 bg-emerald-500/10 shadow-[0_0_28px_rgba(52,211,153,0.26)]"
+  },
+  output: {
+    label: "OUTPUT EVENT",
+    icon: Route,
+    borderClass: "border-amber-400/40",
+    iconClass: "text-amber-300",
+    selectedClass: "border-amber-300 bg-amber-500/10 shadow-[0_0_28px_rgba(251,191,36,0.24)]"
+  }
+};
+
+const workflowEventOptions = (definitions: EventDefinition[]) =>
+  definitions.map((definition) => ({
+    value: definition.eventType,
+    label: `${definition.eventType} · ${definition.name}`
+  }));
+
+const workflowAgentOptions = (agents: Agent[]) =>
+  agents.map((agent) => ({
+    value: agent.id,
+    label: `${agent.name}${agent.enabled ? "" : " · disabled"}`
+  }));
+
+const workflowPolicyOptions = (policies: Policy[]) => [
+  { value: newWorkflowId, label: "Create new policy" },
+  ...policies.map((policy) => ({
+    value: policy.id,
+    label: policy.name
+  }))
+];
+
+const workflowFallbackPolicyName = (inputEventType: string, agentName: string) =>
+  inputEventType && agentName ? `Route ${inputEventType} to ${agentName}` : "New workflow policy";
+
+function WorkflowNode({
+  node,
+  selected,
+  value,
+  options,
+  onChange,
+  onSelect
+}: {
+  node: WorkflowNodeId;
+  selected: boolean;
+  value: string;
+  options?: Array<{ value: string; label: string }>;
+  onChange?: (value: string) => void;
+  onSelect: () => void;
+}) {
+  const config = workflowNodeConfig[node];
+  const Icon = config.icon;
+  const hasSelect = Boolean(options && onChange);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className={cn(
+        "flex min-h-24 w-full min-w-0 flex-col items-center justify-center gap-2 rounded-lg border bg-slate-950/55 px-3 py-4 text-center transition hover:bg-slate-900/80 md:min-h-28",
+        config.borderClass,
+        selected && config.selectedClass
+      )}
+      aria-pressed={selected}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      <Icon className={cn("size-7", config.iconClass)} />
+      <span className="text-[0.72rem] font-semibold uppercase leading-none tracking-normal text-slate-100">{config.label}</span>
+      {hasSelect && options ? (
+        options.length > 0 ? (
+          <Select value={value} onValueChange={onChange}>
+            <SelectTrigger
+              className="h-8 w-full min-w-0 border-slate-700/80 bg-slate-950/80 px-2 text-xs text-slate-100 shadow-none [&>span]:truncate"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <SelectValue placeholder="Not selected" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {options.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="flex h-8 w-full items-center justify-center rounded-md border border-slate-700/80 bg-slate-950/80 px-2 text-xs text-slate-500">
+            No options
+          </span>
+        )
+      ) : (
+        <span className="max-w-full truncate font-mono text-[0.68rem] leading-none text-slate-400">{value || "Not selected"}</span>
+      )}
+    </div>
+  );
+}
+
+function WorkflowConnector() {
+  return (
+    <div className="relative flex items-center justify-center text-slate-500 md:min-w-12">
+      <span className="h-10 w-px bg-slate-700 md:h-px md:w-full" aria-hidden="true" />
+      <ArrowRight className="absolute size-5 rotate-90 text-slate-500 md:relative md:-ml-4 md:rotate-0" aria-hidden="true" />
+    </div>
+  );
+}
+
+function WorkflowOrchestratorView({
+  data,
+  activeDefinitions,
+  workflows,
+  selectedPolicyId,
+  setSelectedPolicyId,
+  creatingWorkflow,
+  setCreatingWorkflow,
+  save,
+  remove,
+  saveEventDefinition,
+  removeEventDefinition
+}: {
+  data: AppData;
+  activeDefinitions: EventDefinition[];
+  workflows: PolicyWorkflow[];
+  selectedPolicyId: string;
+  setSelectedPolicyId: (policyId: string) => void;
+  creatingWorkflow: boolean;
+  setCreatingWorkflow: (creating: boolean) => void;
+  save: ViewProps["save"];
+  remove: ViewProps["remove"];
+  saveEventDefinition: (eventDefinition: Partial<EventDefinition>) => Promise<EventDefinition>;
+  removeEventDefinition: (id: string) => Promise<void>;
+}) {
+  const [selectedNode, setSelectedNode] = useState<WorkflowNodeId>("input");
+  const [error, setError] = useState("");
+
+  const selectedPolicy = data.policies.find((policy) => policy.id === selectedPolicyId);
+  const defaultPolicyId = workflows.find((workflow) => workflow.outputEventType)?.policy.id ?? data.policies[0]?.id ?? newWorkflowId;
+  const agentById = useMemo(() => new Map(data.agents.map((agent) => [agent.id, agent])), [data.agents]);
+  const definitionByEventType = useMemo(
+    () => new Map(data.eventDefinitions.map((definition) => [definition.eventType, definition])),
+    [data.eventDefinitions]
+  );
+
+  const buildDraft = useCallback((policy?: Policy): WorkflowDraftState => {
+    const targetAgentId = policy ? targetAgentIdForWorkflowPolicy(policy) : data.agents[0]?.id ?? "";
+    const inputEventType = policy
+      ? eventTypesForWorkflowPolicy(policy)[0] ?? activeDefinitions[0]?.eventType ?? ""
+      : activeDefinitions[0]?.eventType ?? "";
+    const mappedOutputEventType = findOutputEventDefinition(targetAgentId, activeDefinitions)?.eventType;
+    const outputEventType = mappedOutputEventType ?? (policy
+      ? ""
+      : activeDefinitions.find((definition) => definition.eventType !== inputEventType)?.eventType ?? activeDefinitions[0]?.eventType ?? "");
+
+    return {
+      policyId: policy?.id,
+      policyName: policy?.name ?? "",
+      inputEventType,
+      targetAgentId,
+      outputEventType
+    };
+  }, [activeDefinitions, data.agents]);
+
+  const [draft, setDraft] = useState<WorkflowDraftState>(() => buildDraft(data.policies[0]));
+
+  useEffect(() => {
+    if (creatingWorkflow) return;
+    if (data.policies.length === 0) {
+      setSelectedPolicyId(newWorkflowId);
+      return;
+    }
+    if (!selectedPolicyId || selectedPolicyId === newWorkflowId) {
+      setSelectedPolicyId(defaultPolicyId);
+      return;
+    }
+    if (selectedPolicyId && data.policies.some((policy) => policy.id === selectedPolicyId)) return;
+    setSelectedPolicyId(defaultPolicyId);
+  }, [creatingWorkflow, data.policies, defaultPolicyId, selectedPolicyId]);
+
+  useEffect(() => {
+    if (selectedPolicyId === newWorkflowId && creatingWorkflow) {
+      setDraft(buildDraft());
+      setSelectedNode("input");
+      setError("");
+      return;
+    }
+    if (selectedPolicyId === newWorkflowId) return;
+    setDraft(buildDraft(selectedPolicy));
+    setError("");
+  }, [buildDraft, creatingWorkflow, selectedPolicy, selectedPolicyId]);
+
+  const inputDefinition = definitionByEventType.get(draft.inputEventType);
+  const outputDefinition = definitionByEventType.get(draft.outputEventType);
+  const targetAgent = agentById.get(draft.targetAgentId);
+  const detailTitle = draft.policyName || selectedPolicy?.name || workflowFallbackPolicyName(draft.inputEventType, targetAgent?.name ?? "");
+  const selectedEventDefinition = selectedNode === "output" ? outputDefinition : inputDefinition;
+  const canSave = Boolean(draft.inputEventType && draft.targetAgentId && draft.outputEventType);
+  const eventOptions = workflowEventOptions(activeDefinitions);
+  const policyOptions = workflowPolicyOptions(data.policies);
+  const agentOptions = workflowAgentOptions(data.agents);
+
+  const updateDraft = (patch: Partial<WorkflowDraftState>) => {
+    setDraft((current) => ({ ...current, ...patch }));
+  };
+
+  const selectInputEvent = (inputEventType: string) => {
+    setSelectedNode("input");
+    updateDraft({ inputEventType });
+  };
+
+  const selectPolicy = (policyId: string) => {
+    setSelectedPolicyId(policyId);
+    setSelectedNode("policy");
+    if (policyId === newWorkflowId) {
+      setCreatingWorkflow(true);
+      setDraft(buildDraft());
+      setError("");
+    } else {
+      setCreatingWorkflow(false);
+    }
+  };
+
+  const selectAgent = (targetAgentId: string) => {
+    setSelectedNode("agent");
+    const nextOutput = findOutputEventDefinition(targetAgentId, activeDefinitions)?.eventType ?? draft.outputEventType;
+    updateDraft({ targetAgentId, outputEventType: nextOutput });
+  };
+
+  const selectOutputEvent = (outputEventType: string) => {
+    setSelectedNode("output");
+    updateDraft({ outputEventType });
+  };
+
+  const buildWorkflowPolicyDraft = useCallback((): Partial<Policy> => {
+    const agentName = agentById.get(draft.targetAgentId)?.name ?? draft.targetAgentId;
+
+    return applyWorkflowToPolicy({
+      ...policyTemplate(draft.targetAgentId),
+      name: draft.policyName.trim() || workflowFallbackPolicyName(draft.inputEventType, agentName),
+      description: draft.inputEventType && agentName ? `Route ${draft.inputEventType} to ${agentName}.` : ""
+    }, draft);
+  }, [agentById, draft]);
+
+  const embeddedPolicy = useMemo<Partial<Policy>>(() => {
+    if (selectedPolicyId === newWorkflowId || !selectedPolicy) return buildWorkflowPolicyDraft();
+    return applyWorkflowToPolicy(selectedPolicy, draft);
+  }, [buildWorkflowPolicyDraft, draft, selectedPolicy, selectedPolicyId]);
+
+  const handleEmbeddedPolicySaved = (policy: Policy) => {
+    const nextTargetAgentId = targetAgentIdForWorkflowPolicy(policy);
+    setCreatingWorkflow(false);
+    setSelectedPolicyId(policy.id);
+    setDraft((current) => ({
+      ...current,
+      policyId: policy.id,
+      policyName: policy.name,
+      inputEventType: eventTypesForWorkflowPolicy(policy)[0] ?? current.inputEventType,
+      targetAgentId: nextTargetAgentId || current.targetAgentId
+    }));
+  };
+
+  const handleEmbeddedEventSaved = (definition: EventDefinition) => {
+    if (selectedNode === "output") {
+      updateDraft({ outputEventType: definition.eventType });
+      return;
+    }
+    updateDraft({ inputEventType: definition.eventType });
+  };
+
+  const handleEmbeddedEventNew = () => {
+    if (selectedNode === "output") {
+      updateDraft({ outputEventType: "" });
+      return;
+    }
+    updateDraft({ inputEventType: "" });
+  };
+
+  const handleEmbeddedEventDeleted = () => {
+    handleEmbeddedEventNew();
+  };
+
+  const saveWorkflow = async () => {
+    setError("");
+    try {
+      if (!draft.inputEventType) throw new Error("Select an input event.");
+      if (!draft.targetAgentId) throw new Error("Select an agent.");
+      if (!draft.outputEventType) throw new Error("Select an output event.");
+
+      const output = definitionByEventType.get(draft.outputEventType);
+      if (!output) throw new Error("Selected output event is not available.");
+
+      const agentName = agentById.get(draft.targetAgentId)?.name ?? draft.targetAgentId;
+      const basePolicy = selectedPolicyId === newWorkflowId || !selectedPolicy
+        ? policyTemplate(draft.targetAgentId)
+        : selectedPolicy;
+      const savedPolicy = await save("policies", applyWorkflowToPolicy({
+        ...basePolicy,
+        name: draft.policyName.trim() || basePolicy.name || workflowFallbackPolicyName(draft.inputEventType, agentName),
+        description: basePolicy.description || `Route ${draft.inputEventType} to ${agentName}.`
+      }, draft));
+
+      await saveEventDefinition(mergeReadyProducer(output, draft.targetAgentId));
+      setCreatingWorkflow(false);
+      setSelectedPolicyId(savedPolicy.id);
+      setDraft((current) => ({
+        ...current,
+        policyId: savedPolicy.id,
+        policyName: savedPolicy.name
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save workflow.");
+    }
+  };
+
+  return (
+    <div className="grid gap-4">
+      <section className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-slate-100 shadow-sm">
+        <header className="border-b border-slate-800 px-4 py-3 md:px-5">
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold leading-tight tracking-normal text-slate-50">Workflows</h1>
+            <p className="mt-1 truncate text-sm text-slate-400">{detailTitle}</p>
+          </div>
+        </header>
+
+        <div className="relative overflow-hidden bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.16)_1px,transparent_0)] [background-size:18px_18px]">
+          <div className="absolute left-4 top-4 hidden flex-col gap-2 rounded-lg border border-slate-800 bg-slate-950/80 p-2 shadow-lg shadow-black/20 md:flex">
+            {[
+              { node: "input" as const, icon: Inbox, label: "Input event" },
+              { node: "policy" as const, icon: Link2, label: "Policy link" },
+              { node: "agent" as const, icon: Bot, label: "Agent" },
+              { node: "output" as const, icon: Route, label: "Output event" }
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <Button
+                  key={item.node}
+                  type="button"
+                  size="icon-sm"
+                  variant={selectedNode === item.node ? "default" : "ghost"}
+                  title={item.label}
+                  onClick={() => setSelectedNode(item.node)}
+                >
+                  <Icon />
+                  <span className="sr-only">{item.label}</span>
+                </Button>
+              );
+            })}
+          </div>
+
+          <div className="grid min-h-[16rem] items-center gap-3 px-4 py-5 md:grid-cols-[minmax(8rem,1fr)_2.5rem_minmax(8rem,0.95fr)_2.5rem_minmax(8rem,0.95fr)_2.5rem_minmax(8rem,0.95fr)] md:px-20 xl:px-28">
+            <WorkflowNode
+              node="input"
+              selected={selectedNode === "input"}
+              value={draft.inputEventType}
+              options={eventOptions}
+              onChange={selectInputEvent}
+              onSelect={() => setSelectedNode("input")}
+            />
+            <WorkflowConnector />
+            <WorkflowNode
+              node="policy"
+              selected={selectedNode === "policy"}
+              value={draft.policyId ?? selectedPolicyId}
+              options={policyOptions}
+              onChange={selectPolicy}
+              onSelect={() => setSelectedNode("policy")}
+            />
+            <WorkflowConnector />
+            <WorkflowNode
+              node="agent"
+              selected={selectedNode === "agent"}
+              value={draft.targetAgentId}
+              options={agentOptions}
+              onChange={selectAgent}
+              onSelect={() => setSelectedNode("agent")}
+            />
+            <WorkflowConnector />
+            <WorkflowNode
+              node="output"
+              selected={selectedNode === "output"}
+              value={draft.outputEventType}
+              options={eventOptions}
+              onChange={selectOutputEvent}
+              onSelect={() => setSelectedNode("output")}
+            />
+          </div>
+        </div>
+
+        <form
+          className="flex flex-col gap-3 border-t border-slate-800 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5"
+          onSubmit={(event) => { event.preventDefault(); void saveWorkflow(); }}
+        >
+          <div className="min-w-0 text-sm">
+            <div className="font-medium text-slate-100">Policy-backed route</div>
+            <div className="mt-1 truncate text-slate-400">
+              {inputDefinition?.name ?? "Input event"} to {targetAgent?.name ?? "agent"} with {outputDefinition?.name ?? "output event"}.
+            </div>
+            {error ? <div className="mt-2 text-sm text-red-300">{error}</div> : null}
+          </div>
+          <Button type="submit" disabled={!canSave} className="shrink-0">
+            <Save data-icon="inline-start" />
+            Save workflow
+          </Button>
+        </form>
+      </section>
+
+      {selectedNode === "agent" ? (
+        <AgentsView agent={targetAgent} runtimes={data.runtimes} save={save} />
+      ) : null}
+      {selectedNode === "policy" ? (
+        <PoliciesView
+          data={data}
+          policy={embeddedPolicy}
+          save={save}
+          remove={remove}
+          newPolicyTemplate={buildWorkflowPolicyDraft}
+          onSaved={handleEmbeddedPolicySaved}
+        />
+      ) : null}
+      {selectedNode === "input" || selectedNode === "output" ? (
+        <EventsView
+          key={`workflow-${selectedNode}-${selectedEventDefinition?.id ?? "new"}`}
+          data={data}
+          eventDefinition={selectedEventDefinition}
+          saveEventDefinition={saveEventDefinition}
+          removeEventDefinition={removeEventDefinition}
+          onSaved={handleEmbeddedEventSaved}
+          onNew={handleEmbeddedEventNew}
+          onDeleted={handleEmbeddedEventDeleted}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function PoliciesView({
+  data,
+  policy,
+  save,
+  remove,
+  newPolicyTemplate,
+  onSaved
+}: ViewProps & {
+  project?: Project;
+  policy?: Partial<Policy>;
+  newPolicyTemplate?: () => Partial<Policy>;
+  onSaved?: (policy: Policy) => void;
+}) {
   const activeDefinitions = useMemo(
     () => data.eventDefinitions.filter((definition) => definition.active && definition.eventType),
     [data.eventDefinitions]
   );
-  const [form, setForm] = useState<Partial<Policy>>(policy ?? policyTemplate(data.agents[0]?.id ?? ""));
+  const createPolicyTemplate = useCallback(
+    () => newPolicyTemplate ? newPolicyTemplate() : policyTemplate(data.agents[0]?.id ?? ""),
+    [data.agents, newPolicyTemplate]
+  );
+  const [form, setForm] = useState<Partial<Policy>>(policy ?? createPolicyTemplate());
   const [selectedEventType, setSelectedEventType] = useState(eventTypesForPolicy(policy ?? {})[0] ?? "");
   const [advancedMatchText, setAdvancedMatchText] = useState("");
   const [error, setError] = useState("");
@@ -1704,13 +2274,13 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
   const invalidSelectedEventType = selectedEventType && !activeEventTypeSet.has(selectedEventType) ? selectedEventType : "";
 
   useEffect(() => {
-    const next = policy ?? policyTemplate(data.agents[0]?.id ?? "");
+    const next = policy ?? createPolicyTemplate();
     const nextEventTypes = eventTypesForPolicy(next);
     setForm(next);
     setSelectedEventType(nextEventTypes[0] ?? activeDefinitions[0]?.eventType ?? "");
     setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
     setError("");
-  }, [activeDefinitions, data.agents, policy]);
+  }, [activeDefinitions, createPolicyTemplate, policy]);
 
   const submit = async () => {
     setError("");
@@ -1720,7 +2290,7 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
       delete advancedMatch.eventTypes;
       const match = { ...advancedMatch, eventTypes: [selectedEventType] };
       const targetAgentId = policyTargetForForm(form, data.agents[0]?.id ?? "");
-      await save("policies", {
+      const saved = await save("policies", {
         ...form,
         match,
         action: { type: "start_agent_run", targetAgentId },
@@ -1730,6 +2300,7 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
         eventTypes: match.eventTypes ?? [],
         payloadMetadata: {}
       });
+      onSaved?.(saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save policy.");
     }
@@ -1779,9 +2350,9 @@ function PoliciesView({ data, policy, save, remove }: ViewProps & { project?: Pr
             disabled={data.agents.length === 0 || activeDefinitions.length === 0 || !selectedEventType || Boolean(invalidSelectedEventType)}
             leading={<SwitchField label="Active" checked={form.active ?? true} onChange={(active) => setForm({ ...form, active })} />}
             onNew={() => {
-              const next = policyTemplate(data.agents[0]?.id ?? "");
+              const next = createPolicyTemplate();
               setForm(next);
-              setSelectedEventType(activeDefinitions[0]?.eventType ?? "");
+              setSelectedEventType(eventTypesForPolicy(next)[0] ?? activeDefinitions[0]?.eventType ?? "");
               setAdvancedMatchText(readJson(advancedPolicyMatchForForm(next)));
               setError("");
             }}
@@ -1823,13 +2394,19 @@ function EventsView({
   eventDefinition,
   saveEventDefinition,
   removeEventDefinition,
-  navigate
+  navigate,
+  onSaved,
+  onNew,
+  onDeleted
 }: {
   data: AppData;
   eventDefinition?: EventDefinition;
   saveEventDefinition: (eventDefinition: Partial<EventDefinition>) => Promise<EventDefinition>;
   removeEventDefinition: (id: string) => Promise<void>;
-  navigate: (path: string) => void;
+  navigate?: (path: string) => void;
+  onSaved?: (eventDefinition: EventDefinition) => void;
+  onNew?: () => void;
+  onDeleted?: (id: string) => void;
 }) {
   const [definitionForm, setDefinitionForm] = useState<Partial<EventDefinition>>(eventDefinition ?? eventDefinitionTemplate());
   const [producersText, setProducersText] = useState(readJson(definitionForm.producers ?? []));
@@ -1863,7 +2440,8 @@ function EventsView({
         producers: parseEventProducers(producersText),
         payloadExample: parsePayload(payloadExampleText)
       });
-      if (saved.relativePath) navigate(eventDefinitionDocumentPath(saved.relativePath));
+      onSaved?.(saved);
+      if (!onSaved && saved.relativePath) navigate?.(eventDefinitionDocumentPath(saved.relativePath));
     } catch (err) {
       setDefinitionError(err instanceof Error ? err.message : "Unable to save event definition.");
     }
@@ -1875,7 +2453,8 @@ function EventsView({
     setProducersText(readJson(next.producers ?? []));
     setPayloadExampleText(readJson(next.payloadExample ?? {}));
     setDefinitionError("");
-    navigate("/events");
+    if (onNew) onNew();
+    else navigate?.("/events");
   };
 
   return (
@@ -1909,7 +2488,10 @@ function EventsView({
               onNew={newDefinition}
               onDelete={() => {
                 if (!definitionForm.id) return;
-                void removeEventDefinition(definitionForm.id).then(() => navigate("/events"));
+                void removeEventDefinition(definitionForm.id).then(() => {
+                  onDeleted?.(definitionForm.id!);
+                  if (!onDeleted) navigate?.("/events");
+                });
               }}
             />
           </form>
