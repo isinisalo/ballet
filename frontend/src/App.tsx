@@ -780,7 +780,7 @@ function TextField({
   compact?: boolean;
 }) {
   return (
-    <Field className={compact ? "grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3" : "gap-1.5"}>
+    <Field className="gap-1.5">
       <FieldLabel className={compact ? "text-muted-foreground" : undefined}>{label}</FieldLabel>
       <Input className={compact ? "min-w-0" : undefined} value={value} type={type} required={required} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </Field>
@@ -826,7 +826,7 @@ function SelectField({
   compact?: boolean;
 }) {
   return (
-    <Field className={compact ? "grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3" : "gap-1.5"}>
+    <Field className="gap-1.5">
       <FieldLabel className={compact ? "text-muted-foreground" : undefined}>{label}</FieldLabel>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="min-w-0 w-full">
@@ -2072,9 +2072,7 @@ function WorkflowAgentEditor({
       {form.errors?.length ? <ErrorPreview errors={form.errors} /> : null}
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <form id={formId} className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-        <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-center gap-3 text-sm">
-          <span className="text-muted-foreground">Runtime</span>
-          <div className="flex min-w-0 items-center gap-1.5 text-foreground">
+        <div className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
             <Select value={runtimeValue} onValueChange={updateRuntime} disabled={runtimeOptions.length === 0}>
               <SelectTrigger size="sm" className="h-7 min-w-0 flex-[1_1_5.5rem] justify-between px-2">
                 <SelectValue placeholder="No runtime" />
@@ -2114,7 +2112,6 @@ function WorkflowAgentEditor({
             >
               <ChartNoAxesColumnIncreasing data-icon="inline-start" />
             </Button>
-          </div>
         </div>
         <FieldGroup>
           <TextField label="Name" required compact value={form.name ?? ""} onChange={(name) => updateForm({ name })} />
