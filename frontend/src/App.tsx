@@ -2751,11 +2751,6 @@ function EventsView(props: {
   renderEmbedded?: (parts: { actions: ReactNode; headerActions: ReactNode; content: ReactNode; form: Partial<EventDefinition> }) => ReactNode;
 }) {
   const { data, eventDefinition, navigate, onSaved, onDeleted, ...editorProps } = props;
-  const eventOptions = workflowEventOptions(data.eventDefinitions);
-  const selectEvent = (eventType: string) => {
-    const selectedEventDefinition = data.eventDefinitions.find((candidate) => candidate.eventType === eventType);
-    if (selectedEventDefinition?.relativePath) navigate?.(eventDefinitionDocumentPath(selectedEventDefinition.relativePath));
-  };
 
   return (
     <div className="grid gap-4 xl:max-w-3xl">
@@ -2778,15 +2773,12 @@ function EventsView(props: {
             node="output"
             selected
             value={form.eventType ?? ""}
-            options={eventOptions}
-            onChange={selectEvent}
             onSelect={() => undefined}
             headerActions={headerActions}
             showSummaryLabel={false}
             showEditorHeader={false}
             compactSummary
             inlineSummary
-            summarySelect
           >
             {content}
           </WorkflowNode>
