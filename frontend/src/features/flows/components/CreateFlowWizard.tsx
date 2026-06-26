@@ -24,6 +24,7 @@ import {
   type MappingRowDraft
 } from "@/components/mapping-builder/mapping-builder-model";
 import { DraftTestPanel } from "@/features/flows/components/DraftTestPanel";
+import { WizardStepper } from "@/features/flows/wizard/WizardStepper";
 import {
   cloneDataShapeFields,
   dataShapeFieldsFromSchema,
@@ -398,14 +399,26 @@ export function CreateFlowWizard({
 
   return (
     <div data-testid="create-flow-wizard">
-      <Section title={editing ? "Edit Flow" : "Create Flow"} description="Create a representative Flow with guided fields, mappings, and result behavior.">
+      <Section title={editing ? "Edit Flow" : "Create Flow"} description="Create a representative Flow with guided fields, mappings, and result behavior." className="border-white/10 bg-card/80">
         {error ? <div role="alert" className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
         <div className="grid gap-5">
-          <div className="grid gap-3 md:grid-cols-2">
-            <TextField label="Flow name" value={name} onChange={setName} required />
-            <TextAreaField label="Purpose" value={purpose} onChange={setPurpose} rows={2} required />
-            <div className="md:col-span-2">
-              <TextAreaField label="Description" value={description} onChange={setDescription} rows={2} />
+          <WizardStepper steps={["Intent", "Trigger", "Agent", "Mapping", "Results", "Safety"]} current={testing ? 5 : branch.eventName ? 4 : mappingRows.length ? 3 : taskName || operationId ? 2 : triggerFields.length ? 1 : 0} />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid gap-3 md:grid-cols-2">
+              <TextField label="Flow name" value={name} onChange={setName} required />
+              <TextAreaField label="Purpose" value={purpose} onChange={setPurpose} rows={2} required />
+              <div className="md:col-span-2">
+                <TextAreaField label="Description" value={description} onChange={setDescription} rows={2} />
+              </div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+              <div className="text-[0.68rem] font-semibold uppercase text-cyan-200">Visual preview</div>
+              <div className="mt-3 grid gap-2 font-mono text-xs">
+                <PreviewStep label="EVENT" value={name ? `${name} started` : "New trigger"} />
+                <PreviewStep label="ROUTE" value={`${taskInputFields.length} mapped field${taskInputFields.length === 1 ? "" : "s"}`} />
+                <PreviewStep label="AGENT" value={taskName || data.agents.find((agent) => agent.id === agentId)?.name || "Agent task"} />
+                <PreviewStep label="EMIT" value={branch.eventName || "Completed"} />
+              </div>
             </div>
           </div>
           <div className="grid gap-1.5">
@@ -561,6 +574,15 @@ export function CreateFlowWizard({
           </div>
         </div>
       </Section>
+    </div>
+  );
+}
+
+function PreviewStep({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+      <div className="text-[0.62rem] text-muted-foreground">{label}</div>
+      <div className="truncate text-slate-100">{value}</div>
     </div>
   );
 }

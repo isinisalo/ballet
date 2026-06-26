@@ -6,6 +6,8 @@ import { OverviewPage } from "@/features/overview/OverviewPage";
 import { FlowsPage } from "@/features/flows/pages/FlowsPage";
 import { RunsPage } from "@/features/runs/RunsPage";
 import { AgentsPage } from "@/features/agents/AgentsPage";
+import { RuntimeConsolePage } from "@/features/runtime-console/RuntimeConsolePage";
+import { ProjectKnowledgePage } from "@/features/project-knowledge/ProjectKnowledgePage";
 import { AdvancedPage } from "@/features/advanced/AdvancedPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -25,13 +27,15 @@ export function App() {
   };
 
   return (
-    <AppLayout route={route} navigate={navigate}>
+    <AppLayout route={route} data={data} flows={flows} navigate={navigate}>
       {loading ? <Alert><AlertDescription>Loading Ballet workspace...</AlertDescription></Alert> : null}
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       {route.main === "overview" ? <OverviewPage data={data} flows={flows} navigate={navigate} /> : null}
       {route.main === "flows" ? <FlowsPage data={data} flows={flows} selectedFlowId={route.id} selectedFlowVersion={route.version} refresh={refresh} navigate={navigate} /> : null}
       {route.main === "runs" ? <RunsPage data={data} flows={flows} selectedRunId={route.id} refresh={refresh} navigate={navigate} /> : null}
       {route.main === "agents" ? <AgentsPage data={data} selectedAgentId={route.id} navigate={navigate} /> : null}
+      {route.main === "runtime-console" ? <RuntimeConsolePage data={data} flows={flows} navigate={navigate} /> : null}
+      {route.main === "knowledge" ? <ProjectKnowledgePage data={data} selectedDocumentId={route.id} /> : null}
       {route.main === "advanced" ? <AdvancedPage data={data} validation={validation} advancedRoute={route.advanced} refresh={refresh} /> : null}
     </AppLayout>
   );

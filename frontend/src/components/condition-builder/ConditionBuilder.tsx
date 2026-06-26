@@ -55,7 +55,7 @@ export function ConditionBuilder({
   const selectedKind = isLeafDraft(value) ? "leaf" : value.kind;
 
   return (
-    <div className="grid gap-3 rounded-md border bg-background p-3">
+    <div className="grid gap-3 rounded-lg border border-white/10 bg-black/15 p-3">
       <div className="grid gap-3 md:grid-cols-[12rem_1fr] md:items-end">
         <div className="grid gap-1.5">
           <Label>Match</Label>
@@ -71,12 +71,12 @@ export function ConditionBuilder({
             </SelectContent>
           </Select>
         </div>
-        <div className="rounded-md border bg-muted/20 p-2 text-sm">{conditionDraftSummary(value, fields)}</div>
+        <div className="rounded-md border border-cyan-300/20 bg-cyan-300/10 p-2 text-sm text-cyan-50">{conditionDraftSummary(value, fields)}</div>
       </div>
       {isLeafDraft(value) ? (
         <LeafConditionEditor fields={fields} value={value} onChange={onChange} rootLabel={rootLabel} />
       ) : value.kind === "not" ? (
-        <div className="grid gap-2 rounded-md border bg-muted/20 p-3">
+        <div className="grid gap-2 rounded-md border border-white/10 bg-black/20 p-3">
           <ConditionBuilder fields={fields} value={value.condition} onChange={(condition) => onChange({ ...value, condition })} rootLabel={rootLabel} />
         </div>
       ) : (
@@ -160,7 +160,7 @@ function ConditionGroupEditor({
   return (
     <div className="grid gap-2">
       {value.conditions.map((condition, index) => (
-        <div key={index} className="grid gap-2 rounded-md border bg-muted/20 p-3">
+        <div key={index} className="grid gap-2 rounded-md border border-white/10 bg-black/20 p-3">
           <div className="flex items-center justify-between gap-2">
             <div className="text-sm font-medium">Condition {index + 1}</div>
             <Button type="button" size="icon-sm" variant="destructive" aria-label={`Remove condition ${index + 1}`} title={`Remove condition ${index + 1}`} onClick={() => removeChild(index)}>

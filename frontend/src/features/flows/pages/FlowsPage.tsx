@@ -3,13 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import type { AgentRun, AppData } from "backend/shared/domain";
 import type { FlowCreateDraft, FlowSettingsUpdateDraft, FlowTestResult, FlowViewModel } from "backend/shared/flow";
 import { api } from "@/api";
-import { DiagnosticsList, HealthBadge } from "@/components/diagnostics/DiagnosticsList";
+import { DiagnosticsList } from "@/components/diagnostics/DiagnosticsList";
 import { Button, EmptyState, PageHeader, Section, TechnicalDetails } from "@/components/forms/FormControls";
-import { Badge } from "@/components/ui/badge";
 import { CreateFlowWizard } from "@/features/flows/components/CreateFlowWizard";
-import { FlowInspector } from "@/features/flows/components/FlowInspector";
-import { FlowSequence } from "@/features/flows/components/FlowSequence";
 import { FlowTestPanel } from "@/features/flows/components/FlowTestPanel";
+import { FlowCanvas } from "@/features/flows/canvas/FlowCanvas";
+import { FlowInspectorDrawer } from "@/features/flows/inspector/FlowInspectorDrawer";
+import { StatusPill, flowHealthTone } from "@/design-system/components/StatusPill";
 import {
   defaultSelection,
   flowEditDraftFromFlow,
@@ -126,8 +126,8 @@ export function FlowsPage({
   return (
     <div className="grid gap-5">
       <PageHeader
-        title="Flows"
-        description="Human-readable views over Loop definitions, routing rules, agent tasks, and emission rules."
+        title="Flow Canvas"
+        description="Visual orchestration surface over Loop definitions, routing rules, agent tasks, and emission rules."
         action={<Button onClick={() => openCreate()}><Plus className="size-4" />Create Flow</Button>}
       />
       {creating ? (
@@ -139,8 +139,8 @@ export function FlowsPage({
           onCreated={async (flow) => { closeCreate(); await refresh(); navigate(flowPath(flow)); }}
         />
       ) : null}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <Section title="Flow Catalog">
+      <div className="grid gap-4 xl:grid-cols-[minmax(17rem,0.28fr)_minmax(0,1fr)_minmax(20rem,0.34fr)]">
+        <Section title="Flow Catalog" className="border-white/10 bg-card/70">
           {flows.length === 0 ? <EmptyState title="No Flows yet." action={<Button onClick={() => openCreate()}>Create Flow</Button>} /> : (
             <div className="grid gap-3">
               {flows.map((flow) => {
@@ -148,12 +148,12 @@ export function FlowsPage({
                 const branchCount = flow.edges.filter((edge) => edge.kind === "emission").length;
                 const recentRun = mostRecentRunForFlow(flow, mostRecentRunByOperation);
                 return (
-                  <button key={`${flow.id}@${flow.version}`} type="button" className="grid gap-3 rounded-md border bg-background p-3 text-left hover:bg-accent" onClick={() => navigate(flowPath(flow))}>
+                  <button key={`${flow.id}@${flow.version}`} type="button" className="grid gap-3 rounded-md border border-white/10 bg-black/15 p-3 text-left hover:border-primary/50 hover:bg-primary/10" onClick={() => navigate(flowPath(flow))}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium">{flow.name}</span>
                       <span className="flex items-center gap-2">
-                        <Badge variant={flow.active ? "default" : "outline"}>{flow.active ? "active" : "draft"}</Badge>
-                        <HealthBadge health={flow.health} />
+                        <StatusPill tone={flow.active ? "success" : "neutral"}>{flow.active ? "active" : "draft"}</StatusPill>
+                        <StatusPill tone={flowHealthTone(flow.health)}>{flow.health}</StatusPill>
                       </span>
                     </div>
                     <p className="text-sm leading-6 text-muted-foreground">{flow.description}</p>
@@ -168,18 +168,17 @@ export function FlowsPage({
             </div>
           )}
         </Section>
-        <Section title={selectedFlow ? selectedFlow.name : "Flow"}>
+        <Section title={selectedFlow ? selectedFlow.name : "Flow"} className="border-white/10 bg-card/70">
           {selectedFlow ? (
             <div className="grid gap-4">
-              <FlowSequence flow={selectedFlow} selected={effectiveSelection} onSelect={setSelectedItem} />
-              {effectiveSelection ? <FlowInspector data={data} flow={selectedFlow} selection={effectiveSelection} onUpdateSettings={updateSettings} /> : null}
+              <FlowCanvas flow={selectedFlow} selected={effectiveSelection} onSelect={setSelectedItem} />
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => void testSelectedFlow(selectedFlow)}>
                   <TestTube2 className="size-4" />Test
                 </Button>
                 <Button type="button" variant="outline" disabled={Boolean(blockActivationReason)} onClick={() => void activate(selectedFlow)}>
                   {selectedFlow.active ? <Pause className="size-4" /> : <Play className="size-4" />}
-                  {selectedFlow.active ? "Pause" : "Activate"}
+                  {selectedFlow.active ? "Pause" : blockActivationReason ? <><span className="sr-only">Activate</span><span>Cannot run</span></> : "Activate"}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => openCreate(flowCreateDraftFromFlow(data, selectedFlow))}>
                   <Copy className="size-4" />Duplicate
@@ -201,6 +200,15 @@ export function FlowsPage({
             </div>
           ) : <EmptyState title="Select or create a Flow." />}
         </Section>
+        {selectedFlow ? (
+          <FlowInspectorDrawer
+            data={data}
+            flow={selectedFlow}
+            selection={effectiveSelection}
+            onUpdateSettings={updateSettings}
+            onClose={() => setSelectedItem(undefined)}
+          />
+        ) : null}
       </div>
     </div>
   );

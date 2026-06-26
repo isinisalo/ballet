@@ -1,7 +1,8 @@
 import { Bot } from "lucide-react";
 import type { AppData } from "backend/shared/domain";
 import { EmptyState, PageHeader, Section, TechnicalDetails } from "@/components/forms/FormControls";
-import { Badge } from "@/components/ui/badge";
+import { StatusPill } from "@/design-system/components/StatusPill";
+import { AgentCard, recentRunForAgent } from "@/features/agents/AgentCard";
 
 const runTimestamp = (value: { updatedAt: string; createdAt: string }): number =>
   Date.parse(value.updatedAt || value.createdAt);
@@ -28,35 +29,37 @@ export function AgentsPage({
 
   return (
     <div className="grid gap-5">
-      <PageHeader title="Agents" description="Reusable agent roles stay separate from operation-specific task instructions." />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <Section title="Agent List">
+      <PageHeader title="Agents" description="Agent Fleet status, operations, recent runs, model settings, and local operator actions." />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.42fr)]">
+        <Section title="Agent Fleet" className="border-white/10 bg-card/70">
           {data.agents.length === 0 ? <EmptyState title="No agents configured." /> : (
-            <div className="grid gap-2">
+            <div className="grid gap-3 lg:grid-cols-2">
               {data.agents.map((agent) => (
-                <button key={agent.id} type="button" className="grid gap-1 rounded-md border bg-background p-3 text-left hover:bg-accent" onClick={() => navigate(`/agents/${encodeURIComponent(agent.id)}`)}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-2"><Bot className="size-4 shrink-0" /><span className="truncate font-medium">{agent.name}</span></span>
-                    <Badge variant={agent.enabled ? "default" : "outline"}>{agent.enabled ? "enabled" : "disabled"}</Badge>
-                  </div>
-                  <p className="line-clamp-2 text-sm text-muted-foreground">{agent.description}</p>
-                </button>
+                <AgentCard
+                  key={agent.id}
+                  agent={agent}
+                  operations={data.operations.filter((operation) => operation.agentId === agent.id)}
+                  recentRun={recentRunForAgent(agent.id, data.agentRuns)}
+                  selected={selectedAgent?.id === agent.id}
+                  onOpen={() => navigate(`/agents/${encodeURIComponent(agent.id)}`)}
+                />
               ))}
             </div>
           )}
         </Section>
-        <Section title={selectedAgent?.name ?? "Agent"}>
+        <Section title={selectedAgent?.name ?? "Agent"} className="border-white/10 bg-card/70">
           {selectedAgent ? (
             <div className="grid gap-5">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3">
                 <AgentFact label="Purpose" value={selectedAgent.description} />
                 <AgentFact label="Model" value={selectedAgent.model ?? "Default model"} />
+                <AgentFact label="Reasoning effort" value={selectedAgent.modelReasoningEffort ?? "standard"} />
                 <AgentFact label="State" value={selectedAgent.enabled ? "Enabled" : "Disabled"} />
               </div>
               <div className="grid gap-2">
                 <h3 className="text-sm font-medium">Operations implemented by this agent</h3>
                 {operations.length === 0 ? <p className="text-sm text-muted-foreground">No operations reference this agent.</p> : operations.map((operation) => (
-                  <div key={`${operation.id}@${operation.version}`} className="rounded-md border bg-background p-3">
+                  <div key={`${operation.id}@${operation.version}`} className="rounded-md border border-white/10 bg-black/15 p-3">
                     <div className="font-medium">{operation.name}</div>
                     <p className="text-sm text-muted-foreground">{operation.description}</p>
                   </div>
@@ -65,16 +68,16 @@ export function AgentsPage({
               <div className="grid gap-2" aria-label={`Recent runs for ${selectedAgent.name}`}>
                 <h3 className="text-sm font-medium">Recent runs</h3>
                 {recentRuns.length === 0 ? <p className="text-sm text-muted-foreground">No recent runs.</p> : recentRuns.map((run) => (
-                  <div key={run.runId} className="flex items-center justify-between gap-2 rounded-md border bg-background p-3">
+                  <div key={run.runId} className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/15 p-3">
                     <span className="truncate text-sm">{operationNameForRun(run, operationsByKey)}</span>
-                    <Badge variant={run.status === "failed" ? "destructive" : "outline"}>{run.status}</Badge>
+                    <StatusPill tone={run.status === "failed" ? "danger" : run.status === "completed" ? "success" : "info"}>{run.status}</StatusPill>
                   </div>
                 ))}
               </div>
               <div className="grid gap-2">
                 <h3 className="text-sm font-medium">Skills</h3>
                 <div className="flex flex-wrap gap-2">
-                  {selectedAgent.skills.length === 0 ? <span className="text-sm text-muted-foreground">No skills linked.</span> : selectedAgent.skills.map((skill) => <Badge key={skill.id} variant="outline">{skill.name}</Badge>)}
+                  {selectedAgent.skills.length === 0 ? <span className="text-sm text-muted-foreground">No skills linked.</span> : selectedAgent.skills.map((skill) => <StatusPill key={skill.id} tone="accent">{skill.name}</StatusPill>)}
                 </div>
               </div>
               <TechnicalDetails>
@@ -90,8 +93,8 @@ export function AgentsPage({
 
 function AgentFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border bg-background p-3 text-sm">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+    <div className="rounded-md border border-white/10 bg-black/15 p-3 text-sm">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Bot className="size-3.5" />{label}</div>
       <div className="mt-1">{value}</div>
     </div>
   );

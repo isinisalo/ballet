@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Braces, CheckCircle2, Hash, List, Plus, ToggleLeft, Trash2, Type } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { DataShapeFieldDraft } from "backend/shared/flow";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,12 @@ export function DataShapeBuilder({
         {fields.map((field, index) => {
           const errors = fieldErrors(field, fields, index);
           return (
-            <div key={index} className="grid gap-3 rounded-md border bg-background p-3">
+            <div key={index} className="grid gap-3 rounded-lg border border-white/10 bg-black/15 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <FieldTypeIcon type={field.type} />
+                <span className="font-mono text-xs text-cyan-200">{field.name || `field_${index + 1}`}</span>
+                {field.required ? <span className="inline-flex items-center gap-1 rounded-sm border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[0.68rem] uppercase text-amber-100"><CheckCircle2 className="size-3" />required</span> : null}
+              </div>
               <div className="grid gap-3 lg:grid-cols-[1fr_1fr_10rem_6rem_auto] lg:items-end">
                 <LabeledInput label="Field name" value={field.name} onChange={(name) => update(index, { name })} />
                 <LabeledInput label="Display label" value={field.label ?? ""} onChange={(label) => update(index, { label })} />
@@ -159,5 +164,22 @@ function LabeledInput({
       <Label htmlFor={id}>{label}</Label>
       <Input id={id} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </div>
+  );
+}
+
+function FieldTypeIcon({ type }: { type: DataShapeFieldDraft["type"] }) {
+  const Icon = type === "number" || type === "number-list"
+    ? Hash
+    : type === "boolean"
+      ? ToggleLeft
+      : type === "object" || type === "object-list"
+        ? Braces
+        : type.endsWith("-list")
+          ? List
+          : Type;
+  return (
+    <span className="grid size-8 place-items-center rounded-md border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+      <Icon className="size-4" />
+    </span>
   );
 }

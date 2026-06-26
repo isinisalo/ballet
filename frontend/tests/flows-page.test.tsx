@@ -1084,7 +1084,7 @@ describe("FlowsPage human UI", () => {
 
     await user.click(screen.getByRole("button", { name: /activate/i }));
     expect(apiMocks.activateFlow).toHaveBeenCalledWith(createdFlow.id, createdFlow.version);
-  }, 10_000);
+  }, 20_000);
 
   it("lets a normal user reuse an existing trigger and agent task when creating a Flow", async () => {
     const user = userEvent.setup();

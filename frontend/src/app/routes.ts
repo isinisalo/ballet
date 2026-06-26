@@ -1,4 +1,4 @@
-export type MainRoute = "overview" | "flows" | "runs" | "agents" | "advanced";
+export type MainRoute = "overview" | "flows" | "runs" | "agents" | "runtime-console" | "knowledge" | "advanced";
 export type AdvancedRoute = "contracts" | "events" | "routing" | "emissions" | "loops" | "runtimes" | "skills";
 
 export interface RouteState {
@@ -23,6 +23,8 @@ export const routeFromPath = (path: string): RouteState => {
   if (parts[0] === "flows") return { main: "flows", id: parts[1], version: versionFromUrl(url) };
   if (parts[0] === "runs") return { main: "runs", id: parts[1] };
   if (parts[0] === "agents") return { main: "agents", id: parts[1] };
+  if (parts[0] === "runtime-console") return { main: "runtime-console", id: parts[1] };
+  if (parts[0] === "knowledge") return { main: "knowledge", id: parts[1] };
   if (parts[0] === "advanced") {
     const advanced = advancedRoutes.has(parts[1] as AdvancedRoute) ? parts[1] as AdvancedRoute : "contracts";
     return { main: "advanced", advanced, id: parts[2] };
@@ -32,6 +34,8 @@ export const routeFromPath = (path: string): RouteState => {
 
 export const pathForRoute = (route: RouteState): string => {
   if (route.main === "overview") return "/";
+  if (route.main === "runtime-console") return `/runtime-console${route.id ? `/${encodeURIComponent(route.id)}` : ""}`;
+  if (route.main === "knowledge") return `/knowledge${route.id ? `/${encodeURIComponent(route.id)}` : ""}`;
   if (route.main === "advanced") return `/advanced/${route.advanced ?? "contracts"}${route.id ? `/${encodeURIComponent(route.id)}` : ""}`;
   const path = `/${route.main}${route.id ? `/${encodeURIComponent(route.id)}` : ""}`;
   return route.main === "flows" && route.version !== undefined ? `${path}?version=${encodeURIComponent(String(route.version))}` : path;

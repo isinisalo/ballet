@@ -1,5 +1,5 @@
 import { useId, useMemo } from "react";
-import { Wand2 } from "lucide-react";
+import { ArrowLeft, Wand2 } from "lucide-react";
 import type { DataShapeFieldDraft } from "backend/shared/flow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,11 +74,16 @@ export function MappingBuilder({
           const warnings = targetField ? rowWarnings(row, targetField, sourceFields) : [];
           const preview = previewForRow(row, effectivePreviewContext, paths);
           return (
-            <div key={row.target} className="grid gap-3 rounded-md border bg-background p-3">
+            <div key={row.target} className="grid gap-3 rounded-lg border border-white/10 bg-black/15 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-sm border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 font-mono text-xs text-emerald-100">{row.target}</span>
+                <ArrowLeft className="size-4 text-muted-foreground" />
+                <span className="text-muted-foreground">{row.sourceKind.replace(/-/g, " ")}</span>
+              </div>
               <div className="grid gap-3 md:grid-cols-[1fr_12rem_1fr_1fr] md:items-end">
                 <div className="grid gap-1">
                   <Label>Target field</Label>
-                  <div className="rounded-md border bg-muted px-3 py-2 text-sm">{row.target}</div>
+                  <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2 font-mono text-sm text-emerald-100">{row.target}</div>
                 </div>
                 <div className="grid gap-1.5">
                   <Label>Value source</Label>
@@ -125,7 +130,7 @@ export function MappingBuilder({
                   {warnings.map((warning) => <div key={warning}>{warning}</div>)}
                 </div>
               ) : null}
-              <div className="rounded-md border bg-muted/20 p-2 text-sm">
+              <div className="rounded-md border border-white/10 bg-black/20 p-2 text-sm">
                 <span className="font-medium">Preview value</span>
                 <span className="text-muted-foreground"> · {preview.ok ? preview.value : preview.error}</span>
               </div>

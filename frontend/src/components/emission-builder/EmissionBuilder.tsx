@@ -79,7 +79,7 @@ export function EmissionBuilder({
     });
   };
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-4 rounded-lg border border-emerald-300/20 bg-emerald-300/10 p-4">
       {eventOptions.length ? (
         <div className="grid gap-1.5">
           <label className="text-sm font-medium" htmlFor={eventSourceId}>Event to publish</label>
@@ -110,7 +110,7 @@ export function EmissionBuilder({
         fields={branch.fields}
         onChange={(fields) => onChange({ ...branch, fields })}
       />
-      <div className="grid gap-4 rounded-md border bg-background p-3">
+      <div className="grid gap-4 rounded-md border border-white/10 bg-black/15 p-3">
         <div className="grid gap-1">
           <h3 className="text-sm font-medium">Publishing behavior</h3>
           <p className="text-sm leading-6 text-muted-foreground">Configure the business event that continues or completes the Flow after this result branch.</p>
@@ -142,7 +142,7 @@ export function EmissionBuilder({
             </select>
           </div>
         </div>
-        <label className="flex items-start gap-2 rounded-md border bg-muted/20 p-3 text-sm">
+        <label className="flex items-start gap-2 rounded-md border border-white/10 bg-black/20 p-3 text-sm">
           <input
             aria-label="Require summary before publishing"
             className="mt-1"

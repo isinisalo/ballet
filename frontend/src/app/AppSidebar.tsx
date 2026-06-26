@@ -1,4 +1,4 @@
-import { Activity, Bot, Boxes, ChevronDown, FileJson2, GitBranch, Home, ListTree, PlayCircle, Route, Settings2, Shapes, Sparkles } from "lucide-react";
+import { Activity, Bot, Boxes, ChevronDown, FileJson2, GitBranch, Home, ListTree, PlayCircle, Route, ScrollText, Settings2, Shapes, Sparkles, TerminalSquare } from "lucide-react";
 import type React from "react";
 import type { RouteState, AdvancedRoute, MainRoute } from "./routes";
 import {
@@ -20,10 +20,12 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const mainItems: Array<{ route: MainRoute; label: string; icon: typeof Home; path: string }> = [
-  { route: "overview", label: "Overview", icon: Home, path: "/" },
-  { route: "flows", label: "Flows", icon: Route, path: "/flows" },
+  { route: "overview", label: "Command Center", icon: Home, path: "/" },
+  { route: "flows", label: "Flow Canvas", icon: Route, path: "/flows" },
+  { route: "agents", label: "Agent Fleet", icon: Bot, path: "/agents" },
+  { route: "runtime-console", label: "Runtime Console", icon: TerminalSquare, path: "/runtime-console" },
+  { route: "knowledge", label: "Project Knowledge", icon: ScrollText, path: "/knowledge" },
   { route: "runs", label: "Runs", icon: Activity, path: "/runs" },
-  { route: "agents", label: "Agents", icon: Bot, path: "/agents" }
 ];
 
 const advancedItems: Array<{ route: AdvancedRoute; label: string; icon: typeof Home; path: string }> = [
@@ -53,7 +55,7 @@ export function AppSidebar({ route, navigate }: { route: RouteState; navigate: (
               <Boxes />
               <span className="flex flex-col gap-0.5">
                 <span className="font-semibold">Ballet</span>
-                <span className="text-xs text-muted-foreground">Flow runtime</span>
+                <span className="text-xs text-muted-foreground">Agent OS</span>
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
