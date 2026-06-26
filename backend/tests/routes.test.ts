@@ -75,6 +75,46 @@ describe("API routes", () => {
     }
   });
 
+  it("creates project Markdown documents through the project document creation route", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api", apiRouter);
+    const createProjectDocument = vi.spyOn(store, "createProjectDocument").mockResolvedValue({
+      id: "reviewer-instructions",
+      title: "Reviewer Instructions",
+      collection: "project",
+      absolutePath: "/test/.ballet/instructions/reviewer-instructions.md",
+      relativePath: ".ballet/instructions/reviewer-instructions.md",
+      slug: "reviewer-instructions",
+      frontmatter: { title: "Reviewer Instructions" },
+      body: ""
+    });
+    const { server, url } = await listen(app);
+
+    try {
+      const response = await fetch(`${url}/api/project-documents/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          directoryPath: ".ballet/instructions",
+          title: "Reviewer Instructions"
+        })
+      });
+
+      expect(response.status).toBe(201);
+      expect(await response.json()).toMatchObject({
+        relativePath: ".ballet/instructions/reviewer-instructions.md",
+        frontmatter: { title: "Reviewer Instructions" }
+      });
+      expect(createProjectDocument).toHaveBeenCalledWith({
+        directoryPath: ".ballet/instructions",
+        title: "Reviewer Instructions"
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
   it("serves runtime health, agent runs, logs, and retry", async () => {
     const app = express();
     app.use(express.json());

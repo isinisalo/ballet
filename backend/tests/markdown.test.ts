@@ -14,7 +14,7 @@ import {
   tomlSource,
   writeMarkdownDocument
 } from "../markdown.js";
-import { loadMarkdownAppData, writeEntityMarkdown, writeProjectMarkdownDocument } from "../markdown-adapter.js";
+import { createProjectMarkdownDocument, loadMarkdownAppData, writeEntityMarkdown, writeProjectMarkdownDocument } from "../markdown-adapter.js";
 
 const fixtureRoot = path.resolve(process.cwd(), ".fixture-ballet-project");
 const tempRoots: string[] = [];
@@ -208,10 +208,12 @@ path = "../.agents/skills/missing-skill"
     const root = await tempRoot();
     await mkdir(path.join(root, ".ballet/adr/backend/deep"), { recursive: true });
     await mkdir(path.join(root, ".ballet/goals"), { recursive: true });
+    await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
     await writeFile(path.join(root, ".ballet/project.md"), "---\ntitle: Root Project\n---\n\nProject body", "utf8");
     await writeFile(path.join(root, ".ballet/other.mdx"), "---\ntitle: Ignored MDX\n---\n\nBody", "utf8");
     await writeFile(path.join(root, ".ballet/index.yaml"), "title: Ignored YAML\n", "utf8");
     await writeFile(path.join(root, ".ballet/goals/goal.md"), "---\ntitle: Goal Title\n---\n\nGoal body", "utf8");
+    await writeFile(path.join(root, ".ballet/instructions/reviewer.md"), "---\ntitle: Reviewer Instructions\n---\n\nInstruction body", "utf8");
     await writeFile(path.join(root, ".ballet/adr/root.md"), "---\ntitle: ADR Root\n---\n\nADR body", "utf8");
     await writeFile(path.join(root, ".ballet/adr/backend/accepted.md"), "---\ntitle: Backend ADR\n---\n\nBackend body", "utf8");
     await writeFile(path.join(root, ".ballet/adr/backend/deep/hidden.md"), "---\ntitle: Hidden ADR\n---\n\nHidden body", "utf8");
@@ -220,6 +222,7 @@ path = "../.agents/skills/missing-skill"
     const project = tree[0];
     const adr = tree.find((node) => node.type === "directory" && node.label === "adr");
     const goals = tree.find((node) => node.type === "directory" && node.label === "goals");
+    const instructions = tree.find((node) => node.type === "directory" && node.label === "instructions");
     const backend = adr?.type === "directory"
       ? adr.children.find((node) => node.type === "directory" && node.label === "backend")
       : undefined;
@@ -230,6 +233,8 @@ path = "../.agents/skills/missing-skill"
     expect(tree.some((node) => node.type === "file" && node.label === "Ignored YAML")).toBe(false);
     expect(goals?.type).toBe("directory");
     expect(goals?.type === "directory" ? goals.children.map((node) => node.label) : []).toContain("Goal Title");
+    expect(instructions?.type).toBe("directory");
+    expect(instructions?.type === "directory" ? instructions.children.map((node) => node.label) : []).toContain("Reviewer Instructions");
     expect(adr?.type).toBe("directory");
     expect(backend?.type).toBe("directory");
     expect(backend?.type === "directory" ? backend.children.map((node) => node.label) : []).toContain("Backend ADR");
@@ -288,6 +293,52 @@ path = "../.agents/skills/missing-skill"
     expect(source).toContain("custom: kept");
     expect(doc.id).toBe("written");
     expect(doc.body).toContain("Written body");
+  });
+
+  it("creates instruction Markdown documents under .ballet/instructions", async () => {
+    const root = await tempRoot();
+    const doc = await createProjectMarkdownDocument(root, {
+      directoryPath: ".ballet/instructions",
+      title: "Reviewer Instructions"
+    });
+
+    const source = await readFile(path.join(root, ".ballet/instructions/reviewer-instructions.md"), "utf8");
+
+    expect(doc.relativePath).toBe(".ballet/instructions/reviewer-instructions.md");
+    expect(doc.title).toBe("Reviewer Instructions");
+    expect(doc.frontmatter.title).toBe("Reviewer Instructions");
+    expect(doc.frontmatter.createdAt).toEqual(expect.any(String));
+    expect(doc.frontmatter.updatedAt).toEqual(expect.any(String));
+    expect(source).toContain("title: Reviewer Instructions");
+  });
+
+  it("creates duplicate project Markdown documents with numeric filename suffixes", async () => {
+    const root = await tempRoot();
+
+    const first = await createProjectMarkdownDocument(root, {
+      directoryPath: ".ballet/instructions",
+      title: "Reviewer Instructions"
+    });
+    const second = await createProjectMarkdownDocument(root, {
+      directoryPath: ".ballet/instructions",
+      title: "Reviewer Instructions"
+    });
+
+    expect(first.relativePath).toBe(".ballet/instructions/reviewer-instructions.md");
+    expect(second.relativePath).toBe(".ballet/instructions/reviewer-instructions-2.md");
+  });
+
+  it("blocks unsafe project Markdown document creation paths", async () => {
+    const root = await tempRoot();
+
+    await expect(createProjectMarkdownDocument(root, {
+      directoryPath: "../outside",
+      title: "Outside"
+    })).rejects.toThrow("Path traversal blocked");
+    await expect(createProjectMarkdownDocument(root, {
+      directoryPath: ".ballet/instructions.txt",
+      title: "Invalid directory"
+    })).rejects.toThrow("Project document directory must not include a file extension.");
   });
 
   it("writes project description as Markdown body instead of frontmatter", async () => {

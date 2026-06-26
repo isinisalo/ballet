@@ -58,6 +58,23 @@ apiRouter.post("/project-documents", async (req, res, next) => {
   }
 });
 
+apiRouter.post("/project-documents/create", async (req, res, next) => {
+  try {
+    const { directoryPath, title } = req.body as {
+      directoryPath?: unknown;
+      title?: unknown;
+    };
+
+    if (typeof directoryPath !== "string" || typeof title !== "string") {
+      return res.status(400).json({ error: "directoryPath and title are required." });
+    }
+
+    res.status(201).json(await store.createProjectDocument({ directoryPath, title }));
+  } catch (error) {
+    next(error);
+  }
+});
+
 apiRouter.get("/runtime/health", (_req, res, next) => {
   try {
     res.json(store.runtimeHealth());

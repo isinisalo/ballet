@@ -28,6 +28,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(document)
     }),
+  createProjectDocument: (document: { directoryPath: string; title: string }) =>
+    request<MarkdownDocument>("/api/project-documents/create", {
+      method: "POST",
+      body: JSON.stringify(document)
+    }),
   remove: (collection: CollectionName, id: string) =>
     request<void>(`/api/${collection}/${id}`, { method: "DELETE" }),
   saveEventDefinition: (eventDefinition: Partial<EventDefinition>) =>

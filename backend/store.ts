@@ -1,6 +1,6 @@
 import type { AgentRunLog, AppData, CollectionName, EventDefinition, EventRecord, MarkdownDocument } from "./shared/domain.js";
 import { getProjectRoot } from "./markdown.js";
-import { loadMarkdownAppData, removeEntityMarkdown, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
+import { createProjectMarkdownDocument, loadMarkdownAppData, removeEntityMarkdown, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
 import { RuntimeDatabase, resolveRuntimeDbPath } from "./runtime-db.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 
@@ -111,6 +111,13 @@ export class MarkdownStore {
     body: string;
   }): Promise<MarkdownDocument> {
     return writeProjectMarkdownDocument(this.root, input);
+  }
+
+  async createProjectDocument(input: {
+    directoryPath: string;
+    title: string;
+  }): Promise<MarkdownDocument> {
+    return createProjectMarkdownDocument(this.root, input);
   }
 
   async createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {

@@ -16,6 +16,7 @@ import {
   Code2,
   Eye,
   FileKey2,
+  FileText,
   GitBranch,
   Hash,
   Inbox,
@@ -753,22 +754,29 @@ function SidebarProjectDirectoryMenu({
   icon,
   node,
   activePath,
-  navigate
+  navigate,
+  action,
+  emptyLabel,
+  forceRender = false
 }: {
   label: string;
   icon: ReactNode;
   node?: ProjectTreeDirectory;
   activePath?: string;
   navigate: (path: string) => void;
+  action?: ReactNode;
+  emptyLabel?: string;
+  forceRender?: boolean;
 }) {
-  const active = projectTreeContainsPath(node?.children ?? [], activePath);
+  const children = node?.children ?? [];
+  const active = projectTreeContainsPath(children, activePath);
   const [open, setOpen] = useState(active);
 
   useEffect(() => {
     if (active) setOpen(true);
   }, [active]);
 
-  if (!node) return null;
+  if (!node && !forceRender) return null;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
@@ -777,11 +785,22 @@ function SidebarProjectDirectoryMenu({
           <SidebarMenuButton isActive={active} tooltip={label}>
             {icon}
             <span>{label}</span>
+            {action}
             <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <ProjectDocumentTree nodes={node.children} activePath={activePath} navigate={navigate} />
+          {children.length > 0 ? (
+            <ProjectDocumentTree nodes={children} activePath={activePath} navigate={navigate} />
+          ) : emptyLabel ? (
+            <SidebarMenuSub>
+              <SidebarMenuSubItem>
+                <span className="block px-2 py-1.5 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                  {emptyLabel}
+                </span>
+              </SidebarMenuSubItem>
+            </SidebarMenuSub>
+          ) : null}
         </CollapsibleContent>
       </SidebarMenuItem>
     </Collapsible>
@@ -919,20 +938,21 @@ function Panel({ title, description, icon, children, action, compact = false }: 
     <Card>
       <CardHeader
         className={cn(
-          "px-4 py-3 has-data-[slot=card-action]:grid-cols-1 sm:has-data-[slot=card-action]:grid-cols-[1fr_auto]",
-          compact && "gap-1.5"
+          "min-h-12 items-center gap-1.5 bg-card px-4 py-2.5 has-data-[slot=card-action]:grid-cols-[minmax(0,1fr)_auto]",
+          description && "items-start",
+          compact && "min-h-12 py-2.5"
         )}
       >
-        <CardTitle className={cn("flex items-center gap-2", compact && "text-base")}>
+        <CardTitle className="flex min-w-0 items-center gap-2 font-mono text-xs font-medium leading-none text-foreground [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground">
           {icon}
-          {title}
+          <span className="truncate">{title}</span>
         </CardTitle>
         {description ? <CardDescription className={cn(compact && "text-xs")}>{description}</CardDescription> : null}
         {action ? (
           <CardAction
             className={cn(
-              "col-start-1 row-span-1 justify-self-start self-start sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end sm:self-center",
-              description ? "row-start-3" : "row-start-2"
+              "col-start-2 row-span-1 row-start-1 justify-self-end self-center",
+              description && "row-span-2 self-start"
             )}
           >
             {action}
@@ -1004,6 +1024,7 @@ function AppSidebar({
   navigate,
   themeMode,
   onThemeModeChange,
+  onCreateInstruction,
   onNewAgent,
   onNewEventDefinition,
   onNewPolicy
@@ -1021,10 +1042,12 @@ function AppSidebar({
   navigate: (path: string) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
+  onCreateInstruction: (title: string) => Promise<void>;
   onNewAgent: () => void;
   onNewEventDefinition: () => void;
   onNewPolicy: () => void;
 }) {
+  const [createInstructionOpen, setCreateInstructionOpen] = useState(false);
   const agentsOpen = route.view === "agents";
   const skillsOpen = route.view === "skills";
   const runtimesOpen = route.view === "runtimes";
@@ -1033,6 +1056,7 @@ function AppSidebar({
   const workflowOpen = route.view === "workflow";
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
+  const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
   const item = (label: string, icon: ReactNode, path: string, active: boolean) => (
     <SidebarMenuItem key={label}>
       <SidebarMenuButton asChild isActive={active} tooltip={label}>
@@ -1064,6 +1088,20 @@ function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarProjectDirectoryMenu label="ADR" icon={<Archive />} node={adrDirectory} activePath={route.documentPath} navigate={navigate} />
+              <SidebarProjectDirectoryMenu
+                label="Instructions"
+                icon={<FileText />}
+                node={instructionsDirectory}
+                activePath={route.documentPath}
+                navigate={navigate}
+                forceRender
+                emptyLabel="No instructions."
+                action={(
+                  <SidebarInlineAction label="New instruction" onClick={() => setCreateInstructionOpen(true)}>
+                    <Plus data-icon="inline-start" />
+                  </SidebarInlineAction>
+                )}
+              />
               <Collapsible defaultOpen={workflowOpen} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
@@ -1191,6 +1229,11 @@ function AppSidebar({
         <ThemeSelector mode={themeMode} onChange={onThemeModeChange} />
       </SidebarFooter>
       <SidebarRail />
+      <CreateInstructionDialog
+        open={createInstructionOpen}
+        onOpenChange={setCreateInstructionOpen}
+        onCreate={onCreateInstruction}
+      />
     </ShadcnSidebar>
   );
 }
@@ -1334,6 +1377,16 @@ export function App() {
     return saved;
   };
 
+  const createInstruction = async (title: string) => {
+    const saved = await api.createProjectDocument({
+      directoryPath: ".ballet/instructions",
+      title
+    });
+    await refresh();
+    setNotice("Created.");
+    navigate(projectDocumentPath(saved.relativePath));
+  };
+
   const remove = async (collection: SaveCollection | "events", id: string) => {
     await api.remove(collection, id);
     await refresh();
@@ -1374,6 +1427,7 @@ export function App() {
           navigate={navigate}
           themeMode={themeMode}
           onThemeModeChange={setThemeMode}
+          onCreateInstruction={createInstruction}
           onNewAgent={newAgent}
           onNewEventDefinition={newEventDefinition}
           onNewPolicy={newPolicy}
@@ -2322,12 +2376,12 @@ function WorkflowOrchestratorView({
   return (
     <div className="grid gap-4">
       <Card>
-        <CardHeader className="gap-1.5 px-4 py-3 has-data-[slot=card-action]:grid-cols-1 sm:has-data-[slot=card-action]:grid-cols-[1fr_auto]">
-          <CardTitle className="flex items-center gap-2 text-base">
+        <CardHeader className="min-h-12 items-center gap-1.5 bg-card px-4 py-2.5 has-data-[slot=card-action]:grid-cols-[minmax(0,1fr)_auto]">
+          <CardTitle className="flex min-w-0 items-center gap-2 font-mono text-xs font-medium leading-none text-foreground [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground">
             <Workflow data-icon="inline-start" />
-            Workflows
+            <span className="truncate">Workflows</span>
           </CardTitle>
-          <CardAction className="col-start-1 row-span-1 row-start-2 justify-self-start self-start sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end sm:self-center">
+          <CardAction className="col-start-2 row-span-1 row-start-1 justify-self-end self-center">
             <div className="flex items-center justify-start gap-2 sm:justify-end">
               <SwitchField label="Enabled" checked={draft.policyActive} onChange={(policyActive) => updateDraft({ policyActive })} />
               <Button
@@ -3142,6 +3196,85 @@ function DeleteConfirmDialog({
               }}
             >
               Delete
+            </Button>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}
+
+function CreateInstructionDialog({
+  open,
+  onOpenChange,
+  onCreate
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreate: (title: string) => Promise<void>;
+}) {
+  const formId = useId();
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (open) return;
+    setTitle("");
+    setError("");
+    setPending(false);
+  }, [open]);
+
+  const submit = async () => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setError("Title is required.");
+      return;
+    }
+
+    setPending(true);
+    setError("");
+    try {
+      await onCreate(trimmedTitle);
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create instruction.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <DialogPrimitive.Content
+          className="fixed left-1/2 top-1/2 z-50 grid w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-divider-strong bg-card p-4 text-card-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="grid gap-1.5">
+            <DialogPrimitive.Title className="text-sm font-semibold text-foreground">
+              New instruction
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Description className="text-sm leading-relaxed text-muted-foreground">
+              Create a Markdown instruction document.
+            </DialogPrimitive.Description>
+          </div>
+          {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+          <form id={formId} className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+            <FieldGroup>
+              <TextField label="Title" required value={title} onChange={setTitle} />
+            </FieldGroup>
+          </form>
+          <div className="flex items-center justify-end gap-2">
+            <DialogPrimitive.Close asChild>
+              <Button type="button" variant="outline" className="cursor-pointer" disabled={pending}>
+                Cancel
+              </Button>
+            </DialogPrimitive.Close>
+            <Button type="submit" form={formId} className="cursor-pointer" disabled={pending || !title.trim()}>
+              <Plus data-icon="inline-start" />
+              Create
             </Button>
           </div>
         </DialogPrimitive.Content>
