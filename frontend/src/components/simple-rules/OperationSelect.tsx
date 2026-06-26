@@ -15,11 +15,11 @@ export function OperationSelect({
   onChange: (operationId: string, version: number) => void;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid min-w-0 gap-1.5">
       <label className="text-sm font-medium" htmlFor={`${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-operation`}>{label}</label>
       <select
         id={`${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-operation`}
-        className="h-10 rounded-md border bg-background px-3 text-sm"
+        className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
         value={value}
         onChange={(event) => {
           const [id = "", version = "1"] = event.target.value.split("@@");
@@ -31,7 +31,7 @@ export function OperationSelect({
           const agent = agents.find((candidate) => candidate.id === operation.agentId);
           return (
             <option key={`${operation.id}@${operation.version}`} value={`${operation.id}@@${operation.version}`}>
-              {operation.name} · {agent?.name ?? operation.agentId} · {operation.id}@{operation.version}
+              {operation.name} · {agent?.name ?? operation.agentId}
             </option>
           );
         })}

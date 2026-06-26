@@ -10,8 +10,29 @@ import { RuntimeConsolePage } from "@/features/runtime-console/RuntimeConsolePag
 import { ProjectKnowledgePage } from "@/features/project-knowledge/ProjectKnowledgePage";
 import { AdvancedPage } from "@/features/advanced/AdvancedPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "@/theme";
+
+function useThemeMode() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredThemeMode());
+
+  useEffect(() => {
+    persistThemeMode(themeMode);
+    applyThemeMode(themeMode);
+
+    if (themeMode !== "system") return undefined;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => applyThemeMode("system");
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [themeMode]);
+
+  return [themeMode, setThemeMode] as const;
+}
 
 export function App() {
+  const [themeMode, setThemeMode] = useThemeMode();
   const [route, setRoute] = useState<RouteState>(() => routeFromPath(`${window.location.pathname}${window.location.search}`));
   const { data, flows, validation, loading, error, refresh } = useWorkspaceData();
 
@@ -27,7 +48,7 @@ export function App() {
   };
 
   return (
-    <AppLayout route={route} data={data} flows={flows} navigate={navigate}>
+    <AppLayout route={route} data={data} navigate={navigate} themeMode={themeMode} onThemeModeChange={setThemeMode}>
       {loading ? <Alert><AlertDescription>Loading Ballet workspace...</AlertDescription></Alert> : null}
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       {route.main === "overview" ? <OverviewPage data={data} flows={flows} navigate={navigate} /> : null}
@@ -36,7 +57,16 @@ export function App() {
       {route.main === "agents" ? <AgentsPage data={data} selectedAgentId={route.id} navigate={navigate} /> : null}
       {route.main === "runtime-console" ? <RuntimeConsolePage data={data} flows={flows} navigate={navigate} /> : null}
       {route.main === "knowledge" ? <ProjectKnowledgePage data={data} selectedDocumentId={route.id} /> : null}
-      {route.main === "advanced" ? <AdvancedPage data={data} validation={validation} advancedRoute={route.advanced} refresh={refresh} /> : null}
+      {route.main === "advanced" ? (
+        <AdvancedPage
+          data={data}
+          validation={validation}
+          advancedRoute={route.advanced}
+          selectedKey={route.id}
+          refresh={refresh}
+          navigate={navigate}
+        />
+      ) : null}
     </AppLayout>
   );
 }

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../backend/shared/domain";
 import type { ContractDefinition } from "../../backend/shared/contracts";
+import { TopBar } from "../src/app/TopBar";
 import { AdvancedPage } from "../src/features/advanced/AdvancedPage";
 
 const apiMocks = vi.hoisted(() => ({
@@ -251,36 +252,58 @@ afterEach(() => {
 });
 
 describe("AdvancedPage non-contract resources", () => {
-  it("shows event data shapes with incoming and outgoing rule references", () => {
-    render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="events" />);
+  it("shows the compact theme selector in the top bar", async () => {
+    const user = userEvent.setup();
+    const onThemeModeChange = vi.fn();
 
-    expect(screen.getByRole("heading", { name: "Plan approved" })).toBeVisible();
+    render(<TopBar data={data} themeMode="dark" onThemeModeChange={onThemeModeChange} />);
+
+    expect(screen.getByRole("button", { name: /dark/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /light/i })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /system/i })).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(screen.getByRole("button", { name: /system/i }));
+    expect(onThemeModeChange).toHaveBeenCalledWith("system");
+  });
+
+  it("shows the selected event data shape with incoming or outgoing rule references", () => {
+    render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="events" selectedKey="plan-implemented" />);
+
+    expect(screen.getByRole("button", { name: /Plan implemented/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Plan approved/ })).toBeVisible();
     expect(screen.getAllByText("Event shape")[0]).toBeVisible();
     expect(screen.getAllByText("Business goal")[0]).toBeVisible();
     expect(screen.getAllByText("Example data")[0]).toBeVisible();
     expect(screen.getAllByText("Event example")[0]).toBeVisible();
     expect(screen.getAllByText("1 event example matches the data shape.")[0]).toBeVisible();
     expect(screen.getAllByText("Launch")[0]).toBeVisible();
-    expect(screen.getAllByText("Outgoing routing rules")[0]).toBeVisible();
-    expect(screen.getByText("When plan approved, ask Implement plan")).toBeVisible();
     expect(screen.getAllByText("Incoming emission rules")[0]).toBeVisible();
     expect(screen.getAllByText(/Publish plan implemented/)[0]).toBeVisible();
+    expect(screen.getAllByText("Outgoing routing rules")[0]).toBeVisible();
+    expect(screen.getAllByText("No routing rules start from this event.")[0]).toBeVisible();
     expect(screen.queryByText("Examples")).not.toBeInTheDocument();
   });
 
-  it("saves a routing rule from the simple event, task, description, and enabled fields", async () => {
+  it("saves a routing rule from only the description, input event, and agent fields", async () => {
     const user = userEvent.setup();
     const refresh = vi.fn().mockResolvedValue(undefined);
     render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="routing" refresh={refresh} />);
 
-    expect(screen.getByRole("heading", { name: "When plan approved, ask Implement plan" })).toBeVisible();
-    expect(screen.getByText("Routing rule")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Plan approved -> Developer/ })).toBeVisible();
+    expect(screen.getByLabelText("Description")).toBeVisible();
     expect(screen.getByLabelText("Input event")).toHaveValue("plan.approved.v1");
-    expect(screen.getByLabelText("Send to agent task")).toHaveValue("developer-agent/implement@@1");
-    expect(screen.getByText("Agent input preview")).toBeVisible();
-    expect(screen.getAllByText("from Event data > goal")[0]).toBeVisible();
-    expect(screen.getAllByText("from Event data > priority")[0]).toBeVisible();
-    expect(screen.getByText("Advanced details").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByLabelText("Agent")).toHaveValue("developer-agent");
+    expect(screen.getByRole("button", { name: /^save routing rule$/i })).toBeVisible();
+    expect(screen.queryByLabelText("Send to agent task")).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced details")).not.toBeInTheDocument();
+    expect(screen.queryByText("Resource details")).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced source")).not.toBeInTheDocument();
+    expect(screen.queryByText("Check delete safety")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent input preview")).not.toBeInTheDocument();
+    expect(screen.queryByText("Enabled")).not.toBeInTheDocument();
+    expect(screen.queryByText("Technical identity")).not.toBeInTheDocument();
+    expect(screen.queryByText("Uses")).not.toBeInTheDocument();
+    expect(screen.queryByText("Used by")).not.toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Start implementation when the plan is approved.");
@@ -300,20 +323,110 @@ describe("AdvancedPage non-contract resources", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("saves an emission rule from the simple operation, condition, event, checks, and enabled fields", async () => {
+  it("selects routing rules from the in-page resource list", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    const secondRouteData: AppData = {
+      ...data,
+      agents: [
+        ...data.agents,
+        {
+          id: "security-agent",
+          name: "Security",
+          description: "Security response.",
+          instructions: "Investigate security events.",
+          skills: [],
+          enabled: true,
+          status: "offline",
+          createdAt: at,
+          updatedAt: at
+        }
+      ],
+      operations: [
+        ...data.operations,
+        {
+          id: "security-agent/investigate",
+          version: 1,
+          name: "Investigate incident",
+          description: "Investigate.",
+          active: true,
+          agentId: "security-agent",
+          instructions: "Investigate.",
+          inputContract: { id: "plan-approved-data", version: 1 },
+          outputContract: { id: "plan-approved-data", version: 2 },
+          emissionRequired: false,
+          createdAt: at,
+          updatedAt: at
+        }
+      ],
+      policies: [
+        ...data.policies,
+        {
+          id: "route-security-incident",
+          name: "Plan implemented -> Security",
+          description: "Routes security incidents to investigation.",
+          active: true,
+          consumes: { eventType: "plan.implemented.v1" },
+          dispatch: { operation: { id: "security-agent/investigate", version: 1 } },
+          input: { object: { goal: { from: "/event/data/goal" } } },
+          selection: { mode: "fanout" },
+          onInvalidInput: "reject-event",
+          createdAt: at,
+          updatedAt: at
+        }
+      ]
+    };
+
+    const { rerender } = render(
+      <AdvancedPage
+        data={secondRouteData}
+        validation={{ valid: true, diagnostics: [] }}
+        advancedRoute="routing"
+        selectedKey="route-plan-approved-to-implement"
+        navigate={navigate}
+      />
+    );
+
+    expect(screen.getByLabelText("Agent")).toHaveValue("developer-agent");
+    expect(screen.queryByDisplayValue("security-agent")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Plan implemented -> Security/ }));
+    expect(navigate).toHaveBeenCalledWith("/advanced/routing/route-security-incident");
+
+    rerender(
+      <AdvancedPage
+        data={secondRouteData}
+        validation={{ valid: true, diagnostics: [] }}
+        advancedRoute="routing"
+        selectedKey="route-security-incident"
+        navigate={navigate}
+      />
+    );
+
+    expect(screen.getByLabelText("Agent")).toHaveValue("security-agent");
+    expect(screen.getByLabelText("Input event")).toHaveValue("plan.implemented.v1");
+  });
+
+  it("saves an emission rule from only the description, operation, condition, and event fields", async () => {
     const user = userEvent.setup();
     const refresh = vi.fn().mockResolvedValue(undefined);
     render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="emissions" refresh={refresh} />);
 
-    expect(screen.getByRole("heading", { name: "Publish plan implemented" })).toBeVisible();
-    expect(screen.getByText("Emission rule")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Publish plan implemented/ })).toBeVisible();
+    expect(screen.getByLabelText("Description")).toBeVisible();
     expect(screen.getByLabelText("When this agent task finishes")).toHaveValue("developer-agent/implement@@1");
+    expect(screen.getByLabelText("And output is")).toHaveValue("completed");
     expect(screen.getByLabelText("Publish this event")).toHaveValue("plan.implemented.v1");
-    expect(screen.getByText("Event data preview")).toBeVisible();
-    expect(screen.getAllByText("from Agent result > goal")[0]).toBeVisible();
-    expect(screen.getAllByText("from Agent result > priority")[0]).toBeVisible();
-    expect(screen.getByLabelText("Require a summary")).toBeChecked();
-    expect(screen.getByText("Advanced details").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: /^save emission rule$/i })).toBeVisible();
+    expect(screen.queryByText("Event data preview")).not.toBeInTheDocument();
+    expect(screen.queryByText("Checks before publishing")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Require a summary")).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced details")).not.toBeInTheDocument();
+    expect(screen.queryByText("Resource details")).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced source")).not.toBeInTheDocument();
+    expect(screen.queryByText("Enabled")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^edit$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^test$/i })).not.toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Publish implementation when the task completes.");
@@ -322,6 +435,7 @@ describe("AdvancedPage non-contract resources", () => {
     expect(apiMocks.save).toHaveBeenCalledWith("emissionPolicies", expect.objectContaining({
       observes: { operation: { id: "developer-agent/implement", version: 1 } },
       when: { path: "/output/status", op: "eq", value: "completed" },
+      gates: [{ type: "required_value", path: "/output/summary" }],
       emissions: [expect.objectContaining({
         slot: "completed",
         eventType: "plan.implemented.v1",
@@ -348,7 +462,7 @@ describe("AdvancedPage non-contract resources", () => {
     expect(screen.getByText("Emission rules included")).toBeVisible();
     expect(screen.getByText("Ends when")).toBeVisible();
     expect(screen.getByLabelText("Maximum agent runs")).toHaveValue(8);
-    expect(screen.getByText("Advanced details").closest("details")).not.toHaveAttribute("open");
+    expect(screen.queryByText("Advanced details")).not.toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("Maximum agent runs"));
     await user.type(screen.getByLabelText("Maximum agent runs"), "50");
@@ -370,8 +484,7 @@ describe("AdvancedPage non-contract resources", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("checks skill and runtime delete safety with their own resource types", async () => {
-    const user = userEvent.setup();
+  it("shows skill and runtime resources without delete-safety controls", () => {
     const dataWithSkillAndRuntime: AppData = {
       ...data,
       skills: [{ id: "typescript", name: "TypeScript", description: "TypeScript work.", metadata: {}, enabled: true }],
@@ -391,47 +504,38 @@ describe("AdvancedPage non-contract resources", () => {
         frontmatter: { runtime: "codex-cli" }
       }))
     };
-    apiMocks.checkSafeDelete.mockResolvedValue({
-      allowed: false,
-      references: [{ type: "agent", id: "developer-agent", label: "Developer" }],
-      diagnostics: []
-    });
-
     const skillsView = render(<AdvancedPage data={dataWithSkillAndRuntime} validation={{ valid: true, diagnostics: [] }} advancedRoute="skills" />);
-    expect(screen.getByRole("heading", { name: "TypeScript" })).toBeVisible();
-    expect(screen.getByText("Developer")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /check delete safety/i }));
-    expect(apiMocks.checkSafeDelete).toHaveBeenLastCalledWith({
-      type: "skill",
-      id: "typescript",
-      label: "TypeScript"
-    });
+    expect(screen.getByRole("button", { name: /TypeScript/ })).toBeVisible();
+    expect(screen.queryByText("Developer")).not.toBeInTheDocument();
+    expect(screen.queryByText("Enabled")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /check delete safety/i })).not.toBeInTheDocument();
     skillsView.unmount();
 
     render(<AdvancedPage data={dataWithSkillAndRuntime} validation={{ valid: true, diagnostics: [] }} advancedRoute="runtimes" />);
-    expect(screen.getByRole("heading", { name: "Codex CLI" })).toBeVisible();
-    expect(screen.getByText("Developer")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /check delete safety/i }));
-    expect(apiMocks.checkSafeDelete).toHaveBeenLastCalledWith({
-      type: "runtime",
-      id: "codex-cli",
-      label: "Codex CLI"
-    });
+    expect(screen.getByRole("button", { name: /Codex CLI/ })).toBeVisible();
+    expect(screen.queryByText("Developer")).not.toBeInTheDocument();
+    expect(screen.queryByText("Enabled")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /check delete safety/i })).not.toBeInTheDocument();
+    expect(apiMocks.checkSafeDelete).not.toHaveBeenCalled();
   });
 });
 
 describe("AdvancedPage data types", () => {
-  it("shows versioned resources, safe-delete feedback, hidden source, and visual next-version creation", async () => {
+  it("shows versioned resources and visual next-version creation without source or delete-safety controls", async () => {
     const user = userEvent.setup();
     const refresh = vi.fn().mockResolvedValue(undefined);
     render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="contracts" refresh={refresh} />);
 
-    expect(screen.getByRole("heading", { name: "Plan approved data v1" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Plan approved data v2" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Plan approved data v1/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Plan approved data v2/ })).toBeVisible();
     expect(screen.getAllByText("v1")[0]).toBeVisible();
     expect(screen.getAllByText("v2")[0]).toBeVisible();
-    expect(screen.getAllByText(/Implement plan/)[0]).toBeVisible();
-    expect(screen.getAllByText(/Plan approved/)[0]).toBeVisible();
+    expect(screen.queryByText("Technical identity")).not.toBeInTheDocument();
+    expect(screen.queryByText("Uses")).not.toBeInTheDocument();
+    expect(screen.queryByText("Used by")).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced source")).not.toBeInTheDocument();
+    expect(screen.queryByText("Resource details")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /check delete safety/i })).not.toBeInTheDocument();
     expect(screen.getAllByText("Data shape")[0]).toBeVisible();
     expect(screen.getAllByText("Fields")[0]).toBeVisible();
     expect(screen.getAllByText("Business goal")[0]).toBeVisible();
@@ -440,21 +544,6 @@ describe("AdvancedPage data types", () => {
     expect(screen.getAllByText("Blocked")[0]).toBeVisible();
     expect(screen.getAllByText("Example validation")[0]).toBeVisible();
     expect(screen.getAllByText("1 example matches this data shape.")[0]).toBeVisible();
-
-    const sourceSummary = screen.getAllByText("Advanced source")[0]!;
-    const sourceDetails = sourceSummary.closest("details");
-    expect(sourceDetails).not.toHaveAttribute("open");
-    expect(within(sourceDetails!).getByText(/plan-approved-data/)).not.toBeVisible();
-
-    await user.click(screen.getAllByRole("button", { name: /check delete safety/i })[0]!);
-    expect(await screen.findByText("Plan approved data v1 cannot be deleted yet")).toBeVisible();
-    expect(screen.getByText(/Referenced by Plan approved/)).toBeVisible();
-    expect(apiMocks.checkSafeDelete).toHaveBeenCalledWith({
-      type: "contract",
-      id: "plan-approved-data",
-      version: 1,
-      label: "Plan approved data v1"
-    });
 
     await user.click(screen.getAllByRole("button", { name: /create next version/i })[0]!);
     expect(screen.getByText("Create version 3")).toBeVisible();

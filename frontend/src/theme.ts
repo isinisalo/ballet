@@ -1,6 +1,6 @@
 export type ThemeMode = "light" | "dark" | "system";
 
-const THEME_STORAGE_KEY = "ballet-theme";
+const THEME_STORAGE_KEY = "ballet-theme-v2";
 const DEFAULT_THEME_MODE: ThemeMode = "dark";
 
 const isThemeMode = (value: string | null): value is ThemeMode =>

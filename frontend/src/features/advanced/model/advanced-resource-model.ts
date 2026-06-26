@@ -97,19 +97,25 @@ export const resourcesFor = (data: AppData, route: AdvancedRoute, validation?: W
     }));
   }
   if (route === "routing") {
-    return data.policies.map((policy) => ({
-      key: policy.id,
-      name: policy.name,
-      description: policy.description,
-      identity: policy.id,
-      active: policy.active,
-      uses: [policy.consumes.eventType, `${policy.dispatch.operation.id}@${policy.dispatch.operation.version}`],
-      usedBy: data.loopDefinitions.filter((loop) => loop.routingPolicyIds.includes(policy.id)).map((loop) => loop.name),
-      preview: `${policy.consumes.eventType} -> ${policy.dispatch.operation.id}@${policy.dispatch.operation.version}`,
-      reference: { type: "routing-policy", id: policy.id, label: policy.name },
-      validationDiagnostics: resourceDiagnostics(validation, "routing-policy", policy.id),
-      raw: policy
-    }));
+    return data.policies.map((policy) => {
+      const operation = findOperation(data, policy.dispatch.operation);
+      const agent = operation ? data.agents.find((candidate) => candidate.id === operation.agentId) : undefined;
+      const eventName = eventNameFor(data, policy.consumes.eventType);
+      const displayName = `${eventName} -> ${agent?.name ?? operation?.name ?? refLabel(policy.dispatch.operation)}`;
+      return {
+        key: policy.id,
+        name: displayName,
+        description: policy.description,
+        identity: policy.id,
+        active: policy.active,
+        uses: [policy.consumes.eventType, `${policy.dispatch.operation.id}@${policy.dispatch.operation.version}`],
+        usedBy: data.loopDefinitions.filter((loop) => loop.routingPolicyIds.includes(policy.id)).map((loop) => loop.name),
+        preview: displayName,
+        reference: { type: "routing-policy", id: policy.id, label: policy.name },
+        validationDiagnostics: resourceDiagnostics(validation, "routing-policy", policy.id),
+        raw: policy
+      };
+    });
   }
   if (route === "emissions") {
     return data.emissionPolicies.map((policy) => ({

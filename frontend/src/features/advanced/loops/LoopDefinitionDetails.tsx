@@ -1,15 +1,12 @@
 import { Save } from "lucide-react";
 import { useState } from "react";
 import type { AppData } from "backend/shared/domain";
-import type { EmissionPolicy } from "backend/shared/emission-policy";
 import type { LoopDefinition } from "backend/shared/loop";
-import type { RoutingPolicy } from "backend/shared/routing-policy";
 import { api } from "@/api";
 import { Button, TextAreaField, TextField } from "@/components/forms/FormControls";
 import { EventSelect } from "@/components/simple-rules/EventSelect";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { FlowBoundaryAdvancedDetails } from "@/features/advanced/loops/FlowBoundaryAdvancedDetails";
 import { FlowBoundaryPreview } from "@/features/advanced/loops/FlowBoundaryPreview";
 import { SimpleFlowBoundaryCard } from "@/features/advanced/loops/SimpleFlowBoundaryCard";
 import { SimpleFlowBoundaryEditor } from "@/features/advanced/loops/SimpleFlowBoundaryEditor";
@@ -19,8 +16,8 @@ import {
   simpleFlowBoundaryFromLoop,
   suggestTerminalEvents
 } from "@/features/advanced/loops/flow-boundary-view-model";
-import { Fact, FlowStep, PanelHeading, ReferenceList } from "@/features/advanced/components/AdvancedPanels";
-import { eventNameFor, findOperation, operationNameFor, refLabel } from "@/features/advanced/model/advanced-resource-model";
+import { PanelHeading } from "@/features/advanced/components/AdvancedPanels";
+import { eventNameFor, operationNameFor } from "@/features/advanced/model/advanced-resource-model";
 
 export function LoopDefinitionDetails({ loop, data, refresh = async () => undefined }: { loop: LoopDefinition; data: AppData; refresh?: () => Promise<void> }) {
   const [name, setName] = useState(loop.name);
@@ -36,15 +33,6 @@ export function LoopDefinitionDetails({ loop, data, refresh = async () => undefi
   const [maxIterationsPerStep, setMaxIterationsPerStep] = useState(String(loop.limits.maxIterationsPerStep));
   const [deadlineSeconds, setDeadlineSeconds] = useState(loop.limits.deadlineSeconds === undefined ? "" : String(loop.limits.deadlineSeconds));
   const [message, setMessage] = useState("");
-  const routingPolicies = loop.routingPolicyIds
-    .map((policyId) => data.policies.find((policy) => policy.id === policyId))
-    .filter((policy): policy is RoutingPolicy => Boolean(policy));
-  const emissionPolicies = loop.emissionPolicyIds
-    .map((policyId) => data.emissionPolicies.find((policy) => policy.id === policyId))
-    .filter((policy): policy is EmissionPolicy => Boolean(policy));
-  const entryEvents = loop.entryEventTypes.map((eventType) => eventNameFor(data, eventType));
-  const terminalEvents = loop.terminalEventTypes.map((eventType) => eventNameFor(data, eventType));
-  const limitExceededEvent = loop.onLimitExceeded?.eventType ? eventNameFor(data, loop.onLimitExceeded.eventType) : "No event configured.";
   const boundary = simpleFlowBoundaryFromLoop({ ...loop, name, description, active, entryEventTypes: entryEventType ? [entryEventType] : [], routingPolicyIds, emissionPolicyIds, terminalEventTypes, onLimitExceeded: limitExceededEventType ? { eventType: limitExceededEventType } : undefined, limits: { maxHops: Number(maxHops) || loop.limits.maxHops, maxRuns: Number(maxRuns) || loop.limits.maxRuns, maxIterationsPerStep: Number(maxIterationsPerStep) || loop.limits.maxIterationsPerStep, ...(deadlineSeconds ? { deadlineSeconds: Number(deadlineSeconds) } : {}) } }, data);
 
   const toggle = (value: string, values: string[], setValues: (values: string[]) => void) => {
@@ -138,42 +126,6 @@ export function LoopDefinitionDetails({ loop, data, refresh = async () => undefi
       <div className="flex justify-end">
         <Button type="button" onClick={() => void save()}><Save className="size-4" />Save Flow boundary</Button>
       </div>
-      <FlowBoundaryAdvancedDetails>
-        <div className="grid gap-3 md:grid-cols-3">
-          <Fact label="Loop id" value={loop.id} mono />
-          <Fact label="Version" value={String(loop.version)} />
-          <Fact label="Limit-exceeded behavior" value={limitExceededEvent} />
-        </div>
-        <ReferenceList title="Raw routing policy IDs" items={routingPolicyIds} emptyLabel="No routing rules are included." />
-        <ReferenceList title="Raw emission policy IDs" items={emissionPolicyIds} emptyLabel="No emission rules are included." />
-      <div className="grid gap-3 md:grid-cols-3">
-        <FlowStep title="When" items={entryEvents} emptyLabel="No entry events." />
-        <FlowStep title="Ask" items={routingPolicies.map((policy) => {
-          const operation = findOperation(data, policy.dispatch.operation);
-          return operation?.name ?? refLabel(policy.dispatch.operation);
-        })} emptyLabel="No routed tasks." />
-        <FlowStep title="Publish or stop at" items={terminalEvents} emptyLabel="No terminal events." />
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <ReferenceList
-          title="Included routing rules"
-          items={routingPolicies.map((policy) => `${policy.name} · ${eventNameFor(data, policy.consumes.eventType)} to ${operationNameFor(data, policy.dispatch.operation)}`)}
-          emptyLabel="No routing rules are included."
-        />
-        <ReferenceList
-          title="Included emission rules"
-          items={emissionPolicies.map((policy) => `${policy.name} · ${operationNameFor(data, policy.observes.operation)}`)}
-          emptyLabel="No emission rules are included."
-        />
-      </div>
-      <div className="grid gap-3 md:grid-cols-4">
-        <Fact label="Maximum steps" value={String(loop.limits.maxHops)} />
-        <Fact label="Maximum agent runs" value={String(loop.limits.maxRuns)} />
-        <Fact label="Maximum repetitions" value={String(loop.limits.maxIterationsPerStep)} />
-        <Fact label="Maximum duration" value={loop.limits.deadlineSeconds ? `${loop.limits.deadlineSeconds} seconds` : "No duration limit."} />
-      </div>
-      <Fact label="Limit-exceeded behavior" value={limitExceededEvent} />
-      </FlowBoundaryAdvancedDetails>
     </SimpleFlowBoundaryEditor>
   );
 }

@@ -1,13 +1,10 @@
-import { ShieldCheck, ShieldX } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { AppData } from "backend/shared/domain";
 import type { AdvancedRoute } from "@/app/routes";
-import type { SafeDeleteResult, WorkspaceValidationResult } from "backend/shared/flow";
-import { api } from "@/api";
+import type { WorkspaceValidationResult } from "backend/shared/flow";
 import { DiagnosticsList } from "@/components/diagnostics/DiagnosticsList";
-import { Button, EmptyState, PageHeader, Section } from "@/components/forms/FormControls";
-import { Badge } from "@/components/ui/badge";
-import { AdvancedSource, Fact, SafeDeletePanel } from "@/features/advanced/components/AdvancedPanels";
+import { EmptyState, PageHeader, Section } from "@/components/forms/FormControls";
+import { Fact } from "@/features/advanced/components/AdvancedPanels";
 import { ContractDetails } from "@/features/advanced/contracts/ContractDetails";
 import { ContractNextVersionEditor } from "@/features/advanced/contracts/ContractNextVersionEditor";
 import { EmissionPolicyDetails } from "@/features/advanced/emissions/EmissionPolicyDetails";
@@ -24,112 +21,150 @@ import {
   resourcesFor,
   type AdvancedItem
 } from "@/features/advanced/model/advanced-resource-model";
+import { cn } from "@/lib/utils";
+
+const advancedRoutes: AdvancedRoute[] = ["contracts", "events", "routing", "emissions", "loops", "runtimes", "skills"];
 
 export function AdvancedPage({
   data,
   validation,
   advancedRoute = "contracts",
+  selectedKey,
+  navigate,
   refresh = async () => undefined
 }: {
   data: AppData;
   validation?: WorkspaceValidationResult;
   advancedRoute?: AdvancedRoute;
+  selectedKey?: string;
+  navigate?: (path: string) => void;
   refresh?: () => Promise<void>;
 }) {
   const items = useMemo(() => resourcesFor(data, advancedRoute, validation), [data, advancedRoute, validation]);
-  const [safeDeleteResults, setSafeDeleteResults] = useState<Record<string, SafeDeleteResult>>({});
-  const [safeDeleteError, setSafeDeleteError] = useState("");
-
-  const checkSafeDelete = async (item: AdvancedItem) => {
-    setSafeDeleteError("");
-    try {
-      const result = await api.checkSafeDelete(item.reference);
-      setSafeDeleteResults((current) => ({ ...current, [item.key]: result }));
-    } catch (error) {
-      setSafeDeleteError(error instanceof Error ? error.message : "Unable to check delete safety.");
-    }
-  };
+  const selectedItem = items.find((item) => item.key === selectedKey) ?? items[0];
 
   return (
-    <div className="grid gap-5">
-      <PageHeader title={labels[advancedRoute]} description="Expert resource management with forms first and raw source kept behind Advanced source." />
+    <div className="grid gap-4">
+      <PageHeader title={labels[advancedRoute]} />
+      <div className="flex gap-1 overflow-x-auto border-b">
+        {advancedRoutes.map((route) => (
+          <button
+            key={route}
+            type="button"
+            className={cn(
+              "shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              route === advancedRoute
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => navigate?.(`/advanced/${route}`)}
+          >
+            {labels[route]}
+          </button>
+        ))}
+      </div>
       {validation && !validation.valid ? <DiagnosticsList diagnostics={validation.diagnostics} /> : null}
-      {safeDeleteError ? <div role="alert" className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">{safeDeleteError}</div> : null}
-      {items.length === 0 ? <EmptyState title={`No ${labels[advancedRoute].toLowerCase()} configured.`} /> : (
-        <div className="grid gap-3">
-          {items.map((item) => (
-            <ResourceCard
-              key={item.key}
-              item={item}
-              route={advancedRoute}
-              data={data}
-              safeDeleteResult={safeDeleteResults[item.key]}
-              onCheckDelete={() => void checkSafeDelete(item)}
-              refresh={refresh}
-            />
-          ))}
+      {items.length === 0 || !selectedItem ? <EmptyState title={`No ${labels[advancedRoute].toLowerCase()} configured.`} /> : (
+        <div className="grid overflow-hidden rounded-md border bg-background lg:grid-cols-[18rem_minmax(0,1fr)]">
+          <ResourceList
+            route={advancedRoute}
+            items={items}
+            selectedKey={selectedItem.key}
+            navigate={navigate}
+          />
+          <ResourceEditor
+            item={selectedItem}
+            route={advancedRoute}
+            data={data}
+            refresh={refresh}
+          />
         </div>
       )}
     </div>
   );
 }
 
-function ResourceCard({
+function ResourceList({
+  route,
+  items,
+  selectedKey,
+  navigate
+}: {
+  route: AdvancedRoute;
+  items: AdvancedItem[];
+  selectedKey: string;
+  navigate?: (path: string) => void;
+}) {
+  return (
+    <aside className="border-b bg-muted/20 lg:border-r lg:border-b-0">
+      <div className="flex items-center justify-between border-b bg-background px-4 py-4">
+        <h2 className="text-base font-semibold">{labels[route]}</h2>
+        <span className="text-xs text-muted-foreground">{items.length}</span>
+      </div>
+      <div className="max-h-72 overflow-auto lg:max-h-[calc(100vh-17rem)]">
+        {items.map((item) => {
+          const selected = item.key === selectedKey;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              className={cn(
+                "grid w-full gap-2 border-b px-4 py-4 text-left transition-colors hover:bg-background",
+                selected && "border-l-2 border-l-primary bg-background"
+              )}
+              onClick={() => navigate?.(`/advanced/${route}/${encodeURIComponent(item.key)}`)}
+            >
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0 truncate font-medium">{item.name}</div>
+                {item.version !== undefined ? <span className="shrink-0 text-xs text-muted-foreground">v{item.version}</span> : null}
+              </div>
+              <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{item.description || item.preview || "No description."}</p>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+function ResourceEditor({
   item,
   route,
   data,
-  safeDeleteResult,
-  onCheckDelete,
   refresh
 }: {
   item: AdvancedItem;
   route: AdvancedRoute;
   data: AppData;
-  safeDeleteResult?: SafeDeleteResult;
-  onCheckDelete: () => void;
   refresh: () => Promise<void>;
 }) {
   return (
-    <Section>
-      <div className="grid gap-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 className="text-base font-semibold">{item.name}</h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant={item.validationDiagnostics.length ? "destructive" : "default"}>
-              {item.validationDiagnostics.length ? "needs fixes" : "valid"}
-            </Badge>
-            {item.active !== undefined ? <Badge variant={item.active ? "default" : "outline"}>{item.active ? "active" : "inactive"}</Badge> : null}
-            {item.version !== undefined ? <Badge variant="outline">v{item.version}</Badge> : null}
-          </div>
-        </div>
-        <div className="grid gap-3 text-sm md:grid-cols-3">
-          <Fact label="Technical identity" value={item.identity} mono />
-          <Fact label="Uses" value={item.uses.length ? item.uses.join(", ") : "No dependencies."} />
-          <Fact label="Used by" value={item.usedBy.length ? item.usedBy.join(", ") : "No incoming references."} />
-        </div>
-        {item.preview ? <div className="rounded-md border bg-background p-3 text-sm">{item.preview}</div> : null}
+    <section className="min-w-0 bg-background">
+      <div className="grid gap-4 p-4 md:p-5">
         {item.validationDiagnostics.length ? <DiagnosticsList diagnostics={item.validationDiagnostics} /> : null}
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={onCheckDelete}>
-            {safeDeleteResult?.allowed === false ? <ShieldX className="size-4" /> : <ShieldCheck className="size-4" />}
-            Check delete safety
-          </Button>
+        <div key={item.key} className="contents">
+          {route === "contracts" && isContract(item.raw) ? (
+            <>
+              <ContractDetails contract={item.raw} diagnostics={item.validationDiagnostics} />
+              <ContractNextVersionEditor contract={item.raw} data={data} refresh={refresh} />
+            </>
+          ) : null}
+          {route === "events" && isEventDefinition(item.raw) ? <EventDetails eventDefinition={item.raw} data={data} diagnostics={item.validationDiagnostics} /> : null}
+          {route === "routing" && isRoutingPolicy(item.raw) ? <RoutingPolicyDetails policy={item.raw} data={data} refresh={refresh} /> : null}
+          {route === "emissions" && isEmissionPolicy(item.raw) ? <EmissionPolicyDetails policy={item.raw} data={data} refresh={refresh} /> : null}
+          {route === "loops" && isLoopDefinition(item.raw) ? <LoopDefinitionDetails loop={item.raw} data={data} refresh={refresh} /> : null}
+          {route === "runtimes" || route === "skills" ? <GenericResourceDetails item={item} /> : null}
         </div>
-        {safeDeleteResult ? <SafeDeletePanel result={safeDeleteResult} targetName={item.name} /> : null}
-        {route === "contracts" && isContract(item.raw) ? (
-          <>
-            <ContractDetails contract={item.raw} diagnostics={item.validationDiagnostics} />
-            <ContractNextVersionEditor contract={item.raw} data={data} refresh={refresh} />
-          </>
-        ) : null}
-        {route === "events" && isEventDefinition(item.raw) ? <EventDetails eventDefinition={item.raw} data={data} diagnostics={item.validationDiagnostics} /> : null}
-        {route === "routing" && isRoutingPolicy(item.raw) ? <RoutingPolicyDetails policy={item.raw} data={data} refresh={refresh} /> : null}
-        {route === "emissions" && isEmissionPolicy(item.raw) ? <EmissionPolicyDetails policy={item.raw} data={data} refresh={refresh} /> : null}
-        {route === "loops" && isLoopDefinition(item.raw) ? <LoopDefinitionDetails loop={item.raw} data={data} refresh={refresh} /> : null}
-        <AdvancedSource value={item.raw} />
+      </div>
+    </section>
+  );
+}
+
+function GenericResourceDetails({ item }: { item: AdvancedItem }) {
+  return (
+    <Section title="Overview">
+      <div className="grid gap-3 text-sm">
+        <Fact label="Description" value={item.description || "No description."} />
       </div>
     </Section>
   );
