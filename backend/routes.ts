@@ -28,6 +28,19 @@ const handleEventValidationError = (error: unknown, res: express.Response): bool
   return false;
 };
 
+const optionalVersionQuery = (value: unknown): number | undefined => {
+  if (value === undefined) return undefined;
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw new EventValidationError("version must be a positive integer.");
+  }
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new EventValidationError("version must be a positive integer.");
+  }
+  return parsed;
+};
+
 apiRouter.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
@@ -36,6 +49,104 @@ apiRouter.get("/data", async (_req, res, next) => {
   try {
     res.json(await store.read());
   } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/workspace/validation", async (_req, res, next) => {
+  try {
+    res.json(await store.validateWorkspace());
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.post("/workspace/safe-delete", async (req, res, next) => {
+  try {
+    const { type, id, version, label } = req.body as Record<string, unknown>;
+    if (typeof type !== "string" || typeof id !== "string" || typeof label !== "string") {
+      return res.status(400).json({ error: "type, id, and label are required." });
+    }
+    res.json(await store.safeDelete({
+      type: type as never,
+      id,
+      version: typeof version === "number" ? version : undefined,
+      label
+    }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/flows", async (_req, res, next) => {
+  try {
+    res.json(await store.listFlows());
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/flows/:id", async (req, res, next) => {
+  try {
+    const flow = await store.getFlow(req.params.id, optionalVersionQuery(req.query.version));
+    if (!flow) return res.status(404).json({ error: "Flow not found." });
+    res.json(flow);
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
+    next(error);
+  }
+});
+
+apiRouter.post("/flows/validate", async (req, res, next) => {
+  try {
+    res.json(await store.validateFlowDraft(req.body));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
+    next(error);
+  }
+});
+
+apiRouter.post("/flows", async (req, res, next) => {
+  try {
+    res.status(201).json(await store.saveFlowDraft(req.body));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
+    next(error);
+  }
+});
+
+apiRouter.put("/flows/:id", async (req, res, next) => {
+  try {
+    res.json(await store.updateFlowSettings(req.params.id, req.body, optionalVersionQuery(req.query.version)));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
+    next(error);
+  }
+});
+
+apiRouter.post("/flows/:id/test", async (req, res, next) => {
+  try {
+    res.json(await store.testFlow(req.params.id, req.body?.payload, optionalVersionQuery(req.query.version)));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
+    next(error);
+  }
+});
+
+apiRouter.post("/flows/:id/activate", async (req, res, next) => {
+  try {
+    res.json(await store.setFlowActive(req.params.id, true, optionalVersionQuery(req.query.version)));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
+    next(error);
+  }
+});
+
+apiRouter.post("/flows/:id/pause", async (req, res, next) => {
+  try {
+    res.json(await store.setFlowActive(req.params.id, false, optionalVersionQuery(req.query.version)));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });
@@ -154,6 +265,30 @@ apiRouter.get("/agent-runs/:id/logs", (req, res, next) => {
   }
 });
 
+apiRouter.get("/traces/correlation/:id", (req, res, next) => {
+  try {
+    res.json(store.traceService().byCorrelation(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/traces/loops/:id", (req, res, next) => {
+  try {
+    res.json(store.traceService().byLoop(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/traces/runs/:id", (req, res, next) => {
+  try {
+    res.json(store.traceService().byRun(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
 apiRouter.get("/loop-instances", (_req, res, next) => {
   try {
     res.json(store.listLoopInstances());
@@ -241,9 +376,10 @@ apiRouter.delete("/:collection/:id", async (req, res, next) => {
   try {
     const collection = req.params.collection as CollectionName;
     if (!collectionSet.has(collection)) return res.status(404).json({ error: "Unknown collection." });
-    await store.remove(collection, req.params.id);
+    await store.remove(collection, req.params.id, optionalVersionQuery(req.query.version));
     res.status(204).end();
   } catch (error) {
+    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });

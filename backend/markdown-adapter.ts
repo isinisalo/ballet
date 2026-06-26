@@ -1,6 +1,6 @@
 import path from "node:path";
-import { stat, unlink } from "node:fs/promises";
-import type { Adr, AdrStatus, Agent, AgentOutcomeStatus, AgentStatus, AppData, EntityStatus, EventDefinition, EventProducerDefinition, Goal, MarkdownDocument, Policy, Project, Runtime, Skill } from "./shared/domain.js";
+import { mkdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
+import type { Adr, AdrStatus, Agent, AgentStatus, AppData, EntityStatus, EventDefinition, Goal, MarkdownDocument, Project, Runtime, Skill } from "./shared/domain.js";
 import type { ContractDefinition, ContractKind } from "./shared/contracts.js";
 import type { EmissionPolicy } from "./shared/emission-policy.js";
 import type { LoopDefinition } from "./shared/loop.js";
@@ -8,7 +8,7 @@ import type { AgentOperation } from "./shared/operations.js";
 import type { RoutingPolicy } from "./shared/routing-policy.js";
 import type { MappingExpression } from "./shared/mapping.js";
 import type { VersionedRef } from "./shared/json.js";
-import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadContracts, loadEmissionPolicies, loadEvents, loadGoals, loadLoopDefinitions, loadOperations, loadPolicies, loadRuntimes, loadSkills, readMarkdownDocument, safeSlug, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
+import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadContracts, loadEmissionPolicies, loadEvents, loadGoals, loadLoopDefinitions, loadOperations, loadPolicies, loadRuntimes, loadSkills, markdownSource, readMarkdownDocument, safeSlug, tomlSource, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
 
 const now = () => new Date().toISOString();
 
@@ -32,10 +32,6 @@ const validEntityStatus = (value: unknown): EntityStatus => ["active", "paused",
 const validGoalStatus = (value: unknown): Goal["status"] => ["not-started", "in-progress", "at-risk", "done"].includes(stringValue(value)) ? stringValue(value) as Goal["status"] : "not-started";
 const validAdrStatus = (value: unknown): AdrStatus => ["proposed", "accepted", "superseded", "rejected"].includes(stringValue(value)) ? stringValue(value) as AdrStatus : "proposed";
 const validAgentStatus = (value: unknown): AgentStatus => ["online", "offline"].includes(stringValue(value)) ? stringValue(value) as AgentStatus : "offline";
-const validAgentOutcomeStatus = (value: unknown): AgentOutcomeStatus | undefined =>
-  ["ready", "blocked", "needs_input", "approved", "changes_requested", "failed"].includes(stringValue(value))
-    ? stringValue(value) as AgentOutcomeStatus
-    : undefined;
 const dateValue = (value: unknown): string => stringValue(value, now());
 
 const bodyPreview = (body: string): string => body.replace(/^#+\s+/gm, "").split(/\n{2,}/)[0]?.trim() ?? "";
@@ -278,25 +274,15 @@ const operationFromDocument = (doc: MarkdownDocument): AgentOperation => {
   }, doc);
 };
 
-const legacyOperationForPolicy = (doc: MarkdownDocument): VersionedRef => {
-  const fm = doc.frontmatter;
-  const action = cloneRecord(fm.action) as Policy["action"] | undefined;
-  const targetAgentId = action?.type === "start_agent_run" && action.targetAgentId
-    ? action.targetAgentId
-    : stringValue(fm.targetAgentId ?? fm.agentId);
-  return { id: targetAgentId, version: 1 };
-};
-
 const routingPolicyFromDocument = (doc: MarkdownDocument): RoutingPolicy => {
   const fm = doc.frontmatter;
   const spec = specFromDocument(doc);
-  const legacyMatch = cloneRecord(fm.match);
   const consumes = isRecord(spec.consumes)
     ? { eventType: stringValue(spec.consumes.eventType) }
-    : { eventType: stringArray(legacyMatch?.eventTypes ?? fm.eventTypes ?? fm.eventType)[0] ?? "" };
+    : { eventType: "" };
   const dispatch = isRecord(spec.dispatch) && isRecord(spec.dispatch.operation)
     ? { operation: versionedRef(spec.dispatch.operation) }
-    : { operation: legacyOperationForPolicy(doc) };
+    : { operation: versionedRef(undefined) };
   return attachDocument({
     id: documentId(doc),
     name: stringValue(spec.name ?? metadataFromDocument(doc).name ?? fm.name, doc.title ?? doc.slug),
@@ -317,30 +303,6 @@ const routingPolicyFromDocument = (doc: MarkdownDocument): RoutingPolicy => {
   }, doc);
 };
 
-const producerFromUnknown = (value: unknown): EventProducerDefinition | undefined => {
-  if (!isRecord(value)) return undefined;
-  const agentRole = stringValue(value.agentRole ?? value.agent_role);
-  if (!agentRole) return undefined;
-  const outcomes = stringArray(value.outcomes ?? value.outcome)
-    .map(validAgentOutcomeStatus)
-    .filter((outcome): outcome is AgentOutcomeStatus => Boolean(outcome));
-  if (outcomes.length === 0) return undefined;
-
-  return {
-    agentRole,
-    outcomes,
-    requires: isRecord(value.requires) ? {
-      ...(value.requires.gitCommitExists !== undefined ? { gitCommitExists: booleanValue(value.requires.gitCommitExists) } : {}),
-      ...(value.requires.requiredChecksPassed !== undefined ? { requiredChecksPassed: booleanValue(value.requires.requiredChecksPassed) } : {})
-    } : undefined
-  };
-};
-
-const producersFromUnknown = (value: unknown): EventProducerDefinition[] =>
-  Array.isArray(value)
-    ? value.map(producerFromUnknown).filter((producer): producer is EventProducerDefinition => Boolean(producer))
-    : [];
-
 const eventDefinitionFromDocument = (doc: MarkdownDocument): EventDefinition => {
   const fm = doc.frontmatter;
   const spec = specFromDocument(doc);
@@ -354,7 +316,6 @@ const eventDefinitionFromDocument = (doc: MarkdownDocument): EventDefinition => 
     tags: stringArray(spec.tags ?? fm.tags),
     dataContract: isRecord(spec.dataContract) ? versionedRef(spec.dataContract) : undefined,
     examples: arrayValue<Record<string, unknown>>(spec.examples ?? fm.examples ?? (isRecord(fm.payloadExample) ? [fm.payloadExample] : [])),
-    producers: producersFromUnknown(fm.producers),
     payloadExample: isRecord(fm.payloadExample) ? fm.payloadExample : isRecord(fm.payload) ? fm.payload : undefined,
     createdAt: dateValue(spec.createdAt ?? fm.createdAt),
     updatedAt: dateValue(spec.updatedAt ?? fm.updatedAt ?? fm.createdAt)
@@ -508,6 +469,24 @@ const collectionName: Record<string, string> = {
   loopDefinitions: "loops",
   eventDefinitions: "events"
 };
+
+type EntityMarkdownCollection = keyof typeof collectionFolder;
+type EntityMarkdownFormat = "markdown" | "toml";
+
+export interface EntityMarkdownWritePlan {
+  collection: EntityMarkdownCollection;
+  item: Record<string, unknown>;
+  id: string;
+  relativePath: string;
+  frontmatter: Record<string, unknown>;
+  body: string;
+  source: string;
+  format: EntityMarkdownFormat;
+}
+
+export interface EntityMarkdownBatchWriteOptions {
+  failAfterCommits?: number;
+}
 
 const entityBody = (item: Record<string, unknown>): string => stringValue(item.body);
 const projectBody = (item: Record<string, unknown>): string => stringValue(item.description, stringValue(item.body));
@@ -676,10 +655,14 @@ const loopDefinitionFrontmatter = (item: Record<string, unknown>, id: string): R
   }, version);
 };
 
-export const writeEntityMarkdown = async (root: string, collection: keyof typeof collectionFolder, item: Record<string, unknown>): Promise<Record<string, unknown>> => {
+const prepareEntityMarkdownWrite = (collection: EntityMarkdownCollection, item: Record<string, unknown>): EntityMarkdownWritePlan => {
   const id = stringValue(item.id, safeSlug(stringValue(item.title ?? item.name, collectionName[collection])));
   const existingPath = stringValue(item.relativePath);
-  const markdownFilename = `${safeSlug(id)}.md`;
+  const version = numberValue(item.version ?? metadataFromItem(item).version, 1);
+  const versionedCollections = new Set(["contracts", "operations", "emissionPolicies", "loopDefinitions"]);
+  const markdownFilename = versionedCollections.has(collection)
+    ? `${safeSlug(id)}.v${version}.md`
+    : `${safeSlug(id)}.md`;
   const relativePath = collection === "projects"
     ? ".ballet/project.md"
     : collection === "agents"
@@ -707,12 +690,116 @@ export const writeEntityMarkdown = async (root: string, collection: keyof typeof
                 ? loopDefinitionFrontmatter(item, id)
                 : entityFrontmatter(item, id);
   const body = collection === "projects" ? projectBody(item) : entityBody(item);
+  const format: EntityMarkdownFormat = collection === "agents" ? "toml" : "markdown";
+  return {
+    collection,
+    item,
+    id,
+    relativePath,
+    frontmatter,
+    body,
+    source: format === "toml" ? tomlSource(frontmatter) : markdownSource(frontmatter, body),
+    format
+  };
+};
+
+const savedEntityFromPlan = (plan: EntityMarkdownWritePlan): Record<string, unknown> => ({
+  ...plan.item,
+  id: plan.id,
+  frontmatter: plan.frontmatter,
+  relativePath: plan.relativePath,
+  slug: safeSlug(path.basename(plan.relativePath, path.extname(plan.relativePath)))
+});
+
+export const writeEntityMarkdown = async (root: string, collection: EntityMarkdownCollection, item: Record<string, unknown>): Promise<Record<string, unknown>> => {
+  const plan = prepareEntityMarkdownWrite(collection, item);
   if (collection === "agents") {
-    await writeTomlDocument({ root, relativePath, frontmatter });
+    await writeTomlDocument({ root, relativePath: plan.relativePath, frontmatter: plan.frontmatter });
   } else {
-    await writeMarkdownDocument({ root, relativePath, frontmatter, body });
+    await writeMarkdownDocument({ root, relativePath: plan.relativePath, frontmatter: plan.frontmatter, body: plan.body });
   }
-  return { ...item, id, frontmatter, relativePath, slug: safeSlug(path.basename(relativePath, path.extname(relativePath))) };
+  return savedEntityFromPlan(plan);
+};
+
+const readExistingSource = async (absolutePath: string): Promise<{ existed: boolean; source?: string }> => {
+  try {
+    return { existed: true, source: await readFile(absolutePath, "utf8") };
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { existed: false };
+    }
+    throw error;
+  }
+};
+
+const rollbackTouchedTargets = async (
+  touched: Iterable<number>,
+  backups: Array<{ absolutePath: string; existed: boolean; source?: string } | undefined>
+): Promise<void> => {
+  for (const index of [...touched].reverse()) {
+    const backup = backups[index];
+    if (!backup) continue;
+    if (backup.existed) {
+      await mkdir(path.dirname(backup.absolutePath), { recursive: true });
+      await writeFile(backup.absolutePath, backup.source ?? "", "utf8");
+    } else {
+      await unlink(backup.absolutePath).catch(() => undefined);
+    }
+  }
+};
+
+export const writeEntityMarkdownBatch = async (
+  root: string,
+  entries: Array<{ collection: EntityMarkdownCollection; item: Record<string, unknown> }>,
+  options: EntityMarkdownBatchWriteOptions = {}
+): Promise<Record<string, unknown>[]> => {
+  const plans = entries.map((entry) => prepareEntityMarkdownWrite(entry.collection, entry.item));
+  const paths = new Set<string>();
+  for (const plan of plans) {
+    if (paths.has(plan.relativePath)) {
+      throw new Error(`Batch write contains duplicate target path: ${plan.relativePath}`);
+    }
+    paths.add(plan.relativePath);
+  }
+
+  const stagingRoot = assertInsideRoot(root, path.posix.join(
+    ".ballet/.staging",
+    `entity-write-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  ));
+  const stagedPaths: string[] = [];
+  const targetPaths = plans.map((plan) => assertInsideRoot(root, plan.relativePath));
+  const backups: Array<{ absolutePath: string; existed: boolean; source?: string } | undefined> = [];
+  const touched = new Set<number>();
+
+  try {
+    await mkdir(stagingRoot, { recursive: true });
+    for (const [index, plan] of plans.entries()) {
+      const extension = plan.format === "toml" ? ".toml" : ".md";
+      const stagedPath = path.join(stagingRoot, `${index}-${safeSlug(plan.id)}${extension}`);
+      stagedPaths.push(stagedPath);
+      await writeFile(stagedPath, plan.source, "utf8");
+    }
+
+    for (const [index, absolutePath] of targetPaths.entries()) {
+      backups[index] = { absolutePath, ...await readExistingSource(absolutePath) };
+    }
+
+    for (const [index, absolutePath] of targetPaths.entries()) {
+      if (options.failAfterCommits !== undefined && touched.size >= options.failAfterCommits) {
+        throw new Error("Injected entity batch write failure.");
+      }
+      touched.add(index);
+      await mkdir(path.dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, await readFile(stagedPaths[index]!, "utf8"), "utf8");
+    }
+  } catch (error) {
+    await rollbackTouchedTargets(touched, backups);
+    throw error;
+  } finally {
+    await rm(stagingRoot, { recursive: true, force: true });
+  }
+
+  return plans.map(savedEntityFromPlan);
 };
 
 export const removeEntityMarkdown = async (root: string, relativePath: string): Promise<void> => {

@@ -1,4 +1,5 @@
 import type { JsonValue } from "./json.js";
+import { stableJson } from "./json.js";
 import { getByJsonPointer } from "./json-pointer.js";
 
 export type Condition =
@@ -41,6 +42,19 @@ const hasOnlyKeys = (value: Record<string, unknown>, keys: string[]): boolean =>
 const isConditionRecord = (condition: unknown): condition is Record<string, unknown> =>
   Boolean(condition) && typeof condition === "object" && !Array.isArray(condition);
 
+const safeRegex = (pattern: unknown): RegExp => {
+  if (typeof pattern !== "string") throw new ConditionEvaluationError("matches condition requires a string value.");
+  if (pattern.length > 256) throw new ConditionEvaluationError("matches condition pattern is too long.");
+  if (/[+*?}]\s*[+*?{]/.test(pattern) || /\([^)]*[+*][^)]*\)\s*[+*{]/.test(pattern)) {
+    throw new ConditionEvaluationError("matches condition pattern uses unsupported nested repetition.");
+  }
+  try {
+    return new RegExp(pattern, "u");
+  } catch (error) {
+    throw new ConditionEvaluationError(`matches condition pattern is invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
 export const assertCondition = (condition: unknown, location = "condition"): void => {
   if (!isConditionRecord(condition)) throw new ConditionEvaluationError(`${location} must be an object.`);
 
@@ -62,15 +76,30 @@ export const assertCondition = (condition: unknown, location = "condition"): voi
     return;
   }
 
+  if (!hasOnlyKeys(condition, ["path", "op", "value"])) {
+    throw new ConditionEvaluationError(`${location} has unexpected keys.`);
+  }
   if (typeof condition.path !== "string" || !condition.path.startsWith("/")) {
     throw new ConditionEvaluationError(`${location}.path must be a JSON Pointer.`);
   }
   if (typeof condition.op !== "string" || !conditionOps.has(condition.op)) {
     throw new ConditionEvaluationError(`${location}.op is invalid.`);
   }
+  if (condition.op === "exists" && condition.value !== undefined && typeof condition.value !== "boolean") {
+    throw new ConditionEvaluationError(`${location}.value must be a boolean for exists.`);
+  }
+  if (condition.op === "in" && !Array.isArray(condition.value)) {
+    throw new ConditionEvaluationError(`${location}.value must be an array for in.`);
+  }
+  if (["gt", "gte", "lt", "lte"].includes(condition.op) && typeof condition.value !== "number") {
+    throw new ConditionEvaluationError(`${location}.value must be a number for ${condition.op}.`);
+  }
+  if (condition.op === "matches") {
+    safeRegex(condition.value);
+  }
 };
 
-const sameJson = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+const sameJson = (left: unknown, right: unknown): boolean => stableJson(left) === stableJson(right);
 
 const numericCompare = (actual: unknown, expected: unknown, op: "gt" | "gte" | "lt" | "lte"): boolean => {
   if (typeof actual !== "number" || typeof expected !== "number") return false;
@@ -78,16 +107,6 @@ const numericCompare = (actual: unknown, expected: unknown, op: "gt" | "gte" | "
   if (op === "gte") return actual >= expected;
   if (op === "lt") return actual < expected;
   return actual <= expected;
-};
-
-const safeRegex = (pattern: unknown): RegExp => {
-  if (typeof pattern !== "string") throw new ConditionEvaluationError("matches condition requires a string value.");
-  if (pattern.length > 256) throw new ConditionEvaluationError("matches condition pattern is too long.");
-  try {
-    return new RegExp(pattern);
-  } catch (error) {
-    throw new ConditionEvaluationError(`matches condition pattern is invalid: ${error instanceof Error ? error.message : String(error)}`);
-  }
 };
 
 const evaluateLeaf = (condition: Extract<Condition, { path: string }>, context: unknown): ConditionTrace => {

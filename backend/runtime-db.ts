@@ -3,14 +3,14 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { v4 as uuid } from "uuid";
-import type { Agent, AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus, EventDefinition, EventRecord, EventRoutingSummary, EventStatus, RuntimeEvent } from "./shared/domain.js";
+import type { Agent, AgentRun, AgentRunLog, AgentRunStatus, EventDefinition, EventRecord, EventRoutingSummary, EventStatus, RuntimeEvent } from "./shared/domain.js";
 import type { ContractDefinition } from "./shared/contracts.js";
 import type { EmissionPolicy } from "./shared/emission-policy.js";
 import type { LoopDefinition, LoopInstance } from "./shared/loop.js";
 import type { AgentOperation } from "./shared/operations.js";
 import type { RoutingPolicy } from "./shared/routing-policy.js";
 import type { JsonValue } from "./shared/json.js";
-import { ContractRegistry } from "./shared/contracts.js";
+import { ContractRegistry, contractSchemaHash } from "./shared/contracts.js";
 import { routeEventToOperations, routingDecisionSnapshot, type OperationRoutingDecision } from "./routing-engine.js";
 
 const PROJECTOR_CONSUMER = "policy-projector";
@@ -64,6 +64,55 @@ const stableJson = (value: unknown): string => {
 const hashDedupeKey = (value: unknown): string =>
   createHash("sha256").update(stableJson(value)).digest("hex").slice(0, 32);
 
+export const operationDefinitionHash = (operation: AgentOperation): string => createHash("sha256").update(stableJson({
+  id: operation.id,
+  version: operation.version,
+  name: operation.name,
+  description: operation.description,
+  active: operation.active,
+  agentId: operation.agentId,
+  instructions: operation.instructions,
+  inputContract: operation.inputContract,
+  outputContract: operation.outputContract,
+  emissionRequired: operation.emissionRequired
+})).digest("hex");
+
+const retryPriorAttemptAudit = (run: AgentRun): Record<string, unknown> => {
+  const audit: Record<string, unknown> = {
+    previous_status: run.status,
+    previous_attempt: run.attempt,
+    cleared_state: {
+      lease: run.leaseOwner !== undefined || run.leaseUntil !== undefined,
+      turn: run.turnId !== undefined,
+      outcome: run.outcome !== undefined,
+      output: run.outputJson !== undefined,
+      output_contract: run.outputContractId !== undefined || run.outputContractVersion !== undefined || run.outputContractHash !== undefined,
+      output_validation_errors: run.outputValidationErrorsJson !== undefined,
+      emission_decisions: run.emissionDecisionsJson !== undefined,
+      completion_error: run.error !== undefined,
+      completed_at: run.completedAt !== undefined
+    }
+  };
+  if (run.leaseOwner !== undefined || run.leaseUntil !== undefined) {
+    audit.lease = { owner: run.leaseOwner, until: run.leaseUntil };
+  }
+  if (run.turnId !== undefined) audit.turn_id = run.turnId;
+  if (run.outcome !== undefined) audit.outcome = run.outcome;
+  if (run.outputJson !== undefined) audit.output_json = run.outputJson;
+  if (run.outputContractId !== undefined || run.outputContractVersion !== undefined || run.outputContractHash !== undefined) {
+    audit.output_contract = {
+      id: run.outputContractId,
+      version: run.outputContractVersion,
+      hash: run.outputContractHash
+    };
+  }
+  if (run.outputValidationErrorsJson !== undefined) audit.output_validation_errors = run.outputValidationErrorsJson;
+  if (run.emissionDecisionsJson !== undefined) audit.emission_decisions = run.emissionDecisionsJson;
+  if (run.error !== undefined) audit.completion_error = run.error;
+  if (run.completedAt !== undefined) audit.completed_at = run.completedAt;
+  return audit;
+};
+
 const parseJsonObject = (value: string): Record<string, unknown> => {
   const parsed = JSON.parse(value) as unknown;
   return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
@@ -115,6 +164,9 @@ interface EventRow {
   assigned_agent_id: string | null;
   routing_json: string | null;
   handling_result: string | null;
+  loop_instance_id: string | null;
+  loop_definition_id: string | null;
+  loop_definition_version: number | null;
   payload_json: string;
 }
 
@@ -128,6 +180,7 @@ interface AgentRunRow {
   correlation_id: string | null;
   operation_id: string | null;
   operation_version: number | null;
+  operation_hash: string | null;
   input_json: string | null;
   input_contract_id: string | null;
   input_contract_version: number | null;
@@ -136,6 +189,7 @@ interface AgentRunRow {
   output_contract_id: string | null;
   output_contract_version: number | null;
   output_contract_hash: string | null;
+  output_validation_errors_json: string | null;
   routing_policy_hash: string | null;
   routing_decision_json: string | null;
   emission_decisions_json: string | null;
@@ -209,11 +263,12 @@ export interface LeaseOptions {
 export interface CompleteRunInput {
   runId: string;
   status: AgentRunStatus;
-  outcome?: AgentOutcome;
+  outcome?: unknown;
   output?: JsonValue;
   outputContractId?: string;
   outputContractVersion?: number;
   outputContractHash?: string;
+  outputValidationErrors?: Record<string, unknown>[];
   emissionDecisions?: Record<string, unknown>[];
   error?: string;
   threadId?: string;
@@ -377,6 +432,7 @@ export class RuntimeDatabase {
       if (!["failed", "blocked", "needs_input", "cancelled"].includes(run.status)) {
         throw new Error(`Agent run with status ${run.status} cannot be retried.`);
       }
+      const priorAttempt = retryPriorAttemptAudit(run);
       db.prepare(`
         UPDATE agent_runs
         SET status = 'queued',
@@ -384,12 +440,18 @@ export class RuntimeDatabase {
             lease_until = NULL,
             turn_id = NULL,
             outcome_json = NULL,
+            output_json = NULL,
+            output_contract_id = NULL,
+            output_contract_version = NULL,
+            output_contract_hash = NULL,
+            output_validation_errors_json = NULL,
+            emission_decisions_json = NULL,
             error = NULL,
             completed_at = NULL,
             updated_at = @updatedAt
         WHERE run_id = @runId
       `).run({ runId, updatedAt: now() });
-      this.appendRunLog(runId, "info", "Run queued for retry.", {});
+      this.appendRunLog(runId, "info", "Run queued for retry.", { prior_attempt: priorAttempt });
       const updated = this.getRun(runId);
       if (!updated) throw new Error("Agent run disappeared during retry.");
       return updated;
@@ -415,6 +477,7 @@ export class RuntimeDatabase {
             output_contract_id = COALESCE(@outputContractId, output_contract_id),
             output_contract_version = COALESCE(@outputContractVersion, output_contract_version),
             output_contract_hash = COALESCE(@outputContractHash, output_contract_hash),
+            output_validation_errors_json = @outputValidationErrorsJson,
             emission_decisions_json = @emissionDecisionsJson,
             error = @error,
             completed_at = @completedAt,
@@ -425,11 +488,12 @@ export class RuntimeDatabase {
         status: input.status,
         threadId: input.threadId ?? null,
         turnId: input.turnId ?? null,
-        outcomeJson: input.outcome ? stringifyJson(input.outcome) : null,
-        outputJson: input.output ? stringifyJson(input.output) : null,
+        outcomeJson: input.outcome !== undefined ? JSON.stringify(input.outcome) : null,
+        outputJson: input.output !== undefined ? JSON.stringify(input.output) : null,
         outputContractId: input.outputContractId ?? null,
         outputContractVersion: input.outputContractVersion ?? null,
         outputContractHash: input.outputContractHash ?? null,
+        outputValidationErrorsJson: input.outputValidationErrors ? stringifyJson(input.outputValidationErrors) : null,
         emissionDecisionsJson: input.emissionDecisions ? stringifyJson(input.emissionDecisions) : null,
         error: input.error ?? null,
         completedAt: completedAt ?? null,
@@ -438,6 +502,7 @@ export class RuntimeDatabase {
 
       let event: RuntimeEvent | undefined;
       let runs: AgentRun[] = [];
+      let publicationError: string | undefined;
       const domainEvents = [
         ...(input.domainEvents ?? []),
         ...(input.domainEvent ? [{ type: input.domainEvent.type, payload: input.domainEvent.payload }] : [])
@@ -447,36 +512,79 @@ export class RuntimeDatabase {
         if (!run) throw new Error("Agent run not found after update.");
         const trigger = this.getEventById(run.triggerEventId);
         if (!trigger) throw new Error("Trigger event not found.");
+        const definitions = input.definitions ?? emptyRuntimeDefinitions();
         const nextDepth = trigger.correlation_depth + 1;
         if (nextDepth > MAX_CORRELATION_DEPTH) {
-          this.appendRunLog(run.runId, "warn", "Domain event publication skipped because correlation depth exceeded the runtime limit.", {
+          publicationError = "Domain event publication skipped because correlation depth exceeded the runtime limit.";
+          this.appendRunLog(run.runId, "warn", publicationError, {
             event_types: domainEvents.map((domainEvent) => domainEvent.type),
             max_correlation_depth: MAX_CORRELATION_DEPTH,
             next_correlation_depth: nextDepth
           });
         } else {
-          for (const domainEvent of domainEvents) {
-            const published = this.insertEventAndProjectPolicies({
-              projectId: trigger.project_id,
-              eventType: domainEvent.type,
-              source: "agentd",
-              subject: domainEvent.subject ?? trigger.subject,
-              correlationId: trigger.correlation_id,
-              causationId: trigger.event_id,
-              dedupeKey: domainEvent.dedupeKey ?? `domain:${run.runId}:${domainEvent.type}`,
-              correlationDepth: nextDepth,
-              tags: domainEvent.tags ?? [],
-              payload: domainEvent.payload,
-              body: domainEvent.body ?? `Agent run ${run.runId} produced ${domainEvent.type}.`,
-              loopInstanceId: run.loopInstanceId,
-              loopDefinitionId: run.loopDefinitionId,
-              loopDefinitionVersion: run.loopDefinitionVersion
-            }, input.definitions ?? emptyRuntimeDefinitions());
-            const publishedRow = this.getEventById(published.event.eventId ?? published.event.id);
-            event = publishedRow ? this.toRuntimeEvent(publishedRow) : event;
-            runs = [...runs, ...published.runs];
+          let failedPreflightEventType: string | undefined;
+          try {
+            const contracts = new ContractRegistry(definitions.contracts);
+            for (const domainEvent of domainEvents) {
+              failedPreflightEventType = domainEvent.type;
+              this.validateEventPayload(domainEvent.type, domainEvent.payload, definitions, contracts, { requireDefinition: true });
+            }
+            failedPreflightEventType = undefined;
+          } catch (error) {
+            publicationError = error instanceof Error ? error.message : String(error);
+            this.appendRunLog(run.runId, "error", "Domain event publication failed.", {
+              event_type: failedPreflightEventType,
+              error: publicationError
+            });
           }
         }
+        if (!publicationError && nextDepth <= MAX_CORRELATION_DEPTH) {
+          for (const domainEvent of domainEvents) {
+            try {
+              const published = this.insertEventAndProjectPolicies({
+                projectId: trigger.project_id,
+                eventType: domainEvent.type,
+                source: "agentd",
+                subject: domainEvent.subject ?? trigger.subject,
+                correlationId: trigger.correlation_id,
+                causationId: trigger.event_id,
+                dedupeKey: domainEvent.dedupeKey ?? `domain:${run.runId}:${domainEvent.type}`,
+                correlationDepth: nextDepth,
+                tags: domainEvent.tags ?? [],
+                payload: domainEvent.payload,
+                body: domainEvent.body ?? `Agent run ${run.runId} produced ${domainEvent.type}.`,
+                loopInstanceId: run.loopInstanceId,
+                loopDefinitionId: run.loopDefinitionId,
+                loopDefinitionVersion: run.loopDefinitionVersion
+              }, definitions);
+              const publishedRow = this.getEventById(published.event.eventId ?? published.event.id);
+              event = publishedRow ? this.toRuntimeEvent(publishedRow) : event;
+              runs = [...runs, ...published.runs];
+            } catch (error) {
+              publicationError = error instanceof Error ? error.message : String(error);
+              this.appendRunLog(run.runId, "error", "Domain event publication failed.", {
+                event_type: domainEvent.type,
+                error: publicationError
+              });
+              break;
+            }
+          }
+        }
+      }
+
+      if (publicationError && input.status === "completed") {
+        db.prepare(`
+          UPDATE agent_runs
+          SET status = 'failed',
+              error = @error,
+              completed_at = @completedAt,
+              updated_at = @completedAt
+          WHERE run_id = @runId
+        `).run({
+          runId: input.runId,
+          error: publicationError,
+          completedAt: now()
+        });
       }
 
       const updated = this.getRun(input.runId);
@@ -496,23 +604,32 @@ export class RuntimeDatabase {
     `).run({ runId, threadId, turnId: turnId ?? null, updatedAt: now() });
   }
 
-  getThreadBinding(workItemId: string, agentRole: string): string | undefined {
+  getThreadBinding(workItemId: string, agentRole: string, operationId?: string, operationVersion?: number): string | undefined {
+    if (operationId && operationVersion !== undefined) {
+      const operationRow = this.connection().prepare(`
+        SELECT thread_id AS threadId
+        FROM thread_bindings
+        WHERE work_item_id = ? AND agent_role = ? AND operation_id = ? AND operation_version = ?
+      `).get(workItemId, agentRole, operationId, operationVersion) as { threadId: string } | undefined;
+      return operationRow?.threadId;
+    }
+
     const row = this.connection().prepare(`
       SELECT thread_id AS threadId
       FROM thread_bindings
-      WHERE work_item_id = ? AND agent_role = ?
+      WHERE work_item_id = ? AND agent_role = ? AND operation_id = ''
     `).get(workItemId, agentRole) as { threadId: string } | undefined;
     return row?.threadId;
   }
 
-  upsertThreadBinding(workItemId: string, agentRole: string, threadId: string): void {
+  upsertThreadBinding(workItemId: string, agentRole: string, threadId: string, operationId?: string, operationVersion?: number): void {
     this.connection().prepare(`
-      INSERT INTO thread_bindings (work_item_id, agent_role, thread_id, updated_at)
-      VALUES (@workItemId, @agentRole, @threadId, @updatedAt)
-      ON CONFLICT(work_item_id, agent_role) DO UPDATE SET
+      INSERT INTO thread_bindings (work_item_id, agent_role, operation_id, operation_version, thread_id, updated_at)
+      VALUES (@workItemId, @agentRole, @operationId, @operationVersion, @threadId, @updatedAt)
+      ON CONFLICT(work_item_id, agent_role, operation_id, operation_version) DO UPDATE SET
         thread_id = excluded.thread_id,
         updated_at = excluded.updated_at
-    `).run({ workItemId, agentRole, threadId, updatedAt: now() });
+    `).run({ workItemId, agentRole, operationId: operationId ?? "", operationVersion: operationVersion ?? 0, threadId, updatedAt: now() });
   }
 
   appendRunLog(runId: string, level: AgentRunLog["level"], message: string, data?: Record<string, unknown>): void {
@@ -601,13 +718,20 @@ export class RuntimeDatabase {
       const runs = this.getRunsForTrigger(duplicate.event_id);
       return { event: this.toEventRecord(duplicate), run: runs[0], runs, duplicate: true };
     }
-    const loopDefinition = input.loopDefinitionId
-      ? definitions.loopDefinitions.find((loop) =>
+    const matchingLoopDefinitions = input.loopDefinitionId
+      ? definitions.loopDefinitions.filter((loop) =>
         loop.active &&
         loop.id === input.loopDefinitionId &&
         (input.loopDefinitionVersion === undefined || loop.version === input.loopDefinitionVersion)
       )
-      : undefined;
+      : [];
+    if (input.loopDefinitionId && input.loopDefinitionVersion === undefined && matchingLoopDefinitions.length > 1) {
+      throw new Error(`Loop definition ${input.loopDefinitionId} has multiple active versions. Specify loopDefinitionVersion.`);
+    }
+    const loopDefinition = matchingLoopDefinitions[0];
+    if (input.loopDefinitionId && !loopDefinition) {
+      throw new Error(`Unknown or inactive loop definition: ${input.loopDefinitionId}${input.loopDefinitionVersion === undefined ? "" : `@${input.loopDefinitionVersion}`}`);
+    }
     const loopInstanceId = input.loopInstanceId ?? (loopDefinition ? uuid() : undefined);
     if (loopDefinition && loopInstanceId && !input.loopInstanceId) {
       this.connection().prepare(`
@@ -632,24 +756,29 @@ export class RuntimeDatabase {
     const effectiveLoopDefinition = loopDefinition ?? (inheritedLoop
       ? definitions.loopDefinitions.find((loop) => loop.id === inheritedLoop.loop_definition_id && loop.version === inheritedLoop.loop_definition_version)
       : undefined);
+    let limitExceededReason: string | undefined;
+    let skipRoutingForLoopLimit = false;
     if (inheritedLoop?.status && inheritedLoop.status !== "running") {
       throw new Error(`Loop instance ${loopInstanceId} is ${inheritedLoop.status} and cannot accept more events.`);
     }
     if (input.loopInstanceId && inheritedLoop && effectiveLoopDefinition && this.loopDeadlineExceeded(inheritedLoop, effectiveLoopDefinition)) {
-      this.markLoopExhausted(input.loopInstanceId, `deadline ${effectiveLoopDefinition.limits.deadlineSeconds}s exceeded`);
-      throw new Error(`Loop ${input.loopInstanceId} exceeded deadlineSeconds=${effectiveLoopDefinition.limits.deadlineSeconds}.`);
+      const reason = `deadline ${effectiveLoopDefinition.limits.deadlineSeconds}s exceeded`;
+      if (this.markLoopExhausted(input.loopInstanceId, reason)) limitExceededReason = reason;
+      skipRoutingForLoopLimit = true;
     }
-    if (input.loopInstanceId && inheritedLoop && effectiveLoopDefinition && input.causationId) {
+    if (!skipRoutingForLoopLimit && input.loopInstanceId && inheritedLoop && effectiveLoopDefinition && input.causationId) {
       if (inheritedLoop.hop_count + 1 > effectiveLoopDefinition.limits.maxHops) {
-        this.markLoopExhausted(input.loopInstanceId, `maxHops ${effectiveLoopDefinition.limits.maxHops} exceeded`);
-        throw new Error(`Loop ${input.loopInstanceId} exceeded maxHops=${effectiveLoopDefinition.limits.maxHops}.`);
+        const reason = `maxHops ${effectiveLoopDefinition.limits.maxHops} exceeded`;
+        if (this.markLoopExhausted(input.loopInstanceId, reason)) limitExceededReason = reason;
+        skipRoutingForLoopLimit = true;
+      } else {
+        this.connection().prepare(`
+          UPDATE loop_instances
+          SET hop_count = hop_count + 1,
+              updated_at = @updatedAt
+          WHERE loop_instance_id = @loopInstanceId AND status = 'running'
+        `).run({ loopInstanceId: input.loopInstanceId, updatedAt: now() });
       }
-      this.connection().prepare(`
-        UPDATE loop_instances
-        SET hop_count = hop_count + 1,
-            updated_at = @updatedAt
-        WHERE loop_instance_id = @loopInstanceId AND status = 'running'
-      `).run({ loopInstanceId: input.loopInstanceId, updatedAt: now() });
     }
 
     const baseEvent: EventRecord = {
@@ -673,10 +802,16 @@ export class RuntimeDatabase {
       createdAt
     };
     const contracts = new ContractRegistry(definitions.contracts);
+    this.validateEventPayload(input.eventType, payload, definitions, contracts);
     const terminalLoopEvent = Boolean(effectiveLoopDefinition?.terminalEventTypes.includes(input.eventType));
-    const routingPolicies = terminalLoopEvent && effectiveLoopDefinition
-      ? definitions.routingPolicies.filter((policy) => !effectiveLoopDefinition.routingPolicyIds.includes(policy.id))
-      : definitions.routingPolicies;
+    const routeAsLoopStep = Boolean(loopInstanceId && effectiveLoopDefinition && !terminalLoopEvent);
+    const routingPolicies = skipRoutingForLoopLimit
+      ? []
+      : effectiveLoopDefinition
+        ? terminalLoopEvent
+          ? definitions.routingPolicies.filter((policy) => !effectiveLoopDefinition.routingPolicyIds.includes(policy.id))
+          : definitions.routingPolicies.filter((policy) => effectiveLoopDefinition.routingPolicyIds.includes(policy.id))
+        : definitions.routingPolicies;
     const decisions = routeEventToOperations({
       event: baseEvent,
       policies: routingPolicies,
@@ -687,7 +822,7 @@ export class RuntimeDatabase {
     let routedDecisions = decisions.filter((decision) => decision.status === "routed");
     const plannedIterations = new Map<OperationRoutingDecision, number>();
     let plannedStepIterations: Record<string, number> | undefined;
-    if (loopInstanceId && effectiveLoopDefinition && routedDecisions.length > 0) {
+    if (routeAsLoopStep && loopInstanceId && effectiveLoopDefinition && routedDecisions.length > 0) {
       const loopRow = this.getLoopInstance(loopInstanceId);
       if (loopRow && this.loopDeadlineExceeded(loopRow, effectiveLoopDefinition)) {
         for (const decision of routedDecisions) {
@@ -695,13 +830,15 @@ export class RuntimeDatabase {
           decision.reason = `Loop ${loopInstanceId} exhausted deadlineSeconds=${effectiveLoopDefinition.limits.deadlineSeconds}.`;
         }
         this.markLoopExhausted(loopInstanceId, `deadline ${effectiveLoopDefinition.limits.deadlineSeconds}s exceeded`);
+        if (!limitExceededReason) limitExceededReason = `deadline ${effectiveLoopDefinition.limits.deadlineSeconds}s exceeded`;
         routedDecisions = [];
       } else if (loopRow && loopRow.run_count + routedDecisions.length > effectiveLoopDefinition.limits.maxRuns) {
         for (const decision of routedDecisions) {
           decision.status = "skipped";
           decision.reason = `Loop ${loopInstanceId} exhausted maxRuns=${effectiveLoopDefinition.limits.maxRuns}.`;
         }
-        this.markLoopExhausted(loopInstanceId, `maxRuns ${effectiveLoopDefinition.limits.maxRuns} exceeded`);
+        const reason = `maxRuns ${effectiveLoopDefinition.limits.maxRuns} exceeded`;
+        if (this.markLoopExhausted(loopInstanceId, reason) && !limitExceededReason) limitExceededReason = reason;
         routedDecisions = [];
       } else if (loopRow) {
         const nextIterations = this.parseLoopStepIterations(loopRow);
@@ -721,7 +858,8 @@ export class RuntimeDatabase {
             decision.status = "skipped";
             decision.reason = `Loop ${loopInstanceId} exhausted maxIterationsPerStep=${effectiveLoopDefinition.limits.maxIterationsPerStep} for step ${exceededStepId}.`;
           }
-          this.markLoopExhausted(loopInstanceId, `maxIterationsPerStep ${effectiveLoopDefinition.limits.maxIterationsPerStep} exceeded for ${exceededStepId}`);
+          const reason = `maxIterationsPerStep ${effectiveLoopDefinition.limits.maxIterationsPerStep} exceeded for ${exceededStepId}`;
+          if (this.markLoopExhausted(loopInstanceId, reason) && !limitExceededReason) limitExceededReason = reason;
           routedDecisions = [];
         } else {
           plannedStepIterations = nextIterations;
@@ -738,12 +876,14 @@ export class RuntimeDatabase {
       INSERT INTO events (
         event_id, type, source, subject, correlation_id, causation_id, dedupe_key,
         correlation_depth, occurred_at, project_id, tags_json, status, matched_policy_id,
-        assigned_agent_id, routing_json, handling_result, payload_json
+        assigned_agent_id, routing_json, handling_result, loop_instance_id, loop_definition_id,
+        loop_definition_version, payload_json
       )
       VALUES (
         @eventId, @type, @source, @subject, @correlationId, @causationId, @dedupeKey,
         @correlationDepth, @occurredAt, @projectId, @tagsJson, @status, @matchedPolicyId,
-        @assignedAgentId, @routingJson, @handlingResult, @payloadJson
+        @assignedAgentId, @routingJson, @handlingResult, @loopInstanceId, @loopDefinitionId,
+        @loopDefinitionVersion, @payloadJson
       )
     `).run({
       eventId,
@@ -762,11 +902,27 @@ export class RuntimeDatabase {
       assignedAgentId: assignedAgentId ?? null,
       routingJson: stringifyJson(routing),
       handlingResult,
+      loopInstanceId: loopInstanceId ?? null,
+      loopDefinitionId: effectiveLoopDefinition?.id ?? null,
+      loopDefinitionVersion: effectiveLoopDefinition?.version ?? null,
       payloadJson: stringifyJson(baseEvent.payload)
     });
 
     const inserted = this.getEventById(eventId);
     if (!inserted) throw new Error("Failed to read inserted event.");
+    if (loopInstanceId && effectiveLoopDefinition && limitExceededReason) {
+      this.insertLoopLimitExceededEvent({
+        loopInstanceId,
+        loop: effectiveLoopDefinition,
+        projectId: baseEvent.projectId,
+        subject: baseEvent.subject ?? baseEvent.projectId,
+        correlationId: baseEvent.correlationId ?? eventId,
+        causationId: inserted.event_id,
+        correlationDepth,
+        reason: limitExceededReason,
+        definitions
+      });
+    }
 
     const runs: AgentRun[] = [];
     for (const decision of routedDecisions) {
@@ -774,15 +930,17 @@ export class RuntimeDatabase {
       this.connection().prepare(`
         INSERT OR IGNORE INTO agent_runs (
           run_id, trigger_event_id, trigger_event_seq, policy_id, policy_version,
-          agent_role, correlation_id, operation_id, operation_version, input_json, input_contract_id,
-          input_contract_version, input_contract_hash, routing_policy_hash, routing_decision_json,
+          agent_role, correlation_id, operation_id, operation_version, operation_hash, input_json, input_contract_id,
+          input_contract_version, input_contract_hash, output_contract_id, output_contract_version,
+          output_contract_hash, routing_policy_hash, routing_decision_json,
           loop_instance_id, loop_definition_id, loop_definition_version, step_id, iteration,
           status, attempt, created_at, updated_at
         )
         VALUES (
           @runId, @triggerEventId, @triggerEventSeq, @policyId, @policyVersion,
-          @agentRole, @correlationId, @operationId, @operationVersion, @inputJson, @inputContractId,
-          @inputContractVersion, @inputContractHash, @routingPolicyHash, @routingDecisionJson,
+          @agentRole, @correlationId, @operationId, @operationVersion, @operationHash, @inputJson, @inputContractId,
+          @inputContractVersion, @inputContractHash, @outputContractId, @outputContractVersion,
+          @outputContractHash, @routingPolicyHash, @routingDecisionJson,
           @loopInstanceId, @loopDefinitionId, @loopDefinitionVersion, @stepId, @iteration,
           'queued', 0, @createdAt, @updatedAt
         )
@@ -796,21 +954,25 @@ export class RuntimeDatabase {
         correlationId: inserted.correlation_id,
         operationId: decision.operationId ?? null,
         operationVersion: decision.operationVersion ?? null,
-        inputJson: decision.input ? stringifyJson(decision.input) : null,
+        operationHash: this.operationHashForDecision(decision, definitions.operations),
+        inputJson: decision.input !== undefined ? stringifyJson(decision.input) : null,
         inputContractId: decision.inputContractId ?? null,
         inputContractVersion: decision.inputContractVersion ?? null,
         inputContractHash: decision.inputContractHash ?? null,
+        outputContractId: this.outputContractSnapshotForDecision(decision, definitions.operations, definitions.contracts).id,
+        outputContractVersion: this.outputContractSnapshotForDecision(decision, definitions.operations, definitions.contracts).version,
+        outputContractHash: this.outputContractSnapshotForDecision(decision, definitions.operations, definitions.contracts).hash,
         routingPolicyHash: decision.policyHash,
         routingDecisionJson: stringifyJson(routingDecisionSnapshot(decision)),
-        loopInstanceId: loopInstanceId ?? null,
-        loopDefinitionId: effectiveLoopDefinition?.id ?? null,
-        loopDefinitionVersion: effectiveLoopDefinition?.version ?? null,
-        stepId: decision.policyId,
-        iteration: plannedIterations.get(decision) ?? input.iteration ?? null,
+        loopInstanceId: routeAsLoopStep ? loopInstanceId ?? null : null,
+        loopDefinitionId: routeAsLoopStep ? effectiveLoopDefinition?.id ?? null : null,
+        loopDefinitionVersion: routeAsLoopStep ? effectiveLoopDefinition?.version ?? null : null,
+        stepId: routeAsLoopStep ? decision.policyId : null,
+        iteration: routeAsLoopStep ? plannedIterations.get(decision) ?? input.iteration ?? null : null,
         createdAt,
         updatedAt: createdAt
       });
-      if (loopInstanceId) this.incrementLoopRunCount(loopInstanceId, 1);
+      if (routeAsLoopStep && loopInstanceId) this.incrementLoopRunCount(loopInstanceId, 1);
       const run = this.getRunByDedupe(inserted.event_id, decision.policyId, decision.policyVersion, decision.agentId ?? "");
       if (run) {
         decision.runId = run.runId;
@@ -838,7 +1000,7 @@ export class RuntimeDatabase {
 
     const updated = this.getEventById(eventId);
     if (!updated) throw new Error("Failed to read updated event.");
-    if (loopInstanceId && plannedStepIterations) {
+    if (routeAsLoopStep && loopInstanceId && plannedStepIterations) {
       this.updateLoopStepIterations(loopInstanceId, plannedStepIterations);
     }
     if (loopInstanceId && effectiveLoopDefinition && terminalLoopEvent) {
@@ -890,6 +1052,9 @@ export class RuntimeDatabase {
         assigned_agent_id TEXT,
         routing_json TEXT,
         handling_result TEXT,
+        loop_instance_id TEXT,
+        loop_definition_id TEXT,
+        loop_definition_version INTEGER,
         payload_json TEXT NOT NULL
       );
 
@@ -908,6 +1073,7 @@ export class RuntimeDatabase {
         correlation_id TEXT,
         operation_id TEXT,
         operation_version INTEGER,
+        operation_hash TEXT,
         input_json TEXT,
         input_contract_id TEXT,
         input_contract_version INTEGER,
@@ -916,6 +1082,7 @@ export class RuntimeDatabase {
         output_contract_id TEXT,
         output_contract_version INTEGER,
         output_contract_hash TEXT,
+        output_validation_errors_json TEXT,
         routing_policy_hash TEXT,
         routing_decision_json TEXT,
         emission_decisions_json TEXT,
@@ -952,9 +1119,11 @@ export class RuntimeDatabase {
       CREATE TABLE IF NOT EXISTS thread_bindings (
         work_item_id TEXT NOT NULL,
         agent_role TEXT NOT NULL,
+        operation_id TEXT NOT NULL DEFAULT '',
+        operation_version INTEGER NOT NULL DEFAULT 0,
         thread_id TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        PRIMARY KEY(work_item_id, agent_role)
+        PRIMARY KEY(work_item_id, agent_role, operation_id, operation_version)
       );
 
       CREATE TABLE IF NOT EXISTS loop_instances (
@@ -984,7 +1153,11 @@ export class RuntimeDatabase {
     if (!eventColumns.has("dedupe_key")) db.exec("ALTER TABLE events ADD COLUMN dedupe_key TEXT");
     if (!eventColumns.has("correlation_depth")) db.exec("ALTER TABLE events ADD COLUMN correlation_depth INTEGER NOT NULL DEFAULT 0");
     if (!eventColumns.has("routing_json")) db.exec("ALTER TABLE events ADD COLUMN routing_json TEXT");
+    if (!eventColumns.has("loop_instance_id")) db.exec("ALTER TABLE events ADD COLUMN loop_instance_id TEXT");
+    if (!eventColumns.has("loop_definition_id")) db.exec("ALTER TABLE events ADD COLUMN loop_definition_id TEXT");
+    if (!eventColumns.has("loop_definition_version")) db.exec("ALTER TABLE events ADD COLUMN loop_definition_version INTEGER");
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedupe_key ON events(dedupe_key) WHERE dedupe_key IS NOT NULL");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_events_loop_instance ON events(loop_instance_id)");
 
     const runColumns = new Set((db.prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>).map((column) => column.name));
     const addRunColumn = (name: string, sql: string) => {
@@ -993,6 +1166,7 @@ export class RuntimeDatabase {
     addRunColumn("correlation_id", "TEXT");
     addRunColumn("operation_id", "TEXT");
     addRunColumn("operation_version", "INTEGER");
+    addRunColumn("operation_hash", "TEXT");
     addRunColumn("input_json", "TEXT");
     addRunColumn("input_contract_id", "TEXT");
     addRunColumn("input_contract_version", "INTEGER");
@@ -1001,6 +1175,7 @@ export class RuntimeDatabase {
     addRunColumn("output_contract_id", "TEXT");
     addRunColumn("output_contract_version", "INTEGER");
     addRunColumn("output_contract_hash", "TEXT");
+    addRunColumn("output_validation_errors_json", "TEXT");
     addRunColumn("routing_policy_hash", "TEXT");
     addRunColumn("routing_decision_json", "TEXT");
     addRunColumn("emission_decisions_json", "TEXT");
@@ -1012,6 +1187,11 @@ export class RuntimeDatabase {
     db.exec("CREATE INDEX IF NOT EXISTS idx_agent_runs_operation ON agent_runs(operation_id, operation_version)");
     db.exec("CREATE INDEX IF NOT EXISTS idx_agent_runs_correlation ON agent_runs(correlation_id)");
     db.exec("CREATE INDEX IF NOT EXISTS idx_agent_runs_loop_instance ON agent_runs(loop_instance_id)");
+
+    const threadColumns = new Set((db.prepare("PRAGMA table_info(thread_bindings)").all() as Array<{ name: string }>).map((column) => column.name));
+    if (!threadColumns.has("operation_id")) db.exec("ALTER TABLE thread_bindings ADD COLUMN operation_id TEXT NOT NULL DEFAULT ''");
+    if (!threadColumns.has("operation_version")) db.exec("ALTER TABLE thread_bindings ADD COLUMN operation_version INTEGER NOT NULL DEFAULT 0");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_thread_bindings_operation_key ON thread_bindings(work_item_id, agent_role, operation_id, operation_version)");
   }
 
   private getEventById(eventId: string): EventRow | undefined {
@@ -1060,8 +1240,8 @@ export class RuntimeDatabase {
     `).run({ loopInstanceId, terminalEventId, completedAt: now() });
   }
 
-  private markLoopExhausted(loopInstanceId: string, failureReason: string): void {
-    this.connection().prepare(`
+  private markLoopExhausted(loopInstanceId: string, failureReason: string): boolean {
+    const result = this.connection().prepare(`
       UPDATE loop_instances
       SET status = 'exhausted',
           failure_reason = @failureReason,
@@ -1069,6 +1249,134 @@ export class RuntimeDatabase {
           updated_at = @completedAt
       WHERE loop_instance_id = @loopInstanceId AND status = 'running'
     `).run({ loopInstanceId, failureReason, completedAt: now() });
+    return result.changes > 0;
+  }
+
+  private validateEventPayload(
+    eventType: string,
+    payload: Record<string, unknown>,
+    definitions: RuntimeDefinitions,
+    contracts: ContractRegistry,
+    options: { requireDefinition?: boolean } = {}
+  ): void {
+    if (definitions.eventDefinitions.length === 0) {
+      if (options.requireDefinition) {
+        throw new Error(`Runtime definitions are required to publish ${eventType}.`);
+      }
+      return;
+    }
+    const definition = definitions.eventDefinitions.find((candidate) => candidate.active && candidate.eventType === eventType);
+    if (!definition) {
+      throw new Error(`Active event definition was not found for ${eventType}.`);
+    }
+    if (!definition.dataContract) {
+      throw new Error(`Event type ${eventType} does not declare a data contract.`);
+    }
+    const validation = contracts.validate(definition.dataContract, payload, "event-data");
+    if (!validation.valid) {
+      const summary = validation.errors.map((error) => error.instancePath ? `${error.instancePath} ${error.message}` : error.message).join("; ");
+      throw new Error(`Event data failed contract ${validation.contractId}@${validation.contractVersion} validation${summary ? `: ${summary}` : "."}`);
+    }
+  }
+
+  private operationHashForDecision(decision: OperationRoutingDecision, operations: AgentOperation[]): string | null {
+    if (!decision.operationId || decision.operationVersion === undefined) return null;
+    const operation = operations.find((candidate) =>
+      candidate.id === decision.operationId &&
+      candidate.version === decision.operationVersion
+    );
+    return operation ? operationDefinitionHash(operation) : null;
+  }
+
+  private outputContractSnapshotForDecision(
+    decision: OperationRoutingDecision,
+    operations: AgentOperation[],
+    contracts: ContractDefinition[]
+  ): { id: string | null; version: number | null; hash: string | null } {
+    if (!decision.operationId || decision.operationVersion === undefined) return { id: null, version: null, hash: null };
+    const operation = operations.find((candidate) =>
+      candidate.id === decision.operationId &&
+      candidate.version === decision.operationVersion
+    );
+    if (!operation) return { id: null, version: null, hash: null };
+    const contract = contracts.find((candidate) =>
+      candidate.id === operation.outputContract.id &&
+      candidate.version === operation.outputContract.version
+    );
+    return {
+      id: operation.outputContract.id,
+      version: operation.outputContract.version,
+      hash: contract ? contractSchemaHash(contract) : null
+    };
+  }
+
+  private insertLoopLimitExceededEvent(input: {
+    loopInstanceId: string;
+    loop: LoopDefinition;
+    projectId: string;
+    subject: string;
+    correlationId: string;
+    causationId: string;
+    correlationDepth: number;
+    reason: string;
+    definitions: RuntimeDefinitions;
+  }): void {
+    const eventType = input.loop.onLimitExceeded?.eventType;
+    if (!eventType) return;
+    const dedupeKey = `loop-exhausted:${input.loopInstanceId}:${eventType}`;
+    if (this.getEventByDedupeKey(dedupeKey)) return;
+
+    const definition = input.definitions.eventDefinitions.find((candidate) => candidate.active && candidate.eventType === eventType);
+    if (!definition?.dataContract) return;
+    const payload = { reason: input.reason };
+    let validation;
+    try {
+      validation = new ContractRegistry(input.definitions.contracts).validate(definition.dataContract, payload, "event-data");
+    } catch {
+      return;
+    }
+    if (!validation.valid) return;
+
+    const eventId = uuid();
+    const occurredAt = now();
+    this.connection().prepare(`
+      INSERT INTO events (
+        event_id, type, source, subject, correlation_id, causation_id, dedupe_key,
+        correlation_depth, occurred_at, project_id, tags_json, status, matched_policy_id,
+        assigned_agent_id, routing_json, handling_result, loop_instance_id, loop_definition_id,
+        loop_definition_version, payload_json
+      )
+      VALUES (
+        @eventId, @type, @source, @subject, @correlationId, @causationId, @dedupeKey,
+        @correlationDepth, @occurredAt, @projectId, @tagsJson, 'handled', NULL,
+        NULL, @routingJson, @handlingResult, @loopInstanceId, @loopDefinitionId,
+        @loopDefinitionVersion, @payloadJson
+      )
+    `).run({
+      eventId,
+      type: eventType,
+      source: "agentd",
+      subject: input.subject,
+      correlationId: input.correlationId,
+      causationId: input.causationId,
+      dedupeKey,
+      correlationDepth: input.correlationDepth + 1,
+      occurredAt,
+      projectId: input.projectId,
+      tagsJson: stringifyJson(definition.tags),
+      loopInstanceId: input.loopInstanceId,
+      loopDefinitionId: input.loop.id,
+      loopDefinitionVersion: input.loop.version,
+      routingJson: stringifyJson({
+        matchedPolicies: 0,
+        routedRuns: 0,
+        skippedPolicies: 0,
+        decisions: [],
+        message: "Loop limit-exceeded event was emitted without routing to avoid recursive exhaustion."
+      }),
+      handlingResult: `Loop ${input.loopInstanceId} exhausted: ${input.reason}`,
+      payloadJson: stringifyJson(payload)
+    });
   }
 
   private loopDeadlineExceeded(row: LoopInstanceRow, loop: LoopDefinition): boolean {
@@ -1131,7 +1439,10 @@ export class RuntimeDatabase {
       matchedPolicyId: row.matched_policy_id ?? undefined,
       assignedAgentId: row.assigned_agent_id ?? undefined,
       routing: parseRoutingSummary(row.routing_json),
-      handlingResult: row.handling_result ?? undefined
+      handlingResult: row.handling_result ?? undefined,
+      loopInstanceId: row.loop_instance_id ?? undefined,
+      loopDefinitionId: row.loop_definition_id ?? undefined,
+      loopDefinitionVersion: row.loop_definition_version ?? undefined
     };
   }
 
@@ -1158,6 +1469,9 @@ export class RuntimeDatabase {
       assignedAgentId: event.assignedAgentId,
       routing: event.routing,
       handlingResult: event.handlingResult,
+      loopInstanceId: event.loopInstanceId,
+      loopDefinitionId: event.loopDefinitionId,
+      loopDefinitionVersion: event.loopDefinitionVersion,
       createdAt: event.occurredAt
     };
   }
@@ -1177,6 +1491,7 @@ export class RuntimeDatabase {
       correlationId: row.correlation_id ?? undefined,
       operationId: row.operation_id ?? undefined,
       operationVersion: row.operation_version ?? undefined,
+      operationHash: row.operation_hash ?? undefined,
       inputJson: parseJsonValue(row.input_json),
       inputContractId: row.input_contract_id ?? undefined,
       inputContractVersion: row.input_contract_version ?? undefined,
@@ -1185,6 +1500,7 @@ export class RuntimeDatabase {
       outputContractId: row.output_contract_id ?? undefined,
       outputContractVersion: row.output_contract_version ?? undefined,
       outputContractHash: row.output_contract_hash ?? undefined,
+      outputValidationErrorsJson: parseJsonRecordArray(row.output_validation_errors_json),
       routingPolicyHash: row.routing_policy_hash ?? undefined,
       routingDecisionJson: parseJsonRecord(row.routing_decision_json),
       emissionDecisionsJson: parseJsonRecordArray(row.emission_decisions_json),
@@ -1199,7 +1515,7 @@ export class RuntimeDatabase {
       leaseUntil: row.lease_until ?? undefined,
       threadId: row.thread_id ?? undefined,
       turnId: row.turn_id ?? undefined,
-      outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
+      outcome: row.outcome_json ? JSON.parse(row.outcome_json) as unknown : undefined,
       error: row.error ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

@@ -22,6 +22,6 @@ export default defineConfig({
   },
   test: {
     root: __dirname,
-    include: ["backend/tests/**/*.test.ts", "frontend/tests/**/*.test.ts"]
+    include: ["backend/tests/**/*.test.ts", "frontend/tests/**/*.test.ts", "frontend/tests/**/*.test.tsx"]
   }
 });

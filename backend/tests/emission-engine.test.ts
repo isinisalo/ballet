@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { evaluateEmissionPolicies } from "../emission-engine.js";
+import { EmissionEngineError, evaluateEmissionPolicies } from "../emission-engine.js";
 import { ContractRegistry } from "../shared/contracts.js";
 import type { ContractDefinition } from "../shared/contracts.js";
 import type { EventDefinition, AgentRun, RuntimeEvent } from "../shared/domain.js";
@@ -168,5 +168,95 @@ describe("emission engine", () => {
       contracts: new ContractRegistry(contracts)
     })).toThrow("Emission gate failed");
   });
-});
 
+  it("fails completed emission-required operations when no event is emitted", () => {
+    try {
+      evaluateEmissionPolicies({
+        projectRoot: process.cwd(),
+        operation,
+        run,
+        trigger,
+        input: { workItemId: "work-1" },
+        output: {
+          status: "completed",
+          summary: "Implemented.",
+          result: { gitSha: head, changedFiles: [] },
+          evidence: { checks: [{ name: "npm test", status: "passed" }] }
+        },
+        policies: [{ ...policy, when: { path: "/output/status", op: "eq", value: "blocked" } }],
+        eventDefinitions,
+        contracts: new ContractRegistry(contracts)
+      });
+      throw new Error("Expected required emission to fail.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(EmissionEngineError);
+      expect(error).toMatchObject({
+        message: "Operation developer-agent/implement-change@1 requires at least one emitted event for completed output.",
+        decisions: [expect.objectContaining({
+          status: "skipped",
+          reason: "Emission condition did not match."
+        })]
+      });
+    }
+  });
+
+  it("allows completed operations without events when emission is optional", () => {
+    const result = evaluateEmissionPolicies({
+      projectRoot: process.cwd(),
+      operation: { ...operation, emissionRequired: false },
+      run,
+      trigger,
+      input: { workItemId: "work-1" },
+      output: {
+        status: "completed",
+        summary: "Implemented.",
+        result: {},
+        evidence: {}
+      },
+      policies: [],
+      eventDefinitions,
+      contracts: new ContractRegistry(contracts)
+    });
+
+    expect(result).toEqual({
+      decisions: [],
+      events: []
+    });
+  });
+
+  it("reports subject and tag mappings with invalid value types", () => {
+    expect(() => evaluateEmissionPolicies({
+      projectRoot: process.cwd(),
+      operation,
+      run,
+      trigger,
+      input: { workItemId: { nested: true } },
+      output: {
+        status: "completed",
+        summary: "Implemented.",
+        result: { gitSha: head, changedFiles: [] },
+        evidence: { checks: [{ name: "npm test", status: "passed" }] }
+      },
+      policies: [policy],
+      eventDefinitions,
+      contracts: new ContractRegistry(contracts)
+    })).toThrow("subject mapping must produce a string");
+
+    expect(() => evaluateEmissionPolicies({
+      projectRoot: process.cwd(),
+      operation,
+      run,
+      trigger,
+      input: { workItemId: "work-1" },
+      output: {
+        status: "completed",
+        summary: "Implemented.",
+        result: { gitSha: head, changedFiles: [] },
+        evidence: { checks: [{ name: "npm test", status: "passed" }] }
+      },
+      policies: [{ ...policy, emissions: [{ ...policy.emissions[0]!, tags: { const: "delivery" } }] }],
+      eventDefinitions,
+      contracts: new ContractRegistry(contracts)
+    })).toThrow("tags mapping must produce an array of strings");
+  });
+});

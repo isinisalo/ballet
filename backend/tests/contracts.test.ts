@@ -56,6 +56,10 @@ const outputContract: ContractDefinition = {
         properties: {
           gitSha: { type: "string" }
         }
+      },
+      evidence: {
+        type: "object",
+        additionalProperties: true
       }
     }
   }
@@ -121,6 +125,20 @@ describe("contract registry", () => {
         }
       }
     ])).toThrow("must require status and summary");
+
+    expect(() => new ContractRegistry([
+      {
+        ...outputContract,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["status", "summary"],
+          properties: {
+            status: { type: "string", enum: ["completed", "blocked", "needs_input", "failed"] },
+            summary: { type: "string" }
+          }
+        }
+      }
+    ])).toThrow("must define status, summary, result, and evidence");
   });
 });
-

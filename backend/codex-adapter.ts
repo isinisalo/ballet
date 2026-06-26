@@ -28,6 +28,8 @@ export interface CodexRunOptions {
   runId: string;
   workItemId: string;
   agentRole: string;
+  operationId: string;
+  operationVersion: number;
   agent: Agent;
   prompt: string;
   outputSchema: Record<string, unknown>;
@@ -170,11 +172,11 @@ const exists = async (filePath: string): Promise<boolean> => {
   }
 };
 
-const prepareCodexHome = async (projectRoot: string, workItemId: string, agentRole: string): Promise<string> => {
+const prepareCodexHome = async (projectRoot: string, workItemId: string, agentRole: string, operationId: string, operationVersion: number): Promise<string> => {
   const homeRoot = process.env.BALLET_CODEX_HOME_ROOT
     ? path.resolve(projectRoot, process.env.BALLET_CODEX_HOME_ROOT)
     : path.join(projectRoot, "data", "codex-home");
-  const codexHome = path.join(homeRoot, `${safePathPart(workItemId)}-${safePathPart(agentRole)}`);
+  const codexHome = path.join(homeRoot, `${safePathPart(workItemId)}-${safePathPart(agentRole)}-${safePathPart(operationId)}-v${operationVersion}`);
   await mkdir(codexHome, { recursive: true });
 
   const sourceHome = process.env.BALLET_CODEX_HOME_TEMPLATE
@@ -249,7 +251,7 @@ export const parseAgentJsonText = (text: string): JsonValue => {
 
 export const runCodexAgent = async (options: CodexRunOptions): Promise<CodexRunResult> => {
   const onLog = options.onLog ?? (() => undefined);
-  const codexHome = await prepareCodexHome(options.projectRoot, options.workItemId, options.agentRole);
+  const codexHome = await prepareCodexHome(options.projectRoot, options.workItemId, options.agentRole, options.operationId, options.operationVersion);
   const proc = spawn(options.codexCommand ?? "codex", ["app-server", "--listen", "stdio://"], {
     cwd: options.projectRoot,
     env: { ...process.env, CODEX_HOME: codexHome },

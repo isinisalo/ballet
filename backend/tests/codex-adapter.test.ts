@@ -154,6 +154,8 @@ const runFixture = async (scenario: string, resumeThreadId?: string) => {
     runId: "run-1",
     workItemId: "work-1",
     agentRole: "developer-agent",
+    operationId: "developer-agent/implement-change",
+    operationVersion: 1,
     agent,
     prompt: "Return schema JSON.",
     outputSchema: {

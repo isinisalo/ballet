@@ -1,21 +1,19 @@
-# AgentOps MVP
+# Ballet
 
-Minimal TypeScript web application for managing projects, goals, ADRs, agents, skills, runtimes, contract-driven routing, explicit emissions, loop tracking, and routed event intake.
+Ballet is a local TypeScript application for designing and running contract-driven agent Flows. The normal UI is organized around human-readable Flows, Runs, and Agents while the canonical project resources remain explicit contracts, routing rules, operations, emission rules, event definitions, and loop definitions.
 
 ## Stack
 
 - React + Vite for the app UI.
 - Express for the local API, including `/api/events/intake`.
 - Project-local TOML/Markdown persistence under `.codex/agents`, `.agents/skills`, and `.ballet/*`.
-- Vitest for contract, mapping, routing, emission, loop, and adapter tests.
-
-The repository was empty, so this stack was chosen as a small full-stack TypeScript default that supports both browser workflows and API event intake without external services.
+- Vitest for Flow projection/composition, contract, mapping, routing, emission, loop, trace, and adapter tests.
 
 ## Repository Structure
 
 - `frontend/` contains the React + Vite UI.
 - `backend/` contains the Express API server.
-- `backend/shared/` contains domain types, contracts, policies, operations, loops, and seed data shared by the UI and API.
+- `backend/shared/` contains domain types, contracts, routing policies, emission policies, operations, loops, Flow view models, and seed data shared by the UI and API.
 - `backend/tests/` contains Vitest tests for backend and shared behavior.
 - `data/`, `audit/`, and `.fixture-ballet-project/` contain project data, visual audit artifacts, and fixtures.
 
@@ -54,20 +52,22 @@ EVENT -> ROUTING POLICY -> AGENT INPUT -> AGENT OPERATION -> AGENT OUTPUT -> EMI
 - The agent prompt contains operation instructions and mapped input only. Event IDs, event types, policy IDs, run IDs, correlation IDs, and loop metadata are not injected unless they are explicitly mapped into the input contract.
 - Agent output is parsed as JSON and validated against the selected operation output contract. Runtime status uses `status: completed | blocked | needs_input | failed`; domain decisions belong under `result`.
 - Emission policies observe one operation version, evaluate deterministic conditions and technical gates, map validated output into event data, validate the target event contract, and publish explicit events transactionally with run completion.
-- Loop Engineering groups routing and emission policies into durable loop definitions. Runtime loop instances track correlation, hop/run counts, terminal events, and exhausted limits.
+- Flows use `LoopDefinition` membership to group routing and emission policies. Runtime loop instances track correlation, hop/run counts, terminal events, and exhausted limits.
 
-## Configuration Migration
+## Canonical Resources
 
-Legacy event `producers` and policy `match/action` relationships were migrated to:
+Current Ballet resources are stored as version-aware Markdown files:
 
 - Contracts in `.ballet/contracts`
 - Operations in `.ballet/operations`
+- Event definitions in `.ballet/events`
 - Routing policies in `.ballet/policies`
 - Emission policies in `.ballet/emissions`
 - Loop definitions in `.ballet/loops`
-- Event definitions with `dataContract` instead of producer authorization
 
-The checked-in delivery example now routes:
+Flows are projections over those resources. Saving a Flow creates or updates the underlying contracts, operations, routing rules, emission rules, and loop membership together; it does not create a second workflow graph.
+
+The checked-in delivery Flow routes:
 
 ```text
 plan.approved.v1

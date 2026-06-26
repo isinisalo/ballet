@@ -143,6 +143,61 @@ describe("Markdown collection loading", () => {
     expect(skills[0]?.title).toBe("fixture-skill");
   });
 
+  it("does not surface legacy producers on normal event definitions", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".ballet/events"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/events/legacy-produced.md"), `---
+id: legacy-produced
+name: Legacy produced event
+active: true
+eventType: legacy.produced.v1
+producers:
+  - agentRole: developer-agent
+    outcomes:
+      - ready
+---
+
+Legacy event with obsolete producer metadata.
+`, "utf8");
+
+    const data = await loadMarkdownAppData(root);
+    const definition = data.eventDefinitions.find((event) => event.id === "legacy-produced");
+
+    expect(definition).toMatchObject({
+      id: "legacy-produced",
+      eventType: "legacy.produced.v1"
+    });
+    expect(definition).not.toHaveProperty("producers");
+  });
+
+  it("does not translate legacy routing match/action frontmatter into operation refs", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".ballet/policies"), { recursive: true });
+    await writeFile(path.join(root, ".ballet/policies/legacy-policy.md"), `---
+id: legacy-policy
+name: Legacy policy
+kind: RoutingPolicy
+match:
+  eventTypes:
+    - legacy.started.v1
+action:
+  type: start_agent_run
+  targetAgentId: developer-agent
+---
+
+Legacy policy with obsolete match/action metadata.
+`, "utf8");
+
+    const data = await loadMarkdownAppData(root);
+    const policy = data.policies.find((candidate) => candidate.id === "legacy-policy");
+
+    expect(policy).toMatchObject({
+      id: "legacy-policy",
+      consumes: { eventType: "" },
+      dispatch: { operation: { id: "", version: 1 } }
+    });
+  });
+
   it("loads agent TOML skills.config entries with resolved SKILL.md names and disabled state", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".codex/agents"), { recursive: true });

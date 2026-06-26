@@ -43,6 +43,8 @@ describe.skipIf(process.env.RUN_CODEX_SMOKE !== "1")("Codex app-server smoke", (
       runId: "smoke-run",
       workItemId: "smoke-work",
       agentRole: "developer-agent",
+      operationId: "developer-agent/implement-change",
+      operationVersion: 1,
       agent,
       projectRoot: root,
       timeoutMs: 120000,

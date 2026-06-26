@@ -131,6 +131,34 @@ const evaluateGate = (gate: EmissionGate, context: unknown, projectRoot: string)
 const eventDefinitionFor = (definitions: EventDefinition[], eventType: string): EventDefinition | undefined =>
   definitions.find((definition) => definition.active && definition.eventType === eventType);
 
+const evaluateOptionalStringMapping = (
+  expression: EmissionPolicy["emissions"][number]["subject"],
+  context: unknown,
+  policyId: string,
+  location: string
+): string | undefined => {
+  if (!expression) return undefined;
+  const value = evaluateMapping(expression, context, { policyId }, location);
+  if (typeof value !== "string") {
+    throw new Error(`${location} mapping must produce a string.`);
+  }
+  return value;
+};
+
+const evaluateTagsMapping = (
+  expression: EmissionPolicy["emissions"][number]["tags"],
+  context: unknown,
+  policyId: string,
+  location: string
+): string[] => {
+  if (!expression) return [];
+  const value = evaluateMapping(expression, context, { policyId }, location);
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error(`${location} mapping must produce an array of strings.`);
+  }
+  return value;
+};
+
 export const evaluateEmissionPolicies = (input: EmissionEngineInput): EmissionEngineResult => {
   const context = contextFor(input);
   const decisions: EmissionDecision[] = [];
@@ -201,13 +229,8 @@ export const evaluateEmissionPolicies = (input: EmissionEngineInput): EmissionEn
           throw new EmissionEngineError(`Emission ${policy.id}/${emission.slot} failed event data contract validation.`, decisions);
         }
 
-        const subject = emission.subject
-          ? String(evaluateMapping(emission.subject, context, { policyId: policy.id }, `emissions.${emission.slot}.subject`))
-          : undefined;
-        const rawTags = emission.tags
-          ? evaluateMapping(emission.tags, context, { policyId: policy.id }, `emissions.${emission.slot}.tags`)
-          : [];
-        const tags = Array.isArray(rawTags) ? rawTags.map(String) : [];
+        const subject = evaluateOptionalStringMapping(emission.subject, context, policy.id, `emissions.${emission.slot}.subject`);
+        const tags = evaluateTagsMapping(emission.tags, context, policy.id, `emissions.${emission.slot}.tags`);
         const dedupeKey = emission.dedupeKey?.template
           ? String(evaluateMapping({ template: emission.dedupeKey.template }, context, { policyId: policy.id }, `emissions.${emission.slot}.dedupeKey`))
           : `emission:${input.run.runId}:${policy.id}:${policy.version}:${emission.slot}`;
@@ -249,4 +272,3 @@ export const evaluateEmissionPolicies = (input: EmissionEngineInput): EmissionEn
 
   return { decisions, events };
 };
-

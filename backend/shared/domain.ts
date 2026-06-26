@@ -11,47 +11,12 @@ export type EventStatus = "received" | "routed" | "unassigned" | "handled";
 export type AgentStatus = "online" | "offline";
 export type RuntimeType = "codex-cli" | "custom";
 export type AgentRunStatus = "queued" | "running" | "completed" | "failed" | "blocked" | "needs_input" | "cancelled";
-export type AgentOutcomeStatus = "ready" | "blocked" | "needs_input" | "approved" | "changes_requested" | "failed";
-export type RunCheckStatus = "passed" | "failed" | "skipped";
-export type PolicyPredicateOperator = "equals" | "in" | "exists";
-export type PolicyPredicateScalar = string | number | boolean | null;
-
-export interface EventProducerRequirements {
-  gitCommitExists?: boolean;
-  requiredChecksPassed?: boolean;
-}
-
-export interface EventProducerDefinition {
-  agentRole: string;
-  outcomes: AgentOutcomeStatus[];
-  requires?: EventProducerRequirements;
-}
-
-export interface PolicyPredicate {
-  operator: PolicyPredicateOperator;
-  value?: PolicyPredicateScalar | PolicyPredicateScalar[];
-}
-
-export interface PolicyMatch {
-  eventTypes?: string[];
-  projectId?: string | PolicyPredicate;
-  source?: string | PolicyPredicate;
-  subject?: string | PolicyPredicate;
-  tags?: string[] | PolicyPredicate;
-  payload?: Record<string, PolicyPredicate | PolicyPredicateScalar | PolicyPredicateScalar[]>;
-}
-
-export interface PolicyAction {
-  type: "start_agent_run";
-  targetAgentId: string;
-}
 
 export interface EventRoutingPolicyDecision {
   policyId: string;
   policyName: string;
   policyVersion: number;
   policyHash?: string;
-  targetAgentId?: string;
   agentId?: string;
   operationId?: string;
   operationVersion?: number;
@@ -203,27 +168,6 @@ export interface Runtime {
   errors?: string[];
 }
 
-export interface Policy {
-  id: string;
-  name: string;
-  description: string;
-  active: boolean;
-  match?: PolicyMatch;
-  action?: PolicyAction;
-  projectId: string | "*";
-  eventTypes: string[];
-  source: string;
-  payloadMetadata: Record<string, string>;
-  targetAgentId: string;
-  createdAt: string;
-  updatedAt: string;
-  frontmatter?: Record<string, unknown>;
-  body?: string;
-  relativePath?: string;
-  slug?: string;
-  errors?: string[];
-}
-
 export interface EventDefinition {
   id: string;
   name: string;
@@ -234,7 +178,6 @@ export interface EventDefinition {
   tags: string[];
   dataContract?: VersionedRef;
   examples: Record<string, unknown>[];
-  producers?: EventProducerDefinition[];
   payloadExample?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -267,6 +210,9 @@ export interface EventRecord {
   assignedAgentId?: string;
   routing?: EventRoutingSummary;
   handlingResult?: string;
+  loopInstanceId?: string;
+  loopDefinitionId?: string;
+  loopDefinitionVersion?: number;
   createdAt: string;
   frontmatter?: Record<string, unknown>;
   body?: string;
@@ -295,23 +241,9 @@ export interface RuntimeEvent {
   assignedAgentId?: string;
   routing?: EventRoutingSummary;
   handlingResult?: string;
-}
-
-export interface RunCheck {
-  name: string;
-  status: RunCheckStatus;
-  details?: string;
-}
-
-export interface AgentOutcome {
-  outcome: AgentOutcomeStatus;
-  summary: string;
-  artifacts?: {
-    git_sha?: string;
-    changed_files?: string[];
-    [key: string]: unknown;
-  };
-  checks: RunCheck[];
+  loopInstanceId?: string;
+  loopDefinitionId?: string;
+  loopDefinitionVersion?: number;
 }
 
 export interface AgentRun {
@@ -324,6 +256,7 @@ export interface AgentRun {
   correlationId?: string;
   operationId?: string;
   operationVersion?: number;
+  operationHash?: string;
   inputJson?: JsonValue;
   inputContractId?: string;
   inputContractVersion?: number;
@@ -332,6 +265,7 @@ export interface AgentRun {
   outputContractId?: string;
   outputContractVersion?: number;
   outputContractHash?: string;
+  outputValidationErrorsJson?: Record<string, unknown>[];
   routingPolicyHash?: string;
   routingDecisionJson?: Record<string, unknown>;
   emissionDecisionsJson?: Record<string, unknown>[];
@@ -346,7 +280,7 @@ export interface AgentRun {
   leaseUntil?: string;
   threadId?: string;
   turnId?: string;
-  outcome?: AgentOutcome;
+  outcome?: unknown;
   error?: string;
   createdAt: string;
   updatedAt: string;
@@ -409,13 +343,3 @@ export type CollectionName =
   | "emissionPolicies"
   | "loopDefinitions"
   | "events";
-
-export interface RouteDecision {
-  policyId: string;
-  policyName: string;
-  policyVersion: number;
-  targetAgentId: string;
-  status: "routed" | "skipped";
-  runId?: string;
-  reason: string;
-}

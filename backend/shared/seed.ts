@@ -205,7 +205,6 @@ export const seedData: AppData = {
       tags: ["kubernetes"],
       dataContract: { id: "deployment-failed-data", version: 1 },
       examples: [{ metadata: { severity: "high", service: "checkout-service" } }],
-      producers: [],
       payloadExample: {
         metadata: { severity: "high", service: "checkout-service" }
       },

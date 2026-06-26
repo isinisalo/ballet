@@ -72,11 +72,13 @@ const assertAgentOutputEnvelope = (contract: ContractDefinition): void => {
   const properties = outputEnvelopeProperties(contract.schema);
   const status = isRecord(properties.status) ? properties.status : undefined;
   const summary = isRecord(properties.summary) ? properties.summary : undefined;
+  const result = isRecord(properties.result) ? properties.result : undefined;
+  const evidence = isRecord(properties.evidence) ? properties.evidence : undefined;
   if (!required.includes("status") || !required.includes("summary")) {
     throw new ContractRegistryError(`Agent-output contract ${contract.id}@${contract.version} must require status and summary.`);
   }
-  if (!status || !summary) {
-    throw new ContractRegistryError(`Agent-output contract ${contract.id}@${contract.version} must define status and summary properties.`);
+  if (!status || !summary || !result || !evidence) {
+    throw new ContractRegistryError(`Agent-output contract ${contract.id}@${contract.version} must define status, summary, result, and evidence properties.`);
   }
 };
 

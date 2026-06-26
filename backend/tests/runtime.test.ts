@@ -3,12 +3,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, AgentOutcome, EventDefinition } from "../shared/domain.js";
+import type { Agent, EventDefinition } from "../shared/domain.js";
 import type { ContractDefinition } from "../shared/contracts.js";
 import type { AgentOperation } from "../shared/operations.js";
 import type { RoutingPolicy } from "../shared/routing-policy.js";
-import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
-import { checksPassRequiredGate, mapOutcomeToDomainEvent, parseAgentOutcomeText } from "../runtime-policy.js";
+import { RuntimeDatabase, isPatchedSqliteVersion, operationDefinitionHash } from "../runtime-db.js";
 import { routingPolicyVersion } from "../routing-engine.js";
 
 const tempRoots: string[] = [];
@@ -74,6 +73,19 @@ const contracts = [
   contract("review-input", "agent-input", looseInputSchema),
   contract("agent-output", "agent-output", agentOutputSchema)
 ];
+
+const changeImplementedEvent: EventDefinition = {
+  id: "change-implemented",
+  name: "Change implemented",
+  description: "A change was implemented.",
+  active: true,
+  eventType: "change.implemented.v1",
+  tags: [],
+  dataContract: { id: "change-implemented-data", version: 1 },
+  examples: [],
+  createdAt: at,
+  updatedAt: at
+};
 
 const developerOperation: AgentOperation = {
   id: "developer-agent/implement-change",
@@ -174,7 +186,7 @@ const runtimeDefinitions = (
   loopDefinitions: []
 });
 
-const readyOutcome: AgentOutcome = {
+const readyOutcome = {
   outcome: "ready",
   summary: "Change is implemented.",
   artifacts: {
@@ -182,41 +194,6 @@ const readyOutcome: AgentOutcome = {
     changed_files: ["backend/runtime-db.ts"]
   },
   checks: [{ name: "unit-tests", status: "passed" }]
-};
-
-const changeImplementedDefinition: EventDefinition = {
-  id: "change-implemented-v1",
-  name: "Change implemented",
-  description: "Developer agent completed an implementation.",
-  active: true,
-  eventType: "change.implemented.v1",
-  source: "agentd",
-  tags: ["delivery"],
-  dataContract: { id: "change-implemented-data", version: 1 },
-  examples: [],
-  producers: [{
-    agentRole: "developer-agent",
-    outcomes: ["ready"],
-    requires: {
-      gitCommitExists: true,
-      requiredChecksPassed: true
-    }
-  }],
-  payloadExample: {},
-  createdAt: "2026-06-24T08:00:00.000Z",
-  updatedAt: "2026-06-24T08:00:00.000Z"
-};
-
-const reviewApprovedDefinition: EventDefinition = {
-  ...changeImplementedDefinition,
-  id: "review-approved-v1",
-  name: "Review approved",
-  description: "Reviewer approved a change.",
-  eventType: "review.approved.v1",
-  producers: [{
-    agentRole: "architecture-reviewer",
-    outcomes: ["approved"]
-  }]
 };
 
 describe("runtime database", () => {
@@ -346,7 +323,10 @@ describe("runtime database", () => {
         type: "change.implemented.v1",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
-      definitions: runtimeDefinitions([], [])
+      definitions: {
+        ...runtimeDefinitions([], []),
+        eventDefinitions: [changeImplementedEvent]
+      }
     });
 
     expect(completed.run.status).toBe("completed");
@@ -354,6 +334,46 @@ describe("runtime database", () => {
     expect(db.listRuntimeEvents()).toHaveLength(2);
 
     expect(() => db.retryRun(leased!.runId)).toThrow("cannot be retried");
+    db.close();
+  });
+
+  it("fails completed domain-event publication when runtime definitions are missing", async () => {
+    const root = await tempRoot();
+    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    db.intakeEvent({
+      projectId: "project",
+      eventType: "plan.approved.v1",
+      source: "test",
+      subject: "work-1",
+      payload: {}
+    }, runtimeDefinitions([policy], [agent]));
+
+    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
+    const completed = db.completeRun({
+      runId: leased!.runId,
+      status: "completed",
+      outcome: readyOutcome,
+      domainEvent: {
+        type: "change.implemented.v1",
+        payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
+      },
+      definitions: runtimeDefinitions([], [])
+    });
+
+    expect(completed.event).toBeUndefined();
+    expect(completed.run.status).toBe("failed");
+    expect(completed.run.error).toBe("Runtime definitions are required to publish change.implemented.v1.");
+    expect(db.listRuntimeEvents()).toHaveLength(1);
+    expect(db.listRunLogs(leased!.runId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        level: "error",
+        message: "Domain event publication failed.",
+        data: expect.objectContaining({
+          event_type: "change.implemented.v1",
+          error: "Runtime definitions are required to publish change.implemented.v1."
+        })
+      })
+    ]));
     db.close();
   });
 
@@ -377,7 +397,10 @@ describe("runtime database", () => {
         type: "change.implemented.v1",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
-      definitions: runtimeDefinitions([policy, architectureReviewPolicy, qaReviewPolicy], [agent, architectureAgent, qaAgent])
+      definitions: {
+        ...runtimeDefinitions([policy, architectureReviewPolicy, qaReviewPolicy], [agent, architectureAgent, qaAgent]),
+        eventDefinitions: [changeImplementedEvent]
+      }
     });
 
     expect(completed.run.status).toBe("completed");
@@ -442,45 +465,287 @@ describe("runtime database", () => {
     });
 
     expect(completed.event).toBeUndefined();
+    expect(completed.run.status).toBe("failed");
     expect(completed.runs).toEqual([]);
     expect(db.listRuntimeEvents()).toHaveLength(1);
     expect(db.listRunLogs(leased!.runId).some((log) => log.level === "warn" && log.message.includes("correlation depth"))).toBe(true);
     db.close();
   });
-});
 
-describe("runtime outcome policy", () => {
-  it("validates structured agent outcome JSON", () => {
-    expect(parseAgentOutcomeText(JSON.stringify(readyOutcome))).toEqual(readyOutcome);
-    expect(() => parseAgentOutcomeText("{bad json")).toThrow("not valid JSON");
+  it("fails a completed run atomically when published event data violates its contract", async () => {
+    const root = await tempRoot();
+    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    db.intakeEvent({
+      projectId: "project",
+      eventType: "plan.approved.v1",
+      source: "test",
+      subject: "work-1",
+      payload: {}
+    }, runtimeDefinitions([policy], [agent]));
+
+    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
+    const strictChangeImplemented = contract("change-implemented-data", "event-data", {
+      type: "object",
+      additionalProperties: false,
+      required: ["summary"],
+      properties: {
+        summary: { type: "string" }
+      }
+    });
+    const completed = db.completeRun({
+      runId: leased!.runId,
+      status: "completed",
+      outcome: readyOutcome,
+      domainEvent: {
+        type: "change.implemented.v1",
+        payload: { summary: 42 }
+      },
+      definitions: {
+        ...runtimeDefinitions([], []),
+        contracts: contracts.map((item) => item.id === "change-implemented-data" ? strictChangeImplemented : item),
+        eventDefinitions: [changeImplementedEvent]
+      }
+    });
+
+    expect(completed.event).toBeUndefined();
+    expect(completed.run.status).toBe("failed");
+    expect(completed.run.error).toContain("Event data failed contract change-implemented-data@1 validation");
+    expect(db.listRuntimeEvents()).toHaveLength(1);
+    expect(db.listRunLogs(leased!.runId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        level: "error",
+        message: "Domain event publication failed.",
+        data: expect.objectContaining({
+          event_type: "change.implemented.v1",
+          error: expect.stringContaining("Event data failed contract change-implemented-data@1 validation")
+        })
+      })
+    ]));
+    db.close();
   });
 
-  it("maps developer ready outcomes only after deterministic validation", () => {
-    expect(checksPassRequiredGate(readyOutcome.checks)).toBe(true);
-    expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
-      gitCommitExists: false,
-      requiredChecksPassed: true
-    }, [changeImplementedDefinition])).toBeUndefined();
-    expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
-      gitCommitExists: true,
-      requiredChecksPassed: true
-    }, [])).toBeUndefined();
-    expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
-      gitCommitExists: true,
-      requiredChecksPassed: true
-    }, [changeImplementedDefinition])?.type).toBe("change.implemented.v1");
+  it("does not commit earlier downstream events when a later publication fails contract validation", async () => {
+    const root = await tempRoot();
+    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    db.intakeEvent({
+      projectId: "project",
+      eventType: "plan.approved.v1",
+      source: "test",
+      subject: "work-1",
+      payload: {}
+    }, runtimeDefinitions([policy], [agent]));
+
+    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
+    const reviewData = contract("review-data", "event-data", {
+      type: "object",
+      additionalProperties: false,
+      required: ["approved"],
+      properties: {
+        approved: { type: "boolean" }
+      }
+    });
+    const reviewEvent = {
+      ...changeImplementedEvent,
+      id: "review-approved",
+      name: "Review approved",
+      eventType: "review.approved.v1",
+      dataContract: { id: "review-data", version: 1 }
+    };
+
+    const completed = db.completeRun({
+      runId: leased!.runId,
+      status: "completed",
+      outcome: readyOutcome,
+      domainEvents: [
+        {
+          type: "change.implemented.v1",
+          payload: { summary: "Valid first event." }
+        },
+        {
+          type: "review.approved.v1",
+          payload: { approved: "yes" }
+        }
+      ],
+      definitions: {
+        ...runtimeDefinitions([], []),
+        contracts: [...contracts, reviewData],
+        eventDefinitions: [changeImplementedEvent, reviewEvent]
+      }
+    });
+
+    expect(completed.event).toBeUndefined();
+    expect(completed.runs).toEqual([]);
+    expect(completed.run.status).toBe("failed");
+    expect(completed.run.error).toContain("Event data failed contract review-data@1 validation");
+    expect(db.listRuntimeEvents()).toHaveLength(1);
+    expect(db.listRuntimeEvents()[0]?.type).toBe("plan.approved.v1");
+    expect(db.listRunLogs(leased!.runId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        level: "error",
+        message: "Domain event publication failed.",
+        data: expect.objectContaining({
+          event_type: "review.approved.v1",
+          error: expect.stringContaining("Event data failed contract review-data@1 validation")
+        })
+      })
+    ]));
+    db.close();
   });
 
-  it("maps reviewer roles only through matching event definitions", () => {
-    const mapping = mapOutcomeToDomainEvent("architecture-reviewer", {
-      outcome: "approved",
-      summary: "Looks good.",
-      checks: [{ name: "review", status: "passed" }]
-    }, {
-      gitCommitExists: true,
-      requiredChecksPassed: true
-    }, [changeImplementedDefinition, reviewApprovedDefinition]);
+  it("clears stale current-attempt state when retrying a run", async () => {
+    const root = await tempRoot();
+    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    db.intakeEvent({
+      projectId: "project",
+      eventType: "plan.approved.v1",
+      source: "test",
+      subject: "work-1",
+      payload: {}
+    }, runtimeDefinitions([policy], [agent]));
 
-    expect(mapping?.type).toBe("review.approved.v1");
+    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
+    db.completeRun({
+      runId: leased!.runId,
+      status: "failed",
+      output: false,
+      outputContractId: "agent-output",
+      outputContractVersion: 1,
+      outputContractHash: "stale",
+      outputValidationErrors: [{
+        instancePath: "/summary",
+        schemaPath: "#/properties/summary/type",
+        message: "must be string",
+        keyword: "type"
+      }],
+      emissionDecisions: [{ status: "failed" }],
+      error: "boom"
+    });
+
+    const retried = db.retryRun(leased!.runId);
+    const retryLog = db.listRunLogs(leased!.runId).find((log) => log.message.includes("retry"));
+    const priorAttempt = retryLog?.data?.prior_attempt as Record<string, unknown> | undefined;
+    expect(retried).toMatchObject({
+      status: "queued",
+      outputJson: undefined,
+      outputContractId: undefined,
+      outputContractVersion: undefined,
+      outputContractHash: undefined,
+      outputValidationErrorsJson: undefined,
+      emissionDecisionsJson: undefined,
+      error: undefined
+    });
+    expect(priorAttempt).toMatchObject({
+      previous_status: "failed",
+      previous_attempt: 1,
+      output_json: false,
+      output_contract: { id: "agent-output", version: 1, hash: "stale" },
+      output_validation_errors: [{
+        instancePath: "/summary",
+        schemaPath: "#/properties/summary/type",
+        message: "must be string",
+        keyword: "type"
+      }],
+      emission_decisions: [{ status: "failed" }],
+      completion_error: "boom",
+      cleared_state: {
+        output: true,
+        output_contract: true,
+        output_validation_errors: true,
+        emission_decisions: true,
+        completion_error: true
+      }
+    });
+    db.close();
+  });
+
+  it("persists structured output validation errors on failed runs", async () => {
+    const root = await tempRoot();
+    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    db.intakeEvent({
+      projectId: "project",
+      eventType: "plan.approved.v1",
+      source: "test",
+      subject: "work-1",
+      payload: {}
+    }, runtimeDefinitions([policy], [agent]));
+
+    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
+    const completed = db.completeRun({
+      runId: leased!.runId,
+      status: "failed",
+      output: { status: "completed" },
+      outputContractId: "agent-output",
+      outputContractVersion: 1,
+      outputContractHash: "hash",
+      outputValidationErrors: [{
+        instancePath: "",
+        schemaPath: "#/required",
+        message: "must have required property 'summary'",
+        keyword: "required"
+      }],
+      error: "Agent output failed contract agent-output@1 validation."
+    });
+
+    expect(completed.run.outputValidationErrorsJson).toEqual([{
+      instancePath: "",
+      schemaPath: "#/required",
+      message: "must have required property 'summary'",
+      keyword: "required"
+    }]);
+    expect(db.getRun(leased!.runId)?.outputValidationErrorsJson).toEqual(completed.run.outputValidationErrorsJson);
+    db.close();
+  });
+
+  it("binds reusable threads by work item, agent, operation, and version", async () => {
+    const root = await tempRoot();
+    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    db.upsertThreadBinding("work-1", "developer-agent", "thread-legacy");
+    db.upsertThreadBinding("work-1", "developer-agent", "thread-implement", "developer-agent/implement-change", 1);
+    db.upsertThreadBinding("work-1", "developer-agent", "thread-review", "architecture-reviewer/review-change", 1);
+
+    expect(db.getThreadBinding("work-1", "developer-agent", "developer-agent/implement-change", 1)).toBe("thread-implement");
+    expect(db.getThreadBinding("work-1", "developer-agent", "architecture-reviewer/review-change", 1)).toBe("thread-review");
+    expect(db.getThreadBinding("work-1", "developer-agent", "qa-verification-reviewer/verify-change", 1)).toBeUndefined();
+    expect(db.getThreadBinding("work-1", "developer-agent")).toBe("thread-legacy");
+    db.close();
+  });
+
+  it("persists falsy JSON output and outcome values with operation snapshots", async () => {
+    const root = await tempRoot();
+    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    db.intakeEvent({
+      projectId: "project",
+      eventType: "plan.approved.v1",
+      source: "test",
+      subject: "work-1",
+      payload: {}
+    }, runtimeDefinitions([policy], [agent]));
+
+    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
+    expect(leased?.operationHash).toBe(operationDefinitionHash(developerOperation));
+    expect(leased?.outputContractHash).toBeTruthy();
+    const completed = db.completeRun({
+      runId: leased!.runId,
+      status: "failed",
+      output: false,
+      outcome: false,
+      error: "failed"
+    });
+
+    expect(completed.run.outputJson).toBe(false);
+
+    const retried = db.retryRun(leased!.runId);
+    const completedWithNull = db.completeRun({
+      runId: retried.runId,
+      status: "failed",
+      output: null,
+      outcome: null,
+      error: "failed again"
+    });
+
+    expect(completed.run.outcome).toBe(false);
+    expect(completedWithNull.run.outputJson).toBeNull();
+    expect(completedWithNull.run.outcome).toBeNull();
+    db.close();
   });
 });

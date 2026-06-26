@@ -3,11 +3,12 @@ import { fileURLToPath } from "node:url";
 import type { Agent, AgentRun, AppData, RuntimeEvent } from "./shared/domain.js";
 import type { AgentOperation } from "./shared/operations.js";
 import type { JsonValue } from "./shared/json.js";
-import { ContractRegistry, ContractRegistryError } from "./shared/contracts.js";
+import { ContractRegistry, ContractRegistryError, contractSchemaHash } from "./shared/contracts.js";
 import { store } from "./store.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 import { runCodexAgent } from "./codex-adapter.js";
 import { EmissionEngineError, evaluateEmissionPolicies } from "./emission-engine.js";
+import { operationDefinitionHash } from "./runtime-db.js";
 
 const workerId = process.env.BALLET_AGENTD_WORKER_ID ?? `agentd-${process.pid}`;
 
@@ -55,6 +56,40 @@ const runStatusFromOutput = (output: JsonValue): "completed" | "blocked" | "need
   return "failed";
 };
 
+export const assertQueuedSnapshotMatches = (run: AgentRun, operation: AgentOperation, registry: ContractRegistry): void => {
+  const currentOperationHash = operationDefinitionHash(operation);
+  if (run.operationHash && run.operationHash !== currentOperationHash) {
+    throw new Error(`Queued operation snapshot for ${operation.id}@${operation.version} no longer matches the current resource.`);
+  }
+  const inputContract = registry.require(operation.inputContract, "agent-input");
+  const inputContractHash = contractSchemaHash(inputContract);
+  if (run.inputContractHash && run.inputContractHash !== inputContractHash) {
+    throw new Error(`Queued input contract snapshot for ${operation.inputContract.id}@${operation.inputContract.version} no longer matches the current schema.`);
+  }
+  const outputContract = registry.require(operation.outputContract, "agent-output");
+  const outputContractHash = contractSchemaHash(outputContract);
+  if (run.outputContractHash && run.outputContractHash !== outputContractHash) {
+    throw new Error(`Queued output contract snapshot for ${operation.outputContract.id}@${operation.outputContract.version} no longer matches the current schema.`);
+  }
+};
+
+export const emissionPoliciesForRun = (data: AppData, run: AgentRun) => {
+  if (!run.loopDefinitionId || run.loopDefinitionVersion === undefined) return data.emissionPolicies;
+  const loop = data.loopDefinitions.find((candidate) =>
+    candidate.id === run.loopDefinitionId &&
+    candidate.version === run.loopDefinitionVersion
+  );
+  if (!loop) return [];
+  const included = data.emissionPolicies.filter((policy) => loop.emissionPolicyIds.includes(policy.id));
+  for (const policyId of loop.emissionPolicyIds) {
+    const activeVersions = included.filter((policy) => policy.id === policyId && policy.active);
+    if (activeVersions.length > 1) {
+      throw new Error(`Loop ${loop.id}@${loop.version} includes emission policy ${policyId}, but multiple active versions exist.`);
+    }
+  }
+  return included;
+};
+
 const completeWithOutput = (
   run: AgentRun,
   trigger: RuntimeEvent,
@@ -75,6 +110,7 @@ const completeWithOutput = (
       outputContractId: outputValidation.contractId,
       outputContractVersion: outputValidation.contractVersion,
       outputContractHash: outputValidation.contractHash,
+      outputValidationErrors: outputValidation.errors as unknown as Record<string, unknown>[],
       error: message,
       threadId,
       turnId
@@ -93,7 +129,7 @@ const completeWithOutput = (
       trigger,
       input: run.inputJson ?? {},
       output,
-      policies: data.emissionPolicies,
+      policies: emissionPoliciesForRun(data, run),
       eventDefinitions: data.eventDefinitions,
       contracts: registry
     });
@@ -133,7 +169,7 @@ const completeWithOutput = (
   });
 
   if (threadId) {
-    store.runtimeDatabase().upsertThreadBinding(trigger.subject, run.agentRole, threadId);
+    store.runtimeDatabase().upsertThreadBinding(trigger.subject, run.agentRole, threadId, operation.id, operation.version);
   }
   store.runtimeDatabase().appendRunLog(run.runId, "info", `Run completed with operation status ${status}.`, {
     emitted_events: emissions.events.map((event) => event.type),
@@ -159,16 +195,19 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
     if (!agent.enabled) throw new Error(`Agent role ${run.agentRole} is disabled.`);
     const trigger = runtime.getTriggerEvent(run);
     if (!trigger) throw new Error(`Trigger event ${run.triggerEventId} was not found.`);
-    const resumeThreadId = runtime.getThreadBinding(trigger.subject, run.agentRole) ?? run.threadId;
     const registry = new ContractRegistry(data.contracts);
+    assertQueuedSnapshotMatches(run, operation, registry);
     const outputContract = registry.require(operation.outputContract, "agent-output");
     if (run.inputJson === undefined) throw new Error(`Run ${run.runId} does not have persisted operation input.`);
+    const resumeThreadId = runtime.getThreadBinding(trigger.subject, run.agentRole, operation.id, operation.version) ?? run.threadId;
     const prompt = buildRunPrompt(operation, run.inputJson);
 
     const result = await runCodexAgent({
       runId: run.runId,
       workItemId: trigger.subject,
       agentRole: run.agentRole,
+      operationId: operation.id,
+      operationVersion: operation.version,
       agent,
       prompt,
       outputSchema: outputContract.schema,
