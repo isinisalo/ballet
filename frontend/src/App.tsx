@@ -188,10 +188,10 @@ const reasoningEffortOptions = [
 const reasoningEffortOrder = reasoningEffortOptions.map((option) => option.value);
 
 const reasoningEffortTone = (value: string) => {
-  if (value === "low") return "border-sky-500/30 bg-sky-500/10 text-sky-400 hover:bg-sky-500/15";
-  if (value === "medium") return "border-yellow-500/30 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/15";
-  if (value === "high") return "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/15";
-  return "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/15";
+  if (value === "low") return "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15";
+  if (value === "medium") return "border-tertiary/30 bg-tertiary/10 text-tertiary hover:bg-tertiary/15";
+  if (value === "high") return "border-tertiary-container/40 bg-tertiary-container/20 text-tertiary hover:bg-tertiary-container/25";
+  return "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15";
 };
 
 const nextReasoningEffort = (value: string) => {
@@ -439,7 +439,7 @@ function FrontmatterValue({ fieldKey, value }: { fieldKey: string; value: unknow
             <Badge
               key={`${String(item)}-${index}`}
               variant={fieldKey === "tags" ? "outline" : "secondary"}
-              className="h-4 rounded px-1.5 font-mono text-[0.6rem] uppercase"
+              className="h-4 rounded-xl px-1.5 font-mono text-[0.6rem] uppercase"
             >
               {String(item)}
             </Badge>
@@ -460,7 +460,7 @@ function FrontmatterValue({ fieldKey, value }: { fieldKey: string; value: unknow
   if (value === null || value === undefined || value === "") return <span className="text-muted-foreground">empty</span>;
   if (fieldKey === "status") {
     return (
-      <Badge variant={statusVariant(String(value))} className="h-5 rounded px-2 font-mono text-[0.65rem] uppercase">
+      <Badge variant={statusVariant(String(value))} className="h-5 rounded-xl px-2 font-mono text-[0.65rem] uppercase">
         {String(value)}
       </Badge>
     );
@@ -472,7 +472,7 @@ function FrontmatterPanel({ frontmatter }: { frontmatter?: Record<string, unknow
   const entries = Object.entries(frontmatter ?? {}).filter(([key]) => key !== "id");
 
   return (
-    <aside className="rounded-lg border bg-card/95 px-3 py-2.5 shadow-sm ring-1 ring-foreground/5">
+    <aside className="rounded-lg border bg-card/95 px-3 py-2.5 ring-1 ring-foreground/5">
       {entries.length === 0 ? (
         <p className="text-sm text-muted-foreground">No frontmatter.</p>
       ) : (
@@ -649,7 +649,7 @@ function SidebarInlineAction({
     <span
       role="button"
       tabIndex={0}
-      className="ml-1 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm bg-emerald-500/15 text-emerald-600 opacity-95 hover:bg-emerald-500/25 hover:text-emerald-700 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:text-emerald-400 dark:hover:text-emerald-300 group-data-[collapsible=icon]:hidden"
+      className="ml-1 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm bg-secondary/15 text-secondary opacity-95 hover:bg-secondary/25 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40 group-data-[collapsible=icon]:hidden"
       aria-label={label}
       title={label}
       onClick={(event) => {
@@ -884,7 +884,7 @@ function SwitchField({ label, checked, onChange }: { label: string; checked: boo
       checked={checked}
       aria-label={label}
       title={label}
-      className="data-checked:bg-emerald-500 data-unchecked:bg-muted-foreground/40 dark:data-unchecked:bg-muted-foreground/45"
+      className="data-checked:bg-secondary data-unchecked:bg-muted-foreground/40 dark:data-unchecked:bg-muted-foreground/45"
       onCheckedChange={onChange}
     />
   );
@@ -908,7 +908,7 @@ function AgentStatusDot({ status }: { status: Agent["status"] }) {
       aria-hidden="true"
       className={cn(
         "size-2 shrink-0 rounded-full",
-        status === "online" ? "bg-emerald-500 shadow-[0_0_0_3px] shadow-emerald-500/15" : "bg-muted-foreground/45"
+        status === "online" ? "bg-secondary shadow-[0_0_0_3px] shadow-secondary/15" : "bg-muted-foreground/45"
       )}
     />
   );
@@ -2984,7 +2984,7 @@ function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promis
             <div className="grid gap-2 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={selectedRun.status} />
-                <Badge variant="outline" className="rounded-md font-mono">{selectedRun.agentRole}</Badge>
+                <Badge variant="outline" className="rounded-xl font-mono">{selectedRun.agentRole}</Badge>
               </div>
               <div className="font-mono text-xs text-muted-foreground break-all">{selectedRun.runId}</div>
             </div>
@@ -3029,7 +3029,7 @@ function SaveAction({ formId, label, disabled = false }: { formId: string; label
     <Button
       type="submit"
       size="icon-sm"
-      className="cursor-pointer bg-primary text-primary-foreground hover:bg-emerald-600 hover:text-white focus-visible:border-emerald-500/60 focus-visible:ring-emerald-500/30 dark:hover:bg-emerald-500"
+      className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary-container focus-visible:border-primary/60 focus-visible:ring-primary/30"
       form={formId}
       disabled={disabled}
       aria-label={label}
