@@ -13,6 +13,7 @@ import { api } from "@/api";
 import { DataShapeBuilder } from "@/components/data-shape-builder/DataShapeBuilder";
 import { EmissionBuilder, defaultResultBranch, type EmissionEventOption, type ResultBranchDraft } from "@/components/emission-builder/EmissionBuilder";
 import { Button, Section, TextAreaField, TextField } from "@/components/forms/FormControls";
+import { AdvancedDisclosure } from "@/components/simple-rules/AdvancedDisclosure";
 import { MappingBuilder } from "@/components/mapping-builder/MappingBuilder";
 import {
   defaultMappingRows,
@@ -291,6 +292,40 @@ export function CreateFlowWizard({
     }));
   };
 
+  const chooseResultEvent = (eventId: string) => {
+    const selected = eventOptions.find((event) => event.id === eventId);
+    setBranch((current) => ({
+      ...current,
+      eventId: eventId || undefined,
+      ...(selected
+        ? {
+            eventName: selected.name,
+            eventDescription: selected.description ?? current.eventDescription,
+            fields: cloneDataShapeFields(selected.fields)
+          }
+        : {})
+    }));
+  };
+
+  const applyTemplate = (template: "basic" | "review" | "parallel" | "manual") => {
+    if (template === "review") {
+      setFollowUpTasks([followUpTaskStateFromDraft(undefined, data, 0)]);
+      return;
+    }
+    if (template === "parallel") {
+      setFollowUpTasks([
+        { ...followUpTaskStateFromDraft(undefined, data, 0), taskName: "Architecture review" },
+        { ...followUpTaskStateFromDraft(undefined, data, 1), taskName: "QA review" }
+      ]);
+      return;
+    }
+    if (template === "manual") {
+      setTriggerEventId("");
+      setTriggerFields(cloneDataShapeFields(defaultTriggerFields));
+    }
+    setFollowUpTasks([]);
+  };
+
   const updateFollowUpTask = (index: number, update: (task: FollowUpTaskState) => FollowUpTaskState) => {
     setFollowUpTasks((tasks) => tasks.map((task, taskIndex) => taskIndex === index ? update(task) : task));
   };
@@ -399,17 +434,23 @@ export function CreateFlowWizard({
 
   return (
     <div data-testid="create-flow-wizard">
-      <Section title={editing ? "Edit Flow" : "Create Flow"} description="Create a representative Flow with guided fields, mappings, and result behavior." className="border-white/10 bg-card/80">
+      <Section title={editing ? "Edit Flow" : "Create Flow"} description="When the start event happens, ask an agent task. When it completes, publish the result event." className="border-white/10 bg-card/80">
         {error ? <div role="alert" className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
         <div className="grid gap-5">
-          <WizardStepper steps={["Intent", "Trigger", "Agent", "Mapping", "Results", "Safety"]} current={testing ? 5 : branch.eventName ? 4 : mappingRows.length ? 3 : taskName || operationId ? 2 : triggerFields.length ? 1 : 0} />
+          <WizardStepper steps={["Name", "Start event", "Agent task", "Result event", "Save"]} current={branch.eventName ? 4 : taskName || operationId ? 2 : triggerEventId || triggerFields.length ? 1 : name ? 0 : 0} />
+          <div className="grid gap-2 rounded-md border bg-muted/20 p-3">
+            <h3 className="text-sm font-medium">Quick-start templates</h3>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => applyTemplate("basic")}>Event -&gt; Agent -&gt; Event</Button>
+              <Button type="button" variant="outline" onClick={() => applyTemplate("review")}>Event -&gt; Agent -&gt; Review Agent -&gt; Event</Button>
+              <Button type="button" variant="outline" onClick={() => applyTemplate("parallel")}>Event -&gt; Agent -&gt; Parallel Reviews -&gt; Event</Button>
+              <Button type="button" variant="outline" onClick={() => applyTemplate("manual")}>Manual trigger -&gt; Agent -&gt; Event</Button>
+            </div>
+          </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <div className="grid gap-3 md:grid-cols-2">
               <TextField label="Flow name" value={name} onChange={setName} required />
               <TextAreaField label="Purpose" value={purpose} onChange={setPurpose} rows={2} required />
-              <div className="md:col-span-2">
-                <TextAreaField label="Description" value={description} onChange={setDescription} rows={2} />
-              </div>
             </div>
             <div className="rounded-lg border border-white/10 bg-black/20 p-4">
               <div className="text-[0.68rem] font-semibold uppercase text-cyan-200">Visual preview</div>
@@ -435,7 +476,6 @@ export function CreateFlowWizard({
               ))}
             </select>
           </div>
-          <DataShapeBuilder title="Trigger data" fields={triggerFields} onChange={setTriggerFields} />
           <div className="grid gap-3 md:grid-cols-2">
             <div className="grid gap-1.5 md:col-span-2">
               <label className="text-sm font-medium" htmlFor="flow-operation-source">Agent task</label>
@@ -453,22 +493,42 @@ export function CreateFlowWizard({
                 ))}
               </select>
             </div>
-            <TextField label="Task name" value={taskName} onChange={setTaskName} />
-            <div className="grid gap-1.5">
-              <label className="text-sm font-medium" htmlFor="flow-agent">Agent</label>
-              <select id="flow-agent" className="h-10 rounded-md border bg-background px-3 text-sm" value={agentId} onChange={(event) => setAgentId(event.target.value)}>
-                {data.agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <TextAreaField label="Task instructions" value={instructions} onChange={setInstructions} rows={3} />
-            </div>
           </div>
-          <DataShapeBuilder title="Task result fields" fields={taskResultFields} onChange={setResultFields} />
-          <MappingBuilder sourceFields={triggerFields} targetFields={taskInputFields} rows={mappingRows} onChange={setMappingRows} />
-          <OperationInputPreview sourceFields={triggerFields} targetFields={taskInputFields} rows={mappingRows} />
-          <EmissionBuilder branch={{ ...branch, subjectField: branchSubjectField }} eventOptions={eventOptions} inputFields={taskInputFields} resultFields={taskResultFields} onChange={setBranch} />
-          <div className="grid gap-4 rounded-md border bg-background p-3">
+          <div className="grid gap-1.5">
+            <label className="text-sm font-medium" htmlFor="flow-result-event-source">Result event</label>
+            <select
+              id="flow-result-event-source"
+              className="h-10 rounded-md border bg-background px-3 text-sm"
+              value={branch.eventId ?? ""}
+              onChange={(event) => chooseResultEvent(event.target.value)}
+            >
+              <option value="">Create a new result event</option>
+              {eventOptions.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+            </select>
+          </div>
+          <div className="rounded-md border bg-muted/20 p-3 text-sm">
+            When {triggerOptions.find((event) => event.id === triggerEventId)?.name || `${name || "this Flow"} starts`}, ask {taskName || operationOptions.find((operation) => operation.id === operationId)?.name || "an agent task"}. When it completes, publish {branch.eventName || "a result event"}.
+          </div>
+          <AdvancedDisclosure title="Optional details" description="Custom descriptions, data shapes, mappings, result conditions, gates, follow-up tasks, and safety limits.">
+            <TextAreaField label="Description" value={description} onChange={setDescription} rows={2} />
+            <DataShapeBuilder title="Trigger data" fields={triggerFields} onChange={setTriggerFields} />
+            <div className="grid gap-3 md:grid-cols-2">
+              <TextField label="Task name" value={taskName} onChange={setTaskName} />
+              <div className="grid gap-1.5">
+                <label className="text-sm font-medium" htmlFor="flow-agent">Agent</label>
+                <select id="flow-agent" className="h-10 rounded-md border bg-background px-3 text-sm" value={agentId} onChange={(event) => setAgentId(event.target.value)}>
+                  {data.agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <TextAreaField label="Task instructions" value={instructions} onChange={setInstructions} rows={3} />
+              </div>
+            </div>
+            <DataShapeBuilder title="Task result fields" fields={taskResultFields} onChange={setResultFields} />
+            <MappingBuilder sourceFields={triggerFields} targetFields={taskInputFields} rows={mappingRows} onChange={setMappingRows} />
+            <OperationInputPreview sourceFields={triggerFields} targetFields={taskInputFields} rows={mappingRows} />
+            <EmissionBuilder branch={{ ...branch, subjectField: branchSubjectField }} eventOptions={eventOptions} inputFields={taskInputFields} resultFields={taskResultFields} onChange={setBranch} />
+            <div className="grid gap-4 rounded-md border bg-background p-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="grid gap-1">
                 <h3 className="text-sm font-medium">Next agent tasks</h3>
@@ -526,8 +586,8 @@ export function CreateFlowWizard({
                 </div>
               );
             })}
-          </div>
-          <div className="grid gap-4 rounded-md border bg-background p-3">
+            </div>
+            <div className="grid gap-4 rounded-md border bg-background p-3">
             <div className="grid gap-1">
               <h3 className="text-sm font-medium">Safety limits</h3>
             </div>
@@ -565,7 +625,8 @@ export function CreateFlowWizard({
                 </>
               ) : null}
             </div>
-          </div>
+            </div>
+          </AdvancedDisclosure>
           {testing ? <DraftTestPanel result={testing} /> : null}
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>

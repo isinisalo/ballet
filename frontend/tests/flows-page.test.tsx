@@ -908,6 +908,7 @@ describe("FlowsPage human UI", () => {
 
     await user.type(screen.getByLabelText("Flow name"), "Customer onboarding");
     await user.type(screen.getByLabelText("Purpose"), "Prepare a customer account for launch.");
+    await user.click(screen.getByText("Optional details"));
     await user.type(screen.getAllByLabelText("Description")[0]!, "Create the launch-ready customer account.");
     await user.selectOptions(screen.getByLabelText("Agent"), "qa-agent");
     await user.type(screen.getByLabelText("Task name"), "Prepare account");
@@ -1095,12 +1096,13 @@ describe("FlowsPage human UI", () => {
     await user.type(screen.getByLabelText("Purpose"), "Reuse the existing onboarding task.");
     await user.selectOptions(screen.getByLabelText("Trigger"), "customer-onboarding-started-v1");
     await user.selectOptions(screen.getByLabelText("Agent task"), "qa-agent/customer-onboarding");
-    const eventToPublish = screen.getByLabelText("Event to publish");
+    const eventToPublish = screen.getByLabelText("Result event");
     await user.selectOptions(
       eventToPublish,
       within(eventToPublish).getByRole("option", { name: "Customer account prepared" })
     );
 
+    await user.click(screen.getByText("Optional details"));
     expect(screen.getByDisplayValue("acceptanceCriteria")).toBeVisible();
     expect(screen.getByLabelText("Task name")).toHaveValue("Prepare account");
     expect(screen.getByLabelText("Agent")).toHaveValue("qa-agent");
@@ -1144,7 +1146,9 @@ describe("FlowsPage human UI", () => {
     expect(screen.getByLabelText("Purpose")).toBeVisible();
     expect(screen.getByLabelText("Trigger")).toBeVisible();
     expect(screen.getByLabelText("Agent task")).toBeVisible();
-    expect(screen.getByLabelText("Event to publish")).toBeVisible();
+    expect(screen.getByLabelText("Result event")).toBeVisible();
+    expect(screen.getByText("Optional details").closest("details")).not.toHaveAttribute("open");
+    await user.click(screen.getByText("Optional details"));
     expect(screen.getByLabelText("Agent")).toBeVisible();
     expect(screen.getByLabelText("Published event")).toBeVisible();
     expect(screen.getByLabelText("Result field")).toBeVisible();
@@ -1208,6 +1212,7 @@ describe("FlowsPage human UI", () => {
 
     await user.click(screen.getByRole("button", { name: /duplicate/i }));
     const wizard = screen.getByTestId("create-flow-wizard");
+    await user.click(within(wizard).getByText("Optional details"));
 
     expect(within(wizard).getByLabelText("Flow name")).toHaveValue("Copy of Customer onboarding");
     expect(within(wizard).getByLabelText("Purpose")).toHaveValue("Prepare a customer account for launch.");

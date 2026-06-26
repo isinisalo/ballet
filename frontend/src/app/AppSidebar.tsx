@@ -33,7 +33,7 @@ const advancedItems: Array<{ route: AdvancedRoute; label: string; icon: typeof H
   { route: "events", label: "Events", icon: PlayCircle, path: "/advanced/events" },
   { route: "routing", label: "Routing rules", icon: GitBranch, path: "/advanced/routing" },
   { route: "emissions", label: "Emission rules", icon: Sparkles, path: "/advanced/emissions" },
-  { route: "loops", label: "Loop definitions", icon: ListTree, path: "/advanced/loops" },
+  { route: "loops", label: "Flow boundaries", icon: ListTree, path: "/advanced/loops" },
   { route: "runtimes", label: "Runtimes", icon: Settings2, path: "/advanced/runtimes" },
   { route: "skills", label: "Skills", icon: FileJson2, path: "/advanced/skills" }
 ];

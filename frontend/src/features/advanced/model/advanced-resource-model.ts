@@ -28,7 +28,7 @@ export const labels: Record<AdvancedRoute, string> = {
   events: "Events",
   routing: "Routing rules",
   emissions: "Emission rules",
-  loops: "Loop definitions",
+  loops: "Flow boundaries",
   runtimes: "Runtimes",
   skills: "Skills"
 };

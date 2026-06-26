@@ -268,85 +268,106 @@ describe("AdvancedPage non-contract resources", () => {
     expect(screen.queryByText("Examples")).not.toBeInTheDocument();
   });
 
-  it("renders routing rules with visual condition and mapping builders plus a dry-run panel", async () => {
+  it("saves a routing rule from the simple event, task, description, and enabled fields", async () => {
     const user = userEvent.setup();
-    render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="routing" />);
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="routing" refresh={refresh} />);
 
     expect(screen.getByRole("heading", { name: "When plan approved, ask Implement plan" })).toBeVisible();
     expect(screen.getByText("Routing rule")).toBeVisible();
-    expect(screen.getByText("Source event")).toBeVisible();
-    expect(screen.getByText("Target task")).toBeVisible();
-    expect(screen.getByText("Trigger field")).toBeVisible();
-    expect(screen.getByText("Input mapping")).toBeVisible();
-    expect(screen.getByText("Reject the event")).toBeVisible();
-    expect(screen.getByText("Trigger data example")).toBeVisible();
-    expect(screen.getByLabelText(/routing test goal/i)).toHaveValue("Launch");
-    expect(screen.queryByLabelText("Routing test event data")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Input event")).toHaveValue("plan.approved.v1");
+    expect(screen.getByLabelText("Send to agent task")).toHaveValue("developer-agent/implement@@1");
+    expect(screen.getByText("Agent input preview")).toBeVisible();
+    expect(screen.getAllByText("from Event data > goal")[0]).toBeVisible();
+    expect(screen.getAllByText("from Event data > priority")[0]).toBeVisible();
+    expect(screen.getByText("Advanced details").closest("details")).not.toHaveAttribute("open");
 
-    const routingPriority = screen.getByLabelText(/routing test priority/i);
-    await user.clear(routingPriority);
-    await user.type(routingPriority, "2");
+    await user.clear(screen.getByLabelText("Description"));
+    await user.type(screen.getByLabelText("Description"), "Start implementation when the plan is approved.");
+    await user.click(screen.getByRole("button", { name: /^save routing rule$/i }));
 
-    await user.click(screen.getByRole("button", { name: /^test routing rule$/i }));
-
-    expect(apiMocks.dryRunRoutingPolicy).toHaveBeenCalledWith("route-plan-approved-to-implement", expect.objectContaining({
-      eventType: "plan.approved.v1",
-      subject: "dry-run-subject",
-      payload: { goal: "Launch", priority: 2 }
+    expect(apiMocks.save).toHaveBeenCalledWith("policies", expect.objectContaining({
+      consumes: { eventType: "plan.approved.v1" },
+      dispatch: { operation: { id: "developer-agent/implement", version: 1 } },
+      description: "Start implementation when the plan is approved.",
+      input: { object: {
+        goal: { from: "/event/data/goal" },
+        priority: { from: "/event/data/priority" }
+      } },
+      selection: { mode: "fanout" },
+      onInvalidInput: "reject-event"
     }));
-    expect(await screen.findByText("1 routing decision evaluated.")).toBeVisible();
+    expect(refresh).toHaveBeenCalled();
   });
 
-  it("renders emission rules with result conditions, gates, event mappings, and dry-run testing", async () => {
+  it("saves an emission rule from the simple operation, condition, event, checks, and enabled fields", async () => {
     const user = userEvent.setup();
-    render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="emissions" />);
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="emissions" refresh={refresh} />);
 
     expect(screen.getByRole("heading", { name: "Publish plan implemented" })).toBeVisible();
     expect(screen.getByText("Emission rule")).toBeVisible();
-    expect(screen.getByText("Observed task")).toBeVisible();
-    expect(screen.getByText("Result condition")).toBeVisible();
-    expect(screen.getByText("Technical gates")).toBeVisible();
-    expect(screen.getByText("Require a value at /output/summary")).toBeVisible();
-    expect(screen.getByText("Event data mapping for Plan implemented")).toBeVisible();
-    expect(screen.getByText("Operation input example")).toBeVisible();
-    expect(screen.getByText("Operation output example")).toBeVisible();
-    expect(screen.getByText("Operation result example")).toBeVisible();
-    expect(screen.getByLabelText(/operation input goal/i)).toHaveValue("Launch");
-    expect(screen.getByLabelText(/operation output status/i)).toHaveValue("completed");
-    expect(screen.queryByLabelText("Emission test operation input")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Emission test operation output")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("When this agent task finishes")).toHaveValue("developer-agent/implement@@1");
+    expect(screen.getByLabelText("Publish this event")).toHaveValue("plan.implemented.v1");
+    expect(screen.getByText("Event data preview")).toBeVisible();
+    expect(screen.getAllByText("from Agent result > goal")[0]).toBeVisible();
+    expect(screen.getAllByText("from Agent result > priority")[0]).toBeVisible();
+    expect(screen.getByLabelText("Require a summary")).toBeChecked();
+    expect(screen.getByText("Advanced details").closest("details")).not.toHaveAttribute("open");
 
-    const resultPriority = screen.getByLabelText(/operation result priority/i);
-    await user.clear(resultPriority);
-    await user.type(resultPriority, "3");
+    await user.clear(screen.getByLabelText("Description"));
+    await user.type(screen.getByLabelText("Description"), "Publish implementation when the task completes.");
+    await user.click(screen.getByRole("button", { name: /^save emission rule$/i }));
 
-    await user.click(screen.getByRole("button", { name: /^test emission rule$/i }));
-
-    expect(apiMocks.dryRunEmissionPolicy).toHaveBeenCalledWith("emit-plan-implemented", expect.objectContaining({
-      operationInput: expect.objectContaining({ goal: "Launch" }),
-      operationOutput: expect.objectContaining({
-        status: "completed",
-        summary: expect.any(String),
-        result: expect.objectContaining({ priority: 3 })
-      })
+    expect(apiMocks.save).toHaveBeenCalledWith("emissionPolicies", expect.objectContaining({
+      observes: { operation: { id: "developer-agent/implement", version: 1 } },
+      when: { path: "/output/status", op: "eq", value: "completed" },
+      emissions: [expect.objectContaining({
+        slot: "completed",
+        eventType: "plan.implemented.v1",
+        subject: { from: "/trigger/subject" },
+        data: { object: {
+          goal: { from: "/output/result/goal" },
+          priority: { from: "/output/result/priority" }
+        } },
+        dedupeKey: { template: "emission:{{/run/id}}:emit-plan-implemented:completed" }
+      })]
     }));
-    expect(await screen.findByText("1 event emitted.")).toBeVisible();
-    expect(screen.getByText("plan.implemented.v1")).toBeVisible();
+    expect(refresh).toHaveBeenCalled();
   });
 
-  it("renders loop definitions as Flow boundaries with included steps and safety limits", () => {
-    render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="loops" />);
+  it("edits Flow boundaries with rule checkboxes and safety limits without raw LoopDefinition JSON", async () => {
+    const user = userEvent.setup();
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    render(<AdvancedPage data={data} validation={{ valid: true, diagnostics: [] }} advancedRoute="loops" refresh={refresh} />);
 
-    expect(screen.getByRole("heading", { name: "Delivery loop" })).toBeVisible();
-    expect(screen.getByText("Flow definition")).toBeVisible();
-    expect(screen.getByText("When")).toBeVisible();
-    expect(screen.getByText("Ask")).toBeVisible();
-    expect(screen.getByText("Publish or stop at")).toBeVisible();
-    expect(screen.getAllByText("Plan approved")[0]).toBeVisible();
-    expect(screen.getAllByText("Implement plan")[0]).toBeVisible();
-    expect(screen.getAllByText("Plan implemented")[0]).toBeVisible();
-    expect(screen.getByText("Maximum agent runs")).toBeVisible();
-    expect(screen.getByText("3600 seconds")).toBeVisible();
+    expect(screen.getAllByRole("heading", { name: "Delivery loop" })[0]).toBeVisible();
+    expect(screen.getByText("Flow boundary")).toBeVisible();
+    expect(screen.getByLabelText("Starts when")).toHaveValue("plan.approved.v1");
+    expect(screen.getByText("Routing rules included")).toBeVisible();
+    expect(screen.getByText("Emission rules included")).toBeVisible();
+    expect(screen.getByText("Ends when")).toBeVisible();
+    expect(screen.getByLabelText("Maximum agent runs")).toHaveValue(8);
+    expect(screen.getByText("Advanced details").closest("details")).not.toHaveAttribute("open");
+
+    await user.clear(screen.getByLabelText("Maximum agent runs"));
+    await user.type(screen.getByLabelText("Maximum agent runs"), "50");
+    await user.click(screen.getByRole("button", { name: /^save flow boundary$/i }));
+
+    expect(apiMocks.save).toHaveBeenCalledWith("loopDefinitions", expect.objectContaining({
+      entryEventTypes: ["plan.approved.v1"],
+      routingPolicyIds: ["route-plan-approved-to-implement"],
+      emissionPolicyIds: ["emit-plan-implemented"],
+      terminalEventTypes: ["plan.implemented.v1"],
+      limits: expect.objectContaining({
+        maxHops: 10,
+        maxRuns: 50,
+        maxIterationsPerStep: 2,
+        deadlineSeconds: 3600
+      }),
+      onLimitExceeded: { eventType: "plan.implemented.v1" }
+    }));
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("checks skill and runtime delete safety with their own resource types", async () => {

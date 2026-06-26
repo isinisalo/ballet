@@ -128,7 +128,7 @@ function ResourceCard({
         {route === "events" && isEventDefinition(item.raw) ? <EventDetails eventDefinition={item.raw} data={data} diagnostics={item.validationDiagnostics} /> : null}
         {route === "routing" && isRoutingPolicy(item.raw) ? <RoutingPolicyDetails policy={item.raw} data={data} refresh={refresh} /> : null}
         {route === "emissions" && isEmissionPolicy(item.raw) ? <EmissionPolicyDetails policy={item.raw} data={data} refresh={refresh} /> : null}
-        {route === "loops" && isLoopDefinition(item.raw) ? <LoopDefinitionDetails loop={item.raw} data={data} /> : null}
+        {route === "loops" && isLoopDefinition(item.raw) ? <LoopDefinitionDetails loop={item.raw} data={data} refresh={refresh} /> : null}
         <AdvancedSource value={item.raw} />
       </div>
     </Section>
