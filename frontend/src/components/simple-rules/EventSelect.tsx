@@ -16,7 +16,7 @@ export function EventSelect({
       <label className="text-sm font-medium" htmlFor={`${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-event`}>{label}</label>
       <select
         id={`${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-event`}
-        className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
+        className="h-8 w-full min-w-0 rounded-md border border-border bg-[color:var(--input)] px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/35"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >

@@ -87,7 +87,7 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn("grid content-start gap-4 rounded-lg border bg-card p-4 text-card-foreground", className)}>
+    <section className={cn("grid content-start gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground", className)}>
       {title || description ? (
         <div className="grid gap-1">
           {title ? <h2 className="text-base font-semibold">{title}</h2> : null}

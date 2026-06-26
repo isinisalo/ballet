@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
 
 export function SimpleRoutingRuleEditor({ children }: { children: ReactNode }) {
-  return <div className="grid gap-4 rounded-md border bg-background p-3">{children}</div>;
+  return <div className="grid gap-4 rounded-lg border border-border bg-card p-3">{children}</div>;
 }

@@ -65,7 +65,7 @@ export function AdvancedPage({
       </div>
       {validation && !validation.valid ? <DiagnosticsList diagnostics={validation.diagnostics} /> : null}
       {items.length === 0 || !selectedItem ? <EmptyState title={`No ${labels[advancedRoute].toLowerCase()} configured.`} /> : (
-        <div className="grid overflow-hidden rounded-md border bg-background lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <div className="grid overflow-hidden rounded-lg border border-border bg-card lg:grid-cols-[18rem_minmax(0,1fr)]">
           <ResourceList
             route={advancedRoute}
             items={items}
@@ -96,8 +96,8 @@ function ResourceList({
   navigate?: (path: string) => void;
 }) {
   return (
-    <aside className="border-b bg-muted/20 lg:border-r lg:border-b-0">
-      <div className="flex items-center justify-between border-b bg-background px-4 py-4">
+    <aside className="border-b border-border bg-card lg:border-r lg:border-b-0">
+      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <h2 className="text-base font-semibold">{labels[route]}</h2>
         <span className="text-xs text-muted-foreground">{items.length}</span>
       </div>
@@ -109,8 +109,8 @@ function ResourceList({
               key={item.key}
               type="button"
               className={cn(
-                "grid w-full gap-2 border-b px-4 py-4 text-left transition-colors hover:bg-background",
-                selected && "border-l-2 border-l-primary bg-background"
+                "grid w-full gap-2 border-b border-border px-4 py-3 text-left transition-colors hover:bg-muted/45",
+                selected && "border-l-2 border-l-primary bg-muted/35"
               )}
               onClick={() => navigate?.(`/advanced/${route}/${encodeURIComponent(item.key)}`)}
             >
@@ -139,8 +139,8 @@ function ResourceEditor({
   refresh: () => Promise<void>;
 }) {
   return (
-    <section className="min-w-0 bg-background">
-      <div className="grid gap-4 p-4 md:p-5">
+    <section className="min-w-0 bg-card">
+      <div className="grid gap-4 p-3 md:p-5">
         {item.validationDiagnostics.length ? <DiagnosticsList diagnostics={item.validationDiagnostics} /> : null}
         <div key={item.key} className="contents">
           {route === "contracts" && isContract(item.raw) ? (

@@ -62,7 +62,7 @@ export function EmissionPolicyDetails({ policy, data, refresh }: { policy: Emiss
         <label className="text-sm font-medium" htmlFor={`emission-condition-${policy.id}`}>And output is</label>
         <select
           id={`emission-condition-${policy.id}`}
-          className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
+          className="h-8 w-full min-w-0 rounded-md border border-border bg-[color:var(--input)] px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/35"
           value={conditionPreset}
           onChange={(event) => setConditionPreset(event.target.value)}
         >
