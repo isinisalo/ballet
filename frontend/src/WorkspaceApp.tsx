@@ -96,9 +96,10 @@ import { cn } from "@/lib/utils";
 import { useRuntimeStream } from "./app/useRuntimeStream";
 import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
 
-type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "automation" | "agents" | "skills" | "agent-runs";
+type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "project-instructions" | "automation" | "agents" | "skills" | "agent-runs";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
 type AutomationTab = "events" | "policies" | "workflows" | "runtimes";
+type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 interface RouteState {
   view: View;
@@ -226,6 +227,9 @@ const routeFromPath = (path: string): RouteState => {
   const adrsMatch = url.pathname.match(/^\/projects\/([^/]+)\/adrs\/?$/);
   if (adrsMatch) return { view: "project-adrs", projectId: decodeURIComponent(adrsMatch[1]) };
 
+  const instructionsMatch = url.pathname.match(/^\/projects\/([^/]+)\/instructions\/?$/);
+  if (instructionsMatch) return { view: "project-instructions", projectId: decodeURIComponent(instructionsMatch[1]) };
+
   if (url.pathname === "/projects/document") {
     const documentPath = url.searchParams.get("path") ?? undefined;
     return documentPath ? { view: "project-document", documentPath } : { view: "projects" };
@@ -339,6 +343,28 @@ const findProjectTreeDocument = (nodes: ProjectDocumentTreeNode[], relativePath?
       if (document) return document;
     }
   }
+  return undefined;
+};
+
+const firstProjectTreeDocument = (node?: ProjectTreeDirectory): MarkdownDocument | undefined => {
+  for (const child of node?.children ?? []) {
+    if (child.type === "file") return child.document;
+    const document = firstProjectTreeDocument(child);
+    if (document) return document;
+  }
+  return undefined;
+};
+
+const projectDocumentCreateConfig: Record<ProjectDocumentCreateKind, { directoryPath: string; title: string; label: string }> = {
+  adr: { directoryPath: ".ballet/adr", title: "New ADR", label: "New ADR" },
+  goal: { directoryPath: ".ballet/goals", title: "New goal", label: "New goal" },
+  instruction: { directoryPath: ".ballet/instructions", title: "New instruction", label: "New instruction" }
+};
+
+const createKindForProjectDocument = (relativePath?: string): ProjectDocumentCreateKind | undefined => {
+  if (relativePath?.startsWith(".ballet/adr/")) return "adr";
+  if (relativePath?.startsWith(".ballet/goals/")) return "goal";
+  if (relativePath?.startsWith(".ballet/instructions/")) return "instruction";
   return undefined;
 };
 
@@ -561,39 +587,6 @@ function ProjectDocumentTreeDirectory({
 type SidebarDocumentEntity = Pick<Agent | Skill, "id" | "name" | "relativePath">;
 type SidebarAgentEntity = Pick<Agent, "id" | "name" | "relativePath" | "status">;
 
-function SidebarInlineAction({
-  label,
-  children,
-  onClick
-}: {
-  label: string;
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <span
-      role="button"
-      tabIndex={0}
-      className="ml-1 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm bg-secondary/15 text-secondary opacity-95 hover:bg-secondary/25 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40 group-data-[collapsible=icon]:hidden"
-      aria-label={label}
-      title={label}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onClick();
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        event.stopPropagation();
-        onClick();
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
 function SidebarDocumentList({
   documents,
   activePath,
@@ -679,21 +672,23 @@ function SidebarProjectDirectoryMenu({
   node,
   activePath,
   navigate,
-  action,
   emptyLabel,
-  forceRender = false
+  forceRender = false,
+  viewPath,
+  activeView = false
 }: {
   label: string;
   icon: ReactNode;
   node?: ProjectTreeDirectory;
   activePath?: string;
   navigate: (path: string) => void;
-  action?: ReactNode;
   emptyLabel?: string;
   forceRender?: boolean;
+  viewPath?: string;
+  activeView?: boolean;
 }) {
   const children = node?.children ?? [];
-  const active = projectTreeContainsPath(children, activePath);
+  const active = activeView || projectTreeContainsPath(children, activePath);
   const [open, setOpen] = useState(active);
 
   useEffect(() => {
@@ -706,10 +701,17 @@ function SidebarProjectDirectoryMenu({
     <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton isActive={active} tooltip={label}>
+          <SidebarMenuButton
+            isActive={active}
+            tooltip={label}
+            onClick={(event) => {
+              if (!viewPath) return;
+              event.preventDefault();
+              navigate(viewPath);
+            }}
+          >
             {icon}
             <span>{label}</span>
-            {action}
             <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
           </SidebarMenuButton>
         </CollapsibleTrigger>
@@ -745,29 +747,27 @@ function AgentStatusDot({ status }: { status: Agent["status"] }) {
 
 function AppSidebar({
   route,
+  projectId,
   projectDocumentTree,
   agents,
   skills,
   navigate,
   themeMode,
-  onThemeModeChange,
-  onCreateInstruction,
-  onNewAgent
+  onThemeModeChange
 }: {
   route: RouteState;
+  projectId?: string;
   projectDocumentTree: ProjectDocumentTreeNode[];
   agents: Agent[];
   skills: Skill[];
   navigate: (path: string) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
-  onCreateInstruction: (title: string) => Promise<void>;
-  onNewAgent: () => void;
 }) {
-  const [createInstructionOpen, setCreateInstructionOpen] = useState(false);
   const agentsOpen = route.view === "agents";
   const skillsOpen = route.view === "skills";
   const automationOpen = route.view === "automation";
+  const activeProjectId = route.projectId ?? projectId ?? "project";
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
@@ -801,7 +801,15 @@ function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarProjectDirectoryMenu label="ADR" icon={<Archive />} node={adrDirectory} activePath={route.documentPath} navigate={navigate} />
+              <SidebarProjectDirectoryMenu
+                label="ADR"
+                icon={<Archive />}
+                node={adrDirectory}
+                activePath={route.documentPath}
+                navigate={navigate}
+                viewPath={`/projects/${encodeURIComponent(activeProjectId)}/adrs`}
+                activeView={route.view === "project-adrs"}
+              />
               <SidebarProjectDirectoryMenu
                 label="Instructions"
                 icon={<FileText />}
@@ -810,11 +818,8 @@ function AppSidebar({
                 navigate={navigate}
                 forceRender
                 emptyLabel="No instructions."
-                action={(
-                  <SidebarInlineAction label="New instruction" onClick={() => setCreateInstructionOpen(true)}>
-                    <Plus data-icon="inline-start" />
-                  </SidebarInlineAction>
-                )}
+                viewPath={`/projects/${encodeURIComponent(activeProjectId)}/instructions`}
+                activeView={route.view === "project-instructions"}
               />
               {item("Automation", <Route />, "/automation", automationOpen)}
               {item("Agent runs", <Activity />, "/agent-runs", route.view === "agent-runs")}
@@ -824,9 +829,6 @@ function AppSidebar({
                     <SidebarMenuButton isActive={agentsOpen} tooltip="Agents">
                       <Bot />
                       <span>Agents</span>
-                      <SidebarInlineAction label="New agent" onClick={onNewAgent}>
-                        <Plus data-icon="inline-start" />
-                      </SidebarInlineAction>
                       <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -835,7 +837,15 @@ function AppSidebar({
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
-              <SidebarProjectDirectoryMenu label="Goals" icon={<CheckCircle2 />} node={goalsDirectory} activePath={route.documentPath} navigate={navigate} />
+              <SidebarProjectDirectoryMenu
+                label="Goals"
+                icon={<CheckCircle2 />}
+                node={goalsDirectory}
+                activePath={route.documentPath}
+                navigate={navigate}
+                viewPath={`/projects/${encodeURIComponent(activeProjectId)}/goals`}
+                activeView={route.view === "project-goals"}
+              />
               <Collapsible defaultOpen={skillsOpen} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
@@ -858,11 +868,6 @@ function AppSidebar({
         <ThemeSelector mode={themeMode} onChange={onThemeModeChange} />
       </SidebarFooter>
       <SidebarRail />
-      <CreateInstructionDialog
-        open={createInstructionOpen}
-        onOpenChange={setCreateInstructionOpen}
-        onCreate={onCreateInstruction}
-      />
     </ShadcnSidebar>
   );
 }
@@ -877,6 +882,7 @@ export function WorkspaceApp() {
   const [selectedProjectId, setSelectedProjectId] = useState(seedData.projects[0]?.id ?? "");
   const [selectedGoalId] = useState("");
   const [selectedAdrId] = useState("");
+  const [createDocumentKind, setCreateDocumentKind] = useState<ProjectDocumentCreateKind | null>(null);
 
   const project = data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId)) ?? data.projects.find((item) => item.id === selectedProjectId) ?? data.projects[0];
   const goals = useMemo(() => data.goals.filter((goal) => goal.projectId === project?.id), [data.goals, project?.id]);
@@ -887,6 +893,10 @@ export function WorkspaceApp() {
   const selectedProjectDocument = useMemo(
     () => findProjectTreeDocument(projectDocumentTree, route.documentPath),
     [projectDocumentTree, route.documentPath]
+  );
+  const selectedInstruction = useMemo(
+    () => firstProjectTreeDocument(findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions")),
+    [projectDocumentTree]
   );
   const selectedAgent = useMemo(
     () => route.view === "agents" && !route.documentPath
@@ -968,14 +978,15 @@ export function WorkspaceApp() {
     );
   };
 
-  const createInstruction = async (title: string) => {
+  const createProjectDocument = async (kind: ProjectDocumentCreateKind, title: string) => {
+    const config = projectDocumentCreateConfig[kind];
     const saved = await runMutation(
       () => api.createProjectDocument({
-        directoryPath: ".ballet/instructions",
+        directoryPath: config.directoryPath,
         title
       }),
       "Created.",
-      "Unable to create instruction."
+      `Unable to create ${kind}.`
     );
     navigate(projectDocumentPath(saved.relativePath));
   };
@@ -996,21 +1007,18 @@ export function WorkspaceApp() {
     );
   };
 
-  const newAgent = () => navigate("/agents");
-
   return (
     <TooltipProvider>
       <SidebarProvider>
         <AppSidebar
           route={route}
+          projectId={project?.id}
           projectDocumentTree={projectDocumentTree}
           agents={data.agents}
           skills={data.skills}
           navigate={navigate}
           themeMode={themeMode}
           onThemeModeChange={setThemeMode}
-          onCreateInstruction={createInstruction}
-          onNewAgent={newAgent}
         />
         <SidebarInset>
           <ScrollArea className="h-svh">
@@ -1040,15 +1048,23 @@ export function WorkspaceApp() {
                   saveProjectDocument={saveProjectDocument}
                 />
               ) : null}
-              {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} /> : null}
-              {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} /> : null}
-              {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} /> : null}
+              {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} onCreateDocument={setCreateDocumentKind} /> : null}
+              {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} onCreateDocument={setCreateDocumentKind} /> : null}
+              {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} onCreateDocument={setCreateDocumentKind} /> : null}
+              {route.view === "project-instructions" ? <InstructionsPage project={project} selectedInstruction={selectedInstruction} onCreateDocument={setCreateDocumentKind} /> : null}
               {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "events"} saveAutomation={saveAutomation} navigate={navigate} /> : null}
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "agent-runs" ? <AgentRunsView data={data} refresh={refresh} /> : null}
             </main>
           </ScrollArea>
+          <CreateProjectDocumentDialog
+            kind={createDocumentKind}
+            onOpenChange={(open) => {
+              if (!open) setCreateDocumentKind(null);
+            }}
+            onCreate={createProjectDocument}
+          />
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
@@ -1069,24 +1085,28 @@ function ProjectsOverview({
 
 function ProjectDocumentPage({
   document,
-  saveProjectDocument
+  saveProjectDocument,
+  onCreateDocument
 }: {
   document?: MarkdownDocument;
   saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
 }) {
   return (
-    <ProjectMarkdownEditorView document={document} emptyTitle="No project document selected." saveProjectDocument={saveProjectDocument} />
+    <ProjectMarkdownEditorView document={document} emptyTitle="No project document selected." saveProjectDocument={saveProjectDocument} onCreateDocument={onCreateDocument} />
   );
 }
 
 function ProjectMarkdownEditorView({
   document,
   emptyTitle,
-  saveProjectDocument
+  saveProjectDocument,
+  onCreateDocument
 }: {
   document?: MarkdownEntity;
   emptyTitle: string;
   saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+  onCreateDocument?: (kind: ProjectDocumentCreateKind) => void;
 }) {
   const formId = useId();
   const [frontmatterText, setFrontmatterText] = useState(frontmatterToYaml(document?.frontmatter));
@@ -1116,6 +1136,8 @@ function ProjectMarkdownEditorView({
   };
 
   if (!document) return <EmptyState title={emptyTitle} />;
+  const createKind = createKindForProjectDocument(document.relativePath);
+  const createConfig = createKind ? projectDocumentCreateConfig[createKind] : undefined;
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -1124,9 +1146,16 @@ function ProjectMarkdownEditorView({
         icon={<FileKey2 data-icon="inline-start" />}
         compact
         action={(
-          <Button type="submit" size="icon-sm" form={formId} aria-label="Save Markdown" title="Save Markdown">
-            <Save data-icon="inline-start" />
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            {createKind && createConfig && onCreateDocument ? (
+              <Button type="button" size="icon-sm" variant="outline" aria-label={createConfig.label} title={createConfig.label} onClick={() => onCreateDocument(createKind)}>
+                <Plus data-icon="inline-start" />
+              </Button>
+            ) : null}
+            <Button type="submit" size="icon-sm" form={formId} aria-label="Save Markdown" title="Save Markdown">
+              <Save data-icon="inline-start" />
+            </Button>
+          </div>
         )}
       >
         <form id={formId} className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
@@ -1144,16 +1173,90 @@ function ProjectMarkdownEditorView({
   );
 }
 
-function GoalsPage({ project, selectedGoal }: { project?: Project; selectedGoal?: Goal }) {
-  if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading GOALS." />;
+function CollectionDocumentPanel({
+  title,
+  icon,
+  document,
+  emptyTitle,
+  createKind,
+  onCreateDocument
+}: {
+  title: string;
+  icon: ReactNode;
+  document?: MarkdownEntity;
+  emptyTitle: string;
+  createKind: ProjectDocumentCreateKind;
+  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
+}) {
+  const createConfig = projectDocumentCreateConfig[createKind];
 
-  return <MarkdownDocumentView document={selectedGoal} emptyTitle="No Goal document selected." />;
+  return (
+    <Panel
+      title={title}
+      icon={icon}
+      compact
+      action={(
+        <Button type="button" size="icon-sm" variant="outline" aria-label={createConfig.label} title={createConfig.label} onClick={() => onCreateDocument(createKind)}>
+          <Plus data-icon="inline-start" />
+        </Button>
+      )}
+    >
+      <MarkdownDocumentView document={document} emptyTitle={emptyTitle} compact embedded />
+    </Panel>
+  );
 }
 
-function AdrsPage({ project, selectedAdr }: { project?: Project; selectedAdr?: Adr }) {
+function GoalsPage({ project, selectedGoal, onCreateDocument }: { project?: Project; selectedGoal?: Goal; onCreateDocument: (kind: ProjectDocumentCreateKind) => void }) {
+  if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading GOALS." />;
+
+  return (
+    <CollectionDocumentPanel
+      title="Goals"
+      icon={<CheckCircle2 data-icon="inline-start" />}
+      document={selectedGoal}
+      emptyTitle="No Goal document selected."
+      createKind="goal"
+      onCreateDocument={onCreateDocument}
+    />
+  );
+}
+
+function AdrsPage({ project, selectedAdr, onCreateDocument }: { project?: Project; selectedAdr?: Adr; onCreateDocument: (kind: ProjectDocumentCreateKind) => void }) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading ADRs." />;
 
-  return <MarkdownDocumentView document={selectedAdr} emptyTitle="No ADR document selected." />;
+  return (
+    <CollectionDocumentPanel
+      title="ADR"
+      icon={<Archive data-icon="inline-start" />}
+      document={selectedAdr}
+      emptyTitle="No ADR document selected."
+      createKind="adr"
+      onCreateDocument={onCreateDocument}
+    />
+  );
+}
+
+function InstructionsPage({
+  project,
+  selectedInstruction,
+  onCreateDocument
+}: {
+  project?: Project;
+  selectedInstruction?: MarkdownDocument;
+  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
+}) {
+  if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading instructions." />;
+
+  return (
+    <CollectionDocumentPanel
+      title="Instructions"
+      icon={<FileText data-icon="inline-start" />}
+      document={selectedInstruction}
+      emptyTitle="No instruction document selected."
+      createKind="instruction"
+      onCreateDocument={onCreateDocument}
+    />
+  );
 }
 
 function AgentsView({
@@ -2279,19 +2382,21 @@ function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promis
   );
 }
 
-function CreateInstructionDialog({
-  open,
+function CreateProjectDocumentDialog({
+  kind,
   onOpenChange,
   onCreate
 }: {
-  open: boolean;
+  kind: ProjectDocumentCreateKind | null;
   onOpenChange: (open: boolean) => void;
-  onCreate: (title: string) => Promise<void>;
+  onCreate: (kind: ProjectDocumentCreateKind, title: string) => Promise<void>;
 }) {
   const formId = useId();
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const open = Boolean(kind);
+  const config = kind ? projectDocumentCreateConfig[kind] : projectDocumentCreateConfig.instruction;
 
   useEffect(() => {
     if (open) return;
@@ -2310,10 +2415,11 @@ function CreateInstructionDialog({
     setPending(true);
     setError("");
     try {
-      await onCreate(trimmedTitle);
+      if (!kind) return;
+      await onCreate(kind, trimmedTitle);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create instruction.");
+      setError(err instanceof Error ? err.message : `Unable to create ${config.title.toLowerCase()}.`);
     } finally {
       setPending(false);
     }
@@ -2329,10 +2435,10 @@ function CreateInstructionDialog({
         >
           <div className="grid gap-1.5">
             <DialogPrimitive.Title className="text-sm font-semibold text-foreground">
-              New instruction
+              {config.title}
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="text-sm leading-relaxed text-muted-foreground">
-              Create a Markdown instruction document.
+              Create a Markdown document.
             </DialogPrimitive.Description>
           </div>
           {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
