@@ -83,6 +83,7 @@ import {
   DataTable,
   EmptyState,
   ErrorPreview,
+  HeaderCrudActions,
   Panel,
   SelectField,
   StatusBadge,
@@ -103,6 +104,7 @@ interface RouteState {
   view: View;
   projectId?: string;
   documentPath?: string;
+  automationTab?: AutomationTab;
 }
 
 const emptyData: AppData = {
@@ -230,9 +232,13 @@ const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  if (url.pathname === "/automation" || url.pathname === "/workflow" || url.pathname === "/runtimes" || url.pathname === "/policies" || url.pathname === "/events") {
-    return { view: "automation" };
-  }
+  const automationMatch = url.pathname.match(/^\/automation\/(events|policies|workflows|runtimes)\/?$/);
+  if (automationMatch) return { view: "automation", automationTab: automationMatch[1] as AutomationTab };
+  if (url.pathname === "/automation") return { view: "automation", automationTab: "events" };
+  if (url.pathname === "/events") return { view: "automation", automationTab: "events" };
+  if (url.pathname === "/policies") return { view: "automation", automationTab: "policies" };
+  if (url.pathname === "/workflow") return { view: "automation", automationTab: "workflows" };
+  if (url.pathname === "/runtimes") return { view: "automation", automationTab: "runtimes" };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/agent-runs") return { view: "agent-runs" };
   return { view: "projects" };
@@ -1037,7 +1043,7 @@ export function WorkspaceApp() {
               {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} /> : null}
               {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} /> : null}
               {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} /> : null}
-              {route.view === "automation" ? <AutomationView data={data} saveAutomation={saveAutomation} /> : null}
+              {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "events"} saveAutomation={saveAutomation} navigate={navigate} /> : null}
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "agent-runs" ? <AgentRunsView data={data} refresh={refresh} /> : null}
@@ -1281,12 +1287,15 @@ const schemaFromPayloadFields = (fields: PayloadFieldDraft[]): Record<string, un
 
 function AutomationView({
   data,
-  saveAutomation
+  activeTab,
+  saveAutomation,
+  navigate
 }: {
   data: AppData;
+  activeTab: AutomationTab;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
+  navigate: (path: string) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<AutomationTab>("events");
   const [draft, setDraft] = useState<ProjectAutomationConfig>(data.automation ?? automationConfigTemplate());
   const [selectedEventId, setSelectedEventId] = useState("");
   const [selectedPolicyId, setSelectedPolicyId] = useState("");
@@ -1318,15 +1327,169 @@ function AutomationView({
     }
   };
 
+  const selectedEvent = draft.events.find((event) => event.id === selectedEventId) ?? draft.events[0];
+  const selectedPolicy = draft.policies.find((policy) => policy.id === selectedPolicyId) ?? draft.policies[0];
+  const selectedWorkflow = draft.workflows.find((workflow) => workflow.id === selectedWorkflowId) ?? draft.workflows[0];
+  const selectedRuntime = draft.runtimes.find((runtime) => runtime.id === selectedRuntimeId) ?? draft.runtimes[0];
+
+  const addEvent = () => {
+    const id = uniqueAutomationId("new.event", draft.events.map((event) => event.id));
+    setDraft((current) => ({
+      ...current,
+      events: [...current.events, { id, title: "New event", source: "runtime" }]
+    }));
+    setSelectedEventId(id);
+  };
+
+  const addPolicy = () => {
+    const id = uniqueAutomationId("new-policy", draft.policies.map((policy) => policy.id));
+    setDraft((current) => ({
+      ...current,
+      policies: [...current.policies, {
+        id,
+        title: "New policy",
+        on: current.events[0]?.id ?? "",
+        run: {
+          agent: data.agents[0]?.id ?? "",
+          runtime: current.runtimes[0]?.id ?? ""
+        },
+        enabled: true
+      }]
+    }));
+    setSelectedPolicyId(id);
+  };
+
+  const addWorkflow = () => {
+    const id = uniqueAutomationId("new-workflow", draft.workflows.map((workflow) => workflow.id));
+    setDraft((current) => ({
+      ...current,
+      workflows: [...current.workflows, { id, title: "New workflow", steps: [] }]
+    }));
+    setSelectedWorkflowId(id);
+  };
+
+  const addRuntime = () => {
+    const id = uniqueAutomationId("new-runtime", draft.runtimes.map((runtime) => runtime.id));
+    setDraft((current) => ({
+      ...current,
+      runtimes: [...current.runtimes, { id, title: "New runtime", command: "codex", args: [], outputEvents: {} }]
+    }));
+    setSelectedRuntimeId(id);
+  };
+
+  const removeSelectedEvent = () => {
+    if (!selectedEvent) return;
+    setDraft((current) => ({
+      ...current,
+      events: current.events.filter((event) => event.id !== selectedEvent.id)
+    }));
+    setSelectedEventId(draft.events.find((event) => event.id !== selectedEvent.id)?.id ?? "");
+  };
+
+  const removeSelectedPolicy = () => {
+    if (!selectedPolicy) return;
+    setDraft((current) => ({
+      ...current,
+      policies: current.policies.filter((policy) => policy.id !== selectedPolicy.id),
+      workflows: current.workflows.map((workflow) => ({
+        ...workflow,
+        steps: workflow.steps.filter((step) => step !== selectedPolicy.id)
+      }))
+    }));
+    setSelectedPolicyId(draft.policies.find((policy) => policy.id !== selectedPolicy.id)?.id ?? "");
+  };
+
+  const removeSelectedWorkflow = () => {
+    if (!selectedWorkflow) return;
+    setDraft((current) => ({
+      ...current,
+      workflows: current.workflows.filter((workflow) => workflow.id !== selectedWorkflow.id)
+    }));
+    setSelectedWorkflowId(draft.workflows.find((workflow) => workflow.id !== selectedWorkflow.id)?.id ?? "");
+  };
+
+  const removeSelectedRuntime = () => {
+    if (!selectedRuntime) return;
+    setDraft((current) => ({
+      ...current,
+      runtimes: current.runtimes.filter((runtime) => runtime.id !== selectedRuntime.id)
+    }));
+    setSelectedRuntimeId(draft.runtimes.find((runtime) => runtime.id !== selectedRuntime.id)?.id ?? "");
+  };
+
+  const addConfig = {
+    events: {
+      label: "Add event",
+      onAdd: addEvent
+    },
+    policies: {
+      label: "Add policy",
+      onAdd: addPolicy
+    },
+    workflows: {
+      label: "Add workflow",
+      onAdd: addWorkflow
+    },
+    runtimes: {
+      label: "Add runtime",
+      onAdd: addRuntime
+    }
+  }[activeTab];
+
+  const deleteConfig = {
+    events: {
+      label: "Delete event",
+      type: "event",
+      resourceName: selectedEvent?.title || selectedEvent?.id,
+      canDelete: Boolean(selectedEvent),
+      onDelete: removeSelectedEvent
+    },
+    policies: {
+      label: "Delete policy",
+      type: "policy",
+      resourceName: selectedPolicy?.title || selectedPolicy?.id,
+      canDelete: Boolean(selectedPolicy),
+      onDelete: removeSelectedPolicy
+    },
+    workflows: {
+      label: "Delete workflow",
+      type: "workflow",
+      resourceName: selectedWorkflow?.title || selectedWorkflow?.id,
+      canDelete: Boolean(selectedWorkflow),
+      onDelete: removeSelectedWorkflow
+    },
+    runtimes: {
+      label: "Delete runtime",
+      type: "runtime",
+      resourceName: selectedRuntime?.title || selectedRuntime?.id,
+      canDelete: Boolean(selectedRuntime),
+      onDelete: removeSelectedRuntime
+    }
+  }[activeTab];
+
   return (
     <div className="grid gap-4">
       <Panel
         title="Automation"
         icon={<Route data-icon="inline-start" />}
         action={(
-          <Button type="button" size="icon-sm" aria-label="Save automation" title="Save automation" onClick={() => void saveDraft()}>
-            <Save data-icon="inline-start" />
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" size="icon-sm" variant="outline" aria-label={addConfig.label} title={addConfig.label} onClick={addConfig.onAdd}>
+              <Plus data-icon="inline-start" />
+            </Button>
+            <HeaderCrudActions
+              saveAction={(
+                <Button type="button" size="icon-sm" aria-label="Save automation" title="Save automation" onClick={() => void saveDraft()}>
+                  <Save data-icon="inline-start" />
+                </Button>
+              )}
+              deleteLabel={deleteConfig.label}
+              deleteType={deleteConfig.type}
+              resourceName={deleteConfig.resourceName}
+              canDelete={deleteConfig.canDelete}
+              onDelete={deleteConfig.onDelete}
+            />
+          </div>
         )}
       >
         <div className="grid gap-4">
@@ -1339,7 +1502,7 @@ function AutomationView({
                 size="sm"
                 role="tab"
                 aria-selected={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => navigate(`/automation/${tab.id}`)}
               >
                 {tab.icon}
                 {tab.label}
@@ -1378,35 +1541,25 @@ function AutomationIssues({ issues }: { issues: ProjectAutomationIssue[] }) {
 }
 
 function AutomationEntityList({
-  title,
   empty,
-  rows,
-  onAdd
+  rows
 }: {
-  title: string;
   empty: string;
   rows: Array<{ id: string; label: string; active: boolean; onSelect: () => void }>;
-  onAdd: () => void;
 }) {
   return (
-    <div className="grid gap-3 rounded-lg border border-divider-strong bg-background p-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-xs font-semibold uppercase text-muted-foreground">{title}</span>
-        <Button type="button" size="icon-sm" variant="outline" aria-label={`Add ${title}`} title={`Add ${title}`} onClick={onAdd}>
-          <Plus data-icon="inline-start" />
-        </Button>
-      </div>
-      <div className="grid gap-1">
+    <div className="grid min-w-0 overflow-hidden rounded-lg border border-divider-strong bg-background p-3">
+      <div className="flex flex-col gap-1">
         {rows.length === 0 ? <span className="px-2 py-1.5 text-xs text-muted-foreground">{empty}</span> : null}
         {rows.map((row) => (
           <Button
             key={row.id}
             type="button"
             variant={row.active ? "secondary" : "ghost"}
-            className="h-auto justify-start px-2 py-1.5 text-left font-mono text-xs"
+            className="h-auto w-full min-w-0 max-w-full justify-start overflow-hidden whitespace-normal px-2 py-1.5 text-left font-mono text-xs"
             onClick={row.onSelect}
           >
-            <span className="truncate">{row.label}</span>
+            <span className="block w-0 min-w-0 flex-1 truncate text-left">{row.label}</span>
           </Button>
         ))}
       </div>
@@ -1443,24 +1596,6 @@ function EventsAutomationTab({
     }));
   };
 
-  const addEvent = () => {
-    const id = uniqueAutomationId("new.event", config.events.map((event) => event.id));
-    updateConfig((current) => ({
-      ...current,
-      events: [...current.events, { id, title: "New event", source: "runtime" }]
-    }));
-    onSelect(id);
-  };
-
-  const removeEvent = () => {
-    if (!selected) return;
-    updateConfig((current) => ({
-      ...current,
-      events: current.events.filter((event) => event.id !== selected.id)
-    }));
-    onSelect(config.events.find((event) => event.id !== selected.id)?.id ?? "");
-  };
-
   const fields = payloadFieldsFromSchema(selected?.payloadSchema);
   const updateFields = (nextFields: PayloadFieldDraft[]) => updateSelected({ payloadSchema: schemaFromPayloadFields(nextFields) });
   const applySchema = () => {
@@ -1477,10 +1612,8 @@ function EventsAutomationTab({
   return (
     <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <AutomationEntityList
-        title="Events"
         empty="No events."
         rows={config.events.map((event) => ({ id: event.id, label: event.id, active: event.id === selected?.id, onSelect: () => onSelect(event.id) }))}
-        onAdd={addEvent}
       />
       {selected ? (
         <div className="grid gap-4">
@@ -1519,7 +1652,6 @@ function EventsAutomationTab({
               </Button>
             </div>
           )}
-          <Button type="button" variant="destructive" className="w-fit" onClick={removeEvent}>Delete event</Button>
         </div>
       ) : <EmptyState title="No event selected." />}
     </div>
@@ -1552,44 +1684,11 @@ function PoliciesAutomationTab({
     }));
   };
 
-  const addPolicy = () => {
-    const id = uniqueAutomationId("new-policy", config.policies.map((policy) => policy.id));
-    updateConfig((current) => ({
-      ...current,
-      policies: [...current.policies, {
-        id,
-        title: "New policy",
-        on: current.events[0]?.id ?? "",
-        run: {
-          agent: data.agents[0]?.id ?? "",
-          runtime: current.runtimes[0]?.id ?? ""
-        },
-        enabled: true
-      }]
-    }));
-    onSelect(id);
-  };
-
-  const removePolicy = () => {
-    if (!selected) return;
-    updateConfig((current) => ({
-      ...current,
-      policies: current.policies.filter((policy) => policy.id !== selected.id),
-      workflows: current.workflows.map((workflow) => ({
-        ...workflow,
-        steps: workflow.steps.filter((step) => step !== selected.id)
-      }))
-    }));
-    onSelect(config.policies.find((policy) => policy.id !== selected.id)?.id ?? "");
-  };
-
   return (
     <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <AutomationEntityList
-        title="Policies"
         empty="No policies."
         rows={config.policies.map((policy) => ({ id: policy.id, label: policy.id, active: policy.id === selected?.id, onSelect: () => onSelect(policy.id) }))}
-        onAdd={addPolicy}
       />
       {selected ? (
         <FieldGroup>
@@ -1598,11 +1697,6 @@ function PoliciesAutomationTab({
           <SelectField label="On event" value={selected.on || noSelection} options={eventOptions} onChange={(on) => updateSelected({ on: on === noSelection ? "" : on })} />
           <SelectField label="Agent" value={selected.run.agent || noSelection} options={agentOptions} onChange={(agent) => updateSelected({ run: { ...selected.run, agent: agent === noSelection ? "" : agent } })} />
           <SelectField label="Runtime" value={selected.run.runtime || noSelection} options={runtimeOptions} onChange={(runtime) => updateSelected({ run: { ...selected.run, runtime: runtime === noSelection ? "" : runtime } })} />
-          <div className="flex items-center gap-3">
-            <SwitchField label="Enabled" checked={selected.enabled} onChange={(enabled) => updateSelected({ enabled })} />
-            <span className="text-sm text-muted-foreground">Enabled</span>
-          </div>
-          <Button type="button" variant="destructive" className="w-fit" onClick={removePolicy}>Delete policy</Button>
         </FieldGroup>
       ) : <EmptyState title="No policy selected." />}
     </div>
@@ -1623,7 +1717,6 @@ function WorkflowsAutomationTab({
   const selected = config.workflows.find((workflow) => workflow.id === selectedId) ?? config.workflows[0];
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const runtimeById = useMemo(() => new Map(config.runtimes.map((runtime) => [runtime.id, runtime])), [config.runtimes]);
-  const workflowEnabled = selected?.steps.every((policyId) => policyById.get(policyId)?.enabled === true) ?? false;
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.title || policy.id }))];
 
   const updateSelected = (patch: Partial<ProjectWorkflow>) => {
@@ -1631,33 +1724,6 @@ function WorkflowsAutomationTab({
     updateConfig((current) => ({
       ...current,
       workflows: current.workflows.map((workflow) => workflow.id === selected.id ? { ...workflow, ...patch } : workflow)
-    }));
-  };
-
-  const addWorkflow = () => {
-    const id = uniqueAutomationId("new-workflow", config.workflows.map((workflow) => workflow.id));
-    updateConfig((current) => ({
-      ...current,
-      workflows: [...current.workflows, { id, title: "New workflow", steps: [] }]
-    }));
-    onSelect(id);
-  };
-
-  const removeWorkflow = () => {
-    if (!selected) return;
-    updateConfig((current) => ({
-      ...current,
-      workflows: current.workflows.filter((workflow) => workflow.id !== selected.id)
-    }));
-    onSelect(config.workflows.find((workflow) => workflow.id !== selected.id)?.id ?? "");
-  };
-
-  const toggleWorkflow = (enabled: boolean) => {
-    if (!selected) return;
-    const stepSet = new Set(selected.steps);
-    updateConfig((current) => ({
-      ...current,
-      policies: current.policies.map((policy) => stepSet.has(policy.id) ? { ...policy, enabled } : policy)
     }));
   };
 
@@ -1678,20 +1744,14 @@ function WorkflowsAutomationTab({
   return (
     <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <AutomationEntityList
-        title="Workflows"
         empty="No workflows."
         rows={config.workflows.map((workflow) => ({ id: workflow.id, label: workflow.id, active: workflow.id === selected?.id, onSelect: () => onSelect(workflow.id) }))}
-        onAdd={addWorkflow}
       />
       {selected ? (
         <div className="grid gap-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+          <div className="grid gap-3 md:grid-cols-2">
             <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
             <TextField label="Title" required value={selected.title} onChange={(title) => updateSelected({ title })} />
-            <div className="flex items-center gap-3 pb-1">
-              <SwitchField label="Workflow policies enabled" checked={workflowEnabled} onChange={toggleWorkflow} />
-              <span className="text-sm text-muted-foreground">Policies enabled</span>
-            </div>
           </div>
           <div className="grid gap-3">
             {selected.steps.map((policyId, index) => {
@@ -1737,7 +1797,6 @@ function WorkflowsAutomationTab({
               Add policy step
             </Button>
           </div>
-          <Button type="button" variant="destructive" className="w-fit" onClick={removeWorkflow}>Delete workflow</Button>
         </div>
       ) : <EmptyState title="No workflow selected." />}
     </div>
@@ -1786,24 +1845,6 @@ function RuntimesAutomationTab({
     }));
   };
 
-  const addRuntime = () => {
-    const id = uniqueAutomationId("new-runtime", config.runtimes.map((runtime) => runtime.id));
-    updateConfig((current) => ({
-      ...current,
-      runtimes: [...current.runtimes, { id, title: "New runtime", command: "codex", args: [], outputEvents: {} }]
-    }));
-    onSelect(id);
-  };
-
-  const removeRuntime = () => {
-    if (!selected) return;
-    updateConfig((current) => ({
-      ...current,
-      runtimes: current.runtimes.filter((runtime) => runtime.id !== selected.id)
-    }));
-    onSelect(config.runtimes.find((runtime) => runtime.id !== selected.id)?.id ?? "");
-  };
-
   const updateOutputEvent = (status: "completed" | "failed" | "blocked" | "cancelled", eventId: string) => {
     if (!selected) return;
     const outputEvents = { ...selected.outputEvents };
@@ -1815,10 +1856,8 @@ function RuntimesAutomationTab({
   return (
     <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <AutomationEntityList
-        title="Runtimes"
         empty="No runtimes."
         rows={config.runtimes.map((runtime) => ({ id: runtime.id, label: runtime.id, active: runtime.id === selected?.id, onSelect: () => onSelect(runtime.id) }))}
-        onAdd={addRuntime}
       />
       {selected ? (
         <FieldGroup>
@@ -1835,7 +1874,6 @@ function RuntimesAutomationTab({
               onChange={(eventId) => updateOutputEvent(status, eventId)}
             />
           ))}
-          <Button type="button" variant="destructive" className="w-fit" onClick={removeRuntime}>Delete runtime</Button>
         </FieldGroup>
       ) : <EmptyState title="No runtime selected." />}
     </div>
