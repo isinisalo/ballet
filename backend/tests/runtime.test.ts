@@ -2,10 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, AgentOutcome, EventDefinition, Policy } from "../shared/domain.js";
+import type { Agent, AgentOutcome, Policy, ProjectRuntime } from "../shared/domain.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
-import { checksPassRequiredGate, mapOutcomeToDomainEvent, parseAgentOutcomeText } from "../runtime-policy.js";
+import { parseAgentOutcomeText } from "../runtime-policy.js";
 import { policyVersion } from "../shared/policy.js";
+import { mapAgentOutputToEvent } from "../automation.js";
 
 const tempRoots: string[] = [];
 
@@ -66,7 +67,7 @@ const architectureReviewPolicy: Policy = {
   active: true,
   match: {
     eventTypes: ["change.implemented.v1"],
-    source: "agentd"
+    source: "runtime-codex"
   },
   action: {
     type: "start_agent_run",
@@ -102,37 +103,17 @@ const readyOutcome: AgentOutcome = {
   checks: [{ name: "unit-tests", status: "passed" }]
 };
 
-const changeImplementedDefinition: EventDefinition = {
-  id: "change-implemented-v1",
-  name: "Change implemented",
-  description: "Developer agent completed an implementation.",
-  active: true,
-  eventType: "change.implemented.v1",
-  source: "agentd",
-  tags: ["delivery"],
-  producers: [{
-    agentRole: "developer-agent",
-    outcomes: ["ready"],
-    requires: {
-      gitCommitExists: true,
-      requiredChecksPassed: true
-    }
-  }],
-  payloadExample: {},
-  createdAt: "2026-06-24T08:00:00.000Z",
-  updatedAt: "2026-06-24T08:00:00.000Z"
-};
-
-const reviewApprovedDefinition: EventDefinition = {
-  ...changeImplementedDefinition,
-  id: "review-approved-v1",
-  name: "Review approved",
-  description: "Reviewer approved a change.",
-  eventType: "review.approved.v1",
-  producers: [{
-    agentRole: "architecture-reviewer",
-    outcomes: ["approved"]
-  }]
+const projectRuntime: ProjectRuntime = {
+  id: "runtime-codex",
+  title: "Codex runtime",
+  command: "codex",
+  args: [],
+  outputEvents: {
+    completed: "agent.output.completed",
+    failed: "agent.output.failed",
+    blocked: "agent.output.blocked",
+    cancelled: "agent.output.cancelled"
+  }
 };
 
 describe("runtime database", () => {
@@ -176,7 +157,7 @@ describe("runtime database", () => {
     const result = db.intakeEvent({
       projectId: "project",
       eventType: "change.implemented.v1",
-      source: "agentd",
+      source: "runtime-codex",
       subject: "work-1",
       payload: { artifacts: { git_sha: "4f28dbd" } }
     }, [qaReviewPolicy, architectureReviewPolicy], [agent, architectureAgent, qaAgent]);
@@ -213,12 +194,14 @@ describe("runtime database", () => {
       outcome: readyOutcome,
       domainEvent: {
         type: "change.implemented.v1",
+        source: "runtime-codex",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       }
     });
 
     expect(completed.run.status).toBe("completed");
     expect(completed.event?.type).toBe("change.implemented.v1");
+    expect(completed.event?.source).toBe("runtime-codex");
     expect(db.listRuntimeEvents()).toHaveLength(2);
 
     expect(() => db.retryRun(leased!.runId)).toThrow("cannot be retried");
@@ -243,6 +226,7 @@ describe("runtime database", () => {
       outcome: readyOutcome,
       domainEvent: {
         type: "change.implemented.v1",
+        source: "runtime-codex",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
       policies: [policy, architectureReviewPolicy, qaReviewPolicy],
@@ -252,6 +236,7 @@ describe("runtime database", () => {
     expect(completed.run.status).toBe("completed");
     expect(completed.event).toMatchObject({
       type: "change.implemented.v1",
+      source: "runtime-codex",
       correlationId: intake.event.correlationId,
       causationId: intake.event.eventId,
       correlationDepth: 1,
@@ -305,6 +290,7 @@ describe("runtime database", () => {
       outcome: readyOutcome,
       domainEvent: {
         type: "change.implemented.v1",
+        source: "runtime-codex",
         payload: { outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
       policies: [architectureReviewPolicy],
@@ -319,38 +305,40 @@ describe("runtime database", () => {
   });
 });
 
-describe("runtime outcome policy", () => {
+describe("runtime output mapping", () => {
   it("validates structured agent outcome JSON", () => {
     expect(parseAgentOutcomeText(JSON.stringify(readyOutcome))).toEqual(readyOutcome);
     expect(() => parseAgentOutcomeText("{bad json")).toThrow("not valid JSON");
   });
 
-  it("maps developer ready outcomes only after deterministic validation", () => {
-    expect(checksPassRequiredGate(readyOutcome.checks)).toBe(true);
-    expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
-      gitCommitExists: false,
-      requiredChecksPassed: true
-    }, [changeImplementedDefinition])).toBeUndefined();
-    expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
-      gitCommitExists: true,
-      requiredChecksPassed: true
-    }, [])).toBeUndefined();
-    expect(mapOutcomeToDomainEvent("developer-agent", readyOutcome, {
-      gitCommitExists: true,
-      requiredChecksPassed: true
-    }, [changeImplementedDefinition])?.type).toBe("change.implemented.v1");
+  it("maps agent output statuses through runtime outputEvents", () => {
+    expect(mapAgentOutputToEvent(projectRuntime, { status: "completed" }).id).toBe("agent.output.completed");
+    expect(mapAgentOutputToEvent(projectRuntime, { status: "failed" }).id).toBe("agent.output.failed");
+    expect(mapAgentOutputToEvent(projectRuntime, { status: "blocked" }).id).toBe("agent.output.blocked");
+    expect(mapAgentOutputToEvent(projectRuntime, { status: "cancelled" }).id).toBe("agent.output.cancelled");
   });
 
-  it("maps reviewer roles only through matching event definitions", () => {
-    const mapping = mapOutcomeToDomainEvent("architecture-reviewer", {
-      outcome: "approved",
-      summary: "Looks good.",
-      checks: [{ name: "review", status: "passed" }]
-    }, {
-      gitCommitExists: true,
-      requiredChecksPassed: true
-    }, [changeImplementedDefinition, reviewApprovedDefinition]);
+  it("does not require an event id in agent output", () => {
+    const routed = mapAgentOutputToEvent(projectRuntime, {
+      runId: "run-1",
+      agentId: "developer-agent",
+      status: "completed",
+      summary: "Done."
+    });
 
-    expect(mapping?.type).toBe("review.approved.v1");
+    expect(routed).toMatchObject({
+      id: "agent.output.completed",
+      source: "runtime-codex",
+      payload: {
+        runId: "run-1",
+        agentId: "developer-agent",
+        status: "completed",
+        summary: "Done."
+      }
+    });
+  });
+
+  it("throws a typed validation error when runtime mapping is missing", () => {
+    expect(() => mapAgentOutputToEvent({ ...projectRuntime, outputEvents: {} }, { status: "completed" })).toThrow("no output event mapping");
   });
 });

@@ -4,10 +4,81 @@ export type EventStatus = "received" | "routed" | "unassigned" | "handled";
 export type AgentStatus = "online" | "offline";
 export type RuntimeType = "codex-cli" | "custom";
 export type AgentRunStatus = "queued" | "running" | "completed" | "failed" | "blocked" | "needs_input" | "cancelled";
+export type AgentOutputEventStatus = "completed" | "failed" | "blocked" | "cancelled";
 export type AgentOutcomeStatus = "ready" | "blocked" | "needs_input" | "approved" | "changes_requested" | "failed";
 export type RunCheckStatus = "passed" | "failed" | "skipped";
 export type PolicyPredicateOperator = "equals" | "in" | "exists";
 export type PolicyPredicateScalar = string | number | boolean | null;
+
+export type JsonSchemaObject = Record<string, unknown>;
+
+export interface ProjectEvent {
+  id: string;
+  title: string;
+  description?: string;
+  source: "runtime" | "system" | "user" | string;
+  payloadSchema?: JsonSchemaObject;
+}
+
+export interface ProjectPolicy {
+  id: string;
+  title: string;
+  on: string;
+  run: {
+    agent: string;
+    runtime: string;
+  };
+  enabled: boolean;
+}
+
+export interface ProjectRuntime {
+  id: string;
+  title: string;
+  command: string;
+  args: string[];
+  outputEvents: Partial<Record<AgentOutputEventStatus, string>>;
+}
+
+export interface ProjectWorkflow {
+  id: string;
+  title: string;
+  steps: string[];
+}
+
+export interface ProjectAutomationConfig {
+  version: 1;
+  events: ProjectEvent[];
+  policies: ProjectPolicy[];
+  workflows: ProjectWorkflow[];
+  runtimes: ProjectRuntime[];
+}
+
+export interface ProjectAutomationIssue {
+  path: string;
+  message: string;
+}
+
+export interface AgentRunOutput {
+  runId?: string;
+  agentId?: string;
+  status: AgentOutputEventStatus;
+  summary?: string;
+  outputRef?: string;
+  raw?: unknown;
+}
+
+export interface RoutedEvent {
+  id: string;
+  source: string;
+  timestamp: string;
+  payload: {
+    runId?: string;
+    agentId?: string;
+    status: AgentOutputEventStatus;
+    summary?: string;
+    outputRef?: string;
+  };
+}
 
 export interface EventProducerRequirements {
   gitCommitExists?: boolean;
@@ -334,6 +405,8 @@ export interface AppData {
   eventDefinitions: EventDefinition[];
   events: EventRecord[];
   agentRuns: AgentRun[];
+  automation: ProjectAutomationConfig;
+  automationIssues: ProjectAutomationIssue[];
   projectDocumentTree?: ProjectDocumentTreeNode[];
   documents?: {
     project: MarkdownDocument[];

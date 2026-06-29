@@ -141,6 +141,7 @@ export interface CompleteRunInput {
   turnId?: string;
   domainEvent?: {
     type: string;
+    source?: string;
     payload: Record<string, unknown>;
   };
   policies?: Policy[];
@@ -348,7 +349,7 @@ export class RuntimeDatabase {
           const published = this.insertEventAndProjectPolicies({
             projectId: trigger.project_id,
             eventType: input.domainEvent.type,
-            source: "agentd",
+            source: input.domainEvent.source ?? "agentd",
             subject: trigger.subject,
             correlationId: trigger.correlation_id,
             causationId: trigger.event_id,

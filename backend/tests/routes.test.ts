@@ -165,14 +165,20 @@ describe("API routes", () => {
     }
   });
 
-  it("returns runtime events in /api/data while preserving Markdown event documents", async () => {
+  it("returns runtime events in /api/data with automation definitions from project.json", async () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
     await mkdir(path.join(root, ".ballet/events"), { recursive: true });
-    await mkdir(path.join(root, ".ballet/policies"), { recursive: true });
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
-    await writeFile(path.join(root, ".ballet/events/markdown-event.md"), "---\nid: markdown-event\neventType: markdown.event\nsource: fixture\nstatus: received\ncreatedAt: 2026-06-24T08:00:00.000Z\n---\n\nMarkdown event.", "utf8");
+    await writeFile(path.join(root, ".ballet/events/markdown-event.md"), "---\nid: markdown-event\neventType: markdown.event\n---\n\nIgnored automation event.", "utf8");
+    await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
+      version: 1,
+      events: [{ id: "runtime.event", title: "Runtime event", source: "runtime" }],
+      policies: [],
+      workflows: [],
+      runtimes: []
+    }, null, 2), "utf8");
 
     store.runtimeDatabase().intakeEvent({
       projectId: "project",
@@ -187,42 +193,39 @@ describe("API routes", () => {
     const { server, url } = await listen(app);
 
     try {
-      const response = await fetch(`${url}/api/data`);
+      const response = await fetch(url + "/api/data");
       expect(response.status).toBe(200);
       const data = await response.json() as {
         eventDefinitions: Array<{ id: string; eventType: string; relativePath?: string }>;
         events: Array<{ id: string; eventType: string; relativePath?: string; routing?: { matchedPolicies: number } }>;
         documents?: { events: Array<{ id: string; relativePath?: string }> };
+        automation: { events: Array<{ id: string; title: string; source: string }> };
       };
 
+      expect(data.automation.events).toEqual([{ id: "runtime.event", title: "Runtime event", source: "runtime" }]);
       expect(data.eventDefinitions).toHaveLength(1);
-      expect(data.eventDefinitions[0]).toMatchObject({
-        id: "markdown-event",
-        eventType: "markdown.event",
-        relativePath: ".ballet/events/markdown-event.md"
-      });
-      expect(data.events).toHaveLength(1);
-      expect(data.events[0]).toMatchObject({
-        eventType: "runtime.event",
-        routing: { matchedPolicies: 0 }
-      });
-      expect(data.events[0]?.relativePath).toBeUndefined();
-      expect(data.documents?.events[0]).toMatchObject({
-        id: "markdown-event",
-        relativePath: ".ballet/events/markdown-event.md"
-      });
+      expect(data.eventDefinitions[0]).toMatchObject({ id: "runtime.event", eventType: "runtime.event" });
+      expect(data.eventDefinitions[0]?.relativePath).toBeUndefined();
+      expect(data.documents?.events).toEqual([]);
+      expect(data.events[0]).toMatchObject({ eventType: "runtime.event", routing: { matchedPolicies: 0 } });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     }
   });
 
-  it("validates intake event types against active Markdown event definitions", async () => {
+  it("validates intake event types against project.json automation events", async () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
-    await mkdir(path.join(root, ".ballet/events"), { recursive: true });
+    await mkdir(path.join(root, ".ballet"), { recursive: true });
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
-    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
+    await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
+      version: 1,
+      events: [{ id: "plan.approved.v1", title: "Plan approved", source: "user" }],
+      policies: [],
+      workflows: [],
+      runtimes: []
+    }, null, 2), "utf8");
 
     const app = express();
     app.use(express.json());
@@ -230,28 +233,18 @@ describe("API routes", () => {
     const { server, url } = await listen(app);
 
     try {
-      const allowed = await fetch(`${url}/api/events/intake`, {
+      const allowed = await fetch(url + "/api/events/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: "project",
-          eventType: "plan.approved.v1",
-          source: "test",
-          payload: {}
-        })
+        body: JSON.stringify({ projectId: "project", eventType: "plan.approved.v1", source: "test", payload: {} })
       });
       expect(allowed.status).toBe(201);
       expect(await allowed.json()).toMatchObject({ eventType: "plan.approved.v1" });
 
-      const blocked = await fetch(`${url}/api/events/intake`, {
+      const blocked = await fetch(url + "/api/events/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: "project",
-          eventType: "unknown.event.v1",
-          source: "test",
-          payload: {}
-        })
+        body: JSON.stringify({ projectId: "project", eventType: "unknown.event.v1", source: "test", payload: {} })
       });
       expect(blocked.status).toBe(400);
       expect(await blocked.json()).toMatchObject({ error: "Unknown or inactive event type: unknown.event.v1" });
@@ -260,137 +253,58 @@ describe("API routes", () => {
     }
   });
 
-  it("rejects policies that do not handle active event catalog types", async () => {
+  it("saves automation through /api/automation and rejects legacy config CRUD", async () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
-    await mkdir(path.join(root, ".ballet/events"), { recursive: true });
-    await mkdir(path.join(root, ".ballet/policies"), { recursive: true });
+    await mkdir(path.join(root, ".codex/agents"), { recursive: true });
+    await mkdir(path.join(root, ".ballet"), { recursive: true });
+    await writeFile(path.join(root, ".codex/agents/developer-agent.toml"), "name = \"Developer Agent\"\ndeveloper_instructions = \"Do work.\"\n", "utf8");
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
-    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
 
     const app = express();
     app.use(express.json());
     app.use("/api", apiRouter);
     const { server, url } = await listen(app);
 
-    try {
-      const unknown = await fetch(`${url}/api/policies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Unknown event policy",
-          description: "Invalid.",
-          active: true,
-          match: { eventTypes: ["unknown.event.v1"], projectId: "*", source: "*" },
-          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
-        })
-      });
-      expect(unknown.status).toBe(400);
-      expect(await unknown.json()).toMatchObject({ error: "Policy references unknown or inactive event type: unknown.event.v1" });
-
-      const empty = await fetch(`${url}/api/policies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Empty event policy",
-          description: "Invalid.",
-          active: true,
-          match: { eventTypes: [], projectId: "*", source: "*" },
-          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
-        })
-      });
-      expect(empty.status).toBe(400);
-      expect(await empty.json()).toMatchObject({ error: "Policy must handle exactly one active event type." });
-
-      const multiple = await fetch(`${url}/api/policies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Multiple event policy",
-          description: "Invalid.",
-          active: true,
-          match: { eventTypes: ["plan.approved.v1", "plan.rejected.v1"], projectId: "*", source: "*" },
-          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
-        })
-      });
-      expect(multiple.status).toBe(400);
-      expect(await multiple.json()).toMatchObject({ error: "Policy must handle exactly one active event type." });
-
-      const valid = await fetch(`${url}/api/policies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "Plan approved policy",
-          description: "Valid.",
-          active: true,
-          match: { eventTypes: ["plan.approved.v1"], projectId: "*", source: "*" },
-          action: { type: "start_agent_run", targetAgentId: "developer-agent" }
-        })
-      });
-      expect(valid.status).toBe(201);
-      expect(await valid.json()).toMatchObject({
-        name: "Plan approved policy",
-        match: { eventTypes: ["plan.approved.v1"] }
-      });
-    } finally {
-      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    }
-  });
-
-  it("protects event definitions that are consumed by policies", async () => {
-    const root = await tempRoot();
-    process.env.BALLET_PROJECT_ROOT = root;
-    process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
-    await mkdir(path.join(root, ".ballet/events"), { recursive: true });
-    await mkdir(path.join(root, ".ballet/policies"), { recursive: true });
-    await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
-    await writeFile(path.join(root, ".ballet/events/plan-approved-v1.md"), "---\nid: plan-approved-v1\nname: Plan approved\nactive: true\neventType: plan.approved.v1\nsource: \"*\"\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nAllowed event.", "utf8");
-    await writeFile(path.join(root, ".ballet/policies/on-plan-approved.md"), "---\nid: on-plan-approved\nname: On plan approved\ndescription: Route approved plans.\nactive: true\nmatch:\n  eventTypes:\n    - plan.approved.v1\n  projectId: \"*\"\n  source: \"*\"\naction:\n  type: start_agent_run\n  targetAgentId: developer-agent\ncreatedAt: 2026-06-24T08:00:00.000Z\nupdatedAt: 2026-06-24T08:00:00.000Z\n---\n\nPolicy body.", "utf8");
-
-    const app = express();
-    app.use(express.json());
-    app.use("/api", apiRouter);
-    const { server, url } = await listen(app);
+    const config = {
+      version: 1,
+      events: [
+        { id: "task.created", title: "Task created", source: "user" },
+        { id: "agent.output.completed", title: "Agent output completed", source: "runtime" }
+      ],
+      policies: [{ id: "assign-developer", title: "Assign developer", on: "task.created", run: { agent: "developer-agent", runtime: "codex-runtime" }, enabled: true }],
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["assign-developer"] }],
+      runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [], outputEvents: { completed: "agent.output.completed" } }]
+    };
 
     try {
-      const deactivate = await fetch(`${url}/api/event-definitions`, {
+      const saved = await fetch(url + "/api/automation", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config)
+      });
+      expect(saved.status).toBe(200);
+      expect(await saved.json()).toMatchObject({ workflows: [{ steps: ["assign-developer"] }] });
+
+      const automation = await fetch(url + "/api/automation");
+      expect(automation.status).toBe(200);
+      expect(await automation.json()).toMatchObject({ config: { policies: [{ id: "assign-developer", on: "task.created" }] }, issues: [] });
+
+      const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: "plan-approved-v1",
-          name: "Plan approved",
-          description: "Allowed event.",
-          active: false,
-          eventType: "plan.approved.v1",
-          source: "*",
-          producers: [],
-          payloadExample: {}
-        })
+        body: JSON.stringify({ id: "legacy" })
       });
-      expect(deactivate.status).toBe(400);
-      expect(await deactivate.json()).toMatchObject({ error: "Event type plan.approved.v1 is used by policies: On plan approved" });
+      expect(legacyPolicy.status).toBe(404);
 
-      const rename = await fetch(`${url}/api/event-definitions`, {
-        method: "POST",
+      const invalid = await fetch(url + "/api/automation", {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: "plan-approved-v1",
-          name: "Plan approved",
-          description: "Allowed event.",
-          active: true,
-          eventType: "plan.accepted.v1",
-          source: "*",
-          producers: [],
-          payloadExample: {}
-        })
+        body: JSON.stringify({ ...config, workflows: [{ id: "legacy", title: "Legacy", steps: [{ policy: "assign-developer", on: "task.created" }] }] })
       });
-      expect(rename.status).toBe(400);
-      expect(await rename.json()).toMatchObject({ error: "Event type plan.approved.v1 cannot be renamed because it is used by policies: On plan approved" });
-
-      const deleteResponse = await fetch(`${url}/api/event-definitions/plan-approved-v1`, { method: "DELETE" });
-      expect(deleteResponse.status).toBe(400);
-      expect(await deleteResponse.json()).toMatchObject({ error: "Event type plan.approved.v1 is used by policies: On plan approved" });
+      expect(invalid.status).toBe(400);
+      expect(await invalid.json()).toMatchObject({ issues: expect.arrayContaining([expect.objectContaining({ message: "Workflow step must be a policy id string." })]) });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     }

@@ -342,6 +342,7 @@ export function DeleteConfirmDialog({
 export function CrudActions({
   newLabel,
   saveLabel,
+  deleteLabel = "Delete",
   formId,
   id,
   disabled = false,
@@ -353,6 +354,7 @@ export function CrudActions({
 }: {
   newLabel: string;
   saveLabel: string;
+  deleteLabel?: string;
   formId: string;
   id?: string;
   disabled?: boolean;
@@ -376,7 +378,7 @@ export function CrudActions({
         </Button>
         {id ? (
           <>
-            <Button type="button" size="icon-sm" variant="destructive" aria-label="Delete" title="Delete" onClick={() => setConfirmOpen(true)}>
+            <Button type="button" size="icon-sm" variant="destructive" aria-label={deleteLabel} title={deleteLabel} onClick={() => setConfirmOpen(true)}>
               <Trash2 data-icon="inline-start" />
             </Button>
             <DeleteConfirmDialog

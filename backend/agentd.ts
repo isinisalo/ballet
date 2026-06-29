@@ -1,27 +1,23 @@
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Agent, AgentOutcome, AgentRun, AppData, RuntimeEvent } from "./shared/domain.js";
+import type { Agent, AgentOutcome, AgentOutputEventStatus, AgentRun, AppData, RuntimeEvent } from "./shared/domain.js";
 import { store } from "./store.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 import { runCodexAgent } from "./codex-adapter.js";
-import { checksPassRequiredGate, mapOutcomeToDomainEvent, outcomeToRunStatus } from "./runtime-policy.js";
+import { outcomeToRunStatus } from "./runtime-policy.js";
+import { mapAgentOutputToEvent } from "./automation.js";
 
 const workerId = process.env.BALLET_AGENTD_WORKER_ID ?? `agentd-${process.pid}`;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const gitCommitExists = (cwd: string, sha?: string): boolean => {
-  if (!sha) return false;
-  try {
-    execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd, stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 const findAgent = (data: AppData, role: string): Agent | undefined => data.agents.find((agent) => agent.id === role);
+
+const outcomeToOutputEventStatus = (outcome: AgentOutcome): AgentOutputEventStatus => {
+  if (outcome.outcome === "failed") return "failed";
+  if (outcome.outcome === "blocked" || outcome.outcome === "needs_input") return "blocked";
+  return "completed";
+};
 
 const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): string => {
   return [
@@ -64,23 +60,34 @@ const completeWithOutcome = (
   run: AgentRun,
   trigger: RuntimeEvent,
   outcome: AgentOutcome,
-  policies: AppData["policies"],
-  eventDefinitions: AppData["eventDefinitions"],
-  agents: AppData["agents"],
+  data: AppData,
   threadId?: string,
   turnId?: string
 ) => {
-  const validation = {
-    gitCommitExists: gitCommitExists(store.root, outcome.artifacts?.git_sha),
-    requiredChecksPassed: checksPassRequiredGate(outcome.checks)
-  };
-  const mapping = mapOutcomeToDomainEvent(run.agentRole, outcome, validation, eventDefinitions);
   let status = outcomeToRunStatus(outcome);
   let error: string | undefined;
+  let domainEvent: { type: string; source: string; payload: Record<string, unknown> } | undefined;
 
-  if (["ready", "approved", "changes_requested"].includes(outcome.outcome) && !mapping) {
+  try {
+    const policy = data.automation.policies.find((candidate) => candidate.id === run.policyId);
+    if (!policy) throw new Error(`Automation policy ${run.policyId} was not found.`);
+    const runtime = data.automation.runtimes.find((candidate) => candidate.id === policy.run.runtime);
+    if (!runtime) throw new Error(`Automation runtime ${policy.run.runtime} was not found.`);
+    const routed = mapAgentOutputToEvent(runtime, {
+      runId: run.runId,
+      agentId: run.agentRole,
+      status: outcomeToOutputEventStatus(outcome),
+      summary: outcome.summary,
+      raw: outcome
+    });
+    domainEvent = {
+      type: routed.id,
+      source: routed.source,
+      payload: routed.payload
+    };
+  } catch (mappingError) {
     status = "failed";
-    error = "Agent outcome did not match an active Ballet event definition and validation rules.";
+    error = mappingError instanceof Error ? mappingError.message : "Agent output could not be mapped to an event.";
   }
 
   const result = store.runtimeDatabase().completeRun({
@@ -90,16 +97,15 @@ const completeWithOutcome = (
     error,
     threadId,
     turnId,
-    domainEvent: error ? undefined : mapping,
-    policies,
-    agents
+    domainEvent: error ? undefined : domainEvent,
+    policies: data.policies,
+    agents: data.agents
   });
 
   if (threadId) {
     store.runtimeDatabase().upsertThreadBinding(trigger.subject, run.agentRole, threadId);
   }
   store.runtimeDatabase().appendRunLog(run.runId, error ? "error" : "info", error ?? `Run completed with outcome ${outcome.outcome}.`, {
-    validation,
     domain_event_type: result.event?.type
   });
   notifyRuntimeChanged("agent-runs");
@@ -139,7 +145,7 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
       onLog: (level, message, details) => runtime.appendRunLog(run.runId, level, message, details)
     });
 
-    completeWithOutcome(run, trigger, result.outcome, data.policies, data.eventDefinitions, data.agents, result.threadId, result.turnId);
+    completeWithOutcome(run, trigger, result.outcome, data, result.threadId, result.turnId);
   } catch (error) {
     completeFailed(run, error);
   }

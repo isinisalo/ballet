@@ -1,4 +1,4 @@
-import type { AgentRun, AgentRunLog, AppData, CollectionName, EventDefinition, EventRecord, MarkdownDocument } from "../../backend/shared/domain";
+import type { AgentRun, AgentRunLog, AppData, CollectionName, EventRecord, MarkdownDocument, ProjectAutomationConfig, ProjectAutomationIssue } from "../../backend/shared/domain";
 
 const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {
@@ -17,6 +17,12 @@ const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
 
 export const api = {
   getData: () => request<AppData>("/api/data"),
+  getAutomation: () => request<{ config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] }>("/api/automation"),
+  saveAutomation: (config: ProjectAutomationConfig) =>
+    request<ProjectAutomationConfig>("/api/automation", {
+      method: "PUT",
+      body: JSON.stringify(config)
+    }),
   reset: () => request<AppData>("/api/reset", { method: "POST" }),
   save: <T extends CollectionName>(collection: T, item: Partial<AppData[T][number]>) =>
     request<AppData[T][number]>(`/api/${collection}`, {
@@ -35,13 +41,6 @@ export const api = {
     }),
   remove: (collection: CollectionName, id: string) =>
     request<void>(`/api/${collection}/${id}`, { method: "DELETE" }),
-  saveEventDefinition: (eventDefinition: Partial<EventDefinition>) =>
-    request<EventDefinition>("/api/event-definitions", {
-      method: "POST",
-      body: JSON.stringify(eventDefinition)
-    }),
-  removeEventDefinition: (id: string) =>
-    request<void>(`/api/event-definitions/${id}`, { method: "DELETE" }),
   intakeEvent: (event: Partial<EventRecord> & Pick<EventRecord, "projectId" | "eventType">) =>
     request<EventRecord>("/api/events/intake", {
       method: "POST",

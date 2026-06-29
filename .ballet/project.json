@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "id": "plan.approved.v1",
+      "title": "Plan approved",
+      "description": "An implementation plan was approved and can be routed to the developer agent.",
+      "source": "user"
+    },
+    {
+      "id": "change.implemented.v1",
+      "title": "Change implemented",
+      "description": "Developer agent completed an implementation with validation evidence.",
+      "source": "runtime"
+    },
+    {
+      "id": "agent.output.completed",
+      "title": "Agent output completed",
+      "description": "Runtime emits this when an agent run completes successfully.",
+      "source": "runtime",
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "outputRef": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId",
+          "agentId",
+          "status"
+        ]
+      }
+    },
+    {
+      "id": "agent.output.failed",
+      "title": "Agent output failed",
+      "description": "Runtime emits this when an agent run fails.",
+      "source": "runtime"
+    },
+    {
+      "id": "agent.output.blocked",
+      "title": "Agent output blocked",
+      "description": "Runtime emits this when an agent run is blocked.",
+      "source": "runtime"
+    },
+    {
+      "id": "agent.output.cancelled",
+      "title": "Agent output cancelled",
+      "description": "Runtime emits this when an agent run is cancelled.",
+      "source": "runtime"
+    }
+  ],
+  "policies": [
+    {
+      "id": "on_plan_approved_then_start_developer_agent_run",
+      "title": "Start developer agent on plan approval",
+      "on": "plan.approved.v1",
+      "run": {
+        "agent": "developer-agent",
+        "runtime": "runtime-codex"
+      },
+      "enabled": true
+    },
+    {
+      "id": "on_change_implemented_then_start_architecture_reviewer_agent_run",
+      "title": "Start architecture reviewer on implementation",
+      "on": "change.implemented.v1",
+      "run": {
+        "agent": "architecture-reviewer",
+        "runtime": "runtime-codex"
+      },
+      "enabled": true
+    },
+    {
+      "id": "on_change_implemented_then_start_qa_verification_reviewer_agent_run",
+      "title": "Start QA verification reviewer on implementation",
+      "on": "change.implemented.v1",
+      "run": {
+        "agent": "qa-verification-reviewer",
+        "runtime": "runtime-codex"
+      },
+      "enabled": true
+    }
+  ],
+  "workflows": [
+    {
+      "id": "plan-implement-review",
+      "title": "Plan, implement, review",
+      "steps": [
+        "on_plan_approved_then_start_developer_agent_run",
+        "on_change_implemented_then_start_architecture_reviewer_agent_run",
+        "on_change_implemented_then_start_qa_verification_reviewer_agent_run"
+      ]
+    }
+  ],
+  "runtimes": [
+    {
+      "id": "runtime-codex",
+      "title": "codex-cli",
+      "command": "codex",
+      "args": [],
+      "outputEvents": {
+        "completed": "agent.output.completed",
+        "failed": "agent.output.failed",
+        "blocked": "agent.output.blocked",
+        "cancelled": "agent.output.cancelled"
+      }
+    }
+  ]
+}

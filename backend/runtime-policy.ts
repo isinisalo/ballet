@@ -1,4 +1,4 @@
-import type { AgentOutcome, AgentOutcomeStatus, AgentRunStatus, EventDefinition, EventProducerDefinition, RunCheck } from "./shared/domain.js";
+import type { AgentOutcome, AgentRunStatus, RunCheck } from "./shared/domain.js";
 
 export const agentOutcomeSchema = {
   type: "object",
@@ -39,16 +39,6 @@ export const agentOutcomeSchema = {
 
 const outcomeStatuses = new Set(["ready", "blocked", "needs_input", "approved", "changes_requested", "failed"]);
 const checkStatuses = new Set(["passed", "failed", "skipped"]);
-
-export interface OutcomeValidation {
-  gitCommitExists: boolean;
-  requiredChecksPassed: boolean;
-}
-
-export interface DomainEventMapping {
-  type: string;
-  payload: Record<string, unknown>;
-}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -95,61 +85,4 @@ export const outcomeToRunStatus = (outcome: AgentOutcome): AgentRunStatus => {
   if (outcome.outcome === "needs_input") return "needs_input";
   if (outcome.outcome === "failed") return "failed";
   return "completed";
-};
-
-export const checksPassRequiredGate = (checks: RunCheck[]): boolean =>
-  checks.length > 0 && checks.every((check) => check.status !== "failed");
-
-const textMatches = (ruleValue: string, actualValue: string): boolean => {
-  if (!ruleValue || ruleValue === "*") return true;
-  return ruleValue.trim().toLowerCase() === actualValue.trim().toLowerCase();
-};
-
-const producerAllowsOutcome = (producer: EventProducerDefinition, outcome: AgentOutcomeStatus): boolean =>
-  producer.outcomes.includes(outcome);
-
-const producerRequirementsPass = (producer: EventProducerDefinition, validation: OutcomeValidation): boolean => {
-  const requires = producer.requires;
-  if (!requires) return true;
-  if (requires.gitCommitExists !== undefined && requires.gitCommitExists !== validation.gitCommitExists) return false;
-  if (requires.requiredChecksPassed !== undefined && requires.requiredChecksPassed !== validation.requiredChecksPassed) return false;
-  return true;
-};
-
-const matchingDefinition = (
-  agentRole: string,
-  outcome: AgentOutcome,
-  validation: OutcomeValidation,
-  eventDefinitions: EventDefinition[],
-  source: string
-): EventDefinition | undefined =>
-  eventDefinitions.find((definition) =>
-    definition.active &&
-    textMatches(definition.source, source) &&
-    definition.producers.some((producer) =>
-      producer.agentRole === agentRole &&
-      producerAllowsOutcome(producer, outcome.outcome) &&
-      producerRequirementsPass(producer, validation)
-    )
-  );
-
-export const mapOutcomeToDomainEvent = (
-  agentRole: string,
-  outcome: AgentOutcome,
-  validation: OutcomeValidation,
-  eventDefinitions: EventDefinition[],
-  source = "agentd"
-): DomainEventMapping | undefined => {
-  const definition = matchingDefinition(agentRole, outcome, validation, eventDefinitions, source);
-  if (!definition) return undefined;
-
-  const basePayload = {
-    agent_role: agentRole,
-    outcome: outcome.outcome,
-    summary: outcome.summary,
-    artifacts: outcome.artifacts ?? {},
-    checks: outcome.checks
-  };
-
-  return { type: definition.eventType, payload: basePayload };
 };

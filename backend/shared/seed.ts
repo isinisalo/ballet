@@ -169,5 +169,70 @@ export const seedData: AppData = {
       createdAt: now
     }
   ],
-  agentRuns: []
+  agentRuns: [],
+  automation: {
+    version: 1,
+    events: [
+      {
+        id: "deployment.failed",
+        title: "Deployment failed",
+        description: "A deployment failed and can be routed to an operator.",
+        source: "runtime"
+      },
+      {
+        id: "agent.output.completed",
+        title: "Agent output completed",
+        source: "runtime"
+      },
+      {
+        id: "agent.output.failed",
+        title: "Agent output failed",
+        source: "runtime"
+      },
+      {
+        id: "agent.output.blocked",
+        title: "Agent output blocked",
+        source: "runtime"
+      },
+      {
+        id: "agent.output.cancelled",
+        title: "Agent output cancelled",
+        source: "runtime"
+      }
+    ],
+    policies: [
+      {
+        id: "policy-deploy-fail",
+        title: "Deployment failures to k8s operator",
+        on: "deployment.failed",
+        run: {
+          agent: "agent-k8s",
+          runtime: "runtime-codex"
+        },
+        enabled: true
+      }
+    ],
+    workflows: [
+      {
+        id: "deployment-response",
+        title: "Deployment response",
+        steps: ["policy-deploy-fail"]
+      }
+    ],
+    runtimes: [
+      {
+        id: "runtime-codex",
+        title: "codex-cli",
+        command: "codex",
+        args: [],
+        outputEvents: {
+          completed: "agent.output.completed",
+          failed: "agent.output.failed",
+          blocked: "agent.output.blocked",
+          cancelled: "agent.output.cancelled"
+        }
+      }
+    ]
+  },
+  automationIssues: []
 };

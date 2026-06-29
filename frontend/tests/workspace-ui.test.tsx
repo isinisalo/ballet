@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Agent, AppData, EventDefinition, Policy } from "../../backend/shared/domain";
+import type { Agent, AppData, ProjectAutomationConfig } from "../../backend/shared/domain";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 
 const now = "2026-06-26T10:00:00.000Z";
@@ -39,29 +39,81 @@ const baseData = (): AppData => ({
     name: "codex-cli",
     type: "codex-cli",
     command: "codex",
-    config: { cwd: "." },
     enabled: true,
     createdAt: now,
     updatedAt: now,
-    relativePath: ".ballet/runtimes/codex-cli.md"
+    config: { args: "[]", outputEvents: "{}" }
   }],
-  policies: [],
-  eventDefinitions: [{
-    id: "event-1",
-    name: "Plan approved",
-    description: "Plan approved event",
+  policies: [{
+    id: "policy-1",
+    name: "Assign existing agent",
+    description: "",
     active: true,
-    eventType: "plan.approved.v1",
-    source: "agentd",
+    match: { eventTypes: ["task.created"], projectId: "*", source: "*" },
+    action: { type: "start_agent_run", targetAgentId: "agent-1" },
+    projectId: "*",
+    eventTypes: ["task.created"],
+    source: "*",
+    payloadMetadata: {},
+    targetAgentId: "agent-1",
+    createdAt: now,
+    updatedAt: now
+  }],
+  eventDefinitions: [{
+    id: "task.created",
+    name: "Task created",
+    description: "Task created event",
+    active: true,
+    eventType: "task.created",
+    source: "user",
     tags: [],
     producers: [],
     payloadExample: {},
     createdAt: now,
-    updatedAt: now,
-    relativePath: ".ballet/events/plan-approved.md"
+    updatedAt: now
+  }, {
+    id: "task.updated",
+    name: "Task updated",
+    description: "Task updated event",
+    active: true,
+    eventType: "task.updated",
+    source: "user",
+    tags: [],
+    producers: [],
+    payloadExample: {},
+    createdAt: now,
+    updatedAt: now
   }],
   events: [],
   agentRuns: [],
+  automation: {
+    version: 1,
+    events: [
+      { id: "task.created", title: "Task created", source: "user" },
+      { id: "task.updated", title: "Task updated", source: "user" },
+      { id: "agent.output.completed", title: "Agent output completed", source: "runtime" }
+    ],
+    policies: [{
+      id: "policy-1",
+      title: "Assign existing agent",
+      on: "task.created",
+      run: { agent: "agent-1", runtime: "runtime-1" },
+      enabled: true
+    }],
+    workflows: [{
+      id: "workflow-1",
+      title: "Default workflow",
+      steps: ["policy-1"]
+    }],
+    runtimes: [{
+      id: "runtime-1",
+      title: "codex-cli",
+      command: "codex",
+      args: [],
+      outputEvents: { completed: "agent.output.completed" }
+    }]
+  },
+  automationIssues: [],
   projectDocumentTree: []
 });
 
@@ -77,8 +129,6 @@ const slug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g
 
 function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
   let agentCounter = data.agents.length + 1;
-  let policyCounter = data.policies.length + 1;
-  let eventCounter = data.eventDefinitions.length + 1;
   let failNextSave = options.failNextSave ?? false;
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -87,7 +137,7 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
 
     if (url === "/api/data" && method === "GET") return jsonResponse(data);
-    if (failNextSave && method === "POST") {
+    if (failNextSave && (method === "POST" || method === "PUT")) {
       failNextSave = false;
       return jsonResponse({ error: "Injected save failure" }, { status: 500 });
     }
@@ -119,59 +169,49 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
       return noContent();
     }
 
-    if (url === "/api/policies" && method === "POST") {
-      const incoming = body as Partial<Policy>;
-      const saved: Policy = {
-        id: incoming.id ?? `policy-${policyCounter++}`,
-        name: incoming.name ?? "",
-        description: incoming.description ?? "",
-        active: incoming.active ?? true,
-        match: incoming.match,
-        action: incoming.action,
-        projectId: incoming.projectId ?? "*",
-        eventTypes: incoming.eventTypes ?? [],
-        source: incoming.source ?? "*",
-        payloadMetadata: incoming.payloadMetadata ?? {},
-        targetAgentId: incoming.targetAgentId ?? "agent-1",
+    if (url === "/api/automation" && method === "PUT") {
+      const saved = body as ProjectAutomationConfig;
+      data.automation = saved;
+      data.eventDefinitions = saved.events.map((event) => ({
+        id: event.id,
+        name: event.title,
+        description: event.description ?? "",
+        active: true,
+        eventType: event.id,
+        source: event.source,
+        tags: [],
+        producers: [],
+        payloadExample: {},
         createdAt: now,
-        updatedAt: now,
-        relativePath: `.ballet/policies/${slug(incoming.name ?? "policy")}.md`
-      };
-      data.policies = [...data.policies.filter((policy) => policy.id !== saved.id), saved];
-      return jsonResponse(saved);
-    }
-
-    if (url.startsWith("/api/policies/") && method === "DELETE") {
-      const id = decodeURIComponent(url.split("/").pop() ?? "");
-      data.policies = data.policies.filter((policy) => policy.id !== id);
-      return noContent();
-    }
-
-    if (url === "/api/event-definitions" && method === "POST") {
-      const incoming = body as Partial<EventDefinition>;
-      const saved: EventDefinition = {
-        id: incoming.id ?? `event-${eventCounter++}`,
-        name: incoming.name ?? "",
-        description: incoming.description ?? "",
-        active: incoming.active ?? true,
-        eventType: incoming.eventType ?? "",
-        source: incoming.source ?? "agentd",
-        tags: incoming.tags ?? [],
-        producers: incoming.producers ?? [],
-        payloadExample: incoming.payloadExample ?? {},
-        body: incoming.body,
+        updatedAt: now
+      }));
+      data.policies = saved.policies.map((policy) => ({
+        id: policy.id,
+        name: policy.title,
+        description: "",
+        active: policy.enabled,
+        match: { eventTypes: [policy.on], projectId: "*", source: "*" },
+        action: { type: "start_agent_run", targetAgentId: policy.run.agent },
+        projectId: "*",
+        eventTypes: [policy.on],
+        source: "*",
+        payloadMetadata: {},
+        targetAgentId: policy.run.agent,
         createdAt: now,
-        updatedAt: now,
-        relativePath: `.ballet/events/${slug(incoming.eventType ?? incoming.name ?? "event")}.md`
-      };
-      data.eventDefinitions = [...data.eventDefinitions.filter((definition) => definition.id !== saved.id), saved];
+        updatedAt: now
+      }));
+      data.runtimes = saved.runtimes.map((runtime) => ({
+        id: runtime.id,
+        name: runtime.title,
+        type: runtime.command === "codex" ? "codex-cli" : "custom",
+        command: runtime.command,
+        config: { args: JSON.stringify(runtime.args), outputEvents: JSON.stringify(runtime.outputEvents) },
+        enabled: true,
+        createdAt: now,
+        updatedAt: now
+      }));
+      data.automationIssues = [];
       return jsonResponse(saved);
-    }
-
-    if (url.startsWith("/api/event-definitions/") && method === "DELETE") {
-      const id = decodeURIComponent(url.split("/").pop() ?? "");
-      data.eventDefinitions = data.eventDefinitions.filter((definition) => definition.id !== id);
-      return noContent();
     }
 
     return jsonResponse({ error: `Unhandled ${method} ${url}` }, { status: 404 });
@@ -224,48 +264,27 @@ describe("workspace entity UI flows", () => {
     expect(window.location.pathname).toBe("/agents");
   });
 
-  it("creates, edits, deletes, and navigates policies", async () => {
+  it("edits automation policies and derives workflow cards from policy data", async () => {
     const user = userEvent.setup();
-    const { data } = await renderRoute("/policies");
+    const { data, fetchMock } = await renderRoute("/automation");
 
-    await user.type(screen.getByLabelText("Description"), "Route approved plans.");
-    await user.click(screen.getByRole("button", { name: "Save policy" }));
+    await user.click(screen.getByRole("tab", { name: /workflows/i }));
+    expect(screen.getByText("task.created")).toBeInTheDocument();
+    expect(screen.getByText("agent-1")).toBeInTheDocument();
 
-    await waitFor(() => expect(data.policies).toHaveLength(1));
-    expect(window.location.pathname).toBe("/policies");
-    expect(window.location.search).toContain(".ballet%2Fpolicies%2Fon-plan-approved-start-agent-1-agent.md");
+    await user.click(screen.getByRole("tab", { name: /policies/i }));
+    await user.click(screen.getByLabelText("On event"));
+    await user.click(await screen.findByText("task.updated · Task updated"));
 
-    await user.clear(screen.getByLabelText("Description"));
-    await user.type(screen.getByLabelText("Description"), "Route approved plans to the agent.");
-    await user.click(screen.getByRole("button", { name: "Save policy" }));
-    await waitFor(() => expect(data.policies[0]?.description).toBe("Route approved plans to the agent."));
+    await user.click(screen.getByRole("tab", { name: /workflows/i }));
+    expect(screen.getByText("task.updated")).toBeInTheDocument();
 
-    await confirmDelete(user, "Delete policy");
-    await waitFor(() => expect(data.policies).toHaveLength(0));
-    expect(window.location.pathname).toBe("/policies");
-  });
-
-  it("creates, edits, deletes, and navigates event definitions", async () => {
-    const user = userEvent.setup();
-    const { data } = await renderRoute("/events");
-
-    await user.type(screen.getByLabelText("Name"), "Change ready");
-    await user.type(screen.getByLabelText("Description"), "Change is ready.");
-    await user.type(screen.getByLabelText("Event type"), "change.ready.v1");
-    await user.click(screen.getByRole("button", { name: "Save definition" }));
-
-    await waitFor(() => expect(data.eventDefinitions.some((definition) => definition.eventType === "change.ready.v1")).toBe(true));
-    expect(window.location.pathname).toBe("/events");
-    expect(window.location.search).toContain(".ballet%2Fevents%2Fchange-ready-v1.md");
-
-    await user.clear(screen.getByLabelText("Description"));
-    await user.type(screen.getByLabelText("Description"), "Change is ready for review.");
-    await user.click(screen.getByRole("button", { name: "Save definition" }));
-    await waitFor(() => expect(data.eventDefinitions.find((definition) => definition.eventType === "change.ready.v1")?.description).toBe("Change is ready for review."));
-
-    await confirmDelete(user, "Delete event definition");
-    await waitFor(() => expect(data.eventDefinitions.some((definition) => definition.eventType === "change.ready.v1")).toBe(false));
-    expect(window.location.pathname).toBe("/events");
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.policies[0]?.on).toBe("task.updated"));
+    expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
+      method: "PUT",
+      body: expect.stringContaining("\"steps\":[\"policy-1\"]")
+    }));
   });
 
   it("shows save failures to users", async () => {

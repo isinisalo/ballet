@@ -1,9 +1,9 @@
 import express from "express";
-import type { CollectionName } from "./shared/domain.js";
-import { EventValidationError, store } from "./store.js";
+import type { CollectionName, ProjectAutomationConfig } from "./shared/domain.js";
+import { AutomationValidationError, EventValidationError, store } from "./store.js";
 import { onRuntimeChanged } from "./runtime-events.js";
 
-const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "skills", "runtimes", "policies"];
+const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "skills"];
 const collectionSet = new Set(collections);
 
 export const apiRouter = express.Router();
@@ -11,6 +11,10 @@ export const apiRouter = express.Router();
 const handleEventValidationError = (error: unknown, res: express.Response): boolean => {
   if (error instanceof EventValidationError) {
     res.status(400).json({ error: error.message });
+    return true;
+  }
+  if (error instanceof AutomationValidationError) {
+    res.status(400).json({ error: error.message, issues: error.issues });
     return true;
   }
   return false;
@@ -32,6 +36,24 @@ apiRouter.post("/reset", async (_req, res, next) => {
   try {
     res.json(await store.reset());
   } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/automation", async (_req, res, next) => {
+  try {
+    const data = await store.read();
+    res.json({ config: data.automation, issues: data.automationIssues });
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.put("/automation", async (req, res, next) => {
+  try {
+    res.json(await store.saveAutomation(req.body as ProjectAutomationConfig));
+  } catch (error) {
+    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });
@@ -111,34 +133,6 @@ apiRouter.get("/events", async (_req, res, next) => {
   try {
     res.json(await store.list("events"));
   } catch (error) {
-    next(error);
-  }
-});
-
-apiRouter.get("/event-definitions", async (_req, res, next) => {
-  try {
-    res.json(await store.listEventDefinitions());
-  } catch (error) {
-    next(error);
-  }
-});
-
-apiRouter.post("/event-definitions", async (req, res, next) => {
-  try {
-    const saved = await store.saveEventDefinition(req.body);
-    res.status(req.body.id ? 200 : 201).json(saved);
-  } catch (error) {
-    if (handleEventValidationError(error, res)) return;
-    next(error);
-  }
-});
-
-apiRouter.delete("/event-definitions/:id", async (req, res, next) => {
-  try {
-    await store.removeEventDefinition(req.params.id);
-    res.status(204).end();
-  } catch (error) {
-    if (handleEventValidationError(error, res)) return;
     next(error);
   }
 });
