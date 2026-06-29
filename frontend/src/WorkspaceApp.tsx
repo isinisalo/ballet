@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -1619,9 +1619,7 @@ function EventsAutomationTab({
         <div className="grid gap-4">
           <FieldGroup>
             <TextField label="Event ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-            <TextField label="Title" required value={selected.title} onChange={(title) => updateSelected({ title })} />
             <TextAreaField label="Description" rows={2} value={selected.description ?? ""} onChange={(description) => updateSelected({ description })} />
-            <TextField label="Source" required value={selected.source} onChange={(source) => updateSelected({ source })} />
           </FieldGroup>
           <Alert><AlertDescription>Events are emitted by the runtime. Agents only produce output.</AlertDescription></Alert>
           <div className="flex items-center justify-between gap-3">
@@ -1693,7 +1691,6 @@ function PoliciesAutomationTab({
       {selected ? (
         <FieldGroup>
           <TextField label="Policy ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-          <TextField label="Title" required value={selected.title} onChange={(title) => updateSelected({ title })} />
           <SelectField label="On event" value={selected.on || noSelection} options={eventOptions} onChange={(on) => updateSelected({ on: on === noSelection ? "" : on })} />
           <SelectField label="Agent" value={selected.run.agent || noSelection} options={agentOptions} onChange={(agent) => updateSelected({ run: { ...selected.run, agent: agent === noSelection ? "" : agent } })} />
           <SelectField label="Runtime" value={selected.run.runtime || noSelection} options={runtimeOptions} onChange={(runtime) => updateSelected({ run: { ...selected.run, runtime: runtime === noSelection ? "" : runtime } })} />
@@ -1715,6 +1712,9 @@ function WorkflowsAutomationTab({
   updateConfig: AutomationConfigUpdater;
 }) {
   const selected = config.workflows.find((workflow) => workflow.id === selectedId) ?? config.workflows[0];
+  const draggedStepIndexRef = useRef<number | null>(null);
+  const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null);
+  const [dragOverStepIndex, setDragOverStepIndex] = useState<number | null>(null);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const runtimeById = useMemo(() => new Map(config.runtimes.map((runtime) => [runtime.id, runtime])), [config.runtimes]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.title || policy.id }))];
@@ -1732,13 +1732,52 @@ function WorkflowsAutomationTab({
     updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? policyId : step) });
   };
 
-  const moveStep = (index: number, direction: -1 | 1) => {
+  const reorderStep = (fromIndex: number, toIndex: number) => {
     if (!selected) return;
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= selected.steps.length) return;
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= selected.steps.length || toIndex >= selected.steps.length) return;
     const steps = [...selected.steps];
-    [steps[index], steps[nextIndex]] = [steps[nextIndex], steps[index]];
+    const [movedStep] = steps.splice(fromIndex, 1);
+    steps.splice(toIndex, 0, movedStep);
     updateSelected({ steps });
+  };
+
+  const resetStepDrag = () => {
+    draggedStepIndexRef.current = null;
+    setDraggedStepIndex(null);
+    setDragOverStepIndex(null);
+  };
+
+  const stepIndexFromPoint = (event: PointerEvent<HTMLDivElement>) => {
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-workflow-step-index]");
+    if (!(target instanceof HTMLElement)) return null;
+    const targetIndex = Number(target.dataset.workflowStepIndex);
+    return Number.isNaN(targetIndex) ? null : targetIndex;
+  };
+
+  const handleStepPointerDown = (event: PointerEvent<HTMLDivElement>, index: number) => {
+    if (event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest("button")) return;
+    draggedStepIndexRef.current = index;
+    setDraggedStepIndex(index);
+    setDragOverStepIndex(index);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleStepPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (draggedStepIndexRef.current === null) return;
+    const targetIndex = stepIndexFromPoint(event);
+    if (targetIndex !== null) setDragOverStepIndex(targetIndex);
+  };
+
+  const handleStepPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    const fromIndex = draggedStepIndexRef.current;
+    if (fromIndex === null) return;
+    const toIndex = stepIndexFromPoint(event) ?? dragOverStepIndex ?? fromIndex;
+    reorderStep(fromIndex, toIndex);
+    setDraggedStepIndex(null);
+    setDragOverStepIndex(null);
+    draggedStepIndexRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
   return (
@@ -1749,42 +1788,50 @@ function WorkflowsAutomationTab({
       />
       {selected ? (
         <div className="grid gap-4">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3">
             <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-            <TextField label="Title" required value={selected.title} onChange={(title) => updateSelected({ title })} />
           </div>
           <div className="grid gap-3">
             {selected.steps.map((policyId, index) => {
               const policy = policyById.get(policyId);
               const runtime = policy ? runtimeById.get(policy.run.runtime) : undefined;
               return (
-                <div key={`${policyId}-${index}`} className="grid gap-3 rounded-lg border border-divider-strong bg-background p-3">
-                  <div className="grid gap-3 md:grid-cols-[minmax(12rem,1fr)_auto_minmax(10rem,0.9fr)_auto_minmax(10rem,0.9fr)] md:items-center">
-                    <WorkflowReadOnlyCard label="Policy" value={policy?.title ?? policyId} tone="policy" />
+                <div
+                  key={`${policyId}-${index}`}
+                  data-workflow-step-index={index}
+                  onPointerDown={(event) => handleStepPointerDown(event, index)}
+                  onPointerMove={handleStepPointerMove}
+                  onPointerUp={handleStepPointerUp}
+                  onPointerCancel={resetStepDrag}
+                  className={cn(
+                    "cursor-grab select-none rounded-lg border border-divider-strong bg-background p-3 active:cursor-grabbing",
+                    draggedStepIndex === index && "opacity-60",
+                    dragOverStepIndex === index && draggedStepIndex !== index && "border-primary/70 ring-2 ring-primary/20"
+                  )}
+                >
+                  <div className="grid gap-3 md:grid-cols-[minmax(12rem,1fr)_auto_minmax(10rem,0.9fr)_auto_minmax(10rem,0.9fr)_auto] md:items-center">
+                    <WorkflowReadOnlyCard
+                      label="Policy"
+                      tone="policy"
+                      value={(
+                        <Select value={policyId || noSelection} onValueChange={(value) => updateStep(index, value === noSelection ? "" : value)}>
+                          <SelectTrigger className="h-8 w-full min-w-0 px-2 text-xs" onDragStart={(event) => event.stopPropagation()}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {policyOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
                     <WorkflowArrow />
                     <WorkflowReadOnlyCard label="Agent" value={policy?.run.agent ?? "Missing policy"} tone="agent" badge={runtime?.title} />
                     <WorkflowArrow />
                     <WorkflowReadOnlyCard label="Event" value={policy?.on ?? "Missing policy"} tone="event" />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Select value={policyId || noSelection} onValueChange={(value) => updateStep(index, value === noSelection ? "" : value)}>
-                      <SelectTrigger className="h-8 w-full min-w-0 max-w-sm px-2 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {policyOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" size="icon-sm" variant="outline" aria-label="Move step up" title="Move step up" onClick={() => moveStep(index, -1)}>
-                      <ChevronDown data-icon="inline-start" className="rotate-180" />
-                    </Button>
-                    <Button type="button" size="icon-sm" variant="outline" aria-label="Move step down" title="Move step down" onClick={() => moveStep(index, 1)}>
-                      <ChevronDown data-icon="inline-start" />
-                    </Button>
                     <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected.steps.filter((_, stepIndex) => stepIndex !== index) })}>
                       <TrashButtonIcon />
                     </Button>
@@ -1803,7 +1850,7 @@ function WorkflowsAutomationTab({
   );
 }
 
-function WorkflowReadOnlyCard({ label, value, badge, tone }: { label: string; value: string; badge?: string; tone: "policy" | "agent" | "event" }) {
+function WorkflowReadOnlyCard({ label, value, badge, tone }: { label: string; value: ReactNode; badge?: string; tone: "policy" | "agent" | "event" }) {
   const Icon = tone === "policy" ? Route : tone === "agent" ? Bot : Activity;
   return (
     <div className="min-h-16 rounded-lg border border-divider-strong bg-card px-3 py-2">
@@ -1814,7 +1861,9 @@ function WorkflowReadOnlyCard({ label, value, badge, tone }: { label: string; va
         </span>
         {badge ? <Badge variant="outline" className="max-w-28 truncate font-mono text-[0.62rem]">{badge}</Badge> : null}
       </div>
-      <div className="mt-2 truncate text-sm text-foreground">{value}</div>
+      <div className="mt-2 min-w-0 text-sm text-foreground">
+        {typeof value === "string" ? <span className="block truncate">{value}</span> : value}
+      </div>
     </div>
   );
 }
