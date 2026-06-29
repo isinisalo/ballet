@@ -63,7 +63,7 @@ The seed data includes:
 
 - Project: `APM · Acme Platform Migration`
 - Codex CLI runtime: `codex-cli`
-- Policy: `Deployment failures to k8s operator`
+- Policy: `on.deployment.failed.then.k8s-operator.start.remediation`
 - Routed event: `deployment.failed`
 - Unassigned event: `cost.anomaly`
 

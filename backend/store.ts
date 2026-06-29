@@ -5,7 +5,7 @@ import { RuntimeDatabase, resolveRuntimeDbPath } from "./runtime-db.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 import {
   AutomationValidationError,
-  automationEventsToEventDefinitions,
+  automationPoliciesToEventDefinitions,
   automationPoliciesToPolicies,
   automationRuntimesToRuntimes,
   loadProjectAutomationConfigWithIssues,
@@ -36,8 +36,8 @@ export class MarkdownStore {
     const automation = await loadProjectAutomationConfigWithIssues(this.root, data.agents);
     data.automation = automation.config;
     data.automationIssues = automation.issues;
-    data.eventDefinitions = automationEventsToEventDefinitions(automation.config.events);
-    data.policies = automationPoliciesToPolicies(automation.config.policies);
+    data.eventDefinitions = automationPoliciesToEventDefinitions(automation.config.policies);
+    data.policies = automationPoliciesToPolicies(automation.config.policies, data.agents);
     data.runtimes = automationRuntimesToRuntimes(automation.config.runtimes);
     data.events = this.db().listEventRecords();
     data.agentRuns = this.db().listRuns();

@@ -172,43 +172,13 @@ export const seedData: AppData = {
   agentRuns: [],
   automation: {
     version: 1,
-    events: [
-      {
-        id: "deployment.failed",
-        title: "Deployment failed",
-        description: "A deployment failed and can be routed to an operator.",
-        source: "runtime"
-      },
-      {
-        id: "agent.output.completed",
-        title: "Agent output completed",
-        source: "runtime"
-      },
-      {
-        id: "agent.output.failed",
-        title: "Agent output failed",
-        source: "runtime"
-      },
-      {
-        id: "agent.output.blocked",
-        title: "Agent output blocked",
-        source: "runtime"
-      },
-      {
-        id: "agent.output.cancelled",
-        title: "Agent output cancelled",
-        source: "runtime"
-      }
-    ],
+    events: [],
     policies: [
       {
-        id: "policy-deploy-fail",
-        title: "Deployment failures to k8s operator",
-        on: "deployment.failed",
-        run: {
-          agent: "agent-k8s",
-          runtime: "runtime-codex"
-        },
+        id: "on.k8s-operator.remediation.failed.v1.then.k8s-operator.start.remediation",
+        event: "k8s-operator.remediation.failed.v1",
+        agent: "k8s-operator",
+        action: "remediation",
         enabled: true
       }
     ],
@@ -216,7 +186,7 @@ export const seedData: AppData = {
       {
         id: "deployment-response",
         title: "Deployment response",
-        steps: ["policy-deploy-fail"]
+        steps: ["on.k8s-operator.remediation.failed.v1.then.k8s-operator.start.remediation"]
       }
     ],
     runtimes: [
@@ -224,13 +194,7 @@ export const seedData: AppData = {
         id: "runtime-codex",
         title: "codex-cli",
         command: "codex",
-        args: [],
-        outputEvents: {
-          completed: "agent.output.completed",
-          failed: "agent.output.failed",
-          blocked: "agent.output.blocked",
-          cancelled: "agent.output.cancelled"
-        }
+        args: []
       }
     ]
   },

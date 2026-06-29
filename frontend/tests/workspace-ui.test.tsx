@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Agent, AppData, ProjectAutomationConfig } from "../../backend/shared/domain";
+import { policyOutputEventTypes } from "../../backend/shared/policy-actions";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 
 const now = "2026-06-26T10:00:00.000Z";
@@ -42,17 +43,17 @@ const baseData = (): AppData => ({
     enabled: true,
     createdAt: now,
     updatedAt: now,
-    config: { args: "[]", outputEvents: "{}" }
+    config: { args: "[]" }
   }],
   policies: [{
     id: "policy-1",
     name: "Assign existing agent",
     description: "",
     active: true,
-    match: { eventTypes: ["task.created"], projectId: "*", source: "*" },
+    match: { eventTypes: ["existing.implementation.failed.v1"], projectId: "*", source: "*" },
     action: { type: "start_agent_run", targetAgentId: "agent-1" },
     projectId: "*",
-    eventTypes: ["task.created"],
+    eventTypes: ["existing.implementation.failed.v1"],
     source: "*",
     payloadMetadata: {},
     targetAgentId: "agent-1",
@@ -60,24 +61,24 @@ const baseData = (): AppData => ({
     updatedAt: now
   }],
   eventDefinitions: [{
-    id: "task.created",
-    name: "Task created",
-    description: "Task created event",
+    id: "existing.implementation.complete.v1",
+    name: "existing.implementation.complete.v1",
+    description: "Generated agent action output event.",
     active: true,
-    eventType: "task.created",
-    source: "user",
+    eventType: "existing.implementation.complete.v1",
+    source: "agentd",
     tags: [],
     producers: [],
     payloadExample: {},
     createdAt: now,
     updatedAt: now
   }, {
-    id: "task.updated",
-    name: "Task updated",
-    description: "Task updated event",
+    id: "existing.implementation.failed.v1",
+    name: "existing.implementation.failed.v1",
+    description: "Generated agent action output event.",
     active: true,
-    eventType: "task.updated",
-    source: "user",
+    eventType: "existing.implementation.failed.v1",
+    source: "agentd",
     tags: [],
     producers: [],
     payloadExample: {},
@@ -88,29 +89,24 @@ const baseData = (): AppData => ({
   agentRuns: [],
   automation: {
     version: 1,
-    events: [
-      { id: "task.created", title: "Task created", source: "user" },
-      { id: "task.updated", title: "Task updated", source: "user" },
-      { id: "agent.output.completed", title: "Agent output completed", source: "runtime" }
-    ],
+    events: [],
     policies: [{
-      id: "policy-1",
-      title: "Assign existing agent",
-      on: "task.created",
-      run: { agent: "agent-1", runtime: "runtime-1" },
+      id: "on.existing.implementation.failed.v1.then.existing.start.implementation",
+      event: "existing.implementation.failed.v1",
+      agent: "existing",
+      action: "implementation",
       enabled: true
     }],
     workflows: [{
       id: "workflow-1",
       title: "Default workflow",
-      steps: ["policy-1"]
+      steps: ["on.existing.implementation.failed.v1.then.existing.start.implementation"]
     }],
     runtimes: [{
       id: "runtime-1",
       title: "codex-cli",
       command: "codex",
-      args: [],
-      outputEvents: { completed: "agent.output.completed" }
+      args: []
     }]
   },
   automationIssues: [],
@@ -170,15 +166,15 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
     }
 
     if (url === "/api/automation" && method === "PUT") {
-      const saved = body as ProjectAutomationConfig;
+      const saved = { ...(body as ProjectAutomationConfig), events: [] };
       data.automation = saved;
-      data.eventDefinitions = saved.events.map((event) => ({
-        id: event.id,
-        name: event.title,
-        description: event.description ?? "",
+      data.eventDefinitions = [...new Set(saved.policies.flatMap(policyOutputEventTypes))].map((eventType) => ({
+        id: eventType,
+        name: eventType,
+        description: "Generated agent action output event.",
         active: true,
-        eventType: event.id,
-        source: event.source,
+        eventType,
+        source: "agentd",
         tags: [],
         producers: [],
         payloadExample: {},
@@ -187,16 +183,16 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
       }));
       data.policies = saved.policies.map((policy) => ({
         id: policy.id,
-        name: policy.title,
+        name: policy.id,
         description: "",
         active: policy.enabled,
-        match: { eventTypes: [policy.on], projectId: "*", source: "*" },
-        action: { type: "start_agent_run", targetAgentId: policy.run.agent },
+        match: { eventTypes: [policy.event], projectId: "*", source: "*" },
+        action: { type: "start_agent_run", targetAgentId: policy.agent },
         projectId: "*",
-        eventTypes: [policy.on],
+        eventTypes: [policy.event],
         source: "*",
         payloadMetadata: {},
-        targetAgentId: policy.run.agent,
+        targetAgentId: policy.agent,
         createdAt: now,
         updatedAt: now
       }));
@@ -205,7 +201,7 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
         name: runtime.title,
         type: runtime.command === "codex" ? "codex-cli" : "custom",
         command: runtime.command,
-        config: { args: JSON.stringify(runtime.args), outputEvents: JSON.stringify(runtime.outputEvents) },
+        config: { args: JSON.stringify(runtime.args) },
         enabled: true,
         createdAt: now,
         updatedAt: now
@@ -268,23 +264,40 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const { data, fetchMock } = await renderRoute("/automation");
 
+    expect(screen.queryByRole("tab", { name: /events/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add event/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /policies/i })).toHaveAttribute("aria-selected", "true");
+
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
-    expect(screen.getByText("task.created")).toBeInTheDocument();
-    expect(screen.getByText("agent-1")).toBeInTheDocument();
+    expect(screen.getByText("Policy")).toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+    expect(screen.getByText("Events")).toBeInTheDocument();
+    expect(screen.getByText("on.existing.implementation.failed.v1.then.existing.start.implementation")).toBeInTheDocument();
+    expect(screen.getByText("existing")).toBeInTheDocument();
+    expect(screen.getByText("existing.implementation.complete.v1")).toBeInTheDocument();
+    expect(screen.queryByText("Output events")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /policies/i }));
-    await user.click(screen.getByLabelText("On event"));
-    await user.click(await screen.findByText("task.updated · Task updated"));
+    await user.click(screen.getByLabelText("Event"));
+    await user.click(await screen.findByText("existing.implementation.blocked.v1 · output"));
 
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
-    expect(screen.getByText("task.updated")).toBeInTheDocument();
+    expect(screen.getByText("on.existing.implementation.blocked.v1.then.existing.start.implementation")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.policies[0]?.on).toBe("task.updated"));
+    await waitFor(() => expect(data.automation.events).toEqual([]));
+    expect(data.automation.policies[0]?.event).toBe("existing.implementation.blocked.v1");
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
-      body: expect.stringContaining("\"steps\":[\"policy-1\"]")
+      body: expect.stringContaining("\"steps\":[\"on.existing.implementation.blocked.v1.then.existing.start.implementation\"]")
     }));
+  });
+
+  it("falls back from the removed automation events route", async () => {
+    await renderRoute("/automation/events");
+
+    expect(screen.queryByRole("tab", { name: /events/i })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Ballet").length).toBeGreaterThan(0);
   });
 
   it("shows save failures to users", async () => {

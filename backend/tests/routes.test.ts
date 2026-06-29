@@ -165,7 +165,7 @@ describe("API routes", () => {
     }
   });
 
-  it("returns runtime events in /api/data with automation definitions from project.json", async () => {
+  it("returns runtime events in /api/data with policy-derived automation definitions from project.json", async () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
@@ -175,14 +175,14 @@ describe("API routes", () => {
     await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
       version: 1,
       events: [{ id: "runtime.event", title: "Runtime event", source: "runtime" }],
-      policies: [],
-      workflows: [],
+      policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", event: "developer.implementation.failed.v1", agent: "developer", action: "implementation", enabled: true }],
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"] }],
       runtimes: []
     }, null, 2), "utf8");
 
     store.runtimeDatabase().intakeEvent({
       projectId: "project",
-      eventType: "runtime.event",
+      eventType: "developer.implementation.failed.v1",
       source: "runtime",
       payload: {}
     }, [], []);
@@ -202,18 +202,20 @@ describe("API routes", () => {
         automation: { events: Array<{ id: string; title: string; source: string }> };
       };
 
-      expect(data.automation.events).toEqual([{ id: "runtime.event", title: "Runtime event", source: "runtime" }]);
-      expect(data.eventDefinitions).toHaveLength(1);
-      expect(data.eventDefinitions[0]).toMatchObject({ id: "runtime.event", eventType: "runtime.event" });
-      expect(data.eventDefinitions[0]?.relativePath).toBeUndefined();
+      expect(data.automation.events).toEqual([]);
+      expect(data.eventDefinitions).toHaveLength(4);
+      expect(data.eventDefinitions).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: "developer.implementation.failed.v1", eventType: "developer.implementation.failed.v1" })
+      ]));
+      expect(data.eventDefinitions.some((definition) => definition.relativePath)).toBe(false);
       expect(data.documents?.events).toEqual([]);
-      expect(data.events[0]).toMatchObject({ eventType: "runtime.event", routing: { matchedPolicies: 0 } });
+      expect(data.events[0]).toMatchObject({ eventType: "developer.implementation.failed.v1", routing: { matchedPolicies: 0 } });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     }
   });
 
-  it("validates intake event types against project.json automation events", async () => {
+  it("validates intake event types against policy-derived automation events", async () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
@@ -221,8 +223,8 @@ describe("API routes", () => {
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
     await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
       version: 1,
-      events: [{ id: "plan.approved.v1", title: "Plan approved", source: "user" }],
-      policies: [],
+      events: [{ id: "plan_approved", title: "Plan approved", source: "user" }],
+      policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", event: "developer.implementation.failed.v1", agent: "developer", action: "implementation", enabled: true }],
       workflows: [],
       runtimes: []
     }, null, 2), "utf8");
@@ -236,10 +238,10 @@ describe("API routes", () => {
       const allowed = await fetch(url + "/api/events/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: "project", eventType: "plan.approved.v1", source: "test", payload: {} })
+        body: JSON.stringify({ projectId: "project", eventType: "developer.implementation.failed.v1", source: "test", payload: {} })
       });
       expect(allowed.status).toBe(201);
-      expect(await allowed.json()).toMatchObject({ eventType: "plan.approved.v1" });
+      expect(await allowed.json()).toMatchObject({ eventType: "developer.implementation.failed.v1" });
 
       const blocked = await fetch(url + "/api/events/intake", {
         method: "POST",
@@ -270,12 +272,11 @@ describe("API routes", () => {
     const config = {
       version: 1,
       events: [
-        { id: "task.created", title: "Task created", source: "user" },
-        { id: "agent.output.completed", title: "Agent output completed", source: "runtime" }
+        { id: "task.created", title: "Task created", source: "user" }
       ],
-      policies: [{ id: "assign-developer", title: "Assign developer", on: "task.created", run: { agent: "developer-agent", runtime: "codex-runtime" }, enabled: true }],
-      workflows: [{ id: "delivery", title: "Delivery", steps: ["assign-developer"] }],
-      runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [], outputEvents: { completed: "agent.output.completed" } }]
+      policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", event: "developer.implementation.failed.v1", agent: "developer", action: "implementation", enabled: true }],
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"] }],
+      runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
     };
 
     try {
@@ -285,11 +286,14 @@ describe("API routes", () => {
         body: JSON.stringify(config)
       });
       expect(saved.status).toBe(200);
-      expect(await saved.json()).toMatchObject({ workflows: [{ steps: ["assign-developer"] }] });
+      expect(await saved.json()).toMatchObject({
+        events: [],
+        workflows: [{ steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"] }]
+      });
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);
-      expect(await automation.json()).toMatchObject({ config: { policies: [{ id: "assign-developer", on: "task.created" }] }, issues: [] });
+      expect(await automation.json()).toMatchObject({ config: { events: [], policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", event: "developer.implementation.failed.v1" }] }, issues: [] });
 
       const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",

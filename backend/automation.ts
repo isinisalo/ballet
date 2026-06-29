@@ -7,13 +7,20 @@ import type {
   Policy,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
-  ProjectEvent,
   ProjectPolicy,
   ProjectRuntime,
   ProjectWorkflow,
   RoutedEvent,
   Runtime
 } from "./shared/domain.js";
+import {
+  agentTokenCandidates,
+  generatedPolicyId,
+  normalizePolicyToken,
+  policyOutputEventType,
+  policyOutputEventTypes,
+  resolvePolicyAgent
+} from "./shared/policy-actions.js";
 
 const automationConfigPath = (root: string) => path.join(root, ".ballet", "project.json");
 const timestamp = "1970-01-01T00:00:00.000Z";
@@ -48,62 +55,67 @@ const stringArray = (value: unknown): string[] =>
 const recordArray = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value) ? value.filter(isRecord) : [];
 
-const cloneRecord = (value: unknown): Record<string, unknown> | undefined =>
-  isRecord(value) ? JSON.parse(JSON.stringify(value)) as Record<string, unknown> : undefined;
+const normalizeAgentPolicyToken = (value: string): string =>
+  normalizePolicyToken(value).replace(/-agent$/, "");
 
-const normalizeEvent = (value: Record<string, unknown>): ProjectEvent => ({
-  id: stringValue(value.id),
-  title: stringValue(value.title),
-  description: typeof value.description === "string" ? value.description : undefined,
-  source: stringValue(value.source),
-  payloadSchema: cloneRecord(value.payloadSchema)
-});
+const inferLegacyPolicyAction = (value: Record<string, unknown>): string => {
+  const haystack = [value.action, value.id, value.title, value.name]
+    .map(stringValue)
+    .join(" ")
+    .toLowerCase();
+  if (haystack.includes("implement")) return "implementation";
+  if (haystack.includes("plan")) return "planning";
+  if (haystack.includes("review")) return "review";
+  return "run";
+};
 
 const normalizePolicy = (value: Record<string, unknown>): ProjectPolicy => {
   const run = isRecord(value.run) ? value.run : {};
-  return {
-    id: stringValue(value.id),
-    title: stringValue(value.title),
-    on: stringValue(value.on),
-    run: {
-      agent: stringValue(run.agent),
-      runtime: stringValue(run.runtime)
-    },
+  const event = stringValue(value.event) || stringValue(value.on);
+  const agent = normalizeAgentPolicyToken(stringValue(value.agent) || stringValue(run.agent));
+  const action = normalizePolicyToken(stringValue(value.action) || inferLegacyPolicyAction(value));
+  const normalized = {
+    id: "",
+    event,
+    agent,
+    action,
     enabled: typeof value.enabled === "boolean" ? value.enabled : false
   };
-};
-
-const normalizeRuntime = (value: Record<string, unknown>): ProjectRuntime => {
-  const outputEvents = isRecord(value.outputEvents)
-    ? Object.fromEntries(
-      Object.entries(value.outputEvents)
-        .filter(([key, item]) => ["completed", "failed", "blocked", "cancelled"].includes(key) && typeof item === "string")
-    )
-    : {};
-
   return {
-    id: stringValue(value.id),
-    title: stringValue(value.title),
-    command: stringValue(value.command),
-    args: stringArray(value.args),
-    outputEvents
+    ...normalized,
+    id: generatedPolicyId(normalized)
   };
 };
 
-const normalizeWorkflow = (value: Record<string, unknown>): ProjectWorkflow => ({
+const normalizeRuntime = (value: Record<string, unknown>): ProjectRuntime => ({
   id: stringValue(value.id),
   title: stringValue(value.title),
-  steps: stringArray(value.steps)
+  command: stringValue(value.command),
+  args: stringArray(value.args)
+});
+
+const normalizeWorkflow = (value: Record<string, unknown>, policyIdMap: Map<string, string>): ProjectWorkflow => ({
+  id: stringValue(value.id),
+  title: stringValue(value.title),
+  steps: stringArray(value.steps).map((step) => policyIdMap.get(step) ?? step)
 });
 
 export const normalizeProjectAutomationConfig = (value: unknown): ProjectAutomationConfig => {
   if (!isRecord(value)) return defaultProjectAutomationConfig();
+  const rawPolicies = recordArray(value.policies);
+  const policyPairs = rawPolicies.map((policy) => ({
+    rawId: stringValue(policy.id),
+    normalized: normalizePolicy(policy)
+  }));
+  const policyIdMap = new Map(policyPairs
+    .filter((pair) => pair.rawId && pair.rawId !== pair.normalized.id)
+    .map((pair) => [pair.rawId, pair.normalized.id]));
 
   return {
     version: 1,
-    events: recordArray(value.events).map(normalizeEvent),
-    policies: recordArray(value.policies).map(normalizePolicy),
-    workflows: recordArray(value.workflows).map(normalizeWorkflow),
+    events: [],
+    policies: policyPairs.map((pair) => pair.normalized),
+    workflows: recordArray(value.workflows).map((workflow) => normalizeWorkflow(workflow, policyIdMap)),
     runtimes: recordArray(value.runtimes).map(normalizeRuntime)
   };
 };
@@ -146,19 +158,18 @@ export const validateProjectAutomationConfig = (
     }
   }
 
-  const rawEvents = Array.isArray(input.events) ? input.events : [];
   const rawPolicies = Array.isArray(input.policies) ? input.policies : [];
   const rawWorkflows = Array.isArray(input.workflows) ? input.workflows : [];
   const rawRuntimes = Array.isArray(input.runtimes) ? input.runtimes : [];
+  const normalized = normalizeProjectAutomationConfig(input);
 
-  const eventIds = rawEvents.map((event, index) => ({
-    id: isRecord(event) ? stringValue(event.id) : "",
-    path: `events[${index}].id`
-  }));
-  const policyIds = rawPolicies.map((policy, index) => ({
-    id: isRecord(policy) ? stringValue(policy.id) : "",
+  const policyIds = normalized.policies.map((policy, index) => ({
+    id: policy.id,
     path: `policies[${index}].id`
   }));
+  const rawPolicyIds = rawPolicies
+    .map((policy) => isRecord(policy) ? stringValue(policy.id) : "")
+    .filter(Boolean);
   const runtimeIds = rawRuntimes.map((runtime, index) => ({
     id: isRecord(runtime) ? stringValue(runtime.id) : "",
     path: `runtimes[${index}].id`
@@ -168,29 +179,14 @@ export const validateProjectAutomationConfig = (
     path: `workflows[${index}].id`
   }));
 
-  addUniqueIssues(issues, eventIds, "event");
   addUniqueIssues(issues, policyIds, "policy");
   addUniqueIssues(issues, runtimeIds, "runtime");
   addUniqueIssues(issues, workflowIds, "workflow");
 
-  const eventIdSet = new Set(eventIds.map((item) => item.id).filter(Boolean));
-  const policyIdSet = new Set(policyIds.map((item) => item.id).filter(Boolean));
-  const runtimeIdSet = new Set(runtimeIds.map((item) => item.id).filter(Boolean));
-  const agentIdSet = new Set(agents.map((agent) => agent.id));
-
-  rawEvents.forEach((event, index) => {
-    const base = `events[${index}]`;
-    if (!isRecord(event)) {
-      issues.push({ path: base, message: "Event must be an object." });
-      return;
-    }
-    addRequiredStringIssue(issues, `${base}.id`, event.id, "Event id");
-    addRequiredStringIssue(issues, `${base}.title`, event.title, "Event title");
-    addRequiredStringIssue(issues, `${base}.source`, event.source, "Event source");
-    if (event.payloadSchema !== undefined && !isRecord(event.payloadSchema)) {
-      issues.push({ path: `${base}.payloadSchema`, message: "Event payloadSchema must be a JSON object." });
-    }
-  });
+  const generatedEventIds = normalized.policies.flatMap(policyOutputEventTypes);
+  const eventIdSet = new Set(generatedEventIds);
+  const policyIdSet = new Set([...policyIds.map((item) => item.id).filter(Boolean), ...rawPolicyIds]);
+  const agentTokenSet = new Set(agents.flatMap(agentTokenCandidates));
 
   rawPolicies.forEach((policy, index) => {
     const base = `policies[${index}]`;
@@ -198,26 +194,26 @@ export const validateProjectAutomationConfig = (
       issues.push({ path: base, message: "Policy must be an object." });
       return;
     }
-    addRequiredStringIssue(issues, `${base}.id`, policy.id, "Policy id");
-    addRequiredStringIssue(issues, `${base}.title`, policy.title, "Policy title");
-    addRequiredStringIssue(issues, `${base}.on`, policy.on, "Policy on event");
+    const run = isRecord(policy.run) ? policy.run : undefined;
+    const rawEvent = stringValue(policy.event) || stringValue(policy.on);
+    const rawAgent = stringValue(policy.agent) || stringValue(run?.agent);
+    const rawAction = stringValue(policy.action);
+    const legacyPolicy = policy.event === undefined && policy.agent === undefined && run !== undefined;
+
+    addRequiredStringIssue(issues, `${base}.event`, rawEvent, "Policy event");
+    addRequiredStringIssue(issues, `${base}.agent`, rawAgent, "Policy agent");
+    if (!legacyPolicy) {
+      addRequiredStringIssue(issues, `${base}.action`, rawAction, "Policy action");
+    }
     if (typeof policy.enabled !== "boolean") {
       issues.push({ path: `${base}.enabled`, message: "Policy enabled must be boolean." });
     }
-    if (typeof policy.on === "string" && policy.on && !eventIdSet.has(policy.on)) {
-      issues.push({ path: `${base}.on`, message: `Policy references unknown event: ${policy.on}.` });
+    if (rawEvent && !eventIdSet.has(rawEvent)) {
+      issues.push({ path: `${base}.event`, message: `Policy references unknown event: ${rawEvent}.` });
     }
-    if (!isRecord(policy.run)) {
-      issues.push({ path: `${base}.run`, message: "Policy run must be an object." });
-      return;
-    }
-    addRequiredStringIssue(issues, `${base}.run.agent`, policy.run.agent, "Policy run.agent");
-    addRequiredStringIssue(issues, `${base}.run.runtime`, policy.run.runtime, "Policy run.runtime");
-    if (typeof policy.run.runtime === "string" && policy.run.runtime && !runtimeIdSet.has(policy.run.runtime)) {
-      issues.push({ path: `${base}.run.runtime`, message: `Policy references unknown runtime: ${policy.run.runtime}.` });
-    }
-    if (agents.length > 0 && typeof policy.run.agent === "string" && policy.run.agent && !agentIdSet.has(policy.run.agent)) {
-      issues.push({ path: `${base}.run.agent`, message: `Policy references unknown agent: ${policy.run.agent}.` });
+    const normalizedPolicy = normalized.policies[index];
+    if (agents.length > 0 && rawAgent && normalizedPolicy && !agentTokenSet.has(normalizedPolicy.agent)) {
+      issues.push({ path: `${base}.agent`, message: `Policy references unknown agent: ${rawAgent}.` });
     }
   });
 
@@ -232,25 +228,6 @@ export const validateProjectAutomationConfig = (
     addRequiredStringIssue(issues, `${base}.command`, runtime.command, "Runtime command");
     if (!Array.isArray(runtime.args) || runtime.args.some((item) => typeof item !== "string")) {
       issues.push({ path: `${base}.args`, message: "Runtime args must be a string array." });
-    }
-    if (runtime.outputEvents !== undefined && !isRecord(runtime.outputEvents)) {
-      issues.push({ path: `${base}.outputEvents`, message: "Runtime outputEvents must be an object." });
-      return;
-    }
-    if (isRecord(runtime.outputEvents)) {
-      for (const [status, eventId] of Object.entries(runtime.outputEvents)) {
-        if (!["completed", "failed", "blocked", "cancelled"].includes(status)) {
-          issues.push({ path: `${base}.outputEvents.${status}`, message: `Unsupported output event status: ${status}.` });
-          continue;
-        }
-        if (typeof eventId !== "string" || !eventId.trim()) {
-          issues.push({ path: `${base}.outputEvents.${status}`, message: "Runtime output event id must be a string." });
-          continue;
-        }
-        if (!eventIdSet.has(eventId)) {
-          issues.push({ path: `${base}.outputEvents.${status}`, message: `Runtime output event references unknown event: ${eventId}.` });
-        }
-      }
     }
   });
 
@@ -271,7 +248,7 @@ export const validateProjectAutomationConfig = (
       if (typeof step !== "string") {
         issues.push({ path: stepPath, message: "Workflow step must be a policy id string." });
         if (isRecord(step)) {
-          for (const forbidden of ["on", "event", "agent", "runtime"]) {
+          for (const forbidden of ["on", "event", "agent", "runtime", "action"]) {
             if (forbidden in step) {
               issues.push({ path: `${stepPath}.${forbidden}`, message: `Workflow step must not contain ${forbidden}.` });
             }
@@ -343,41 +320,42 @@ export const saveProjectAutomationConfig = async (
   return normalized;
 };
 
-export const automationEventsToEventDefinitions = (events: ProjectEvent[]): EventDefinition[] =>
-  events.map((event) => ({
-    id: event.id,
-    name: event.title,
-    description: event.description ?? "",
-    active: true,
-    eventType: event.id,
-    source: event.source,
-    tags: [],
-    producers: [],
-    payloadExample: {},
-    createdAt: timestamp,
-    updatedAt: timestamp
-  }));
+export const automationPoliciesToEventDefinitions = (policies: ProjectPolicy[] = []): EventDefinition[] =>
+  [...new Set(policies.flatMap(policyOutputEventTypes))]
+    .map((eventType) => ({
+      id: eventType,
+      name: eventType,
+      description: "Generated agent action output event.",
+      active: true,
+      eventType,
+      source: "agentd",
+      tags: [],
+      producers: [],
+      payloadExample: {},
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }));
 
-export const automationPoliciesToPolicies = (policies: ProjectPolicy[]): Policy[] =>
+export const automationPoliciesToPolicies = (policies: ProjectPolicy[], agents: Agent[] = []): Policy[] =>
   policies.map((policy) => ({
     id: policy.id,
-    name: policy.title,
+    name: policy.id,
     description: "",
     active: policy.enabled,
     match: {
-      eventTypes: [policy.on],
+      eventTypes: [policy.event],
       projectId: "*",
       source: "*"
     },
     action: {
       type: "start_agent_run",
-      targetAgentId: policy.run.agent
+      targetAgentId: resolvePolicyAgent(agents, policy.agent)?.id ?? policy.agent
     },
     projectId: "*",
-    eventTypes: [policy.on],
+    eventTypes: [policy.event],
     source: "*",
     payloadMetadata: {},
-    targetAgentId: policy.run.agent,
+    targetAgentId: resolvePolicyAgent(agents, policy.agent)?.id ?? policy.agent,
     createdAt: timestamp,
     updatedAt: timestamp
   }));
@@ -389,8 +367,7 @@ export const automationRuntimesToRuntimes = (runtimes: ProjectRuntime[]): Runtim
     type: runtime.command === "codex" ? "codex-cli" : "custom",
     command: [runtime.command, ...runtime.args].join(" ").trim(),
     config: {
-      args: JSON.stringify(runtime.args),
-      outputEvents: JSON.stringify(runtime.outputEvents)
+      args: JSON.stringify(runtime.args)
     },
     enabled: true,
     createdAt: timestamp,
@@ -398,27 +375,24 @@ export const automationRuntimesToRuntimes = (runtimes: ProjectRuntime[]): Runtim
   }));
 
 export function mapAgentOutputToEvent(
-  runtime: ProjectRuntime,
+  policy: ProjectPolicy,
   output: AgentRunOutput
 ): RoutedEvent {
-  const eventId = runtime.outputEvents[output.status];
-  if (!eventId) {
-    throw new AutomationValidationError(`Runtime ${runtime.id} has no output event mapping for ${output.status}.`, [{
-      path: `runtimes.${runtime.id}.outputEvents.${output.status}`,
-      message: `Missing output event mapping for ${output.status}.`
-    }]);
-  }
-
   return {
-    id: eventId,
-    source: runtime.id,
+    id: policyOutputEventType(policy, output.status),
+    source: "agentd",
     timestamp: new Date().toISOString(),
     payload: {
-      ...(output.runId ? { runId: output.runId } : {}),
-      ...(output.agentId ? { agentId: output.agentId } : {}),
+      agent: policy.agent,
+      action: policy.action,
       status: output.status,
+      ...(output.outcome ? { outcome: output.outcome } : {}),
       ...(output.summary ? { summary: output.summary } : {}),
-      ...(output.outputRef ? { outputRef: output.outputRef } : {})
+      ...(output.runId ? { run_id: output.runId } : {}),
+      ...(output.triggerEventId ? { trigger_event_id: output.triggerEventId } : {}),
+      ...(output.policyId ? { policy_id: output.policyId } : {}),
+      ...(output.policyVersion ? { policy_version: output.policyVersion } : {}),
+      ...(output.payload ? { payload: output.payload } : {})
     }
   };
 }

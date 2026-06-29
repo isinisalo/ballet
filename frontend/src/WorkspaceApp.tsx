@@ -16,7 +16,6 @@ import {
   FileKey2,
   FileText,
   Hash,
-  Inbox,
   Menu,
   Monitor,
   Moon,
@@ -42,13 +41,13 @@ import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectDocumentTreeNode,
-  ProjectEvent,
   ProjectPolicy,
   ProjectRuntime,
   ProjectWorkflow,
   Runtime,
   Skill
 } from "../../backend/shared/domain";
+import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyOutputEventTypes, preferredAgentToken } from "../../backend/shared/policy-actions";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -87,7 +86,6 @@ import {
   Panel,
   SelectField,
   StatusBadge,
-  SwitchField,
   TextAreaField,
   TextField,
   statusVariant
@@ -98,7 +96,7 @@ import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } 
 
 type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "project-instructions" | "automation" | "agents" | "skills" | "agent-runs";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
-type AutomationTab = "events" | "policies" | "workflows" | "runtimes";
+type AutomationTab = "policies" | "workflows" | "runtimes";
 type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 interface RouteState {
@@ -129,9 +127,6 @@ const emptyData: AppData = {
   automationIssues: [],
   projectDocumentTree: []
 };
-
-const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 const readJson = (value: unknown) => JSON.stringify(value, null, 2);
 const frontmatterToYaml = (frontmatter?: Record<string, unknown>) => stringifyYaml(frontmatter ?? {}).trimEnd();
@@ -219,6 +214,36 @@ const uniqueAutomationId = (base: string, ids: string[]) => {
   return candidate;
 };
 
+const automationEventOptions = (config: ProjectAutomationConfig) => {
+  const options = new Map<string, string>();
+  for (const policy of config.policies) {
+    for (const eventType of policyOutputEventTypes(policy)) {
+      if (!options.has(eventType)) options.set(eventType, `${eventType} · output`);
+    }
+  }
+  return [...options].map(([value, label]) => ({ value, label }));
+};
+
+const automationAgentOptions = (agents: Agent[]) => {
+  const used = new Set<string>();
+  return agents.map((agent) => {
+    const token = agentTokenCandidates(agent).find((candidate) => !used.has(candidate)) ?? preferredAgentToken(agent);
+    used.add(token);
+    return { value: token, label: agent.name };
+  });
+};
+
+const uniquePolicyAction = (event: string, agent: string, baseAction: string, policies: ProjectPolicy[]) => {
+  const base = normalizePolicyToken(baseAction) || "action";
+  let action = base;
+  let suffix = 2;
+  while (policies.some((policy) => policy.id === generatedPolicyId({ event, agent, action }))) {
+    action = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  return action;
+};
+
 const routeFromPath = (path: string): RouteState => {
   const url = new URL(path, "http://localhost");
   const goalsMatch = url.pathname.match(/^\/projects\/([^/]+)\/goals\/?$/);
@@ -236,10 +261,9 @@ const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  const automationMatch = url.pathname.match(/^\/automation\/(events|policies|workflows|runtimes)\/?$/);
+  const automationMatch = url.pathname.match(/^\/automation\/(policies|workflows|runtimes)\/?$/);
   if (automationMatch) return { view: "automation", automationTab: automationMatch[1] as AutomationTab };
-  if (url.pathname === "/automation") return { view: "automation", automationTab: "events" };
-  if (url.pathname === "/events") return { view: "automation", automationTab: "events" };
+  if (url.pathname === "/automation") return { view: "automation", automationTab: "policies" };
   if (url.pathname === "/policies") return { view: "automation", automationTab: "policies" };
   if (url.pathname === "/workflow") return { view: "automation", automationTab: "workflows" };
   if (url.pathname === "/runtimes") return { view: "automation", automationTab: "runtimes" };
@@ -1052,7 +1076,7 @@ export function WorkspaceApp() {
               {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} onCreateDocument={setCreateDocumentKind} /> : null}
               {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} onCreateDocument={setCreateDocumentKind} /> : null}
               {route.view === "project-instructions" ? <InstructionsPage project={project} selectedInstruction={selectedInstruction} onCreateDocument={setCreateDocumentKind} /> : null}
-              {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "events"} saveAutomation={saveAutomation} navigate={navigate} /> : null}
+              {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "policies"} saveAutomation={saveAutomation} navigate={navigate} /> : null}
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "agent-runs" ? <AgentRunsView data={data} refresh={refresh} /> : null}
@@ -1351,42 +1375,14 @@ function SkillsView({
 }
 
 const automationTabs: Array<{ id: AutomationTab; label: string; icon: ReactNode }> = [
-  { id: "events", label: "Events", icon: <Inbox data-icon="inline-start" /> },
   { id: "policies", label: "Policies", icon: <Route data-icon="inline-start" /> },
   { id: "workflows", label: "Workflows", icon: <Activity data-icon="inline-start" /> },
   { id: "runtimes", label: "Runtimes", icon: <Code2 data-icon="inline-start" /> }
 ];
 
-const payloadFieldTypes = ["string", "number", "boolean", "object", "array"];
 const noSelection = "__none__";
 
-type PayloadFieldDraft = {
-  name: string;
-  type: string;
-  required: boolean;
-};
-
 type AutomationConfigUpdater = (updater: (config: ProjectAutomationConfig) => ProjectAutomationConfig) => void;
-
-const payloadFieldsFromSchema = (schema?: Record<string, unknown>): PayloadFieldDraft[] => {
-  const properties = isPlainRecord(schema?.properties) ? schema.properties : {};
-  const required = Array.isArray(schema?.required) ? new Set(schema.required.map(String)) : new Set<string>();
-  return Object.entries(properties).map(([name, value]) => ({
-    name,
-    type: isPlainRecord(value) && typeof value.type === "string" ? value.type : "string",
-    required: required.has(name)
-  }));
-};
-
-const schemaFromPayloadFields = (fields: PayloadFieldDraft[]): Record<string, unknown> => ({
-  type: "object",
-  properties: Object.fromEntries(
-    fields
-      .filter((field) => field.name.trim())
-      .map((field) => [field.name.trim(), { type: field.type }])
-  ),
-  required: fields.filter((field) => field.name.trim() && field.required).map((field) => field.name.trim())
-});
 
 function AutomationView({
   data,
@@ -1400,7 +1396,6 @@ function AutomationView({
   navigate: (path: string) => void;
 }) {
   const [draft, setDraft] = useState<ProjectAutomationConfig>(data.automation ?? automationConfigTemplate());
-  const [selectedEventId, setSelectedEventId] = useState("");
   const [selectedPolicyId, setSelectedPolicyId] = useState("");
   const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
   const [selectedRuntimeId, setSelectedRuntimeId] = useState("");
@@ -1409,7 +1404,6 @@ function AutomationView({
   useEffect(() => {
     const next = data.automation ?? automationConfigTemplate();
     setDraft(next);
-    setSelectedEventId((current) => next.events.some((event) => event.id === current) ? current : next.events[0]?.id ?? "");
     setSelectedPolicyId((current) => next.policies.some((policy) => policy.id === current) ? current : next.policies[0]?.id ?? "");
     setSelectedWorkflowId((current) => next.workflows.some((workflow) => workflow.id === current) ? current : next.workflows[0]?.id ?? "");
     setSelectedRuntimeId((current) => next.runtimes.some((runtime) => runtime.id === current) ? current : next.runtimes[0]?.id ?? "");
@@ -1430,32 +1424,22 @@ function AutomationView({
     }
   };
 
-  const selectedEvent = draft.events.find((event) => event.id === selectedEventId) ?? draft.events[0];
   const selectedPolicy = draft.policies.find((policy) => policy.id === selectedPolicyId) ?? draft.policies[0];
   const selectedWorkflow = draft.workflows.find((workflow) => workflow.id === selectedWorkflowId) ?? draft.workflows[0];
   const selectedRuntime = draft.runtimes.find((runtime) => runtime.id === selectedRuntimeId) ?? draft.runtimes[0];
 
-  const addEvent = () => {
-    const id = uniqueAutomationId("new.event", draft.events.map((event) => event.id));
-    setDraft((current) => ({
-      ...current,
-      events: [...current.events, { id, title: "New event", source: "runtime" }]
-    }));
-    setSelectedEventId(id);
-  };
-
   const addPolicy = () => {
-    const id = uniqueAutomationId("new-policy", draft.policies.map((policy) => policy.id));
+    const event = automationEventOptions(draft)[0]?.value ?? "";
+    const agent = data.agents[0] ? preferredAgentToken(data.agents[0]) : "";
+    const action = uniquePolicyAction(event, agent, "implementation", draft.policies);
+    const id = generatedPolicyId({ event, agent, action });
     setDraft((current) => ({
       ...current,
       policies: [...current.policies, {
         id,
-        title: "New policy",
-        on: current.events[0]?.id ?? "",
-        run: {
-          agent: data.agents[0]?.id ?? "",
-          runtime: current.runtimes[0]?.id ?? ""
-        },
+        event,
+        agent,
+        action,
         enabled: true
       }]
     }));
@@ -1475,18 +1459,9 @@ function AutomationView({
     const id = uniqueAutomationId("new-runtime", draft.runtimes.map((runtime) => runtime.id));
     setDraft((current) => ({
       ...current,
-      runtimes: [...current.runtimes, { id, title: "New runtime", command: "codex", args: [], outputEvents: {} }]
+      runtimes: [...current.runtimes, { id, title: "New runtime", command: "codex", args: [] }]
     }));
     setSelectedRuntimeId(id);
-  };
-
-  const removeSelectedEvent = () => {
-    if (!selectedEvent) return;
-    setDraft((current) => ({
-      ...current,
-      events: current.events.filter((event) => event.id !== selectedEvent.id)
-    }));
-    setSelectedEventId(draft.events.find((event) => event.id !== selectedEvent.id)?.id ?? "");
   };
 
   const removeSelectedPolicy = () => {
@@ -1521,10 +1496,6 @@ function AutomationView({
   };
 
   const addConfig = {
-    events: {
-      label: "Add event",
-      onAdd: addEvent
-    },
     policies: {
       label: "Add policy",
       onAdd: addPolicy
@@ -1540,17 +1511,10 @@ function AutomationView({
   }[activeTab];
 
   const deleteConfig = {
-    events: {
-      label: "Delete event",
-      type: "event",
-      resourceName: selectedEvent?.title || selectedEvent?.id,
-      canDelete: Boolean(selectedEvent),
-      onDelete: removeSelectedEvent
-    },
     policies: {
       label: "Delete policy",
       type: "policy",
-      resourceName: selectedPolicy?.title || selectedPolicy?.id,
+      resourceName: selectedPolicy?.id,
       canDelete: Boolean(selectedPolicy),
       onDelete: removeSelectedPolicy
     },
@@ -1614,9 +1578,6 @@ function AutomationView({
           </div>
           {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
           <AutomationIssues issues={data.automationIssues} />
-          {activeTab === "events" ? (
-            <EventsAutomationTab config={draft} selectedId={selectedEventId} onSelect={setSelectedEventId} updateConfig={updateConfig} />
-          ) : null}
           {activeTab === "policies" ? (
             <PoliciesAutomationTab data={data} config={draft} selectedId={selectedPolicyId} onSelect={setSelectedPolicyId} updateConfig={updateConfig} />
           ) : null}
@@ -1670,95 +1631,6 @@ function AutomationEntityList({
   );
 }
 
-function EventsAutomationTab({
-  config,
-  selectedId,
-  onSelect,
-  updateConfig
-}: {
-  config: ProjectAutomationConfig;
-  selectedId: string;
-  onSelect: (id: string) => void;
-  updateConfig: AutomationConfigUpdater;
-}) {
-  const selected = config.events.find((event) => event.id === selectedId) ?? config.events[0];
-  const [advancedSchema, setAdvancedSchema] = useState(false);
-  const [schemaText, setSchemaText] = useState("");
-  const [schemaError, setSchemaError] = useState("");
-
-  useEffect(() => {
-    setSchemaText(readJson(selected?.payloadSchema ?? { type: "object", properties: {}, required: [] }));
-    setSchemaError("");
-  }, [selected?.id, selected?.payloadSchema]);
-
-  const updateSelected = (patch: Partial<ProjectEvent>) => {
-    if (!selected) return;
-    updateConfig((current) => ({
-      ...current,
-      events: current.events.map((event) => event.id === selected.id ? { ...event, ...patch } : event)
-    }));
-  };
-
-  const fields = payloadFieldsFromSchema(selected?.payloadSchema);
-  const updateFields = (nextFields: PayloadFieldDraft[]) => updateSelected({ payloadSchema: schemaFromPayloadFields(nextFields) });
-  const applySchema = () => {
-    setSchemaError("");
-    try {
-      const parsed = JSON.parse(schemaText) as unknown;
-      if (!isPlainRecord(parsed)) throw new Error("Schema must be a JSON object.");
-      updateSelected({ payloadSchema: parsed });
-    } catch (err) {
-      setSchemaError(err instanceof Error ? err.message : "Invalid JSON schema.");
-    }
-  };
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <AutomationEntityList
-        empty="No events."
-        rows={config.events.map((event) => ({ id: event.id, label: event.id, active: event.id === selected?.id, onSelect: () => onSelect(event.id) }))}
-      />
-      {selected ? (
-        <div className="grid gap-4">
-          <FieldGroup>
-            <TextField label="Event ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-            <TextAreaField label="Description" rows={2} value={selected.description ?? ""} onChange={(description) => updateSelected({ description })} />
-          </FieldGroup>
-          <Alert><AlertDescription>Events are emitted by the runtime. Agents only produce output.</AlertDescription></Alert>
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-mono text-xs font-semibold uppercase text-muted-foreground">Payload fields</span>
-            <SwitchField label="Advanced JSON schema" checked={advancedSchema} onChange={setAdvancedSchema} />
-          </div>
-          {advancedSchema ? (
-            <FieldGroup>
-              <TextAreaField label="Payload schema JSON" rows={10} value={schemaText} onChange={setSchemaText} className="font-mono text-xs leading-relaxed" />
-              {schemaError ? <Alert variant="destructive"><AlertDescription>{schemaError}</AlertDescription></Alert> : null}
-              <Button type="button" variant="outline" className="w-fit" onClick={applySchema}>Apply schema</Button>
-            </FieldGroup>
-          ) : (
-            <div className="grid gap-2">
-              {fields.map((field, index) => (
-                <div key={`${field.name}-${index}`} className="grid gap-2 rounded-lg border border-divider-strong bg-background p-2 md:grid-cols-[minmax(0,1fr)_10rem_auto_auto] md:items-end">
-                  <TextField label="Field name" compact value={field.name} onChange={(name) => updateFields(fields.map((item, itemIndex) => itemIndex === index ? { ...item, name } : item))} />
-                  <SelectField label="Type" compact value={field.type} options={payloadFieldTypes.map((type) => ({ value: type, label: type }))} onChange={(type) => updateFields(fields.map((item, itemIndex) => itemIndex === index ? { ...item, type } : item))} />
-                  <SwitchField label="Required" checked={field.required} onChange={(required) => updateFields(fields.map((item, itemIndex) => itemIndex === index ? { ...item, required } : item))} />
-                  <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove payload field" title="Remove payload field" onClick={() => updateFields(fields.filter((_, itemIndex) => itemIndex !== index))}>
-                    <TrashButtonIcon />
-                  </Button>
-                </div>
-              ))}
-              <Button type="button" variant="outline" className="w-fit" onClick={() => updateFields([...fields, { name: `field${fields.length + 1}`, type: "string", required: false }])}>
-                <Plus data-icon="inline-start" />
-                Add payload field
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : <EmptyState title="No event selected." />}
-    </div>
-  );
-}
-
 function PoliciesAutomationTab({
   data,
   config,
@@ -1773,16 +1645,27 @@ function PoliciesAutomationTab({
   updateConfig: AutomationConfigUpdater;
 }) {
   const selected = config.policies.find((policy) => policy.id === selectedId) ?? config.policies[0];
-  const eventOptions = [{ value: noSelection, label: "No event" }, ...config.events.map((event) => ({ value: event.id, label: `${event.id} · ${event.title}` }))];
-  const agentOptions = [{ value: noSelection, label: "No agent" }, ...data.agents.map((agent) => ({ value: agent.id, label: agent.name }))];
-  const runtimeOptions = [{ value: noSelection, label: "No runtime" }, ...config.runtimes.map((runtime) => ({ value: runtime.id, label: runtime.title }))];
+  const eventOptions = [{ value: noSelection, label: "No event" }, ...automationEventOptions(config)];
+  const agentOptions = [{ value: noSelection, label: "No agent" }, ...automationAgentOptions(data.agents)];
 
   const updateSelected = (patch: Partial<ProjectPolicy>) => {
     if (!selected) return;
+    const next = { ...selected, ...patch };
+    const normalized = {
+      ...next,
+      agent: normalizePolicyToken(next.agent),
+      action: normalizePolicyToken(next.action)
+    };
+    const nextId = generatedPolicyId(normalized);
     updateConfig((current) => ({
       ...current,
-      policies: current.policies.map((policy) => policy.id === selected.id ? { ...policy, ...patch } : policy)
+      policies: current.policies.map((policy) => policy.id === selected.id ? { ...normalized, id: nextId } : policy),
+      workflows: current.workflows.map((workflow) => ({
+        ...workflow,
+        steps: workflow.steps.map((step) => step === selected.id ? nextId : step)
+      }))
     }));
+    onSelect(nextId);
   };
 
   return (
@@ -1793,10 +1676,15 @@ function PoliciesAutomationTab({
       />
       {selected ? (
         <FieldGroup>
-          <TextField label="Policy ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-          <SelectField label="On event" value={selected.on || noSelection} options={eventOptions} onChange={(on) => updateSelected({ on: on === noSelection ? "" : on })} />
-          <SelectField label="Agent" value={selected.run.agent || noSelection} options={agentOptions} onChange={(agent) => updateSelected({ run: { ...selected.run, agent: agent === noSelection ? "" : agent } })} />
-          <SelectField label="Runtime" value={selected.run.runtime || noSelection} options={runtimeOptions} onChange={(runtime) => updateSelected({ run: { ...selected.run, runtime: runtime === noSelection ? "" : runtime } })} />
+          <Field className="gap-1.5">
+            <FieldLabel className="text-muted-foreground">Policy ID</FieldLabel>
+            <div className="min-h-8 rounded border border-input bg-background px-2.5 py-1.5 font-mono text-xs text-muted-foreground break-all">
+              {selected.id}
+            </div>
+          </Field>
+          <SelectField label="Event" value={selected.event || noSelection} options={eventOptions} onChange={(event) => updateSelected({ event: event === noSelection ? "" : event })} />
+          <SelectField label="Agent" value={selected.agent || noSelection} options={agentOptions} onChange={(agent) => updateSelected({ agent: agent === noSelection ? "" : agent })} />
+          <TextField label="Action" required value={selected.action} onChange={(action) => updateSelected({ action })} />
         </FieldGroup>
       ) : <EmptyState title="No policy selected." />}
     </div>
@@ -1819,8 +1707,7 @@ function WorkflowsAutomationTab({
   const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null);
   const [dragOverStepIndex, setDragOverStepIndex] = useState<number | null>(null);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
-  const runtimeById = useMemo(() => new Map(config.runtimes.map((runtime) => [runtime.id, runtime])), [config.runtimes]);
-  const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.title || policy.id }))];
+  const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
 
   const updateSelected = (patch: Partial<ProjectWorkflow>) => {
     if (!selected) return;
@@ -1897,7 +1784,7 @@ function WorkflowsAutomationTab({
           <div className="grid gap-3">
             {selected.steps.map((policyId, index) => {
               const policy = policyById.get(policyId);
-              const runtime = policy ? runtimeById.get(policy.run.runtime) : undefined;
+              const outputEvents = policy ? policyOutputEventTypes(policy) : [];
               return (
                 <div
                   key={`${policyId}-${index}`}
@@ -1912,7 +1799,7 @@ function WorkflowsAutomationTab({
                     dragOverStepIndex === index && draggedStepIndex !== index && "border-primary/70 ring-2 ring-primary/20"
                   )}
                 >
-                  <div className="grid gap-3 md:grid-cols-[minmax(12rem,1fr)_auto_minmax(10rem,0.9fr)_auto_minmax(10rem,0.9fr)_auto] md:items-center">
+                  <div className="grid gap-3 md:grid-cols-[minmax(12rem,1fr)_auto_minmax(10rem,0.65fr)_auto_minmax(18rem,1.35fr)_auto] md:items-center">
                     <WorkflowReadOnlyCard
                       label="Policy"
                       tone="policy"
@@ -1932,9 +1819,21 @@ function WorkflowsAutomationTab({
                       )}
                     />
                     <WorkflowArrow />
-                    <WorkflowReadOnlyCard label="Agent" value={policy?.run.agent ?? "Missing policy"} tone="agent" badge={runtime?.title} />
+                    <WorkflowReadOnlyCard label="Agent" value={policy?.agent ?? "Missing policy"} tone="agent" />
                     <WorkflowArrow />
-                    <WorkflowReadOnlyCard label="Event" value={policy?.on ?? "Missing policy"} tone="event" />
+                    <WorkflowReadOnlyCard
+                      label="Events"
+                      tone="event"
+                      value={outputEvents.length > 0 ? (
+                        <div className="flex min-w-0 flex-wrap gap-2">
+                          {outputEvents.map((eventType) => (
+                            <Badge key={eventType} variant="outline" className="max-w-full rounded-md font-mono text-[0.62rem] break-all">
+                              {eventType}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : "Missing policy"}
+                    />
                     <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected.steps.filter((_, stepIndex) => stepIndex !== index) })}>
                       <TrashButtonIcon />
                     </Button>
@@ -1953,7 +1852,11 @@ function WorkflowsAutomationTab({
   );
 }
 
-function WorkflowReadOnlyCard({ label, value, badge, tone }: { label: string; value: ReactNode; badge?: string; tone: "policy" | "agent" | "event" }) {
+function WorkflowArrow() {
+  return <div className="hidden text-center font-mono text-xs text-muted-foreground md:block" aria-hidden="true">-&gt;</div>;
+}
+
+function WorkflowReadOnlyCard({ label, value, tone }: { label: string; value: ReactNode; tone: "policy" | "agent" | "event" }) {
   const Icon = tone === "policy" ? Route : tone === "agent" ? Bot : Activity;
   return (
     <div className="min-h-16 rounded-lg border border-divider-strong bg-card px-3 py-2">
@@ -1962,17 +1865,12 @@ function WorkflowReadOnlyCard({ label, value, badge, tone }: { label: string; va
           <Icon data-icon="inline-start" />
           {label}
         </span>
-        {badge ? <Badge variant="outline" className="max-w-28 truncate font-mono text-[0.62rem]">{badge}</Badge> : null}
       </div>
       <div className="mt-2 min-w-0 text-sm text-foreground">
         {typeof value === "string" ? <span className="block truncate">{value}</span> : value}
       </div>
     </div>
   );
-}
-
-function WorkflowArrow() {
-  return <div className="hidden text-center font-mono text-xs text-muted-foreground md:block" aria-hidden="true">-&gt;</div>;
 }
 
 function RuntimesAutomationTab({
@@ -1987,7 +1885,6 @@ function RuntimesAutomationTab({
   updateConfig: AutomationConfigUpdater;
 }) {
   const selected = config.runtimes.find((runtime) => runtime.id === selectedId) ?? config.runtimes[0];
-  const eventOptions = [{ value: noSelection, label: "No event" }, ...config.events.map((event) => ({ value: event.id, label: `${event.id} · ${event.title}` }))];
 
   const updateSelected = (patch: Partial<ProjectRuntime>) => {
     if (!selected) return;
@@ -1995,14 +1892,6 @@ function RuntimesAutomationTab({
       ...current,
       runtimes: current.runtimes.map((runtime) => runtime.id === selected.id ? { ...runtime, ...patch } : runtime)
     }));
-  };
-
-  const updateOutputEvent = (status: "completed" | "failed" | "blocked" | "cancelled", eventId: string) => {
-    if (!selected) return;
-    const outputEvents = { ...selected.outputEvents };
-    if (eventId === noSelection) delete outputEvents[status];
-    else outputEvents[status] = eventId;
-    updateSelected({ outputEvents });
   };
 
   return (
@@ -2017,15 +1906,6 @@ function RuntimesAutomationTab({
           <TextField label="Title" required value={selected.title} onChange={(title) => updateSelected({ title })} />
           <TextField label="Command" required value={selected.command} onChange={(command) => updateSelected({ command })} />
           <TextAreaField label="Args" rows={4} value={selected.args.join("\n")} onChange={(value) => updateSelected({ args: value.split("\n").map((item) => item.trim()).filter(Boolean) })} />
-          {(["completed", "failed", "blocked", "cancelled"] as const).map((status) => (
-            <SelectField
-              key={status}
-              label={`Output event: ${status}`}
-              value={selected.outputEvents[status] ?? noSelection}
-              options={eventOptions}
-              onChange={(eventId) => updateOutputEvent(status, eventId)}
-            />
-          ))}
         </FieldGroup>
       ) : <EmptyState title="No runtime selected." />}
     </div>

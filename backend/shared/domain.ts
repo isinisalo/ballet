@@ -4,7 +4,7 @@ export type EventStatus = "received" | "routed" | "unassigned" | "handled";
 export type AgentStatus = "online" | "offline";
 export type RuntimeType = "codex-cli" | "custom";
 export type AgentRunStatus = "queued" | "running" | "completed" | "failed" | "blocked" | "needs_input" | "cancelled";
-export type AgentOutputEventStatus = "completed" | "failed" | "blocked" | "cancelled";
+export type AgentOutputEventStatus = "complete" | "failed" | "blocked" | "cancelled";
 export type AgentOutcomeStatus = "ready" | "blocked" | "needs_input" | "approved" | "changes_requested" | "failed";
 export type RunCheckStatus = "passed" | "failed" | "skipped";
 export type PolicyPredicateOperator = "equals" | "in" | "exists";
@@ -22,12 +22,9 @@ export interface ProjectEvent {
 
 export interface ProjectPolicy {
   id: string;
-  title: string;
-  on: string;
-  run: {
-    agent: string;
-    runtime: string;
-  };
+  event: string;
+  agent: string;
+  action: string;
   enabled: boolean;
 }
 
@@ -36,7 +33,6 @@ export interface ProjectRuntime {
   title: string;
   command: string;
   args: string[];
-  outputEvents: Partial<Record<AgentOutputEventStatus, string>>;
 }
 
 export interface ProjectWorkflow {
@@ -60,10 +56,13 @@ export interface ProjectAutomationIssue {
 
 export interface AgentRunOutput {
   runId?: string;
-  agentId?: string;
   status: AgentOutputEventStatus;
+  outcome?: AgentOutcomeStatus;
   summary?: string;
-  outputRef?: string;
+  triggerEventId?: string;
+  policyId?: string;
+  policyVersion?: number;
+  payload?: Record<string, unknown>;
   raw?: unknown;
 }
 
@@ -72,11 +71,16 @@ export interface RoutedEvent {
   source: string;
   timestamp: string;
   payload: {
-    runId?: string;
-    agentId?: string;
+    agent: string;
+    action: string;
     status: AgentOutputEventStatus;
+    outcome?: AgentOutcomeStatus;
     summary?: string;
-    outputRef?: string;
+    run_id?: string;
+    trigger_event_id?: string;
+    policy_id?: string;
+    policy_version?: number;
+    payload?: Record<string, unknown>;
   };
 }
 

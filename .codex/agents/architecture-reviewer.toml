@@ -1,4 +1,4 @@
-name = "Architecture Reviewer"
+name = "Architect"
 description = "Arvioi Ballet-muutoksen rajapinnat, tietomallit, vastuurajat, ylläpidettävyyden ja teknisen velan."
 model = "gpt-5.5"
 model_reasoning_effort = "medium"

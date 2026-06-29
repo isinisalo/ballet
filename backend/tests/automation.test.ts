@@ -36,19 +36,14 @@ const agent: Agent = {
 const validConfig = (): ProjectAutomationConfig => ({
   version: 1,
   events: [
-    { id: "task.created", title: "Task created", source: "user" },
-    { id: "agent.output.completed", title: "Agent output completed", source: "runtime" },
-    { id: "agent.output.failed", title: "Agent output failed", source: "runtime" }
+    { id: "task.created", title: "Task created", source: "user" }
   ],
   policies: [
     {
-      id: "assign-developer",
-      title: "Assign developer",
-      on: "task.created",
-      run: {
-        agent: "developer-agent",
-        runtime: "codex-runtime"
-      },
+      id: "on.developer.implementation.failed.v1.then.developer.start.implementation",
+      event: "developer.implementation.failed.v1",
+      agent: "developer",
+      action: "implementation",
       enabled: true
     }
   ],
@@ -56,7 +51,7 @@ const validConfig = (): ProjectAutomationConfig => ({
     {
       id: "delivery",
       title: "Delivery",
-      steps: ["assign-developer"]
+      steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"]
     }
   ],
   runtimes: [
@@ -64,11 +59,7 @@ const validConfig = (): ProjectAutomationConfig => ({
       id: "codex-runtime",
       title: "Codex runtime",
       command: "codex",
-      args: ["app-server", "--listen", "stdio://"],
-      outputEvents: {
-        completed: "agent.output.completed",
-        failed: "agent.output.failed"
-      }
+      args: ["app-server", "--listen", "stdio://"]
     }
   ]
 });
@@ -93,44 +84,69 @@ describe("project automation config", () => {
     await saveProjectAutomationConfig(root, validConfig(), [agent]);
 
     const saved = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
-    expect(saved.workflows[0]?.steps).toEqual(["assign-developer"]);
+    expect(saved.events).toEqual([]);
+    expect(saved.policies[0]?.id).toBe("on.developer.implementation.failed.v1.then.developer.start.implementation");
+    expect(saved.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.v1.then.developer.start.implementation"]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
   });
 
-  it("validates event, policy, runtime, and workflow references", () => {
+  it("normalizes legacy policy fields to event, agent, and action", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".ballet"), { recursive: true });
+    const legacy = {
+      version: 1,
+      events: [{ id: "task.created", title: "Task created", source: "user" }],
+      policies: [{
+        id: "assign-developer",
+        title: "Assign developer",
+        on: "developer.run.failed.v1",
+        run: { agent: "developer-agent", runtime: "codex-runtime" },
+        enabled: true
+      }],
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["assign-developer"] }],
+      runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [], outputEvents: { completed: "agent.output.completed" } }]
+    };
+
+    await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify(legacy), "utf8");
+
+    const loaded = await loadProjectAutomationConfig(root, [agent]);
+    expect(loaded.events).toEqual([]);
+    expect(loaded.policies[0]).toMatchObject({
+      id: "on.developer.run.failed.v1.then.developer.start.run",
+      event: "developer.run.failed.v1",
+      agent: "developer",
+      action: "run"
+    });
+    expect(loaded.workflows[0]?.steps).toEqual(["on.developer.run.failed.v1.then.developer.start.run"]);
+    expect(loaded.runtimes[0]).not.toHaveProperty("outputEvents");
+  });
+
+  it("validates policy, runtime, and workflow references while ignoring legacy event definitions", () => {
     expect(validateProjectAutomationConfig(validConfig(), [agent])).toEqual([]);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      events: [{ id: "", title: "Missing id", source: "runtime" }]
-    }, [agent]).some((issue) => issue.message === "Event id is required.")).toBe(true);
+      events: [{ id: "", title: "", source: "", payloadSchema: "not-an-object" }]
+    }, [agent])).toEqual([]);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      events: [
-        { id: "task.created", title: "Task created", source: "user" },
-        { id: "task.created", title: "Duplicate", source: "runtime" }
-      ]
-    }, [agent]).some((issue) => issue.message === "Duplicate event id: task.created.")).toBe(true);
+      policies: [{ ...validConfig().policies[0]!, event: "" }]
+    }, [agent]).some((issue) => issue.message === "Policy event is required.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      policies: [{ ...validConfig().policies[0]!, on: "" }]
-    }, [agent]).some((issue) => issue.message === "Policy on event is required.")).toBe(true);
-
-    expect(validateProjectAutomationConfig({
-      ...validConfig(),
-      policies: [{ ...validConfig().policies[0]!, on: "missing.event" }]
+      policies: [{ ...validConfig().policies[0]!, event: "missing.event" }]
     }, [agent]).some((issue) => issue.message === "Policy references unknown event: missing.event.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      policies: [{ ...validConfig().policies[0]!, run: { agent: "developer-agent", runtime: "missing-runtime" } }]
-    }, [agent]).some((issue) => issue.message === "Policy references unknown runtime: missing-runtime.")).toBe(true);
+      policies: [{ ...validConfig().policies[0]!, action: "" }]
+    }, [agent]).some((issue) => issue.message === "Policy action is required.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      policies: [{ ...validConfig().policies[0]!, run: { agent: "missing-agent", runtime: "codex-runtime" } }]
+      policies: [{ ...validConfig().policies[0]!, agent: "missing-agent" }]
     }, [agent]).some((issue) => issue.message === "Policy references unknown agent: missing-agent.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
@@ -138,10 +154,11 @@ describe("project automation config", () => {
       runtimes: [{ ...validConfig().runtimes[0]!, command: "" }]
     }, [agent]).some((issue) => issue.message === "Runtime command is required.")).toBe(true);
 
-    expect(validateProjectAutomationConfig({
+    const configWithLegacyRuntimeOutput = {
       ...validConfig(),
       runtimes: [{ ...validConfig().runtimes[0]!, outputEvents: { completed: "missing.event" } }]
-    }, [agent]).some((issue) => issue.message === "Runtime output event references unknown event: missing.event.")).toBe(true);
+    };
+    expect(validateProjectAutomationConfig(configWithLegacyRuntimeOutput, [agent])).toEqual([]);
   });
 
   it("rejects object workflow steps instead of migrating them", () => {
@@ -150,13 +167,14 @@ describe("project automation config", () => {
       workflows: [{
         id: "legacy",
         title: "Legacy",
-        steps: [{ policy: "assign-developer", on: "task.created", agent: "developer-agent", runtime: "codex-runtime" }]
+        steps: [{ policy: "assign-developer", on: "task.created", agent: "developer-agent", action: "implementation", runtime: "codex-runtime" }]
       }]
     }, [agent]);
 
     expect(issues.some((issue) => issue.message === "Workflow step must be a policy id string.")).toBe(true);
     expect(issues.some((issue) => issue.message === "Workflow step must not contain on.")).toBe(true);
     expect(issues.some((issue) => issue.message === "Workflow step must not contain agent.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Workflow step must not contain action.")).toBe(true);
     expect(issues.some((issue) => issue.message === "Workflow step must not contain runtime.")).toBe(true);
   });
 

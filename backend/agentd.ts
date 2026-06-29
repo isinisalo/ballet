@@ -16,7 +16,7 @@ const findAgent = (data: AppData, role: string): Agent | undefined => data.agent
 const outcomeToOutputEventStatus = (outcome: AgentOutcome): AgentOutputEventStatus => {
   if (outcome.outcome === "failed") return "failed";
   if (outcome.outcome === "blocked" || outcome.outcome === "needs_input") return "blocked";
-  return "completed";
+  return "complete";
 };
 
 const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): string => {
@@ -71,12 +71,13 @@ const completeWithOutcome = (
   try {
     const policy = data.automation.policies.find((candidate) => candidate.id === run.policyId);
     if (!policy) throw new Error(`Automation policy ${run.policyId} was not found.`);
-    const runtime = data.automation.runtimes.find((candidate) => candidate.id === policy.run.runtime);
-    if (!runtime) throw new Error(`Automation runtime ${policy.run.runtime} was not found.`);
-    const routed = mapAgentOutputToEvent(runtime, {
+    const routed = mapAgentOutputToEvent(policy, {
       runId: run.runId,
-      agentId: run.agentRole,
+      triggerEventId: trigger.eventId,
+      policyId: run.policyId,
+      policyVersion: run.policyVersion,
       status: outcomeToOutputEventStatus(outcome),
+      outcome: outcome.outcome,
       summary: outcome.summary,
       raw: outcome
     });
