@@ -21,7 +21,10 @@ export default defineConfig({
     }
   },
   test: {
+    environment: "node",
+    environmentMatchGlobs: [["frontend/tests/**/*.test.tsx", "jsdom"]],
     root: __dirname,
-    include: ["backend/tests/**/*.test.ts", "frontend/tests/**/*.test.ts"]
+    include: ["backend/tests/**/*.test.ts", "frontend/tests/**/*.test.{ts,tsx}"],
+    setupFiles: ["frontend/tests/setup.ts"]
   }
 });
