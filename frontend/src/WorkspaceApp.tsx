@@ -2127,14 +2127,14 @@ function WorkflowsAutomationTab({
 
   const nodeSizes = {
     trigger: { width: 176, height: 46 },
-    policy: { width: 234, height: 50 },
+    policy: { width: 228, height: 112 },
     agent: { width: 224, height: 46 },
     event: { width: 240, height: 46 },
     delete: { width: 28, height: 28 }
   };
   const canvasLayout = {
     startX: 32,
-    startY: 32,
+    startY: 64,
     columnGap: 36,
     branchGap: 20,
     rowStep: 54,
@@ -2182,20 +2182,24 @@ function WorkflowsAutomationTab({
         icon={Route}
         value={record.policyId || "No policy"}
         dashed={!record.policy}
-        className="w-[14.625rem]"
+        className="h-28 w-[14.25rem] max-w-none items-start py-2"
       >
-        <Select value={record.policyId || noSelection} onValueChange={(value) => updateStep(record.index, value === noSelection ? "" : value)}>
-          <SelectTrigger className="h-6 w-44 min-w-0 px-1.5 font-mono text-[0.64rem]" title={record.policyId || "No policy"} onDragStart={(event) => event.stopPropagation()}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {policyOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        {record.policy ? (
+          <WorkflowPolicySummary policy={record.policy} />
+        ) : (
+          <Select value={record.policyId || noSelection} onValueChange={(value) => updateStep(record.index, value === noSelection ? "" : value)}>
+            <SelectTrigger className="h-6 w-full min-w-0 px-1.5 font-mono text-[0.64rem]" title={record.policyId || "No policy"} onDragStart={(event) => event.stopPropagation()}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {policyOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        )}
       </WorkflowCanvasNode>
     </div>
   );
@@ -2209,11 +2213,11 @@ function WorkflowsAutomationTab({
     const policyX = x;
     const policyY = y;
     const agentX = policyX + nodeSizes.policy.width + canvasLayout.columnGap;
-    const agentY = y;
+    const agentY = y + nodeSizes.policy.height / 2 - nodeSizes.agent.height / 2;
     const deleteX = agentX + nodeSizes.agent.width - nodeSizes.delete.width;
     const deleteY = agentY + nodeSizes.agent.height + 6;
     const eventX = agentX + nodeSizes.agent.width + canvasLayout.columnGap + nodeSizes.delete.width + canvasLayout.edgePad;
-    let cursorY = y;
+    let cursorY = y + nodeSizes.policy.height / 2 - nodeSizes.event.height / 2;
     let branchWidth = eventX + nodeSizes.event.width - x;
 
     addLayoutNode(`policy-${record.index}`, policyX, policyY, nodeSizes.policy.width, nodeSizes.policy.height, renderPolicyNode(record));
@@ -2261,14 +2265,15 @@ function WorkflowsAutomationTab({
         if (childRecord) {
           addLayoutNode(eventKey, eventX, eventY, nodeSizes.event.width, nodeSizes.event.height, <WorkflowCanvasNode label="Events" value={eventType} tone="event" icon={Activity} active className="w-60" />);
           const childX = eventX + nodeSizes.event.width + canvasLayout.columnGap;
-          const childLayout = layoutPolicyBranch(childRecord, childX, eventY, nextVisitedPolicyIds);
+          const childY = eventY + nodeSizes.event.height / 2 - nodeSizes.policy.height / 2;
+          const childLayout = layoutPolicyBranch(childRecord, childX, childY, nextVisitedPolicyIds);
           addLayoutEdge(
             `event-policy-${record.index}-${childRecord.index}-${eventType}`,
             { x: eventX + nodeSizes.event.width, y: eventY + nodeSizes.event.height / 2 },
-            { x: childX, y: eventY + nodeSizes.policy.height / 2 }
+            { x: childX, y: childY + nodeSizes.policy.height / 2 }
           );
           branchWidth = Math.max(branchWidth, eventX + nodeSizes.event.width + canvasLayout.columnGap + childLayout.width - x);
-          cursorY += Math.max(canvasLayout.rowStep, childLayout.height) + canvasLayout.branchGap;
+          cursorY += Math.max(canvasLayout.rowStep, childY + childLayout.height - eventY) + canvasLayout.branchGap;
         } else {
           addLayoutNode(
             eventKey,
@@ -2314,7 +2319,7 @@ function WorkflowsAutomationTab({
 
   if (selected) {
     const rootX = canvasLayout.startX + nodeSizes.trigger.width + canvasLayout.columnGap;
-    let rootY = canvasLayout.startY;
+    let rootY = canvasLayout.startY + nodeSizes.trigger.height / 2 - nodeSizes.policy.height / 2;
 
     if (workflowGraph.rootRecords.length > 0) {
       workflowGraph.rootRecords.forEach((record) => {
@@ -2444,6 +2449,21 @@ function WorkflowCanvasEdgePath({ edge }: { edge: WorkflowCanvasEdge }) {
       strokeDasharray={edge.dashed ? "6 5" : undefined}
       markerEnd={edge.dashed ? "url(#workflow-arrow-muted)" : "url(#workflow-arrow)"}
     />
+  );
+}
+
+function WorkflowPolicySummary({ policy }: { policy: ProjectPolicy }) {
+  const sourceValue = policy.source === "trigger" ? policy.trigger : policy.event;
+
+  return (
+    <div className="grid min-w-0 gap-0.5 font-mono text-[0.62rem] leading-[0.82rem]">
+      <span className="text-foreground">on</span>
+      <span className="truncate pl-2 text-primary" title={sourceValue || "Missing source"}>{sourceValue || "Missing source"}</span>
+      <span className="text-foreground">then</span>
+      <span className="truncate pl-2 text-secondary" title={policy.agent || "Missing agent"}>{policy.agent || "Missing agent"}</span>
+      <span className="text-foreground">start</span>
+      <span className="truncate pl-2 text-tertiary" title={policy.action || "Missing action"}>{policy.action || "Missing action"}</span>
+    </div>
   );
 }
 

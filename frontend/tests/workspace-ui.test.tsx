@@ -279,8 +279,10 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("tab", { name: /policies/i })).toHaveAttribute("aria-selected", "true");
 
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
-    expect(screen.getByText("on.existing.implementation.failed.v1.then.existing.start.implementation")).toBeInTheDocument();
-    expect(screen.getByText("existing")).toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: on.existing.implementation.failed.v1.then.existing.start.implementation")).toBeInTheDocument();
+    expect(screen.getAllByText("existing.implementation.failed.v1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("existing").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
     expect(screen.getByText("existing.implementation.complete.v1")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();
@@ -290,7 +292,7 @@ describe("workspace entity UI flows", () => {
     await user.click(await screen.findByText("existing.implementation.blocked.v1 · output"));
 
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
-    expect(screen.getByText("on.existing.implementation.blocked.v1.then.existing.start.implementation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: on.existing.implementation.blocked.v1.then.existing.start.implementation")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation).not.toHaveProperty("events"));
@@ -359,7 +361,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByLabelText("Trigger")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
-    expect(screen.getByText("on.trigger.manual-start.then.existing.start.implementation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: on.trigger.manual-start.then.existing.start.implementation")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.policies[0]).toMatchObject({
