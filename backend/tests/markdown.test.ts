@@ -98,7 +98,7 @@ describe("Markdown collection loading", () => {
     expect(data.eventDefinitions).toEqual([]);
     expect(data.runtimes).toEqual([]);
     expect(data.policies).toEqual([]);
-    expect(data.automation).toEqual({ version: 1, events: [], policies: [], workflows: [], runtimes: [] });
+    expect(data.automation).toEqual({ version: 1, triggers: [], policies: [], workflows: [], runtimes: [] });
   });
 
   it("loads only .ballet/project.md for the project document", async () => {

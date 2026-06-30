@@ -172,10 +172,11 @@ export const seedData: AppData = {
   agentRuns: [],
   automation: {
     version: 1,
-    events: [],
+    triggers: [],
     policies: [
       {
         id: "on.k8s-operator.remediation.failed.v1.then.k8s-operator.start.remediation",
+        source: "event",
         event: "k8s-operator.remediation.failed.v1",
         agent: "k8s-operator",
         action: "remediation",

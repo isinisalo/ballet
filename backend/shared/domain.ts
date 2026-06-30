@@ -12,17 +12,16 @@ export type PolicyPredicateScalar = string | number | boolean | null;
 
 export type JsonSchemaObject = Record<string, unknown>;
 
-export interface ProjectEvent {
+export interface ProjectTrigger {
   id: string;
-  title: string;
-  description?: string;
-  source: "runtime" | "system" | "user" | string;
-  payloadSchema?: JsonSchemaObject;
+  description: string;
 }
 
 export interface ProjectPolicy {
   id: string;
-  event: string;
+  source: "event" | "trigger";
+  event?: string;
+  trigger?: string;
   agent: string;
   action: string;
   enabled: boolean;
@@ -43,7 +42,7 @@ export interface ProjectWorkflow {
 
 export interface ProjectAutomationConfig {
   version: 1;
-  events: ProjectEvent[];
+  triggers: ProjectTrigger[];
   policies: ProjectPolicy[];
   workflows: ProjectWorkflow[];
   runtimes: ProjectRuntime[];

@@ -1,23 +1,23 @@
 {
   "version": 1,
-  "events": [
+  "triggers": [
     {
       "id": "plan_approved",
-      "title": "Plan approved",
-      "description": "An implementation plan was approved and can be routed to the developer agent.",
-      "source": "user"
+      "description": "Plan approved"
     }
   ],
   "policies": [
     {
-      "id": "on.plan_approved.then.developer.start.implementation",
-      "event": "plan_approved",
+      "id": "on.trigger.plan_approved.then.developer.start.implementation",
+      "source": "trigger",
+      "trigger": "plan_approved",
       "agent": "developer",
       "action": "implementation",
       "enabled": true
     },
     {
       "id": "on.developer.implementation.complete.v1.then.architect.start.review",
+      "source": "event",
       "event": "developer.implementation.complete.v1",
       "agent": "architect",
       "action": "review",
@@ -25,6 +25,7 @@
     },
     {
       "id": "on.developer.implementation.complete.v1.then.qa-verification-reviewer.start.review",
+      "source": "event",
       "event": "developer.implementation.complete.v1",
       "agent": "qa-verification-reviewer",
       "action": "review",
@@ -36,7 +37,7 @@
       "id": "plan-implement-review",
       "title": "Plan, implement, review",
       "steps": [
-        "on.plan_approved.then.developer.start.implementation",
+        "on.trigger.plan_approved.then.developer.start.implementation",
         "on.developer.implementation.complete.v1.then.architect.start.review",
         "on.developer.implementation.complete.v1.then.qa-verification-reviewer.start.review"
       ]

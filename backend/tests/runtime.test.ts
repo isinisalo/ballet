@@ -105,6 +105,7 @@ const readyOutcome: AgentOutcome = {
 
 const projectPolicy: ProjectPolicy = {
   id: "on.plan_approved.then.developer.start.implementation",
+  source: "event",
   event: "plan_approved",
   agent: "developer",
   action: "implementation",

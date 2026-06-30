@@ -89,9 +89,13 @@ const baseData = (): AppData => ({
   agentRuns: [],
   automation: {
     version: 1,
-    events: [],
+    triggers: [{
+      id: "manual-start",
+      description: "Manual workflow start"
+    }],
     policies: [{
       id: "on.existing.implementation.failed.v1.then.existing.start.implementation",
+      source: "event",
       event: "existing.implementation.failed.v1",
       agent: "existing",
       action: "implementation",
@@ -166,9 +170,11 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
     }
 
     if (url === "/api/automation" && method === "PUT") {
-      const saved = { ...(body as ProjectAutomationConfig), events: [] };
+      const saved = body as ProjectAutomationConfig;
       data.automation = saved;
-      data.eventDefinitions = [...new Set(saved.policies.flatMap(policyOutputEventTypes))].map((eventType) => ({
+      data.eventDefinitions = [...new Set(data.agents.flatMap((agent) =>
+        saved.policies.flatMap((policy) => policyOutputEventTypes({ agent: agent.name.split(/\s+/)[0]?.toLowerCase() ?? agent.id, action: policy.action }))
+      ))].map((eventType) => ({
         id: eventType,
         name: eventType,
         description: "Generated agent action output event.",
@@ -186,10 +192,10 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
         name: policy.id,
         description: "",
         active: policy.enabled,
-        match: { eventTypes: [policy.event], projectId: "*", source: "*" },
+        match: { eventTypes: [policy.source === "trigger" ? `trigger.${policy.trigger}` : policy.event ?? ""], projectId: "*", source: "*" },
         action: { type: "start_agent_run", targetAgentId: policy.agent },
         projectId: "*",
-        eventTypes: [policy.event],
+        eventTypes: [policy.source === "trigger" ? `trigger.${policy.trigger}` : policy.event ?? ""],
         source: "*",
         payloadMetadata: {},
         targetAgentId: policy.agent,
@@ -271,7 +277,7 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
     expect(screen.getByText("Policy")).toBeInTheDocument();
     expect(screen.getByText("Agent")).toBeInTheDocument();
-    expect(screen.getByText("Events")).toBeInTheDocument();
+    expect(screen.getAllByText("Events").length).toBeGreaterThan(0);
     expect(screen.getByText("on.existing.implementation.failed.v1.then.existing.start.implementation")).toBeInTheDocument();
     expect(screen.getByText("existing")).toBeInTheDocument();
     expect(screen.getByText("existing.implementation.complete.v1")).toBeInTheDocument();
@@ -285,12 +291,74 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByText("on.existing.implementation.blocked.v1.then.existing.start.implementation")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.events).toEqual([]));
+    await waitFor(() => expect(data.automation).not.toHaveProperty("events"));
     expect(data.automation.policies[0]?.event).toBe("existing.implementation.blocked.v1");
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
       body: expect.stringContaining("\"steps\":[\"on.existing.implementation.blocked.v1.then.existing.start.implementation\"]")
     }));
+  });
+
+  it("searches existing policy actions and creates one new selected action", async () => {
+    const user = userEvent.setup();
+    const { data } = await renderRoute("/automation");
+
+    const action = screen.getByLabelText("Action");
+    await user.click(action);
+    await user.clear(action);
+    await user.type(action, "imp");
+    expect(screen.getByRole("option", { name: /implementation/i })).toBeInTheDocument();
+
+    await user.clear(action);
+    await user.type(action, "Review pass");
+    await user.click(screen.getByRole("option", { name: /create "review-pass"/i }));
+    expect(screen.getByLabelText("Action")).toHaveValue("review-pass");
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.policies[0]?.action).toBe("review-pass"));
+    expect(data.automation.policies[0]?.id).toBe("on.existing.implementation.failed.v1.then.existing.start.review-pass");
+    expect(data.automation.policies).toHaveLength(1);
+  });
+
+  it("creates, edits, deletes, and saves automation triggers", async () => {
+    const user = userEvent.setup();
+    const { data } = await renderRoute("/automation/triggers");
+
+    expect(screen.getByRole("tab", { name: /triggers/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByDisplayValue("Manual workflow start")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add trigger" }));
+    await user.clear(screen.getByLabelText("Trigger ID"));
+    await user.type(screen.getByLabelText("Trigger ID"), "release-ready");
+    await user.clear(screen.getByLabelText("Description"));
+    await user.type(screen.getByLabelText("Description"), "Release can start.");
+    expect(screen.getByLabelText("Trigger ID")).toHaveValue("release-ready");
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.triggers.some((trigger) => trigger.id === "release-ready")).toBe(true));
+
+    await confirmDelete(user, "Delete trigger");
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.triggers.some((trigger) => trigger.id === "release-ready")).toBe(false));
+  });
+
+  it("switches a policy from event source to trigger source and updates workflow references", async () => {
+    const user = userEvent.setup();
+    const { data } = await renderRoute("/automation/policies");
+
+    await user.click(screen.getByLabelText("Source"));
+    await user.click(await screen.findByText("Trigger"));
+    expect(screen.getByLabelText("Trigger")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /workflows/i }));
+    expect(screen.getByText("on.trigger.manual-start.then.existing.start.implementation")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.policies[0]).toMatchObject({
+      source: "trigger",
+      trigger: "manual-start",
+      id: "on.trigger.manual-start.then.existing.start.implementation"
+    }));
+    expect(data.automation.workflows[0]?.steps).toEqual(["on.trigger.manual-start.then.existing.start.implementation"]);
   });
 
   it("falls back from the removed automation events route", async () => {

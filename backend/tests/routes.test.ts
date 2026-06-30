@@ -169,13 +169,16 @@ describe("API routes", () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
+    await mkdir(path.join(root, ".codex/agents"), { recursive: true });
     await mkdir(path.join(root, ".ballet/events"), { recursive: true });
+    await writeFile(path.join(root, ".codex/agents/developer-agent.toml"), "name = \"Developer Agent\"\ndeveloper_instructions = \"Do work.\"\n", "utf8");
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
     await writeFile(path.join(root, ".ballet/events/markdown-event.md"), "---\nid: markdown-event\neventType: markdown.event\n---\n\nIgnored automation event.", "utf8");
     await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
       version: 1,
       events: [{ id: "runtime.event", title: "Runtime event", source: "runtime" }],
-      policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", event: "developer.implementation.failed.v1", agent: "developer", action: "implementation", enabled: true }],
+      triggers: [],
+      policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", source: "event", event: "developer.implementation.failed.v1", agent: "developer", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"] }],
       runtimes: []
     }, null, 2), "utf8");
@@ -199,10 +202,10 @@ describe("API routes", () => {
         eventDefinitions: Array<{ id: string; eventType: string; relativePath?: string }>;
         events: Array<{ id: string; eventType: string; relativePath?: string; routing?: { matchedPolicies: number } }>;
         documents?: { events: Array<{ id: string; relativePath?: string }> };
-        automation: { events: Array<{ id: string; title: string; source: string }> };
+        automation: Record<string, unknown>;
       };
 
-      expect(data.automation.events).toEqual([]);
+      expect(data.automation).not.toHaveProperty("events");
       expect(data.eventDefinitions).toHaveLength(4);
       expect(data.eventDefinitions).toEqual(expect.arrayContaining([
         expect.objectContaining({ id: "developer.implementation.failed.v1", eventType: "developer.implementation.failed.v1" })
@@ -219,12 +222,15 @@ describe("API routes", () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
+    await mkdir(path.join(root, ".codex/agents"), { recursive: true });
     await mkdir(path.join(root, ".ballet"), { recursive: true });
+    await writeFile(path.join(root, ".codex/agents/developer-agent.toml"), "name = \"Developer Agent\"\ndeveloper_instructions = \"Do work.\"\n", "utf8");
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
     await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
       version: 1,
       events: [{ id: "plan_approved", title: "Plan approved", source: "user" }],
-      policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", event: "developer.implementation.failed.v1", agent: "developer", action: "implementation", enabled: true }],
+      triggers: [{ id: "plan_approved", description: "Plan approved" }],
+      policies: [{ id: "on.trigger.plan_approved.then.developer.start.implementation", source: "trigger", trigger: "plan_approved", agent: "developer", action: "implementation", enabled: true }],
       workflows: [],
       runtimes: []
     }, null, 2), "utf8");
@@ -238,10 +244,10 @@ describe("API routes", () => {
       const allowed = await fetch(url + "/api/events/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: "project", eventType: "developer.implementation.failed.v1", source: "test", payload: {} })
+        body: JSON.stringify({ projectId: "project", eventType: "trigger.plan_approved", source: "test", payload: {} })
       });
       expect(allowed.status).toBe(201);
-      expect(await allowed.json()).toMatchObject({ eventType: "developer.implementation.failed.v1" });
+      expect(await allowed.json()).toMatchObject({ eventType: "trigger.plan_approved" });
 
       const blocked = await fetch(url + "/api/events/intake", {
         method: "POST",
@@ -274,7 +280,8 @@ describe("API routes", () => {
       events: [
         { id: "task.created", title: "Task created", source: "user" }
       ],
-      policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", event: "developer.implementation.failed.v1", agent: "developer", action: "implementation", enabled: true }],
+      triggers: [{ id: "manual_start", description: "Manual start" }],
+      policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", source: "event", event: "developer.implementation.failed.v1", agent: "developer", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
     };
@@ -286,14 +293,18 @@ describe("API routes", () => {
         body: JSON.stringify(config)
       });
       expect(saved.status).toBe(200);
-      expect(await saved.json()).toMatchObject({
-        events: [],
+      const savedBody = await saved.json();
+      expect(savedBody).not.toHaveProperty("events");
+      expect(savedBody).toMatchObject({
+        triggers: [{ id: "manual_start", description: "Manual start" }],
         workflows: [{ steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"] }]
       });
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);
-      expect(await automation.json()).toMatchObject({ config: { events: [], policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", event: "developer.implementation.failed.v1" }] }, issues: [] });
+      const automationBody = await automation.json() as { config: Record<string, unknown> };
+      expect(automationBody.config).not.toHaveProperty("events");
+      expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], policies: [{ id: "on.developer.implementation.failed.v1.then.developer.start.implementation", source: "event", event: "developer.implementation.failed.v1" }] }, issues: [] });
 
       const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",

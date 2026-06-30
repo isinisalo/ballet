@@ -8,6 +8,7 @@ import {
   Activity,
   Bot,
   CalendarDays,
+  Check,
   CheckCircle2,
   ChartNoAxesColumnIncreasing,
   ChevronDown,
@@ -27,6 +28,7 @@ import {
   Tags,
   Trash2,
   UserRound,
+  Zap,
   type LucideIcon
 } from "lucide-react";
 import type {
@@ -43,11 +45,12 @@ import type {
   ProjectDocumentTreeNode,
   ProjectPolicy,
   ProjectRuntime,
+  ProjectTrigger,
   ProjectWorkflow,
   Runtime,
   Skill
 } from "../../backend/shared/domain";
-import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyOutputEventTypes, preferredAgentToken } from "../../backend/shared/policy-actions";
+import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyActionTokens, policyEventTypesForAgentsAndActions, policyOutputEventType, policyOutputEventTypes, preferredAgentToken } from "../../backend/shared/policy-actions";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -55,6 +58,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -96,7 +100,7 @@ import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } 
 
 type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "project-instructions" | "automation" | "agents" | "skills" | "agent-runs";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
-type AutomationTab = "policies" | "workflows" | "runtimes";
+type AutomationTab = "policies" | "triggers" | "workflows" | "runtimes";
 type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 interface RouteState {
@@ -119,7 +123,7 @@ const emptyData: AppData = {
   agentRuns: [],
   automation: {
     version: 1,
-    events: [],
+    triggers: [],
     policies: [],
     workflows: [],
     runtimes: []
@@ -195,7 +199,7 @@ const agentTemplate = (): Partial<Agent> => ({
 
 const automationConfigTemplate = (): ProjectAutomationConfig => ({
   version: 1,
-  events: [],
+  triggers: [],
   policies: [],
   workflows: [],
   runtimes: []
@@ -203,6 +207,9 @@ const automationConfigTemplate = (): ProjectAutomationConfig => ({
 
 const slugValue = (value: string, fallback: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;
+
+const editablePolicyToken = (value: string): string =>
+  value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+/, "");
 
 const uniqueAutomationId = (base: string, ids: string[]) => {
   let candidate = slugValue(base, "item");
@@ -214,15 +221,11 @@ const uniqueAutomationId = (base: string, ids: string[]) => {
   return candidate;
 };
 
-const automationEventOptions = (config: ProjectAutomationConfig) => {
-  const options = new Map<string, string>();
-  for (const policy of config.policies) {
-    for (const eventType of policyOutputEventTypes(policy)) {
-      if (!options.has(eventType)) options.set(eventType, `${eventType} · output`);
-    }
-  }
-  return [...options].map(([value, label]) => ({ value, label }));
-};
+const automationEventOptions = (agents: Agent[], actions: string[]) =>
+  policyEventTypesForAgentsAndActions(agents, actions).map((eventType) => ({
+    value: eventType,
+    label: `${eventType} · output`
+  }));
 
 const automationAgentOptions = (agents: Agent[]) => {
   const used = new Set<string>();
@@ -237,7 +240,7 @@ const uniquePolicyAction = (event: string, agent: string, baseAction: string, po
   const base = normalizePolicyToken(baseAction) || "action";
   let action = base;
   let suffix = 2;
-  while (policies.some((policy) => policy.id === generatedPolicyId({ event, agent, action }))) {
+  while (policies.some((policy) => policy.id === generatedPolicyId({ source: "event", event, agent, action }))) {
     action = `${base}-${suffix}`;
     suffix += 1;
   }
@@ -261,7 +264,7 @@ const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  const automationMatch = url.pathname.match(/^\/automation\/(policies|workflows|runtimes)\/?$/);
+  const automationMatch = url.pathname.match(/^\/automation\/(policies|triggers|workflows|runtimes)\/?$/);
   if (automationMatch) return { view: "automation", automationTab: automationMatch[1] as AutomationTab };
   if (url.pathname === "/automation") return { view: "automation", automationTab: "policies" };
   if (url.pathname === "/policies") return { view: "automation", automationTab: "policies" };
@@ -1376,6 +1379,7 @@ function SkillsView({
 
 const automationTabs: Array<{ id: AutomationTab; label: string; icon: ReactNode }> = [
   { id: "policies", label: "Policies", icon: <Route data-icon="inline-start" /> },
+  { id: "triggers", label: "Triggers", icon: <Zap data-icon="inline-start" /> },
   { id: "workflows", label: "Workflows", icon: <Activity data-icon="inline-start" /> },
   { id: "runtimes", label: "Runtimes", icon: <Code2 data-icon="inline-start" /> }
 ];
@@ -1397,6 +1401,7 @@ function AutomationView({
 }) {
   const [draft, setDraft] = useState<ProjectAutomationConfig>(data.automation ?? automationConfigTemplate());
   const [selectedPolicyId, setSelectedPolicyId] = useState("");
+  const [selectedTriggerId, setSelectedTriggerId] = useState("");
   const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
   const [selectedRuntimeId, setSelectedRuntimeId] = useState("");
   const [error, setError] = useState("");
@@ -1405,6 +1410,7 @@ function AutomationView({
     const next = data.automation ?? automationConfigTemplate();
     setDraft(next);
     setSelectedPolicyId((current) => next.policies.some((policy) => policy.id === current) ? current : next.policies[0]?.id ?? "");
+    setSelectedTriggerId((current) => next.triggers.some((trigger) => trigger.id === current) ? current : next.triggers[0]?.id ?? "");
     setSelectedWorkflowId((current) => next.workflows.some((workflow) => workflow.id === current) ? current : next.workflows[0]?.id ?? "");
     setSelectedRuntimeId((current) => next.runtimes.some((runtime) => runtime.id === current) ? current : next.runtimes[0]?.id ?? "");
     setError("");
@@ -1425,18 +1431,20 @@ function AutomationView({
   };
 
   const selectedPolicy = draft.policies.find((policy) => policy.id === selectedPolicyId) ?? draft.policies[0];
+  const selectedTrigger = draft.triggers.find((trigger) => trigger.id === selectedTriggerId) ?? draft.triggers[0];
   const selectedWorkflow = draft.workflows.find((workflow) => workflow.id === selectedWorkflowId) ?? draft.workflows[0];
   const selectedRuntime = draft.runtimes.find((runtime) => runtime.id === selectedRuntimeId) ?? draft.runtimes[0];
 
   const addPolicy = () => {
-    const event = automationEventOptions(draft)[0]?.value ?? "";
     const agent = data.agents[0] ? preferredAgentToken(data.agents[0]) : "";
-    const action = uniquePolicyAction(event, agent, "implementation", draft.policies);
-    const id = generatedPolicyId({ event, agent, action });
+    const action = uniquePolicyAction(policyOutputEventType({ agent, action: "implementation" }, "complete"), agent, "implementation", draft.policies);
+    const event = agent && action ? policyOutputEventType({ agent, action }, "complete") : "";
+    const id = generatedPolicyId({ source: "event", event, agent, action });
     setDraft((current) => ({
       ...current,
       policies: [...current.policies, {
         id,
+        source: "event",
         event,
         agent,
         action,
@@ -1446,6 +1454,15 @@ function AutomationView({
     setSelectedPolicyId(id);
   };
 
+  const addTrigger = () => {
+    const id = uniqueAutomationId("new-trigger", draft.triggers.map((trigger) => trigger.id));
+    setDraft((current) => ({
+      ...current,
+      triggers: [...current.triggers, { id, description: "New trigger" }]
+    }));
+    setSelectedTriggerId(id);
+  };
+
   const addWorkflow = () => {
     const id = uniqueAutomationId("new-workflow", draft.workflows.map((workflow) => workflow.id));
     setDraft((current) => ({
@@ -1453,6 +1470,15 @@ function AutomationView({
       workflows: [...current.workflows, { id, title: "New workflow", steps: [] }]
     }));
     setSelectedWorkflowId(id);
+  };
+
+  const removeSelectedTrigger = () => {
+    if (!selectedTrigger) return;
+    setDraft((current) => ({
+      ...current,
+      triggers: current.triggers.filter((trigger) => trigger.id !== selectedTrigger.id)
+    }));
+    setSelectedTriggerId(draft.triggers.find((trigger) => trigger.id !== selectedTrigger.id)?.id ?? "");
   };
 
   const addRuntime = () => {
@@ -1500,6 +1526,10 @@ function AutomationView({
       label: "Add policy",
       onAdd: addPolicy
     },
+    triggers: {
+      label: "Add trigger",
+      onAdd: addTrigger
+    },
     workflows: {
       label: "Add workflow",
       onAdd: addWorkflow
@@ -1517,6 +1547,13 @@ function AutomationView({
       resourceName: selectedPolicy?.id,
       canDelete: Boolean(selectedPolicy),
       onDelete: removeSelectedPolicy
+    },
+    triggers: {
+      label: "Delete trigger",
+      type: "trigger",
+      resourceName: selectedTrigger?.id,
+      canDelete: Boolean(selectedTrigger),
+      onDelete: removeSelectedTrigger
     },
     workflows: {
       label: "Delete workflow",
@@ -1581,6 +1618,9 @@ function AutomationView({
           {activeTab === "policies" ? (
             <PoliciesAutomationTab data={data} config={draft} selectedId={selectedPolicyId} onSelect={setSelectedPolicyId} updateConfig={updateConfig} />
           ) : null}
+          {activeTab === "triggers" ? (
+            <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={setSelectedTriggerId} updateConfig={updateConfig} />
+          ) : null}
           {activeTab === "workflows" ? (
             <WorkflowsAutomationTab config={draft} selectedId={selectedWorkflowId} onSelect={setSelectedWorkflowId} updateConfig={updateConfig} />
           ) : null}
@@ -1631,6 +1671,170 @@ function AutomationEntityList({
   );
 }
 
+function CreatableActionField({
+  label,
+  value,
+  options,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  const fieldId = useId();
+  const listId = useId();
+  const [query, setQuery] = useState(value);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) setQuery(value);
+  }, [open, value]);
+
+  const normalizedQuery = normalizePolicyToken(query);
+  const normalizedOptions = [...new Set(options.map(normalizePolicyToken).filter(Boolean))];
+  const filteredOptions = normalizedOptions.filter((option) => option.includes(normalizedQuery));
+  const exactMatch = normalizedOptions.includes(normalizedQuery);
+  const canCreate = normalizedQuery.length > 0 && !exactMatch;
+
+  const selectAction = (action: string) => {
+    onChange(action);
+    setQuery(action);
+    setOpen(false);
+  };
+
+  const commitQuery = () => {
+    if (filteredOptions[0] && (exactMatch || !canCreate)) {
+      selectAction(filteredOptions[0]);
+      return;
+    }
+    if (normalizedQuery) selectAction(normalizedQuery);
+  };
+
+  return (
+    <Field className="relative gap-1.5">
+      <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
+      <Input
+        id={fieldId}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open}
+        aria-controls={listId}
+        required
+        value={open ? query : value}
+        onFocus={() => {
+          setQuery(value);
+          setOpen(true);
+        }}
+        onBlur={() => window.setTimeout(() => setOpen(false), 100)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commitQuery();
+          }
+          if (event.key === "Escape") {
+            setQuery(value);
+            setOpen(false);
+          }
+        }}
+      />
+      {open ? (
+        <div
+          id={listId}
+          role="listbox"
+          className="absolute top-full z-50 mt-1 grid max-h-52 w-full overflow-y-auto rounded border border-divider-strong bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {filteredOptions.length === 0 && !canCreate ? (
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">No actions.</div>
+          ) : null}
+          {filteredOptions.map((option) => (
+            <Button
+              key={option}
+              type="button"
+              role="option"
+              variant="ghost"
+              className="h-8 justify-start gap-2 px-2 font-mono text-xs"
+              aria-selected={option === value}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectAction(option)}
+            >
+              <Check data-icon="inline-start" className={cn("opacity-0", option === value && "opacity-100")} />
+              <span className="truncate">{option}</span>
+            </Button>
+          ))}
+          {canCreate ? (
+            <Button
+              type="button"
+              role="option"
+              variant="ghost"
+              className="h-8 justify-start gap-2 px-2 font-mono text-xs"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectAction(normalizedQuery)}
+            >
+              <Plus data-icon="inline-start" />
+              <span className="truncate">Create "{normalizedQuery}"</span>
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </Field>
+  );
+}
+
+function TriggersAutomationTab({
+  config,
+  selectedId,
+  onSelect,
+  updateConfig
+}: {
+  config: ProjectAutomationConfig;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  updateConfig: AutomationConfigUpdater;
+}) {
+  const selectedIndex = Math.max(0, config.triggers.findIndex((trigger) => trigger.id === selectedId));
+  const selected = config.triggers[selectedIndex];
+
+  const updateSelected = (patch: Partial<ProjectTrigger>) => {
+    if (!selected) return;
+    const next = { ...selected, ...patch };
+    const normalized = {
+      ...next,
+      id: editablePolicyToken(next.id)
+    };
+    updateConfig((current) => {
+      const previousId = current.triggers[selectedIndex]?.id ?? selected.id;
+      return {
+        ...current,
+        triggers: current.triggers.map((trigger, index) => index === selectedIndex ? normalized : trigger),
+        policies: current.policies.map((policy) => policy.source === "trigger" && policy.trigger === previousId
+          ? { ...policy, trigger: normalized.id, id: generatedPolicyId({ ...policy, trigger: normalized.id }) }
+          : policy)
+      };
+    });
+    onSelect(normalized.id);
+  };
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <AutomationEntityList
+        empty="No triggers."
+        rows={config.triggers.map((trigger) => ({ id: trigger.id, label: trigger.id, active: trigger.id === selected?.id, onSelect: () => onSelect(trigger.id) }))}
+      />
+      {selected ? (
+        <FieldGroup>
+          <TextField label="Trigger ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
+          <TextAreaField label="Description" required rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
+        </FieldGroup>
+      ) : <EmptyState title="No trigger selected." />}
+    </div>
+  );
+}
+
 function PoliciesAutomationTab({
   data,
   config,
@@ -1645,14 +1849,20 @@ function PoliciesAutomationTab({
   updateConfig: AutomationConfigUpdater;
 }) {
   const selected = config.policies.find((policy) => policy.id === selectedId) ?? config.policies[0];
-  const eventOptions = [{ value: noSelection, label: "No event" }, ...automationEventOptions(config)];
+  const actionOptions = policyActionTokens(config.policies);
+  const eventOptions = [{ value: noSelection, label: "No event" }, ...automationEventOptions(data.agents, actionOptions)];
+  const triggerOptions = [{ value: noSelection, label: "No trigger" }, ...config.triggers.map((trigger) => ({ value: trigger.id, label: trigger.id }))];
   const agentOptions = [{ value: noSelection, label: "No agent" }, ...automationAgentOptions(data.agents)];
 
   const updateSelected = (patch: Partial<ProjectPolicy>) => {
     if (!selected) return;
     const next = { ...selected, ...patch };
+    const source: ProjectPolicy["source"] = next.source === "trigger" ? "trigger" : "event";
     const normalized = {
       ...next,
+      source,
+      event: source === "event" ? next.event ?? "" : undefined,
+      trigger: source === "trigger" ? normalizePolicyToken(next.trigger ?? "") : undefined,
       agent: normalizePolicyToken(next.agent),
       action: normalizePolicyToken(next.action)
     };
@@ -1666,6 +1876,20 @@ function PoliciesAutomationTab({
       }))
     }));
     onSelect(nextId);
+  };
+
+  const updateSource = (source: ProjectPolicy["source"]) => {
+    updateSelected(source === "trigger"
+      ? {
+        source,
+        event: undefined,
+        trigger: selected?.trigger || config.triggers[0]?.id || ""
+      }
+      : {
+        source,
+        event: selected?.event || eventOptions[1]?.value || "",
+        trigger: undefined
+      });
   };
 
   return (
@@ -1682,9 +1906,19 @@ function PoliciesAutomationTab({
               {selected.id}
             </div>
           </Field>
-          <SelectField label="Event" value={selected.event || noSelection} options={eventOptions} onChange={(event) => updateSelected({ event: event === noSelection ? "" : event })} />
+          <SelectField
+            label="Source"
+            value={selected.source ?? "event"}
+            options={[{ value: "event", label: "Event" }, { value: "trigger", label: "Trigger" }]}
+            onChange={(source) => updateSource(source === "trigger" ? "trigger" : "event")}
+          />
+          {selected.source === "trigger" ? (
+            <SelectField label="Trigger" value={selected.trigger || noSelection} options={triggerOptions} onChange={(trigger) => updateSelected({ trigger: trigger === noSelection ? "" : trigger })} />
+          ) : (
+            <SelectField label="Event" value={selected.event || noSelection} options={eventOptions} onChange={(event) => updateSelected({ event: event === noSelection ? "" : event })} />
+          )}
           <SelectField label="Agent" value={selected.agent || noSelection} options={agentOptions} onChange={(agent) => updateSelected({ agent: agent === noSelection ? "" : agent })} />
-          <TextField label="Action" required value={selected.action} onChange={(action) => updateSelected({ action })} />
+          <CreatableActionField label="Action" value={selected.action} options={actionOptions} onChange={(action) => updateSelected({ action })} />
         </FieldGroup>
       ) : <EmptyState title="No policy selected." />}
     </div>
@@ -1771,7 +2005,7 @@ function WorkflowsAutomationTab({
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <div className="grid gap-4">
       <AutomationEntityList
         empty="No workflows."
         rows={config.workflows.map((workflow) => ({ id: workflow.id, label: workflow.id, active: workflow.id === selected?.id, onSelect: () => onSelect(workflow.id) }))}
@@ -1781,70 +2015,99 @@ function WorkflowsAutomationTab({
           <div className="grid gap-3">
             <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
           </div>
-          <div className="grid gap-3">
-            {selected.steps.map((policyId, index) => {
-              const policy = policyById.get(policyId);
-              const outputEvents = policy ? policyOutputEventTypes(policy) : [];
-              return (
-                <div
-                  key={`${policyId}-${index}`}
-                  data-workflow-step-index={index}
-                  onPointerDown={(event) => handleStepPointerDown(event, index)}
-                  onPointerMove={handleStepPointerMove}
-                  onPointerUp={handleStepPointerUp}
-                  onPointerCancel={resetStepDrag}
-                  className={cn(
-                    "cursor-grab select-none rounded-lg border border-divider-strong bg-background p-3 active:cursor-grabbing",
-                    draggedStepIndex === index && "opacity-60",
-                    dragOverStepIndex === index && draggedStepIndex !== index && "border-primary/70 ring-2 ring-primary/20"
-                  )}
-                >
-                  <div className="grid gap-3 md:grid-cols-[minmax(12rem,1fr)_auto_minmax(10rem,0.65fr)_auto_minmax(18rem,1.35fr)_auto] md:items-center">
-                    <WorkflowReadOnlyCard
-                      label="Policy"
-                      tone="policy"
-                      value={(
-                        <Select value={policyId || noSelection} onValueChange={(value) => updateStep(index, value === noSelection ? "" : value)}>
-                          <SelectTrigger className="h-8 w-full min-w-0 px-2 text-xs" onDragStart={(event) => event.stopPropagation()}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {policyOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    <WorkflowArrow />
-                    <WorkflowReadOnlyCard label="Agent" value={policy?.agent ?? "Missing policy"} tone="agent" />
-                    <WorkflowArrow />
-                    <WorkflowReadOnlyCard
-                      label="Events"
-                      tone="event"
-                      value={outputEvents.length > 0 ? (
-                        <div className="flex min-w-0 flex-wrap gap-2">
+          <div className="overflow-hidden rounded-lg border border-divider-strong bg-background">
+            <div className="overflow-x-auto">
+              <div className="min-h-[28rem] min-w-max bg-[image:linear-gradient(to_right,var(--divider-strong)_1px,transparent_1px),linear-gradient(to_bottom,var(--divider-strong)_1px,transparent_1px)] bg-[size:24px_24px] p-6">
+                <div className="flex min-h-[22rem] items-center">
+                  <WorkflowCanvasNode
+                    label="Trigger"
+                    value={workflowTriggerLabel(policyById.get(selected.steps[0] ?? ""))}
+                    tone="trigger"
+                    icon={Zap}
+                    dashed={selected.steps.length === 0}
+                  />
+                  {selected.steps.length > 0 ? selected.steps.map((policyId, index) => {
+                    const policy = policyById.get(policyId);
+                    const nextPolicy = policyById.get(selected.steps[index + 1] ?? "");
+                    const continuationEvent = nextPolicy?.source === "event" ? nextPolicy.event : undefined;
+                    const outputEvents = workflowOutputEvents(policy, continuationEvent);
+
+                    return (
+                      <div
+                        key={`${policyId}-${index}`}
+                        data-workflow-step-index={index}
+                        onPointerDown={(event) => handleStepPointerDown(event, index)}
+                        onPointerMove={handleStepPointerMove}
+                        onPointerUp={handleStepPointerUp}
+                        onPointerCancel={resetStepDrag}
+                        className={cn(
+                          "flex cursor-grab select-none items-center rounded-lg px-1 py-2 active:cursor-grabbing",
+                          draggedStepIndex === index && "opacity-60",
+                          dragOverStepIndex === index && draggedStepIndex !== index && "ring-2 ring-primary/20"
+                        )}
+                      >
+                        <WorkflowConnector />
+                        <WorkflowCanvasNode
+                          label="Policy"
+                          tone="policy"
+                          icon={Route}
+                          value={policyId || "No policy"}
+                          dashed={!policy}
+                        >
+                          <Select value={policyId || noSelection} onValueChange={(value) => updateStep(index, value === noSelection ? "" : value)}>
+                            <SelectTrigger className="h-7 w-56 min-w-0 px-2 font-mono text-[0.68rem]" onDragStart={(event) => event.stopPropagation()}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {policyOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </WorkflowCanvasNode>
+                        <WorkflowConnector />
+                        <WorkflowCanvasNode label="Agent" value={policy?.agent ?? "Missing policy"} tone="agent" icon={Bot} dashed={!policy} />
+                        <WorkflowConnector dashed={!continuationEvent} />
+                        <div className="flex flex-col gap-2">
                           {outputEvents.map((eventType) => (
-                            <Badge key={eventType} variant="outline" className="max-w-full rounded-md font-mono text-[0.62rem] break-all">
-                              {eventType}
-                            </Badge>
+                            <WorkflowCanvasNode
+                              key={eventType}
+                              label="Events"
+                              value={eventType}
+                              tone="event"
+                              icon={Activity}
+                              dashed={eventType !== continuationEvent}
+                              active={eventType === continuationEvent}
+                            />
                           ))}
                         </div>
-                      ) : "Missing policy"}
-                    />
-                    <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected.steps.filter((_, stepIndex) => stepIndex !== index) })}>
-                      <TrashButtonIcon />
-                    </Button>
-                  </div>
+                        <Button type="button" size="icon-sm" variant="destructive" className="ml-3" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected.steps.filter((_, stepIndex) => stepIndex !== index) })}>
+                          <TrashButtonIcon />
+                        </Button>
+                      </div>
+                    );
+                  }) : (
+                    <>
+                      <WorkflowConnector dashed />
+                      <WorkflowCanvasNode label="Policy" value="Add first policy" tone="policy" icon={Route} dashed />
+                      <WorkflowConnector dashed />
+                      <WorkflowCanvasNode label="Agent" value="Select agent" tone="agent" icon={Bot} dashed />
+                      <WorkflowConnector dashed />
+                      <WorkflowCanvasNode label="Events" value="Next event" tone="event" icon={Activity} dashed />
+                    </>
+                  )}
                 </div>
-              );
-            })}
-            <Button type="button" variant="outline" className="w-fit" onClick={() => updateSelected({ steps: [...selected.steps, config.policies[0]?.id ?? ""] })}>
-              <Plus data-icon="inline-start" />
-              Add policy step
-            </Button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-divider-strong bg-card px-3 py-2">
+              <span className="font-mono text-[0.68rem] uppercase text-muted-foreground">Trigger - Policy - Agent - Events</span>
+              <Button type="button" variant="outline" className="w-fit" onClick={() => updateSelected({ steps: [...selected.steps, config.policies[0]?.id ?? ""] })}>
+                <Plus data-icon="inline-start" />
+                Add policy step
+              </Button>
+            </div>
           </div>
         </div>
       ) : <EmptyState title="No workflow selected." />}
@@ -1852,22 +2115,67 @@ function WorkflowsAutomationTab({
   );
 }
 
-function WorkflowArrow() {
-  return <div className="hidden text-center font-mono text-xs text-muted-foreground md:block" aria-hidden="true">-&gt;</div>;
+type WorkflowNodeTone = "trigger" | "policy" | "agent" | "event";
+
+const workflowNodeToneClasses: Record<WorkflowNodeTone, string> = {
+  trigger: "text-tertiary",
+  policy: "text-primary",
+  agent: "text-secondary",
+  event: "text-primary"
+};
+
+function workflowTriggerLabel(policy?: ProjectPolicy) {
+  if (!policy) return "Next trigger";
+  if (policy.source === "trigger") return policy.trigger || "Missing trigger";
+  return policy.event || "External event";
 }
 
-function WorkflowReadOnlyCard({ label, value, tone }: { label: string; value: ReactNode; tone: "policy" | "agent" | "event" }) {
-  const Icon = tone === "policy" ? Route : tone === "agent" ? Bot : Activity;
+function workflowOutputEvents(policy: ProjectPolicy | undefined, continuationEvent?: string) {
+  if (!policy) return ["Missing policy"];
+  const events = policyOutputEventTypes(policy);
+  return continuationEvent && !events.includes(continuationEvent) ? [continuationEvent, ...events] : events;
+}
+
+function WorkflowConnector({ dashed = false }: { dashed?: boolean }) {
   return (
-    <div className="min-h-16 rounded-lg border border-divider-strong bg-card px-3 py-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-2 font-mono text-[0.68rem] font-semibold uppercase text-muted-foreground">
-          <Icon data-icon="inline-start" />
-          {label}
-        </span>
+    <div className="flex w-10 items-center" aria-hidden="true">
+      <span className={cn("h-px flex-1 border-t-2 border-primary/70", dashed && "border-dashed border-muted-foreground/70")} />
+      <span className={cn("size-0 border-y-[5px] border-l-[7px] border-y-transparent border-l-primary/70", dashed && "border-l-muted-foreground/70")} />
+    </div>
+  );
+}
+
+function WorkflowCanvasNode({
+  label,
+  value,
+  tone,
+  icon: Icon,
+  dashed = false,
+  active = false,
+  children
+}: {
+  label: string;
+  value: string;
+  tone: WorkflowNodeTone;
+  icon: LucideIcon;
+  dashed?: boolean;
+  active?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-11 min-w-48 max-w-72 items-center gap-2 rounded-md border border-divider-strong bg-card px-2.5 py-2",
+        dashed && "border-dashed border-muted-foreground/70 bg-background/80 opacity-80",
+        active && "border-primary/80 ring-2 ring-primary/20"
+      )}
+    >
+      <div className={cn("flex size-7 shrink-0 items-center justify-center rounded border border-divider-strong bg-background", workflowNodeToneClasses[tone])}>
+        <Icon className="size-4" aria-hidden="true" />
       </div>
-      <div className="mt-2 min-w-0 text-sm text-foreground">
-        {typeof value === "string" ? <span className="block truncate">{value}</span> : value}
+      <div className="grid min-w-0 flex-1 gap-0.5">
+        <span className="font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">{label}</span>
+        {children ?? <span className="truncate font-mono text-[0.72rem] leading-4 text-foreground">{value}</span>}
       </div>
     </div>
   );
