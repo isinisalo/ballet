@@ -280,6 +280,11 @@ describe("workspace entity UI flows", () => {
 
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.v1.then.existing.start.implementation")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Agent: existing")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Events: existing.implementation.complete.v1")).not.toBeInTheDocument();
+    expect(screen.getAllByText("on:").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("then:").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("start:").length).toBeGreaterThan(0);
     expect(screen.getAllByText("existing.implementation.failed.v1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("existing").length).toBeGreaterThan(0);
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);

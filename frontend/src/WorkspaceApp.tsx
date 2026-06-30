@@ -2127,8 +2127,7 @@ function WorkflowsAutomationTab({
 
   const nodeSizes = {
     trigger: { width: 176, height: 46 },
-    policy: { width: 228, height: 112 },
-    agent: { width: 224, height: 46 },
+    policy: { width: 240, height: 84 },
     event: { width: 240, height: 46 },
     delete: { width: 28, height: 28 }
   };
@@ -2138,7 +2137,8 @@ function WorkflowsAutomationTab({
     columnGap: 36,
     branchGap: 20,
     rowStep: 54,
-    edgePad: 18
+    edgePad: 18,
+    policyAnchorY: 18
   };
   const layoutNodes: ReactNode[] = [];
   const layoutEdges: WorkflowCanvasEdge[] = [];
@@ -2182,7 +2182,7 @@ function WorkflowsAutomationTab({
         icon={Route}
         value={record.policyId || "No policy"}
         dashed={!record.policy}
-        className="h-28 w-[14.25rem] max-w-none items-start py-2"
+        className="h-[5.25rem] w-60 max-w-none items-start py-2"
       >
         {record.policy ? (
           <WorkflowPolicySummary policy={record.policy} />
@@ -2212,23 +2212,13 @@ function WorkflowsAutomationTab({
 
     const policyX = x;
     const policyY = y;
-    const agentX = policyX + nodeSizes.policy.width + canvasLayout.columnGap;
-    const agentY = y + nodeSizes.policy.height / 2 - nodeSizes.agent.height / 2;
-    const deleteX = agentX + nodeSizes.agent.width - nodeSizes.delete.width;
-    const deleteY = agentY + nodeSizes.agent.height + 6;
-    const eventX = agentX + nodeSizes.agent.width + canvasLayout.columnGap + nodeSizes.delete.width + canvasLayout.edgePad;
-    let cursorY = y + nodeSizes.policy.height / 2 - nodeSizes.event.height / 2;
-    let branchWidth = eventX + nodeSizes.event.width - x;
+    const outputX = policyX + nodeSizes.policy.width + canvasLayout.columnGap;
+    const deleteX = policyX + nodeSizes.policy.width - nodeSizes.delete.width;
+    const deleteY = policyY + nodeSizes.policy.height + 6;
+    let cursorY = y + canvasLayout.policyAnchorY - nodeSizes.event.height / 2;
+    let branchWidth = nodeSizes.policy.width;
 
     addLayoutNode(`policy-${record.index}`, policyX, policyY, nodeSizes.policy.width, nodeSizes.policy.height, renderPolicyNode(record));
-    addLayoutNode(
-      `agent-${record.index}`,
-      agentX,
-      agentY,
-      nodeSizes.agent.width,
-      nodeSizes.agent.height,
-      <WorkflowCanvasNode label="Agent" value={policy?.agent ?? "Missing policy"} tone="agent" icon={Bot} dashed={!policy} className="w-56" />
-    );
     addLayoutNode(
       `delete-${record.index}`,
       deleteX,
@@ -2239,13 +2229,6 @@ function WorkflowsAutomationTab({
         <TrashButtonIcon />
       </Button>
     );
-    addLayoutEdge(
-      `policy-agent-${record.index}`,
-      { x: policyX + nodeSizes.policy.width, y: policyY + nodeSizes.policy.height / 2 },
-      { x: agentX, y: agentY + nodeSizes.agent.height / 2 },
-      !policy
-    );
-
     workflowOutputEvents(policy).forEach((eventType) => {
       const childRecords = (workflowGraph.childRecordsByParentEvent.get(`${record.index}:${eventType}`) ?? []).filter((childRecord) => childRecord.policyId !== record.policyId && !nextVisitedPolicyIds.has(childRecord.policyId));
       const eventRows = childRecords.length > 0 ? childRecords : [undefined];
@@ -2255,29 +2238,27 @@ function WorkflowsAutomationTab({
         const eventKey = `event-${record.index}-${eventType}-${childRecord?.index ?? "ghost"}-${childIndex}`;
         const canAddPolicyForEvent = Boolean(policy?.agent || config.policies[0]?.agent);
 
-        addLayoutEdge(
-          `agent-event-${record.index}-${eventType}-${childRecord?.index ?? "ghost"}-${childIndex}`,
-          { x: agentX + nodeSizes.agent.width, y: agentY + nodeSizes.agent.height / 2 },
-          { x: eventX, y: eventY + nodeSizes.event.height / 2 },
-          !policy
-        );
-
         if (childRecord) {
-          addLayoutNode(eventKey, eventX, eventY, nodeSizes.event.width, nodeSizes.event.height, <WorkflowCanvasNode label="Events" value={eventType} tone="event" icon={Activity} active className="w-60" />);
-          const childX = eventX + nodeSizes.event.width + canvasLayout.columnGap;
-          const childY = eventY + nodeSizes.event.height / 2 - nodeSizes.policy.height / 2;
+          const childX = outputX;
+          const childY = eventY + nodeSizes.event.height / 2 - canvasLayout.policyAnchorY;
           const childLayout = layoutPolicyBranch(childRecord, childX, childY, nextVisitedPolicyIds);
           addLayoutEdge(
-            `event-policy-${record.index}-${childRecord.index}-${eventType}`,
-            { x: eventX + nodeSizes.event.width, y: eventY + nodeSizes.event.height / 2 },
-            { x: childX, y: childY + nodeSizes.policy.height / 2 }
+            `policy-policy-${record.index}-${childRecord.index}-${eventType}`,
+            { x: policyX + nodeSizes.policy.width, y: policyY + canvasLayout.policyAnchorY },
+            { x: childX, y: childY + canvasLayout.policyAnchorY }
           );
-          branchWidth = Math.max(branchWidth, eventX + nodeSizes.event.width + canvasLayout.columnGap + childLayout.width - x);
+          branchWidth = Math.max(branchWidth, outputX + childLayout.width - x);
           cursorY += Math.max(canvasLayout.rowStep, childY + childLayout.height - eventY) + canvasLayout.branchGap;
         } else {
+          addLayoutEdge(
+            `policy-event-${record.index}-${eventType}-${childIndex}`,
+            { x: policyX + nodeSizes.policy.width, y: policyY + canvasLayout.policyAnchorY },
+            { x: outputX, y: eventY + nodeSizes.event.height / 2 },
+            !policy
+          );
           addLayoutNode(
             eventKey,
-            eventX,
+            outputX,
             eventY,
             nodeSizes.event.width,
             nodeSizes.event.height,
@@ -2290,13 +2271,14 @@ function WorkflowsAutomationTab({
               className="w-60"
             />
           );
+          branchWidth = Math.max(branchWidth, outputX + nodeSizes.event.width - x);
           cursorY += canvasLayout.rowStep;
         }
       });
     });
 
     return {
-      height: Math.max(nodeSizes.policy.height, cursorY - y),
+      height: Math.max(nodeSizes.policy.height, cursorY - y, deleteY + nodeSizes.delete.height - y),
       width: branchWidth
     };
   };
@@ -2319,7 +2301,7 @@ function WorkflowsAutomationTab({
 
   if (selected) {
     const rootX = canvasLayout.startX + nodeSizes.trigger.width + canvasLayout.columnGap;
-    let rootY = canvasLayout.startY + nodeSizes.trigger.height / 2 - nodeSizes.policy.height / 2;
+    let rootY = canvasLayout.startY + nodeSizes.trigger.height / 2 - canvasLayout.policyAnchorY;
 
     if (workflowGraph.rootRecords.length > 0) {
       workflowGraph.rootRecords.forEach((record) => {
@@ -2327,22 +2309,23 @@ function WorkflowsAutomationTab({
         addLayoutEdge(
           `trigger-policy-${record.index}`,
           { x: canvasLayout.startX + nodeSizes.trigger.width, y: canvasLayout.startY + nodeSizes.trigger.height / 2 },
-          { x: rootX, y: rootY + nodeSizes.policy.height / 2 },
+          { x: rootX, y: rootY + canvasLayout.policyAnchorY },
           !record.policy
         );
         rootY += Math.max(canvasLayout.rowStep, rootLayout.height) + canvasLayout.branchGap;
       });
     } else {
+      const firstGhostY = canvasLayout.startY + nodeSizes.trigger.height / 2 - nodeSizes.event.height / 2;
       addLayoutEdge(
         "trigger-first-policy",
         { x: canvasLayout.startX + nodeSizes.trigger.width, y: canvasLayout.startY + nodeSizes.trigger.height / 2 },
-        { x: rootX, y: rootY + nodeSizes.event.height / 2 },
+        { x: rootX, y: firstGhostY + nodeSizes.event.height / 2 },
         true
       );
       addLayoutNode(
         "first-policy-ghost",
         rootX,
-        rootY,
+        firstGhostY,
         nodeSizes.event.width,
         nodeSizes.event.height,
         <WorkflowGhostNode value="Add first policy" icon={Route} ariaLabel="Add first policy" onClick={() => addPolicyStep()} disabled={config.policies.length === 0} className="w-60" />
@@ -2456,13 +2439,19 @@ function WorkflowPolicySummary({ policy }: { policy: ProjectPolicy }) {
   const sourceValue = policy.source === "trigger" ? policy.trigger : policy.event;
 
   return (
-    <div className="grid min-w-0 gap-0.5 font-mono text-[0.62rem] leading-[0.82rem]">
-      <span className="text-foreground">on</span>
-      <span className="truncate pl-2 text-primary" title={sourceValue || "Missing source"}>{sourceValue || "Missing source"}</span>
-      <span className="text-foreground">then</span>
-      <span className="truncate pl-2 text-secondary" title={policy.agent || "Missing agent"}>{policy.agent || "Missing agent"}</span>
-      <span className="text-foreground">start</span>
-      <span className="truncate pl-2 text-tertiary" title={policy.action || "Missing action"}>{policy.action || "Missing action"}</span>
+    <div className="grid min-w-0 gap-1 font-mono text-[0.62rem] leading-4">
+      <div className="flex min-w-0 gap-1">
+        <span className="shrink-0 text-foreground">on:</span>
+        <span className="truncate text-primary" title={sourceValue || "Missing source"}>{sourceValue || "Missing source"}</span>
+      </div>
+      <div className="flex min-w-0 gap-1">
+        <span className="shrink-0 text-foreground">then:</span>
+        <span className="truncate text-secondary" title={policy.agent || "Missing agent"}>{policy.agent || "Missing agent"}</span>
+      </div>
+      <div className="flex min-w-0 gap-1">
+        <span className="shrink-0 text-foreground">start:</span>
+        <span className="truncate text-tertiary" title={policy.action || "Missing action"}>{policy.action || "Missing action"}</span>
+      </div>
     </div>
   );
 }
