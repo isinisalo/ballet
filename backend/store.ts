@@ -36,7 +36,7 @@ export class MarkdownStore {
     const automation = await loadProjectAutomationConfigWithIssues(this.root, data.agents);
     data.automation = automation.config;
     data.automationIssues = automation.issues;
-    data.eventDefinitions = automationPoliciesToEventDefinitions(automation.config.policies, data.agents, automation.config.triggers);
+    data.eventDefinitions = automationPoliciesToEventDefinitions(automation.config.policies, data.agents, automation.config.triggers, automation.config.actions);
     data.policies = automationPoliciesToPolicies(automation.config.policies, data.agents);
     data.runtimes = automationRuntimesToRuntimes(automation.config.runtimes);
     data.events = this.db().listEventRecords();

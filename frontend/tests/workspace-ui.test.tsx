@@ -93,6 +93,10 @@ const baseData = (): AppData => ({
       id: "manual-start",
       description: "Manual workflow start"
     }],
+    actions: [{
+      id: "implementation",
+      description: "Implement work"
+    }],
     policies: [{
       id: "on.existing.implementation.failed.v1.then.existing.start.implementation",
       source: "event",
@@ -173,7 +177,7 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
       const saved = body as ProjectAutomationConfig;
       data.automation = saved;
       data.eventDefinitions = [...new Set(data.agents.flatMap((agent) =>
-        saved.policies.flatMap((policy) => policyOutputEventTypes({ agent: agent.name.split(/\s+/)[0]?.toLowerCase() ?? agent.id, action: policy.action }))
+        saved.actions.flatMap((action) => policyOutputEventTypes({ agent: agent.name.split(/\s+/)[0]?.toLowerCase() ?? agent.id, action: action.id }))
       ))].map((eventType) => ({
         id: eventType,
         name: eventType,
@@ -297,20 +301,27 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
-  it("searches existing policy actions and creates one new selected action", async () => {
+  it("creates an automation action and selects it from policy actions", async () => {
     const user = userEvent.setup();
-    const { data } = await renderRoute("/automation");
+    const { data } = await renderRoute("/automation/actions");
 
-    const action = screen.getByLabelText("Action");
-    await user.click(action);
-    await user.clear(action);
-    await user.type(action, "imp");
-    expect(screen.getByRole("option", { name: /implementation/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /actions/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByDisplayValue("Implement work")).toBeInTheDocument();
 
-    await user.clear(action);
-    await user.type(action, "Review pass");
-    await user.click(screen.getByRole("option", { name: /create "review-pass"/i }));
-    expect(screen.getByLabelText("Action")).toHaveValue("review-pass");
+    await user.click(screen.getByRole("button", { name: "Add action" }));
+    await screen.findByDisplayValue("New action");
+    await user.clear(screen.getByLabelText("Action ID"));
+    await user.type(screen.getByLabelText("Action ID"), "review-pass");
+    await user.clear(screen.getByLabelText("Description"));
+    await user.type(screen.getByLabelText("Description"), "Review output");
+    expect(screen.getByDisplayValue("Review output")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.actions.some((action) => action.id === "review-pass" && action.description === "Review output")).toBe(true));
+
+    await user.click(screen.getByRole("tab", { name: /policies/i }));
+    await user.click(screen.getByLabelText("Action"));
+    await user.click(await screen.findByRole("option", { name: /review-pass/i }));
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.policies[0]?.action).toBe("review-pass"));

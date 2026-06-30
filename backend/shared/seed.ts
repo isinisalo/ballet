@@ -173,6 +173,12 @@ export const seedData: AppData = {
   automation: {
     version: 1,
     triggers: [],
+    actions: [
+      {
+        id: "remediation",
+        description: "Remediate failed infrastructure or deployment state."
+      }
+    ],
     policies: [
       {
         id: "on.k8s-operator.remediation.failed.v1.then.k8s-operator.start.remediation",

@@ -4,6 +4,7 @@ import type {
   Agent,
   AgentRunOutput,
   EventDefinition,
+  ProjectAction,
   Policy,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
@@ -31,6 +32,7 @@ const timestamp = "1970-01-01T00:00:00.000Z";
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: 1,
   triggers: [],
+  actions: [],
   policies: [],
   workflows: [],
   runtimes: []
@@ -62,6 +64,11 @@ const normalizeAgentPolicyToken = (value: string): string =>
   normalizePolicyToken(value).replace(/-agent$/, "");
 
 const normalizeTrigger = (value: Record<string, unknown>): ProjectTrigger => ({
+  id: normalizePolicyToken(stringValue(value.id)),
+  description: stringValue(value.description)
+});
+
+const normalizeAction = (value: Record<string, unknown>): ProjectAction => ({
   id: normalizePolicyToken(stringValue(value.id)),
   description: stringValue(value.description)
 });
@@ -123,10 +130,16 @@ export const normalizeProjectAutomationConfig = (value: unknown): ProjectAutomat
     .filter((pair) => pair.rawId && pair.rawId !== pair.normalized.id)
     .map((pair) => [pair.rawId, pair.normalized.id]));
 
+  const policies = policyPairs.map((pair) => pair.normalized);
+  const actions = Array.isArray(value.actions)
+    ? recordArray(value.actions).map(normalizeAction)
+    : policyActionTokens(policies).map((id) => ({ id, description: "" }));
+
   return {
     version: 1,
     triggers: recordArray(value.triggers).map(normalizeTrigger),
-    policies: policyPairs.map((pair) => pair.normalized),
+    actions,
+    policies,
     workflows: recordArray(value.workflows).map((workflow) => normalizeWorkflow(workflow, policyIdMap)),
     runtimes: recordArray(value.runtimes).map(normalizeRuntime)
   };
@@ -164,14 +177,15 @@ export const validateProjectAutomationConfig = (
     issues.push({ path: "version", message: "version must be 1." });
   }
 
-  for (const key of ["triggers", "policies", "workflows", "runtimes"] as const) {
-    if (key === "triggers" && input[key] === undefined) continue;
+  for (const key of ["triggers", "actions", "policies", "workflows", "runtimes"] as const) {
+    if ((key === "triggers" || key === "actions") && input[key] === undefined) continue;
     if (!Array.isArray(input[key])) {
       issues.push({ path: key, message: `${key} must be an array.` });
     }
   }
 
   const rawTriggers = Array.isArray(input.triggers) ? input.triggers : [];
+  const rawActions = Array.isArray(input.actions) ? input.actions : [];
   const rawPolicies = Array.isArray(input.policies) ? input.policies : [];
   const rawWorkflows = Array.isArray(input.workflows) ? input.workflows : [];
   const rawRuntimes = Array.isArray(input.runtimes) ? input.runtimes : [];
@@ -195,12 +209,14 @@ export const validateProjectAutomationConfig = (
 
   addUniqueIssues(issues, policyIds, "policy");
   addUniqueIssues(issues, normalized.triggers.map((trigger, index) => ({ id: trigger.id, path: `triggers[${index}].id` })), "trigger");
+  addUniqueIssues(issues, normalized.actions.map((action, index) => ({ id: action.id, path: `actions[${index}].id` })), "action");
   addUniqueIssues(issues, runtimeIds, "runtime");
   addUniqueIssues(issues, workflowIds, "workflow");
 
-  const generatedEventIds = policyEventTypesForAgentsAndActions(agents, policyActionTokens(normalized.policies));
+  const generatedEventIds = policyEventTypesForAgentsAndActions(agents, normalized.actions.map((action) => action.id));
   const eventIdSet = new Set(generatedEventIds);
   const triggerIdSet = new Set(normalized.triggers.map((trigger) => trigger.id));
+  const actionIdSet = new Set(normalized.actions.map((action) => action.id));
   const policyIdSet = new Set([...policyIds.map((item) => item.id).filter(Boolean), ...rawPolicyIds]);
   const agentTokenSet = new Set(agents.flatMap(agentTokenCandidates));
 
@@ -212,6 +228,18 @@ export const validateProjectAutomationConfig = (
     }
     addRequiredStringIssue(issues, `${base}.id`, trigger.id, "Trigger id");
     addRequiredStringIssue(issues, `${base}.description`, trigger.description, "Trigger description");
+  });
+
+  rawActions.forEach((action, index) => {
+    const base = `actions[${index}]`;
+    if (!isRecord(action)) {
+      issues.push({ path: base, message: "Action must be an object." });
+      return;
+    }
+    addRequiredStringIssue(issues, `${base}.id`, action.id, "Action id");
+    if (action.description !== undefined && typeof action.description !== "string") {
+      issues.push({ path: `${base}.description`, message: "Action description must be a string." });
+    }
   });
 
   rawPolicies.forEach((policy, index) => {
@@ -244,6 +272,9 @@ export const validateProjectAutomationConfig = (
     addRequiredStringIssue(issues, `${base}.agent`, rawAgent, "Policy agent");
     if (!legacyPolicy) {
       addRequiredStringIssue(issues, `${base}.action`, rawAction, "Policy action");
+    }
+    if (normalizedPolicy?.action && !actionIdSet.has(normalizedPolicy.action)) {
+      issues.push({ path: `${base}.action`, message: `Policy references unknown action: ${rawAction || normalizedPolicy.action}.` });
     }
     if (typeof policy.enabled !== "boolean") {
       issues.push({ path: `${base}.enabled`, message: "Policy enabled must be boolean." });
@@ -362,9 +393,14 @@ export const saveProjectAutomationConfig = async (
   return normalized;
 };
 
-export const automationPoliciesToEventDefinitions = (policies: ProjectPolicy[] = [], agents: Agent[] = [], triggers: ProjectTrigger[] = []): EventDefinition[] =>
+export const automationPoliciesToEventDefinitions = (
+  policies: ProjectPolicy[] = [],
+  agents: Agent[] = [],
+  triggers: ProjectTrigger[] = [],
+  actions: ProjectAction[] = []
+): EventDefinition[] =>
   [...new Set([
-    ...policyEventTypesForAgentsAndActions(agents, policyActionTokens(policies)),
+    ...policyEventTypesForAgentsAndActions(agents, actions.length > 0 ? actions.map((action) => action.id) : policyActionTokens(policies)),
     ...triggers.map((trigger) => `trigger.${trigger.id}`)
   ])]
     .map((eventType) => ({

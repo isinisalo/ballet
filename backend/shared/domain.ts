@@ -17,6 +17,11 @@ export interface ProjectTrigger {
   description: string;
 }
 
+export interface ProjectAction {
+  id: string;
+  description: string;
+}
+
 export interface ProjectPolicy {
   id: string;
   source: "event" | "trigger";
@@ -43,6 +48,7 @@ export interface ProjectWorkflow {
 export interface ProjectAutomationConfig {
   version: 1;
   triggers: ProjectTrigger[];
+  actions: ProjectAction[];
   policies: ProjectPolicy[];
   workflows: ProjectWorkflow[];
   runtimes: ProjectRuntime[];

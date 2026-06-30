@@ -6,6 +6,16 @@
       "description": "Plan approved"
     }
   ],
+  "actions": [
+    {
+      "id": "implementation",
+      "description": "Implement an approved plan."
+    },
+    {
+      "id": "review",
+      "description": "Review implementation output."
+    }
+  ],
   "policies": [
     {
       "id": "on.trigger.plan_approved.then.developer.start.implementation",

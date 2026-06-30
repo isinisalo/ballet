@@ -37,6 +37,12 @@ const agent: Agent = {
 const validConfig = (): ProjectAutomationConfig => ({
   version: 1,
   triggers: [],
+  actions: [
+    {
+      id: "implementation",
+      description: "Implement approved work."
+    }
+  ],
   policies: [
     {
       id: "on.developer.implementation.failed.v1.then.developer.start.implementation",
@@ -69,6 +75,7 @@ describe("project automation config", () => {
     await expect(loadProjectAutomationConfig(await tempRoot())).resolves.toEqual({
       version: 1,
       triggers: [],
+      actions: [],
       policies: [],
       workflows: [],
       runtimes: []
@@ -111,6 +118,7 @@ describe("project automation config", () => {
 
     const loaded = await loadProjectAutomationConfig(root, [agent]);
     expect(loaded).not.toHaveProperty("events");
+    expect(loaded.actions).toEqual([{ id: "run", description: "" }]);
     expect(loaded.policies[0]).toMatchObject({
       id: "on.developer.run.failed.v1.then.developer.start.run",
       source: "event",
@@ -144,6 +152,11 @@ describe("project automation config", () => {
       ...validConfig(),
       policies: [{ ...validConfig().policies[0]!, action: "" }]
     }, [agent]).some((issue) => issue.message === "Policy action is required.")).toBe(true);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      policies: [{ ...validConfig().policies[0]!, action: "missing-action" }]
+    }, [agent]).some((issue) => issue.message === "Policy references unknown action: missing-action.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),

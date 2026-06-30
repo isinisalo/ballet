@@ -8,7 +8,6 @@ import {
   Activity,
   Bot,
   CalendarDays,
-  Check,
   CheckCircle2,
   ChartNoAxesColumnIncreasing,
   ChevronDown,
@@ -40,6 +39,7 @@ import type {
   Goal,
   MarkdownDocument,
   Project,
+  ProjectAction,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectDocumentTreeNode,
@@ -50,7 +50,7 @@ import type {
   Runtime,
   Skill
 } from "../../backend/shared/domain";
-import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyActionTokens, policyEventTypesForAgentsAndActions, policyOutputEventType, policyOutputEventTypes, preferredAgentToken } from "../../backend/shared/policy-actions";
+import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyEventTypesForAgentsAndActions, policyOutputEventType, policyOutputEventTypes, preferredAgentToken } from "../../backend/shared/policy-actions";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -58,7 +58,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -100,7 +99,7 @@ import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } 
 
 type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "project-instructions" | "automation" | "agents" | "skills" | "agent-runs";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
-type AutomationTab = "policies" | "triggers" | "workflows" | "runtimes";
+type AutomationTab = "policies" | "triggers" | "actions" | "workflows" | "runtimes";
 type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 interface RouteState {
@@ -124,6 +123,7 @@ const emptyData: AppData = {
   automation: {
     version: 1,
     triggers: [],
+    actions: [],
     policies: [],
     workflows: [],
     runtimes: []
@@ -200,6 +200,7 @@ const agentTemplate = (): Partial<Agent> => ({
 const automationConfigTemplate = (): ProjectAutomationConfig => ({
   version: 1,
   triggers: [],
+  actions: [],
   policies: [],
   workflows: [],
   runtimes: []
@@ -264,10 +265,11 @@ const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  const automationMatch = url.pathname.match(/^\/automation\/(policies|triggers|workflows|runtimes)\/?$/);
+  const automationMatch = url.pathname.match(/^\/automation\/(policies|triggers|actions|workflows|runtimes)\/?$/);
   if (automationMatch) return { view: "automation", automationTab: automationMatch[1] as AutomationTab };
   if (url.pathname === "/automation") return { view: "automation", automationTab: "policies" };
   if (url.pathname === "/policies") return { view: "automation", automationTab: "policies" };
+  if (url.pathname === "/actions") return { view: "automation", automationTab: "actions" };
   if (url.pathname === "/workflow") return { view: "automation", automationTab: "workflows" };
   if (url.pathname === "/runtimes") return { view: "automation", automationTab: "runtimes" };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
@@ -1380,6 +1382,7 @@ function SkillsView({
 const automationTabs: Array<{ id: AutomationTab; label: string; icon: ReactNode }> = [
   { id: "policies", label: "Policies", icon: <Route data-icon="inline-start" /> },
   { id: "triggers", label: "Triggers", icon: <Zap data-icon="inline-start" /> },
+  { id: "actions", label: "Actions", icon: <FileKey2 data-icon="inline-start" /> },
   { id: "workflows", label: "Workflows", icon: <Activity data-icon="inline-start" /> },
   { id: "runtimes", label: "Runtimes", icon: <Code2 data-icon="inline-start" /> }
 ];
@@ -1402,6 +1405,7 @@ function AutomationView({
   const [draft, setDraft] = useState<ProjectAutomationConfig>(data.automation ?? automationConfigTemplate());
   const [selectedPolicyId, setSelectedPolicyId] = useState("");
   const [selectedTriggerId, setSelectedTriggerId] = useState("");
+  const [selectedActionId, setSelectedActionId] = useState("");
   const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
   const [selectedRuntimeId, setSelectedRuntimeId] = useState("");
   const [error, setError] = useState("");
@@ -1411,6 +1415,7 @@ function AutomationView({
     setDraft(next);
     setSelectedPolicyId((current) => next.policies.some((policy) => policy.id === current) ? current : next.policies[0]?.id ?? "");
     setSelectedTriggerId((current) => next.triggers.some((trigger) => trigger.id === current) ? current : next.triggers[0]?.id ?? "");
+    setSelectedActionId((current) => next.actions.some((action) => action.id === current) ? current : next.actions[0]?.id ?? "");
     setSelectedWorkflowId((current) => next.workflows.some((workflow) => workflow.id === current) ? current : next.workflows[0]?.id ?? "");
     setSelectedRuntimeId((current) => next.runtimes.some((runtime) => runtime.id === current) ? current : next.runtimes[0]?.id ?? "");
     setError("");
@@ -1432,16 +1437,18 @@ function AutomationView({
 
   const selectedPolicy = draft.policies.find((policy) => policy.id === selectedPolicyId) ?? draft.policies[0];
   const selectedTrigger = draft.triggers.find((trigger) => trigger.id === selectedTriggerId) ?? draft.triggers[0];
+  const selectedAction = draft.actions.find((action) => action.id === selectedActionId) ?? draft.actions[0];
   const selectedWorkflow = draft.workflows.find((workflow) => workflow.id === selectedWorkflowId) ?? draft.workflows[0];
   const selectedRuntime = draft.runtimes.find((runtime) => runtime.id === selectedRuntimeId) ?? draft.runtimes[0];
 
   const addPolicy = () => {
     const agent = data.agents[0] ? preferredAgentToken(data.agents[0]) : "";
-    const action = uniquePolicyAction(policyOutputEventType({ agent, action: "implementation" }, "complete"), agent, "implementation", draft.policies);
+    const action = draft.actions[0]?.id || uniquePolicyAction(policyOutputEventType({ agent, action: "implementation" }, "complete"), agent, "implementation", draft.policies);
     const event = agent && action ? policyOutputEventType({ agent, action }, "complete") : "";
     const id = generatedPolicyId({ source: "event", event, agent, action });
     setDraft((current) => ({
       ...current,
+      actions: current.actions.some((candidate) => candidate.id === action) ? current.actions : [...current.actions, { id: action, description: "" }],
       policies: [...current.policies, {
         id,
         source: "event",
@@ -1463,6 +1470,15 @@ function AutomationView({
     setSelectedTriggerId(id);
   };
 
+  const addAction = () => {
+    const id = uniqueAutomationId("new-action", draft.actions.map((action) => action.id));
+    setDraft((current) => ({
+      ...current,
+      actions: [...current.actions, { id, description: "New action" }]
+    }));
+    setSelectedActionId(id);
+  };
+
   const addWorkflow = () => {
     const id = uniqueAutomationId("new-workflow", draft.workflows.map((workflow) => workflow.id));
     setDraft((current) => ({
@@ -1479,6 +1495,15 @@ function AutomationView({
       triggers: current.triggers.filter((trigger) => trigger.id !== selectedTrigger.id)
     }));
     setSelectedTriggerId(draft.triggers.find((trigger) => trigger.id !== selectedTrigger.id)?.id ?? "");
+  };
+
+  const removeSelectedAction = () => {
+    if (!selectedAction) return;
+    setDraft((current) => ({
+      ...current,
+      actions: current.actions.filter((action) => action.id !== selectedAction.id)
+    }));
+    setSelectedActionId(draft.actions.find((action) => action.id !== selectedAction.id)?.id ?? "");
   };
 
   const addRuntime = () => {
@@ -1530,6 +1555,10 @@ function AutomationView({
       label: "Add trigger",
       onAdd: addTrigger
     },
+    actions: {
+      label: "Add action",
+      onAdd: addAction
+    },
     workflows: {
       label: "Add workflow",
       onAdd: addWorkflow
@@ -1554,6 +1583,13 @@ function AutomationView({
       resourceName: selectedTrigger?.id,
       canDelete: Boolean(selectedTrigger),
       onDelete: removeSelectedTrigger
+    },
+    actions: {
+      label: "Delete action",
+      type: "action",
+      resourceName: selectedAction?.id,
+      canDelete: Boolean(selectedAction),
+      onDelete: removeSelectedAction
     },
     workflows: {
       label: "Delete workflow",
@@ -1621,6 +1657,9 @@ function AutomationView({
           {activeTab === "triggers" ? (
             <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={setSelectedTriggerId} updateConfig={updateConfig} />
           ) : null}
+          {activeTab === "actions" ? (
+            <ActionsAutomationTab config={draft} selectedId={selectedActionId} onSelect={setSelectedActionId} updateConfig={updateConfig} />
+          ) : null}
           {activeTab === "workflows" ? (
             <WorkflowsAutomationTab config={draft} selectedId={selectedWorkflowId} onSelect={setSelectedWorkflowId} updateConfig={updateConfig} />
           ) : null}
@@ -1671,120 +1710,6 @@ function AutomationEntityList({
   );
 }
 
-function CreatableActionField({
-  label,
-  value,
-  options,
-  onChange
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
-  const fieldId = useId();
-  const listId = useId();
-  const [query, setQuery] = useState(value);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) setQuery(value);
-  }, [open, value]);
-
-  const normalizedQuery = normalizePolicyToken(query);
-  const normalizedOptions = [...new Set(options.map(normalizePolicyToken).filter(Boolean))];
-  const filteredOptions = normalizedOptions.filter((option) => option.includes(normalizedQuery));
-  const exactMatch = normalizedOptions.includes(normalizedQuery);
-  const canCreate = normalizedQuery.length > 0 && !exactMatch;
-
-  const selectAction = (action: string) => {
-    onChange(action);
-    setQuery(action);
-    setOpen(false);
-  };
-
-  const commitQuery = () => {
-    if (filteredOptions[0] && (exactMatch || !canCreate)) {
-      selectAction(filteredOptions[0]);
-      return;
-    }
-    if (normalizedQuery) selectAction(normalizedQuery);
-  };
-
-  return (
-    <Field className="relative gap-1.5">
-      <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
-      <Input
-        id={fieldId}
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={open}
-        aria-controls={listId}
-        required
-        value={open ? query : value}
-        onFocus={() => {
-          setQuery(value);
-          setOpen(true);
-        }}
-        onBlur={() => window.setTimeout(() => setOpen(false), 100)}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commitQuery();
-          }
-          if (event.key === "Escape") {
-            setQuery(value);
-            setOpen(false);
-          }
-        }}
-      />
-      {open ? (
-        <div
-          id={listId}
-          role="listbox"
-          className="absolute top-full z-50 mt-1 grid max-h-52 w-full overflow-y-auto rounded border border-divider-strong bg-popover p-1 text-popover-foreground shadow-md"
-        >
-          {filteredOptions.length === 0 && !canCreate ? (
-            <div className="px-2 py-1.5 text-xs text-muted-foreground">No actions.</div>
-          ) : null}
-          {filteredOptions.map((option) => (
-            <Button
-              key={option}
-              type="button"
-              role="option"
-              variant="ghost"
-              className="h-8 justify-start gap-2 px-2 font-mono text-xs"
-              aria-selected={option === value}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => selectAction(option)}
-            >
-              <Check data-icon="inline-start" className={cn("opacity-0", option === value && "opacity-100")} />
-              <span className="truncate">{option}</span>
-            </Button>
-          ))}
-          {canCreate ? (
-            <Button
-              type="button"
-              role="option"
-              variant="ghost"
-              className="h-8 justify-start gap-2 px-2 font-mono text-xs"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => selectAction(normalizedQuery)}
-            >
-              <Plus data-icon="inline-start" />
-              <span className="truncate">Create "{normalizedQuery}"</span>
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-    </Field>
-  );
-}
-
 function TriggersAutomationTab({
   config,
   selectedId,
@@ -1796,8 +1721,16 @@ function TriggersAutomationTab({
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
 }) {
-  const selectedIndex = Math.max(0, config.triggers.findIndex((trigger) => trigger.id === selectedId));
+  const lastSelectedIndexRef = useRef(0);
+  const foundSelectedIndex = config.triggers.findIndex((trigger) => trigger.id === selectedId);
+  const selectedIndex = foundSelectedIndex >= 0
+    ? foundSelectedIndex
+    : Math.min(lastSelectedIndexRef.current, Math.max(0, config.triggers.length - 1));
   const selected = config.triggers[selectedIndex];
+
+  useEffect(() => {
+    if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
+  }, [foundSelectedIndex]);
 
   const updateSelected = (patch: Partial<ProjectTrigger>) => {
     if (!selected) return;
@@ -1835,6 +1768,74 @@ function TriggersAutomationTab({
   );
 }
 
+function ActionsAutomationTab({
+  config,
+  selectedId,
+  onSelect,
+  updateConfig
+}: {
+  config: ProjectAutomationConfig;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  updateConfig: AutomationConfigUpdater;
+}) {
+  const lastSelectedIndexRef = useRef(0);
+  const foundSelectedIndex = config.actions.findIndex((action) => action.id === selectedId);
+  const selectedIndex = foundSelectedIndex >= 0
+    ? foundSelectedIndex
+    : Math.min(lastSelectedIndexRef.current, Math.max(0, config.actions.length - 1));
+  const selected = config.actions[selectedIndex];
+
+  useEffect(() => {
+    if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
+  }, [foundSelectedIndex]);
+
+  const updateSelected = (patch: Partial<ProjectAction>) => {
+    if (!selected) return;
+    const next = { ...selected, ...patch };
+    const normalized = {
+      ...next,
+      id: editablePolicyToken(next.id)
+    };
+    updateConfig((current) => {
+      const previousId = current.actions[selectedIndex]?.id ?? selected.id;
+      const policyIdMap = new Map<string, string>();
+      const policies = current.policies.map((policy) => {
+        if (policy.action !== previousId) return policy;
+        const nextPolicy = { ...policy, action: normalized.id };
+        const nextPolicyId = generatedPolicyId(nextPolicy);
+        policyIdMap.set(policy.id, nextPolicyId);
+        return { ...nextPolicy, id: nextPolicyId };
+      });
+      return {
+        ...current,
+        actions: current.actions.map((action, index) => index === selectedIndex ? normalized : action),
+        policies,
+        workflows: current.workflows.map((workflow) => ({
+          ...workflow,
+          steps: workflow.steps.map((step) => policyIdMap.get(step) ?? step)
+        }))
+      };
+    });
+    onSelect(normalized.id);
+  };
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <AutomationEntityList
+        empty="No actions."
+        rows={config.actions.map((action) => ({ id: action.id, label: action.id, active: action.id === selected?.id, onSelect: () => onSelect(action.id) }))}
+      />
+      {selected ? (
+        <FieldGroup>
+          <TextField label="Action ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
+          <TextAreaField label="Description" rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
+        </FieldGroup>
+      ) : <EmptyState title="No action selected." />}
+    </div>
+  );
+}
+
 function PoliciesAutomationTab({
   data,
   config,
@@ -1849,8 +1850,12 @@ function PoliciesAutomationTab({
   updateConfig: AutomationConfigUpdater;
 }) {
   const selected = config.policies.find((policy) => policy.id === selectedId) ?? config.policies[0];
-  const actionOptions = policyActionTokens(config.policies);
-  const eventOptions = [{ value: noSelection, label: "No event" }, ...automationEventOptions(data.agents, actionOptions)];
+  const actionIds = config.actions.map((action) => action.id).filter(Boolean);
+  const actionOptions = [
+    { value: noSelection, label: "No action" },
+    ...config.actions.map((action) => ({ value: action.id, label: action.description ? `${action.id} · ${action.description}` : action.id }))
+  ];
+  const eventOptions = [{ value: noSelection, label: "No event" }, ...automationEventOptions(data.agents, actionIds)];
   const triggerOptions = [{ value: noSelection, label: "No trigger" }, ...config.triggers.map((trigger) => ({ value: trigger.id, label: trigger.id }))];
   const agentOptions = [{ value: noSelection, label: "No agent" }, ...automationAgentOptions(data.agents)];
 
@@ -1918,7 +1923,7 @@ function PoliciesAutomationTab({
             <SelectField label="Event" value={selected.event || noSelection} options={eventOptions} onChange={(event) => updateSelected({ event: event === noSelection ? "" : event })} />
           )}
           <SelectField label="Agent" value={selected.agent || noSelection} options={agentOptions} onChange={(agent) => updateSelected({ agent: agent === noSelection ? "" : agent })} />
-          <CreatableActionField label="Action" value={selected.action} options={actionOptions} onChange={(action) => updateSelected({ action })} />
+          <SelectField label="Action" value={selected.action || noSelection} options={actionOptions} onChange={(action) => updateSelected({ action: action === noSelection ? "" : action })} />
         </FieldGroup>
       ) : <EmptyState title="No policy selected." />}
     </div>
@@ -1938,13 +1943,37 @@ function WorkflowsAutomationTab({
 }) {
   const selected = config.workflows.find((workflow) => workflow.id === selectedId) ?? config.workflows[0];
   const draggedStepIndexRef = useRef<number | null>(null);
+  const workflowCanvasRef = useRef<HTMLDivElement | null>(null);
   const canvasPanRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null);
   const [dragOverStepIndex, setDragOverStepIndex] = useState<number | null>(null);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [canvasHeight, setCanvasHeight] = useState<number | null>(null);
   const [isCanvasPanning, setIsCanvasPanning] = useState(false);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
+
+  useEffect(() => {
+    const updateCanvasHeight = () => {
+      const top = workflowCanvasRef.current?.getBoundingClientRect().top;
+      if (typeof top !== "number") return;
+      setCanvasHeight(Math.max(448, window.innerHeight - top - 24));
+    };
+
+    updateCanvasHeight();
+    const frame = window.requestAnimationFrame(updateCanvasHeight);
+    const timeout = window.setTimeout(updateCanvasHeight, 0);
+    window.addEventListener("resize", updateCanvasHeight);
+    document.addEventListener("scroll", updateCanvasHeight, true);
+    window.visualViewport?.addEventListener("resize", updateCanvasHeight);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+      window.removeEventListener("resize", updateCanvasHeight);
+      document.removeEventListener("scroll", updateCanvasHeight, true);
+      window.visualViewport?.removeEventListener("resize", updateCanvasHeight);
+    };
+  }, [selected?.id]);
 
   const updateSelected = (patch: Partial<ProjectWorkflow>) => {
     if (!selected) return;
@@ -2058,8 +2087,10 @@ function WorkflowsAutomationTab({
             <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
           </div>
           <div
+            ref={workflowCanvasRef}
             data-workflow-canvas
             className={cn("relative min-h-[28rem] overflow-hidden rounded-lg border border-divider-strong bg-background", isCanvasPanning ? "cursor-grabbing" : "cursor-grab")}
+            style={{ height: canvasHeight ? `${canvasHeight}px` : undefined }}
             onPointerDown={handleCanvasPointerDown}
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={handleCanvasPointerUp}
