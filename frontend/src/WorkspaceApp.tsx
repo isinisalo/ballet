@@ -1938,8 +1938,11 @@ function WorkflowsAutomationTab({
 }) {
   const selected = config.workflows.find((workflow) => workflow.id === selectedId) ?? config.workflows[0];
   const draggedStepIndexRef = useRef<number | null>(null);
+  const canvasPanRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null);
   const [dragOverStepIndex, setDragOverStepIndex] = useState<number | null>(null);
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [isCanvasPanning, setIsCanvasPanning] = useState(false);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
 
@@ -1954,6 +1957,11 @@ function WorkflowsAutomationTab({
   const updateStep = (index: number, policyId: string) => {
     if (!selected) return;
     updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? policyId : step) });
+  };
+
+  const addPolicyStep = () => {
+    if (!selected) return;
+    updateSelected({ steps: [...selected.steps, config.policies[0]?.id ?? ""] });
   };
 
   const reorderStep = (fromIndex: number, toIndex: number) => {
@@ -2004,6 +2012,40 @@ function WorkflowsAutomationTab({
     event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
+  const resetCanvasPan = () => {
+    canvasPanRef.current = null;
+    setIsCanvasPanning(false);
+  };
+
+  const handleCanvasPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest("[data-workflow-node], button, [role='combobox']")) return;
+    canvasPanRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: canvasOffset.x,
+      originY: canvasOffset.y
+    };
+    setIsCanvasPanning(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleCanvasPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const pan = canvasPanRef.current;
+    if (!pan) return;
+    setCanvasOffset({
+      x: pan.originX + event.clientX - pan.startX,
+      y: pan.originY + event.clientY - pan.startY
+    });
+  };
+
+  const handleCanvasPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    if (!canvasPanRef.current) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    resetCanvasPan();
+  };
+
   return (
     <div className="grid gap-4">
       <AutomationEntityList
@@ -2015,98 +2057,91 @@ function WorkflowsAutomationTab({
           <div className="grid gap-3">
             <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
           </div>
-          <div className="overflow-hidden rounded-lg border border-divider-strong bg-background">
-            <div className="overflow-x-auto">
-              <div className="min-h-[28rem] min-w-max bg-[image:linear-gradient(to_right,var(--divider-strong)_1px,transparent_1px),linear-gradient(to_bottom,var(--divider-strong)_1px,transparent_1px)] bg-[size:24px_24px] p-6">
-                <div className="flex min-h-[22rem] items-center">
-                  <WorkflowCanvasNode
-                    label="Trigger"
-                    value={workflowTriggerLabel(policyById.get(selected.steps[0] ?? ""))}
-                    tone="trigger"
-                    icon={Zap}
-                    dashed={selected.steps.length === 0}
-                  />
-                  {selected.steps.length > 0 ? selected.steps.map((policyId, index) => {
-                    const policy = policyById.get(policyId);
-                    const nextPolicy = policyById.get(selected.steps[index + 1] ?? "");
-                    const continuationEvent = nextPolicy?.source === "event" ? nextPolicy.event : undefined;
-                    const outputEvents = workflowOutputEvents(policy, continuationEvent);
+          <div
+            data-workflow-canvas
+            className={cn("relative min-h-[28rem] overflow-hidden rounded-lg border border-divider-strong bg-background", isCanvasPanning ? "cursor-grabbing" : "cursor-grab")}
+            onPointerDown={handleCanvasPointerDown}
+            onPointerMove={handleCanvasPointerMove}
+            onPointerUp={handleCanvasPointerUp}
+            onPointerCancel={resetCanvasPan}
+          >
+            <div className="pointer-events-none absolute inset-0 opacity-50 bg-[image:linear-gradient(to_right,var(--divider-strong)_1px,transparent_1px),linear-gradient(to_bottom,var(--divider-strong)_1px,transparent_1px)] bg-[size:24px_24px]" />
+            <div
+              className="absolute left-8 top-1/2 flex min-w-max select-none items-center"
+              style={{ transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) translateY(-50%)` }}
+            >
+              <WorkflowCanvasNode
+                label="Trigger"
+                value={workflowTriggerLabel(policyById.get(selected.steps[0] ?? ""))}
+                tone="trigger"
+                icon={Zap}
+                dashed={selected.steps.length === 0}
+              />
+              {selected.steps.map((policyId, index) => {
+                const policy = policyById.get(policyId);
+                const nextPolicy = policyById.get(selected.steps[index + 1] ?? "");
+                const continuationEvent = nextPolicy?.source === "event" ? nextPolicy.event : undefined;
+                const outputEvents = workflowOutputEvents(policy, continuationEvent);
 
-                    return (
-                      <div
-                        key={`${policyId}-${index}`}
-                        data-workflow-step-index={index}
-                        onPointerDown={(event) => handleStepPointerDown(event, index)}
-                        onPointerMove={handleStepPointerMove}
-                        onPointerUp={handleStepPointerUp}
-                        onPointerCancel={resetStepDrag}
-                        className={cn(
-                          "flex cursor-grab select-none items-center rounded-lg px-1 py-2 active:cursor-grabbing",
-                          draggedStepIndex === index && "opacity-60",
-                          dragOverStepIndex === index && draggedStepIndex !== index && "ring-2 ring-primary/20"
-                        )}
-                      >
-                        <WorkflowConnector />
+                return (
+                  <div
+                    key={`${policyId}-${index}`}
+                    data-workflow-step-index={index}
+                    onPointerDown={(event) => handleStepPointerDown(event, index)}
+                    onPointerMove={handleStepPointerMove}
+                    onPointerUp={handleStepPointerUp}
+                    onPointerCancel={resetStepDrag}
+                    className={cn(
+                      "flex cursor-grab select-none items-center rounded-lg px-1 py-2 active:cursor-grabbing",
+                      draggedStepIndex === index && "opacity-60",
+                      dragOverStepIndex === index && draggedStepIndex !== index && "ring-2 ring-primary/20"
+                    )}
+                  >
+                    <WorkflowConnector />
+                    <WorkflowCanvasNode
+                      label="Policy"
+                      tone="policy"
+                      icon={Route}
+                      value={policyId || "No policy"}
+                      dashed={!policy}
+                    >
+                      <Select value={policyId || noSelection} onValueChange={(value) => updateStep(index, value === noSelection ? "" : value)}>
+                        <SelectTrigger className="h-7 w-44 min-w-0 px-2 font-mono text-[0.68rem]" onDragStart={(event) => event.stopPropagation()}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {policyOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </WorkflowCanvasNode>
+                    <WorkflowConnector />
+                    <WorkflowCanvasNode label="Agent" value={policy?.agent ?? "Missing policy"} tone="agent" icon={Bot} dashed={!policy} />
+                    <WorkflowConnector dashed={!continuationEvent} />
+                    <div className="flex flex-col gap-2">
+                      {outputEvents.map((eventType) => (
                         <WorkflowCanvasNode
-                          label="Policy"
-                          tone="policy"
-                          icon={Route}
-                          value={policyId || "No policy"}
-                          dashed={!policy}
-                        >
-                          <Select value={policyId || noSelection} onValueChange={(value) => updateStep(index, value === noSelection ? "" : value)}>
-                            <SelectTrigger className="h-7 w-56 min-w-0 px-2 font-mono text-[0.68rem]" onDragStart={(event) => event.stopPropagation()}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {policyOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        </WorkflowCanvasNode>
-                        <WorkflowConnector />
-                        <WorkflowCanvasNode label="Agent" value={policy?.agent ?? "Missing policy"} tone="agent" icon={Bot} dashed={!policy} />
-                        <WorkflowConnector dashed={!continuationEvent} />
-                        <div className="flex flex-col gap-2">
-                          {outputEvents.map((eventType) => (
-                            <WorkflowCanvasNode
-                              key={eventType}
-                              label="Events"
-                              value={eventType}
-                              tone="event"
-                              icon={Activity}
-                              dashed={eventType !== continuationEvent}
-                              active={eventType === continuationEvent}
-                            />
-                          ))}
-                        </div>
-                        <Button type="button" size="icon-sm" variant="destructive" className="ml-3" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected.steps.filter((_, stepIndex) => stepIndex !== index) })}>
-                          <TrashButtonIcon />
-                        </Button>
-                      </div>
-                    );
-                  }) : (
-                    <>
-                      <WorkflowConnector dashed />
-                      <WorkflowCanvasNode label="Policy" value="Add first policy" tone="policy" icon={Route} dashed />
-                      <WorkflowConnector dashed />
-                      <WorkflowCanvasNode label="Agent" value="Select agent" tone="agent" icon={Bot} dashed />
-                      <WorkflowConnector dashed />
-                      <WorkflowCanvasNode label="Events" value="Next event" tone="event" icon={Activity} dashed />
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-3 border-t border-divider-strong bg-card px-3 py-2">
-              <span className="font-mono text-[0.68rem] uppercase text-muted-foreground">Trigger - Policy - Agent - Events</span>
-              <Button type="button" variant="outline" className="w-fit" onClick={() => updateSelected({ steps: [...selected.steps, config.policies[0]?.id ?? ""] })}>
-                <Plus data-icon="inline-start" />
-                Add policy step
-              </Button>
+                          key={eventType}
+                          label="Events"
+                          value={eventType}
+                          tone="event"
+                          icon={Activity}
+                          dashed={eventType !== continuationEvent}
+                          active={eventType === continuationEvent}
+                        />
+                      ))}
+                    </div>
+                    <Button type="button" size="icon-sm" variant="destructive" className="ml-3" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected.steps.filter((_, stepIndex) => stepIndex !== index) })}>
+                      <TrashButtonIcon />
+                    </Button>
+                  </div>
+                );
+              })}
+              <WorkflowConnector dashed />
+              <WorkflowGhostNode value={selected.steps.length === 0 ? "Add first policy" : "Add policy step"} icon={Route} onClick={addPolicyStep} />
             </div>
           </div>
         </div>
@@ -2138,7 +2173,7 @@ function workflowOutputEvents(policy: ProjectPolicy | undefined, continuationEve
 
 function WorkflowConnector({ dashed = false }: { dashed?: boolean }) {
   return (
-    <div className="flex w-10 items-center" aria-hidden="true">
+    <div className="flex w-8 items-center" aria-hidden="true">
       <span className={cn("h-px flex-1 border-t-2 border-primary/70", dashed && "border-dashed border-muted-foreground/70")} />
       <span className={cn("size-0 border-y-[5px] border-l-[7px] border-y-transparent border-l-primary/70", dashed && "border-l-muted-foreground/70")} />
     </div>
@@ -2164,8 +2199,10 @@ function WorkflowCanvasNode({
 }) {
   return (
     <div
+      data-workflow-node
+      aria-label={`${label}: ${value}`}
       className={cn(
-        "flex min-h-11 min-w-48 max-w-72 items-center gap-2 rounded-md border border-divider-strong bg-card px-2.5 py-2",
+        "flex min-h-11 min-w-44 max-w-60 items-center gap-2 rounded-md border border-divider-strong bg-card px-2.5 py-2",
         dashed && "border-dashed border-muted-foreground/70 bg-background/80 opacity-80",
         active && "border-primary/80 ring-2 ring-primary/20"
       )}
@@ -2173,11 +2210,28 @@ function WorkflowCanvasNode({
       <div className={cn("flex size-7 shrink-0 items-center justify-center rounded border border-divider-strong bg-background", workflowNodeToneClasses[tone])}>
         <Icon className="size-4" aria-hidden="true" />
       </div>
-      <div className="grid min-w-0 flex-1 gap-0.5">
-        <span className="font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">{label}</span>
+      <div className="grid min-w-0 flex-1">
         {children ?? <span className="truncate font-mono text-[0.72rem] leading-4 text-foreground">{value}</span>}
       </div>
     </div>
+  );
+}
+
+function WorkflowGhostNode({ value, icon: Icon, onClick }: { value: string; icon: LucideIcon; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      data-workflow-node
+      className="flex min-h-11 min-w-44 max-w-60 cursor-pointer items-center gap-2 rounded-md border border-dashed border-muted-foreground/70 bg-background/80 px-2.5 py-2 text-left opacity-80 transition-colors hover:border-primary/80 hover:bg-card hover:opacity-100 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      aria-label={value}
+      title={value}
+      onClick={onClick}
+    >
+      <div className="flex size-7 shrink-0 items-center justify-center rounded border border-dashed border-muted-foreground/70 bg-background text-primary">
+        <Icon className="size-4" aria-hidden="true" />
+      </div>
+      <span className="truncate font-mono text-[0.72rem] leading-4 text-muted-foreground">{value}</span>
+    </button>
   );
 }
 

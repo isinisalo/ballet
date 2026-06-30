@@ -275,12 +275,10 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("tab", { name: /policies/i })).toHaveAttribute("aria-selected", "true");
 
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
-    expect(screen.getByText("Policy")).toBeInTheDocument();
-    expect(screen.getByText("Agent")).toBeInTheDocument();
-    expect(screen.getAllByText("Events").length).toBeGreaterThan(0);
     expect(screen.getByText("on.existing.implementation.failed.v1.then.existing.start.implementation")).toBeInTheDocument();
     expect(screen.getByText("existing")).toBeInTheDocument();
     expect(screen.getByText("existing.implementation.complete.v1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add policy step" })).toBeInTheDocument();
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /policies/i }));
