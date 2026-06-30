@@ -2149,7 +2149,7 @@ function WorkflowsAutomationTab({
     layoutWidth = Math.max(layoutWidth, x + width + canvasLayout.startX);
     layoutHeight = Math.max(layoutHeight, y + height + canvasLayout.startY);
     layoutNodes.push(
-      <div key={key} className="absolute" style={{ transform: `translate(${x}px, ${y}px)`, width, height }}>
+      <div key={key} className="absolute flex items-center" style={{ transform: `translate(${x}px, ${y}px)`, width, height }}>
         {node}
       </div>
     );
@@ -2185,7 +2185,7 @@ function WorkflowsAutomationTab({
         className="w-[14.625rem]"
       >
         <Select value={record.policyId || noSelection} onValueChange={(value) => updateStep(record.index, value === noSelection ? "" : value)}>
-          <SelectTrigger className="h-7 w-44 min-w-0 px-2 font-mono text-[0.68rem]" onDragStart={(event) => event.stopPropagation()}>
+          <SelectTrigger className="h-6 w-44 min-w-0 px-1.5 font-mono text-[0.64rem]" title={record.policyId || "No policy"} onDragStart={(event) => event.stopPropagation()}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -2470,18 +2470,19 @@ function WorkflowCanvasNode({
     <div
       data-workflow-node
       aria-label={`${label}: ${value}`}
+      title={value}
       className={cn(
-        "flex min-h-11 min-w-44 max-w-60 shrink-0 items-center gap-2 rounded-md border border-divider-strong bg-card px-2.5 py-2",
+        "flex min-h-9 min-w-44 max-w-60 shrink-0 items-center gap-1.5 rounded-md border border-divider-strong bg-card px-2 py-1.5",
         dashed && "border-dashed border-muted-foreground/70 bg-background/80 opacity-80",
         active && "border-primary/80 ring-2 ring-primary/20",
         className
       )}
     >
-      <div className={cn("flex size-7 shrink-0 items-center justify-center rounded border border-divider-strong bg-background", workflowNodeToneClasses[tone])}>
-        <Icon className="size-4" aria-hidden="true" />
+      <div className={cn("flex size-5 shrink-0 items-center justify-center rounded border border-divider-strong bg-background", workflowNodeToneClasses[tone])}>
+        <Icon className="size-3.5" aria-hidden="true" />
       </div>
       <div className="grid min-w-0 flex-1">
-        {children ?? <span className="truncate font-mono text-[0.72rem] leading-4 text-foreground">{value}</span>}
+        {children ?? <span className="truncate font-mono text-[0.66rem] leading-4 text-foreground">{value}</span>}
       </div>
     </div>
   );
@@ -2492,16 +2493,16 @@ function WorkflowGhostNode({ value, icon: Icon, ariaLabel, disabled = false, cla
     <button
       type="button"
       data-workflow-node
-      className={cn("flex min-h-11 min-w-44 max-w-60 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-dashed border-muted-foreground/70 bg-background/80 px-2.5 py-2 text-left opacity-80 transition-colors hover:border-primary/80 hover:bg-card hover:opacity-100 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80", className)}
+      className={cn("flex min-h-9 min-w-44 max-w-60 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-muted-foreground/70 bg-background/80 px-2 py-1.5 text-left opacity-80 transition-colors hover:border-primary/80 hover:bg-card hover:opacity-100 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80", className)}
       aria-label={ariaLabel}
-      title={ariaLabel}
+      title={value}
       disabled={disabled}
       onClick={onClick}
     >
-      <div className="flex size-7 shrink-0 items-center justify-center rounded border border-dashed border-muted-foreground/70 bg-background text-primary">
-        <Icon className="size-4" aria-hidden="true" />
+      <div className="flex size-5 shrink-0 items-center justify-center rounded border border-dashed border-muted-foreground/70 bg-background text-primary">
+        <Icon className="size-3.5" aria-hidden="true" />
       </div>
-      <span className="truncate font-mono text-[0.72rem] leading-4 text-muted-foreground">{value}</span>
+      <span className="truncate font-mono text-[0.66rem] leading-4 text-muted-foreground">{value}</span>
     </button>
   );
 }
