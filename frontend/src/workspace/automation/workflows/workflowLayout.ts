@@ -48,7 +48,7 @@ export type WorkflowCanvasLayout = {
 
 export const workflowNodeSizes = {
   trigger: { width: 176, height: 46 },
-  policy: { width: 240, height: 116 },
+  policy: { width: 240, height: 92 },
   event: { width: 240, height: 46 },
   action: { width: 28, height: 28 }
 };

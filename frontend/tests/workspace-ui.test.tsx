@@ -534,8 +534,13 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("button", { name: /add event/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Automation" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "Environment" })).toHaveAttribute("aria-expanded", "false");
+    const automationToggle = screen.getByRole("button", { name: "Automation" });
+    const environmentToggle = screen.getByRole("button", { name: "Environment" });
+    const projectToggle = screen.getByRole("button", { name: "Project" });
+    expect(automationToggle).toHaveAttribute("aria-expanded", "true");
+    expect(environmentToggle).toHaveAttribute("aria-expanded", "false");
+    expect(automationToggle.compareDocumentPosition(environmentToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(environmentToggle.compareDocumentPosition(projectToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
 
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();

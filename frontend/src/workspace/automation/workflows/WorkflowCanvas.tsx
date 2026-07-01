@@ -172,7 +172,7 @@ export function WorkflowCanvas({
           icon={Route}
           value={record.policyId || "No policy"}
           dashed={!record.policy}
-          className="h-[7.25rem] w-60 max-w-none items-start py-2"
+          className="h-[5.75rem] w-60 max-w-none items-start py-2"
         >
           {record.policy ? (
             <WorkflowPolicySummary

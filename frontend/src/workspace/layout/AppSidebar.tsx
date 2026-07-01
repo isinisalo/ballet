@@ -52,9 +52,9 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarProjectMenu route={route} projectId={projectId} projectDocumentTree={projectDocumentTree} navigate={navigate} />
               <SidebarAutomationMenu route={route} automation={automation} navigate={navigate} />
               <SidebarEnvironmentMenu route={route} agents={agents} skills={skills} runtimes={automation.runtimes} navigate={navigate} />
+              <SidebarProjectMenu route={route} projectId={projectId} projectDocumentTree={projectDocumentTree} navigate={navigate} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
