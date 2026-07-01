@@ -1,14 +1,15 @@
 ---
 id: goal-001
-status: accepted
 title: Projektin tavoite
-created_date: '2026-06-06 07:19'
-updated_date: '2026-06-23'
+created_date: 2026-06-06 07:19
+updated_date: 2026-06-23
+status: accepted
 tags:
   - intent
   - goal
 version: 1
 ---
+
 # Projektin tavoite
 
 ## GOAL

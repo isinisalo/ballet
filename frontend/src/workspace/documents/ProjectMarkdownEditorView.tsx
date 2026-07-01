@@ -171,30 +171,28 @@ export function ProjectMarkdownEditorView({
       >
         <form id={formId} className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
           {validationError ? <Alert variant="destructive"><AlertDescription>{validationError}</AlertDescription></Alert> : null}
-          <div className="rounded-lg border border-border/80 bg-panel-section">
-            <div className="flex min-h-10 flex-wrap items-center justify-between gap-3 border-b border-border/80 bg-panel-header px-3 py-2">
-              <EditorToolbar />
-              <div className="flex items-center gap-3">
-                <EditorMetric label="Words" value={wordCount} />
-                <EditorMetric label="Tokens" value={tokens} />
-                <span className="rounded bg-muted px-2 py-1 font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">
-                  MARKDOWN_MODE
-                </span>
+          <div className="-mx-4 -mt-3 flex min-h-10 flex-wrap items-center justify-between gap-3 bg-panel-header px-4 py-2">
+            <EditorToolbar />
+            <div className="flex items-center gap-3">
+              <EditorMetric label="Words" value={wordCount} />
+              <EditorMetric label="Tokens" value={tokens} />
+              <span className="rounded bg-muted px-2 py-1 font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">
+                MARKDOWN_MODE
+              </span>
+            </div>
+          </div>
+          <div className="grid gap-3 pt-3">
+            <div className="flex items-start gap-2 pb-1">
+              <Braces className="mt-0.5 size-4 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <p className="truncate font-mono text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                  Editing source
+                </p>
+                <p className="truncate text-sm font-medium text-foreground">{title}</p>
               </div>
             </div>
-            <div className="grid gap-3 p-3">
-              <div className="flex items-start gap-2 border-b border-border/70 pb-3">
-                <Braces className="mt-0.5 size-4 shrink-0 text-primary" />
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                    Editing source
-                  </p>
-                  <p className="truncate text-sm font-medium text-foreground">{title}</p>
-                </div>
-              </div>
-              <WorkbenchTextArea label="YAML Frontmatter" rows={9} value={frontmatterText} onChange={setFrontmatterText} />
-              <WorkbenchTextArea label="Markdown Body" rows={18} value={bodyText} onChange={setBodyText} />
-            </div>
+            <WorkbenchTextArea label="YAML Frontmatter" rows={9} value={frontmatterText} onChange={setFrontmatterText} />
+            <WorkbenchTextArea label="Markdown Body" rows={18} value={bodyText} onChange={setBodyText} />
           </div>
         </form>
       </Panel>
