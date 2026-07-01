@@ -646,11 +646,87 @@ function activeAutomationEntityId(config: ProjectAutomationConfig, tab: Automati
   return entities.some((entity) => entity.id === routeId) ? routeId : entities[0]?.id ?? "";
 }
 
-const automationSidebarSections: Array<{ id: AutomationTab; label: string; icon: LucideIcon; emptyLabel: string }> = [
+type AutomationSidebarSection = { id: AutomationTab; label: string; icon: LucideIcon; emptyLabel: string };
+
+const automationSidebarSections: AutomationSidebarSection[] = [
   { id: "actions", label: "Actions", icon: FileKey2, emptyLabel: "No actions." },
   { id: "triggers", label: "Triggers", icon: Zap, emptyLabel: "No triggers." },
   { id: "workflows", label: "Workflows", icon: Activity, emptyLabel: "No workflows." }
 ];
+
+function SidebarAutomationSection({
+  section,
+  automation,
+  route,
+  navigate
+}: {
+  section: AutomationSidebarSection;
+  automation: ProjectAutomationConfig;
+  route: RouteState;
+  navigate: (path: string) => void;
+}) {
+  const entities = automationEntities(automation, section.id);
+  const selectedId = activeAutomationEntityId(automation, section.id, route.automationTab === section.id ? route.automationEntityId : undefined);
+  const sectionActive = route.view === "automation" && route.automationTab === section.id;
+  const sectionPath = automationSectionPath(section.id, selectedId || undefined);
+  const Icon = section.icon;
+  const [open, setOpen] = useState(sectionActive);
+
+  useEffect(() => {
+    if (sectionActive) setOpen(true);
+  }, [sectionActive]);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="group/automation-section">
+      <SidebarMenuSubItem>
+        <SidebarMenuSubButton
+          href={sectionPath}
+          size="sm"
+          isActive={sectionActive}
+          aria-expanded={open}
+          className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+          onClick={(event) => {
+            event.preventDefault();
+            setOpen((current) => !current);
+            navigate(sectionPath);
+          }}
+        >
+          <Icon />
+          <span>{section.label}</span>
+          <ChevronRight className="ml-auto transition-transform group-data-[state=open]/automation-section:rotate-90" />
+        </SidebarMenuSubButton>
+        <CollapsibleContent>
+          <SidebarMenuSub className="mx-2 gap-0.5 border-sidebar-border/60 px-2 py-1">
+            {entities.length === 0 ? (
+              <SidebarMenuSubItem>
+                <span className="block px-2 py-1 text-xs text-muted-foreground">{section.emptyLabel}</span>
+              </SidebarMenuSubItem>
+            ) : null}
+            {entities.map((entity) => {
+              const path = automationSectionPath(section.id, entity.id);
+              return (
+                <SidebarMenuSubItem key={entity.id}>
+                  <SidebarMenuSubButton
+                    href={path}
+                    size="sm"
+                    isActive={sectionActive && entity.id === selectedId}
+                    className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigate(path);
+                    }}
+                  >
+                    <span className="truncate">{entity.label}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuSubItem>
+    </Collapsible>
+  );
+}
 
 function SidebarAutomationMenu({
   route,
@@ -679,57 +755,9 @@ function SidebarAutomationMenu({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub>
-            {automationSidebarSections.map((section) => {
-              const entities = automationEntities(automation, section.id);
-              const selectedId = activeAutomationEntityId(automation, section.id, route.automationTab === section.id ? route.automationEntityId : undefined);
-              const sectionActive = route.view === "automation" && route.automationTab === section.id;
-              const sectionPath = automationSectionPath(section.id, selectedId || undefined);
-              const Icon = section.icon;
-
-              return (
-                <SidebarMenuSubItem key={section.id}>
-                  <SidebarMenuSubButton
-                    href={sectionPath}
-                    size="sm"
-                    isActive={sectionActive}
-                    className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigate(sectionPath);
-                    }}
-                  >
-                    <Icon />
-                    <span>{section.label}</span>
-                  </SidebarMenuSubButton>
-                  <SidebarMenuSub className="mx-2 gap-0.5 border-sidebar-border/60 px-2 py-1">
-                    {entities.length === 0 ? (
-                      <SidebarMenuSubItem>
-                        <span className="block px-2 py-1 text-xs text-muted-foreground">{section.emptyLabel}</span>
-                      </SidebarMenuSubItem>
-                    ) : null}
-                    {entities.map((entity) => {
-                      const path = automationSectionPath(section.id, entity.id);
-                      return (
-                        <SidebarMenuSubItem key={entity.id}>
-                          <SidebarMenuSubButton
-                            href={path}
-                            size="sm"
-                            isActive={sectionActive && entity.id === selectedId}
-                            className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              navigate(path);
-                            }}
-                          >
-                            <span className="truncate">{entity.label}</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      );
-                    })}
-                  </SidebarMenuSub>
-                </SidebarMenuSubItem>
-              );
-            })}
+            {automationSidebarSections.map((section) => (
+              <SidebarAutomationSection key={section.id} section={section} automation={automation} route={route} navigate={navigate} />
+            ))}
           </SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>
@@ -737,7 +765,7 @@ function SidebarAutomationMenu({
   );
 }
 
-function SidebarRuntimesMenu({
+function SidebarRuntimesSection({
   route,
   runtimes,
   navigate
@@ -749,34 +777,33 @@ function SidebarRuntimesMenu({
   const runtimesOpen = route.view === "runtimes";
   const selectedId = runtimes.some((runtime) => runtime.id === route.runtimeId) ? route.runtimeId : runtimes[0]?.id ?? "";
   const rootPath = runtimePath(selectedId || undefined);
+  const [open, setOpen] = useState(runtimesOpen);
+
+  useEffect(() => {
+    if (runtimesOpen) setOpen(true);
+  }, [runtimesOpen]);
 
   return (
-    <Collapsible defaultOpen={runtimesOpen} className="group/collapsible">
-      <SidebarMenuItem>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton isActive={runtimesOpen} tooltip="Runtimes">
-            <Code2 />
-            <span>Runtimes</span>
-            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
+    <Collapsible open={open} onOpenChange={setOpen} className="group/environment-section">
+      <SidebarMenuSubItem>
+        <SidebarMenuSubButton
+          href={rootPath}
+          size="sm"
+          isActive={runtimesOpen}
+          aria-expanded={open}
+          className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+          onClick={(event) => {
+            event.preventDefault();
+            setOpen((current) => !current);
+            navigate(rootPath);
+          }}
+        >
+          <Code2 />
+          <span>Runtimes</span>
+          <ChevronRight className="ml-auto transition-transform group-data-[state=open]/environment-section:rotate-90" />
+        </SidebarMenuSubButton>
         <CollapsibleContent>
-          <SidebarMenuSub>
-            <SidebarMenuSubItem>
-              <SidebarMenuSubButton
-                href={rootPath}
-                size="sm"
-                isActive={runtimesOpen}
-                className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigate(rootPath);
-                }}
-              >
-                <Code2 />
-                <span>Runtimes</span>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
+          <SidebarMenuSub className="mx-2 gap-0.5 border-sidebar-border/60 px-2 py-1">
             {runtimes.length === 0 ? (
               <SidebarMenuSubItem>
                 <span className="block px-2 py-1.5 text-xs text-muted-foreground">No runtimes.</span>
@@ -801,6 +828,164 @@ function SidebarRuntimesMenu({
                 </SidebarMenuSubItem>
               );
             })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuSubItem>
+    </Collapsible>
+  );
+}
+
+function SidebarEnvironmentSection({
+  label,
+  icon,
+  path,
+  active,
+  children,
+  navigate
+}: {
+  label: string;
+  icon: ReactNode;
+  path: string;
+  active: boolean;
+  children: ReactNode;
+  navigate: (path: string) => void;
+}) {
+  const [open, setOpen] = useState(active);
+
+  useEffect(() => {
+    if (active) setOpen(true);
+  }, [active]);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="group/environment-section">
+      <SidebarMenuSubItem>
+        <SidebarMenuSubButton
+          href={path}
+          size="sm"
+          isActive={active}
+          aria-expanded={open}
+          className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+          onClick={(event) => {
+            event.preventDefault();
+            setOpen((current) => !current);
+            navigate(path);
+          }}
+        >
+          {icon}
+          <span>{label}</span>
+          <ChevronRight className="ml-auto transition-transform group-data-[state=open]/environment-section:rotate-90" />
+        </SidebarMenuSubButton>
+        <CollapsibleContent>
+          {children}
+        </CollapsibleContent>
+      </SidebarMenuSubItem>
+    </Collapsible>
+  );
+}
+
+function SidebarEnvironmentMenu({
+  route,
+  agents,
+  skills,
+  runtimes,
+  navigate
+}: {
+  route: RouteState;
+  agents: Agent[];
+  skills: Skill[];
+  runtimes: ProjectRuntime[];
+  navigate: (path: string) => void;
+}) {
+  const environmentOpen = route.view === "agents" || route.view === "skills" || route.view === "runtimes";
+  const agentsOpen = route.view === "agents";
+  const skillsOpen = route.view === "skills";
+
+  return (
+    <Collapsible defaultOpen={environmentOpen} className="group/collapsible">
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            isActive={environmentOpen}
+            tooltip="Environment"
+            className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
+          >
+            <Code2 />
+            <span>Environment</span>
+            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            <SidebarEnvironmentSection label="Agents" icon={<Bot />} path="/agents" active={agentsOpen} navigate={navigate}>
+              <SidebarAgentList agents={agents} activePath={agentsOpen ? route.documentPath : undefined} navigate={navigate} />
+            </SidebarEnvironmentSection>
+            <SidebarEnvironmentSection label="Skills" icon={<FileKey2 />} path="/skills" active={skillsOpen} navigate={navigate}>
+              <SidebarDocumentList documents={skills} activePath={skillsOpen ? route.documentPath : undefined} pathFor={skillDocumentPath} navigate={navigate} />
+            </SidebarEnvironmentSection>
+            <SidebarRuntimesSection route={route} runtimes={runtimes} navigate={navigate} />
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
+function SidebarProjectMenu({
+  route,
+  projectDocumentTree,
+  navigate
+}: {
+  route: RouteState;
+  projectDocumentTree: ProjectDocumentTreeNode[];
+  navigate: (path: string) => void;
+}) {
+  const projectOpen = route.view === "projects" || route.view === "project-document" || route.view === "project-goals" || route.view === "project-adrs" || route.view === "project-instructions";
+  const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
+  const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
+  const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
+
+  return (
+    <Collapsible defaultOpen={projectOpen} className="group/collapsible">
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            isActive={projectOpen}
+            tooltip="Project"
+            className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
+          >
+            <FileText />
+            <span>Project</span>
+            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            <SidebarProjectDirectoryMenu
+              label="ADR"
+              icon={<Archive />}
+              node={adrDirectory}
+              activePath={route.documentPath}
+              navigate={navigate}
+              activeView={route.view === "project-adrs"}
+            />
+            <SidebarProjectDirectoryMenu
+              label="Goals"
+              icon={<CheckCircle2 />}
+              node={goalsDirectory}
+              activePath={route.documentPath}
+              navigate={navigate}
+              activeView={route.view === "project-goals"}
+            />
+            <SidebarProjectDirectoryMenu
+              label="Instructions"
+              icon={<FileText />}
+              node={instructionsDirectory}
+              activePath={route.documentPath}
+              navigate={navigate}
+              forceRender
+              emptyLabel="No instructions."
+              activeView={route.view === "project-instructions"}
+            />
           </SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>
@@ -833,14 +1018,21 @@ function SidebarProjectDirectoryMenu({
   if (!node && !forceRender) return null;
 
   return (
-    <Collapsible defaultOpen={active} className="group/collapsible">
-      <SidebarMenuItem>
+    <Collapsible defaultOpen={active} className="group/project-section">
+      <SidebarMenuSubItem>
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton isActive={active} tooltip={label}>
-            {icon}
-            <span>{label}</span>
-            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-          </SidebarMenuButton>
+          <SidebarMenuSubButton
+            asChild
+            size="sm"
+            isActive={active}
+            className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+          >
+            <button type="button">
+              {icon}
+              <span>{label}</span>
+              <ChevronRight className="ml-auto transition-transform group-data-[state=open]/project-section:rotate-90" />
+            </button>
+          </SidebarMenuSubButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
           {children.length > 0 ? (
@@ -855,7 +1047,7 @@ function SidebarProjectDirectoryMenu({
             </SidebarMenuSub>
           ) : null}
         </CollapsibleContent>
-      </SidebarMenuItem>
+      </SidebarMenuSubItem>
     </Collapsible>
   );
 }
@@ -887,12 +1079,6 @@ function AppSidebar({
   skills: Skill[];
   navigate: (path: string) => void;
 }) {
-  const agentsOpen = route.view === "agents";
-  const skillsOpen = route.view === "skills";
-  const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
-  const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
-  const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
-
   return (
     <ShadcnSidebar collapsible="icon">
       <SidebarHeader>
@@ -912,62 +1098,9 @@ function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarProjectDirectoryMenu
-                label="ADR"
-                icon={<Archive />}
-                node={adrDirectory}
-                activePath={route.documentPath}
-                navigate={navigate}
-                activeView={route.view === "project-adrs"}
-              />
-              <SidebarProjectDirectoryMenu
-                label="Instructions"
-                icon={<FileText />}
-                node={instructionsDirectory}
-                activePath={route.documentPath}
-                navigate={navigate}
-                forceRender
-                emptyLabel="No instructions."
-                activeView={route.view === "project-instructions"}
-              />
+              <SidebarProjectMenu route={route} projectDocumentTree={projectDocumentTree} navigate={navigate} />
               <SidebarAutomationMenu route={route} automation={automation} navigate={navigate} />
-              <SidebarRuntimesMenu route={route} runtimes={automation.runtimes} navigate={navigate} />
-              <Collapsible defaultOpen={agentsOpen} className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={agentsOpen} tooltip="Agents">
-                      <Bot />
-                      <span>Agents</span>
-                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarAgentList agents={agents} activePath={agentsOpen ? route.documentPath : undefined} navigate={navigate} />
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-              <SidebarProjectDirectoryMenu
-                label="Goals"
-                icon={<CheckCircle2 />}
-                node={goalsDirectory}
-                activePath={route.documentPath}
-                navigate={navigate}
-                activeView={route.view === "project-goals"}
-              />
-              <Collapsible defaultOpen={skillsOpen} className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={skillsOpen} tooltip="Skills">
-                      <FileKey2 />
-                      <span>Skills</span>
-                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarDocumentList documents={skills} activePath={skillsOpen ? route.documentPath : undefined} pathFor={skillDocumentPath} navigate={navigate} />
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
+              <SidebarEnvironmentMenu route={route} agents={agents} skills={skills} runtimes={automation.runtimes} navigate={navigate} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

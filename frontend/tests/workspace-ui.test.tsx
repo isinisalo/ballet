@@ -333,6 +333,8 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     await renderRoute("/projects/project-1/adrs", dataWithProjectDocumentTree());
 
+    const projectToggle = screen.getByRole("button", { name: "Project" });
+    expect(projectToggle).toHaveAttribute("aria-expanded", "true");
     const adrToggle = screen.getByRole("button", { name: "ADR" });
     expect(adrToggle).toHaveAttribute("aria-expanded", "true");
     expect(adrToggle.querySelector(".lucide-chevron-right")).not.toBeNull();
@@ -358,6 +360,8 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("button", { name: /add event/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Automation" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Environment" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
 
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
@@ -399,16 +403,36 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     await renderRoute("/automation");
 
+    let actionsToggle = screen.getByRole("link", { name: "Actions" });
+    expect(actionsToggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(actionsToggle);
+    actionsToggle = screen.getByRole("link", { name: "Actions" });
+    expect(actionsToggle).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("link", { name: "implementation" }));
     expect(window.location.pathname).toBe("/automation/actions");
     expect(window.location.search).toBe("?id=implementation");
     expect(screen.getByDisplayValue("Implement work")).toBeInTheDocument();
 
+    let triggersToggle = screen.getByRole("link", { name: "Triggers" });
+    expect(triggersToggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(triggersToggle);
+    triggersToggle = screen.getByRole("link", { name: "Triggers" });
+    expect(triggersToggle).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("link", { name: "manual-start" }));
     expect(window.location.pathname).toBe("/automation/triggers");
     expect(window.location.search).toBe("?id=manual-start");
     expect(screen.getByDisplayValue("Manual workflow start")).toBeInTheDocument();
 
+    let workflowsToggle = screen.getByRole("link", { name: "Workflows" });
+    expect(workflowsToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(workflowsToggle);
+    workflowsToggle = screen.getByRole("link", { name: "Workflows" });
+    expect(workflowsToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(workflowsToggle);
+    workflowsToggle = screen.getByRole("link", { name: "Workflows" });
+    expect(workflowsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("link", { name: "workflow-1" })).not.toBeInTheDocument();
+    await user.click(workflowsToggle);
     await user.click(screen.getByRole("link", { name: "workflow-1" }));
     expect(window.location.pathname).toBe("/automation/workflows");
     expect(window.location.search).toBe("?id=workflow-1");
@@ -661,6 +685,10 @@ describe("workspace entity UI flows", () => {
     await renderRoute("/runtimes");
 
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Environment" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: "Agents" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Skills" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Runtimes" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "Add runtime" })).toBeInTheDocument();
     expect(screen.getByLabelText("Runtime ID")).toHaveValue("runtime-1");
     expect(screen.getByLabelText("Title")).toHaveValue("codex-cli");
