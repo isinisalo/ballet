@@ -1,0 +1,61 @@
+import { useEffect, useRef } from "react";
+import type { ProjectAutomationConfig, ProjectTrigger } from "../../../../../shared/api/workspace-contracts";
+import { EmptyState, TextAreaField, TextField } from "@/components/shared/workspace-ui";
+import { FieldGroup } from "@/components/ui/field";
+import { generatedPolicyId } from "../../../../../shared/policy-actions";
+import { editablePolicyToken } from "../automationUtils";
+import type { AutomationConfigUpdater } from "../useAutomationDraft";
+
+export function TriggersAutomationTab({
+  config,
+  selectedId,
+  onSelect,
+  updateConfig
+}: {
+  config: ProjectAutomationConfig;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  updateConfig: AutomationConfigUpdater;
+}) {
+  const lastSelectedIndexRef = useRef(0);
+  const foundSelectedIndex = config.triggers.findIndex((trigger) => trigger.id === selectedId);
+  const selectedIndex = foundSelectedIndex >= 0
+    ? foundSelectedIndex
+    : Math.min(lastSelectedIndexRef.current, Math.max(0, config.triggers.length - 1));
+  const selected = config.triggers[selectedIndex];
+
+  useEffect(() => {
+    if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
+  }, [foundSelectedIndex]);
+
+  const updateSelected = (patch: Partial<ProjectTrigger>) => {
+    if (!selected) return;
+    const next = { ...selected, ...patch };
+    const normalized = {
+      ...next,
+      id: editablePolicyToken(next.id)
+    };
+    updateConfig((current) => {
+      const previousId = current.triggers[selectedIndex]?.id ?? selected.id;
+      return {
+        ...current,
+        triggers: current.triggers.map((trigger, index) => index === selectedIndex ? normalized : trigger),
+        policies: current.policies.map((policy) => policy.source === "trigger" && policy.trigger === previousId
+          ? { ...policy, trigger: normalized.id, id: generatedPolicyId({ ...policy, trigger: normalized.id }) }
+          : policy)
+      };
+    });
+    if (normalized.id) onSelect(normalized.id);
+  };
+
+  return (
+    <div className="grid gap-4">
+      {selected ? (
+        <FieldGroup>
+          <TextField label="Trigger ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
+          <TextAreaField label="Description" required rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
+        </FieldGroup>
+      ) : <EmptyState title="No trigger selected." />}
+    </div>
+  );
+}
