@@ -9,8 +9,12 @@ const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `Request failed with ${response.status}`);
+    const body = (await response.json().catch(() => ({}))) as { error?: string; issues?: Array<{ path?: string; message?: string }> };
+    const issueMessage = body.issues
+      ?.map((issue) => [issue.path, issue.message].filter(Boolean).join(": "))
+      .filter(Boolean)
+      .join("; ");
+    throw new Error(issueMessage ? `${body.error ?? `Request failed with ${response.status}`}: ${issueMessage}` : body.error ?? `Request failed with ${response.status}`);
   }
 
   if (response.status === 204) return undefined as T;

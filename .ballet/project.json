@@ -24,6 +24,28 @@
       "description": "Plan incomplete specs."
     }
   ],
+  "outputs": [
+    {
+      "id": "completed",
+      "description": "Agent work completed."
+    },
+    {
+      "id": "failed",
+      "description": "Agent work failed."
+    },
+    {
+      "id": "blocked",
+      "description": "Agent work ended up in a blocked state."
+    },
+    {
+      "id": "accepted",
+      "description": "Agent work accepted."
+    },
+    {
+      "id": "rejected",
+      "description": "Agent work rejected."
+    }
+  ],
   "policies": [
     {
       "id": "on.trigger.plan_approved.then.developer.start.implement",
