@@ -11,7 +11,11 @@ export type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skil
 };
 
 export const documentTitle = (document: MarkdownEntity) =>
-  document.title || document.name || (typeof document.frontmatter?.title === "string" ? document.frontmatter.title : undefined) || document.id;
+  document.title
+  || document.name
+  || (typeof document.frontmatter?.title === "string" ? document.frontmatter.title : undefined)
+  || (typeof document.frontmatter?.name === "string" ? document.frontmatter.name : undefined)
+  || document.id;
 
 export const normalizeHeadingText = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 

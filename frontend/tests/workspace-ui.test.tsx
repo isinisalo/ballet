@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppData, MarkdownDocument, ProjectDocumentTreeNode } from "../../shared/api/workspace-contracts";
 import type { Agent } from "../../shared/api/workspace-contracts";
 import type { ProjectAutomationConfig } from "../../shared/api/workspace-contracts";
+import type { Skill } from "../../shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "../../shared/policy-actions";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 
@@ -159,6 +160,25 @@ const dataWithProjectDocumentTree = () => {
   return data;
 };
 
+const dataWithSkill = () => {
+  const data = baseData();
+  data.skills = [{
+    id: "fixture-skill",
+    name: "Fixture Skill",
+    description: "Writes specs.",
+    metadata: {},
+    body: "# Fixture Skill\n\nOriginal body.",
+    relativePath: ".agents/skills/fixture-skill/SKILL.md",
+    slug: "SKILL",
+    frontmatter: {
+      name: "Fixture Skill",
+      description: "Writes specs.",
+      tags: ["docs"]
+    }
+  }];
+  return data;
+};
+
 const jsonResponse = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
@@ -232,6 +252,28 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
     if (url.startsWith("/api/agents/") && method === "DELETE") {
       const id = decodeURIComponent(url.split("/").pop() ?? "");
       data.agents = data.agents.filter((agent) => agent.id !== id);
+      return noContent();
+    }
+
+    if (url === "/api/skills" && method === "POST") {
+      const incoming = body as Partial<Skill>;
+      const saved: Skill = {
+        id: incoming.id ?? slug(incoming.name ?? "skill"),
+        name: incoming.name ?? "",
+        description: incoming.description ?? "",
+        metadata: incoming.metadata ?? {},
+        body: incoming.body ?? "",
+        relativePath: incoming.relativePath ?? `.agents/skills/${slug(incoming.name ?? "skill")}/SKILL.md`,
+        slug: incoming.slug ?? "SKILL",
+        frontmatter: incoming.frontmatter
+      };
+      data.skills = [...data.skills.filter((skill) => skill.id !== saved.id), saved];
+      return jsonResponse(saved);
+    }
+
+    if (url.startsWith("/api/skills/") && method === "DELETE") {
+      const id = decodeURIComponent(url.split("/").pop() ?? "");
+      data.skills = data.skills.filter((skill) => skill.id !== id);
       return noContent();
     }
 
@@ -412,6 +454,76 @@ describe("workspace entity UI flows", () => {
       method: "POST",
       body: expect.stringContaining(`"relativePath":"${relativePath}"`)
     }));
+  });
+
+  it("renders, previews, and saves skills through the Markdown workbench", async () => {
+    const user = userEvent.setup();
+    const { data, fetchMock } = await renderRoute("/skills", dataWithSkill());
+
+    const frontmatter = screen.getByLabelText(/yaml frontmatter/i);
+    const markdownBody = screen.getByLabelText(/markdown body/i);
+    expect(screen.getByText("Markdown Workbench")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save skill" })).toBeInTheDocument();
+    expect((frontmatter as HTMLTextAreaElement).value).toContain("name: Fixture Skill");
+    expect(markdownBody).toHaveValue("# Fixture Skill\n\nOriginal body.");
+
+    await user.clear(frontmatter);
+    await user.type(frontmatter, "name: Updated Skill\ndescription: Updated description\ntags:\n  - docs\n  - review");
+    await user.clear(markdownBody);
+    await user.type(markdownBody, "# Updated Skill\n\nDraft body marker.");
+    expect(screen.getAllByText("Updated Skill").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Draft body marker.").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Save skill" }));
+
+    await waitFor(() => expect(data.skills[0]).toMatchObject({
+      id: "fixture-skill",
+      name: "Updated Skill",
+      description: "Updated description",
+      relativePath: ".agents/skills/fixture-skill/SKILL.md",
+      body: "# Updated Skill\n\nDraft body marker."
+    }));
+    expect(data.skills[0]?.frontmatter).toMatchObject({
+      name: "Updated Skill",
+      description: "Updated description",
+      tags: ["docs", "review"]
+    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/skills", expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining("\"relativePath\":\".agents/skills/fixture-skill/SKILL.md\"")
+    }));
+  });
+
+  it("blocks invalid or unnamed skill frontmatter before saving", async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = await renderRoute("/skills", dataWithSkill());
+    const frontmatter = screen.getByLabelText(/yaml frontmatter/i);
+
+    fireEvent.change(frontmatter, { target: { value: "name: [" } });
+    await user.click(screen.getByRole("button", { name: "Save skill" }));
+    expect((await screen.findAllByText(/Flow sequence/)).length).toBeGreaterThan(0);
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/skills", expect.anything());
+
+    fireEvent.change(frontmatter, { target: { value: "description: Missing name" } });
+    await user.click(screen.getByRole("button", { name: "Save skill" }));
+    expect(await screen.findByText("Skill frontmatter name is required.")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/skills", expect.anything());
+  });
+
+  it("resets new skills and deletes existing skills from the workbench header", async () => {
+    const user = userEvent.setup();
+    const { data } = await renderRoute("/skills", dataWithSkill());
+
+    await user.click(screen.getByRole("button", { name: "New" }));
+    expect(screen.getByLabelText(/yaml frontmatter/i)).toHaveValue("name: \"\"\ndescription: \"\"");
+    expect(screen.getByLabelText(/markdown body/i)).toHaveValue("");
+    expect(screen.queryByRole("button", { name: "Delete skill" })).not.toBeInTheDocument();
+
+    await renderRoute("/skills", data);
+    await confirmDelete(user, "Delete skill");
+
+    await waitFor(() => expect(data.skills).toHaveLength(0));
+    expect(window.location.pathname).toBe("/skills");
   });
 
   it("defaults automation to workflows and locks policy input fields on the canvas", async () => {
