@@ -1,8 +1,16 @@
 import type { Agent } from "./domain/agents.js";
-import type { ProjectPolicy } from "./domain/automation.js";
+import type { ProjectAction, ProjectOutput, ProjectPolicy } from "./domain/automation.js";
 
-export const policyOutputStatuses = ["complete", "blocked", "failed"] as const;
-export type PolicyOutputStatus = typeof policyOutputStatuses[number];
+export const defaultPolicyOutputIds = ["complete", "blocked", "failed"] as const;
+export type PolicyOutputId = string;
+export const policyOutputStatuses = defaultPolicyOutputIds;
+export type PolicyOutputStatus = typeof defaultPolicyOutputIds[number];
+
+export const defaultProjectOutputs = (): ProjectOutput[] => [
+  { id: "complete", description: "Action completed." },
+  { id: "blocked", description: "Action is blocked." },
+  { id: "failed", description: "Action failed." }
+];
 
 export const normalizePolicyToken = (value: string): string =>
   value
@@ -21,15 +29,29 @@ export const generatedPolicyId = (input: Pick<ProjectPolicy, "source" | "event" 
 
 export const policyOutputEventType = (
   input: Pick<ProjectPolicy, "agent" | "action">,
-  status: PolicyOutputStatus
-): string => `${input.agent}.${input.action}.${status}`;
+  outputId: PolicyOutputId
+): string => `${input.agent}.${input.action}.${normalizePolicyToken(outputId)}`;
 
-export const policyOutputEventTypes = (input: Pick<ProjectPolicy, "agent" | "action">): string[] =>
-  policyOutputStatuses.map((status) => policyOutputEventType(input, status));
+export const actionOutputIds = (
+  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
+  actionId: string
+): string[] => {
+  const normalizedActionId = normalizePolicyToken(actionId);
+  const action = actions.find((candidate) => normalizePolicyToken(candidate.id) === normalizedActionId);
+  const outputIds = action?.outputIds ?? defaultPolicyOutputIds;
+  return [...new Set(outputIds.map(normalizePolicyToken).filter(Boolean))].slice(0, 3);
+};
+
+export const policyOutputEventTypes = (
+  input: Pick<ProjectPolicy, "agent" | "action">,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds">> = []
+): string[] => {
+  const outputIds = actions.length > 0 ? actionOutputIds(actions, input.action) : [...defaultPolicyOutputIds];
+  return outputIds.map((outputId) => policyOutputEventType(input, outputId));
+};
 
 export const normalizePolicyOutputEventType = (value: string): string => {
-  const statusPattern = policyOutputStatuses.join("|");
-  return value.replace(new RegExp(`^([a-z0-9_-]+)\\.([a-z0-9_-]+)\\.(${statusPattern})\\.v1$`), "$1.$2.$3");
+  return value.replace(/^([a-z0-9_-]+)\.([a-z0-9_-]+)\.([a-z0-9_-]+)\.v1$/, "$1.$2.$3");
 };
 
 export const policyActionTokens = (policies: Array<Pick<ProjectPolicy, "action">>): string[] =>
@@ -60,10 +82,16 @@ export const uniqueAgentPolicyTokens = (agents: Agent[]): string[] => {
   });
 };
 
-export const policyEventTypesForAgentsAndActions = (agents: Agent[], actions: string[]): string[] => {
-  const normalizedActions = [...new Set(actions.map(normalizePolicyToken).filter(Boolean))];
+export const policyEventTypesForAgentsAndActions = (
+  agents: Agent[],
+  actions: Array<Pick<ProjectAction, "id" | "outputIds">>
+): string[] => {
+  const normalizedActions = [...new Map(actions
+    .map((action) => ({ ...action, id: normalizePolicyToken(action.id) }))
+    .filter((action) => action.id)
+    .map((action) => [action.id, action])).values()];
   return uniqueAgentPolicyTokens(agents).flatMap((agent) =>
-    normalizedActions.flatMap((action) => policyOutputEventTypes({ agent, action }))
+    normalizedActions.flatMap((action) => policyOutputEventTypes({ agent, action: action.id }, normalizedActions))
   );
 };
 

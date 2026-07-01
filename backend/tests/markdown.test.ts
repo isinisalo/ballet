@@ -98,7 +98,19 @@ describe("Markdown collection loading", () => {
     expect(data.eventDefinitions).toEqual([]);
     expect(data.runtimes).toEqual([]);
     expect(data.policies).toEqual([]);
-    expect(data.automation).toEqual({ version: 1, triggers: [], actions: [], outputs: [], policies: [], workflows: [], runtimes: [] });
+    expect(data.automation).toEqual({
+      version: 1,
+      triggers: [],
+      actions: [],
+      outputs: [
+        { id: "complete", description: "Action completed." },
+        { id: "blocked", description: "Action is blocked." },
+        { id: "failed", description: "Action failed." }
+      ],
+      policies: [],
+      workflows: [],
+      runtimes: []
+    });
   });
 
   it("loads only .ballet/project.md for the project document", async () => {

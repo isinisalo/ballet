@@ -19,7 +19,8 @@ const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyInde
   const records: WorkflowStepRecord[] = steps.map((policyId, index) => ({
     policyId,
     index,
-    policy: policyById.get(policyId)
+    policy: policyById.get(policyId),
+    outputEvents: policyById.get(policyId) ? policyOutputEventTypes(policyById.get(policyId)!, [{ id: policyById.get(policyId)!.action, outputIds: ["complete", "failed"] }]) : undefined
   }));
 
   return calculateWorkflowCanvasLayout({
@@ -39,10 +40,9 @@ describe("workflowConnectorPath", () => {
 });
 
 describe("calculateWorkflowCanvasLayout", () => {
-  it("uses complete, blocked, and failed as policy output events", () => {
-    expect(policyOutputEventTypes({ agent: "codex", action: "build" })).toEqual([
+  it("uses selected action outputs as policy output events", () => {
+    expect(policyOutputEventTypes({ agent: "codex", action: "build" }, [{ id: "build", outputIds: ["complete", "failed"] }])).toEqual([
       "codex.build.complete",
-      "codex.build.blocked",
       "codex.build.failed"
     ]);
   });
@@ -64,5 +64,63 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(layout.nodes.filter((node) => node.kind === "policy").map((node) => node.record?.policyId)).toEqual(["first", "child"]);
     expect(layout.edges.some((edge) => edge.key === "policy-policy-0-1-codex.build.complete")).toBe(true);
     expect(layout.nodes.some((node) => node.kind === "event-ghost" && node.eventType === "codex.build.failed")).toBe(true);
+  });
+
+  it("links repeated output events through ghost events to existing handler policies", () => {
+    const implement = (id: string, event: string | undefined): ProjectPolicy => ({
+      id,
+      source: event ? "event" : "trigger",
+      event,
+      trigger: event ? undefined : "plan_approved",
+      agent: "developer",
+      action: "implement",
+      enabled: true
+    });
+    const review: ProjectPolicy = {
+      id: "architect-review",
+      source: "event",
+      event: "developer.implement.completed",
+      agent: "architect",
+      action: "review",
+      enabled: true
+    };
+    const records: WorkflowStepRecord[] = [
+      {
+        policyId: "developer-implement-initial",
+        index: 0,
+        policy: implement("developer-implement-initial", undefined),
+        outputEvents: ["developer.implement.completed", "developer.implement.failed"]
+      },
+      {
+        policyId: review.id,
+        index: 1,
+        policy: review,
+        outputEvents: ["architect.review.accepted", "architect.review.rejected"]
+      },
+      {
+        policyId: "developer-implement-rework",
+        index: 2,
+        policy: implement("developer-implement-rework", "architect.review.rejected"),
+        outputEvents: ["developer.implement.completed", "developer.implement.failed"]
+      }
+    ];
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph(records),
+      editingPolicyIndex: null
+    });
+
+    const handledEventNode = layout.nodes.find((node) =>
+      node.kind === "handled-event-ghost" &&
+      node.eventType === "developer.implement.completed" &&
+      node.record?.index === 2
+    );
+    const repeatedHandlerEdge = layout.edges.find((edge) => edge.key === "event-policy-2-1-developer.implement.completed");
+    const policyToGhostEdge = layout.edges.find((edge) => edge.key === "policy-handled-event-2-developer.implement.completed");
+
+    expect(handledEventNode).toBeDefined();
+    expect(policyToGhostEdge).toBeDefined();
+    expect(repeatedHandlerEdge).toBeDefined();
+    expect(repeatedHandlerEdge?.waypoints?.length).toBeGreaterThan(0);
+    expect(layout.nodes.some((node) => node.kind === "event-ghost" && node.eventType === "developer.implement.completed" && node.record?.index === 2)).toBe(false);
   });
 });

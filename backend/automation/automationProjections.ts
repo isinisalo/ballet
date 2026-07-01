@@ -8,6 +8,7 @@ import type {
 import type { EventDefinition } from "../../shared/domain/events.js";
 import type { ProjectRuntime, Runtime } from "../../shared/domain/runtime.js";
 import {
+  defaultPolicyOutputIds,
   policyActionTokens,
   policyEventTypesForAgentsAndActions,
   policySourceKey,
@@ -23,7 +24,12 @@ export const automationPoliciesToEventDefinitions = (
   actions: ProjectAction[] = []
 ): EventDefinition[] =>
   [...new Set([
-    ...policyEventTypesForAgentsAndActions(agents, actions.length > 0 ? actions.map((action) => action.id) : policyActionTokens(policies)),
+    ...policyEventTypesForAgentsAndActions(
+      agents,
+      actions.length > 0
+        ? actions
+        : policyActionTokens(policies).map((id) => ({ id, outputIds: [...defaultPolicyOutputIds] }))
+    ),
     ...triggers.map((trigger) => `trigger.${trigger.id}`)
   ])]
     .map((eventType) => ({

@@ -176,10 +176,15 @@ export const seedData: AppData = {
     actions: [
       {
         id: "remediation",
-        description: "Remediate failed infrastructure or deployment state."
+        description: "Remediate failed infrastructure or deployment state.",
+        outputIds: ["failed"]
       }
     ],
     outputs: [
+      {
+        id: "failed",
+        description: "Action failed."
+      },
       {
         id: "runbook",
         description: "Operator-facing remediation notes or runbook updates."

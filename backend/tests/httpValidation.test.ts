@@ -34,7 +34,7 @@ describe("HTTP Zod validation", () => {
     const valid = {
       version: 1,
       triggers: [{ id: "manual-start", description: "Manual start" }],
-      actions: [{ id: "implementation", description: "Implementation" }],
+      actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"] }],
       outputs: [{ id: "summary", description: "Summary artifact" }],
       policies: [{
         id: "on.trigger.manual-start.then.developer.start.implementation",
@@ -51,6 +51,7 @@ describe("HTTP Zod validation", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, events: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: undefined }), "actions");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: undefined }), "outputs");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation" }] }), "actions.0.outputIds");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", description: "Summary", extra: true }] }), "outputs.0");
   });
 

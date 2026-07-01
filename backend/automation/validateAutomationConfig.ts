@@ -30,9 +30,11 @@ interface ValidationContext {
   eventIdSet: Set<string>;
   triggerIdSet: Set<string>;
   actionIdSet: Set<string>;
+  outputIdSet: Set<string>;
   policyIdSet: Set<string>;
   agentTokenSet: Set<string>;
   normalizedPolicies: ReturnType<typeof normalizeProjectAutomationConfig>["policies"];
+  normalizedActions: ReturnType<typeof normalizeProjectAutomationConfig>["actions"];
 }
 
 interface PolicyValidationState {
@@ -103,7 +105,7 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
   const rawPolicyIds = rawPolicies
     .map((policy) => isRecord(policy) ? stringValue(policy.id) : "")
     .filter(Boolean);
-  const generatedEventIds = policyEventTypesForAgentsAndActions(agents, normalized.actions.map((action) => action.id));
+  const generatedEventIds = policyEventTypesForAgentsAndActions(agents, normalized.actions);
   const policyIds = normalized.policies.map((policy) => policy.id).filter(Boolean);
   return {
     input,
@@ -116,9 +118,11 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     eventIdSet: new Set(generatedEventIds),
     triggerIdSet: new Set(normalized.triggers.map((trigger) => trigger.id)),
     actionIdSet: new Set(normalized.actions.map((action) => action.id)),
+    outputIdSet: new Set(normalized.outputs.map((output) => output.id)),
     policyIdSet: new Set([...policyIds, ...rawPolicyIds]),
     agentTokenSet: new Set(agents.flatMap(agentTokenCandidates)),
-    normalizedPolicies: normalized.policies
+    normalizedPolicies: normalized.policies,
+    normalizedActions: normalized.actions
   };
 };
 
@@ -132,7 +136,7 @@ const validateTrigger = (trigger: unknown, index: number, issues: ProjectAutomat
   addRequiredStringIssue(issues, `${base}.description`, trigger.description, "Trigger description");
 };
 
-const validateAction = (action: unknown, index: number, issues: ProjectAutomationIssue[]) => {
+const validateAction = (action: unknown, index: number, context: ValidationContext, issues: ProjectAutomationIssue[]) => {
   const base = `actions[${index}]`;
   if (!isRecord(action)) {
     issues.push({ path: base, message: "Action must be an object." });
@@ -142,6 +146,31 @@ const validateAction = (action: unknown, index: number, issues: ProjectAutomatio
   if (action.description !== undefined && typeof action.description !== "string") {
     issues.push({ path: `${base}.description`, message: "Action description must be a string." });
   }
+  if (action.outputIds === undefined) return;
+  if (!Array.isArray(action.outputIds)) {
+    issues.push({ path: `${base}.outputIds`, message: "Action outputIds must be an array." });
+    return;
+  }
+  action.outputIds.forEach((outputId, outputIndex) => {
+    if (typeof outputId !== "string") {
+      issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: "Action output id must be a string." });
+    }
+  });
+  const normalizedOutputIds = context.normalizedActions[index]?.outputIds ?? [];
+  if (normalizedOutputIds.length < 1) {
+    issues.push({ path: `${base}.outputIds`, message: "Action must select at least 1 output." });
+  }
+  if (normalizedOutputIds.length > 3) {
+    issues.push({ path: `${base}.outputIds`, message: "Action can select at most 3 outputs." });
+  }
+  const seen = new Set<string>();
+  normalizedOutputIds.forEach((outputId, outputIndex) => {
+    if (seen.has(outputId)) issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Duplicate action output id: ${outputId}.` });
+    seen.add(outputId);
+    if (!context.outputIdSet.has(outputId)) {
+      issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Action references unknown output: ${outputId}.` });
+    }
+  });
 };
 
 const validateOutput = (output: unknown, index: number, issues: ProjectAutomationIssue[]) => {
@@ -309,7 +338,7 @@ export const validateProjectAutomationConfig = (
   const context = createValidationContext(input, agents);
   collectIdentityIssues(context, issues);
   context.rawTriggers.forEach((trigger, index) => validateTrigger(trigger, index, issues));
-  context.rawActions.forEach((action, index) => validateAction(action, index, issues));
+  context.rawActions.forEach((action, index) => validateAction(action, index, context, issues));
   context.rawOutputs.forEach((output, index) => validateOutput(output, index, issues));
   context.rawPolicies.forEach((policy, index) => validatePolicy(policy, index, context, issues));
   context.rawRuntimes.forEach((runtime, index) => validateRuntime(runtime, index, issues));

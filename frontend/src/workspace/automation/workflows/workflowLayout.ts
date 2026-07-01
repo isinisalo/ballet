@@ -1,16 +1,13 @@
 import { workflowOutputEvents, type WorkflowGraph, type WorkflowStepRecord } from "./workflowGraph";
+import {
+  workflowExistingHandlerEdges,
+  type WorkflowCanvasEdge,
+  type WorkflowEventNodePosition,
+  type WorkflowPolicyNodePosition
+} from "./workflowLayoutEdges";
 
-export type WorkflowCanvasPoint = {
-  x: number;
-  y: number;
-};
-
-export type WorkflowCanvasEdge = {
-  key: string;
-  from: WorkflowCanvasPoint;
-  to: WorkflowCanvasPoint;
-  dashed?: boolean;
-};
+export { workflowConnectorPath } from "./workflowLayoutEdges";
+export type { WorkflowCanvasEdge, WorkflowCanvasPoint } from "./workflowLayoutEdges";
 
 export type WorkflowBranchLayout = {
   height: number;
@@ -24,6 +21,7 @@ export type WorkflowCanvasNodeKind =
   | "edit-policy"
   | "delete-policy"
   | "event-ghost"
+  | "handled-event-ghost"
   | "first-policy-ghost";
 
 export type WorkflowCanvasLayoutNode = {
@@ -63,13 +61,6 @@ export const workflowCanvasLayoutConfig = {
   policyAnchorY: 18
 };
 
-export const workflowConnectorPath = (edge: WorkflowCanvasEdge) => {
-  const midX = edge.from.x + Math.max(18, Math.min(48, (edge.to.x - edge.from.x) / 2));
-  return Math.abs(edge.from.y - edge.to.y) <= 2
-    ? `M ${edge.from.x} ${edge.from.y} H ${edge.to.x}`
-    : `M ${edge.from.x} ${edge.from.y} H ${midX} V ${edge.to.y} H ${edge.to.x}`;
-};
-
 export function calculateWorkflowCanvasLayout({
   workflowGraph,
   editingPolicyIndex
@@ -79,6 +70,9 @@ export function calculateWorkflowCanvasLayout({
 }): WorkflowCanvasLayout {
   const nodes: WorkflowCanvasLayoutNode[] = [];
   const edges: WorkflowCanvasEdge[] = [];
+  const edgeKeys = new Set<string>();
+  const policyNodePositions = new Map<number, WorkflowPolicyNodePosition>();
+  const handledEventNodePositions: WorkflowEventNodePosition[] = [];
   let width = workflowCanvasLayoutConfig.startX + workflowNodeSizes.trigger.width;
   let height = workflowCanvasLayoutConfig.startY + workflowNodeSizes.trigger.height;
 
@@ -89,8 +83,11 @@ export function calculateWorkflowCanvasLayout({
   };
 
   const addEdge = (edge: WorkflowCanvasEdge) => {
-    width = Math.max(width, edge.from.x, edge.to.x + workflowCanvasLayoutConfig.startX);
-    height = Math.max(height, edge.from.y, edge.to.y + workflowCanvasLayoutConfig.startY);
+    if (edgeKeys.has(edge.key)) return;
+    edgeKeys.add(edge.key);
+    const edgePoints = [edge.from, edge.to, ...(edge.waypoints ?? [])];
+    width = Math.max(width, ...edgePoints.map((point) => point.x + workflowCanvasLayoutConfig.startX));
+    height = Math.max(height, ...edgePoints.map((point) => point.y + workflowCanvasLayoutConfig.startY));
     edges.push(edge);
   };
 
@@ -120,6 +117,7 @@ export function calculateWorkflowCanvasLayout({
       record,
       isEditingPolicy
     });
+    policyNodePositions.set(record.index, { record, position: { x: policyX, y: policyY } });
 
     addNode({
       key: isEditingPolicy ? `save-${record.index}` : `edit-${record.index}`,
@@ -143,13 +141,17 @@ export function calculateWorkflowCanvasLayout({
       });
     }
 
-    workflowOutputEvents(policy).forEach((eventType) => {
+    workflowOutputEvents(record).forEach((eventType) => {
       const childRecords = (workflowGraph.childRecordsByParentEvent.get(`${record.index}:${eventType}`) ?? [])
         .filter((childRecord) => childRecord.policyId !== record.policyId && !nextVisitedPolicyIds.has(childRecord.policyId));
-      const eventRows = childRecords.length > 0 ? childRecords : [undefined];
+      const existingHandlerRecords = workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [];
+      const eventRows = childRecords.length > 0
+        ? childRecords
+        : [undefined];
 
       eventRows.forEach((childRecord, childIndex) => {
         const eventY = cursorY;
+        const handledByExistingPolicy = !childRecord && existingHandlerRecords.length > 0;
 
         if (childRecord) {
           const childX = outputX;
@@ -164,14 +166,18 @@ export function calculateWorkflowCanvasLayout({
           cursorY += Math.max(workflowCanvasLayoutConfig.rowStep, childY + childLayout.height - eventY) + workflowCanvasLayoutConfig.branchGap;
         } else {
           addEdge({
-            key: `policy-event-${record.index}-${eventType}-${childIndex}`,
+            key: handledByExistingPolicy
+              ? `policy-handled-event-${record.index}-${eventType}`
+              : `policy-event-${record.index}-${eventType}-${childIndex}`,
             from: { x: policyX + workflowNodeSizes.policy.width, y: policyY + workflowCanvasLayoutConfig.policyAnchorY },
             to: { x: outputX, y: eventY + workflowNodeSizes.event.height / 2 },
             dashed: !policy
           });
           addNode({
-            key: `event-${record.index}-${eventType}-ghost-${childIndex}`,
-            kind: "event-ghost",
+            key: handledByExistingPolicy
+              ? `event-${record.index}-${eventType}-handled`
+              : `event-${record.index}-${eventType}-ghost-${childIndex}`,
+            kind: handledByExistingPolicy ? "handled-event-ghost" : "event-ghost",
             x: outputX,
             y: eventY,
             width: workflowNodeSizes.event.width,
@@ -180,6 +186,13 @@ export function calculateWorkflowCanvasLayout({
             eventType,
             sourcePolicyId: record.policyId
           });
+          if (handledByExistingPolicy) {
+            handledEventNodePositions.push({
+              eventType,
+              sourceIndex: record.index,
+              position: { x: outputX, y: eventY }
+            });
+          }
           branchWidth = Math.max(branchWidth, outputX + workflowNodeSizes.event.width - x);
           cursorY += workflowCanvasLayoutConfig.rowStep;
         }
@@ -232,6 +245,19 @@ export function calculateWorkflowCanvasLayout({
       height: workflowNodeSizes.event.height
     });
   }
+
+  workflowExistingHandlerEdges({
+    workflowGraph,
+    policyNodePositions,
+    eventNodePositions: handledEventNodePositions,
+    policyWidth: workflowNodeSizes.policy.width,
+    policyHeight: workflowNodeSizes.policy.height,
+    eventWidth: workflowNodeSizes.event.width,
+    eventHeight: workflowNodeSizes.event.height,
+    policyAnchorY: workflowCanvasLayoutConfig.policyAnchorY,
+    branchGap: workflowCanvasLayoutConfig.branchGap,
+    edgePad: workflowCanvasLayoutConfig.edgePad
+  }).forEach(addEdge);
 
   return { nodes, edges, width, height };
 }

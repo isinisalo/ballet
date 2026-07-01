@@ -9,19 +9,39 @@
   "actions": [
     {
       "id": "implement",
-      "description": "Implement an approved plan."
+      "description": "Implement an approved plan.",
+      "outputIds": [
+        "completed",
+        "failed",
+        "blocked"
+      ]
     },
     {
       "id": "review",
-      "description": "Review implementation output."
+      "description": "Review implementation output.",
+      "outputIds": [
+        "accepted",
+        "rejected",
+        "failed"
+      ]
     },
     {
       "id": "test",
-      "description": "Test implementation ja paljon tekstiä tämän perään."
+      "description": "Test implementation ja paljon tekstiä tämän perään.",
+      "outputIds": [
+        "completed",
+        "failed",
+        "blocked"
+      ]
     },
     {
       "id": "plan",
-      "description": "Plan incomplete specs."
+      "description": "Plan incomplete specs.",
+      "outputIds": [
+        "completed",
+        "failed",
+        "blocked"
+      ]
     }
   ],
   "outputs": [
@@ -56,26 +76,42 @@
       "enabled": true
     },
     {
-      "id": "on.developer.implement.complete.then.qa.start.test",
+      "id": "on.developer.implement.completed.then.architect.start.review",
       "source": "event",
-      "event": "developer.implement.complete",
-      "agent": "qa",
-      "action": "test",
+      "event": "developer.implement.completed",
+      "agent": "architect",
+      "action": "review",
       "enabled": true
     },
     {
-      "id": "on.developer.implement.complete.then.qa-verification-reviewer.start.review",
+      "id": "on.developer.implement.completed.then.qa-verification-reviewer.start.review",
       "source": "event",
-      "event": "developer.implement.complete",
+      "event": "developer.implement.completed",
       "agent": "qa-verification-reviewer",
       "action": "review",
       "enabled": true
     },
     {
-      "id": "on.qa.test.complete.then.ux.start.test",
+      "id": "on.qa.test.completed.then.ux.start.test",
       "source": "event",
-      "event": "qa.test.complete",
+      "event": "qa.test.completed",
       "agent": "ux",
+      "action": "test",
+      "enabled": true
+    },
+    {
+      "id": "on.architect.review.rejected.then.developer.start.implement",
+      "source": "event",
+      "event": "architect.review.rejected",
+      "agent": "developer",
+      "action": "implement",
+      "enabled": true
+    },
+    {
+      "id": "on.architect.review.accepted.then.qa.start.test",
+      "source": "event",
+      "event": "architect.review.accepted",
+      "agent": "qa",
       "action": "test",
       "enabled": true
     }
@@ -86,7 +122,9 @@
       "title": "Plan, implement, review",
       "steps": [
         "on.trigger.plan_approved.then.developer.start.implement",
-        "on.developer.implement.complete.then.qa.start.test"
+        "on.developer.implement.completed.then.architect.start.review",
+        "on.architect.review.rejected.then.developer.start.implement",
+        "on.architect.review.accepted.then.qa.start.test"
       ]
     }
   ],

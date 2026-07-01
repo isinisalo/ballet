@@ -1,4 +1,5 @@
 import type { ProjectRuntime } from "./runtime.js";
+import { defaultProjectOutputs } from "../policy-actions.js";
 
 export type PolicyPredicateOperator = "equals" | "in" | "exists";
 export type PolicyPredicateScalar = string | number | boolean | null;
@@ -13,6 +14,7 @@ export interface ProjectTrigger {
 export interface ProjectAction {
   id: string;
   description: string;
+  outputIds: string[];
 }
 
 export interface ProjectOutput {
@@ -50,7 +52,7 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: 1,
   triggers: [],
   actions: [],
-  outputs: [],
+  outputs: defaultProjectOutputs(),
   policies: [],
   workflows: [],
   runtimes: []

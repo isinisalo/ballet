@@ -120,7 +120,8 @@ const projectTriggerSchema = z.object({
 
 const projectActionSchema = z.object({
   id: z.string(),
-  description: z.string()
+  description: z.string(),
+  outputIds: z.array(z.string())
 }).strict();
 
 const projectOutputSchema = z.object({

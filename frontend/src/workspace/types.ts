@@ -1,4 +1,4 @@
-import type { AppData } from "../../../shared/api/workspace-contracts";
+import { defaultProjectAutomationConfig, type AppData } from "../../../shared/api/workspace-contracts";
 
 export type View =
   | "projects"
@@ -35,15 +35,7 @@ export const emptyData: AppData = {
   eventDefinitions: [],
   events: [],
   agentRuns: [],
-  automation: {
-    version: 1,
-    triggers: [],
-    actions: [],
-    outputs: [],
-    policies: [],
-    workflows: [],
-    runtimes: []
-  },
+  automation: defaultProjectAutomationConfig(),
   automationIssues: [],
   projectDocumentTree: []
 };

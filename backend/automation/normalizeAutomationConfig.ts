@@ -9,6 +9,8 @@ import type {
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
 import type { ProjectRuntime } from "../../shared/domain/runtime.js";
 import {
+  defaultPolicyOutputIds,
+  defaultProjectOutputs,
   generatedPolicyId,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
@@ -35,10 +37,15 @@ const normalizeTrigger = (value: Record<string, unknown>): ProjectTrigger => ({
   description: stringValue(value.description)
 });
 
-const normalizeAction = (value: Record<string, unknown>): ProjectAction => ({
-  id: normalizePolicyToken(stringValue(value.id)),
-  description: stringValue(value.description)
-});
+const normalizeAction = (value: Record<string, unknown>, availableOutputIds: string[]): ProjectAction => {
+  const rawOutputIds = Array.isArray(value.outputIds) ? stringArray(value.outputIds).map(normalizePolicyToken).filter(Boolean) : undefined;
+  const fallbackOutputIds = defaultPolicyOutputIds.filter((id) => availableOutputIds.includes(id));
+  return {
+    id: normalizePolicyToken(stringValue(value.id)),
+    description: stringValue(value.description),
+    outputIds: rawOutputIds ?? (fallbackOutputIds.length > 0 ? fallbackOutputIds : availableOutputIds.slice(0, 3))
+  };
+};
 
 const normalizeOutput = (value: Record<string, unknown>): ProjectOutput => ({
   id: normalizePolicyToken(stringValue(value.id)),
@@ -103,12 +110,17 @@ export const normalizeProjectAutomationConfig = (value: unknown): ProjectAutomat
     .map((pair) => [pair.rawId, pair.normalized.id]));
 
   const policies = policyPairs.map((pair) => pair.normalized);
-  const actions = Array.isArray(value.actions)
-    ? recordArray(value.actions).map(normalizeAction)
-    : policyActionTokens(policies).map((id) => ({ id, description: "" }));
-  const outputs = Array.isArray(value.outputs)
+  const outputs = Array.isArray(value.outputs) && recordArray(value.outputs).length > 0
     ? recordArray(value.outputs).map(normalizeOutput)
-    : [];
+    : defaultProjectOutputs();
+  const availableOutputIds = outputs.map((output) => output.id).filter(Boolean);
+  const actions = Array.isArray(value.actions)
+    ? recordArray(value.actions).map((action) => normalizeAction(action, availableOutputIds))
+    : policyActionTokens(policies).map((id) => ({
+      id,
+      description: "",
+      outputIds: defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId))
+    }));
 
   return {
     version: 1,

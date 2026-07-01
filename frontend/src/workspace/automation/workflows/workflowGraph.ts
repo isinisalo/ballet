@@ -5,10 +5,12 @@ export type WorkflowStepRecord = {
   policyId: string;
   index: number;
   policy?: ProjectPolicy;
+  outputEvents?: string[];
 };
 
 export type WorkflowGraph = {
   childRecordsByParentEvent: Map<string, WorkflowStepRecord[]>;
+  eventHandlerRecordsByEvent: Map<string, WorkflowStepRecord[]>;
   rootRecords: WorkflowStepRecord[];
 };
 
@@ -18,23 +20,33 @@ export const workflowTriggerLabel = (policy?: ProjectPolicy) => {
   return policy.event || "External event";
 };
 
-export const workflowOutputEvents = (policy: ProjectPolicy | undefined, continuationEvent?: string) => {
+export const workflowOutputEvents = (recordOrPolicy: WorkflowStepRecord | ProjectPolicy | undefined, continuationEvent?: string) => {
+  if (!recordOrPolicy) return ["Missing policy"];
+  const policy = "policyId" in recordOrPolicy ? recordOrPolicy.policy : recordOrPolicy;
   if (!policy) return ["Missing policy"];
-  const events = policyOutputEventTypes(policy);
+  const events = "policyId" in recordOrPolicy
+    ? recordOrPolicy.outputEvents ?? policyOutputEventTypes(policy)
+    : policyOutputEventTypes(policy);
   return continuationEvent && !events.includes(continuationEvent) ? [continuationEvent, ...events] : events;
 };
 
 export const buildWorkflowGraph = (workflowStepRecords: WorkflowStepRecord[]): WorkflowGraph => {
   const childRecordsByParentEvent = new Map<string, WorkflowStepRecord[]>();
+  const eventHandlerRecordsByEvent = new Map<string, WorkflowStepRecord[]>();
   const childRecordIndexes = new Set<number>();
 
   workflowStepRecords.forEach((record) => {
     if (record.policy?.source !== "event" || !record.policy.event) return;
+    eventHandlerRecordsByEvent.set(record.policy.event, [
+      ...(eventHandlerRecordsByEvent.get(record.policy.event) ?? []),
+      record
+    ]);
+
     const parentRecord = workflowStepRecords
       .filter((candidate) =>
         candidate.index < record.index &&
         candidate.policy &&
-        policyOutputEventTypes(candidate.policy).includes(record.policy?.event ?? "")
+        workflowOutputEvents(candidate).includes(record.policy?.event ?? "")
       )
       .at(-1);
     if (!parentRecord) return;
@@ -46,6 +58,7 @@ export const buildWorkflowGraph = (workflowStepRecords: WorkflowStepRecord[]): W
   const rootRecords = workflowStepRecords.filter((record) => !childRecordIndexes.has(record.index));
   return {
     childRecordsByParentEvent,
+    eventHandlerRecordsByEvent,
     rootRecords: rootRecords.length > 0 ? rootRecords : workflowStepRecords.slice(0, 1)
   };
 };

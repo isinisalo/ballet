@@ -137,6 +137,10 @@ export function WorkflowCanvas({
       );
     }
 
+    if (node.kind === "handled-event-ghost" && node.eventType) {
+      return <WorkflowCanvasNode label="Event" value={node.eventType} tone="event" icon={Activity} dashed className="w-60" />;
+    }
+
     if (node.kind === "event-ghost" && node.eventType) {
       const sourcePolicy = node.sourcePolicyId ? policyById.get(node.sourcePolicyId) : undefined;
       return (
