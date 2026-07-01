@@ -19,6 +19,7 @@ import {
   Menu,
   Monitor,
   Moon,
+  Pencil,
   Plus,
   RefreshCw,
   Route,
@@ -1661,7 +1662,7 @@ function AutomationView({
             <ActionsAutomationTab config={draft} selectedId={selectedActionId} onSelect={setSelectedActionId} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "workflows" ? (
-            <WorkflowsAutomationTab config={draft} selectedId={selectedWorkflowId} onSelect={setSelectedWorkflowId} updateConfig={updateConfig} />
+            <WorkflowsAutomationTab data={data} config={draft} selectedId={selectedWorkflowId} onSelect={setSelectedWorkflowId} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "runtimes" ? (
             <RuntimesAutomationTab config={draft} selectedId={selectedRuntimeId} onSelect={setSelectedRuntimeId} updateConfig={updateConfig} />
@@ -1931,11 +1932,13 @@ function PoliciesAutomationTab({
 }
 
 function WorkflowsAutomationTab({
+  data,
   config,
   selectedId,
   onSelect,
   updateConfig
 }: {
+  data: AppData;
   config: ProjectAutomationConfig;
   selectedId: string;
   onSelect: (id: string) => void;
@@ -1950,8 +1953,14 @@ function WorkflowsAutomationTab({
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [canvasHeight, setCanvasHeight] = useState<number | null>(null);
   const [isCanvasPanning, setIsCanvasPanning] = useState(false);
+  const [editingPolicyIndex, setEditingPolicyIndex] = useState<number | null>(null);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
+  const actionOptions = [
+    { value: noSelection, label: "No action" },
+    ...config.actions.map((action) => ({ value: action.id, label: action.description ? `${action.id} · ${action.description}` : action.id }))
+  ];
+  const agentOptions = [{ value: noSelection, label: "No agent" }, ...automationAgentOptions(data.agents)];
   const workflowStepRecords = useMemo(() =>
     selected?.steps.map((policyId, index) => ({ policyId, index, policy: policyById.get(policyId) })) ?? [],
   [policyById, selected?.steps]);
@@ -2012,6 +2021,31 @@ function WorkflowsAutomationTab({
     updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? policyId : step) });
   };
 
+  const updateWorkflowPolicy = (record: typeof workflowStepRecords[number], patch: Partial<ProjectPolicy>) => {
+    if (!record.policy) return;
+    const selectedPolicy = record.policy;
+    const next = { ...selectedPolicy, ...patch };
+    const source: ProjectPolicy["source"] = next.source === "trigger" ? "trigger" : "event";
+    const normalized = {
+      ...next,
+      source,
+      event: source === "event" ? next.event ?? "" : undefined,
+      trigger: source === "trigger" ? normalizePolicyToken(next.trigger ?? "") : undefined,
+      agent: normalizePolicyToken(next.agent),
+      action: normalizePolicyToken(next.action)
+    };
+    const nextId = generatedPolicyId(normalized);
+
+    updateConfig((current) => ({
+      ...current,
+      policies: current.policies.map((policy) => policy.id === selectedPolicy.id ? { ...normalized, id: nextId } : policy),
+      workflows: current.workflows.map((workflow) => ({
+        ...workflow,
+        steps: workflow.steps.map((step) => step === selectedPolicy.id ? nextId : step)
+      }))
+    }));
+  };
+
   const addPolicyStep = (eventType?: string, sourcePolicy?: ProjectPolicy) => {
     if (!selected) return;
     const selectedPolicyIds = new Set(selected.steps);
@@ -2059,6 +2093,7 @@ function WorkflowsAutomationTab({
   };
 
   const stepIndexFromPoint = (event: PointerEvent<HTMLDivElement>) => {
+    if (typeof document.elementFromPoint !== "function") return null;
     const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-workflow-step-index]");
     if (!(target instanceof HTMLElement)) return null;
     const targetIndex = Number(target.dataset.workflowStepIndex);
@@ -2067,7 +2102,7 @@ function WorkflowsAutomationTab({
 
   const handleStepPointerDown = (event: PointerEvent<HTMLDivElement>, index: number) => {
     if (event.button !== 0) return;
-    if (event.target instanceof Element && event.target.closest("button")) return;
+    if (event.target instanceof Element && event.target.closest("button, [role='combobox']")) return;
     draggedStepIndexRef.current = index;
     setDraggedStepIndex(index);
     setDragOverStepIndex(index);
@@ -2129,7 +2164,7 @@ function WorkflowsAutomationTab({
     trigger: { width: 176, height: 46 },
     policy: { width: 240, height: 84 },
     event: { width: 240, height: 46 },
-    delete: { width: 28, height: 28 }
+    action: { width: 28, height: 28 }
   };
   const canvasLayout = {
     startX: 32,
@@ -2185,7 +2220,14 @@ function WorkflowsAutomationTab({
         className="h-[5.25rem] w-60 max-w-none items-start py-2"
       >
         {record.policy ? (
-          <WorkflowPolicySummary policy={record.policy} />
+          <WorkflowPolicySummary
+            policy={record.policy}
+            editing={editingPolicyIndex === record.index}
+            agentOptions={agentOptions}
+            actionOptions={actionOptions}
+            onAgentChange={(agent) => updateWorkflowPolicy(record, { agent: agent === noSelection ? "" : agent })}
+            onActionChange={(action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action })}
+          />
         ) : (
           <Select value={record.policyId || noSelection} onValueChange={(value) => updateStep(record.index, value === noSelection ? "" : value)}>
             <SelectTrigger className="h-6 w-full min-w-0 px-1.5 font-mono text-[0.64rem]" title={record.policyId || "No policy"} onDragStart={(event) => event.stopPropagation()}>
@@ -2213,18 +2255,36 @@ function WorkflowsAutomationTab({
     const policyX = x;
     const policyY = y;
     const outputX = policyX + nodeSizes.policy.width + canvasLayout.columnGap;
-    const deleteX = policyX + nodeSizes.policy.width - nodeSizes.delete.width;
-    const deleteY = policyY + nodeSizes.policy.height + 6;
+    const deleteX = policyX + nodeSizes.policy.width - nodeSizes.action.width;
+    const editX = deleteX - nodeSizes.action.width - 6;
+    const actionY = policyY + nodeSizes.policy.height + 6;
     let cursorY = y + canvasLayout.policyAnchorY - nodeSizes.event.height / 2;
     let branchWidth = nodeSizes.policy.width;
 
     addLayoutNode(`policy-${record.index}`, policyX, policyY, nodeSizes.policy.width, nodeSizes.policy.height, renderPolicyNode(record));
     addLayoutNode(
+      `edit-${record.index}`,
+      editX,
+      actionY,
+      nodeSizes.action.width,
+      nodeSizes.action.height,
+      <Button
+        type="button"
+        size="icon-sm"
+        variant={editingPolicyIndex === record.index ? "secondary" : "outline"}
+        aria-label="Edit workflow policy"
+        title="Edit workflow policy"
+        onClick={() => setEditingPolicyIndex((current) => current === record.index ? null : record.index)}
+      >
+        <Pencil data-icon="inline-start" />
+      </Button>
+    );
+    addLayoutNode(
       `delete-${record.index}`,
       deleteX,
-      deleteY,
-      nodeSizes.delete.width,
-      nodeSizes.delete.height,
+      actionY,
+      nodeSizes.action.width,
+      nodeSizes.action.height,
       <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected?.steps.filter((_, stepIndex) => stepIndex !== record.index) ?? [] })}>
         <TrashButtonIcon />
       </Button>
@@ -2278,7 +2338,7 @@ function WorkflowsAutomationTab({
     });
 
     return {
-      height: Math.max(nodeSizes.policy.height, cursorY - y, deleteY + nodeSizes.delete.height - y),
+      height: Math.max(nodeSizes.policy.height, cursorY - y, actionY + nodeSizes.action.height - y),
       width: branchWidth
     };
   };
@@ -2435,8 +2495,24 @@ function WorkflowCanvasEdgePath({ edge }: { edge: WorkflowCanvasEdge }) {
   );
 }
 
-function WorkflowPolicySummary({ policy }: { policy: ProjectPolicy }) {
+function WorkflowPolicySummary({
+  policy,
+  editing,
+  agentOptions,
+  actionOptions,
+  onAgentChange,
+  onActionChange
+}: {
+  policy: ProjectPolicy;
+  editing: boolean;
+  agentOptions: Array<{ value: string; label: string }>;
+  actionOptions: Array<{ value: string; label: string }>;
+  onAgentChange: (agent: string) => void;
+  onActionChange: (action: string) => void;
+}) {
   const sourceValue = policy.source === "trigger" ? policy.trigger : policy.event;
+  const editSelectClass = "h-5 min-h-5 max-h-5 w-full min-w-0 max-w-full flex-1 cursor-pointer rounded border border-input bg-background px-1.5 py-0 font-mono text-[0.62rem] leading-4 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40";
+  const stopCanvasPointerEvent = (event: PointerEvent<HTMLSelectElement>) => event.stopPropagation();
 
   return (
     <div className="grid min-w-0 gap-1 font-mono text-[0.62rem] leading-4">
@@ -2444,13 +2520,49 @@ function WorkflowPolicySummary({ policy }: { policy: ProjectPolicy }) {
         <span className="shrink-0 text-foreground">on:</span>
         <span className="truncate text-primary" title={sourceValue || "Missing source"}>{sourceValue || "Missing source"}</span>
       </div>
-      <div className="flex min-w-0 gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         <span className="shrink-0 text-foreground">then:</span>
-        <span className="truncate text-secondary" title={policy.agent || "Missing agent"}>{policy.agent || "Missing agent"}</span>
+        {editing ? (
+          <select
+            aria-label="Workflow policy agent"
+            className={cn(editSelectClass, "text-secondary")}
+            title={policy.agent || "Missing agent"}
+            value={policy.agent || noSelection}
+            onChange={(event) => onAgentChange(event.target.value)}
+            onPointerDown={stopCanvasPointerEvent}
+            onPointerMove={stopCanvasPointerEvent}
+            onPointerUp={stopCanvasPointerEvent}
+            onDragStart={(event) => event.stopPropagation()}
+          >
+            {agentOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="truncate text-secondary" title={policy.agent || "Missing agent"}>{policy.agent || "Missing agent"}</span>
+        )}
       </div>
-      <div className="flex min-w-0 gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         <span className="shrink-0 text-foreground">start:</span>
-        <span className="truncate text-tertiary" title={policy.action || "Missing action"}>{policy.action || "Missing action"}</span>
+        {editing ? (
+          <select
+            aria-label="Workflow policy action"
+            className={cn(editSelectClass, "text-tertiary")}
+            title={policy.action || "Missing action"}
+            value={policy.action || noSelection}
+            onChange={(event) => onActionChange(event.target.value)}
+            onPointerDown={stopCanvasPointerEvent}
+            onPointerMove={stopCanvasPointerEvent}
+            onPointerUp={stopCanvasPointerEvent}
+            onDragStart={(event) => event.stopPropagation()}
+          >
+            {actionOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="truncate text-tertiary" title={policy.action || "Missing action"}>{policy.action || "Missing action"}</span>
+        )}
       </div>
     </div>
   );

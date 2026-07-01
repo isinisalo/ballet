@@ -308,6 +308,46 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
+  it("edits workflow policy agent and action from the canvas", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.agents.push({
+      id: "agent-2",
+      name: "Review Agent",
+      description: "Reviews work",
+      instructions: "Review work",
+      skills: [],
+      enabled: true,
+      status: "online",
+      createdAt: now,
+      updatedAt: now,
+      relativePath: ".codex/agents/review-agent.toml",
+      frontmatter: { runtime: "runtime-1" }
+    });
+    workflowData.automation.actions.push({
+      id: "review-pass",
+      description: "Review output"
+    });
+    const { data, fetchMock } = await renderRoute("/automation/workflows", workflowData);
+
+    expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Edit workflow policy" }));
+
+    await user.selectOptions(screen.getByLabelText("Workflow policy agent"), "review");
+    await user.selectOptions(screen.getByLabelText("Workflow policy action"), "review-pass");
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.policies[0]).toMatchObject({
+      agent: "review",
+      action: "review-pass",
+      id: "on.existing.implementation.failed.v1.then.review.start.review-pass"
+    }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
+      method: "PUT",
+      body: expect.stringContaining("\"steps\":[\"on.existing.implementation.failed.v1.then.review.start.review-pass\"]")
+    }));
+  });
+
   it("creates an automation action and selects it from policy actions", async () => {
     const user = userEvent.setup();
     const { data } = await renderRoute("/automation/actions");

@@ -14,6 +14,10 @@
     {
       "id": "review",
       "description": "Review implementation output."
+    },
+    {
+      "id": "test",
+      "description": "Test implementation"
     }
   ],
   "policies": [
@@ -26,11 +30,11 @@
       "enabled": true
     },
     {
-      "id": "on.developer.implementation.complete.v1.then.architect.start.review",
+      "id": "on.developer.implementation.complete.v1.then.developer.start.implementation",
       "source": "event",
       "event": "developer.implementation.complete.v1",
-      "agent": "architect",
-      "action": "review",
+      "agent": "developer",
+      "action": "implementation",
       "enabled": true
     },
     {
@@ -48,8 +52,7 @@
       "title": "Plan, implement, review",
       "steps": [
         "on.trigger.plan_approved.then.developer.start.implementation",
-        "on.developer.implementation.complete.v1.then.architect.start.review",
-        "on.developer.implementation.complete.v1.then.qa-verification-reviewer.start.review"
+        "on.developer.implementation.complete.v1.then.developer.start.implementation"
       ]
     }
   ],
