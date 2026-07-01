@@ -56,6 +56,14 @@
       "agent": "ux",
       "action": "test",
       "enabled": true
+    },
+    {
+      "id": "on.qa.test.cancelled.then.qa.start.test",
+      "source": "event",
+      "event": "qa.test.cancelled",
+      "agent": "qa",
+      "action": "test",
+      "enabled": true
     }
   ],
   "workflows": [

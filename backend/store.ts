@@ -4,169 +4,97 @@ import type { MarkdownDocument } from "../shared/domain/documents.js";
 import type { EventRecord } from "../shared/domain/events.js";
 import type { AgentRunLog } from "../shared/domain/runtime.js";
 import { getProjectRoot } from "./markdown.js";
-import { createProjectMarkdownDocument, loadMarkdownAppData, removeEntityMarkdown, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
-import { RuntimeDatabase, resolveRuntimeDbPath } from "./runtime-db.js";
-import { notifyRuntimeChanged } from "./runtime-events.js";
-import {
-  AutomationValidationError,
-  automationPoliciesToEventDefinitions,
-  automationPoliciesToPolicies,
-  automationRuntimesToRuntimes,
-  loadProjectAutomationConfigWithIssues,
-  saveProjectAutomationConfig
-} from "./automation.js";
-
-type MutableMarkdownCollection = Exclude<CollectionName, "events" | "runtimes" | "policies">;
-
-const markdownCollections = new Set<MutableMarkdownCollection>(["projects", "goals", "adrs", "agents", "skills"]);
-
-export class EventValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "EventValidationError";
-  }
-}
+import type { RuntimeDatabase } from "./runtime-db.js";
+import { AutomationValidationError } from "./automation.js";
+import { AutomationService } from "./services/AutomationService.js";
+import { EventIntakeService, EventValidationError } from "./services/EventIntakeService.js";
+import { MarkdownEntityService } from "./services/MarkdownEntityService.js";
+import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
+import { RuntimeRunService } from "./services/RuntimeRunService.js";
+import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
 
 export class MarkdownStore {
-  private runtimeDb?: RuntimeDatabase;
-  private runtimeDbPath?: string;
+  private readonly runtimeDatabaseProvider = new RuntimeDatabaseProvider(() => this.root);
+  private readonly workspaceDataService = new WorkspaceDataService(() => this.root, this.runtimeDatabaseProvider);
+  private readonly markdownEntityService = new MarkdownEntityService(() => this.root, () => this.read());
+  private readonly automationService = new AutomationService(() => this.root);
+  private readonly eventIntakeService = new EventIntakeService(() => this.read(), this.runtimeDatabaseProvider);
+  private readonly runtimeRunService = new RuntimeRunService(this.runtimeDatabaseProvider);
 
   get root(): string {
     return getProjectRoot();
   }
 
-  async read(): Promise<AppData> {
-    const data = await loadMarkdownAppData(this.root);
-    const automation = await loadProjectAutomationConfigWithIssues(this.root, data.agents);
-    data.automation = automation.config;
-    data.automationIssues = automation.issues;
-    data.eventDefinitions = automationPoliciesToEventDefinitions(automation.config.policies, data.agents, automation.config.triggers, automation.config.actions);
-    data.policies = automationPoliciesToPolicies(automation.config.policies, data.agents);
-    data.runtimes = automationRuntimesToRuntimes(automation.config.runtimes);
-    data.events = this.db().listEventRecords();
-    data.agentRuns = this.db().listRuns();
-    return data;
+  read(): Promise<AppData> {
+    return this.workspaceDataService.read();
   }
 
-  async reset(): Promise<AppData> {
+  reset(): Promise<AppData> {
     return this.read();
   }
 
-  async list<T extends CollectionName>(collection: T): Promise<AppData[T]> {
-    const data = await this.read();
-    return data[collection];
+  list<T extends CollectionName>(collection: T): Promise<AppData[T]> {
+    return this.markdownEntityService.list(collection);
   }
 
-  async upsert<T extends CollectionName>(
+  upsert<T extends CollectionName>(
     collection: T,
     item: Partial<AppData[T][number]> & { id?: string }
   ): Promise<AppData[T][number]> {
-    if (!markdownCollections.has(collection as MutableMarkdownCollection)) {
-      throw new Error(`Unsupported collection: ${collection}`);
-    }
-
-    const data = await this.read();
-    const existing = (data[collection] as unknown as Array<Record<string, unknown>>).find((candidate) => candidate.id === item.id);
-    const nextInput = { ...existing, ...item } as Record<string, unknown>;
-    const saved = await writeEntityMarkdown(this.root, collection as MutableMarkdownCollection, nextInput);
-    const refreshed = await this.read();
-    return ((refreshed[collection] as unknown as Array<Record<string, unknown>>).find((candidate) => candidate.id === saved.id) ?? saved) as unknown as AppData[T][number];
+    return this.markdownEntityService.upsert(collection, item);
   }
 
   async remove(collection: CollectionName, id: string): Promise<void> {
     if (collection === "events") {
-      this.db().deleteEvent(id);
-      notifyRuntimeChanged("events");
+      this.eventIntakeService.removeEvent(id);
       return;
     }
-
-    const data = await this.read();
-    const target = (data[collection] as unknown as Array<Record<string, unknown>>).find((item) => item.id === id);
-    const relativePath = typeof target?.relativePath === "string" ? target.relativePath : undefined;
-    if (!relativePath) return;
-    await removeEntityMarkdown(this.root, relativePath);
+    await this.markdownEntityService.remove(collection, id);
   }
 
-  async saveAutomation(config: ProjectAutomationConfig): Promise<ProjectAutomationConfig> {
-    const data = await loadMarkdownAppData(this.root);
-    const saved = await saveProjectAutomationConfig(this.root, config, data.agents);
-    notifyRuntimeChanged("events");
-    return saved;
+  saveAutomation(config: ProjectAutomationConfig): Promise<ProjectAutomationConfig> {
+    return this.automationService.save(config);
   }
 
-  async saveProjectDocument(input: {
+  saveProjectDocument(input: {
     relativePath: string;
     frontmatter: Record<string, unknown>;
     body: string;
   }): Promise<MarkdownDocument> {
-    return writeProjectMarkdownDocument(this.root, input);
+    return this.markdownEntityService.saveProjectDocument(input);
   }
 
-  async createProjectDocument(input: {
+  createProjectDocument(input: {
     directoryPath: string;
     title: string;
   }): Promise<MarkdownDocument> {
-    return createProjectMarkdownDocument(this.root, input);
+    return this.markdownEntityService.createProjectDocument(input);
   }
 
-  async createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {
-    const data = await this.read();
-    const hasActiveDefinition = data.eventDefinitions.some((definition) =>
-      definition.active && definition.eventType === input.eventType
-    );
-    if (!hasActiveDefinition) {
-      throw new EventValidationError(`Unknown or inactive event type: ${input.eventType}`);
-    }
-    const result = this.db().intakeEvent({
-      projectId: input.projectId,
-      eventType: input.eventType,
-      source: input.source,
-      subject: typeof input.subject === "string" ? input.subject : undefined,
-      correlationId: typeof input.correlationId === "string" ? input.correlationId : undefined,
-      causationId: typeof input.causationId === "string" ? input.causationId : undefined,
-      dedupeKey: typeof input.dedupeKey === "string" ? input.dedupeKey : undefined,
-      correlationDepth: typeof input.correlationDepth === "number" ? input.correlationDepth : undefined,
-      tags: input.tags,
-      payload: input.payload,
-      body: input.body
-    }, data.policies, data.agents);
-    notifyRuntimeChanged("events");
-    if (result.runs.length > 0) notifyRuntimeChanged("agent-runs");
-    return result.event;
+  createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {
+    return this.eventIntakeService.createEvent(input);
   }
 
   listAgentRuns() {
-    return this.db().listRuns();
+    return this.runtimeRunService.listAgentRuns();
   }
 
   retryAgentRun(runId: string) {
-    const run = this.db().retryRun(runId);
-    notifyRuntimeChanged("agent-runs");
-    return run;
+    return this.runtimeRunService.retryAgentRun(runId);
   }
 
   listRunLogs(runId?: string): AgentRunLog[] {
-    return this.db().listRunLogs(runId);
+    return this.runtimeRunService.listRunLogs(runId);
   }
 
   runtimeHealth() {
-    return this.db().health();
+    return this.runtimeRunService.runtimeHealth();
   }
 
   runtimeDatabase(): RuntimeDatabase {
-    return this.db();
-  }
-
-  private db(): RuntimeDatabase {
-    const dbPath = resolveRuntimeDbPath(this.root);
-    if (!this.runtimeDb || this.runtimeDbPath !== dbPath) {
-      this.runtimeDb?.close();
-      this.runtimeDb = new RuntimeDatabase(dbPath);
-      this.runtimeDbPath = dbPath;
-    }
-    return this.runtimeDb;
+    return this.runtimeRunService.runtimeDatabase();
   }
 }
 
 export const store = new MarkdownStore();
-export { AutomationValidationError };
+export { AutomationValidationError, EventValidationError };
