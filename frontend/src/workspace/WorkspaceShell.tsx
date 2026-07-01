@@ -12,16 +12,16 @@ import {
 } from "lucide-react";
 import type {
   AppData,
-} from "../../../shared/api/workspaceData";
-import type { Agent } from "../../../shared/domain/agents";
-import type { ProjectAutomationConfig } from "../../../shared/domain/automation";
+} from "../../../shared/api/workspace-contracts";
+import type { Agent } from "../../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "../../../shared/api/workspace-contracts";
 import type {
   Adr,
   Goal,
   MarkdownDocument,
   Project
-} from "../../../shared/domain/documents";
-import type { Runtime } from "../../../shared/domain/runtime";
+} from "../../../shared/api/workspace-contracts";
+import type { Runtime } from "../../../shared/api/workspace-contracts";
 import { seedData } from "../../../shared/seed";
 import { api } from "../api";
 import { frontmatterToYaml, parseFrontmatterYaml } from "./documents/frontmatter";

@@ -1,4 +1,4 @@
-import type { Agent } from "../../../../shared/domain/agents";
+import type { Agent } from "../../../../shared/api/workspace-contracts";
 
 export const codexModelOptions = [
   { value: "gpt-5.5", label: "GPT-5.5" },

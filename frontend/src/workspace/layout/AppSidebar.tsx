@@ -12,10 +12,10 @@ import {
   Zap,
   type LucideIcon
 } from "lucide-react";
-import type { Agent } from "../../../../shared/domain/agents";
-import type { ProjectAutomationConfig } from "../../../../shared/domain/automation";
-import type { ProjectDocumentTreeNode, Skill } from "../../../../shared/domain/documents";
-import type { ProjectRuntime } from "../../../../shared/domain/runtime";
+import type { Agent } from "../../../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
+import type { ProjectDocumentTreeNode, Skill } from "../../../../shared/api/workspace-contracts";
+import type { ProjectRuntime } from "../../../../shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sidebar as ShadcnSidebar,

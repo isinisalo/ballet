@@ -1,7 +1,7 @@
-import type { AppData, CollectionName } from "../../shared/api/workspaceData";
-import type { ProjectAutomationConfig, ProjectAutomationIssue } from "../../shared/domain/automation";
-import type { MarkdownDocument } from "../../shared/domain/documents";
-import type { EventRecord } from "../../shared/domain/events";
+import type { AppData, CollectionName } from "../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig, ProjectAutomationIssue } from "../../shared/api/workspace-contracts";
+import type { MarkdownDocument } from "../../shared/api/workspace-contracts";
+import type { EventRecord } from "../../shared/api/workspace-contracts";
 
 const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {

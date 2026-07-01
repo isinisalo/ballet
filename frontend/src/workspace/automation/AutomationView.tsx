@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Activity, Code2, Pencil, Plus, Route, Save, Trash2, Zap, type LucideIcon } from "lucide-react";
-import type { AppData } from "../../../../shared/api/workspaceData";
-import type { Agent } from "../../../../shared/domain/agents";
+import type { AppData } from "../../../../shared/api/workspace-contracts";
+import type { Agent } from "../../../../shared/api/workspace-contracts";
 import type {
   ProjectAction,
   ProjectAutomationConfig,
@@ -9,8 +9,8 @@ import type {
   ProjectPolicy,
   ProjectTrigger,
   ProjectWorkflow
-} from "../../../../shared/domain/automation";
-import type { ProjectRuntime } from "../../../../shared/domain/runtime";
+} from "../../../../shared/api/workspace-contracts";
+import type { ProjectRuntime } from "../../../../shared/api/workspace-contracts";
 import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyOutputEventType, policyOutputEventTypes, preferredAgentToken } from "../../../../shared/policy-actions";
 import { HeaderCrudActions, EmptyState, Panel, TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";

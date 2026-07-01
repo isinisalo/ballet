@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { Eye, FileKey2 } from "lucide-react";
-import type { Skill } from "../../../../shared/domain/documents";
+import type { Skill } from "../../../../shared/api/workspace-contracts";
 import { CrudActions, Panel, TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
 import { MarkdownDocumentView } from "../documents/MarkdownDocumentView";

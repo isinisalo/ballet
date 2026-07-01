@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { automationConfigSchema } from "../http/validation/automationSchemas.js";
-import { eventIntakeSchema } from "../http/validation/eventSchemas.js";
 import { parseUnknown, HttpValidationError } from "../http/validation/httpValidation.js";
-import { collectionUpsertSchema, projectDocumentSaveSchema } from "../http/validation/workspaceSchemas.js";
+import {
+  automationConfigSchema,
+  collectionUpsertSchema,
+  eventIntakeSchema,
+  projectDocumentSaveSchema
+} from "../../shared/api/workspace-schemas.js";
 
 const expectValidationError = (callback: () => unknown, path: string) => {
   expect(callback).toThrow(HttpValidationError);

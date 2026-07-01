@@ -1,4 +1,4 @@
-import type { ProjectPolicy } from "../../../../../shared/domain/automation";
+import type { ProjectPolicy } from "../../../../../shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "../../../../../shared/policy-actions";
 
 export type WorkflowStepRecord = {
