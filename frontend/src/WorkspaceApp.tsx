@@ -1431,8 +1431,10 @@ function AutomationView({
     try {
       const saved = await saveAutomation(draft);
       setDraft(saved);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save automation config.");
+      return false;
     }
   };
 
@@ -1659,10 +1661,10 @@ function AutomationView({
             <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={setSelectedTriggerId} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "actions" ? (
-            <ActionsAutomationTab config={draft} selectedId={selectedActionId} onSelect={setSelectedActionId} updateConfig={updateConfig} />
+            <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} onSelect={setSelectedActionId} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "workflows" ? (
-            <WorkflowsAutomationTab data={data} config={draft} selectedId={selectedWorkflowId} onSelect={setSelectedWorkflowId} updateConfig={updateConfig} />
+            <WorkflowsAutomationTab data={data} config={draft} selectedId={selectedWorkflowId} onSelect={setSelectedWorkflowId} updateConfig={updateConfig} saveDraft={saveDraft} />
           ) : null}
           {activeTab === "runtimes" ? (
             <RuntimesAutomationTab config={draft} selectedId={selectedRuntimeId} onSelect={setSelectedRuntimeId} updateConfig={updateConfig} />
@@ -1770,11 +1772,13 @@ function TriggersAutomationTab({
 }
 
 function ActionsAutomationTab({
+  agents,
   config,
   selectedId,
   onSelect,
   updateConfig
 }: {
+  agents: Agent[];
   config: ProjectAutomationConfig;
   selectedId: string;
   onSelect: (id: string) => void;
@@ -1800,10 +1804,21 @@ function ActionsAutomationTab({
     };
     updateConfig((current) => {
       const previousId = current.actions[selectedIndex]?.id ?? selected.id;
+      const eventIdMap = new Map<string, string>();
+      const agentTokens = [...new Set(agents.flatMap(agentTokenCandidates))];
+      agentTokens.forEach((agent) => {
+        const previousEvents = policyOutputEventTypes({ agent, action: previousId });
+        const nextEvents = policyOutputEventTypes({ agent, action: normalized.id });
+        previousEvents.forEach((event, index) => {
+          eventIdMap.set(event, nextEvents[index] ?? event);
+        });
+      });
       const policyIdMap = new Map<string, string>();
       const policies = current.policies.map((policy) => {
-        if (policy.action !== previousId) return policy;
-        const nextPolicy = { ...policy, action: normalized.id };
+        const nextAction = policy.action === previousId ? normalized.id : policy.action;
+        const nextEvent = policy.source === "event" && policy.event ? eventIdMap.get(policy.event) ?? policy.event : policy.event;
+        if (nextAction === policy.action && nextEvent === policy.event) return policy;
+        const nextPolicy = { ...policy, action: nextAction, event: nextEvent };
         const nextPolicyId = generatedPolicyId(nextPolicy);
         policyIdMap.set(policy.id, nextPolicyId);
         return { ...nextPolicy, id: nextPolicyId };
@@ -1936,13 +1951,15 @@ function WorkflowsAutomationTab({
   config,
   selectedId,
   onSelect,
-  updateConfig
+  updateConfig,
+  saveDraft
 }: {
   data: AppData;
   config: ProjectAutomationConfig;
   selectedId: string;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
+  saveDraft: () => Promise<boolean>;
 }) {
   const selected = config.workflows.find((workflow) => workflow.id === selectedId) ?? config.workflows[0];
   const draggedStepIndexRef = useRef<number | null>(null);
@@ -2044,6 +2061,11 @@ function WorkflowsAutomationTab({
         steps: workflow.steps.map((step) => step === selectedPolicy.id ? nextId : step)
       }))
     }));
+  };
+
+  const saveWorkflowPolicyEdit = async () => {
+    const saved = await saveDraft();
+    if (saved) setEditingPolicyIndex(null);
   };
 
   const addPolicyStep = (eventType?: string, sourcePolicy?: ProjectPolicy) => {
@@ -2202,7 +2224,7 @@ function WorkflowsAutomationTab({
     dragOverStepIndex === index && draggedStepIndex !== index && "ring-2 ring-primary/20"
   );
 
-  const renderPolicyNode = (record: typeof workflowStepRecords[number]) => (
+  const renderPolicyNode = (record: typeof workflowStepRecords[number], isEditingPolicy: boolean) => (
     <div
       data-workflow-step-index={record.index}
       onPointerDown={(event) => handleStepPointerDown(event, record.index)}
@@ -2222,7 +2244,7 @@ function WorkflowsAutomationTab({
         {record.policy ? (
           <WorkflowPolicySummary
             policy={record.policy}
-            editing={editingPolicyIndex === record.index}
+            editing={isEditingPolicy}
             agentOptions={agentOptions}
             actionOptions={actionOptions}
             onAgentChange={(agent) => updateWorkflowPolicy(record, { agent: agent === noSelection ? "" : agent })}
@@ -2258,37 +2280,51 @@ function WorkflowsAutomationTab({
     const deleteX = policyX + nodeSizes.policy.width - nodeSizes.action.width;
     const editX = deleteX - nodeSizes.action.width - 6;
     const actionY = policyY + nodeSizes.policy.height + 6;
+    const isEditingPolicy = editingPolicyIndex === record.index;
     let cursorY = y + canvasLayout.policyAnchorY - nodeSizes.event.height / 2;
     let branchWidth = nodeSizes.policy.width;
 
-    addLayoutNode(`policy-${record.index}`, policyX, policyY, nodeSizes.policy.width, nodeSizes.policy.height, renderPolicyNode(record));
-    addLayoutNode(
-      `edit-${record.index}`,
-      editX,
-      actionY,
-      nodeSizes.action.width,
-      nodeSizes.action.height,
-      <Button
-        type="button"
-        size="icon-sm"
-        variant={editingPolicyIndex === record.index ? "secondary" : "outline"}
-        aria-label="Edit workflow policy"
-        title="Edit workflow policy"
-        onClick={() => setEditingPolicyIndex((current) => current === record.index ? null : record.index)}
-      >
-        <Pencil data-icon="inline-start" />
-      </Button>
-    );
-    addLayoutNode(
-      `delete-${record.index}`,
-      deleteX,
-      actionY,
-      nodeSizes.action.width,
-      nodeSizes.action.height,
-      <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected?.steps.filter((_, stepIndex) => stepIndex !== record.index) ?? [] })}>
-        <TrashButtonIcon />
-      </Button>
-    );
+    addLayoutNode(`policy-${record.index}`, policyX, policyY, nodeSizes.policy.width, nodeSizes.policy.height, renderPolicyNode(record, isEditingPolicy));
+    if (isEditingPolicy) {
+      addLayoutNode(
+        `save-${record.index}`,
+        deleteX,
+        actionY,
+        nodeSizes.action.width,
+        nodeSizes.action.height,
+        <Button type="button" size="icon-sm" aria-label="Save workflow policy" title="Save workflow policy" onClick={() => void saveWorkflowPolicyEdit()}>
+          <Save data-icon="inline-start" />
+        </Button>
+      );
+    } else {
+      addLayoutNode(
+        `edit-${record.index}`,
+        editX,
+        actionY,
+        nodeSizes.action.width,
+        nodeSizes.action.height,
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="outline"
+          aria-label="Edit workflow policy"
+          title="Edit workflow policy"
+          onClick={() => setEditingPolicyIndex(record.index)}
+        >
+          <Pencil data-icon="inline-start" />
+        </Button>
+      );
+      addLayoutNode(
+        `delete-${record.index}`,
+        deleteX,
+        actionY,
+        nodeSizes.action.width,
+        nodeSizes.action.height,
+        <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => updateSelected({ steps: selected?.steps.filter((_, stepIndex) => stepIndex !== record.index) ?? [] })}>
+          <TrashButtonIcon />
+        </Button>
+      );
+    }
     workflowOutputEvents(policy).forEach((eventType) => {
       const childRecords = (workflowGraph.childRecordsByParentEvent.get(`${record.index}:${eventType}`) ?? []).filter((childRecord) => childRecord.policyId !== record.policyId && !nextVisitedPolicyIds.has(childRecord.policyId));
       const eventRows = childRecords.length > 0 ? childRecords : [undefined];

@@ -45,9 +45,9 @@ const validConfig = (): ProjectAutomationConfig => ({
   ],
   policies: [
     {
-      id: "on.developer.implementation.failed.v1.then.developer.start.implementation",
+      id: "on.developer.implementation.failed.then.developer.start.implementation",
       source: "event",
-      event: "developer.implementation.failed.v1",
+      event: "developer.implementation.failed",
       agent: "developer",
       action: "implementation",
       enabled: true
@@ -57,7 +57,7 @@ const validConfig = (): ProjectAutomationConfig => ({
     {
       id: "delivery",
       title: "Delivery",
-      steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"]
+      steps: ["on.developer.implementation.failed.then.developer.start.implementation"]
     }
   ],
   runtimes: [
@@ -92,8 +92,8 @@ describe("project automation config", () => {
 
     const saved = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     expect(saved).not.toHaveProperty("events");
-    expect(saved.policies[0]?.id).toBe("on.developer.implementation.failed.v1.then.developer.start.implementation");
-    expect(saved.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.v1.then.developer.start.implementation"]);
+    expect(saved.policies[0]?.id).toBe("on.developer.implementation.failed.then.developer.start.implementation");
+    expect(saved.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.then.developer.start.implementation"]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
   });
 
@@ -106,7 +106,7 @@ describe("project automation config", () => {
       policies: [{
         id: "assign-developer",
         title: "Assign developer",
-        on: "developer.run.failed.v1",
+        on: "developer.run.failed",
         run: { agent: "developer-agent", runtime: "codex-runtime" },
         enabled: true
       }],
@@ -120,14 +120,46 @@ describe("project automation config", () => {
     expect(loaded).not.toHaveProperty("events");
     expect(loaded.actions).toEqual([{ id: "run", description: "" }]);
     expect(loaded.policies[0]).toMatchObject({
-      id: "on.developer.run.failed.v1.then.developer.start.run",
+      id: "on.developer.run.failed.then.developer.start.run",
       source: "event",
-      event: "developer.run.failed.v1",
+      event: "developer.run.failed",
       agent: "developer",
       action: "run"
     });
-    expect(loaded.workflows[0]?.steps).toEqual(["on.developer.run.failed.v1.then.developer.start.run"]);
+    expect(loaded.workflows[0]?.steps).toEqual(["on.developer.run.failed.then.developer.start.run"]);
     expect(loaded.runtimes[0]).not.toHaveProperty("outputEvents");
+  });
+
+  it("normalizes legacy v1 output events and remaps workflow policy ids", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".ballet"), { recursive: true });
+    await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({
+      version: 1,
+      triggers: [],
+      actions: [{ id: "implementation", description: "Implement approved work." }],
+      policies: [{
+        id: "on.developer.implementation.failed.v1.then.developer.start.implementation",
+        source: "event",
+        event: "developer.implementation.failed.v1",
+        agent: "developer",
+        action: "implementation",
+        enabled: true
+      }],
+      workflows: [{
+        id: "delivery",
+        title: "Delivery",
+        steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"]
+      }],
+      runtimes: []
+    }), "utf8");
+
+    const loaded = await loadProjectAutomationConfig(root, [agent]);
+
+    expect(loaded.policies[0]).toMatchObject({
+      id: "on.developer.implementation.failed.then.developer.start.implementation",
+      event: "developer.implementation.failed"
+    });
+    expect(loaded.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.then.developer.start.implementation"]);
   });
 
   it("validates policy, runtime, and workflow references while ignoring legacy event definitions", () => {
@@ -211,9 +243,9 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       policies: [{
-        id: "on.reviewer.implementation.complete.v1.then.developer.start.implementation",
+        id: "on.reviewer.implementation.complete.then.developer.start.implementation",
         source: "event",
-        event: "reviewer.implementation.complete.v1",
+        event: "reviewer.implementation.complete",
         agent: "developer",
         action: "implementation",
         enabled: true
@@ -221,7 +253,7 @@ describe("project automation config", () => {
       workflows: [{
         id: "delivery",
         title: "Delivery",
-        steps: ["on.reviewer.implementation.complete.v1.then.developer.start.implementation"]
+        steps: ["on.reviewer.implementation.complete.then.developer.start.implementation"]
       }]
     }, [agent, reviewer])).toEqual([]);
   });
@@ -259,7 +291,7 @@ describe("project automation config", () => {
       policies: [{
         id: "bad-policy",
         source: "trigger",
-        event: "developer.implementation.failed.v1",
+        event: "developer.implementation.failed",
         trigger: "plan_approved",
         agent: "developer",
         action: "implementation",

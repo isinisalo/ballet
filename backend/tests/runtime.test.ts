@@ -61,12 +61,12 @@ const qaAgent: Agent = {
 };
 
 const architectureReviewPolicy: Policy = {
-  id: "on.developer.implementation.complete.v1.then.architect.start.review",
-  name: "on.developer.implementation.complete.v1.then.architect.start.review",
+  id: "on.developer.implementation.complete.then.architect.start.review",
+  name: "on.developer.implementation.complete.then.architect.start.review",
   description: "Route implemented change facts to architecture review.",
   active: true,
   match: {
-    eventTypes: ["developer.implementation.complete.v1"],
+    eventTypes: ["developer.implementation.complete"],
     source: "agentd"
   },
   action: {
@@ -74,7 +74,7 @@ const architectureReviewPolicy: Policy = {
     targetAgentId: "architecture-reviewer"
   },
   projectId: "*",
-  eventTypes: ["developer.implementation.complete.v1"],
+  eventTypes: ["developer.implementation.complete"],
   source: "*",
   payloadMetadata: {},
   targetAgentId: "architecture-reviewer",
@@ -84,8 +84,8 @@ const architectureReviewPolicy: Policy = {
 
 const qaReviewPolicy: Policy = {
   ...architectureReviewPolicy,
-  id: "on.developer.implementation.complete.v1.then.qa-verification-reviewer.start.review",
-  name: "on.developer.implementation.complete.v1.then.qa-verification-reviewer.start.review",
+  id: "on.developer.implementation.complete.then.qa-verification-reviewer.start.review",
+  name: "on.developer.implementation.complete.then.qa-verification-reviewer.start.review",
   action: {
     type: "start_agent_run",
     targetAgentId: "qa-verification-reviewer"
@@ -152,7 +152,7 @@ describe("runtime database", () => {
 
     const result = db.intakeEvent({
       projectId: "project",
-      eventType: "developer.implementation.complete.v1",
+      eventType: "developer.implementation.complete",
       source: "agentd",
       subject: "work-1",
       payload: { artifacts: { git_sha: "4f28dbd" } }
@@ -189,14 +189,14 @@ describe("runtime database", () => {
       status: "completed",
       outcome: readyOutcome,
       domainEvent: {
-        type: "developer.implementation.complete.v1",
+        type: "developer.implementation.complete",
         source: "agentd",
         payload: { agent: "developer", action: "implementation", status: "complete", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       }
     });
 
     expect(completed.run.status).toBe("completed");
-    expect(completed.event?.type).toBe("developer.implementation.complete.v1");
+    expect(completed.event?.type).toBe("developer.implementation.complete");
     expect(completed.event?.source).toBe("agentd");
     expect(db.listRuntimeEvents()).toHaveLength(2);
 
@@ -221,7 +221,7 @@ describe("runtime database", () => {
       status: "completed",
       outcome: readyOutcome,
       domainEvent: {
-        type: "developer.implementation.complete.v1",
+        type: "developer.implementation.complete",
         source: "agentd",
         payload: { agent: "developer", action: "implementation", status: "complete", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
@@ -231,7 +231,7 @@ describe("runtime database", () => {
 
     expect(completed.run.status).toBe("completed");
     expect(completed.event).toMatchObject({
-      type: "developer.implementation.complete.v1",
+      type: "developer.implementation.complete",
       source: "agentd",
       correlationId: intake.event.correlationId,
       causationId: intake.event.eventId,
@@ -285,7 +285,7 @@ describe("runtime database", () => {
       status: "completed",
       outcome: readyOutcome,
       domainEvent: {
-        type: "developer.implementation.complete.v1",
+        type: "developer.implementation.complete",
         source: "agentd",
         payload: { agent: "developer", action: "implementation", status: "complete", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
@@ -308,10 +308,10 @@ describe("runtime output mapping", () => {
   });
 
   it("maps agent output statuses through policy action output events", () => {
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "complete" }).id).toBe("developer.implementation.complete.v1");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "failed" }).id).toBe("developer.implementation.failed.v1");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "blocked" }).id).toBe("developer.implementation.blocked.v1");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "cancelled" }).id).toBe("developer.implementation.cancelled.v1");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "complete" }).id).toBe("developer.implementation.complete");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "failed" }).id).toBe("developer.implementation.failed");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "blocked" }).id).toBe("developer.implementation.blocked");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "cancelled" }).id).toBe("developer.implementation.cancelled");
   });
 
   it("does not require an event id in agent output", () => {
@@ -326,7 +326,7 @@ describe("runtime output mapping", () => {
     });
 
     expect(routed).toMatchObject({
-      id: "developer.implementation.complete.v1",
+      id: "developer.implementation.complete",
       source: "agentd",
       payload: {
         agent: "developer",

@@ -50,10 +50,10 @@ const baseData = (): AppData => ({
     name: "Assign existing agent",
     description: "",
     active: true,
-    match: { eventTypes: ["existing.implementation.failed.v1"], projectId: "*", source: "*" },
+    match: { eventTypes: ["existing.implementation.failed"], projectId: "*", source: "*" },
     action: { type: "start_agent_run", targetAgentId: "agent-1" },
     projectId: "*",
-    eventTypes: ["existing.implementation.failed.v1"],
+    eventTypes: ["existing.implementation.failed"],
     source: "*",
     payloadMetadata: {},
     targetAgentId: "agent-1",
@@ -61,11 +61,11 @@ const baseData = (): AppData => ({
     updatedAt: now
   }],
   eventDefinitions: [{
-    id: "existing.implementation.complete.v1",
-    name: "existing.implementation.complete.v1",
+    id: "existing.implementation.complete",
+    name: "existing.implementation.complete",
     description: "Generated agent action output event.",
     active: true,
-    eventType: "existing.implementation.complete.v1",
+    eventType: "existing.implementation.complete",
     source: "agentd",
     tags: [],
     producers: [],
@@ -73,11 +73,11 @@ const baseData = (): AppData => ({
     createdAt: now,
     updatedAt: now
   }, {
-    id: "existing.implementation.failed.v1",
-    name: "existing.implementation.failed.v1",
+    id: "existing.implementation.failed",
+    name: "existing.implementation.failed",
     description: "Generated agent action output event.",
     active: true,
-    eventType: "existing.implementation.failed.v1",
+    eventType: "existing.implementation.failed",
     source: "agentd",
     tags: [],
     producers: [],
@@ -98,9 +98,9 @@ const baseData = (): AppData => ({
       description: "Implement work"
     }],
     policies: [{
-      id: "on.existing.implementation.failed.v1.then.existing.start.implementation",
+      id: "on.existing.implementation.failed.then.existing.start.implementation",
       source: "event",
-      event: "existing.implementation.failed.v1",
+      event: "existing.implementation.failed",
       agent: "existing",
       action: "implementation",
       enabled: true
@@ -108,7 +108,7 @@ const baseData = (): AppData => ({
     workflows: [{
       id: "workflow-1",
       title: "Default workflow",
-      steps: ["on.existing.implementation.failed.v1.then.existing.start.implementation"]
+      steps: ["on.existing.implementation.failed.then.existing.start.implementation"]
     }],
     runtimes: [{
       id: "runtime-1",
@@ -279,32 +279,32 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("tab", { name: /policies/i })).toHaveAttribute("aria-selected", "true");
 
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
-    expect(screen.getByLabelText("Policy: on.existing.implementation.failed.v1.then.existing.start.implementation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
     expect(screen.queryByLabelText("Agent: existing")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Events: existing.implementation.complete.v1")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Events: existing.implementation.complete")).not.toBeInTheDocument();
     expect(screen.getAllByText("on:").length).toBeGreaterThan(0);
     expect(screen.getAllByText("then:").length).toBeGreaterThan(0);
     expect(screen.getAllByText("start:").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("existing.implementation.failed.v1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("existing.implementation.failed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("existing").length).toBeGreaterThan(0);
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
-    expect(screen.getByText("existing.implementation.complete.v1")).toBeInTheDocument();
+    expect(screen.getByText("existing.implementation.complete")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /policies/i }));
     await user.click(screen.getByLabelText("Event"));
-    await user.click(await screen.findByText("existing.implementation.blocked.v1 · output"));
+    await user.click(await screen.findByText("existing.implementation.blocked · output"));
 
     await user.click(screen.getByRole("tab", { name: /workflows/i }));
-    expect(screen.getByLabelText("Policy: on.existing.implementation.blocked.v1.then.existing.start.implementation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: on.existing.implementation.blocked.then.existing.start.implementation")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation).not.toHaveProperty("events"));
-    expect(data.automation.policies[0]?.event).toBe("existing.implementation.blocked.v1");
+    expect(data.automation.policies[0]?.event).toBe("existing.implementation.blocked");
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
-      body: expect.stringContaining("\"steps\":[\"on.existing.implementation.blocked.v1.then.existing.start.implementation\"]")
+      body: expect.stringContaining("\"steps\":[\"on.existing.implementation.blocked.then.existing.start.implementation\"]")
     }));
   });
 
@@ -332,19 +332,26 @@ describe("workspace entity UI flows", () => {
 
     expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Edit workflow policy" }));
+    expect(screen.queryByRole("button", { name: "Edit workflow policy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove workflow step" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save workflow policy" })).toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText("Workflow policy agent"), "review");
     await user.selectOptions(screen.getByLabelText("Workflow policy action"), "review-pass");
 
-    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await user.click(screen.getByRole("button", { name: "Save workflow policy" }));
     await waitFor(() => expect(data.automation.policies[0]).toMatchObject({
       agent: "review",
       action: "review-pass",
-      id: "on.existing.implementation.failed.v1.then.review.start.review-pass"
+      id: "on.existing.implementation.failed.then.review.start.review-pass"
     }));
+    expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save workflow policy" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit workflow policy" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove workflow step" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
-      body: expect.stringContaining("\"steps\":[\"on.existing.implementation.failed.v1.then.review.start.review-pass\"]")
+      body: expect.stringContaining("\"steps\":[\"on.existing.implementation.failed.then.review.start.review-pass\"]")
     }));
   });
 
@@ -372,8 +379,51 @@ describe("workspace entity UI flows", () => {
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.policies[0]?.action).toBe("review-pass"));
-    expect(data.automation.policies[0]?.id).toBe("on.existing.implementation.failed.v1.then.existing.start.review-pass");
+    expect(data.automation.policies[0]?.id).toBe("on.existing.implementation.failed.then.existing.start.review-pass");
     expect(data.automation.policies).toHaveLength(1);
+  });
+
+  it("renames an automation action and rewrites derived policy events", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.automation.actions.push({
+      id: "review",
+      description: "Review implementation output."
+    });
+    workflowData.automation.policies.push({
+      id: "on.existing.implementation.complete.then.existing.start.review",
+      source: "event",
+      event: "existing.implementation.complete",
+      agent: "existing",
+      action: "review",
+      enabled: true
+    });
+    workflowData.automation.workflows[0]!.steps = [
+      "on.existing.implementation.failed.then.existing.start.implementation",
+      "on.existing.implementation.complete.then.existing.start.review"
+    ];
+    const { data } = await renderRoute("/automation/actions", workflowData);
+
+    await user.clear(screen.getByLabelText("Action ID"));
+    await user.type(screen.getByLabelText("Action ID"), "implement");
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+
+    await waitFor(() => expect(data.automation.actions[0]?.id).toBe("implement"));
+    expect(screen.queryByText("Automation config is invalid.")).not.toBeInTheDocument();
+    expect(data.automation.policies[0]).toMatchObject({
+      id: "on.existing.implement.failed.then.existing.start.implement",
+      event: "existing.implement.failed",
+      action: "implement"
+    });
+    expect(data.automation.policies[1]).toMatchObject({
+      id: "on.existing.implement.complete.then.existing.start.review",
+      event: "existing.implement.complete",
+      action: "review"
+    });
+    expect(data.automation.workflows[0]?.steps).toEqual([
+      "on.existing.implement.failed.then.existing.start.implement",
+      "on.existing.implement.complete.then.existing.start.review"
+    ]);
   });
 
   it("creates, edits, deletes, and saves automation triggers", async () => {

@@ -18,6 +18,7 @@ import type {
 import {
   agentTokenCandidates,
   generatedPolicyId,
+  normalizePolicyOutputEventType,
   normalizePolicyToken,
   policyActionTokens,
   policyEventTypesForAgentsAndActions,
@@ -86,7 +87,7 @@ const inferLegacyPolicyAction = (value: Record<string, unknown>): string => {
 
 const normalizePolicy = (value: Record<string, unknown>): ProjectPolicy => {
   const run = isRecord(value.run) ? value.run : {};
-  const event = stringValue(value.event) || stringValue(value.on);
+  const event = normalizePolicyOutputEventType(stringValue(value.event) || stringValue(value.on));
   const trigger = normalizePolicyToken(stringValue(value.trigger));
   const source: ProjectPolicy["source"] = stringValue(value.source) === "trigger" || trigger ? "trigger" : "event";
   const agent = normalizeAgentPolicyToken(stringValue(value.agent) || stringValue(run.agent));
@@ -250,6 +251,7 @@ export const validateProjectAutomationConfig = (
     }
     const run = isRecord(policy.run) ? policy.run : undefined;
     const rawEvent = stringValue(policy.event) || stringValue(policy.on);
+    const normalizedEvent = normalizePolicyOutputEventType(rawEvent);
     const rawTrigger = stringValue(policy.trigger);
     const rawSource = stringValue(policy.source);
     const rawAgent = stringValue(policy.agent) || stringValue(run?.agent);
@@ -279,7 +281,7 @@ export const validateProjectAutomationConfig = (
     if (typeof policy.enabled !== "boolean") {
       issues.push({ path: `${base}.enabled`, message: "Policy enabled must be boolean." });
     }
-    if (!isTriggerPolicy && rawEvent && !eventIdSet.has(rawEvent)) {
+    if (!isTriggerPolicy && normalizedEvent && !eventIdSet.has(normalizedEvent)) {
       issues.push({ path: `${base}.event`, message: `Policy references unknown event: ${rawEvent}.` });
     }
     if (isTriggerPolicy && normalizedPolicy?.trigger && !triggerIdSet.has(normalizedPolicy.trigger)) {

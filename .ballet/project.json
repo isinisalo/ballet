@@ -8,7 +8,7 @@
   ],
   "actions": [
     {
-      "id": "implementation",
+      "id": "implement",
       "description": "Implement an approved plan."
     },
     {
@@ -22,25 +22,25 @@
   ],
   "policies": [
     {
-      "id": "on.trigger.plan_approved.then.developer.start.implementation",
+      "id": "on.trigger.plan_approved.then.developer.start.implement",
       "source": "trigger",
       "trigger": "plan_approved",
       "agent": "developer",
-      "action": "implementation",
+      "action": "implement",
       "enabled": true
     },
     {
-      "id": "on.developer.implementation.complete.v1.then.developer.start.implementation",
+      "id": "on.developer.implement.complete.then.qa.start.test",
       "source": "event",
-      "event": "developer.implementation.complete.v1",
-      "agent": "developer",
-      "action": "implementation",
+      "event": "developer.implement.complete",
+      "agent": "qa",
+      "action": "test",
       "enabled": true
     },
     {
-      "id": "on.developer.implementation.complete.v1.then.qa-verification-reviewer.start.review",
+      "id": "on.developer.implement.complete.then.qa-verification-reviewer.start.review",
       "source": "event",
-      "event": "developer.implementation.complete.v1",
+      "event": "developer.implement.complete",
       "agent": "qa-verification-reviewer",
       "action": "review",
       "enabled": true
@@ -51,8 +51,8 @@
       "id": "plan-implement-review",
       "title": "Plan, implement, review",
       "steps": [
-        "on.trigger.plan_approved.then.developer.start.implementation",
-        "on.developer.implementation.complete.v1.then.developer.start.implementation"
+        "on.trigger.plan_approved.then.developer.start.implement",
+        "on.developer.implement.complete.then.qa.start.test"
       ]
     }
   ],

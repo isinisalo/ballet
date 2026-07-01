@@ -181,9 +181,9 @@ export const seedData: AppData = {
     ],
     policies: [
       {
-        id: "on.k8s-operator.remediation.failed.v1.then.k8s-operator.start.remediation",
+        id: "on.k8s-operator.remediation.failed.then.k8s-operator.start.remediation",
         source: "event",
-        event: "k8s-operator.remediation.failed.v1",
+        event: "k8s-operator.remediation.failed",
         agent: "k8s-operator",
         action: "remediation",
         enabled: true
@@ -193,7 +193,7 @@ export const seedData: AppData = {
       {
         id: "deployment-response",
         title: "Deployment response",
-        steps: ["on.k8s-operator.remediation.failed.v1.then.k8s-operator.start.remediation"]
+        steps: ["on.k8s-operator.remediation.failed.then.k8s-operator.start.remediation"]
       }
     ],
     runtimes: [

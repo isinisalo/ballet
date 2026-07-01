@@ -3,8 +3,6 @@ import type { Agent, ProjectPolicy } from "./domain.js";
 export const policyOutputStatuses = ["complete", "cancelled", "blocked", "failed"] as const;
 export type PolicyOutputStatus = typeof policyOutputStatuses[number];
 
-export const policyEventVersion = "v1";
-
 export const normalizePolicyToken = (value: string): string =>
   value
     .trim()
@@ -23,10 +21,15 @@ export const generatedPolicyId = (input: Pick<ProjectPolicy, "source" | "event" 
 export const policyOutputEventType = (
   input: Pick<ProjectPolicy, "agent" | "action">,
   status: PolicyOutputStatus
-): string => `${input.agent}.${input.action}.${status}.${policyEventVersion}`;
+): string => `${input.agent}.${input.action}.${status}`;
 
 export const policyOutputEventTypes = (input: Pick<ProjectPolicy, "agent" | "action">): string[] =>
   policyOutputStatuses.map((status) => policyOutputEventType(input, status));
+
+export const normalizePolicyOutputEventType = (value: string): string => {
+  const statusPattern = policyOutputStatuses.join("|");
+  return value.replace(new RegExp(`^([a-z0-9_-]+)\\.([a-z0-9_-]+)\\.(${statusPattern})\\.v1$`), "$1.$2.$3");
+};
 
 export const policyActionTokens = (policies: Array<Pick<ProjectPolicy, "action">>): string[] =>
   [...new Set(policies.map((policy) => normalizePolicyToken(policy.action)).filter(Boolean))];
