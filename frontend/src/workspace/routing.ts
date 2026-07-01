@@ -13,6 +13,27 @@ const projectCollectionRoute = (view: "project-adrs" | "project-goals" | "projec
   return documentPath ? { view, projectId, documentPath } : { view, projectId };
 };
 
+const automationRoute = (automationTab: AutomationTab, url: URL): RouteState => ({
+  view: "automation",
+  automationTab,
+  automationEntityId: url.searchParams.get("id") ?? undefined
+});
+
+const runtimeRoute = (url: URL): RouteState => ({
+  view: "runtimes",
+  runtimeId: url.searchParams.get("id") ?? undefined
+});
+
+const legacyRouteAliases: Record<string, (url: URL) => RouteState> = {
+  // Compatibility aliases for routes used before the automation/runtimes navigation split.
+  "/automation/policies": (url) => automationRoute("workflows", url),
+  "/policies": (url) => automationRoute("workflows", url),
+  "/actions": (url) => automationRoute("actions", url),
+  "/workflow": (url) => automationRoute("workflows", url),
+  "/automation/runtimes": runtimeRoute,
+  "/agent-runs": (url) => automationRoute("workflows", url)
+};
+
 export const routeFromPath = (path: string): RouteState => {
   const url = new URL(path, "http://localhost");
   const goalsMatch = url.pathname.match(/^\/projects\/([^/]+)\/goals\/?$/);
@@ -30,20 +51,13 @@ export const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  if (url.pathname === "/automation/policies" || url.pathname === "/policies") {
-    return { view: "automation", automationTab: "workflows", automationEntityId: url.searchParams.get("id") ?? undefined };
-  }
   const automationMatch = url.pathname.match(/^\/automation\/(triggers|actions|workflows)\/?$/);
-  if (automationMatch) {
-    return { view: "automation", automationTab: automationMatch[1] as AutomationTab, automationEntityId: url.searchParams.get("id") ?? undefined };
-  }
-  if (url.pathname === "/automation/runtimes") return { view: "runtimes", runtimeId: url.searchParams.get("id") ?? undefined };
-  if (url.pathname === "/automation") return { view: "automation", automationTab: "workflows", automationEntityId: url.searchParams.get("id") ?? undefined };
-  if (url.pathname === "/actions") return { view: "automation", automationTab: "actions", automationEntityId: url.searchParams.get("id") ?? undefined };
-  if (url.pathname === "/workflow") return { view: "automation", automationTab: "workflows", automationEntityId: url.searchParams.get("id") ?? undefined };
-  if (url.pathname === "/runtimes") return { view: "runtimes", runtimeId: url.searchParams.get("id") ?? undefined };
+  if (automationMatch) return automationRoute(automationMatch[1] as AutomationTab, url);
+  if (url.pathname === "/automation") return automationRoute("workflows", url);
+  if (url.pathname === "/runtimes") return runtimeRoute(url);
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
-  if (url.pathname === "/agent-runs") return { view: "automation", automationTab: "workflows", automationEntityId: url.searchParams.get("id") ?? undefined };
+  const legacyRoute = legacyRouteAliases[url.pathname];
+  if (legacyRoute) return legacyRoute(url);
   return { view: "projects" };
 };
 

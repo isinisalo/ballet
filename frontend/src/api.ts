@@ -1,7 +1,6 @@
 import type { AppData, CollectionName } from "../../shared/api/workspace-contracts";
-import type { ProjectAutomationConfig, ProjectAutomationIssue } from "../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "../../shared/api/workspace-contracts";
 import type { MarkdownDocument } from "../../shared/api/workspace-contracts";
-import type { EventRecord } from "../../shared/api/workspace-contracts";
 
 const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {
@@ -20,13 +19,11 @@ const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
 
 export const api = {
   getData: () => request<AppData>("/api/data"),
-  getAutomation: () => request<{ config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] }>("/api/automation"),
   saveAutomation: (config: ProjectAutomationConfig) =>
     request<ProjectAutomationConfig>("/api/automation", {
       method: "PUT",
       body: JSON.stringify(config)
     }),
-  reset: () => request<AppData>("/api/reset", { method: "POST" }),
   save: <T extends CollectionName>(collection: T, item: Partial<AppData[T][number]>) =>
     request<AppData[T][number]>(`/api/${collection}`, {
       method: "POST",
@@ -43,11 +40,5 @@ export const api = {
       body: JSON.stringify(document)
     }),
   remove: (collection: CollectionName, id: string) =>
-    request<void>(`/api/${collection}/${id}`, { method: "DELETE" }),
-  intakeEvent: (event: Partial<EventRecord> & Pick<EventRecord, "projectId" | "eventType">) =>
-    request<EventRecord>("/api/events/intake", {
-      method: "POST",
-      body: JSON.stringify(event)
-    }),
-  getRuntimeHealth: () => request<Record<string, unknown>>("/api/runtime/health")
+    request<void>(`/api/${collection}/${id}`, { method: "DELETE" })
 };

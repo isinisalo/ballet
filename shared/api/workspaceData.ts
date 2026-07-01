@@ -8,7 +8,6 @@ export type {
   ProjectDocumentSaveRequest,
   ProjectDocumentCreateRequest,
   EventIntakeRequest,
-  EventRecordDto,
   WorkspaceSaveRequestByCollection,
   WorkspaceSaveResponseByCollection
 } from "./workspace-contracts.js";

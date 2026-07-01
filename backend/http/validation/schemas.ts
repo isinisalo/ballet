@@ -1,7 +1,11 @@
 export {
+  agentRunParamsSchema,
+  automationConfigSchema,
   collectionItemParamsSchema,
   collectionParamsSchema,
   collectionUpsertSchema,
+  eventIntakeSchema,
+  eventParamsSchema,
   mutableCollectionParamsSchema,
   mutableCollections,
   projectDocumentCreateSchema,

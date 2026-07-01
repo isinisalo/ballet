@@ -1,12 +1,12 @@
 import type { RequestHandler } from "express";
 import { onRuntimeChanged } from "../../runtime-events.js";
-import { workspaceService } from "../../services/workspaceService.js";
-import { agentRunParamsSchema } from "../validation/eventSchemas.js";
+import { store } from "../../store.js";
+import { agentRunParamsSchema } from "../validation/schemas.js";
 import { parseParams } from "../validation/httpValidation.js";
 
 export const runtimeHealth: RequestHandler = (_req, res, next) => {
   try {
-    res.json(workspaceService.runtimeHealth());
+    res.json(store.runtimeHealth());
   } catch (error) {
     next(error);
   }
@@ -38,7 +38,7 @@ export const runtimeStream: RequestHandler = (req, res) => {
 
 export const listAgentRuns: RequestHandler = (_req, res, next) => {
   try {
-    res.json(workspaceService.listAgentRuns());
+    res.json(store.listAgentRuns());
   } catch (error) {
     next(error);
   }
@@ -47,7 +47,7 @@ export const listAgentRuns: RequestHandler = (_req, res, next) => {
 export const listRunLogs: RequestHandler = (req, res, next) => {
   try {
     const { id } = parseParams(agentRunParamsSchema, req);
-    res.json(workspaceService.listRunLogs(id));
+    res.json(store.listRunLogs(id));
   } catch (error) {
     next(error);
   }
@@ -56,7 +56,7 @@ export const listRunLogs: RequestHandler = (req, res, next) => {
 export const retryAgentRun: RequestHandler = (req, res, next) => {
   try {
     const { id } = parseParams(agentRunParamsSchema, req);
-    res.json(workspaceService.retryAgentRun(id));
+    res.json(store.retryAgentRun(id));
   } catch (error) {
     next(error);
   }

@@ -35,18 +35,42 @@ describe("workspace routing", () => {
     });
   });
 
-  it("parses automation aliases and selected entities", () => {
+  it("parses canonical automation and runtime routes with selected entities", () => {
     expect(routeFromPath("/automation/actions?id=build")).toEqual({
       view: "automation",
       automationTab: "actions",
       automationEntityId: "build"
+    });
+    expect(routeFromPath("/runtimes?id=codex")).toEqual({ view: "runtimes", runtimeId: "codex" });
+  });
+
+  it("keeps legacy automation route aliases explicit", () => {
+    expect(routeFromPath("/automation/policies?id=policy-1")).toEqual({
+      view: "automation",
+      automationTab: "workflows",
+      automationEntityId: "policy-1"
     });
     expect(routeFromPath("/policies?id=policy-1")).toEqual({
       view: "automation",
       automationTab: "workflows",
       automationEntityId: "policy-1"
     });
+    expect(routeFromPath("/actions?id=build")).toEqual({
+      view: "automation",
+      automationTab: "actions",
+      automationEntityId: "build"
+    });
+    expect(routeFromPath("/workflow?id=delivery")).toEqual({
+      view: "automation",
+      automationTab: "workflows",
+      automationEntityId: "delivery"
+    });
     expect(routeFromPath("/automation/runtimes?id=codex")).toEqual({ view: "runtimes", runtimeId: "codex" });
+    expect(routeFromPath("/agent-runs?id=run-1")).toEqual({
+      view: "automation",
+      automationTab: "workflows",
+      automationEntityId: "run-1"
+    });
   });
 
   it("builds encoded paths", () => {

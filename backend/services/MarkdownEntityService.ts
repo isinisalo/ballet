@@ -38,14 +38,13 @@ export class MarkdownEntityService {
     return ((refreshed[collection] as unknown as Array<Record<string, unknown>>).find((candidate) => candidate.id === saved.id) ?? saved) as unknown as AppData[T][number];
   }
 
-  async remove(collection: CollectionName, id: string): Promise<boolean> {
-    if (collection === "events") return false;
+  async remove(collection: CollectionName, id: string): Promise<void> {
+    if (collection === "events") return;
     const data = await this.readData();
     const target = (data[collection] as unknown as Array<Record<string, unknown>>).find((item) => item.id === id);
     const relativePath = typeof target?.relativePath === "string" ? target.relativePath : undefined;
-    if (!relativePath) return true;
+    if (!relativePath) return;
     await removeEntityMarkdown(this.root(), relativePath);
-    return true;
   }
 
   async saveProjectDocument(input: {

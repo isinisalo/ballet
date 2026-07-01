@@ -40,6 +40,15 @@ export interface ProjectAutomationConfig {
   runtimes: ProjectRuntime[];
 }
 
+export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
+  version: 1,
+  triggers: [],
+  actions: [],
+  policies: [],
+  workflows: [],
+  runtimes: []
+});
+
 export interface ProjectAutomationIssue {
   path: string;
   message: string;

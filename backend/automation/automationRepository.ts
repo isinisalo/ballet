@@ -1,8 +1,7 @@
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { Agent } from "../../shared/domain/agents.js";
-import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
-import { defaultProjectAutomationConfig } from "./defaultConfig.js";
+import { defaultProjectAutomationConfig, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
 import { AutomationValidationError, validateProjectAutomationConfig } from "./validateAutomationConfig.js";
 

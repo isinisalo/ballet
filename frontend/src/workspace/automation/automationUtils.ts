@@ -1,15 +1,6 @@
 import type { Agent } from "../../../../shared/api/workspace-contracts";
-import type { ProjectAutomationConfig, ProjectPolicy } from "../../../../shared/api/workspace-contracts";
+import type { ProjectPolicy } from "../../../../shared/api/workspace-contracts";
 import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, preferredAgentToken } from "../../../../shared/policy-actions";
-
-export const automationConfigTemplate = (): ProjectAutomationConfig => ({
-  version: 1,
-  triggers: [],
-  actions: [],
-  policies: [],
-  workflows: [],
-  runtimes: []
-});
 
 const slugValue = (value: string, fallback: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;

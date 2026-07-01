@@ -5,6 +5,7 @@ import type {
   ProjectTrigger,
   ProjectWorkflow
 } from "../../shared/domain/automation.js";
+import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
 import type { ProjectRuntime } from "../../shared/domain/runtime.js";
 import {
   generatedPolicyId,
@@ -12,7 +13,6 @@ import {
   normalizePolicyToken,
   policyActionTokens
 } from "../../shared/policy-actions.js";
-import { defaultProjectAutomationConfig } from "./defaultConfig.js";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);

@@ -9,9 +9,9 @@ import {
   projectDocumentCreateSchema,
   projectDocumentSaveSchema,
   type MutableCollectionName
-} from "../validation/workspaceSchemas.js";
+} from "../validation/schemas.js";
 import { HttpValidationError, parseBody, parseParams } from "../validation/httpValidation.js";
-import { workspaceService } from "../../services/workspaceService.js";
+import { store } from "../../store.js";
 import type { CollectionName } from "../../../shared/api/workspaceData.js";
 
 const assertReadableCollection = (collection: string): CollectionName => {
@@ -28,13 +28,18 @@ const assertMutableCollection = (collection: string): MutableCollectionName => {
   return collection as MutableCollectionName;
 };
 
+const saveStoreCollectionItem = <T extends MutableCollectionName>(
+  collection: T,
+  item: Record<string, unknown> & { id?: string }
+) => store.upsert(collection, item as Parameters<typeof store.upsert<T>>[1]);
+
 export const health: RequestHandler = (_req, res) => {
   res.json({ ok: true });
 };
 
 export const getData: RequestHandler = async (_req, res, next) => {
   try {
-    res.json(await workspaceService.readData());
+    res.json(await store.read());
   } catch (error) {
     next(error);
   }
@@ -42,7 +47,7 @@ export const getData: RequestHandler = async (_req, res, next) => {
 
 export const resetData: RequestHandler = async (_req, res, next) => {
   try {
-    res.json(await workspaceService.resetData());
+    res.json(await store.reset());
   } catch (error) {
     next(error);
   }
@@ -50,7 +55,7 @@ export const resetData: RequestHandler = async (_req, res, next) => {
 
 export const saveProjectDocument: RequestHandler = async (req, res, next) => {
   try {
-    res.json(await workspaceService.saveProjectDocument(parseBody(projectDocumentSaveSchema, req)));
+    res.json(await store.saveProjectDocument(parseBody(projectDocumentSaveSchema, req)));
   } catch (error) {
     next(error);
   }
@@ -58,7 +63,7 @@ export const saveProjectDocument: RequestHandler = async (req, res, next) => {
 
 export const createProjectDocument: RequestHandler = async (req, res, next) => {
   try {
-    res.status(201).json(await workspaceService.createProjectDocument(parseBody(projectDocumentCreateSchema, req)));
+    res.status(201).json(await store.createProjectDocument(parseBody(projectDocumentCreateSchema, req)));
   } catch (error) {
     next(error);
   }
@@ -68,7 +73,7 @@ export const listCollection: RequestHandler = async (req, res, next) => {
   try {
     const { collection: rawCollection } = parseParams(collectionParamsSchema, req);
     const collection = assertReadableCollection(rawCollection);
-    res.json(await workspaceService.listCollection(collection));
+    res.json(await store.list(collection));
   } catch (error) {
     next(error);
   }
@@ -79,7 +84,7 @@ export const saveCollectionItem: RequestHandler = async (req, res, next) => {
     const { collection: rawCollection } = parseParams(mutableCollectionParamsSchema, req);
     const collection = assertMutableCollection(rawCollection);
     const item = parseBody(collectionUpsertSchema(collection), req);
-    const saved = await workspaceService.saveCollectionItem(collection, item);
+    const saved = await saveStoreCollectionItem(collection, item);
     res.status(item.id ? 200 : 201).json(saved);
   } catch (error) {
     next(error);
@@ -90,7 +95,7 @@ export const removeCollectionItem: RequestHandler = async (req, res, next) => {
   try {
     const { collection: rawCollection, id } = parseParams(collectionItemParamsSchema, req);
     const collection = assertMutableCollection(rawCollection);
-    await workspaceService.removeCollectionItem(collection, id);
+    await store.remove(collection, id);
     res.status(204).end();
   } catch (error) {
     next(error);

@@ -19,52 +19,33 @@ import type {
 import type { EventDefinition, EventRecord } from "../domain/events.js";
 import type { AgentRun, ProjectRuntime, Runtime } from "../domain/runtime.js";
 
-export type AgentDto = Agent;
-export type AdrDto = Adr;
-export type EventDefinitionDto = EventDefinition;
 export type EventIntakeRequest = Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">;
-export type EventRecordDto = EventRecord;
-export type GoalDto = Goal;
-export type MarkdownDocumentDto = MarkdownDocument;
-export type PolicyDto = Policy;
-export type ProjectActionDto = ProjectAction;
-export type ProjectAutomationConfigDto = ProjectAutomationConfig;
-export type ProjectAutomationIssueDto = ProjectAutomationIssue;
 export type ProjectDocumentCreateRequest = { directoryPath: string; title: string };
 export type ProjectDocumentSaveRequest = Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">;
-export type ProjectDocumentTreeNodeDto = ProjectDocumentTreeNode;
-export type ProjectDto = Project;
-export type ProjectPolicyDto = ProjectPolicy;
-export type ProjectRuntimeDto = ProjectRuntime;
-export type ProjectTriggerDto = ProjectTrigger;
-export type ProjectWorkflowDto = ProjectWorkflow;
-export type RuntimeDto = Runtime;
-export type RunDto = AgentRun;
-export type SkillDto = Skill;
 
 export interface WorkspaceDataDto {
-  projects: ProjectDto[];
-  goals: GoalDto[];
-  adrs: AdrDto[];
-  agents: AgentDto[];
-  skills: SkillDto[];
-  runtimes: RuntimeDto[];
-  policies: PolicyDto[];
-  eventDefinitions: EventDefinitionDto[];
-  events: EventRecordDto[];
-  agentRuns: RunDto[];
-  automation: ProjectAutomationConfigDto;
-  automationIssues: ProjectAutomationIssueDto[];
-  projectDocumentTree?: ProjectDocumentTreeNodeDto[];
+  projects: Project[];
+  goals: Goal[];
+  adrs: Adr[];
+  agents: Agent[];
+  skills: Skill[];
+  runtimes: Runtime[];
+  policies: Policy[];
+  eventDefinitions: EventDefinition[];
+  events: EventRecord[];
+  agentRuns: AgentRun[];
+  automation: ProjectAutomationConfig;
+  automationIssues: ProjectAutomationIssue[];
+  projectDocumentTree?: ProjectDocumentTreeNode[];
   documents?: {
-    project: MarkdownDocumentDto[];
-    goals: MarkdownDocumentDto[];
-    adr: MarkdownDocumentDto[];
-    agents: MarkdownDocumentDto[];
-    skills: MarkdownDocumentDto[];
-    runtimes: MarkdownDocumentDto[];
-    events: MarkdownDocumentDto[];
-    policies: MarkdownDocumentDto[];
+    project: MarkdownDocument[];
+    goals: MarkdownDocument[];
+    adr: MarkdownDocument[];
+    agents: MarkdownDocument[];
+    skills: MarkdownDocument[];
+    runtimes: MarkdownDocument[];
+    events: MarkdownDocument[];
+    policies: MarkdownDocument[];
   };
   projectRoot?: string;
 }
@@ -72,8 +53,8 @@ export interface WorkspaceDataDto {
 export type WorkspaceCollectionName = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
 
 export type WorkspaceAutomationResponseDto = {
-  config: ProjectAutomationConfigDto;
-  issues: ProjectAutomationIssueDto[];
+  config: ProjectAutomationConfig;
+  issues: ProjectAutomationIssue[];
 };
 
 export type WorkspaceSaveRequestByCollection = {
@@ -86,6 +67,8 @@ export type WorkspaceSaveResponseByCollection = {
 
 export type AppData = WorkspaceDataDto;
 export type CollectionName = WorkspaceCollectionName;
+
+export { defaultProjectAutomationConfig } from "../domain/automation.js";
 
 export type {
   Agent,

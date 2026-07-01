@@ -1,4 +1,4 @@
-export { defaultProjectAutomationConfig } from "./automation/defaultConfig.js";
+export { defaultProjectAutomationConfig } from "../shared/domain/automation.js";
 export { normalizeProjectAutomationConfig } from "./automation/normalizeAutomationConfig.js";
 export { AutomationValidationError, validateProjectAutomationConfig } from "./automation/validateAutomationConfig.js";
 export {
