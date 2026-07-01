@@ -45,7 +45,7 @@ import type {
   Runtime,
   Skill
 } from "../../backend/shared/domain";
-import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyEventTypesForAgentsAndActions, policyOutputEventType, policyOutputEventTypes, preferredAgentToken } from "../../backend/shared/policy-actions";
+import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyOutputEventType, policyOutputEventTypes, preferredAgentToken } from "../../backend/shared/policy-actions";
 import { seedData } from "../../backend/shared/seed";
 import { api } from "./api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -211,12 +211,6 @@ const uniqueAutomationId = (base: string, ids: string[]) => {
   }
   return candidate;
 };
-
-const automationEventOptions = (agents: Agent[], actions: string[]) =>
-  policyEventTypesForAgentsAndActions(agents, actions).map((eventType) => ({
-    value: eventType,
-    label: `${eventType} · output`
-  }));
 
 const automationAgentOptions = (agents: Agent[]) => {
   const used = new Set<string>();
@@ -1743,13 +1737,10 @@ function WorkflowsAutomationTab({
   const [editingPolicyIndex, setEditingPolicyIndex] = useState<number | null>(null);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
-  const actionIds = config.actions.map((action) => action.id).filter(Boolean);
   const actionOptions = [
     { value: noSelection, label: "No action" },
     ...config.actions.map((action) => ({ value: action.id, label: action.description ? `${action.id} · ${action.description}` : action.id }))
   ];
-  const eventOptions = [{ value: noSelection, label: "No event" }, ...automationEventOptions(data.agents, actionIds)];
-  const triggerOptions = [{ value: noSelection, label: "No trigger" }, ...config.triggers.map((trigger) => ({ value: trigger.id, label: trigger.id }))];
   const agentOptions = [{ value: noSelection, label: "No agent" }, ...automationAgentOptions(data.agents)];
   const defaultAgent = data.agents[0] ? preferredAgentToken(data.agents[0]) : "";
   const defaultAction = config.actions[0]?.id ?? "";
@@ -1836,20 +1827,6 @@ function WorkflowsAutomationTab({
         steps: workflow.steps.map((step) => step === selectedPolicy.id ? nextId : step)
       }))
     }));
-  };
-
-  const updateWorkflowPolicySource = (record: typeof workflowStepRecords[number], source: ProjectPolicy["source"]) => {
-    updateWorkflowPolicy(record, source === "trigger"
-      ? {
-        source,
-        event: undefined,
-        trigger: record.policy?.trigger || config.triggers[0]?.id || ""
-      }
-      : {
-        source,
-        event: record.policy?.event || eventOptions[1]?.value || "",
-        trigger: undefined
-      });
   };
 
   const saveWorkflowPolicyEdit = async () => {
@@ -2042,13 +2019,8 @@ function WorkflowsAutomationTab({
           <WorkflowPolicySummary
             policy={record.policy}
             editing={isEditingPolicy}
-            eventOptions={eventOptions}
-            triggerOptions={triggerOptions}
             agentOptions={agentOptions}
             actionOptions={actionOptions}
-            onSourceChange={(source) => updateWorkflowPolicySource(record, source)}
-            onEventChange={(event) => updateWorkflowPolicy(record, { event: event === noSelection ? "" : event })}
-            onTriggerChange={(trigger) => updateWorkflowPolicy(record, { trigger: trigger === noSelection ? "" : trigger })}
             onAgentChange={(agent) => updateWorkflowPolicy(record, { agent: agent === noSelection ? "" : agent })}
             onActionChange={(action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action })}
           />
@@ -2336,84 +2308,31 @@ function WorkflowCanvasEdgePath({ edge }: { edge: WorkflowCanvasEdge }) {
 function WorkflowPolicySummary({
   policy,
   editing,
-  eventOptions,
-  triggerOptions,
   agentOptions,
   actionOptions,
-  onSourceChange,
-  onEventChange,
-  onTriggerChange,
   onAgentChange,
   onActionChange
 }: {
   policy: ProjectPolicy;
   editing: boolean;
-  eventOptions: Array<{ value: string; label: string }>;
-  triggerOptions: Array<{ value: string; label: string }>;
   agentOptions: Array<{ value: string; label: string }>;
   actionOptions: Array<{ value: string; label: string }>;
-  onSourceChange: (source: ProjectPolicy["source"]) => void;
-  onEventChange: (event: string) => void;
-  onTriggerChange: (trigger: string) => void;
   onAgentChange: (agent: string) => void;
   onActionChange: (action: string) => void;
 }) {
   const sourceValue = policy.source === "trigger" ? policy.trigger : policy.event;
   const editSelectClass = "h-5 min-h-5 max-h-5 w-full min-w-0 max-w-full flex-1 cursor-pointer rounded border border-input bg-background px-1.5 py-0 font-mono text-[0.62rem] leading-4 outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40";
   const stopCanvasPointerEvent = (event: PointerEvent<HTMLSelectElement>) => event.stopPropagation();
-  const sourceOptions: Array<{ value: ProjectPolicy["source"]; label: string }> = [
-    { value: "event", label: "Event" },
-    { value: "trigger", label: "Trigger" }
-  ];
-  const selectedSourceOptions = policy.source === "trigger" ? triggerOptions : eventOptions;
-  const selectedSourceValue = policy.source === "trigger" ? policy.trigger || noSelection : policy.event || noSelection;
-  const selectedSourceLabel = policy.source === "trigger" ? "Workflow policy trigger" : "Workflow policy event";
 
   return (
     <div className="grid min-w-0 gap-1 font-mono text-[0.62rem] leading-4">
       <div className="flex min-w-0 gap-1">
         <span className="shrink-0 text-foreground">type:</span>
-        {editing ? (
-          <select
-            aria-label="Workflow policy source"
-            className={cn(editSelectClass, "text-primary")}
-            title={policy.source || "event"}
-            value={policy.source ?? "event"}
-            onChange={(event) => onSourceChange(event.target.value === "trigger" ? "trigger" : "event")}
-            onPointerDown={stopCanvasPointerEvent}
-            onPointerMove={stopCanvasPointerEvent}
-            onPointerUp={stopCanvasPointerEvent}
-            onDragStart={(event) => event.stopPropagation()}
-          >
-            {sourceOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="truncate text-primary" title={policy.source || "event"}>{policy.source || "event"}</span>
-        )}
+        <span className="truncate text-primary" title={policy.source || "event"}>{policy.source || "event"}</span>
       </div>
       <div className="flex min-w-0 items-center gap-1">
         <span className="shrink-0 text-foreground">on:</span>
-        {editing ? (
-          <select
-            aria-label={selectedSourceLabel}
-            className={cn(editSelectClass, "text-primary")}
-            title={sourceValue || "Missing source"}
-            value={selectedSourceValue}
-            onChange={(event) => policy.source === "trigger" ? onTriggerChange(event.target.value) : onEventChange(event.target.value)}
-            onPointerDown={stopCanvasPointerEvent}
-            onPointerMove={stopCanvasPointerEvent}
-            onPointerUp={stopCanvasPointerEvent}
-            onDragStart={(event) => event.stopPropagation()}
-          >
-            {selectedSourceOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="truncate text-primary" title={sourceValue || "Missing source"}>{sourceValue || "Missing source"}</span>
-        )}
+        <span className="truncate text-primary" title={sourceValue || "Missing source"}>{sourceValue || "Missing source"}</span>
       </div>
       <div className="flex min-w-0 items-center gap-1">
         <span className="shrink-0 text-foreground">then:</span>

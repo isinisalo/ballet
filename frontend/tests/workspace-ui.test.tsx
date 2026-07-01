@@ -348,7 +348,7 @@ describe("workspace entity UI flows", () => {
     }
   });
 
-  it("defaults automation to workflows and edits policy events from the canvas", async () => {
+  it("defaults automation to workflows and locks policy input fields on the canvas", async () => {
     const user = userEvent.setup();
     const { data, fetchMock } = await renderRoute("/automation");
 
@@ -372,15 +372,23 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Edit workflow policy" }));
-    await user.selectOptions(screen.getByLabelText("Workflow policy event"), "existing.implementation.blocked");
+    expect(screen.queryByLabelText("Workflow policy source")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Workflow policy event")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Workflow policy trigger")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Workflow policy agent")).toBeInTheDocument();
+    expect(screen.getByLabelText("Workflow policy action")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save workflow policy" }));
-    expect(screen.getByLabelText("Policy: on.existing.implementation.blocked.then.existing.start.implementation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
 
     await waitFor(() => expect(data.automation).not.toHaveProperty("events"));
-    expect(data.automation.policies[0]?.event).toBe("existing.implementation.blocked");
+    expect(data.automation.policies[0]).toMatchObject({
+      source: "event",
+      event: "existing.implementation.failed",
+      id: "on.existing.implementation.failed.then.existing.start.implementation"
+    });
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
-      body: expect.stringContaining("\"steps\":[\"on.existing.implementation.blocked.then.existing.start.implementation\"]")
+      body: expect.stringContaining("\"steps\":[\"on.existing.implementation.failed.then.existing.start.implementation\"]")
     }));
   });
 
@@ -522,26 +530,56 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => expect(data.automation.triggers.some((trigger) => trigger.id === "release-ready")).toBe(false));
   });
 
-  it("switches a policy from event source to trigger source and updates workflow references", async () => {
+  it("creates a policy from a ghost event and keeps its input event read-only", async () => {
     const user = userEvent.setup();
-    const { data } = await renderRoute("/automation/policies");
+    const workflowData = baseData();
+    workflowData.agents.push({
+      id: "agent-2",
+      name: "Review Agent",
+      description: "Reviews work",
+      instructions: "Review work",
+      skills: [],
+      enabled: true,
+      status: "online",
+      createdAt: now,
+      updatedAt: now,
+      relativePath: ".codex/agents/review-agent.toml",
+      frontmatter: { runtime: "runtime-1" }
+    });
+    workflowData.automation.actions.push({
+      id: "review-pass",
+      description: "Review output"
+    });
+    const { data } = await renderRoute("/automation/policies", workflowData);
 
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /workflows/i })).toHaveAttribute("aria-selected", "true");
 
-    await user.click(screen.getByRole("button", { name: "Edit workflow policy" }));
-    await user.selectOptions(screen.getByLabelText("Workflow policy source"), "trigger");
-    expect(screen.getByLabelText("Workflow policy trigger")).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText("Workflow policy trigger"), "manual-start");
-    await user.click(screen.getByRole("button", { name: "Save workflow policy" }));
-    expect(screen.getByLabelText("Policy: on.trigger.manual-start.then.existing.start.implementation")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add policy step for existing.implementation.complete" }));
+    expect(screen.getByLabelText("Policy: on.existing.implementation.complete.then.existing.start.implementation")).toBeInTheDocument();
 
-    await waitFor(() => expect(data.automation.policies[0]).toMatchObject({
-      source: "trigger",
-      trigger: "manual-start",
-      id: "on.trigger.manual-start.then.existing.start.implementation"
-    }));
-    expect(data.automation.workflows[0]?.steps).toEqual(["on.trigger.manual-start.then.existing.start.implementation"]);
+    const editButtons = screen.getAllByRole("button", { name: "Edit workflow policy" });
+    await user.click(editButtons[1]!);
+    expect(screen.queryByLabelText("Workflow policy source")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Workflow policy event")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Workflow policy trigger")).not.toBeInTheDocument();
+    expect(screen.getAllByText("existing.implementation.complete").length).toBeGreaterThan(0);
+    await user.selectOptions(screen.getByLabelText("Workflow policy agent"), "review");
+    await user.selectOptions(screen.getByLabelText("Workflow policy action"), "review-pass");
+    await user.click(screen.getByRole("button", { name: "Save workflow policy" }));
+    expect(screen.getByLabelText("Policy: on.existing.implementation.complete.then.review.start.review-pass")).toBeInTheDocument();
+
+    await waitFor(() => expect(data.automation.policies).toContainEqual(expect.objectContaining({
+      source: "event",
+      event: "existing.implementation.complete",
+      agent: "review",
+      action: "review-pass",
+      id: "on.existing.implementation.complete.then.review.start.review-pass"
+    })));
+    expect(data.automation.workflows[0]?.steps).toEqual([
+      "on.existing.implementation.failed.then.existing.start.implementation",
+      "on.existing.implementation.complete.then.review.start.review-pass"
+    ]);
   });
 
   it("routes legacy policies paths to workflow configuration", async () => {
