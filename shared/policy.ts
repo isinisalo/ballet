@@ -1,11 +1,11 @@
 import type {
-  Agent,
-  EventRecord,
   Policy,
   PolicyPredicate,
   PolicyPredicateScalar,
   RouteDecision
-} from "./domain.js";
+} from "./domain/automation.js";
+import type { Agent } from "./domain/agents.js";
+import type { EventRecord } from "./domain/events.js";
 
 const textMatches = (ruleValue: string, actualValue: string): boolean => {
   if (!ruleValue || ruleValue === "*") return true;

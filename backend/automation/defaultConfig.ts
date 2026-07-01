@@ -1,4 +1,4 @@
-import type { ProjectAutomationConfig } from "../../shared/domain.js";
+import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: 1,

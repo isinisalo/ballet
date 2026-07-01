@@ -1,4 +1,7 @@
-import type { CollectionName, EventRecord, MarkdownDocument, ProjectAutomationConfig } from "../../../shared/domain.js";
+import type { CollectionName } from "../../../shared/api/workspaceData.js";
+import type { ProjectAutomationConfig } from "../../../shared/domain/automation.js";
+import type { MarkdownDocument } from "../../../shared/domain/documents.js";
+import type { EventRecord } from "../../../shared/domain/events.js";
 
 const collections: CollectionName[] = ["projects", "goals", "adrs", "agents", "skills"];
 const collectionSet = new Set(collections);

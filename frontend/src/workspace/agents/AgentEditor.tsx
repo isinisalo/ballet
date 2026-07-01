@@ -1,5 +1,6 @@
 import { Bot, ChartNoAxesColumnIncreasing } from "lucide-react";
-import type { Agent, Runtime } from "../../../../shared/domain";
+import type { Agent } from "../../../../shared/domain/agents";
+import type { Runtime } from "../../../../shared/domain/runtime";
 import { CrudActions, ErrorPreview, Panel, TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";

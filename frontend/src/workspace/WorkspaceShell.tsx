@@ -11,15 +11,17 @@ import {
   Save
 } from "lucide-react";
 import type {
-  Adr,
-  Agent,
   AppData,
+} from "../../../shared/api/workspaceData";
+import type { Agent } from "../../../shared/domain/agents";
+import type { ProjectAutomationConfig } from "../../../shared/domain/automation";
+import type {
+  Adr,
   Goal,
   MarkdownDocument,
-  Project,
-  ProjectAutomationConfig,
-  Runtime
-} from "../../../shared/domain";
+  Project
+} from "../../../shared/domain/documents";
+import type { Runtime } from "../../../shared/domain/runtime";
 import { seedData } from "../../../shared/seed";
 import { api } from "../api";
 import { frontmatterToYaml, parseFrontmatterYaml } from "./documents/frontmatter";

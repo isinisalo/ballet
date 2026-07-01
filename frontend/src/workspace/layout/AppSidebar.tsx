@@ -12,7 +12,10 @@ import {
   Zap,
   type LucideIcon
 } from "lucide-react";
-import type { Agent, ProjectAutomationConfig, ProjectDocumentTreeNode, ProjectRuntime, Skill } from "../../../../shared/domain";
+import type { Agent } from "../../../../shared/domain/agents";
+import type { ProjectAutomationConfig } from "../../../../shared/domain/automation";
+import type { ProjectDocumentTreeNode, Skill } from "../../../../shared/domain/documents";
+import type { ProjectRuntime } from "../../../../shared/domain/runtime";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sidebar as ShadcnSidebar,
@@ -676,4 +679,3 @@ export function AppSidebar({
     </ShadcnSidebar>
   );
 }
-

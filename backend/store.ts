@@ -1,4 +1,8 @@
-import type { AgentRunLog, AppData, CollectionName, EventRecord, MarkdownDocument, ProjectAutomationConfig } from "../shared/domain.js";
+import type { AppData, CollectionName } from "../shared/api/workspaceData.js";
+import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
+import type { MarkdownDocument } from "../shared/domain/documents.js";
+import type { EventRecord } from "../shared/domain/events.js";
+import type { AgentRunLog } from "../shared/domain/runtime.js";
 import { getProjectRoot } from "./markdown.js";
 import { createProjectMarkdownDocument, loadMarkdownAppData, removeEntityMarkdown, writeEntityMarkdown, writeProjectMarkdownDocument } from "./markdown-adapter.js";
 import { RuntimeDatabase, resolveRuntimeDbPath } from "./runtime-db.js";

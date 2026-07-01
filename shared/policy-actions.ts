@@ -1,4 +1,5 @@
-import type { Agent, ProjectPolicy } from "./domain.js";
+import type { Agent } from "./domain/agents.js";
+import type { ProjectPolicy } from "./domain/automation.js";
 
 export const policyOutputStatuses = ["complete", "cancelled", "blocked", "failed"] as const;
 export type PolicyOutputStatus = typeof policyOutputStatuses[number];

@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import type { Agent, Runtime } from "../../../../shared/domain";
+import type { Agent } from "../../../../shared/domain/agents";
+import type { Runtime } from "../../../../shared/domain/runtime";
 import { agentTemplate, codexModelOptions, reasoningEffortOptions } from "./agentOptions";
 
 export type SaveAgent = (collection: "agents", item: Partial<Agent>) => Promise<Agent>;

@@ -1,6 +1,8 @@
 import path from "node:path";
 import { mkdir, stat, unlink } from "node:fs/promises";
-import type { Adr, AdrStatus, Agent, AgentStatus, AppData, EntityStatus, Goal, MarkdownDocument, Project, Skill } from "../shared/domain.js";
+import type { AppData } from "../shared/api/workspaceData.js";
+import type { Agent, AgentStatus } from "../shared/domain/agents.js";
+import type { Adr, AdrStatus, EntityStatus, Goal, MarkdownDocument, Project, Skill } from "../shared/domain/documents.js";
 import { defaultProjectAutomationConfig } from "./automation.js";
 import { assertInsideRoot, loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadGoals, loadSkills, readMarkdownDocument, safeSlug, writeMarkdownDocument, writeTomlDocument } from "./markdown.js";
 

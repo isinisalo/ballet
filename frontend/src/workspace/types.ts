@@ -1,4 +1,4 @@
-import type { AppData } from "../../../shared/domain";
+import type { AppData } from "../../../shared/api/workspaceData";
 
 export type View =
   | "projects"

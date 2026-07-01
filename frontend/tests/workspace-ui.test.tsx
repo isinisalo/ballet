@@ -1,7 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Agent, AppData, ProjectAutomationConfig } from "../../shared/domain";
+import type { AppData } from "../../shared/api/workspaceData";
+import type { Agent } from "../../shared/domain/agents";
+import type { ProjectAutomationConfig } from "../../shared/domain/automation";
 import { policyOutputEventTypes } from "../../shared/policy-actions";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 

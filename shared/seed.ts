@@ -1,4 +1,4 @@
-import type { AppData } from "./domain.js";
+import type { AppData } from "./api/workspaceData.js";
 
 const now = "2026-06-23T08:00:00.000Z";
 

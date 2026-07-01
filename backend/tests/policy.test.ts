@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Agent, EventRecord, Policy } from "../../shared/domain.js";
+import type { Agent } from "../../shared/domain/agents.js";
+import type { Policy } from "../../shared/domain/automation.js";
+import type { EventRecord } from "../../shared/domain/events.js";
 import { policyMatchesEvent, policyVersion, routeEvent } from "../../shared/policy.js";
 
 const event: EventRecord = {

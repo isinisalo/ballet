@@ -1,4 +1,5 @@
-import type { Agent, ProjectAutomationConfig, ProjectPolicy } from "../../../../shared/domain";
+import type { Agent } from "../../../../shared/domain/agents";
+import type { ProjectAutomationConfig, ProjectPolicy } from "../../../../shared/domain/automation";
 import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, preferredAgentToken } from "../../../../shared/policy-actions";
 
 export const automationConfigTemplate = (): ProjectAutomationConfig => ({

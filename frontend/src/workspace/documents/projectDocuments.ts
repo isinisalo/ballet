@@ -1,4 +1,4 @@
-import type { MarkdownDocument, ProjectDocumentTreeNode } from "../../../../shared/domain";
+import type { MarkdownDocument, ProjectDocumentTreeNode } from "../../../../shared/domain/documents";
 import type { ProjectDocumentCreateKind } from "../types";
 
 export const projectTreeContainsPath = (nodes: ProjectDocumentTreeNode[], relativePath?: string): boolean =>

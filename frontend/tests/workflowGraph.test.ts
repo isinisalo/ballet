@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectPolicy } from "../../shared/domain";
+import type { ProjectPolicy } from "../../shared/domain/automation";
 import { buildWorkflowGraph, workflowOutputEvents, workflowTriggerLabel } from "../src/workspace/automation/workflows/workflowGraph";
 import { workflowConnectorPath } from "../src/workspace/automation/workflows/workflowLayout";
 

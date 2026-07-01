@@ -1,4 +1,6 @@
-import type { CollectionName, MarkdownDocument, ProjectAutomationConfig } from "../../shared/domain.js";
+import type { CollectionName } from "../../shared/api/workspaceData.js";
+import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import type { MarkdownDocument } from "../../shared/domain/documents.js";
 import { store } from "../store.js";
 
 export const workspaceService = {

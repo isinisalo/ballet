@@ -1,4 +1,4 @@
-import type { Adr, Goal, MarkdownDocument, Project, Skill } from "../../../../shared/domain";
+import type { Adr, Goal, MarkdownDocument, Project, Skill } from "../../../../shared/domain/documents";
 
 export type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skill, "id" | "frontmatter" | "body" | "relativePath" | "errors"> & {
   createdAt?: string;

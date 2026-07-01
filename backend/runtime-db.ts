@@ -3,7 +3,10 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { v4 as uuid } from "uuid";
-import type { Agent, AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus, EventRecord, EventRoutingSummary, EventStatus, Policy, RouteDecision, RuntimeEvent } from "../shared/domain.js";
+import type { Agent } from "../shared/domain/agents.js";
+import type { EventRoutingSummary, Policy, RouteDecision } from "../shared/domain/automation.js";
+import type { EventRecord, EventStatus, RuntimeEvent } from "../shared/domain/events.js";
+import type { AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus } from "../shared/domain/runtime.js";
 import { routeEvent } from "../shared/policy.js";
 import { resolveRuntimeDbPath } from "./runtime/runtimeDbPath.js";
 

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiRouter } from "../routes.js";
 import { store } from "../store.js";
 import { notifyRuntimeChanged } from "../runtime-events.js";
-import type { AgentRun, AgentRunLog } from "../../shared/domain.js";
+import type { AgentRun, AgentRunLog } from "../../shared/domain/runtime.js";
 
 const listen = async (app: express.Express): Promise<{ server: Server; url: string }> => {
   const server = createServer(app);

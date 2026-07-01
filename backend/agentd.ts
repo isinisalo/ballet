@@ -1,6 +1,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Agent, AgentOutcome, AgentOutputEventStatus, AgentRun, AppData, RuntimeEvent } from "../shared/domain.js";
+import type { AppData } from "../shared/api/workspaceData.js";
+import type { Agent } from "../shared/domain/agents.js";
+import type { RuntimeEvent } from "../shared/domain/events.js";
+import type { AgentOutcome, AgentOutputEventStatus, AgentRun } from "../shared/domain/runtime.js";
 import { store } from "./store.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 import { runCodexAgent } from "./codex-adapter.js";

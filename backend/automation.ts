@@ -1,20 +1,17 @@
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type {
-  Agent,
-  AgentRunOutput,
-  EventDefinition,
   ProjectAction,
   Policy,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectPolicy,
-  ProjectRuntime,
   ProjectTrigger,
-  ProjectWorkflow,
-  RoutedEvent,
-  Runtime
-} from "../shared/domain.js";
+  ProjectWorkflow
+} from "../shared/domain/automation.js";
+import type { Agent } from "../shared/domain/agents.js";
+import type { EventDefinition, RoutedEvent } from "../shared/domain/events.js";
+import type { AgentRunOutput, ProjectRuntime, Runtime } from "../shared/domain/runtime.js";
 import {
   agentTokenCandidates,
   generatedPolicyId,

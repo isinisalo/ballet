@@ -3,7 +3,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, AgentOutcomeStatus } from "../../shared/domain.js";
+import type { Agent } from "../../shared/domain/agents.js";
+import type { AgentOutcomeStatus } from "../../shared/domain/runtime.js";
 import { runCodexAgent } from "../codex-adapter.js";
 
 const tempRoots: string[] = [];

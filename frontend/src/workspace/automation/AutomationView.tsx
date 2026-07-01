@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Activity, Code2, Pencil, Plus, Route, Save, Trash2, Zap, type LucideIcon } from "lucide-react";
+import type { AppData } from "../../../../shared/api/workspaceData";
+import type { Agent } from "../../../../shared/domain/agents";
 import type {
-  Agent,
-  AppData,
   ProjectAction,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectPolicy,
-  ProjectRuntime,
   ProjectTrigger,
   ProjectWorkflow
-} from "../../../../shared/domain";
+} from "../../../../shared/domain/automation";
+import type { ProjectRuntime } from "../../../../shared/domain/runtime";
 import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, policyOutputEventType, policyOutputEventTypes, preferredAgentToken } from "../../../../shared/policy-actions";
 import { HeaderCrudActions, EmptyState, Panel, TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -1169,4 +1169,3 @@ function RuntimesEditor({
 function TrashButtonIcon() {
   return <Trash2 data-icon="inline-start" />;
 }
-

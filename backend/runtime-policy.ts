@@ -1,4 +1,4 @@
-import type { AgentOutcome, AgentRunStatus, RunCheck } from "../shared/domain.js";
+import type { AgentOutcome, AgentRunStatus, RunCheck } from "../shared/domain/runtime.js";
 
 export const agentOutcomeSchema = {
   type: "object",
