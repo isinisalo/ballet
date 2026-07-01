@@ -15,6 +15,11 @@ export interface ProjectAction {
   description: string;
 }
 
+export interface ProjectOutput {
+  id: string;
+  description: string;
+}
+
 export interface ProjectPolicy {
   id: string;
   source: "event" | "trigger";
@@ -35,6 +40,7 @@ export interface ProjectAutomationConfig {
   version: 1;
   triggers: ProjectTrigger[];
   actions: ProjectAction[];
+  outputs: ProjectOutput[];
   policies: ProjectPolicy[];
   workflows: ProjectWorkflow[];
   runtimes: ProjectRuntime[];
@@ -44,6 +50,7 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: 1,
   triggers: [],
   actions: [],
+  outputs: [],
   policies: [],
   workflows: [],
   runtimes: []

@@ -123,6 +123,11 @@ const projectActionSchema = z.object({
   description: z.string()
 }).strict();
 
+const projectOutputSchema = z.object({
+  id: z.string(),
+  description: z.string()
+}).strict();
+
 const projectPolicySchema = z.object({
   id: z.string(),
   source: z.enum(["event", "trigger"]),
@@ -150,6 +155,7 @@ export const automationConfigSchema = z.object({
   version: z.literal(1),
   triggers: z.array(projectTriggerSchema),
   actions: z.array(projectActionSchema),
+  outputs: z.array(projectOutputSchema),
   policies: z.array(projectPolicySchema),
   workflows: z.array(projectWorkflowSchema),
   runtimes: z.array(projectRuntimeSchema)

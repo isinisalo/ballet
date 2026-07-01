@@ -23,6 +23,7 @@ interface ValidationContext {
   input: RawAutomationConfig;
   rawTriggers: unknown[];
   rawActions: unknown[];
+  rawOutputs: unknown[];
   rawPolicies: unknown[];
   rawWorkflows: unknown[];
   rawRuntimes: unknown[];
@@ -70,8 +71,8 @@ const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: stri
 };
 
 const requireAutomationArrays = (input: RawAutomationConfig, issues: ProjectAutomationIssue[]) => {
-  for (const key of ["triggers", "actions", "policies", "workflows", "runtimes"] as const) {
-    if ((key === "triggers" || key === "actions") && input[key] === undefined) continue;
+  for (const key of ["triggers", "actions", "outputs", "policies", "workflows", "runtimes"] as const) {
+    if ((key === "triggers" || key === "actions" || key === "outputs") && input[key] === undefined) continue;
     if (!Array.isArray(input[key])) issues.push({ path: key, message: `${key} must be an array.` });
   }
 };
@@ -91,6 +92,7 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
   addUniqueIssues(issues, policyIds, "policy");
   addUniqueIssues(issues, normalized.triggers.map((trigger, index) => ({ id: trigger.id, path: `triggers[${index}].id` })), "trigger");
   addUniqueIssues(issues, normalized.actions.map((action, index) => ({ id: action.id, path: `actions[${index}].id` })), "action");
+  addUniqueIssues(issues, normalized.outputs.map((output, index) => ({ id: output.id, path: `outputs[${index}].id` })), "output");
   addUniqueIssues(issues, runtimeIds, "runtime");
   addUniqueIssues(issues, workflowIds, "workflow");
 };
@@ -107,6 +109,7 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     input,
     rawTriggers: Array.isArray(input.triggers) ? input.triggers : [],
     rawActions: Array.isArray(input.actions) ? input.actions : [],
+    rawOutputs: Array.isArray(input.outputs) ? input.outputs : [],
     rawPolicies,
     rawWorkflows: Array.isArray(input.workflows) ? input.workflows : [],
     rawRuntimes: Array.isArray(input.runtimes) ? input.runtimes : [],
@@ -138,6 +141,18 @@ const validateAction = (action: unknown, index: number, issues: ProjectAutomatio
   addRequiredStringIssue(issues, `${base}.id`, action.id, "Action id");
   if (action.description !== undefined && typeof action.description !== "string") {
     issues.push({ path: `${base}.description`, message: "Action description must be a string." });
+  }
+};
+
+const validateOutput = (output: unknown, index: number, issues: ProjectAutomationIssue[]) => {
+  const base = `outputs[${index}]`;
+  if (!isRecord(output)) {
+    issues.push({ path: base, message: "Output must be an object." });
+    return;
+  }
+  addRequiredStringIssue(issues, `${base}.id`, output.id, "Output id");
+  if (output.description !== undefined && typeof output.description !== "string") {
+    issues.push({ path: `${base}.description`, message: "Output description must be a string." });
   }
 };
 
@@ -295,6 +310,7 @@ export const validateProjectAutomationConfig = (
   collectIdentityIssues(context, issues);
   context.rawTriggers.forEach((trigger, index) => validateTrigger(trigger, index, issues));
   context.rawActions.forEach((action, index) => validateAction(action, index, issues));
+  context.rawOutputs.forEach((output, index) => validateOutput(output, index, issues));
   context.rawPolicies.forEach((policy, index) => validatePolicy(policy, index, context, issues));
   context.rawRuntimes.forEach((runtime, index) => validateRuntime(runtime, index, issues));
   context.rawWorkflows.forEach((workflow, index) => validateWorkflow(workflow, index, context, issues));

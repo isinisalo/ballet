@@ -100,6 +100,10 @@ const baseData = (): AppData => ({
       id: "implementation",
       description: "Implement work"
     }],
+    outputs: [{
+      id: "summary",
+      description: "Summarize implementation output"
+    }],
     policies: [{
       id: "on.existing.implementation.failed.then.existing.start.implementation",
       source: "event",
@@ -593,6 +597,16 @@ describe("workspace entity UI flows", () => {
     expect(window.location.search).toBe("?id=implementation");
     expect(screen.getByDisplayValue("Implement work")).toBeInTheDocument();
 
+    let outputsToggle = screen.getByRole("link", { name: "Outputs" });
+    expect(outputsToggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(outputsToggle);
+    outputsToggle = screen.getByRole("link", { name: "Outputs" });
+    expect(outputsToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("link", { name: "summary" }));
+    expect(window.location.pathname).toBe("/automation/outputs");
+    expect(window.location.search).toBe("?id=summary");
+    expect(screen.getByDisplayValue("Summarize implementation output")).toBeInTheDocument();
+
     let triggersToggle = screen.getByRole("link", { name: "Triggers" });
     expect(triggersToggle).toHaveAttribute("aria-expanded", "false");
     await user.click(triggersToggle);
@@ -616,6 +630,17 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("link", { name: "workflow-1" }));
     expect(window.location.pathname).toBe("/automation/workflows");
     expect(window.location.search).toBe("?id=workflow-1");
+    expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
+  });
+
+  it("renders automation when loaded data is missing newer outputs field", async () => {
+    const legacyData = baseData();
+    delete (legacyData.automation as Partial<ProjectAutomationConfig>).outputs;
+
+    await renderRoute("/automation", legacyData);
+
+    expect(screen.getByRole("link", { name: "Outputs" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Actions" })).toBeInTheDocument();
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
   });
 
@@ -692,6 +717,30 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => expect(data.automation.policies[0]?.action).toBe("review-pass"));
     expect(data.automation.policies[0]?.id).toBe("on.existing.implementation.failed.then.existing.start.review-pass");
     expect(data.automation.policies).toHaveLength(1);
+  });
+
+  it("creates, edits, deletes, and saves automation outputs", async () => {
+    const user = userEvent.setup();
+    const { data } = await renderRoute("/automation/outputs");
+
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Outputs" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Summarize implementation output")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add output" }));
+    await screen.findByDisplayValue("New output");
+    await user.clear(screen.getByLabelText("Output ID"));
+    await user.type(screen.getByLabelText("Output ID"), "review-notes");
+    await user.clear(screen.getByLabelText("Description"));
+    await user.type(screen.getByLabelText("Description"), "Review notes artifact");
+    expect(screen.getByLabelText("Output ID")).toHaveValue("review-notes");
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.outputs.some((output) => output.id === "review-notes" && output.description === "Review notes artifact")).toBe(true));
+
+    await confirmDelete(user, "Delete output");
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.outputs.some((output) => output.id === "review-notes")).toBe(false));
   });
 
   it("renames an automation action and rewrites derived policy events", async () => {

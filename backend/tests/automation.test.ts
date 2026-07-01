@@ -44,6 +44,12 @@ const validConfig = (): ProjectAutomationConfig => ({
       description: "Implement approved work."
     }
   ],
+  outputs: [
+    {
+      id: "summary",
+      description: "Summarized work output."
+    }
+  ],
   policies: [
     {
       id: "on.developer.implementation.failed.then.developer.start.implementation",
@@ -77,6 +83,7 @@ describe("project automation config", () => {
       version: 1,
       triggers: [],
       actions: [],
+      outputs: [],
       policies: [],
       workflows: [],
       runtimes: []
@@ -120,6 +127,7 @@ describe("project automation config", () => {
     const loaded = await loadProjectAutomationConfig(root, [agent]);
     expect(loaded).not.toHaveProperty("events");
     expect(loaded.actions).toEqual([{ id: "run", description: "" }]);
+    expect(loaded.outputs).toEqual([]);
     expect(loaded.policies[0]).toMatchObject({
       id: "on.developer.run.failed.then.developer.start.run",
       source: "event",
@@ -138,6 +146,7 @@ describe("project automation config", () => {
       version: 1,
       triggers: [],
       actions: [{ id: "implementation", description: "Implement approved work." }],
+      outputs: [],
       policies: [{
         id: "on.developer.implementation.failed.v1.then.developer.start.implementation",
         source: "event",
@@ -206,6 +215,21 @@ describe("project automation config", () => {
       runtimes: [{ ...validConfig().runtimes[0]!, outputEvents: { completed: "missing.event" } }]
     };
     expect(validateProjectAutomationConfig(configWithLegacyRuntimeOutput, [agent])).toEqual([]);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      outputs: [{ id: "summary", description: "Summary" }, { id: "summary", description: "Duplicate summary" }]
+    }, [agent]).some((issue) => issue.message === "Duplicate output id: summary.")).toBe(true);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      outputs: [{ id: "", description: "Missing id" }]
+    }, [agent]).some((issue) => issue.message === "Output id is required.")).toBe(true);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      outputs: [{ id: "bad", description: 123 }]
+    }, [agent]).some((issue) => issue.message === "Output description must be a string.")).toBe(true);
   });
 
   it("rejects object workflow steps instead of migrating them", () => {

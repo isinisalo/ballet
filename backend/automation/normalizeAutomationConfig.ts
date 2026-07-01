@@ -1,6 +1,7 @@
 import type {
   ProjectAction,
   ProjectAutomationConfig,
+  ProjectOutput,
   ProjectPolicy,
   ProjectTrigger,
   ProjectWorkflow
@@ -35,6 +36,11 @@ const normalizeTrigger = (value: Record<string, unknown>): ProjectTrigger => ({
 });
 
 const normalizeAction = (value: Record<string, unknown>): ProjectAction => ({
+  id: normalizePolicyToken(stringValue(value.id)),
+  description: stringValue(value.description)
+});
+
+const normalizeOutput = (value: Record<string, unknown>): ProjectOutput => ({
   id: normalizePolicyToken(stringValue(value.id)),
   description: stringValue(value.description)
 });
@@ -100,11 +106,15 @@ export const normalizeProjectAutomationConfig = (value: unknown): ProjectAutomat
   const actions = Array.isArray(value.actions)
     ? recordArray(value.actions).map(normalizeAction)
     : policyActionTokens(policies).map((id) => ({ id, description: "" }));
+  const outputs = Array.isArray(value.outputs)
+    ? recordArray(value.outputs).map(normalizeOutput)
+    : [];
 
   return {
     version: 1,
     triggers: recordArray(value.triggers).map(normalizeTrigger),
     actions,
+    outputs,
     policies,
     workflows: recordArray(value.workflows).map((workflow) => normalizeWorkflow(workflow, policyIdMap)),
     runtimes: recordArray(value.runtimes).map(normalizeRuntime)

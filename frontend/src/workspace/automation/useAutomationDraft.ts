@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { defaultProjectAutomationConfig, type ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
+import { ensureAutomationConfig } from "./automationConfigCompat";
 
 export type AutomationConfigUpdater = (updater: (config: ProjectAutomationConfig) => ProjectAutomationConfig) => void;
 
@@ -10,10 +11,10 @@ export function useAutomationDraft({
   automation?: ProjectAutomationConfig;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
 }) {
-  const [draft, setDraft] = useState<ProjectAutomationConfig>(automation ?? defaultProjectAutomationConfig());
+  const [draft, setDraft] = useState<ProjectAutomationConfig>(() => ensureAutomationConfig(automation));
 
   useEffect(() => {
-    setDraft(automation ?? defaultProjectAutomationConfig());
+    setDraft(ensureAutomationConfig(automation));
   }, [automation]);
 
   const updateConfig: AutomationConfigUpdater = (updater) => {

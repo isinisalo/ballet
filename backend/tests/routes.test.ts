@@ -206,7 +206,7 @@ describe("API routes", () => {
       };
 
       expect(data.automation).not.toHaveProperty("events");
-      expect(data.eventDefinitions).toHaveLength(4);
+      expect(data.eventDefinitions).toHaveLength(3);
       expect(data.eventDefinitions).toEqual(expect.arrayContaining([
         expect.objectContaining({ id: "developer.implementation.failed", eventType: "developer.implementation.failed" })
       ]));
@@ -278,6 +278,7 @@ describe("API routes", () => {
     const config = {
       version: 1,
       actions: [{ id: "implementation", description: "Implementation" }],
+      outputs: [{ id: "summary", description: "Summary output" }],
       triggers: [{ id: "manual_start", description: "Manual start" }],
       policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed", agent: "developer", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }],
@@ -292,7 +293,7 @@ describe("API routes", () => {
       });
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
-      expect(savedBody).toMatchObject({ actions: [{ id: "implementation" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }] });
+      expect(savedBody).toMatchObject({ actions: [{ id: "implementation" }], outputs: [{ id: "summary" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }] });
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);

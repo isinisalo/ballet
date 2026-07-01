@@ -179,6 +179,12 @@ export const seedData: AppData = {
         description: "Remediate failed infrastructure or deployment state."
       }
     ],
+    outputs: [
+      {
+        id: "runbook",
+        description: "Operator-facing remediation notes or runbook updates."
+      }
+    ],
     policies: [
       {
         id: "on.k8s-operator.remediation.failed.then.k8s-operator.start.remediation",

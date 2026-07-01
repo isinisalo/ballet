@@ -12,7 +12,7 @@ import { AgentsView } from "./agents/AgentsView";
 import { SkillsView } from "./skills/SkillsView";
 import { AutomationView } from "./automation/AutomationView";
 import { RuntimesView } from "./automation/runtimes/RuntimesView";
-import { defaultProjectAutomationConfig } from "../../../shared/api/workspace-contracts";
+import { ensureAutomationConfig } from "./automation/automationConfigCompat";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -96,7 +96,7 @@ export function WorkspaceShell() {
           route={route}
           projectId={project?.id}
           projectDocumentTree={projectDocumentTree}
-          automation={data.automation ?? defaultProjectAutomationConfig()}
+          automation={ensureAutomationConfig(data.automation)}
           agents={data.agents}
           skills={data.skills}
           navigate={navigate}
