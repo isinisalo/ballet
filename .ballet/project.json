@@ -48,6 +48,14 @@
       "agent": "qa-verification-reviewer",
       "action": "review",
       "enabled": true
+    },
+    {
+      "id": "on.qa.test.complete.then.ux.start.test",
+      "source": "event",
+      "event": "qa.test.complete",
+      "agent": "ux",
+      "action": "test",
+      "enabled": true
     }
   ],
   "workflows": [

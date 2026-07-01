@@ -1,4 +1,4 @@
-import type { AgentRun, AgentRunLog, AppData, CollectionName, EventRecord, MarkdownDocument, ProjectAutomationConfig, ProjectAutomationIssue } from "../../backend/shared/domain";
+import type { AppData, CollectionName, EventRecord, MarkdownDocument, ProjectAutomationConfig, ProjectAutomationIssue } from "../../backend/shared/domain";
 
 const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {
@@ -46,8 +46,5 @@ export const api = {
       method: "POST",
       body: JSON.stringify(event)
     }),
-  getAgentRuns: () => request<AgentRun[]>("/api/agent-runs"),
-  retryAgentRun: (runId: string) => request<AgentRun>(`/api/agent-runs/${runId}/retry`, { method: "POST" }),
-  getAgentRunLogs: (runId: string) => request<AgentRunLog[]>(`/api/agent-runs/${runId}/logs`),
   getRuntimeHealth: () => request<Record<string, unknown>>("/api/runtime/health")
 };
