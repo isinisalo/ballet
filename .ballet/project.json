@@ -18,6 +18,10 @@
     {
       "id": "test",
       "description": "Test implementation"
+    },
+    {
+      "id": "plan",
+      "description": "Plan incomplete specs."
     }
   ],
   "policies": [

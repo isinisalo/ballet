@@ -95,6 +95,7 @@ import {
   statusVariant
 } from "@/components/shared/workspace-ui";
 import { cn } from "@/lib/utils";
+import { NotificationProvider, useNotifications } from "./app/notifications";
 import { useRuntimeStream } from "./app/useRuntimeStream";
 import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
 
@@ -903,16 +904,26 @@ function AppSidebar({
 }
 
 export function WorkspaceApp() {
+  return (
+    <TooltipProvider>
+      <NotificationProvider>
+        <WorkspaceShell />
+      </NotificationProvider>
+    </TooltipProvider>
+  );
+}
+
+function WorkspaceShell() {
+  const { notifications, notify } = useNotifications();
   const [themeMode, setThemeMode] = useThemeMode();
   const [data, setData] = useState<AppData>(emptyData);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [route, setRoute] = useState<RouteState>(() => routeFromPath(`${window.location.pathname}${window.location.search}`));
   const [selectedProjectId, setSelectedProjectId] = useState(seedData.projects[0]?.id ?? "");
   const [selectedGoalId] = useState("");
   const [selectedAdrId] = useState("");
   const [createDocumentKind, setCreateDocumentKind] = useState<ProjectDocumentCreateKind | null>(null);
+  const runtimeNotificationRef = useRef<{ status: "reconnecting" | "disconnected"; id: string } | null>(null);
 
   const project = data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId)) ?? data.projects.find((item) => item.id === selectedProjectId) ?? data.projects[0];
   const goals = useMemo(() => data.goals.filter((goal) => goal.projectId === project?.id), [data.goals, project?.id]);
@@ -946,7 +957,6 @@ export function WorkspaceApp() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    setError("");
     try {
       const next = await api.getData();
       setData(next);
@@ -957,11 +967,11 @@ export function WorkspaceApp() {
         setSelectedProjectId(next.projects[0]?.id ?? "");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data.");
+      notify({ type: "error", message: err instanceof Error ? err.message : "Failed to load data." });
     } finally {
       setLoading(false);
     }
-  }, [route.projectId, selectedProjectId]);
+  }, [notify, route.projectId, selectedProjectId]);
 
   useEffect(() => {
     const onPopState = () => setRoute(routeFromPath(`${window.location.pathname}${window.location.search}`));
@@ -976,18 +986,34 @@ export function WorkspaceApp() {
   const runtimeStreamStatus = useRuntimeStream(refresh);
 
   useEffect(() => {
+    if (runtimeStreamStatus !== "reconnecting" && runtimeStreamStatus !== "disconnected") {
+      runtimeNotificationRef.current = null;
+      return;
+    }
+
+    const current = runtimeNotificationRef.current;
+    const currentIsVisible = current ? notifications.some((notification) => notification.id === current.id) : false;
+    if (current?.status === runtimeStreamStatus && currentIsVisible) return;
+
+    const id = notify({
+      type: runtimeStreamStatus === "disconnected" ? "error" : "info",
+      message: `Runtime stream ${runtimeStreamStatus}. Live updates will resume automatically.`
+    });
+    runtimeNotificationRef.current = { status: runtimeStreamStatus, id };
+  }, [notifications, notify, runtimeStreamStatus]);
+
+  useEffect(() => {
     if (route.projectId) setSelectedProjectId(route.projectId);
   }, [route.projectId]);
 
   const runMutation = async <T,>(action: () => Promise<T>, successMessage: string, fallbackError: string) => {
-    setError("");
     try {
       const result = await action();
       await refresh();
-      setNotice(successMessage);
+      notify({ type: "info", message: successMessage });
       return result;
     } catch (err) {
-      setError(err instanceof Error ? err.message : fallbackError);
+      notify({ type: "error", message: err instanceof Error ? err.message : fallbackError });
       throw err;
     }
   };
@@ -1038,7 +1064,6 @@ export function WorkspaceApp() {
   };
 
   return (
-    <TooltipProvider>
       <SidebarProvider>
         <AppSidebar
           route={route}
@@ -1062,15 +1087,6 @@ export function WorkspaceApp() {
               </header>
 
               {loading ? <Alert><AlertDescription>Loading workspace data...</AlertDescription></Alert> : null}
-              {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-              {notice ? <Alert><AlertDescription>{notice}</AlertDescription></Alert> : null}
-              {runtimeStreamStatus === "reconnecting" || runtimeStreamStatus === "disconnected" ? (
-                <Alert variant={runtimeStreamStatus === "disconnected" ? "destructive" : "default"}>
-                  <AlertDescription>
-                    Runtime stream {runtimeStreamStatus}. Live updates will resume automatically.
-                  </AlertDescription>
-                </Alert>
-              ) : null}
 
               {route.view === "projects" ? (
                 <ProjectsOverview
@@ -1097,7 +1113,6 @@ export function WorkspaceApp() {
           />
         </SidebarInset>
       </SidebarProvider>
-    </TooltipProvider>
   );
 }
 
@@ -1409,7 +1424,6 @@ function AutomationView({
   const [selectedActionId, setSelectedActionId] = useState("");
   const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
   const [selectedRuntimeId, setSelectedRuntimeId] = useState("");
-  const [error, setError] = useState("");
 
   useEffect(() => {
     const next = data.automation ?? automationConfigTemplate();
@@ -1419,7 +1433,6 @@ function AutomationView({
     setSelectedActionId((current) => next.actions.some((action) => action.id === current) ? current : next.actions[0]?.id ?? "");
     setSelectedWorkflowId((current) => next.workflows.some((workflow) => workflow.id === current) ? current : next.workflows[0]?.id ?? "");
     setSelectedRuntimeId((current) => next.runtimes.some((runtime) => runtime.id === current) ? current : next.runtimes[0]?.id ?? "");
-    setError("");
   }, [data.automation]);
 
   const updateConfig: AutomationConfigUpdater = (updater) => {
@@ -1427,13 +1440,11 @@ function AutomationView({
   };
 
   const saveDraft = async () => {
-    setError("");
     try {
       const saved = await saveAutomation(draft);
       setDraft(saved);
       return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save automation config.");
+    } catch {
       return false;
     }
   };
@@ -1652,7 +1663,6 @@ function AutomationView({
               </Button>
             ))}
           </div>
-          {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
           <AutomationIssues issues={data.automationIssues} />
           {activeTab === "policies" ? (
             <PoliciesAutomationTab data={data} config={draft} selectedId={selectedPolicyId} onSelect={setSelectedPolicyId} updateConfig={updateConfig} />
@@ -2727,11 +2737,9 @@ function useAgentEditor({
   const formId = useId();
   const instructionsId = useId();
   const [form, setForm] = useState<Partial<Agent>>(agent ?? agentTemplate());
-  const [error, setError] = useState("");
 
   useEffect(() => {
     setForm(agent ?? agentTemplate());
-    setError("");
   }, [agent]);
 
   const frontmatterRuntime = typeof form.frontmatter?.runtime === "string" ? form.frontmatter.runtime : "";
@@ -2757,12 +2765,10 @@ function useAgentEditor({
 
   const newAgent = () => {
     setForm(agentTemplate());
-    setError("");
     onNew?.();
   };
 
   const submit = async () => {
-    setError("");
     try {
       const name = form.name?.trim();
       if (!name) throw new Error("Agent name is required.");
@@ -2779,25 +2785,27 @@ function useAgentEditor({
       });
       setForm(saved);
       onSaved?.(saved);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save agent.");
+    } catch {
+      // Save failures are surfaced by the shared mutation notification layer.
     }
   };
 
   const deleteAgent = async () => {
     if (!form.id) return;
     const deletedId = form.id;
-    await remove("agents", deletedId);
-    setForm(agentTemplate());
-    setError("");
-    onDeleted?.(deletedId);
+    try {
+      await remove("agents", deletedId);
+      setForm(agentTemplate());
+      onDeleted?.(deletedId);
+    } catch {
+      // Delete failures are surfaced by the shared mutation notification layer.
+    }
   };
 
   return {
     form,
     formId,
     instructionsId,
-    error,
     runtimeValue,
     runtimeOptions,
     modelValue,
@@ -2836,7 +2844,6 @@ function AgentEditorContent({ editor, showNameField = true }: { editor: AgentEdi
   return (
     <div className="grid gap-3">
       {editor.form.errors?.length ? <ErrorPreview errors={editor.form.errors} /> : null}
-      {editor.error ? <Alert variant="destructive"><AlertDescription>{editor.error}</AlertDescription></Alert> : null}
       <form id={editor.formId} className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void editor.submit(); }}>
         <div className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
             <Select value={editor.runtimeValue} onValueChange={editor.updateRuntime} disabled={editor.runtimeOptions.length === 0}>
@@ -2928,9 +2935,9 @@ function AgentEditor(props: {
 const retryableRunStatuses = new Set(["failed", "blocked", "needs_input", "cancelled"]);
 
 function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promise<void> }) {
+  const { notify } = useNotifications();
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(data.agentRuns[0]?.runId);
   const [logs, setLogs] = useState<AgentRunLog[]>([]);
-  const [error, setError] = useState("");
   const selectedRun = data.agentRuns.find((run) => run.runId === selectedRunId) ?? data.agentRuns[0];
 
   useEffect(() => {
@@ -2941,20 +2948,19 @@ function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promis
 
     api.getAgentRunLogs(selectedRun.runId)
       .then(setLogs)
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load run logs."));
-  }, [selectedRun?.runId]);
+      .catch((err) => notify({ type: "error", message: err instanceof Error ? err.message : "Unable to load run logs." }));
+  }, [notify, selectedRun?.runId]);
 
   useEffect(() => {
     if (!selectedRunId && data.agentRuns[0]?.runId) setSelectedRunId(data.agentRuns[0].runId);
   }, [data.agentRuns, selectedRunId]);
 
   const retry = async (run: AgentRun) => {
-    setError("");
     try {
       await api.retryAgentRun(run.runId);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to retry run.");
+      notify({ type: "error", message: err instanceof Error ? err.message : "Unable to retry run." });
     }
   };
 
@@ -2973,7 +2979,6 @@ function AgentRunsView({ data, refresh }: { data: AppData; refresh: () => Promis
           </Button>
         )}
       >
-        {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
         <DataTable
           empty="No agent runs queued."
           columns={["Created", "Agent", "Status", "Attempt", "Policy", "Thread", "Turn", "Error"]}
@@ -3089,8 +3094,8 @@ function CreateProjectDocumentDialog({
       if (!kind) return;
       await onCreate(kind, trimmedTitle);
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `Unable to create ${config.title.toLowerCase()}.`);
+    } catch {
+      // Async create failures are surfaced by the shared mutation notification layer.
     } finally {
       setPending(false);
     }

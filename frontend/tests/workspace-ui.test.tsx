@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Agent, AppData, ProjectAutomationConfig } from "../../backend/shared/domain";
 import { policyOutputEventTypes } from "../../backend/shared/policy-actions";
 import { WorkspaceApp } from "../src/WorkspaceApp";
@@ -242,9 +242,21 @@ async function confirmDelete(user: ReturnType<typeof userEvent.setup>, triggerNa
   await user.click(confirmButtons[confirmButtons.length - 1]);
 }
 
+async function flushAsyncUpdates() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 describe("workspace entity UI flows", () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("creates, edits, deletes, and navigates agents", async () => {
@@ -474,14 +486,83 @@ describe("workspace entity UI flows", () => {
     expect(screen.getAllByText("Ballet").length).toBeGreaterThan(0);
   });
 
-  it("shows save failures to users", async () => {
+  it("shows save failures as auto-dismissing floating notifications", async () => {
     const user = userEvent.setup();
     await renderRoute("/agents", baseData(), { failNextSave: true });
 
     await user.type(screen.getByLabelText("Name"), "Failing Agent");
     await user.type(screen.getByLabelText("Instructions"), "Try to save.");
-    await user.click(screen.getByRole("button", { name: "Save agent" }));
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Save agent" }));
+    await flushAsyncUpdates();
 
-    expect((await screen.findAllByText("Injected save failure")).length).toBeGreaterThan(0);
+    const message = screen.getByText("Injected save failure");
+    expect(message.closest("ol")).toHaveAttribute("aria-label", "Notifications");
+
+    act(() => {
+      vi.advanceTimersByTime(8000);
+    });
+
+    expect(screen.queryByText("Injected save failure")).not.toBeInTheDocument();
+  });
+
+  it("shows successful saves as auto-dismissing floating notifications", async () => {
+    const user = userEvent.setup();
+    await renderRoute("/agents");
+
+    await user.type(screen.getByLabelText("Name"), "Notify Agent");
+    await user.type(screen.getByLabelText("Instructions"), "Save and notify.");
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Save agent" }));
+    await flushAsyncUpdates();
+
+    const message = screen.getByText("Saved.");
+    expect(message.closest("ol")).toHaveAttribute("aria-label", "Notifications");
+
+    act(() => {
+      vi.advanceTimersByTime(8000);
+    });
+
+    expect(screen.queryByText("Saved.")).not.toBeInTheDocument();
+  });
+
+  it("keeps clicked notifications visible until dismissed", async () => {
+    const user = userEvent.setup();
+    await renderRoute("/agents", baseData(), { failNextSave: true });
+
+    await user.type(screen.getByLabelText("Name"), "Pinned Agent");
+    await user.type(screen.getByLabelText("Instructions"), "Try to save.");
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Save agent" }));
+    await flushAsyncUpdates();
+
+    const message = screen.getByText("Injected save failure");
+    const notification = message.closest("li");
+    expect(notification).not.toBeNull();
+
+    fireEvent.click(notification!);
+    expect(notification).toHaveAttribute("data-pinned", "true");
+
+    act(() => {
+      vi.advanceTimersByTime(8000);
+    });
+
+    expect(screen.getByText("Injected save failure")).toBeInTheDocument();
+    fireEvent.click(within(notification!).getByRole("button", { name: "Dismiss notification" }));
+    expect(screen.queryByText("Injected save failure")).not.toBeInTheDocument();
+  });
+
+  it("keeps automation config issues inline", async () => {
+    const issueData = baseData();
+    issueData.automationIssues = [{
+      path: "automation.policies[0].event",
+      message: "Automation config is invalid."
+    }];
+
+    await renderRoute("/automation", issueData);
+
+    const issue = screen.getByText("automation.policies[0].event: Automation config is invalid.");
+    expect(issue.closest("[role='alert']")).toBeInTheDocument();
+    expect(issue.closest("ol")).toBeNull();
   });
 });
