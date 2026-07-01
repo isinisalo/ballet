@@ -42,7 +42,11 @@ export function WorkflowsAutomationTab({
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
   const actionOptions = [
     { value: noSelection, label: "No action" },
-    ...config.actions.map((action) => ({ value: action.id, label: action.description ? `${action.id} · ${action.description}` : action.id }))
+    ...config.actions.map((action) => ({
+      value: action.id,
+      label: action.description ? `${action.id} · ${action.description}` : action.id,
+      description: action.description
+    }))
   ];
   const agentOptions = [{ value: noSelection, label: "No agent" }, ...automationAgentOptions(data.agents)];
   const defaultAgent = data.agents[0] ? preferredAgentToken(data.agents[0]) : "";

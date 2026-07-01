@@ -553,6 +553,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.getAllByText("existing.implementation.failed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("existing").length).toBeGreaterThan(0);
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
+    expect(within(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).getByText("implementation")).toHaveAttribute("title", "Implement work");
     expect(screen.getByText("existing.implementation.complete")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();

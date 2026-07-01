@@ -14,7 +14,7 @@ import { WorkflowCanvasNode } from "./WorkflowCanvasNode";
 import { WorkflowGhostNode } from "./WorkflowGhostNode";
 import { WorkflowPolicySummary } from "./WorkflowPolicySummary";
 
-type Option = { value: string; label: string };
+type Option = { value: string; label: string; description?: string };
 
 export function WorkflowCanvas({
   layout,
