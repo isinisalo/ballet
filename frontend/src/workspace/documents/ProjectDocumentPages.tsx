@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Archive, CheckCircle2, FileText, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import type { MarkdownDocument, Project } from "../../../../shared/api/workspace-contracts";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Panel } from "@/components/shared/workspace-ui";
@@ -35,31 +35,47 @@ export function ProjectDocumentPage({
   );
 }
 
-export function GoalsPage({ project, selectedGoal, onCreateDocument }: { project?: Project; selectedGoal?: MarkdownEntity; onCreateDocument: (kind: ProjectDocumentCreateKind) => void }) {
+export function GoalsPage({
+  project,
+  selectedGoal,
+  saveProjectDocument,
+  onCreateDocument
+}: {
+  project?: Project;
+  selectedGoal?: MarkdownEntity;
+  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
+}) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading GOALS." />;
 
   return (
-    <CollectionDocumentPanel
-      title="Goals"
-      icon={<CheckCircle2 data-icon="inline-start" />}
+    <ProjectMarkdownEditorView
       document={selectedGoal}
       emptyTitle="No Goal document selected."
-      createKind="goal"
+      saveProjectDocument={saveProjectDocument}
       onCreateDocument={onCreateDocument}
     />
   );
 }
 
-export function AdrsPage({ project, selectedAdr, onCreateDocument }: { project?: Project; selectedAdr?: MarkdownEntity; onCreateDocument: (kind: ProjectDocumentCreateKind) => void }) {
+export function AdrsPage({
+  project,
+  selectedAdr,
+  saveProjectDocument,
+  onCreateDocument
+}: {
+  project?: Project;
+  selectedAdr?: MarkdownEntity;
+  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
+}) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading ADRs." />;
 
   return (
-    <CollectionDocumentPanel
-      title="ADR"
-      icon={<Archive data-icon="inline-start" />}
+    <ProjectMarkdownEditorView
       document={selectedAdr}
       emptyTitle="No ADR document selected."
-      createKind="adr"
+      saveProjectDocument={saveProjectDocument}
       onCreateDocument={onCreateDocument}
     />
   );

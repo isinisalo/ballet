@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { CalendarDays, CheckCircle2, FileKey2, Hash, Tags, UserRound, type LucideIcon } from "lucide-react";
+import { CalendarDays, CheckCircle2, FileKey2, Hash, ShieldCheck, Tags, UserRound, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, ErrorPreview, statusVariant } from "@/components/shared/workspace-ui";
 import { cn } from "@/lib/utils";
@@ -57,15 +57,15 @@ function FrontmatterValue({ fieldKey, value }: { fieldKey: string; value: unknow
   return <span className="font-medium">{String(value)}</span>;
 }
 
-function FrontmatterPanel({ frontmatter }: { frontmatter?: Record<string, unknown> }) {
-  const entries = Object.entries(frontmatter ?? {}).filter(([key]) => key !== "id");
+function FrontmatterPanel({ document }: { document: MarkdownEntity }) {
+  const entries = Object.entries({ id: document.id, ...(document.frontmatter ?? {}) }).filter(([, value]) => value !== undefined);
 
   return (
-    <aside className="rounded-lg border bg-card/95 px-3 py-2.5 ring-1 ring-foreground/5">
+    <aside className="rounded-lg border border-border/90 bg-panel-section px-3 py-2.5 ring-1 ring-foreground/5">
       {entries.length === 0 ? (
         <p className="text-sm text-muted-foreground">No frontmatter.</p>
       ) : (
-        <dl className="flex flex-wrap">
+        <dl className="grid gap-0 sm:grid-cols-2 xl:grid-cols-4">
           {entries.map(([key, value], index) => {
             const Icon = frontmatterIcon(key);
             const isComplexObject = Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -73,9 +73,9 @@ function FrontmatterPanel({ frontmatter }: { frontmatter?: Record<string, unknow
               <div
                 key={key}
                 className={cn(
-                  "min-w-36 flex-1 border-border/70 py-1.5 pr-5",
-                  index > 0 && "border-l pl-5",
-                  isComplexObject && "basis-full"
+                  "min-w-0 border-border/70 py-2 pr-4",
+                  index > 0 && "sm:border-l sm:pl-4",
+                  isComplexObject && "sm:col-span-2 xl:col-span-4"
                 )}
               >
                 <dt className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.65rem] font-semibold uppercase leading-none text-muted-foreground">
@@ -99,7 +99,7 @@ function MarkdownBody({ source, title }: { source?: string; title?: string }) {
   if (!body) return <p className="text-muted-foreground">No Markdown body.</p>;
 
   return (
-    <div className="markdown-body">
+    <div className="markdown-body markdown-document-preview">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
     </div>
   );
@@ -111,8 +111,20 @@ export function MarkdownDocumentView({ document, emptyTitle, compact = false, em
 
   return (
     <div className="grid auto-rows-min gap-4 self-start">
-      <FrontmatterPanel frontmatter={document.frontmatter} />
       <article className={cn("min-w-0", embedded ? "p-0" : "rounded-lg border bg-card p-5 md:p-8")}>
+        <header className="mb-4 grid gap-3">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="mb-1 flex items-center gap-2 font-mono text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-primary">
+                <FileKey2 className="size-3.5" />
+                {document.relativePath ?? document.id}
+              </p>
+              <h1 className="truncate text-xl font-semibold leading-tight text-foreground md:text-2xl">{title}</h1>
+            </div>
+            <ShieldCheck className="hidden size-10 shrink-0 text-muted-foreground/30 sm:block" />
+          </div>
+          <FrontmatterPanel document={document} />
+        </header>
         {document.errors?.length ? (
           <header className="mb-6 flex min-w-0 flex-wrap items-center gap-2 border-b pb-5">
             <ErrorPreview errors={document.errors} />

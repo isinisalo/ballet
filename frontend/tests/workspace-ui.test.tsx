@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppData } from "../../shared/api/workspace-contracts";
+import type { AppData, MarkdownDocument, ProjectDocumentTreeNode } from "../../shared/api/workspace-contracts";
 import type { Agent } from "../../shared/api/workspace-contracts";
 import type { ProjectAutomationConfig } from "../../shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "../../shared/policy-actions";
@@ -169,6 +169,30 @@ const noContent = () => new Response(null, { status: 204 });
 
 const slug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
 
+const updateProjectTreeDocument = (
+  nodes: ProjectDocumentTreeNode[],
+  document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">
+): MarkdownDocument | undefined => {
+  for (const node of nodes) {
+    if (node.type === "file" && node.document.relativePath === document.relativePath) {
+      node.document = {
+        ...node.document,
+        frontmatter: document.frontmatter,
+        body: document.body,
+        title: typeof document.frontmatter.title === "string" ? document.frontmatter.title : node.document.title
+      };
+      return node.document;
+    }
+
+    if (node.type === "directory") {
+      const updated = updateProjectTreeDocument(node.children, document);
+      if (updated) return updated;
+    }
+  }
+
+  return undefined;
+};
+
 function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
   let agentCounter = data.agents.length + 1;
   let failNextSave = options.failNextSave ?? false;
@@ -256,6 +280,12 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
       }));
       data.automationIssues = [];
       return jsonResponse(saved);
+    }
+
+    if (url === "/api/project-documents" && method === "POST") {
+      const incoming = body as Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">;
+      const saved = updateProjectTreeDocument(data.projectDocumentTree ?? [], incoming);
+      return saved ? jsonResponse(saved) : jsonResponse({ error: "Document not found" }, { status: 404 });
     }
 
     return jsonResponse({ error: `Unhandled ${method} ${url}` }, { status: 404 });
@@ -352,6 +382,36 @@ describe("workspace entity UI flows", () => {
       await user.click(toggle);
       expect(toggle).toHaveAttribute("aria-expanded", "false");
     }
+  });
+
+  it.each([
+    { route: "/projects/project-1/adrs", title: "ADR One", relativePath: ".ballet/adr/one.md" },
+    { route: "/projects/project-1/goals", title: "Goal One", relativePath: ".ballet/goals/one.md" }
+  ])("renders the Markdown workbench for $route and saves the selected document", async ({ route, title, relativePath }) => {
+    const user = userEvent.setup();
+    const { data, fetchMock } = await renderRoute(route, dataWithProjectDocumentTree());
+
+    const frontmatter = screen.getByLabelText(/yaml frontmatter/i);
+    const markdownBody = screen.getByLabelText(/markdown body/i);
+    expect(frontmatter).toHaveValue(`title: ${title}`);
+    expect(markdownBody).toHaveValue(`# ${title}`);
+    expect(screen.getByRole("button", { name: "Save Markdown" })).toBeInTheDocument();
+
+    await user.clear(frontmatter);
+    await user.type(frontmatter, `title: Updated ${title}`);
+    await user.clear(markdownBody);
+    await user.type(markdownBody, `# Updated ${title}\n\nDocument body`);
+    await user.click(screen.getByRole("button", { name: "Save Markdown" }));
+
+    await waitFor(() => expect(data.projectDocumentTree?.some((node) =>
+      node.type === "directory" && node.children.some((child) =>
+        child.type === "file" && child.document.relativePath === relativePath && child.document.body === `# Updated ${title}\n\nDocument body`
+      )
+    )).toBe(true));
+    expect(fetchMock).toHaveBeenCalledWith("/api/project-documents", expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining(`"relativePath":"${relativePath}"`)
+    }));
   });
 
   it("defaults automation to workflows and locks policy input fields on the canvas", async () => {

@@ -121,8 +121,8 @@ export function WorkspaceShell() {
                 />
               ) : null}
               {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} onCreateDocument={setCreateDocumentKind} /> : null}
-              {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} onCreateDocument={setCreateDocumentKind} /> : null}
-              {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} onCreateDocument={setCreateDocumentKind} /> : null}
+              {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} saveProjectDocument={saveProjectDocument} onCreateDocument={setCreateDocumentKind} /> : null}
+              {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} saveProjectDocument={saveProjectDocument} onCreateDocument={setCreateDocumentKind} /> : null}
               {route.view === "project-instructions" ? <InstructionsPage project={project} selectedInstruction={selectedInstruction} onCreateDocument={setCreateDocumentKind} /> : null}
               {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "workflows"} selectedId={route.automationEntityId} saveAutomation={saveAutomation} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView data={data} selectedId={route.runtimeId} saveAutomation={saveAutomation} navigate={navigate} /> : null}
