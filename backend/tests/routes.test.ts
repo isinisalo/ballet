@@ -277,9 +277,7 @@ describe("API routes", () => {
 
     const config = {
       version: 1,
-      events: [
-        { id: "task.created", title: "Task created", source: "user" }
-      ],
+      actions: [{ id: "implementation", description: "Implementation" }],
       triggers: [{ id: "manual_start", description: "Manual start" }],
       policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed", agent: "developer", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }],
@@ -294,11 +292,7 @@ describe("API routes", () => {
       });
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
-      expect(savedBody).not.toHaveProperty("events");
-      expect(savedBody).toMatchObject({
-        triggers: [{ id: "manual_start", description: "Manual start" }],
-        workflows: [{ steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }]
-      });
+      expect(savedBody).toMatchObject({ actions: [{ id: "implementation" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }] });
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);
@@ -319,7 +313,7 @@ describe("API routes", () => {
         body: JSON.stringify({ ...config, workflows: [{ id: "legacy", title: "Legacy", steps: [{ policy: "assign-developer", on: "task.created" }] }] })
       });
       expect(invalid.status).toBe(400);
-      expect(await invalid.json()).toMatchObject({ issues: expect.arrayContaining([expect.objectContaining({ message: "Workflow step must be a policy id string." })]) });
+      expect(await invalid.json()).toMatchObject({ error: "Request validation failed.", issues: expect.arrayContaining([expect.objectContaining({ path: "workflows.0.steps.0" })]) });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     }
