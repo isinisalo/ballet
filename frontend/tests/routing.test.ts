@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   agentDocumentPath,
   automationSectionPath,
+  projectCollectionDocumentPath,
   projectDocumentPath,
   routeFromPath,
   runtimePath,
@@ -15,8 +16,23 @@ describe("workspace routing", () => {
       documentPath: ".ballet/goals/one.md"
     });
     expect(routeFromPath("/projects/project%201/goals")).toEqual({ view: "project-goals", projectId: "project 1" });
+    expect(routeFromPath("/projects/project%201/goals?path=.ballet%2Fgoals%2Fone.md")).toEqual({
+      view: "project-goals",
+      projectId: "project 1",
+      documentPath: ".ballet/goals/one.md"
+    });
     expect(routeFromPath("/projects/project-1/adrs")).toEqual({ view: "project-adrs", projectId: "project-1" });
+    expect(routeFromPath("/projects/project-1/adrs?path=.ballet%2Fadr%2Fdecision.md")).toEqual({
+      view: "project-adrs",
+      projectId: "project-1",
+      documentPath: ".ballet/adr/decision.md"
+    });
     expect(routeFromPath("/projects/project-1/instructions")).toEqual({ view: "project-instructions", projectId: "project-1" });
+    expect(routeFromPath("/projects/project-1/instructions?path=.ballet%2Finstructions%2Freviewer.md")).toEqual({
+      view: "project-instructions",
+      projectId: "project-1",
+      documentPath: ".ballet/instructions/reviewer.md"
+    });
   });
 
   it("parses automation aliases and selected entities", () => {
@@ -35,6 +51,9 @@ describe("workspace routing", () => {
 
   it("builds encoded paths", () => {
     expect(projectDocumentPath(".ballet/goals/a b.md")).toBe("/projects/document?path=.ballet%2Fgoals%2Fa%20b.md");
+    expect(projectCollectionDocumentPath("project 1", "goal", ".ballet/goals/a b.md")).toBe("/projects/project%201/goals?path=.ballet%2Fgoals%2Fa%20b.md");
+    expect(projectCollectionDocumentPath("project 1", "adr", ".ballet/adr/a b.md")).toBe("/projects/project%201/adrs?path=.ballet%2Fadr%2Fa%20b.md");
+    expect(projectCollectionDocumentPath("project 1", "instruction", ".ballet/instructions/a b.md")).toBe("/projects/project%201/instructions?path=.ballet%2Finstructions%2Fa%20b.md");
     expect(agentDocumentPath(".codex/agents/a b.toml")).toBe("/agents?path=.codex%2Fagents%2Fa%20b.toml");
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(automationSectionPath("workflows", "wf 1")).toBe("/automation/workflows?id=wf%201");

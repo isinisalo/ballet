@@ -32,51 +32,59 @@ import {
   SidebarRail
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { agentDocumentPath, automationSectionPath, projectDocumentPath, runtimePath, skillDocumentPath } from "../routing";
-import type { AutomationTab, RouteState } from "../types";
+import { agentDocumentPath, automationSectionPath, projectCollectionDocumentPath, projectDocumentPath, runtimePath, skillDocumentPath } from "../routing";
+import type { AutomationTab, ProjectDocumentCreateKind, RouteState } from "../types";
 import { findProjectTreeDirectory, projectTreeContainsPath, type ProjectTreeDirectory } from "../documents/projectDocuments";
 
 function ProjectDocumentTree({
   nodes,
   activePath,
   navigate,
+  pathFor = projectDocumentPath,
   level = 0
 }: {
   nodes: ProjectDocumentTreeNode[];
   activePath?: string;
   navigate: (path: string) => void;
+  pathFor?: (relativePath: string) => string;
   level?: number;
 }) {
   if (nodes.length === 0) return null;
 
   return (
     <SidebarMenuSub className={cn(level > 0 && "mx-2 mt-1 gap-0.5 border-sidebar-border/60 px-2 py-1")}>
-      {nodes.map((node) => (
-        node.type === "file" ? (
-          <SidebarMenuSubItem key={node.document.relativePath}>
-            <SidebarMenuSubButton
-              href={projectDocumentPath(node.document.relativePath)}
-              size="sm"
-              isActive={node.document.relativePath === activePath}
-              className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
-              onClick={(event) => {
-                event.preventDefault();
-                navigate(projectDocumentPath(node.document.relativePath));
-              }}
-            >
-              <span>{node.label}</span>
-            </SidebarMenuSubButton>
-          </SidebarMenuSubItem>
-        ) : (
+      {nodes.map((node) => {
+        if (node.type === "file") {
+          const path = pathFor(node.document.relativePath);
+          return (
+            <SidebarMenuSubItem key={node.document.relativePath}>
+              <SidebarMenuSubButton
+                href={path}
+                size="sm"
+                isActive={node.document.relativePath === activePath}
+                className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigate(path);
+                }}
+              >
+                <span>{node.label}</span>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+          );
+        }
+
+        return (
           <ProjectDocumentTreeDirectory
             key={node.relativePath}
             node={node}
             activePath={activePath}
             navigate={navigate}
+            pathFor={pathFor}
             level={level}
           />
-        )
-      ))}
+        );
+      })}
     </SidebarMenuSub>
   );
 }
@@ -85,11 +93,13 @@ function ProjectDocumentTreeDirectory({
   node,
   activePath,
   navigate,
+  pathFor,
   level
 }: {
   node: Extract<ProjectDocumentTreeNode, { type: "directory" }>;
   activePath?: string;
   navigate: (path: string) => void;
+  pathFor: (relativePath: string) => string;
   level: number;
 }) {
   const containsActive = projectTreeContainsPath(node.children, activePath);
@@ -116,7 +126,7 @@ function ProjectDocumentTreeDirectory({
           </SidebarMenuSubButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <ProjectDocumentTree nodes={node.children} activePath={activePath} navigate={navigate} level={level + 1} />
+          <ProjectDocumentTree nodes={node.children} activePath={activePath} navigate={navigate} pathFor={pathFor} level={level + 1} />
         </CollapsibleContent>
       </Collapsible>
     </SidebarMenuSubItem>
@@ -502,10 +512,12 @@ function SidebarEnvironmentMenu({
 
 function SidebarProjectMenu({
   route,
+  projectId,
   projectDocumentTree,
   navigate
 }: {
   route: RouteState;
+  projectId?: string;
   projectDocumentTree: ProjectDocumentTreeNode[];
   navigate: (path: string) => void;
 }) {
@@ -513,6 +525,8 @@ function SidebarProjectMenu({
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
+  const projectPathFor = (kind: ProjectDocumentCreateKind) => (relativePath: string) =>
+    projectId ? projectCollectionDocumentPath(projectId, kind, relativePath) : projectDocumentPath(relativePath);
 
   return (
     <Collapsible defaultOpen={projectOpen} className="group/collapsible">
@@ -536,6 +550,7 @@ function SidebarProjectMenu({
               node={adrDirectory}
               activePath={route.documentPath}
               navigate={navigate}
+              pathFor={projectPathFor("adr")}
               activeView={route.view === "project-adrs"}
             />
             <SidebarProjectDirectoryMenu
@@ -544,6 +559,7 @@ function SidebarProjectMenu({
               node={goalsDirectory}
               activePath={route.documentPath}
               navigate={navigate}
+              pathFor={projectPathFor("goal")}
               activeView={route.view === "project-goals"}
             />
             <SidebarProjectDirectoryMenu
@@ -552,6 +568,7 @@ function SidebarProjectMenu({
               node={instructionsDirectory}
               activePath={route.documentPath}
               navigate={navigate}
+              pathFor={projectPathFor("instruction")}
               forceRender
               emptyLabel="No instructions."
               activeView={route.view === "project-instructions"}
@@ -569,6 +586,7 @@ function SidebarProjectDirectoryMenu({
   node,
   activePath,
   navigate,
+  pathFor = projectDocumentPath,
   emptyLabel,
   forceRender = false,
   activeView = false
@@ -578,6 +596,7 @@ function SidebarProjectDirectoryMenu({
   node?: ProjectTreeDirectory;
   activePath?: string;
   navigate: (path: string) => void;
+  pathFor?: (relativePath: string) => string;
   emptyLabel?: string;
   forceRender?: boolean;
   activeView?: boolean;
@@ -606,7 +625,7 @@ function SidebarProjectDirectoryMenu({
         </CollapsibleTrigger>
         <CollapsibleContent>
           {children.length > 0 ? (
-            <ProjectDocumentTree nodes={children} activePath={activePath} navigate={navigate} />
+            <ProjectDocumentTree nodes={children} activePath={activePath} navigate={navigate} pathFor={pathFor} />
           ) : emptyLabel ? (
             <SidebarMenuSub>
               <SidebarMenuSubItem>
@@ -636,6 +655,7 @@ function AgentStatusDot({ status }: { status: Agent["status"] }) {
 
 export function AppSidebar({
   route,
+  projectId,
   projectDocumentTree,
   automation,
   agents,
@@ -643,6 +663,7 @@ export function AppSidebar({
   navigate
 }: {
   route: RouteState;
+  projectId?: string;
   projectDocumentTree: ProjectDocumentTreeNode[];
   automation: ProjectAutomationConfig;
   agents: Agent[];
@@ -668,7 +689,7 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarProjectMenu route={route} projectDocumentTree={projectDocumentTree} navigate={navigate} />
+              <SidebarProjectMenu route={route} projectId={projectId} projectDocumentTree={projectDocumentTree} navigate={navigate} />
               <SidebarAutomationMenu route={route} automation={automation} navigate={navigate} />
               <SidebarEnvironmentMenu route={route} agents={agents} skills={skills} runtimes={automation.runtimes} navigate={navigate} />
             </SidebarMenu>

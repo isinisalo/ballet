@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { frontmatterToYaml, parseFrontmatterYaml } from "../src/workspace/documents/frontmatter";
 import { documentTitle, markdownPreviewDocument, removeMatchingLeadingH1 } from "../src/workspace/documents/markdownDocument";
+import { findProjectTreeDirectory, selectedProjectTreeDocument } from "../src/workspace/documents/projectDocuments";
+import type { ProjectDocumentTreeNode } from "../../shared/api/workspace-contracts";
 
 describe("frontmatter helpers", () => {
   it("stringifies and parses YAML mappings", () => {
@@ -42,5 +44,51 @@ describe("markdown document helpers", () => {
     expect(preview.frontmatter).toEqual(document.frontmatter);
     expect(preview.body).toBe("Draft body");
     expect(preview.errors?.[0]).toMatch(/Flow sequence/);
+  });
+});
+
+describe("project document selection helpers", () => {
+  const projectDocumentTree: ProjectDocumentTreeNode[] = [
+    {
+      type: "directory",
+      label: "goals",
+      relativePath: ".ballet/goals",
+      children: [
+        {
+          type: "file",
+          label: "First goal",
+          document: {
+            id: "first-goal",
+            collection: "goals",
+            absolutePath: "/workspace/.ballet/goals/first.md",
+            relativePath: ".ballet/goals/first.md",
+            slug: "first",
+            frontmatter: { title: "First goal" },
+            body: "First body"
+          }
+        },
+        {
+          type: "file",
+          label: "Second goal",
+          document: {
+            id: "second-goal",
+            collection: "goals",
+            absolutePath: "/workspace/.ballet/goals/second.md",
+            relativePath: ".ballet/goals/second.md",
+            slug: "second",
+            frontmatter: { title: "Second goal" },
+            body: "Second body"
+          }
+        }
+      ]
+    }
+  ];
+
+  it("selects routed documents inside a directory and falls back to the first directory document", () => {
+    const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
+
+    expect(selectedProjectTreeDocument(goalsDirectory, ".ballet/goals/second.md")?.id).toBe("second-goal");
+    expect(selectedProjectTreeDocument(goalsDirectory, ".ballet/adr/decision.md")?.id).toBe("first-goal");
+    expect(selectedProjectTreeDocument(goalsDirectory)?.id).toBe("first-goal");
   });
 });

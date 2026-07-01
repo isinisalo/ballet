@@ -16,8 +16,6 @@ import type {
 import type { Agent } from "../../../shared/api/workspace-contracts";
 import type { ProjectAutomationConfig } from "../../../shared/api/workspace-contracts";
 import type {
-  Adr,
-  Goal,
   MarkdownDocument,
   Project
 } from "../../../shared/api/workspace-contracts";
@@ -31,11 +29,12 @@ import {
   createKindForProjectDocument,
   findProjectTreeDirectory,
   findProjectTreeDocument,
-  firstProjectTreeDocument,
-  projectDocumentCreateConfig
+  projectDocumentCreateConfig,
+  selectedProjectTreeDocument
 } from "./documents/projectDocuments";
 import {
   agentDocumentPath,
+  projectCollectionDocumentPath,
   projectDocumentPath
 } from "./routing";
 import { emptyData, type ProjectDocumentCreateKind, type SaveCollection } from "./types";
@@ -73,18 +72,34 @@ export function WorkspaceShell() {
   const runtimeNotificationRef = useRef<{ status: "reconnecting" | "disconnected"; id: string } | null>(null);
 
   const project = data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId)) ?? data.projects.find((item) => item.id === selectedProjectId) ?? data.projects[0];
-  const goals = useMemo(() => data.goals.filter((goal) => goal.projectId === project?.id), [data.goals, project?.id]);
-  const adrs = useMemo(() => data.adrs.filter((adr) => adr.projectId === project?.id), [data.adrs, project?.id]);
-  const selectedGoal = goals[0];
-  const selectedAdr = adrs[0];
   const projectDocumentTree = data.projectDocumentTree ?? [];
   const selectedProjectDocument = useMemo(
     () => findProjectTreeDocument(projectDocumentTree, route.documentPath),
     [projectDocumentTree, route.documentPath]
   );
-  const selectedInstruction = useMemo(
-    () => firstProjectTreeDocument(findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions")),
+  const adrDirectory = useMemo(
+    () => findProjectTreeDirectory(projectDocumentTree, ".ballet/adr"),
     [projectDocumentTree]
+  );
+  const goalsDirectory = useMemo(
+    () => findProjectTreeDirectory(projectDocumentTree, ".ballet/goals"),
+    [projectDocumentTree]
+  );
+  const instructionsDirectory = useMemo(
+    () => findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions"),
+    [projectDocumentTree]
+  );
+  const selectedAdr = useMemo(
+    () => selectedProjectTreeDocument(adrDirectory, route.documentPath),
+    [adrDirectory, route.documentPath]
+  );
+  const selectedGoal = useMemo(
+    () => selectedProjectTreeDocument(goalsDirectory, route.documentPath),
+    [goalsDirectory, route.documentPath]
+  );
+  const selectedInstruction = useMemo(
+    () => selectedProjectTreeDocument(instructionsDirectory, route.documentPath),
+    [instructionsDirectory, route.documentPath]
   );
   const selectedAgent = useMemo(
     () => route.view === "agents" && !route.documentPath
@@ -180,7 +195,7 @@ export function WorkspaceShell() {
       "Created.",
       `Unable to create ${kind}.`
     );
-    navigate(projectDocumentPath(saved.relativePath));
+    navigate(project?.id ? projectCollectionDocumentPath(project.id, kind, saved.relativePath) : projectDocumentPath(saved.relativePath));
   };
 
   const remove = async (collection: SaveCollection | "events", id: string) => {
@@ -203,6 +218,7 @@ export function WorkspaceShell() {
       <SidebarProvider>
         <AppSidebar
           route={route}
+          projectId={project?.id}
           projectDocumentTree={projectDocumentTree}
           automation={data.automation ?? automationConfigTemplate()}
           agents={data.agents}
@@ -314,10 +330,14 @@ function ProjectMarkdownEditorView({
     }
   };
 
+  const previewDocument = useMemo(
+    () => document ? markdownPreviewDocument(document, frontmatterText, bodyText, parseFrontmatterYaml) : undefined,
+    [bodyText, document, frontmatterText]
+  );
+
   if (!document) return <EmptyState title={emptyTitle} />;
   const createKind = createKindForProjectDocument(document.relativePath);
   const createConfig = createKind ? projectDocumentCreateConfig[createKind] : undefined;
-  const previewDocument = markdownPreviewDocument(document, frontmatterText, bodyText, parseFrontmatterYaml);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -386,7 +406,7 @@ function CollectionDocumentPanel({
   );
 }
 
-function GoalsPage({ project, selectedGoal, onCreateDocument }: { project?: Project; selectedGoal?: Goal; onCreateDocument: (kind: ProjectDocumentCreateKind) => void }) {
+function GoalsPage({ project, selectedGoal, onCreateDocument }: { project?: Project; selectedGoal?: MarkdownEntity; onCreateDocument: (kind: ProjectDocumentCreateKind) => void }) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading GOALS." />;
 
   return (
@@ -401,7 +421,7 @@ function GoalsPage({ project, selectedGoal, onCreateDocument }: { project?: Proj
   );
 }
 
-function AdrsPage({ project, selectedAdr, onCreateDocument }: { project?: Project; selectedAdr?: Adr; onCreateDocument: (kind: ProjectDocumentCreateKind) => void }) {
+function AdrsPage({ project, selectedAdr, onCreateDocument }: { project?: Project; selectedAdr?: MarkdownEntity; onCreateDocument: (kind: ProjectDocumentCreateKind) => void }) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading ADRs." />;
 
   return (
@@ -422,7 +442,7 @@ function InstructionsPage({
   onCreateDocument
 }: {
   project?: Project;
-  selectedInstruction?: MarkdownDocument;
+  selectedInstruction?: MarkdownEntity;
   onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
 }) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading instructions." />;

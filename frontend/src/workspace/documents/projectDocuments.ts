@@ -42,6 +42,12 @@ export const firstProjectTreeDocument = (node?: ProjectTreeDirectory): MarkdownD
   return undefined;
 };
 
+export const selectedProjectTreeDocument = (node?: ProjectTreeDirectory, relativePath?: string): MarkdownDocument | undefined => {
+  const children = node?.children ?? [];
+  const routedDocument = projectTreeContainsPath(children, relativePath) ? findProjectTreeDocument(children, relativePath) : undefined;
+  return routedDocument ?? firstProjectTreeDocument(node);
+};
+
 export const projectDocumentCreateConfig: Record<ProjectDocumentCreateKind, { directoryPath: string; title: string; label: string }> = {
   adr: { directoryPath: ".ballet/adr", title: "New ADR", label: "New ADR" },
   goal: { directoryPath: ".ballet/goals", title: "New goal", label: "New goal" },
