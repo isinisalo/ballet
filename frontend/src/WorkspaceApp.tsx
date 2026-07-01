@@ -88,9 +88,9 @@ import { cn } from "@/lib/utils";
 import { NotificationProvider, useNotifications } from "./app/notifications";
 import { useRuntimeStream } from "./app/useRuntimeStream";
 
-type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "project-instructions" | "automation" | "agents" | "skills";
+type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "project-instructions" | "automation" | "runtimes" | "agents" | "skills";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
-type AutomationTab = "triggers" | "actions" | "workflows" | "runtimes";
+type AutomationTab = "triggers" | "actions" | "workflows";
 type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 interface RouteState {
@@ -98,6 +98,8 @@ interface RouteState {
   projectId?: string;
   documentPath?: string;
   automationTab?: AutomationTab;
+  automationEntityId?: string;
+  runtimeId?: string;
 }
 
 const emptyData: AppData = {
@@ -249,21 +251,24 @@ const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  if (url.pathname === "/automation/policies" || url.pathname === "/policies") return { view: "automation", automationTab: "workflows" };
-  const automationMatch = url.pathname.match(/^\/automation\/(triggers|actions|workflows|runtimes)\/?$/);
-  if (automationMatch) return { view: "automation", automationTab: automationMatch[1] as AutomationTab };
-  if (url.pathname === "/automation") return { view: "automation", automationTab: "workflows" };
-  if (url.pathname === "/actions") return { view: "automation", automationTab: "actions" };
-  if (url.pathname === "/workflow") return { view: "automation", automationTab: "workflows" };
-  if (url.pathname === "/runtimes") return { view: "automation", automationTab: "runtimes" };
+  if (url.pathname === "/automation/policies" || url.pathname === "/policies") return { view: "automation", automationTab: "workflows", automationEntityId: url.searchParams.get("id") ?? undefined };
+  const automationMatch = url.pathname.match(/^\/automation\/(triggers|actions|workflows)\/?$/);
+  if (automationMatch) return { view: "automation", automationTab: automationMatch[1] as AutomationTab, automationEntityId: url.searchParams.get("id") ?? undefined };
+  if (url.pathname === "/automation/runtimes") return { view: "runtimes", runtimeId: url.searchParams.get("id") ?? undefined };
+  if (url.pathname === "/automation") return { view: "automation", automationTab: "workflows", automationEntityId: url.searchParams.get("id") ?? undefined };
+  if (url.pathname === "/actions") return { view: "automation", automationTab: "actions", automationEntityId: url.searchParams.get("id") ?? undefined };
+  if (url.pathname === "/workflow") return { view: "automation", automationTab: "workflows", automationEntityId: url.searchParams.get("id") ?? undefined };
+  if (url.pathname === "/runtimes") return { view: "runtimes", runtimeId: url.searchParams.get("id") ?? undefined };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
-  if (url.pathname === "/agent-runs") return { view: "automation", automationTab: "workflows" };
+  if (url.pathname === "/agent-runs") return { view: "automation", automationTab: "workflows", automationEntityId: url.searchParams.get("id") ?? undefined };
   return { view: "projects" };
 };
 
 const projectDocumentPath = (relativePath: string) => `/projects/document?path=${encodeURIComponent(relativePath)}`;
 const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
 const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
+const automationSectionPath = (tab: AutomationTab, id?: string) => `/automation/${tab}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
+const runtimePath = (id?: string) => `/runtimes${id ? `?id=${encodeURIComponent(id)}` : ""}`;
 
 type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skill, "id" | "frontmatter" | "body" | "relativePath" | "errors"> & {
   createdAt?: string;
@@ -630,6 +635,179 @@ function SidebarAgentList({
   );
 }
 
+function automationEntities(config: ProjectAutomationConfig, tab: AutomationTab): Array<{ id: string; label: string }> {
+  if (tab === "actions") return config.actions.map((action) => ({ id: action.id, label: action.id }));
+  if (tab === "triggers") return config.triggers.map((trigger) => ({ id: trigger.id, label: trigger.id }));
+  return config.workflows.map((workflow) => ({ id: workflow.id, label: workflow.id }));
+}
+
+function activeAutomationEntityId(config: ProjectAutomationConfig, tab: AutomationTab, routeId?: string) {
+  const entities = automationEntities(config, tab);
+  return entities.some((entity) => entity.id === routeId) ? routeId : entities[0]?.id ?? "";
+}
+
+const automationSidebarSections: Array<{ id: AutomationTab; label: string; icon: LucideIcon; emptyLabel: string }> = [
+  { id: "actions", label: "Actions", icon: FileKey2, emptyLabel: "No actions." },
+  { id: "triggers", label: "Triggers", icon: Zap, emptyLabel: "No triggers." },
+  { id: "workflows", label: "Workflows", icon: Activity, emptyLabel: "No workflows." }
+];
+
+function SidebarAutomationMenu({
+  route,
+  automation,
+  navigate
+}: {
+  route: RouteState;
+  automation: ProjectAutomationConfig;
+  navigate: (path: string) => void;
+}) {
+  const automationOpen = route.view === "automation";
+
+  return (
+    <Collapsible defaultOpen={automationOpen} className="group/collapsible">
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            isActive={automationOpen}
+            tooltip="Automation"
+            className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
+          >
+            <Route />
+            <span>Automation</span>
+            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {automationSidebarSections.map((section) => {
+              const entities = automationEntities(automation, section.id);
+              const selectedId = activeAutomationEntityId(automation, section.id, route.automationTab === section.id ? route.automationEntityId : undefined);
+              const sectionActive = route.view === "automation" && route.automationTab === section.id;
+              const sectionPath = automationSectionPath(section.id, selectedId || undefined);
+              const Icon = section.icon;
+
+              return (
+                <SidebarMenuSubItem key={section.id}>
+                  <SidebarMenuSubButton
+                    href={sectionPath}
+                    size="sm"
+                    isActive={sectionActive}
+                    className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigate(sectionPath);
+                    }}
+                  >
+                    <Icon />
+                    <span>{section.label}</span>
+                  </SidebarMenuSubButton>
+                  <SidebarMenuSub className="mx-2 gap-0.5 border-sidebar-border/60 px-2 py-1">
+                    {entities.length === 0 ? (
+                      <SidebarMenuSubItem>
+                        <span className="block px-2 py-1 text-xs text-muted-foreground">{section.emptyLabel}</span>
+                      </SidebarMenuSubItem>
+                    ) : null}
+                    {entities.map((entity) => {
+                      const path = automationSectionPath(section.id, entity.id);
+                      return (
+                        <SidebarMenuSubItem key={entity.id}>
+                          <SidebarMenuSubButton
+                            href={path}
+                            size="sm"
+                            isActive={sectionActive && entity.id === selectedId}
+                            className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              navigate(path);
+                            }}
+                          >
+                            <span className="truncate">{entity.label}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
+function SidebarRuntimesMenu({
+  route,
+  runtimes,
+  navigate
+}: {
+  route: RouteState;
+  runtimes: ProjectRuntime[];
+  navigate: (path: string) => void;
+}) {
+  const runtimesOpen = route.view === "runtimes";
+  const selectedId = runtimes.some((runtime) => runtime.id === route.runtimeId) ? route.runtimeId : runtimes[0]?.id ?? "";
+  const rootPath = runtimePath(selectedId || undefined);
+
+  return (
+    <Collapsible defaultOpen={runtimesOpen} className="group/collapsible">
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton isActive={runtimesOpen} tooltip="Runtimes">
+            <Code2 />
+            <span>Runtimes</span>
+            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            <SidebarMenuSubItem>
+              <SidebarMenuSubButton
+                href={rootPath}
+                size="sm"
+                isActive={runtimesOpen}
+                className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigate(rootPath);
+                }}
+              >
+                <Code2 />
+                <span>Runtimes</span>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+            {runtimes.length === 0 ? (
+              <SidebarMenuSubItem>
+                <span className="block px-2 py-1.5 text-xs text-muted-foreground">No runtimes.</span>
+              </SidebarMenuSubItem>
+            ) : null}
+            {runtimes.map((runtime) => {
+              const path = runtimePath(runtime.id);
+              return (
+                <SidebarMenuSubItem key={runtime.id}>
+                  <SidebarMenuSubButton
+                    href={path}
+                    size="sm"
+                    isActive={runtimesOpen && runtime.id === selectedId}
+                    className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigate(path);
+                    }}
+                  >
+                    <span className="truncate">{runtime.id}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
 function SidebarProjectDirectoryMenu({
   label,
   icon,
@@ -697,32 +875,23 @@ function AgentStatusDot({ status }: { status: Agent["status"] }) {
 function AppSidebar({
   route,
   projectDocumentTree,
+  automation,
   agents,
   skills,
   navigate
 }: {
   route: RouteState;
   projectDocumentTree: ProjectDocumentTreeNode[];
+  automation: ProjectAutomationConfig;
   agents: Agent[];
   skills: Skill[];
   navigate: (path: string) => void;
 }) {
   const agentsOpen = route.view === "agents";
   const skillsOpen = route.view === "skills";
-  const automationOpen = route.view === "automation";
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
-  const item = (label: string, icon: ReactNode, path: string, active: boolean) => (
-    <SidebarMenuItem key={label}>
-      <SidebarMenuButton asChild isActive={active} tooltip={label}>
-        <a href={path} onClick={(event) => { event.preventDefault(); navigate(path); }}>
-          {icon}
-          <span>{label}</span>
-        </a>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
 
   return (
     <ShadcnSidebar collapsible="icon">
@@ -761,7 +930,8 @@ function AppSidebar({
                 emptyLabel="No instructions."
                 activeView={route.view === "project-instructions"}
               />
-              {item("Automation", <Route />, "/automation", automationOpen)}
+              <SidebarAutomationMenu route={route} automation={automation} navigate={navigate} />
+              <SidebarRuntimesMenu route={route} runtimes={automation.runtimes} navigate={navigate} />
               <Collapsible defaultOpen={agentsOpen} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
@@ -971,6 +1141,7 @@ function WorkspaceShell() {
         <AppSidebar
           route={route}
           projectDocumentTree={projectDocumentTree}
+          automation={data.automation ?? automationConfigTemplate()}
           agents={data.agents}
           skills={data.skills}
           navigate={navigate}
@@ -998,7 +1169,8 @@ function WorkspaceShell() {
               {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} onCreateDocument={setCreateDocumentKind} /> : null}
               {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} onCreateDocument={setCreateDocumentKind} /> : null}
               {route.view === "project-instructions" ? <InstructionsPage project={project} selectedInstruction={selectedInstruction} onCreateDocument={setCreateDocumentKind} /> : null}
-              {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "workflows"} saveAutomation={saveAutomation} navigate={navigate} /> : null}
+              {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "workflows"} selectedId={route.automationEntityId} saveAutomation={saveAutomation} navigate={navigate} /> : null}
+              {route.view === "runtimes" ? <RuntimesView data={data} selectedId={route.runtimeId} saveAutomation={saveAutomation} navigate={navigate} /> : null}
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
             </main>
@@ -1294,13 +1466,6 @@ function SkillsView({
   );
 }
 
-const automationTabs: Array<{ id: AutomationTab; label: string; icon: ReactNode }> = [
-  { id: "triggers", label: "Triggers", icon: <Zap data-icon="inline-start" /> },
-  { id: "actions", label: "Actions", icon: <FileKey2 data-icon="inline-start" /> },
-  { id: "workflows", label: "Workflows", icon: <Activity data-icon="inline-start" /> },
-  { id: "runtimes", label: "Runtimes", icon: <Code2 data-icon="inline-start" /> }
-];
-
 const noSelection = "__none__";
 
 type AutomationConfigUpdater = (updater: (config: ProjectAutomationConfig) => ProjectAutomationConfig) => void;
@@ -1308,27 +1473,21 @@ type AutomationConfigUpdater = (updater: (config: ProjectAutomationConfig) => Pr
 function AutomationView({
   data,
   activeTab,
+  selectedId,
   saveAutomation,
   navigate
 }: {
   data: AppData;
   activeTab: AutomationTab;
+  selectedId?: string;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
   navigate: (path: string) => void;
 }) {
   const [draft, setDraft] = useState<ProjectAutomationConfig>(data.automation ?? automationConfigTemplate());
-  const [selectedTriggerId, setSelectedTriggerId] = useState("");
-  const [selectedActionId, setSelectedActionId] = useState("");
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
-  const [selectedRuntimeId, setSelectedRuntimeId] = useState("");
 
   useEffect(() => {
     const next = data.automation ?? automationConfigTemplate();
     setDraft(next);
-    setSelectedTriggerId((current) => next.triggers.some((trigger) => trigger.id === current) ? current : next.triggers[0]?.id ?? "");
-    setSelectedActionId((current) => next.actions.some((action) => action.id === current) ? current : next.actions[0]?.id ?? "");
-    setSelectedWorkflowId((current) => next.workflows.some((workflow) => workflow.id === current) ? current : next.workflows[0]?.id ?? "");
-    setSelectedRuntimeId((current) => next.runtimes.some((runtime) => runtime.id === current) ? current : next.runtimes[0]?.id ?? "");
   }, [data.automation]);
 
   const updateConfig: AutomationConfigUpdater = (updater) => {
@@ -1345,10 +1504,13 @@ function AutomationView({
     }
   };
 
+  const selectedTriggerId = activeTab === "triggers" ? selectedId ?? draft.triggers[0]?.id ?? "" : draft.triggers[0]?.id ?? "";
+  const selectedActionId = activeTab === "actions" ? selectedId ?? draft.actions[0]?.id ?? "" : draft.actions[0]?.id ?? "";
+  const selectedWorkflowId = activeTab === "workflows" ? selectedId ?? draft.workflows[0]?.id ?? "" : draft.workflows[0]?.id ?? "";
   const selectedTrigger = draft.triggers.find((trigger) => trigger.id === selectedTriggerId) ?? draft.triggers[0];
   const selectedAction = draft.actions.find((action) => action.id === selectedActionId) ?? draft.actions[0];
   const selectedWorkflow = draft.workflows.find((workflow) => workflow.id === selectedWorkflowId) ?? draft.workflows[0];
-  const selectedRuntime = draft.runtimes.find((runtime) => runtime.id === selectedRuntimeId) ?? draft.runtimes[0];
+  const selectAutomationEntity = (tab: AutomationTab, id: string) => navigate(automationSectionPath(tab, id));
 
   const addTrigger = () => {
     const id = uniqueAutomationId("new-trigger", draft.triggers.map((trigger) => trigger.id));
@@ -1356,7 +1518,7 @@ function AutomationView({
       ...current,
       triggers: [...current.triggers, { id, description: "New trigger" }]
     }));
-    setSelectedTriggerId(id);
+    selectAutomationEntity("triggers", id);
   };
 
   const addAction = () => {
@@ -1365,7 +1527,7 @@ function AutomationView({
       ...current,
       actions: [...current.actions, { id, description: "New action" }]
     }));
-    setSelectedActionId(id);
+    selectAutomationEntity("actions", id);
   };
 
   const addWorkflow = () => {
@@ -1374,52 +1536,37 @@ function AutomationView({
       ...current,
       workflows: [...current.workflows, { id, title: "New workflow", steps: [] }]
     }));
-    setSelectedWorkflowId(id);
+    selectAutomationEntity("workflows", id);
   };
 
   const removeSelectedTrigger = () => {
     if (!selectedTrigger) return;
+    const nextId = draft.triggers.find((trigger) => trigger.id !== selectedTrigger.id)?.id;
     setDraft((current) => ({
       ...current,
       triggers: current.triggers.filter((trigger) => trigger.id !== selectedTrigger.id)
     }));
-    setSelectedTriggerId(draft.triggers.find((trigger) => trigger.id !== selectedTrigger.id)?.id ?? "");
+    navigate(automationSectionPath("triggers", nextId));
   };
 
   const removeSelectedAction = () => {
     if (!selectedAction) return;
+    const nextId = draft.actions.find((action) => action.id !== selectedAction.id)?.id;
     setDraft((current) => ({
       ...current,
       actions: current.actions.filter((action) => action.id !== selectedAction.id)
     }));
-    setSelectedActionId(draft.actions.find((action) => action.id !== selectedAction.id)?.id ?? "");
-  };
-
-  const addRuntime = () => {
-    const id = uniqueAutomationId("new-runtime", draft.runtimes.map((runtime) => runtime.id));
-    setDraft((current) => ({
-      ...current,
-      runtimes: [...current.runtimes, { id, title: "New runtime", command: "codex", args: [] }]
-    }));
-    setSelectedRuntimeId(id);
+    navigate(automationSectionPath("actions", nextId));
   };
 
   const removeSelectedWorkflow = () => {
     if (!selectedWorkflow) return;
+    const nextId = draft.workflows.find((workflow) => workflow.id !== selectedWorkflow.id)?.id;
     setDraft((current) => ({
       ...current,
       workflows: current.workflows.filter((workflow) => workflow.id !== selectedWorkflow.id)
     }));
-    setSelectedWorkflowId(draft.workflows.find((workflow) => workflow.id !== selectedWorkflow.id)?.id ?? "");
-  };
-
-  const removeSelectedRuntime = () => {
-    if (!selectedRuntime) return;
-    setDraft((current) => ({
-      ...current,
-      runtimes: current.runtimes.filter((runtime) => runtime.id !== selectedRuntime.id)
-    }));
-    setSelectedRuntimeId(draft.runtimes.find((runtime) => runtime.id !== selectedRuntime.id)?.id ?? "");
+    navigate(automationSectionPath("workflows", nextId));
   };
 
   const addConfig = {
@@ -1434,10 +1581,6 @@ function AutomationView({
     workflows: {
       label: "Add workflow",
       onAdd: addWorkflow
-    },
-    runtimes: {
-      label: "Add runtime",
-      onAdd: addRuntime
     }
   }[activeTab];
 
@@ -1462,13 +1605,6 @@ function AutomationView({
       resourceName: selectedWorkflow?.title || selectedWorkflow?.id,
       canDelete: Boolean(selectedWorkflow),
       onDelete: removeSelectedWorkflow
-    },
-    runtimes: {
-      label: "Delete runtime",
-      type: "runtime",
-      resourceName: selectedRuntime?.title || selectedRuntime?.id,
-      canDelete: Boolean(selectedRuntime),
-      onDelete: removeSelectedRuntime
     }
   }[activeTab];
 
@@ -1498,35 +1634,103 @@ function AutomationView({
         )}
       >
         <div className="grid gap-4">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Automation sections">
-            {automationTabs.map((tab) => (
-              <Button
-                key={tab.id}
-                type="button"
-                variant={activeTab === tab.id ? "default" : "outline"}
-                size="sm"
-                role="tab"
-                aria-selected={activeTab === tab.id}
-                onClick={() => navigate(`/automation/${tab.id}`)}
-              >
-                {tab.icon}
-                {tab.label}
-              </Button>
-            ))}
-          </div>
           <AutomationIssues issues={data.automationIssues} />
           {activeTab === "triggers" ? (
-            <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={setSelectedTriggerId} updateConfig={updateConfig} />
+            <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={(id) => selectAutomationEntity("triggers", id)} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "actions" ? (
-            <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} onSelect={setSelectedActionId} updateConfig={updateConfig} />
+            <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "workflows" ? (
-            <WorkflowsAutomationTab data={data} config={draft} selectedId={selectedWorkflowId} onSelect={setSelectedWorkflowId} updateConfig={updateConfig} saveDraft={saveDraft} />
+            <WorkflowsAutomationTab data={data} config={draft} selectedId={selectedWorkflowId} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} />
           ) : null}
-          {activeTab === "runtimes" ? (
-            <RuntimesAutomationTab config={draft} selectedId={selectedRuntimeId} onSelect={setSelectedRuntimeId} updateConfig={updateConfig} />
-          ) : null}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function RuntimesView({
+  data,
+  selectedId,
+  saveAutomation,
+  navigate
+}: {
+  data: AppData;
+  selectedId?: string;
+  saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
+  navigate: (path: string) => void;
+}) {
+  const [draft, setDraft] = useState<ProjectAutomationConfig>(data.automation ?? automationConfigTemplate());
+
+  useEffect(() => {
+    setDraft(data.automation ?? automationConfigTemplate());
+  }, [data.automation]);
+
+  const updateConfig: AutomationConfigUpdater = (updater) => {
+    setDraft((current) => updater(current));
+  };
+
+  const saveDraft = async () => {
+    try {
+      const saved = await saveAutomation(draft);
+      setDraft(saved);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const selectedRuntimeId = selectedId ?? draft.runtimes[0]?.id ?? "";
+  const selectedRuntime = draft.runtimes.find((runtime) => runtime.id === selectedRuntimeId) ?? draft.runtimes[0];
+
+  const addRuntime = () => {
+    const id = uniqueAutomationId("new-runtime", draft.runtimes.map((runtime) => runtime.id));
+    setDraft((current) => ({
+      ...current,
+      runtimes: [...current.runtimes, { id, title: "New runtime", command: "codex", args: [] }]
+    }));
+    navigate(runtimePath(id));
+  };
+
+  const removeSelectedRuntime = () => {
+    if (!selectedRuntime) return;
+    const nextId = draft.runtimes.find((runtime) => runtime.id !== selectedRuntime.id)?.id;
+    setDraft((current) => ({
+      ...current,
+      runtimes: current.runtimes.filter((runtime) => runtime.id !== selectedRuntime.id)
+    }));
+    navigate(runtimePath(nextId));
+  };
+
+  return (
+    <div className="grid gap-4">
+      <Panel
+        title="Runtimes"
+        icon={<Code2 data-icon="inline-start" />}
+        action={(
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" size="icon-sm" variant="outline" aria-label="Add runtime" title="Add runtime" onClick={addRuntime}>
+              <Plus data-icon="inline-start" />
+            </Button>
+            <HeaderCrudActions
+              saveAction={(
+                <Button type="button" size="icon-sm" aria-label="Save runtimes" title="Save runtimes" onClick={() => void saveDraft()}>
+                  <Save data-icon="inline-start" />
+                </Button>
+              )}
+              deleteLabel="Delete runtime"
+              deleteType="runtime"
+              resourceName={selectedRuntime?.title || selectedRuntime?.id}
+              canDelete={Boolean(selectedRuntime)}
+              onDelete={removeSelectedRuntime}
+            />
+          </div>
+        )}
+      >
+        <div className="grid gap-4">
+          <AutomationIssues issues={data.automationIssues} />
+          <RuntimesEditor config={draft} selectedId={selectedRuntimeId} onSelect={(id) => navigate(runtimePath(id))} updateConfig={updateConfig} />
         </div>
       </Panel>
     </div>
@@ -1541,33 +1745,6 @@ function AutomationIssues({ issues }: { issues: ProjectAutomationIssue[] }) {
         {issues.map((issue) => `${issue.path}: ${issue.message}`).join(" ")}
       </AlertDescription>
     </Alert>
-  );
-}
-
-function AutomationEntityList({
-  empty,
-  rows
-}: {
-  empty: string;
-  rows: Array<{ id: string; label: string; active: boolean; onSelect: () => void }>;
-}) {
-  return (
-    <div className="grid min-w-0 overflow-hidden rounded-lg border border-divider-strong bg-background p-3">
-      <div className="flex flex-col gap-1">
-        {rows.length === 0 ? <span className="px-2 py-1.5 text-xs text-muted-foreground">{empty}</span> : null}
-        {rows.map((row) => (
-          <Button
-            key={row.id}
-            type="button"
-            variant={row.active ? "secondary" : "ghost"}
-            className="h-auto w-full min-w-0 max-w-full justify-start overflow-hidden whitespace-normal px-2 py-1.5 text-left font-mono text-xs"
-            onClick={row.onSelect}
-          >
-            <span className="block w-0 min-w-0 flex-1 truncate text-left">{row.label}</span>
-          </Button>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -1610,15 +1787,11 @@ function TriggersAutomationTab({
           : policy)
       };
     });
-    onSelect(normalized.id);
+    if (normalized.id) onSelect(normalized.id);
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <AutomationEntityList
-        empty="No triggers."
-        rows={config.triggers.map((trigger) => ({ id: trigger.id, label: trigger.id, active: trigger.id === selected?.id, onSelect: () => onSelect(trigger.id) }))}
-      />
+    <div className="grid gap-4">
       {selected ? (
         <FieldGroup>
           <TextField label="Trigger ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
@@ -1691,15 +1864,11 @@ function ActionsAutomationTab({
         }))
       };
     });
-    onSelect(normalized.id);
+    if (normalized.id) onSelect(normalized.id);
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <AutomationEntityList
-        empty="No actions."
-        rows={config.actions.map((action) => ({ id: action.id, label: action.id, active: action.id === selected?.id, onSelect: () => onSelect(action.id) }))}
-      />
+    <div className="grid gap-4">
       {selected ? (
         <FieldGroup>
           <TextField label="Action ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
@@ -1725,7 +1894,12 @@ function WorkflowsAutomationTab({
   updateConfig: AutomationConfigUpdater;
   saveDraft: () => Promise<boolean>;
 }) {
-  const selected = config.workflows.find((workflow) => workflow.id === selectedId) ?? config.workflows[0];
+  const lastSelectedIndexRef = useRef(0);
+  const foundSelectedIndex = config.workflows.findIndex((workflow) => workflow.id === selectedId);
+  const selectedIndex = foundSelectedIndex >= 0
+    ? foundSelectedIndex
+    : Math.min(lastSelectedIndexRef.current, Math.max(0, config.workflows.length - 1));
+  const selected = config.workflows[selectedIndex];
   const draggedStepIndexRef = useRef<number | null>(null);
   const workflowCanvasRef = useRef<HTMLDivElement | null>(null);
   const canvasPanRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -1770,6 +1944,10 @@ function WorkflowsAutomationTab({
   }, [workflowStepRecords]);
 
   useEffect(() => {
+    if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
+  }, [foundSelectedIndex]);
+
+  useEffect(() => {
     const updateCanvasHeight = () => {
       const top = workflowCanvasRef.current?.getBoundingClientRect().top;
       if (typeof top !== "number") return;
@@ -1795,8 +1973,9 @@ function WorkflowsAutomationTab({
     if (!selected) return;
     updateConfig((current) => ({
       ...current,
-      workflows: current.workflows.map((workflow) => workflow.id === selected.id ? { ...workflow, ...patch } : workflow)
+      workflows: current.workflows.map((workflow, index) => index === selectedIndex ? { ...workflow, ...patch } : workflow)
     }));
+    if (patch.id) onSelect(patch.id);
   };
 
   const updateStep = (index: number, policyId: string) => {
@@ -2205,10 +2384,6 @@ function WorkflowsAutomationTab({
 
   return (
     <div className="grid gap-4">
-      <AutomationEntityList
-        empty="No workflows."
-        rows={config.workflows.map((workflow) => ({ id: workflow.id, label: workflow.id, active: workflow.id === selected?.id, onSelect: () => onSelect(workflow.id) }))}
-      />
       {selected ? (
         <div className="grid gap-4">
           <div className="grid gap-3">
@@ -2442,7 +2617,7 @@ function WorkflowGhostNode({ value, icon: Icon, ariaLabel, disabled = false, cla
   );
 }
 
-function RuntimesAutomationTab({
+function RuntimesEditor({
   config,
   selectedId,
   onSelect,
@@ -2453,22 +2628,28 @@ function RuntimesAutomationTab({
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
 }) {
-  const selected = config.runtimes.find((runtime) => runtime.id === selectedId) ?? config.runtimes[0];
+  const lastSelectedIndexRef = useRef(0);
+  const foundSelectedIndex = config.runtimes.findIndex((runtime) => runtime.id === selectedId);
+  const selectedIndex = foundSelectedIndex >= 0
+    ? foundSelectedIndex
+    : Math.min(lastSelectedIndexRef.current, Math.max(0, config.runtimes.length - 1));
+  const selected = config.runtimes[selectedIndex];
+
+  useEffect(() => {
+    if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
+  }, [foundSelectedIndex]);
 
   const updateSelected = (patch: Partial<ProjectRuntime>) => {
     if (!selected) return;
     updateConfig((current) => ({
       ...current,
-      runtimes: current.runtimes.map((runtime) => runtime.id === selected.id ? { ...runtime, ...patch } : runtime)
+      runtimes: current.runtimes.map((runtime, index) => index === selectedIndex ? { ...runtime, ...patch } : runtime)
     }));
+    if (patch.id) onSelect(patch.id);
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <AutomationEntityList
-        empty="No runtimes."
-        rows={config.runtimes.map((runtime) => ({ id: runtime.id, label: runtime.id, active: runtime.id === selected?.id, onSelect: () => onSelect(runtime.id) }))}
-      />
+    <div className="grid gap-4">
       {selected ? (
         <FieldGroup>
           <TextField label="Runtime ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Agent, AppData, ProjectAutomationConfig } from "../../backend/shared/domain";
@@ -264,6 +264,7 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
 }
 
 async function renderRoute(path: string, data = baseData(), options?: { failNextSave?: boolean }) {
+  cleanup();
   window.history.pushState({}, "", path);
   const api = installApi(data, options);
   render(<WorkspaceApp />);
@@ -324,7 +325,8 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("button", { name: "Light theme" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dark theme" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "System theme" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /workflows/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
   });
 
   it("toggles project document sidebar menus closed after they have been opened", async () => {
@@ -355,7 +357,8 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("tab", { name: /events/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /add event/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /workflows/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
 
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
     expect(screen.queryByLabelText("Agent: existing")).not.toBeInTheDocument();
@@ -390,6 +393,26 @@ describe("workspace entity UI flows", () => {
       method: "PUT",
       body: expect.stringContaining("\"steps\":[\"on.existing.implementation.failed.then.existing.start.implementation\"]")
     }));
+  });
+
+  it("selects automation entities from the sidebar and stores query ids", async () => {
+    const user = userEvent.setup();
+    await renderRoute("/automation");
+
+    await user.click(screen.getByRole("link", { name: "implementation" }));
+    expect(window.location.pathname).toBe("/automation/actions");
+    expect(window.location.search).toBe("?id=implementation");
+    expect(screen.getByDisplayValue("Implement work")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "manual-start" }));
+    expect(window.location.pathname).toBe("/automation/triggers");
+    expect(window.location.search).toBe("?id=manual-start");
+    expect(screen.getByDisplayValue("Manual workflow start")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "workflow-1" }));
+    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(window.location.search).toBe("?id=workflow-1");
+    expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
   });
 
   it("edits workflow policy agent and action from the canvas", async () => {
@@ -443,7 +466,8 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const { data } = await renderRoute("/automation/actions");
 
-    expect(screen.getByRole("tab", { name: /actions/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Actions" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Implement work")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add action" }));
@@ -457,7 +481,7 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.actions.some((action) => action.id === "review-pass" && action.description === "Review output")).toBe(true));
 
-    await user.click(screen.getByRole("tab", { name: /workflows/i }));
+    await user.click(screen.getByRole("link", { name: "Workflows" }));
     await user.click(screen.getByRole("button", { name: "Edit workflow policy" }));
     await user.selectOptions(screen.getByLabelText("Workflow policy action"), "review-pass");
     await user.click(screen.getByRole("button", { name: "Save workflow policy" }));
@@ -513,7 +537,8 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const { data } = await renderRoute("/automation/triggers");
 
-    expect(screen.getByRole("tab", { name: /triggers/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Triggers" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Manual workflow start")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add trigger" }));
@@ -553,7 +578,8 @@ describe("workspace entity UI flows", () => {
     const { data } = await renderRoute("/automation/policies", workflowData);
 
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /workflows/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add policy step for existing.implementation.complete" }));
     expect(screen.getByLabelText("Policy: on.existing.implementation.complete.then.existing.start.implementation")).toBeInTheDocument();
@@ -586,7 +612,8 @@ describe("workspace entity UI flows", () => {
     await renderRoute("/policies");
 
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /workflows/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
   });
@@ -597,7 +624,8 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("link", { name: /agent runs/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Agent runs")).not.toBeInTheDocument();
     expect(screen.queryByText("Run detail")).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /workflows/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
   });
 
@@ -627,6 +655,19 @@ describe("workspace entity UI flows", () => {
 
     expect(screen.queryByRole("tab", { name: /events/i })).not.toBeInTheDocument();
     expect(screen.getAllByText("Ballet").length).toBeGreaterThan(0);
+  });
+
+  it("renders runtimes as a standalone page and routes legacy automation runtimes there", async () => {
+    await renderRoute("/runtimes");
+
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add runtime" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Runtime ID")).toHaveValue("runtime-1");
+    expect(screen.getByLabelText("Title")).toHaveValue("codex-cli");
+
+    await renderRoute("/automation/runtimes");
+    expect(screen.getByRole("button", { name: "Add runtime" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Runtime ID")).toHaveValue("runtime-1");
   });
 
   it("shows save failures as auto-dismissing floating notifications", async () => {
