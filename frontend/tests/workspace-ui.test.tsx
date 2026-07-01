@@ -121,6 +121,42 @@ const baseData = (): AppData => ({
   projectDocumentTree: []
 });
 
+const documentTreeFile = (collection: string, title: string, relativePath: string) => ({
+  type: "file" as const,
+  label: title,
+  document: {
+    id: relativePath,
+    collection,
+    title,
+    frontmatter: { title },
+    body: `# ${title}`,
+    absolutePath: `/workspace/${relativePath}`,
+    relativePath,
+    slug: slug(title)
+  }
+});
+
+const dataWithProjectDocumentTree = () => {
+  const data = baseData();
+  data.projectDocumentTree = [{
+    type: "directory",
+    label: "ADR",
+    relativePath: ".ballet/adr",
+    children: [documentTreeFile("adrs", "ADR One", ".ballet/adr/one.md")]
+  }, {
+    type: "directory",
+    label: "Goals",
+    relativePath: ".ballet/goals",
+    children: [documentTreeFile("goals", "Goal One", ".ballet/goals/one.md")]
+  }, {
+    type: "directory",
+    label: "Instructions",
+    relativePath: ".ballet/instructions",
+    children: [documentTreeFile("documents", "Instruction One", ".ballet/instructions/one.md")]
+  }];
+  return data;
+};
+
 const jsonResponse = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), {
     status: init?.status ?? 200,
@@ -280,6 +316,36 @@ describe("workspace entity UI flows", () => {
     await confirmDelete(user, "Delete agent");
     await waitFor(() => expect(data.agents.some((agent) => agent.name === "Review Agent")).toBe(false));
     expect(window.location.pathname).toBe("/agents");
+  });
+
+  it("does not render the removed sidebar theme selector", async () => {
+    await renderRoute("/automation");
+
+    expect(screen.queryByRole("button", { name: "Light theme" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dark theme" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "System theme" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /workflows/i })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("toggles project document sidebar menus closed after they have been opened", async () => {
+    const user = userEvent.setup();
+    await renderRoute("/projects/project-1/adrs", dataWithProjectDocumentTree());
+
+    const adrToggle = screen.getByRole("button", { name: "ADR" });
+    expect(adrToggle).toHaveAttribute("aria-expanded", "true");
+    expect(adrToggle.querySelector(".lucide-chevron-right")).not.toBeNull();
+    await user.click(adrToggle);
+    expect(adrToggle).toHaveAttribute("aria-expanded", "false");
+
+    for (const label of ["Instructions", "Goals"]) {
+      const toggle = screen.getByRole("button", { name: label });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(toggle.querySelector(".lucide-chevron-right")).not.toBeNull();
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+    }
   });
 
   it("defaults automation to workflows and edits policy events from the canvas", async () => {

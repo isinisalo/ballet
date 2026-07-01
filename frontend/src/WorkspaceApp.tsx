@@ -10,20 +10,17 @@ import {
   CalendarDays,
   CheckCircle2,
   ChartNoAxesColumnIncreasing,
-  ChevronDown,
+  ChevronRight,
   Code2,
   Eye,
   FileKey2,
   FileText,
   Hash,
   Menu,
-  Monitor,
-  Moon,
   Pencil,
   Plus,
   Route,
   Save,
-  Sun,
   Tags,
   Trash2,
   UserRound,
@@ -61,7 +58,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -91,7 +87,6 @@ import {
 import { cn } from "@/lib/utils";
 import { NotificationProvider, useNotifications } from "./app/notifications";
 import { useRuntimeStream } from "./app/useRuntimeStream";
-import { applyThemeMode, getStoredThemeMode, persistThemeMode, type ThemeMode } from "./theme";
 
 type View = "projects" | "project-document" | "project-goals" | "project-adrs" | "project-instructions" | "automation" | "agents" | "skills";
 type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
@@ -275,55 +270,6 @@ const routeFromPath = (path: string): RouteState => {
 const projectDocumentPath = (relativePath: string) => `/projects/document?path=${encodeURIComponent(relativePath)}`;
 const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
 const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
-
-const themeOptions: Array<{ mode: ThemeMode; label: string; icon: LucideIcon }> = [
-  { mode: "light", label: "Light theme", icon: Sun },
-  { mode: "dark", label: "Dark theme", icon: Moon },
-  { mode: "system", label: "System theme", icon: Monitor }
-];
-
-function useThemeMode() {
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredThemeMode());
-
-  useEffect(() => {
-    persistThemeMode(themeMode);
-    applyThemeMode(themeMode);
-
-    if (themeMode !== "system") return undefined;
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => applyThemeMode("system");
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [themeMode]);
-
-  return [themeMode, setThemeMode] as const;
-}
-
-function ThemeSelector({ mode, onChange }: { mode: ThemeMode; onChange: (mode: ThemeMode) => void }) {
-  return (
-    <div className="flex w-fit items-center gap-1 self-start rounded-lg border bg-card p-1" aria-label="Theme selector">
-      {themeOptions.map((option) => {
-        const Icon = option.icon;
-        return (
-          <Button
-            key={option.mode}
-            type="button"
-            size="icon-sm"
-            variant={mode === option.mode ? "default" : "ghost"}
-            aria-pressed={mode === option.mode}
-            title={option.label}
-            onClick={() => onChange(option.mode)}
-          >
-            <Icon data-icon="inline-start" />
-            <span className="sr-only">{option.label}</span>
-          </Button>
-        );
-      })}
-    </div>
-  );
-}
 
 type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skill, "id" | "frontmatter" | "body" | "relativePath" | "errors"> & {
   createdAt?: string;
@@ -596,7 +542,7 @@ function ProjectDocumentTreeDirectory({
           >
             <button type="button">
               <span>{node.label}</span>
-              <ChevronDown className={cn("ml-auto transition-transform", open && "rotate-180")} />
+              <ChevronRight className={cn("ml-auto transition-transform", open && "rotate-90")} />
             </button>
           </SidebarMenuSubButton>
         </CollapsibleTrigger>
@@ -698,7 +644,6 @@ function SidebarProjectDirectoryMenu({
   navigate,
   emptyLabel,
   forceRender = false,
-  viewPath,
   activeView = false
 }: {
   label: string;
@@ -708,35 +653,21 @@ function SidebarProjectDirectoryMenu({
   navigate: (path: string) => void;
   emptyLabel?: string;
   forceRender?: boolean;
-  viewPath?: string;
   activeView?: boolean;
 }) {
   const children = node?.children ?? [];
   const active = activeView || projectTreeContainsPath(children, activePath);
-  const [open, setOpen] = useState(active);
-
-  useEffect(() => {
-    if (active) setOpen(true);
-  }, [active]);
 
   if (!node && !forceRender) return null;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
+    <Collapsible defaultOpen={active} className="group/collapsible">
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton
-            isActive={active}
-            tooltip={label}
-            onClick={(event) => {
-              if (!viewPath) return;
-              event.preventDefault();
-              navigate(viewPath);
-            }}
-          >
+          <SidebarMenuButton isActive={active} tooltip={label}>
             {icon}
             <span>{label}</span>
-            <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -771,27 +702,20 @@ function AgentStatusDot({ status }: { status: Agent["status"] }) {
 
 function AppSidebar({
   route,
-  projectId,
   projectDocumentTree,
   agents,
   skills,
-  navigate,
-  themeMode,
-  onThemeModeChange
+  navigate
 }: {
   route: RouteState;
-  projectId?: string;
   projectDocumentTree: ProjectDocumentTreeNode[];
   agents: Agent[];
   skills: Skill[];
   navigate: (path: string) => void;
-  themeMode: ThemeMode;
-  onThemeModeChange: (mode: ThemeMode) => void;
 }) {
   const agentsOpen = route.view === "agents";
   const skillsOpen = route.view === "skills";
   const automationOpen = route.view === "automation";
-  const activeProjectId = route.projectId ?? projectId ?? "project";
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
@@ -831,7 +755,6 @@ function AppSidebar({
                 node={adrDirectory}
                 activePath={route.documentPath}
                 navigate={navigate}
-                viewPath={`/projects/${encodeURIComponent(activeProjectId)}/adrs`}
                 activeView={route.view === "project-adrs"}
               />
               <SidebarProjectDirectoryMenu
@@ -842,7 +765,6 @@ function AppSidebar({
                 navigate={navigate}
                 forceRender
                 emptyLabel="No instructions."
-                viewPath={`/projects/${encodeURIComponent(activeProjectId)}/instructions`}
                 activeView={route.view === "project-instructions"}
               />
               {item("Automation", <Route />, "/automation", automationOpen)}
@@ -852,7 +774,7 @@ function AppSidebar({
                     <SidebarMenuButton isActive={agentsOpen} tooltip="Agents">
                       <Bot />
                       <span>Agents</span>
-                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -866,7 +788,6 @@ function AppSidebar({
                 node={goalsDirectory}
                 activePath={route.documentPath}
                 navigate={navigate}
-                viewPath={`/projects/${encodeURIComponent(activeProjectId)}/goals`}
                 activeView={route.view === "project-goals"}
               />
               <Collapsible defaultOpen={skillsOpen} className="group/collapsible">
@@ -875,7 +796,7 @@ function AppSidebar({
                     <SidebarMenuButton isActive={skillsOpen} tooltip="Skills">
                       <FileKey2 />
                       <span>Skills</span>
-                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -887,9 +808,6 @@ function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <ThemeSelector mode={themeMode} onChange={onThemeModeChange} />
-      </SidebarFooter>
       <SidebarRail />
     </ShadcnSidebar>
   );
@@ -907,7 +825,6 @@ export function WorkspaceApp() {
 
 function WorkspaceShell() {
   const { notifications, notify } = useNotifications();
-  const [themeMode, setThemeMode] = useThemeMode();
   const [data, setData] = useState<AppData>(emptyData);
   const [loading, setLoading] = useState(true);
   const [route, setRoute] = useState<RouteState>(() => routeFromPath(`${window.location.pathname}${window.location.search}`));
@@ -1059,13 +976,10 @@ function WorkspaceShell() {
       <SidebarProvider>
         <AppSidebar
           route={route}
-          projectId={project?.id}
           projectDocumentTree={projectDocumentTree}
           agents={data.agents}
           skills={data.skills}
           navigate={navigate}
-          themeMode={themeMode}
-          onThemeModeChange={setThemeMode}
         />
         <SidebarInset>
           <ScrollArea className="h-svh">
