@@ -10,7 +10,7 @@
     "build": "rm -rf dist dist-server && tsc -b --force && vite build",
     "test": "vitest run",
     "lint": "eslint .",
-    "preview": "npm run build && node dist-server/index.js"
+    "preview": "npm run build && node dist-server/backend/index.js"
   },
   "dependencies": {
     "@fontsource-variable/geist-mono": "^5.2.8",

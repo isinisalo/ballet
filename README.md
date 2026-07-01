@@ -15,7 +15,7 @@ The repository was empty, so this stack was chosen as a small full-stack TypeScr
 
 - `frontend/` contains the React + Vite UI.
 - `backend/` contains the Express API server.
-- `backend/shared/` contains domain types, policies, and seed data shared by the UI and API.
+- `shared/` contains domain types, policies, and seed data shared by the UI and API.
 - `backend/tests/` contains Vitest tests for backend and shared behavior.
 - `data/`, `audit/`, and `.fixture-ballet-project/` contain project data, visual audit artifacts, and fixtures.
 

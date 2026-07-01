@@ -3,19 +3,16 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { v4 as uuid } from "uuid";
-import type { Agent, AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus, EventRecord, EventRoutingSummary, EventStatus, Policy, RouteDecision, RuntimeEvent } from "./shared/domain.js";
-import { routeEvent } from "./shared/policy.js";
+import type { Agent, AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus, EventRecord, EventRoutingSummary, EventStatus, Policy, RouteDecision, RuntimeEvent } from "../shared/domain.js";
+import { routeEvent } from "../shared/policy.js";
+import { resolveRuntimeDbPath } from "./runtime/runtimeDbPath.js";
 
 const PROJECTOR_CONSUMER = "policy-projector";
 const MAX_CORRELATION_DEPTH = 20;
 
 const now = () => new Date().toISOString();
 
-export const resolveRuntimeDbPath = (root: string): string => {
-  const configured = process.env.BALLET_DB_PATH?.trim();
-  if (configured) return path.isAbsolute(configured) ? configured : path.resolve(root, configured);
-  return path.join(root, "data", "ballet-runtime.sqlite");
-};
+export { resolveRuntimeDbPath };
 
 const parseVersion = (version: string): [number, number, number] => {
   const [major = 0, minor = 0, patch = 0] = version.split(".").map((part) => Number.parseInt(part, 10));

@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { copyFile, mkdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Agent, AgentOutcome } from "./shared/domain.js";
+import type { Agent, AgentOutcome } from "../shared/domain.js";
 import { agentOutcomeSchema, parseAgentOutcomeText } from "./runtime-policy.js";
 
 type JsonRpcId = string | number;

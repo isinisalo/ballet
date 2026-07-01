@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 import { isMap, parseDocument, stringify } from "yaml";
-import type { MarkdownDocument, ProjectDocumentTreeNode } from "./shared/domain.js";
+import type { MarkdownDocument, ProjectDocumentTreeNode } from "../shared/domain.js";
 
 export interface ParsedMarkdownDocument {
   frontmatter: Record<string, unknown>;

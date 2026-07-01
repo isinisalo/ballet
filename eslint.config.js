@@ -11,6 +11,12 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module"
+    },
+    rules: {
+      complexity: ["warn", 20],
+      "max-depth": ["warn", 4],
+      "max-lines": ["warn", { max: 500, skipBlankLines: true, skipComments: true }],
+      "max-lines-per-function": ["warn", { max: 120, skipBlankLines: true, skipComments: true }]
     }
   }
 );

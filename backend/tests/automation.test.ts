@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, ProjectAutomationConfig } from "../shared/domain.js";
+import type { Agent, ProjectAutomationConfig } from "../../shared/domain.js";
 import {
   automationPoliciesToPolicies,
   loadProjectAutomationConfig,

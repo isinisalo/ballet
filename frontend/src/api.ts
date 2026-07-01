@@ -1,4 +1,4 @@
-import type { AppData, CollectionName, EventRecord, MarkdownDocument, ProjectAutomationConfig, ProjectAutomationIssue } from "../../backend/shared/domain";
+import type { AppData, CollectionName, EventRecord, MarkdownDocument, ProjectAutomationConfig, ProjectAutomationIssue } from "../../shared/domain";
 
 const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {

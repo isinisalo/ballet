@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Agent, EventRecord, Policy } from "../shared/domain.js";
-import { policyMatchesEvent, policyVersion, routeEvent } from "../shared/policy.js";
+import type { Agent, EventRecord, Policy } from "../../shared/domain.js";
+import { policyMatchesEvent, policyVersion, routeEvent } from "../../shared/policy.js";
 
 const event: EventRecord = {
   id: "event-1",

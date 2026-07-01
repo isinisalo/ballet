@@ -14,7 +14,7 @@ import type {
   ProjectWorkflow,
   RoutedEvent,
   Runtime
-} from "./shared/domain.js";
+} from "../shared/domain.js";
 import {
   agentTokenCandidates,
   generatedPolicyId,
@@ -25,19 +25,13 @@ import {
   policyOutputEventType,
   policySourceKey,
   resolvePolicyAgent
-} from "./shared/policy-actions.js";
+} from "../shared/policy-actions.js";
+import { defaultProjectAutomationConfig } from "./automation/defaultConfig.js";
 
 const automationConfigPath = (root: string) => path.join(root, ".ballet", "project.json");
 const timestamp = "1970-01-01T00:00:00.000Z";
 
-export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
-  version: 1,
-  triggers: [],
-  actions: [],
-  policies: [],
-  workflows: [],
-  runtimes: []
-});
+export { defaultProjectAutomationConfig };
 
 export class AutomationValidationError extends Error {
   constructor(

@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Agent, AppData, ProjectAutomationConfig } from "../../backend/shared/domain";
-import { policyOutputEventTypes } from "../../backend/shared/policy-actions";
+import type { Agent, AppData, ProjectAutomationConfig } from "../../shared/domain";
+import { policyOutputEventTypes } from "../../shared/policy-actions";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 
 const now = "2026-06-26T10:00:00.000Z";

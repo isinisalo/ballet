@@ -2,10 +2,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, AgentOutcome, Policy, ProjectPolicy } from "../shared/domain.js";
+import type { Agent, AgentOutcome, Policy, ProjectPolicy } from "../../shared/domain.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
 import { parseAgentOutcomeText } from "../runtime-policy.js";
-import { policyVersion } from "../shared/policy.js";
+import { policyVersion } from "../../shared/policy.js";
 import { mapAgentOutputToEvent } from "../automation.js";
 
 const tempRoots: string[] = [];

@@ -23,5 +23,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["frontend/src", "backend/shared"]
+  "include": ["frontend/src", "shared"]
 }
