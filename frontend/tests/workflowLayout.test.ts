@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectPolicy } from "../../shared/api/workspace-contracts";
+import { policyOutputEventTypes } from "../../shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { calculateWorkflowCanvasLayout, workflowConnectorPath } from "../src/workspace/automation/workflows/workflowLayout";
 
@@ -38,6 +39,14 @@ describe("workflowConnectorPath", () => {
 });
 
 describe("calculateWorkflowCanvasLayout", () => {
+  it("uses complete, blocked, and failed as policy output events", () => {
+    expect(policyOutputEventTypes({ agent: "codex", action: "build" })).toEqual([
+      "codex.build.complete",
+      "codex.build.blocked",
+      "codex.build.failed"
+    ]);
+  });
+
   it("creates a trigger and first-policy ghost for an empty workflow", () => {
     const layout = layoutFor([], []);
 

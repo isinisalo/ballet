@@ -1,7 +1,7 @@
 import type { Agent } from "./domain/agents.js";
 import type { ProjectPolicy } from "./domain/automation.js";
 
-export const policyOutputStatuses = ["complete", "cancelled", "blocked", "failed"] as const;
+export const policyOutputStatuses = ["complete", "blocked", "failed"] as const;
 export type PolicyOutputStatus = typeof policyOutputStatuses[number];
 
 export const normalizePolicyToken = (value: string): string =>

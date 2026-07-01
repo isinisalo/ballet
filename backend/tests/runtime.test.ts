@@ -313,7 +313,6 @@ describe("runtime output mapping", () => {
     expect(mapAgentOutputToEvent(projectPolicy, { status: "complete" }).id).toBe("developer.implementation.complete");
     expect(mapAgentOutputToEvent(projectPolicy, { status: "failed" }).id).toBe("developer.implementation.failed");
     expect(mapAgentOutputToEvent(projectPolicy, { status: "blocked" }).id).toBe("developer.implementation.blocked");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "cancelled" }).id).toBe("developer.implementation.cancelled");
   });
 
   it("does not require an event id in agent output", () => {
