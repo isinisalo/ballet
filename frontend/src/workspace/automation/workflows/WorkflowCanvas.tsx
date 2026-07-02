@@ -16,6 +16,7 @@ const workflowEdgeTypes = {
 
 const workflowSolidEdgeStroke = "color-mix(in srgb, var(--primary) 70%, transparent)";
 const workflowDashedEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 70%, transparent)";
+const workflowReturnEdgeStroke = "color-mix(in srgb, var(--tertiary) 85%, transparent)";
 
 const workflowSolidEdgeMarker = {
   type: MarkerType.ArrowClosed,
@@ -31,11 +32,34 @@ const workflowDashedEdgeMarker = {
   color: workflowDashedEdgeStroke
 } as const;
 
-function workflowEdgeDomAttributes(dashed?: boolean): WorkflowReactFlowEdge["domAttributes"] {
+const workflowReturnEdgeMarker = {
+  type: MarkerType.ArrowClosed,
+  width: 8,
+  height: 8,
+  color: workflowReturnEdgeStroke
+} as const;
+
+function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][number]): WorkflowReactFlowEdge["domAttributes"] {
   return {
     "data-workflow-connector": "true",
-    "data-dashed": dashed ? "true" : "false"
+    "data-dashed": edge.dashed || edge.tone === "return" ? "true" : "false",
+    "data-workflow-edge-tone": edge.tone ?? "flow"
   } as WorkflowReactFlowEdge["domAttributes"];
+}
+
+function workflowEdgeStroke(edge: WorkflowCanvasProps["layout"]["edges"][number]) {
+  if (edge.tone === "return") return workflowReturnEdgeStroke;
+  return edge.dashed ? workflowDashedEdgeStroke : workflowSolidEdgeStroke;
+}
+
+function workflowEdgeMarker(edge: WorkflowCanvasProps["layout"]["edges"][number]) {
+  if (edge.tone === "return") return workflowReturnEdgeMarker;
+  return edge.dashed ? workflowDashedEdgeMarker : workflowSolidEdgeMarker;
+}
+
+function workflowEdgeStrokeDasharray(edge: WorkflowCanvasProps["layout"]["edges"][number]) {
+  if (edge.tone === "return") return "4 4";
+  return edge.dashed ? "6 5" : undefined;
 }
 
 export function WorkflowCanvas({
@@ -221,17 +245,17 @@ export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layou
     sourceHandle: workflowEdge.sourceHandleId,
     targetHandle: workflowEdge.targetHandleId,
     data: { workflowEdge, context },
-    markerEnd: workflowEdge.dashed ? workflowDashedEdgeMarker : workflowSolidEdgeMarker,
+    markerEnd: workflowEdgeMarker(workflowEdge),
     style: {
-      stroke: workflowEdge.dashed ? workflowDashedEdgeStroke : workflowSolidEdgeStroke,
+      stroke: workflowEdgeStroke(workflowEdge),
       strokeWidth: 2,
-      strokeDasharray: workflowEdge.dashed ? "6 5" : undefined
+      strokeDasharray: workflowEdgeStrokeDasharray(workflowEdge)
     },
     interactionWidth: 0,
     selectable: false,
     focusable: false,
     reconnectable: false,
-    domAttributes: workflowEdgeDomAttributes(workflowEdge.dashed)
+    domAttributes: workflowEdgeDomAttributes(workflowEdge)
   }));
 }
 

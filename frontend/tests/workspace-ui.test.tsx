@@ -918,14 +918,45 @@ describe("workspace entity UI flows", () => {
   });
 
   it("renders workflow edges with the smart step edge type", async () => {
-    await renderRoute("/automation/workflows");
-    await screen.findByRole("button", { name: "Add policy step for existing.implementation.complete" });
+    const workflowData = baseData();
+    workflowData.automation.actions.push({
+      id: "review",
+      description: "Review implementation output.",
+      outputIds: ["rejected"]
+    });
+    workflowData.automation.policies = [{
+      id: "on.trigger.manual-start.then.existing.start.implementation",
+      source: "trigger",
+      trigger: "manual-start",
+      agent: "existing",
+      action: "implementation",
+      enabled: true
+    }, {
+      id: "on.existing.implementation.complete.then.existing.start.review",
+      source: "event",
+      event: "existing.implementation.complete",
+      agent: "existing",
+      action: "review",
+      enabled: true
+    }, {
+      id: "on.existing.review.rejected.then.existing.start.implementation",
+      source: "event",
+      event: "existing.review.rejected",
+      agent: "existing",
+      action: "implementation",
+      enabled: true
+    }];
+    workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
+
+    await renderRoute("/automation/workflows", workflowData);
+    await screen.findByLabelText("Policy: on.existing.review.rejected.then.existing.start.implementation");
 
     await waitFor(() => {
       expect(document.querySelectorAll(".react-flow__edge-workflowSmart").length).toBeGreaterThan(0);
     });
     expect(document.querySelectorAll(".react-flow__edge-smoothstep")).toHaveLength(0);
     expect(document.querySelectorAll("[data-workflow-connector=\"true\"]").length).toBeGreaterThan(0);
+    expect(document.querySelectorAll("[data-workflow-edge-tone=\"return\"]")).toHaveLength(1);
   });
 
   it("routes legacy policies paths to workflow configuration", async () => {

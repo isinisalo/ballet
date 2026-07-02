@@ -226,6 +226,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       targetNodeKey: "policy-1",
       sourceHandleId: "right",
       targetHandleId: "left",
+      tone: "return",
       eventType: "developer.implement.completed"
     });
     expect(reworkOutputEventsNode?.outputEvents).toEqual([{ eventType: "developer.implement.failed" }]);
@@ -242,6 +243,7 @@ describe("toWorkflowReactFlowEdges", () => {
       sourceHandleId: "right",
       targetHandleId: "left",
       dashed: true,
+      tone: "return",
       eventType: "existing.implementation.complete"
     }]);
 
@@ -260,13 +262,17 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(edge.type).not.toBe("smoothstep");
     expect(edge.domAttributes).toMatchObject({
       "data-workflow-connector": "true",
-      "data-dashed": "true"
+      "data-dashed": "true",
+      "data-workflow-edge-tone": "return"
     });
     expect(edge.data?.workflowEdge.eventType).toBe("existing.implementation.complete");
     expect(edge.style).toMatchObject({
-      stroke: "color-mix(in srgb, var(--muted-foreground) 70%, transparent)",
-      strokeDasharray: "6 5",
+      stroke: "color-mix(in srgb, var(--tertiary) 85%, transparent)",
+      strokeDasharray: "4 4",
       strokeWidth: 2
+    });
+    expect(edge.markerEnd).toMatchObject({
+      color: "color-mix(in srgb, var(--tertiary) 85%, transparent)"
     });
   });
 });
