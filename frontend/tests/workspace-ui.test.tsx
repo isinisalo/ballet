@@ -565,7 +565,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.getAllByText("existing").length).toBeGreaterThan(0);
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
     expect(within(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).getByText("implementation")).toHaveAttribute("title", "Implement work");
-    expect(screen.getByText("existing.implementation.complete")).toBeInTheDocument();
+    expect(await screen.findByText("existing.implementation.complete")).toBeInTheDocument();
     expect(screen.queryByText("existing.implementation.blocked")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();
@@ -852,7 +852,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add policy step for existing.implementation.complete" }));
+    await user.click(await screen.findByRole("button", { name: "Add policy step for existing.implementation.complete" }));
     expect(screen.getByLabelText("Policy: on.existing.implementation.complete.then.existing.start.implementation")).toBeInTheDocument();
 
     const editButtons = screen.getAllByRole("button", { name: "Edit workflow policy" });
@@ -913,7 +913,7 @@ describe("workspace entity UI flows", () => {
     await renderRoute("/automation/workflows", workflowData);
 
     expect(screen.getByLabelText("Policy: on.existing.implementation.complete.then.existing.start.review")).toBeInTheDocument();
-    expect(screen.getByLabelText("Event: existing.implementation.complete")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Event: existing.implementation.complete")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add policy step for existing.implementation.complete" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Add policy step for existing.implementation.failed" }).length).toBeGreaterThan(0);
   });

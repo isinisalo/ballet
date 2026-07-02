@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectPolicy } from "../../shared/api/workspace-contracts";
 import { buildWorkflowGraph, workflowOutputEvents, workflowTriggerLabel } from "../src/workspace/automation/workflows/workflowGraph";
-import { workflowConnectorPath } from "../src/workspace/automation/workflows/workflowLayout";
 
 const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
   id: patch.id ?? "policy",
@@ -45,12 +44,5 @@ describe("workflow graph", () => {
     expect(workflowTriggerLabel(triggerPolicy)).toBe("manual-start");
     expect(workflowOutputEvents(undefined)).toEqual(["Missing policy"]);
     expect(buildWorkflowGraph([{ policyId: "orphan", index: 0 }]).rootRecords).toEqual([{ policyId: "orphan", index: 0 }]);
-  });
-});
-
-describe("workflow layout", () => {
-  it("builds straight and elbow connector paths", () => {
-    expect(workflowConnectorPath({ key: "flat", sourceNodeKey: "source", targetNodeKey: "target", from: { x: 0, y: 10 }, to: { x: 100, y: 11 } })).toBe("M 0 10 H 100");
-    expect(workflowConnectorPath({ key: "elbow", sourceNodeKey: "source", targetNodeKey: "target", from: { x: 0, y: 10 }, to: { x: 100, y: 80 } })).toBe("M 0 10 H 48 V 80 H 100");
   });
 });

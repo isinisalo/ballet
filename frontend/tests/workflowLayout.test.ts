@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ProjectPolicy } from "../../shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "../../shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
-import { calculateWorkflowCanvasLayout, workflowConnectorPath } from "../src/workspace/automation/workflows/workflowLayout";
+import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
+import { calculateWorkflowCanvasLayout, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 
 const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
   id,
@@ -14,7 +15,7 @@ const policy = (id: string, event: string | undefined, action = "build"): Projec
   enabled: true
 });
 
-const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyIndex: number | null = null) => {
+const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyIndex: number | null = null, direction: WorkflowLayoutDirection = "horizontal") => {
   const policyById = new Map(policies.map((item) => [item.id, item]));
   const records: WorkflowStepRecord[] = steps.map((policyId, index) => ({
     policyId,
@@ -25,19 +26,10 @@ const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyInde
 
   return calculateWorkflowCanvasLayout({
     workflowGraph: buildWorkflowGraph(records),
-    editingPolicyIndex
+    editingPolicyIndex,
+    direction
   });
 };
-
-describe("workflowConnectorPath", () => {
-  it("draws a straight connector when points are horizontally aligned", () => {
-    expect(workflowConnectorPath({ key: "edge", sourceNodeKey: "source", targetNodeKey: "target", from: { x: 10, y: 20 }, to: { x: 80, y: 21 } })).toBe("M 10 20 H 80");
-  });
-
-  it("draws a stepped connector when vertical movement is needed", () => {
-    expect(workflowConnectorPath({ key: "edge", sourceNodeKey: "source", targetNodeKey: "target", from: { x: 10, y: 20 }, to: { x: 80, y: 100 } })).toBe("M 10 20 H 45 V 100 H 80");
-  });
-});
 
 describe("calculateWorkflowCanvasLayout", () => {
   it("uses selected action outputs as policy output events", () => {
@@ -67,8 +59,13 @@ describe("calculateWorkflowCanvasLayout", () => {
     const first = policy("first", undefined, "build");
     const child = policy("child", "codex.build.complete", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id]);
+    const firstNode = layout.nodes.find((node) => node.key === "policy-0");
+    const childNode = layout.nodes.find((node) => node.key === "policy-1");
+    const failedEventAnchor = layout.nodes.find((node) => node.kind === "event-anchor" && node.eventType === "codex.build.failed");
+    const failedEventEdge = layout.edges.find((edge) => edge.key === "policy-event-0-codex.build.failed-0");
 
     expect(layout.nodes.filter((node) => node.kind === "policy").map((node) => node.record?.policyId)).toEqual(["first", "child"]);
+    expect(childNode?.x).toBeGreaterThan(firstNode?.x ?? 0);
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-policy-0-1-codex.build.complete",
       sourceNodeKey: "policy-0",
@@ -76,7 +73,32 @@ describe("calculateWorkflowCanvasLayout", () => {
       sourceHandleId: "right",
       targetHandleId: "left"
     }));
-    expect(layout.nodes.some((node) => node.kind === "event-ghost" && node.eventType === "codex.build.failed")).toBe(true);
+    expect(failedEventAnchor).toMatchObject({
+      kind: "event-anchor",
+      eventType: "codex.build.failed"
+    });
+    expect(failedEventEdge?.label).toMatchObject({
+      kind: "event-ghost",
+      eventType: "codex.build.failed",
+      interactive: true
+    });
+    expect(failedEventEdge?.label?.x).toBe(failedEventAnchor ? failedEventAnchor.x + failedEventAnchor.width / 2 : undefined);
+  });
+
+  it("lays out child event policies below the source policy in vertical mode", () => {
+    const first = policy("first", undefined, "build");
+    const child = policy("child", "codex.build.complete", "deploy");
+    const layout = layoutFor([first, child], [first.id, child.id], null, "vertical");
+    const firstNode = layout.nodes.find((node) => node.key === "policy-0");
+    const childNode = layout.nodes.find((node) => node.key === "policy-1");
+
+    expect(layout.direction).toBe("vertical");
+    expect(childNode?.y).toBeGreaterThan(firstNode?.y ?? 0);
+    expect(layout.edges).toContainEqual(expect.objectContaining({
+      key: "policy-policy-0-1-codex.build.complete",
+      sourceHandleId: "bottom",
+      targetHandleId: "top"
+    }));
   });
 
   it("links repeated output events through ghost events to existing handler policies", () => {
@@ -122,26 +144,71 @@ describe("calculateWorkflowCanvasLayout", () => {
       editingPolicyIndex: null
     });
 
-    const handledEventNode = layout.nodes.find((node) =>
-      node.kind === "handled-event-ghost" &&
-      node.eventType === "developer.implement.completed" &&
-      node.record?.index === 2
-    );
     const repeatedHandlerEdge = layout.edges.find((edge) => edge.key === "event-policy-2-1-developer.implement.completed");
-    const policyToGhostEdge = layout.edges.find((edge) => edge.key === "policy-handled-event-2-developer.implement.completed");
 
-    expect(handledEventNode).toBeDefined();
-    expect(policyToGhostEdge).toBeDefined();
     expect(repeatedHandlerEdge).toBeDefined();
-    expect(policyToGhostEdge).toMatchObject({
-      sourceNodeKey: "policy-2",
-      targetNodeKey: "event-2-developer.implement.completed-handled"
-    });
     expect(repeatedHandlerEdge).toMatchObject({
-      sourceNodeKey: "event-2-developer.implement.completed-handled",
-      targetNodeKey: "policy-1"
+      sourceNodeKey: "policy-2",
+      targetNodeKey: "policy-1",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      label: expect.objectContaining({
+        kind: "handled-event",
+        eventType: "developer.implement.completed",
+        interactive: false
+      })
     });
-    expect(repeatedHandlerEdge?.waypoints?.length).toBeGreaterThan(0);
-    expect(layout.nodes.some((node) => node.kind === "event-ghost" && node.eventType === "developer.implement.completed" && node.record?.index === 2)).toBe(false);
+    expect(layout.nodes.some((node) => node.kind === "event-anchor" && node.eventType === "developer.implement.completed" && node.record?.index === 2)).toBe(false);
+    expect(repeatedHandlerEdge?.label?.x).toBeGreaterThan((layout.nodes.find((node) => node.key === "policy-2")?.x ?? 0));
+  });
+});
+
+describe("toWorkflowReactFlowEdges", () => {
+  it("maps workflow layout edges to smart ReactFlow edges", () => {
+    const [edge] = toWorkflowReactFlowEdges([{
+      key: "event-policy-2-1-existing.implementation.complete",
+      sourceNodeKey: "event-2-existing.implementation.complete-handled",
+      targetNodeKey: "policy-1",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      dashed: true,
+      label: {
+        kind: "event-ghost",
+        eventType: "existing.implementation.complete",
+        interactive: true,
+        x: 320,
+        y: 140
+      }
+    }]);
+
+    expect(edge).toMatchObject({
+      id: "event-policy-2-1-existing.implementation.complete",
+      type: "workflowSmart",
+      source: "event-2-existing.implementation.complete-handled",
+      target: "policy-1",
+      sourceHandle: "right",
+      targetHandle: "left",
+      selectable: false,
+      focusable: false,
+      reconnectable: false,
+      interactionWidth: 0
+    });
+    expect(edge.type).not.toBe("smoothstep");
+    expect(edge.domAttributes).toMatchObject({
+      "data-workflow-connector": "true",
+      "data-dashed": "true"
+    });
+    expect(edge.data?.workflowEdge.label).toMatchObject({
+      kind: "event-ghost",
+      eventType: "existing.implementation.complete",
+      interactive: true,
+      x: 320,
+      y: 140
+    });
+    expect(edge.style).toMatchObject({
+      stroke: "color-mix(in srgb, var(--muted-foreground) 70%, transparent)",
+      strokeDasharray: "6 5",
+      strokeWidth: 2
+    });
   });
 });

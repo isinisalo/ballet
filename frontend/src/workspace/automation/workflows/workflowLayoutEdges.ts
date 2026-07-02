@@ -1,9 +1,4 @@
-import type { WorkflowGraph, WorkflowStepRecord } from "./workflowGraph";
-
-export type WorkflowCanvasPoint = {
-  x: number;
-  y: number;
-};
+import type { WorkflowGraph } from "./workflowGraph";
 
 export type WorkflowCanvasEdge = {
   key: string;
@@ -11,111 +6,62 @@ export type WorkflowCanvasEdge = {
   targetNodeKey: string;
   sourceHandleId?: string;
   targetHandleId?: string;
-  from: WorkflowCanvasPoint;
-  to: WorkflowCanvasPoint;
-  waypoints?: WorkflowCanvasPoint[];
   dashed?: boolean;
+  label?: WorkflowCanvasEdgeLabel;
 };
 
-export type WorkflowPolicyNodePosition = {
-  record: WorkflowStepRecord;
-  position: WorkflowCanvasPoint;
-};
-
-export type WorkflowEventNodePosition = {
-  nodeKey: string;
+export type WorkflowHandledEventNode = {
   eventType: string;
   sourceIndex: number;
-  position: WorkflowCanvasPoint;
+  sourceNodeKey: string;
+  sourcePolicyId?: string;
+  labelSlotIndex: number;
 };
 
-export const workflowConnectorPath = (edge: WorkflowCanvasEdge) => {
-  if (edge.waypoints?.length) {
-    return [edge.from, ...edge.waypoints, edge.to]
-      .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-      .join(" ");
-  }
-
-  const midX = edge.from.x + Math.max(18, Math.min(48, (edge.to.x - edge.from.x) / 2));
-  return Math.abs(edge.from.y - edge.to.y) <= 2
-    ? `M ${edge.from.x} ${edge.from.y} H ${edge.to.x}`
-    : `M ${edge.from.x} ${edge.from.y} H ${midX} V ${edge.to.y} H ${edge.to.x}`;
+export type WorkflowCanvasEdgeLabel = {
+  kind: "event-ghost" | "handled-event";
+  eventType: string;
+  interactive: boolean;
+  sourcePolicyId?: string;
+  x?: number;
+  y?: number;
+  slotIndex?: number;
 };
-
-const policyAnchor = ({
-  position,
-  policyWidth,
-  policyAnchorY,
-  side
-}: {
-  position: WorkflowCanvasPoint;
-  policyWidth: number;
-  policyAnchorY: number;
-  side: "left" | "right";
-}): WorkflowCanvasPoint => ({
-  x: position.x + (side === "right" ? policyWidth : 0),
-  y: position.y + policyAnchorY
-});
 
 export const workflowExistingHandlerEdges = ({
   workflowGraph,
-  policyNodePositions,
-  eventNodePositions,
-  policyWidth,
-  policyHeight,
-  eventWidth,
-  eventHeight,
-  policyAnchorY,
-  branchGap,
-  edgePad
+  policyNodeIndexes,
+  handledEventNodes,
+  sourceHandleId,
+  targetHandleId
 }: {
   workflowGraph: WorkflowGraph;
-  policyNodePositions: Map<number, WorkflowPolicyNodePosition>;
-  eventNodePositions: WorkflowEventNodePosition[];
-  policyWidth: number;
-  policyHeight: number;
-  eventWidth: number;
-  eventHeight: number;
-  policyAnchorY: number;
-  branchGap: number;
-  edgePad: number;
+  policyNodeIndexes: ReadonlySet<number>;
+  handledEventNodes: WorkflowHandledEventNode[];
+  sourceHandleId: string;
+  targetHandleId: string;
 }): WorkflowCanvasEdge[] => {
   const edges: WorkflowCanvasEdge[] = [];
-  let routedEdgeIndex = 0;
 
-  eventNodePositions.forEach(({ nodeKey, eventType, sourceIndex, position: eventPosition }) => {
+  handledEventNodes.forEach(({ eventType, sourceIndex, sourceNodeKey, sourcePolicyId, labelSlotIndex }) => {
     const handlerRecords = workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [];
     handlerRecords.forEach((handlerRecord) => {
-      const targetPosition = policyNodePositions.get(handlerRecord.index)?.position;
-      if (!targetPosition) return;
-
-      const from = {
-        x: eventPosition.x + eventWidth,
-        y: eventPosition.y + eventHeight / 2
-      };
-      const to = policyAnchor({ position: targetPosition, policyWidth, policyAnchorY, side: "left" });
-      const laneY = Math.max(
-        eventPosition.y + eventHeight,
-        targetPosition.y + policyHeight
-      ) + branchGap + edgePad + (routedEdgeIndex % 6) * 10;
-      const sourceLaneX = from.x + edgePad;
-      const targetLaneX = to.x - edgePad;
-      routedEdgeIndex += 1;
+      if (handlerRecord.index === sourceIndex) return;
+      if (!policyNodeIndexes.has(handlerRecord.index)) return;
 
       edges.push({
         key: `event-policy-${sourceIndex}-${handlerRecord.index}-${eventType}`,
-        sourceNodeKey: nodeKey,
+        sourceNodeKey,
         targetNodeKey: `policy-${handlerRecord.index}`,
-        sourceHandleId: "right",
-        targetHandleId: "left",
-        from,
-        to,
-        waypoints: [
-          { x: sourceLaneX, y: from.y },
-          { x: sourceLaneX, y: laneY },
-          { x: targetLaneX, y: laneY },
-          { x: targetLaneX, y: to.y }
-        ]
+        sourceHandleId,
+        targetHandleId,
+        label: {
+          kind: "handled-event",
+          eventType,
+          interactive: false,
+          sourcePolicyId,
+          slotIndex: labelSlotIndex
+        }
       });
     });
   });

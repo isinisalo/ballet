@@ -1,4 +1,4 @@
-import { Activity, Pencil, Route, Save, Trash2, Zap } from "lucide-react";
+import { Pencil, Route, Save, Trash2, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,21 +25,24 @@ function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutN
   const anchorTop = layoutNode.kind === "policy"
     ? workflowCanvasLayoutConfig.policyAnchorY
     : layoutNode.height / 2;
+  const anchorLeft = layoutNode.width / 2;
 
   return (
     <>
       <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
       <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
+      <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
+      <Handle id="bottom" type="source" position={Position.Bottom} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
     </>
   );
 }
 
 function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
+  if (node.kind === "event-anchor") return null;
   if (node.kind === "trigger") return renderTriggerNode(context);
   if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(context);
   if (!node.record) return null;
   if (node.kind === "save-policy" || node.kind === "edit-policy" || node.kind === "delete-policy") return renderPolicyActionNode(node, context, node.record);
-  if (node.kind === "handled-event-ghost" || node.kind === "event-ghost") return renderEventNode(node, context);
   return renderPolicyNode(node, context, node.record);
 }
 
@@ -90,26 +93,6 @@ function renderPolicyActionNode(node: WorkflowCanvasLayoutNode, context: Workflo
     <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => context.onDeleteStep(record.index)} className="nodrag">
       <Trash2 data-icon="inline-start" />
     </Button>
-  );
-}
-
-function renderEventNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
-  if (node.kind === "handled-event-ghost" && node.eventType) {
-    return <WorkflowCanvasNode label="Event" value={node.eventType} tone="event" icon={Activity} dashed className="w-60" />;
-  }
-
-  if (node.kind !== "event-ghost" || !node.eventType) return null;
-  const sourcePolicy = node.sourcePolicyId ? context.policyById.get(node.sourcePolicyId) : undefined;
-
-  return (
-    <WorkflowGhostNode
-      value={node.eventType}
-      icon={Activity}
-      ariaLabel={`Add policy step for ${node.eventType}`}
-      onClick={() => context.onAddPolicyStep(node.eventType, sourcePolicy)}
-      disabled={!context.canAddPolicyForEvent(sourcePolicy)}
-      className="nodrag w-60"
-    />
   );
 }
 

@@ -38,14 +38,15 @@ export type WorkflowCanvasProps = {
 
 export type WorkflowNodeContext = Omit<WorkflowCanvasProps, "layout" | "canvasHeight" | "isCanvasPanning" | "workflowCanvasRef" | "onCanvasMoveStart" | "onCanvasMoveEnd">;
 
-export type WorkflowReactFlowNodeData = {
+export type WorkflowReactFlowNodeData = Record<string, unknown> & {
   layoutNode: WorkflowCanvasLayoutNode;
   context: WorkflowNodeContext;
 };
 
-export type WorkflowReactFlowEdgeData = {
+export type WorkflowReactFlowEdgeData = Record<string, unknown> & {
   workflowEdge: WorkflowCanvasEdge;
+  context?: WorkflowNodeContext;
 };
 
 export type WorkflowReactFlowNode = Node<WorkflowReactFlowNodeData, "workflow">;
-export type WorkflowReactFlowEdge = Edge<WorkflowReactFlowEdgeData, "workflow">;
+export type WorkflowReactFlowEdge = Edge<WorkflowReactFlowEdgeData, "workflowSmart">;
