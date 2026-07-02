@@ -22,7 +22,7 @@ export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReact
 }
 
 function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
-  const anchorTop = layoutNode.kind === "policy" || layoutNode.kind === "output-events"
+  const anchorTop = layoutNode.kind === "trigger" || layoutNode.kind === "policy" || layoutNode.kind === "output-events"
     ? workflowCanvasLayoutConfig.policyAnchorY
     : layoutNode.height / 2;
   const anchorLeft = layoutNode.width / 2;

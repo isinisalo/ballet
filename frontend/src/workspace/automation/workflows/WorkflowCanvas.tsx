@@ -199,7 +199,7 @@ function useWorkflowNodes(layoutNodes: WorkflowCanvasProps["layout"]["nodes"], n
 }
 
 function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][number]): WorkflowReactFlowNode["handles"] {
-  const anchorTop = layoutNode.kind === "policy" || layoutNode.kind === "output-events"
+  const anchorTop = layoutNode.kind === "trigger" || layoutNode.kind === "policy" || layoutNode.kind === "output-events"
     ? workflowCanvasLayoutConfig.policyAnchorY
     : layoutNode.height / 2;
   const anchorLeft = layoutNode.width / 2;
