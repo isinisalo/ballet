@@ -50,7 +50,7 @@ describe("workflow graph", () => {
 
 describe("workflow layout", () => {
   it("builds straight and elbow connector paths", () => {
-    expect(workflowConnectorPath({ key: "flat", from: { x: 0, y: 10 }, to: { x: 100, y: 11 } })).toBe("M 0 10 H 100");
-    expect(workflowConnectorPath({ key: "elbow", from: { x: 0, y: 10 }, to: { x: 100, y: 80 } })).toBe("M 0 10 H 48 V 80 H 100");
+    expect(workflowConnectorPath({ key: "flat", sourceNodeKey: "source", targetNodeKey: "target", from: { x: 0, y: 10 }, to: { x: 100, y: 11 } })).toBe("M 0 10 H 100");
+    expect(workflowConnectorPath({ key: "elbow", sourceNodeKey: "source", targetNodeKey: "target", from: { x: 0, y: 10 }, to: { x: 100, y: 80 } })).toBe("M 0 10 H 48 V 80 H 100");
   });
 });

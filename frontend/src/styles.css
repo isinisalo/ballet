@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@xyflow/react/dist/base.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
@@ -292,6 +293,33 @@ body {
 .agent-instructions-preview .markdown-body h3,
 .agent-instructions-preview .markdown-body h4 {
   margin-top: 1.35rem;
+}
+
+.workflow-react-flow {
+  background: transparent;
+}
+
+.workflow-react-flow .react-flow__node,
+.workflow-react-flow .react-flow__edge {
+  outline: none;
+}
+
+.workflow-react-flow .react-flow__node:focus,
+.workflow-react-flow .react-flow__node:focus-visible,
+.workflow-react-flow .react-flow__edge:focus,
+.workflow-react-flow .react-flow__edge:focus-visible {
+  outline: none;
+}
+
+.workflow-react-flow .workflow-react-flow-handle {
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @theme inline {

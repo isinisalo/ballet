@@ -159,24 +159,33 @@ export function calculateWorkflowCanvasLayout({
           const childLayout = layoutPolicyBranch(childRecord, childX, childY, nextVisitedPolicyIds);
           addEdge({
             key: `policy-policy-${record.index}-${childRecord.index}-${eventType}`,
+            sourceNodeKey: `policy-${record.index}`,
+            targetNodeKey: `policy-${childRecord.index}`,
+            sourceHandleId: "right",
+            targetHandleId: "left",
             from: { x: policyX + workflowNodeSizes.policy.width, y: policyY + workflowCanvasLayoutConfig.policyAnchorY },
             to: { x: childX, y: childY + workflowCanvasLayoutConfig.policyAnchorY }
           });
           branchWidth = Math.max(branchWidth, outputX + childLayout.width - x);
           cursorY += Math.max(workflowCanvasLayoutConfig.rowStep, childY + childLayout.height - eventY) + workflowCanvasLayoutConfig.branchGap;
         } else {
+          const eventNodeKey = handledByExistingPolicy
+            ? `event-${record.index}-${eventType}-handled`
+            : `event-${record.index}-${eventType}-ghost-${childIndex}`;
           addEdge({
             key: handledByExistingPolicy
               ? `policy-handled-event-${record.index}-${eventType}`
               : `policy-event-${record.index}-${eventType}-${childIndex}`,
+            sourceNodeKey: `policy-${record.index}`,
+            targetNodeKey: eventNodeKey,
+            sourceHandleId: "right",
+            targetHandleId: "left",
             from: { x: policyX + workflowNodeSizes.policy.width, y: policyY + workflowCanvasLayoutConfig.policyAnchorY },
             to: { x: outputX, y: eventY + workflowNodeSizes.event.height / 2 },
             dashed: !policy
           });
           addNode({
-            key: handledByExistingPolicy
-              ? `event-${record.index}-${eventType}-handled`
-              : `event-${record.index}-${eventType}-ghost-${childIndex}`,
+            key: eventNodeKey,
             kind: handledByExistingPolicy ? "handled-event-ghost" : "event-ghost",
             x: outputX,
             y: eventY,
@@ -188,6 +197,7 @@ export function calculateWorkflowCanvasLayout({
           });
           if (handledByExistingPolicy) {
             handledEventNodePositions.push({
+              nodeKey: eventNodeKey,
               eventType,
               sourceIndex: record.index,
               position: { x: outputX, y: eventY }
@@ -222,6 +232,10 @@ export function calculateWorkflowCanvasLayout({
       const rootLayout = layoutPolicyBranch(record, rootX, rootY);
       addEdge({
         key: `trigger-policy-${record.index}`,
+        sourceNodeKey: "trigger",
+        targetNodeKey: `policy-${record.index}`,
+        sourceHandleId: "right",
+        targetHandleId: "left",
         from: { x: workflowCanvasLayoutConfig.startX + workflowNodeSizes.trigger.width, y: workflowCanvasLayoutConfig.startY + workflowNodeSizes.trigger.height / 2 },
         to: { x: rootX, y: rootY + workflowCanvasLayoutConfig.policyAnchorY },
         dashed: !record.policy
@@ -232,6 +246,10 @@ export function calculateWorkflowCanvasLayout({
     const firstGhostY = workflowCanvasLayoutConfig.startY + workflowNodeSizes.trigger.height / 2 - workflowNodeSizes.event.height / 2;
     addEdge({
       key: "trigger-first-policy",
+      sourceNodeKey: "trigger",
+      targetNodeKey: "first-policy-ghost",
+      sourceHandleId: "right",
+      targetHandleId: "left",
       from: { x: workflowCanvasLayoutConfig.startX + workflowNodeSizes.trigger.width, y: workflowCanvasLayoutConfig.startY + workflowNodeSizes.trigger.height / 2 },
       to: { x: rootX, y: firstGhostY + workflowNodeSizes.event.height / 2 },
       dashed: true

@@ -198,7 +198,6 @@ export function WorkflowsAutomationTab({
             actionOptions={actionOptions}
             draggedStepIndex={canvasInteraction.draggedStepIndex}
             dragOverStepIndex={canvasInteraction.dragOverStepIndex}
-            canvasOffset={canvasInteraction.canvasOffset}
             canvasHeight={canvasInteraction.canvasHeight}
             isCanvasPanning={canvasInteraction.isCanvasPanning}
             workflowCanvasRef={canvasInteraction.workflowCanvasRef}
@@ -208,10 +207,8 @@ export function WorkflowsAutomationTab({
             onStepPointerMove={canvasInteraction.handleStepPointerMove}
             onStepPointerUp={canvasInteraction.handleStepPointerUp}
             onStepPointerCancel={canvasInteraction.resetStepDrag}
-            onCanvasPointerDown={canvasInteraction.handleCanvasPointerDown}
-            onCanvasPointerMove={canvasInteraction.handleCanvasPointerMove}
-            onCanvasPointerUp={canvasInteraction.handleCanvasPointerUp}
-            onCanvasPointerCancel={canvasInteraction.resetCanvasPan}
+            onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
+            onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
             onPolicyChange={updateStep}
             onAgentChange={(record, agent) => updateWorkflowPolicy(record, { agent: agent === noSelection ? "" : agent })}
             onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action })}

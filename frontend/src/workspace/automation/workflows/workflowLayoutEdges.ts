@@ -7,6 +7,10 @@ export type WorkflowCanvasPoint = {
 
 export type WorkflowCanvasEdge = {
   key: string;
+  sourceNodeKey: string;
+  targetNodeKey: string;
+  sourceHandleId?: string;
+  targetHandleId?: string;
   from: WorkflowCanvasPoint;
   to: WorkflowCanvasPoint;
   waypoints?: WorkflowCanvasPoint[];
@@ -19,6 +23,7 @@ export type WorkflowPolicyNodePosition = {
 };
 
 export type WorkflowEventNodePosition = {
+  nodeKey: string;
   eventType: string;
   sourceIndex: number;
   position: WorkflowCanvasPoint;
@@ -78,7 +83,7 @@ export const workflowExistingHandlerEdges = ({
   const edges: WorkflowCanvasEdge[] = [];
   let routedEdgeIndex = 0;
 
-  eventNodePositions.forEach(({ eventType, sourceIndex, position: eventPosition }) => {
+  eventNodePositions.forEach(({ nodeKey, eventType, sourceIndex, position: eventPosition }) => {
     const handlerRecords = workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [];
     handlerRecords.forEach((handlerRecord) => {
       const targetPosition = policyNodePositions.get(handlerRecord.index)?.position;
@@ -99,6 +104,10 @@ export const workflowExistingHandlerEdges = ({
 
       edges.push({
         key: `event-policy-${sourceIndex}-${handlerRecord.index}-${eventType}`,
+        sourceNodeKey: nodeKey,
+        targetNodeKey: `policy-${handlerRecord.index}`,
+        sourceHandleId: "right",
+        targetHandleId: "left",
         from,
         to,
         waypoints: [

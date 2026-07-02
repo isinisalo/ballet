@@ -31,11 +31,11 @@ const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyInde
 
 describe("workflowConnectorPath", () => {
   it("draws a straight connector when points are horizontally aligned", () => {
-    expect(workflowConnectorPath({ key: "edge", from: { x: 10, y: 20 }, to: { x: 80, y: 21 } })).toBe("M 10 20 H 80");
+    expect(workflowConnectorPath({ key: "edge", sourceNodeKey: "source", targetNodeKey: "target", from: { x: 10, y: 20 }, to: { x: 80, y: 21 } })).toBe("M 10 20 H 80");
   });
 
   it("draws a stepped connector when vertical movement is needed", () => {
-    expect(workflowConnectorPath({ key: "edge", from: { x: 10, y: 20 }, to: { x: 80, y: 100 } })).toBe("M 10 20 H 45 V 100 H 80");
+    expect(workflowConnectorPath({ key: "edge", sourceNodeKey: "source", targetNodeKey: "target", from: { x: 10, y: 20 }, to: { x: 80, y: 100 } })).toBe("M 10 20 H 45 V 100 H 80");
   });
 });
 
@@ -52,7 +52,14 @@ describe("calculateWorkflowCanvasLayout", () => {
 
     expect(layout.nodes.map((node) => node.kind)).toEqual(["trigger", "first-policy-ghost"]);
     expect(layout.edges).toEqual([
-      expect.objectContaining({ key: "trigger-first-policy", dashed: true })
+      expect.objectContaining({
+        key: "trigger-first-policy",
+        sourceNodeKey: "trigger",
+        targetNodeKey: "first-policy-ghost",
+        sourceHandleId: "right",
+        targetHandleId: "left",
+        dashed: true
+      })
     ]);
   });
 
@@ -62,7 +69,13 @@ describe("calculateWorkflowCanvasLayout", () => {
     const layout = layoutFor([first, child], [first.id, child.id]);
 
     expect(layout.nodes.filter((node) => node.kind === "policy").map((node) => node.record?.policyId)).toEqual(["first", "child"]);
-    expect(layout.edges.some((edge) => edge.key === "policy-policy-0-1-codex.build.complete")).toBe(true);
+    expect(layout.edges).toContainEqual(expect.objectContaining({
+      key: "policy-policy-0-1-codex.build.complete",
+      sourceNodeKey: "policy-0",
+      targetNodeKey: "policy-1",
+      sourceHandleId: "right",
+      targetHandleId: "left"
+    }));
     expect(layout.nodes.some((node) => node.kind === "event-ghost" && node.eventType === "codex.build.failed")).toBe(true);
   });
 
@@ -120,6 +133,14 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(handledEventNode).toBeDefined();
     expect(policyToGhostEdge).toBeDefined();
     expect(repeatedHandlerEdge).toBeDefined();
+    expect(policyToGhostEdge).toMatchObject({
+      sourceNodeKey: "policy-2",
+      targetNodeKey: "event-2-developer.implement.completed-handled"
+    });
+    expect(repeatedHandlerEdge).toMatchObject({
+      sourceNodeKey: "event-2-developer.implement.completed-handled",
+      targetNodeKey: "policy-1"
+    });
     expect(repeatedHandlerEdge?.waypoints?.length).toBeGreaterThan(0);
     expect(layout.nodes.some((node) => node.kind === "event-ghost" && node.eventType === "developer.implement.completed" && node.record?.index === 2)).toBe(false);
   });

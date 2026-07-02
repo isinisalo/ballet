@@ -41,20 +41,64 @@ if (typeof window !== "undefined") {
     value: TestEventSource
   });
 
+  class TestResizeObserver implements ResizeObserver {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+
+    observe(target: Element) {
+      const bounds = target.getBoundingClientRect();
+      const width = bounds.width || 1024;
+      const height = bounds.height || 768;
+      const contentRect = {
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: width,
+        bottom: height,
+        width,
+        height,
+        toJSON: () => ({})
+      } as DOMRectReadOnly;
+      const boxSize = [{ inlineSize: width, blockSize: height }] as ResizeObserverSize[];
+
+      this.callback([{
+        target,
+        contentRect,
+        borderBoxSize: boxSize,
+        contentBoxSize: boxSize,
+        devicePixelContentBoxSize: boxSize
+      } as ResizeObserverEntry], this);
+    }
+
+    unobserve() {
+      // Test double.
+    }
+
+    disconnect() {
+      // Test double.
+    }
+  }
+
   Object.defineProperty(window, "ResizeObserver", {
     writable: true,
-    value: class {
-      observe() {
-        // Test double.
-      }
-      unobserve() {
-        // Test double.
-      }
-      disconnect() {
-        // Test double.
-      }
-    }
+    value: TestResizeObserver
   });
+
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    writable: true,
+    value: TestResizeObserver
+  });
+
+  if (typeof window.DOMMatrixReadOnly !== "function") {
+    class TestDOMMatrixReadOnly {
+      readonly m22 = 1;
+    }
+
+    Object.defineProperty(window, "DOMMatrixReadOnly", {
+      writable: true,
+      value: TestDOMMatrixReadOnly
+    });
+  }
 
   if (!window.HTMLElement.prototype.hasPointerCapture) {
     Object.defineProperty(window.HTMLElement.prototype, "hasPointerCapture", {
