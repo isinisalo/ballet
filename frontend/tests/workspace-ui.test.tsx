@@ -913,9 +913,19 @@ describe("workspace entity UI flows", () => {
     await renderRoute("/automation/workflows", workflowData);
 
     expect(screen.getByLabelText("Policy: on.existing.implementation.complete.then.existing.start.review")).toBeInTheDocument();
-    expect(await screen.findByLabelText("Event: existing.implementation.complete")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add policy step for existing.implementation.complete" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Add policy step for existing.implementation.failed" }).length).toBeGreaterThan(0);
+  });
+
+  it("renders workflow edges with the smart step edge type", async () => {
+    await renderRoute("/automation/workflows");
+    await screen.findByRole("button", { name: "Add policy step for existing.implementation.complete" });
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".react-flow__edge-workflowSmart").length).toBeGreaterThan(0);
+    });
+    expect(document.querySelectorAll(".react-flow__edge-smoothstep")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-workflow-connector=\"true\"]").length).toBeGreaterThan(0);
   });
 
   it("routes legacy policies paths to workflow configuration", async () => {

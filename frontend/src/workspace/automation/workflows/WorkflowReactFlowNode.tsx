@@ -1,4 +1,4 @@
-import { Pencil, Route, Save, Trash2, Zap } from "lucide-react";
+import { Activity, Pencil, Route, Save, Trash2, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,7 +22,7 @@ export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReact
 }
 
 function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
-  const anchorTop = layoutNode.kind === "policy"
+  const anchorTop = layoutNode.kind === "policy" || layoutNode.kind === "output-events"
     ? workflowCanvasLayoutConfig.policyAnchorY
     : layoutNode.height / 2;
   const anchorLeft = layoutNode.width / 2;
@@ -38,9 +38,9 @@ function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutN
 }
 
 function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
-  if (node.kind === "event-anchor") return null;
   if (node.kind === "trigger") return renderTriggerNode(context);
   if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(context);
+  if (node.kind === "output-events") return renderOutputEventsNode(node, context);
   if (!node.record) return null;
   if (node.kind === "save-policy" || node.kind === "edit-policy" || node.kind === "delete-policy") return renderPolicyActionNode(node, context, node.record);
   return renderPolicyNode(node, context, node.record);
@@ -69,6 +69,39 @@ function renderFirstPolicyGhost(context: WorkflowNodeContext) {
       disabled={!context.canAddFirstPolicy}
       className="nodrag w-60"
     />
+  );
+}
+
+function renderOutputEventsNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
+  const outputEvents = node.outputEvents ?? [];
+  const sourcePolicy = node.sourcePolicyId ? context.policyById.get(node.sourcePolicyId) : undefined;
+
+  return (
+    <WorkflowCanvasNode
+      label="Output Events"
+      value={`${outputEvents.length} output event${outputEvents.length === 1 ? "" : "s"}`}
+      tone="event"
+      icon={Activity}
+      dashed
+      className="w-60 max-w-none py-2"
+    >
+      <div className="grid gap-1">
+        {outputEvents.map(({ eventType }) => (
+          <button
+            key={eventType}
+            type="button"
+            data-workflow-output-event={eventType}
+            aria-label={`Add policy step for ${eventType}`}
+            title={eventType}
+            disabled={!context.canAddPolicyForEvent(sourcePolicy)}
+            onClick={() => context.onAddPolicyStep(eventType, sourcePolicy)}
+            className="nodrag nopan h-6 min-w-0 rounded border border-dashed border-muted-foreground/70 bg-background/80 px-1.5 text-left font-mono text-[0.62rem] leading-4 text-muted-foreground transition-colors hover:border-primary/80 hover:bg-card hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80"
+          >
+            <span className="block truncate">{eventType}</span>
+          </button>
+        ))}
+      </div>
+    </WorkflowCanvasNode>
   );
 }
 

@@ -1,25 +1,17 @@
 import { useEffect, useMemo } from "react";
-import { Activity } from "lucide-react";
-import { BaseEdge, EdgeLabelRenderer, MarkerType, Position, ReactFlow, getSmoothStepPath, type EdgeProps, type EdgeTypes, type NodeTypes, useNodes, useUpdateNodeInternals } from "@xyflow/react";
-import { getSmartEdge, svgDrawSmoothStepLinePath } from "@tisoap/react-flow-smart-edge";
+import { MarkerType, Position, ReactFlow, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
+import { SmartStepEdge } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
-import { WorkflowCanvasNode } from "./WorkflowCanvasNode";
-import { WorkflowGhostNode } from "./WorkflowGhostNode";
 import { WorkflowReactFlowNodeComponent } from "./WorkflowReactFlowNode";
 import type { WorkflowCanvasProps, WorkflowNodeContext, WorkflowReactFlowEdge, WorkflowReactFlowNode } from "./WorkflowCanvasTypes";
-import { workflowCanvasLayoutConfig, type WorkflowCanvasEdge } from "./workflowLayout";
+import { workflowCanvasLayoutConfig } from "./workflowLayout";
 
 const workflowNodeTypes = {
   workflow: WorkflowReactFlowNodeComponent
 } satisfies NodeTypes;
 
-const workflowSmartEdgeOptions = {
-  nodePadding: 4,
-  drawEdge: svgDrawSmoothStepLinePath({ borderRadius: 0 })
-};
-
 const workflowEdgeTypes = {
-  workflowSmart: WorkflowSmartEdgeComponent
+  workflowSmart: SmartStepEdge
 } satisfies EdgeTypes;
 
 const workflowSolidEdgeStroke = "color-mix(in srgb, var(--primary) 70%, transparent)";
@@ -99,78 +91,6 @@ export function WorkflowCanvas({
         <WorkflowNodeInternalsUpdater nodeIds={nodeIds} />
       </ReactFlow>
     </div>
-  );
-}
-
-function WorkflowSmartEdgeComponent(props: EdgeProps<WorkflowReactFlowEdge>) {
-  const nodes = useNodes<WorkflowReactFlowNode>();
-  const smartEdge = getSmartEdge({
-    nodes,
-    options: workflowSmartEdgeOptions,
-    sourceX: props.sourceX,
-    sourceY: props.sourceY,
-    targetX: props.targetX,
-    targetY: props.targetY,
-    sourcePosition: props.sourcePosition,
-    targetPosition: props.targetPosition
-  });
-  const [fallbackPath] = getSmoothStepPath({
-    sourceX: props.sourceX,
-    sourceY: props.sourceY,
-    targetX: props.targetX,
-    targetY: props.targetY,
-    sourcePosition: props.sourcePosition,
-    targetPosition: props.targetPosition,
-    borderRadius: 0,
-    offset: workflowCanvasLayoutConfig.edgePad
-  });
-  const path = smartEdge instanceof Error ? fallbackPath : smartEdge.svgPathString;
-
-  return (
-    <>
-      <BaseEdge
-        id={props.id}
-        path={path}
-        style={props.style}
-        markerStart={props.markerStart}
-        markerEnd={props.markerEnd}
-        interactionWidth={props.interactionWidth}
-      />
-      <WorkflowEdgeLabel workflowEdge={props.data?.workflowEdge} context={props.data?.context} />
-    </>
-  );
-}
-
-function WorkflowEdgeLabel({ workflowEdge, context }: { workflowEdge?: WorkflowCanvasEdge; context?: WorkflowNodeContext }) {
-  const label = workflowEdge?.label;
-  if (!label || typeof label.x !== "number" || typeof label.y !== "number") return null;
-  const sourcePolicy = label.sourcePolicyId ? context?.policyById.get(label.sourcePolicyId) : undefined;
-
-  return (
-    <EdgeLabelRenderer>
-      <div
-        data-workflow-edge-label
-        data-workflow-edge-label-kind={label.kind}
-        className="workflow-edge-label nodrag nopan absolute"
-        style={{
-          pointerEvents: "all",
-          transform: `translate(-50%, -50%) translate(${label.x}px, ${label.y}px)`
-        }}
-      >
-        {label.interactive && context ? (
-          <WorkflowGhostNode
-            value={label.eventType}
-            icon={Activity}
-            ariaLabel={`Add policy step for ${label.eventType}`}
-            onClick={() => context.onAddPolicyStep(label.eventType, sourcePolicy)}
-            disabled={!context.canAddPolicyForEvent(sourcePolicy)}
-            className="w-60"
-          />
-        ) : (
-          <WorkflowCanvasNode label="Event" value={label.eventType} tone="event" icon={Activity} dashed className="w-60" />
-        )}
-      </div>
-    </EdgeLabelRenderer>
   );
 }
 
@@ -273,14 +193,13 @@ function useWorkflowNodes(layoutNodes: WorkflowCanvasProps["layout"]["nodes"], n
     style: {
       width: layoutNode.width,
       height: layoutNode.height,
-      opacity: layoutNode.kind === "event-anchor" ? 0 : undefined,
-      pointerEvents: layoutNode.kind === "event-anchor" ? "none" : "all"
+      pointerEvents: "all"
     }
   })), [layoutNodes, nodeContext]);
 }
 
 function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][number]): WorkflowReactFlowNode["handles"] {
-  const anchorTop = layoutNode.kind === "policy"
+  const anchorTop = layoutNode.kind === "policy" || layoutNode.kind === "output-events"
     ? workflowCanvasLayoutConfig.policyAnchorY
     : layoutNode.height / 2;
   const anchorLeft = layoutNode.width / 2;

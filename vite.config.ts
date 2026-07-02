@@ -7,9 +7,10 @@ export default defineConfig({
   root: "frontend",
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "frontend/src")
-    }
+    alias: [
+      { find: /^@xyflow\/react$/, replacement: path.resolve(__dirname, "node_modules/@xyflow/react/dist/esm/index.mjs") },
+      { find: "@", replacement: path.resolve(__dirname, "frontend/src") }
+    ]
   },
   build: {
     outDir: path.resolve(__dirname, "dist"),

@@ -16,8 +16,12 @@ export type WorkflowCanvasNodeKind =
   | "save-policy"
   | "edit-policy"
   | "delete-policy"
-  | "event-anchor"
+  | "output-events"
   | "first-policy-ghost";
+
+export type WorkflowCanvasOutputEvent = {
+  eventType: string;
+};
 
 export type WorkflowCanvasLayoutNode = {
   key: string;
@@ -29,6 +33,7 @@ export type WorkflowCanvasLayoutNode = {
   direction: WorkflowLayoutDirection;
   record?: WorkflowStepRecord;
   eventType?: string;
+  outputEvents?: WorkflowCanvasOutputEvent[];
   sourcePolicyId?: string;
   isEditingPolicy?: boolean;
 };
@@ -43,6 +48,7 @@ export const workflowNodeSizes = {
   trigger: { width: 176, height: 46 },
   policy: { width: 240, height: 92 },
   event: { width: 240, height: 46 },
+  outputEvents: { width: 240, minHeight: 46, paddingY: 16, rowHeight: 24, rowGap: 4 },
   action: { width: 28, height: 28 }
 };
 
@@ -51,7 +57,6 @@ export const workflowCanvasLayoutConfig = {
   startY: 64,
   columnGap: 36,
   branchGap: 20,
-  rowStep: 54,
   edgePad: 18,
   policyAnchorY: 18
 };
@@ -66,6 +71,15 @@ type WorkflowCanvasLayoutNodeDraft = Omit<WorkflowCanvasLayoutNode, "x" | "y">;
 type WorkflowDagreEdge = {
   source: string;
   target: string;
+};
+
+type WorkflowLayoutMetrics = {
+  horizontalRootPolicyX: number;
+  horizontalPolicyColumnStep: number;
+  horizontalRowStep: number;
+  verticalRootPolicyY: number;
+  verticalPolicyRankStep: number;
+  verticalColumnStep: number;
 };
 
 export function calculateWorkflowCanvasLayout({
@@ -114,31 +128,40 @@ export function calculateWorkflowCanvasLayout({
     policyNodeIndexes.add(record.index);
   };
 
-  const addEventAnchorNode = (record: WorkflowStepRecord, eventType: string, childIndex: number) => {
-    const key = `event-${record.index}-${eventType}-anchor-${childIndex}`;
+  const addOutputEventsNode = (record: WorkflowStepRecord, outputEvents: string[]) => {
+    const key = `output-events-${record.index}`;
     addNode({
       key,
-      kind: "event-anchor",
-      width: workflowNodeSizes.event.width,
-      height: workflowNodeSizes.event.height,
+      kind: "output-events",
+      width: workflowNodeSizes.outputEvents.width,
+      height: workflowOutputEventsNodeHeight(outputEvents.length),
       direction,
       record,
-      eventType,
+      outputEvents: outputEvents.map((eventType) => ({ eventType })),
       sourcePolicyId: record.policyId
     });
-    return key;
+    addCanvasEdge({
+      key: `policy-output-events-${record.index}`,
+      sourceNodeKey: `policy-${record.index}`,
+      targetNodeKey: key,
+      sourceHandleId,
+      targetHandleId,
+      dashed: !record.policy
+    });
   };
 
   const layoutPolicyBranch = (record: WorkflowStepRecord, visitedPolicyIds = new Set<string>()) => {
     if (visitedPolicyIds.has(record.policyId)) return;
     const nextVisitedPolicyIds = new Set(visitedPolicyIds);
+    const outputEvents: string[] = [];
     nextVisitedPolicyIds.add(record.policyId);
     addPolicyNode(record);
 
-    workflowOutputEvents(record).forEach((eventType, labelSlotIndex) => {
+    workflowOutputEvents(record).forEach((eventType) => {
       const childRecords = (workflowGraph.childRecordsByParentEvent.get(`${record.index}:${eventType}`) ?? [])
         .filter((childRecord) => childRecord.policyId !== record.policyId && !nextVisitedPolicyIds.has(childRecord.policyId));
-      const existingHandlerRecords = workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [];
+      const existingHandlerRecords = (workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [])
+        .filter((handlerRecord) => handlerRecord.index !== record.index);
 
       if (childRecords.length > 0) {
         childRecords.forEach((childRecord) => {
@@ -149,7 +172,8 @@ export function calculateWorkflowCanvasLayout({
             sourceNodeKey: `policy-${record.index}`,
             targetNodeKey: `policy-${childRecord.index}`,
             sourceHandleId,
-            targetHandleId
+            targetHandleId,
+            eventType
           });
         });
         return;
@@ -159,30 +183,15 @@ export function calculateWorkflowCanvasLayout({
         handledEventNodes.push({
           eventType,
           sourceIndex: record.index,
-          sourceNodeKey: `policy-${record.index}`,
-          sourcePolicyId: record.policyId,
-          labelSlotIndex
+          sourceNodeKey: `policy-${record.index}`
         });
         return;
       }
 
-      const eventNodeKey = addEventAnchorNode(record, eventType, 0);
-      addDagreEdge({ source: `policy-${record.index}`, target: eventNodeKey });
-      addCanvasEdge({
-        key: `policy-event-${record.index}-${eventType}-0`,
-        sourceNodeKey: `policy-${record.index}`,
-        targetNodeKey: eventNodeKey,
-        sourceHandleId,
-        targetHandleId,
-        dashed: !record.policy,
-        label: {
-          kind: "event-ghost",
-          eventType,
-          interactive: true,
-          sourcePolicyId: record.policyId
-        }
-      });
+      outputEvents.push(eventType);
     });
+
+    if (outputEvents.length > 0) addOutputEventsNode(record, outputEvents);
   };
 
   addNode({
@@ -234,18 +243,146 @@ export function calculateWorkflowCanvasLayout({
   }).forEach(addCanvasEdge);
 
   const positionedNodes = positionWorkflowNodes([...nodeDrafts.values()], dagreEdges, direction);
-  const coreNodeByKey = new Map(positionedNodes.map((node) => [node.key, node]));
   const actionNodes = positionedNodes.flatMap((node) => actionNodesForPolicy(node, editingPolicyIndex));
-  const positionedEdges = canvasEdges.map((edge) => positionWorkflowEdgeLabel(edge, coreNodeByKey, direction));
 
   return {
     nodes: [...positionedNodes, ...actionNodes],
-    edges: positionedEdges,
+    edges: canvasEdges,
     direction
   };
 }
 
+export function workflowOutputEventsNodeHeight(eventCount: number) {
+  if (eventCount <= 0) return workflowNodeSizes.outputEvents.minHeight;
+  const rowTotal = eventCount * workflowNodeSizes.outputEvents.rowHeight;
+  const gapTotal = Math.max(0, eventCount - 1) * workflowNodeSizes.outputEvents.rowGap;
+  return Math.max(workflowNodeSizes.outputEvents.minHeight, workflowNodeSizes.outputEvents.paddingY + rowTotal + gapTotal);
+}
+
 function positionWorkflowNodes(nodes: WorkflowCanvasLayoutNodeDraft[], edges: WorkflowDagreEdge[], direction: WorkflowLayoutDirection): WorkflowCanvasLayoutNode[] {
+  const primaryNodes = nodes.filter((node) => node.kind !== "output-events");
+  const outputNodes = nodes.filter((node) => node.kind === "output-events");
+  const metrics = workflowLayoutMetrics(outputNodes);
+  const positionedPrimaryNodes = positionPrimaryNodes(primaryNodes, edges, direction, metrics);
+  const primaryNodeByKey = new Map(positionedPrimaryNodes.map((node) => [node.key, node]));
+  const positionedOutputNodes = outputNodes.map((node) => positionOutputEventsNode(node, primaryNodeByKey, direction));
+
+  return [...positionedPrimaryNodes, ...positionedOutputNodes];
+}
+
+function positionPrimaryNodes(
+  nodes: WorkflowCanvasLayoutNodeDraft[],
+  edges: WorkflowDagreEdge[],
+  direction: WorkflowLayoutDirection,
+  metrics: WorkflowLayoutMetrics
+): WorkflowCanvasLayoutNode[] {
+  const ranks = workflowNodeRanks(nodes, edges);
+  const orderIndexes = workflowNodeOrderIndexes(nodes, edges, direction);
+
+  return nodes.map((node) => {
+    const rank = ranks.get(node.key) ?? 0;
+    const orderIndex = orderIndexes.get(node.key) ?? 0;
+
+    return {
+      ...node,
+      x: direction === "horizontal"
+        ? horizontalNodeX(rank, metrics)
+        : workflowCanvasLayoutConfig.startX + orderIndex * metrics.verticalColumnStep,
+      y: direction === "horizontal"
+        ? workflowCanvasLayoutConfig.startY + orderIndex * metrics.horizontalRowStep
+        : verticalNodeY(rank, metrics)
+    };
+  });
+}
+
+function positionOutputEventsNode(
+  node: WorkflowCanvasLayoutNodeDraft,
+  nodeByKey: ReadonlyMap<string, WorkflowCanvasLayoutNode>,
+  direction: WorkflowLayoutDirection
+): WorkflowCanvasLayoutNode {
+  const sourceNode = node.record ? nodeByKey.get(`policy-${node.record.index}`) : undefined;
+  if (!sourceNode) {
+    return { ...node, x: workflowCanvasLayoutConfig.startX, y: workflowCanvasLayoutConfig.startY };
+  }
+
+  return {
+    ...node,
+    x: direction === "horizontal"
+      ? sourceNode.x + sourceNode.width + workflowCanvasLayoutConfig.columnGap
+      : sourceNode.x,
+    y: direction === "horizontal"
+      ? sourceNode.y
+      : sourceNode.y + sourceNode.height + workflowCanvasLayoutConfig.branchGap
+  };
+}
+
+function workflowLayoutMetrics(outputNodes: WorkflowCanvasLayoutNodeDraft[]): WorkflowLayoutMetrics {
+  const maxOutputHeight = Math.max(workflowNodeSizes.outputEvents.minHeight, ...outputNodes.map((node) => node.height));
+  const policyActionHeight = workflowNodeSizes.policy.height + workflowNodeSizes.action.height + 12;
+
+  return {
+    horizontalRootPolicyX: workflowCanvasLayoutConfig.startX + workflowNodeSizes.trigger.width + workflowCanvasLayoutConfig.columnGap,
+    horizontalPolicyColumnStep: workflowNodeSizes.policy.width + workflowCanvasLayoutConfig.columnGap + workflowNodeSizes.outputEvents.width + workflowCanvasLayoutConfig.columnGap,
+    horizontalRowStep: Math.max(policyActionHeight, maxOutputHeight, workflowNodeSizes.trigger.height) + workflowCanvasLayoutConfig.branchGap,
+    verticalRootPolicyY: workflowCanvasLayoutConfig.startY + workflowNodeSizes.trigger.height + workflowCanvasLayoutConfig.branchGap,
+    verticalPolicyRankStep: workflowNodeSizes.policy.height + workflowCanvasLayoutConfig.branchGap + maxOutputHeight + workflowCanvasLayoutConfig.branchGap,
+    verticalColumnStep: Math.max(workflowNodeSizes.policy.width, workflowNodeSizes.outputEvents.width) + workflowCanvasLayoutConfig.branchGap
+  };
+}
+
+function horizontalNodeX(rank: number, metrics: WorkflowLayoutMetrics) {
+  if (rank <= 0) return workflowCanvasLayoutConfig.startX;
+  return metrics.horizontalRootPolicyX + (rank - 1) * metrics.horizontalPolicyColumnStep;
+}
+
+function verticalNodeY(rank: number, metrics: WorkflowLayoutMetrics) {
+  if (rank <= 0) return workflowCanvasLayoutConfig.startY;
+  return metrics.verticalRootPolicyY + (rank - 1) * metrics.verticalPolicyRankStep;
+}
+
+function workflowNodeRanks(nodes: WorkflowCanvasLayoutNodeDraft[], edges: WorkflowDagreEdge[]) {
+  const nodeKeys = new Set(nodes.map((node) => node.key));
+  const ranks = new Map(nodes.map((node) => [node.key, 0]));
+
+  for (let pass = 0; pass < nodes.length; pass += 1) {
+    edges.forEach((edge) => {
+      if (!nodeKeys.has(edge.source) || !nodeKeys.has(edge.target)) return;
+      const sourceRank = ranks.get(edge.source) ?? 0;
+      const targetRank = ranks.get(edge.target) ?? 0;
+      if (targetRank <= sourceRank) ranks.set(edge.target, sourceRank + 1);
+    });
+  }
+
+  return ranks;
+}
+
+function workflowNodeOrderIndexes(nodes: WorkflowCanvasLayoutNodeDraft[], edges: WorkflowDagreEdge[], direction: WorkflowLayoutDirection) {
+  const dagrePositions = workflowDagrePositions(nodes, edges, direction);
+  const orderedNodes = nodes
+    .map((node, sourceIndex) => ({
+      key: node.key,
+      sourceIndex,
+      value: direction === "horizontal"
+        ? dagrePositions.get(node.key)?.y ?? sourceIndex
+        : dagrePositions.get(node.key)?.x ?? sourceIndex
+    }))
+    .sort((a, b) => a.value - b.value || a.sourceIndex - b.sourceIndex);
+  const orderIndexes = new Map<string, number>();
+  let previousValue: number | undefined;
+  let orderIndex = -1;
+
+  orderedNodes.forEach((node) => {
+    if (previousValue === undefined || Math.abs(node.value - previousValue) > 2) {
+      orderIndex += 1;
+      previousValue = node.value;
+    }
+    orderIndexes.set(node.key, orderIndex);
+  });
+
+  return orderIndexes;
+}
+
+function workflowDagrePositions(nodes: WorkflowCanvasLayoutNodeDraft[], edges: WorkflowDagreEdge[], direction: WorkflowLayoutDirection) {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
@@ -260,22 +397,9 @@ function positionWorkflowNodes(nodes: WorkflowCanvasLayoutNodeDraft[], edges: Wo
   edges.forEach((edge) => graph.setEdge(edge.source, edge.target));
   dagre.layout(graph);
 
-  const positioned = nodes.map((node) => {
-    const dagreNode = graph.node(node.key) as { x: number; y: number };
-    return {
-      ...node,
-      x: dagreNode.x - node.width / 2,
-      y: dagreNode.y - node.height / 2
-    };
-  });
-
-  const minX = Math.min(...positioned.map((node) => node.x));
-  const minY = Math.min(...positioned.map((node) => node.y));
-
-  return positioned.map((node) => ({
-    ...node,
-    x: node.x - minX + workflowCanvasLayoutConfig.startX,
-    y: node.y - minY + workflowCanvasLayoutConfig.startY
+  return new Map(nodes.map((node) => {
+    const dagreNode = graph.node(node.key) as { x: number; y: number } | undefined;
+    return [node.key, { x: dagreNode?.x ?? 0, y: dagreNode?.y ?? 0 }];
   }));
 }
 
@@ -312,37 +436,4 @@ function actionNodesForPolicy(node: WorkflowCanvasLayoutNode, editingPolicyIndex
       record: node.record
     }
   ];
-}
-
-function positionWorkflowEdgeLabel(edge: WorkflowCanvasEdge, nodeByKey: ReadonlyMap<string, WorkflowCanvasLayoutNode>, direction: WorkflowLayoutDirection): WorkflowCanvasEdge {
-  if (!edge.label) return edge;
-
-  const anchorNode = edge.label.kind === "event-ghost" ? nodeByKey.get(edge.targetNodeKey) : undefined;
-  if (anchorNode) {
-    return {
-      ...edge,
-      label: {
-        ...edge.label,
-        x: anchorNode.x + anchorNode.width / 2,
-        y: anchorNode.y + anchorNode.height / 2
-      }
-    };
-  }
-
-  const sourceNode = nodeByKey.get(edge.sourceNodeKey);
-  if (!sourceNode) return edge;
-  const slotIndex = edge.label.slotIndex ?? 0;
-
-  return {
-    ...edge,
-    label: {
-      ...edge.label,
-      x: direction === "horizontal"
-        ? sourceNode.x + sourceNode.width + workflowCanvasLayoutConfig.columnGap + workflowNodeSizes.event.width / 2
-        : sourceNode.x + sourceNode.width / 2 + slotIndex * (workflowNodeSizes.event.width + workflowCanvasLayoutConfig.branchGap),
-      y: direction === "horizontal"
-        ? sourceNode.y + workflowCanvasLayoutConfig.policyAnchorY + slotIndex * workflowCanvasLayoutConfig.rowStep
-        : sourceNode.y + sourceNode.height + workflowCanvasLayoutConfig.branchGap + workflowNodeSizes.event.height / 2
-    }
-  };
 }

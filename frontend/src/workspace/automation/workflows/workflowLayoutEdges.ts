@@ -7,25 +7,13 @@ export type WorkflowCanvasEdge = {
   sourceHandleId?: string;
   targetHandleId?: string;
   dashed?: boolean;
-  label?: WorkflowCanvasEdgeLabel;
+  eventType?: string;
 };
 
 export type WorkflowHandledEventNode = {
   eventType: string;
   sourceIndex: number;
   sourceNodeKey: string;
-  sourcePolicyId?: string;
-  labelSlotIndex: number;
-};
-
-export type WorkflowCanvasEdgeLabel = {
-  kind: "event-ghost" | "handled-event";
-  eventType: string;
-  interactive: boolean;
-  sourcePolicyId?: string;
-  x?: number;
-  y?: number;
-  slotIndex?: number;
 };
 
 export const workflowExistingHandlerEdges = ({
@@ -43,7 +31,7 @@ export const workflowExistingHandlerEdges = ({
 }): WorkflowCanvasEdge[] => {
   const edges: WorkflowCanvasEdge[] = [];
 
-  handledEventNodes.forEach(({ eventType, sourceIndex, sourceNodeKey, sourcePolicyId, labelSlotIndex }) => {
+  handledEventNodes.forEach(({ eventType, sourceIndex, sourceNodeKey }) => {
     const handlerRecords = workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [];
     handlerRecords.forEach((handlerRecord) => {
       if (handlerRecord.index === sourceIndex) return;
@@ -55,13 +43,7 @@ export const workflowExistingHandlerEdges = ({
         targetNodeKey: `policy-${handlerRecord.index}`,
         sourceHandleId,
         targetHandleId,
-        label: {
-          kind: "handled-event",
-          eventType,
-          interactive: false,
-          sourcePolicyId,
-          slotIndex: labelSlotIndex
-        }
+        eventType
       });
     });
   });
