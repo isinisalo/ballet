@@ -3,7 +3,7 @@ import type { ProjectPolicy } from "../../shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "../../shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
-import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
+import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 
 const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
   id,
@@ -79,7 +79,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(layout.edges.filter((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey === "output-events-0")).toHaveLength(1);
   });
 
-  it("groups unhandled output events next to the source policy", () => {
+  it("groups unhandled output events in the next policy column after active policies", () => {
     const first = policy("first", undefined, "build");
     const child = policy("child", "codex.build.complete", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id]);
@@ -110,9 +110,49 @@ describe("calculateWorkflowCanvasLayout", () => {
       sourceHandleId: "right",
       targetHandleId: "left"
     });
-    expect(outputEventsNode?.x).toBe(firstNode ? firstNode.x + firstNode.width + workflowCanvasLayoutConfig.columnGap : undefined);
-    expect(outputEventsNode?.y).toBe(firstNode?.y);
+    expect(outputEventsNode?.x).toBe(childNode?.x);
+    expect(outputEventsNode?.y).toBe(childNode ? childNode.y + workflowPolicyStackHeight() : undefined);
     expect(layout.nodes.some((node) => node.kind === "output-events" && node.outputEvents?.some((event) => event.eventType === "codex.build.complete"))).toBe(false);
+  });
+
+  it("keeps the primary horizontal policy path on the trigger baseline and stacks branches compactly below it", () => {
+    const first = policy("first", undefined, "build");
+    const completeChild = policy("complete-child", "codex.build.complete", "deploy");
+    const failedChild = policy("failed-child", "codex.build.failed", "debug");
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph([
+        {
+          policyId: first.id,
+          index: 0,
+          policy: first,
+          outputEvents: ["codex.build.complete", "codex.build.failed", "codex.build.blocked"]
+        },
+        {
+          policyId: completeChild.id,
+          index: 1,
+          policy: completeChild,
+          outputEvents: ["codex.deploy.complete"]
+        },
+        {
+          policyId: failedChild.id,
+          index: 2,
+          policy: failedChild,
+          outputEvents: ["codex.debug.complete"]
+        }
+      ]),
+      editingPolicyIndex: null
+    });
+    const triggerNode = layout.nodes.find((node) => node.key === "trigger");
+    const firstNode = layout.nodes.find((node) => node.key === "policy-0");
+    const completeChildNode = layout.nodes.find((node) => node.key === "policy-1");
+    const failedChildNode = layout.nodes.find((node) => node.key === "policy-2");
+    const outputEventsNode = layout.nodes.find((node) => node.key === "output-events-0");
+
+    expect(firstNode?.y).toBe(triggerNode?.y);
+    expect(completeChildNode?.y).toBe(firstNode?.y);
+    expect(failedChildNode?.y).toBe(firstNode ? firstNode.y + workflowPolicyStackHeight() + workflowCanvasLayoutConfig.branchGap : undefined);
+    expect(outputEventsNode?.x).toBe(completeChildNode?.x);
+    expect(outputEventsNode?.y).toBe(failedChildNode ? failedChildNode.y + workflowPolicyStackHeight() : undefined);
   });
 
   it("lays out child event policies below the source policy in vertical mode", () => {
@@ -125,8 +165,8 @@ describe("calculateWorkflowCanvasLayout", () => {
 
     expect(layout.direction).toBe("vertical");
     expect(childNode?.y).toBeGreaterThan(firstNode?.y ?? 0);
-    expect(outputEventsNode?.x).toBe(firstNode?.x);
-    expect(outputEventsNode?.y).toBe(firstNode ? firstNode.y + firstNode.height + workflowCanvasLayoutConfig.branchGap : undefined);
+    expect(outputEventsNode?.x).toBe(childNode ? childNode.x + childNode.width + workflowCanvasLayoutConfig.branchGap : undefined);
+    expect(outputEventsNode?.y).toBe(childNode?.y);
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-policy-0-1-codex.build.complete",
       sourceHandleId: "bottom",
