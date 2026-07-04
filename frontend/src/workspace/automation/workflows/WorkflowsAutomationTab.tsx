@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Columns3, Rows3 } from "lucide-react";
 import type {
   AppData,
   ProjectAutomationConfig,
@@ -8,13 +7,11 @@ import type {
 } from "../../../../../shared/api/workspace-contracts";
 import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType, preferredAgentToken } from "../../../../../shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { automationAgentOptions, uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { buildWorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
-import { calculateWorkflowCanvasLayout, type WorkflowLayoutDirection } from "./workflowLayout";
+import { calculateWorkflowCanvasLayout } from "./workflowLayout";
 import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
 
 const noSelection = "__none__";
@@ -41,7 +38,6 @@ export function WorkflowsAutomationTab({
     : Math.min(lastSelectedIndexRef.current, Math.max(0, config.workflows.length - 1));
   const selected = config.workflows[selectedIndex];
   const [editingPolicyIndex, setEditingPolicyIndex] = useState<number | null>(null);
-  const [layoutDirection, setLayoutDirection] = useState<WorkflowLayoutDirection>("horizontal");
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
   const actionOptions = [
@@ -77,8 +73,8 @@ export function WorkflowsAutomationTab({
   [config.actions, config.outputs, policyById, selected?.steps]);
   const workflowGraph = useMemo(() => buildWorkflowGraph(workflowStepRecords), [workflowStepRecords]);
   const workflowLayout = useMemo(
-    () => selected ? calculateWorkflowCanvasLayout({ workflowGraph, editingPolicyIndex, direction: layoutDirection }) : undefined,
-    [editingPolicyIndex, layoutDirection, selected, workflowGraph]
+    () => selected ? calculateWorkflowCanvasLayout({ workflowGraph, editingPolicyIndex, direction: "horizontal" }) : undefined,
+    [editingPolicyIndex, selected, workflowGraph]
   );
 
   useEffect(() => {
@@ -197,9 +193,8 @@ export function WorkflowsAutomationTab({
     <div className="grid gap-4">
       {selected && workflowLayout ? (
         <div className="grid gap-4">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div className="grid gap-3">
             <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-            <WorkflowLayoutToggle direction={layoutDirection} onDirectionChange={setLayoutDirection} />
           </div>
           <WorkflowCanvas
             layout={workflowLayout}
@@ -232,43 +227,6 @@ export function WorkflowsAutomationTab({
           />
         </div>
       ) : <EmptyState title="No workflow selected." />}
-    </div>
-  );
-}
-
-function WorkflowLayoutToggle({
-  direction,
-  onDirectionChange
-}: {
-  direction: WorkflowLayoutDirection;
-  onDirectionChange: (direction: WorkflowLayoutDirection) => void;
-}) {
-  return (
-    <div role="group" aria-label="Workflow layout" className="inline-flex h-8 w-fit overflow-hidden rounded border border-divider-strong bg-background">
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        aria-pressed={direction === "horizontal"}
-        aria-label="Horizontal workflow layout"
-        className={cn("h-8 rounded-none border-0 px-2 text-muted-foreground", direction === "horizontal" && "bg-muted text-foreground")}
-        onClick={() => onDirectionChange("horizontal")}
-      >
-        <Columns3 data-icon="inline-start" />
-        Horizontal
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        aria-pressed={direction === "vertical"}
-        aria-label="Vertical workflow layout"
-        className={cn("h-8 rounded-none border-0 border-l border-divider-strong px-2 text-muted-foreground", direction === "vertical" && "bg-muted text-foreground")}
-        onClick={() => onDirectionChange("vertical")}
-      >
-        <Rows3 data-icon="inline-start" />
-        Vertical
-      </Button>
     </div>
   );
 }
