@@ -1,6 +1,7 @@
 import type {
   ProjectAction,
   ProjectAutomationConfig,
+  ProjectGate,
   ProjectOutput,
   ProjectPolicy,
   ProjectTrigger,
@@ -33,6 +34,11 @@ const normalizeAgentPolicyToken = (value: string): string =>
   normalizePolicyToken(value).replace(/-agent$/, "");
 
 const normalizeTrigger = (value: Record<string, unknown>): ProjectTrigger => ({
+  id: normalizePolicyToken(stringValue(value.id)),
+  description: stringValue(value.description)
+});
+
+const normalizeGate = (value: Record<string, unknown>): ProjectGate => ({
   id: normalizePolicyToken(stringValue(value.id)),
   description: stringValue(value.description)
 });
@@ -125,6 +131,7 @@ export const normalizeProjectAutomationConfig = (value: unknown): ProjectAutomat
   return {
     version: 1,
     triggers: recordArray(value.triggers).map(normalizeTrigger),
+    gates: recordArray(value.gates).map(normalizeGate),
     actions,
     outputs,
     policies,

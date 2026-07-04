@@ -34,6 +34,7 @@ describe("HTTP Zod validation", () => {
     const valid = {
       version: 1,
       triggers: [{ id: "manual-start", description: "Manual start" }],
+      gates: [{ id: "intent_changed", description: "Intent changed" }],
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"] }],
       outputs: [{ id: "summary", description: "Summary artifact" }],
       policies: [{

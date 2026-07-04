@@ -10,6 +10,7 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
     ...defaults,
     ...config,
     triggers: Array.isArray(config?.triggers) ? config.triggers : defaults.triggers,
+    gates: Array.isArray(config?.gates) ? config.gates : defaults.gates,
     actions: Array.isArray(config?.actions)
       ? config.actions.map((action) => {
         const selectedOutputIds = Array.isArray(action.outputIds)

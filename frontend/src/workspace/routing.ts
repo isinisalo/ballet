@@ -51,7 +51,7 @@ export const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  const automationMatch = url.pathname.match(/^\/automation\/(triggers|actions|outputs|workflows)\/?$/);
+  const automationMatch = url.pathname.match(/^\/automation\/(triggers|gates|actions|outputs|workflows)\/?$/);
   if (automationMatch) return automationRoute(automationMatch[1] as AutomationTab, url);
   if (url.pathname === "/automation") return automationRoute("workflows", url);
   if (url.pathname === "/runtimes") return runtimeRoute(url);

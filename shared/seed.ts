@@ -173,6 +173,7 @@ export const seedData: AppData = {
   automation: {
     version: 1,
     triggers: [],
+    gates: [],
     actions: [
       {
         id: "remediation",

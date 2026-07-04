@@ -1,4 +1,4 @@
-import { Activity, Box, ChevronRight, FileKey2, Route, Zap, type LucideIcon } from "lucide-react";
+import { Activity, Box, ChevronRight, FileKey2, Route, ShieldCheck, Zap, type LucideIcon } from "lucide-react";
 import type { ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -16,6 +16,7 @@ function automationEntities(config: ProjectAutomationConfig, tab: AutomationTab)
   if (tab === "actions") return config.actions.map((action) => ({ id: action.id, label: action.id }));
   if (tab === "outputs") return config.outputs.map((output) => ({ id: output.id, label: output.id }));
   if (tab === "triggers") return config.triggers.map((trigger) => ({ id: trigger.id, label: trigger.id }));
+  if (tab === "gates") return config.gates.map((gate) => ({ id: gate.id, label: gate.id }));
   return config.workflows.map((workflow) => ({ id: workflow.id, label: workflow.id }));
 }
 
@@ -30,6 +31,7 @@ const automationSidebarSections: AutomationSidebarSection[] = [
   { id: "actions", label: "Actions", icon: FileKey2, emptyLabel: "No actions." },
   { id: "outputs", label: "Outputs", icon: Box, emptyLabel: "No outputs." },
   { id: "triggers", label: "Triggers", icon: Zap, emptyLabel: "No triggers." },
+  { id: "gates", label: "Gates", icon: ShieldCheck, emptyLabel: "No gates." },
   { id: "workflows", label: "Workflows", icon: Activity, emptyLabel: "No workflows." }
 ];
 

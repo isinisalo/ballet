@@ -38,6 +38,7 @@ const agent: Agent = {
 const validConfig = (): ProjectAutomationConfig => ({
   version: 1,
   triggers: [],
+  gates: [],
   actions: [
     {
       id: "implementation",
@@ -87,6 +88,7 @@ describe("project automation config", () => {
     await expect(loadProjectAutomationConfig(await tempRoot())).resolves.toEqual({
       version: 1,
       triggers: [],
+      gates: [],
       actions: [],
       outputs: [
         { id: "complete", description: "Action completed." },
@@ -109,6 +111,7 @@ describe("project automation config", () => {
 
     const saved = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     expect(saved).not.toHaveProperty("events");
+    expect(saved.gates).toEqual([]);
     expect(saved.policies[0]?.id).toBe("on.developer.implementation.failed.then.developer.start.implementation");
     expect(saved.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.then.developer.start.implementation"]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
@@ -135,6 +138,7 @@ describe("project automation config", () => {
 
     const loaded = await loadProjectAutomationConfig(root, [agent]);
     expect(loaded).not.toHaveProperty("events");
+    expect(loaded.gates).toEqual([]);
     expect(loaded.actions).toEqual([{ id: "run", description: "", outputIds: ["complete", "blocked", "failed"] }]);
     expect(loaded.outputs).toEqual([
       { id: "complete", description: "Action completed." },
@@ -158,6 +162,7 @@ describe("project automation config", () => {
     await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({
       version: 1,
       triggers: [],
+      gates: [{ id: "intent_changed", description: "Intent changed gate" }],
       actions: [{ id: "implementation", description: "Implement approved work." }],
       outputs: [],
       policies: [{
@@ -182,6 +187,7 @@ describe("project automation config", () => {
       id: "on.developer.implementation.failed.then.developer.start.implementation",
       event: "developer.implementation.failed"
     });
+    expect(loaded.gates).toEqual([{ id: "intent_changed", description: "Intent changed gate" }]);
     expect(loaded.actions[0]?.outputIds).toEqual(["complete", "blocked", "failed"]);
     expect(loaded.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.then.developer.start.implementation"]);
   });
@@ -193,6 +199,29 @@ describe("project automation config", () => {
       ...validConfig(),
       events: [{ id: "", title: "", source: "", payloadSchema: "not-an-object" }]
     }, [agent])).toEqual([]);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      gates: "not-an-array"
+    }, [agent]).some((issue) => issue.message === "gates must be an array.")).toBe(true);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      gates: [{ id: "", description: "Missing id" }]
+    }, [agent]).some((issue) => issue.message === "Gate id is required.")).toBe(true);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      gates: [{ id: "intent_changed", description: "" }]
+    }, [agent]).some((issue) => issue.message === "Gate description is required.")).toBe(true);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      gates: [
+        { id: "intent_changed", description: "Intent changed" },
+        { id: "intent_changed", description: "Duplicate gate" }
+      ]
+    }, [agent]).some((issue) => issue.message === "Duplicate gate id: intent_changed.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),

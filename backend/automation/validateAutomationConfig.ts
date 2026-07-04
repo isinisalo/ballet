@@ -22,6 +22,7 @@ type RawAutomationConfig = Record<string, unknown>;
 interface ValidationContext {
   input: RawAutomationConfig;
   rawTriggers: unknown[];
+  rawGates: unknown[];
   rawActions: unknown[];
   rawOutputs: unknown[];
   rawPolicies: unknown[];
@@ -73,8 +74,8 @@ const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: stri
 };
 
 const requireAutomationArrays = (input: RawAutomationConfig, issues: ProjectAutomationIssue[]) => {
-  for (const key of ["triggers", "actions", "outputs", "policies", "workflows", "runtimes"] as const) {
-    if ((key === "triggers" || key === "actions" || key === "outputs") && input[key] === undefined) continue;
+  for (const key of ["triggers", "gates", "actions", "outputs", "policies", "workflows", "runtimes"] as const) {
+    if ((key === "triggers" || key === "gates" || key === "actions" || key === "outputs") && input[key] === undefined) continue;
     if (!Array.isArray(input[key])) issues.push({ path: key, message: `${key} must be an array.` });
   }
 };
@@ -93,6 +94,7 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
 
   addUniqueIssues(issues, policyIds, "policy");
   addUniqueIssues(issues, normalized.triggers.map((trigger, index) => ({ id: trigger.id, path: `triggers[${index}].id` })), "trigger");
+  addUniqueIssues(issues, normalized.gates.map((gate, index) => ({ id: gate.id, path: `gates[${index}].id` })), "gate");
   addUniqueIssues(issues, normalized.actions.map((action, index) => ({ id: action.id, path: `actions[${index}].id` })), "action");
   addUniqueIssues(issues, normalized.outputs.map((output, index) => ({ id: output.id, path: `outputs[${index}].id` })), "output");
   addUniqueIssues(issues, runtimeIds, "runtime");
@@ -110,6 +112,7 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
   return {
     input,
     rawTriggers: Array.isArray(input.triggers) ? input.triggers : [],
+    rawGates: Array.isArray(input.gates) ? input.gates : [],
     rawActions: Array.isArray(input.actions) ? input.actions : [],
     rawOutputs: Array.isArray(input.outputs) ? input.outputs : [],
     rawPolicies,
@@ -134,6 +137,16 @@ const validateTrigger = (trigger: unknown, index: number, issues: ProjectAutomat
   }
   addRequiredStringIssue(issues, `${base}.id`, trigger.id, "Trigger id");
   addRequiredStringIssue(issues, `${base}.description`, trigger.description, "Trigger description");
+};
+
+const validateGate = (gate: unknown, index: number, issues: ProjectAutomationIssue[]) => {
+  const base = `gates[${index}]`;
+  if (!isRecord(gate)) {
+    issues.push({ path: base, message: "Gate must be an object." });
+    return;
+  }
+  addRequiredStringIssue(issues, `${base}.id`, gate.id, "Gate id");
+  addRequiredStringIssue(issues, `${base}.description`, gate.description, "Gate description");
 };
 
 const validateAction = (action: unknown, index: number, context: ValidationContext, issues: ProjectAutomationIssue[]) => {
@@ -338,6 +351,7 @@ export const validateProjectAutomationConfig = (
   const context = createValidationContext(input, agents);
   collectIdentityIssues(context, issues);
   context.rawTriggers.forEach((trigger, index) => validateTrigger(trigger, index, issues));
+  context.rawGates.forEach((gate, index) => validateGate(gate, index, issues));
   context.rawActions.forEach((action, index) => validateAction(action, index, context, issues));
   context.rawOutputs.forEach((output, index) => validateOutput(output, index, issues));
   context.rawPolicies.forEach((policy, index) => validatePolicy(policy, index, context, issues));

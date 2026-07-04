@@ -101,6 +101,7 @@ describe("Markdown collection loading", () => {
     expect(data.automation).toEqual({
       version: 1,
       triggers: [],
+      gates: [],
       actions: [],
       outputs: [
         { id: "complete", description: "Action completed." },
