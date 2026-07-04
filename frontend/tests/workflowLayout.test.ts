@@ -159,14 +159,21 @@ describe("calculateWorkflowCanvasLayout", () => {
     const first = policy("first", undefined, "build");
     const child = policy("child", "codex.build.complete", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id], null, "vertical");
+    const triggerNode = layout.nodes.find((node) => node.key === "trigger");
     const firstNode = layout.nodes.find((node) => node.key === "policy-0");
     const childNode = layout.nodes.find((node) => node.key === "policy-1");
     const outputEventsNode = layout.nodes.find((node) => node.key === "output-events-0");
+    const triggerPolicyEdge = layout.edges.find((edge) => edge.key === "trigger-policy-0");
 
     expect(layout.direction).toBe("vertical");
+    expect(triggerNode ? triggerNode.x + triggerNode.width / 2 : undefined).toBe(firstNode ? firstNode.x + firstNode.width / 2 : undefined);
     expect(childNode?.y).toBeGreaterThan(firstNode?.y ?? 0);
     expect(outputEventsNode?.x).toBe(childNode ? childNode.x + childNode.width + workflowCanvasLayoutConfig.branchGap : undefined);
     expect(outputEventsNode?.y).toBe(childNode?.y);
+    expect(triggerPolicyEdge).toMatchObject({
+      sourceHandleId: "bottom",
+      targetHandleId: "top"
+    });
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-policy-0-1-codex.build.complete",
       sourceHandleId: "bottom",

@@ -287,7 +287,7 @@ function positionPrimaryNodes(
       ...node,
       x: direction === "horizontal"
         ? horizontalNodeX(rank, metrics)
-        : workflowCanvasLayoutConfig.startX + orderIndex * metrics.verticalColumnStep,
+        : verticalNodeX(node, orderIndex, metrics),
       y: direction === "horizontal"
         ? workflowCanvasLayoutConfig.startY + orderIndex * metrics.horizontalRowStep
         : verticalNodeY(rank, metrics)
@@ -359,6 +359,12 @@ function horizontalNodeX(rank: number, metrics: WorkflowLayoutMetrics) {
 function verticalNodeY(rank: number, metrics: WorkflowLayoutMetrics) {
   if (rank <= 0) return workflowCanvasLayoutConfig.startY;
   return metrics.verticalRootPolicyY + (rank - 1) * metrics.verticalPolicyRankStep;
+}
+
+function verticalNodeX(node: WorkflowCanvasLayoutNodeDraft, orderIndex: number, metrics: WorkflowLayoutMetrics) {
+  const columnWidth = metrics.verticalColumnStep - workflowCanvasLayoutConfig.branchGap;
+  const centeredOffset = Math.max(0, (columnWidth - node.width) / 2);
+  return workflowCanvasLayoutConfig.startX + orderIndex * metrics.verticalColumnStep + centeredOffset;
 }
 
 function workflowNodeRanks(nodes: WorkflowCanvasLayoutNodeDraft[], edges: WorkflowDagreEdge[]) {
