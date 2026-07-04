@@ -38,7 +38,6 @@ const agent: Agent = {
 const validConfig = (): ProjectAutomationConfig => ({
   version: 1,
   triggers: [],
-  gates: [],
   actions: [
     {
       id: "implementation",
@@ -49,11 +48,13 @@ const validConfig = (): ProjectAutomationConfig => ({
   outputs: [
     {
       id: "failed",
-      description: "Action failed."
+      description: "Action failed.",
+      type: "event"
     },
     {
       id: "summary",
-      description: "Summarized work output."
+      description: "Summarized work output.",
+      type: "event"
     }
   ],
   policies: [
@@ -88,12 +89,11 @@ describe("project automation config", () => {
     await expect(loadProjectAutomationConfig(await tempRoot())).resolves.toEqual({
       version: 1,
       triggers: [],
-      gates: [],
       actions: [],
       outputs: [
-        { id: "complete", description: "Action completed." },
-        { id: "blocked", description: "Action is blocked." },
-        { id: "failed", description: "Action failed." }
+        { id: "complete", description: "Action completed.", type: "event" },
+        { id: "blocked", description: "Action is blocked.", type: "event" },
+        { id: "failed", description: "Action failed.", type: "event" }
       ],
       policies: [],
       workflows: [],
@@ -111,7 +111,7 @@ describe("project automation config", () => {
 
     const saved = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     expect(saved).not.toHaveProperty("events");
-    expect(saved.gates).toEqual([]);
+    expect(saved).not.toHaveProperty("gates");
     expect(saved.policies[0]?.id).toBe("on.developer.implementation.failed.then.developer.start.implementation");
     expect(saved.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.then.developer.start.implementation"]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
@@ -138,12 +138,12 @@ describe("project automation config", () => {
 
     const loaded = await loadProjectAutomationConfig(root, [agent]);
     expect(loaded).not.toHaveProperty("events");
-    expect(loaded.gates).toEqual([]);
+    expect(loaded).not.toHaveProperty("gates");
     expect(loaded.actions).toEqual([{ id: "run", description: "", outputIds: ["complete", "blocked", "failed"] }]);
     expect(loaded.outputs).toEqual([
-      { id: "complete", description: "Action completed." },
-      { id: "blocked", description: "Action is blocked." },
-      { id: "failed", description: "Action failed." }
+      { id: "complete", description: "Action completed.", type: "event" },
+      { id: "blocked", description: "Action is blocked.", type: "event" },
+      { id: "failed", description: "Action failed.", type: "event" }
     ]);
     expect(loaded.policies[0]).toMatchObject({
       id: "on.developer.run.failed.then.developer.start.run",
@@ -187,7 +187,8 @@ describe("project automation config", () => {
       id: "on.developer.implementation.failed.then.developer.start.implementation",
       event: "developer.implementation.failed"
     });
-    expect(loaded.gates).toEqual([{ id: "intent_changed", description: "Intent changed gate" }]);
+    expect(loaded).not.toHaveProperty("gates");
+    expect(loaded.outputs.every((output) => output.type === "event")).toBe(true);
     expect(loaded.actions[0]?.outputIds).toEqual(["complete", "blocked", "failed"]);
     expect(loaded.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.then.developer.start.implementation"]);
   });
@@ -202,26 +203,8 @@ describe("project automation config", () => {
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      gates: "not-an-array"
-    }, [agent]).some((issue) => issue.message === "gates must be an array.")).toBe(true);
-
-    expect(validateProjectAutomationConfig({
-      ...validConfig(),
-      gates: [{ id: "", description: "Missing id" }]
-    }, [agent]).some((issue) => issue.message === "Gate id is required.")).toBe(true);
-
-    expect(validateProjectAutomationConfig({
-      ...validConfig(),
-      gates: [{ id: "intent_changed", description: "" }]
-    }, [agent]).some((issue) => issue.message === "Gate description is required.")).toBe(true);
-
-    expect(validateProjectAutomationConfig({
-      ...validConfig(),
-      gates: [
-        { id: "intent_changed", description: "Intent changed" },
-        { id: "intent_changed", description: "Duplicate gate" }
-      ]
-    }, [agent]).some((issue) => issue.message === "Duplicate gate id: intent_changed.")).toBe(true);
+      outputs: [{ id: "summary", description: "Summary", type: "invalid" }]
+    }, [agent]).some((issue) => issue.message === "Output type must be event or gate.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
@@ -261,17 +244,17 @@ describe("project automation config", () => {
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      outputs: [{ id: "summary", description: "Summary" }, { id: "summary", description: "Duplicate summary" }]
+      outputs: [{ id: "summary", description: "Summary", type: "event" }, { id: "summary", description: "Duplicate summary", type: "event" }]
     }, [agent]).some((issue) => issue.message === "Duplicate output id: summary.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      outputs: [{ id: "", description: "Missing id" }]
+      outputs: [{ id: "", description: "Missing id", type: "event" }]
     }, [agent]).some((issue) => issue.message === "Output id is required.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      outputs: [{ id: "bad", description: 123 }]
+      outputs: [{ id: "bad", description: 123, type: "event" }]
     }, [agent]).some((issue) => issue.message === "Output description must be a string.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
@@ -282,7 +265,7 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: ["failed", "summary", "extra", "too-many"] }],
-      outputs: [...validConfig().outputs, { id: "extra", description: "Extra" }, { id: "too-many", description: "Too many" }]
+      outputs: [...validConfig().outputs, { id: "extra", description: "Extra", type: "event" }, { id: "too-many", description: "Too many", type: "event" }]
     }, [agent]).some((issue) => issue.message === "Action can select at most 3 outputs.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
@@ -301,13 +284,20 @@ describe("project automation config", () => {
       policies: [{ ...validConfig().policies[0]!, event: "developer.implementation.failed" }]
     }, [agent]).some((issue) => issue.message === "Policy references unknown event: developer.implementation.failed.")).toBe(true);
 
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      actions: [{ ...validConfig().actions[0]!, outputIds: ["failed"] }],
+      outputs: [{ id: "failed", description: "Terminal gate", type: "gate" }],
+      policies: [{ ...validConfig().policies[0]!, event: "developer.implementation.failed" }]
+    }, [agent]).some((issue) => issue.message === "Policy references unknown event: developer.implementation.failed.")).toBe(true);
+
     const completedConfig: ProjectAutomationConfig = {
       ...validConfig(),
       actions: [{ id: "implementation", description: "Implement approved work.", outputIds: ["completed", "failed", "blocked"] }],
       outputs: [
-        { id: "completed", description: "Action completed." },
-        { id: "failed", description: "Action failed." },
-        { id: "blocked", description: "Action is blocked." }
+        { id: "completed", description: "Action completed.", type: "event" },
+        { id: "failed", description: "Action failed.", type: "event" },
+        { id: "blocked", description: "Action is blocked.", type: "event" }
       ],
       policies: [{
         id: "on.developer.implementation.completed.then.developer.start.implementation",

@@ -6,14 +6,14 @@ import type {
   ProjectPolicy,
   ProjectWorkflow
 } from "../../../../../shared/api/workspace-contracts";
-import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType, policyOutputEventTypes, preferredAgentToken } from "../../../../../shared/policy-actions";
+import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType, preferredAgentToken } from "../../../../../shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { automationAgentOptions, uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
-import { buildWorkflowGraph, type WorkflowStepRecord } from "./workflowGraph";
+import { buildWorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
 import { calculateWorkflowCanvasLayout, type WorkflowLayoutDirection } from "./workflowLayout";
 import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
 
@@ -56,17 +56,25 @@ export function WorkflowsAutomationTab({
   const defaultAgent = data.agents[0] ? preferredAgentToken(data.agents[0]) : "";
   const defaultAction = config.actions[0]?.id ?? "";
   const selectedActionOutputIds = (actionId: string) => actionOutputIds(config.actions, actionId);
+  const workflowOutputTargets = (policy: ProjectPolicy): WorkflowOutputTarget[] =>
+    selectedActionOutputIds(policy.action).map((outputId) => ({
+      outputId,
+      eventType: policyOutputEventType(policy, outputId),
+      type: config.outputs.find((output) => output.id === outputId)?.type ?? "event"
+    }));
   const workflowStepRecords = useMemo<WorkflowStepRecord[]>(() =>
     selected?.steps.map((policyId, index) => {
       const policy = policyById.get(policyId);
+      const outputTargets = policy ? workflowOutputTargets(policy) : undefined;
       return {
         policyId,
         index,
         policy,
-        outputEvents: policy ? policyOutputEventTypes(policy, config.actions) : undefined
+        outputEvents: outputTargets?.filter((output) => output.type === "event").map((output) => output.eventType),
+        outputTargets
       };
     }) ?? [],
-  [config.actions, policyById, selected?.steps]);
+  [config.actions, config.outputs, policyById, selected?.steps]);
   const workflowGraph = useMemo(() => buildWorkflowGraph(workflowStepRecords), [workflowStepRecords]);
   const workflowLayout = useMemo(
     () => selected ? calculateWorkflowCanvasLayout({ workflowGraph, editingPolicyIndex, direction: layoutDirection }) : undefined,

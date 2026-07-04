@@ -6,7 +6,6 @@ import type { AutomationTab } from "../types";
 import { ActionsAutomationTab } from "./actions/ActionsAutomationTab";
 import { createAutomationEntityControls } from "./automationEntityControls";
 import { AutomationIssues } from "./AutomationIssues";
-import { GatesAutomationTab } from "./gates/GatesAutomationTab";
 import { OutputsAutomationTab } from "./outputs/OutputsAutomationTab";
 import { TriggersAutomationTab } from "./triggers/TriggersAutomationTab";
 import { useAutomationDraft } from "./useAutomationDraft";
@@ -34,7 +33,6 @@ export function AutomationView({
     addConfig,
     deleteConfig,
     selectedActionId,
-    selectedGateId,
     selectedOutputId,
     selectedTriggerId,
     selectedWorkflowId,
@@ -70,9 +68,6 @@ export function AutomationView({
           <AutomationIssues issues={data.automationIssues} />
           {activeTab === "triggers" ? (
             <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={(id) => selectAutomationEntity("triggers", id)} updateConfig={updateConfig} />
-          ) : null}
-          {activeTab === "gates" ? (
-            <GatesAutomationTab config={draft} selectedId={selectedGateId} onSelect={(id) => selectAutomationEntity("gates", id)} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "actions" ? (
             <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />

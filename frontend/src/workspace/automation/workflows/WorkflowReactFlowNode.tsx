@@ -1,4 +1,4 @@
-import { Activity, Pencil, Route, Save, Trash2, Zap } from "lucide-react";
+import { Activity, CheckCircle2, Pencil, Route, Save, Trash2, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,15 +22,34 @@ export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReact
 }
 
 function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
-  const anchorTop = layoutNode.kind === "trigger" || layoutNode.kind === "policy" || layoutNode.kind === "output-events"
+  const anchorTop = layoutNode.kind === "gate-output"
+    ? layoutNode.height / 2
+    : layoutNode.kind === "trigger" || layoutNode.kind === "policy" || layoutNode.kind === "output-events"
     ? workflowCanvasLayoutConfig.policyAnchorY
     : layoutNode.height / 2;
   const anchorLeft = layoutNode.width / 2;
+  const outputAnchorTop = layoutNode.kind === "policy"
+    ? layoutNode.height - workflowCanvasLayoutConfig.edgePad / 2
+    : layoutNode.height / 2;
+
+  if (layoutNode.kind === "gate-output") {
+    return layoutNode.direction === "vertical" ? (
+      <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
+    ) : (
+      <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
+    );
+  }
 
   return (
     <>
       <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
       <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
+      {layoutNode.kind === "policy" && (
+        <Handle id="right-output" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: outputAnchorTop }} />
+      )}
+      {layoutNode.kind === "output-events" && (
+        <Handle id="left-output" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: layoutNode.height / 2 }} />
+      )}
       <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
       <Handle id="bottom" type="source" position={Position.Bottom} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
     </>
@@ -41,6 +60,7 @@ function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNode
   if (node.kind === "trigger") return renderTriggerNode(context);
   if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(context);
   if (node.kind === "output-events") return renderOutputEventsNode(node, context);
+  if (node.kind === "gate-output") return renderGateOutputNode(node);
   if (!node.record) return null;
   if (node.kind === "save-policy" || node.kind === "edit-policy" || node.kind === "delete-policy") return renderPolicyActionNode(node, context, node.record);
   return renderPolicyNode(node, context, node.record);
@@ -78,8 +98,8 @@ function renderOutputEventsNode(node: WorkflowCanvasLayoutNode, context: Workflo
 
   return (
     <WorkflowCanvasNode
-      label="Output Events"
-      value={`${outputEvents.length} output event${outputEvents.length === 1 ? "" : "s"}`}
+      label="Outputs"
+      value={`${outputEvents.length} output${outputEvents.length === 1 ? "" : "s"}`}
       tone="event"
       icon={Activity}
       dashed
@@ -102,6 +122,22 @@ function renderOutputEventsNode(node: WorkflowCanvasLayoutNode, context: Workflo
         ))}
       </div>
     </WorkflowCanvasNode>
+  );
+}
+
+function renderGateOutputNode(node: WorkflowCanvasLayoutNode) {
+  const outputId = node.gateOutput?.outputId ?? "Gate";
+
+  return (
+    <div
+      aria-label={`Gate: ${outputId}`}
+      title={outputId}
+      data-workflow-gate-output={outputId}
+      className="flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md border border-divider-strong bg-card px-1.5 font-mono text-[0.66rem] leading-4 text-foreground"
+    >
+      <CheckCircle2 className="size-3.5 shrink-0 text-secondary" aria-hidden="true" />
+      <span className="block min-w-0 truncate">{outputId}</span>
+    </div>
   );
 }
 

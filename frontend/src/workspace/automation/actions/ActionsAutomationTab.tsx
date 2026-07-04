@@ -49,7 +49,9 @@ export function ActionsAutomationTab({
       const eventIdMap = new Map<string, string>();
       if (previousId !== normalized.id) {
         const agentTokens = [...new Set(agents.flatMap(agentTokenCandidates))];
-        const previousOutputIds = previousAction.outputIds;
+        const previousOutputIds = previousAction.outputIds.filter((outputId) =>
+          current.outputs.find((output) => output.id === outputId)?.type !== "gate"
+        );
         agentTokens.forEach((agent) => {
           previousOutputIds.forEach((outputId) => {
             eventIdMap.set(
@@ -131,7 +133,7 @@ export function ActionsAutomationTab({
                   <SelectGroup>
                     {selectableOutputs.map((output) => (
                       <SelectItem key={output.id} value={output.id}>
-                        {output.description ? `${output.id} · ${output.description}` : output.id}
+                        {output.description ? `${output.id} · ${output.type} · ${output.description}` : `${output.id} · ${output.type}`}
                       </SelectItem>
                     ))}
                   </SelectGroup>

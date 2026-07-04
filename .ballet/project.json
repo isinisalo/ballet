@@ -104,7 +104,7 @@
       "outputIds": [
         "approved",
         "changes_requested",
-        "blocked"
+        "done"
       ]
     },
     {
@@ -183,27 +183,38 @@
   "outputs": [
     {
       "id": "ready",
-      "description": "Action produced usable evidence for the next agent or human gate."
+      "description": "Action produced usable evidence for the next agent or human gate.",
+      "type": "event"
     },
     {
       "id": "approved",
-      "description": "Review gate approved this perspective."
+      "description": "Review gate approved this perspective.",
+      "type": "event"
     },
     {
       "id": "changes_requested",
-      "description": "Review gate requires corrections before continuing."
+      "description": "Review gate requires corrections before continuing.",
+      "type": "event"
     },
     {
       "id": "blocked",
-      "description": "Action cannot continue without a human decision, missing dependency, or conflict resolution."
+      "description": "Action cannot continue without a human decision, missing dependency, or conflict resolution.",
+      "type": "event"
     },
     {
       "id": "failed",
-      "description": "Action failed technically or at runtime."
+      "description": "Action failed technically or at runtime.",
+      "type": "event"
     },
     {
       "id": "deployed",
-      "description": "Deployment completed in the approved environment."
+      "description": "Deployment completed in the approved environment.",
+      "type": "event"
+    },
+    {
+      "id": "done",
+      "description": "Workflow is done.",
+      "type": "gate"
     }
   ],
   "policies": [
@@ -494,6 +505,14 @@
       "agent": "release",
       "action": "design-release",
       "enabled": true
+    },
+    {
+      "id": "on.roadmap.design-roadmap.ready.then.intent.start.review",
+      "source": "event",
+      "event": "roadmap.design-roadmap.ready",
+      "agent": "intent",
+      "action": "review",
+      "enabled": true
     }
   ],
   "workflows": [
@@ -503,7 +522,8 @@
       "steps": [
         "on.trigger.intent_changed.then.project.start.route",
         "on.project.route.ready.then.intent.start.analyze-intent",
-        "on.intent.analyze-intent.ready.then.roadmap.start.design-roadmap"
+        "on.intent.analyze-intent.ready.then.roadmap.start.design-roadmap",
+        "on.roadmap.design-roadmap.ready.then.intent.start.review"
       ]
     },
     {

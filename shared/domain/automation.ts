@@ -11,20 +11,18 @@ export interface ProjectTrigger {
   description: string;
 }
 
-export interface ProjectGate {
-  id: string;
-  description: string;
-}
-
 export interface ProjectAction {
   id: string;
   description: string;
   outputIds: string[];
 }
 
+export type ProjectOutputType = "event" | "gate";
+
 export interface ProjectOutput {
   id: string;
   description: string;
+  type: ProjectOutputType;
 }
 
 export interface ProjectPolicy {
@@ -46,7 +44,6 @@ export interface ProjectWorkflow {
 export interface ProjectAutomationConfig {
   version: 1;
   triggers: ProjectTrigger[];
-  gates: ProjectGate[];
   actions: ProjectAction[];
   outputs: ProjectOutput[];
   policies: ProjectPolicy[];
@@ -57,7 +54,6 @@ export interface ProjectAutomationConfig {
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: 1,
   triggers: [],
-  gates: [],
   actions: [],
   outputs: defaultProjectOutputs(),
   policies: [],

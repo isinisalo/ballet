@@ -1,16 +1,17 @@
 import { defaultProjectAutomationConfig, type ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
-import { defaultPolicyOutputIds, defaultProjectOutputs, normalizePolicyToken } from "../../../../shared/policy-actions";
+import { defaultPolicyOutputIds, defaultProjectOutputs, normalizePolicyToken, normalizeProjectOutputType } from "../../../../shared/policy-actions";
 
 export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefined): ProjectAutomationConfig => {
   const defaults = defaultProjectAutomationConfig();
-  const outputs = Array.isArray(config?.outputs) && config.outputs.length > 0 ? config.outputs : defaultProjectOutputs();
+  const outputs = Array.isArray(config?.outputs) && config.outputs.length > 0
+    ? config.outputs.map((output) => ({ ...output, type: normalizeProjectOutputType(output.type) }))
+    : defaultProjectOutputs();
   const outputIds = outputs.map((output) => output.id);
   const fallbackOutputIds = defaultPolicyOutputIds.filter((outputId) => outputIds.includes(outputId));
   return {
     ...defaults,
     ...config,
     triggers: Array.isArray(config?.triggers) ? config.triggers : defaults.triggers,
-    gates: Array.isArray(config?.gates) ? config.gates : defaults.gates,
     actions: Array.isArray(config?.actions)
       ? config.actions.map((action) => {
         const selectedOutputIds = Array.isArray(action.outputIds)

@@ -178,7 +178,8 @@ describe("API routes", () => {
       version: 1,
       events: [{ id: "runtime.event", title: "Runtime event", source: "runtime" }],
       triggers: [],
-      gates: [],
+      actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"] }],
+      outputs: [{ id: "failed", description: "Failed output", type: "event" }],
       policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed", agent: "developer", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }],
       runtimes: []
@@ -207,7 +208,7 @@ describe("API routes", () => {
       };
 
       expect(data.automation).not.toHaveProperty("events");
-      expect(data.eventDefinitions).toHaveLength(3);
+      expect(data.eventDefinitions).toHaveLength(1);
       expect(data.eventDefinitions).toEqual(expect.arrayContaining([
         expect.objectContaining({ id: "developer.implementation.failed", eventType: "developer.implementation.failed" })
       ]));
@@ -231,7 +232,8 @@ describe("API routes", () => {
       version: 1,
       events: [{ id: "plan_approved", title: "Plan approved", source: "user" }],
       triggers: [{ id: "plan_approved", description: "Plan approved" }],
-      gates: [],
+      actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"] }],
+      outputs: [{ id: "failed", description: "Failed output", type: "event" }],
       policies: [{ id: "on.trigger.plan_approved.then.developer.start.implementation", source: "trigger", trigger: "plan_approved", agent: "developer", action: "implementation", enabled: true }],
       workflows: [],
       runtimes: []
@@ -280,9 +282,8 @@ describe("API routes", () => {
     const config = {
       version: 1,
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"] }],
-      outputs: [{ id: "failed", description: "Failed output" }, { id: "summary", description: "Summary output" }],
+      outputs: [{ id: "failed", description: "Failed output", type: "event" }, { id: "summary", description: "Summary output", type: "gate" }],
       triggers: [{ id: "manual_start", description: "Manual start" }],
-      gates: [{ id: "intent_changed", description: "Intent changed" }],
       policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed", agent: "developer", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
@@ -296,13 +297,14 @@ describe("API routes", () => {
       });
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
-      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["failed"] }], outputs: [{ id: "failed" }, { id: "summary" }], triggers: [{ id: "manual_start" }], gates: [{ id: "intent_changed" }], workflows: [{ steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }] });
+      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["failed"] }], outputs: [{ id: "failed", type: "event" }, { id: "summary", type: "gate" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }] });
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);
       const automationBody = await automation.json() as { config: Record<string, unknown> };
       expect(automationBody.config).not.toHaveProperty("events");
-      expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], gates: [{ id: "intent_changed" }], policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed" }] }, issues: [] });
+      expect(automationBody.config).not.toHaveProperty("gates");
+      expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], outputs: [{ id: "failed", type: "event" }, { id: "summary", type: "gate" }], policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed" }] }, issues: [] });
 
       const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",

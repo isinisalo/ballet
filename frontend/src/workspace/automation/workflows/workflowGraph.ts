@@ -1,11 +1,18 @@
 import type { ProjectPolicy } from "../../../../../shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "../../../../../shared/policy-actions";
 
+export type WorkflowOutputTarget = {
+  outputId: string;
+  eventType: string;
+  type: "event" | "gate";
+};
+
 export type WorkflowStepRecord = {
   policyId: string;
   index: number;
   policy?: ProjectPolicy;
   outputEvents?: string[];
+  outputTargets?: WorkflowOutputTarget[];
 };
 
 export type WorkflowGraph = {

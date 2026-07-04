@@ -173,7 +173,6 @@ export const seedData: AppData = {
   automation: {
     version: 1,
     triggers: [],
-    gates: [],
     actions: [
       {
         id: "remediation",
@@ -184,11 +183,13 @@ export const seedData: AppData = {
     outputs: [
       {
         id: "failed",
-        description: "Action failed."
+        description: "Action failed.",
+        type: "event"
       },
       {
         id: "runbook",
-        description: "Operator-facing remediation notes or runbook updates."
+        description: "Operator-facing remediation notes or runbook updates.",
+        type: "event"
       }
     ],
     policies: [

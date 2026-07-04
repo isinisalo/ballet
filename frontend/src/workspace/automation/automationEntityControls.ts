@@ -22,7 +22,6 @@ const selectedCollectionId = <T extends { id: string }>(isActive: boolean, selec
 
 const selectedEntityIds = (activeTab: AutomationTab, selectedId: string | undefined, draft: ProjectAutomationConfig) => ({
   selectedTriggerId: selectedCollectionId(activeTab === "triggers", selectedId, draft.triggers),
-  selectedGateId: selectedCollectionId(activeTab === "gates", selectedId, draft.gates),
   selectedActionId: selectedCollectionId(activeTab === "actions", selectedId, draft.actions),
   selectedOutputId: selectedCollectionId(activeTab === "outputs", selectedId, draft.outputs),
   selectedWorkflowId: selectedCollectionId(activeTab === "workflows", selectedId, draft.workflows)
@@ -42,15 +41,6 @@ const addEntityConfig = (
           const id = uniqueAutomationId("new-trigger", draft.triggers.map((trigger) => trigger.id));
           setDraft((current) => ({ ...current, triggers: [...current.triggers, { id, description: "New trigger" }] }));
           selectAutomationEntity("triggers", id);
-        }
-      };
-    case "gates":
-      return {
-        label: "Add gate",
-        onAdd: () => {
-          const id = uniqueAutomationId("new-gate", draft.gates.map((gate) => gate.id));
-          setDraft((current) => ({ ...current, gates: [...current.gates, { id, description: "New gate" }] }));
-          selectAutomationEntity("gates", id);
         }
       };
     case "actions":
@@ -74,7 +64,7 @@ const addEntityConfig = (
         label: "Add output",
         onAdd: () => {
           const id = uniqueAutomationId("new-output", draft.outputs.map((output) => output.id));
-          setDraft((current) => ({ ...current, outputs: [...current.outputs, { id, description: "New output" }] }));
+          setDraft((current) => ({ ...current, outputs: [...current.outputs, { id, description: "New output", type: "event" }] }));
           selectAutomationEntity("outputs", id);
         }
       };
@@ -109,21 +99,6 @@ const deleteEntityConfig = (
           const nextId = draft.triggers.find((trigger) => trigger.id !== selected.id)?.id;
           setDraft((current) => ({ ...current, triggers: current.triggers.filter((trigger) => trigger.id !== selected.id) }));
           selectAutomationEntity("triggers", nextId);
-        }
-      };
-    }
-    case "gates": {
-      const selected = draft.gates.find((gate) => gate.id === ids.selectedGateId) ?? draft.gates[0];
-      return {
-        label: "Delete gate",
-        type: "gate",
-        resourceName: selected?.id,
-        canDelete: Boolean(selected),
-        onDelete: () => {
-          if (!selected) return;
-          const nextId = draft.gates.find((gate) => gate.id !== selected.id)?.id;
-          setDraft((current) => ({ ...current, gates: current.gates.filter((gate) => gate.id !== selected.id) }));
-          selectAutomationEntity("gates", nextId);
         }
       };
     }

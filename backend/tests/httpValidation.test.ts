@@ -34,9 +34,8 @@ describe("HTTP Zod validation", () => {
     const valid = {
       version: 1,
       triggers: [{ id: "manual-start", description: "Manual start" }],
-      gates: [{ id: "intent_changed", description: "Intent changed" }],
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"] }],
-      outputs: [{ id: "summary", description: "Summary artifact" }],
+      outputs: [{ id: "summary", description: "Summary artifact", type: "event" }],
       policies: [{
         id: "on.trigger.manual-start.then.developer.start.implementation",
         source: "trigger",
@@ -53,7 +52,7 @@ describe("HTTP Zod validation", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: undefined }), "actions");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: undefined }), "outputs");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation" }] }), "actions.0.outputIds");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", description: "Summary", extra: true }] }), "outputs.0");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", description: "Summary", type: "event", extra: true }] }), "outputs.0");
   });
 
   it("accepts valid event intake payloads and defaults payload to an object", () => {

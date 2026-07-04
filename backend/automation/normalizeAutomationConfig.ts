@@ -1,7 +1,6 @@
 import type {
   ProjectAction,
   ProjectAutomationConfig,
-  ProjectGate,
   ProjectOutput,
   ProjectPolicy,
   ProjectTrigger,
@@ -13,6 +12,7 @@ import {
   defaultPolicyOutputIds,
   defaultProjectOutputs,
   generatedPolicyId,
+  normalizeProjectOutputType,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
   policyActionTokens
@@ -38,11 +38,6 @@ const normalizeTrigger = (value: Record<string, unknown>): ProjectTrigger => ({
   description: stringValue(value.description)
 });
 
-const normalizeGate = (value: Record<string, unknown>): ProjectGate => ({
-  id: normalizePolicyToken(stringValue(value.id)),
-  description: stringValue(value.description)
-});
-
 const normalizeAction = (value: Record<string, unknown>, availableOutputIds: string[]): ProjectAction => {
   const rawOutputIds = Array.isArray(value.outputIds) ? stringArray(value.outputIds).map(normalizePolicyToken).filter(Boolean) : undefined;
   const fallbackOutputIds = defaultPolicyOutputIds.filter((id) => availableOutputIds.includes(id));
@@ -55,7 +50,8 @@ const normalizeAction = (value: Record<string, unknown>, availableOutputIds: str
 
 const normalizeOutput = (value: Record<string, unknown>): ProjectOutput => ({
   id: normalizePolicyToken(stringValue(value.id)),
-  description: stringValue(value.description)
+  description: stringValue(value.description),
+  type: normalizeProjectOutputType(value.type)
 });
 
 const inferLegacyPolicyAction = (value: Record<string, unknown>): string => {
@@ -131,7 +127,6 @@ export const normalizeProjectAutomationConfig = (value: unknown): ProjectAutomat
   return {
     version: 1,
     triggers: recordArray(value.triggers).map(normalizeTrigger),
-    gates: recordArray(value.gates).map(normalizeGate),
     actions,
     outputs,
     policies,

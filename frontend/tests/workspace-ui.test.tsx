@@ -96,10 +96,6 @@ const baseData = (): AppData => ({
       id: "manual-start",
       description: "Manual workflow start"
     }],
-    gates: [{
-      id: "intent_changed",
-      description: "Intent changed gate"
-    }],
     actions: [{
       id: "implementation",
       description: "Implement work",
@@ -107,13 +103,16 @@ const baseData = (): AppData => ({
     }],
     outputs: [{
       id: "complete",
-      description: "Action completed"
+      description: "Action completed",
+      type: "event"
     }, {
       id: "failed",
-      description: "Action failed"
+      description: "Action failed",
+      type: "event"
     }, {
       id: "summary",
-      description: "Summarize implementation output"
+      description: "Summarize implementation output",
+      type: "gate"
     }],
     policies: [{
       id: "on.existing.implementation.failed.then.existing.start.implementation",
@@ -296,7 +295,7 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
       const saved = body as ProjectAutomationConfig;
       data.automation = saved;
       data.eventDefinitions = [...new Set(data.agents.flatMap((agent) =>
-        saved.actions.flatMap((action) => policyOutputEventTypes({ agent: agent.name.split(/\s+/)[0]?.toLowerCase() ?? agent.id, action: action.id }, saved.actions))
+        saved.actions.flatMap((action) => policyOutputEventTypes({ agent: agent.name.split(/\s+/)[0]?.toLowerCase() ?? agent.id, action: action.id }, saved.actions, saved.outputs))
       ))].map((eventType) => ({
         id: eventType,
         name: eventType,
@@ -629,16 +628,6 @@ describe("workspace entity UI flows", () => {
     expect(window.location.search).toBe("?id=manual-start");
     expect(screen.getByDisplayValue("Manual workflow start")).toBeInTheDocument();
 
-    let gatesToggle = screen.getByRole("link", { name: "Gates" });
-    expect(gatesToggle).toHaveAttribute("aria-expanded", "false");
-    await user.click(gatesToggle);
-    gatesToggle = screen.getByRole("link", { name: "Gates" });
-    expect(gatesToggle).toHaveAttribute("aria-expanded", "true");
-    await user.click(screen.getByRole("link", { name: "intent_changed" }));
-    expect(window.location.pathname).toBe("/automation/gates");
-    expect(window.location.search).toBe("?id=intent_changed");
-    expect(screen.getByDisplayValue("Intent changed gate")).toBeInTheDocument();
-
     let workflowsToggle = screen.getByRole("link", { name: "Workflows" });
     expect(workflowsToggle).toHaveAttribute("aria-expanded", "true");
     await user.click(workflowsToggle);
@@ -658,13 +647,12 @@ describe("workspace entity UI flows", () => {
   it("renders automation when loaded data is missing newer outputs field", async () => {
     const legacyData = baseData();
     delete (legacyData.automation as Partial<ProjectAutomationConfig>).outputs;
-    delete (legacyData.automation as Partial<ProjectAutomationConfig>).gates;
 
     await renderRoute("/automation", legacyData);
 
     expect(screen.getByRole("link", { name: "Outputs" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Actions" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Gates" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Gates" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
   });
 
@@ -758,21 +746,37 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Outputs" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Summarize implementation output")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Output type" })).toHaveTextContent("Gate");
 
     await user.click(screen.getByRole("button", { name: "Add output" }));
     await screen.findByDisplayValue("New output");
     await user.clear(screen.getByLabelText("Output ID"));
     await user.type(screen.getByLabelText("Output ID"), "review-notes");
+    expect(screen.getByRole("combobox", { name: "Output type" })).toHaveTextContent("Event");
+    await user.click(screen.getByRole("combobox", { name: "Output type" }));
+    await user.click(await screen.findByRole("option", { name: "Gate" }));
     await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Review notes artifact");
     expect(screen.getByLabelText("Output ID")).toHaveValue("review-notes");
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.outputs.some((output) => output.id === "review-notes" && output.description === "Review notes artifact")).toBe(true));
+    await waitFor(() => expect(data.automation.outputs.some((output) => output.id === "review-notes" && output.description === "Review notes artifact" && output.type === "gate")).toBe(true));
 
     await confirmDelete(user, "Delete output");
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.outputs.some((output) => output.id === "review-notes")).toBe(false));
+  });
+
+  it("renders gate outputs as workflow endpoints without policy creation", async () => {
+    const workflowData = baseData();
+    workflowData.automation.actions[0]!.outputIds = ["failed", "summary"];
+
+    await renderRoute("/automation/workflows", workflowData);
+
+    expect(screen.getByRole("button", { name: "Add policy step for existing.implementation.failed" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Gate: summary")).toBeInTheDocument();
+    expect(document.querySelector('[data-workflow-gate-output="summary"]')).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add policy step for existing.implementation.summary" })).not.toBeInTheDocument();
   });
 
   it("renames an automation action and rewrites derived policy events", async () => {
@@ -839,28 +843,6 @@ describe("workspace entity UI flows", () => {
     await confirmDelete(user, "Delete trigger");
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.triggers.some((trigger) => trigger.id === "release-ready")).toBe(false));
-  });
-
-  it("creates, edits, deletes, and saves automation gates", async () => {
-    const user = userEvent.setup();
-    const { data } = await renderRoute("/automation/gates?id=intent_changed");
-
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Gates" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Intent changed gate")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Add gate" }));
-    await user.clear(screen.getByLabelText("Gate ID"));
-    await user.type(screen.getByLabelText("Gate ID"), "release-ready");
-    await user.clear(screen.getByLabelText("Description"));
-    await user.type(screen.getByLabelText("Description"), "Release readiness gate.");
-    expect(screen.getByLabelText("Gate ID")).toHaveValue("release-ready");
-    await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.gates.some((gate) => gate.id === "release-ready" && gate.description === "Release readiness gate.")).toBe(true));
-
-    await confirmDelete(user, "Delete gate");
-    await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.gates.some((gate) => gate.id === "release-ready")).toBe(false));
   });
 
   it("creates a policy from a ghost event and keeps its input event read-only", async () => {

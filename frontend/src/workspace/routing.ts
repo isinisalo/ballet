@@ -30,6 +30,7 @@ const legacyRouteAliases: Record<string, (url: URL) => RouteState> = {
   "/policies": (url) => automationRoute("workflows", url),
   "/actions": (url) => automationRoute("actions", url),
   "/workflow": (url) => automationRoute("workflows", url),
+  "/automation/gates": (url) => automationRoute("outputs", url),
   "/automation/runtimes": runtimeRoute,
   "/agent-runs": (url) => automationRoute("workflows", url)
 };
@@ -51,7 +52,7 @@ export const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  const automationMatch = url.pathname.match(/^\/automation\/(triggers|gates|actions|outputs|workflows)\/?$/);
+  const automationMatch = url.pathname.match(/^\/automation\/(triggers|actions|outputs|workflows)\/?$/);
   if (automationMatch) return automationRoute(automationMatch[1] as AutomationTab, url);
   if (url.pathname === "/automation") return automationRoute("workflows", url);
   if (url.pathname === "/runtimes") return runtimeRoute(url);

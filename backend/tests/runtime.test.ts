@@ -9,7 +9,7 @@ import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
 import { parseAgentOutcomeText } from "../runtime-policy.js";
 import { policyVersion } from "../../shared/policy.js";
 import { mapAgentOutputToEvent } from "../automation.js";
-import { outcomeToOutputEventStatus } from "../agentd.js";
+import { agentOutcomeDomainEvent, outcomeToOutputEventStatus } from "../agentd.js";
 
 const tempRoots: string[] = [];
 
@@ -343,6 +343,21 @@ describe("runtime output mapping", () => {
       projectPolicy,
       [{ id: "implementation", outputIds: ["complete", "blocked", "failed"] }]
     )).toBe("complete");
+  });
+
+  it("does not publish a domain event for a gate output outcome", () => {
+    expect(agentOutcomeDomainEvent(
+      readyOutcome,
+      projectPolicy,
+      [{ id: "implementation", outputIds: ["complete"] }],
+      [{ id: "complete", type: "gate" }],
+      {
+        runId: "run-1",
+        triggerEventId: "event-1",
+        policyId: projectPolicy.id,
+        policyVersion: 1
+      }
+    )).toBeUndefined();
   });
 
   it("does not require an event id in agent output", () => {

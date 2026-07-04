@@ -12,7 +12,7 @@ export type View =
   | "skills";
 
 export type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
-export type AutomationTab = "triggers" | "gates" | "actions" | "outputs" | "workflows";
+export type AutomationTab = "triggers" | "actions" | "outputs" | "workflows";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {

@@ -4,7 +4,7 @@ import type { AppData } from "../shared/api/workspaceData.js";
 import type { Agent } from "../shared/domain/agents.js";
 import type { RuntimeEvent } from "../shared/domain/events.js";
 import type { AgentOutcome, AgentOutputEventStatus, AgentRun } from "../shared/domain/runtime.js";
-import type { ProjectAction, ProjectPolicy } from "../shared/domain/automation.js";
+import type { ProjectAction, ProjectOutput, ProjectPolicy } from "../shared/domain/automation.js";
 import { actionOutputIds } from "../shared/policy-actions.js";
 import { store } from "./store.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
@@ -47,6 +47,46 @@ export const outcomeToOutputEventStatus = (
         "ready"
       );
   }
+};
+
+const actionOutputType = (
+  policy: Pick<ProjectPolicy, "action">,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
+  outputs: Array<Pick<ProjectOutput, "id" | "type">>,
+  outputId: string
+) => {
+  const allowedOutputIds = actionOutputIds(actions, policy.action);
+  if (!allowedOutputIds.includes(outputId)) return undefined;
+  return outputs.find((output) => output.id === outputId)?.type ?? "event";
+};
+
+export const agentOutcomeDomainEvent = (
+  outcome: AgentOutcome,
+  policy: ProjectPolicy,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
+  outputs: Array<Pick<ProjectOutput, "id" | "type">>,
+  context: {
+    runId: string;
+    triggerEventId: string;
+    policyId: string;
+    policyVersion: number;
+  }
+): { type: string; source: string; payload: Record<string, unknown> } | undefined => {
+  const outputStatus = outcomeToOutputEventStatus(outcome, policy, actions);
+  if (actionOutputType(policy, actions, outputs, outputStatus) === "gate") return undefined;
+
+  const routed = mapAgentOutputToEvent(policy, {
+    ...context,
+    status: outputStatus,
+    outcome: outcome.outcome,
+    summary: outcome.summary,
+    raw: outcome
+  });
+  return {
+    type: routed.id,
+    source: routed.source,
+    payload: routed.payload
+  };
 };
 
 const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): string => {
@@ -101,21 +141,12 @@ const completeWithOutcome = (
   try {
     const policy = data.automation.policies.find((candidate) => candidate.id === run.policyId);
     if (!policy) throw new Error(`Automation policy ${run.policyId} was not found.`);
-    const routed = mapAgentOutputToEvent(policy, {
+    domainEvent = agentOutcomeDomainEvent(outcome, policy, data.automation.actions, data.automation.outputs, {
       runId: run.runId,
       triggerEventId: trigger.eventId,
       policyId: run.policyId,
-      policyVersion: run.policyVersion,
-      status: outcomeToOutputEventStatus(outcome, policy, data.automation.actions),
-      outcome: outcome.outcome,
-      summary: outcome.summary,
-      raw: outcome
+      policyVersion: run.policyVersion
     });
-    domainEvent = {
-      type: routed.id,
-      source: routed.source,
-      payload: routed.payload
-    };
   } catch (mappingError) {
     status = "failed";
     error = mappingError instanceof Error ? mappingError.message : "Agent output could not be mapped to an event.";

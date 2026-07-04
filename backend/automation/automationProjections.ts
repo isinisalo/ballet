@@ -21,14 +21,16 @@ export const automationPoliciesToEventDefinitions = (
   policies: ProjectPolicy[] = [],
   agents: Agent[] = [],
   triggers: ProjectTrigger[] = [],
-  actions: ProjectAction[] = []
+  actions: ProjectAction[] = [],
+  outputs: Array<{ id: string; type: "event" | "gate" }> = []
 ): EventDefinition[] =>
   [...new Set([
     ...policyEventTypesForAgentsAndActions(
       agents,
       actions.length > 0
         ? actions
-        : policyActionTokens(policies).map((id) => ({ id, outputIds: [...defaultPolicyOutputIds] }))
+        : policyActionTokens(policies).map((id) => ({ id, outputIds: [...defaultPolicyOutputIds] })),
+      outputs
     ),
     ...triggers.map((trigger) => `trigger.${trigger.id}`)
   ])]

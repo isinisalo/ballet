@@ -101,12 +101,11 @@ describe("Markdown collection loading", () => {
     expect(data.automation).toEqual({
       version: 1,
       triggers: [],
-      gates: [],
       actions: [],
       outputs: [
-        { id: "complete", description: "Action completed." },
-        { id: "blocked", description: "Action is blocked." },
-        { id: "failed", description: "Action failed." }
+        { id: "complete", description: "Action completed.", type: "event" },
+        { id: "blocked", description: "Action is blocked.", type: "event" },
+        { id: "failed", description: "Action failed.", type: "event" }
       ],
       policies: [],
       workflows: [],

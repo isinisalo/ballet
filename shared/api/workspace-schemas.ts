@@ -118,11 +118,6 @@ const projectTriggerSchema = z.object({
   description: z.string()
 }).strict();
 
-const projectGateSchema = z.object({
-  id: z.string(),
-  description: z.string()
-}).strict();
-
 const projectActionSchema = z.object({
   id: z.string(),
   description: z.string(),
@@ -131,7 +126,8 @@ const projectActionSchema = z.object({
 
 const projectOutputSchema = z.object({
   id: z.string(),
-  description: z.string()
+  description: z.string(),
+  type: z.enum(["event", "gate"])
 }).strict();
 
 const projectPolicySchema = z.object({
@@ -160,7 +156,6 @@ const projectRuntimeSchema = z.object({
 export const automationConfigSchema = z.object({
   version: z.literal(1),
   triggers: z.array(projectTriggerSchema),
-  gates: z.array(projectGateSchema),
   actions: z.array(projectActionSchema),
   outputs: z.array(projectOutputSchema),
   policies: z.array(projectPolicySchema),
