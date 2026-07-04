@@ -2,7 +2,7 @@ import type { MarkdownBackedEntity } from "./documents.js";
 
 export type RuntimeType = "codex-cli" | "custom";
 export type AgentRunStatus = "queued" | "running" | "completed" | "failed" | "blocked" | "needs_input" | "cancelled";
-export type AgentOutputEventStatus = "complete" | "failed" | "blocked";
+export type AgentOutputEventStatus = string;
 export type AgentOutcomeStatus = "ready" | "blocked" | "needs_input" | "approved" | "changes_requested" | "failed";
 export type RunCheckStatus = "passed" | "failed" | "skipped";
 

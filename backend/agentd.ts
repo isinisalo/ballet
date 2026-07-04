@@ -4,6 +4,8 @@ import type { AppData } from "../shared/api/workspaceData.js";
 import type { Agent } from "../shared/domain/agents.js";
 import type { RuntimeEvent } from "../shared/domain/events.js";
 import type { AgentOutcome, AgentOutputEventStatus, AgentRun } from "../shared/domain/runtime.js";
+import type { ProjectAction, ProjectPolicy } from "../shared/domain/automation.js";
+import { actionOutputIds } from "../shared/policy-actions.js";
 import { store } from "./store.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 import { runCodexAgent } from "./codex-adapter.js";
@@ -16,10 +18,35 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const findAgent = (data: AppData, role: string): Agent | undefined => data.agents.find((agent) => agent.id === role);
 
-const outcomeToOutputEventStatus = (outcome: AgentOutcome): AgentOutputEventStatus => {
-  if (outcome.outcome === "failed") return "failed";
-  if (outcome.outcome === "blocked" || outcome.outcome === "needs_input") return "blocked";
-  return "complete";
+const firstAllowedOutput = (
+  allowedOutputIds: string[],
+  preferred: string[],
+  fallback: string
+): AgentOutputEventStatus => preferred.find((outputId) => allowedOutputIds.includes(outputId)) ?? fallback;
+
+export const outcomeToOutputEventStatus = (
+  outcome: AgentOutcome,
+  policy: Pick<ProjectPolicy, "action">,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds">>
+): AgentOutputEventStatus => {
+  const allowedOutputIds = actionOutputIds(actions, policy.action);
+  switch (outcome.outcome) {
+    case "failed":
+      return firstAllowedOutput(allowedOutputIds, ["failed"], "failed");
+    case "blocked":
+    case "needs_input":
+      return firstAllowedOutput(allowedOutputIds, ["blocked", "failed"], "blocked");
+    case "changes_requested":
+      return firstAllowedOutput(allowedOutputIds, ["changes_requested", "rejected", "blocked"], "changes_requested");
+    case "approved":
+      return firstAllowedOutput(allowedOutputIds, ["approved", "accepted", "complete", "completed"], "approved");
+    case "ready":
+      return firstAllowedOutput(
+        allowedOutputIds,
+        policy.action === "deploy" ? ["deployed", "ready", "complete", "completed"] : ["ready", "complete", "completed"],
+        "ready"
+      );
+  }
 };
 
 const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): string => {
@@ -79,7 +106,7 @@ const completeWithOutcome = (
       triggerEventId: trigger.eventId,
       policyId: run.policyId,
       policyVersion: run.policyVersion,
-      status: outcomeToOutputEventStatus(outcome),
+      status: outcomeToOutputEventStatus(outcome, policy, data.automation.actions),
       outcome: outcome.outcome,
       summary: outcome.summary,
       raw: outcome

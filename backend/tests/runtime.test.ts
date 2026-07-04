@@ -9,6 +9,7 @@ import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
 import { parseAgentOutcomeText } from "../runtime-policy.js";
 import { policyVersion } from "../../shared/policy.js";
 import { mapAgentOutputToEvent } from "../automation.js";
+import { outcomeToOutputEventStatus } from "../agentd.js";
 
 const tempRoots: string[] = [];
 
@@ -313,6 +314,35 @@ describe("runtime output mapping", () => {
     expect(mapAgentOutputToEvent(projectPolicy, { status: "complete" }).id).toBe("developer.implementation.complete");
     expect(mapAgentOutputToEvent(projectPolicy, { status: "failed" }).id).toBe("developer.implementation.failed");
     expect(mapAgentOutputToEvent(projectPolicy, { status: "blocked" }).id).toBe("developer.implementation.blocked");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }).id).toBe("developer.implementation.ready");
+  });
+
+  it("maps structured outcomes to configured action outputs", () => {
+    expect(outcomeToOutputEventStatus(
+      readyOutcome,
+      projectPolicy,
+      [{ id: "implementation", outputIds: ["ready", "blocked", "failed"] }]
+    )).toBe("ready");
+    expect(outcomeToOutputEventStatus(
+      { ...readyOutcome, outcome: "approved" },
+      { ...projectPolicy, action: "review" },
+      [{ id: "review", outputIds: ["approved", "changes_requested", "blocked"] }]
+    )).toBe("approved");
+    expect(outcomeToOutputEventStatus(
+      { ...readyOutcome, outcome: "changes_requested" },
+      { ...projectPolicy, action: "review" },
+      [{ id: "review", outputIds: ["approved", "changes_requested", "blocked"] }]
+    )).toBe("changes_requested");
+    expect(outcomeToOutputEventStatus(
+      readyOutcome,
+      { ...projectPolicy, action: "deploy" },
+      [{ id: "deploy", outputIds: ["deployed", "blocked", "failed"] }]
+    )).toBe("deployed");
+    expect(outcomeToOutputEventStatus(
+      readyOutcome,
+      projectPolicy,
+      [{ id: "implementation", outputIds: ["complete", "blocked", "failed"] }]
+    )).toBe("complete");
   });
 
   it("does not require an event id in agent output", () => {

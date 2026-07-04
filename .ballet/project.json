@@ -2,129 +2,572 @@
   "version": 1,
   "triggers": [
     {
-      "id": "plan_approved",
-      "description": "Plan approved"
+      "id": "intent_changed",
+      "description": "Human-approved Goal or ADR changed and roadmap analysis can start."
+    },
+    {
+      "id": "roadmap_approved",
+      "description": "Human approved the agent-produced roadmap."
+    },
+    {
+      "id": "implementation_plan_approved",
+      "description": "Human approved the implementation plan, acceptance criteria, and Definition of Done."
+    },
+    {
+      "id": "review_gate_approved",
+      "description": "Human approved the review gate and release preparation can start."
+    },
+    {
+      "id": "release_approved",
+      "description": "Human approved deployment to a non-production environment."
+    },
+    {
+      "id": "production_deploy_approved",
+      "description": "Human approved production deployment."
+    },
+    {
+      "id": "ci_or_validation_failed",
+      "description": "CI, lint, build, test, or runtime validation failed."
+    },
+    {
+      "id": "incident_reported",
+      "description": "A user, runtime, or monitor reported an operational issue."
     }
   ],
   "actions": [
     {
-      "id": "implement",
-      "description": "Implement an approved plan.",
+      "id": "route",
+      "description": "Select the next workflow path without doing role work.",
       "outputIds": [
-        "completed",
-        "failed",
-        "blocked"
-      ]
-    },
-    {
-      "id": "review",
-      "description": "Review implementation output.",
-      "outputIds": [
-        "accepted",
-        "rejected",
+        "ready",
+        "blocked",
         "failed"
       ]
     },
     {
-      "id": "test",
-      "description": "Test implementation ja paljon tekstiä tämän perään.",
+      "id": "analyze-intent",
+      "description": "Read Goals and ADRs, identify scope, limits, and unresolved decisions.",
       "outputIds": [
-        "completed",
-        "failed",
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "design-roadmap",
+      "description": "Break approved intent into traceable roadmap or backlog items.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "design-release",
+      "description": "Create an implementation-ready plan, acceptance criteria, tests, and Definition of Done.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "design-ui",
+      "description": "Create or review UI/UX design evidence for the approved scope.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "implement",
+      "description": "Implement the approved plan as the smallest safe code change.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "verify",
+      "description": "Run or assess acceptance, regression, lint, build, and test evidence.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "review",
+      "description": "Review implementation evidence from one role-specific perspective.",
+      "outputIds": [
+        "approved",
+        "changes_requested",
         "blocked"
       ]
     },
     {
-      "id": "plan",
-      "description": "Plan incomplete specs.",
+      "id": "aggregate-review",
+      "description": "Combine role-specific reviews into one review gate decision.",
       "outputIds": [
-        "completed",
-        "failed",
+        "approved",
+        "changes_requested",
         "blocked"
+      ]
+    },
+    {
+      "id": "document",
+      "description": "Update documentation needed before release preparation.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "document-release",
+      "description": "Record release or deployment evidence after a deploy completes.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "prepare-deploy",
+      "description": "Check release, rollback, configuration, migration, and observability readiness.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "review-release",
+      "description": "Review release preparation without colliding with implementation review events.",
+      "outputIds": [
+        "approved",
+        "changes_requested",
+        "blocked"
+      ]
+    },
+    {
+      "id": "deploy",
+      "description": "Execute an explicitly approved deployment.",
+      "outputIds": [
+        "deployed",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "troubleshoot",
+      "description": "Diagnose a failed check, runtime failure, or deploy failure and produce a correction plan.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
+      ]
+    },
+    {
+      "id": "triage-incident",
+      "description": "Diagnose an incident and route it toward a planned correction instead of direct implementation.",
+      "outputIds": [
+        "ready",
+        "blocked",
+        "failed"
       ]
     }
   ],
   "outputs": [
     {
-      "id": "completed",
-      "description": "Agent work completed."
+      "id": "ready",
+      "description": "Action produced usable evidence for the next agent or human gate."
     },
     {
-      "id": "failed",
-      "description": "Agent work failed."
+      "id": "approved",
+      "description": "Review gate approved this perspective."
+    },
+    {
+      "id": "changes_requested",
+      "description": "Review gate requires corrections before continuing."
     },
     {
       "id": "blocked",
-      "description": "Agent work ended up in a blocked state."
+      "description": "Action cannot continue without a human decision, missing dependency, or conflict resolution."
     },
     {
-      "id": "accepted",
-      "description": "Agent work accepted."
+      "id": "failed",
+      "description": "Action failed technically or at runtime."
     },
     {
-      "id": "rejected",
-      "description": "Agent work rejected."
+      "id": "deployed",
+      "description": "Deployment completed in the approved environment."
     }
   ],
   "policies": [
     {
-      "id": "on.trigger.plan_approved.then.developer.start.implement",
+      "id": "on.trigger.intent_changed.then.project.start.route",
       "source": "trigger",
-      "trigger": "plan_approved",
+      "trigger": "intent_changed",
+      "agent": "project",
+      "action": "route",
+      "enabled": true
+    },
+    {
+      "id": "on.project.route.ready.then.intent.start.analyze-intent",
+      "source": "event",
+      "event": "project.route.ready",
+      "agent": "intent",
+      "action": "analyze-intent",
+      "enabled": true
+    },
+    {
+      "id": "on.intent.analyze-intent.ready.then.roadmap.start.design-roadmap",
+      "source": "event",
+      "event": "intent.analyze-intent.ready",
+      "agent": "roadmap",
+      "action": "design-roadmap",
+      "enabled": true
+    },
+    {
+      "id": "on.trigger.roadmap_approved.then.release.start.design-release",
+      "source": "trigger",
+      "trigger": "roadmap_approved",
+      "agent": "release",
+      "action": "design-release",
+      "enabled": true
+    },
+    {
+      "id": "on.trigger.roadmap_approved.then.ux.start.design-ui",
+      "source": "trigger",
+      "trigger": "roadmap_approved",
+      "agent": "ux",
+      "action": "design-ui",
+      "enabled": true
+    },
+    {
+      "id": "on.release.design-release.ready.then.feasibility.start.review",
+      "source": "event",
+      "event": "release.design-release.ready",
+      "agent": "feasibility",
+      "action": "review",
+      "enabled": true
+    },
+    {
+      "id": "on.ux.design-ui.ready.then.feasibility.start.review",
+      "source": "event",
+      "event": "ux.design-ui.ready",
+      "agent": "feasibility",
+      "action": "review",
+      "enabled": true
+    },
+    {
+      "id": "on.feasibility.review.changes_requested.then.release.start.design-release",
+      "source": "event",
+      "event": "feasibility.review.changes_requested",
+      "agent": "release",
+      "action": "design-release",
+      "enabled": true
+    },
+    {
+      "id": "on.feasibility.review.changes_requested.then.ux.start.design-ui",
+      "source": "event",
+      "event": "feasibility.review.changes_requested",
+      "agent": "ux",
+      "action": "design-ui",
+      "enabled": true
+    },
+    {
+      "id": "on.trigger.implementation_plan_approved.then.delivery.start.route",
+      "source": "trigger",
+      "trigger": "implementation_plan_approved",
+      "agent": "delivery",
+      "action": "route",
+      "enabled": true
+    },
+    {
+      "id": "on.delivery.route.ready.then.developer.start.implement",
+      "source": "event",
+      "event": "delivery.route.ready",
       "agent": "developer",
       "action": "implement",
       "enabled": true
     },
     {
-      "id": "on.developer.implement.completed.then.architect.start.review",
+      "id": "on.developer.implement.ready.then.qa.start.verify",
       "source": "event",
-      "event": "developer.implement.completed",
+      "event": "developer.implement.ready",
+      "agent": "qa",
+      "action": "verify",
+      "enabled": true
+    },
+    {
+      "id": "on.qa.verify.ready.then.intent.start.review",
+      "source": "event",
+      "event": "qa.verify.ready",
+      "agent": "intent",
+      "action": "review",
+      "enabled": true
+    },
+    {
+      "id": "on.qa.verify.ready.then.architect.start.review",
+      "source": "event",
+      "event": "qa.verify.ready",
       "agent": "architect",
       "action": "review",
       "enabled": true
     },
     {
-      "id": "on.developer.implement.completed.then.qa-verification-reviewer.start.review",
+      "id": "on.qa.verify.ready.then.qa-verification-reviewer.start.review",
       "source": "event",
-      "event": "developer.implement.completed",
+      "event": "qa.verify.ready",
       "agent": "qa-verification-reviewer",
       "action": "review",
       "enabled": true
     },
     {
-      "id": "on.qa.test.completed.then.ux.start.test",
+      "id": "on.qa.verify.ready.then.ops.start.review",
       "source": "event",
-      "event": "qa.test.completed",
-      "agent": "ux",
-      "action": "test",
+      "event": "qa.verify.ready",
+      "agent": "ops",
+      "action": "review",
       "enabled": true
     },
     {
-      "id": "on.architect.review.rejected.then.developer.start.implement",
+      "id": "on.qa-verification-reviewer.review.approved.then.review.start.aggregate-review",
       "source": "event",
-      "event": "architect.review.rejected",
-      "agent": "developer",
-      "action": "implement",
+      "event": "qa-verification-reviewer.review.approved",
+      "agent": "review",
+      "action": "aggregate-review",
       "enabled": true
     },
     {
-      "id": "on.architect.review.accepted.then.qa.start.test",
+      "id": "on.intent.review.changes_requested.then.delivery.start.route",
       "source": "event",
-      "event": "architect.review.accepted",
-      "agent": "qa",
-      "action": "test",
+      "event": "intent.review.changes_requested",
+      "agent": "delivery",
+      "action": "route",
+      "enabled": true
+    },
+    {
+      "id": "on.architect.review.changes_requested.then.delivery.start.route",
+      "source": "event",
+      "event": "architect.review.changes_requested",
+      "agent": "delivery",
+      "action": "route",
+      "enabled": true
+    },
+    {
+      "id": "on.qa-verification-reviewer.review.changes_requested.then.delivery.start.route",
+      "source": "event",
+      "event": "qa-verification-reviewer.review.changes_requested",
+      "agent": "delivery",
+      "action": "route",
+      "enabled": true
+    },
+    {
+      "id": "on.ops.review.changes_requested.then.delivery.start.route",
+      "source": "event",
+      "event": "ops.review.changes_requested",
+      "agent": "delivery",
+      "action": "route",
+      "enabled": true
+    },
+    {
+      "id": "on.review.aggregate-review.changes_requested.then.delivery.start.route",
+      "source": "event",
+      "event": "review.aggregate-review.changes_requested",
+      "agent": "delivery",
+      "action": "route",
+      "enabled": true
+    },
+    {
+      "id": "on.developer.implement.failed.then.troubleshooter.start.troubleshoot",
+      "source": "event",
+      "event": "developer.implement.failed",
+      "agent": "troubleshooter",
+      "action": "troubleshoot",
+      "enabled": true
+    },
+    {
+      "id": "on.qa.verify.failed.then.troubleshooter.start.troubleshoot",
+      "source": "event",
+      "event": "qa.verify.failed",
+      "agent": "troubleshooter",
+      "action": "troubleshoot",
+      "enabled": true
+    },
+    {
+      "id": "on.troubleshooter.troubleshoot.ready.then.devops.start.deploy",
+      "source": "event",
+      "event": "troubleshooter.troubleshoot.ready",
+      "agent": "devops",
+      "action": "deploy",
+      "enabled": true
+    },
+    {
+      "id": "on.trigger.review_gate_approved.then.documentation.start.document",
+      "source": "trigger",
+      "trigger": "review_gate_approved",
+      "agent": "documentation",
+      "action": "document",
+      "enabled": true
+    },
+    {
+      "id": "on.documentation.document.ready.then.devops.start.prepare-deploy",
+      "source": "event",
+      "event": "documentation.document.ready",
+      "agent": "devops",
+      "action": "prepare-deploy",
+      "enabled": true
+    },
+    {
+      "id": "on.devops.prepare-deploy.ready.then.ops.start.review-release",
+      "source": "event",
+      "event": "devops.prepare-deploy.ready",
+      "agent": "ops",
+      "action": "review-release",
+      "enabled": true
+    },
+    {
+      "id": "on.ops.review-release.changes_requested.then.devops.start.prepare-deploy",
+      "source": "event",
+      "event": "ops.review-release.changes_requested",
+      "agent": "devops",
+      "action": "prepare-deploy",
+      "enabled": true
+    },
+    {
+      "id": "on.trigger.release_approved.then.devops.start.deploy",
+      "source": "trigger",
+      "trigger": "release_approved",
+      "agent": "devops",
+      "action": "deploy",
+      "enabled": true
+    },
+    {
+      "id": "on.trigger.production_deploy_approved.then.devops.start.deploy",
+      "source": "trigger",
+      "trigger": "production_deploy_approved",
+      "agent": "devops",
+      "action": "deploy",
+      "enabled": true
+    },
+    {
+      "id": "on.devops.deploy.deployed.then.documentation.start.document-release",
+      "source": "event",
+      "event": "devops.deploy.deployed",
+      "agent": "documentation",
+      "action": "document-release",
+      "enabled": true
+    },
+    {
+      "id": "on.devops.deploy.failed.then.troubleshooter.start.troubleshoot",
+      "source": "event",
+      "event": "devops.deploy.failed",
+      "agent": "troubleshooter",
+      "action": "troubleshoot",
+      "enabled": true
+    },
+    {
+      "id": "on.trigger.ci_or_validation_failed.then.troubleshooter.start.troubleshoot",
+      "source": "trigger",
+      "trigger": "ci_or_validation_failed",
+      "agent": "troubleshooter",
+      "action": "troubleshoot",
+      "enabled": true
+    },
+    {
+      "id": "on.trigger.incident_reported.then.troubleshooter.start.triage-incident",
+      "source": "trigger",
+      "trigger": "incident_reported",
+      "agent": "troubleshooter",
+      "action": "triage-incident",
+      "enabled": true
+    },
+    {
+      "id": "on.troubleshooter.triage-incident.ready.then.release.start.design-release",
+      "source": "event",
+      "event": "troubleshooter.triage-incident.ready",
+      "agent": "release",
+      "action": "design-release",
       "enabled": true
     }
   ],
   "workflows": [
     {
-      "id": "plan-implement-review",
-      "title": "Plan, implement, review",
+      "id": "intent-to-roadmap",
+      "title": "Intent to roadmap",
       "steps": [
-        "on.trigger.plan_approved.then.developer.start.implement",
-        "on.developer.implement.completed.then.architect.start.review",
-        "on.architect.review.rejected.then.developer.start.implement",
-        "on.architect.review.accepted.then.qa.start.test"
+        "on.trigger.intent_changed.then.project.start.route",
+        "on.project.route.ready.then.intent.start.analyze-intent",
+        "on.intent.analyze-intent.ready.then.roadmap.start.design-roadmap"
+      ]
+    },
+    {
+      "id": "roadmap-to-implementation-plan",
+      "title": "Roadmap to implementation plan",
+      "steps": [
+        "on.trigger.roadmap_approved.then.release.start.design-release",
+        "on.trigger.roadmap_approved.then.ux.start.design-ui",
+        "on.release.design-release.ready.then.feasibility.start.review",
+        "on.ux.design-ui.ready.then.feasibility.start.review",
+        "on.feasibility.review.changes_requested.then.release.start.design-release",
+        "on.feasibility.review.changes_requested.then.ux.start.design-ui"
+      ]
+    },
+    {
+      "id": "implementation-loop",
+      "title": "Implementation loop",
+      "steps": [
+        "on.trigger.implementation_plan_approved.then.delivery.start.route",
+        "on.delivery.route.ready.then.developer.start.implement",
+        "on.developer.implement.ready.then.qa.start.verify",
+        "on.qa.verify.ready.then.intent.start.review",
+        "on.qa.verify.ready.then.architect.start.review",
+        "on.qa.verify.ready.then.qa-verification-reviewer.start.review",
+        "on.qa.verify.ready.then.ops.start.review",
+        "on.qa-verification-reviewer.review.approved.then.review.start.aggregate-review",
+        "on.intent.review.changes_requested.then.delivery.start.route",
+        "on.architect.review.changes_requested.then.delivery.start.route",
+        "on.qa-verification-reviewer.review.changes_requested.then.delivery.start.route",
+        "on.ops.review.changes_requested.then.delivery.start.route",
+        "on.review.aggregate-review.changes_requested.then.delivery.start.route",
+        "on.developer.implement.failed.then.troubleshooter.start.troubleshoot",
+        "on.qa.verify.failed.then.troubleshooter.start.troubleshoot",
+        "on.troubleshooter.troubleshoot.ready.then.devops.start.deploy"
+      ]
+    },
+    {
+      "id": "documentation-and-release-preparation",
+      "title": "Documentation and release preparation",
+      "steps": [
+        "on.trigger.review_gate_approved.then.documentation.start.document",
+        "on.documentation.document.ready.then.devops.start.prepare-deploy",
+        "on.devops.prepare-deploy.ready.then.ops.start.review-release",
+        "on.ops.review-release.changes_requested.then.devops.start.prepare-deploy"
+      ]
+    },
+    {
+      "id": "deploy",
+      "title": "Deploy",
+      "steps": [
+        "on.trigger.production_deploy_approved.then.devops.start.deploy",
+        "on.devops.deploy.deployed.then.documentation.start.document-release",
+        "on.devops.deploy.failed.then.troubleshooter.start.troubleshoot",
+        "on.troubleshooter.troubleshoot.ready.then.devops.start.deploy"
+      ]
+    },
+    {
+      "id": "incident-and-failure-recovery",
+      "title": "Incident and failure recovery",
+      "steps": [
+        "on.trigger.ci_or_validation_failed.then.troubleshooter.start.troubleshoot",
+        "on.troubleshooter.troubleshoot.ready.then.devops.start.deploy",
+        "on.trigger.incident_reported.then.troubleshooter.start.triage-incident",
+        "on.troubleshooter.triage-incident.ready.then.release.start.design-release"
       ]
     }
   ],
