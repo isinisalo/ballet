@@ -21,9 +21,9 @@ export function useAutomationDraft({
     setDraft((current) => updater(current));
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async (nextDraft: ProjectAutomationConfig = draft) => {
     try {
-      const saved = await saveAutomation(draft);
+      const saved = await saveAutomation(nextDraft);
       setDraft(saved);
       return true;
     } catch {

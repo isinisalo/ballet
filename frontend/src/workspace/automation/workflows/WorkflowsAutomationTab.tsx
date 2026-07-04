@@ -6,7 +6,7 @@ import type {
   ProjectWorkflow
 } from "../../../../../shared/api/workspace-contracts";
 import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType, preferredAgentToken } from "../../../../../shared/policy-actions";
-import { EmptyState, TextField } from "@/components/shared/workspace-ui";
+import { EmptyState } from "@/components/shared/workspace-ui";
 import { automationAgentOptions, uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
@@ -192,40 +192,35 @@ export function WorkflowsAutomationTab({
   return (
     <div className="grid gap-4">
       {selected && workflowLayout ? (
-        <div className="grid gap-4">
-          <div className="grid gap-3">
-            <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-          </div>
-          <WorkflowCanvas
-            layout={workflowLayout}
-            policyById={policyById}
-            firstPolicy={policyById.get(selected.steps[0] ?? "")}
-            noSelectionValue={noSelection}
-            policyOptions={policyOptions}
-            agentOptions={agentOptions}
-            actionOptions={actionOptions}
-            draggedStepIndex={canvasInteraction.draggedStepIndex}
-            dragOverStepIndex={canvasInteraction.dragOverStepIndex}
-            canvasHeight={canvasInteraction.canvasHeight}
-            isCanvasPanning={canvasInteraction.isCanvasPanning}
-            workflowCanvasRef={canvasInteraction.workflowCanvasRef}
-            canAddFirstPolicy={canAddFirstPolicy}
-            canAddPolicyForEvent={canAddPolicyForEvent}
-            onStepPointerDown={canvasInteraction.handleStepPointerDown}
-            onStepPointerMove={canvasInteraction.handleStepPointerMove}
-            onStepPointerUp={canvasInteraction.handleStepPointerUp}
-            onStepPointerCancel={canvasInteraction.resetStepDrag}
-            onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
-            onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-            onPolicyChange={updateStep}
-            onAgentChange={(record, agent) => updateWorkflowPolicy(record, { agent: agent === noSelection ? "" : agent })}
-            onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action })}
-            onSavePolicy={() => void saveWorkflowPolicyEdit()}
-            onEditPolicy={setEditingPolicyIndex}
-            onDeleteStep={deleteStep}
-            onAddPolicyStep={addPolicyStep}
-          />
-        </div>
+        <WorkflowCanvas
+          layout={workflowLayout}
+          policyById={policyById}
+          firstPolicy={policyById.get(selected.steps[0] ?? "")}
+          noSelectionValue={noSelection}
+          policyOptions={policyOptions}
+          agentOptions={agentOptions}
+          actionOptions={actionOptions}
+          draggedStepIndex={canvasInteraction.draggedStepIndex}
+          dragOverStepIndex={canvasInteraction.dragOverStepIndex}
+          canvasHeight={canvasInteraction.canvasHeight}
+          isCanvasPanning={canvasInteraction.isCanvasPanning}
+          workflowCanvasRef={canvasInteraction.workflowCanvasRef}
+          canAddFirstPolicy={canAddFirstPolicy}
+          canAddPolicyForEvent={canAddPolicyForEvent}
+          onStepPointerDown={canvasInteraction.handleStepPointerDown}
+          onStepPointerMove={canvasInteraction.handleStepPointerMove}
+          onStepPointerUp={canvasInteraction.handleStepPointerUp}
+          onStepPointerCancel={canvasInteraction.resetStepDrag}
+          onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
+          onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
+          onPolicyChange={updateStep}
+          onAgentChange={(record, agent) => updateWorkflowPolicy(record, { agent: agent === noSelection ? "" : agent })}
+          onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action })}
+          onSavePolicy={() => void saveWorkflowPolicyEdit()}
+          onEditPolicy={setEditingPolicyIndex}
+          onDeleteStep={deleteStep}
+          onAddPolicyStep={addPolicyStep}
+        />
       ) : <EmptyState title="No workflow selected." />}
     </div>
   );

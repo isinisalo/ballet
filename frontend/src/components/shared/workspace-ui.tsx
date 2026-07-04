@@ -144,7 +144,23 @@ export function EmptyState({ title, action }: { title: string; action?: string }
   );
 }
 
-export function Panel({ title, description, icon, children, action, compact = false }: { title: string; description?: string; icon: ReactNode; children: ReactNode; action?: ReactNode; compact?: boolean }) {
+export function Panel({
+  title,
+  titleExtra,
+  description,
+  icon,
+  children,
+  action,
+  compact = false
+}: {
+  title: string;
+  titleExtra?: ReactNode;
+  description?: string;
+  icon: ReactNode;
+  children: ReactNode;
+  action?: ReactNode;
+  compact?: boolean;
+}) {
   return (
     <Card>
       <CardHeader
@@ -157,6 +173,7 @@ export function Panel({ title, description, icon, children, action, compact = fa
         <CardTitle className="flex min-w-0 items-center gap-2 font-mono text-xs font-medium leading-none text-foreground [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground">
           {icon}
           <span className="truncate">{title}</span>
+          {titleExtra}
         </CardTitle>
         {description ? <CardDescription className={cn(compact && "text-xs")}>{description}</CardDescription> : null}
         {action ? (

@@ -9,6 +9,8 @@ import { AutomationIssues } from "./AutomationIssues";
 import { OutputsAutomationTab } from "./outputs/OutputsAutomationTab";
 import { TriggersAutomationTab } from "./triggers/TriggersAutomationTab";
 import { useAutomationDraft } from "./useAutomationDraft";
+import { useWorkflowHeaderNameEditor } from "./workflows/useWorkflowHeaderNameEditor";
+import { WorkflowHeaderNameEditor } from "./workflows/WorkflowHeaderNameEditor";
 import { WorkflowsAutomationTab } from "./workflows/WorkflowsAutomationTab";
 
 export function AutomationView({
@@ -38,15 +40,26 @@ export function AutomationView({
     selectedWorkflowId,
     selectAutomationEntity
   } = createAutomationEntityControls({ activeTab, selectedId, draft, setDraft, navigate });
+  const workflowNameEditor = useWorkflowHeaderNameEditor({
+    activeTab,
+    draft,
+    setDraft,
+    saveDraft,
+    selectedWorkflowId,
+    selectAutomationEntity
+  });
 
   return (
     <div className="grid gap-4">
       <Panel
         title="Automation"
+        titleExtra={activeTab === "workflows" ? (
+          <WorkflowHeaderNameEditor {...workflowNameEditor.editorProps} />
+        ) : null}
         icon={<Route data-icon="inline-start" />}
         action={(
           <div className="flex items-center justify-end gap-2">
-            <Button type="button" size="icon-sm" variant="outline" aria-label={addConfig.label} title={addConfig.label} onClick={addConfig.onAdd}>
+            <Button type="button" size="icon-sm" variant="outline" aria-label={addConfig.label} title={addConfig.label} onClick={activeTab === "workflows" ? workflowNameEditor.beginCreate : addConfig.onAdd}>
               <Plus data-icon="inline-start" />
             </Button>
             <HeaderCrudActions

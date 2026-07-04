@@ -656,6 +656,78 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByLabelText("Policy: on.existing.implementation.failed.then.existing.start.implementation")).toBeInTheDocument();
   });
 
+  it("renames the selected workflow from the automation header", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.automation.workflows.push({
+      id: "workflow-2",
+      title: "Second workflow",
+      steps: []
+    });
+    const { data, fetchMock } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
+
+    expect(screen.queryByLabelText("Workflow ID")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "workflow-1" })).toHaveClass("cursor-pointer");
+    await user.click(screen.getByRole("button", { name: "workflow-1" }));
+
+    const workflowNameInput = screen.getByLabelText("Workflow name");
+    const saveWorkflowButton = screen.getByRole("button", { name: "Save workflow" });
+    expect(workflowNameInput).toHaveValue("workflow-1");
+    await user.clear(workflowNameInput);
+    expect(saveWorkflowButton).toBeDisabled();
+    await user.type(workflowNameInput, "workflow-2");
+    expect(saveWorkflowButton).toBeDisabled();
+    await user.clear(workflowNameInput);
+    await user.type(workflowNameInput, "roadmap-flow");
+    expect(saveWorkflowButton).toBeEnabled();
+
+    await user.click(saveWorkflowButton);
+
+    await waitFor(() => expect(data.automation.workflows[0]).toMatchObject({
+      id: "roadmap-flow",
+      title: "roadmap-flow"
+    }));
+    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(window.location.search).toBe("?id=roadmap-flow");
+    expect(screen.getByRole("button", { name: "roadmap-flow" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
+      method: "PUT",
+      body: expect.stringContaining("\"id\":\"roadmap-flow\"")
+    }));
+  });
+
+  it("creates a workflow from the automation header add action", async () => {
+    const user = userEvent.setup();
+    const { data, fetchMock } = await renderRoute("/automation/workflows");
+
+    await user.click(screen.getByRole("button", { name: "Add workflow" }));
+
+    const workflowNameInput = screen.getByLabelText("Workflow name");
+    const saveWorkflowButton = screen.getByRole("button", { name: "Save workflow" });
+    expect(workflowNameInput).toHaveValue("");
+    expect(saveWorkflowButton).toBeDisabled();
+    await user.type(workflowNameInput, "workflow-1");
+    expect(saveWorkflowButton).toBeDisabled();
+    await user.clear(workflowNameInput);
+    await user.type(workflowNameInput, "release-flow");
+    expect(saveWorkflowButton).toBeEnabled();
+
+    await user.click(saveWorkflowButton);
+
+    await waitFor(() => expect(data.automation.workflows.some((workflow) =>
+      workflow.id === "release-flow" &&
+      workflow.title === "release-flow" &&
+      workflow.steps.length === 0
+    )).toBe(true));
+    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(window.location.search).toBe("?id=release-flow");
+    expect(screen.getByRole("button", { name: "release-flow" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
+      method: "PUT",
+      body: expect.stringContaining("\"id\":\"release-flow\"")
+    }));
+  });
+
   it("edits workflow policy agent and action from the canvas", async () => {
     const user = userEvent.setup();
     const workflowData = baseData();
