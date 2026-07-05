@@ -319,7 +319,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     });
 
     const repeatedHandlerEdge = layout.edges.find((edge) => edge.key === "event-policy-2-1-implement.completed");
-    const reworkOutputEventNode = layout.nodes.find((node) => node.key === "output-event-2-implement.failed");
+    const reworkOutputEventNodes = layout.nodes.filter((node) => node.kind === "output-event" && node.record?.index === 2);
 
     expect(repeatedHandlerEdge).toBeDefined();
     expect(repeatedHandlerEdge).toMatchObject({
@@ -330,12 +330,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       tone: "return",
       eventType: "implement.completed"
     });
-    expect(reworkOutputEventNode?.outputEvent).toEqual({
-      outputId: "implement.failed",
-      eventType: "implement.failed",
-      outputType: "event"
-    });
-    expect(layout.nodes.some((node) => node.kind === "output-event" && node.record?.index === 2 && node.outputEvent?.eventType === "implement.completed")).toBe(false);
+    expect(reworkOutputEventNodes).toHaveLength(0);
   });
 });
 

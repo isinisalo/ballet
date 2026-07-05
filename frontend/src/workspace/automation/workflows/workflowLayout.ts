@@ -84,7 +84,7 @@ type WorkflowDagreEdge = {
 type WorkflowActiveOutputTask =
   | { kind: "gate"; output: WorkflowOutputTarget }
   | { kind: "children"; output: WorkflowOutputTarget; childRecords: WorkflowStepRecord[] }
-  | { kind: "existing-handler"; output: WorkflowOutputTarget };
+  | { kind: "existing-handler"; output: WorkflowOutputTarget; hasBackwardHandler: boolean };
 
 type WorkflowLayoutMetrics = {
   horizontalRootPolicyX: number;
@@ -209,7 +209,6 @@ export function calculateWorkflowCanvasLayout({
       eventType,
       type: "event" as const
     }));
-    addPolicyNode(record, recordOutputTargets.length);
 
     recordOutputTargets.forEach((output) => {
       if (output.type === "gate") {
@@ -228,12 +227,21 @@ export function calculateWorkflowCanvasLayout({
       }
 
       if (existingHandlerRecords.length > 0) {
-        activeOutputTasks.push({ kind: "existing-handler", output });
+        activeOutputTasks.push({
+          kind: "existing-handler",
+          output,
+          hasBackwardHandler: existingHandlerRecords.some((handlerRecord) => handlerRecord.index < record.index)
+        });
         return;
       }
 
       inactiveOutputTargets.push(output);
     });
+
+    const visibleInactiveOutputTargets = activeOutputTasks.some((task) => task.kind === "existing-handler" && task.hasBackwardHandler)
+      ? []
+      : inactiveOutputTargets;
+    addPolicyNode(record, activeOutputTasks.length + visibleInactiveOutputTargets.length);
 
     activeOutputTasks.forEach((task, outputIndex) => {
       if (task.kind === "gate") {
@@ -264,7 +272,7 @@ export function calculateWorkflowCanvasLayout({
       });
     });
 
-    inactiveOutputTargets.forEach((output, inactiveIndex) => {
+    visibleInactiveOutputTargets.forEach((output, inactiveIndex) => {
       addOutputEventNode(record, output, activeOutputTasks.length + inactiveIndex);
     });
   };
