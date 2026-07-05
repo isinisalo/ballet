@@ -93,6 +93,48 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(layout.edges.filter((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey.startsWith("output-event-"))).toHaveLength(3);
   });
 
+  it("keeps terminal output events beside the source policy edge", () => {
+    const routeProject = policy("route-project", undefined, "route-project");
+    const aggregateReview = policy("aggregate-review", "route-project.blocked", "aggregate-review");
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph([
+        {
+          policyId: routeProject.id,
+          index: 0,
+          policy: routeProject,
+          outputEvents: ["route-project.blocked"]
+        },
+        {
+          policyId: aggregateReview.id,
+          index: 1,
+          policy: aggregateReview,
+          outputEvents: [
+            "aggregate-review.approved",
+            "aggregate-review.changes_requested",
+            "aggregate-review.blocked"
+          ]
+        }
+      ]),
+      editingPolicyIndex: null
+    });
+    const sourceNode = layout.nodes.find((node) => node.key === "policy-1");
+    const outputEventNodes = [
+      layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.approved"),
+      layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.changes_requested"),
+      layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.blocked")
+    ];
+
+    expect(sourceNode).toBeDefined();
+    expect(outputEventNodes.every(Boolean)).toBe(true);
+    outputEventNodes.forEach((node) => expect(node?.x).toBeGreaterThan(sourceNode?.x ?? 0));
+    const outputEventStep = workflowNodeSizes.outputEvent.height + workflowNodeSizes.outputEvent.rowGap;
+    expect(outputEventNodes.map((node) => node?.y)).toEqual([
+      sourceNode ? sourceNode.y : undefined,
+      sourceNode ? sourceNode.y + outputEventStep : undefined,
+      sourceNode ? sourceNode.y + outputEventStep * 2 : undefined
+    ]);
+  });
+
   it("renders gate outputs as active terminal nodes before inactive output-event nodes", () => {
     const start = policy("start", undefined, "build");
     const layout = calculateWorkflowCanvasLayout({
@@ -198,7 +240,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       eventType: "build.complete"
     }));
     expect(triggerPolicyEdge?.label).toBe("project.updated");
-    expect(childPolicyEdge?.label).toBe("build.complete");
+    expect(childPolicyEdge?.label).toBe("complete");
     expect(outputEventNode).toMatchObject({
       kind: "output-event",
       sourcePolicyId: first.id,
@@ -211,7 +253,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       targetHandleId: "left",
       dashed: true,
       eventType: "build.failed",
-      label: "build.failed"
+      label: "failed"
     });
     expect(outputEventNode?.x).toBe(childNode?.x);
     expect(outputEventNode?.y).toBe(childNode
@@ -245,7 +287,7 @@ describe("calculateWorkflowCanvasLayout", () => {
 
     expect(firstNode).toBeDefined();
     expect(childNode).toBeDefined();
-    expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeGreaterThan(200);
+    expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeGreaterThan(120);
   });
 
   it("keeps the primary horizontal policy path on the trigger baseline and stacks branches compactly below it", () => {
@@ -369,7 +411,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       targetHandleId: "left",
       tone: "return",
       eventType: "implement.completed",
-      label: "implement.completed"
+      label: "completed"
     });
     expect(reworkOutputEventNodes).toHaveLength(0);
   });
@@ -386,7 +428,7 @@ describe("toWorkflowReactFlowEdges", () => {
       dashed: true,
       tone: "return",
       eventType: "implementation.complete",
-      label: "implementation.complete"
+      label: "complete"
     }]);
 
     expect(edge).toMatchObject({
@@ -410,7 +452,7 @@ describe("toWorkflowReactFlowEdges", () => {
     });
     expect(edge.animated).toBe(false);
     expect(edge.data?.workflowEdge.eventType).toBe("implementation.complete");
-    expect(edge.data?.workflowEdge.label).toBe("implementation.complete");
+    expect(edge.data?.workflowEdge.label).toBe("complete");
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--tertiary) 85%, transparent)",
       strokeDasharray: "4 4",

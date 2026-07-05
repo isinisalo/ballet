@@ -1,4 +1,3 @@
-import { Route } from "lucide-react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { WorkflowStepRecord } from "./workflowGraph";
@@ -35,9 +34,9 @@ export function WorkflowPolicyNode({
         data-workflow-node
         aria-label={`Policy: ${record.policyId || "No policy"}`}
         title={title}
-        className="nodrag nopan flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80"
+        className="nodrag nopan flex h-[22px] w-full min-w-0 items-center gap-1 rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80"
       >
-        <Route className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+        <span className="shrink-0 text-foreground">then:</span>
         {record.policy ? (
           <WorkflowPolicySummary
             policy={record.policy}

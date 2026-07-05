@@ -14,6 +14,7 @@ export type WorkflowCanvasEdge = {
 
 export type WorkflowHandledEventNode = {
   eventType: string;
+  label?: string;
   sourceIndex: number;
   sourceNodeKey: string;
   sourceHandleId?: string;
@@ -34,7 +35,7 @@ export const workflowExistingHandlerEdges = ({
 }): WorkflowCanvasEdge[] => {
   const edges: WorkflowCanvasEdge[] = [];
 
-  handledEventNodes.forEach(({ eventType, sourceIndex, sourceNodeKey, sourceHandleId: eventSourceHandleId }) => {
+  handledEventNodes.forEach(({ eventType, label, sourceIndex, sourceNodeKey, sourceHandleId: eventSourceHandleId }) => {
     const handlerRecords = workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [];
     handlerRecords.forEach((handlerRecord) => {
       if (handlerRecord.index === sourceIndex) return;
@@ -48,10 +49,15 @@ export const workflowExistingHandlerEdges = ({
         targetHandleId,
         tone: handlerRecord.index < sourceIndex ? "return" : undefined,
         eventType,
-        label: eventType
+        label: label ?? workflowEventOutputLabel(eventType)
       });
     });
   });
 
   return edges;
 };
+
+export function workflowEventOutputLabel(eventType: string) {
+  const separatorIndex = eventType.lastIndexOf(".");
+  return separatorIndex >= 0 ? eventType.slice(separatorIndex + 1) : eventType;
+}

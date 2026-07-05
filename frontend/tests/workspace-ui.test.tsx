@@ -570,20 +570,22 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByLabelText("Events: implementation.complete")).not.toBeInTheDocument();
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
     expect(screen.queryByText("type:")).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).queryByText("on:")).not.toBeInTheDocument();
-    expect(screen.queryByText("then:")).not.toBeInTheDocument();
+    const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
+    expect(within(implementationPolicyNode).queryByText("on:")).not.toBeInTheDocument();
+    expect(within(implementationPolicyNode).getByText("then:")).toHaveClass("text-foreground");
+    expect(implementationPolicyNode.querySelector("svg")).not.toBeInTheDocument();
     expect(screen.queryByText("start:")).not.toBeInTheDocument();
     expect(screen.getAllByText("implementation.failed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
-    expect(within(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).getByText("implementation")).toHaveAttribute("title", "Implement work");
-    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("implementation.failed"));
-    const implementationFailedEdgeLabel = workflowEdgeLabels().find((label) => label.dataset.workflowEdgeLabelValue === "implementation.failed");
+    expect(within(implementationPolicyNode).getByText("implementation")).toHaveAttribute("title", "Implement work");
+    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
+    const implementationFailedEdgeLabel = workflowEdgeLabels().find((label) => label.dataset.workflowEdgeLabelValue === "failed");
     expect(implementationFailedEdgeLabel).toBeDefined();
-    expect(implementationFailedEdgeLabel?.children[0]).toHaveTextContent("on:");
-    expect(implementationFailedEdgeLabel?.children[0]).toHaveClass("text-foreground");
-    expect(implementationFailedEdgeLabel?.children[1]).toHaveTextContent("implementation.failed");
-    expect(implementationFailedEdgeLabel?.children[1]).toHaveClass("text-primary");
-    expect(await screen.findByText("implementation.complete")).toBeInTheDocument();
+    expect(implementationFailedEdgeLabel).toHaveTextContent("failed");
+    expect(implementationFailedEdgeLabel).not.toHaveTextContent("on:");
+    expect(implementationFailedEdgeLabel).not.toHaveTextContent("implementation.failed");
+    expect(implementationFailedEdgeLabel?.children[0]).toHaveClass("text-primary");
+    expect(await screen.findByText("complete")).toBeInTheDocument();
     expect(screen.queryByText("implementation.blocked")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();
@@ -866,7 +868,7 @@ describe("workspace entity UI flows", () => {
     expect(outputEvent).toBeInTheDocument();
     expect(outputEvent).toHaveTextContent("+ Action");
     expect(outputEvent).not.toHaveTextContent("implementation.failed");
-    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("implementation.failed"));
+    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
     expect(outputEvent.querySelector("svg")).not.toBeInTheDocument();
     expect(gateOutput).toBeInTheDocument();
     expect(gateOutput).toHaveTextContent("summary");
@@ -977,7 +979,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByLabelText("Workflow policy source")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Workflow policy event")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Workflow policy trigger")).not.toBeInTheDocument();
-    expect(screen.getAllByText("implementation.complete").length).toBeGreaterThan(0);
+    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("complete"));
     expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Workflow policy action"), "review-pass");
     await user.click(screen.getByRole("button", { name: "Save workflow policy" }));
@@ -1078,8 +1080,8 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => {
       expect(workflowEdgeLabelTexts()).toEqual(expect.arrayContaining([
         "manual-start",
-        "implementation.complete",
-        "review.rejected"
+        "complete",
+        "rejected"
       ]));
     });
     expect(workflowEdgeLabels().some((label) =>

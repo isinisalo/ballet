@@ -31,8 +31,7 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
               transform: `translate(-100%, -50%) translate(${targetX - workflowEdgeLabelTargetOffset}px, ${targetY}px)`
             }}
           >
-            <span className="text-foreground">on:</span>
-            <span className="ml-1 text-primary">{label}</span>
+            <span className="text-primary">{label}</span>
           </div>
         </EdgeLabelRenderer>
       ) : null}
