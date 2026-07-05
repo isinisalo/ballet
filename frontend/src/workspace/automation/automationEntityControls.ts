@@ -53,13 +53,14 @@ const addEntityConfig = (
           setDraft((current) => {
             const availableOutputIds = current.outputs.map((output) => output.id);
             const outputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
+            const agentIds = agents?.[0]?.id ? [agents[0].id] : [];
             return {
               ...current,
               actions: [...current.actions, {
                 id,
                 description: "New action",
-                outputIds: outputIds.length > 0 ? outputIds : availableOutputIds.slice(0, 1),
-                agentIds: agents?.[0]?.id ? [agents[0].id] : []
+                outputIds: agentIds.length > 0 ? outputIds.length > 0 ? outputIds : availableOutputIds.slice(0, 1) : [],
+                agentIds
               }]
             };
           });

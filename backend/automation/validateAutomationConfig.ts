@@ -163,7 +163,11 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
     });
   }
   const normalizedOutputIds = context.normalizedActions[index]?.outputIds ?? [];
-  if (normalizedOutputIds.length < 1) {
+  const normalizedAgentIds = context.normalizedActions[index]?.agentIds ?? [];
+  if (normalizedAgentIds.length === 0 && normalizedOutputIds.length > 0) {
+    issues.push({ path: `${base}.outputIds`, message: "Action without agents cannot select outputs." });
+  }
+  if (normalizedAgentIds.length > 0 && normalizedOutputIds.length < 1) {
     issues.push({ path: `${base}.outputIds`, message: "Action must select at least 1 output." });
   }
   if (normalizedOutputIds.length > 3) {
@@ -194,10 +198,6 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
       }
       seenRawAgentIds.add(agentId);
     });
-  }
-  const normalizedAgentIds = context.normalizedActions[index]?.agentIds ?? [];
-  if (normalizedAgentIds.length < 1) {
-    issues.push({ path: `${base}.agentIds`, message: "Action must select at least 1 agent." });
   }
   if (normalizedAgentIds.length > 5) {
     issues.push({ path: `${base}.agentIds`, message: "Action can select at most 5 agents." });

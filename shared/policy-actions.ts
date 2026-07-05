@@ -42,18 +42,19 @@ const eventOutputIdSet = (outputs: Array<Pick<ProjectOutput, "id" | "type">>): S
     .filter(Boolean));
 
 export const actionOutputIds = (
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
   actionId: string
 ): string[] => {
   const normalizedActionId = normalizePolicyToken(actionId);
   const action = actions.find((candidate) => normalizePolicyToken(candidate.id) === normalizedActionId);
+  if (action && Array.isArray(action.agentIds) && action.agentIds.length === 0) return [];
   const outputIds = action?.outputIds ?? defaultPolicyOutputIds;
   return [...new Set(outputIds.map(normalizePolicyToken).filter(Boolean))].slice(0, 3);
 };
 
 export const policyOutputEventTypes = (
   input: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">> = [],
+  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }> = [],
   outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
 ): string[] => {
   const outputIds = actions.length > 0 ? actionOutputIds(actions, input.action) : [...defaultPolicyOutputIds];
@@ -96,7 +97,7 @@ export const uniqueAgentPolicyTokens = (agents: Agent[]): string[] => {
 };
 
 export const policyEventTypesForActions = (
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
   outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
 ): string[] => {
   const normalizedActions = [...new Map(actions
@@ -108,7 +109,7 @@ export const policyEventTypesForActions = (
 
 export const policyEventTypesForAgentsAndActions = (
   _agents: Agent[],
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
   outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
 ): string[] => policyEventTypesForActions(actions, outputs);
 

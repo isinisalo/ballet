@@ -281,6 +281,12 @@
       "agentIds": [
         "troubleshooter"
       ]
+    },
+    {
+      "id": "done",
+      "description": "No further actions.",
+      "outputIds": [],
+      "agentIds": []
     }
   ],
   "outputs": [

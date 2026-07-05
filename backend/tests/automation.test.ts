@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import {
+  automationPoliciesToEventDefinitions,
   automationPoliciesToPolicies,
   loadProjectAutomationConfig,
   saveProjectAutomationConfig,
@@ -260,6 +261,31 @@ describe("project automation config", () => {
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: [] }]
     }, [agent]).some((issue) => issue.message === "Action must select at least 1 output.")).toBe(true);
+
+    const agentlessConfig: ProjectAutomationConfig = {
+      ...validConfig(),
+      actions: [{ id: "manual-gate", description: "Manual workflow stop.", outputIds: [], agentIds: [] }],
+      policies: [{
+        id: "on.trigger.manual-start.start.manual-gate",
+        source: "trigger",
+        trigger: "manual-start",
+        action: "manual-gate",
+        enabled: true
+      }],
+      triggers: [{ id: "manual-start", description: "Manual workflow start" }],
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.trigger.manual-start.start.manual-gate"] }]
+    };
+    expect(validateProjectAutomationConfig(agentlessConfig, [agent])).toEqual([]);
+    expect(validateProjectAutomationConfig({
+      ...agentlessConfig,
+      actions: [{ ...agentlessConfig.actions[0]!, outputIds: ["failed"] }]
+    }, [agent]).some((issue) => issue.message === "Action without agents cannot select outputs.")).toBe(true);
+    expect(automationPoliciesToEventDefinitions(
+      agentlessConfig.policies,
+      agentlessConfig.triggers,
+      agentlessConfig.actions,
+      agentlessConfig.outputs
+    ).map((event) => event.eventType)).toEqual(["trigger.manual-start"]);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),

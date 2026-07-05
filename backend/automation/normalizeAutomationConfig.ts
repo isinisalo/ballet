@@ -131,10 +131,16 @@ const createActions = (
   });
 
   const actionBases = rawActions.length > 0
-    ? rawActions.map((action) => ({
-      base: normalizeActionBase(action, availableOutputIds),
-      rawAgentIds: normalizeRawAgentIds(action.agentIds, agents)
-    }))
+    ? rawActions.map((action) => {
+      const rawAgentIds = normalizeRawAgentIds(action.agentIds, agents);
+      const base = normalizeActionBase(action, availableOutputIds);
+      return {
+        base: rawAgentIds?.length === 0 && !Array.isArray(action.outputIds)
+          ? { ...base, outputIds: [] }
+          : base,
+        rawAgentIds
+      };
+    })
     : policyActionTokens(legacyPolicies).map((id) => ({
       base: { id, description: "", outputIds: fallbackActionOutputIds(availableOutputIds) },
       rawAgentIds: undefined

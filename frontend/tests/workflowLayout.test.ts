@@ -93,6 +93,22 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(layout.edges.filter((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey.startsWith("output-event-"))).toHaveLength(3);
   });
 
+  it("does not render output nodes for an agentless action", () => {
+    const start = policy("manual-gate", undefined, "manual-gate");
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph([{
+        policyId: start.id,
+        index: 0,
+        policy: start,
+        outputEvents: policyOutputEventTypes(start, [{ id: "manual-gate", outputIds: ["complete"], agentIds: [] }])
+      }]),
+      editingPolicyIndex: null
+    });
+
+    expect(layout.nodes.some((node) => node.kind === "output-event" || node.kind === "gate-output")).toBe(false);
+    expect(layout.edges.some((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey.startsWith("output-event-"))).toBe(false);
+  });
+
   it("keeps terminal output events beside the source policy edge", () => {
     const routeProject = policy("route-project", undefined, "route-project");
     const aggregateReview = policy("aggregate-review", "route-project.blocked", "aggregate-review");

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { generatedPolicyId, policyOutputEventType } from "../../../../../shared/policy-actions";
+import { defaultPolicyOutputIds, generatedPolicyId, policyOutputEventType } from "../../../../../shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 
@@ -50,6 +50,7 @@ export function ActionsAutomationTab({
       outputIds: [...new Set(next.outputIds)].slice(0, 3),
       agentIds: [...new Set(next.agentIds)].slice(0, 5)
     };
+    if (normalized.agentIds.length === 0) normalized.outputIds = [];
     if (creating) {
       onCreateDraftChange(normalized);
       return;
@@ -98,22 +99,30 @@ export function ActionsAutomationTab({
   const selectableOutputs = useMemo(() => config.outputs.filter((output) => !selectedOutputIds.includes(output.id)), [config.outputs, selectedOutputIds]);
   const selectableAgents = useMemo(() => agents.filter((agent) => !selectedAgentIds.includes(agent.id)), [agents, selectedAgentIds]);
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
-  const canAddOutput = selectedOutputIds.length < 3 && selectableOutputs.length > 0;
+  const fallbackOutputIds = () => {
+    const availableOutputIds = config.outputs.map((output) => output.id);
+    const defaultOutputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
+    return defaultOutputIds.length > 0 ? defaultOutputIds.slice(0, 1) : availableOutputIds.slice(0, 1);
+  };
+  const canAddOutput = selectedAgentIds.length > 0 && selectedOutputIds.length < 3 && selectableOutputs.length > 0;
   const canAddAgent = selectedAgentIds.length < 5 && selectableAgents.length > 0;
   const addOutput = (outputId: string) => {
     if (!selected || !outputId || selectedOutputIds.includes(outputId) || selectedOutputIds.length >= 3) return;
     updateSelected({ outputIds: [...selectedOutputIds, outputId] });
   };
   const removeOutput = (outputId: string) => {
-    if (!selected || selectedOutputIds.length <= 1) return;
+    if (!selected || (selectedAgentIds.length > 0 && selectedOutputIds.length <= 1)) return;
     updateSelected({ outputIds: selectedOutputIds.filter((candidate) => candidate !== outputId) });
   };
   const addAgent = (agentId: string) => {
     if (!selected || !agentId || selectedAgentIds.includes(agentId) || selectedAgentIds.length >= 5) return;
-    updateSelected({ agentIds: [...selectedAgentIds, agentId] });
+    updateSelected({
+      agentIds: [...selectedAgentIds, agentId],
+      outputIds: selectedOutputIds.length > 0 ? selectedOutputIds : fallbackOutputIds()
+    });
   };
   const removeAgent = (agentId: string) => {
-    if (!selected || selectedAgentIds.length <= 1) return;
+    if (!selected) return;
     updateSelected({ agentIds: selectedAgentIds.filter((candidate) => candidate !== agentId) });
   };
 
@@ -134,7 +143,6 @@ export function ActionsAutomationTab({
                     variant="ghost"
                     aria-label={`Remove agent ${agentLabel(agentId)}`}
                     title={`Remove agent ${agentLabel(agentId)}`}
-                    disabled={selectedAgentIds.length <= 1}
                     onClick={() => removeAgent(agentId)}
                     className="-mr-1 size-4 rounded-full p-0"
                   >
@@ -173,7 +181,7 @@ export function ActionsAutomationTab({
                     variant="ghost"
                     aria-label={`Remove output ${outputId}`}
                     title={`Remove output ${outputId}`}
-                    disabled={selectedOutputIds.length <= 1}
+                    disabled={selectedAgentIds.length > 0 && selectedOutputIds.length <= 1}
                     onClick={() => removeOutput(outputId)}
                     className="-mr-1 size-4 rounded-full p-0"
                   >

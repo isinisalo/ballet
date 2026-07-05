@@ -863,6 +863,57 @@ describe("workspace entity UI flows", () => {
     expect(data.automation.policies).toHaveLength(1);
   });
 
+  it("allows saving an agentless action without outputs", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.automation.policies[0] = {
+      id: "on.trigger.manual-start.start.implementation",
+      source: "trigger",
+      trigger: "manual-start",
+      action: "implementation",
+      enabled: true
+    };
+    workflowData.automation.workflows[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    const { data } = await renderRoute("/automation/actions?id=implementation", workflowData);
+
+    await user.click(screen.getByRole("button", { name: "Remove agent Existing Agent" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Remove output complete" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Remove output failed" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Add output" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.actions[0]).toMatchObject({
+      id: "implementation",
+      outputIds: [],
+      agentIds: []
+    }));
+    expect(data.eventDefinitions.map((event) => event.eventType)).not.toContain("implementation.complete");
+    expect(data.eventDefinitions.map((event) => event.eventType)).not.toContain("implementation.failed");
+  });
+
+  it("selects an agentless workflow action without rendering output events", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.automation.actions.push({
+      id: "manual-gate",
+      description: "Manual workflow stop",
+      outputIds: [],
+      agentIds: []
+    });
+    const { data } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
+
+    await user.click(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
+    await user.selectOptions(screen.getByLabelText("Workflow policy action"), "manual-gate");
+
+    await waitFor(() => expect(data.automation.policies[0]).toMatchObject({
+      action: "manual-gate",
+      id: "on.implementation.failed.start.manual-gate"
+    }));
+    expect(screen.queryByRole("button", { name: /Add policy step for manual-gate\./ })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-workflow-output-event^="manual-gate."]')).not.toBeInTheDocument();
+  });
+
   it("creates, edits, deletes, and saves automation outputs", async () => {
     const user = userEvent.setup();
     const { data } = await renderRoute("/automation/outputs");

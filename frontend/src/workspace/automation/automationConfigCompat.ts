@@ -14,13 +14,14 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
     triggers: Array.isArray(config?.triggers) ? config.triggers : defaults.triggers,
     actions: Array.isArray(config?.actions)
       ? config.actions.map((action) => {
+        const agentIds = Array.isArray(action.agentIds) ? [...new Set(action.agentIds.filter(Boolean))].slice(0, 5) : [];
         const selectedOutputIds = Array.isArray(action.outputIds)
           ? [...new Set(action.outputIds.map(normalizePolicyToken).filter(Boolean))].slice(0, 3)
           : fallbackOutputIds;
         return {
           ...action,
-          outputIds: selectedOutputIds.length > 0 ? selectedOutputIds : outputIds.slice(0, 1),
-          agentIds: Array.isArray(action.agentIds) ? [...new Set(action.agentIds.filter(Boolean))].slice(0, 5) : []
+          outputIds: agentIds.length === 0 ? [] : selectedOutputIds.length > 0 ? selectedOutputIds : outputIds.slice(0, 1),
+          agentIds
         };
       })
       : defaults.actions,

@@ -190,11 +190,10 @@ export function WorkflowsAutomationTab({
     reorderStep
   });
 
-  const canAddFirstPolicy = Boolean(defaultAction && (config.actions.find((action) => action.id === defaultAction)?.agentIds.length ?? 0) > 0);
+  const canAddFirstPolicy = Boolean(defaultAction);
   const canAddPolicyForEvent = (policy?: ProjectPolicy) => {
     const action = policy?.action || defaultAction;
-    const actionAgentCount = config.actions.find((candidate) => candidate.id === action)?.agentIds.length ?? 0;
-    return Boolean(action && actionAgentCount > 0 && selectedActionOutputIds(action).length > 0);
+    return Boolean(action && selectedActionOutputIds(action).length > 0);
   };
 
   if (!selected || !workflowLayout) return <EmptyState title="No workflow selected." />;

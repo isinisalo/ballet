@@ -16,7 +16,7 @@ export const allPolicyRunsTerminal = (runs: AgentRun[]): boolean =>
 export const outcomeToOutputEventStatus = (
   outcome: AgentOutcome,
   policy: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>
+  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>
 ): AgentOutputEventStatus => {
   const allowedOutputIds = actionOutputIds(actions, policy.action);
   switch (outcome.outcome) {
@@ -41,7 +41,7 @@ export const outcomeToOutputEventStatus = (
 export const aggregateActionOutputStatus = (
   runs: AgentRun[],
   policy: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>
+  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>
 ): AgentOutputEventStatus => {
   const allowedOutputIds = actionOutputIds(actions, policy.action);
   const outcomes = runs.map((run) => run.outcome?.outcome).filter(Boolean);
@@ -66,7 +66,7 @@ export const aggregateActionOutputStatus = (
 
 export const actionOutputType = (
   policy: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
   outputs: Array<Pick<ProjectOutput, "id" | "type">>,
   outputId: string
 ) => {
