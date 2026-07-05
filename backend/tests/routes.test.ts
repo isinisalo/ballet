@@ -179,7 +179,7 @@ describe("API routes", () => {
       events: [{ id: "runtime.event", title: "Runtime event", source: "runtime" }],
       triggers: [],
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }],
-      outputs: [{ id: "failed", description: "Failed output", type: "event" }],
+      outputs: [{ id: "failed" }],
       policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
       runtimes: []
@@ -233,7 +233,7 @@ describe("API routes", () => {
       events: [{ id: "plan_approved", title: "Plan approved", source: "user" }],
       triggers: [{ id: "plan_approved", description: "Plan approved" }],
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }],
-      outputs: [{ id: "failed", description: "Failed output", type: "event" }],
+      outputs: [{ id: "failed" }],
       policies: [{ id: "on.trigger.plan_approved.start.implementation", source: "trigger", trigger: "plan_approved", action: "implementation", enabled: true }],
       workflows: [],
       runtimes: []
@@ -282,7 +282,7 @@ describe("API routes", () => {
     const config = {
       version: 1,
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }],
-      outputs: [{ id: "failed", description: "Failed output", type: "event" }, { id: "summary", description: "Summary output", type: "event" }],
+      outputs: [{ id: "failed" }, { id: "summary" }],
       triggers: [{ id: "manual_start", description: "Manual start" }],
       policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
@@ -297,14 +297,14 @@ describe("API routes", () => {
       });
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
-      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }], outputs: [{ id: "failed", type: "event" }, { id: "summary", type: "event" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.implementation.failed.start.implementation"] }] });
+      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }], outputs: [{ id: "failed" }, { id: "summary" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.implementation.failed.start.implementation"] }] });
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);
       const automationBody = await automation.json() as { config: Record<string, unknown> };
       expect(automationBody.config).not.toHaveProperty("events");
       expect(automationBody.config).not.toHaveProperty("gates");
-      expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], outputs: [{ id: "failed", type: "event" }, { id: "summary", type: "event" }], policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
+      expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], outputs: [{ id: "failed" }, { id: "summary" }], policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
 
       const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",

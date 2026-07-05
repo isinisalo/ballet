@@ -59,7 +59,7 @@ export function WorkflowsAutomationTab({
     selectedActionOutputIds(policy.action).map((outputId) => ({
       outputId,
       eventType: policyOutputEventType(policy, outputId),
-      type: config.outputs.find((output) => output.id === outputId)?.type ?? "event"
+      type: "event"
     }));
   const workflowStepRecords = useMemo<WorkflowStepRecord[]>(() =>
     selected?.steps.map((policyId, index) => {
@@ -69,7 +69,7 @@ export function WorkflowsAutomationTab({
         policyId,
         index,
         policy,
-        outputEvents: outputTargets?.filter((output) => output.type === "event").map((output) => output.eventType),
+        outputEvents: outputTargets?.map((output) => output.eventType),
         outputTargets
       };
     }) ?? [],

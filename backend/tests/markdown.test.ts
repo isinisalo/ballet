@@ -103,9 +103,9 @@ describe("Markdown collection loading", () => {
       triggers: [],
       actions: [],
       outputs: [
-        { id: "complete", description: "Action completed.", type: "event" },
-        { id: "blocked", description: "Action is blocked.", type: "event" },
-        { id: "failed", description: "Action failed.", type: "event" }
+        { id: "ready" },
+        { id: "cancelled" },
+        { id: "warn" }
       ],
       policies: [],
       workflows: [],

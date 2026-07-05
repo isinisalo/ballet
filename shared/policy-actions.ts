@@ -1,15 +1,15 @@
 import type { Agent } from "./domain/agents.js";
-import type { ProjectAction, ProjectOutput, ProjectOutputType, ProjectPolicy } from "./domain/automation.js";
+import type { ProjectAction, ProjectOutput, ProjectPolicy } from "./domain/automation.js";
 
-export const defaultPolicyOutputIds = ["complete", "blocked", "failed"] as const;
+export const defaultPolicyOutputIds = ["ready", "cancelled", "warn"] as const;
 export type PolicyOutputId = string;
 export const policyOutputStatuses = defaultPolicyOutputIds;
 export type PolicyOutputStatus = typeof defaultPolicyOutputIds[number];
 
 export const defaultProjectOutputs = (): ProjectOutput[] => [
-  { id: "complete", description: "Action completed.", type: "event" },
-  { id: "blocked", description: "Action is blocked.", type: "event" },
-  { id: "failed", description: "Action failed.", type: "event" }
+  { id: "ready" },
+  { id: "cancelled" },
+  { id: "warn" }
 ];
 
 export const normalizePolicyToken = (value: string): string =>
@@ -32,9 +32,6 @@ export const policyOutputEventType = (
   outputId: PolicyOutputId
 ): string => `${input.action}.${normalizePolicyToken(outputId)}`;
 
-export const normalizeProjectOutputType = (): ProjectOutputType =>
-  "event";
-
 const outputIdSet = (outputs: Array<Pick<ProjectOutput, "id">>): Set<string> =>
   new Set(outputs
     .map((output) => normalizePolicyToken(output.id))
@@ -54,7 +51,7 @@ export const actionOutputIds = (
 export const policyOutputEventTypes = (
   input: Pick<ProjectPolicy, "action">,
   actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }> = [],
-  outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
+  outputs: Array<Pick<ProjectOutput, "id">> = []
 ): string[] => {
   const outputIds = actions.length > 0 ? actionOutputIds(actions, input.action) : [...defaultPolicyOutputIds];
   const availableOutputIds = outputs.length > 0 ? outputIdSet(outputs) : undefined;
@@ -97,7 +94,7 @@ export const uniqueAgentPolicyTokens = (agents: Agent[]): string[] => {
 
 export const policyEventTypesForActions = (
   actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
-  outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
+  outputs: Array<Pick<ProjectOutput, "id">> = []
 ): string[] => {
   const normalizedActions = [...new Map(actions
     .map((action) => ({ ...action, id: normalizePolicyToken(action.id) }))
@@ -109,7 +106,7 @@ export const policyEventTypesForActions = (
 export const policyEventTypesForAgentsAndActions = (
   _agents: Agent[],
   actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
-  outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
+  outputs: Array<Pick<ProjectOutput, "id">> = []
 ): string[] => policyEventTypesForActions(actions, outputs);
 
 export const resolvePolicyAgent = (agents: Agent[], token: string): Agent | undefined => {

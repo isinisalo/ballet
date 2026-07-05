@@ -43,12 +43,12 @@ describe("workspace routing", () => {
     });
     expect(routeFromPath("/automation/outputs?id=artifact")).toEqual({
       view: "automation",
-      automationTab: "outputs",
+      automationTab: "actions",
       automationEntityId: "artifact"
     });
     expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({
       view: "automation",
-      automationTab: "outputs",
+      automationTab: "actions",
       automationEntityId: "gate-1"
     });
     expect(routeFromPath("/runtimes?id=codex")).toEqual({ view: "runtimes", runtimeId: "codex" });
@@ -91,7 +91,7 @@ describe("workspace routing", () => {
     expect(agentDocumentPath(".codex/agents/a b.toml")).toBe("/agents?path=.codex%2Fagents%2Fa%20b.toml");
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(automationSectionPath("workflows", "wf 1")).toBe("/automation/workflows?id=wf%201");
-    expect(automationSectionPath("outputs", "artifact 1")).toBe("/automation/outputs?id=artifact%201");
+    expect(automationSectionPath("actions", "action 1")).toBe("/automation/actions?id=action%201");
     expect(runtimePath("runtime 1")).toBe("/runtimes?id=runtime%201");
   });
 });

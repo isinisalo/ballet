@@ -7,7 +7,6 @@ import type { AutomationTab } from "../types";
 import { ActionsAutomationTab } from "./actions/ActionsAutomationTab";
 import { createAutomationEntityControls } from "./automationEntityControls";
 import { AutomationIssues } from "./AutomationIssues";
-import { OutputsAutomationTab } from "./outputs/OutputsAutomationTab";
 import { TriggersAutomationTab } from "./triggers/TriggersAutomationTab";
 import { useAutomationDraft } from "./useAutomationDraft";
 import { useAutomationCreateDrafts } from "./useAutomationCreateDrafts";
@@ -35,7 +34,6 @@ export function AutomationView({
   const {
     deleteConfig,
     selectedActionId,
-    selectedOutputId,
     selectedTriggerId,
     selectedWorkflowId,
     selectAutomationEntity
@@ -43,9 +41,8 @@ export function AutomationView({
   const isCreateMode = useMemo(() => {
     if (activeTab === "triggers") return !selectedTriggerId;
     if (activeTab === "actions") return !selectedActionId;
-    if (activeTab === "outputs") return !selectedOutputId;
     return !selectedWorkflowId;
-  }, [activeTab, selectedActionId, selectedOutputId, selectedTriggerId, selectedWorkflowId]);
+  }, [activeTab, selectedActionId, selectedTriggerId, selectedWorkflowId]);
   const workflowNameEditor = useWorkflowHeaderNameEditor({
     activeTab,
     draft,
@@ -109,9 +106,6 @@ export function AutomationView({
             ) : null}
             {activeTab === "actions" ? (
               <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} createDraft={createDrafts.newAction} onCreateDraftChange={createDrafts.updateNewAction} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />
-            ) : null}
-            {activeTab === "outputs" ? (
-              <OutputsAutomationTab config={draft} selectedId={selectedOutputId} createDraft={createDrafts.newOutput} onCreateDraftChange={createDrafts.updateNewOutput} onSelect={(id) => selectAutomationEntity("outputs", id)} updateConfig={updateConfig} />
             ) : null}
           </div>
         )}

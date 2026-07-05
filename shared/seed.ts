@@ -182,16 +182,8 @@ export const seedData: AppData = {
       }
     ],
     outputs: [
-      {
-        id: "failed",
-        description: "Action failed.",
-        type: "event"
-      },
-      {
-        id: "runbook",
-        description: "Operator-facing remediation notes or runbook updates.",
-        type: "event"
-      }
+      { id: "failed" },
+      { id: "runbook" }
     ],
     policies: [
       {

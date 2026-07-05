@@ -122,9 +122,9 @@ const implementationAction = {
 };
 
 const implementationOutputs = [
-  { id: "ready", description: "Ready for review.", type: "event" as const },
-  { id: "blocked", description: "Blocked.", type: "event" as const },
-  { id: "failed", description: "Failed.", type: "event" as const }
+  { id: "ready" },
+  { id: "blocked" },
+  { id: "failed" }
 ];
 
 const multiAgentImplementationPolicy = (targetAgentId: string): Policy => ({
@@ -455,7 +455,7 @@ describe("runtime output mapping", () => {
       outcome: readyOutcome,
       projectPolicy,
       actions: [{ ...implementationAction, outputIds: ["complete"] }],
-      outputs: [{ id: "complete", description: "Action completed.", type: "event" }]
+      outputs: [{ id: "complete" }]
     });
 
     expect(completed.event?.type).toBe("implementation.complete");

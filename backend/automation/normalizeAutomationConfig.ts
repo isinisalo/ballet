@@ -13,7 +13,6 @@ import {
   defaultPolicyOutputIds,
   defaultProjectOutputs,
   generatedPolicyId,
-  normalizeProjectOutputType,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
   policyActionTokens,
@@ -48,9 +47,7 @@ const normalizeTrigger = (value: Record<string, unknown>): ProjectTrigger => ({
 });
 
 const normalizeOutput = (value: Record<string, unknown>): ProjectOutput => ({
-  id: normalizePolicyToken(stringValue(value.id)),
-  description: stringValue(value.description),
-  type: normalizeProjectOutputType()
+  id: normalizePolicyToken(stringValue(value.id))
 });
 
 const normalizeOutputIds = (value: unknown): string[] | undefined => {

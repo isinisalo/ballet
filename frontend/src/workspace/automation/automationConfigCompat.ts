@@ -1,10 +1,13 @@
 import { defaultProjectAutomationConfig, type ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
-import { defaultPolicyOutputIds, defaultProjectOutputs, normalizePolicyToken, normalizeProjectOutputType } from "../../../../shared/policy-actions";
+import { defaultPolicyOutputIds, defaultProjectOutputs, normalizePolicyToken } from "../../../../shared/policy-actions";
 
 export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefined): ProjectAutomationConfig => {
   const defaults = defaultProjectAutomationConfig();
   const outputs = Array.isArray(config?.outputs) && config.outputs.length > 0
-    ? config.outputs.map((output) => ({ ...output, type: normalizeProjectOutputType() }))
+    ? [...new Map(config.outputs
+      .map((output) => ({ id: normalizePolicyToken(output.id) }))
+      .filter((output) => output.id)
+      .map((output) => [output.id, output])).values()]
     : defaultProjectOutputs();
   const outputIds = outputs.map((output) => output.id);
   const fallbackOutputIds = defaultPolicyOutputIds.filter((outputId) => outputIds.includes(outputId));

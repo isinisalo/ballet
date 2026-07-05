@@ -127,9 +127,7 @@ const projectActionSchema = z.object({
 }).strict();
 
 const projectOutputSchema = z.object({
-  id: z.string(),
-  description: z.string(),
-  type: z.literal("event")
+  id: z.string()
 }).strict();
 
 const projectPolicySchema = z.object({

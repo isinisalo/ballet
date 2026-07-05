@@ -24,7 +24,6 @@ const selectedCollectionId = <T extends { id: string }>(isActive: boolean, selec
 const selectedEntityIds = (activeTab: AutomationTab, selectedId: string | undefined, draft: ProjectAutomationConfig) => ({
   selectedTriggerId: selectedCollectionId(activeTab === "triggers", selectedId, draft.triggers),
   selectedActionId: selectedCollectionId(activeTab === "actions", selectedId, draft.actions),
-  selectedOutputId: selectedCollectionId(activeTab === "outputs", selectedId, draft.outputs),
   selectedWorkflowId: selectedCollectionId(activeTab === "workflows", selectedId, draft.workflows)
 });
 
@@ -65,15 +64,6 @@ const addEntityConfig = (
             };
           });
           selectAutomationEntity("actions", id);
-        }
-      };
-    case "outputs":
-      return {
-        label: "Add output",
-        onAdd: () => {
-          const id = uniqueAutomationId("new-output", draft.outputs.map((output) => output.id));
-          setDraft((current) => ({ ...current, outputs: [...current.outputs, { id, description: "New output", type: "event" }] }));
-          selectAutomationEntity("outputs", id);
         }
       };
     case "workflows":
@@ -122,31 +112,6 @@ const deleteEntityConfig = (
           const nextId = draft.actions.find((action) => action.id !== selected.id)?.id;
           setDraft((current) => ({ ...current, actions: current.actions.filter((action) => action.id !== selected.id) }));
           selectAutomationEntity("actions", nextId);
-        }
-      };
-    }
-    case "outputs": {
-      const selected = draft.outputs.find((output) => output.id === ids.selectedOutputId);
-      const deleteWouldEmptyAction = Boolean(selected && draft.actions.some((action) =>
-        action.outputIds.includes(selected.id) && action.outputIds.length <= 1
-      ));
-      return {
-        label: "Delete output",
-        type: "output",
-        resourceName: selected?.id,
-        canDelete: Boolean(selected) && !deleteWouldEmptyAction,
-        onDelete: () => {
-          if (!selected || deleteWouldEmptyAction) return;
-          const nextId = draft.outputs.find((output) => output.id !== selected.id)?.id;
-          setDraft((current) => ({
-            ...current,
-            outputs: current.outputs.filter((output) => output.id !== selected.id),
-            actions: current.actions.map((action) => ({
-              ...action,
-              outputIds: action.outputIds.filter((outputId) => outputId !== selected.id)
-            }))
-          }));
-          selectAutomationEntity("outputs", nextId);
         }
       };
     }

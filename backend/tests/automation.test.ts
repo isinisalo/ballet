@@ -47,18 +47,7 @@ const validConfig = (): ProjectAutomationConfig => ({
       agentIds: ["developer-agent"]
     }
   ],
-  outputs: [
-    {
-      id: "failed",
-      description: "Action failed.",
-      type: "event"
-    },
-    {
-      id: "summary",
-      description: "Summarized work output.",
-      type: "event"
-    }
-  ],
+  outputs: [{ id: "failed" }, { id: "summary" }],
   policies: [
     {
       id: "on.implementation.failed.start.implementation",
@@ -92,9 +81,9 @@ describe("project automation config", () => {
       triggers: [],
       actions: [],
       outputs: [
-        { id: "complete", description: "Action completed.", type: "event" },
-        { id: "blocked", description: "Action is blocked.", type: "event" },
-        { id: "failed", description: "Action failed.", type: "event" }
+        { id: "ready" },
+        { id: "cancelled" },
+        { id: "warn" }
       ],
       policies: [],
       workflows: [],
@@ -127,7 +116,7 @@ describe("project automation config", () => {
       policies: [{
         id: "assign-developer",
         title: "Assign developer",
-        on: "developer.run.failed",
+        on: "developer.run.ready",
         run: { agent: "developer-agent", runtime: "codex-runtime" },
         enabled: true
       }],
@@ -140,19 +129,19 @@ describe("project automation config", () => {
     const loaded = await loadProjectAutomationConfig(root, [agent]);
     expect(loaded).not.toHaveProperty("events");
     expect(loaded).not.toHaveProperty("gates");
-    expect(loaded.actions).toEqual([{ id: "run", description: "", outputIds: ["complete", "blocked", "failed"], agentIds: ["developer-agent"] }]);
+    expect(loaded.actions).toEqual([{ id: "run", description: "", outputIds: ["ready", "cancelled", "warn"], agentIds: ["developer-agent"] }]);
     expect(loaded.outputs).toEqual([
-      { id: "complete", description: "Action completed.", type: "event" },
-      { id: "blocked", description: "Action is blocked.", type: "event" },
-      { id: "failed", description: "Action failed.", type: "event" }
+      { id: "ready" },
+      { id: "cancelled" },
+      { id: "warn" }
     ]);
     expect(loaded.policies[0]).toMatchObject({
-      id: "on.run.failed.start.run",
+      id: "on.run.ready.start.run",
       source: "event",
-      event: "run.failed",
+      event: "run.ready",
       action: "run"
     });
-    expect(loaded.workflows[0]?.steps).toEqual(["on.run.failed.start.run"]);
+    expect(loaded.workflows[0]?.steps).toEqual(["on.run.ready.start.run"]);
     expect(loaded.runtimes[0]).not.toHaveProperty("outputEvents");
   });
 
@@ -166,9 +155,9 @@ describe("project automation config", () => {
       actions: [{ id: "implementation", description: "Implement approved work." }],
       outputs: [],
       policies: [{
-        id: "on.developer.implementation.failed.v1.then.developer.start.implementation",
+        id: "on.developer.implementation.ready.v1.then.developer.start.implementation",
         source: "event",
-        event: "developer.implementation.failed.v1",
+        event: "developer.implementation.ready.v1",
         agent: "developer",
         action: "implementation",
         enabled: true
@@ -176,7 +165,7 @@ describe("project automation config", () => {
       workflows: [{
         id: "delivery",
         title: "Delivery",
-        steps: ["on.developer.implementation.failed.v1.then.developer.start.implementation"]
+        steps: ["on.developer.implementation.ready.v1.then.developer.start.implementation"]
       }],
       runtimes: []
     }), "utf8");
@@ -184,13 +173,13 @@ describe("project automation config", () => {
     const loaded = await loadProjectAutomationConfig(root, [agent]);
 
     expect(loaded.policies[0]).toMatchObject({
-      id: "on.implementation.failed.start.implementation",
-      event: "implementation.failed"
+      id: "on.implementation.ready.start.implementation",
+      event: "implementation.ready"
     });
     expect(loaded).not.toHaveProperty("gates");
-    expect(loaded.outputs.every((output) => output.type === "event")).toBe(true);
-    expect(loaded.actions[0]?.outputIds).toEqual(["complete", "blocked", "failed"]);
-    expect(loaded.workflows[0]?.steps).toEqual(["on.implementation.failed.start.implementation"]);
+    expect(loaded.outputs).toEqual([{ id: "ready" }, { id: "cancelled" }, { id: "warn" }]);
+    expect(loaded.actions[0]?.outputIds).toEqual(["ready", "cancelled", "warn"]);
+    expect(loaded.workflows[0]?.steps).toEqual(["on.implementation.ready.start.implementation"]);
   });
 
   it("validates policy, runtime, and workflow references while ignoring legacy event definitions", () => {
@@ -200,11 +189,6 @@ describe("project automation config", () => {
       ...validConfig(),
       events: [{ id: "", title: "", source: "", payloadSchema: "not-an-object" }]
     }, [agent])).toEqual([]);
-
-    expect(validateProjectAutomationConfig({
-      ...validConfig(),
-      outputs: [{ id: "summary", description: "Summary", type: "invalid" }]
-    }, [agent]).some((issue) => issue.message === "Output type must be event.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
@@ -244,18 +228,13 @@ describe("project automation config", () => {
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      outputs: [{ id: "summary", description: "Summary", type: "event" }, { id: "summary", description: "Duplicate summary", type: "event" }]
+      outputs: [{ id: "summary" }, { id: "summary" }]
     }, [agent]).some((issue) => issue.message === "Duplicate output id: summary.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      outputs: [{ id: "", description: "Missing id", type: "event" }]
+      outputs: [{ id: "" }]
     }, [agent]).some((issue) => issue.message === "Output id is required.")).toBe(true);
-
-    expect(validateProjectAutomationConfig({
-      ...validConfig(),
-      outputs: [{ id: "bad", description: 123, type: "event" }]
-    }, [agent]).some((issue) => issue.message === "Output description must be a string.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
@@ -290,7 +269,7 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: ["failed", "summary", "extra", "too-many"] }],
-      outputs: [...validConfig().outputs, { id: "extra", description: "Extra", type: "event" }, { id: "too-many", description: "Too many", type: "event" }]
+      outputs: [...validConfig().outputs, { id: "extra" }, { id: "too-many" }]
     }, [agent]).some((issue) => issue.message === "Action can select at most 3 outputs.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
@@ -309,20 +288,13 @@ describe("project automation config", () => {
       policies: [{ ...validConfig().policies[0]!, event: "implementation.failed" }]
     }, [agent]).some((issue) => issue.message === "Policy references unknown event: implementation.failed.")).toBe(true);
 
-    expect(validateProjectAutomationConfig({
-      ...validConfig(),
-      actions: [{ ...validConfig().actions[0]!, outputIds: ["failed"] }],
-      outputs: [{ id: "failed", description: "Terminal output.", type: "gate" }],
-      policies: [{ ...validConfig().policies[0]!, event: "implementation.failed" }]
-    }, [agent]).some((issue) => issue.message === "Output type must be event.")).toBe(true);
-
     const completedConfig: ProjectAutomationConfig = {
       ...validConfig(),
       actions: [{ id: "implementation", description: "Implement approved work.", outputIds: ["completed", "failed", "blocked"], agentIds: ["developer-agent"] }],
       outputs: [
-        { id: "completed", description: "Action completed.", type: "event" },
-        { id: "failed", description: "Action failed.", type: "event" },
-        { id: "blocked", description: "Action is blocked.", type: "event" }
+        { id: "completed" },
+        { id: "failed" },
+        { id: "blocked" }
       ],
       policies: [{
         id: "on.implementation.completed.start.implementation",

@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { defaultPolicyOutputIds, generatedPolicyId, policyOutputEventType } from "../../../../../shared/policy-actions";
+import { defaultPolicyOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "../../../../../shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
+import { OutputSelector } from "../outputs/OutputSelector";
+import { uniqueOutputIds } from "../outputs/outputSelectorUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 
 export function ActionsAutomationTab({
@@ -47,7 +49,7 @@ export function ActionsAutomationTab({
     const normalized = {
       ...next,
       id: editablePolicyToken(next.id),
-      outputIds: [...new Set(next.outputIds)].slice(0, 3),
+      outputIds: uniqueOutputIds(next.outputIds, 3),
       agentIds: [...new Set(next.agentIds)].slice(0, 5)
     };
     if (normalized.agentIds.length === 0) normalized.outputIds = [];
@@ -93,7 +95,6 @@ export function ActionsAutomationTab({
 
   const selectedOutputIds = selected?.outputIds ?? [];
   const selectedAgentIds = selected?.agentIds ?? [];
-  const selectableOutputs = useMemo(() => config.outputs.filter((output) => !selectedOutputIds.includes(output.id)), [config.outputs, selectedOutputIds]);
   const selectableAgents = useMemo(() => agents.filter((agent) => !selectedAgentIds.includes(agent.id)), [agents, selectedAgentIds]);
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
   const fallbackOutputIds = () => {
@@ -101,15 +102,15 @@ export function ActionsAutomationTab({
     const defaultOutputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
     return defaultOutputIds.length > 0 ? defaultOutputIds.slice(0, 1) : availableOutputIds.slice(0, 1);
   };
-  const canAddOutput = selectedAgentIds.length > 0 && selectedOutputIds.length < 3 && selectableOutputs.length > 0;
   const canAddAgent = selectedAgentIds.length < 5 && selectableAgents.length > 0;
-  const addOutput = (outputId: string) => {
-    if (!selected || !outputId || selectedOutputIds.includes(outputId) || selectedOutputIds.length >= 3) return;
-    updateSelected({ outputIds: [...selectedOutputIds, outputId] });
+  const updateOutputs = (outputIds: string[]) => {
+    if (!selected) return;
+    updateSelected({ outputIds });
   };
-  const removeOutput = (outputId: string) => {
-    if (!selected || (selectedAgentIds.length > 0 && selectedOutputIds.length <= 1)) return;
-    updateSelected({ outputIds: selectedOutputIds.filter((candidate) => candidate !== outputId) });
+  const createOutput = (outputId: string) => {
+    const id = normalizePolicyToken(outputId);
+    if (!id || config.outputs.some((output) => normalizePolicyToken(output.id) === id)) return;
+    updateConfig((current) => ({ ...current, outputs: [...current.outputs, { id }] }));
   };
   const addAgent = (agentId: string) => {
     if (!selected || !agentId || selectedAgentIds.includes(agentId) || selectedAgentIds.length >= 5) return;
@@ -168,42 +169,13 @@ export function ActionsAutomationTab({
           </Field>
           <Field>
             <FieldLabel>Outputs</FieldLabel>
-            <div className="flex min-h-7 flex-wrap items-center gap-2">
-              {selectedOutputIds.map((outputId) => (
-                <Badge key={outputId} variant="outline" className="border-divider-strong bg-muted/50 font-mono">
-                  {outputId}
-                  <Button
-                    type="button"
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label={`Remove output ${outputId}`}
-                    title={`Remove output ${outputId}`}
-                    disabled={selectedAgentIds.length > 0 && selectedOutputIds.length <= 1}
-                    onClick={() => removeOutput(outputId)}
-                    className="-mr-1 size-4 rounded-full p-0"
-                  >
-                    <X data-icon="inline-end" />
-                  </Button>
-                </Badge>
-              ))}
-              <Select onValueChange={addOutput} disabled={!canAddOutput}>
-                <SelectTrigger
-                  aria-label="Add output"
-                  className="h-5 w-auto gap-1 rounded-xl border-dashed border-divider-strong bg-transparent px-2 py-0.5 font-mono text-xs text-muted-foreground shadow-none hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <SelectValue placeholder="+ Output" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {selectableOutputs.map((output) => (
-                      <SelectItem key={output.id} value={output.id}>
-                        {output.description ? `${output.id} · ${output.type} · ${output.description}` : `${output.id} · ${output.type}`}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+            <OutputSelector
+              value={selectedOutputIds}
+              initialOptions={config.outputs.map((output) => output.id)}
+              disabled={selectedAgentIds.length === 0}
+              onChange={updateOutputs}
+              onCreateOption={createOutput}
+            />
           </Field>
       </FieldGroup>
     </div>

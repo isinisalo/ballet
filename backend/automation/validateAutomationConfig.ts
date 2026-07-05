@@ -219,12 +219,6 @@ const validateOutput = (output: unknown, index: number, issues: ProjectAutomatio
     return;
   }
   addRequiredStringIssue(issues, `${base}.id`, output.id, "Output id");
-  if (output.description !== undefined && typeof output.description !== "string") {
-    issues.push({ path: `${base}.description`, message: "Output description must be a string." });
-  }
-  if (output.type !== undefined && output.type !== "event") {
-    issues.push({ path: `${base}.type`, message: "Output type must be event." });
-  }
 };
 
 const policyValidationState = (
