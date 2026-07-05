@@ -1,13 +1,11 @@
 import { Activity, CheckCircle2, Pencil, Route, Save, Trash2, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { workflowTriggerLabel, type WorkflowStepRecord } from "./workflowGraph";
-import { workflowCanvasLayoutConfig, workflowPolicyOutputHandleY, type WorkflowCanvasLayoutNode } from "./workflowLayout";
-import { WorkflowCanvasNode } from "./WorkflowCanvasNode";
+import { workflowCanvasNodeAnchorY, workflowPolicyOutputHandleY, type WorkflowCanvasLayoutNode } from "./workflowLayout";
 import { WorkflowGhostNode } from "./WorkflowGhostNode";
-import { WorkflowPolicySummary } from "./WorkflowPolicySummary";
+import { WorkflowPolicyNode } from "./WorkflowPolicyNode";
 import type { WorkflowNodeContext, WorkflowReactFlowNode } from "./WorkflowCanvasTypes";
 
 export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReactFlowNode>) {
@@ -22,11 +20,7 @@ export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReact
 }
 
 function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
-  const anchorTop = layoutNode.kind === "gate-output" || layoutNode.kind === "output-event"
-    ? layoutNode.height / 2
-    : layoutNode.kind === "trigger" || layoutNode.kind === "policy"
-    ? workflowCanvasLayoutConfig.policyAnchorY
-    : layoutNode.height / 2;
+  const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
   const anchorLeft = layoutNode.width / 2;
   const outputHandles = layoutNode.kind === "policy"
     ? Array.from({ length: layoutNode.outputHandleCount ?? 0 }, (_, outputIndex) => outputIndex)
@@ -64,19 +58,25 @@ function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNode
   if (node.kind === "gate-output") return renderGateOutputNode(node);
   if (!node.record) return null;
   if (node.kind === "save-policy" || node.kind === "edit-policy" || node.kind === "delete-policy") return renderPolicyActionNode(node, context, node.record);
-  return renderPolicyNode(node, context, node.record);
+  return <WorkflowPolicyNode node={node} context={context} record={node.record} />;
 }
 
 function renderTriggerNode(context: WorkflowNodeContext) {
+  const value = workflowTriggerLabel(context.firstPolicy);
+
   return (
-    <WorkflowCanvasNode
-      label="Trigger"
-      value={workflowTriggerLabel(context.firstPolicy)}
-      tone="trigger"
-      icon={Zap}
-      dashed={!context.firstPolicy}
-      className="w-44"
-    />
+    <div
+      data-workflow-node
+      aria-label={`Trigger: ${value}`}
+      title={value}
+      className={cn(
+        "flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md border border-divider-strong bg-card px-1.5 font-mono text-[0.66rem] leading-4 text-foreground",
+        !context.firstPolicy && "border-dashed border-muted-foreground/70 bg-background/80 text-muted-foreground"
+      )}
+    >
+      <Zap className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
+      <span className="block min-w-0 truncate">{value}</span>
+    </div>
   );
 }
 
@@ -151,59 +151,5 @@ function renderPolicyActionNode(node: WorkflowCanvasLayoutNode, context: Workflo
     <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => context.onDeleteStep(record.index)} className="nodrag">
       <Trash2 data-icon="inline-start" />
     </Button>
-  );
-}
-
-function renderPolicyNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext, record: WorkflowStepRecord) {
-  const stepDragClass = cn(
-    "cursor-grab select-none active:cursor-grabbing",
-    context.draggedStepIndex === record.index && "opacity-60",
-    context.dragOverStepIndex === record.index && context.draggedStepIndex !== record.index && "ring-2 ring-primary/20"
-  );
-
-  return (
-    <div
-      data-workflow-step-index={record.index}
-      onPointerDown={(event) => context.onStepPointerDown(event, record.index)}
-      onPointerMove={context.onStepPointerMove}
-      onPointerUp={context.onStepPointerUp}
-      onPointerCancel={context.onStepPointerCancel}
-      className={stepDragClass}
-    >
-      <WorkflowCanvasNode label="Policy" tone="policy" icon={Route} value={record.policyId || "No policy"} dashed={!record.policy} className="h-[3.625rem] w-60 max-w-none items-start py-2">
-        {record.policy ? renderPolicySummary(node, context, record) : renderMissingPolicySelect(context, record)}
-      </WorkflowCanvasNode>
-    </div>
-  );
-}
-
-function renderPolicySummary(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext, record: WorkflowStepRecord) {
-  if (!record.policy) return null;
-
-  return (
-    <WorkflowPolicySummary
-      policy={record.policy}
-      editing={Boolean(node.isEditingPolicy)}
-      actionOptions={context.actionOptions}
-      noSelectionValue={context.noSelectionValue}
-      onActionChange={(action) => context.onActionChange(record, action)}
-    />
-  );
-}
-
-function renderMissingPolicySelect(context: WorkflowNodeContext, record: WorkflowStepRecord) {
-  return (
-    <Select value={record.policyId || context.noSelectionValue} onValueChange={(value) => context.onPolicyChange(record.index, value === context.noSelectionValue ? "" : value)}>
-      <SelectTrigger className="nodrag h-6 w-full min-w-0 px-1.5 font-mono text-[0.64rem]" title={record.policyId || "No policy"} onDragStart={(event) => event.stopPropagation()}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {context.policyOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
   );
 }

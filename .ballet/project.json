@@ -579,6 +579,13 @@
       "action": "review-intent",
       "enabled": true,
       "id": "on.design-roadmap.ready.start.review-intent"
+    },
+    {
+      "source": "event",
+      "event": "route-project.blocked",
+      "action": "aggregate-review",
+      "enabled": true,
+      "id": "on.route-project.blocked.start.aggregate-review"
     }
   ],
   "workflows": [
@@ -590,7 +597,8 @@
         "on.route-project.ready.start.analyze-intent",
         "on.analyze-intent.ready.start.design-roadmap",
         "on.design-roadmap.ready.start.review-intent",
-        "on.review-intent.changes_requested.start.analyze-intent"
+        "on.review-intent.changes_requested.start.analyze-intent",
+        "on.route-project.blocked.start.aggregate-review"
       ]
     },
     {

@@ -51,8 +51,8 @@ export type WorkflowCanvasLayout = {
 };
 
 export const workflowNodeSizes = {
-  trigger: { width: 176, height: 46 },
-  policy: { width: 240, height: 58 },
+  trigger: { minWidth: 120, maxWidth: 200, height: 22 },
+  policy: { minWidth: 120, maxWidth: 200, height: 22 },
   event: { width: 240, height: 46 },
   outputEvent: { minWidth: 120, maxWidth: 240, height: 22, rowGap: 16 },
   gateOutput: { minWidth: 64, maxWidth: 180, height: 22 },
@@ -65,8 +65,16 @@ export const workflowCanvasLayoutConfig = {
   columnGap: 72,
   branchGap: 28,
   edgePad: 18,
-  policyAnchorY: 18,
+  triggerAnchorY: 11,
+  policyAnchorY: 11,
   outputEventsLaneGap: 24
+};
+
+const workflowEdgeLabelLayout = {
+  minGap: 96,
+  paddingX: 12,
+  characterWidth: 6.25,
+  clearance: 32
 };
 
 const workflowDirectionHandles: Record<WorkflowLayoutDirection, { rankdir: "LR" | "TB"; sourceHandleId: string; targetHandleId: string }> = {
@@ -79,6 +87,7 @@ type WorkflowCanvasLayoutNodeDraft = Omit<WorkflowCanvasLayoutNode, "x" | "y">;
 type WorkflowDagreEdge = {
   source: string;
   target: string;
+  label?: string;
 };
 
 type WorkflowActiveOutputTask =
@@ -94,6 +103,18 @@ type WorkflowLayoutMetrics = {
   verticalPolicyRankStep: number;
   verticalColumnStep: number;
 };
+
+function workflowPolicyInputLabel(record: WorkflowStepRecord) {
+  if (!record.policy) return undefined;
+  if (record.policy.source === "trigger") return record.policy.trigger || "Missing trigger";
+  return record.policy.event || "Missing event";
+}
+
+export function workflowCanvasNodeAnchorY(layoutNode: Pick<WorkflowCanvasLayoutNode, "height" | "kind">) {
+  if (layoutNode.kind === "trigger") return workflowCanvasLayoutConfig.triggerAnchorY;
+  if (layoutNode.kind === "policy") return workflowCanvasLayoutConfig.policyAnchorY;
+  return layoutNode.height / 2;
+}
 
 export function calculateWorkflowCanvasLayout({
   workflowGraph,
@@ -132,7 +153,7 @@ export function calculateWorkflowCanvasLayout({
     addNode({
       key: `policy-${record.index}`,
       kind: "policy",
-      width: workflowNodeSizes.policy.width,
+      width: workflowPolicyNodeWidth(record),
       height: workflowNodeSizes.policy.height,
       direction,
       record,
@@ -260,14 +281,19 @@ export function calculateWorkflowCanvasLayout({
 
       task.childRecords.forEach((childRecord) => {
         layoutPolicyBranch(childRecord, nextVisitedPolicyIds);
-        addDagreEdge({ source: `policy-${record.index}`, target: `policy-${childRecord.index}` });
+        addDagreEdge({
+          source: `policy-${record.index}`,
+          target: `policy-${childRecord.index}`,
+          label: task.output.eventType
+        });
         addCanvasEdge({
           key: `policy-policy-${record.index}-${childRecord.index}-${task.output.eventType}`,
           sourceNodeKey: `policy-${record.index}`,
           targetNodeKey: `policy-${childRecord.index}`,
           sourceHandleId: workflowOutputSourceHandleId(direction, outputIndex),
           targetHandleId,
-          eventType: task.output.eventType
+          eventType: task.output.eventType,
+          label: task.output.eventType
         });
       });
     });
@@ -280,7 +306,7 @@ export function calculateWorkflowCanvasLayout({
   addNode({
     key: "trigger",
     kind: "trigger",
-    width: workflowNodeSizes.trigger.width,
+    width: workflowTriggerNodeWidth(workflowGraph.rootRecords[0] ? workflowPolicyInputLabel(workflowGraph.rootRecords[0]) ?? "Next trigger" : "Next trigger"),
     height: workflowNodeSizes.trigger.height,
     direction
   });
@@ -288,14 +314,19 @@ export function calculateWorkflowCanvasLayout({
   if (workflowGraph.rootRecords.length > 0) {
     workflowGraph.rootRecords.forEach((record) => {
       layoutPolicyBranch(record);
-      addDagreEdge({ source: "trigger", target: `policy-${record.index}` });
+      addDagreEdge({
+        source: "trigger",
+        target: `policy-${record.index}`,
+        label: workflowPolicyInputLabel(record)
+      });
       addCanvasEdge({
         key: `trigger-policy-${record.index}`,
         sourceNodeKey: "trigger",
         targetNodeKey: `policy-${record.index}`,
         sourceHandleId,
         targetHandleId,
-        dashed: !record.policy
+        dashed: !record.policy,
+        label: workflowPolicyInputLabel(record)
       });
     });
   } else {
@@ -350,7 +381,7 @@ export function workflowPolicyOutputHandleY(outputIndex: number, outputHandleCou
 function positionWorkflowNodes(nodes: WorkflowCanvasLayoutNodeDraft[], edges: WorkflowDagreEdge[], direction: WorkflowLayoutDirection): WorkflowCanvasLayoutNode[] {
   const primaryNodes = nodes.filter((node) => node.kind !== "output-event");
   const outputNodes = nodes.filter((node) => node.kind === "output-event");
-  const metrics = workflowLayoutMetrics(outputNodes);
+  const metrics = workflowLayoutMetrics(primaryNodes, outputNodes, edges);
   const positionedPrimaryNodes = positionPrimaryNodes(primaryNodes, outputNodes, edges, direction, metrics);
   const primaryNodeByKey = new Map(positionedPrimaryNodes.map((node) => [node.key, node]));
   const positionedOutputNodes = positionOutputEventNodes(outputNodes, primaryNodeByKey, edges, direction, metrics);
@@ -515,21 +546,27 @@ function nextVerticalOutputEventsX(childNodes: WorkflowCanvasLayoutNode[], sourc
   return Math.max(...childNodes.map((childNode) => childNode.x + childNode.width + workflowCanvasLayoutConfig.branchGap));
 }
 
-function workflowLayoutMetrics(outputNodes: WorkflowCanvasLayoutNodeDraft[]): WorkflowLayoutMetrics {
+function workflowLayoutMetrics(
+  primaryNodes: WorkflowCanvasLayoutNodeDraft[],
+  outputNodes: WorkflowCanvasLayoutNodeDraft[],
+  edges: WorkflowDagreEdge[]
+): WorkflowLayoutMetrics {
   const outputStackHeights = [...new Map(outputNodes.map((node) => {
     const sourceKey = node.record ? `policy-${node.record.index}` : node.key;
     return [sourceKey, outputNodes.filter((candidate) => candidate.record?.index === node.record?.index).length];
   })).values()].map(outputEventStackHeight);
   const maxOutputHeight = Math.max(workflowNodeSizes.outputEvent.height, ...outputStackHeights);
   const policyStackHeight = workflowPolicyStackHeight();
+  const triggerWidth = primaryNodes.find((node) => node.kind === "trigger")?.width ?? workflowNodeSizes.trigger.minWidth;
+  const horizontalEdgeGap = workflowHorizontalEdgeGap(edges);
 
   return {
-    horizontalRootPolicyX: workflowCanvasLayoutConfig.startX + workflowNodeSizes.trigger.width + workflowCanvasLayoutConfig.columnGap,
-    horizontalPolicyColumnStep: workflowNodeSizes.policy.width + workflowCanvasLayoutConfig.columnGap,
+    horizontalRootPolicyX: workflowCanvasLayoutConfig.startX + triggerWidth + horizontalEdgeGap,
+    horizontalPolicyColumnStep: workflowNodeSizes.policy.maxWidth + horizontalEdgeGap,
     horizontalRowStep: Math.max(policyStackHeight, workflowNodeSizes.trigger.height) + workflowCanvasLayoutConfig.branchGap,
     verticalRootPolicyY: workflowCanvasLayoutConfig.startY + workflowNodeSizes.trigger.height + workflowCanvasLayoutConfig.branchGap,
     verticalPolicyRankStep: policyStackHeight + maxOutputHeight + workflowCanvasLayoutConfig.branchGap,
-    verticalColumnStep: Math.max(workflowNodeSizes.policy.width, workflowNodeSizes.outputEvent.maxWidth, workflowNodeSizes.gateOutput.maxWidth) + workflowCanvasLayoutConfig.branchGap
+    verticalColumnStep: Math.max(workflowNodeSizes.policy.maxWidth, workflowNodeSizes.outputEvent.maxWidth, workflowNodeSizes.gateOutput.maxWidth) + workflowCanvasLayoutConfig.branchGap
   };
 }
 
@@ -545,6 +582,14 @@ function workflowOutputEventNodeWidth(eventType: string) {
   return workflowOutputNodeWidth(eventType, workflowNodeSizes.outputEvent.minWidth, workflowNodeSizes.outputEvent.maxWidth);
 }
 
+function workflowPolicyNodeWidth(record: WorkflowStepRecord) {
+  return workflowOutputNodeWidth(record.policy?.action || record.policyId || "No policy", workflowNodeSizes.policy.minWidth, workflowNodeSizes.policy.maxWidth);
+}
+
+function workflowTriggerNodeWidth(value: string) {
+  return workflowOutputNodeWidth(value, workflowNodeSizes.trigger.minWidth, workflowNodeSizes.trigger.maxWidth);
+}
+
 function workflowOutputNodeWidth(value: string, minWidth: number, maxWidth: number) {
   const iconAndGapWidth = 20;
   const estimatedCharacterWidth = 7;
@@ -552,6 +597,21 @@ function workflowOutputNodeWidth(value: string, minWidth: number, maxWidth: numb
     maxWidth,
     Math.max(minWidth, iconAndGapWidth + value.length * estimatedCharacterWidth)
   );
+}
+
+function workflowHorizontalEdgeGap(edges: WorkflowDagreEdge[]) {
+  const maxLabelWidth = Math.max(
+    0,
+    ...edges.map((edge) => edge.label ? workflowEdgeLabelWidth(edge.label) : 0)
+  );
+  return Math.max(
+    workflowEdgeLabelLayout.minGap,
+    Math.ceil(maxLabelWidth + workflowEdgeLabelLayout.clearance)
+  );
+}
+
+function workflowEdgeLabelWidth(label: string) {
+  return workflowEdgeLabelLayout.paddingX + label.length * workflowEdgeLabelLayout.characterWidth;
 }
 
 function outputEventStackStep() {
@@ -786,7 +846,7 @@ function workflowDagrePositions(nodes: WorkflowCanvasLayoutNodeDraft[], edges: W
 function actionNodesForPolicy(node: WorkflowCanvasLayoutNode, editingPolicyIndex: number | null): WorkflowCanvasLayoutNode[] {
   if (node.kind !== "policy" || !node.record) return [];
 
-  const deleteX = node.x + workflowNodeSizes.policy.width - workflowNodeSizes.action.width;
+  const deleteX = node.x + node.width - workflowNodeSizes.action.width;
   const editX = deleteX - workflowNodeSizes.action.width - 6;
   const actionY = node.y + workflowNodeSizes.policy.height + 6;
   const isEditingPolicy = editingPolicyIndex === node.record.index;

@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarkerType, Position, ReactFlow, type EdgeMouseHandler, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
-import { SmartStepEdge } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
 import { WorkflowReactFlowNodeComponent } from "./WorkflowReactFlowNode";
+import { WorkflowSmartEdge } from "./WorkflowSmartEdge";
 import type { WorkflowCanvasProps, WorkflowNodeContext, WorkflowReactFlowEdge, WorkflowReactFlowNode } from "./WorkflowCanvasTypes";
-import { workflowCanvasLayoutConfig, workflowPolicyOutputHandleY } from "./workflowLayout";
+import { workflowCanvasNodeAnchorY, workflowPolicyOutputHandleY } from "./workflowLayout";
 
 const workflowNodeTypes = {
   workflow: WorkflowReactFlowNodeComponent
 } satisfies NodeTypes;
 
 const workflowEdgeTypes = {
-  workflowSmart: SmartStepEdge
+  workflowSmart: WorkflowSmartEdge
 } satisfies EdgeTypes;
 
 const workflowSolidEdgeStroke = "color-mix(in srgb, var(--primary) 70%, transparent)";
@@ -229,11 +229,7 @@ function useWorkflowNodes(layoutNodes: WorkflowCanvasProps["layout"]["nodes"], n
 }
 
 function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][number]): WorkflowReactFlowNode["handles"] {
-  const anchorTop = layoutNode.kind === "gate-output" || layoutNode.kind === "output-event"
-    ? layoutNode.height / 2
-    : layoutNode.kind === "trigger" || layoutNode.kind === "policy"
-    ? workflowCanvasLayoutConfig.policyAnchorY
-    : layoutNode.height / 2;
+  const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
   const anchorLeft = layoutNode.width / 2;
   const outputHandles = layoutNode.kind === "policy"
     ? Array.from({ length: layoutNode.outputHandleCount ?? 0 }, (_, outputIndex) => outputIndex)

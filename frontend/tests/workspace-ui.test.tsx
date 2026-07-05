@@ -203,6 +203,11 @@ const noContent = () => new Response(null, { status: 204 });
 
 const slug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
 
+const workflowEdgeLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-workflow-edge-label=\"true\"]"));
+
+const workflowEdgeLabelTexts = () => workflowEdgeLabels()
+  .map((label) => label.textContent);
+
 const updateProjectTreeDocument = (
   nodes: ProjectDocumentTreeNode[],
   document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">
@@ -565,12 +570,13 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByLabelText("Events: implementation.complete")).not.toBeInTheDocument();
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
     expect(screen.queryByText("type:")).not.toBeInTheDocument();
-    expect(screen.getAllByText("on:").length).toBeGreaterThan(0);
+    expect(screen.queryByText("on:")).not.toBeInTheDocument();
     expect(screen.queryByText("then:")).not.toBeInTheDocument();
-    expect(screen.getAllByText("start:").length).toBeGreaterThan(0);
+    expect(screen.queryByText("start:")).not.toBeInTheDocument();
     expect(screen.getAllByText("implementation.failed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
     expect(within(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).getByText("implementation")).toHaveAttribute("title", "Implement work");
+    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("implementation.failed"));
     expect(await screen.findByText("implementation.complete")).toBeInTheDocument();
     expect(screen.queryByText("implementation.blocked")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
@@ -1055,6 +1061,16 @@ describe("workspace entity UI flows", () => {
     expect(document.querySelectorAll(".react-flow__edge-smoothstep")).toHaveLength(0);
     expect(document.querySelectorAll("[data-workflow-connector=\"true\"]").length).toBeGreaterThan(0);
     expect(document.querySelectorAll("[data-workflow-edge-tone=\"return\"]")).toHaveLength(1);
+    await waitFor(() => {
+      expect(workflowEdgeLabelTexts()).toEqual(expect.arrayContaining([
+        "manual-start",
+        "implementation.complete",
+        "review.rejected"
+      ]));
+    });
+    expect(workflowEdgeLabels().some((label) =>
+      Array.from(label.classList).some((className) => className === "border" || className.startsWith("border-"))
+    )).toBe(false);
   });
 
   it("toggles the workflow edge animation effect on click", async () => {

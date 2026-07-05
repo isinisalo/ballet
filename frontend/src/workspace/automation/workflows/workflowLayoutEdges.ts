@@ -9,6 +9,7 @@ export type WorkflowCanvasEdge = {
   dashed?: boolean;
   tone?: "return";
   eventType?: string;
+  label?: string;
 };
 
 export type WorkflowHandledEventNode = {
@@ -46,7 +47,8 @@ export const workflowExistingHandlerEdges = ({
         sourceHandleId: eventSourceHandleId ?? sourceHandleId,
         targetHandleId,
         tone: handlerRecord.index < sourceIndex ? "return" : undefined,
-        eventType
+        eventType,
+        label: eventType
       });
     });
   });
