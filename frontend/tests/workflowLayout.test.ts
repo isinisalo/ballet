@@ -157,7 +157,8 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(gateNode).toMatchObject({
       kind: "gate-output",
       gateOutput: { outputId: "summary", outputType: "gate" },
-      height: workflowNodeSizes.gateOutput.height
+      height: workflowNodeSizes.gateOutput.height,
+      width: workflowNodeSizes.gateOutput.minWidth
     });
     expect(policyNode?.outputHandleCount).toBe(2);
     expect(gateNode?.width).toBeGreaterThanOrEqual(workflowNodeSizes.gateOutput.minWidth);
@@ -177,7 +178,9 @@ describe("calculateWorkflowCanvasLayout", () => {
       sourceNodeKey: "policy-0",
       targetNodeKey: "gate-output-0-summary",
       sourceHandleId: "right",
-      targetHandleId: "left"
+      targetHandleId: "left",
+      eventType: "build.summary",
+      label: "summary"
     }));
     expect(layout.edges.some((edge) => edge.sourceNodeKey === gateNode?.key)).toBe(false);
   });
@@ -447,7 +450,7 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(edge.type).not.toBe("smoothstep");
     expect(edge.domAttributes).toMatchObject({
       "data-workflow-connector": "true",
-      "data-dashed": "true",
+      "data-dashed": "false",
       "data-workflow-edge-tone": "return",
       "data-workflow-edge-animated": "false"
     });
@@ -456,9 +459,9 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(edge.data?.workflowEdge.label).toBe("complete");
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--tertiary) 85%, transparent)",
-      strokeDasharray: "4 4",
       strokeWidth: 2
     });
+    expect(edge.style?.strokeDasharray).toBeUndefined();
     expect(edge.markerEnd).toBeUndefined();
   });
 

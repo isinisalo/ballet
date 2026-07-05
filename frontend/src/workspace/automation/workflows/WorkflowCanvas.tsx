@@ -21,7 +21,7 @@ const workflowReturnEdgeStroke = "color-mix(in srgb, var(--tertiary) 85%, transp
 function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][number], isAnimated = false): WorkflowReactFlowEdge["domAttributes"] {
   return {
     "data-workflow-connector": "true",
-    "data-dashed": edge.dashed || edge.tone === "return" ? "true" : "false",
+    "data-dashed": edge.dashed && edge.tone !== "return" ? "true" : "false",
     "data-workflow-edge-tone": edge.tone ?? "flow",
     "data-workflow-edge-animated": isAnimated ? "true" : "false"
   } as WorkflowReactFlowEdge["domAttributes"];
@@ -33,8 +33,7 @@ function workflowEdgeStroke(edge: WorkflowCanvasProps["layout"]["edges"][number]
 }
 
 function workflowEdgeStrokeDasharray(edge: WorkflowCanvasProps["layout"]["edges"][number]) {
-  if (edge.tone === "return") return "4 4";
-  return edge.dashed ? "6 5" : undefined;
+  return edge.dashed && edge.tone !== "return" ? "6 5" : undefined;
 }
 
 export function WorkflowCanvas({

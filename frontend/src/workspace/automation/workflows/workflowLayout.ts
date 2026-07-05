@@ -52,8 +52,8 @@ export const workflowNodeSizes = {
   trigger: { minWidth: 28, maxWidth: 28, height: 22 },
   policy: { minWidth: 136, maxWidth: 220, height: 22 },
   event: { width: 240, height: 46 },
-  outputEvent: { minWidth: 28, maxWidth: 28, height: 22, rowGap: 16 },
-  gateOutput: { minWidth: 64, maxWidth: 180, height: 22 },
+  outputEvent: { minWidth: 76, maxWidth: 120, height: 22, rowGap: 16 },
+  gateOutput: { minWidth: 28, maxWidth: 28, height: 22 },
   action: { width: 28, height: 28 }
 };
 
@@ -75,7 +75,7 @@ const workflowEdgeLabelLayout = {
   clearance: 24
 };
 
-export const workflowAddActionGhostLabel = "+";
+export const workflowAddActionGhostLabel = "+ Action";
 
 const workflowDirectionHandles: Record<WorkflowLayoutDirection, { rankdir: "LR" | "TB"; sourceHandleId: string; targetHandleId: string }> = {
   horizontal: { rankdir: "LR", sourceHandleId: "right", targetHandleId: "left" },
@@ -202,7 +202,7 @@ export function calculateWorkflowCanvasLayout({
     addNode({
       key,
       kind: "gate-output",
-      width: workflowGateOutputNodeWidth(output.outputId),
+      width: workflowGateOutputNodeWidth(),
       height: workflowNodeSizes.gateOutput.height,
       direction,
       record,
@@ -213,14 +213,16 @@ export function calculateWorkflowCanvasLayout({
       },
       sourcePolicyId: record.policyId
     });
-    addDagreEdge({ source: `policy-${record.index}`, target: key });
+    addDagreEdge({ source: `policy-${record.index}`, target: key, label: workflowOutputEdgeLabel(output) });
     addCanvasEdge({
       key: `policy-gate-output-${record.index}-${output.outputId}`,
       sourceNodeKey: `policy-${record.index}`,
       targetNodeKey: key,
       sourceHandleId: workflowOutputSourceHandleId(),
       targetHandleId,
-      dashed: !record.policy
+      dashed: !record.policy,
+      eventType: output.eventType,
+      label: workflowOutputEdgeLabel(output)
     });
   };
 
@@ -581,8 +583,8 @@ export function workflowPolicyStackHeight() {
   return workflowNodeSizes.policy.height;
 }
 
-function workflowGateOutputNodeWidth(outputId: string) {
-  return workflowOutputNodeWidth(outputId, workflowNodeSizes.gateOutput.minWidth, workflowNodeSizes.gateOutput.maxWidth);
+function workflowGateOutputNodeWidth() {
+  return workflowOutputNodeWidth("", workflowNodeSizes.gateOutput.minWidth, workflowNodeSizes.gateOutput.maxWidth);
 }
 
 function workflowOutputEventNodeWidth() {

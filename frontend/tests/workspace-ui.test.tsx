@@ -872,14 +872,14 @@ describe("workspace entity UI flows", () => {
     const gateOutput = screen.getByLabelText("Gate: summary");
 
     expect(outputEvent).toBeInTheDocument();
-    expect(outputEvent).toHaveTextContent("+");
-    expect(outputEvent).not.toHaveTextContent("Action");
+    expect(outputEvent).toHaveTextContent("+ Action");
     expect(outputEvent).not.toHaveTextContent("implementation.failed");
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
     expect(outputEvent.querySelector("svg")).not.toBeInTheDocument();
     expect(gateOutput).toBeInTheDocument();
-    expect(gateOutput).toHaveTextContent("summary");
+    expect(gateOutput).not.toHaveTextContent("summary");
     expect(gateOutput.querySelector("svg")).toBeInTheDocument();
+    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("summary"));
     expect(document.querySelector('[data-workflow-gate-output="summary"]')).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add policy step for implementation.summary" })).not.toBeInTheDocument();
   });
