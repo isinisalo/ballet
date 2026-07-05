@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { MarkerType, Position, ReactFlow, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MarkerType, Position, ReactFlow, type EdgeMouseHandler, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
 import { SmartStepEdge } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
 import { WorkflowReactFlowNodeComponent } from "./WorkflowReactFlowNode";
@@ -39,11 +39,12 @@ const workflowReturnEdgeMarker = {
   color: workflowReturnEdgeStroke
 } as const;
 
-function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][number]): WorkflowReactFlowEdge["domAttributes"] {
+function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][number], isAnimated = false): WorkflowReactFlowEdge["domAttributes"] {
   return {
     "data-workflow-connector": "true",
     "data-dashed": edge.dashed || edge.tone === "return" ? "true" : "false",
-    "data-workflow-edge-tone": edge.tone ?? "flow"
+    "data-workflow-edge-tone": edge.tone ?? "flow",
+    "data-workflow-edge-animated": isAnimated ? "true" : "false"
   } as WorkflowReactFlowEdge["domAttributes"];
 }
 
@@ -74,7 +75,17 @@ export function WorkflowCanvas({
   const nodeContext = useWorkflowNodeContext(nodeContextProps);
   const nodes = useWorkflowNodes(layout.nodes, nodeContext);
   const nodeIds = useMemo(() => layout.nodes.map((node) => node.key), [layout.nodes]);
-  const edges = useWorkflowEdges(layout.edges, nodeContext);
+  const [animatedEdgeId, setAnimatedEdgeId] = useState<string | null>(null);
+  const edges = useWorkflowEdges(layout.edges, nodeContext, animatedEdgeId);
+  const handleEdgeClick = useCallback<EdgeMouseHandler<WorkflowReactFlowEdge>>((event, edge) => {
+    event.stopPropagation();
+    setAnimatedEdgeId((currentEdgeId) => currentEdgeId === edge.id ? null : edge.id);
+  }, []);
+
+  useEffect(() => {
+    if (!animatedEdgeId || layout.edges.some((edge) => edge.key === animatedEdgeId)) return;
+    setAnimatedEdgeId(null);
+  }, [animatedEdgeId, layout.edges]);
 
   return (
     <div
@@ -109,6 +120,7 @@ export function WorkflowCanvas({
         selectionKeyCode={null}
         multiSelectionKeyCode={null}
         proOptions={{ hideAttribution: true }}
+        onEdgeClick={handleEdgeClick}
         onMoveStart={onCanvasMoveStart}
         onMoveEnd={onCanvasMoveEnd}
       >
@@ -254,7 +266,7 @@ function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][
   ];
 }
 
-export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layout"]["edges"], context?: WorkflowNodeContext): WorkflowReactFlowEdge[] {
+export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layout"]["edges"], context?: WorkflowNodeContext, animatedEdgeId?: string | null): WorkflowReactFlowEdge[] {
   return layoutEdges.map((workflowEdge) => ({
     id: workflowEdge.key,
     type: "workflowSmart",
@@ -263,20 +275,22 @@ export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layou
     sourceHandle: workflowEdge.sourceHandleId,
     targetHandle: workflowEdge.targetHandleId,
     data: { workflowEdge, context },
+    animated: workflowEdge.key === animatedEdgeId,
+    className: workflowEdge.key === animatedEdgeId ? "workflow-edge-animated" : undefined,
     markerEnd: workflowEdgeMarker(workflowEdge),
     style: {
       stroke: workflowEdgeStroke(workflowEdge),
       strokeWidth: 2,
       strokeDasharray: workflowEdgeStrokeDasharray(workflowEdge)
     },
-    interactionWidth: 0,
+    interactionWidth: 16,
     selectable: false,
     focusable: false,
     reconnectable: false,
-    domAttributes: workflowEdgeDomAttributes(workflowEdge)
+    domAttributes: workflowEdgeDomAttributes(workflowEdge, workflowEdge.key === animatedEdgeId)
   }));
 }
 
-function useWorkflowEdges(layoutEdges: WorkflowCanvasProps["layout"]["edges"], context: WorkflowNodeContext) {
-  return useMemo(() => toWorkflowReactFlowEdges(layoutEdges, context), [context, layoutEdges]);
+function useWorkflowEdges(layoutEdges: WorkflowCanvasProps["layout"]["edges"], context: WorkflowNodeContext, animatedEdgeId: string | null) {
+  return useMemo(() => toWorkflowReactFlowEdges(layoutEdges, context, animatedEdgeId), [animatedEdgeId, context, layoutEdges]);
 }

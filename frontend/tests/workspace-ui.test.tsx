@@ -1058,6 +1058,50 @@ describe("workspace entity UI flows", () => {
     expect(document.querySelectorAll("[data-workflow-edge-tone=\"return\"]")).toHaveLength(1);
   });
 
+  it("toggles the workflow edge animation effect on click", async () => {
+    const workflowData = baseData();
+    workflowData.automation.policies = [{
+      id: "on.trigger.manual-start.then.existing.start.implementation",
+      source: "trigger",
+      trigger: "manual-start",
+      agent: "existing",
+      action: "implementation",
+      enabled: true
+    }, {
+      id: "on.existing.implementation.complete.then.existing.start.review",
+      source: "event",
+      event: "existing.implementation.complete",
+      agent: "existing",
+      action: "review",
+      enabled: true
+    }];
+    workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
+
+    await renderRoute("/automation/workflows", workflowData);
+    await screen.findByLabelText("Policy: on.existing.implementation.complete.then.existing.start.review");
+
+    await waitFor(() => {
+      expect(document.querySelectorAll("[data-workflow-connector=\"true\"]").length).toBeGreaterThan(0);
+    });
+    const edge = document.querySelector("[data-workflow-connector=\"true\"]");
+    expect(edge).not.toBeNull();
+    expect(edge).toHaveAttribute("data-workflow-edge-animated", "false");
+
+    fireEvent.click(edge!);
+
+    await waitFor(() => {
+      expect(edge).toHaveAttribute("data-workflow-edge-animated", "true");
+    });
+    expect(edge).toHaveClass("workflow-edge-animated");
+
+    fireEvent.click(edge!);
+
+    await waitFor(() => {
+      expect(edge).toHaveAttribute("data-workflow-edge-animated", "false");
+    });
+    expect(edge).not.toHaveClass("workflow-edge-animated");
+  });
+
   it("routes legacy policies paths to workflow configuration", async () => {
     await renderRoute("/policies");
 

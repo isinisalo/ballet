@@ -311,6 +311,12 @@ body {
   outline: none;
 }
 
+.workflow-react-flow .workflow-edge-animated .react-flow__edge-path {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 70%, transparent));
+  stroke-dasharray: 8 6;
+  animation: workflow-edge-flow 0.85s linear infinite;
+}
+
 .workflow-react-flow .workflow-react-flow-handle {
   width: 1px;
   height: 1px;
@@ -320,6 +326,12 @@ body {
   background: transparent;
   opacity: 0;
   pointer-events: none;
+}
+
+@keyframes workflow-edge-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
 }
 
 @theme inline {

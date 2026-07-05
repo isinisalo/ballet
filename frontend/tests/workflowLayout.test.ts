@@ -321,14 +321,16 @@ describe("toWorkflowReactFlowEdges", () => {
       selectable: false,
       focusable: false,
       reconnectable: false,
-      interactionWidth: 0
+      interactionWidth: 16
     });
     expect(edge.type).not.toBe("smoothstep");
     expect(edge.domAttributes).toMatchObject({
       "data-workflow-connector": "true",
       "data-dashed": "true",
-      "data-workflow-edge-tone": "return"
+      "data-workflow-edge-tone": "return",
+      "data-workflow-edge-animated": "false"
     });
+    expect(edge.animated).toBe(false);
     expect(edge.data?.workflowEdge.eventType).toBe("existing.implementation.complete");
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--tertiary) 85%, transparent)",
@@ -366,6 +368,36 @@ describe("toWorkflowReactFlowEdges", () => {
     ]);
 
     expect(edges.map((edge) => edge.type)).toEqual(["workflowSmart", "workflowSmart", "workflowSmart"]);
+  });
+
+  it("marks one workflow edge as animated when requested", () => {
+    const edges = toWorkflowReactFlowEdges([
+      {
+        key: "policy-policy-0-1-codex.build.complete",
+        sourceNodeKey: "policy-0",
+        targetNodeKey: "policy-1",
+        sourceHandleId: "right",
+        targetHandleId: "left"
+      },
+      {
+        key: "policy-output-event-0-codex.build.failed",
+        sourceNodeKey: "policy-0",
+        targetNodeKey: "output-event-0-codex.build.failed",
+        sourceHandleId: "right",
+        targetHandleId: "left",
+        dashed: true
+      }
+    ], undefined, "policy-output-event-0-codex.build.failed");
+
+    expect(edges.map((edge) => edge.animated)).toEqual([false, true]);
+    expect(edges[0]?.domAttributes?.["data-workflow-edge-animated"]).toBe("false");
+    expect(edges[1]).toMatchObject({
+      animated: true,
+      className: "workflow-edge-animated",
+      domAttributes: {
+        "data-workflow-edge-animated": "true"
+      }
+    });
   });
 
 });
