@@ -112,6 +112,7 @@ export function MarkdownWorkbench({
           title="Markdown Workbench"
           icon={<FileKey2 data-icon="inline-start" />}
           compact
+          contentClassName="p-0"
           action={(
             <div className="flex items-center justify-end gap-2">
               {headerActions}
@@ -121,9 +122,13 @@ export function MarkdownWorkbench({
             </div>
           )}
         >
-          <form id={formId} className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void onSubmit(); }}>
-            {validationError ? <Alert variant="destructive"><AlertDescription>{validationError}</AlertDescription></Alert> : null}
-            <div className="-mx-4 -mt-3 flex min-h-10 flex-wrap items-center justify-between gap-3 bg-panel-header px-4 py-2">
+          <form id={formId} className="flex flex-col" onSubmit={(event) => { event.preventDefault(); void onSubmit(); }}>
+            {validationError ? (
+              <div className="px-4 py-3">
+                <Alert variant="destructive"><AlertDescription>{validationError}</AlertDescription></Alert>
+              </div>
+            ) : null}
+            <div className="flex min-h-10 flex-wrap items-center justify-between gap-3 bg-panel-header px-4 py-2">
               <EditorToolbar />
               <div className="flex items-center gap-3">
                 <EditorMetric label="Words" value={countWords(bodyText)} />
@@ -133,7 +138,7 @@ export function MarkdownWorkbench({
                 </span>
               </div>
             </div>
-            <div className="grid gap-3 pt-3">
+            <div className="grid gap-3 px-4 py-3">
               <div className="flex items-start gap-2 pb-1">
                 <Braces className="mt-0.5 size-4 shrink-0 text-primary" />
                 <div className="min-w-0">
