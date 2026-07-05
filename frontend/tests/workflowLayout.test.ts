@@ -201,7 +201,7 @@ describe("calculateWorkflowCanvasLayout", () => {
 
     expect(firstNode?.y).toBe(triggerNode?.y);
     expect(completeChildNode?.y).toBe(firstNode?.y);
-    expect(failedChildNode?.y).toBeGreaterThan(firstNode ? firstNode.y + workflowPolicyStackHeight() + workflowCanvasLayoutConfig.branchGap : 0);
+    expect(failedChildNode?.y).toBe(firstNode ? firstNode.y + workflowPolicyStackHeight() + workflowCanvasLayoutConfig.branchGap : undefined);
     expect(outputEventNode?.x).toBe(completeChildNode?.x);
     expect(outputEventNode?.y).toBe(failedChildNode
       ? failedChildNode.y + workflowPolicyStackHeight() + workflowNodeSizes.outputEvent.rowGap

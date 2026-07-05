@@ -66,7 +66,7 @@ export const workflowCanvasLayoutConfig = {
   branchGap: 28,
   edgePad: 18,
   policyAnchorY: 18,
-  outputEventsLaneGap: 64
+  outputEventsLaneGap: 24
 };
 
 const workflowDirectionHandles: Record<WorkflowLayoutDirection, { rankdir: "LR" | "TB"; sourceHandleId: string; targetHandleId: string }> = {
@@ -343,7 +343,7 @@ function positionWorkflowNodes(nodes: WorkflowCanvasLayoutNodeDraft[], edges: Wo
   const primaryNodes = nodes.filter((node) => node.kind !== "output-event");
   const outputNodes = nodes.filter((node) => node.kind === "output-event");
   const metrics = workflowLayoutMetrics(outputNodes);
-  const positionedPrimaryNodes = positionPrimaryNodes(primaryNodes, edges, direction, metrics);
+  const positionedPrimaryNodes = positionPrimaryNodes(primaryNodes, outputNodes, edges, direction, metrics);
   const primaryNodeByKey = new Map(positionedPrimaryNodes.map((node) => [node.key, node]));
   const positionedOutputNodes = positionOutputEventNodes(outputNodes, primaryNodeByKey, edges, direction, metrics);
 
@@ -352,12 +352,16 @@ function positionWorkflowNodes(nodes: WorkflowCanvasLayoutNodeDraft[], edges: Wo
 
 function positionPrimaryNodes(
   nodes: WorkflowCanvasLayoutNodeDraft[],
+  outputNodes: WorkflowCanvasLayoutNodeDraft[],
   edges: WorkflowDagreEdge[],
   direction: WorkflowLayoutDirection,
   metrics: WorkflowLayoutMetrics
 ): WorkflowCanvasLayoutNode[] {
   const ranks = workflowNodeRanks(nodes, edges);
   const orderIndexes = workflowNodeOrderIndexes(nodes, edges, direction);
+  const horizontalLaneYOffsets = direction === "horizontal"
+    ? workflowHorizontalLaneYOffsets(nodes, outputNodes, edges, orderIndexes)
+    : new Map<number, number>();
   const sourceKeyByTargetKey = new Map(edges.map((edge) => [edge.target, edge.source]));
 
   const positionedNodes = nodes.map((node) => {
@@ -370,7 +374,7 @@ function positionPrimaryNodes(
         ? horizontalNodeX(rank, metrics)
         : verticalNodeX(node, orderIndex, metrics),
       y: direction === "horizontal"
-        ? workflowCanvasLayoutConfig.startY + orderIndex * metrics.horizontalRowStep
+        ? workflowCanvasLayoutConfig.startY + (horizontalLaneYOffsets.get(orderIndex) ?? orderIndex * metrics.horizontalRowStep)
         : verticalNodeY(rank, metrics)
     };
   });
@@ -477,12 +481,11 @@ function workflowLayoutMetrics(outputNodes: WorkflowCanvasLayoutNodeDraft[]): Wo
   })).values()].map(outputEventStackHeight);
   const maxOutputHeight = Math.max(workflowNodeSizes.outputEvent.height, ...outputStackHeights);
   const policyStackHeight = workflowPolicyStackHeight();
-  const horizontalLaneHeight = policyStackHeight + workflowCanvasLayoutConfig.outputEventsLaneGap + maxOutputHeight;
 
   return {
     horizontalRootPolicyX: workflowCanvasLayoutConfig.startX + workflowNodeSizes.trigger.width + workflowCanvasLayoutConfig.columnGap,
     horizontalPolicyColumnStep: workflowNodeSizes.policy.width + workflowCanvasLayoutConfig.columnGap,
-    horizontalRowStep: Math.max(horizontalLaneHeight, workflowNodeSizes.trigger.height) + workflowCanvasLayoutConfig.branchGap,
+    horizontalRowStep: Math.max(policyStackHeight, workflowNodeSizes.trigger.height) + workflowCanvasLayoutConfig.branchGap,
     verticalRootPolicyY: workflowCanvasLayoutConfig.startY + workflowNodeSizes.trigger.height + workflowCanvasLayoutConfig.branchGap,
     verticalPolicyRankStep: policyStackHeight + maxOutputHeight + workflowCanvasLayoutConfig.branchGap,
     verticalColumnStep: Math.max(workflowNodeSizes.policy.width, workflowNodeSizes.outputEvent.maxWidth, workflowNodeSizes.gateOutput.maxWidth) + workflowCanvasLayoutConfig.branchGap
@@ -527,7 +530,7 @@ function canAlignTerminalOutputEvents(outputHandleCount: number) {
   return rowGap >= workflowNodeSizes.outputEvent.rowGap / 2;
 }
 
-function workflowBranchStackHeight(node: WorkflowCanvasLayoutNode) {
+function workflowBranchStackHeight(node: Pick<WorkflowCanvasLayoutNode, "height" | "kind">) {
   return node.kind === "policy"
     ? workflowPolicyStackHeight()
     : node.height;
@@ -623,7 +626,89 @@ function workflowHorizontalLaneIndexes(nodes: WorkflowCanvasLayoutNodeDraft[], e
     if (!laneIndexes.has(node.key)) assignLane(node.key, nextLaneIndex++);
   });
 
-  return laneIndexes;
+  return compactWorkflowLaneIndexes(laneIndexes);
+}
+
+function compactWorkflowLaneIndexes(laneIndexes: ReadonlyMap<string, number>) {
+  const compactIndexByLaneIndex = new Map(
+    [...new Set(laneIndexes.values())]
+      .sort((firstLaneIndex, secondLaneIndex) => firstLaneIndex - secondLaneIndex)
+      .map((laneIndex, compactIndex) => [laneIndex, compactIndex])
+  );
+
+  return new Map([...laneIndexes].map(([nodeKey, laneIndex]) => [
+    nodeKey,
+    compactIndexByLaneIndex.get(laneIndex) ?? laneIndex
+  ]));
+}
+
+function workflowHorizontalLaneYOffsets(
+  nodes: WorkflowCanvasLayoutNodeDraft[],
+  outputNodes: WorkflowCanvasLayoutNodeDraft[],
+  edges: WorkflowDagreEdge[],
+  laneIndexes: ReadonlyMap<string, number>
+) {
+  const primaryNodeByKey = new Map(nodes.map((node) => [node.key, node]));
+  const laneCount = Math.max(0, ...[...laneIndexes.values()]) + 1;
+  const laneHeights = Array.from({ length: laneCount }, () => 0);
+
+  nodes.forEach((node) => {
+    const laneIndex = laneIndexes.get(node.key);
+    if (laneIndex === undefined) return;
+    laneHeights[laneIndex] = Math.max(laneHeights[laneIndex], workflowBranchStackHeight(node));
+  });
+
+  outputNodesBySourceKey(outputNodes).forEach((sourceOutputNodes, sourceKey) => {
+    const sourceNode = primaryNodeByKey.get(sourceKey);
+    const sourceLaneIndex = laneIndexes.get(sourceKey);
+    if (!sourceNode || sourceLaneIndex === undefined) return;
+    const outputStackHeightValue = outputEventStackHeight(sourceOutputNodes.length);
+    const childNodes = edges
+      .filter((edge) => edge.source === sourceKey && (edge.target.startsWith("policy-") || edge.target.startsWith("gate-output-")))
+      .map((edge) => primaryNodeByKey.get(edge.target))
+      .filter((childNode): childNode is WorkflowCanvasLayoutNodeDraft => Boolean(childNode));
+
+    if (childNodes.length === 0) {
+      if (canAlignTerminalOutputEvents(sourceNode.outputHandleCount ?? 0)) return;
+      laneHeights[sourceLaneIndex] = Math.max(
+        laneHeights[sourceLaneIndex],
+        workflowBranchStackHeight(sourceNode) + workflowCanvasLayoutConfig.outputEventsLaneGap + outputStackHeightValue
+      );
+      return;
+    }
+
+    const lastChildNode = childNodes.reduce((currentLastChildNode, childNode) => {
+      const currentLaneIndex = laneIndexes.get(currentLastChildNode.key) ?? 0;
+      const childLaneIndex = laneIndexes.get(childNode.key) ?? 0;
+      return childLaneIndex > currentLaneIndex ? childNode : currentLastChildNode;
+    }, childNodes[0]);
+    const childLaneIndex = laneIndexes.get(lastChildNode.key);
+    if (childLaneIndex === undefined) return;
+    laneHeights[childLaneIndex] = Math.max(
+      laneHeights[childLaneIndex],
+      workflowBranchStackHeight(lastChildNode) + workflowNodeSizes.outputEvent.rowGap + outputStackHeightValue
+    );
+  });
+
+  const laneYOffsets = new Map<number, number>();
+  let nextOffset = 0;
+  laneHeights.forEach((laneHeight, laneIndex) => {
+    laneYOffsets.set(laneIndex, nextOffset);
+    nextOffset += Math.max(laneHeight, workflowNodeSizes.trigger.height) + workflowCanvasLayoutConfig.branchGap;
+  });
+  return laneYOffsets;
+}
+
+function outputNodesBySourceKey(outputNodes: WorkflowCanvasLayoutNodeDraft[]) {
+  const nodesBySourceKey = new Map<string, WorkflowCanvasLayoutNodeDraft[]>();
+
+  outputNodes.forEach((node) => {
+    const sourceKey = node.record ? `policy-${node.record.index}` : "";
+    if (!sourceKey) return;
+    nodesBySourceKey.set(sourceKey, [...(nodesBySourceKey.get(sourceKey) ?? []), node]);
+  });
+
+  return nodesBySourceKey;
 }
 
 function workflowDagrePositions(nodes: WorkflowCanvasLayoutNodeDraft[], edges: WorkflowDagreEdge[], direction: WorkflowLayoutDirection) {
