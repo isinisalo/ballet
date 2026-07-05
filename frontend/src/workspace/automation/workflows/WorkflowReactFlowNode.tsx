@@ -1,8 +1,7 @@
-import { CheckCircle2, Pencil, Route, Save, Trash2, Zap } from "lucide-react";
+import { CheckCircle2, Route, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { workflowTriggerLabel, type WorkflowStepRecord } from "./workflowGraph";
+import { workflowTriggerLabel } from "./workflowGraph";
 import { workflowAddActionGhostLabel, workflowCanvasNodeAnchorY, type WorkflowCanvasLayoutNode } from "./workflowLayout";
 import { WorkflowGhostNode } from "./WorkflowGhostNode";
 import { WorkflowPolicyNode } from "./WorkflowPolicyNode";
@@ -20,12 +19,14 @@ export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReact
 }
 
 function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
-  if (layoutNode.kind === "save-policy" || layoutNode.kind === "edit-policy" || layoutNode.kind === "delete-policy") return null;
-
   const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
 
   if (layoutNode.kind === "gate-output" || layoutNode.kind === "output-event") {
     return <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />;
+  }
+
+  if (layoutNode.kind === "trigger") {
+    return <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />;
   }
 
   return (
@@ -42,7 +43,6 @@ function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNode
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (node.kind === "gate-output") return renderGateOutputNode(node);
   if (!node.record) return null;
-  if (node.kind === "save-policy" || node.kind === "edit-policy" || node.kind === "delete-policy") return renderPolicyActionNode(node, context, node.record);
   return <WorkflowPolicyNode node={node} context={context} record={node.record} />;
 }
 
@@ -111,29 +111,5 @@ function renderGateOutputNode(node: WorkflowCanvasLayoutNode) {
       <CheckCircle2 className="size-3.5 shrink-0 text-secondary" aria-hidden="true" />
       <span className="block min-w-0 truncate">{outputId}</span>
     </div>
-  );
-}
-
-function renderPolicyActionNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext, record: WorkflowStepRecord) {
-  if (node.kind === "save-policy") {
-    return (
-      <Button type="button" size="icon-sm" aria-label="Save workflow policy" title="Save workflow policy" onClick={context.onSavePolicy} className="nodrag">
-        <Save data-icon="inline-start" />
-      </Button>
-    );
-  }
-
-  if (node.kind === "edit-policy") {
-    return (
-      <Button type="button" size="icon-sm" variant="outline" aria-label="Edit workflow policy" title="Edit workflow policy" onClick={() => context.onEditPolicy(record.index)} className="nodrag">
-        <Pencil data-icon="inline-start" />
-      </Button>
-    );
-  }
-
-  return (
-    <Button type="button" size="icon-sm" variant="destructive" aria-label="Remove workflow step" title="Remove workflow step" onClick={() => context.onDeleteStep(record.index)} className="nodrag">
-      <Trash2 data-icon="inline-start" />
-    </Button>
   );
 }

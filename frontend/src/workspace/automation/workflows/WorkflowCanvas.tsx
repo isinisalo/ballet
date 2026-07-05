@@ -130,9 +130,7 @@ function useWorkflowNodeContext({
   onStepPointerCancel,
   onPolicyChange,
   onActionChange,
-  onSavePolicy,
   onEditPolicy,
-  onDeleteStep,
   onAddPolicyStep
 }: WorkflowNodeContext) {
   return useMemo<WorkflowNodeContext>(() => ({
@@ -151,9 +149,7 @@ function useWorkflowNodeContext({
     onStepPointerCancel,
     onPolicyChange,
     onActionChange,
-    onSavePolicy,
     onEditPolicy,
-    onDeleteStep,
     onAddPolicyStep
   }), [
     actionOptions,
@@ -165,10 +161,8 @@ function useWorkflowNodeContext({
     noSelectionValue,
     onActionChange,
     onAddPolicyStep,
-    onDeleteStep,
     onEditPolicy,
     onPolicyChange,
-    onSavePolicy,
     onStepPointerCancel,
     onStepPointerDown,
     onStepPointerMove,
@@ -207,6 +201,10 @@ function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][
 
   if (layoutNode.kind === "gate-output" || layoutNode.kind === "output-event") {
     return [{ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 }];
+  }
+
+  if (layoutNode.kind === "trigger") {
+    return [{ id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 }];
   }
 
   return [

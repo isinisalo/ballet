@@ -26,7 +26,7 @@ export function WorkflowsAutomationTab({
   selectedId: string;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
-  saveDraft: () => Promise<boolean>;
+  saveDraft: (nextDraft?: ProjectAutomationConfig) => Promise<boolean>;
 }) {
   const lastSelectedIndexRef = useRef(0);
   const foundSelectedIndex = config.workflows.findIndex((workflow) => workflow.id === selectedId);
@@ -90,8 +90,8 @@ export function WorkflowsAutomationTab({
     updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? policyId : step) });
   };
 
-  const updateWorkflowPolicy = (record: WorkflowStepRecord, patch: Partial<ProjectPolicy>) => {
-    if (!record.policy) return;
+  const nextConfigWithWorkflowPolicy = (current: ProjectAutomationConfig, record: WorkflowStepRecord, patch: Partial<ProjectPolicy>) => {
+    if (!record.policy) return current;
     const selectedPolicy = record.policy;
     const next = { ...selectedPolicy, ...patch };
     const source: ProjectPolicy["source"] = next.source === "trigger" ? "trigger" : "event";
@@ -104,19 +104,20 @@ export function WorkflowsAutomationTab({
     };
     const nextId = generatedPolicyId(normalized);
 
-    updateConfig((current) => ({
+    return {
       ...current,
       policies: current.policies.map((policy) => policy.id === selectedPolicy.id ? { ...normalized, id: nextId } : policy),
       workflows: current.workflows.map((workflow) => ({
         ...workflow,
         steps: workflow.steps.map((step) => step === selectedPolicy.id ? nextId : step)
       }))
-    }));
+    };
   };
 
-  const saveWorkflowPolicyEdit = async () => {
-    const saved = await saveDraft();
-    if (saved) setEditingPolicyIndex(null);
+  const updateWorkflowPolicy = (record: WorkflowStepRecord, patch: Partial<ProjectPolicy>, { autoSave = false }: { autoSave?: boolean } = {}) => {
+    const nextConfig = nextConfigWithWorkflowPolicy(config, record, patch);
+    updateConfig(() => nextConfig);
+    if (autoSave) void saveDraft(nextConfig);
   };
 
   const addPolicyStep = (eventType?: string, sourcePolicy?: ProjectPolicy) => {
@@ -177,10 +178,6 @@ export function WorkflowsAutomationTab({
     reorderStep
   });
 
-  const deleteStep = (index: number) => {
-    updateSelected({ steps: selected?.steps.filter((_, stepIndex) => stepIndex !== index) ?? [] });
-  };
-
   const canAddFirstPolicy = Boolean(defaultAction && (config.actions.find((action) => action.id === defaultAction)?.agentIds.length ?? 0) > 0);
   const canAddPolicyForEvent = (policy?: ProjectPolicy) => {
     const action = policy?.action || defaultAction;
@@ -212,10 +209,8 @@ export function WorkflowsAutomationTab({
           onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
           onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
           onPolicyChange={updateStep}
-          onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action })}
-          onSavePolicy={() => void saveWorkflowPolicyEdit()}
+          onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action }, { autoSave: true })}
           onEditPolicy={setEditingPolicyIndex}
-          onDeleteStep={deleteStep}
           onAddPolicyStep={addPolicyStep}
         />
       ) : <EmptyState title="No workflow selected." />}

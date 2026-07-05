@@ -15,11 +15,15 @@ export function WorkflowPolicyNode({
   record: WorkflowStepRecord;
 }) {
   const stepDragClass = cn(
-    "cursor-grab select-none active:cursor-grabbing",
+    "w-full cursor-grab select-none active:cursor-grabbing",
     context.draggedStepIndex === record.index && "opacity-60",
     context.dragOverStepIndex === record.index && context.draggedStepIndex !== record.index && "ring-2 ring-primary/20"
   );
   const title = record.policy?.action || record.policyId || "No policy";
+  const openActionEditor = () => {
+    if (!record.policy) return;
+    context.onEditPolicy(record.index);
+  };
 
   return (
     <div
@@ -34,6 +38,7 @@ export function WorkflowPolicyNode({
         data-workflow-node
         aria-label={`Policy: ${record.policyId || "No policy"}`}
         title={title}
+        onClick={openActionEditor}
         className="nodrag nopan flex h-[22px] w-full min-w-0 items-center gap-1 rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80"
       >
         <span className="shrink-0 text-foreground">then:</span>

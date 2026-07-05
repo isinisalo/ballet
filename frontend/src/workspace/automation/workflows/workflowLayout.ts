@@ -14,9 +14,6 @@ export type WorkflowLayoutDirection = "horizontal" | "vertical";
 export type WorkflowCanvasNodeKind =
   | "trigger"
   | "policy"
-  | "save-policy"
-  | "edit-policy"
-  | "delete-policy"
   | "output-event"
   | "gate-output"
   | "first-policy-ghost";
@@ -372,11 +369,8 @@ export function calculateWorkflowCanvasLayout({
     targetHandleId
   }).forEach(addCanvasEdge);
 
-  const positionedNodes = positionWorkflowNodes([...nodeDrafts.values()], dagreEdges, direction);
-  const actionNodes = positionedNodes.flatMap((node) => actionNodesForPolicy(node, editingPolicyIndex));
-
   return {
-    nodes: [...positionedNodes, ...actionNodes],
+    nodes: positionWorkflowNodes([...nodeDrafts.values()], dagreEdges, direction),
     edges: canvasEdges,
     direction
   };
@@ -590,7 +584,7 @@ function workflowLayoutMetrics(
 }
 
 export function workflowPolicyStackHeight() {
-  return workflowNodeSizes.policy.height + workflowNodeSizes.action.height + 12;
+  return workflowNodeSizes.policy.height;
 }
 
 function workflowGateOutputNodeWidth(outputId: string) {
@@ -859,39 +853,4 @@ function workflowDagrePositions(nodes: WorkflowCanvasLayoutNodeDraft[], edges: W
     const dagreNode = graph.node(node.key) as { x: number; y: number } | undefined;
     return [node.key, { x: dagreNode?.x ?? 0, y: dagreNode?.y ?? 0 }];
   }));
-}
-
-function actionNodesForPolicy(node: WorkflowCanvasLayoutNode, editingPolicyIndex: number | null): WorkflowCanvasLayoutNode[] {
-  if (node.kind !== "policy" || !node.record) return [];
-
-  const deleteX = node.x + node.width - workflowNodeSizes.action.width;
-  const editX = deleteX - workflowNodeSizes.action.width - 6;
-  const actionY = node.y + workflowNodeSizes.policy.height + 6;
-  const isEditingPolicy = editingPolicyIndex === node.record.index;
-  const saveOrEdit: WorkflowCanvasLayoutNode = {
-    key: isEditingPolicy ? `save-${node.record.index}` : `edit-${node.record.index}`,
-    kind: isEditingPolicy ? "save-policy" : "edit-policy",
-    x: isEditingPolicy ? deleteX : editX,
-    y: actionY,
-    width: workflowNodeSizes.action.width,
-    height: workflowNodeSizes.action.height,
-    direction: node.direction,
-    record: node.record
-  };
-
-  if (isEditingPolicy) return [saveOrEdit];
-
-  return [
-    saveOrEdit,
-    {
-      key: `delete-${node.record.index}`,
-      kind: "delete-policy",
-      x: deleteX,
-      y: actionY,
-      width: workflowNodeSizes.action.width,
-      height: workflowNodeSizes.action.height,
-      direction: node.direction,
-      record: node.record
-    }
-  ];
 }
