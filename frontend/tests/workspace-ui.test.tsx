@@ -234,6 +234,7 @@ const updateProjectTreeDocument = (
 
 function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
   let agentCounter = data.agents.length + 1;
+  let projectDocumentCounter = 1;
   let failNextSave = options.failNextSave ?? false;
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -352,6 +353,17 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
       return saved ? jsonResponse(saved) : jsonResponse({ error: "Document not found" }, { status: 404 });
     }
 
+    if (url === "/api/project-documents/create" && method === "POST") {
+      const incoming = body as { directoryPath: string; title: string };
+      const relativePath = `${incoming.directoryPath}/${slug(incoming.title)}-${projectDocumentCounter++}.md`;
+      const document = documentTreeFile("project", incoming.title, relativePath).document;
+      const directory = data.projectDocumentTree?.find((node) =>
+        node.type === "directory" && node.relativePath === incoming.directoryPath
+      );
+      if (directory?.type === "directory") directory.children.push({ type: "file", label: incoming.title, document });
+      return jsonResponse(document, { status: 201 });
+    }
+
     return jsonResponse({ error: `Unhandled ${method} ${url}` }, { status: 404 });
   });
 
@@ -449,8 +461,8 @@ describe("workspace entity UI flows", () => {
   });
 
   it.each([
-    { route: "/projects/project-1/adrs", title: "ADR One", relativePath: ".ballet/adr/one.md" },
-    { route: "/projects/project-1/goals", title: "Goal One", relativePath: ".ballet/goals/one.md" }
+    { route: "/projects/project-1/adrs?path=.ballet%2Fadr%2Fone.md", title: "ADR One", relativePath: ".ballet/adr/one.md" },
+    { route: "/projects/project-1/goals?path=.ballet%2Fgoals%2Fone.md", title: "Goal One", relativePath: ".ballet/goals/one.md" }
   ])("renders the Markdown workbench for $route and saves the selected document", async ({ route, title, relativePath }) => {
     const user = userEvent.setup();
     const { data, fetchMock } = await renderRoute(route, dataWithProjectDocumentTree());
@@ -478,9 +490,36 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
+  it("creates project documents from collection routes without header plus actions", async () => {
+    const user = userEvent.setup();
+    const { data, fetchMock } = await renderRoute("/projects/project-1/goals", dataWithProjectDocumentTree());
+
+    const frontmatter = screen.getByLabelText(/yaml frontmatter/i);
+    const markdownBody = screen.getByLabelText(/markdown body/i);
+    expect(frontmatter).toHaveValue("title: \"\"");
+    expect(markdownBody).toHaveValue("");
+    expect(screen.queryByRole("button", { name: "New goal" })).not.toBeInTheDocument();
+
+    fireEvent.change(frontmatter, { target: { value: "title: Launch Plan" } });
+    await user.type(markdownBody, "# Launch Plan\n\nShip it.");
+    await user.click(screen.getByRole("button", { name: "Save Markdown" }));
+
+    await waitFor(() => expect(data.projectDocumentTree?.some((node) =>
+      node.type === "directory" && node.relativePath === ".ballet/goals" && node.children.some((child) =>
+        child.type === "file" && child.document.relativePath === ".ballet/goals/launch-plan-1.md" && child.document.body === "# Launch Plan\n\nShip it."
+      )
+    )).toBe(true));
+    expect(window.location.pathname).toBe("/projects/project-1/goals");
+    expect(window.location.search).toBe("?path=.ballet%2Fgoals%2Flaunch-plan-1.md");
+    expect(fetchMock).toHaveBeenCalledWith("/api/project-documents/create", expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining("\"title\":\"Launch Plan\"")
+    }));
+  });
+
   it("renders, previews, and saves skills through the Markdown workbench", async () => {
     const user = userEvent.setup();
-    const { data, fetchMock } = await renderRoute("/skills", dataWithSkill());
+    const { data, fetchMock } = await renderRoute("/skills?path=.agents%2Fskills%2Ffixture-skill%2FSKILL.md", dataWithSkill());
 
     const frontmatter = screen.getByLabelText(/yaml frontmatter/i);
     const markdownBody = screen.getByLabelText(/markdown body/i);
@@ -536,12 +575,12 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const { data } = await renderRoute("/skills", dataWithSkill());
 
-    await user.click(screen.getByRole("button", { name: "New" }));
     expect(screen.getByLabelText(/yaml frontmatter/i)).toHaveValue("name: \"\"\ndescription: \"\"");
     expect(screen.getByLabelText(/markdown body/i)).toHaveValue("");
     expect(screen.queryByRole("button", { name: "Delete skill" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New" })).not.toBeInTheDocument();
 
-    await renderRoute("/skills", data);
+    await renderRoute("/skills?path=.agents%2Fskills%2Ffixture-skill%2FSKILL.md", data);
     await confirmDelete(user, "Delete skill");
 
     await waitFor(() => expect(data.skills).toHaveLength(0));
@@ -550,7 +589,7 @@ describe("workspace entity UI flows", () => {
 
   it("defaults automation to workflows and locks policy input fields on the canvas", async () => {
     const user = userEvent.setup();
-    const { data } = await renderRoute("/automation");
+    const { data } = await renderRoute("/automation/workflows?id=workflow-1");
 
     expect(screen.queryByRole("tab", { name: /events/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /add event/i })).not.toBeInTheDocument();
@@ -671,7 +710,7 @@ describe("workspace entity UI flows", () => {
     const legacyData = baseData();
     delete (legacyData.automation as Partial<ProjectAutomationConfig>).outputs;
 
-    await renderRoute("/automation", legacyData);
+    await renderRoute("/automation/workflows?id=workflow-1", legacyData);
 
     expect(screen.getByRole("link", { name: "Outputs" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Actions" })).toBeInTheDocument();
@@ -723,19 +762,12 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const { data, fetchMock } = await renderRoute("/automation/workflows");
 
-    await user.click(screen.getByRole("button", { name: "Add workflow" }));
-
-    const workflowNameInput = screen.getByLabelText("Workflow name");
-    const saveWorkflowButton = screen.getByRole("button", { name: "Save workflow" });
+    expect(screen.queryByRole("button", { name: "Add workflow" })).not.toBeInTheDocument();
+    const workflowNameInput = screen.getByLabelText("Workflow ID");
     expect(workflowNameInput).toHaveValue("");
-    expect(saveWorkflowButton).toBeDisabled();
-    await user.type(workflowNameInput, "workflow-1");
-    expect(saveWorkflowButton).toBeDisabled();
-    await user.clear(workflowNameInput);
-    await user.type(workflowNameInput, "release-flow");
-    expect(saveWorkflowButton).toBeEnabled();
+    fireEvent.change(workflowNameInput, { target: { value: "release-flow" } });
 
-    await user.click(saveWorkflowButton);
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.workflows.some((workflow) =>
       workflow.id === "release-flow" &&
@@ -773,7 +805,7 @@ describe("workspace entity UI flows", () => {
       outputIds: ["complete"],
       agentIds: ["agent-2"]
     });
-    const { data, fetchMock } = await renderRoute("/automation/workflows", workflowData);
+    const { data, fetchMock } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
     expect(screen.queryByRole("button", { name: "Delete workflow" })).not.toBeInTheDocument();
     const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
@@ -805,13 +837,9 @@ describe("workspace entity UI flows", () => {
 
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Actions" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Implement work")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Add action" }));
-    await screen.findByDisplayValue("New action");
-    await user.clear(screen.getByLabelText("Action ID"));
+    expect(screen.queryByDisplayValue("Implement work")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add action" })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText("Action ID"), "review-pass");
-    await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Review output");
     expect(screen.getByDisplayValue("Review output")).toBeInTheDocument();
     await user.click(screen.getByRole("combobox", { name: "Add output" }));
@@ -822,11 +850,12 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => expect(data.automation.actions.some((action) =>
       action.id === "review-pass" &&
       action.description === "Review output" &&
-      action.outputIds.join(",") === "failed,summary" &&
+      action.outputIds.join(",") === "summary" &&
       action.agentIds.join(",") === "agent-1"
     )).toBe(true));
 
     await user.click(screen.getByRole("link", { name: "Workflows" }));
+    await user.click(screen.getByRole("link", { name: "workflow-1" }));
     await user.click(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
     await user.selectOptions(screen.getByLabelText("Workflow policy action"), "review-pass");
     await waitFor(() => expect(data.automation.policies[0]?.action).toBe("review-pass"));
@@ -836,16 +865,13 @@ describe("workspace entity UI flows", () => {
 
   it("creates, edits, deletes, and saves automation outputs", async () => {
     const user = userEvent.setup();
-    const { data } = await renderRoute("/automation/outputs?id=summary");
+    const { data } = await renderRoute("/automation/outputs");
 
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Outputs" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Summarize implementation output")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Output type" })).toHaveTextContent("Gate");
+    expect(screen.queryByDisplayValue("Summarize implementation output")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add output" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add output" }));
-    await screen.findByDisplayValue("New output");
-    await user.clear(screen.getByLabelText("Output ID"));
     await user.type(screen.getByLabelText("Output ID"), "review-notes");
     expect(screen.getByRole("combobox", { name: "Output type" })).toHaveTextContent("Event");
     await user.click(screen.getByRole("combobox", { name: "Output type" }));
@@ -866,7 +892,7 @@ describe("workspace entity UI flows", () => {
     const workflowData = baseData();
     workflowData.automation.actions[0]!.outputIds = ["failed", "summary"];
 
-    await renderRoute("/automation/workflows", workflowData);
+    await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
     const outputEvent = screen.getByRole("button", { name: "Add policy step for implementation.failed" });
     const gateOutput = screen.getByLabelText("Gate: summary");
@@ -904,10 +930,9 @@ describe("workspace entity UI flows", () => {
       "on.implementation.failed.start.implementation",
       "on.implementation.complete.start.review"
     ];
-    const { data } = await renderRoute("/automation/actions", workflowData);
+    const { data } = await renderRoute("/automation/actions?id=implementation", workflowData);
 
-    await user.clear(screen.getByLabelText("Action ID"));
-    await user.type(screen.getByLabelText("Action ID"), "implement");
+    fireEvent.change(screen.getByLabelText("Action ID"), { target: { value: "implement" } });
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.actions[0]?.id).toBe("implement"));
@@ -934,12 +959,10 @@ describe("workspace entity UI flows", () => {
 
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Triggers" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Manual workflow start")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Manual workflow start")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add trigger" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add trigger" }));
-    await user.clear(screen.getByLabelText("Trigger ID"));
     await user.type(screen.getByLabelText("Trigger ID"), "release-ready");
-    await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Release can start.");
     expect(screen.getByLabelText("Trigger ID")).toHaveValue("release-ready");
     await user.click(screen.getByRole("button", { name: "Save automation" }));
@@ -972,7 +995,7 @@ describe("workspace entity UI flows", () => {
       outputIds: ["complete"],
       agentIds: ["agent-2"]
     });
-    const { data } = await renderRoute("/automation/policies", workflowData);
+    const { data } = await renderRoute("/automation/policies?id=workflow-1", workflowData);
 
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
@@ -1031,7 +1054,7 @@ describe("workspace entity UI flows", () => {
     }];
     workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
 
-    await renderRoute("/automation/workflows", workflowData);
+    await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
     expect(screen.getByLabelText("Policy: on.implementation.complete.start.review")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add policy step for implementation.complete" })).not.toBeInTheDocument();
@@ -1067,7 +1090,7 @@ describe("workspace entity UI flows", () => {
     }];
     workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
 
-    await renderRoute("/automation/workflows", workflowData);
+    await renderRoute("/automation/workflows?id=workflow-1", workflowData);
     await screen.findByLabelText("Policy: on.review.rejected.start.implementation");
 
     await waitFor(() => {
@@ -1111,7 +1134,7 @@ describe("workspace entity UI flows", () => {
     }];
     workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
 
-    await renderRoute("/automation/workflows", workflowData);
+    await renderRoute("/automation/workflows?id=workflow-1", workflowData);
     await screen.findByLabelText("Policy: on.implementation.complete.start.review");
 
     await waitFor(() => {
@@ -1142,7 +1165,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Workflow ID")).toHaveValue("");
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
   });
 
@@ -1154,7 +1177,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByText("Run detail")).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Workflow ID")).toHaveValue("");
   });
 
   it("creates the first workflow policy from the workflow canvas", async () => {
@@ -1162,7 +1185,7 @@ describe("workspace entity UI flows", () => {
     const workflowData = baseData();
     workflowData.automation.policies = [];
     workflowData.automation.workflows[0]!.steps = [];
-    const { data } = await renderRoute("/automation/workflows", workflowData);
+    const { data } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
     await user.click(screen.getByRole("button", { name: "Add first policy" }));
     await user.click(screen.getByRole("button", { name: "Save automation" }));
@@ -1192,12 +1215,12 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("link", { name: "Agents" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Skills" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Runtimes" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "Add runtime" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Runtime ID")).toHaveValue("runtime-1");
-    expect(screen.getByLabelText("Title")).toHaveValue("codex-cli");
+    expect(screen.queryByRole("button", { name: "Add runtime" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Runtime ID")).toHaveValue("");
+    expect(screen.getByLabelText("Title")).toHaveValue("");
 
-    await renderRoute("/automation/runtimes");
-    expect(screen.getByRole("button", { name: "Add runtime" })).toBeInTheDocument();
+    await renderRoute("/automation/runtimes?id=runtime-1");
+    expect(screen.queryByRole("button", { name: "Add runtime" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Runtime ID")).toHaveValue("runtime-1");
   });
 

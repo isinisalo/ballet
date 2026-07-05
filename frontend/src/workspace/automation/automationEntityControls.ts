@@ -19,7 +19,7 @@ type ControlsInput = {
 type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
 
 const selectedCollectionId = <T extends { id: string }>(isActive: boolean, selectedId: string | undefined, items: T[]) =>
-  isActive ? selectedId ?? items[0]?.id ?? "" : items[0]?.id ?? "";
+  isActive && items.some((item) => item.id === selectedId) ? selectedId : undefined;
 
 const selectedEntityIds = (activeTab: AutomationTab, selectedId: string | undefined, draft: ProjectAutomationConfig) => ({
   selectedTriggerId: selectedCollectionId(activeTab === "triggers", selectedId, draft.triggers),
@@ -95,7 +95,7 @@ const deleteEntityConfig = (
   const { activeTab, draft, setDraft } = input;
   switch (activeTab) {
     case "triggers": {
-      const selected = draft.triggers.find((trigger) => trigger.id === ids.selectedTriggerId) ?? draft.triggers[0];
+      const selected = draft.triggers.find((trigger) => trigger.id === ids.selectedTriggerId);
       return {
         label: "Delete trigger",
         type: "trigger",
@@ -110,7 +110,7 @@ const deleteEntityConfig = (
       };
     }
     case "actions": {
-      const selected = draft.actions.find((action) => action.id === ids.selectedActionId) ?? draft.actions[0];
+      const selected = draft.actions.find((action) => action.id === ids.selectedActionId);
       return {
         label: "Delete action",
         type: "action",
@@ -125,7 +125,7 @@ const deleteEntityConfig = (
       };
     }
     case "outputs": {
-      const selected = draft.outputs.find((output) => output.id === ids.selectedOutputId) ?? draft.outputs[0];
+      const selected = draft.outputs.find((output) => output.id === ids.selectedOutputId);
       const deleteWouldEmptyAction = Boolean(selected && draft.actions.some((action) =>
         action.outputIds.includes(selected.id) && action.outputIds.length <= 1
       ));
@@ -150,7 +150,7 @@ const deleteEntityConfig = (
       };
     }
     case "workflows": {
-      const selected = draft.workflows.find((workflow) => workflow.id === ids.selectedWorkflowId) ?? draft.workflows[0];
+      const selected = draft.workflows.find((workflow) => workflow.id === ids.selectedWorkflowId);
       return {
         label: "Delete workflow",
         type: "workflow",

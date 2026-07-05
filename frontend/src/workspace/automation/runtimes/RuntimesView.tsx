@@ -1,9 +1,10 @@
-import { Code2, Plus, Save } from "lucide-react";
+import { useState } from "react";
+import { Code2, Save } from "lucide-react";
 import type { AppData, ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
 import { HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import { runtimePath } from "../../routing";
-import { uniqueAutomationId } from "../automationUtils";
+import { editablePolicyToken } from "../automationUtils";
 import { AutomationIssues } from "../AutomationIssues";
 import { useAutomationDraft } from "../useAutomationDraft";
 import { RuntimesEditor } from "./RuntimesEditor";
@@ -23,17 +24,29 @@ export function RuntimesView({
     automation: data.automation,
     saveAutomation
   });
+  const [newRuntime, setNewRuntime] = useState({ id: "", title: "", command: "codex", args: [] as string[] });
 
-  const selectedRuntimeId = selectedId ?? draft.runtimes[0]?.id ?? "";
-  const selectedRuntime = draft.runtimes.find((runtime) => runtime.id === selectedRuntimeId) ?? draft.runtimes[0];
+  const selectedRuntimeId = draft.runtimes.some((runtime) => runtime.id === selectedId) ? selectedId : undefined;
+  const selectedRuntime = draft.runtimes.find((runtime) => runtime.id === selectedRuntimeId);
+  const isCreateMode = !selectedRuntime;
 
-  const addRuntime = () => {
-    const id = uniqueAutomationId("new-runtime", draft.runtimes.map((runtime) => runtime.id));
-    setDraft((current) => ({
-      ...current,
-      runtimes: [...current.runtimes, { id, title: "New runtime", command: "codex", args: [] }]
-    }));
-    navigate(runtimePath(id));
+  const saveRuntimesFromHeader = async () => {
+    if (!isCreateMode) {
+      await saveDraft();
+      return;
+    }
+    const id = editablePolicyToken(newRuntime.id);
+    if (!id || draft.runtimes.some((runtime) => runtime.id === id)) return;
+    const nextDraft = {
+      ...draft,
+      runtimes: [...draft.runtimes, { ...newRuntime, id, title: newRuntime.title || id }]
+    };
+    setDraft(nextDraft);
+    const saved = await saveDraft(nextDraft);
+    if (saved) {
+      setNewRuntime({ id: "", title: "", command: "codex", args: [] });
+      navigate(runtimePath(id));
+    }
   };
 
   const removeSelectedRuntime = () => {
@@ -53,12 +66,9 @@ export function RuntimesView({
         icon={<Code2 data-icon="inline-start" />}
         action={(
           <div className="flex items-center justify-end gap-2">
-            <Button type="button" size="icon-sm" variant="outline" aria-label="Add runtime" title="Add runtime" onClick={addRuntime}>
-              <Plus data-icon="inline-start" />
-            </Button>
             <HeaderCrudActions
               saveAction={(
-                <Button type="button" size="icon-sm" aria-label="Save runtimes" title="Save runtimes" onClick={() => void saveDraft()}>
+                <Button type="button" size="icon-sm" aria-label="Save runtimes" title="Save runtimes" onClick={() => void saveRuntimesFromHeader()}>
                   <Save data-icon="inline-start" />
                 </Button>
               )}
@@ -73,7 +83,7 @@ export function RuntimesView({
       >
         <div className="grid gap-4">
           <AutomationIssues issues={data.automationIssues} />
-          <RuntimesEditor config={draft} selectedId={selectedRuntimeId} onSelect={(id) => navigate(runtimePath(id))} updateConfig={updateConfig} />
+          <RuntimesEditor config={draft} selectedId={selectedRuntimeId} createDraft={newRuntime} onCreateDraftChange={(patch) => setNewRuntime((current) => ({ ...current, ...patch }))} onSelect={(id) => navigate(runtimePath(id))} updateConfig={updateConfig} />
         </div>
       </Panel>
     </div>

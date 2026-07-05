@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Menu } from "lucide-react";
 import {
   findProjectTreeDirectory,
   findProjectTreeDocument,
   selectedProjectTreeDocument
 } from "./documents/projectDocuments";
-import { type ProjectDocumentCreateKind } from "./types";
 import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
 import { AppSidebar } from "./layout/AppSidebar";
 import { AgentsView } from "./agents/AgentsView";
@@ -32,12 +31,10 @@ import {
   ProjectDocumentPage,
   ProjectsOverview
 } from "./documents/ProjectDocumentPages";
-import { CreateProjectDocumentDialog } from "./documents/CreateProjectDocumentDialog";
 
 export function WorkspaceShell() {
   const { notifications, notify } = useNotifications();
   const { route, navigate } = useWorkspaceNavigation();
-  const [createDocumentKind, setCreateDocumentKind] = useState<ProjectDocumentCreateKind | null>(null);
   const { data, loading, refresh, selectedProjectId } = useWorkspaceData({ notify, routeProjectId: route.projectId });
 
   const project = data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId)) ?? data.projects.find((item) => item.id === selectedProjectId) ?? data.projects[0];
@@ -59,15 +56,15 @@ export function WorkspaceShell() {
     [projectDocumentTree]
   );
   const selectedAdr = useMemo(
-    () => selectedProjectTreeDocument(adrDirectory, route.documentPath),
+    () => route.documentPath ? selectedProjectTreeDocument(adrDirectory, route.documentPath) : undefined,
     [adrDirectory, route.documentPath]
   );
   const selectedGoal = useMemo(
-    () => selectedProjectTreeDocument(goalsDirectory, route.documentPath),
+    () => route.documentPath ? selectedProjectTreeDocument(goalsDirectory, route.documentPath) : undefined,
     [goalsDirectory, route.documentPath]
   );
   const selectedInstruction = useMemo(
-    () => selectedProjectTreeDocument(instructionsDirectory, route.documentPath),
+    () => route.documentPath ? selectedProjectTreeDocument(instructionsDirectory, route.documentPath) : undefined,
     [instructionsDirectory, route.documentPath]
   );
   const selectedAgent = useMemo(
@@ -77,7 +74,7 @@ export function WorkspaceShell() {
     [data.agents, route.documentPath, route.view]
   );
   const selectedSkill = useMemo(
-    () => data.skills.find((skill) => skill.relativePath === route.documentPath) ?? data.skills[0],
+    () => route.documentPath ? data.skills.find((skill) => skill.relativePath === route.documentPath) : undefined,
     [data.skills, route.documentPath]
   );
 
@@ -120,23 +117,16 @@ export function WorkspaceShell() {
                   saveProjectDocument={saveProjectDocument}
                 />
               ) : null}
-              {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} onCreateDocument={setCreateDocumentKind} /> : null}
-              {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} saveProjectDocument={saveProjectDocument} onCreateDocument={setCreateDocumentKind} /> : null}
-              {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} saveProjectDocument={saveProjectDocument} onCreateDocument={setCreateDocumentKind} /> : null}
-              {route.view === "project-instructions" ? <InstructionsPage project={project} selectedInstruction={selectedInstruction} onCreateDocument={setCreateDocumentKind} /> : null}
+              {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} /> : null}
+              {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} saveProjectDocument={saveProjectDocument} createProjectDocument={createProjectDocument} /> : null}
+              {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} saveProjectDocument={saveProjectDocument} createProjectDocument={createProjectDocument} /> : null}
+              {route.view === "project-instructions" ? <InstructionsPage project={project} selectedInstruction={selectedInstruction} saveProjectDocument={saveProjectDocument} createProjectDocument={createProjectDocument} /> : null}
               {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "workflows"} selectedId={route.automationEntityId} saveAutomation={saveAutomation} navigate={navigate} /> : null}
               {route.view === "runtimes" ? <RuntimesView data={data} selectedId={route.runtimeId} saveAutomation={saveAutomation} navigate={navigate} /> : null}
               {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
               {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
             </main>
           </ScrollArea>
-          <CreateProjectDocumentDialog
-            kind={createDocumentKind}
-            onOpenChange={(open) => {
-              if (!open) setCreateDocumentKind(null);
-            }}
-            onCreate={createProjectDocument}
-          />
         </SidebarInset>
       </SidebarProvider>
   );

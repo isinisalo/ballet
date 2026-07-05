@@ -1,41 +1,61 @@
-import { useEffect, useId, useState } from "react";
-import { Plus } from "lucide-react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { MarkdownDocument } from "../../../../shared/api/workspace-contracts";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/workspace-ui";
 import { frontmatterToYaml, parseFrontmatterYaml } from "./frontmatter";
 import { MarkdownWorkbench } from "./MarkdownWorkbench";
 import { type MarkdownEntity } from "./markdownDocument";
-import { createKindForProjectDocument, projectDocumentCreateConfig } from "./projectDocuments";
 import type { ProjectDocumentCreateKind } from "../types";
 
 export function ProjectMarkdownEditorView({
   document,
   emptyTitle,
   saveProjectDocument,
-  onCreateDocument
+  createProjectDocument,
+  createKind
 }: {
   document?: MarkdownEntity;
   emptyTitle: string;
   saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
-  onCreateDocument?: (kind: ProjectDocumentCreateKind) => void;
+  createProjectDocument?: (kind: ProjectDocumentCreateKind, title: string) => Promise<MarkdownDocument>;
+  createKind?: ProjectDocumentCreateKind;
 }) {
   const formId = useId();
-  const [frontmatterText, setFrontmatterText] = useState(frontmatterToYaml(document?.frontmatter));
+  const creating = !document && Boolean(createKind && createProjectDocument);
+  const createDocument = useMemo<MarkdownEntity | undefined>(() => creating ? {
+    id: `new-${createKind}`,
+    frontmatter: { title: "" },
+    body: "",
+    relativePath: "",
+    errors: []
+  } : undefined, [createKind, creating]);
+  const activeDocument = document ?? createDocument;
+  const [frontmatterText, setFrontmatterText] = useState(frontmatterToYaml(activeDocument?.frontmatter));
   const [bodyText, setBodyText] = useState(document?.body ?? "");
   const [validationError, setValidationError] = useState("");
 
   useEffect(() => {
-    setFrontmatterText(frontmatterToYaml(document?.frontmatter));
-    setBodyText(document?.body ?? "");
+    setFrontmatterText(frontmatterToYaml(activeDocument?.frontmatter));
+    setBodyText(activeDocument?.body ?? "");
     setValidationError("");
-  }, [document]);
+  }, [activeDocument]);
 
   const handleSave = async () => {
-    if (!document?.relativePath) return;
-
     try {
       const frontmatter = parseFrontmatterYaml(frontmatterText);
+      if (creating) {
+        if (!createKind || !createProjectDocument) return;
+        const title = titleFromFrontmatter(frontmatter);
+        if (!title) throw new Error("Document frontmatter title or name is required.");
+        const created = await createProjectDocument(createKind, title);
+        await saveProjectDocument({
+          relativePath: created.relativePath,
+          frontmatter,
+          body: bodyText
+        });
+        setValidationError("");
+        return;
+      }
+      if (!document?.relativePath) return;
       setValidationError("");
       await saveProjectDocument({
         relativePath: document.relativePath,
@@ -47,27 +67,28 @@ export function ProjectMarkdownEditorView({
     }
   };
 
-  if (!document) return <EmptyState title={emptyTitle} />;
-  const createKind = createKindForProjectDocument(document.relativePath);
-  const createConfig = createKind ? projectDocumentCreateConfig[createKind] : undefined;
+  if (!activeDocument) return <EmptyState title={emptyTitle} />;
 
   return (
     <MarkdownWorkbench
-      document={document}
+      document={activeDocument}
       emptyTitle={emptyTitle}
       formId={formId}
       saveLabel="Save Markdown"
       frontmatterText={frontmatterText}
       bodyText={bodyText}
       validationError={validationError}
-      headerActions={createKind && createConfig && onCreateDocument ? (
-        <Button type="button" size="icon-sm" variant="outline" aria-label={createConfig.label} title={createConfig.label} onClick={() => onCreateDocument(createKind)}>
-          <Plus data-icon="inline-start" />
-        </Button>
-      ) : null}
       onFrontmatterChange={setFrontmatterText}
       onBodyChange={setBodyText}
       onSubmit={handleSave}
     />
   );
 }
+
+const titleFromFrontmatter = (frontmatter: Record<string, unknown>) => {
+  const title = frontmatter.title;
+  if (typeof title === "string" && title.trim()) return title.trim();
+  const name = frontmatter.name;
+  if (typeof name === "string" && name.trim()) return name.trim();
+  return "";
+};

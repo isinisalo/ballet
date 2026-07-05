@@ -1,20 +1,18 @@
-import type { ReactNode } from "react";
-import { FileText, Plus } from "lucide-react";
 import type { MarkdownDocument, Project } from "../../../../shared/api/workspace-contracts";
-import { Button } from "@/components/ui/button";
-import { EmptyState, Panel } from "@/components/shared/workspace-ui";
-import { MarkdownDocumentView } from "./MarkdownDocumentView";
+import { EmptyState } from "@/components/shared/workspace-ui";
 import { ProjectMarkdownEditorView } from "./ProjectMarkdownEditorView";
 import { type MarkdownEntity } from "./markdownDocument";
-import { projectDocumentCreateConfig } from "./projectDocuments";
 import type { ProjectDocumentCreateKind } from "../types";
+
+type SaveProjectDocument = (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+type CreateProjectDocument = (kind: ProjectDocumentCreateKind, title: string) => Promise<MarkdownDocument>;
 
 export function ProjectsOverview({
   project,
   saveProjectDocument
 }: {
   project?: Project;
-  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
+  saveProjectDocument: SaveProjectDocument;
 }) {
   return (
     <ProjectMarkdownEditorView document={project} emptyTitle="No project document found." saveProjectDocument={saveProjectDocument} />
@@ -23,15 +21,13 @@ export function ProjectsOverview({
 
 export function ProjectDocumentPage({
   document,
-  saveProjectDocument,
-  onCreateDocument
+  saveProjectDocument
 }: {
   document?: MarkdownDocument;
-  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
-  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
+  saveProjectDocument: SaveProjectDocument;
 }) {
   return (
-    <ProjectMarkdownEditorView document={document} emptyTitle="No project document selected." saveProjectDocument={saveProjectDocument} onCreateDocument={onCreateDocument} />
+    <ProjectMarkdownEditorView document={document} emptyTitle="No project document selected." saveProjectDocument={saveProjectDocument} />
   );
 }
 
@@ -39,12 +35,12 @@ export function GoalsPage({
   project,
   selectedGoal,
   saveProjectDocument,
-  onCreateDocument
+  createProjectDocument
 }: {
   project?: Project;
   selectedGoal?: MarkdownEntity;
-  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
-  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
+  saveProjectDocument: SaveProjectDocument;
+  createProjectDocument: CreateProjectDocument;
 }) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading GOALS." />;
 
@@ -53,7 +49,8 @@ export function GoalsPage({
       document={selectedGoal}
       emptyTitle="No Goal document selected."
       saveProjectDocument={saveProjectDocument}
-      onCreateDocument={onCreateDocument}
+      createProjectDocument={createProjectDocument}
+      createKind="goal"
     />
   );
 }
@@ -62,12 +59,12 @@ export function AdrsPage({
   project,
   selectedAdr,
   saveProjectDocument,
-  onCreateDocument
+  createProjectDocument
 }: {
   project?: Project;
   selectedAdr?: MarkdownEntity;
-  saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
-  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
+  saveProjectDocument: SaveProjectDocument;
+  createProjectDocument: CreateProjectDocument;
 }) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading ADRs." />;
 
@@ -76,7 +73,8 @@ export function AdrsPage({
       document={selectedAdr}
       emptyTitle="No ADR document selected."
       saveProjectDocument={saveProjectDocument}
-      onCreateDocument={onCreateDocument}
+      createProjectDocument={createProjectDocument}
+      createKind="adr"
     />
   );
 }
@@ -84,55 +82,23 @@ export function AdrsPage({
 export function InstructionsPage({
   project,
   selectedInstruction,
-  onCreateDocument
+  saveProjectDocument,
+  createProjectDocument
 }: {
   project?: Project;
   selectedInstruction?: MarkdownEntity;
-  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
+  saveProjectDocument: SaveProjectDocument;
+  createProjectDocument: CreateProjectDocument;
 }) {
   if (!project) return <EmptyState title="No project selected." action="Open the Project page before reading instructions." />;
 
   return (
-    <CollectionDocumentPanel
-      title="Instructions"
-      icon={<FileText data-icon="inline-start" />}
+    <ProjectMarkdownEditorView
       document={selectedInstruction}
       emptyTitle="No instruction document selected."
+      saveProjectDocument={saveProjectDocument}
+      createProjectDocument={createProjectDocument}
       createKind="instruction"
-      onCreateDocument={onCreateDocument}
     />
-  );
-}
-
-export function CollectionDocumentPanel({
-  title,
-  icon,
-  document,
-  emptyTitle,
-  createKind,
-  onCreateDocument
-}: {
-  title: string;
-  icon: ReactNode;
-  document?: MarkdownEntity;
-  emptyTitle: string;
-  createKind: ProjectDocumentCreateKind;
-  onCreateDocument: (kind: ProjectDocumentCreateKind) => void;
-}) {
-  const createConfig = projectDocumentCreateConfig[createKind];
-
-  return (
-    <Panel
-      title={title}
-      icon={icon}
-      compact
-      action={(
-        <Button type="button" size="icon-sm" variant="outline" aria-label={createConfig.label} title={createConfig.label} onClick={() => onCreateDocument(createKind)}>
-          <Plus data-icon="inline-start" />
-        </Button>
-      )}
-    >
-      <MarkdownDocumentView document={document} emptyTitle={emptyTitle} compact embedded />
-    </Panel>
   );
 }

@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { X } from "lucide-react";
 import type { Agent, ProjectAction, ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
-import { EmptyState, TextAreaField, TextField } from "@/components/shared/workspace-ui";
+import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -14,21 +14,28 @@ export function ActionsAutomationTab({
   agents,
   config,
   selectedId,
+  createDraft,
+  onCreateDraftChange,
   onSelect,
   updateConfig
 }: {
   agents: Agent[];
   config: ProjectAutomationConfig;
-  selectedId: string;
+  selectedId?: string;
+  createDraft: ProjectAction;
+  onCreateDraftChange: (patch: Partial<ProjectAction>) => void;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
 }) {
-  const lastSelectedIndexRef = useRef(0);
   const foundSelectedIndex = config.actions.findIndex((action) => action.id === selectedId);
+  const lastSelectedIndexRef = useRef<number | undefined>(foundSelectedIndex >= 0 ? foundSelectedIndex : undefined);
   const selectedIndex = foundSelectedIndex >= 0
     ? foundSelectedIndex
-    : Math.min(lastSelectedIndexRef.current, Math.max(0, config.actions.length - 1));
-  const selected = config.actions[selectedIndex];
+    : selectedId && lastSelectedIndexRef.current !== undefined
+      ? Math.min(lastSelectedIndexRef.current, Math.max(0, config.actions.length - 1))
+      : -1;
+  const selected = selectedIndex >= 0 ? config.actions[selectedIndex] : createDraft;
+  const creating = selectedIndex < 0;
 
   useEffect(() => {
     if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
@@ -43,6 +50,10 @@ export function ActionsAutomationTab({
       outputIds: [...new Set(next.outputIds)].slice(0, 3),
       agentIds: [...new Set(next.agentIds)].slice(0, 5)
     };
+    if (creating) {
+      onCreateDraftChange(normalized);
+      return;
+    }
     updateConfig((current) => {
       const previousAction = current.actions[selectedIndex] ?? selected;
       const previousId = previousAction.id;
@@ -84,8 +95,8 @@ export function ActionsAutomationTab({
 
   const selectedOutputIds = selected?.outputIds ?? [];
   const selectedAgentIds = selected?.agentIds ?? [];
-  const selectableOutputs = config.outputs.filter((output) => !selectedOutputIds.includes(output.id));
-  const selectableAgents = agents.filter((agent) => !selectedAgentIds.includes(agent.id));
+  const selectableOutputs = useMemo(() => config.outputs.filter((output) => !selectedOutputIds.includes(output.id)), [config.outputs, selectedOutputIds]);
+  const selectableAgents = useMemo(() => agents.filter((agent) => !selectedAgentIds.includes(agent.id)), [agents, selectedAgentIds]);
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
   const canAddOutput = selectedOutputIds.length < 3 && selectableOutputs.length > 0;
   const canAddAgent = selectedAgentIds.length < 5 && selectableAgents.length > 0;
@@ -108,10 +119,9 @@ export function ActionsAutomationTab({
 
   return (
     <div className="grid gap-4">
-      {selected ? (
-        <FieldGroup>
-          <TextField label="Action ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-          <TextAreaField label="Description" rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
+      <FieldGroup>
+        <TextField label="Action ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
+        <TextAreaField label="Description" rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
           <Field>
             <FieldLabel>Agents</FieldLabel>
             <div className="flex min-h-7 flex-wrap items-center gap-2">
@@ -190,8 +200,7 @@ export function ActionsAutomationTab({
               </Select>
             </div>
           </Field>
-        </FieldGroup>
-      ) : <EmptyState title="No action selected." />}
+      </FieldGroup>
     </div>
   );
 }

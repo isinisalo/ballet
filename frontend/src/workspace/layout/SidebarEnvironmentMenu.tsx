@@ -24,8 +24,8 @@ function SidebarRuntimesSection({
   navigate: (path: string) => void;
 }) {
   const runtimesOpen = route.view === "runtimes";
-  const selectedId = runtimes.some((runtime) => runtime.id === route.runtimeId) ? route.runtimeId : runtimes[0]?.id ?? "";
-  const rootPath = runtimePath(selectedId || undefined);
+  const selectedId = runtimes.some((runtime) => runtime.id === route.runtimeId) ? route.runtimeId : undefined;
+  const rootPath = runtimePath();
 
   return (
     <SidebarCollapsibleLinkSection

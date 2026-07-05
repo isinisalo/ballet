@@ -31,6 +31,8 @@ export function SidebarProjectMenu({
   const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
   const projectPathFor = (kind: ProjectDocumentCreateKind) => (relativePath: string) =>
     projectId ? projectCollectionDocumentPath(projectId, kind, relativePath) : projectDocumentPath(relativePath);
+  const projectCollectionPathFor = (kind: ProjectDocumentCreateKind) =>
+    projectId ? projectCollectionDocumentPath(projectId, kind) : "/";
 
   return (
     <Collapsible defaultOpen={projectOpen} className="group/collapsible">
@@ -57,6 +59,7 @@ export function SidebarProjectMenu({
               activePath={route.documentPath}
               navigate={navigate}
               pathFor={projectPathFor("adr")}
+              rootPath={projectCollectionPathFor("adr")}
               activeView={route.view === "project-adrs"}
             />
             <SidebarProjectDirectoryMenu
@@ -66,6 +69,7 @@ export function SidebarProjectMenu({
               activePath={route.documentPath}
               navigate={navigate}
               pathFor={projectPathFor("goal")}
+              rootPath={projectCollectionPathFor("goal")}
               activeView={route.view === "project-goals"}
             />
             <SidebarProjectDirectoryMenu
@@ -75,6 +79,7 @@ export function SidebarProjectMenu({
               activePath={route.documentPath}
               navigate={navigate}
               pathFor={projectPathFor("instruction")}
+              rootPath={projectCollectionPathFor("instruction")}
               forceRender
               emptyLabel="No instructions."
               activeView={route.view === "project-instructions"}
@@ -93,6 +98,7 @@ function SidebarProjectDirectoryMenu({
   activePath,
   navigate,
   pathFor = projectDocumentPath,
+  rootPath,
   emptyLabel,
   forceRender = false,
   activeView = false
@@ -103,6 +109,7 @@ function SidebarProjectDirectoryMenu({
   activePath?: string;
   navigate: (path: string) => void;
   pathFor?: (relativePath: string) => string;
+  rootPath?: string;
   emptyLabel?: string;
   forceRender?: boolean;
   activeView?: boolean;
@@ -122,6 +129,9 @@ function SidebarProjectDirectoryMenu({
               size="sm"
               isActive={active}
               className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+              onClick={() => {
+                if (rootPath) navigate(rootPath);
+              }}
             >
               {icon}
               <span>{label}</span>

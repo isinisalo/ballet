@@ -17,11 +17,11 @@ export function useWorkflowHeaderNameEditor({
   draft: ProjectAutomationConfig;
   setDraft: Dispatch<SetStateAction<ProjectAutomationConfig>>;
   saveDraft: (nextDraft?: ProjectAutomationConfig) => Promise<boolean>;
-  selectedWorkflowId: string;
+  selectedWorkflowId?: string;
   selectAutomationEntity: SelectAutomationEntity;
 }) {
   const selectedWorkflow = activeTab === "workflows"
-    ? draft.workflows.find((workflow) => workflow.id === selectedWorkflowId) ?? draft.workflows[0]
+    ? draft.workflows.find((workflow) => workflow.id === selectedWorkflowId)
     : undefined;
   const [mode, setMode] = useState<WorkflowNameMode>("read");
   const [value, setValue] = useState("");

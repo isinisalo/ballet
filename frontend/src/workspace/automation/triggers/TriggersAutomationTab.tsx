@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ProjectAutomationConfig, ProjectTrigger } from "../../../../../shared/api/workspace-contracts";
-import { EmptyState, TextAreaField, TextField } from "@/components/shared/workspace-ui";
+import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
 import { generatedPolicyId } from "../../../../../shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
@@ -9,20 +9,27 @@ import type { AutomationConfigUpdater } from "../useAutomationDraft";
 export function TriggersAutomationTab({
   config,
   selectedId,
+  createDraft,
+  onCreateDraftChange,
   onSelect,
   updateConfig
 }: {
   config: ProjectAutomationConfig;
-  selectedId: string;
+  selectedId?: string;
+  createDraft: ProjectTrigger;
+  onCreateDraftChange: (patch: Partial<ProjectTrigger>) => void;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
 }) {
-  const lastSelectedIndexRef = useRef(0);
   const foundSelectedIndex = config.triggers.findIndex((trigger) => trigger.id === selectedId);
+  const lastSelectedIndexRef = useRef<number | undefined>(foundSelectedIndex >= 0 ? foundSelectedIndex : undefined);
   const selectedIndex = foundSelectedIndex >= 0
     ? foundSelectedIndex
-    : Math.min(lastSelectedIndexRef.current, Math.max(0, config.triggers.length - 1));
-  const selected = config.triggers[selectedIndex];
+    : selectedId && lastSelectedIndexRef.current !== undefined
+      ? Math.min(lastSelectedIndexRef.current, Math.max(0, config.triggers.length - 1))
+      : -1;
+  const selected = selectedIndex >= 0 ? config.triggers[selectedIndex] : createDraft;
+  const creating = selectedIndex < 0;
 
   useEffect(() => {
     if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
@@ -35,6 +42,10 @@ export function TriggersAutomationTab({
       ...next,
       id: editablePolicyToken(next.id)
     };
+    if (creating) {
+      onCreateDraftChange(normalized);
+      return;
+    }
     updateConfig((current) => {
       const previousId = current.triggers[selectedIndex]?.id ?? selected.id;
       return {
@@ -50,12 +61,10 @@ export function TriggersAutomationTab({
 
   return (
     <div className="grid gap-4">
-      {selected ? (
-        <FieldGroup>
-          <TextField label="Trigger ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-          <TextAreaField label="Description" required rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
-        </FieldGroup>
-      ) : <EmptyState title="No trigger selected." />}
+      <FieldGroup>
+        <TextField label="Trigger ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
+        <TextAreaField label="Description" required rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
+      </FieldGroup>
     </div>
   );
 }

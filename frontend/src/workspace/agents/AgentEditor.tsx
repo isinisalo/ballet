@@ -23,6 +23,7 @@ function AgentEditorActions({ editor }: { editor: AgentEditorState }) {
       resourceName={editor.form.name}
       onNew={editor.newAgent}
       onDelete={editor.deleteAgent}
+      showNew={false}
     />
   );
 }

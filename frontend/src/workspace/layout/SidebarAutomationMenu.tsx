@@ -21,7 +21,7 @@ function automationEntities(config: ProjectAutomationConfig, tab: AutomationTab)
 
 function activeAutomationEntityId(config: ProjectAutomationConfig, tab: AutomationTab, routeId?: string) {
   const entities = automationEntities(config, tab);
-  return entities.some((entity) => entity.id === routeId) ? routeId : entities[0]?.id ?? "";
+  return entities.some((entity) => entity.id === routeId) ? routeId : undefined;
 }
 
 type AutomationSidebarSection = { id: AutomationTab; label: string; icon: LucideIcon; emptyLabel: string };
@@ -47,7 +47,7 @@ function SidebarAutomationSection({
   const entities = automationEntities(automation, section.id);
   const selectedId = activeAutomationEntityId(automation, section.id, route.automationTab === section.id ? route.automationEntityId : undefined);
   const sectionActive = route.view === "automation" && route.automationTab === section.id;
-  const sectionPath = automationSectionPath(section.id, selectedId || undefined);
+  const sectionPath = automationSectionPath(section.id);
   const Icon = section.icon;
 
   return (

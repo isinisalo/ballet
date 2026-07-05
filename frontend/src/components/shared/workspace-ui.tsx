@@ -371,7 +371,8 @@ export function CrudActions({
   deleteType = "item",
   resourceName,
   onNew,
-  onDelete
+  onDelete,
+  showNew = true
 }: {
   newLabel: string;
   saveLabel: string;
@@ -384,6 +385,7 @@ export function CrudActions({
   resourceName?: string;
   onNew: () => void;
   onDelete: () => void | Promise<void>;
+  showNew?: boolean;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -391,9 +393,11 @@ export function CrudActions({
     <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
       {leading}
       <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
-        <Button type="button" size="icon-sm" variant="outline" aria-label={newLabel} title={newLabel} onClick={onNew}>
-          <Plus data-icon="inline-start" />
-        </Button>
+        {showNew ? (
+          <Button type="button" size="icon-sm" variant="outline" aria-label={newLabel} title={newLabel} onClick={onNew}>
+            <Plus data-icon="inline-start" />
+          </Button>
+        ) : null}
         <Button type="submit" size="icon-sm" form={formId} disabled={disabled} aria-label={saveLabel} title={saveLabel}>
           <Save data-icon="inline-start" />
         </Button>

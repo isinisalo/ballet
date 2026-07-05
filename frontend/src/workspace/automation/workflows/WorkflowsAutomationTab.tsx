@@ -5,7 +5,8 @@ import type {
   ProjectWorkflow
 } from "../../../../../shared/api/workspace-contracts";
 import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "../../../../../shared/policy-actions";
-import { EmptyState } from "@/components/shared/workspace-ui";
+import { EmptyState, TextField } from "@/components/shared/workspace-ui";
+import { FieldGroup } from "@/components/ui/field";
 import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
@@ -18,22 +19,29 @@ const noSelection = "__none__";
 export function WorkflowsAutomationTab({
   config,
   selectedId,
+  createDraft,
+  onCreateDraftChange,
   onSelect,
   updateConfig,
   saveDraft
 }: {
   config: ProjectAutomationConfig;
-  selectedId: string;
+  selectedId?: string;
+  createDraft: ProjectWorkflow;
+  onCreateDraftChange: (patch: Partial<ProjectWorkflow>) => void;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
   saveDraft: (nextDraft?: ProjectAutomationConfig) => Promise<boolean>;
 }) {
-  const lastSelectedIndexRef = useRef(0);
   const foundSelectedIndex = config.workflows.findIndex((workflow) => workflow.id === selectedId);
+  const lastSelectedIndexRef = useRef<number | undefined>(foundSelectedIndex >= 0 ? foundSelectedIndex : undefined);
   const selectedIndex = foundSelectedIndex >= 0
     ? foundSelectedIndex
-    : Math.min(lastSelectedIndexRef.current, Math.max(0, config.workflows.length - 1));
-  const selected = config.workflows[selectedIndex];
+    : selectedId && lastSelectedIndexRef.current !== undefined
+      ? Math.min(lastSelectedIndexRef.current, Math.max(0, config.workflows.length - 1))
+      : -1;
+  const selected = selectedIndex >= 0 ? config.workflows[selectedIndex] : createDraft;
+  const creating = selectedIndex < 0;
   const [editingPolicyIndex, setEditingPolicyIndex] = useState<number | null>(null);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
@@ -78,6 +86,10 @@ export function WorkflowsAutomationTab({
 
   const updateSelected = (patch: Partial<ProjectWorkflow>) => {
     if (!selected) return;
+    if (creating) {
+      onCreateDraftChange({ ...patch, id: patch.id ? normalizePolicyToken(patch.id) : patch.id });
+      return;
+    }
     updateConfig((current) => ({
       ...current,
       workflows: current.workflows.map((workflow, index) => index === selectedIndex ? { ...workflow, ...patch } : workflow)
@@ -186,6 +198,17 @@ export function WorkflowsAutomationTab({
   };
 
   if (!selected || !workflowLayout) return <EmptyState title="No workflow selected." />;
+
+  if (creating) {
+    return (
+      <div className="grid gap-4 p-4">
+        <FieldGroup>
+          <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
+          <TextField label="Title" value={selected.title} onChange={(title) => updateSelected({ title })} />
+        </FieldGroup>
+      </div>
+    );
+  }
 
   return (
     <WorkflowCanvas

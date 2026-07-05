@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { Skill } from "../../../../shared/api/workspace-contracts";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmDialog } from "@/components/shared/workspace-ui";
@@ -86,14 +86,6 @@ export function SkillsView({
     navigate("/skills");
   };
 
-  const handleNew = () => {
-    const next = skillTemplate();
-    setForm(next);
-    setFrontmatterText(frontmatterToYaml(next.frontmatter));
-    setBodyText("");
-    setValidationError("");
-  };
-
   return (
     <MarkdownWorkbench
       document={previewDocument}
@@ -105,9 +97,6 @@ export function SkillsView({
       validationError={validationError}
       headerActions={(
         <>
-          <Button type="button" size="icon-sm" variant="outline" aria-label="New" title="New" onClick={handleNew}>
-            <Plus data-icon="inline-start" />
-          </Button>
           {form.id ? (
             <>
               <Button type="button" size="icon-sm" variant="destructive" aria-label="Delete skill" title="Delete skill" onClick={() => setConfirmDeleteOpen(true)}>

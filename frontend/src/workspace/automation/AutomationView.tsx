@@ -1,4 +1,5 @@
-import { Plus, Route, Save } from "lucide-react";
+import { useMemo } from "react";
+import { Route, Save } from "lucide-react";
 import type { AppData, ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
 import { HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { AutomationIssues } from "./AutomationIssues";
 import { OutputsAutomationTab } from "./outputs/OutputsAutomationTab";
 import { TriggersAutomationTab } from "./triggers/TriggersAutomationTab";
 import { useAutomationDraft } from "./useAutomationDraft";
+import { useAutomationCreateDrafts } from "./useAutomationCreateDrafts";
 import { useWorkflowHeaderNameEditor } from "./workflows/useWorkflowHeaderNameEditor";
 import { WorkflowHeaderNameEditor } from "./workflows/WorkflowHeaderNameEditor";
 import { WorkflowsAutomationTab } from "./workflows/WorkflowsAutomationTab";
@@ -30,9 +32,7 @@ export function AutomationView({
     automation: data.automation,
     saveAutomation
   });
-
   const {
-    addConfig,
     deleteConfig,
     selectedActionId,
     selectedOutputId,
@@ -40,6 +40,12 @@ export function AutomationView({
     selectedWorkflowId,
     selectAutomationEntity
   } = createAutomationEntityControls({ activeTab, selectedId, draft, agents: data.agents, setDraft, navigate });
+  const isCreateMode = useMemo(() => {
+    if (activeTab === "triggers") return !selectedTriggerId;
+    if (activeTab === "actions") return !selectedActionId;
+    if (activeTab === "outputs") return !selectedOutputId;
+    return !selectedWorkflowId;
+  }, [activeTab, selectedActionId, selectedOutputId, selectedTriggerId, selectedWorkflowId]);
   const workflowNameEditor = useWorkflowHeaderNameEditor({
     activeTab,
     draft,
@@ -48,23 +54,29 @@ export function AutomationView({
     selectedWorkflowId,
     selectAutomationEntity
   });
+  const createDrafts = useAutomationCreateDrafts({
+    activeTab,
+    agents: data.agents,
+    draft,
+    setDraft,
+    saveDraft,
+    selectAutomationEntity,
+    isCreateMode
+  });
 
   return (
     <div className="grid gap-4">
       <Panel
         title="Automation"
-        titleExtra={activeTab === "workflows" ? (
+        titleExtra={activeTab === "workflows" && !isCreateMode ? (
           <WorkflowHeaderNameEditor {...workflowNameEditor.editorProps} />
         ) : null}
         icon={<Route data-icon="inline-start" />}
         action={(
           <div className="flex items-center justify-end gap-2">
-            <Button type="button" size="icon-sm" variant="outline" aria-label={addConfig.label} title={addConfig.label} onClick={activeTab === "workflows" ? workflowNameEditor.beginCreate : addConfig.onAdd}>
-              <Plus data-icon="inline-start" />
-            </Button>
             <HeaderCrudActions
               saveAction={(
-                <Button type="button" size="icon-sm" aria-label="Save automation" title="Save automation" onClick={() => void saveDraft()}>
+                <Button type="button" size="icon-sm" aria-label="Save automation" title="Save automation" onClick={() => void createDrafts.saveAutomationFromHeader()}>
                   <Save data-icon="inline-start" />
                 </Button>
               )}
@@ -85,7 +97,7 @@ export function AutomationView({
                 <AutomationIssues issues={data.automationIssues} />
               </div>
             ) : null}
-            <WorkflowsAutomationTab config={draft} selectedId={selectedWorkflowId} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} />
+            <WorkflowsAutomationTab config={draft} selectedId={selectedWorkflowId} createDraft={createDrafts.newWorkflow} onCreateDraftChange={createDrafts.updateNewWorkflow} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} />
           </>
         ) : (
           <div className="grid gap-4">
@@ -93,13 +105,13 @@ export function AutomationView({
               <AutomationIssues issues={data.automationIssues} />
             ) : null}
             {activeTab === "triggers" ? (
-              <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={(id) => selectAutomationEntity("triggers", id)} updateConfig={updateConfig} />
+              <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} createDraft={createDrafts.newTrigger} onCreateDraftChange={createDrafts.updateNewTrigger} onSelect={(id) => selectAutomationEntity("triggers", id)} updateConfig={updateConfig} />
             ) : null}
             {activeTab === "actions" ? (
-              <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />
+              <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} createDraft={createDrafts.newAction} onCreateDraftChange={createDrafts.updateNewAction} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />
             ) : null}
             {activeTab === "outputs" ? (
-              <OutputsAutomationTab config={draft} selectedId={selectedOutputId} onSelect={(id) => selectAutomationEntity("outputs", id)} updateConfig={updateConfig} />
+              <OutputsAutomationTab config={draft} selectedId={selectedOutputId} createDraft={createDrafts.newOutput} onCreateDraftChange={createDrafts.updateNewOutput} onSelect={(id) => selectAutomationEntity("outputs", id)} updateConfig={updateConfig} />
             ) : null}
           </div>
         )}
