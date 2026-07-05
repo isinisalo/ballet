@@ -105,7 +105,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       editingPolicyIndex: null
     });
 
-    expect(layout.nodes.some((node) => node.kind === "output-event" || node.kind === "gate-output")).toBe(false);
+    expect(layout.nodes.some((node) => node.kind === "output-event")).toBe(false);
     expect(layout.edges.some((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey.startsWith("output-event-"))).toBe(false);
   });
 
@@ -151,7 +151,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     ]);
   });
 
-  it("renders gate outputs as active terminal nodes before inactive output-event nodes", () => {
+  it("renders every output target as an output-event node", () => {
     const start = policy("start", undefined, "build");
     const layout = calculateWorkflowCanvasLayout({
       workflowGraph: buildWorkflowGraph([{
@@ -161,47 +161,42 @@ describe("calculateWorkflowCanvasLayout", () => {
         outputEvents: ["build.failed"],
         outputTargets: [
           { outputId: "failed", eventType: "build.failed", type: "event" },
-          { outputId: "summary", eventType: "build.summary", type: "gate" }
+          { outputId: "summary", eventType: "build.summary", type: "event" }
         ]
       }]),
       editingPolicyIndex: null
     });
-    const gateNode = layout.nodes.find((node) => node.key === "gate-output-0-summary");
     const policyNode = layout.nodes.find((node) => node.key === "policy-0");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-failed");
+    const summaryOutputNode = layout.nodes.find((node) => node.key === "output-event-0-summary");
 
-    expect(gateNode).toMatchObject({
-      kind: "gate-output",
-      gateOutput: { outputId: "summary", outputType: "gate" },
-      height: workflowNodeSizes.gateOutput.height,
-      width: workflowNodeSizes.gateOutput.minWidth
-    });
     expect(policyNode?.outputHandleCount).toBe(2);
-    expect(gateNode?.width).toBeGreaterThanOrEqual(workflowNodeSizes.gateOutput.minWidth);
-    expect(gateNode?.width).toBeLessThanOrEqual(workflowNodeSizes.gateOutput.maxWidth);
-    expect(gateNode?.y).toBe(policyNode ? policyNode.y + workflowCanvasLayoutConfig.policyAnchorY - workflowNodeSizes.gateOutput.height / 2 : undefined);
     expect(outputEventNode).toMatchObject({
       kind: "output-event",
       outputEvent: { outputId: "failed", eventType: "build.failed", outputType: "event" },
       width: workflowNodeSizes.outputEvent.minWidth
     });
-    expect(outputEventNode?.y).toBe(gateNode
-      ? gateNode.y + gateNode.height + workflowNodeSizes.outputEvent.rowGap
+    expect(summaryOutputNode).toMatchObject({
+      kind: "output-event",
+      outputEvent: { outputId: "summary", eventType: "build.summary", outputType: "event" },
+      width: workflowNodeSizes.outputEvent.minWidth
+    });
+    expect(summaryOutputNode?.y).toBe(outputEventNode
+      ? outputEventNode.y + workflowNodeSizes.outputEvent.height + workflowNodeSizes.outputEvent.rowGap
       : undefined);
-    expect(outputEventNode?.y).toBeGreaterThan(gateNode ? gateNode.y + gateNode.height : 0);
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-gate-output-0-summary",
+      key: "policy-output-event-0-summary",
       sourceNodeKey: "policy-0",
-      targetNodeKey: "gate-output-0-summary",
+      targetNodeKey: "output-event-0-summary",
       sourceHandleId: "right",
       targetHandleId: "left",
+      dashed: true,
       eventType: "build.summary",
       label: "summary"
     }));
-    expect(layout.edges.some((edge) => edge.sourceNodeKey === gateNode?.key)).toBe(false);
   });
 
-  it("keeps gate outputs from overlapping active child policies in the next column", () => {
+  it("places unhandled done output events after active child policies", () => {
     const start = policy("start", undefined, "design");
     const child = policy("release", "design.ready", "release");
     const layout = calculateWorkflowCanvasLayout({
@@ -213,7 +208,7 @@ describe("calculateWorkflowCanvasLayout", () => {
           outputEvents: ["design.ready"],
           outputTargets: [
             { outputId: "ready", eventType: "design.ready", type: "event" },
-            { outputId: "done", eventType: "design.done", type: "gate" }
+            { outputId: "done", eventType: "design.done", type: "event" }
           ]
         },
         {
@@ -227,14 +222,14 @@ describe("calculateWorkflowCanvasLayout", () => {
     });
     const sourceNode = layout.nodes.find((node) => node.key === "policy-0");
     const childNode = layout.nodes.find((node) => node.key === "policy-1");
-    const gateNode = layout.nodes.find((node) => node.key === "gate-output-0-done");
+    const doneOutputNode = layout.nodes.find((node) => node.key === "output-event-0-done");
 
-    expect(gateNode).toBeDefined();
+    expect(doneOutputNode).toBeDefined();
     expect(childNode).toBeDefined();
     expect(sourceNode).toBeDefined();
-    expect(workflowTestRectsOverlap(gateNode!, childNode!)).toBe(false);
-    expect(gateNode!.x).toBe(childNode!.x);
-    expect(gateNode!.y).toBe(childNode!.y + childNode!.height + workflowNodeSizes.outputEvent.rowGap);
+    expect(workflowTestRectsOverlap(doneOutputNode!, childNode!)).toBe(false);
+    expect(doneOutputNode!.x).toBe(childNode!.x);
+    expect(doneOutputNode!.y).toBe(childNode!.y + childNode!.height + workflowNodeSizes.outputEvent.rowGap);
   });
 
   it("places unhandled output events in the next policy column after active policies", () => {
@@ -491,9 +486,9 @@ describe("toWorkflowReactFlowEdges", () => {
         targetHandleId: "left"
       },
       {
-        key: "policy-gate-output-0-done",
+        key: "policy-output-event-0-done",
         sourceNodeKey: "policy-0",
-        targetNodeKey: "gate-output-0-done",
+        targetNodeKey: "output-event-0-done",
         sourceHandleId: "right",
         targetHandleId: "left"
       },

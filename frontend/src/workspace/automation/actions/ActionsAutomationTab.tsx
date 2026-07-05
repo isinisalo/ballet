@@ -61,10 +61,7 @@ export function ActionsAutomationTab({
       const nextActions = current.actions.map((action, index) => index === selectedIndex ? normalized : action);
       const eventIdMap = new Map<string, string>();
       if (previousId !== normalized.id) {
-        const previousOutputIds = previousAction.outputIds.filter((outputId) =>
-          current.outputs.find((output) => output.id === outputId)?.type !== "gate"
-        );
-        previousOutputIds.forEach((outputId) => {
+        previousAction.outputIds.forEach((outputId) => {
           eventIdMap.set(
             policyOutputEventType({ action: previousId }, outputId),
             policyOutputEventType({ action: normalized.id }, outputId)

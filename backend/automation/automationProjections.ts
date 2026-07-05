@@ -19,7 +19,7 @@ export const automationPoliciesToEventDefinitions = (
   policies: ProjectPolicy[] = [],
   triggers: ProjectTrigger[] = [],
   actions: ProjectAction[] = [],
-  outputs: Array<{ id: string; type: "event" | "gate" }> = []
+  outputs: Array<{ id: string; type: "event" }> = []
 ): EventDefinition[] =>
   [...new Set([
     ...policyEventTypesForActions(

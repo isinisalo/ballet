@@ -18,7 +18,7 @@ export interface ProjectAction {
   agentIds: string[];
 }
 
-export type ProjectOutputType = "event" | "gate";
+export type ProjectOutputType = "event";
 
 export interface ProjectOutput {
   id: string;

@@ -323,7 +323,7 @@
     {
       "id": "done",
       "description": "Workflow is done.",
-      "type": "gate"
+      "type": "event"
     }
   ],
   "policies": [
@@ -592,6 +592,20 @@
       "action": "aggregate-review",
       "enabled": true,
       "id": "on.route-project.blocked.start.aggregate-review"
+    },
+    {
+      "source": "event",
+      "event": "review-intent.done",
+      "action": "done",
+      "enabled": true,
+      "id": "on.review-intent.done.start.done"
+    },
+    {
+      "source": "event",
+      "event": "review-feasibility.done",
+      "action": "done",
+      "enabled": true,
+      "id": "on.review-feasibility.done.start.done"
     }
   ],
   "workflows": [
@@ -604,7 +618,8 @@
         "on.analyze-intent.ready.start.design-roadmap",
         "on.design-roadmap.ready.start.review-intent",
         "on.review-intent.changes_requested.start.analyze-intent",
-        "on.route-project.blocked.start.aggregate-review"
+        "on.route-project.blocked.start.aggregate-review",
+        "on.review-intent.done.start.done"
       ]
     },
     {
@@ -616,7 +631,8 @@
         "on.design-release.ready.start.review-feasibility",
         "on.design-ui.ready.start.review-feasibility",
         "on.review-feasibility.changes_requested.start.design-release",
-        "on.review-feasibility.changes_requested.start.design-ui"
+        "on.review-feasibility.changes_requested.start.design-ui",
+        "on.review-feasibility.done.start.done"
       ]
     },
     {

@@ -437,7 +437,7 @@ describe("runtime output mapping", () => {
     )).toBe("complete");
   });
 
-  it("does not publish a domain event for a gate output outcome", async () => {
+  it("publishes a domain event for configured output outcomes", async () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     db.intakeEvent({
@@ -455,11 +455,11 @@ describe("runtime output mapping", () => {
       outcome: readyOutcome,
       projectPolicy,
       actions: [{ ...implementationAction, outputIds: ["complete"] }],
-      outputs: [{ id: "complete", description: "Review gate.", type: "gate" }]
+      outputs: [{ id: "complete", description: "Action completed.", type: "event" }]
     });
 
-    expect(completed.event).toBeUndefined();
-    expect(db.listRuntimeEvents()).toHaveLength(1);
+    expect(completed.event?.type).toBe("implementation.complete");
+    expect(db.listRuntimeEvents()).toHaveLength(2);
     db.close();
   });
 

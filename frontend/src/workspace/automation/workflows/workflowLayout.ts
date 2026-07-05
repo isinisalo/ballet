@@ -15,13 +15,12 @@ export type WorkflowCanvasNodeKind =
   | "trigger"
   | "policy"
   | "output-event"
-  | "gate-output"
   | "first-policy-ghost";
 
 export type WorkflowCanvasOutputEvent = {
   outputId: string;
   eventType: string;
-  outputType: "event" | "gate";
+  outputType: "event";
 };
 
 export type WorkflowCanvasLayoutNode = {
@@ -35,7 +34,6 @@ export type WorkflowCanvasLayoutNode = {
   record?: WorkflowStepRecord;
   eventType?: string;
   outputEvent?: WorkflowCanvasOutputEvent;
-  gateOutput?: WorkflowCanvasOutputEvent;
   sourcePolicyId?: string;
   isEditingPolicy?: boolean;
   outputIndex?: number;
@@ -53,7 +51,6 @@ export const workflowNodeSizes = {
   policy: { minWidth: 136, maxWidth: 220, height: 22 },
   event: { width: 240, height: 46 },
   outputEvent: { minWidth: 76, maxWidth: 120, height: 22, rowGap: 16 },
-  gateOutput: { minWidth: 28, maxWidth: 28, height: 22 },
   action: { width: 28, height: 28 }
 };
 
@@ -91,7 +88,6 @@ type WorkflowDagreEdge = {
 };
 
 type WorkflowActiveOutputTask =
-  | { kind: "gate"; output: WorkflowOutputTarget }
   | { kind: "children"; output: WorkflowOutputTarget; childRecords: WorkflowStepRecord[] }
   | { kind: "existing-handler"; output: WorkflowOutputTarget; hasBackwardHandler: boolean };
 
@@ -197,35 +193,6 @@ export function calculateWorkflowCanvasLayout({
     });
   };
 
-  const addGateOutputNode = (record: WorkflowStepRecord, output: WorkflowOutputTarget) => {
-    const key = `gate-output-${record.index}-${output.outputId}`;
-    addNode({
-      key,
-      kind: "gate-output",
-      width: workflowGateOutputNodeWidth(),
-      height: workflowNodeSizes.gateOutput.height,
-      direction,
-      record,
-      gateOutput: {
-        outputId: output.outputId,
-        eventType: output.eventType,
-        outputType: output.type
-      },
-      sourcePolicyId: record.policyId
-    });
-    addDagreEdge({ source: `policy-${record.index}`, target: key, label: workflowOutputEdgeLabel(output) });
-    addCanvasEdge({
-      key: `policy-gate-output-${record.index}-${output.outputId}`,
-      sourceNodeKey: `policy-${record.index}`,
-      targetNodeKey: key,
-      sourceHandleId: workflowOutputSourceHandleId(),
-      targetHandleId,
-      dashed: !record.policy,
-      eventType: output.eventType,
-      label: workflowOutputEdgeLabel(output)
-    });
-  };
-
   const layoutPolicyBranch = (record: WorkflowStepRecord, visitedPolicyIds = new Set<string>()) => {
     if (visitedPolicyIds.has(record.policyId)) return;
     const nextVisitedPolicyIds = new Set(visitedPolicyIds);
@@ -240,10 +207,6 @@ export function calculateWorkflowCanvasLayout({
     }));
 
     recordOutputTargets.forEach((output) => {
-      if (output.type === "gate") {
-        activeOutputTasks.push({ kind: "gate", output });
-        return;
-      }
       const { eventType } = output;
       const childRecords = (workflowGraph.childRecordsByParentEvent.get(`${record.index}:${eventType}`) ?? [])
         .filter((childRecord) => childRecord.policyId !== record.policyId && !nextVisitedPolicyIds.has(childRecord.policyId));
@@ -273,10 +236,6 @@ export function calculateWorkflowCanvasLayout({
     addPolicyNode(record, activeOutputTasks.length + visibleInactiveOutputTargets.length);
 
     activeOutputTasks.forEach((task) => {
-      if (task.kind === "gate") {
-        addGateOutputNode(record, task.output);
-        return;
-      }
       if (task.kind === "existing-handler") {
         handledEventNodes.push({
           eventType: task.output.eventType,
@@ -407,9 +366,7 @@ function positionPrimaryNodes(
   const horizontalLaneYOffsets = direction === "horizontal"
     ? workflowHorizontalLaneYOffsets(nodes, outputNodes, edges, orderIndexes)
     : new Map<number, number>();
-  const sourceKeyByTargetKey = new Map(edges.map((edge) => [edge.target, edge.source]));
-
-  const positionedNodes = nodes.map((node) => {
+  return nodes.map((node) => {
     const rank = ranks.get(node.key) ?? 0;
     const orderIndex = orderIndexes.get(node.key) ?? 0;
 
@@ -423,57 +380,6 @@ function positionPrimaryNodes(
         : verticalNodeY(rank, metrics)
     };
   });
-
-  const positionedNodeByKey = new Map(positionedNodes.map((node) => [node.key, node]));
-
-  return positionedNodes.map((node) => {
-    if (node.kind !== "gate-output") return node;
-    const sourceNode = positionedNodeByKey.get(sourceKeyByTargetKey.get(node.key) ?? "");
-    if (!sourceNode) return node;
-    return positionGateOutputNode(node, sourceNode, positionedNodes, direction);
-  });
-}
-
-function positionGateOutputNode(
-  node: WorkflowCanvasLayoutNode,
-  sourceNode: WorkflowCanvasLayoutNode,
-  positionedNodes: WorkflowCanvasLayoutNode[],
-  direction: WorkflowLayoutDirection
-): WorkflowCanvasLayoutNode {
-  const positionedNode = {
-    ...node,
-    x: direction === "vertical"
-      ? sourceNode.x + sourceNode.width / 2 - node.width / 2
-      : node.x,
-    y: direction === "horizontal"
-      ? sourceNode.y + workflowCanvasLayoutConfig.policyAnchorY - node.height / 2
-      : node.y
-  };
-
-  if (direction !== "horizontal") return positionedNode;
-  return avoidPolicyOverlapForGateOutput(positionedNode, sourceNode, positionedNodes);
-}
-
-function avoidPolicyOverlapForGateOutput(
-  node: WorkflowCanvasLayoutNode,
-  sourceNode: WorkflowCanvasLayoutNode,
-  positionedNodes: WorkflowCanvasLayoutNode[]
-): WorkflowCanvasLayoutNode {
-  const policyNodes = positionedNodes
-    .filter((candidate) => candidate.kind === "policy" && candidate.key !== sourceNode.key)
-    .sort((firstNode, secondNode) => firstNode.y - secondNode.y || firstNode.x - secondNode.x);
-  let positionedNode = node;
-
-  for (let passIndex = 0; passIndex < policyNodes.length; passIndex += 1) {
-    const collidingPolicyNode = policyNodes.find((candidate) => workflowNodeRectsOverlap(positionedNode, candidate));
-    if (!collidingPolicyNode) return positionedNode;
-    positionedNode = {
-      ...positionedNode,
-      y: collidingPolicyNode.y + collidingPolicyNode.height + workflowNodeSizes.outputEvent.rowGap
-    };
-  }
-
-  return positionedNode;
 }
 
 function positionOutputEventNodes(
@@ -512,7 +418,7 @@ function positionOutputEventNode(
     return { ...node, x: workflowCanvasLayoutConfig.startX, y: workflowCanvasLayoutConfig.startY };
   }
   const childNodes = edges
-    .filter((edge) => edge.source === sourceKey && (edge.target.startsWith("policy-") || edge.target.startsWith("gate-output-")))
+    .filter((edge) => edge.source === sourceKey && edge.target.startsWith("policy-"))
     .map((edge) => nodeByKey.get(edge.target))
     .filter((childNode): childNode is WorkflowCanvasLayoutNode => Boolean(childNode));
 
@@ -575,16 +481,12 @@ function workflowLayoutMetrics(
     horizontalRowStep: Math.max(policyStackHeight, workflowNodeSizes.trigger.height) + workflowCanvasLayoutConfig.branchGap,
     verticalRootPolicyY: workflowCanvasLayoutConfig.startY + workflowNodeSizes.trigger.height + workflowCanvasLayoutConfig.branchGap,
     verticalPolicyRankStep: policyStackHeight + maxOutputHeight + workflowCanvasLayoutConfig.branchGap,
-    verticalColumnStep: Math.max(workflowNodeSizes.policy.maxWidth, workflowNodeSizes.outputEvent.maxWidth, workflowNodeSizes.gateOutput.maxWidth) + workflowCanvasLayoutConfig.branchGap
+    verticalColumnStep: Math.max(workflowNodeSizes.policy.maxWidth, workflowNodeSizes.outputEvent.maxWidth) + workflowCanvasLayoutConfig.branchGap
   };
 }
 
 export function workflowPolicyStackHeight() {
   return workflowNodeSizes.policy.height;
-}
-
-function workflowGateOutputNodeWidth() {
-  return workflowOutputNodeWidth("", workflowNodeSizes.gateOutput.minWidth, workflowNodeSizes.gateOutput.maxWidth);
 }
 
 function workflowOutputEventNodeWidth() {
@@ -644,16 +546,6 @@ function workflowBranchStackHeight(node: Pick<WorkflowCanvasLayoutNode, "height"
   return node.kind === "policy"
     ? workflowPolicyStackHeight()
     : node.height;
-}
-
-function workflowNodeRectsOverlap(
-  firstNode: Pick<WorkflowCanvasLayoutNode, "x" | "y" | "width" | "height">,
-  secondNode: Pick<WorkflowCanvasLayoutNode, "x" | "y" | "width" | "height">
-) {
-  return firstNode.x < secondNode.x + secondNode.width &&
-    firstNode.x + firstNode.width > secondNode.x &&
-    firstNode.y < secondNode.y + secondNode.height &&
-    firstNode.y + firstNode.height > secondNode.y;
 }
 
 function horizontalNodeX(rank: number, metrics: WorkflowLayoutMetrics) {
@@ -784,7 +676,7 @@ function workflowHorizontalLaneYOffsets(
     if (!sourceNode || sourceLaneIndex === undefined) return;
     const outputStackHeightValue = outputEventStackHeight(sourceOutputNodes.length);
     const childNodes = edges
-      .filter((edge) => edge.source === sourceKey && (edge.target.startsWith("policy-") || edge.target.startsWith("gate-output-")))
+      .filter((edge) => edge.source === sourceKey && edge.target.startsWith("policy-"))
       .map((edge) => primaryNodeByKey.get(edge.target))
       .filter((childNode): childNode is WorkflowCanvasLayoutNodeDraft => Boolean(childNode));
 

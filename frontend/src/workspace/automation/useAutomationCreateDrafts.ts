@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { Agent, ProjectAutomationConfig, ProjectOutputType } from "../../../../shared/api/workspace-contracts";
+import type { Agent, ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
 import type { AutomationTab } from "../types";
 import { editablePolicyToken } from "./automationUtils";
 
@@ -8,7 +8,7 @@ type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
 type AutomationCreateDrafts = {
   trigger: { id: string; description: string };
   action: { id: string; description: string; outputIds: string[]; agentIds: string[] };
-  output: { id: string; description: string; type: "event" | "gate" };
+  output: { id: string; description: string; type: "event" };
   workflow: { id: string; title: string; steps: string[] };
 };
 
@@ -31,7 +31,7 @@ export function useAutomationCreateDrafts({
 }) {
   const [newTrigger, setNewTrigger] = useState({ id: "", description: "" });
   const [newAction, setNewAction] = useState({ id: "", description: "", outputIds: [] as string[], agentIds: [] as string[] });
-  const [newOutput, setNewOutput] = useState<{ id: string; description: string; type: ProjectOutputType }>({ id: "", description: "", type: "event" });
+  const [newOutput, setNewOutput] = useState<{ id: string; description: string; type: "event" }>({ id: "", description: "", type: "event" });
   const [newWorkflow, setNewWorkflow] = useState({ id: "", title: "", steps: [] as string[] });
   const createDraftsRef = useRef<AutomationCreateDrafts>({
     trigger: newTrigger,

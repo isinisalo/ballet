@@ -135,15 +135,24 @@ export function WorkflowsAutomationTab({
   const addPolicyStep = (eventType?: string, sourcePolicy?: ProjectPolicy) => {
     if (!selected) return;
     const selectedPolicyIds = new Set(selected.steps);
+    const eventOutputId = eventType?.split(".").at(-1) ?? "";
+    const isDoneEvent = normalizePolicyToken(eventOutputId) === "done";
     const nextPolicy = eventType
-      ? config.policies.find((policy) => policy.source === "event" && policy.event === eventType && !selectedPolicyIds.has(policy.id))
+      ? config.policies.find((policy) =>
+        policy.source === "event" &&
+        policy.event === eventType &&
+        (!isDoneEvent || policy.action === "done") &&
+        !selectedPolicyIds.has(policy.id)
+      )
       : config.policies.find((policy) => !selectedPolicyIds.has(policy.id)) ?? config.policies[0];
     if (!nextPolicy) {
       const baseAction = sourcePolicy?.action || defaultAction;
       if (!baseAction) return;
       const generatedSource: ProjectPolicy["source"] = eventType || !config.triggers[0]?.id ? "event" : "trigger";
       const generatedEvent = eventType || policyOutputEventType({ action: baseAction }, selectedActionOutputIds(baseAction)[0] ?? "");
-      const action = generatedSource === "event" ? uniquePolicyAction(generatedEvent, baseAction, config.policies) : baseAction;
+      const action = generatedSource === "event"
+        ? isDoneEvent ? "done" : uniquePolicyAction(generatedEvent, baseAction, config.policies)
+        : baseAction;
       const outputIds = selectedActionOutputIds(action);
       const generatedPolicy: ProjectPolicy = {
         id: generatedPolicyId({
@@ -164,9 +173,9 @@ export function WorkflowsAutomationTab({
           ? current.actions
           : [...current.actions, {
             id: action,
-            description: "",
-            outputIds,
-            agentIds: current.actions.find((candidate) => candidate.id === baseAction)?.agentIds ?? []
+            description: action === "done" ? "No further actions." : "",
+            outputIds: action === "done" ? [] : outputIds,
+            agentIds: action === "done" ? [] : current.actions.find((candidate) => candidate.id === baseAction)?.agentIds ?? []
           }],
         policies: [...current.policies, generatedPolicy],
         workflows: current.workflows.map((workflow) => workflow.id === selected.id ? { ...workflow, steps: [...workflow.steps, generatedPolicy.id] } : workflow)

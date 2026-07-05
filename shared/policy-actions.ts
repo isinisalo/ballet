@@ -32,12 +32,11 @@ export const policyOutputEventType = (
   outputId: PolicyOutputId
 ): string => `${input.action}.${normalizePolicyToken(outputId)}`;
 
-export const normalizeProjectOutputType = (value: unknown): ProjectOutputType =>
-  value === "gate" ? "gate" : "event";
+export const normalizeProjectOutputType = (): ProjectOutputType =>
+  "event";
 
-const eventOutputIdSet = (outputs: Array<Pick<ProjectOutput, "id" | "type">>): Set<string> =>
+const outputIdSet = (outputs: Array<Pick<ProjectOutput, "id">>): Set<string> =>
   new Set(outputs
-    .filter((output) => output.type === "event")
     .map((output) => normalizePolicyToken(output.id))
     .filter(Boolean));
 
@@ -58,9 +57,9 @@ export const policyOutputEventTypes = (
   outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
 ): string[] => {
   const outputIds = actions.length > 0 ? actionOutputIds(actions, input.action) : [...defaultPolicyOutputIds];
-  const eventIds = outputs.length > 0 ? eventOutputIdSet(outputs) : undefined;
+  const availableOutputIds = outputs.length > 0 ? outputIdSet(outputs) : undefined;
   return outputIds
-    .filter((outputId) => !eventIds || eventIds.has(outputId))
+    .filter((outputId) => !availableOutputIds || availableOutputIds.has(outputId))
     .map((outputId) => policyOutputEventType(input, outputId));
 };
 

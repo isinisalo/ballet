@@ -1,4 +1,4 @@
-import type { ProjectAction, ProjectOutput, ProjectPolicy } from "../../shared/domain/automation.js";
+import type { ProjectAction, ProjectPolicy } from "../../shared/domain/automation.js";
 import type { AgentOutcome, AgentOutputEventStatus, AgentRun } from "../../shared/domain/runtime.js";
 import { actionOutputIds, policyOutputEventType } from "../../shared/policy-actions.js";
 
@@ -62,17 +62,6 @@ export const aggregateActionOutputStatus = (
     policy.action === "deploy" ? ["deployed", "ready", "complete", "completed"] : ["ready", "complete", "completed"],
     "ready"
   );
-};
-
-export const actionOutputType = (
-  policy: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
-  outputs: Array<Pick<ProjectOutput, "id" | "type">>,
-  outputId: string
-) => {
-  const allowedOutputIds = actionOutputIds(actions, policy.action);
-  if (!allowedOutputIds.includes(outputId)) return undefined;
-  return outputs.find((output) => output.id === outputId)?.type ?? "event";
 };
 
 export const actionOutputEventType = (

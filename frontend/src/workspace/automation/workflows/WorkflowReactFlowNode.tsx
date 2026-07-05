@@ -1,4 +1,4 @@
-import { CheckCircle2, Route, Zap } from "lucide-react";
+import { Route, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { workflowTriggerLabel } from "./workflowGraph";
@@ -21,7 +21,7 @@ export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReact
 function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
   const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
 
-  if (layoutNode.kind === "gate-output" || layoutNode.kind === "output-event") {
+  if (layoutNode.kind === "output-event") {
     return <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />;
   }
 
@@ -41,7 +41,6 @@ function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNode
   if (node.kind === "trigger") return renderTriggerNode(context);
   if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(context);
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
-  if (node.kind === "gate-output") return renderGateOutputNode(node);
   if (!node.record) return null;
   return <WorkflowPolicyNode node={node} context={context} record={node.record} />;
 }
@@ -94,20 +93,5 @@ function renderOutputEventNode(node: WorkflowCanvasLayoutNode, context: Workflow
     >
       <span className="block min-w-0 truncate">{workflowAddActionGhostLabel}</span>
     </button>
-  );
-}
-
-function renderGateOutputNode(node: WorkflowCanvasLayoutNode) {
-  const outputId = node.gateOutput?.outputId ?? "Gate";
-
-  return (
-    <div
-      aria-label={`Gate: ${outputId}`}
-      title={outputId}
-      data-workflow-gate-output={outputId}
-      className="flex h-[22px] w-full min-w-0 items-center justify-center rounded-md border border-divider-strong bg-card text-foreground"
-    >
-      <CheckCircle2 className="size-3.5 shrink-0 text-secondary" aria-hidden="true" />
-    </div>
   );
 }

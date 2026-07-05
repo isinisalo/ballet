@@ -129,7 +129,7 @@ const projectActionSchema = z.object({
 const projectOutputSchema = z.object({
   id: z.string(),
   description: z.string(),
-  type: z.enum(["event", "gate"])
+  type: z.literal("event")
 }).strict();
 
 const projectPolicySchema = z.object({

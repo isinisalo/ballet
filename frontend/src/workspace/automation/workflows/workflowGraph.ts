@@ -4,7 +4,7 @@ import { policyOutputEventTypes } from "../../../../../shared/policy-actions";
 export type WorkflowOutputTarget = {
   outputId: string;
   eventType: string;
-  type: "event" | "gate";
+  type: "event";
 };
 
 export type WorkflowStepRecord = {

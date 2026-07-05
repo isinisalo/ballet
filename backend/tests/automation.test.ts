@@ -204,7 +204,7 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       outputs: [{ id: "summary", description: "Summary", type: "invalid" }]
-    }, [agent]).some((issue) => issue.message === "Output type must be event or gate.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Output type must be event.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
@@ -312,9 +312,9 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: ["failed"] }],
-      outputs: [{ id: "failed", description: "Terminal gate", type: "gate" }],
+      outputs: [{ id: "failed", description: "Terminal output.", type: "gate" }],
       policies: [{ ...validConfig().policies[0]!, event: "implementation.failed" }]
-    }, [agent]).some((issue) => issue.message === "Policy references unknown event: implementation.failed.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Output type must be event.")).toBe(true);
 
     const completedConfig: ProjectAutomationConfig = {
       ...validConfig(),

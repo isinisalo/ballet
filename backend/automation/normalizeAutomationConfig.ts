@@ -50,7 +50,7 @@ const normalizeTrigger = (value: Record<string, unknown>): ProjectTrigger => ({
 const normalizeOutput = (value: Record<string, unknown>): ProjectOutput => ({
   id: normalizePolicyToken(stringValue(value.id)),
   description: stringValue(value.description),
-  type: normalizeProjectOutputType(value.type)
+  type: normalizeProjectOutputType()
 });
 
 const normalizeOutputIds = (value: unknown): string[] | undefined => {

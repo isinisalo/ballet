@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { ProjectAutomationConfig, ProjectOutput } from "../../../../../shared/api/workspace-contracts";
 import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FieldGroup } from "@/components/ui/field";
 import { generatedPolicyId, policyOutputEventType } from "../../../../../shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
@@ -41,7 +40,8 @@ export function OutputsAutomationTab({
     const next = { ...selected, ...patch };
     const normalized = {
       ...next,
-      id: editablePolicyToken(next.id)
+      id: editablePolicyToken(next.id),
+      type: "event" as const
     };
     if (creating) {
       onCreateDraftChange(normalized);
@@ -49,18 +49,15 @@ export function OutputsAutomationTab({
     }
     updateConfig((current) => {
       const previousId = current.outputs[selectedIndex]?.id ?? selected.id;
-      const previousType = current.outputs[selectedIndex]?.type ?? selected.type;
       const eventIdMap = new Map<string, string>();
-      if (previousType === "event" && normalized.type === "event") {
-        current.actions
-          .filter((action) => action.outputIds.includes(previousId))
-          .forEach((action) => {
-            eventIdMap.set(
-              policyOutputEventType({ action: action.id }, previousId),
-              policyOutputEventType({ action: action.id }, normalized.id)
-            );
-          });
-      }
+      current.actions
+        .filter((action) => action.outputIds.includes(previousId))
+        .forEach((action) => {
+          eventIdMap.set(
+            policyOutputEventType({ action: action.id }, previousId),
+            policyOutputEventType({ action: action.id }, normalized.id)
+          );
+        });
       const policyIdMap = new Map<string, string>();
       const policies = current.policies.map((policy) => {
         const nextEvent = policy.source === "event" && policy.event ? eventIdMap.get(policy.event) ?? policy.event : policy.event;
@@ -91,20 +88,6 @@ export function OutputsAutomationTab({
     <div className="grid gap-4">
       <FieldGroup>
         <TextField label="Output ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-        <Field>
-          <FieldLabel>Type</FieldLabel>
-          <Select value={selected.type} onValueChange={(type: ProjectOutput["type"]) => updateSelected({ type })}>
-            <SelectTrigger aria-label="Output type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="event">Event</SelectItem>
-                <SelectItem value="gate">Gate</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
         <TextAreaField label="Description" rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
       </FieldGroup>
     </div>

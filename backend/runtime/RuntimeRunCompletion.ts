@@ -8,7 +8,6 @@ import { RuntimeProjector } from "./RuntimeProjector.js";
 import { MAX_CORRELATION_DEPTH, now, type CompleteRunInput } from "./RuntimeDbTypes.js";
 import {
   actionOutputEventType,
-  actionOutputType,
   aggregateActionOutputStatus,
   allPolicyRunsTerminal
 } from "../automation/actionOutputAggregator.js";
@@ -114,7 +113,6 @@ export class RuntimeRunCompletion {
     if (!allPolicyRunsTerminal(policyRuns)) return undefined;
 
     const outputStatus = aggregateActionOutputStatus(policyRuns, policy, input.actions);
-    if (actionOutputType(policy, input.actions, input.outputs, outputStatus) === "gate") return undefined;
 
     return {
       type: actionOutputEventType(policy, outputStatus),

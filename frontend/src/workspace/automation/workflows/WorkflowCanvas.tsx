@@ -198,7 +198,7 @@ function useWorkflowNodes(layoutNodes: WorkflowCanvasProps["layout"]["nodes"], n
 function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][number]): WorkflowReactFlowNode["handles"] {
   const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
 
-  if (layoutNode.kind === "gate-output" || layoutNode.kind === "output-event") {
+  if (layoutNode.kind === "output-event") {
     return [{ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 }];
   }
 

@@ -113,7 +113,7 @@ const baseData = (): AppData => ({
     }, {
       id: "summary",
       description: "Summarize implementation output",
-      type: "gate"
+      type: "event"
     }],
     policies: [{
       id: "on.implementation.failed.start.implementation",
@@ -924,41 +924,68 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("button", { name: "Add output" })).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Output ID"), "review-notes");
-    expect(screen.getByRole("combobox", { name: "Output type" })).toHaveTextContent("Event");
-    await user.click(screen.getByRole("combobox", { name: "Output type" }));
-    await user.click(await screen.findByRole("option", { name: "Gate" }));
+    expect(screen.queryByRole("combobox", { name: "Output type" })).not.toBeInTheDocument();
     await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Review notes artifact");
     expect(screen.getByLabelText("Output ID")).toHaveValue("review-notes");
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.outputs.some((output) => output.id === "review-notes" && output.description === "Review notes artifact" && output.type === "gate")).toBe(true));
+    await waitFor(() => expect(data.automation.outputs.some((output) => output.id === "review-notes" && output.description === "Review notes artifact" && output.type === "event")).toBe(true));
 
     await confirmDelete(user, "Delete output");
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.outputs.some((output) => output.id === "review-notes")).toBe(false));
   });
 
-  it("renders gate outputs as workflow endpoints without policy creation", async () => {
+  it("renders every action output as a workflow event endpoint", async () => {
     const workflowData = baseData();
     workflowData.automation.actions[0]!.outputIds = ["failed", "summary"];
 
     await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
     const outputEvent = screen.getByRole("button", { name: "Add policy step for implementation.failed" });
-    const gateOutput = screen.getByLabelText("Gate: summary");
+    const summaryOutputEvent = screen.getByRole("button", { name: "Add policy step for implementation.summary" });
 
     expect(outputEvent).toBeInTheDocument();
     expect(outputEvent).toHaveTextContent("+ Action");
     expect(outputEvent).not.toHaveTextContent("implementation.failed");
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
     expect(outputEvent.querySelector("svg")).not.toBeInTheDocument();
-    expect(gateOutput).toBeInTheDocument();
-    expect(gateOutput).not.toHaveTextContent("summary");
-    expect(gateOutput.querySelector("svg")).toBeInTheDocument();
+    expect(summaryOutputEvent).toBeInTheDocument();
+    expect(summaryOutputEvent).not.toHaveTextContent("implementation.summary");
+    expect(summaryOutputEvent.querySelector("svg")).not.toBeInTheDocument();
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("summary"));
-    expect(document.querySelector('[data-workflow-gate-output="summary"]')).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add policy step for implementation.summary" })).not.toBeInTheDocument();
+    expect(document.querySelector("[data-workflow-gate-output]")).not.toBeInTheDocument();
+  });
+
+  it("creates done workflow handlers with the done action", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.automation.outputs.push({
+      id: "done",
+      description: "Workflow is done",
+      type: "event"
+    });
+    workflowData.automation.actions[0]!.outputIds = ["failed", "done"];
+    workflowData.automation.actions.push({
+      id: "done",
+      description: "No further actions.",
+      outputIds: [],
+      agentIds: []
+    });
+    const { data } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
+
+    await user.click(screen.getByRole("button", { name: "Add policy step for implementation.done" }));
+    expect(screen.getByLabelText("Policy: on.implementation.done.start.done")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+
+    await waitFor(() => expect(data.automation.policies).toContainEqual(expect.objectContaining({
+      id: "on.implementation.done.start.done",
+      source: "event",
+      event: "implementation.done",
+      action: "done"
+    })));
+    expect(data.automation.workflows[0]?.steps).toContain("on.implementation.done.start.done");
   });
 
   it("renames an automation action and rewrites derived policy events", async () => {

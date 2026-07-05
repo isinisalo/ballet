@@ -4,7 +4,7 @@ import { defaultPolicyOutputIds, defaultProjectOutputs, normalizePolicyToken, no
 export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefined): ProjectAutomationConfig => {
   const defaults = defaultProjectAutomationConfig();
   const outputs = Array.isArray(config?.outputs) && config.outputs.length > 0
-    ? config.outputs.map((output) => ({ ...output, type: normalizeProjectOutputType(output.type) }))
+    ? config.outputs.map((output) => ({ ...output, type: normalizeProjectOutputType() }))
     : defaultProjectOutputs();
   const outputIds = outputs.map((output) => output.id);
   const fallbackOutputIds = defaultPolicyOutputIds.filter((outputId) => outputIds.includes(outputId));
