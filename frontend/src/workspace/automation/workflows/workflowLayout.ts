@@ -385,17 +385,50 @@ function positionPrimaryNodes(
     if (node.kind !== "gate-output") return node;
     const sourceNode = positionedNodeByKey.get(sourceKeyByTargetKey.get(node.key) ?? "");
     if (!sourceNode) return node;
-
-    return {
-      ...node,
-      x: direction === "vertical"
-        ? sourceNode.x + sourceNode.width / 2 - node.width / 2
-        : node.x,
-      y: direction === "horizontal"
-        ? sourceNode.y + workflowCanvasLayoutConfig.policyAnchorY - node.height / 2
-        : node.y
-    };
+    return positionGateOutputNode(node, sourceNode, positionedNodes, direction);
   });
+}
+
+function positionGateOutputNode(
+  node: WorkflowCanvasLayoutNode,
+  sourceNode: WorkflowCanvasLayoutNode,
+  positionedNodes: WorkflowCanvasLayoutNode[],
+  direction: WorkflowLayoutDirection
+): WorkflowCanvasLayoutNode {
+  const positionedNode = {
+    ...node,
+    x: direction === "vertical"
+      ? sourceNode.x + sourceNode.width / 2 - node.width / 2
+      : node.x,
+    y: direction === "horizontal"
+      ? sourceNode.y + workflowCanvasLayoutConfig.policyAnchorY - node.height / 2
+      : node.y
+  };
+
+  if (direction !== "horizontal") return positionedNode;
+  return avoidPolicyOverlapForGateOutput(positionedNode, sourceNode, positionedNodes);
+}
+
+function avoidPolicyOverlapForGateOutput(
+  node: WorkflowCanvasLayoutNode,
+  sourceNode: WorkflowCanvasLayoutNode,
+  positionedNodes: WorkflowCanvasLayoutNode[]
+): WorkflowCanvasLayoutNode {
+  const policyNodes = positionedNodes
+    .filter((candidate) => candidate.kind === "policy" && candidate.key !== sourceNode.key)
+    .sort((firstNode, secondNode) => firstNode.y - secondNode.y || firstNode.x - secondNode.x);
+  let positionedNode = node;
+
+  for (let passIndex = 0; passIndex < policyNodes.length; passIndex += 1) {
+    const collidingPolicyNode = policyNodes.find((candidate) => workflowNodeRectsOverlap(positionedNode, candidate));
+    if (!collidingPolicyNode) return positionedNode;
+    positionedNode = {
+      ...positionedNode,
+      y: collidingPolicyNode.y + collidingPolicyNode.height + workflowNodeSizes.outputEvent.rowGap
+    };
+  }
+
+  return positionedNode;
 }
 
 function positionOutputEventNodes(
@@ -534,6 +567,16 @@ function workflowBranchStackHeight(node: Pick<WorkflowCanvasLayoutNode, "height"
   return node.kind === "policy"
     ? workflowPolicyStackHeight()
     : node.height;
+}
+
+function workflowNodeRectsOverlap(
+  firstNode: Pick<WorkflowCanvasLayoutNode, "x" | "y" | "width" | "height">,
+  secondNode: Pick<WorkflowCanvasLayoutNode, "x" | "y" | "width" | "height">
+) {
+  return firstNode.x < secondNode.x + secondNode.width &&
+    firstNode.x + firstNode.width > secondNode.x &&
+    firstNode.y < secondNode.y + secondNode.height &&
+    firstNode.y + firstNode.height > secondNode.y;
 }
 
 function horizontalNodeX(rank: number, metrics: WorkflowLayoutMetrics) {

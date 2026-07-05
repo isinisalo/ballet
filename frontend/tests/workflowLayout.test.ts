@@ -31,6 +31,14 @@ const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyInde
   });
 };
 
+const workflowTestRectsOverlap = (
+  firstNode: { x: number; y: number; width: number; height: number },
+  secondNode: { x: number; y: number; width: number; height: number }
+) => firstNode.x < secondNode.x + secondNode.width &&
+  firstNode.x + firstNode.width > secondNode.x &&
+  firstNode.y < secondNode.y + secondNode.height &&
+  firstNode.y + firstNode.height > secondNode.y;
+
 describe("calculateWorkflowCanvasLayout", () => {
   it("uses selected action outputs as policy output events", () => {
     expect(policyOutputEventTypes({ agent: "codex", action: "build" }, [{ id: "build", outputIds: ["complete", "failed"] }])).toEqual([
@@ -125,6 +133,42 @@ describe("calculateWorkflowCanvasLayout", () => {
       targetHandleId: "left"
     }));
     expect(layout.edges.some((edge) => edge.sourceNodeKey === gateNode?.key)).toBe(false);
+  });
+
+  it("keeps gate outputs from overlapping active child policies in the next column", () => {
+    const start = policy("start", undefined, "design");
+    const child = policy("release", "codex.design.ready", "release");
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph([
+        {
+          policyId: start.id,
+          index: 0,
+          policy: start,
+          outputEvents: ["codex.design.ready"],
+          outputTargets: [
+            { outputId: "ready", eventType: "codex.design.ready", type: "event" },
+            { outputId: "done", eventType: "codex.design.done", type: "gate" }
+          ]
+        },
+        {
+          policyId: child.id,
+          index: 1,
+          policy: child,
+          outputEvents: ["codex.release.complete"]
+        }
+      ]),
+      editingPolicyIndex: null
+    });
+    const sourceNode = layout.nodes.find((node) => node.key === "policy-0");
+    const childNode = layout.nodes.find((node) => node.key === "policy-1");
+    const gateNode = layout.nodes.find((node) => node.key === "gate-output-0-done");
+
+    expect(gateNode).toBeDefined();
+    expect(childNode).toBeDefined();
+    expect(sourceNode).toBeDefined();
+    expect(workflowTestRectsOverlap(gateNode!, childNode!)).toBe(false);
+    expect(gateNode!.x).toBe(childNode!.x);
+    expect(gateNode!.y).toBe(childNode!.y + childNode!.height + workflowNodeSizes.outputEvent.rowGap);
   });
 
   it("places unhandled output events in the next policy column after active policies", () => {
