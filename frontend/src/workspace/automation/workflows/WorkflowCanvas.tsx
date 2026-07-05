@@ -64,7 +64,7 @@ export function WorkflowCanvas({
     <div
       ref={workflowCanvasRef}
       data-workflow-canvas
-      className={cn("relative min-h-[28rem] overflow-hidden rounded-lg border border-divider-strong bg-background", isCanvasPanning ? "cursor-grabbing" : "cursor-grab")}
+      className={cn("relative min-h-[28rem] overflow-hidden border border-divider-strong bg-background", isCanvasPanning ? "cursor-grabbing" : "cursor-grab")}
       style={{ height: canvasHeight ? `${canvasHeight}px` : undefined }}
     >
       <div className="pointer-events-none absolute inset-0 z-0 opacity-50 bg-[image:linear-gradient(to_right,var(--divider-strong)_1px,transparent_1px),linear-gradient(to_bottom,var(--divider-strong)_1px,transparent_1px)] bg-[size:24px_24px]" />

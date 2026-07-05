@@ -185,35 +185,33 @@ export function WorkflowsAutomationTab({
     return Boolean(action && actionAgentCount > 0 && selectedActionOutputIds(action).length > 0);
   };
 
+  if (!selected || !workflowLayout) return <EmptyState title="No workflow selected." />;
+
   return (
-    <div className="grid gap-4">
-      {selected && workflowLayout ? (
-        <WorkflowCanvas
-          layout={workflowLayout}
-          policyById={policyById}
-          firstPolicy={policyById.get(selected.steps[0] ?? "")}
-          noSelectionValue={noSelection}
-          policyOptions={policyOptions}
-          actionOptions={actionOptions}
-          draggedStepIndex={canvasInteraction.draggedStepIndex}
-          dragOverStepIndex={canvasInteraction.dragOverStepIndex}
-          canvasHeight={canvasInteraction.canvasHeight}
-          isCanvasPanning={canvasInteraction.isCanvasPanning}
-          workflowCanvasRef={canvasInteraction.workflowCanvasRef}
-          canAddFirstPolicy={canAddFirstPolicy}
-          canAddPolicyForEvent={canAddPolicyForEvent}
-          onStepPointerDown={canvasInteraction.handleStepPointerDown}
-          onStepPointerMove={canvasInteraction.handleStepPointerMove}
-          onStepPointerUp={canvasInteraction.handleStepPointerUp}
-          onStepPointerCancel={canvasInteraction.resetStepDrag}
-          onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
-          onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-          onPolicyChange={updateStep}
-          onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action }, { autoSave: true })}
-          onEditPolicy={setEditingPolicyIndex}
-          onAddPolicyStep={addPolicyStep}
-        />
-      ) : <EmptyState title="No workflow selected." />}
-    </div>
+    <WorkflowCanvas
+      layout={workflowLayout}
+      policyById={policyById}
+      firstPolicy={policyById.get(selected.steps[0] ?? "")}
+      noSelectionValue={noSelection}
+      policyOptions={policyOptions}
+      actionOptions={actionOptions}
+      draggedStepIndex={canvasInteraction.draggedStepIndex}
+      dragOverStepIndex={canvasInteraction.dragOverStepIndex}
+      canvasHeight={canvasInteraction.canvasHeight}
+      isCanvasPanning={canvasInteraction.isCanvasPanning}
+      workflowCanvasRef={canvasInteraction.workflowCanvasRef}
+      canAddFirstPolicy={canAddFirstPolicy}
+      canAddPolicyForEvent={canAddPolicyForEvent}
+      onStepPointerDown={canvasInteraction.handleStepPointerDown}
+      onStepPointerMove={canvasInteraction.handleStepPointerMove}
+      onStepPointerUp={canvasInteraction.handleStepPointerUp}
+      onStepPointerCancel={canvasInteraction.resetStepDrag}
+      onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
+      onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
+      onPolicyChange={updateStep}
+      onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action }, { autoSave: true })}
+      onEditPolicy={setEditingPolicyIndex}
+      onAddPolicyStep={addPolicyStep}
+    />
   );
 }

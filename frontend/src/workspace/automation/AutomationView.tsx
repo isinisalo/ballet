@@ -76,22 +76,33 @@ export function AutomationView({
             />
           </div>
         )}
+        contentClassName={activeTab === "workflows" ? "p-0" : undefined}
       >
-        <div className="grid gap-4">
-          <AutomationIssues issues={data.automationIssues} />
-          {activeTab === "triggers" ? (
-            <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={(id) => selectAutomationEntity("triggers", id)} updateConfig={updateConfig} />
-          ) : null}
-          {activeTab === "actions" ? (
-            <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />
-          ) : null}
-          {activeTab === "outputs" ? (
-            <OutputsAutomationTab config={draft} selectedId={selectedOutputId} onSelect={(id) => selectAutomationEntity("outputs", id)} updateConfig={updateConfig} />
-          ) : null}
-          {activeTab === "workflows" ? (
+        {activeTab === "workflows" ? (
+          <>
+            {data.automationIssues.length > 0 ? (
+              <div className="px-4 py-4">
+                <AutomationIssues issues={data.automationIssues} />
+              </div>
+            ) : null}
             <WorkflowsAutomationTab config={draft} selectedId={selectedWorkflowId} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} />
-          ) : null}
-        </div>
+          </>
+        ) : (
+          <div className="grid gap-4">
+            {data.automationIssues.length > 0 ? (
+              <AutomationIssues issues={data.automationIssues} />
+            ) : null}
+            {activeTab === "triggers" ? (
+              <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} onSelect={(id) => selectAutomationEntity("triggers", id)} updateConfig={updateConfig} />
+            ) : null}
+            {activeTab === "actions" ? (
+              <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />
+            ) : null}
+            {activeTab === "outputs" ? (
+              <OutputsAutomationTab config={draft} selectedId={selectedOutputId} onSelect={(id) => selectAutomationEntity("outputs", id)} updateConfig={updateConfig} />
+            ) : null}
+          </div>
+        )}
       </Panel>
     </div>
   );

@@ -151,7 +151,8 @@ export function Panel({
   icon,
   children,
   action,
-  compact = false
+  compact = false,
+  contentClassName
 }: {
   title: string;
   titleExtra?: ReactNode;
@@ -160,6 +161,7 @@ export function Panel({
   children: ReactNode;
   action?: ReactNode;
   compact?: boolean;
+  contentClassName?: string;
 }) {
   return (
     <Card className="rounded-none ring-0">
@@ -187,7 +189,7 @@ export function Panel({
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className={cn("px-4 py-4", compact && "py-3")}>{children}</CardContent>
+      <CardContent className={cn("px-4 py-4", compact && "py-3", contentClassName)}>{children}</CardContent>
     </Card>
   );
 }
