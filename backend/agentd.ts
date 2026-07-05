@@ -3,91 +3,18 @@ import { fileURLToPath } from "node:url";
 import type { AppData } from "../shared/api/workspaceData.js";
 import type { Agent } from "../shared/domain/agents.js";
 import type { RuntimeEvent } from "../shared/domain/events.js";
-import type { AgentOutcome, AgentOutputEventStatus, AgentRun } from "../shared/domain/runtime.js";
-import type { ProjectAction, ProjectOutput, ProjectPolicy } from "../shared/domain/automation.js";
-import { actionOutputIds } from "../shared/policy-actions.js";
+import type { AgentOutcome, AgentRun } from "../shared/domain/runtime.js";
 import { store } from "./store.js";
 import { notifyRuntimeChanged } from "./runtime-events.js";
 import { runCodexAgent } from "./codex-adapter.js";
 import { outcomeToRunStatus } from "./runtime-policy.js";
-import { mapAgentOutputToEvent } from "./automation.js";
+export { outcomeToOutputEventStatus } from "./automation/actionOutputAggregator.js";
 
 const workerId = process.env.BALLET_AGENTD_WORKER_ID ?? `agentd-${process.pid}`;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const findAgent = (data: AppData, role: string): Agent | undefined => data.agents.find((agent) => agent.id === role);
-
-const firstAllowedOutput = (
-  allowedOutputIds: string[],
-  preferred: string[],
-  fallback: string
-): AgentOutputEventStatus => preferred.find((outputId) => allowedOutputIds.includes(outputId)) ?? fallback;
-
-export const outcomeToOutputEventStatus = (
-  outcome: AgentOutcome,
-  policy: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>
-): AgentOutputEventStatus => {
-  const allowedOutputIds = actionOutputIds(actions, policy.action);
-  switch (outcome.outcome) {
-    case "failed":
-      return firstAllowedOutput(allowedOutputIds, ["failed"], "failed");
-    case "blocked":
-    case "needs_input":
-      return firstAllowedOutput(allowedOutputIds, ["blocked", "failed"], "blocked");
-    case "changes_requested":
-      return firstAllowedOutput(allowedOutputIds, ["changes_requested", "rejected", "blocked"], "changes_requested");
-    case "approved":
-      return firstAllowedOutput(allowedOutputIds, ["approved", "accepted", "complete", "completed"], "approved");
-    case "ready":
-      return firstAllowedOutput(
-        allowedOutputIds,
-        policy.action === "deploy" ? ["deployed", "ready", "complete", "completed"] : ["ready", "complete", "completed"],
-        "ready"
-      );
-  }
-};
-
-const actionOutputType = (
-  policy: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
-  outputs: Array<Pick<ProjectOutput, "id" | "type">>,
-  outputId: string
-) => {
-  const allowedOutputIds = actionOutputIds(actions, policy.action);
-  if (!allowedOutputIds.includes(outputId)) return undefined;
-  return outputs.find((output) => output.id === outputId)?.type ?? "event";
-};
-
-export const agentOutcomeDomainEvent = (
-  outcome: AgentOutcome,
-  policy: ProjectPolicy,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
-  outputs: Array<Pick<ProjectOutput, "id" | "type">>,
-  context: {
-    runId: string;
-    triggerEventId: string;
-    policyId: string;
-    policyVersion: number;
-  }
-): { type: string; source: string; payload: Record<string, unknown> } | undefined => {
-  const outputStatus = outcomeToOutputEventStatus(outcome, policy, actions);
-  if (actionOutputType(policy, actions, outputs, outputStatus) === "gate") return undefined;
-
-  const routed = mapAgentOutputToEvent(policy, {
-    ...context,
-    status: outputStatus,
-    outcome: outcome.outcome,
-    summary: outcome.summary,
-    raw: outcome
-  });
-  return {
-    type: routed.id,
-    source: routed.source,
-    payload: routed.payload
-  };
-};
 
 const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): string => {
   return [
@@ -115,15 +42,22 @@ const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): str
   ].join("\n");
 };
 
-const completeFailed = (run: AgentRun, error: unknown) => {
+const completeFailed = (run: AgentRun, error: unknown, data?: AppData) => {
   const message = error instanceof Error ? error.message : String(error);
+  const policy = data?.automation.policies.find((candidate) => candidate.id === run.policyId);
   store.runtimeDatabase().appendRunLog(run.runId, "error", message);
-  store.runtimeDatabase().completeRun({
+  const result = store.runtimeDatabase().completeRun({
     runId: run.runId,
     status: "failed",
-    error: message
+    error: message,
+    projectPolicy: policy,
+    actions: data?.automation.actions,
+    outputs: data?.automation.outputs,
+    policies: data?.policies,
+    agents: data?.agents
   });
   notifyRuntimeChanged("agent-runs");
+  if (result.event) notifyRuntimeChanged("events");
 };
 
 const completeWithOutcome = (
@@ -136,17 +70,10 @@ const completeWithOutcome = (
 ) => {
   let status = outcomeToRunStatus(outcome);
   let error: string | undefined;
-  let domainEvent: { type: string; source: string; payload: Record<string, unknown> } | undefined;
+  const policy = data.automation.policies.find((candidate) => candidate.id === run.policyId);
 
   try {
-    const policy = data.automation.policies.find((candidate) => candidate.id === run.policyId);
     if (!policy) throw new Error(`Automation policy ${run.policyId} was not found.`);
-    domainEvent = agentOutcomeDomainEvent(outcome, policy, data.automation.actions, data.automation.outputs, {
-      runId: run.runId,
-      triggerEventId: trigger.eventId,
-      policyId: run.policyId,
-      policyVersion: run.policyVersion
-    });
   } catch (mappingError) {
     status = "failed";
     error = mappingError instanceof Error ? mappingError.message : "Agent output could not be mapped to an event.";
@@ -159,7 +86,9 @@ const completeWithOutcome = (
     error,
     threadId,
     turnId,
-    domainEvent: error ? undefined : domainEvent,
+    projectPolicy: error ? undefined : policy,
+    actions: data.automation.actions,
+    outputs: data.automation.outputs,
     policies: data.policies,
     agents: data.agents
   });
@@ -180,9 +109,10 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
   if (!run) return false;
   notifyRuntimeChanged("agent-runs");
   runtime.appendRunLog(run.runId, "info", "Run leased by agentd.", { worker_id: workerId });
+  let data: AppData | undefined;
 
   try {
-    const data = await store.read();
+    data = await store.read();
     const agent = findAgent(data, run.agentRole);
     if (!agent) throw new Error(`Agent role ${run.agentRole} was not found in .codex/agents.`);
     if (!agent.enabled) throw new Error(`Agent role ${run.agentRole} is disabled.`);
@@ -209,7 +139,7 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
 
     completeWithOutcome(run, trigger, result.outcome, data, result.threadId, result.turnId);
   } catch (error) {
-    completeFailed(run, error);
+    completeFailed(run, error, data);
   }
 
   return true;

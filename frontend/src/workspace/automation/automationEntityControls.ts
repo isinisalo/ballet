@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
+import type { Agent, ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
 import { defaultPolicyOutputIds } from "../../../../shared/policy-actions";
 import { automationSectionPath } from "../routing";
 import type { AutomationTab } from "../types";
@@ -11,6 +11,7 @@ type ControlsInput = {
   activeTab: AutomationTab;
   selectedId?: string;
   draft: ProjectAutomationConfig;
+  agents?: Agent[];
   setDraft: DraftSetter;
   navigate: (path: string) => void;
 };
@@ -30,6 +31,7 @@ const selectedEntityIds = (activeTab: AutomationTab, selectedId: string | undefi
 const addEntityConfig = (
   activeTab: AutomationTab,
   draft: ProjectAutomationConfig,
+  agents: Agent[] | undefined,
   setDraft: DraftSetter,
   selectAutomationEntity: SelectAutomationEntity
 ) => {
@@ -53,7 +55,12 @@ const addEntityConfig = (
             const outputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
             return {
               ...current,
-              actions: [...current.actions, { id, description: "New action", outputIds: outputIds.length > 0 ? outputIds : availableOutputIds.slice(0, 1) }]
+              actions: [...current.actions, {
+                id,
+                description: "New action",
+                outputIds: outputIds.length > 0 ? outputIds : availableOutputIds.slice(0, 1),
+                agentIds: agents?.[0]?.id ? [agents[0].id] : []
+              }]
             };
           });
           selectAutomationEntity("actions", id);
@@ -166,7 +173,7 @@ export const createAutomationEntityControls = (input: ControlsInput) => {
   const selectAutomationEntity = (tab: AutomationTab, id?: string) => navigate(automationSectionPath(tab, id));
 
   return {
-    addConfig: addEntityConfig(activeTab, draft, setDraft, selectAutomationEntity),
+    addConfig: addEntityConfig(activeTab, draft, input.agents, setDraft, selectAutomationEntity),
     deleteConfig: deleteEntityConfig(input, ids, selectAutomationEntity),
     ...ids,
     selectAutomationEntity

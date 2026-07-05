@@ -12,7 +12,6 @@ export type WorkflowCanvasProps = {
   firstPolicy?: ProjectPolicy;
   noSelectionValue: string;
   policyOptions: WorkflowCanvasOption[];
-  agentOptions: WorkflowCanvasOption[];
   actionOptions: WorkflowCanvasOption[];
   draggedStepIndex: number | null;
   dragOverStepIndex: number | null;
@@ -28,7 +27,6 @@ export type WorkflowCanvasProps = {
   onCanvasMoveStart: () => void;
   onCanvasMoveEnd: () => void;
   onPolicyChange: (index: number, policyId: string) => void;
-  onAgentChange: (record: WorkflowStepRecord, agent: string) => void;
   onActionChange: (record: WorkflowStepRecord, action: string) => void;
   onSavePolicy: () => void;
   onEditPolicy: (index: number) => void;

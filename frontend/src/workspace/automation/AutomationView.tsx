@@ -39,7 +39,7 @@ export function AutomationView({
     selectedTriggerId,
     selectedWorkflowId,
     selectAutomationEntity
-  } = createAutomationEntityControls({ activeTab, selectedId, draft, setDraft, navigate });
+  } = createAutomationEntityControls({ activeTab, selectedId, draft, agents: data.agents, setDraft, navigate });
   const workflowNameEditor = useWorkflowHeaderNameEditor({
     activeTab,
     draft,
@@ -86,10 +86,10 @@ export function AutomationView({
             <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "outputs" ? (
-            <OutputsAutomationTab agents={data.agents} config={draft} selectedId={selectedOutputId} onSelect={(id) => selectAutomationEntity("outputs", id)} updateConfig={updateConfig} />
+            <OutputsAutomationTab config={draft} selectedId={selectedOutputId} onSelect={(id) => selectAutomationEntity("outputs", id)} updateConfig={updateConfig} />
           ) : null}
           {activeTab === "workflows" ? (
-            <WorkflowsAutomationTab data={data} config={draft} selectedId={selectedWorkflowId} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} />
+            <WorkflowsAutomationTab config={draft} selectedId={selectedWorkflowId} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} />
           ) : null}
         </div>
       </Panel>

@@ -15,6 +15,7 @@ export interface ProjectAction {
   id: string;
   description: string;
   outputIds: string[];
+  agentIds: string[];
 }
 
 export type ProjectOutputType = "event" | "gate";
@@ -30,7 +31,6 @@ export interface ProjectPolicy {
   source: "event" | "trigger";
   event?: string;
   trigger?: string;
-  agent: string;
   action: string;
   enabled: boolean;
 }

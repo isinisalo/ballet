@@ -1,6 +1,5 @@
-import type { Agent } from "../../../../shared/api/workspace-contracts";
 import type { ProjectPolicy } from "../../../../shared/api/workspace-contracts";
-import { agentTokenCandidates, generatedPolicyId, normalizePolicyToken, preferredAgentToken } from "../../../../shared/policy-actions";
+import { generatedPolicyId, normalizePolicyToken } from "../../../../shared/policy-actions";
 
 const slugValue = (value: string, fallback: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;
@@ -18,20 +17,11 @@ export const uniqueAutomationId = (base: string, ids: string[]) => {
   return candidate;
 };
 
-export const automationAgentOptions = (agents: Agent[]) => {
-  const used = new Set<string>();
-  return agents.map((agent) => {
-    const token = agentTokenCandidates(agent).find((candidate) => !used.has(candidate)) ?? preferredAgentToken(agent);
-    used.add(token);
-    return { value: token, label: agent.name };
-  });
-};
-
-export const uniquePolicyAction = (event: string, agent: string, baseAction: string, policies: ProjectPolicy[]) => {
+export const uniquePolicyAction = (event: string, baseAction: string, policies: ProjectPolicy[]) => {
   const base = normalizePolicyToken(baseAction) || "action";
   let action = base;
   let suffix = 2;
-  while (policies.some((policy) => policy.id === generatedPolicyId({ source: "event", event, agent, action }))) {
+  while (policies.some((policy) => policy.id === generatedPolicyId({ source: "event", event, action }))) {
     action = `${base}-${suffix}`;
     suffix += 1;
   }

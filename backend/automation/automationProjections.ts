@@ -1,4 +1,3 @@
-import type { Agent } from "../../shared/domain/agents.js";
 import type {
   Policy,
   ProjectAction,
@@ -10,26 +9,23 @@ import type { ProjectRuntime, Runtime } from "../../shared/domain/runtime.js";
 import {
   defaultPolicyOutputIds,
   policyActionTokens,
-  policyEventTypesForAgentsAndActions,
+  policyEventTypesForActions,
   policySourceKey,
-  resolvePolicyAgent
 } from "../../shared/policy-actions.js";
 
 const timestamp = "1970-01-01T00:00:00.000Z";
 
 export const automationPoliciesToEventDefinitions = (
   policies: ProjectPolicy[] = [],
-  agents: Agent[] = [],
   triggers: ProjectTrigger[] = [],
   actions: ProjectAction[] = [],
   outputs: Array<{ id: string; type: "event" | "gate" }> = []
 ): EventDefinition[] =>
   [...new Set([
-    ...policyEventTypesForAgentsAndActions(
-      agents,
+    ...policyEventTypesForActions(
       actions.length > 0
         ? actions
-        : policyActionTokens(policies).map((id) => ({ id, outputIds: [...defaultPolicyOutputIds] })),
+        : policyActionTokens(policies).map((id) => ({ id, outputIds: [...defaultPolicyOutputIds], agentIds: [] })),
       outputs
     ),
     ...triggers.map((trigger) => `trigger.${trigger.id}`)
@@ -46,31 +42,38 @@ export const automationPoliciesToEventDefinitions = (
       payloadExample: {},
       createdAt: timestamp,
       updatedAt: timestamp
-    }));
-
-export const automationPoliciesToPolicies = (policies: ProjectPolicy[], agents: Agent[] = []): Policy[] =>
-  policies.map((policy) => ({
-    id: policy.id,
-    name: policy.id,
-    description: "",
-    active: policy.enabled,
-    match: {
-      eventTypes: [policySourceKey(policy)],
-      projectId: "*",
-      source: "*"
-    },
-    action: {
-      type: "start_agent_run",
-      targetAgentId: resolvePolicyAgent(agents, policy.agent)?.id ?? policy.agent
-    },
-    projectId: "*",
-    eventTypes: [policySourceKey(policy)],
-    source: "*",
-    payloadMetadata: {},
-    targetAgentId: resolvePolicyAgent(agents, policy.agent)?.id ?? policy.agent,
-    createdAt: timestamp,
-    updatedAt: timestamp
   }));
+
+export const automationPoliciesToPolicies = (
+  policies: ProjectPolicy[],
+  actions: ProjectAction[] = []
+): Policy[] =>
+  policies.flatMap((policy) => {
+    const action = actions.find((candidate) => candidate.id === policy.action);
+    const targetAgentIds = action?.agentIds ?? [];
+    return targetAgentIds.map((targetAgentId) => ({
+      id: policy.id,
+      name: policy.id,
+      description: "",
+      active: policy.enabled,
+      match: {
+        eventTypes: [policySourceKey(policy)],
+        projectId: "*",
+        source: "*"
+      },
+      action: {
+        type: "start_agent_run" as const,
+        targetAgentId
+      },
+      projectId: "*",
+      eventTypes: [policySourceKey(policy)],
+      source: "*",
+      payloadMetadata: {},
+      targetAgentId,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }));
+  });
 
 export const automationRuntimesToRuntimes = (runtimes: ProjectRuntime[]): Runtime[] =>
   runtimes.map((runtime) => ({

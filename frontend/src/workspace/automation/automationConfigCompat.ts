@@ -19,7 +19,8 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
           : fallbackOutputIds;
         return {
           ...action,
-          outputIds: selectedOutputIds.length > 0 ? selectedOutputIds : outputIds.slice(0, 1)
+          outputIds: selectedOutputIds.length > 0 ? selectedOutputIds : outputIds.slice(0, 1),
+          agentIds: Array.isArray(action.agentIds) ? [...new Set(action.agentIds.filter(Boolean))].slice(0, 5) : []
         };
       })
       : defaults.actions,

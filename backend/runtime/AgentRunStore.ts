@@ -137,6 +137,16 @@ export class AgentRunStore {
     return rows.map(toAgentRun);
   }
 
+  getRunsForPolicyTrigger(triggerEventId: string, policyId: string): AgentRun[] {
+    const rows = this.connection().prepare(`
+      SELECT *
+      FROM agent_runs
+      WHERE trigger_event_id = ? AND policy_id = ?
+      ORDER BY created_at ASC, run_id ASC
+    `).all(triggerEventId, policyId) as AgentRunRow[];
+    return rows.map(toAgentRun);
+  }
+
   getRunByDedupe(triggerEventId: string, policyId: string, policyVersion: number, agentRole: string): AgentRun | undefined {
     const row = this.connection().prepare(`
       SELECT *

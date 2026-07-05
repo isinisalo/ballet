@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
-  AppData,
   ProjectAutomationConfig,
   ProjectPolicy,
   ProjectWorkflow
 } from "../../../../../shared/api/workspace-contracts";
-import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType, preferredAgentToken } from "../../../../../shared/policy-actions";
+import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "../../../../../shared/policy-actions";
 import { EmptyState } from "@/components/shared/workspace-ui";
-import { automationAgentOptions, uniquePolicyAction } from "../automationUtils";
+import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { buildWorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
@@ -17,14 +16,12 @@ import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
 const noSelection = "__none__";
 
 export function WorkflowsAutomationTab({
-  data,
   config,
   selectedId,
   onSelect,
   updateConfig,
   saveDraft
 }: {
-  data: AppData;
   config: ProjectAutomationConfig;
   selectedId: string;
   onSelect: (id: string) => void;
@@ -48,8 +45,6 @@ export function WorkflowsAutomationTab({
       description: action.description
     }))
   ];
-  const agentOptions = [{ value: noSelection, label: "No agent" }, ...automationAgentOptions(data.agents)];
-  const defaultAgent = data.agents[0] ? preferredAgentToken(data.agents[0]) : "";
   const defaultAction = config.actions[0]?.id ?? "";
   const selectedActionOutputIds = (actionId: string) => actionOutputIds(config.actions, actionId);
   const workflowOutputTargets = (policy: ProjectPolicy): WorkflowOutputTarget[] =>
@@ -105,7 +100,6 @@ export function WorkflowsAutomationTab({
       source,
       event: source === "event" ? next.event ?? "" : undefined,
       trigger: source === "trigger" ? normalizePolicyToken(next.trigger ?? "") : undefined,
-      agent: normalizePolicyToken(next.agent),
       action: normalizePolicyToken(next.action)
     };
     const nextId = generatedPolicyId(normalized);
@@ -132,31 +126,35 @@ export function WorkflowsAutomationTab({
       ? config.policies.find((policy) => policy.source === "event" && policy.event === eventType && !selectedPolicyIds.has(policy.id))
       : config.policies.find((policy) => !selectedPolicyIds.has(policy.id)) ?? config.policies[0];
     if (!nextPolicy) {
-      const agent = sourcePolicy?.agent || config.policies[0]?.agent || defaultAgent;
       const baseAction = sourcePolicy?.action || defaultAction;
-      if (!agent || !baseAction) return;
+      if (!baseAction) return;
       const generatedSource: ProjectPolicy["source"] = eventType || !config.triggers[0]?.id ? "event" : "trigger";
-      const generatedEvent = eventType || policyOutputEventType({ agent, action: baseAction }, selectedActionOutputIds(baseAction)[0] ?? "");
-      const action = generatedSource === "event" ? uniquePolicyAction(generatedEvent, agent, baseAction, config.policies) : baseAction;
+      const generatedEvent = eventType || policyOutputEventType({ action: baseAction }, selectedActionOutputIds(baseAction)[0] ?? "");
+      const action = generatedSource === "event" ? uniquePolicyAction(generatedEvent, baseAction, config.policies) : baseAction;
       const outputIds = selectedActionOutputIds(action);
       const generatedPolicy: ProjectPolicy = {
         id: generatedPolicyId({
           source: generatedSource,
           event: generatedSource === "event" ? generatedEvent : undefined,
           trigger: generatedSource === "trigger" ? config.triggers[0]?.id ?? "" : undefined,
-          agent,
           action
         }),
         source: generatedSource,
         event: generatedSource === "event" ? generatedEvent : undefined,
         trigger: generatedSource === "trigger" ? config.triggers[0]?.id ?? "" : undefined,
-        agent,
         action,
         enabled: true
       };
       updateConfig((current) => ({
         ...current,
-        actions: current.actions.some((candidate) => candidate.id === action) ? current.actions : [...current.actions, { id: action, description: "", outputIds }],
+        actions: current.actions.some((candidate) => candidate.id === action)
+          ? current.actions
+          : [...current.actions, {
+            id: action,
+            description: "",
+            outputIds,
+            agentIds: current.actions.find((candidate) => candidate.id === baseAction)?.agentIds ?? []
+          }],
         policies: [...current.policies, generatedPolicy],
         workflows: current.workflows.map((workflow) => workflow.id === selected.id ? { ...workflow, steps: [...workflow.steps, generatedPolicy.id] } : workflow)
       }));
@@ -183,10 +181,11 @@ export function WorkflowsAutomationTab({
     updateSelected({ steps: selected?.steps.filter((_, stepIndex) => stepIndex !== index) ?? [] });
   };
 
-  const canAddFirstPolicy = Boolean(defaultAgent && defaultAction);
+  const canAddFirstPolicy = Boolean(defaultAction && (config.actions.find((action) => action.id === defaultAction)?.agentIds.length ?? 0) > 0);
   const canAddPolicyForEvent = (policy?: ProjectPolicy) => {
     const action = policy?.action || defaultAction;
-    return Boolean((policy?.agent || config.policies[0]?.agent || defaultAgent) && action && selectedActionOutputIds(action).length > 0);
+    const actionAgentCount = config.actions.find((candidate) => candidate.id === action)?.agentIds.length ?? 0;
+    return Boolean(action && actionAgentCount > 0 && selectedActionOutputIds(action).length > 0);
   };
 
   return (
@@ -198,7 +197,6 @@ export function WorkflowsAutomationTab({
           firstPolicy={policyById.get(selected.steps[0] ?? "")}
           noSelectionValue={noSelection}
           policyOptions={policyOptions}
-          agentOptions={agentOptions}
           actionOptions={actionOptions}
           draggedStepIndex={canvasInteraction.draggedStepIndex}
           dragOverStepIndex={canvasInteraction.dragOverStepIndex}
@@ -214,7 +212,6 @@ export function WorkflowsAutomationTab({
           onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
           onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
           onPolicyChange={updateStep}
-          onAgentChange={(record, agent) => updateWorkflowPolicy(record, { agent: agent === noSelection ? "" : agent })}
           onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action })}
           onSavePolicy={() => void saveWorkflowPolicyEdit()}
           onEditPolicy={setEditingPolicyIndex}

@@ -12,9 +12,9 @@ export function mapAgentOutputToEvent(
     source: "agentd",
     timestamp: new Date().toISOString(),
     payload: {
-      agent: policy.agent,
       action: policy.action,
       status: output.status,
+      ...(output.agent ? { agent: output.agent } : {}),
       ...(output.outcome ? { outcome: output.outcome } : {}),
       ...(output.summary ? { summary: output.summary } : {}),
       ...(output.runId ? { run_id: output.runId } : {}),

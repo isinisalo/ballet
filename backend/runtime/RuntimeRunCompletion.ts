@@ -6,6 +6,12 @@ import { EventStore } from "./EventStore.js";
 import { AgentRunStore } from "./AgentRunStore.js";
 import { RuntimeProjector } from "./RuntimeProjector.js";
 import { MAX_CORRELATION_DEPTH, now, type CompleteRunInput } from "./RuntimeDbTypes.js";
+import {
+  actionOutputEventType,
+  actionOutputType,
+  aggregateActionOutputStatus,
+  allPolicyRunsTerminal
+} from "../automation/actionOutputAggregator.js";
 
 export class RuntimeRunCompletion {
   constructor(
@@ -44,39 +50,46 @@ export class RuntimeRunCompletion {
         updatedAt: now()
       });
 
+      const run = this.runStore.getRun(input.runId);
+      if (!run) throw new Error("Agent run not found after update.");
       let event: RuntimeEvent | undefined;
       let runs: AgentRun[] = [];
-      if (input.domainEvent) {
-        const run = this.runStore.getRun(input.runId);
-        if (!run) throw new Error("Agent run not found after update.");
+      const domainEvent = input.projectPolicy && input.actions && input.outputs
+        ? this.aggregateDomainEvent(run, input)
+        : input.domainEvent;
+      if (domainEvent) {
         const trigger = this.eventStore.getEventById(run.triggerEventId);
         if (!trigger) throw new Error("Trigger event not found.");
         const nextDepth = trigger.correlation_depth + 1;
         if (nextDepth > MAX_CORRELATION_DEPTH) {
           this.runStore.appendRunLog(run.runId, "warn", "Domain event publication skipped because correlation depth exceeded the runtime limit.", {
-            event_type: input.domainEvent.type,
+            event_type: domainEvent.type,
             max_correlation_depth: MAX_CORRELATION_DEPTH,
             next_correlation_depth: nextDepth
           });
         } else {
           const published = this.projector.insertEventAndProjectPolicies({
             projectId: trigger.project_id,
-            eventType: input.domainEvent.type,
-            source: input.domainEvent.source ?? "agentd",
+            eventType: domainEvent.type,
+            source: domainEvent.source ?? "agentd",
             subject: trigger.subject,
             correlationId: trigger.correlation_id,
             causationId: trigger.event_id,
-            dedupeKey: `domain:${run.runId}:${input.domainEvent.type}`,
+            dedupeKey: input.projectPolicy
+              ? `domain:${run.triggerEventId}:${run.policyId}:${domainEvent.type}`
+              : `domain:${run.runId}:${domainEvent.type}`,
             correlationDepth: nextDepth,
             tags: [],
             payload: {
-              ...input.domainEvent.payload,
+              ...domainEvent.payload,
               run_id: run.runId,
               trigger_event_id: run.triggerEventId,
               policy_id: run.policyId,
               policy_version: run.policyVersion
             },
-            body: `Agent run ${run.runId} produced ${input.domainEvent.type}.`
+            body: input.projectPolicy
+              ? `Agent runs for policy ${run.policyId} produced ${domainEvent.type}.`
+              : `Agent run ${run.runId} produced ${domainEvent.type}.`
           }, input.policies ?? [], input.agents ?? []);
           const publishedRow = this.eventStore.getEventById(published.event.eventId ?? published.event.id);
           event = publishedRow ? this.eventStore.toRuntimeEvent(publishedRow) : undefined;
@@ -89,5 +102,34 @@ export class RuntimeRunCompletion {
       return { run: updated, event, runs };
     });
     return transaction() as { run: AgentRun; event?: RuntimeEvent; runs?: AgentRun[] };
+  }
+
+  private aggregateDomainEvent(
+    run: AgentRun,
+    input: CompleteRunInput
+  ): CompleteRunInput["domainEvent"] | undefined {
+    const policy = input.projectPolicy;
+    if (!policy || !input.actions || !input.outputs) return undefined;
+    const policyRuns = this.runStore.getRunsForPolicyTrigger(run.triggerEventId, run.policyId);
+    if (!allPolicyRunsTerminal(policyRuns)) return undefined;
+
+    const outputStatus = aggregateActionOutputStatus(policyRuns, policy, input.actions);
+    if (actionOutputType(policy, input.actions, input.outputs, outputStatus) === "gate") return undefined;
+
+    return {
+      type: actionOutputEventType(policy, outputStatus),
+      source: "agentd",
+      payload: {
+        action: policy.action,
+        status: outputStatus,
+        agents: policyRuns.map((policyRun) => ({
+          agent: policyRun.agentRole,
+          run_id: policyRun.runId,
+          status: policyRun.status,
+          outcome: policyRun.outcome?.outcome,
+          summary: policyRun.outcome?.summary
+        }))
+      }
+    };
   }
 }

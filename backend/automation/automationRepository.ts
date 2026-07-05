@@ -26,7 +26,7 @@ export const loadProjectAutomationConfigWithIssues = async (
   const { exists, value } = await parseAutomationJson(root);
   if (!exists) return { config: defaultProjectAutomationConfig(), issues: [] };
   return {
-    config: normalizeProjectAutomationConfig(value),
+    config: normalizeProjectAutomationConfig(value, agents),
     issues: validateProjectAutomationConfig(value, agents)
   };
 };
@@ -52,7 +52,7 @@ export const saveProjectAutomationConfig = async (
     throw new AutomationValidationError("Automation config is invalid.", issues);
   }
 
-  const normalized = normalizeProjectAutomationConfig(config);
+  const normalized = normalizeProjectAutomationConfig(config, agents);
   await mkdir(path.join(root, ".ballet"), { recursive: true });
   await writeFile(automationConfigPath(root), `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
   return normalized;

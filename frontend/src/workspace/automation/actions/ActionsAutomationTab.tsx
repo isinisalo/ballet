@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { agentTokenCandidates, generatedPolicyId, policyOutputEventType } from "../../../../../shared/policy-actions";
+import { generatedPolicyId, policyOutputEventType } from "../../../../../shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 
@@ -40,7 +40,8 @@ export function ActionsAutomationTab({
     const normalized = {
       ...next,
       id: editablePolicyToken(next.id),
-      outputIds: [...new Set(next.outputIds)].slice(0, 3)
+      outputIds: [...new Set(next.outputIds)].slice(0, 3),
+      agentIds: [...new Set(next.agentIds)].slice(0, 5)
     };
     updateConfig((current) => {
       const previousAction = current.actions[selectedIndex] ?? selected;
@@ -48,17 +49,14 @@ export function ActionsAutomationTab({
       const nextActions = current.actions.map((action, index) => index === selectedIndex ? normalized : action);
       const eventIdMap = new Map<string, string>();
       if (previousId !== normalized.id) {
-        const agentTokens = [...new Set(agents.flatMap(agentTokenCandidates))];
         const previousOutputIds = previousAction.outputIds.filter((outputId) =>
           current.outputs.find((output) => output.id === outputId)?.type !== "gate"
         );
-        agentTokens.forEach((agent) => {
-          previousOutputIds.forEach((outputId) => {
-            eventIdMap.set(
-              policyOutputEventType({ agent, action: previousId }, outputId),
-              policyOutputEventType({ agent, action: normalized.id }, outputId)
-            );
-          });
+        previousOutputIds.forEach((outputId) => {
+          eventIdMap.set(
+            policyOutputEventType({ action: previousId }, outputId),
+            policyOutputEventType({ action: normalized.id }, outputId)
+          );
         });
       }
       const policyIdMap = new Map<string, string>();
@@ -85,8 +83,12 @@ export function ActionsAutomationTab({
   };
 
   const selectedOutputIds = selected?.outputIds ?? [];
+  const selectedAgentIds = selected?.agentIds ?? [];
   const selectableOutputs = config.outputs.filter((output) => !selectedOutputIds.includes(output.id));
+  const selectableAgents = agents.filter((agent) => !selectedAgentIds.includes(agent.id));
+  const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
   const canAddOutput = selectedOutputIds.length < 3 && selectableOutputs.length > 0;
+  const canAddAgent = selectedAgentIds.length < 5 && selectableAgents.length > 0;
   const addOutput = (outputId: string) => {
     if (!selected || !outputId || selectedOutputIds.includes(outputId) || selectedOutputIds.length >= 3) return;
     updateSelected({ outputIds: [...selectedOutputIds, outputId] });
@@ -95,6 +97,14 @@ export function ActionsAutomationTab({
     if (!selected || selectedOutputIds.length <= 1) return;
     updateSelected({ outputIds: selectedOutputIds.filter((candidate) => candidate !== outputId) });
   };
+  const addAgent = (agentId: string) => {
+    if (!selected || !agentId || selectedAgentIds.includes(agentId) || selectedAgentIds.length >= 5) return;
+    updateSelected({ agentIds: [...selectedAgentIds, agentId] });
+  };
+  const removeAgent = (agentId: string) => {
+    if (!selected || selectedAgentIds.length <= 1) return;
+    updateSelected({ agentIds: selectedAgentIds.filter((candidate) => candidate !== agentId) });
+  };
 
   return (
     <div className="grid gap-4">
@@ -102,6 +112,45 @@ export function ActionsAutomationTab({
         <FieldGroup>
           <TextField label="Action ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
           <TextAreaField label="Description" rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
+          <Field>
+            <FieldLabel>Agents</FieldLabel>
+            <div className="flex min-h-7 flex-wrap items-center gap-2">
+              {selectedAgentIds.map((agentId) => (
+                <Badge key={agentId} variant="outline" className="border-divider-strong bg-muted/50 font-mono">
+                  {agentLabel(agentId)}
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label={`Remove agent ${agentLabel(agentId)}`}
+                    title={`Remove agent ${agentLabel(agentId)}`}
+                    disabled={selectedAgentIds.length <= 1}
+                    onClick={() => removeAgent(agentId)}
+                    className="-mr-1 size-4 rounded-full p-0"
+                  >
+                    <X data-icon="inline-end" />
+                  </Button>
+                </Badge>
+              ))}
+              <Select onValueChange={addAgent} disabled={!canAddAgent}>
+                <SelectTrigger
+                  aria-label="Add agent"
+                  className="h-5 w-auto gap-1 rounded-xl border-dashed border-divider-strong bg-transparent px-2 py-0.5 font-mono text-xs text-muted-foreground shadow-none hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <SelectValue placeholder="+ Agent" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {selectableAgents.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.name ? `${agent.name} · ${agent.id}` : agent.id}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </Field>
           <Field>
             <FieldLabel>Outputs</FieldLabel>
             <div className="flex min-h-7 flex-wrap items-center gap-2">

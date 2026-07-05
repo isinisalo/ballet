@@ -9,11 +9,18 @@ export interface RoutedEvent {
   source: string;
   timestamp: string;
   payload: {
-    agent: string;
+    agent?: string;
     action: string;
     status: AgentOutputEventStatus;
     outcome?: AgentOutcomeStatus;
     summary?: string;
+    agents?: Array<{
+      agent: string;
+      run_id: string;
+      status: string;
+      outcome?: AgentOutcomeStatus;
+      summary?: string;
+    }>;
     run_id?: string;
     trigger_event_id?: string;
     policy_id?: string;

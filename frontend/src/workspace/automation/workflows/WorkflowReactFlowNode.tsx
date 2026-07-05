@@ -184,10 +184,8 @@ function renderPolicySummary(node: WorkflowCanvasLayoutNode, context: WorkflowNo
     <WorkflowPolicySummary
       policy={record.policy}
       editing={Boolean(node.isEditingPolicy)}
-      agentOptions={context.agentOptions}
       actionOptions={context.actionOptions}
       noSelectionValue={context.noSelectionValue}
-      onAgentChange={(agent) => context.onAgentChange(record, agent)}
       onActionChange={(action) => context.onActionChange(record, action)}
     />
   );

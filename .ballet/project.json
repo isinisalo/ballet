@@ -36,11 +36,25 @@
   ],
   "actions": [
     {
-      "id": "route",
+      "id": "route-project",
       "description": "Select the next workflow path without doing role work.",
       "outputIds": [
         "ready",
         "blocked"
+      ],
+      "agentIds": [
+        "project-orchestrator"
+      ]
+    },
+    {
+      "id": "route-delivery",
+      "description": "Select the next workflow path without doing role work.",
+      "outputIds": [
+        "ready",
+        "blocked"
+      ],
+      "agentIds": [
+        "delivery-orchestrator"
       ]
     },
     {
@@ -49,6 +63,9 @@
       "outputIds": [
         "ready",
         "blocked"
+      ],
+      "agentIds": [
+        "intent-reviewer"
       ]
     },
     {
@@ -57,6 +74,9 @@
       "outputIds": [
         "ready",
         "blocked"
+      ],
+      "agentIds": [
+        "roadmap-designer"
       ]
     },
     {
@@ -66,6 +86,9 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "release-designer"
       ]
     },
     {
@@ -75,6 +98,9 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "ux-designer"
       ]
     },
     {
@@ -84,6 +110,9 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "developer-agent"
       ]
     },
     {
@@ -93,15 +122,68 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "qa-agent"
       ]
     },
     {
-      "id": "review",
+      "id": "review-feasibility",
       "description": "Review implementation evidence from one role-specific perspective.",
       "outputIds": [
         "approved",
         "changes_requested",
         "done"
+      ],
+      "agentIds": [
+        "feasibility-reviewer"
+      ]
+    },
+    {
+      "id": "review-intent",
+      "description": "Review implementation evidence from one role-specific perspective.",
+      "outputIds": [
+        "changes_requested",
+        "done"
+      ],
+      "agentIds": [
+        "intent-reviewer"
+      ]
+    },
+    {
+      "id": "review-architect",
+      "description": "Review implementation evidence from one role-specific perspective.",
+      "outputIds": [
+        "approved",
+        "changes_requested",
+        "done"
+      ],
+      "agentIds": [
+        "architecture-reviewer"
+      ]
+    },
+    {
+      "id": "review-qa-verification-reviewer",
+      "description": "Review implementation evidence from one role-specific perspective.",
+      "outputIds": [
+        "approved",
+        "changes_requested",
+        "done"
+      ],
+      "agentIds": [
+        "qa-verification-reviewer"
+      ]
+    },
+    {
+      "id": "review-ops",
+      "description": "Review implementation evidence from one role-specific perspective.",
+      "outputIds": [
+        "approved",
+        "changes_requested",
+        "done"
+      ],
+      "agentIds": [
+        "ops-release-reviewer"
       ]
     },
     {
@@ -111,6 +193,9 @@
         "approved",
         "changes_requested",
         "blocked"
+      ],
+      "agentIds": [
+        "review-orchestrator"
       ]
     },
     {
@@ -120,6 +205,9 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "documentation-agent"
       ]
     },
     {
@@ -129,6 +217,9 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "documentation-agent"
       ]
     },
     {
@@ -138,6 +229,9 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "devops-agent"
       ]
     },
     {
@@ -147,6 +241,9 @@
         "approved",
         "changes_requested",
         "blocked"
+      ],
+      "agentIds": [
+        "ops-release-reviewer"
       ]
     },
     {
@@ -156,6 +253,9 @@
         "deployed",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "devops-agent"
       ]
     },
     {
@@ -165,6 +265,9 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "troubleshooter"
       ]
     },
     {
@@ -174,6 +277,9 @@
         "ready",
         "blocked",
         "failed"
+      ],
+      "agentIds": [
+        "troubleshooter"
       ]
     }
   ],
@@ -216,300 +322,263 @@
   ],
   "policies": [
     {
-      "id": "on.trigger.intent_changed.then.project.start.route",
       "source": "trigger",
       "trigger": "intent_changed",
-      "agent": "project",
-      "action": "route",
-      "enabled": true
+      "action": "route-project",
+      "enabled": true,
+      "id": "on.trigger.intent_changed.start.route-project"
     },
     {
-      "id": "on.project.route.ready.then.intent.start.analyze-intent",
       "source": "event",
-      "event": "project.route.ready",
-      "agent": "intent",
+      "event": "route-project.ready",
       "action": "analyze-intent",
-      "enabled": true
+      "enabled": true,
+      "id": "on.route-project.ready.start.analyze-intent"
     },
     {
-      "id": "on.intent.analyze-intent.ready.then.roadmap.start.design-roadmap",
       "source": "event",
-      "event": "intent.analyze-intent.ready",
-      "agent": "roadmap",
+      "event": "analyze-intent.ready",
       "action": "design-roadmap",
-      "enabled": true
+      "enabled": true,
+      "id": "on.analyze-intent.ready.start.design-roadmap"
     },
     {
-      "id": "on.trigger.roadmap_approved.then.release.start.design-release",
       "source": "trigger",
       "trigger": "roadmap_approved",
-      "agent": "release",
       "action": "design-release",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.roadmap_approved.start.design-release"
     },
     {
-      "id": "on.trigger.roadmap_approved.then.ux.start.design-ui",
       "source": "trigger",
       "trigger": "roadmap_approved",
-      "agent": "ux",
       "action": "design-ui",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.roadmap_approved.start.design-ui"
     },
     {
-      "id": "on.release.design-release.ready.then.feasibility.start.review",
       "source": "event",
-      "event": "release.design-release.ready",
-      "agent": "feasibility",
-      "action": "review",
-      "enabled": true
+      "event": "design-release.ready",
+      "action": "review-feasibility",
+      "enabled": true,
+      "id": "on.design-release.ready.start.review-feasibility"
     },
     {
-      "id": "on.ux.design-ui.ready.then.feasibility.start.review",
       "source": "event",
-      "event": "ux.design-ui.ready",
-      "agent": "feasibility",
-      "action": "review",
-      "enabled": true
+      "event": "design-ui.ready",
+      "action": "review-feasibility",
+      "enabled": true,
+      "id": "on.design-ui.ready.start.review-feasibility"
     },
     {
-      "id": "on.feasibility.review.changes_requested.then.release.start.design-release",
       "source": "event",
-      "event": "feasibility.review.changes_requested",
-      "agent": "release",
+      "event": "review-feasibility.changes_requested",
       "action": "design-release",
-      "enabled": true
+      "enabled": true,
+      "id": "on.review-feasibility.changes_requested.start.design-release"
     },
     {
-      "id": "on.feasibility.review.changes_requested.then.ux.start.design-ui",
       "source": "event",
-      "event": "feasibility.review.changes_requested",
-      "agent": "ux",
+      "event": "review-feasibility.changes_requested",
       "action": "design-ui",
-      "enabled": true
+      "enabled": true,
+      "id": "on.review-feasibility.changes_requested.start.design-ui"
     },
     {
-      "id": "on.trigger.implementation_plan_approved.then.delivery.start.route",
       "source": "trigger",
       "trigger": "implementation_plan_approved",
-      "agent": "delivery",
-      "action": "route",
-      "enabled": true
+      "action": "route-delivery",
+      "enabled": true,
+      "id": "on.trigger.implementation_plan_approved.start.route-delivery"
     },
     {
-      "id": "on.delivery.route.ready.then.developer.start.implement",
       "source": "event",
-      "event": "delivery.route.ready",
-      "agent": "developer",
+      "event": "route-delivery.ready",
       "action": "implement",
-      "enabled": true
+      "enabled": true,
+      "id": "on.route-delivery.ready.start.implement"
     },
     {
-      "id": "on.developer.implement.ready.then.qa.start.verify",
       "source": "event",
-      "event": "developer.implement.ready",
-      "agent": "qa",
+      "event": "implement.ready",
       "action": "verify",
-      "enabled": true
+      "enabled": true,
+      "id": "on.implement.ready.start.verify"
     },
     {
-      "id": "on.qa.verify.ready.then.intent.start.review",
       "source": "event",
-      "event": "qa.verify.ready",
-      "agent": "intent",
-      "action": "review",
-      "enabled": true
+      "event": "verify.ready",
+      "action": "review-intent",
+      "enabled": true,
+      "id": "on.verify.ready.start.review-intent"
     },
     {
-      "id": "on.qa.verify.ready.then.architect.start.review",
       "source": "event",
-      "event": "qa.verify.ready",
-      "agent": "architect",
-      "action": "review",
-      "enabled": true
+      "event": "verify.ready",
+      "action": "review-architect",
+      "enabled": true,
+      "id": "on.verify.ready.start.review-architect"
     },
     {
-      "id": "on.qa.verify.ready.then.qa-verification-reviewer.start.review",
       "source": "event",
-      "event": "qa.verify.ready",
-      "agent": "qa-verification-reviewer",
-      "action": "review",
-      "enabled": true
+      "event": "verify.ready",
+      "action": "review-qa-verification-reviewer",
+      "enabled": true,
+      "id": "on.verify.ready.start.review-qa-verification-reviewer"
     },
     {
-      "id": "on.qa.verify.ready.then.ops.start.review",
       "source": "event",
-      "event": "qa.verify.ready",
-      "agent": "ops",
-      "action": "review",
-      "enabled": true
+      "event": "verify.ready",
+      "action": "review-ops",
+      "enabled": true,
+      "id": "on.verify.ready.start.review-ops"
     },
     {
-      "id": "on.qa-verification-reviewer.review.approved.then.review.start.aggregate-review",
       "source": "event",
-      "event": "qa-verification-reviewer.review.approved",
-      "agent": "review",
+      "event": "review-qa-verification-reviewer.approved",
       "action": "aggregate-review",
-      "enabled": true
+      "enabled": true,
+      "id": "on.review-qa-verification-reviewer.approved.start.aggregate-review"
     },
     {
-      "id": "on.intent.review.changes_requested.then.delivery.start.route",
       "source": "event",
-      "event": "intent.review.changes_requested",
-      "agent": "delivery",
-      "action": "route",
-      "enabled": true
+      "event": "review-intent.changes_requested",
+      "action": "analyze-intent",
+      "enabled": true,
+      "id": "on.review-intent.changes_requested.start.analyze-intent"
     },
     {
-      "id": "on.architect.review.changes_requested.then.delivery.start.route",
       "source": "event",
-      "event": "architect.review.changes_requested",
-      "agent": "delivery",
-      "action": "route",
-      "enabled": true
+      "event": "review-architect.changes_requested",
+      "action": "route-delivery",
+      "enabled": true,
+      "id": "on.review-architect.changes_requested.start.route-delivery"
     },
     {
-      "id": "on.qa-verification-reviewer.review.changes_requested.then.delivery.start.route",
       "source": "event",
-      "event": "qa-verification-reviewer.review.changes_requested",
-      "agent": "delivery",
-      "action": "route",
-      "enabled": true
+      "event": "review-qa-verification-reviewer.changes_requested",
+      "action": "route-delivery",
+      "enabled": true,
+      "id": "on.review-qa-verification-reviewer.changes_requested.start.route-delivery"
     },
     {
-      "id": "on.ops.review.changes_requested.then.delivery.start.route",
       "source": "event",
-      "event": "ops.review.changes_requested",
-      "agent": "delivery",
-      "action": "route",
-      "enabled": true
+      "event": "review-ops.changes_requested",
+      "action": "route-delivery",
+      "enabled": true,
+      "id": "on.review-ops.changes_requested.start.route-delivery"
     },
     {
-      "id": "on.review.aggregate-review.changes_requested.then.delivery.start.route",
       "source": "event",
-      "event": "review.aggregate-review.changes_requested",
-      "agent": "delivery",
-      "action": "route",
-      "enabled": true
+      "event": "aggregate-review.changes_requested",
+      "action": "route-delivery",
+      "enabled": true,
+      "id": "on.aggregate-review.changes_requested.start.route-delivery"
     },
     {
-      "id": "on.developer.implement.failed.then.troubleshooter.start.troubleshoot",
       "source": "event",
-      "event": "developer.implement.failed",
-      "agent": "troubleshooter",
+      "event": "implement.failed",
       "action": "troubleshoot",
-      "enabled": true
+      "enabled": true,
+      "id": "on.implement.failed.start.troubleshoot"
     },
     {
-      "id": "on.qa.verify.failed.then.troubleshooter.start.troubleshoot",
       "source": "event",
-      "event": "qa.verify.failed",
-      "agent": "troubleshooter",
+      "event": "verify.failed",
       "action": "troubleshoot",
-      "enabled": true
+      "enabled": true,
+      "id": "on.verify.failed.start.troubleshoot"
     },
     {
-      "id": "on.troubleshooter.troubleshoot.ready.then.devops.start.deploy",
       "source": "event",
-      "event": "troubleshooter.troubleshoot.ready",
-      "agent": "devops",
+      "event": "troubleshoot.ready",
       "action": "deploy",
-      "enabled": true
+      "enabled": true,
+      "id": "on.troubleshoot.ready.start.deploy"
     },
     {
-      "id": "on.trigger.review_gate_approved.then.documentation.start.document",
       "source": "trigger",
       "trigger": "review_gate_approved",
-      "agent": "documentation",
       "action": "document",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.review_gate_approved.start.document"
     },
     {
-      "id": "on.documentation.document.ready.then.devops.start.prepare-deploy",
       "source": "event",
-      "event": "documentation.document.ready",
-      "agent": "devops",
+      "event": "document.ready",
       "action": "prepare-deploy",
-      "enabled": true
+      "enabled": true,
+      "id": "on.document.ready.start.prepare-deploy"
     },
     {
-      "id": "on.devops.prepare-deploy.ready.then.ops.start.review-release",
       "source": "event",
-      "event": "devops.prepare-deploy.ready",
-      "agent": "ops",
+      "event": "prepare-deploy.ready",
       "action": "review-release",
-      "enabled": true
+      "enabled": true,
+      "id": "on.prepare-deploy.ready.start.review-release"
     },
     {
-      "id": "on.ops.review-release.changes_requested.then.devops.start.prepare-deploy",
       "source": "event",
-      "event": "ops.review-release.changes_requested",
-      "agent": "devops",
+      "event": "review-release.changes_requested",
       "action": "prepare-deploy",
-      "enabled": true
+      "enabled": true,
+      "id": "on.review-release.changes_requested.start.prepare-deploy"
     },
     {
-      "id": "on.trigger.release_approved.then.devops.start.deploy",
       "source": "trigger",
       "trigger": "release_approved",
-      "agent": "devops",
       "action": "deploy",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.release_approved.start.deploy"
     },
     {
-      "id": "on.trigger.production_deploy_approved.then.devops.start.deploy",
       "source": "trigger",
       "trigger": "production_deploy_approved",
-      "agent": "devops",
       "action": "deploy",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.production_deploy_approved.start.deploy"
     },
     {
-      "id": "on.devops.deploy.deployed.then.documentation.start.document-release",
       "source": "event",
-      "event": "devops.deploy.deployed",
-      "agent": "documentation",
+      "event": "deploy.deployed",
       "action": "document-release",
-      "enabled": true
+      "enabled": true,
+      "id": "on.deploy.deployed.start.document-release"
     },
     {
-      "id": "on.devops.deploy.failed.then.troubleshooter.start.troubleshoot",
       "source": "event",
-      "event": "devops.deploy.failed",
-      "agent": "troubleshooter",
+      "event": "deploy.failed",
       "action": "troubleshoot",
-      "enabled": true
+      "enabled": true,
+      "id": "on.deploy.failed.start.troubleshoot"
     },
     {
-      "id": "on.trigger.ci_or_validation_failed.then.troubleshooter.start.troubleshoot",
       "source": "trigger",
       "trigger": "ci_or_validation_failed",
-      "agent": "troubleshooter",
       "action": "troubleshoot",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.ci_or_validation_failed.start.troubleshoot"
     },
     {
-      "id": "on.trigger.incident_reported.then.troubleshooter.start.triage-incident",
       "source": "trigger",
       "trigger": "incident_reported",
-      "agent": "troubleshooter",
       "action": "triage-incident",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.incident_reported.start.triage-incident"
     },
     {
-      "id": "on.troubleshooter.triage-incident.ready.then.release.start.design-release",
       "source": "event",
-      "event": "troubleshooter.triage-incident.ready",
-      "agent": "release",
+      "event": "triage-incident.ready",
       "action": "design-release",
-      "enabled": true
+      "enabled": true,
+      "id": "on.triage-incident.ready.start.design-release"
     },
     {
-      "id": "on.roadmap.design-roadmap.ready.then.intent.start.review",
       "source": "event",
-      "event": "roadmap.design-roadmap.ready",
-      "agent": "intent",
-      "action": "review",
-      "enabled": true
+      "event": "design-roadmap.ready",
+      "action": "review-intent",
+      "enabled": true,
+      "id": "on.design-roadmap.ready.start.review-intent"
     }
   ],
   "workflows": [
@@ -517,74 +586,75 @@
       "id": "intent-to-roadmap",
       "title": "Intent to roadmap",
       "steps": [
-        "on.trigger.intent_changed.then.project.start.route",
-        "on.project.route.ready.then.intent.start.analyze-intent",
-        "on.intent.analyze-intent.ready.then.roadmap.start.design-roadmap",
-        "on.roadmap.design-roadmap.ready.then.intent.start.review"
+        "on.trigger.intent_changed.start.route-project",
+        "on.route-project.ready.start.analyze-intent",
+        "on.analyze-intent.ready.start.design-roadmap",
+        "on.design-roadmap.ready.start.review-intent",
+        "on.review-intent.changes_requested.start.analyze-intent"
       ]
     },
     {
       "id": "roadmap-to-implementation-plan",
       "title": "Roadmap to implementation plan",
       "steps": [
-        "on.trigger.roadmap_approved.then.release.start.design-release",
-        "on.trigger.roadmap_approved.then.ux.start.design-ui",
-        "on.release.design-release.ready.then.feasibility.start.review",
-        "on.ux.design-ui.ready.then.feasibility.start.review",
-        "on.feasibility.review.changes_requested.then.release.start.design-release",
-        "on.feasibility.review.changes_requested.then.ux.start.design-ui"
+        "on.trigger.roadmap_approved.start.design-release",
+        "on.trigger.roadmap_approved.start.design-ui",
+        "on.design-release.ready.start.review-feasibility",
+        "on.design-ui.ready.start.review-feasibility",
+        "on.review-feasibility.changes_requested.start.design-release",
+        "on.review-feasibility.changes_requested.start.design-ui"
       ]
     },
     {
       "id": "implementation-loop",
       "title": "Implementation loop",
       "steps": [
-        "on.trigger.implementation_plan_approved.then.delivery.start.route",
-        "on.delivery.route.ready.then.developer.start.implement",
-        "on.developer.implement.ready.then.qa.start.verify",
-        "on.qa.verify.ready.then.intent.start.review",
-        "on.qa.verify.ready.then.architect.start.review",
-        "on.qa.verify.ready.then.qa-verification-reviewer.start.review",
-        "on.qa.verify.ready.then.ops.start.review",
-        "on.qa-verification-reviewer.review.approved.then.review.start.aggregate-review",
-        "on.intent.review.changes_requested.then.delivery.start.route",
-        "on.architect.review.changes_requested.then.delivery.start.route",
-        "on.qa-verification-reviewer.review.changes_requested.then.delivery.start.route",
-        "on.ops.review.changes_requested.then.delivery.start.route",
-        "on.review.aggregate-review.changes_requested.then.delivery.start.route",
-        "on.developer.implement.failed.then.troubleshooter.start.troubleshoot",
-        "on.qa.verify.failed.then.troubleshooter.start.troubleshoot",
-        "on.troubleshooter.troubleshoot.ready.then.devops.start.deploy"
+        "on.trigger.implementation_plan_approved.start.route-delivery",
+        "on.route-delivery.ready.start.implement",
+        "on.implement.ready.start.verify",
+        "on.verify.ready.start.review-intent",
+        "on.verify.ready.start.review-architect",
+        "on.verify.ready.start.review-qa-verification-reviewer",
+        "on.verify.ready.start.review-ops",
+        "on.review-qa-verification-reviewer.approved.start.aggregate-review",
+        "on.review-intent.changes_requested.start.analyze-intent",
+        "on.review-architect.changes_requested.start.route-delivery",
+        "on.review-qa-verification-reviewer.changes_requested.start.route-delivery",
+        "on.review-ops.changes_requested.start.route-delivery",
+        "on.aggregate-review.changes_requested.start.route-delivery",
+        "on.implement.failed.start.troubleshoot",
+        "on.verify.failed.start.troubleshoot",
+        "on.troubleshoot.ready.start.deploy"
       ]
     },
     {
       "id": "documentation-and-release-preparation",
       "title": "Documentation and release preparation",
       "steps": [
-        "on.trigger.review_gate_approved.then.documentation.start.document",
-        "on.documentation.document.ready.then.devops.start.prepare-deploy",
-        "on.devops.prepare-deploy.ready.then.ops.start.review-release",
-        "on.ops.review-release.changes_requested.then.devops.start.prepare-deploy"
+        "on.trigger.review_gate_approved.start.document",
+        "on.document.ready.start.prepare-deploy",
+        "on.prepare-deploy.ready.start.review-release",
+        "on.review-release.changes_requested.start.prepare-deploy"
       ]
     },
     {
       "id": "deploy",
       "title": "Deploy",
       "steps": [
-        "on.trigger.production_deploy_approved.then.devops.start.deploy",
-        "on.devops.deploy.deployed.then.documentation.start.document-release",
-        "on.devops.deploy.failed.then.troubleshooter.start.troubleshoot",
-        "on.troubleshooter.troubleshoot.ready.then.devops.start.deploy"
+        "on.trigger.production_deploy_approved.start.deploy",
+        "on.deploy.deployed.start.document-release",
+        "on.deploy.failed.start.troubleshoot",
+        "on.troubleshoot.ready.start.deploy"
       ]
     },
     {
       "id": "incident-and-failure-recovery",
       "title": "Incident and failure recovery",
       "steps": [
-        "on.trigger.ci_or_validation_failed.then.troubleshooter.start.troubleshoot",
-        "on.troubleshooter.troubleshoot.ready.then.devops.start.deploy",
-        "on.trigger.incident_reported.then.troubleshooter.start.triage-incident",
-        "on.troubleshooter.triage-incident.ready.then.release.start.design-release"
+        "on.trigger.ci_or_validation_failed.start.troubleshoot",
+        "on.troubleshoot.ready.start.deploy",
+        "on.trigger.incident_reported.start.triage-incident",
+        "on.triage-incident.ready.start.design-release"
       ]
     }
   ],

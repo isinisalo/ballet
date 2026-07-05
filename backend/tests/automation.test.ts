@@ -42,7 +42,8 @@ const validConfig = (): ProjectAutomationConfig => ({
     {
       id: "implementation",
       description: "Implement approved work.",
-      outputIds: ["failed"]
+      outputIds: ["failed"],
+      agentIds: ["developer-agent"]
     }
   ],
   outputs: [
@@ -59,10 +60,9 @@ const validConfig = (): ProjectAutomationConfig => ({
   ],
   policies: [
     {
-      id: "on.developer.implementation.failed.then.developer.start.implementation",
+      id: "on.implementation.failed.start.implementation",
       source: "event",
-      event: "developer.implementation.failed",
-      agent: "developer",
+      event: "implementation.failed",
       action: "implementation",
       enabled: true
     }
@@ -71,7 +71,7 @@ const validConfig = (): ProjectAutomationConfig => ({
     {
       id: "delivery",
       title: "Delivery",
-      steps: ["on.developer.implementation.failed.then.developer.start.implementation"]
+      steps: ["on.implementation.failed.start.implementation"]
     }
   ],
   runtimes: [
@@ -112,12 +112,12 @@ describe("project automation config", () => {
     const saved = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     expect(saved).not.toHaveProperty("events");
     expect(saved).not.toHaveProperty("gates");
-    expect(saved.policies[0]?.id).toBe("on.developer.implementation.failed.then.developer.start.implementation");
-    expect(saved.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.then.developer.start.implementation"]);
+    expect(saved.policies[0]?.id).toBe("on.implementation.failed.start.implementation");
+    expect(saved.workflows[0]?.steps).toEqual(["on.implementation.failed.start.implementation"]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
   });
 
-  it("normalizes legacy policy fields to event, agent, and action", async () => {
+  it("normalizes legacy policy fields to event and action agents", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".ballet"), { recursive: true });
     const legacy = {
@@ -139,20 +139,19 @@ describe("project automation config", () => {
     const loaded = await loadProjectAutomationConfig(root, [agent]);
     expect(loaded).not.toHaveProperty("events");
     expect(loaded).not.toHaveProperty("gates");
-    expect(loaded.actions).toEqual([{ id: "run", description: "", outputIds: ["complete", "blocked", "failed"] }]);
+    expect(loaded.actions).toEqual([{ id: "run", description: "", outputIds: ["complete", "blocked", "failed"], agentIds: ["developer-agent"] }]);
     expect(loaded.outputs).toEqual([
       { id: "complete", description: "Action completed.", type: "event" },
       { id: "blocked", description: "Action is blocked.", type: "event" },
       { id: "failed", description: "Action failed.", type: "event" }
     ]);
     expect(loaded.policies[0]).toMatchObject({
-      id: "on.developer.run.failed.then.developer.start.run",
+      id: "on.run.failed.start.run",
       source: "event",
-      event: "developer.run.failed",
-      agent: "developer",
+      event: "run.failed",
       action: "run"
     });
-    expect(loaded.workflows[0]?.steps).toEqual(["on.developer.run.failed.then.developer.start.run"]);
+    expect(loaded.workflows[0]?.steps).toEqual(["on.run.failed.start.run"]);
     expect(loaded.runtimes[0]).not.toHaveProperty("outputEvents");
   });
 
@@ -184,13 +183,13 @@ describe("project automation config", () => {
     const loaded = await loadProjectAutomationConfig(root, [agent]);
 
     expect(loaded.policies[0]).toMatchObject({
-      id: "on.developer.implementation.failed.then.developer.start.implementation",
-      event: "developer.implementation.failed"
+      id: "on.implementation.failed.start.implementation",
+      event: "implementation.failed"
     });
     expect(loaded).not.toHaveProperty("gates");
     expect(loaded.outputs.every((output) => output.type === "event")).toBe(true);
     expect(loaded.actions[0]?.outputIds).toEqual(["complete", "blocked", "failed"]);
-    expect(loaded.workflows[0]?.steps).toEqual(["on.developer.implementation.failed.then.developer.start.implementation"]);
+    expect(loaded.workflows[0]?.steps).toEqual(["on.implementation.failed.start.implementation"]);
   });
 
   it("validates policy, runtime, and workflow references while ignoring legacy event definitions", () => {
@@ -228,8 +227,8 @@ describe("project automation config", () => {
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      policies: [{ ...validConfig().policies[0]!, agent: "missing-agent" }]
-    }, [agent]).some((issue) => issue.message === "Policy references unknown agent: missing-agent.")).toBe(true);
+      actions: [{ ...validConfig().actions[0]!, agentIds: ["missing-agent"] }]
+    }, [agent]).some((issue) => issue.message === "Action references unknown agent: missing-agent.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
@@ -281,43 +280,42 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: ["summary"] }],
-      policies: [{ ...validConfig().policies[0]!, event: "developer.implementation.failed" }]
-    }, [agent]).some((issue) => issue.message === "Policy references unknown event: developer.implementation.failed.")).toBe(true);
+      policies: [{ ...validConfig().policies[0]!, event: "implementation.failed" }]
+    }, [agent]).some((issue) => issue.message === "Policy references unknown event: implementation.failed.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: ["failed"] }],
       outputs: [{ id: "failed", description: "Terminal gate", type: "gate" }],
-      policies: [{ ...validConfig().policies[0]!, event: "developer.implementation.failed" }]
-    }, [agent]).some((issue) => issue.message === "Policy references unknown event: developer.implementation.failed.")).toBe(true);
+      policies: [{ ...validConfig().policies[0]!, event: "implementation.failed" }]
+    }, [agent]).some((issue) => issue.message === "Policy references unknown event: implementation.failed.")).toBe(true);
 
     const completedConfig: ProjectAutomationConfig = {
       ...validConfig(),
-      actions: [{ id: "implementation", description: "Implement approved work.", outputIds: ["completed", "failed", "blocked"] }],
+      actions: [{ id: "implementation", description: "Implement approved work.", outputIds: ["completed", "failed", "blocked"], agentIds: ["developer-agent"] }],
       outputs: [
         { id: "completed", description: "Action completed.", type: "event" },
         { id: "failed", description: "Action failed.", type: "event" },
         { id: "blocked", description: "Action is blocked.", type: "event" }
       ],
       policies: [{
-        id: "on.developer.implementation.completed.then.developer.start.implementation",
+        id: "on.implementation.completed.start.implementation",
         source: "event",
-        event: "developer.implementation.completed",
-        agent: "developer",
+        event: "implementation.completed",
         action: "implementation",
         enabled: true
       }],
       workflows: [{
         id: "delivery",
         title: "Delivery",
-        steps: ["on.developer.implementation.completed.then.developer.start.implementation"]
+        steps: ["on.implementation.completed.start.implementation"]
       }]
     };
     expect(validateProjectAutomationConfig(completedConfig, [agent])).toEqual([]);
     expect(validateProjectAutomationConfig({
       ...completedConfig,
-      policies: [{ ...completedConfig.policies[0]!, event: "developer.implementation.complete" }]
-    }, [agent]).some((issue) => issue.message === "Policy references unknown event: developer.implementation.complete.")).toBe(true);
+      policies: [{ ...completedConfig.policies[0]!, event: "implementation.complete" }]
+    }, [agent]).some((issue) => issue.message === "Policy references unknown event: implementation.complete.")).toBe(true);
   });
 
   it("rejects object workflow steps instead of migrating them", () => {
@@ -346,7 +344,7 @@ describe("project automation config", () => {
     expect(issues.some((issue) => issue.message === "Workflow references unknown policy: missing-policy.")).toBe(true);
   });
 
-  it("accepts events derived from any saved agent and action pair", () => {
+  it("accepts events derived from saved action outputs", () => {
     const reviewer: Agent = {
       ...agent,
       id: "reviewer-agent",
@@ -356,17 +354,16 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       policies: [{
-        id: "on.reviewer.implementation.failed.then.developer.start.implementation",
+        id: "on.implementation.failed.start.implementation",
         source: "event",
-        event: "reviewer.implementation.failed",
-        agent: "developer",
+        event: "implementation.failed",
         action: "implementation",
         enabled: true
       }],
       workflows: [{
         id: "delivery",
         title: "Delivery",
-        steps: ["on.reviewer.implementation.failed.then.developer.start.implementation"]
+        steps: ["on.implementation.failed.start.implementation"]
       }]
     }, [agent, reviewer])).toEqual([]);
   });
@@ -376,23 +373,21 @@ describe("project automation config", () => {
       ...validConfig(),
       triggers: [{ id: "plan_approved", description: "Plan approved" }],
       policies: [{
-        id: "on.trigger.plan_approved.then.developer.start.implementation",
+        id: "on.trigger.plan_approved.start.implementation",
         source: "trigger",
         trigger: "plan_approved",
-        agent: "developer",
         action: "implementation",
         enabled: true
       }],
-      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.trigger.plan_approved.then.developer.start.implementation"] }]
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.trigger.plan_approved.start.implementation"] }]
     }, [agent])).toEqual([]);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       policies: [{
-        id: "on.trigger.missing.then.developer.start.implementation",
+        id: "on.trigger.missing.start.implementation",
         source: "trigger",
         trigger: "missing",
-        agent: "developer",
         action: "implementation",
         enabled: true
       }]
@@ -404,21 +399,19 @@ describe("project automation config", () => {
       policies: [{
         id: "bad-policy",
         source: "trigger",
-        event: "developer.implementation.failed",
+        event: "implementation.failed",
         trigger: "plan_approved",
-        agent: "developer",
         action: "implementation",
         enabled: true
       }]
     }, [agent]).some((issue) => issue.message === "Policy must reference either event or trigger, not both.")).toBe(true);
 
     expect(automationPoliciesToPolicies([{
-      id: "on.trigger.plan_approved.then.developer.start.implementation",
+      id: "on.trigger.plan_approved.start.implementation",
       source: "trigger",
       trigger: "plan_approved",
-      agent: "developer",
       action: "implementation",
       enabled: true
-    }], [agent])[0]?.eventTypes).toEqual(["trigger.plan_approved"]);
+    }], [{ id: "implementation", description: "Implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }])[0]?.eventTypes).toEqual(["trigger.plan_approved"]);
   });
 });

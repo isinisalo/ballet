@@ -5,18 +5,14 @@ import { cn } from "@/lib/utils";
 export function WorkflowPolicySummary({
   policy,
   editing,
-  agentOptions,
   actionOptions,
   noSelectionValue,
-  onAgentChange,
   onActionChange
 }: {
   policy: ProjectPolicy;
   editing: boolean;
-  agentOptions: Array<{ value: string; label: string }>;
   actionOptions: Array<{ value: string; label: string; description?: string }>;
   noSelectionValue: string;
-  onAgentChange: (agent: string) => void;
   onActionChange: (action: string) => void;
 }) {
   const sourceValue = policy.source === "trigger" ? policy.trigger : policy.event;
@@ -34,28 +30,6 @@ export function WorkflowPolicySummary({
       <div className="flex min-w-0 items-center gap-1">
         <span className="shrink-0 text-foreground">on:</span>
         <span className="truncate text-primary" title={sourceValue || "Missing source"}>{sourceValue || "Missing source"}</span>
-      </div>
-      <div className="flex min-w-0 items-center gap-1">
-        <span className="shrink-0 text-foreground">then:</span>
-        {editing ? (
-          <select
-            aria-label="Workflow policy agent"
-            className={cn(editSelectClass, "text-secondary")}
-            title={policy.agent || "Missing agent"}
-            value={policy.agent || noSelectionValue}
-            onChange={(event) => onAgentChange(event.target.value)}
-            onPointerDown={stopCanvasPointerEvent}
-            onPointerMove={stopCanvasPointerEvent}
-            onPointerUp={stopCanvasPointerEvent}
-            onDragStart={(event) => event.stopPropagation()}
-          >
-            {agentOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="truncate text-secondary" title={policy.agent || "Missing agent"}>{policy.agent || "Missing agent"}</span>
-        )}
       </div>
       <div className="flex min-w-0 items-center gap-1">
         <span className="shrink-0 text-foreground">start:</span>

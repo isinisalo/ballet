@@ -109,9 +109,10 @@ const collectionUpsertSchemas = {
 } as const;
 
 export type MutableCollectionName = keyof typeof collectionUpsertSchemas;
+export type CollectionUpsertPayload = Record<string, unknown> & { id?: string };
 
-export const collectionUpsertSchema = (collection: MutableCollectionName) =>
-  collectionUpsertSchemas[collection];
+export const collectionUpsertSchema = (collection: MutableCollectionName): z.ZodType<CollectionUpsertPayload> =>
+  collectionUpsertSchemas[collection] as z.ZodType<CollectionUpsertPayload>;
 
 const projectTriggerSchema = z.object({
   id: z.string(),
@@ -121,7 +122,8 @@ const projectTriggerSchema = z.object({
 const projectActionSchema = z.object({
   id: z.string(),
   description: z.string(),
-  outputIds: z.array(z.string())
+  outputIds: z.array(z.string()),
+  agentIds: z.array(z.string())
 }).strict();
 
 const projectOutputSchema = z.object({
@@ -135,7 +137,6 @@ const projectPolicySchema = z.object({
   source: z.enum(["event", "trigger"]),
   event: z.string().optional(),
   trigger: z.string().optional(),
-  agent: z.string(),
   action: z.string(),
   enabled: z.boolean()
 }).strict();

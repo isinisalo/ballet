@@ -178,16 +178,16 @@ describe("API routes", () => {
       version: 1,
       events: [{ id: "runtime.event", title: "Runtime event", source: "runtime" }],
       triggers: [],
-      actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"] }],
+      actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "failed", description: "Failed output", type: "event" }],
-      policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed", agent: "developer", action: "implementation", enabled: true }],
-      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }],
+      policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
       runtimes: []
     }, null, 2), "utf8");
 
     store.runtimeDatabase().intakeEvent({
       projectId: "project",
-      eventType: "developer.implementation.failed",
+      eventType: "implementation.failed",
       source: "runtime",
       payload: {}
     }, [], []);
@@ -210,11 +210,11 @@ describe("API routes", () => {
       expect(data.automation).not.toHaveProperty("events");
       expect(data.eventDefinitions).toHaveLength(1);
       expect(data.eventDefinitions).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: "developer.implementation.failed", eventType: "developer.implementation.failed" })
+        expect.objectContaining({ id: "implementation.failed", eventType: "implementation.failed" })
       ]));
       expect(data.eventDefinitions.some((definition) => definition.relativePath)).toBe(false);
       expect(data.documents?.events).toEqual([]);
-      expect(data.events[0]).toMatchObject({ eventType: "developer.implementation.failed", routing: { matchedPolicies: 0 } });
+      expect(data.events[0]).toMatchObject({ eventType: "implementation.failed", routing: { matchedPolicies: 0 } });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     }
@@ -232,9 +232,9 @@ describe("API routes", () => {
       version: 1,
       events: [{ id: "plan_approved", title: "Plan approved", source: "user" }],
       triggers: [{ id: "plan_approved", description: "Plan approved" }],
-      actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"] }],
+      actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "failed", description: "Failed output", type: "event" }],
-      policies: [{ id: "on.trigger.plan_approved.then.developer.start.implementation", source: "trigger", trigger: "plan_approved", agent: "developer", action: "implementation", enabled: true }],
+      policies: [{ id: "on.trigger.plan_approved.start.implementation", source: "trigger", trigger: "plan_approved", action: "implementation", enabled: true }],
       workflows: [],
       runtimes: []
     }, null, 2), "utf8");
@@ -281,11 +281,11 @@ describe("API routes", () => {
 
     const config = {
       version: 1,
-      actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"] }],
+      actions: [{ id: "implementation", description: "Implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "failed", description: "Failed output", type: "event" }, { id: "summary", description: "Summary output", type: "gate" }],
       triggers: [{ id: "manual_start", description: "Manual start" }],
-      policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed", agent: "developer", action: "implementation", enabled: true }],
-      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }],
+      policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
     };
 
@@ -297,14 +297,14 @@ describe("API routes", () => {
       });
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
-      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["failed"] }], outputs: [{ id: "failed", type: "event" }, { id: "summary", type: "gate" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.developer.implementation.failed.then.developer.start.implementation"] }] });
+      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["failed"], agentIds: ["developer-agent"] }], outputs: [{ id: "failed", type: "event" }, { id: "summary", type: "gate" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.implementation.failed.start.implementation"] }] });
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);
       const automationBody = await automation.json() as { config: Record<string, unknown> };
       expect(automationBody.config).not.toHaveProperty("events");
       expect(automationBody.config).not.toHaveProperty("gates");
-      expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], outputs: [{ id: "failed", type: "event" }, { id: "summary", type: "gate" }], policies: [{ id: "on.developer.implementation.failed.then.developer.start.implementation", source: "event", event: "developer.implementation.failed" }] }, issues: [] });
+      expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], outputs: [{ id: "failed", type: "event" }, { id: "summary", type: "gate" }], policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
 
       const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",

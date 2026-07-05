@@ -24,13 +24,13 @@ export const triggerEventType = (triggerId: string): string => `trigger.${normal
 export const policySourceKey = (input: Pick<ProjectPolicy, "source" | "event" | "trigger">): string =>
   input.source === "trigger" ? triggerEventType(input.trigger ?? "") : (input.event ?? "");
 
-export const generatedPolicyId = (input: Pick<ProjectPolicy, "source" | "event" | "trigger" | "agent" | "action">): string =>
-  `on.${input.source === "trigger" ? `trigger.${input.trigger ?? ""}` : input.event ?? ""}.then.${input.agent}.start.${input.action}`;
+export const generatedPolicyId = (input: Pick<ProjectPolicy, "source" | "event" | "trigger" | "action">): string =>
+  `on.${input.source === "trigger" ? `trigger.${input.trigger ?? ""}` : input.event ?? ""}.start.${input.action}`;
 
 export const policyOutputEventType = (
-  input: Pick<ProjectPolicy, "agent" | "action">,
+  input: Pick<ProjectPolicy, "action">,
   outputId: PolicyOutputId
-): string => `${input.agent}.${input.action}.${normalizePolicyToken(outputId)}`;
+): string => `${input.action}.${normalizePolicyToken(outputId)}`;
 
 export const normalizeProjectOutputType = (value: unknown): ProjectOutputType =>
   value === "gate" ? "gate" : "event";
@@ -52,7 +52,7 @@ export const actionOutputIds = (
 };
 
 export const policyOutputEventTypes = (
-  input: Pick<ProjectPolicy, "agent" | "action">,
+  input: Pick<ProjectPolicy, "action">,
   actions: Array<Pick<ProjectAction, "id" | "outputIds">> = [],
   outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
 ): string[] => {
@@ -95,8 +95,7 @@ export const uniqueAgentPolicyTokens = (agents: Agent[]): string[] => {
   });
 };
 
-export const policyEventTypesForAgentsAndActions = (
-  agents: Agent[],
+export const policyEventTypesForActions = (
   actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
   outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
 ): string[] => {
@@ -104,10 +103,14 @@ export const policyEventTypesForAgentsAndActions = (
     .map((action) => ({ ...action, id: normalizePolicyToken(action.id) }))
     .filter((action) => action.id)
     .map((action) => [action.id, action])).values()];
-  return uniqueAgentPolicyTokens(agents).flatMap((agent) =>
-    normalizedActions.flatMap((action) => policyOutputEventTypes({ agent, action: action.id }, normalizedActions, outputs))
-  );
+  return normalizedActions.flatMap((action) => policyOutputEventTypes({ action: action.id }, normalizedActions, outputs));
 };
+
+export const policyEventTypesForAgentsAndActions = (
+  _agents: Agent[],
+  actions: Array<Pick<ProjectAction, "id" | "outputIds">>,
+  outputs: Array<Pick<ProjectOutput, "id" | "type">> = []
+): string[] => policyEventTypesForActions(actions, outputs);
 
 export const resolvePolicyAgent = (agents: Agent[], token: string): Agent | undefined => {
   const normalized = normalizePolicyToken(token);

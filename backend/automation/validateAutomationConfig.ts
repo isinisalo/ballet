@@ -1,9 +1,8 @@
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationIssue } from "../../shared/domain/automation.js";
 import {
-  agentTokenCandidates,
   normalizePolicyOutputEventType,
-  policyEventTypesForAgentsAndActions
+  policyEventTypesForActions
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
 
@@ -32,7 +31,7 @@ interface ValidationContext {
   actionIdSet: Set<string>;
   outputIdSet: Set<string>;
   policyIdSet: Set<string>;
-  agentTokenSet: Set<string>;
+  agentIdSet: Set<string>;
   normalizedPolicies: ReturnType<typeof normalizeProjectAutomationConfig>["policies"];
   normalizedActions: ReturnType<typeof normalizeProjectAutomationConfig>["actions"];
 }
@@ -43,7 +42,6 @@ interface PolicyValidationState {
   normalizedEvent: string;
   rawTrigger: string;
   rawSource: string;
-  rawAgent: string;
   rawAction: string;
   legacyPolicy: boolean;
   normalizedPolicy?: ValidationContext["normalizedPolicies"][number];
@@ -100,12 +98,12 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
 };
 
 const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): ValidationContext => {
-  const normalized = normalizeProjectAutomationConfig(input);
+  const normalized = normalizeProjectAutomationConfig(input, agents);
   const rawPolicies = Array.isArray(input.policies) ? input.policies : [];
   const rawPolicyIds = rawPolicies
     .map((policy) => isRecord(policy) ? stringValue(policy.id) : "")
     .filter(Boolean);
-  const generatedEventIds = policyEventTypesForAgentsAndActions(agents, normalized.actions, normalized.outputs);
+  const generatedEventIds = policyEventTypesForActions(normalized.actions, normalized.outputs);
   const policyIds = normalized.policies.map((policy) => policy.id).filter(Boolean);
   return {
     input,
@@ -120,7 +118,7 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     actionIdSet: new Set(normalized.actions.map((action) => action.id)),
     outputIdSet: new Set(normalized.outputs.map((output) => output.id)),
     policyIdSet: new Set([...policyIds, ...rawPolicyIds]),
-    agentTokenSet: new Set(agents.flatMap(agentTokenCandidates)),
+    agentIdSet: new Set(agents.map((agent) => agent.id)),
     normalizedPolicies: normalized.policies,
     normalizedActions: normalized.actions
   };
@@ -146,16 +144,24 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
   if (action.description !== undefined && typeof action.description !== "string") {
     issues.push({ path: `${base}.description`, message: "Action description must be a string." });
   }
-  if (action.outputIds === undefined) return;
-  if (!Array.isArray(action.outputIds)) {
+  if (action.outputIds !== undefined && !Array.isArray(action.outputIds)) {
     issues.push({ path: `${base}.outputIds`, message: "Action outputIds must be an array." });
     return;
   }
-  action.outputIds.forEach((outputId, outputIndex) => {
-    if (typeof outputId !== "string") {
-      issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: "Action output id must be a string." });
-    }
-  });
+  if (Array.isArray(action.outputIds)) {
+    const seenRawOutputIds = new Set<string>();
+    action.outputIds.forEach((outputId, outputIndex) => {
+      if (typeof outputId !== "string") {
+        issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: "Action output id must be a string." });
+        return;
+      }
+      const normalizedOutputId = normalizePolicyOutputEventType(outputId);
+      if (seenRawOutputIds.has(normalizedOutputId)) {
+        issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Duplicate action output id: ${normalizedOutputId}.` });
+      }
+      seenRawOutputIds.add(normalizedOutputId);
+    });
+  }
   const normalizedOutputIds = context.normalizedActions[index]?.outputIds ?? [];
   if (normalizedOutputIds.length < 1) {
     issues.push({ path: `${base}.outputIds`, message: "Action must select at least 1 output." });
@@ -169,6 +175,39 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
     seen.add(outputId);
     if (!context.outputIdSet.has(outputId)) {
       issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Action references unknown output: ${outputId}.` });
+    }
+  });
+
+  if (action.agentIds !== undefined && !Array.isArray(action.agentIds)) {
+    issues.push({ path: `${base}.agentIds`, message: "Action agentIds must be an array." });
+    return;
+  }
+  if (Array.isArray(action.agentIds)) {
+    const seenRawAgentIds = new Set<string>();
+    action.agentIds.forEach((agentId, agentIndex) => {
+      if (typeof agentId !== "string") {
+        issues.push({ path: `${base}.agentIds[${agentIndex}]`, message: "Action agent id must be a string." });
+        return;
+      }
+      if (seenRawAgentIds.has(agentId)) {
+        issues.push({ path: `${base}.agentIds[${agentIndex}]`, message: `Duplicate action agent id: ${agentId}.` });
+      }
+      seenRawAgentIds.add(agentId);
+    });
+  }
+  const normalizedAgentIds = context.normalizedActions[index]?.agentIds ?? [];
+  if (normalizedAgentIds.length < 1) {
+    issues.push({ path: `${base}.agentIds`, message: "Action must select at least 1 agent." });
+  }
+  if (normalizedAgentIds.length > 5) {
+    issues.push({ path: `${base}.agentIds`, message: "Action can select at most 5 agents." });
+  }
+  const seenAgents = new Set<string>();
+  normalizedAgentIds.forEach((agentId, agentIndex) => {
+    if (seenAgents.has(agentId)) issues.push({ path: `${base}.agentIds[${agentIndex}]`, message: `Duplicate action agent id: ${agentId}.` });
+    seenAgents.add(agentId);
+    if (context.agentIdSet.size > 0 && !context.agentIdSet.has(agentId)) {
+      issues.push({ path: `${base}.agentIds[${agentIndex}]`, message: `Action references unknown agent: ${agentId}.` });
     }
   });
 };
@@ -199,10 +238,9 @@ const policyValidationState = (
   return {
     run,
     rawEvent,
-    normalizedEvent: normalizePolicyOutputEventType(rawEvent),
+    normalizedEvent: normalizedPolicy?.event ?? normalizePolicyOutputEventType(rawEvent),
     rawTrigger: stringValue(policy.trigger),
     rawSource: stringValue(policy.source),
-    rawAgent: stringValue(policy.agent) || stringValue(run?.agent),
     rawAction: stringValue(policy.action),
     legacyPolicy: policy.event === undefined && policy.agent === undefined && run !== undefined,
     normalizedPolicy,
@@ -232,7 +270,6 @@ const validatePolicyRequiredFields = (
   const sourceField = state.isTriggerPolicy ? "trigger" : "event";
   const sourceValue = state.isTriggerPolicy ? state.rawTrigger : state.rawEvent;
   addRequiredStringIssue(issues, `${base}.${sourceField}`, sourceValue, `Policy ${sourceField}`);
-  addRequiredStringIssue(issues, `${base}.agent`, state.rawAgent, "Policy agent");
   if (!state.legacyPolicy) addRequiredStringIssue(issues, `${base}.action`, state.rawAction, "Policy action");
   if (typeof policy.enabled !== "boolean") issues.push({ path: `${base}.enabled`, message: "Policy enabled must be boolean." });
 };
@@ -251,9 +288,6 @@ const validatePolicyKnownReferences = (
   }
   if (state.isTriggerPolicy && state.normalizedPolicy?.trigger && !context.triggerIdSet.has(state.normalizedPolicy.trigger)) {
     issues.push({ path: `${base}.trigger`, message: `Policy references unknown trigger: ${state.rawTrigger}.` });
-  }
-  if (context.agentTokenSet.size > 0 && state.rawAgent && state.normalizedPolicy && !context.agentTokenSet.has(state.normalizedPolicy.agent)) {
-    issues.push({ path: `${base}.agent`, message: `Policy references unknown agent: ${state.rawAgent}.` });
   }
 };
 

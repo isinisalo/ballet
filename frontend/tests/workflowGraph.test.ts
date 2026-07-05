@@ -7,33 +7,32 @@ const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
   source: patch.source ?? "event",
   event: patch.event,
   trigger: patch.trigger,
-  agent: patch.agent ?? "agent",
   action: patch.action ?? "build",
   enabled: true
 });
 
 describe("workflow graph", () => {
   it("groups event policies under the latest parent output event", () => {
-    const parent = policy({ id: "parent", event: "external.start", agent: "builder", action: "deploy" });
-    const child = policy({ id: "child", event: "builder.deploy.failed", agent: "fixer", action: "repair" });
+    const parent = policy({ id: "parent", event: "external.start", action: "deploy" });
+    const child = policy({ id: "child", event: "deploy.failed", action: "repair" });
     const graph = buildWorkflowGraph([
-      { policyId: parent.id, index: 0, policy: parent, outputEvents: ["builder.deploy.failed"] },
-      { policyId: child.id, index: 1, policy: child, outputEvents: ["fixer.repair.complete"] }
+      { policyId: parent.id, index: 0, policy: parent, outputEvents: ["deploy.failed"] },
+      { policyId: child.id, index: 1, policy: child, outputEvents: ["repair.complete"] }
     ]);
 
     expect(graph.rootRecords.map((record) => record.policyId)).toEqual(["parent"]);
-    expect(graph.childRecordsByParentEvent.get("0:builder.deploy.failed")?.map((record) => record.policyId)).toEqual(["child"]);
+    expect(graph.childRecordsByParentEvent.get("0:deploy.failed")?.map((record) => record.policyId)).toEqual(["child"]);
   });
 
   it("indexes every existing policy handler by input event", () => {
-    const first = policy({ id: "first-handler", event: "builder.deploy.completed", agent: "reviewer", action: "review" });
-    const second = policy({ id: "second-handler", event: "builder.deploy.completed", agent: "auditor", action: "audit" });
+    const first = policy({ id: "first-handler", event: "deploy.completed", action: "review" });
+    const second = policy({ id: "second-handler", event: "deploy.completed", action: "audit" });
     const graph = buildWorkflowGraph([
-      { policyId: first.id, index: 0, policy: first, outputEvents: ["reviewer.review.complete"] },
-      { policyId: second.id, index: 1, policy: second, outputEvents: ["auditor.audit.complete"] }
+      { policyId: first.id, index: 0, policy: first, outputEvents: ["review.complete"] },
+      { policyId: second.id, index: 1, policy: second, outputEvents: ["audit.complete"] }
     ]);
 
-    expect(graph.eventHandlerRecordsByEvent.get("builder.deploy.completed")?.map((record) => record.policyId)).toEqual([
+    expect(graph.eventHandlerRecordsByEvent.get("deploy.completed")?.map((record) => record.policyId)).toEqual([
       "first-handler",
       "second-handler"
     ]);

@@ -25,6 +25,7 @@ export interface Runtime extends MarkdownBackedEntity {
 }
 
 export interface AgentRunOutput {
+  agent?: string;
   runId?: string;
   status: AgentOutputEventStatus;
   outcome?: AgentOutcomeStatus;
