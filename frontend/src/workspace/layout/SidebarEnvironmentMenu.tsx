@@ -87,17 +87,19 @@ export function SidebarEnvironmentMenu({
   return (
     <Collapsible defaultOpen={environmentOpen} className="group/collapsible">
       <SidebarMenuItem>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton
-            isActive={environmentOpen}
-            tooltip="Environment"
-            className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
-          >
-            <Code2 />
-            <span>Environment</span>
-            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
+        <CollapsibleTrigger
+          render={
+            <SidebarMenuButton
+              isActive={environmentOpen}
+              tooltip="Environment"
+              className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
+            >
+              <Code2 />
+              <span>Environment</span>
+              <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+            </SidebarMenuButton>
+          }
+        />
         <CollapsibleContent>
           <SidebarMenuSub>
             <SidebarCollapsibleLinkSection label="Agents" icon={<Bot />} path="/agents" active={agentsOpen} navigate={navigate} groupClassName="group/environment-section" chevronClassName="group-data-[state=open]/environment-section:rotate-90">

@@ -87,19 +87,19 @@ function ProjectDocumentTreeDirectory({
   return (
     <SidebarMenuSubItem>
       <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
-        <CollapsibleTrigger asChild>
-          <SidebarMenuSubButton
-            asChild
-            size="sm"
-            isActive={containsActive}
-            className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
-          >
-            <button type="button">
+        <CollapsibleTrigger
+          render={
+            <SidebarMenuSubButton
+              render={<button type="button" />}
+              size="sm"
+              isActive={containsActive}
+              className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+            >
               <span>{node.label}</span>
               <ChevronRight className={cn("ml-auto transition-transform", open && "rotate-90")} />
-            </button>
-          </SidebarMenuSubButton>
-        </CollapsibleTrigger>
+            </SidebarMenuSubButton>
+          }
+        />
         <CollapsibleContent>
           <ProjectDocumentTree nodes={node.children} activePath={activePath} navigate={navigate} pathFor={pathFor} level={level + 1} />
         </CollapsibleContent>

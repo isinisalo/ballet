@@ -2,6 +2,10 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 
+if (typeof Element !== "undefined" && !Element.prototype.getAnimations) {
+  Element.prototype.getAnimations = () => [];
+}
+
 if (typeof window !== "undefined") {
   class TestEventSource extends EventTarget {
     onopen: (() => void) | null = null;

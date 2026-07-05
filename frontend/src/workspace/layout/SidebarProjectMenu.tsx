@@ -35,17 +35,19 @@ export function SidebarProjectMenu({
   return (
     <Collapsible defaultOpen={projectOpen} className="group/collapsible">
       <SidebarMenuItem>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton
-            isActive={projectOpen}
-            tooltip="Project"
-            className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
-          >
-            <FileText />
-            <span>Project</span>
-            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
+        <CollapsibleTrigger
+          render={
+            <SidebarMenuButton
+              isActive={projectOpen}
+              tooltip="Project"
+              className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
+            >
+              <FileText />
+              <span>Project</span>
+              <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+            </SidebarMenuButton>
+          }
+        />
         <CollapsibleContent>
           <SidebarMenuSub>
             <SidebarProjectDirectoryMenu
@@ -113,20 +115,20 @@ function SidebarProjectDirectoryMenu({
   return (
     <Collapsible defaultOpen={active} className="group/project-section">
       <SidebarMenuSubItem>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuSubButton
-            asChild
-            size="sm"
-            isActive={active}
-            className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
-          >
-            <button type="button">
+        <CollapsibleTrigger
+          render={
+            <SidebarMenuSubButton
+              render={<button type="button" />}
+              size="sm"
+              isActive={active}
+              className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+            >
               {icon}
               <span>{label}</span>
               <ChevronRight className="ml-auto transition-transform group-data-[state=open]/project-section:rotate-90" />
-            </button>
-          </SidebarMenuSubButton>
-        </CollapsibleTrigger>
+            </SidebarMenuSubButton>
+          }
+        />
         <CollapsibleContent>
           {children.length > 0 ? (
             <ProjectDocumentTree nodes={children} activePath={activePath} navigate={navigate} pathFor={pathFor} />

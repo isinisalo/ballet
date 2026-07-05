@@ -104,17 +104,19 @@ export function SidebarAutomationMenu({
   return (
     <Collapsible defaultOpen={automationOpen} className="group/collapsible">
       <SidebarMenuItem>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton
-            isActive={automationOpen}
-            tooltip="Automation"
-            className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
-          >
-            <Route />
-            <span>Automation</span>
-            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
+        <CollapsibleTrigger
+          render={
+            <SidebarMenuButton
+              isActive={automationOpen}
+              tooltip="Automation"
+              className="text-muted-foreground data-active:bg-transparent data-active:text-muted-foreground hover:text-sidebar-accent-foreground"
+            >
+              <Route />
+              <span>Automation</span>
+              <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+            </SidebarMenuButton>
+          }
+        />
         <CollapsibleContent>
           <SidebarMenuSub>
             {automationSidebarSections.map((section) => (
