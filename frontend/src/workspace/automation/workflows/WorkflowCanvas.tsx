@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MarkerType, Position, ReactFlow, type EdgeMouseHandler, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
+import { Position, ReactFlow, type EdgeMouseHandler, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { WorkflowReactFlowNodeComponent } from "./WorkflowReactFlowNode";
 import { WorkflowSmartEdge } from "./WorkflowSmartEdge";
 import type { WorkflowCanvasProps, WorkflowNodeContext, WorkflowReactFlowEdge, WorkflowReactFlowNode } from "./WorkflowCanvasTypes";
-import { workflowCanvasNodeAnchorY, workflowPolicyOutputHandleY } from "./workflowLayout";
+import { workflowCanvasNodeAnchorY } from "./workflowLayout";
 
 const workflowNodeTypes = {
   workflow: WorkflowReactFlowNodeComponent
@@ -18,27 +18,6 @@ const workflowSolidEdgeStroke = "color-mix(in srgb, var(--primary) 70%, transpar
 const workflowDashedEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 70%, transparent)";
 const workflowReturnEdgeStroke = "color-mix(in srgb, var(--tertiary) 85%, transparent)";
 
-const workflowSolidEdgeMarker = {
-  type: MarkerType.ArrowClosed,
-  width: 8,
-  height: 8,
-  color: workflowSolidEdgeStroke
-} as const;
-
-const workflowDashedEdgeMarker = {
-  type: MarkerType.ArrowClosed,
-  width: 8,
-  height: 8,
-  color: workflowDashedEdgeStroke
-} as const;
-
-const workflowReturnEdgeMarker = {
-  type: MarkerType.ArrowClosed,
-  width: 8,
-  height: 8,
-  color: workflowReturnEdgeStroke
-} as const;
-
 function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][number], isAnimated = false): WorkflowReactFlowEdge["domAttributes"] {
   return {
     "data-workflow-connector": "true",
@@ -51,11 +30,6 @@ function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][
 function workflowEdgeStroke(edge: WorkflowCanvasProps["layout"]["edges"][number]) {
   if (edge.tone === "return") return workflowReturnEdgeStroke;
   return edge.dashed ? workflowDashedEdgeStroke : workflowSolidEdgeStroke;
-}
-
-function workflowEdgeMarker(edge: WorkflowCanvasProps["layout"]["edges"][number]) {
-  if (edge.tone === "return") return workflowReturnEdgeMarker;
-  return edge.dashed ? workflowDashedEdgeMarker : workflowSolidEdgeMarker;
 }
 
 function workflowEdgeStrokeDasharray(edge: WorkflowCanvasProps["layout"]["edges"][number]) {
@@ -230,10 +204,6 @@ function useWorkflowNodes(layoutNodes: WorkflowCanvasProps["layout"]["nodes"], n
 
 function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][number]): WorkflowReactFlowNode["handles"] {
   const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
-  const anchorLeft = layoutNode.width / 2;
-  const outputHandles = layoutNode.kind === "policy"
-    ? Array.from({ length: layoutNode.outputHandleCount ?? 0 }, (_, outputIndex) => outputIndex)
-    : [];
 
   if (layoutNode.kind === "gate-output" || layoutNode.kind === "output-event") {
     return [{ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 }];
@@ -241,18 +211,7 @@ function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][
 
   return [
     { id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 },
-    { id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 },
-    ...outputHandles.map((outputIndex) => ({
-      id: `right-output-${outputIndex}`,
-      type: "source" as const,
-      position: Position.Right,
-      x: layoutNode.width,
-      y: workflowPolicyOutputHandleY(outputIndex, layoutNode.outputHandleCount ?? 0),
-      width: 1,
-      height: 1
-    })),
-    { id: "top", type: "target", position: Position.Top, x: anchorLeft, y: 0, width: 1, height: 1 },
-    { id: "bottom", type: "source", position: Position.Bottom, x: anchorLeft, y: layoutNode.height, width: 1, height: 1 }
+    { id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 }
   ];
 }
 
@@ -267,7 +226,6 @@ export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layou
     data: { workflowEdge, context },
     animated: workflowEdge.key === animatedEdgeId,
     className: workflowEdge.key === animatedEdgeId ? "workflow-edge-animated" : undefined,
-    markerEnd: workflowEdgeMarker(workflowEdge),
     style: {
       stroke: workflowEdgeStroke(workflowEdge),
       strokeWidth: 2,

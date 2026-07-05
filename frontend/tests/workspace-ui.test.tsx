@@ -206,7 +206,7 @@ const slug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g
 const workflowEdgeLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-workflow-edge-label=\"true\"]"));
 
 const workflowEdgeLabelTexts = () => workflowEdgeLabels()
-  .map((label) => label.textContent);
+  .map((label) => label.dataset.workflowEdgeLabelValue ?? label.textContent);
 
 const updateProjectTreeDocument = (
   nodes: ProjectDocumentTreeNode[],
@@ -570,13 +570,19 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByLabelText("Events: implementation.complete")).not.toBeInTheDocument();
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
     expect(screen.queryByText("type:")).not.toBeInTheDocument();
-    expect(screen.queryByText("on:")).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).queryByText("on:")).not.toBeInTheDocument();
     expect(screen.queryByText("then:")).not.toBeInTheDocument();
     expect(screen.queryByText("start:")).not.toBeInTheDocument();
     expect(screen.getAllByText("implementation.failed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
     expect(within(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).getByText("implementation")).toHaveAttribute("title", "Implement work");
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("implementation.failed"));
+    const implementationFailedEdgeLabel = workflowEdgeLabels().find((label) => label.dataset.workflowEdgeLabelValue === "implementation.failed");
+    expect(implementationFailedEdgeLabel).toBeDefined();
+    expect(implementationFailedEdgeLabel?.children[0]).toHaveTextContent("on:");
+    expect(implementationFailedEdgeLabel?.children[0]).toHaveClass("text-foreground");
+    expect(implementationFailedEdgeLabel?.children[1]).toHaveTextContent("implementation.failed");
+    expect(implementationFailedEdgeLabel?.children[1]).toHaveClass("text-primary");
     expect(await screen.findByText("implementation.complete")).toBeInTheDocument();
     expect(screen.queryByText("implementation.blocked")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
@@ -858,8 +864,10 @@ describe("workspace entity UI flows", () => {
     const gateOutput = screen.getByLabelText("Gate: summary");
 
     expect(outputEvent).toBeInTheDocument();
-    expect(outputEvent).toHaveTextContent("implementation.failed");
-    expect(outputEvent.querySelector("svg")).toBeInTheDocument();
+    expect(outputEvent).toHaveTextContent("+ Action");
+    expect(outputEvent).not.toHaveTextContent("implementation.failed");
+    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("implementation.failed"));
+    expect(outputEvent.querySelector("svg")).not.toBeInTheDocument();
     expect(gateOutput).toBeInTheDocument();
     expect(gateOutput).toHaveTextContent("summary");
     expect(gateOutput.querySelector("svg")).toBeInTheDocument();
@@ -1060,6 +1068,12 @@ describe("workspace entity UI flows", () => {
     });
     expect(document.querySelectorAll(".react-flow__edge-smoothstep")).toHaveLength(0);
     expect(document.querySelectorAll("[data-workflow-connector=\"true\"]").length).toBeGreaterThan(0);
+    const connectionPoints = document.querySelectorAll(".workflow-react-flow-handle");
+    expect(connectionPoints.length).toBeGreaterThan(0);
+    expect(getComputedStyle(connectionPoints[0]!).opacity).toBe("1");
+    expect(document.querySelectorAll(".react-flow__handle-top, .react-flow__handle-bottom")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-handleid^=\"right-output-\"]")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-workflow-edge-endpoint]").length).toBe(0);
     expect(document.querySelectorAll("[data-workflow-edge-tone=\"return\"]")).toHaveLength(1);
     await waitFor(() => {
       expect(workflowEdgeLabelTexts()).toEqual(expect.arrayContaining([

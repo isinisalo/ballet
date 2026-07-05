@@ -133,7 +133,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       key: "policy-gate-output-0-summary",
       sourceNodeKey: "policy-0",
       targetNodeKey: "gate-output-0-summary",
-      sourceHandleId: "right-output-0",
+      sourceHandleId: "right",
       targetHandleId: "left"
     }));
     expect(layout.edges.some((edge) => edge.sourceNodeKey === gateNode?.key)).toBe(false);
@@ -193,7 +193,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       key: "policy-policy-0-1-build.complete",
       sourceNodeKey: "policy-0",
       targetNodeKey: "policy-1",
-      sourceHandleId: "right-output-0",
+      sourceHandleId: "right",
       targetHandleId: "left",
       eventType: "build.complete"
     }));
@@ -207,11 +207,12 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(outputEventEdge).toMatchObject({
       sourceNodeKey: "policy-0",
       targetNodeKey: "output-event-0-build.failed",
-      sourceHandleId: "right-output-1",
+      sourceHandleId: "right",
       targetHandleId: "left",
-      dashed: true
+      dashed: true,
+      eventType: "build.failed",
+      label: "build.failed"
     });
-    expect(outputEventEdge?.label).toBeUndefined();
     expect(outputEventNode?.x).toBe(childNode?.x);
     expect(outputEventNode?.y).toBe(childNode
       ? childNode.y + workflowPolicyStackHeight() + workflowNodeSizes.outputEvent.rowGap
@@ -311,7 +312,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     });
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-policy-0-1-build.complete",
-      sourceHandleId: "right-output-0",
+      sourceHandleId: "right",
       targetHandleId: "left"
     }));
   });
@@ -364,7 +365,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(repeatedHandlerEdge).toMatchObject({
       sourceNodeKey: "policy-2",
       targetNodeKey: "policy-1",
-      sourceHandleId: "right-output-0",
+      sourceHandleId: "right",
       targetHandleId: "left",
       tone: "return",
       eventType: "implement.completed",
@@ -415,9 +416,7 @@ describe("toWorkflowReactFlowEdges", () => {
       strokeDasharray: "4 4",
       strokeWidth: 2
     });
-    expect(edge.markerEnd).toMatchObject({
-      color: "color-mix(in srgb, var(--tertiary) 85%, transparent)"
-    });
+    expect(edge.markerEnd).toBeUndefined();
   });
 
   it("maps every workflow edge to SmartStepEdge", () => {

@@ -54,7 +54,7 @@ export const workflowNodeSizes = {
   trigger: { minWidth: 120, maxWidth: 200, height: 22 },
   policy: { minWidth: 120, maxWidth: 200, height: 22 },
   event: { width: 240, height: 46 },
-  outputEvent: { minWidth: 120, maxWidth: 240, height: 22, rowGap: 16 },
+  outputEvent: { minWidth: 76, maxWidth: 120, height: 22, rowGap: 16 },
   gateOutput: { minWidth: 64, maxWidth: 180, height: 22 },
   action: { width: 28, height: 28 }
 };
@@ -76,6 +76,8 @@ const workflowEdgeLabelLayout = {
   characterWidth: 6.25,
   clearance: 32
 };
+
+export const workflowAddActionGhostLabel = "+ Action";
 
 const workflowDirectionHandles: Record<WorkflowLayoutDirection, { rankdir: "LR" | "TB"; sourceHandleId: string; targetHandleId: string }> = {
   horizontal: { rankdir: "LR", sourceHandleId: "right", targetHandleId: "left" },
@@ -168,7 +170,7 @@ export function calculateWorkflowCanvasLayout({
     addNode({
       key,
       kind: "output-event",
-      width: workflowOutputEventNodeWidth(output.eventType),
+      width: workflowOutputEventNodeWidth(),
       height: workflowNodeSizes.outputEvent.height,
       direction,
       record,
@@ -185,13 +187,15 @@ export function calculateWorkflowCanvasLayout({
       key: `policy-output-event-${record.index}-${output.outputId}`,
       sourceNodeKey: `policy-${record.index}`,
       targetNodeKey: key,
-      sourceHandleId: workflowOutputSourceHandleId(direction, outputIndex),
+      sourceHandleId: workflowOutputSourceHandleId(),
       targetHandleId,
-      dashed: true
+      dashed: true,
+      eventType: output.eventType,
+      label: output.eventType
     });
   };
 
-  const addGateOutputNode = (record: WorkflowStepRecord, output: WorkflowOutputTarget, outputIndex: number) => {
+  const addGateOutputNode = (record: WorkflowStepRecord, output: WorkflowOutputTarget) => {
     const key = `gate-output-${record.index}-${output.outputId}`;
     addNode({
       key,
@@ -212,7 +216,7 @@ export function calculateWorkflowCanvasLayout({
       key: `policy-gate-output-${record.index}-${output.outputId}`,
       sourceNodeKey: `policy-${record.index}`,
       targetNodeKey: key,
-      sourceHandleId: workflowOutputSourceHandleId(direction, outputIndex),
+      sourceHandleId: workflowOutputSourceHandleId(),
       targetHandleId,
       dashed: !record.policy
     });
@@ -264,9 +268,9 @@ export function calculateWorkflowCanvasLayout({
       : inactiveOutputTargets;
     addPolicyNode(record, activeOutputTasks.length + visibleInactiveOutputTargets.length);
 
-    activeOutputTasks.forEach((task, outputIndex) => {
+    activeOutputTasks.forEach((task) => {
       if (task.kind === "gate") {
-        addGateOutputNode(record, task.output, outputIndex);
+        addGateOutputNode(record, task.output);
         return;
       }
       if (task.kind === "existing-handler") {
@@ -274,7 +278,7 @@ export function calculateWorkflowCanvasLayout({
           eventType: task.output.eventType,
           sourceIndex: record.index,
           sourceNodeKey: `policy-${record.index}`,
-          sourceHandleId: workflowOutputSourceHandleId(direction, outputIndex)
+          sourceHandleId: workflowOutputSourceHandleId()
         });
         return;
       }
@@ -290,7 +294,7 @@ export function calculateWorkflowCanvasLayout({
           key: `policy-policy-${record.index}-${childRecord.index}-${task.output.eventType}`,
           sourceNodeKey: `policy-${record.index}`,
           targetNodeKey: `policy-${childRecord.index}`,
-          sourceHandleId: workflowOutputSourceHandleId(direction, outputIndex),
+          sourceHandleId: workflowOutputSourceHandleId(),
           targetHandleId,
           eventType: task.output.eventType,
           label: task.output.eventType
@@ -366,8 +370,8 @@ export function calculateWorkflowCanvasLayout({
   };
 }
 
-export function workflowOutputSourceHandleId(_direction: WorkflowLayoutDirection, outputIndex: number) {
-  return `right-output-${outputIndex}`;
+export function workflowOutputSourceHandleId() {
+  return "right";
 }
 
 export function workflowPolicyOutputHandleY(outputIndex: number, outputHandleCount: number) {
@@ -578,8 +582,8 @@ function workflowGateOutputNodeWidth(outputId: string) {
   return workflowOutputNodeWidth(outputId, workflowNodeSizes.gateOutput.minWidth, workflowNodeSizes.gateOutput.maxWidth);
 }
 
-function workflowOutputEventNodeWidth(eventType: string) {
-  return workflowOutputNodeWidth(eventType, workflowNodeSizes.outputEvent.minWidth, workflowNodeSizes.outputEvent.maxWidth);
+function workflowOutputEventNodeWidth() {
+  return workflowOutputNodeWidth(workflowAddActionGhostLabel, workflowNodeSizes.outputEvent.minWidth, workflowNodeSizes.outputEvent.maxWidth);
 }
 
 function workflowPolicyNodeWidth(record: WorkflowStepRecord) {

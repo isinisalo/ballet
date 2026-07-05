@@ -1,9 +1,9 @@
-import { Activity, CheckCircle2, Pencil, Route, Save, Trash2, Zap } from "lucide-react";
+import { CheckCircle2, Pencil, Route, Save, Trash2, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { workflowTriggerLabel, type WorkflowStepRecord } from "./workflowGraph";
-import { workflowCanvasNodeAnchorY, workflowPolicyOutputHandleY, type WorkflowCanvasLayoutNode } from "./workflowLayout";
+import { workflowAddActionGhostLabel, workflowCanvasNodeAnchorY, type WorkflowCanvasLayoutNode } from "./workflowLayout";
 import { WorkflowGhostNode } from "./WorkflowGhostNode";
 import { WorkflowPolicyNode } from "./WorkflowPolicyNode";
 import type { WorkflowNodeContext, WorkflowReactFlowNode } from "./WorkflowCanvasTypes";
@@ -20,11 +20,9 @@ export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReact
 }
 
 function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
+  if (layoutNode.kind === "save-policy" || layoutNode.kind === "edit-policy" || layoutNode.kind === "delete-policy") return null;
+
   const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
-  const anchorLeft = layoutNode.width / 2;
-  const outputHandles = layoutNode.kind === "policy"
-    ? Array.from({ length: layoutNode.outputHandleCount ?? 0 }, (_, outputIndex) => outputIndex)
-    : [];
 
   if (layoutNode.kind === "gate-output" || layoutNode.kind === "output-event") {
     return <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />;
@@ -34,19 +32,6 @@ function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutN
     <>
       <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
       <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
-      {outputHandles.map((outputIndex) => (
-        <Handle
-          key={outputIndex}
-          id={`right-output-${outputIndex}`}
-          type="source"
-          position={Position.Right}
-          isConnectable={false}
-          className="workflow-react-flow-handle"
-          style={{ top: workflowPolicyOutputHandleY(outputIndex, layoutNode.outputHandleCount ?? 0) }}
-        />
-      ))}
-      <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
-      <Handle id="bottom" type="source" position={Position.Bottom} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
     </>
   );
 }
@@ -103,13 +88,12 @@ function renderOutputEventNode(node: WorkflowCanvasLayoutNode, context: Workflow
       type="button"
       data-workflow-output-event={eventType}
       aria-label={`Add policy step for ${eventType}`}
-      title={eventType}
+      title={`Add action for ${eventType}`}
       disabled={!context.canAddPolicyForEvent(sourcePolicy)}
       onClick={() => context.onAddPolicyStep(eventType, sourcePolicy)}
-      className="nodrag nopan flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md border border-dashed border-muted-foreground/70 bg-background/80 px-1.5 text-left font-mono text-[0.66rem] leading-4 text-muted-foreground transition-colors hover:border-primary/80 hover:bg-card hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80"
+      className="nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-dashed border-muted-foreground/70 bg-background/80 px-1.5 text-left font-mono text-[0.66rem] leading-4 text-muted-foreground transition-colors hover:border-primary/80 hover:bg-card hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80"
     >
-      <Activity className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-      <span className="block min-w-0 truncate">{eventType}</span>
+      <span className="block min-w-0 truncate">{workflowAddActionGhostLabel}</span>
     </button>
   );
 }
