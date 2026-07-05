@@ -23,10 +23,6 @@ export function WorkflowPolicySummary({
 
   return (
     <div className="grid min-w-0 gap-1 font-mono text-[0.62rem] leading-4">
-      <div className="flex min-w-0 gap-1">
-        <span className="shrink-0 text-foreground">type:</span>
-        <span className="truncate text-primary" title={policy.source || "event"}>{policy.source || "event"}</span>
-      </div>
       <div className="flex min-w-0 items-center gap-1">
         <span className="shrink-0 text-foreground">on:</span>
         <span className="truncate text-primary" title={sourceValue || "Missing source"}>{sourceValue || "Missing source"}</span>

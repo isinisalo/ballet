@@ -564,7 +564,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByLabelText("Agent: existing")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Events: implementation.complete")).not.toBeInTheDocument();
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
-    expect(screen.getAllByText("type:").length).toBeGreaterThan(0);
+    expect(screen.queryByText("type:")).not.toBeInTheDocument();
     expect(screen.getAllByText("on:").length).toBeGreaterThan(0);
     expect(screen.queryByText("then:")).not.toBeInTheDocument();
     expect(screen.getAllByText("start:").length).toBeGreaterThan(0);
