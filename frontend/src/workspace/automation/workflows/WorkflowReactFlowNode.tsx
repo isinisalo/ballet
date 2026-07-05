@@ -170,7 +170,7 @@ function renderPolicyNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeC
       onPointerCancel={context.onStepPointerCancel}
       className={stepDragClass}
     >
-      <WorkflowCanvasNode label="Policy" tone="policy" icon={Route} value={record.policyId || "No policy"} dashed={!record.policy} className="h-[5.75rem] w-60 max-w-none items-start py-2">
+      <WorkflowCanvasNode label="Policy" tone="policy" icon={Route} value={record.policyId || "No policy"} dashed={!record.policy} className="h-[3.625rem] w-60 max-w-none items-start py-2">
         {record.policy ? renderPolicySummary(node, context, record) : renderMissingPolicySelect(context, record)}
       </WorkflowCanvasNode>
     </div>

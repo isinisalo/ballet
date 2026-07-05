@@ -52,7 +52,7 @@ export type WorkflowCanvasLayout = {
 
 export const workflowNodeSizes = {
   trigger: { width: 176, height: 46 },
-  policy: { width: 240, height: 92 },
+  policy: { width: 240, height: 58 },
   event: { width: 240, height: 46 },
   outputEvent: { minWidth: 120, maxWidth: 240, height: 22, rowGap: 16 },
   gateOutput: { minWidth: 64, maxWidth: 180, height: 22 },
