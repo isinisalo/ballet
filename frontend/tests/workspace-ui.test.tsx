@@ -845,8 +845,15 @@ describe("workspace entity UI flows", () => {
 
     await renderRoute("/automation/workflows", workflowData);
 
-    expect(screen.getByRole("button", { name: "Add policy step for existing.implementation.failed" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Gate: summary")).toBeInTheDocument();
+    const outputEvent = screen.getByRole("button", { name: "Add policy step for existing.implementation.failed" });
+    const gateOutput = screen.getByLabelText("Gate: summary");
+
+    expect(outputEvent).toBeInTheDocument();
+    expect(outputEvent).toHaveTextContent("existing.implementation.failed");
+    expect(outputEvent.querySelector("svg")).toBeInTheDocument();
+    expect(gateOutput).toBeInTheDocument();
+    expect(gateOutput).toHaveTextContent("summary");
+    expect(gateOutput.querySelector("svg")).toBeInTheDocument();
     expect(document.querySelector('[data-workflow-gate-output="summary"]')).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add policy step for existing.implementation.summary" })).not.toBeInTheDocument();
   });

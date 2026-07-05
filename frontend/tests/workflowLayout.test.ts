@@ -3,7 +3,7 @@ import type { ProjectPolicy } from "../../shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "../../shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
-import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowNodeSizes, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
+import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowNodeSizes, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 
 const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
   id,
@@ -55,7 +55,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     ]);
   });
 
-  it("renders multiple unhandled outputs in one output-events node", () => {
+  it("renders multiple unhandled outputs as separate output-event nodes", () => {
     const start = policy("start", undefined, "build");
     const layout = calculateWorkflowCanvasLayout({
       workflowGraph: buildWorkflowGraph([{
@@ -66,20 +66,22 @@ describe("calculateWorkflowCanvasLayout", () => {
       }]),
       editingPolicyIndex: null
     });
-    const outputEventsNode = layout.nodes.find((node) => node.key === "output-events-0");
+    const outputEventNodes = layout.nodes.filter((node) => node.kind === "output-event");
 
-    expect(outputEventsNode).toMatchObject({
-      kind: "output-events",
-      outputEvents: [
-        { eventType: "codex.build.complete" },
-        { eventType: "codex.build.failed" },
-        { eventType: "codex.build.blocked" }
-      ]
-    });
-    expect(layout.edges.filter((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey === "output-events-0")).toHaveLength(1);
+    expect(outputEventNodes.map((node) => node.outputEvent?.eventType)).toEqual([
+      "codex.build.complete",
+      "codex.build.failed",
+      "codex.build.blocked"
+    ]);
+    expect(outputEventNodes.map((node) => node.key)).toEqual([
+      "output-event-0-codex.build.complete",
+      "output-event-0-codex.build.failed",
+      "output-event-0-codex.build.blocked"
+    ]);
+    expect(layout.edges.filter((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey.startsWith("output-event-"))).toHaveLength(3);
   });
 
-  it("renders gate outputs as active terminal nodes outside the output-events node", () => {
+  it("renders gate outputs as active terminal nodes before inactive output-event nodes", () => {
     const start = policy("start", undefined, "build");
     const layout = calculateWorkflowCanvasLayout({
       workflowGraph: buildWorkflowGraph([{
@@ -96,42 +98,43 @@ describe("calculateWorkflowCanvasLayout", () => {
     });
     const gateNode = layout.nodes.find((node) => node.key === "gate-output-0-summary");
     const policyNode = layout.nodes.find((node) => node.key === "policy-0");
-    const outputEventsNode = layout.nodes.find((node) => node.key === "output-events-0");
+    const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-failed");
 
     expect(gateNode).toMatchObject({
       kind: "gate-output",
       gateOutput: { outputId: "summary", outputType: "gate" },
       height: workflowNodeSizes.gateOutput.height
     });
+    expect(policyNode?.outputHandleCount).toBe(2);
     expect(gateNode?.width).toBeGreaterThanOrEqual(workflowNodeSizes.gateOutput.minWidth);
     expect(gateNode?.width).toBeLessThanOrEqual(workflowNodeSizes.gateOutput.maxWidth);
     expect(gateNode?.y).toBe(policyNode ? policyNode.y + workflowCanvasLayoutConfig.policyAnchorY - workflowNodeSizes.gateOutput.height / 2 : undefined);
-    expect(outputEventsNode).toMatchObject({
-      kind: "output-events",
-      outputEvents: [{ outputId: "failed", eventType: "codex.build.failed", outputType: "event" }]
+    expect(outputEventNode).toMatchObject({
+      kind: "output-event",
+      outputEvent: { outputId: "failed", eventType: "codex.build.failed", outputType: "event" }
     });
-    expect(outputEventsNode?.y).toBe(policyNode
-      ? policyNode.y + workflowPolicyStackHeight() + workflowCanvasLayoutConfig.outputEventsLaneGap
+    expect(outputEventNode?.y).toBe(policyNode
+      ? policyNode.y + workflowPolicyOutputHandleY(1, policyNode.outputHandleCount ?? 0) - workflowNodeSizes.outputEvent.height / 2
       : undefined);
-    expect(outputEventsNode?.y).toBeGreaterThan(gateNode ? gateNode.y + gateNode.height : 0);
+    expect(outputEventNode?.y).toBeGreaterThan(gateNode ? gateNode.y + gateNode.height : 0);
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-gate-output-0-summary",
       sourceNodeKey: "policy-0",
       targetNodeKey: "gate-output-0-summary",
-      sourceHandleId: "right",
+      sourceHandleId: "right-output-0",
       targetHandleId: "left"
     }));
     expect(layout.edges.some((edge) => edge.sourceNodeKey === gateNode?.key)).toBe(false);
   });
 
-  it("groups unhandled output events in the next policy column after active policies", () => {
+  it("places unhandled output events in the next policy column after active policies", () => {
     const first = policy("first", undefined, "build");
     const child = policy("child", "codex.build.complete", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id]);
     const firstNode = layout.nodes.find((node) => node.key === "policy-0");
     const childNode = layout.nodes.find((node) => node.key === "policy-1");
-    const outputEventsNode = layout.nodes.find((node) => node.key === "output-events-0");
-    const outputEventsEdge = layout.edges.find((edge) => edge.key === "policy-output-events-0");
+    const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-codex.build.failed");
+    const outputEventEdge = layout.edges.find((edge) => edge.key === "policy-output-event-0-codex.build.failed");
 
     expect(layout.nodes.filter((node) => node.kind === "policy").map((node) => node.record?.policyId)).toEqual(["first", "child"]);
     expect(childNode?.x).toBeGreaterThan(firstNode?.x ?? 0);
@@ -140,27 +143,27 @@ describe("calculateWorkflowCanvasLayout", () => {
       key: "policy-policy-0-1-codex.build.complete",
       sourceNodeKey: "policy-0",
       targetNodeKey: "policy-1",
-      sourceHandleId: "right",
+      sourceHandleId: "right-output-0",
       targetHandleId: "left",
       eventType: "codex.build.complete"
     }));
-    expect(outputEventsNode).toMatchObject({
-      kind: "output-events",
+    expect(outputEventNode).toMatchObject({
+      kind: "output-event",
       sourcePolicyId: first.id,
-      outputEvents: [{ eventType: "codex.build.failed" }]
+      outputEvent: { eventType: "codex.build.failed" }
     });
-    expect(outputEventsEdge).toMatchObject({
+    expect(outputEventEdge).toMatchObject({
       sourceNodeKey: "policy-0",
-      targetNodeKey: "output-events-0",
-      sourceHandleId: "right-output",
-      targetHandleId: "left-output",
+      targetNodeKey: "output-event-0-codex.build.failed",
+      sourceHandleId: "right-output-1",
+      targetHandleId: "left",
       dashed: true
     });
-    expect(outputEventsNode?.x).toBe(childNode?.x);
-    expect(outputEventsNode?.y).toBe(childNode
-      ? childNode.y + workflowPolicyStackHeight() + workflowCanvasLayoutConfig.outputEventsLaneGap
+    expect(outputEventNode?.x).toBe(childNode?.x);
+    expect(outputEventNode?.y).toBe(childNode
+      ? childNode.y + workflowPolicyStackHeight() + workflowNodeSizes.outputEvent.rowGap
       : undefined);
-    expect(layout.nodes.some((node) => node.kind === "output-events" && node.outputEvents?.some((event) => event.eventType === "codex.build.complete"))).toBe(false);
+    expect(layout.nodes.some((node) => node.kind === "output-event" && node.outputEvent?.eventType === "codex.build.complete")).toBe(false);
   });
 
   it("keeps the primary horizontal policy path on the trigger baseline and stacks branches compactly below it", () => {
@@ -194,14 +197,14 @@ describe("calculateWorkflowCanvasLayout", () => {
     const firstNode = layout.nodes.find((node) => node.key === "policy-0");
     const completeChildNode = layout.nodes.find((node) => node.key === "policy-1");
     const failedChildNode = layout.nodes.find((node) => node.key === "policy-2");
-    const outputEventsNode = layout.nodes.find((node) => node.key === "output-events-0");
+    const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-codex.build.blocked");
 
     expect(firstNode?.y).toBe(triggerNode?.y);
     expect(completeChildNode?.y).toBe(firstNode?.y);
     expect(failedChildNode?.y).toBeGreaterThan(firstNode ? firstNode.y + workflowPolicyStackHeight() + workflowCanvasLayoutConfig.branchGap : 0);
-    expect(outputEventsNode?.x).toBe(completeChildNode?.x);
-    expect(outputEventsNode?.y).toBe(failedChildNode
-      ? failedChildNode.y + workflowPolicyStackHeight() + workflowCanvasLayoutConfig.outputEventsLaneGap
+    expect(outputEventNode?.x).toBe(completeChildNode?.x);
+    expect(outputEventNode?.y).toBe(failedChildNode
+      ? failedChildNode.y + workflowPolicyStackHeight() + workflowNodeSizes.outputEvent.rowGap
       : undefined);
   });
 
@@ -212,22 +215,22 @@ describe("calculateWorkflowCanvasLayout", () => {
     const triggerNode = layout.nodes.find((node) => node.key === "trigger");
     const firstNode = layout.nodes.find((node) => node.key === "policy-0");
     const childNode = layout.nodes.find((node) => node.key === "policy-1");
-    const outputEventsNode = layout.nodes.find((node) => node.key === "output-events-0");
+    const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-codex.build.failed");
     const triggerPolicyEdge = layout.edges.find((edge) => edge.key === "trigger-policy-0");
 
     expect(layout.direction).toBe("vertical");
     expect(triggerNode ? triggerNode.x + triggerNode.width / 2 : undefined).toBe(firstNode ? firstNode.x + firstNode.width / 2 : undefined);
     expect(childNode?.y).toBeGreaterThan(firstNode?.y ?? 0);
-    expect(outputEventsNode?.x).toBe(childNode ? childNode.x + childNode.width + workflowCanvasLayoutConfig.branchGap : undefined);
-    expect(outputEventsNode?.y).toBe(childNode?.y);
+    expect(outputEventNode?.x).toBe(childNode ? childNode.x + childNode.width + workflowCanvasLayoutConfig.branchGap : undefined);
+    expect(outputEventNode?.y).toBe(childNode?.y);
     expect(triggerPolicyEdge).toMatchObject({
-      sourceHandleId: "bottom",
-      targetHandleId: "top"
+      sourceHandleId: "right",
+      targetHandleId: "left"
     });
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-policy-0-1-codex.build.complete",
-      sourceHandleId: "bottom",
-      targetHandleId: "top"
+      sourceHandleId: "right-output-0",
+      targetHandleId: "left"
     }));
   });
 
@@ -275,23 +278,23 @@ describe("calculateWorkflowCanvasLayout", () => {
     });
 
     const repeatedHandlerEdge = layout.edges.find((edge) => edge.key === "event-policy-2-1-developer.implement.completed");
-    const reworkOutputEventsNode = layout.nodes.find((node) => node.key === "output-events-2");
+    const reworkOutputEventNode = layout.nodes.find((node) => node.key === "output-event-2-developer.implement.failed");
 
     expect(repeatedHandlerEdge).toBeDefined();
     expect(repeatedHandlerEdge).toMatchObject({
       sourceNodeKey: "policy-2",
       targetNodeKey: "policy-1",
-      sourceHandleId: "right",
+      sourceHandleId: "right-output-0",
       targetHandleId: "left",
       tone: "return",
       eventType: "developer.implement.completed"
     });
-    expect(reworkOutputEventsNode?.outputEvents).toEqual([{
+    expect(reworkOutputEventNode?.outputEvent).toEqual({
       outputId: "developer.implement.failed",
       eventType: "developer.implement.failed",
       outputType: "event"
-    }]);
-    expect(reworkOutputEventsNode?.outputEvents?.some((event) => event.eventType === "developer.implement.completed")).toBe(false);
+    });
+    expect(layout.nodes.some((node) => node.kind === "output-event" && node.record?.index === 2 && node.outputEvent?.eventType === "developer.implement.completed")).toBe(false);
   });
 });
 
@@ -337,8 +340,15 @@ describe("toWorkflowReactFlowEdges", () => {
     });
   });
 
-  it("maps gate terminal edges straight and output-event ghost edges smart", () => {
+  it("maps every workflow edge to SmartStepEdge", () => {
     const edges = toWorkflowReactFlowEdges([
+      {
+        key: "policy-policy-0-1-codex.build.complete",
+        sourceNodeKey: "policy-0",
+        targetNodeKey: "policy-1",
+        sourceHandleId: "right",
+        targetHandleId: "left"
+      },
       {
         key: "policy-gate-output-0-done",
         sourceNodeKey: "policy-0",
@@ -347,15 +357,15 @@ describe("toWorkflowReactFlowEdges", () => {
         targetHandleId: "left"
       },
       {
-        key: "policy-output-events-0",
+        key: "policy-output-event-0-codex.build.failed",
         sourceNodeKey: "policy-0",
-        targetNodeKey: "output-events-0",
-        sourceHandleId: "right-output",
-        targetHandleId: "left-output"
+        targetNodeKey: "output-event-0-codex.build.failed",
+        sourceHandleId: "right",
+        targetHandleId: "left"
       }
     ]);
 
-    expect(edges.map((edge) => edge.type)).toEqual(["workflowStraight", "workflowSmart"]);
+    expect(edges.map((edge) => edge.type)).toEqual(["workflowSmart", "workflowSmart", "workflowSmart"]);
   });
 
 });

@@ -1,18 +1,17 @@
 import { useEffect, useMemo } from "react";
-import { MarkerType, Position, ReactFlow, StraightEdge, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
+import { MarkerType, Position, ReactFlow, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
 import { SmartStepEdge } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
 import { WorkflowReactFlowNodeComponent } from "./WorkflowReactFlowNode";
 import type { WorkflowCanvasProps, WorkflowNodeContext, WorkflowReactFlowEdge, WorkflowReactFlowNode } from "./WorkflowCanvasTypes";
-import { workflowCanvasLayoutConfig } from "./workflowLayout";
+import { workflowCanvasLayoutConfig, workflowPolicyOutputHandleY } from "./workflowLayout";
 
 const workflowNodeTypes = {
   workflow: WorkflowReactFlowNodeComponent
 } satisfies NodeTypes;
 
 const workflowEdgeTypes = {
-  workflowSmart: SmartStepEdge,
-  workflowStraight: StraightEdge
+  workflowSmart: SmartStepEdge
 } satisfies EdgeTypes;
 
 const workflowSolidEdgeStroke = "color-mix(in srgb, var(--primary) 70%, transparent)";
@@ -224,31 +223,32 @@ function useWorkflowNodes(layoutNodes: WorkflowCanvasProps["layout"]["nodes"], n
 }
 
 function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][number]): WorkflowReactFlowNode["handles"] {
-  const anchorTop = layoutNode.kind === "gate-output"
+  const anchorTop = layoutNode.kind === "gate-output" || layoutNode.kind === "output-event"
     ? layoutNode.height / 2
-    : layoutNode.kind === "trigger" || layoutNode.kind === "policy" || layoutNode.kind === "output-events"
+    : layoutNode.kind === "trigger" || layoutNode.kind === "policy"
     ? workflowCanvasLayoutConfig.policyAnchorY
     : layoutNode.height / 2;
   const anchorLeft = layoutNode.width / 2;
-  const outputAnchorTop = layoutNode.kind === "policy"
-    ? layoutNode.height - workflowCanvasLayoutConfig.edgePad / 2
-    : layoutNode.height / 2;
+  const outputHandles = layoutNode.kind === "policy"
+    ? Array.from({ length: layoutNode.outputHandleCount ?? 0 }, (_, outputIndex) => outputIndex)
+    : [];
 
-  if (layoutNode.kind === "gate-output") {
-    return layoutNode.direction === "vertical"
-      ? [{ id: "top", type: "target", position: Position.Top, x: anchorLeft, y: 0, width: 1, height: 1 }]
-      : [{ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 }];
+  if (layoutNode.kind === "gate-output" || layoutNode.kind === "output-event") {
+    return [{ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 }];
   }
 
   return [
     { id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 },
     { id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 },
-    ...(layoutNode.kind === "policy"
-      ? [{ id: "right-output", type: "source" as const, position: Position.Right, x: layoutNode.width, y: outputAnchorTop, width: 1, height: 1 }]
-      : []),
-    ...(layoutNode.kind === "output-events"
-      ? [{ id: "left-output", type: "target" as const, position: Position.Left, x: 0, y: layoutNode.height / 2, width: 1, height: 1 }]
-      : []),
+    ...outputHandles.map((outputIndex) => ({
+      id: `right-output-${outputIndex}`,
+      type: "source" as const,
+      position: Position.Right,
+      x: layoutNode.width,
+      y: workflowPolicyOutputHandleY(outputIndex, layoutNode.outputHandleCount ?? 0),
+      width: 1,
+      height: 1
+    })),
     { id: "top", type: "target", position: Position.Top, x: anchorLeft, y: 0, width: 1, height: 1 },
     { id: "bottom", type: "source", position: Position.Bottom, x: anchorLeft, y: layoutNode.height, width: 1, height: 1 }
   ];
@@ -257,7 +257,7 @@ function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][
 export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layout"]["edges"], context?: WorkflowNodeContext): WorkflowReactFlowEdge[] {
   return layoutEdges.map((workflowEdge) => ({
     id: workflowEdge.key,
-    type: workflowTerminalEdgeTarget(workflowEdge.targetNodeKey) ? "workflowStraight" : "workflowSmart",
+    type: "workflowSmart",
     source: workflowEdge.sourceNodeKey,
     target: workflowEdge.targetNodeKey,
     sourceHandle: workflowEdge.sourceHandleId,
@@ -275,10 +275,6 @@ export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layou
     reconnectable: false,
     domAttributes: workflowEdgeDomAttributes(workflowEdge)
   }));
-}
-
-function workflowTerminalEdgeTarget(targetNodeKey: string) {
-  return targetNodeKey.startsWith("gate-output-");
 }
 
 function useWorkflowEdges(layoutEdges: WorkflowCanvasProps["layout"]["edges"], context: WorkflowNodeContext) {

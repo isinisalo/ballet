@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { workflowTriggerLabel, type WorkflowStepRecord } from "./workflowGraph";
-import { workflowCanvasLayoutConfig, type WorkflowCanvasLayoutNode } from "./workflowLayout";
+import { workflowCanvasLayoutConfig, workflowPolicyOutputHandleY, type WorkflowCanvasLayoutNode } from "./workflowLayout";
 import { WorkflowCanvasNode } from "./WorkflowCanvasNode";
 import { WorkflowGhostNode } from "./WorkflowGhostNode";
 import { WorkflowPolicySummary } from "./WorkflowPolicySummary";
@@ -22,34 +22,35 @@ export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReact
 }
 
 function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
-  const anchorTop = layoutNode.kind === "gate-output"
+  const anchorTop = layoutNode.kind === "gate-output" || layoutNode.kind === "output-event"
     ? layoutNode.height / 2
-    : layoutNode.kind === "trigger" || layoutNode.kind === "policy" || layoutNode.kind === "output-events"
+    : layoutNode.kind === "trigger" || layoutNode.kind === "policy"
     ? workflowCanvasLayoutConfig.policyAnchorY
     : layoutNode.height / 2;
   const anchorLeft = layoutNode.width / 2;
-  const outputAnchorTop = layoutNode.kind === "policy"
-    ? layoutNode.height - workflowCanvasLayoutConfig.edgePad / 2
-    : layoutNode.height / 2;
+  const outputHandles = layoutNode.kind === "policy"
+    ? Array.from({ length: layoutNode.outputHandleCount ?? 0 }, (_, outputIndex) => outputIndex)
+    : [];
 
-  if (layoutNode.kind === "gate-output") {
-    return layoutNode.direction === "vertical" ? (
-      <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
-    ) : (
-      <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
-    );
+  if (layoutNode.kind === "gate-output" || layoutNode.kind === "output-event") {
+    return <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />;
   }
 
   return (
     <>
       <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
       <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
-      {layoutNode.kind === "policy" && (
-        <Handle id="right-output" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: outputAnchorTop }} />
-      )}
-      {layoutNode.kind === "output-events" && (
-        <Handle id="left-output" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: layoutNode.height / 2 }} />
-      )}
+      {outputHandles.map((outputIndex) => (
+        <Handle
+          key={outputIndex}
+          id={`right-output-${outputIndex}`}
+          type="source"
+          position={Position.Right}
+          isConnectable={false}
+          className="workflow-react-flow-handle"
+          style={{ top: workflowPolicyOutputHandleY(outputIndex, layoutNode.outputHandleCount ?? 0) }}
+        />
+      ))}
       <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
       <Handle id="bottom" type="source" position={Position.Bottom} isConnectable={false} className="workflow-react-flow-handle" style={{ left: anchorLeft }} />
     </>
@@ -59,7 +60,7 @@ function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutN
 function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
   if (node.kind === "trigger") return renderTriggerNode(context);
   if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(context);
-  if (node.kind === "output-events") return renderOutputEventsNode(node, context);
+  if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (node.kind === "gate-output") return renderGateOutputNode(node);
   if (!node.record) return null;
   if (node.kind === "save-policy" || node.kind === "edit-policy" || node.kind === "delete-policy") return renderPolicyActionNode(node, context, node.record);
@@ -92,36 +93,24 @@ function renderFirstPolicyGhost(context: WorkflowNodeContext) {
   );
 }
 
-function renderOutputEventsNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
-  const outputEvents = node.outputEvents ?? [];
+function renderOutputEventNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
+  const outputEvent = node.outputEvent;
+  const eventType = outputEvent?.eventType ?? "Output event";
   const sourcePolicy = node.sourcePolicyId ? context.policyById.get(node.sourcePolicyId) : undefined;
 
   return (
-    <WorkflowCanvasNode
-      label="Outputs"
-      value={`${outputEvents.length} output${outputEvents.length === 1 ? "" : "s"}`}
-      tone="event"
-      icon={Activity}
-      dashed
-      className="w-60 max-w-none py-2"
+    <button
+      type="button"
+      data-workflow-output-event={eventType}
+      aria-label={`Add policy step for ${eventType}`}
+      title={eventType}
+      disabled={!context.canAddPolicyForEvent(sourcePolicy)}
+      onClick={() => context.onAddPolicyStep(eventType, sourcePolicy)}
+      className="nodrag nopan flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md border border-dashed border-muted-foreground/70 bg-background/80 px-1.5 text-left font-mono text-[0.66rem] leading-4 text-muted-foreground transition-colors hover:border-primary/80 hover:bg-card hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80"
     >
-      <div className="grid gap-1">
-        {outputEvents.map(({ eventType }) => (
-          <button
-            key={eventType}
-            type="button"
-            data-workflow-output-event={eventType}
-            aria-label={`Add policy step for ${eventType}`}
-            title={eventType}
-            disabled={!context.canAddPolicyForEvent(sourcePolicy)}
-            onClick={() => context.onAddPolicyStep(eventType, sourcePolicy)}
-            className="nodrag nopan h-6 min-w-0 rounded border border-dashed border-muted-foreground/70 bg-background/80 px-1.5 text-left font-mono text-[0.62rem] leading-4 text-muted-foreground transition-colors hover:border-primary/80 hover:bg-card hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80"
-          >
-            <span className="block truncate">{eventType}</span>
-          </button>
-        ))}
-      </div>
-    </WorkflowCanvasNode>
+      <Activity className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+      <span className="block min-w-0 truncate">{eventType}</span>
+    </button>
   );
 }
 

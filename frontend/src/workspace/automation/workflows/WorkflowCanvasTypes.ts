@@ -49,4 +49,4 @@ export type WorkflowReactFlowEdgeData = Record<string, unknown> & {
 };
 
 export type WorkflowReactFlowNode = Node<WorkflowReactFlowNodeData, "workflow">;
-export type WorkflowReactFlowEdge = Edge<WorkflowReactFlowEdgeData, "workflowSmart" | "workflowStraight">;
+export type WorkflowReactFlowEdge = Edge<WorkflowReactFlowEdgeData, "workflowSmart">;
