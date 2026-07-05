@@ -165,7 +165,8 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(gateNode?.y).toBe(policyNode ? policyNode.y + workflowCanvasLayoutConfig.policyAnchorY - workflowNodeSizes.gateOutput.height / 2 : undefined);
     expect(outputEventNode).toMatchObject({
       kind: "output-event",
-      outputEvent: { outputId: "failed", eventType: "build.failed", outputType: "event" }
+      outputEvent: { outputId: "failed", eventType: "build.failed", outputType: "event" },
+      width: workflowNodeSizes.outputEvent.minWidth
     });
     expect(outputEventNode?.y).toBe(gateNode
       ? gateNode.y + gateNode.height + workflowNodeSizes.outputEvent.rowGap

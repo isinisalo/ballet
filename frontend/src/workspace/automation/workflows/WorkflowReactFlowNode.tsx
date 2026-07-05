@@ -55,12 +55,11 @@ function renderTriggerNode(context: WorkflowNodeContext) {
       aria-label={`Trigger: ${value}`}
       title={value}
       className={cn(
-        "flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md border border-divider-strong bg-card px-1.5 font-mono text-[0.66rem] leading-4 text-foreground",
+        "flex h-[22px] w-full min-w-0 items-center justify-center rounded-md border border-divider-strong bg-card text-foreground",
         !context.firstPolicy && "border-dashed border-muted-foreground/70 bg-background/80 text-muted-foreground"
       )}
     >
       <Zap className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
-      <span className="block min-w-0 truncate">{value}</span>
     </div>
   );
 }
@@ -91,7 +90,7 @@ function renderOutputEventNode(node: WorkflowCanvasLayoutNode, context: Workflow
       title={`Add action for ${eventType}`}
       disabled={!context.canAddPolicyForEvent(sourcePolicy)}
       onClick={() => context.onAddPolicyStep(eventType, sourcePolicy)}
-      className="nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-dashed border-muted-foreground/70 bg-background/80 px-1.5 text-left font-mono text-[0.66rem] leading-4 text-muted-foreground transition-colors hover:border-primary/80 hover:bg-card hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80"
+      className="nodrag nopan flex h-[22px] w-full min-w-0 items-center justify-center rounded-md border border-dashed border-muted-foreground/70 bg-background/80 px-0 text-center font-mono text-[0.66rem] leading-4 text-muted-foreground transition-colors hover:border-primary/80 hover:bg-card hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-muted-foreground/70 disabled:hover:bg-background/80"
     >
       <span className="block min-w-0 truncate">{workflowAddActionGhostLabel}</span>
     </button>

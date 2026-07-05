@@ -49,10 +49,10 @@ export type WorkflowCanvasLayout = {
 };
 
 export const workflowNodeSizes = {
-  trigger: { minWidth: 120, maxWidth: 200, height: 22 },
+  trigger: { minWidth: 28, maxWidth: 28, height: 22 },
   policy: { minWidth: 136, maxWidth: 220, height: 22 },
   event: { width: 240, height: 46 },
-  outputEvent: { minWidth: 76, maxWidth: 120, height: 22, rowGap: 16 },
+  outputEvent: { minWidth: 28, maxWidth: 28, height: 22, rowGap: 16 },
   gateOutput: { minWidth: 64, maxWidth: 180, height: 22 },
   action: { width: 28, height: 28 }
 };
@@ -75,7 +75,7 @@ const workflowEdgeLabelLayout = {
   clearance: 24
 };
 
-export const workflowAddActionGhostLabel = "+ Action";
+export const workflowAddActionGhostLabel = "+";
 
 const workflowDirectionHandles: Record<WorkflowLayoutDirection, { rankdir: "LR" | "TB"; sourceHandleId: string; targetHandleId: string }> = {
   horizontal: { rankdir: "LR", sourceHandleId: "right", targetHandleId: "left" },
@@ -103,12 +103,6 @@ type WorkflowLayoutMetrics = {
   verticalPolicyRankStep: number;
   verticalColumnStep: number;
 };
-
-function workflowPolicyInputLabel(record: WorkflowStepRecord) {
-  if (!record.policy) return undefined;
-  if (record.policy.source === "trigger") return record.policy.trigger || "Missing trigger";
-  return record.policy.event || "Missing event";
-}
 
 function workflowPolicyInputEdgeLabel(record: WorkflowStepRecord) {
   if (!record.policy) return undefined;
@@ -319,7 +313,7 @@ export function calculateWorkflowCanvasLayout({
   addNode({
     key: "trigger",
     kind: "trigger",
-    width: workflowTriggerNodeWidth(workflowGraph.rootRecords[0] ? workflowPolicyInputLabel(workflowGraph.rootRecords[0]) ?? "Next trigger" : "Next trigger"),
+    width: workflowTriggerNodeWidth(),
     height: workflowNodeSizes.trigger.height,
     direction
   });
@@ -599,8 +593,8 @@ function workflowPolicyNodeWidth(record: WorkflowStepRecord) {
   return workflowOutputNodeWidth(`then: ${record.policy?.action || record.policyId || "No policy"}`, workflowNodeSizes.policy.minWidth, workflowNodeSizes.policy.maxWidth);
 }
 
-function workflowTriggerNodeWidth(value: string) {
-  return workflowOutputNodeWidth(value, workflowNodeSizes.trigger.minWidth, workflowNodeSizes.trigger.maxWidth);
+function workflowTriggerNodeWidth() {
+  return workflowOutputNodeWidth("", workflowNodeSizes.trigger.minWidth, workflowNodeSizes.trigger.maxWidth);
 }
 
 function workflowOutputNodeWidth(value: string, minWidth: number, maxWidth: number) {

@@ -571,6 +571,7 @@ describe("workspace entity UI flows", () => {
     expect(triggerReactFlowNode?.querySelectorAll(".react-flow__handle-left")).toHaveLength(0);
     expect(triggerReactFlowNode?.querySelectorAll(".react-flow__handle-top")).toHaveLength(0);
     expect(triggerReactFlowNode?.querySelectorAll(".react-flow__handle-bottom")).toHaveLength(0);
+    expect(within(triggerReactFlowNode as HTMLElement).queryByText("implementation.failed")).not.toBeInTheDocument();
 
     expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
     expect(screen.queryByLabelText("Agent: existing")).not.toBeInTheDocument();
@@ -583,7 +584,6 @@ describe("workspace entity UI flows", () => {
     expect(within(implementationPolicyNode).getByText("then:")).toHaveClass("text-foreground");
     expect(implementationPolicyNode.querySelector("svg")).not.toBeInTheDocument();
     expect(screen.queryByText("start:")).not.toBeInTheDocument();
-    expect(screen.getAllByText("implementation.failed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
     expect(within(implementationPolicyNode).getByText("implementation")).toHaveAttribute("title", "Implement work");
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
@@ -872,7 +872,8 @@ describe("workspace entity UI flows", () => {
     const gateOutput = screen.getByLabelText("Gate: summary");
 
     expect(outputEvent).toBeInTheDocument();
-    expect(outputEvent).toHaveTextContent("+ Action");
+    expect(outputEvent).toHaveTextContent("+");
+    expect(outputEvent).not.toHaveTextContent("Action");
     expect(outputEvent).not.toHaveTextContent("implementation.failed");
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
     expect(outputEvent.querySelector("svg")).not.toBeInTheDocument();
