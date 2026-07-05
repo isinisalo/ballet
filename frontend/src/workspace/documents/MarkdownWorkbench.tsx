@@ -103,50 +103,52 @@ export function MarkdownWorkbench({
   const title = documentTitle(previewDocument ?? document);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)]">
+    <div className="grid gap-0 xl:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)]">
       <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
         <MarkdownDocumentView document={previewDocument} emptyTitle={emptyTitle} compact embedded />
       </Panel>
-      <Panel
-        title="Markdown Workbench"
-        icon={<FileKey2 data-icon="inline-start" />}
-        compact
-        action={(
-          <div className="flex items-center justify-end gap-2">
-            {headerActions}
-            <Button type="submit" size="icon-sm" form={formId} aria-label={saveLabel} title={saveLabel}>
-              <Save data-icon="inline-start" />
-            </Button>
-          </div>
-        )}
-      >
-        <form id={formId} className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void onSubmit(); }}>
-          {validationError ? <Alert variant="destructive"><AlertDescription>{validationError}</AlertDescription></Alert> : null}
-          <div className="-mx-4 -mt-3 flex min-h-10 flex-wrap items-center justify-between gap-3 bg-panel-header px-4 py-2">
-            <EditorToolbar />
-            <div className="flex items-center gap-3">
-              <EditorMetric label="Words" value={countWords(bodyText)} />
-              <EditorMetric label="Tokens" value={tokenEstimate(`${frontmatterText}\n${bodyText}`)} />
-              <span className="rounded bg-muted px-2 py-1 font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">
-                MARKDOWN_MODE
-              </span>
+      <div className="border-t border-divider-strong xl:border-l xl:border-t-0">
+        <Panel
+          title="Markdown Workbench"
+          icon={<FileKey2 data-icon="inline-start" />}
+          compact
+          action={(
+            <div className="flex items-center justify-end gap-2">
+              {headerActions}
+              <Button type="submit" size="icon-sm" form={formId} aria-label={saveLabel} title={saveLabel}>
+                <Save data-icon="inline-start" />
+              </Button>
             </div>
-          </div>
-          <div className="grid gap-3 pt-3">
-            <div className="flex items-start gap-2 pb-1">
-              <Braces className="mt-0.5 size-4 shrink-0 text-primary" />
-              <div className="min-w-0">
-                <p className="truncate font-mono text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  Editing source
-                </p>
-                <p className="truncate text-sm font-medium text-foreground">{title}</p>
+          )}
+        >
+          <form id={formId} className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void onSubmit(); }}>
+            {validationError ? <Alert variant="destructive"><AlertDescription>{validationError}</AlertDescription></Alert> : null}
+            <div className="-mx-4 -mt-3 flex min-h-10 flex-wrap items-center justify-between gap-3 bg-panel-header px-4 py-2">
+              <EditorToolbar />
+              <div className="flex items-center gap-3">
+                <EditorMetric label="Words" value={countWords(bodyText)} />
+                <EditorMetric label="Tokens" value={tokenEstimate(`${frontmatterText}\n${bodyText}`)} />
+                <span className="rounded bg-muted px-2 py-1 font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">
+                  MARKDOWN_MODE
+                </span>
               </div>
             </div>
-            <WorkbenchTextArea label="YAML Frontmatter" rows={9} value={frontmatterText} onChange={onFrontmatterChange} />
-            <WorkbenchTextArea label="Markdown Body" rows={18} value={bodyText} onChange={onBodyChange} />
-          </div>
-        </form>
-      </Panel>
+            <div className="grid gap-3 pt-3">
+              <div className="flex items-start gap-2 pb-1">
+                <Braces className="mt-0.5 size-4 shrink-0 text-primary" />
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                    Editing source
+                  </p>
+                  <p className="truncate text-sm font-medium text-foreground">{title}</p>
+                </div>
+              </div>
+              <WorkbenchTextArea label="YAML Frontmatter" rows={9} value={frontmatterText} onChange={onFrontmatterChange} />
+              <WorkbenchTextArea label="Markdown Body" rows={18} value={bodyText} onChange={onBodyChange} />
+            </div>
+          </form>
+        </Panel>
+      </div>
     </div>
   );
 }

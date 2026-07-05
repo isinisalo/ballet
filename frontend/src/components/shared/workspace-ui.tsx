@@ -162,7 +162,7 @@ export function Panel({
   compact?: boolean;
 }) {
   return (
-    <Card>
+    <Card className="rounded-none ring-0">
       <CardHeader
         className={cn(
           "min-h-12 items-center gap-1.5 bg-card px-4 py-2.5 has-data-[slot=card-action]:grid-cols-[minmax(0,1fr)_auto]",

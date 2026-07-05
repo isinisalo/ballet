@@ -103,8 +103,8 @@ export function WorkspaceShell() {
         />
         <SidebarInset>
           <ScrollArea className="h-svh">
-            <main className="flex min-h-svh flex-col gap-4 bg-muted/30 p-3 md:p-4">
-              <header className="flex flex-col gap-4 md:hidden">
+            <main className="flex min-h-svh flex-col bg-muted/30">
+              <header className="flex flex-col gap-4 p-3 pb-0 md:hidden">
                 <div className="flex items-start gap-2">
                   <SidebarTrigger className="md:hidden">
                     <Menu />
