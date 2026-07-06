@@ -11,7 +11,7 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
   const isReturnEdge = data?.workflowEdge.tone === "return";
   const returnEdgePath = isReturnEdge ? workflowReturnEdgePath(props) : undefined;
   const labelTransform = isReturnEdge
-    ? `translate(-50%, -50%) translate(${returnEdgePath?.labelX ?? (sourceX + targetX) / 2}px, ${returnEdgePath?.labelY ?? (sourceY + targetY) / 2 - 12}px)`
+    ? `translate(-50%, -50%) translate(${returnEdgePath?.labelX ?? (sourceX + targetX) / 2}px, ${returnEdgePath?.labelY ?? (sourceY + targetY) / 2}px)`
     : `translate(-100%, -50%) translate(${targetX - workflowEdgeLabelTargetOffset}px, ${targetY}px)`;
   const smartStepEdgeProps = {
     ...props,
@@ -56,7 +56,7 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
   );
 }
 
-function workflowReturnEdgePath({ data, sourceX, sourceY, targetX, targetY }: EdgeProps<WorkflowReactFlowEdge>) {
+export function workflowReturnEdgePath({ data, sourceX, sourceY, targetX, targetY }: EdgeProps<WorkflowReactFlowEdge>) {
   const sourceNode = data?.sourceNode;
   const targetNode = data?.targetNode;
   const targetHandleId = data?.workflowEdge.targetHandleId;
@@ -71,7 +71,7 @@ function workflowReturnEdgePath({ data, sourceX, sourceY, targetX, targetY }: Ed
   const sourceExitX = resolvedSourceX + sourcePad;
   const targetEntryY = targetHandleId === "bottom" ? resolvedTargetY + targetPad : resolvedTargetY - targetPad;
   const labelX = Math.min(sourceExitX, resolvedTargetX) + Math.abs(resolvedTargetX - sourceExitX) / 2;
-  const labelY = Math.min(resolvedSourceY, targetEntryY) + Math.abs(targetEntryY - resolvedSourceY) / 2 - 12;
+  const labelY = targetEntryY;
 
   return {
     labelX,

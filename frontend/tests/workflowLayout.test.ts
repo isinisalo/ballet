@@ -3,6 +3,7 @@ import type { ProjectPolicy } from "../../shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "../../shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
+import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
 import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowNodeSizes, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 
 const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
@@ -433,6 +434,53 @@ describe("calculateWorkflowCanvasLayout", () => {
 });
 
 describe("toWorkflowReactFlowEdges", () => {
+  it("centers return edge labels on the top or bottom return segment", () => {
+    const sourceNode = { key: "policy-2", kind: "policy" as const, x: 300, y: 120, width: 140, height: 22, direction: "horizontal" as const };
+    const topTargetNode = { key: "policy-1", kind: "policy" as const, x: 120, y: 40, width: 140, height: 22, direction: "horizontal" as const };
+    const bottomTargetNode = { ...topTargetNode, y: 220 };
+    const baseProps = {
+      id: "event-policy-2-1-complete",
+      source: "policy-2",
+      target: "policy-1",
+      selected: false,
+      sourceX: 440,
+      sourceY: 131,
+      targetX: 190,
+      targetY: 40
+    };
+
+    expect(workflowReturnEdgePath({
+      ...baseProps,
+      targetY: topTargetNode.y,
+      data: {
+        workflowEdge: {
+          key: "event-policy-2-1-complete",
+          sourceNodeKey: "policy-2",
+          targetNodeKey: "policy-1",
+          targetHandleId: "top",
+          tone: "return"
+        },
+        sourceNode,
+        targetNode: topTargetNode
+      }
+    }).labelY).toBe(topTargetNode.y - 28);
+    expect(workflowReturnEdgePath({
+      ...baseProps,
+      targetY: bottomTargetNode.y + bottomTargetNode.height,
+      data: {
+        workflowEdge: {
+          key: "event-policy-2-1-complete",
+          sourceNodeKey: "policy-2",
+          targetNodeKey: "policy-1",
+          targetHandleId: "bottom",
+          tone: "return"
+        },
+        sourceNode,
+        targetNode: bottomTargetNode
+      }
+    }).labelY).toBe(bottomTargetNode.y + bottomTargetNode.height + 28);
+  });
+
   it("maps workflow layout edges to smart ReactFlow edges", () => {
     const [edge] = toWorkflowReactFlowEdges([{
       key: "event-policy-2-1-implementation.complete",
