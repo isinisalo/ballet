@@ -14,7 +14,7 @@ const baseData = (): AppData => ({
   projects: [{
     id: "project-1",
     name: "Ballet",
-    description: "AgentOps project",
+    description: "Ballet project",
     status: "active",
     createdAt: now,
     updatedAt: now,
@@ -390,7 +390,7 @@ async function renderRoute(path: string, data = baseData(), options?: InstallApi
   window.history.pushState({}, "", path);
   const api = installApi(data, options);
   render(<WorkspaceApp />);
-  await screen.findByText("AgentOps");
+  await screen.findByText("Ballet");
   await waitFor(() => expect(api.fetchMock).toHaveBeenCalledWith("/api/data", expect.anything()));
   return api;
 }

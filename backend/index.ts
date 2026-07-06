@@ -28,5 +28,5 @@ app.use((error: unknown, _req: express.Request, res: express.Response, next: exp
 });
 
 app.listen(port, "127.0.0.1", () => {
-  console.log(`AgentOps MVP running at http://127.0.0.1:${port}`);
+  console.log(`Ballet running at http://127.0.0.1:${port}`);
 });

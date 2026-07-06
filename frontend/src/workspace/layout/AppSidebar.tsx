@@ -38,11 +38,11 @@ export function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip="AgentOps">
+            <SidebarMenuButton size="lg" tooltip="Ballet">
               <Route />
               <span className="flex flex-col gap-0.5">
-                <span className="font-semibold">AgentOps</span>
-                <span className="text-xs text-muted-foreground">MVP control plane</span>
+                <span className="font-semibold">Ballet</span>
+                <span className="text-xs text-muted-foreground">Control plane</span>
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>

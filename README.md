@@ -1,4 +1,4 @@
-# AgentOps MVP
+# Ballet
 
 Minimal TypeScript web application for managing projects, goals, ADRs, agents, skills, runtimes, policies, and routed event intake.
 

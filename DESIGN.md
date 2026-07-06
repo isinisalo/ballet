@@ -1,5 +1,5 @@
 ---
-name: Ballet AgentOps Command Center
+name: Ballet
 version: alpha
 colors:
   surface: '#111316'
@@ -109,7 +109,7 @@ spacing:
 ---
 
 ## Brand & Style
-Ballet is an AgentOps command center for managing projects, goals, ADRs, agents, skills, runtimes, policies, and routed event intake. The interface must feel like a high-stakes AI operations workspace: dense, structured, technical, and calm under pressure.
+Ballet is an agent operations command center for managing projects, goals, ADRs, agents, skills, runtimes, policies, and routed event intake. The interface must feel like a high-stakes AI operations workspace: dense, structured, technical, and calm under pressure.
 
 The visual system uses **Modern Minimalism** fused with **Technical Industrialism**. Dark tonal layers reduce eye strain during long monitoring sessions, while high-vibrancy signal colors mark active decisions, agent state, policy routing, and event urgency. The target users are DevOps engineers, AI architects, and operator agents who need fast scanning, reliable hierarchy, and low visual ambiguity.
 
