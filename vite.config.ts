@@ -15,7 +15,32 @@ export default defineConfig({
   },
   build: {
     outDir: path.resolve(__dirname, "dist"),
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return;
+          }
+
+          if (id.includes("@xyflow/react") || id.includes("@tisoap/react-flow-smart-edge") || id.includes("@dagrejs/dagre")) {
+            return "vendor-workflow";
+          }
+
+          if (id.includes("react-markdown") || id.includes("remark-gfm") || id.includes("mdast-util-") || id.includes("micromark")) {
+            return "vendor-markdown";
+          }
+
+          if (id.includes("lucide-react")) {
+            return "vendor-icons";
+          }
+
+          if (id.includes("/node_modules/react/") || id.includes("/node_modules/react-dom/") || id.includes("/node_modules/scheduler/")) {
+            return "vendor-react";
+          }
+        }
+      }
+    }
   },
   server: {
     proxy: {
