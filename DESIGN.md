@@ -116,6 +116,8 @@ The visual system uses **Modern Minimalism** fused with **Technical Industrialis
 ## Colors
 The palette is rooted in a deep, multi-layered dark mode.
 
+Theme support is currently dark-only. Do not expose light or system theme modes unless a complete light palette is added to this file and implemented as first-class design tokens.
+
 - **Primary (Electric Blue):** Use for primary actions, selected navigation, focused fields, graph flow paths, and the active route through an orchestration workflow.
 - **Secondary (Emerald):** Use for running agents, successful policy outcomes, accepted goals, healthy runtimes, and go-forward states.
 - **Tertiary (Amber):** Use for warnings, idle agents, pending events, event stream highlights, and attention states that do not require destructive styling.

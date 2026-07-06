@@ -23,6 +23,7 @@
   --primary-container: #4b8eff;
   --primary-container-foreground: #00285c;
   --secondary: #4edea3;
+  --secondary-hover: color-mix(in oklch, var(--secondary), var(--foreground) 5%);
   --secondary-foreground: #003824;
   --secondary-container: #00a572;
   --secondary-container-foreground: #00311f;
@@ -374,7 +375,9 @@ body {
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
@@ -384,13 +387,14 @@ body {
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: 0.125rem;
+  --radius-xs: 0.125rem;
+  --radius-sm: var(--radius);
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.75rem;
+  --radius-4xl: 0.75rem;
 }
 
 .dark {
