@@ -181,6 +181,12 @@ export function WorkflowsAutomationTab({
     updateSelected({ steps });
   };
 
+  const removeSelectedActionStep = () => {
+    if (!selected || selectedActionStepIndex === null) return;
+    updateSelected({ steps: selected.steps.filter((_, index) => index !== selectedActionStepIndex) });
+    setSelectedActionStepIndex(null);
+  };
+
   const canvasInteraction = useWorkflowCanvasInteraction({
     selectedId: selected?.id,
     reorderStep
@@ -256,6 +262,7 @@ export function WorkflowsAutomationTab({
         }}
         onActionChange={updateSelectedAction}
         onCreateOutput={createOutput}
+        onRemoveFromWorkflow={removeSelectedActionStep}
       />
     </>
   );

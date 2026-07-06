@@ -1,4 +1,6 @@
 import type { Agent, ProjectAction, ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ActionEditorFields } from "../actions/ActionEditorFields";
 
@@ -13,7 +15,8 @@ export function WorkflowActionSheet({
   config,
   onOpenChange,
   onActionChange,
-  onCreateOutput
+  onCreateOutput,
+  onRemoveFromWorkflow
 }: {
   open: boolean;
   action?: ProjectAction;
@@ -22,6 +25,7 @@ export function WorkflowActionSheet({
   onOpenChange: (open: boolean, details?: WorkflowActionSheetOpenChangeDetails) => void;
   onActionChange: (patch: Partial<ProjectAction>) => void;
   onCreateOutput: (id: string) => void;
+  onRemoveFromWorkflow: () => void;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
@@ -44,6 +48,12 @@ export function WorkflowActionSheet({
               onChange={onActionChange}
               onCreateOutput={onCreateOutput}
             />
+            <div className="mt-4 border-t border-divider-strong pt-4">
+              <Button type="button" variant="destructive" size="sm" onClick={onRemoveFromWorkflow}>
+                <Trash2 data-icon="inline-start" />
+                Remove from workflow
+              </Button>
+            </div>
           </div>
         ) : null}
       </SheetContent>

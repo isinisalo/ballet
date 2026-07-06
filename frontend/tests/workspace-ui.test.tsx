@@ -819,6 +819,30 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
+  it("removes the selected action node from the workflow sheet without deleting global config", async () => {
+    const user = userEvent.setup();
+    const { data, fetchMock } = await renderRoute("/automation/workflows?id=workflow-1");
+    const policyId = "on.implementation.failed.start.implementation";
+
+    activateWorkflowNode(screen.getByLabelText(`Policy: ${policyId}`));
+    expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Remove from workflow" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Action" })).not.toBeInTheDocument());
+    expect(screen.queryByLabelText(`Policy: ${policyId}`)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+
+    await waitFor(() => expect(data.automation.workflows[0]?.steps).toEqual([]));
+    expect(data.automation.policies).toContainEqual(expect.objectContaining({ id: policyId }));
+    expect(data.automation.actions).toContainEqual(expect.objectContaining({ id: "implementation" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
+      method: "PUT",
+      body: expect.stringContaining("\"steps\":[]")
+    }));
+  });
+
   it("switches workflow action sheet content and only closes with the sheet close button", async () => {
     const workflowData = baseData();
     workflowData.agents.push({
