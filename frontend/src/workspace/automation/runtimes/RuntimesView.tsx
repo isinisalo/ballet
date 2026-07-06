@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Code2, Save } from "lucide-react";
 import type { AppData, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
 import { HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import { runtimePath } from "../../routing";
@@ -32,14 +33,16 @@ export function RuntimesView({
 
   const saveRuntimesFromHeader = async () => {
     if (!isCreateMode) {
+      if (draft.runtimes.some(hasRuntimeFieldErrors)) return;
       await saveDraft();
       return;
     }
     const id = editablePolicyToken(newRuntime.id);
-    if (!id || draft.runtimes.some((runtime) => runtime.id === id)) return;
+    const nextRuntime = { ...newRuntime, id, title: newRuntime.title.trim() };
+    if (hasRuntimeFieldErrors(nextRuntime) || draft.runtimes.some((runtime) => runtime.id === id)) return;
     const nextDraft = {
       ...draft,
-      runtimes: [...draft.runtimes, { ...newRuntime, id, title: newRuntime.title || id }]
+      runtimes: [...draft.runtimes, nextRuntime]
     };
     setDraft(nextDraft);
     const saved = await saveDraft(nextDraft);
@@ -89,3 +92,9 @@ export function RuntimesView({
     </div>
   );
 }
+
+const hasRuntimeFieldErrors = (runtime: { id: string; title: string; command: string; args: string[] }) =>
+  Boolean(automationTokenValidationMessage("Runtime ID", runtime.id)) ||
+  Boolean(automationStringValidationMessage("Title", runtime.title, automationFieldLimits.name)) ||
+  Boolean(automationStringValidationMessage("Command", runtime.command, automationFieldLimits.command)) ||
+  runtime.args.some((arg) => Boolean(automationStringValidationMessage("Arg", arg, automationFieldLimits.arg, { required: false })));

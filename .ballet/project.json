@@ -287,6 +287,16 @@
       "description": "No further actions.",
       "outputIds": [],
       "agentIds": []
+    },
+    {
+      "id": "tassa-on-pitka-nimi-actionilla-milta-se",
+      "description": "",
+      "outputIds": [
+        "ready"
+      ],
+      "agentIds": [
+        "architecture-reviewer"
+      ]
     }
   ],
   "outputs": [

@@ -1,4 +1,5 @@
 import { Save } from "lucide-react";
+import { automationFieldLimits } from "@shared/api/automationValidation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,8 @@ export function WorkflowHeaderNameEditor({
         aria-invalid={!canSave}
         autoFocus
         className={cn("h-8 w-[min(18rem,42vw)] min-w-0 font-mono text-xs", !canSave && "border-destructive")}
+        minLength={automationFieldLimits.token.min}
+        maxLength={automationFieldLimits.token.max}
         value={value}
         placeholder="Workflow name"
         onChange={(event) => onValueChange(event.target.value)}

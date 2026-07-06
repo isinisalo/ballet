@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage, normalizeAutomationToken } from "@shared/api/automationValidation";
 import type { AutomationTab } from "../types";
-import { editablePolicyToken } from "./automationUtils";
 
 type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
 
@@ -55,7 +55,10 @@ export function useAutomationCreateDrafts({
   }, [agents, draft.outputs]);
 
   const saveAutomationFromHeader = async () => {
-    if (!isCreateMode) return saveDraft();
+    if (!isCreateMode) {
+      if (hasAutomationDraftFieldErrors(activeTab, draft)) return false;
+      return saveDraft();
+    }
     const nextDraft = createDraftWithNewEntity(activeTab, draft, createDraftsRef.current);
     if (!nextDraft) return false;
     setDraft(nextDraft.config);
@@ -102,16 +105,35 @@ const createDraftWithNewEntity = (
   drafts: AutomationCreateDrafts
 ): { config: ProjectAutomationConfig; id: string } | undefined => {
   if (activeTab === "triggers") {
-    const id = editablePolicyToken(drafts.trigger.id);
-    if (!id || draft.triggers.some((trigger) => trigger.id === id)) return undefined;
+    const id = normalizeAutomationToken(drafts.trigger.id);
+    if (automationTokenValidationMessage("Trigger ID", id) || automationStringValidationMessage("Description", drafts.trigger.description, automationFieldLimits.description) || draft.triggers.some((trigger) => trigger.id === id)) return undefined;
     return { id, config: { ...draft, triggers: [...draft.triggers, { ...drafts.trigger, id }] } };
   }
   if (activeTab === "actions") {
-    const id = editablePolicyToken(drafts.action.id);
-    if (!id || draft.actions.some((action) => action.id === id)) return undefined;
+    const id = normalizeAutomationToken(drafts.action.id);
+    if (automationTokenValidationMessage("Action ID", id) || automationStringValidationMessage("Description", drafts.action.description, automationFieldLimits.description, { required: false }) || draft.actions.some((action) => action.id === id)) return undefined;
     return { id, config: { ...draft, actions: [...draft.actions, { ...drafts.action, id }] } };
   }
-  const id = editablePolicyToken(drafts.workflow.id);
-  if (!id || draft.workflows.some((workflow) => workflow.id === id)) return undefined;
-  return { id, config: { ...draft, workflows: [...draft.workflows, { ...drafts.workflow, id, title: drafts.workflow.title || id }] } };
+  const id = normalizeAutomationToken(drafts.workflow.id);
+  if (automationTokenValidationMessage("Workflow ID", id) || automationStringValidationMessage("Title", drafts.workflow.title, automationFieldLimits.name) || draft.workflows.some((workflow) => workflow.id === id)) return undefined;
+  return { id, config: { ...draft, workflows: [...draft.workflows, { ...drafts.workflow, id, title: drafts.workflow.title.trim() }] } };
+};
+
+const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectAutomationConfig): boolean => {
+  if (activeTab === "triggers") {
+    return draft.triggers.some((trigger) =>
+      Boolean(automationTokenValidationMessage("Trigger ID", trigger.id)) ||
+      Boolean(automationStringValidationMessage("Description", trigger.description, automationFieldLimits.description))
+    );
+  }
+  if (activeTab === "actions") {
+    return draft.actions.some((action) =>
+      Boolean(automationTokenValidationMessage("Action ID", action.id)) ||
+      Boolean(automationStringValidationMessage("Description", action.description, automationFieldLimits.description, { required: false }))
+    );
+  }
+  return draft.workflows.some((workflow) =>
+    Boolean(automationTokenValidationMessage("Workflow ID", workflow.id)) ||
+    Boolean(automationStringValidationMessage("Title", workflow.title, automationFieldLimits.name))
+  );
 };

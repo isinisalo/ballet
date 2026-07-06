@@ -1,21 +1,25 @@
-import { normalizePolicyToken } from "@shared/policy-actions";
+import {
+  automationFieldLimits,
+  automationOutputIdValidationMessage,
+  normalizeAutomationToken
+} from "@shared/api/automationValidation";
 
 export type OutputId = string;
 
-export const outputIdMinLength = 2;
-export const outputIdMaxLength = 18;
+export const outputIdMinLength = automationFieldLimits.outputId.min ?? 0;
+export const outputIdMaxLength = automationFieldLimits.outputId.max;
 
 export const normalizeOutputId = (value: string): OutputId =>
-  normalizePolicyToken(value);
+  normalizeAutomationToken(value);
 
 export const uniqueOutputIds = (values: string[], max = Number.POSITIVE_INFINITY): OutputId[] =>
   [...new Set(values.map(normalizeOutputId).filter(Boolean))].slice(0, max);
 
 export const outputValidationMessage = (value: string): string | undefined => {
-  const normalized = normalizeOutputId(value);
-  if (!normalized) return "Output id is required.";
-  if (normalized.length < outputIdMinLength) return `Use at least ${outputIdMinLength} characters.`;
-  if (normalized.length > outputIdMaxLength) return `Use ${outputIdMaxLength} characters or fewer.`;
+  const message = automationOutputIdValidationMessage(value);
+  if (message === "Output id is required.") return message;
+  if (message?.includes("at least")) return `Use at least ${outputIdMinLength} characters.`;
+  if (message?.includes("or fewer")) return `Use ${outputIdMaxLength} characters or fewer.`;
   return undefined;
 };
 

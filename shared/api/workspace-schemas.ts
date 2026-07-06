@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ProjectAutomationConfig } from "../domain/automation.js";
+import { automationFieldLimits } from "./automationValidation.js";
 
 export const mutableCollections = ["projects", "goals", "adrs", "agents", "skills"] as const;
 export const readableCollections = [...mutableCollections, "runtimes", "policies", "events"] as const;
@@ -114,42 +115,52 @@ export type CollectionUpsertPayload = Record<string, unknown> & { id?: string };
 export const collectionUpsertSchema = (collection: MutableCollectionName): z.ZodType<CollectionUpsertPayload> =>
   collectionUpsertSchemas[collection] as z.ZodType<CollectionUpsertPayload>;
 
+const automationTokenSchema = z.string().min(automationFieldLimits.token.min).max(automationFieldLimits.token.max);
+const automationNameSchema = z.string().min(automationFieldLimits.name.min).max(automationFieldLimits.name.max);
+const automationDescriptionSchema = z.string().min(automationFieldLimits.description.min).max(automationFieldLimits.description.max);
+const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits.description.max);
+const automationOutputIdSchema = z.string().min(automationFieldLimits.outputId.min).max(automationFieldLimits.outputId.max);
+const automationEventTypeSchema = z.string().min(automationFieldLimits.eventType.min).max(automationFieldLimits.eventType.max);
+const automationPolicyIdSchema = z.string().min(automationFieldLimits.policyId.min).max(automationFieldLimits.policyId.max);
+const automationCommandSchema = z.string().min(automationFieldLimits.command.min).max(automationFieldLimits.command.max);
+const automationArgSchema = z.string().min(automationFieldLimits.arg.min).max(automationFieldLimits.arg.max);
+
 const projectTriggerSchema = z.object({
-  id: z.string(),
-  description: z.string()
+  id: automationTokenSchema,
+  description: automationDescriptionSchema
 }).strict();
 
 const projectActionSchema = z.object({
-  id: z.string(),
-  description: z.string(),
-  outputIds: z.array(z.string()),
-  agentIds: z.array(z.string())
+  id: automationTokenSchema,
+  description: optionalAutomationDescriptionSchema,
+  outputIds: z.array(automationOutputIdSchema),
+  agentIds: z.array(z.string().min(1))
 }).strict();
 
 const projectOutputSchema = z.object({
-  id: z.string()
+  id: automationOutputIdSchema
 }).strict();
 
 const projectPolicySchema = z.object({
-  id: z.string(),
+  id: automationPolicyIdSchema,
   source: z.enum(["event", "trigger"]),
-  event: z.string().optional(),
-  trigger: z.string().optional(),
-  action: z.string(),
+  event: automationEventTypeSchema.optional(),
+  trigger: automationTokenSchema.optional(),
+  action: automationTokenSchema,
   enabled: z.boolean()
 }).strict();
 
 const projectWorkflowSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  steps: z.array(z.string())
+  id: automationTokenSchema,
+  title: automationNameSchema,
+  steps: z.array(automationPolicyIdSchema)
 }).strict();
 
 const projectRuntimeSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  command: z.string(),
-  args: z.array(z.string())
+  id: automationTokenSchema,
+  title: automationNameSchema,
+  command: automationCommandSchema,
+  args: z.array(automationArgSchema)
 }).strict();
 
 export const automationConfigSchema = z.object({

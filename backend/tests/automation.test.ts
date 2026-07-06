@@ -342,6 +342,19 @@ describe("project automation config", () => {
     expect(issues.some((issue) => issue.message === "Workflow references unknown policy: missing-policy.")).toBe(true);
   });
 
+  it("validates automation field lengths", () => {
+    const issues = validateProjectAutomationConfig({
+      ...validConfig(),
+      actions: [{ ...validConfig().actions[0]!, id: "a".repeat(41) }],
+      outputs: [{ id: "x".repeat(19) }],
+      workflows: [{ ...validConfig().workflows[0]!, title: "" }]
+    }, [agent]);
+
+    expect(issues.some((issue) => issue.message === "Action id must be 40 characters or fewer.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Output id must be 18 characters or fewer.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Workflow title is required.")).toBe(true);
+  });
+
   it("accepts events derived from saved action outputs", () => {
     const reviewer: Agent = {
       ...agent,

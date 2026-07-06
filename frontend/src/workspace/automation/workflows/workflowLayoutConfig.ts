@@ -21,6 +21,7 @@ export const workflowCanvasLayoutConfig = {
 
 export const workflowEdgeLabelLayout = {
   minGap: 80,
+  maxWidth: 160,
   paddingX: 12,
   characterWidth: 6.25,
   clearance: 24

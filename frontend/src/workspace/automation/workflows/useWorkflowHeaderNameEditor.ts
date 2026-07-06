@@ -1,5 +1,6 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { automationTokenValidationMessage, normalizeAutomationToken } from "@shared/api/automationValidation";
 import type { AutomationTab } from "../../types";
 import type { WorkflowNameMode } from "./WorkflowHeaderNameEditor";
 
@@ -25,11 +26,11 @@ export function useWorkflowHeaderNameEditor({
     : undefined;
   const [mode, setMode] = useState<WorkflowNameMode>("read");
   const [value, setValue] = useState("");
-  const trimmedValue = value.trim();
+  const normalizedValue = normalizeAutomationToken(value);
   const valueExists = draft.workflows.some((workflow) =>
-    workflow.id === trimmedValue && (mode === "create" || workflow.id !== selectedWorkflow?.id)
+    workflow.id === normalizedValue && (mode === "create" || workflow.id !== selectedWorkflow?.id)
   );
-  const canSave = Boolean(trimmedValue) && !valueExists;
+  const canSave = !automationTokenValidationMessage("Workflow name", value) && !valueExists;
 
   useEffect(() => {
     setMode("read");
@@ -50,13 +51,13 @@ export function useWorkflowHeaderNameEditor({
   const save = async () => {
     if (!canSave) return;
     const nextDraft = mode === "create"
-      ? createWorkflowDraft(draft, trimmedValue)
-      : renameWorkflowDraft(draft, selectedWorkflow?.id, trimmedValue);
+      ? createWorkflowDraft(draft, normalizedValue)
+      : renameWorkflowDraft(draft, selectedWorkflow?.id, normalizedValue);
 
     setDraft(nextDraft);
     const saved = await saveDraft(nextDraft);
     if (saved) {
-      selectAutomationEntity("workflows", trimmedValue);
+      selectAutomationEntity("workflows", normalizedValue);
       setMode("read");
       setValue("");
     }

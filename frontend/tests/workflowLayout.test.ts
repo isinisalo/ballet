@@ -78,6 +78,29 @@ describe("workflow layout helper modules", () => {
     expect(policyNode?.x).toBeGreaterThan((triggerNode?.x ?? 0) + workflowNodeSizes.trigger.minWidth);
     expect(policyNode?.y).toBe(triggerNode?.y);
   });
+
+  it("caps horizontal spacing for long edge labels", () => {
+    const nodes = positionWorkflowNodes([
+      {
+        key: "trigger",
+        kind: "trigger",
+        width: workflowNodeSizes.trigger.minWidth,
+        height: workflowNodeSizes.trigger.height,
+        direction: "horizontal"
+      },
+      {
+        key: "policy-0",
+        kind: "policy",
+        width: workflowNodeSizes.policy.minWidth,
+        height: workflowNodeSizes.policy.height,
+        direction: "horizontal"
+      }
+    ], [{ source: "trigger", target: "policy-0", label: "x".repeat(500) }], "horizontal");
+
+    const policyNode = nodes.find((node) => node.key === "policy-0");
+
+    expect(policyNode?.x).toBeLessThan(260);
+  });
 });
 
 describe("calculateWorkflowCanvasLayout", () => {

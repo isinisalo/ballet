@@ -5,6 +5,7 @@ import type {
   ProjectPolicy,
   ProjectWorkflow
 } from "@shared/api/workspace-contracts";
+import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
 import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "@shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
@@ -45,6 +46,8 @@ export function WorkflowsAutomationTab({
       : -1;
   const selected = selectedIndex >= 0 ? config.workflows[selectedIndex] : createDraft;
   const creating = selectedIndex < 0;
+  const workflowIdError = selected ? automationTokenValidationMessage("Workflow ID", selected.id) : undefined;
+  const titleError = selected ? automationStringValidationMessage("Title", selected.title, automationFieldLimits.name) : undefined;
   const [selectedActionStepIndex, setSelectedActionStepIndex] = useState<number | null>(null);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
@@ -103,7 +106,7 @@ export function WorkflowsAutomationTab({
   const updateSelected = (patch: Partial<ProjectWorkflow>) => {
     if (!selected) return;
     if (creating) {
-      onCreateDraftChange({ ...patch, id: patch.id ? normalizePolicyToken(patch.id) : patch.id });
+      onCreateDraftChange(patch.id === undefined ? patch : { ...patch, id: normalizePolicyToken(patch.id) });
       return;
     }
     updateConfig((current) => ({
@@ -218,8 +221,24 @@ export function WorkflowsAutomationTab({
     return (
       <div className="grid gap-4 p-4">
         <FieldGroup>
-          <TextField label="Workflow ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-          <TextField label="Title" value={selected.title} onChange={(title) => updateSelected({ title })} />
+          <TextField
+            label="Workflow ID"
+            required
+            minLength={automationFieldLimits.token.min}
+            maxLength={automationFieldLimits.token.max}
+            error={workflowIdError}
+            value={selected.id}
+            onChange={(id) => updateSelected({ id })}
+          />
+          <TextField
+            label="Title"
+            required
+            minLength={automationFieldLimits.name.min}
+            maxLength={automationFieldLimits.name.max}
+            error={titleError}
+            value={selected.title}
+            onChange={(title) => updateSelected({ title })}
+          />
         </FieldGroup>
       </div>
     );

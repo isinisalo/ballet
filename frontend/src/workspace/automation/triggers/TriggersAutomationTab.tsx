@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ProjectAutomationConfig, ProjectTrigger } from "@shared/api/workspace-contracts";
+import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
 import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
 import { generatedPolicyId } from "@shared/policy-actions";
@@ -30,6 +31,8 @@ export function TriggersAutomationTab({
       : -1;
   const selected = selectedIndex >= 0 ? config.triggers[selectedIndex] : createDraft;
   const creating = selectedIndex < 0;
+  const triggerIdError = selected ? automationTokenValidationMessage("Trigger ID", selected.id) : undefined;
+  const descriptionError = selected ? automationStringValidationMessage("Description", selected.description, automationFieldLimits.description) : undefined;
 
   useEffect(() => {
     if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
@@ -62,8 +65,25 @@ export function TriggersAutomationTab({
   return (
     <div className="grid gap-4">
       <FieldGroup>
-        <TextField label="Trigger ID" required value={selected.id} onChange={(id) => updateSelected({ id })} />
-        <TextAreaField label="Description" required rows={4} value={selected.description} onChange={(description) => updateSelected({ description })} />
+        <TextField
+          label="Trigger ID"
+          required
+          minLength={automationFieldLimits.token.min}
+          maxLength={automationFieldLimits.token.max}
+          error={triggerIdError}
+          value={selected.id}
+          onChange={(id) => updateSelected({ id })}
+        />
+        <TextAreaField
+          label="Description"
+          required
+          rows={4}
+          minLength={automationFieldLimits.description.min}
+          maxLength={automationFieldLimits.description.max}
+          error={descriptionError}
+          value={selected.description}
+          onChange={(description) => updateSelected({ description })}
+        />
       </FieldGroup>
     </div>
   );

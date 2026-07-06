@@ -80,5 +80,8 @@ function workflowOutputNodeWidth(value: string, minWidth: number, maxWidth: numb
 }
 
 function workflowEdgeLabelWidth(label: string) {
-  return workflowEdgeLabelLayout.paddingX + label.length * workflowEdgeLabelLayout.characterWidth;
+  return Math.min(
+    workflowEdgeLabelLayout.maxWidth,
+    workflowEdgeLabelLayout.paddingX + label.length * workflowEdgeLabelLayout.characterWidth
+  );
 }

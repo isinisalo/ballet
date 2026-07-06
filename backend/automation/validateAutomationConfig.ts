@@ -1,6 +1,13 @@
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationIssue } from "../../shared/domain/automation.js";
 import {
+  automationFieldLimits,
+  automationStringValidationMessage,
+  automationTokenValidationMessage,
+  automationOutputIdValidationMessage,
+  type AutomationFieldLimit
+} from "../../shared/api/automationValidation.js";
+import {
   normalizePolicyOutputEventType,
   policyEventTypesForActions
 } from "../../shared/policy-actions.js";
@@ -58,6 +65,33 @@ const addRequiredStringIssue = (issues: ProjectAutomationIssue[], pathName: stri
   if (typeof value !== "string" || value.trim().length === 0) {
     issues.push({ path: pathName, message: `${label} is required.` });
   }
+};
+
+const addStringIssue = (
+  issues: ProjectAutomationIssue[],
+  pathName: string,
+  value: unknown,
+  label: string,
+  limit: AutomationFieldLimit,
+  options?: { required?: boolean; token?: boolean }
+) => {
+  if (typeof value !== "string") {
+    if (options?.required !== false) issues.push({ path: pathName, message: `${label} is required.` });
+    return;
+  }
+  const message = options?.token
+    ? automationTokenValidationMessage(label, value)
+    : automationStringValidationMessage(label, value, limit, { required: options?.required });
+  if (message) issues.push({ path: pathName, message });
+};
+
+const addOutputIdIssue = (issues: ProjectAutomationIssue[], pathName: string, value: unknown) => {
+  if (typeof value !== "string") {
+    issues.push({ path: pathName, message: "Output id is required." });
+    return;
+  }
+  const message = automationOutputIdValidationMessage(value);
+  if (message) issues.push({ path: pathName, message });
 };
 
 const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: string; path: string }>, label: string) => {
@@ -130,8 +164,8 @@ const validateTrigger = (trigger: unknown, index: number, issues: ProjectAutomat
     issues.push({ path: base, message: "Trigger must be an object." });
     return;
   }
-  addRequiredStringIssue(issues, `${base}.id`, trigger.id, "Trigger id");
-  addRequiredStringIssue(issues, `${base}.description`, trigger.description, "Trigger description");
+  addStringIssue(issues, `${base}.id`, trigger.id, "Trigger id", automationFieldLimits.token, { token: true });
+  addStringIssue(issues, `${base}.description`, trigger.description, "Trigger description", automationFieldLimits.description);
 };
 
 const validateAction = (action: unknown, index: number, context: ValidationContext, issues: ProjectAutomationIssue[]) => {
@@ -140,9 +174,11 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
     issues.push({ path: base, message: "Action must be an object." });
     return;
   }
-  addRequiredStringIssue(issues, `${base}.id`, action.id, "Action id");
+  addStringIssue(issues, `${base}.id`, action.id, "Action id", automationFieldLimits.token, { token: true });
   if (action.description !== undefined && typeof action.description !== "string") {
     issues.push({ path: `${base}.description`, message: "Action description must be a string." });
+  } else {
+    addStringIssue(issues, `${base}.description`, action.description, "Action description", automationFieldLimits.description, { required: false });
   }
   if (action.outputIds !== undefined && !Array.isArray(action.outputIds)) {
     issues.push({ path: `${base}.outputIds`, message: "Action outputIds must be an array." });
@@ -155,6 +191,7 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
         issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: "Action output id must be a string." });
         return;
       }
+      addOutputIdIssue(issues, `${base}.outputIds[${outputIndex}]`, outputId);
       const normalizedOutputId = normalizePolicyOutputEventType(outputId);
       if (seenRawOutputIds.has(normalizedOutputId)) {
         issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Duplicate action output id: ${normalizedOutputId}.` });
@@ -218,7 +255,7 @@ const validateOutput = (output: unknown, index: number, issues: ProjectAutomatio
     issues.push({ path: base, message: "Output must be an object." });
     return;
   }
-  addRequiredStringIssue(issues, `${base}.id`, output.id, "Output id");
+  addOutputIdIssue(issues, `${base}.id`, output.id);
 };
 
 const policyValidationState = (
@@ -264,7 +301,16 @@ const validatePolicyRequiredFields = (
   const sourceField = state.isTriggerPolicy ? "trigger" : "event";
   const sourceValue = state.isTriggerPolicy ? state.rawTrigger : state.rawEvent;
   addRequiredStringIssue(issues, `${base}.${sourceField}`, sourceValue, `Policy ${sourceField}`);
+  addStringIssue(
+    issues,
+    `${base}.${sourceField}`,
+    sourceValue,
+    `Policy ${sourceField}`,
+    state.isTriggerPolicy ? automationFieldLimits.token : automationFieldLimits.eventType,
+    { token: state.isTriggerPolicy }
+  );
   if (!state.legacyPolicy) addRequiredStringIssue(issues, `${base}.action`, state.rawAction, "Policy action");
+  if (!state.legacyPolicy) addStringIssue(issues, `${base}.action`, state.rawAction, "Policy action", automationFieldLimits.token, { token: true });
   if (typeof policy.enabled !== "boolean") issues.push({ path: `${base}.enabled`, message: "Policy enabled must be boolean." });
 };
 
@@ -313,11 +359,15 @@ const validateRuntime = (runtime: unknown, index: number, issues: ProjectAutomat
     issues.push({ path: base, message: "Runtime must be an object." });
     return;
   }
-  addRequiredStringIssue(issues, `${base}.id`, runtime.id, "Runtime id");
-  addRequiredStringIssue(issues, `${base}.title`, runtime.title, "Runtime title");
-  addRequiredStringIssue(issues, `${base}.command`, runtime.command, "Runtime command");
+  addStringIssue(issues, `${base}.id`, runtime.id, "Runtime id", automationFieldLimits.token, { token: true });
+  addStringIssue(issues, `${base}.title`, runtime.title, "Runtime title", automationFieldLimits.name);
+  addStringIssue(issues, `${base}.command`, runtime.command, "Runtime command", automationFieldLimits.command);
   if (!Array.isArray(runtime.args) || runtime.args.some((item) => typeof item !== "string")) {
     issues.push({ path: `${base}.args`, message: "Runtime args must be a string array." });
+  } else {
+    runtime.args.forEach((arg, argIndex) =>
+      addStringIssue(issues, `${base}.args[${argIndex}]`, arg, "Runtime arg", automationFieldLimits.arg)
+    );
   }
 };
 
@@ -336,8 +386,15 @@ const validateWorkflowStep = (
     }
     return;
   }
-  if (!step.trim()) issues.push({ path: stepPath, message: "Workflow step policy id is required." });
-  else if (!policyIdSet.has(step)) issues.push({ path: stepPath, message: `Workflow references unknown policy: ${step}.` });
+  if (!step.trim()) {
+    issues.push({ path: stepPath, message: "Workflow step policy id is required." });
+    return;
+  }
+  if (step.length > automationFieldLimits.policyId.max) {
+    issues.push({ path: stepPath, message: `Workflow step policy id must be ${automationFieldLimits.policyId.max} characters or fewer.` });
+    return;
+  }
+  if (!policyIdSet.has(step)) issues.push({ path: stepPath, message: `Workflow references unknown policy: ${step}.` });
 };
 
 const validateWorkflow = (workflow: unknown, index: number, context: ValidationContext, issues: ProjectAutomationIssue[]) => {
@@ -346,8 +403,8 @@ const validateWorkflow = (workflow: unknown, index: number, context: ValidationC
     issues.push({ path: base, message: "Workflow must be an object." });
     return;
   }
-  addRequiredStringIssue(issues, `${base}.id`, workflow.id, "Workflow id");
-  addRequiredStringIssue(issues, `${base}.title`, workflow.title, "Workflow title");
+  addStringIssue(issues, `${base}.id`, workflow.id, "Workflow id", automationFieldLimits.token, { token: true });
+  addStringIssue(issues, `${base}.title`, workflow.title, "Workflow title", automationFieldLimits.name);
   if (!Array.isArray(workflow.steps)) {
     issues.push({ path: `${base}.steps`, message: "Workflow steps must be an array." });
     return;

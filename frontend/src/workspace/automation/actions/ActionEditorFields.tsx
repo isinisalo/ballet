@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { X } from "lucide-react";
 import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
 import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ export function ActionEditorFields({
 }) {
   const selectedAgentIds = action.agentIds ?? [];
   const selectedOutputIds = action.outputIds ?? [];
+  const actionIdError = automationTokenValidationMessage("Action ID", action.id);
+  const descriptionError = automationStringValidationMessage("Description", action.description, automationFieldLimits.description, { required: false });
   const selectableAgents = useMemo(() => agents.filter((agent) => !selectedAgentIds.includes(agent.id)), [agents, selectedAgentIds]);
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
   const fallbackOutputIds = () => {
@@ -45,8 +48,23 @@ export function ActionEditorFields({
 
   return (
     <FieldGroup>
-      <TextField label="Action ID" required value={action.id} onChange={(id) => onChange({ id })} />
-      <TextAreaField label="Description" rows={4} value={action.description} onChange={(description) => onChange({ description })} />
+      <TextField
+        label="Action ID"
+        required
+        minLength={automationFieldLimits.token.min}
+        maxLength={automationFieldLimits.token.max}
+        error={actionIdError}
+        value={action.id}
+        onChange={(id) => onChange({ id })}
+      />
+      <TextAreaField
+        label="Description"
+        rows={4}
+        maxLength={automationFieldLimits.description.max}
+        error={descriptionError}
+        value={action.description}
+        onChange={(description) => onChange({ description })}
+      />
       <Field>
         <FieldLabel>Agents</FieldLabel>
         <div className="flex min-h-7 flex-wrap items-center gap-2">

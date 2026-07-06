@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -37,7 +37,10 @@ export function TextField({
   type = "text",
   required = false,
   placeholder,
-  compact = false
+  compact = false,
+  minLength,
+  maxLength,
+  error
 }: {
   label: string;
   value: string | number;
@@ -46,13 +49,28 @@ export function TextField({
   required?: boolean;
   placeholder?: string;
   compact?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  error?: string;
 }) {
   const fieldId = useId();
 
   return (
-    <Field className="gap-1.5">
+    <Field className="gap-1.5" data-invalid={Boolean(error)}>
       <FieldLabel htmlFor={fieldId} className={compact ? "text-muted-foreground" : undefined}>{label}</FieldLabel>
-      <Input id={fieldId} className={compact ? "min-w-0" : undefined} value={value} type={type} required={required} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <Input
+        id={fieldId}
+        className={compact ? "min-w-0" : undefined}
+        value={value}
+        type={type}
+        required={required}
+        minLength={minLength}
+        maxLength={maxLength}
+        aria-invalid={Boolean(error)}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {error ? <FieldError>{error}</FieldError> : null}
     </Field>
   );
 }
@@ -64,7 +82,10 @@ export function TextAreaField({
   rows = 3,
   required = false,
   className,
-  compact = false
+  compact = false,
+  minLength,
+  maxLength,
+  error
 }: {
   label: string;
   value: string;
@@ -73,13 +94,27 @@ export function TextAreaField({
   required?: boolean;
   className?: string;
   compact?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  error?: string;
 }) {
   const fieldId = useId();
 
   return (
-    <Field className="gap-1.5">
+    <Field className="gap-1.5" data-invalid={Boolean(error)}>
       <FieldLabel htmlFor={fieldId} className={compact ? "text-muted-foreground" : undefined}>{label}</FieldLabel>
-      <Textarea id={fieldId} className={className} value={value} rows={rows} required={required} onChange={(event) => onChange(event.target.value)} />
+      <Textarea
+        id={fieldId}
+        className={className}
+        value={value}
+        rows={rows}
+        required={required}
+        minLength={minLength}
+        maxLength={maxLength}
+        aria-invalid={Boolean(error)}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {error ? <FieldError>{error}</FieldError> : null}
     </Field>
   );
 }

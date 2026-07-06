@@ -793,12 +793,13 @@ describe("workspace entity UI flows", () => {
     const workflowNameInput = screen.getByLabelText("Workflow ID");
     expect(workflowNameInput).toHaveValue("");
     fireEvent.change(workflowNameInput, { target: { value: "release-flow" } });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Release flow" } });
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.workflows.some((workflow) =>
       workflow.id === "release-flow" &&
-      workflow.title === "release-flow" &&
+      workflow.title === "Release flow" &&
       workflow.steps.length === 0
     )).toBe(true));
     expect(window.location.pathname).toBe("/automation/workflows");
