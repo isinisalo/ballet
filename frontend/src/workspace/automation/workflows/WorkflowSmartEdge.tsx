@@ -107,6 +107,7 @@ function WorkflowEdgeLabels({
   showEndLabel: boolean;
 }) {
   if (!label) return null;
+  const isGhostTarget = targetKind === "output-event" || targetKind === "first-policy-ghost";
 
   return (
     <EdgeLabelRenderer>
@@ -140,7 +141,7 @@ function WorkflowEdgeLabels({
           transform: labelTransform
         }}
       >
-        <span className="text-primary">{label}</span>
+        <span className={isGhostTarget ? "text-primary/55" : "text-primary"}>{label}</span>
       </div>
       {showEndLabel ? (
         <div

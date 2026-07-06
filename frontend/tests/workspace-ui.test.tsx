@@ -1151,6 +1151,11 @@ describe("workspace entity UI flows", () => {
       label.dataset.workflowEdgeLabelValue === "failed" &&
       label.dataset.workflowEdgeTargetKind === "output-event"
     )).toBe(false);
+    const implementationFailedGhostEdgeLabel = workflowEdgeLabels().find((label) =>
+      label.dataset.workflowEdgeLabelValue === "failed" &&
+      label.dataset.workflowEdgeTargetKind === "output-event"
+    );
+    expect(implementationFailedGhostEdgeLabel?.children[0]).toHaveClass("text-primary/55");
     expect(outputEvent.querySelector("svg")).not.toBeInTheDocument();
     expect(summaryOutputEvent).toBeInTheDocument();
     expect(summaryOutputEvent).not.toHaveTextContent("implementation.summary");

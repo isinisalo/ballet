@@ -37,7 +37,7 @@ export function WorkflowCanvasNode({
       title={value}
       className={cn(
         "relative grid min-h-9 min-w-44 max-w-60 shrink-0 rounded-md border border-divider-strong bg-card px-2 pb-1.5 pt-3",
-        dashed && "border-dashed border-muted-foreground/70 bg-background/80 opacity-80",
+        dashed && "border-dashed border-muted-foreground/50 bg-background/60 opacity-60",
         active && "border-primary/80 ring-2 ring-primary/20",
         className
       )}

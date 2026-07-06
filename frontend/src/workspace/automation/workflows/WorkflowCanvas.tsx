@@ -15,7 +15,7 @@ const workflowEdgeTypes = {
 } satisfies EdgeTypes;
 
 const workflowSolidEdgeStroke = "color-mix(in srgb, var(--primary) 70%, transparent)";
-const workflowDashedEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 70%, transparent)";
+const workflowDashedEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 35%, transparent)";
 const workflowReturnEdgeStroke = "color-mix(in srgb, var(--tertiary) 85%, transparent)";
 
 function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][number], isAnimated = false): WorkflowReactFlowEdge["domAttributes"] {
