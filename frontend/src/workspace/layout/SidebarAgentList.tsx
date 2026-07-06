@@ -1,11 +1,10 @@
 import type { Agent } from "../../../../shared/api/workspace-contracts";
 import {
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem
+  SidebarMenuSub
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { agentDocumentPath } from "../routing";
+import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
 type SidebarAgentEntity = Pick<Agent, "id" | "name" | "relativePath" | "status">;
 
@@ -27,21 +26,16 @@ export function SidebarAgentList({
         if (!relativePath) return null;
         const path = agentDocumentPath(relativePath);
         return (
-          <SidebarMenuSubItem key={agent.id}>
-            <SidebarMenuSubButton
-              href={path}
-              size="sm"
-              isActive={relativePath === activePath}
-              className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
-              onClick={(event) => {
-                event.preventDefault();
-                navigate(path);
-              }}
-            >
-              <AgentStatusDot status={agent.status} />
-              <span className="truncate">{agent.name}</span>
-            </SidebarMenuSubButton>
-          </SidebarMenuSubItem>
+          <SidebarNavLinkItem
+            key={agent.id}
+            path={path}
+            isActive={relativePath === activePath}
+            navigate={navigate}
+            className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+          >
+            <AgentStatusDot status={agent.status} />
+            <span className="truncate">{agent.name}</span>
+          </SidebarNavLinkItem>
         );
       })}
     </SidebarMenuSub>

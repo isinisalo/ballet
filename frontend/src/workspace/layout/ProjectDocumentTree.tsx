@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import type { ProjectDocumentTreeNode } from "../../../../shared/api/workspace-contracts";
 import { projectDocumentPath } from "../routing";
 import { projectTreeContainsPath } from "../documents/projectDocuments";
+import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
 export function ProjectDocumentTree({
   nodes,
@@ -32,20 +33,15 @@ export function ProjectDocumentTree({
         if (node.type === "file") {
           const path = pathFor(node.document.relativePath);
           return (
-            <SidebarMenuSubItem key={node.document.relativePath}>
-              <SidebarMenuSubButton
-                href={path}
-                size="sm"
-                isActive={node.document.relativePath === activePath}
-                className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigate(path);
-                }}
-              >
-                <span>{node.label}</span>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
+            <SidebarNavLinkItem
+              key={node.document.relativePath}
+              path={path}
+              isActive={node.document.relativePath === activePath}
+              navigate={navigate}
+              className="h-6 text-muted-foreground data-active:text-sidebar-accent-foreground"
+            >
+              <span>{node.label}</span>
+            </SidebarNavLinkItem>
           );
         }
 

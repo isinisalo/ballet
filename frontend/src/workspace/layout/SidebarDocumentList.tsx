@@ -1,9 +1,8 @@
 import type { Agent, Skill } from "../../../../shared/api/workspace-contracts";
 import {
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem
+  SidebarMenuSub
 } from "@/components/ui/sidebar";
+import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
 type SidebarDocumentEntity = Pick<Agent | Skill, "id" | "name" | "relativePath">;
 
@@ -27,20 +26,15 @@ export function SidebarDocumentList({
         if (!relativePath) return null;
         const path = pathFor(relativePath);
         return (
-          <SidebarMenuSubItem key={document.id}>
-            <SidebarMenuSubButton
-              href={path}
-              size="sm"
-              isActive={relativePath === activePath}
-              className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
-              onClick={(event) => {
-                event.preventDefault();
-                navigate(path);
-              }}
-            >
-              <span className="truncate">{document.name}</span>
-            </SidebarMenuSubButton>
-          </SidebarMenuSubItem>
+          <SidebarNavLinkItem
+            key={document.id}
+            path={path}
+            isActive={relativePath === activePath}
+            navigate={navigate}
+            className="h-6 min-w-0 text-muted-foreground data-active:text-sidebar-accent-foreground"
+          >
+            <span className="truncate">{document.name}</span>
+          </SidebarNavLinkItem>
         );
       })}
     </SidebarMenuSub>

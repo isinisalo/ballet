@@ -5,12 +5,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarMenuSubButton,
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
 import { automationSectionPath } from "../routing";
 import type { AutomationTab, RouteState } from "../types";
 import { SidebarCollapsibleLinkSection } from "./SidebarCollapsibleLinkSection";
+import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
 function automationEntities(config: ProjectAutomationConfig, tab: AutomationTab): Array<{ id: string; label: string }> {
   if (tab === "actions") return config.actions.map((action) => ({ id: action.id, label: action.id }));
@@ -67,20 +67,15 @@ function SidebarAutomationSection({
         {entities.map((entity) => {
           const path = automationSectionPath(section.id, entity.id);
           return (
-            <SidebarMenuSubItem key={entity.id}>
-              <SidebarMenuSubButton
-                href={path}
-                size="sm"
-                isActive={sectionActive && entity.id === selectedId}
-                className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigate(path);
-                }}
-              >
-                <span className="truncate">{entity.label}</span>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
+            <SidebarNavLinkItem
+              key={entity.id}
+              path={path}
+              isActive={sectionActive && entity.id === selectedId}
+              navigate={navigate}
+              className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
+            >
+              <span className="truncate">{entity.label}</span>
+            </SidebarNavLinkItem>
           );
         })}
       </SidebarMenuSub>

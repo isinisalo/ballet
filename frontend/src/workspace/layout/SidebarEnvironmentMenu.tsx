@@ -5,7 +5,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarMenuSubButton,
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
 import { runtimePath, skillDocumentPath } from "../routing";
@@ -13,6 +12,7 @@ import type { RouteState } from "../types";
 import { SidebarAgentList } from "./SidebarAgentList";
 import { SidebarCollapsibleLinkSection } from "./SidebarCollapsibleLinkSection";
 import { SidebarDocumentList } from "./SidebarDocumentList";
+import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
 function SidebarRuntimesSection({
   route,
@@ -46,20 +46,15 @@ function SidebarRuntimesSection({
         {runtimes.map((runtime) => {
           const path = runtimePath(runtime.id);
           return (
-            <SidebarMenuSubItem key={runtime.id}>
-              <SidebarMenuSubButton
-                href={path}
-                size="sm"
-                isActive={runtimesOpen && runtime.id === selectedId}
-                className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigate(path);
-                }}
-              >
-                <span className="truncate">{runtime.id}</span>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
+            <SidebarNavLinkItem
+              key={runtime.id}
+              path={path}
+              isActive={runtimesOpen && runtime.id === selectedId}
+              navigate={navigate}
+              className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
+            >
+              <span className="truncate">{runtime.id}</span>
+            </SidebarNavLinkItem>
           );
         })}
       </SidebarMenuSub>
