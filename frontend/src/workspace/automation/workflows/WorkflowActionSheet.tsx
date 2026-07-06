@@ -39,7 +39,7 @@ export function WorkflowActionSheet({
     <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
       <SheetContent
         side="right"
-        overlayClassName="pointer-events-none"
+        overlayClassName="pointer-events-none bg-black/5 supports-backdrop-filter:backdrop-blur-[1px]"
         className="overflow-y-auto sm:max-w-md"
         onPointerDown={(event) => event.stopPropagation()}
       >
