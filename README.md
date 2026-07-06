@@ -27,7 +27,7 @@ Loaded collections:
 
 - `.codex/agents/*.toml`
 - `.agents/skills/**/SKILL.md`
-- `.ballet/project.md`
+- `.ballet/project.json`
 - `.ballet/adr/*.md|*.mdx`
 - `.ballet/goals/*.md|*.mdx`
 - `.ballet/runtimes/*.md|*.mdx`
