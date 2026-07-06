@@ -121,6 +121,10 @@ export function WorkflowsAutomationTab({
   const addPolicyStep = (eventType?: string, sourcePolicy?: ProjectPolicy) => {
     if (!selected) return;
     const selectedPolicyIds = new Set(selected.steps);
+    const addedStepIndex = selected.steps.length;
+    const selectAddedOutputEventStep = () => {
+      if (eventType) setSelectedActionStepIndex(addedStepIndex);
+    };
     const eventOutputId = eventType?.split(".").at(-1) ?? "";
     const isDoneEvent = normalizePolicyToken(eventOutputId) === "done";
     const nextPolicy = eventType
@@ -166,9 +170,11 @@ export function WorkflowsAutomationTab({
         policies: [...current.policies, generatedPolicy],
         workflows: current.workflows.map((workflow) => workflow.id === selected.id ? { ...workflow, steps: [...workflow.steps, generatedPolicy.id] } : workflow)
       }));
+      selectAddedOutputEventStep();
       return;
     }
     updateSelected({ steps: [...selected.steps, nextPolicy.id] });
+    selectAddedOutputEventStep();
   };
 
   const reorderStep = (fromIndex: number, toIndex: number) => {

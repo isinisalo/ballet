@@ -1076,6 +1076,8 @@ describe("workspace entity UI flows", () => {
 
     await user.click(screen.getByRole("button", { name: "Add policy step for implementation.done" }));
     expect(screen.getByLabelText("Policy: on.implementation.done.start.done")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
+    expectActionSelectValue("done");
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.policies).toContainEqual(expect.objectContaining({
@@ -1181,7 +1183,6 @@ describe("workspace entity UI flows", () => {
     await user.click(await screen.findByRole("button", { name: "Add policy step for implementation.complete" }));
     expect(screen.getByLabelText("Policy: on.implementation.complete.start.implementation")).toBeInTheDocument();
 
-    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.complete.start.implementation"));
     expect(screen.queryByLabelText("Workflow policy source")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Workflow policy event")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Workflow policy trigger")).not.toBeInTheDocument();
