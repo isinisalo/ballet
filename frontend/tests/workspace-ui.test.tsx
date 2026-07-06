@@ -1120,7 +1120,7 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Change approval output" }));
     await user.type(screen.getByLabelText("Search or create output"), "cancel");
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("button", { name: "Remove output cancelled" })).toBeInTheDocument();
+    expect(screen.getByText("cancelled")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Change rework output" }));
     await user.type(screen.getByLabelText("Search or create output"), "Warm");
@@ -1132,6 +1132,31 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => expect(data.automation.actions[0]?.outputIds).toEqual(["cancelled", "warm"]));
     expect(data.automation.outputs).toContainEqual({ id: "warm" });
     expect(data.automation.outputs.filter((output) => output.id === "ready")).toHaveLength(1);
+  });
+
+  it("allows removing the optional rework output from an agent action", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.automation.policies[0] = {
+      id: "on.trigger.manual-start.start.implementation",
+      source: "trigger",
+      trigger: "manual-start",
+      action: "implementation",
+      enabled: true
+    };
+    workflowData.automation.workflows[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    const { data } = await renderRoute("/automation/actions?id=implementation", workflowData);
+
+    expect(screen.queryByRole("button", { name: "Remove output complete" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove output failed" }));
+    expect(screen.queryByRole("button", { name: "Remove output failed" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add rework output" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+
+    await waitFor(() => expect(data.automation.actions[0]?.outputIds).toEqual(["complete"]));
+    expect(data.eventDefinitions.map((event) => event.eventType)).toContain("implementation.complete");
+    expect(data.eventDefinitions.map((event) => event.eventType)).not.toContain("implementation.failed");
   });
 
   it("renders every action output as a workflow event endpoint", async () => {
@@ -1162,6 +1187,26 @@ describe("workspace entity UI flows", () => {
     expect(summaryOutputEvent.querySelector("svg")).not.toBeInTheDocument();
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("summary"));
     expect(document.querySelector("[data-workflow-gate-output]")).not.toBeInTheDocument();
+  });
+
+  it("renders only the approval endpoint for one-output workflow actions", async () => {
+    const workflowData = baseData();
+    workflowData.automation.policies[0] = {
+      id: "on.trigger.manual-start.start.implementation",
+      source: "trigger",
+      trigger: "manual-start",
+      action: "implementation",
+      enabled: true
+    };
+    workflowData.automation.workflows[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    workflowData.automation.actions[0]!.outputIds = ["summary"];
+
+    await renderRoute("/automation/workflows?id=workflow-1", workflowData);
+
+    expect(screen.getByRole("button", { name: "Add policy step for implementation.summary" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add policy step for implementation.failed" })).not.toBeInTheDocument();
+    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("summary"));
+    expect(workflowEdgeLabelTexts()).not.toContain("failed");
   });
 
   it("creates done workflow handlers with the done action", async () => {

@@ -1,5 +1,5 @@
 import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { actionOutputSlotKind, generatedPolicyId, normalizeActionOutputSlots, policyOutputEventType } from "@shared/policy-actions";
+import { actionOutputSlotCount, actionOutputSlotKind, generatedPolicyId, normalizeActionOutputSlots, policyOutputEventType } from "@shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 
 export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
@@ -13,7 +13,8 @@ export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
   return normalized;
 };
 
-const previousOutputSlotIndex = (outputId: string, index: number): number | undefined => {
+const previousOutputSlotIndex = (outputId: string, index: number, outputCount: number): number | undefined => {
+  if (outputCount <= actionOutputSlotCount) return index;
   const slot = actionOutputSlotKind(outputId);
   if (slot === "approval") return 0;
   if (slot === "rework") return 1;
@@ -35,7 +36,7 @@ export const nextConfigWithActionPatch = (
   const eventIdMap = new Map<string, string>();
   if (previousId !== normalized.id || previousAction.outputIds.join("\0") !== normalized.outputIds.join("\0")) {
     previousAction.outputIds.forEach((outputId, outputIndex) => {
-      const slotIndex = previousOutputSlotIndex(outputId, outputIndex);
+      const slotIndex = previousOutputSlotIndex(outputId, outputIndex, previousAction.outputIds.length);
       const nextOutputId = slotIndex === undefined ? undefined : normalized.outputIds[slotIndex];
       if (!nextOutputId) return;
       eventIdMap.set(

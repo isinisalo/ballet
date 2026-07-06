@@ -23,6 +23,7 @@ type OutputSelectorProps = {
   max?: number;
   replaceWhenFull?: boolean;
   openButtonLabel?: string;
+  canRemove?: boolean;
   disabled?: boolean;
   onCreateOption?: (id: OutputId) => void;
 };
@@ -35,6 +36,7 @@ export function OutputSelector({
   max = 3,
   replaceWhenFull = false,
   openButtonLabel,
+  canRemove = true,
   disabled = false,
   onCreateOption
 }: OutputSelectorProps) {
@@ -100,16 +102,18 @@ export function OutputSelector({
         {selected.map((outputId) => (
           <Badge key={outputId} variant="outline" className="border-divider-strong bg-muted/50 font-mono">
             {outputId}
-            <Button
-              type="button" size="icon-xs" variant="ghost"
-              aria-label={`Remove output ${outputId}`}
-              title={`Remove output ${outputId}`}
-              disabled={disabled}
-              onClick={() => removeOutput(outputId)}
-              className="-mr-1 size-4 rounded-full p-0"
-            >
-              <X data-icon="inline-end" />
-            </Button>
+            {canRemove ? (
+              <Button
+                type="button" size="icon-xs" variant="ghost"
+                aria-label={`Remove output ${outputId}`}
+                title={`Remove output ${outputId}`}
+                disabled={disabled}
+                onClick={() => removeOutput(outputId)}
+                className="-mr-1 size-4 rounded-full p-0"
+              >
+                <X data-icon="inline-end" />
+              </Button>
+            ) : null}
           </Badge>
         ))}
         {!editing && canOpenEditor ? (

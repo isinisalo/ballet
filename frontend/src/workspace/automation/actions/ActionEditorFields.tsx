@@ -47,9 +47,11 @@ export function ActionEditorFields({
     onChange({ agentIds: selectedAgentIds.filter((candidate) => candidate !== agentId) });
   };
   const updateOutputSlot = (slotIndex: 0 | 1, outputIds: string[]) => {
-    const nextOutputId = outputIds[0] ?? defaultPolicyOutputIds[slotIndex];
-    const nextOutputIds = [...outputSlotIds];
-    nextOutputIds[slotIndex] = nextOutputId;
+    const approvalOutputId = slotIndex === 0
+      ? outputIds[0] ?? outputSlotIds[0] ?? defaultPolicyOutputIds[0]
+      : outputSlotIds[0] ?? defaultPolicyOutputIds[0];
+    const reworkOutputId = slotIndex === 1 ? outputIds[0] : outputSlotIds[1];
+    const nextOutputIds = reworkOutputId ? [approvalOutputId, reworkOutputId] : [approvalOutputId];
     onChange({ outputIds: normalizeActionOutputSlots(nextOutputIds) });
   };
   const outputOptionIds = config.outputs.map((output) => output.id);
@@ -126,6 +128,7 @@ export function ActionEditorFields({
                 max={1}
                 replaceWhenFull
                 openButtonLabel="Change approval output"
+                canRemove={false}
                 onChange={(outputIds) => updateOutputSlot(0, outputIds)}
                 onCreateOption={onCreateOutput}
               />
@@ -138,7 +141,7 @@ export function ActionEditorFields({
                 blockedOptions={outputSlotIds[0] ? [outputSlotIds[0]] : []}
                 max={1}
                 replaceWhenFull
-                openButtonLabel="Change rework output"
+                openButtonLabel={outputSlotIds[1] ? "Change rework output" : "Add rework output"}
                 onChange={(outputIds) => updateOutputSlot(1, outputIds)}
                 onCreateOption={onCreateOutput}
               />

@@ -7,8 +7,8 @@ const terminalRunStatuses = new Set(["completed", "failed", "blocked", "needs_in
 const approvalOutput = (allowedOutputIds: string[]): AgentOutputEventStatus =>
   allowedOutputIds[0] ?? defaultPolicyOutputIds[0];
 
-const reworkOutput = (allowedOutputIds: string[]): AgentOutputEventStatus =>
-  allowedOutputIds[1] ?? defaultPolicyOutputIds[1];
+const reworkOutput = (allowedOutputIds: string[]): AgentOutputEventStatus | undefined =>
+  allowedOutputIds[1];
 
 export const allPolicyRunsTerminal = (runs: AgentRun[]): boolean =>
   runs.length > 0 && runs.every((run) => terminalRunStatuses.has(run.status));
@@ -17,7 +17,7 @@ export const outcomeToOutputEventStatus = (
   outcome: AgentOutcome,
   policy: Pick<ProjectPolicy, "action">,
   actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>
-): AgentOutputEventStatus => {
+): AgentOutputEventStatus | undefined => {
   const allowedOutputIds = actionOutputIds(actions, policy.action);
   switch (outcome.outcome) {
     case "failed":
@@ -38,7 +38,7 @@ export const aggregateActionOutputStatus = (
   runs: AgentRun[],
   policy: Pick<ProjectPolicy, "action">,
   actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>
-): AgentOutputEventStatus => {
+): AgentOutputEventStatus | undefined => {
   const allowedOutputIds = actionOutputIds(actions, policy.action);
   const outcomes = runs.map((run) => run.outcome?.outcome).filter(Boolean);
   if (runs.some((run) => run.status === "failed" || run.status === "cancelled" || run.outcome?.outcome === "failed")) {

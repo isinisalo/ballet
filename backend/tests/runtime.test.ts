@@ -425,6 +425,16 @@ describe("runtime output mapping", () => {
       [{ id: "review", outputIds: ["accepted", "reject"] }]
     )).toBe("reject");
     expect(outcomeToOutputEventStatus(
+      { ...readyOutcome, outcome: "ready" },
+      { ...projectPolicy, action: "create_roadmap" },
+      [{ id: "create_roadmap", outputIds: ["roadmap_ready"] }]
+    )).toBe("roadmap_ready");
+    expect(outcomeToOutputEventStatus(
+      { ...readyOutcome, outcome: "changes_requested" },
+      { ...projectPolicy, action: "create_roadmap" },
+      [{ id: "create_roadmap", outputIds: ["roadmap_ready"] }]
+    )).toBeUndefined();
+    expect(outcomeToOutputEventStatus(
       readyOutcome,
       { ...projectPolicy, action: "deploy" },
       [{ id: "deploy", outputIds: ["deployed", "rollback"] }]
@@ -459,6 +469,32 @@ describe("runtime output mapping", () => {
 
     expect(completed.event?.type).toBe("implementation.complete");
     expect(db.listRuntimeEvents()).toHaveLength(2);
+    db.close();
+  });
+
+  it("skips domain event publication for rework outcomes without a rework output slot", async () => {
+    const root = await tempRoot();
+    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    db.intakeEvent({
+      projectId: "project",
+      eventType: "plan_approved",
+      source: "test",
+      subject: "work-1",
+      payload: {}
+    }, [multiAgentImplementationPolicy("developer-agent")], [agent]);
+
+    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
+    const completed = db.completeRun({
+      runId: leased!.runId,
+      status: "failed",
+      outcome: { ...readyOutcome, outcome: "failed" },
+      projectPolicy,
+      actions: [{ ...implementationAction, outputIds: ["complete"] }],
+      outputs: [{ id: "complete" }]
+    });
+
+    expect(completed.event).toBeUndefined();
+    expect(db.listRuntimeEvents()).toHaveLength(1);
     db.close();
   });
 

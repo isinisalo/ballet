@@ -8,6 +8,7 @@ import {
   type AutomationFieldLimit
 } from "../../shared/api/automationValidation.js";
 import {
+  actionOutputSlotMinCount,
   actionOutputSlotCount,
   actionOutputSlotKind,
   defaultProjectOutputs,
@@ -180,7 +181,6 @@ const normalizedActionOutputIds = (action: Record<string, unknown>): string[] | 
 
 const legacyCompatibleOutputIds = (outputIds: string[]): boolean => {
   const slotKinds = new Set(outputIds.map(actionOutputSlotKind).filter(Boolean));
-  if (outputIds.length === 1) return Boolean(actionOutputSlotKind(outputIds[0] ?? ""));
   return outputIds.length > actionOutputSlotCount &&
     outputIds.every((outputId) => Boolean(actionOutputSlotKind(outputId))) &&
     slotKinds.has("approval") &&
@@ -237,10 +237,10 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
   if (
     normalizedAgentIds.length > 0 &&
     rawNormalizedOutputIds &&
-    rawNormalizedOutputIds.length !== actionOutputSlotCount &&
+    (rawNormalizedOutputIds.length < actionOutputSlotMinCount || rawNormalizedOutputIds.length > actionOutputSlotCount) &&
     !legacyCompatibleOutputIds(rawNormalizedOutputIds)
   ) {
-    issues.push({ path: `${base}.outputIds`, message: "Action must define exactly 2 outputs: approval and rework." });
+    issues.push({ path: `${base}.outputIds`, message: "Action must define 1 or 2 outputs: approval and optional rework." });
   }
   const seen = new Set<string>();
   const outputIdsToValidate = rawNormalizedOutputIds ?? normalizedOutputIds;

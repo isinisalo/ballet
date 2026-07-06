@@ -180,6 +180,43 @@ describe("project automation config", () => {
     expect(loaded.workflows[0]?.steps).toEqual(["on.implementation.ok.start.implementation"]);
   });
 
+  it("preserves one-output agent actions as approval-only actions", async () => {
+    const root = await tempRoot();
+    const config: ProjectAutomationConfig = {
+      ...validConfig(),
+      actions: [{
+        id: "implementation",
+        description: "Implement approved work.",
+        outputIds: ["roadmap_ready"],
+        agentIds: ["developer-agent"]
+      }],
+      outputs: [{ id: "roadmap_ready" }],
+      policies: [{
+        id: "on.implementation.roadmap_ready.start.implementation",
+        source: "event",
+        event: "implementation.roadmap_ready",
+        action: "implementation",
+        enabled: true
+      }],
+      workflows: [{
+        id: "delivery",
+        title: "Delivery",
+        steps: ["on.implementation.roadmap_ready.start.implementation"]
+      }]
+    };
+
+    const saved = await saveProjectAutomationConfig(root, config, [agent]);
+
+    expect(saved.actions[0]?.outputIds).toEqual(["roadmap_ready"]);
+    expect(saved.outputs).toEqual([{ id: "roadmap_ready" }]);
+    expect(automationPoliciesToEventDefinitions(
+      saved.policies,
+      saved.triggers,
+      saved.actions,
+      saved.outputs
+    ).map((event) => event.eventType)).toEqual(["implementation.roadmap_ready"]);
+  });
+
   it("validates policy, runtime, and workflow references while ignoring legacy event definitions", () => {
     expect(validateProjectAutomationConfig(validConfig(), [agent])).toEqual([]);
 
@@ -237,7 +274,7 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: [] }]
-    }, [agent]).some((issue) => issue.message === "Action must define exactly 2 outputs: approval and rework.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Action must define 1 or 2 outputs: approval and optional rework.")).toBe(true);
 
     const agentlessConfig: ProjectAutomationConfig = {
       ...validConfig(),
@@ -268,7 +305,7 @@ describe("project automation config", () => {
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: ["failed", "summary", "extra", "too-many"] }],
       outputs: [...validConfig().outputs, { id: "extra" }, { id: "too-many" }]
-    }, [agent]).some((issue) => issue.message === "Action must define exactly 2 outputs: approval and rework.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Action must define 1 or 2 outputs: approval and optional rework.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
@@ -284,7 +321,7 @@ describe("project automation config", () => {
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: ["summary"] }],
       policies: [{ ...validConfig().policies[0]!, event: "implementation.failed" }]
-    }, [agent]).some((issue) => issue.message === "Action must define exactly 2 outputs: approval and rework.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Policy references unknown event: implementation.failed.")).toBe(true);
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),

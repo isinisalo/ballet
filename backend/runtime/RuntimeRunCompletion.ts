@@ -113,6 +113,7 @@ export class RuntimeRunCompletion {
     if (!allPolicyRunsTerminal(policyRuns)) return undefined;
 
     const outputStatus = aggregateActionOutputStatus(policyRuns, policy, input.actions);
+    if (!outputStatus) return undefined;
 
     return {
       type: actionOutputEventType(policy, outputStatus),

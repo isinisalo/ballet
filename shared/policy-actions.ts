@@ -2,6 +2,7 @@ import type { Agent } from "./domain/agents.js";
 import type { ProjectAction, ProjectOutput, ProjectPolicy } from "./domain/automation.js";
 
 export const actionOutputSlotCount = 2;
+export const actionOutputSlotMinCount = 1;
 export const defaultPolicyOutputIds = ["ok", "rework"] as const;
 export type PolicyOutputId = string;
 export const policyOutputStatuses = defaultPolicyOutputIds;
@@ -75,11 +76,7 @@ export const uniquePolicyOutputIds = (outputIds: readonly string[], max = Number
 
 export const normalizeActionOutputSlots = (outputIds: readonly string[] = defaultPolicyOutputIds): string[] => {
   const normalized = uniquePolicyOutputIds(outputIds);
-  if (normalized.length === actionOutputSlotCount) {
-    const [first, second] = normalized;
-    if (actionOutputSlotKind(first) === "rework" && actionOutputSlotKind(second) === "approval") {
-      return [second, first];
-    }
+  if (normalized.length > 0 && normalized.length <= actionOutputSlotCount) {
     return normalized;
   }
 
@@ -107,7 +104,7 @@ export const actionOutputIds = (
   const action = actions.find((candidate) => normalizePolicyToken(candidate.id) === normalizedActionId);
   if (action && Array.isArray(action.agentIds) && action.agentIds.length === 0) return [];
   const outputIds = action?.outputIds ?? defaultPolicyOutputIds;
-  return uniquePolicyOutputIds(outputIds, actionOutputSlotCount);
+  return normalizeActionOutputSlots(outputIds);
 };
 
 export const policyOutputEventTypes = (
