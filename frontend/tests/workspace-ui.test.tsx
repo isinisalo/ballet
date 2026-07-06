@@ -797,9 +797,8 @@ describe("workspace entity UI flows", () => {
 
     fireEvent.click(returnEdgeLabel!);
     const outputHandlerDialog = screen.getByRole("dialog", { name: "Output handler" });
-    expect(within(outputHandlerDialog).getByText("challenge-roadmap")).toBeInTheDocument();
-    expect(within(outputHandlerDialog).getByText("changes_requested")).toBeInTheDocument();
-    expect(within(outputHandlerDialog).getAllByText("create-roadmap").length).toBeGreaterThan(0);
+    expect(within(outputHandlerDialog).getByText("challenge-roadmap")).toHaveClass("text-tertiary");
+    expect(within(outputHandlerDialog).getByText("changes_requested")).toHaveClass("text-primary");
     expect(within(outputHandlerDialog).getByLabelText("Handler action")).toHaveTextContent("create-roadmap");
     fireEvent.click(within(outputHandlerDialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument());
@@ -807,8 +806,8 @@ describe("workspace entity UI flows", () => {
     activateWorkflowNode(createRoadmapNode);
     const workflowHandlerDialog = screen.getByRole("dialog", { name: "Workflow handler" });
     expect(within(workflowHandlerDialog).getByText("project_brief_approved")).toBeInTheDocument();
-    expect(within(workflowHandlerDialog).getByText("challenge-roadmap")).toBeInTheDocument();
-    expect(within(workflowHandlerDialog).getByText("changes_requested")).toBeInTheDocument();
+    expect(within(workflowHandlerDialog).getByText("challenge-roadmap")).toHaveClass("text-tertiary");
+    expect(within(workflowHandlerDialog).getByText("changes_requested")).toHaveClass("text-primary");
     expect(within(workflowHandlerDialog).getAllByLabelText("Handler action")).toHaveLength(2);
   });
 

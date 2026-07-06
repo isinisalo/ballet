@@ -74,7 +74,7 @@ export function WorkflowHandlerSheet({
               return (
                 <div key={route.id} className="rounded-md border border-divider-strong bg-card/80 p-3">
                   <div className="flex min-w-0 items-start justify-between gap-2">
-                    <WorkflowHandlerRoutePath route={route} />
+                    <WorkflowHandlerRouteEvent route={route} />
                     {routes.length > 1 ? (
                       <Button
                         type="button"
@@ -88,7 +88,6 @@ export function WorkflowHandlerSheet({
                       </Button>
                     ) : null}
                   </div>
-                  {route.eventType ? <div className="mt-2 truncate font-mono text-xs text-muted-foreground">{route.eventType}</div> : null}
                   <FieldGroup className="mt-3">
                     <Field className="gap-1.5">
                       <FieldLabel htmlFor={routeActionFieldId}>Handler action</FieldLabel>
@@ -139,24 +138,18 @@ export function WorkflowHandlerSheet({
   );
 }
 
-function WorkflowHandlerRoutePath({ route }: { route: WorkflowHandlerRoute }) {
+function WorkflowHandlerRouteEvent({ route }: { route: WorkflowHandlerRoute }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5 font-mono text-xs">
-      <Badge variant="outline" className="max-w-full border-divider-strong bg-muted/50 font-mono">
-        <span className="truncate">{route.sourceLabel}</span>
-      </Badge>
+    <div className="min-w-0 truncate font-mono text-xs" title={route.eventType ?? route.sourceLabel}>
       {route.outputId ? (
         <>
-          <span className="text-muted-foreground">-&gt;</span>
-          <Badge variant="outline" className="max-w-full border-primary/50 bg-background font-mono text-primary">
-            <span className="truncate">{route.outputId}</span>
-          </Badge>
+          <span className="text-tertiary">{route.sourceLabel}</span>
+          <span className="text-muted-foreground">.</span>
+          <span className="text-primary">{route.outputId}</span>
         </>
-      ) : null}
-      <span className="text-muted-foreground">-&gt;</span>
-      <Badge variant="outline" className="max-w-full border-divider-strong bg-muted/50 font-mono text-tertiary">
-        <span className="truncate">{route.actionId || "Missing action"}</span>
-      </Badge>
+      ) : (
+        <span className="text-tertiary">{route.sourceLabel}</span>
+      )}
     </div>
   );
 }
