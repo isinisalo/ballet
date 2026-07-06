@@ -27,22 +27,24 @@ export type WorkflowCanvasProps = {
   onStepPointerCancel: () => void;
   onCanvasMoveStart: () => void;
   onCanvasMoveEnd: () => void;
-  onActionSelectionClear: () => void;
   onPolicyChange: (index: number, policyId: string) => void;
   onActionStepSelect: (record: WorkflowStepRecord) => void;
   onAddPolicyStep: (eventType?: string, sourcePolicy?: ProjectPolicy) => void;
 };
 
-export type WorkflowNodeContext = Omit<WorkflowCanvasProps, "layout" | "canvasHeight" | "isCanvasPanning" | "workflowCanvasRef" | "onCanvasMoveStart" | "onCanvasMoveEnd" | "onActionSelectionClear">;
+export type WorkflowNodeContext = Omit<WorkflowCanvasProps, "layout" | "canvasHeight" | "isCanvasPanning" | "workflowCanvasRef" | "onCanvasMoveStart" | "onCanvasMoveEnd">;
 
 export type WorkflowReactFlowNodeData = Record<string, unknown> & {
   layoutNode: WorkflowCanvasLayoutNode;
   context: WorkflowNodeContext;
+  activeHandleIds: string[];
 };
 
 export type WorkflowReactFlowEdgeData = Record<string, unknown> & {
   workflowEdge: WorkflowCanvasEdge;
   context?: WorkflowNodeContext;
+  sourceNode?: WorkflowCanvasLayoutNode;
+  targetNode?: WorkflowCanvasLayoutNode;
 };
 
 export type WorkflowReactFlowNode = Node<WorkflowReactFlowNodeData, "workflow">;

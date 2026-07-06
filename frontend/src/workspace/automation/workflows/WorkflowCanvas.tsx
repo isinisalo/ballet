@@ -43,14 +43,13 @@ export function WorkflowCanvas({
   workflowCanvasRef,
   onCanvasMoveStart,
   onCanvasMoveEnd,
-  onActionSelectionClear,
   ...nodeContextProps
 }: WorkflowCanvasProps) {
   const nodeContext = useWorkflowNodeContext(nodeContextProps);
-  const nodes = useWorkflowNodes(layout.nodes, nodeContext);
+  const nodes = useWorkflowNodes(layout.nodes, layout.edges, nodeContext);
   const nodeIds = useMemo(() => layout.nodes.map((node) => node.key), [layout.nodes]);
   const [animatedEdgeId, setAnimatedEdgeId] = useState<string | null>(null);
-  const edges = useWorkflowEdges(layout.edges, nodeContext, animatedEdgeId);
+  const edges = useWorkflowEdges(layout.edges, layout.nodes, nodeContext, animatedEdgeId);
   const handleEdgeClick = useCallback<EdgeMouseHandler<WorkflowReactFlowEdge>>((event, edge) => {
     event.stopPropagation();
     setAnimatedEdgeId((currentEdgeId) => currentEdgeId === edge.id ? null : edge.id);
@@ -95,7 +94,6 @@ export function WorkflowCanvas({
         multiSelectionKeyCode={null}
         proOptions={{ hideAttribution: true }}
         onEdgeClick={handleEdgeClick}
-        onPaneClick={onActionSelectionClear}
         onMoveStart={onCanvasMoveStart}
         onMoveEnd={onCanvasMoveEnd}
       >
@@ -173,18 +171,28 @@ function useWorkflowNodeContext({
   ]);
 }
 
-function useWorkflowNodes(layoutNodes: WorkflowCanvasProps["layout"]["nodes"], nodeContext: WorkflowNodeContext) {
+function useWorkflowNodes(
+  layoutNodes: WorkflowCanvasProps["layout"]["nodes"],
+  layoutEdges: WorkflowCanvasProps["layout"]["edges"],
+  nodeContext: WorkflowNodeContext
+) {
+  const activeHandleIdsByNodeKey = useMemo(() => workflowActiveHandleIdsByNodeKey(layoutEdges), [layoutEdges]);
+
   return useMemo<WorkflowReactFlowNode[]>(() => layoutNodes.map((layoutNode) => ({
     id: layoutNode.key,
     type: "workflow",
     position: { x: layoutNode.x, y: layoutNode.y },
-    data: { layoutNode, context: nodeContext },
+    data: {
+      layoutNode,
+      context: nodeContext,
+      activeHandleIds: activeHandleIdsByNodeKey.get(layoutNode.key) ?? []
+    },
     width: layoutNode.width,
     height: layoutNode.height,
     initialWidth: layoutNode.width,
     initialHeight: layoutNode.height,
     measured: { width: layoutNode.width, height: layoutNode.height },
-    handles: workflowNodeHandles(layoutNode),
+    handles: workflowNodeHandles(layoutNode, activeHandleIdsByNodeKey.get(layoutNode.key) ?? []),
     draggable: false,
     selectable: false,
     connectable: false,
@@ -194,27 +202,47 @@ function useWorkflowNodes(layoutNodes: WorkflowCanvasProps["layout"]["nodes"], n
       height: layoutNode.height,
       pointerEvents: "all"
     }
-  })), [layoutNodes, nodeContext]);
+  })), [activeHandleIdsByNodeKey, layoutNodes, nodeContext]);
 }
 
-function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][number]): WorkflowReactFlowNode["handles"] {
+function workflowActiveHandleIdsByNodeKey(layoutEdges: WorkflowCanvasProps["layout"]["edges"]) {
+  const activeHandleIdsByNodeKey = new Map<string, Set<string>>();
+  const addActiveHandleId = (nodeKey: string, handleId?: string) => {
+    if (!handleId) return;
+    const activeHandleIds = activeHandleIdsByNodeKey.get(nodeKey) ?? new Set<string>();
+    activeHandleIds.add(handleId);
+    activeHandleIdsByNodeKey.set(nodeKey, activeHandleIds);
+  };
+
+  layoutEdges.forEach((edge) => {
+    addActiveHandleId(edge.sourceNodeKey, edge.sourceHandleId);
+    addActiveHandleId(edge.targetNodeKey, edge.targetHandleId);
+  });
+
+  return new Map([...activeHandleIdsByNodeKey].map(([nodeKey, activeHandleIds]) => [nodeKey, [...activeHandleIds]]));
+}
+
+function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][number], activeHandleIds: string[]): WorkflowReactFlowNode["handles"] {
   const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
+  const activeHandleIdSet = new Set(activeHandleIds);
+  const handles: NonNullable<WorkflowReactFlowNode["handles"]> = [];
 
-  if (layoutNode.kind === "output-event") {
-    return [{ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 }];
-  }
+  if (activeHandleIdSet.has("left")) handles.push({ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 });
+  if (activeHandleIdSet.has("right")) handles.push({ id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 });
+  if (activeHandleIdSet.has("top")) handles.push({ id: "top", type: "target", position: Position.Top, x: layoutNode.width / 2, y: 0, width: 1, height: 1 });
+  if (activeHandleIdSet.has("bottom")) handles.push({ id: "bottom", type: "source", position: Position.Bottom, x: layoutNode.width / 2, y: layoutNode.height, width: 1, height: 1 });
 
-  if (layoutNode.kind === "trigger") {
-    return [{ id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 }];
-  }
-
-  return [
-    { id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 },
-    { id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 }
-  ];
+  return handles;
 }
 
-export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layout"]["edges"], context?: WorkflowNodeContext, animatedEdgeId?: string | null): WorkflowReactFlowEdge[] {
+export function toWorkflowReactFlowEdges(
+  layoutEdges: WorkflowCanvasProps["layout"]["edges"],
+  layoutNodes: WorkflowCanvasProps["layout"]["nodes"] = [],
+  context?: WorkflowNodeContext,
+  animatedEdgeId?: string | null
+): WorkflowReactFlowEdge[] {
+  const nodeByKey = new Map(layoutNodes.map((node) => [node.key, node]));
+
   return layoutEdges.map((workflowEdge) => ({
     id: workflowEdge.key,
     type: "workflowSmart",
@@ -222,7 +250,12 @@ export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layou
     target: workflowEdge.targetNodeKey,
     sourceHandle: workflowEdge.sourceHandleId,
     targetHandle: workflowEdge.targetHandleId,
-    data: { workflowEdge, context },
+    data: {
+      workflowEdge,
+      context,
+      sourceNode: nodeByKey.get(workflowEdge.sourceNodeKey),
+      targetNode: nodeByKey.get(workflowEdge.targetNodeKey)
+    },
     animated: workflowEdge.key === animatedEdgeId,
     className: workflowEdge.key === animatedEdgeId ? "workflow-edge-animated" : undefined,
     style: {
@@ -238,6 +271,11 @@ export function toWorkflowReactFlowEdges(layoutEdges: WorkflowCanvasProps["layou
   }));
 }
 
-function useWorkflowEdges(layoutEdges: WorkflowCanvasProps["layout"]["edges"], context: WorkflowNodeContext, animatedEdgeId: string | null) {
-  return useMemo(() => toWorkflowReactFlowEdges(layoutEdges, context, animatedEdgeId), [animatedEdgeId, context, layoutEdges]);
+function useWorkflowEdges(
+  layoutEdges: WorkflowCanvasProps["layout"]["edges"],
+  layoutNodes: WorkflowCanvasProps["layout"]["nodes"],
+  context: WorkflowNodeContext,
+  animatedEdgeId: string | null
+) {
+  return useMemo(() => toWorkflowReactFlowEdges(layoutEdges, layoutNodes, context, animatedEdgeId), [animatedEdgeId, context, layoutEdges, layoutNodes]);
 }

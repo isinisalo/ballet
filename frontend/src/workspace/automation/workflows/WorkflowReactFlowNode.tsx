@@ -8,31 +8,26 @@ import { WorkflowPolicyNode } from "./WorkflowPolicyNode";
 import type { WorkflowNodeContext, WorkflowReactFlowNode } from "./WorkflowCanvasTypes";
 
 export function WorkflowReactFlowNodeComponent({ data }: NodeProps<WorkflowReactFlowNode>) {
-  const { layoutNode, context } = data;
+  const { layoutNode, context, activeHandleIds } = data;
 
   return (
     <div className="workflow-react-flow-node nopan flex h-full w-full items-center">
-      <WorkflowNodeHandles layoutNode={layoutNode} />
+      <WorkflowNodeHandles activeHandleIds={activeHandleIds} layoutNode={layoutNode} />
       {renderNodeContent(layoutNode, context)}
     </div>
   );
 }
 
-function WorkflowNodeHandles({ layoutNode }: { layoutNode: WorkflowCanvasLayoutNode }) {
+function WorkflowNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds: string[]; layoutNode: WorkflowCanvasLayoutNode }) {
   const anchorTop = workflowCanvasNodeAnchorY(layoutNode);
-
-  if (layoutNode.kind === "output-event") {
-    return <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />;
-  }
-
-  if (layoutNode.kind === "trigger") {
-    return <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />;
-  }
+  const activeHandleIdSet = new Set(activeHandleIds);
 
   return (
     <>
-      <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
-      <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} />
+      {activeHandleIdSet.has("left") ? <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} /> : null}
+      {activeHandleIdSet.has("right") ? <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} /> : null}
+      {activeHandleIdSet.has("top") ? <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: "50%" }} /> : null}
+      {activeHandleIdSet.has("bottom") ? <Handle id="bottom" type="source" position={Position.Bottom} isConnectable={false} className="workflow-react-flow-handle" style={{ left: "50%" }} /> : null}
     </>
   );
 }

@@ -2,6 +2,10 @@ import type { Agent, ProjectAction, ProjectAutomationConfig } from "../../../../
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ActionEditorFields } from "../actions/ActionEditorFields";
 
+type WorkflowActionSheetOpenChangeDetails = {
+  reason?: string;
+};
+
 export function WorkflowActionSheet({
   open,
   action,
@@ -15,12 +19,12 @@ export function WorkflowActionSheet({
   action?: ProjectAction;
   agents: Agent[];
   config: ProjectAutomationConfig;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (open: boolean, details?: WorkflowActionSheetOpenChangeDetails) => void;
   onActionChange: (patch: Partial<ProjectAction>) => void;
   onCreateOutput: (id: string) => void;
 }) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
       <SheetContent
         side="right"
         overlayClassName="pointer-events-none"

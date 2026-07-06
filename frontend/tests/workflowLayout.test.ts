@@ -423,7 +423,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       sourceNodeKey: "policy-2",
       targetNodeKey: "policy-1",
       sourceHandleId: "right",
-      targetHandleId: "left",
+      targetHandleId: "top",
       tone: "return",
       eventType: "implement.completed",
       label: "completed"
@@ -439,7 +439,7 @@ describe("toWorkflowReactFlowEdges", () => {
       sourceNodeKey: "policy-2",
       targetNodeKey: "policy-1",
       sourceHandleId: "right",
-      targetHandleId: "left",
+      targetHandleId: "top",
       dashed: true,
       tone: "return",
       eventType: "implementation.complete",
@@ -452,7 +452,7 @@ describe("toWorkflowReactFlowEdges", () => {
       source: "policy-2",
       target: "policy-1",
       sourceHandle: "right",
-      targetHandle: "left",
+      targetHandle: "top",
       selectable: false,
       focusable: false,
       reconnectable: false,
@@ -521,7 +521,7 @@ describe("toWorkflowReactFlowEdges", () => {
         targetHandleId: "left",
         dashed: true
       }
-    ], undefined, "policy-output-event-0-build.failed");
+    ], [], undefined, "policy-output-event-0-build.failed");
 
     expect(edges.map((edge) => edge.animated)).toEqual([false, true]);
     expect(edges[0]?.domAttributes?.["data-workflow-edge-animated"]).toBe("false");

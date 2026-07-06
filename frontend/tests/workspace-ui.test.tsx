@@ -203,6 +203,7 @@ const workflowEdgeLabelTexts = () => workflowEdgeLabels()
 const activateWorkflowNode = (element: HTMLElement) => {
   fireEvent.pointerDown(element, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
   fireEvent.pointerUp(element, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
+  fireEvent.click(element);
 };
 
 const updateProjectTreeDocument = (
@@ -647,6 +648,9 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
 
     activateWorkflowNode(implementationPolicyNode);
+    expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Action ID")).toHaveValue("implementation");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Action" })).not.toBeInTheDocument());
 
     await waitFor(() => expect(data.automation).not.toHaveProperty("events"));
@@ -815,7 +819,7 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
-  it("switches workflow action sheet content and closes on outside click", async () => {
+  it("switches workflow action sheet content and only closes with the sheet close button", async () => {
     const workflowData = baseData();
     workflowData.agents.push({
       id: "agent-2",
@@ -859,15 +863,17 @@ describe("workspace entity UI flows", () => {
     const workflowPane = document.querySelector(".react-flow__pane");
     expect(workflowPane).toBeInTheDocument();
     fireEvent.click(workflowPane as Element);
+    expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Action ID")).toHaveValue("review-pass");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Action" })).not.toBeInTheDocument());
   });
 
-  it("opens the workflow action sheet from node pointer activation", async () => {
+  it("opens the workflow action sheet from node click activation", async () => {
     await renderRoute("/automation/workflows?id=workflow-1");
 
     const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
-    fireEvent.pointerDown(implementationPolicyNode, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
-    fireEvent.pointerUp(implementationPolicyNode, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
+    activateWorkflowNode(implementationPolicyNode);
 
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
     expect(screen.getByLabelText("Action ID")).toHaveValue("implementation");
@@ -1236,7 +1242,13 @@ describe("workspace entity UI flows", () => {
     const connectionPoints = document.querySelectorAll(".workflow-react-flow-handle");
     expect(connectionPoints.length).toBeGreaterThan(0);
     expect(getComputedStyle(connectionPoints[0]!).opacity).toBe("1");
-    expect(document.querySelectorAll(".react-flow__handle-top, .react-flow__handle-bottom")).toHaveLength(0);
+    const returnSourcePolicyNode = screen.getByLabelText("Policy: on.review.rejected.start.implementation").closest(".react-flow__node");
+    const returnTargetPolicyNode = screen.getByLabelText("Policy: on.implementation.complete.start.review").closest(".react-flow__node");
+    expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-right")).toHaveLength(1);
+    expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-bottom")).toHaveLength(0);
+    expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-top")).toHaveLength(0);
+    expect(returnTargetPolicyNode?.querySelectorAll(".react-flow__handle-top")).toHaveLength(1);
+    expect(returnTargetPolicyNode?.querySelectorAll(".react-flow__handle-bottom")).toHaveLength(0);
     expect(document.querySelectorAll("[data-handleid^=\"right-output-\"]")).toHaveLength(0);
     expect(document.querySelectorAll("[data-workflow-edge-endpoint]").length).toBe(0);
     expect(document.querySelectorAll("[data-workflow-edge-tone=\"return\"]")).toHaveLength(1);
@@ -1247,6 +1259,12 @@ describe("workspace entity UI flows", () => {
         "rejected"
       ]));
     });
+    const returnEdgeLabel = workflowEdgeLabels().find((label) =>
+      label.dataset.workflowEdgeLabelTone === "return" &&
+      label.dataset.workflowEdgeLabelValue === "complete"
+    );
+    expect(returnEdgeLabel).toBeDefined();
+    expect(returnEdgeLabel).toHaveTextContent("complete");
     expect(workflowEdgeLabels().some((label) =>
       Array.from(label.classList).some((className) => className === "border" || className.startsWith("border-"))
     )).toBe(false);

@@ -324,15 +324,36 @@ export function calculateWorkflowCanvasLayout({
     targetHandleId
   }).forEach(addCanvasEdge);
 
+  const positionedNodes = positionWorkflowNodes([...nodeDrafts.values()], dagreEdges, direction);
+
   return {
-    nodes: positionWorkflowNodes([...nodeDrafts.values()], dagreEdges, direction),
-    edges: canvasEdges,
+    nodes: positionedNodes,
+    edges: workflowReturnEdgesWithTargetHandles(canvasEdges, positionedNodes),
     direction
   };
 }
 
 export function workflowOutputSourceHandleId() {
   return "right";
+}
+
+function workflowReturnEdgesWithTargetHandles(
+  edges: WorkflowCanvasEdge[],
+  nodes: WorkflowCanvasLayoutNode[]
+) {
+  const nodeByKey = new Map(nodes.map((node) => [node.key, node]));
+
+  return edges.map((edge) => {
+    if (edge.tone !== "return") return edge;
+    const sourceNode = nodeByKey.get(edge.sourceNodeKey);
+    const targetNode = nodeByKey.get(edge.targetNodeKey);
+    if (!sourceNode || !targetNode) return edge;
+
+    return {
+      ...edge,
+      targetHandleId: sourceNode.y + sourceNode.height / 2 > targetNode.y + targetNode.height / 2 ? "bottom" : "top"
+    };
+  });
 }
 
 export function workflowPolicyOutputHandleY(outputIndex: number, outputHandleCount: number) {

@@ -40,14 +40,15 @@ export const workflowExistingHandlerEdges = ({
     handlerRecords.forEach((handlerRecord) => {
       if (handlerRecord.index === sourceIndex) return;
       if (!policyNodeIndexes.has(handlerRecord.index)) return;
+      const isReturnEdge = handlerRecord.index < sourceIndex;
 
       edges.push({
         key: `event-policy-${sourceIndex}-${handlerRecord.index}-${eventType}`,
         sourceNodeKey,
         targetNodeKey: `policy-${handlerRecord.index}`,
-        sourceHandleId: eventSourceHandleId ?? sourceHandleId,
-        targetHandleId,
-        tone: handlerRecord.index < sourceIndex ? "return" : undefined,
+        sourceHandleId: isReturnEdge ? sourceHandleId : eventSourceHandleId ?? sourceHandleId,
+        targetHandleId: isReturnEdge ? "top" : targetHandleId,
+        tone: isReturnEdge ? "return" : undefined,
         eventType,
         label: label ?? workflowEventOutputLabel(eventType)
       });

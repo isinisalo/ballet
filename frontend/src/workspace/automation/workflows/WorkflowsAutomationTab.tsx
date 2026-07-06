@@ -193,8 +193,9 @@ export function WorkflowsAutomationTab({
   };
   const clearActionSelection = () => setSelectedActionStepIndex(null);
   const selectActionStep = (record: WorkflowStepRecord) => {
-    setSelectedActionStepIndex((current) => current === record.index ? null : record.index);
+    setSelectedActionStepIndex(record.index);
   };
+
   const updateSelectedAction = (patch: Partial<ProjectAction>) => {
     if (!selectedAction) return;
     updateConfig((current) => nextConfigWithActionPatch(current, selectedAction.id, patch).config);
@@ -241,7 +242,6 @@ export function WorkflowsAutomationTab({
         onStepPointerCancel={canvasInteraction.resetStepDrag}
         onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
         onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-        onActionSelectionClear={clearActionSelection}
         onPolicyChange={updateStep}
         onActionStepSelect={selectActionStep}
         onAddPolicyStep={addPolicyStep}
@@ -251,8 +251,8 @@ export function WorkflowsAutomationTab({
         action={selectedAction}
         agents={agents}
         config={config}
-        onOpenChange={(open) => {
-          if (!open) clearActionSelection();
+        onOpenChange={(open, details) => {
+          if (!open && details?.reason === "close-press") clearActionSelection();
         }}
         onActionChange={updateSelectedAction}
         onCreateOutput={createOutput}
