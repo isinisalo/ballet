@@ -21,10 +21,10 @@ const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
   version: 1,
   triggers: [{ id: "manual-start", description: "Manual start" }],
   actions: [
-    { id: "build", description: "Build the change.", outputIds: ["ready"], agentIds: ["builder-agent"] },
-    { id: "review", description: "Review the change.", outputIds: ["approved"], agentIds: ["reviewer-agent"] }
+    { id: "build", description: "Build the change.", outputIds: ["ready", "blocked"], agentIds: ["builder-agent"] },
+    { id: "review", description: "Review the change.", outputIds: ["approved", "changes-requested"], agentIds: ["reviewer-agent"] }
   ],
-  outputs: [{ id: "ready" }, { id: "approved" }],
+  outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes-requested" }],
   policies,
   workflows: [{ id: "delivery", title: "Delivery", steps: policies.map((item) => item.id) }],
   runtimes: []

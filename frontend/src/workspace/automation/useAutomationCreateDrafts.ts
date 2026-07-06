@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage, normalizeAutomationToken } from "@shared/api/automationValidation";
+import { defaultPolicyOutputIds } from "@shared/policy-actions";
 import type { AutomationTab } from "../types";
 
 type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
@@ -49,7 +50,7 @@ export function useAutomationCreateDrafts({
 
   useEffect(() => {
     updateNewAction({
-      outputIds: newAction.outputIds.length > 0 ? newAction.outputIds : draft.outputs.slice(0, 1).map((output) => output.id),
+      outputIds: newAction.outputIds.length > 0 ? newAction.outputIds : defaultActionOutputIds(draft),
       agentIds: newAction.agentIds.length > 0 ? newAction.agentIds : agents.slice(0, 1).map((agent) => agent.id)
     });
   }, [agents, draft.outputs]);
@@ -95,9 +96,15 @@ const syncDraft = <K extends keyof AutomationCreateDrafts>(
 
 const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): AutomationCreateDrafts => ({
   trigger: { id: "", description: "" },
-  action: { id: "", description: "", outputIds: draft.outputs.slice(0, 1).map((output) => output.id), agentIds: agents.slice(0, 1).map((agent) => agent.id) },
+  action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id) },
   workflow: { id: "", title: "", steps: [] }
 });
+
+const defaultActionOutputIds = (draft: ProjectAutomationConfig): string[] => {
+  const availableOutputIds = draft.outputs.map((output) => output.id);
+  const defaultOutputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
+  return defaultOutputIds.length === defaultPolicyOutputIds.length ? defaultOutputIds : [...defaultPolicyOutputIds];
+};
 
 const createDraftWithNewEntity = (
   activeTab: AutomationTab,
@@ -112,7 +119,12 @@ const createDraftWithNewEntity = (
   if (activeTab === "actions") {
     const id = normalizeAutomationToken(drafts.action.id);
     if (automationTokenValidationMessage("Action ID", id) || automationStringValidationMessage("Description", drafts.action.description, automationFieldLimits.description, { required: false }) || draft.actions.some((action) => action.id === id)) return undefined;
-    return { id, config: { ...draft, actions: [...draft.actions, { ...drafts.action, id }] } };
+    const outputIds = drafts.action.agentIds.length > 0 ? drafts.action.outputIds : [];
+    const outputs = [...draft.outputs];
+    outputIds.forEach((outputId) => {
+      if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
+    });
+    return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds }] } };
   }
   const id = normalizeAutomationToken(drafts.workflow.id);
   if (automationTokenValidationMessage("Workflow ID", id) || automationStringValidationMessage("Title", drafts.workflow.title, automationFieldLimits.name) || draft.workflows.some((workflow) => workflow.id === id)) return undefined;

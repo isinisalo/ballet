@@ -117,13 +117,12 @@ const projectPolicy: ProjectPolicy = {
 const implementationAction = {
   id: "implementation",
   description: "Implement approved work.",
-  outputIds: ["ready", "blocked", "failed"],
+  outputIds: ["complete", "failed"],
   agentIds: ["developer-agent", "architecture-reviewer"]
 };
 
 const implementationOutputs = [
-  { id: "ready" },
-  { id: "blocked" },
+  { id: "complete" },
   { id: "failed" }
 ];
 
@@ -246,14 +245,14 @@ describe("runtime database", () => {
     });
 
     expect(secondCompletion.event).toMatchObject({
-      type: "implementation.ready",
+      type: "implementation.complete",
       source: "agentd",
       correlationId: intake.event.correlationId,
       causationId: intake.event.eventId,
       status: "unassigned",
       payload: {
         action: "implementation",
-        status: "ready",
+        status: "complete",
         agents: expect.arrayContaining([
           expect.objectContaining({ agent: "developer-agent", status: "completed", outcome: "ready" }),
           expect.objectContaining({ agent: "architecture-reviewer", status: "completed", outcome: "ready" })
@@ -413,28 +412,28 @@ describe("runtime output mapping", () => {
     expect(outcomeToOutputEventStatus(
       readyOutcome,
       projectPolicy,
-      [{ id: "implementation", outputIds: ["ready", "blocked", "failed"] }]
-    )).toBe("ready");
+      [{ id: "implementation", outputIds: ["done", "needs-clarification"] }]
+    )).toBe("done");
     expect(outcomeToOutputEventStatus(
       { ...readyOutcome, outcome: "approved" },
       { ...projectPolicy, action: "review" },
-      [{ id: "review", outputIds: ["approved", "changes_requested", "blocked"] }]
-    )).toBe("approved");
+      [{ id: "review", outputIds: ["accepted", "reject"] }]
+    )).toBe("accepted");
     expect(outcomeToOutputEventStatus(
       { ...readyOutcome, outcome: "changes_requested" },
       { ...projectPolicy, action: "review" },
-      [{ id: "review", outputIds: ["approved", "changes_requested", "blocked"] }]
-    )).toBe("changes_requested");
+      [{ id: "review", outputIds: ["accepted", "reject"] }]
+    )).toBe("reject");
     expect(outcomeToOutputEventStatus(
       readyOutcome,
       { ...projectPolicy, action: "deploy" },
-      [{ id: "deploy", outputIds: ["deployed", "blocked", "failed"] }]
+      [{ id: "deploy", outputIds: ["deployed", "rollback"] }]
     )).toBe("deployed");
     expect(outcomeToOutputEventStatus(
-      readyOutcome,
+      { ...readyOutcome, outcome: "failed" },
       projectPolicy,
-      [{ id: "implementation", outputIds: ["complete", "blocked", "failed"] }]
-    )).toBe("complete");
+      [{ id: "implementation", outputIds: ["complete", "failed"] }]
+    )).toBe("failed");
   });
 
   it("publishes a domain event for configured output outcomes", async () => {
@@ -454,8 +453,8 @@ describe("runtime output mapping", () => {
       status: "completed",
       outcome: readyOutcome,
       projectPolicy,
-      actions: [{ ...implementationAction, outputIds: ["complete"] }],
-      outputs: [{ id: "complete" }]
+      actions: [{ ...implementationAction, outputIds: ["complete", "failed"] }],
+      outputs: [{ id: "complete" }, { id: "failed" }]
     });
 
     expect(completed.event?.type).toBe("implementation.complete");

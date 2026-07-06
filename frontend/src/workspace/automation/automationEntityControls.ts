@@ -52,13 +52,19 @@ const addEntityConfig = (
           setDraft((current) => {
             const availableOutputIds = current.outputs.map((output) => output.id);
             const outputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
+            const selectedOutputIds = outputIds.length === defaultPolicyOutputIds.length ? outputIds : [...defaultPolicyOutputIds];
+            const outputs = [...current.outputs];
+            selectedOutputIds.forEach((outputId) => {
+              if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
+            });
             const agentIds = agents?.[0]?.id ? [agents[0].id] : [];
             return {
               ...current,
+              outputs,
               actions: [...current.actions, {
                 id,
                 description: "New action",
-                outputIds: agentIds.length > 0 ? outputIds.length > 0 ? outputIds : availableOutputIds.slice(0, 1) : [],
+                outputIds: agentIds.length > 0 ? selectedOutputIds : [],
                 agentIds
               }]
             };

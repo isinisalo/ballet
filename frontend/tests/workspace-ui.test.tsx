@@ -882,7 +882,7 @@ describe("workspace entity UI flows", () => {
     workflowData.automation.actions.push({
       id: "review-pass",
       description: "Review output",
-      outputIds: ["summary"],
+      outputIds: ["summary", "failed"],
       agentIds: ["agent-1"]
     });
     const { data, fetchMock } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
@@ -972,7 +972,7 @@ describe("workspace entity UI flows", () => {
     workflowData.automation.actions.push({
       id: "review-pass",
       description: "Review output",
-      outputIds: ["summary"],
+      outputIds: ["summary", "failed"],
       agentIds: ["agent-2"]
     });
     workflowData.automation.policies.push({
@@ -1025,18 +1025,23 @@ describe("workspace entity UI flows", () => {
     await user.type(screen.getByLabelText("Action ID"), "review-pass");
     await user.type(screen.getByLabelText("Description"), "Review output");
     expect(screen.getByDisplayValue("Review output")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Add output" }));
+    expect(screen.getByText("Approval output")).toBeInTheDocument();
+    expect(screen.getByText("Rework output")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Change approval output" }));
     await user.type(screen.getByLabelText("Search or create output"), "summary");
     await user.click(await screen.findByRole("button", { name: "summary" }));
-    await user.click(screen.getByRole("button", { name: "Remove output ready" }));
+    await user.click(screen.getByRole("button", { name: "Change rework output" }));
+    await user.type(screen.getByLabelText("Search or create output"), "needs-clarification");
+    await user.click(await screen.findByRole("button", { name: "Create needs-clarification" }));
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.actions.some((action) =>
       action.id === "review-pass" &&
       action.description === "Review output" &&
-      action.outputIds.join(",") === "summary" &&
+      action.outputIds.join(",") === "summary,needs-clarification" &&
       action.agentIds.join(",") === "agent-1"
     )).toBe(true));
+    expect(data.automation.outputs).toContainEqual({ id: "needs-clarification" });
 
     await user.click(screen.getByRole("link", { name: "Workflows" }));
     await user.click(screen.getByRole("link", { name: "workflow-1" }));
@@ -1066,7 +1071,8 @@ describe("workspace entity UI flows", () => {
 
     await waitFor(() => expect(screen.queryByRole("button", { name: "Remove output complete" })).not.toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Remove output failed" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add output" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Add output" })).not.toBeInTheDocument();
+    expect(screen.getByText("None")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.actions[0]).toMatchObject({
@@ -1104,32 +1110,26 @@ describe("workspace entity UI flows", () => {
     expect(document.querySelector('[data-workflow-output-event^="manual-gate."]')).not.toBeInTheDocument();
   });
 
-  it("selects, creates, normalizes, removes, and caps action outputs", async () => {
+  it("selects, creates, normalizes, and preserves action output slots", async () => {
     const user = userEvent.setup();
     const selectorData = baseData();
     selectorData.automation.outputs = [{ id: "ready" }, { id: "cancelled" }, { id: "warn" }];
-    selectorData.automation.actions[0]!.outputIds = ["cancelled"];
+    selectorData.automation.actions[0]!.outputIds = ["ready", "warn"];
     const { data } = await renderRoute("/automation/actions?id=implementation", selectorData);
 
-    await user.click(screen.getByRole("button", { name: "Add output" }));
-    await user.type(screen.getByLabelText("Search or create output"), "war");
+    await user.click(screen.getByRole("button", { name: "Change approval output" }));
+    await user.type(screen.getByLabelText("Search or create output"), "cancel");
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("button", { name: "Remove output warn" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove output cancelled" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add output" }));
+    await user.click(screen.getByRole("button", { name: "Change rework output" }));
     await user.type(screen.getByLabelText("Search or create output"), "Warm");
     await user.keyboard("{Enter}");
     expect(screen.getByRole("button", { name: "Remove output warm" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Remove output warn" }));
-    await user.click(screen.getByRole("button", { name: "Add output" }));
-    await user.type(screen.getByLabelText("Search or create output"), "READY");
-    await user.keyboard("{Enter}");
-    expect(screen.getByRole("button", { name: "Remove output ready" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add output" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.actions[0]?.outputIds).toEqual(["cancelled", "warm", "ready"]));
+    await waitFor(() => expect(data.automation.actions[0]?.outputIds).toEqual(["cancelled", "warm"]));
     expect(data.automation.outputs).toContainEqual({ id: "warm" });
     expect(data.automation.outputs.filter((output) => output.id === "ready")).toHaveLength(1);
   });
@@ -1198,7 +1198,7 @@ describe("workspace entity UI flows", () => {
     workflowData.automation.actions.push({
       id: "review",
       description: "Review implementation output.",
-      outputIds: ["complete"],
+      outputIds: ["complete", "failed"],
       agentIds: ["agent-1"]
     });
     workflowData.automation.policies.push({
@@ -1274,7 +1274,7 @@ describe("workspace entity UI flows", () => {
     workflowData.automation.actions.push({
       id: "review-pass",
       description: "Review output",
-      outputIds: ["complete"],
+      outputIds: ["complete", "failed"],
       agentIds: ["agent-2"]
     });
     const { data } = await renderRoute("/automation/policies?id=workflow-1", workflowData);
@@ -1313,10 +1313,11 @@ describe("workspace entity UI flows", () => {
 
   it("does not activate repeated workflow events that already have a policy handler", async () => {
     const workflowData = baseData();
+    workflowData.automation.outputs.push({ id: "accepted" }, { id: "rejected" });
     workflowData.automation.actions.push({
       id: "review",
       description: "Review implementation output.",
-      outputIds: ["rejected"],
+      outputIds: ["accepted", "rejected"],
       agentIds: ["agent-1"]
     });
     workflowData.automation.policies = [{
@@ -1349,10 +1350,11 @@ describe("workspace entity UI flows", () => {
 
   it("renders workflow edges with the smart step edge type", async () => {
     const workflowData = baseData();
+    workflowData.automation.outputs.push({ id: "accepted" }, { id: "rejected" });
     workflowData.automation.actions.push({
       id: "review",
       description: "Review implementation output.",
-      outputIds: ["rejected"],
+      outputIds: ["accepted", "rejected"],
       agentIds: ["agent-1"]
     });
     workflowData.automation.policies = [{

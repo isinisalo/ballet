@@ -19,7 +19,10 @@ type OutputSelectorProps = {
   value: OutputId[];
   onChange: (value: OutputId[]) => void;
   initialOptions: OutputId[];
+  blockedOptions?: OutputId[];
   max?: number;
+  replaceWhenFull?: boolean;
+  openButtonLabel?: string;
   disabled?: boolean;
   onCreateOption?: (id: OutputId) => void;
 };
@@ -28,7 +31,10 @@ export function OutputSelector({
   value,
   onChange,
   initialOptions,
+  blockedOptions = [],
   max = 3,
+  replaceWhenFull = false,
+  openButtonLabel,
   disabled = false,
   onCreateOption
 }: OutputSelectorProps) {
@@ -37,12 +43,14 @@ export function OutputSelector({
   const [query, setQuery] = useState("");
   const [createdOptions, setCreatedOptions] = useState<OutputId[]>([]);
   const selected = useMemo(() => uniqueOutputIds(value, max), [max, value]);
+  const blocked = useMemo(() => uniqueOutputIds(blockedOptions), [blockedOptions]);
   const options = useMemo(() => uniqueOutputIds([...initialOptions, ...createdOptions, ...selected]), [createdOptions, initialOptions, selected]);
-  const suggestions = useMemo(() => outputSuggestions(options, selected, query), [options, query, selected]);
+  const suggestions = useMemo(() => outputSuggestions(options, [...selected, ...blocked], query), [blocked, options, query, selected]);
   const normalizedQuery = normalizeOutputId(query);
   const validationMessage = query ? outputValidationMessage(query) : undefined;
-  const canCreate = query ? outputCanCreate(query, options, selected) : false;
+  const canCreate = query ? outputCanCreate(query, options, [...selected, ...blocked]) : false;
   const atLimit = selected.length >= max;
+  const canOpenEditor = !disabled && (!atLimit || replaceWhenFull);
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
@@ -55,16 +63,22 @@ export function OutputSelector({
 
   const selectOutput = (outputId: string) => {
     const normalized = normalizeOutputId(outputId);
-    if (!normalized || selected.length >= max) return;
-    onChange(nextSelectedOutputIds(selected, normalized, max));
+    if (!normalized || blocked.includes(normalized)) return;
+    if (selected.length >= max) {
+      if (!replaceWhenFull || max !== 1) return;
+      onChange([normalized]);
+    } else {
+      onChange(nextSelectedOutputIds(selected, normalized, max));
+    }
     closeEditor();
   };
 
   const createOutput = () => {
-    if (!canCreate || !normalizedQuery || selected.length >= max) return;
+    if (!canCreate || !normalizedQuery) return;
+    if (selected.length >= max && (!replaceWhenFull || max !== 1)) return;
     setCreatedOptions((current) => uniqueOutputIds([...current, normalizedQuery]));
     onCreateOption?.(normalizedQuery);
-    onChange(nextSelectedOutputIds(selected, normalizedQuery, max));
+    onChange(selected.length >= max ? [normalizedQuery] : nextSelectedOutputIds(selected, normalizedQuery, max));
     closeEditor();
   };
 
@@ -98,10 +112,10 @@ export function OutputSelector({
             </Button>
           </Badge>
         ))}
-        {!editing && !atLimit ? (
+        {!editing && canOpenEditor ? (
           <Button
             type="button" size="xs" variant="outline"
-            aria-label="Add output"
+            aria-label={openButtonLabel ?? "Add output"}
             disabled={disabled}
             onClick={() => setEditing(true)}
             className="h-5 rounded-xl border-dashed border-divider-strong bg-transparent px-2 py-0.5 font-mono text-xs text-muted-foreground shadow-none hover:bg-muted"
@@ -111,7 +125,7 @@ export function OutputSelector({
           </Button>
         ) : null}
       </div>
-      {editing && !atLimit ? (
+      {editing && canOpenEditor ? (
         <div className="flex max-w-72 flex-col gap-1.5">
           <Input
             ref={inputRef}

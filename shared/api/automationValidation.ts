@@ -7,7 +7,7 @@ export type AutomationFieldLimit = {
 
 export const automationFieldLimits = {
   token: { min: 2, max: 40 },
-  outputId: { min: 2, max: 18 },
+  outputId: { min: 2, max: 32 },
   name: { min: 1, max: 40 },
   description: { min: 1, max: 240 },
   command: { min: 1, max: 120 },

@@ -1,15 +1,15 @@
 import type { Agent } from "./domain/agents.js";
 import type { ProjectAction, ProjectOutput, ProjectPolicy } from "./domain/automation.js";
 
-export const defaultPolicyOutputIds = ["ready", "cancelled", "warn"] as const;
+export const actionOutputSlotCount = 2;
+export const defaultPolicyOutputIds = ["ok", "rework"] as const;
 export type PolicyOutputId = string;
 export const policyOutputStatuses = defaultPolicyOutputIds;
 export type PolicyOutputStatus = typeof defaultPolicyOutputIds[number];
 
 export const defaultProjectOutputs = (): ProjectOutput[] => [
-  { id: "ready" },
-  { id: "cancelled" },
-  { id: "warn" }
+  { id: "ok" },
+  { id: "rework" }
 ];
 
 export const normalizePolicyToken = (value: string): string =>
@@ -32,6 +32,68 @@ export const policyOutputEventType = (
   outputId: PolicyOutputId
 ): string => `${input.action}.${normalizePolicyToken(outputId)}`;
 
+export type ActionOutputSlotKind = "approval" | "rework";
+
+export const approvalOutputCandidates = [
+  "ok",
+  "done",
+  "accepted",
+  "approved",
+  "ready",
+  "complete",
+  "completed",
+  "deployed"
+] as const;
+
+export const reworkOutputCandidates = [
+  "rework",
+  "reject",
+  "rejected",
+  "failed",
+  "blocked",
+  "needs_input",
+  "needs-input",
+  "needs-clarification",
+  "changes_requested",
+  "changes-requested",
+  "cancelled",
+  "warn"
+] as const;
+
+const approvalOutputCandidateSet = new Set<string>(approvalOutputCandidates);
+const reworkOutputCandidateSet = new Set<string>(reworkOutputCandidates);
+
+export const actionOutputSlotKind = (outputId: string): ActionOutputSlotKind | undefined => {
+  const normalized = normalizePolicyToken(outputId);
+  if (approvalOutputCandidateSet.has(normalized)) return "approval";
+  if (reworkOutputCandidateSet.has(normalized)) return "rework";
+  return undefined;
+};
+
+export const uniquePolicyOutputIds = (outputIds: readonly string[], max = Number.POSITIVE_INFINITY): string[] =>
+  [...new Set(outputIds.map(normalizePolicyToken).filter(Boolean))].slice(0, max);
+
+export const normalizeActionOutputSlots = (outputIds: readonly string[] = defaultPolicyOutputIds): string[] => {
+  const normalized = uniquePolicyOutputIds(outputIds);
+  if (normalized.length === actionOutputSlotCount) {
+    const [first, second] = normalized;
+    if (actionOutputSlotKind(first) === "rework" && actionOutputSlotKind(second) === "approval") {
+      return [second, first];
+    }
+    return normalized;
+  }
+
+  const approvalOutputId = normalized.find((outputId) => actionOutputSlotKind(outputId) === "approval") ?? defaultPolicyOutputIds[0];
+  const reworkOutputId = normalized.find((outputId) =>
+    outputId !== approvalOutputId && actionOutputSlotKind(outputId) === "rework"
+  ) ?? defaultPolicyOutputIds[1];
+
+  if (approvalOutputId === reworkOutputId) {
+    return [approvalOutputId, defaultPolicyOutputIds.find((outputId) => outputId !== approvalOutputId) ?? "rework"];
+  }
+  return [approvalOutputId, reworkOutputId];
+};
+
 const outputIdSet = (outputs: Array<Pick<ProjectOutput, "id">>): Set<string> =>
   new Set(outputs
     .map((output) => normalizePolicyToken(output.id))
@@ -45,7 +107,7 @@ export const actionOutputIds = (
   const action = actions.find((candidate) => normalizePolicyToken(candidate.id) === normalizedActionId);
   if (action && Array.isArray(action.agentIds) && action.agentIds.length === 0) return [];
   const outputIds = action?.outputIds ?? defaultPolicyOutputIds;
-  return [...new Set(outputIds.map(normalizePolicyToken).filter(Boolean))].slice(0, 3);
+  return uniquePolicyOutputIds(outputIds, actionOutputSlotCount);
 };
 
 export const policyOutputEventTypes = (

@@ -10,13 +10,18 @@ import type {
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
 import type { ProjectRuntime } from "../../shared/domain/runtime.js";
 import {
+  actionOutputSlotKind,
+  approvalOutputCandidates,
+  reworkOutputCandidates,
   defaultPolicyOutputIds,
   defaultProjectOutputs,
   generatedPolicyId,
+  normalizeActionOutputSlots,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
   policyActionTokens,
   policyOutputEventType,
+  uniquePolicyOutputIds,
   resolvePolicyAgent
 } from "../../shared/policy-actions.js";
 
@@ -50,15 +55,19 @@ const normalizeOutput = (value: Record<string, unknown>): ProjectOutput => ({
   id: normalizePolicyToken(stringValue(value.id))
 });
 
+const normalizeRawOutputIds = (value: unknown): string[] | undefined =>
+  Array.isArray(value) ? uniquePolicyOutputIds(stringArray(value)) : undefined;
+
 const normalizeOutputIds = (value: unknown): string[] | undefined => {
-  const rawOutputIds = Array.isArray(value) ? stringArray(value).map(normalizePolicyToken).filter(Boolean) : undefined;
-  if (!rawOutputIds) return undefined;
-  return [...new Set(rawOutputIds)];
+  const rawOutputIds = normalizeRawOutputIds(value);
+  return rawOutputIds ? normalizeActionOutputSlots(rawOutputIds) : undefined;
 };
 
 const fallbackActionOutputIds = (availableOutputIds: string[]) => {
   const fallbackOutputIds = defaultPolicyOutputIds.filter((id) => availableOutputIds.includes(id));
-  return fallbackOutputIds.length > 0 ? fallbackOutputIds : availableOutputIds.slice(0, 3);
+  return fallbackOutputIds.length === defaultPolicyOutputIds.length
+    ? fallbackOutputIds
+    : [...defaultPolicyOutputIds];
 };
 
 const normalizeActionBase = (value: Record<string, unknown>, availableOutputIds: string[]) => ({
@@ -114,6 +123,33 @@ type ActionRewrite = {
   eventIdByLegacyEvent: Map<string, string>;
 };
 
+const semanticOutputIds = (): string[] =>
+  uniquePolicyOutputIds([
+    ...defaultPolicyOutputIds,
+    ...approvalOutputCandidates,
+    ...reworkOutputCandidates
+  ]);
+
+const targetOutputIdForLegacyOutput = (legacyOutputId: string, action: ProjectAction): string | undefined => {
+  const normalizedLegacyOutputId = normalizePolicyToken(legacyOutputId);
+  const slot = actionOutputSlotKind(normalizedLegacyOutputId);
+  if (slot === "approval") return action.outputIds[0];
+  if (slot === "rework") return action.outputIds[1];
+  return action.outputIds.includes(normalizedLegacyOutputId) ? normalizedLegacyOutputId : undefined;
+};
+
+const addOutputEventRewrite = (
+  rewrite: ActionRewrite,
+  legacyEvent: string,
+  action: ProjectAction,
+  outputId: string
+) => {
+  rewrite.eventIdByLegacyEvent.set(
+    normalizePolicyOutputEventType(legacyEvent),
+    policyOutputEventType({ action: action.id }, outputId)
+  );
+};
+
 const createActions = (
   rawActions: Record<string, unknown>[],
   legacyPolicies: LegacyPolicy[],
@@ -130,17 +166,20 @@ const createActions = (
   const actionBases = rawActions.length > 0
     ? rawActions.map((action) => {
       const rawAgentIds = normalizeRawAgentIds(action.agentIds, agents);
+      const rawOutputIds = normalizeRawOutputIds(action.outputIds);
       const base = normalizeActionBase(action, availableOutputIds);
       return {
-        base: rawAgentIds?.length === 0 && !Array.isArray(action.outputIds)
+        base: rawAgentIds?.length === 0
           ? { ...base, outputIds: [] }
           : base,
-        rawAgentIds
+        rawAgentIds,
+        rawOutputIds
       };
     })
     : policyActionTokens(legacyPolicies).map((id) => ({
       base: { id, description: "", outputIds: fallbackActionOutputIds(availableOutputIds) },
-      rawAgentIds: undefined
+      rawAgentIds: undefined,
+      rawOutputIds: [...defaultPolicyOutputIds]
     }));
 
   const rewrite: ActionRewrite = {
@@ -161,25 +200,31 @@ const createActions = (
     return candidate;
   };
 
-  const registerLegacyEventRewrites = (legacyActionId: string, legacyAgentToken: string, action: ProjectAction) => {
-    const legacyEventPrefix = `${legacyAgentToken}.${legacyActionId}.`;
-    action.outputIds.forEach((outputId) => {
-      rewrite.eventIdByLegacyEvent.set(
-        normalizePolicyOutputEventType(`${legacyEventPrefix}${outputId}`),
-        policyOutputEventType({ action: action.id }, outputId)
-      );
+  const registerLegacyEventRewrites = (
+    legacyActionId: string,
+    legacyAgentToken: string,
+    action: ProjectAction,
+    rawOutputIds: string[]
+  ) => {
+    const legacyOutputIds = uniquePolicyOutputIds([...rawOutputIds, ...semanticOutputIds()]);
+    legacyOutputIds.forEach((legacyOutputId) => {
+      const outputId = targetOutputIdForLegacyOutput(legacyOutputId, action);
+      if (!outputId) return;
+      addOutputEventRewrite(rewrite, `${legacyActionId}.${legacyOutputId}`, action, outputId);
+      if (legacyAgentToken) addOutputEventRewrite(rewrite, `${legacyAgentToken}.${legacyActionId}.${legacyOutputId}`, action, outputId);
     });
   };
 
-  actionBases.forEach(({ base, rawAgentIds }) => {
+  actionBases.forEach(({ base, rawAgentIds, rawOutputIds }) => {
     const legacyAgentTokens = [...(actionAgentTokens.get(base.id) ?? new Set<string>())];
     if (rawAgentIds) {
       const action = { ...base, id: uniqueActionId(base.id), agentIds: rawAgentIds };
       actions.push(action);
       legacyAgentTokens.forEach((agentToken) => {
         rewrite.actionIdByLegacyAgent.set(`${base.id}:${agentToken}`, action.id);
-        registerLegacyEventRewrites(base.id, agentToken, action);
+        registerLegacyEventRewrites(base.id, agentToken, action, rawOutputIds ?? action.outputIds);
       });
+      registerLegacyEventRewrites(base.id, "", action, rawOutputIds ?? action.outputIds);
       return;
     }
 
@@ -193,8 +238,9 @@ const createActions = (
       actions.push(action);
       legacyAgentTokens.forEach((agentToken) => {
         rewrite.actionIdByLegacyAgent.set(`${base.id}:${agentToken}`, action.id);
-        registerLegacyEventRewrites(base.id, agentToken, action);
+        registerLegacyEventRewrites(base.id, agentToken, action, rawOutputIds ?? action.outputIds);
       });
+      registerLegacyEventRewrites(base.id, "", action, rawOutputIds ?? action.outputIds);
       return;
     }
 
@@ -206,7 +252,7 @@ const createActions = (
       };
       actions.push(action);
       rewrite.actionIdByLegacyAgent.set(`${base.id}:${agentToken}`, action.id);
-      registerLegacyEventRewrites(base.id, agentToken, action);
+      registerLegacyEventRewrites(base.id, agentToken, action, rawOutputIds ?? action.outputIds);
     });
   });
 
@@ -247,21 +293,30 @@ const normalizeWorkflow = (value: Record<string, unknown>, policyIdMap: Map<stri
   steps: stringArray(value.steps).map((step) => policyIdMap.get(step) ?? step)
 });
 
+const outputsWithActionOutputIds = (outputs: ProjectOutput[], actions: ProjectAction[]): ProjectOutput[] => {
+  const outputById = new Map(outputs.map((output) => [output.id, output]));
+  actions.flatMap((action) => action.outputIds).forEach((outputId) => {
+    if (!outputById.has(outputId)) outputById.set(outputId, { id: outputId });
+  });
+  return [...outputById.values()];
+};
+
 export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[] = []): ProjectAutomationConfig => {
   if (!isRecord(value)) return defaultProjectAutomationConfig();
   const rawPolicies = recordArray(value.policies);
   const legacyPolicies = rawPolicies.map(readLegacyPolicy);
 
-  const outputs = Array.isArray(value.outputs) && recordArray(value.outputs).length > 0
+  const rawOutputs = Array.isArray(value.outputs) && recordArray(value.outputs).length > 0
     ? recordArray(value.outputs).map(normalizeOutput)
     : defaultProjectOutputs();
-  const availableOutputIds = outputs.map((output) => output.id).filter(Boolean);
+  const availableOutputIds = rawOutputs.map((output) => output.id).filter(Boolean);
   const { actions, rewrite } = createActions(
     Array.isArray(value.actions) ? recordArray(value.actions) : [],
     legacyPolicies,
     availableOutputIds,
     agents
   );
+  const outputs = outputsWithActionOutputIds(rawOutputs, actions);
 
   const policyPairs = legacyPolicies.map((policy) => ({
     rawId: policy.rawId,

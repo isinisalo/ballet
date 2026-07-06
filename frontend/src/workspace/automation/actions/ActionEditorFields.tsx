@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { defaultPolicyOutputIds } from "@shared/policy-actions";
+import { defaultPolicyOutputIds, normalizeActionOutputSlots } from "@shared/policy-actions";
 import { OutputSelector } from "../outputs/OutputSelector";
 
 export function ActionEditorFields({
@@ -25,6 +25,7 @@ export function ActionEditorFields({
 }) {
   const selectedAgentIds = action.agentIds ?? [];
   const selectedOutputIds = action.outputIds ?? [];
+  const outputSlotIds = selectedAgentIds.length > 0 ? normalizeActionOutputSlots(selectedOutputIds) : [];
   const actionIdError = automationTokenValidationMessage("Action ID", action.id);
   const descriptionError = automationStringValidationMessage("Description", action.description, automationFieldLimits.description, { required: false });
   const selectableAgents = useMemo(() => agents.filter((agent) => !selectedAgentIds.includes(agent.id)), [agents, selectedAgentIds]);
@@ -32,7 +33,7 @@ export function ActionEditorFields({
   const fallbackOutputIds = () => {
     const availableOutputIds = config.outputs.map((output) => output.id);
     const defaultOutputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
-    return defaultOutputIds.length > 0 ? defaultOutputIds.slice(0, 1) : availableOutputIds.slice(0, 1);
+    return defaultOutputIds.length === defaultPolicyOutputIds.length ? defaultOutputIds : [...defaultPolicyOutputIds];
   };
   const canAddAgent = selectedAgentIds.length < 5 && selectableAgents.length > 0;
   const addAgent = (agentId: string) => {
@@ -45,6 +46,13 @@ export function ActionEditorFields({
   const removeAgent = (agentId: string) => {
     onChange({ agentIds: selectedAgentIds.filter((candidate) => candidate !== agentId) });
   };
+  const updateOutputSlot = (slotIndex: 0 | 1, outputIds: string[]) => {
+    const nextOutputId = outputIds[0] ?? defaultPolicyOutputIds[slotIndex];
+    const nextOutputIds = [...outputSlotIds];
+    nextOutputIds[slotIndex] = nextOutputId;
+    onChange({ outputIds: normalizeActionOutputSlots(nextOutputIds) });
+  };
+  const outputOptionIds = config.outputs.map((output) => output.id);
 
   return (
     <FieldGroup>
@@ -105,13 +113,38 @@ export function ActionEditorFields({
       </Field>
       <Field>
         <FieldLabel>Outputs</FieldLabel>
-        <OutputSelector
-          value={selectedOutputIds}
-          initialOptions={config.outputs.map((output) => output.id)}
-          disabled={selectedAgentIds.length === 0}
-          onChange={(outputIds) => onChange({ outputIds })}
-          onCreateOption={onCreateOutput}
-        />
+        {selectedAgentIds.length === 0 ? (
+          <span className="text-sm text-muted-foreground">None</span>
+        ) : (
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <FieldLabel className="text-xs text-muted-foreground">Approval output</FieldLabel>
+              <OutputSelector
+                value={outputSlotIds[0] ? [outputSlotIds[0]] : []}
+                initialOptions={outputOptionIds}
+                blockedOptions={outputSlotIds[1] ? [outputSlotIds[1]] : []}
+                max={1}
+                replaceWhenFull
+                openButtonLabel="Change approval output"
+                onChange={(outputIds) => updateOutputSlot(0, outputIds)}
+                onCreateOption={onCreateOutput}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <FieldLabel className="text-xs text-muted-foreground">Rework output</FieldLabel>
+              <OutputSelector
+                value={outputSlotIds[1] ? [outputSlotIds[1]] : []}
+                initialOptions={outputOptionIds}
+                blockedOptions={outputSlotIds[0] ? [outputSlotIds[0]] : []}
+                max={1}
+                replaceWhenFull
+                openButtonLabel="Change rework output"
+                onChange={(outputIds) => updateOutputSlot(1, outputIds)}
+                onCreateOption={onCreateOutput}
+              />
+            </div>
+          </div>
+        )}
       </Field>
     </FieldGroup>
   );

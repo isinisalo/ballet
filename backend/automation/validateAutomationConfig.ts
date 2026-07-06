@@ -8,7 +8,11 @@ import {
   type AutomationFieldLimit
 } from "../../shared/api/automationValidation.js";
 import {
+  actionOutputSlotCount,
+  actionOutputSlotKind,
+  defaultProjectOutputs,
   normalizePolicyOutputEventType,
+  normalizePolicyToken,
   policyEventTypesForActions
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
@@ -118,6 +122,10 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
     id: isRecord(runtime) ? stringValue(runtime.id) : "",
     path: `runtimes[${index}].id`
   }));
+  const outputIds = context.rawOutputs.map((output, index) => ({
+    id: isRecord(output) ? normalizePolicyToken(stringValue(output.id)) : "",
+    path: `outputs[${index}].id`
+  }));
   const workflowIds = context.rawWorkflows.map((workflow, index) => ({
     id: isRecord(workflow) ? stringValue(workflow.id) : "",
     path: `workflows[${index}].id`
@@ -126,7 +134,7 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
   addUniqueIssues(issues, policyIds, "policy");
   addUniqueIssues(issues, normalized.triggers.map((trigger, index) => ({ id: trigger.id, path: `triggers[${index}].id` })), "trigger");
   addUniqueIssues(issues, normalized.actions.map((action, index) => ({ id: action.id, path: `actions[${index}].id` })), "action");
-  addUniqueIssues(issues, normalized.outputs.map((output, index) => ({ id: output.id, path: `outputs[${index}].id` })), "output");
+  addUniqueIssues(issues, outputIds.length > 0 ? outputIds : normalized.outputs.map((output, index) => ({ id: output.id, path: `outputs[${index}].id` })), "output");
   addUniqueIssues(issues, runtimeIds, "runtime");
   addUniqueIssues(issues, workflowIds, "workflow");
 };
@@ -134,8 +142,12 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
 const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): ValidationContext => {
   const normalized = normalizeProjectAutomationConfig(input, agents);
   const rawPolicies = Array.isArray(input.policies) ? input.policies : [];
+  const rawOutputs = Array.isArray(input.outputs) ? input.outputs : [];
   const rawPolicyIds = rawPolicies
     .map((policy) => isRecord(policy) ? stringValue(policy.id) : "")
+    .filter(Boolean);
+  const configuredOutputIds = (rawOutputs.length > 0 ? rawOutputs : defaultProjectOutputs())
+    .map((output) => isRecord(output) ? normalizePolicyToken(stringValue(output.id)) : "")
     .filter(Boolean);
   const generatedEventIds = policyEventTypesForActions(normalized.actions, normalized.outputs);
   const policyIds = normalized.policies.map((policy) => policy.id).filter(Boolean);
@@ -143,19 +155,36 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     input,
     rawTriggers: Array.isArray(input.triggers) ? input.triggers : [],
     rawActions: Array.isArray(input.actions) ? input.actions : [],
-    rawOutputs: Array.isArray(input.outputs) ? input.outputs : [],
+    rawOutputs,
     rawPolicies,
     rawWorkflows: Array.isArray(input.workflows) ? input.workflows : [],
     rawRuntimes: Array.isArray(input.runtimes) ? input.runtimes : [],
     eventIdSet: new Set(generatedEventIds),
     triggerIdSet: new Set(normalized.triggers.map((trigger) => trigger.id)),
     actionIdSet: new Set(normalized.actions.map((action) => action.id)),
-    outputIdSet: new Set(normalized.outputs.map((output) => output.id)),
+    outputIdSet: new Set(configuredOutputIds),
     policyIdSet: new Set([...policyIds, ...rawPolicyIds]),
     agentIdSet: new Set(agents.map((agent) => agent.id)),
     normalizedPolicies: normalized.policies,
     normalizedActions: normalized.actions
   };
+};
+
+const normalizedActionOutputIds = (action: Record<string, unknown>): string[] | undefined =>
+  Array.isArray(action.outputIds)
+    ? [...new Set(action.outputIds
+      .filter((outputId): outputId is string => typeof outputId === "string")
+      .map(normalizePolicyToken)
+      .filter(Boolean))]
+    : undefined;
+
+const legacyCompatibleOutputIds = (outputIds: string[]): boolean => {
+  const slotKinds = new Set(outputIds.map(actionOutputSlotKind).filter(Boolean));
+  if (outputIds.length === 1) return Boolean(actionOutputSlotKind(outputIds[0] ?? ""));
+  return outputIds.length > actionOutputSlotCount &&
+    outputIds.every((outputId) => Boolean(actionOutputSlotKind(outputId))) &&
+    slotKinds.has("approval") &&
+    slotKinds.has("rework");
 };
 
 const validateTrigger = (trigger: unknown, index: number, issues: ProjectAutomationIssue[]) => {
@@ -200,21 +229,25 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
     });
   }
   const normalizedOutputIds = context.normalizedActions[index]?.outputIds ?? [];
+  const rawNormalizedOutputIds = normalizedActionOutputIds(action);
   const normalizedAgentIds = context.normalizedActions[index]?.agentIds ?? [];
-  if (normalizedAgentIds.length === 0 && normalizedOutputIds.length > 0) {
+  if (normalizedAgentIds.length === 0 && (rawNormalizedOutputIds ?? normalizedOutputIds).length > 0) {
     issues.push({ path: `${base}.outputIds`, message: "Action without agents cannot select outputs." });
   }
-  if (normalizedAgentIds.length > 0 && normalizedOutputIds.length < 1) {
-    issues.push({ path: `${base}.outputIds`, message: "Action must select at least 1 output." });
-  }
-  if (normalizedOutputIds.length > 3) {
-    issues.push({ path: `${base}.outputIds`, message: "Action can select at most 3 outputs." });
+  if (
+    normalizedAgentIds.length > 0 &&
+    rawNormalizedOutputIds &&
+    rawNormalizedOutputIds.length !== actionOutputSlotCount &&
+    !legacyCompatibleOutputIds(rawNormalizedOutputIds)
+  ) {
+    issues.push({ path: `${base}.outputIds`, message: "Action must define exactly 2 outputs: approval and rework." });
   }
   const seen = new Set<string>();
-  normalizedOutputIds.forEach((outputId, outputIndex) => {
+  const outputIdsToValidate = rawNormalizedOutputIds ?? normalizedOutputIds;
+  outputIdsToValidate.forEach((outputId, outputIndex) => {
     if (seen.has(outputId)) issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Duplicate action output id: ${outputId}.` });
     seen.add(outputId);
-    if (!context.outputIdSet.has(outputId)) {
+    if (!context.outputIdSet.has(outputId) && !actionOutputSlotKind(outputId)) {
       issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Action references unknown output: ${outputId}.` });
     }
   });

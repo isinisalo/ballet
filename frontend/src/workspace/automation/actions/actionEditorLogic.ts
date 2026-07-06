@@ -1,17 +1,23 @@
 import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { generatedPolicyId, policyOutputEventType } from "@shared/policy-actions";
+import { actionOutputSlotKind, generatedPolicyId, normalizeActionOutputSlots, policyOutputEventType } from "@shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
-import { uniqueOutputIds } from "../outputs/outputSelectorUtils";
 
 export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
   const normalized = {
     ...action,
     id: editablePolicyToken(action.id),
-    outputIds: uniqueOutputIds(action.outputIds, 3),
+    outputIds: normalizeActionOutputSlots(action.outputIds),
     agentIds: [...new Set(action.agentIds)].slice(0, 5)
   };
   if (normalized.agentIds.length === 0) normalized.outputIds = [];
   return normalized;
+};
+
+const previousOutputSlotIndex = (outputId: string, index: number): number | undefined => {
+  const slot = actionOutputSlotKind(outputId);
+  if (slot === "approval") return 0;
+  if (slot === "rework") return 1;
+  return index < 2 ? index : undefined;
 };
 
 export const nextConfigWithActionPatch = (
@@ -27,11 +33,14 @@ export const nextConfigWithActionPatch = (
   const previousId = previousAction.id;
   const nextActions = current.actions.map((action, index) => index === selectedIndex ? normalized : action);
   const eventIdMap = new Map<string, string>();
-  if (previousId !== normalized.id) {
-    previousAction.outputIds.forEach((outputId) => {
+  if (previousId !== normalized.id || previousAction.outputIds.join("\0") !== normalized.outputIds.join("\0")) {
+    previousAction.outputIds.forEach((outputId, outputIndex) => {
+      const slotIndex = previousOutputSlotIndex(outputId, outputIndex);
+      const nextOutputId = slotIndex === undefined ? undefined : normalized.outputIds[slotIndex];
+      if (!nextOutputId) return;
       eventIdMap.set(
         policyOutputEventType({ action: previousId }, outputId),
-        policyOutputEventType({ action: normalized.id }, outputId)
+        policyOutputEventType({ action: normalized.id }, nextOutputId)
       );
     });
   }

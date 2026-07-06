@@ -1,14 +1,14 @@
 import type { ProjectAction, ProjectPolicy } from "../../shared/domain/automation.js";
 import type { AgentOutcome, AgentOutputEventStatus, AgentRun } from "../../shared/domain/runtime.js";
-import { actionOutputIds, policyOutputEventType } from "../../shared/policy-actions.js";
+import { actionOutputIds, defaultPolicyOutputIds, policyOutputEventType } from "../../shared/policy-actions.js";
 
 const terminalRunStatuses = new Set(["completed", "failed", "blocked", "needs_input", "cancelled"]);
 
-const firstAllowedOutput = (
-  allowedOutputIds: string[],
-  preferred: string[],
-  fallback: string
-): AgentOutputEventStatus => preferred.find((outputId) => allowedOutputIds.includes(outputId)) ?? fallback;
+const approvalOutput = (allowedOutputIds: string[]): AgentOutputEventStatus =>
+  allowedOutputIds[0] ?? defaultPolicyOutputIds[0];
+
+const reworkOutput = (allowedOutputIds: string[]): AgentOutputEventStatus =>
+  allowedOutputIds[1] ?? defaultPolicyOutputIds[1];
 
 export const allPolicyRunsTerminal = (runs: AgentRun[]): boolean =>
   runs.length > 0 && runs.every((run) => terminalRunStatuses.has(run.status));
@@ -21,20 +21,16 @@ export const outcomeToOutputEventStatus = (
   const allowedOutputIds = actionOutputIds(actions, policy.action);
   switch (outcome.outcome) {
     case "failed":
-      return firstAllowedOutput(allowedOutputIds, ["failed"], "failed");
+      return reworkOutput(allowedOutputIds);
     case "blocked":
     case "needs_input":
-      return firstAllowedOutput(allowedOutputIds, ["blocked", "failed"], "blocked");
+      return reworkOutput(allowedOutputIds);
     case "changes_requested":
-      return firstAllowedOutput(allowedOutputIds, ["changes_requested", "rejected", "blocked"], "changes_requested");
+      return reworkOutput(allowedOutputIds);
     case "approved":
-      return firstAllowedOutput(allowedOutputIds, ["approved", "accepted", "complete", "completed"], "approved");
+      return approvalOutput(allowedOutputIds);
     case "ready":
-      return firstAllowedOutput(
-        allowedOutputIds,
-        policy.action === "deploy" ? ["deployed", "ready", "complete", "completed"] : ["ready", "complete", "completed"],
-        "ready"
-      );
+      return approvalOutput(allowedOutputIds);
   }
 };
 
@@ -46,22 +42,18 @@ export const aggregateActionOutputStatus = (
   const allowedOutputIds = actionOutputIds(actions, policy.action);
   const outcomes = runs.map((run) => run.outcome?.outcome).filter(Boolean);
   if (runs.some((run) => run.status === "failed" || run.status === "cancelled" || run.outcome?.outcome === "failed")) {
-    return firstAllowedOutput(allowedOutputIds, ["failed"], "failed");
+    return reworkOutput(allowedOutputIds);
   }
   if (runs.some((run) => run.status === "blocked" || run.status === "needs_input" || run.outcome?.outcome === "blocked" || run.outcome?.outcome === "needs_input")) {
-    return firstAllowedOutput(allowedOutputIds, ["blocked", "failed"], "blocked");
+    return reworkOutput(allowedOutputIds);
   }
   if (outcomes.includes("changes_requested")) {
-    return firstAllowedOutput(allowedOutputIds, ["changes_requested", "rejected", "blocked"], "changes_requested");
+    return reworkOutput(allowedOutputIds);
   }
   if (outcomes.length > 0 && outcomes.every((outcome) => outcome === "approved")) {
-    return firstAllowedOutput(allowedOutputIds, ["approved", "accepted", "complete", "completed"], "approved");
+    return approvalOutput(allowedOutputIds);
   }
-  return firstAllowedOutput(
-    allowedOutputIds,
-    policy.action === "deploy" ? ["deployed", "ready", "complete", "completed"] : ["ready", "complete", "completed"],
-    "ready"
-  );
+  return approvalOutput(allowedOutputIds);
 };
 
 export const actionOutputEventType = (

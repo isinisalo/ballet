@@ -103,9 +103,8 @@ describe("Markdown collection loading", () => {
       triggers: [],
       actions: [],
       outputs: [
-        { id: "ready" },
-        { id: "cancelled" },
-        { id: "warn" }
+        { id: "ok" },
+        { id: "rework" }
       ],
       policies: [],
       workflows: [],

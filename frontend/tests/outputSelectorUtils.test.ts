@@ -16,7 +16,7 @@ describe("output selector utilities", () => {
   it("validates output length and empty values", () => {
     expect(outputValidationMessage("")).toBe("Output id is required.");
     expect(outputValidationMessage("a")).toBe("Use at least 2 characters.");
-    expect(outputValidationMessage("abcdefghijklmnopqrs")).toBe("Use 18 characters or fewer.");
+    expect(outputValidationMessage("a".repeat(33))).toBe("Use 32 characters or fewer.");
     expect(outputValidationMessage("warm")).toBeUndefined();
   });
 
