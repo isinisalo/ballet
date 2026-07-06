@@ -15,6 +15,7 @@ export type WorkflowCanvasProps = {
   actionOptions: WorkflowCanvasOption[];
   draggedStepIndex: number | null;
   dragOverStepIndex: number | null;
+  selectedActionStepIndex: number | null;
   canvasHeight: number | null;
   isCanvasPanning: boolean;
   workflowCanvasRef: RefObject<HTMLDivElement>;
@@ -22,17 +23,17 @@ export type WorkflowCanvasProps = {
   canAddPolicyForEvent: (policy?: ProjectPolicy) => boolean;
   onStepPointerDown: (event: PointerEvent<HTMLDivElement>, index: number) => void;
   onStepPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
-  onStepPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
+  onStepPointerUp: (event: PointerEvent<HTMLDivElement>) => boolean;
   onStepPointerCancel: () => void;
   onCanvasMoveStart: () => void;
   onCanvasMoveEnd: () => void;
+  onActionSelectionClear: () => void;
   onPolicyChange: (index: number, policyId: string) => void;
-  onActionChange: (record: WorkflowStepRecord, action: string) => void;
-  onEditPolicy: (index: number) => void;
+  onActionStepSelect: (record: WorkflowStepRecord) => void;
   onAddPolicyStep: (eventType?: string, sourcePolicy?: ProjectPolicy) => void;
 };
 
-export type WorkflowNodeContext = Omit<WorkflowCanvasProps, "layout" | "canvasHeight" | "isCanvasPanning" | "workflowCanvasRef" | "onCanvasMoveStart" | "onCanvasMoveEnd">;
+export type WorkflowNodeContext = Omit<WorkflowCanvasProps, "layout" | "canvasHeight" | "isCanvasPanning" | "workflowCanvasRef" | "onCanvasMoveStart" | "onCanvasMoveEnd" | "onActionSelectionClear">;
 
 export type WorkflowReactFlowNodeData = Record<string, unknown> & {
   layoutNode: WorkflowCanvasLayoutNode;

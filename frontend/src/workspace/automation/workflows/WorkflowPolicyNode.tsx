@@ -1,16 +1,14 @@
+import { useRef, type MouseEvent, type PointerEvent } from "react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { WorkflowStepRecord } from "./workflowGraph";
-import type { WorkflowCanvasLayoutNode } from "./workflowLayout";
 import type { WorkflowNodeContext } from "./WorkflowCanvasTypes";
 import { WorkflowPolicySummary } from "./WorkflowPolicySummary";
 
 export function WorkflowPolicyNode({
-  node,
   context,
   record
 }: {
-  node: WorkflowCanvasLayoutNode;
   context: WorkflowNodeContext;
   record: WorkflowStepRecord;
 }) {
@@ -19,10 +17,23 @@ export function WorkflowPolicyNode({
     context.draggedStepIndex === record.index && "opacity-60",
     context.dragOverStepIndex === record.index && context.draggedStepIndex !== record.index && "ring-2 ring-primary/20"
   );
+  const ignoreNextClickRef = useRef(false);
+  const selected = context.selectedActionStepIndex === record.index;
   const title = record.policy?.action || record.policyId || "No policy";
-  const openActionEditor = () => {
-    if (!record.policy) return;
-    context.onEditPolicy(record.index);
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    const shouldSelect = context.onStepPointerUp(event);
+    if (shouldSelect && record.policy) {
+      ignoreNextClickRef.current = true;
+      context.onActionStepSelect(record);
+    }
+  };
+  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    if (ignoreNextClickRef.current) {
+      ignoreNextClickRef.current = false;
+      return;
+    }
+    if (record.policy) context.onActionStepSelect(record);
   };
 
   return (
@@ -30,25 +41,25 @@ export function WorkflowPolicyNode({
       data-workflow-step-index={record.index}
       onPointerDown={(event) => context.onStepPointerDown(event, record.index)}
       onPointerMove={context.onStepPointerMove}
-      onPointerUp={context.onStepPointerUp}
+      onPointerUp={handlePointerUp}
       onPointerCancel={context.onStepPointerCancel}
+      onClick={handleClick}
       className={stepDragClass}
     >
       <div
         data-workflow-node
         aria-label={`Policy: ${record.policyId || "No policy"}`}
         title={title}
-        onClick={openActionEditor}
-        className="nodrag nopan flex h-[22px] w-full min-w-0 items-center gap-1 rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80"
+        className={cn(
+          "nodrag nopan flex h-[22px] w-full min-w-0 items-center gap-1 rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80",
+          selected && "border-primary/80 ring-2 ring-primary/20"
+        )}
       >
         <span className="shrink-0 text-foreground">then:</span>
         {record.policy ? (
           <WorkflowPolicySummary
             policy={record.policy}
-            editing={Boolean(node.isEditingPolicy)}
             actionOptions={context.actionOptions}
-            noSelectionValue={context.noSelectionValue}
-            onActionChange={(action) => context.onActionChange(record, action)}
           />
         ) : (
           <Select value={record.policyId || context.noSelectionValue} onValueChange={(value) => context.onPolicyChange(record.index, value === context.noSelectionValue ? "" : value)}>

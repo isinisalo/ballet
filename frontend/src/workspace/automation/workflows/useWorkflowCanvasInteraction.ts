@@ -8,6 +8,8 @@ export function useWorkflowCanvasInteraction({
   reorderStep: (fromIndex: number, toIndex: number) => void;
 }) {
   const draggedStepIndexRef = useRef<number | null>(null);
+  const dragStartPointRef = useRef<{ x: number; y: number } | null>(null);
+  const hasDraggedStepRef = useRef(false);
   const workflowCanvasRef = useRef<HTMLDivElement | null>(null);
   const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null);
   const [dragOverStepIndex, setDragOverStepIndex] = useState<number | null>(null);
@@ -38,6 +40,8 @@ export function useWorkflowCanvasInteraction({
 
   const resetStepDrag = () => {
     draggedStepIndexRef.current = null;
+    dragStartPointRef.current = null;
+    hasDraggedStepRef.current = false;
     setDraggedStepIndex(null);
     setDragOverStepIndex(null);
   };
@@ -54,6 +58,8 @@ export function useWorkflowCanvasInteraction({
     if (event.button !== 0) return;
     if (event.target instanceof Element && event.target.closest("button, input, select, textarea, [role='combobox']")) return;
     draggedStepIndexRef.current = index;
+    dragStartPointRef.current = { x: event.clientX, y: event.clientY };
+    hasDraggedStepRef.current = false;
     setDraggedStepIndex(index);
     setDragOverStepIndex(index);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -61,17 +67,23 @@ export function useWorkflowCanvasInteraction({
 
   const handleStepPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (draggedStepIndexRef.current === null) return;
+    const startPoint = dragStartPointRef.current;
+    if (startPoint && Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 4) {
+      hasDraggedStepRef.current = true;
+    }
     const targetIndex = stepIndexFromPoint(event);
     if (targetIndex !== null) setDragOverStepIndex(targetIndex);
   };
 
   const handleStepPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const fromIndex = draggedStepIndexRef.current;
-    if (fromIndex === null) return;
+    if (fromIndex === null) return false;
     const toIndex = stepIndexFromPoint(event) ?? dragOverStepIndex ?? fromIndex;
+    const shouldActivate = !hasDraggedStepRef.current && toIndex === fromIndex;
     reorderStep(fromIndex, toIndex);
     resetStepDrag();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    return shouldActivate;
   };
 
   const handleCanvasMoveStart = () => {

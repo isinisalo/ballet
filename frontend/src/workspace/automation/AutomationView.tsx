@@ -94,7 +94,7 @@ export function AutomationView({
                 <AutomationIssues issues={data.automationIssues} />
               </div>
             ) : null}
-            <WorkflowsAutomationTab config={draft} selectedId={selectedWorkflowId} createDraft={createDrafts.newWorkflow} onCreateDraftChange={createDrafts.updateNewWorkflow} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} />
+            <WorkflowsAutomationTab agents={data.agents} config={draft} selectedId={selectedWorkflowId} createDraft={createDrafts.newWorkflow} onCreateDraftChange={createDrafts.updateNewWorkflow} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} />
           </>
         ) : (
           <div className="grid gap-4">

@@ -42,7 +42,7 @@ function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNode
   if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(context);
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (!node.record) return null;
-  return <WorkflowPolicyNode node={node} context={context} record={node.record} />;
+  return <WorkflowPolicyNode context={context} record={node.record} />;
 }
 
 function renderTriggerNode(context: WorkflowNodeContext) {

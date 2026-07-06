@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
+  Agent,
+  ProjectAction,
   ProjectAutomationConfig,
   ProjectPolicy,
   ProjectWorkflow
@@ -7,9 +9,11 @@ import type {
 import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "../../../../../shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
+import { nextConfigWithActionPatch } from "../actions/actionEditorLogic";
 import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
+import { WorkflowActionSheet } from "./WorkflowActionSheet";
 import { buildWorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
 import { calculateWorkflowCanvasLayout } from "./workflowLayout";
 import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
@@ -17,21 +21,21 @@ import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
 const noSelection = "__none__";
 
 export function WorkflowsAutomationTab({
+  agents,
   config,
   selectedId,
   createDraft,
   onCreateDraftChange,
   onSelect,
-  updateConfig,
-  saveDraft
+  updateConfig
 }: {
+  agents: Agent[];
   config: ProjectAutomationConfig;
   selectedId?: string;
   createDraft: ProjectWorkflow;
   onCreateDraftChange: (patch: Partial<ProjectWorkflow>) => void;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
-  saveDraft: (nextDraft?: ProjectAutomationConfig) => Promise<boolean>;
 }) {
   const foundSelectedIndex = config.workflows.findIndex((workflow) => workflow.id === selectedId);
   const lastSelectedIndexRef = useRef<number | undefined>(foundSelectedIndex >= 0 ? foundSelectedIndex : undefined);
@@ -42,7 +46,7 @@ export function WorkflowsAutomationTab({
       : -1;
   const selected = selectedIndex >= 0 ? config.workflows[selectedIndex] : createDraft;
   const creating = selectedIndex < 0;
-  const [editingPolicyIndex, setEditingPolicyIndex] = useState<number | null>(null);
+  const [selectedActionStepIndex, setSelectedActionStepIndex] = useState<number | null>(null);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
   const actionOptions = [
@@ -76,13 +80,26 @@ export function WorkflowsAutomationTab({
   [config.actions, config.outputs, policyById, selected?.steps]);
   const workflowGraph = useMemo(() => buildWorkflowGraph(workflowStepRecords), [workflowStepRecords]);
   const workflowLayout = useMemo(
-    () => selected ? calculateWorkflowCanvasLayout({ workflowGraph, editingPolicyIndex, direction: "horizontal" }) : undefined,
-    [editingPolicyIndex, selected, workflowGraph]
+    () => selected ? calculateWorkflowCanvasLayout({ workflowGraph, editingPolicyIndex: null, direction: "horizontal" }) : undefined,
+    [selected, workflowGraph]
   );
+  const selectedActionRecord = selectedActionStepIndex === null ? undefined : workflowStepRecords.find((record) => record.index === selectedActionStepIndex);
+  const selectedAction = selectedActionRecord?.policy
+    ? config.actions.find((action) => action.id === selectedActionRecord.policy?.action)
+    : undefined;
 
   useEffect(() => {
     if (foundSelectedIndex >= 0) lastSelectedIndexRef.current = foundSelectedIndex;
   }, [foundSelectedIndex]);
+
+  useEffect(() => {
+    setSelectedActionStepIndex(null);
+  }, [selected?.id]);
+
+  useEffect(() => {
+    if (selectedActionStepIndex === null) return;
+    if (!selectedActionRecord?.policy || !selectedAction) setSelectedActionStepIndex(null);
+  }, [selectedAction, selectedActionRecord, selectedActionStepIndex]);
 
   const updateSelected = (patch: Partial<ProjectWorkflow>) => {
     if (!selected) return;
@@ -100,36 +117,6 @@ export function WorkflowsAutomationTab({
   const updateStep = (index: number, policyId: string) => {
     if (!selected) return;
     updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? policyId : step) });
-  };
-
-  const nextConfigWithWorkflowPolicy = (current: ProjectAutomationConfig, record: WorkflowStepRecord, patch: Partial<ProjectPolicy>) => {
-    if (!record.policy) return current;
-    const selectedPolicy = record.policy;
-    const next = { ...selectedPolicy, ...patch };
-    const source: ProjectPolicy["source"] = next.source === "trigger" ? "trigger" : "event";
-    const normalized = {
-      ...next,
-      source,
-      event: source === "event" ? next.event ?? "" : undefined,
-      trigger: source === "trigger" ? normalizePolicyToken(next.trigger ?? "") : undefined,
-      action: normalizePolicyToken(next.action)
-    };
-    const nextId = generatedPolicyId(normalized);
-
-    return {
-      ...current,
-      policies: current.policies.map((policy) => policy.id === selectedPolicy.id ? { ...normalized, id: nextId } : policy),
-      workflows: current.workflows.map((workflow) => ({
-        ...workflow,
-        steps: workflow.steps.map((step) => step === selectedPolicy.id ? nextId : step)
-      }))
-    };
-  };
-
-  const updateWorkflowPolicy = (record: WorkflowStepRecord, patch: Partial<ProjectPolicy>, { autoSave = false }: { autoSave?: boolean } = {}) => {
-    const nextConfig = nextConfigWithWorkflowPolicy(config, record, patch);
-    updateConfig(() => nextConfig);
-    if (autoSave) void saveDraft(nextConfig);
   };
 
   const addPolicyStep = (eventType?: string, sourcePolicy?: ProjectPolicy) => {
@@ -204,6 +191,19 @@ export function WorkflowsAutomationTab({
     const action = policy?.action || defaultAction;
     return Boolean(action && selectedActionOutputIds(action).length > 0);
   };
+  const clearActionSelection = () => setSelectedActionStepIndex(null);
+  const selectActionStep = (record: WorkflowStepRecord) => {
+    setSelectedActionStepIndex((current) => current === record.index ? null : record.index);
+  };
+  const updateSelectedAction = (patch: Partial<ProjectAction>) => {
+    if (!selectedAction) return;
+    updateConfig((current) => nextConfigWithActionPatch(current, selectedAction.id, patch).config);
+  };
+  const createOutput = (outputId: string) => {
+    const id = normalizePolicyToken(outputId);
+    if (!id || config.outputs.some((output) => normalizePolicyToken(output.id) === id)) return;
+    updateConfig((current) => ({ ...current, outputs: [...current.outputs, { id }] }));
+  };
 
   if (!selected || !workflowLayout) return <EmptyState title="No workflow selected." />;
 
@@ -219,30 +219,44 @@ export function WorkflowsAutomationTab({
   }
 
   return (
-    <WorkflowCanvas
-      layout={workflowLayout}
-      policyById={policyById}
-      firstPolicy={policyById.get(selected.steps[0] ?? "")}
-      noSelectionValue={noSelection}
-      policyOptions={policyOptions}
-      actionOptions={actionOptions}
-      draggedStepIndex={canvasInteraction.draggedStepIndex}
-      dragOverStepIndex={canvasInteraction.dragOverStepIndex}
-      canvasHeight={canvasInteraction.canvasHeight}
-      isCanvasPanning={canvasInteraction.isCanvasPanning}
-      workflowCanvasRef={canvasInteraction.workflowCanvasRef}
-      canAddFirstPolicy={canAddFirstPolicy}
-      canAddPolicyForEvent={canAddPolicyForEvent}
-      onStepPointerDown={canvasInteraction.handleStepPointerDown}
-      onStepPointerMove={canvasInteraction.handleStepPointerMove}
-      onStepPointerUp={canvasInteraction.handleStepPointerUp}
-      onStepPointerCancel={canvasInteraction.resetStepDrag}
-      onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
-      onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-      onPolicyChange={updateStep}
-      onActionChange={(record, action) => updateWorkflowPolicy(record, { action: action === noSelection ? "" : action }, { autoSave: true })}
-      onEditPolicy={setEditingPolicyIndex}
-      onAddPolicyStep={addPolicyStep}
-    />
+    <>
+      <WorkflowCanvas
+        layout={workflowLayout}
+        policyById={policyById}
+        firstPolicy={policyById.get(selected.steps[0] ?? "")}
+        noSelectionValue={noSelection}
+        policyOptions={policyOptions}
+        actionOptions={actionOptions}
+        draggedStepIndex={canvasInteraction.draggedStepIndex}
+        dragOverStepIndex={canvasInteraction.dragOverStepIndex}
+        selectedActionStepIndex={selectedActionStepIndex}
+        canvasHeight={canvasInteraction.canvasHeight}
+        isCanvasPanning={canvasInteraction.isCanvasPanning}
+        workflowCanvasRef={canvasInteraction.workflowCanvasRef}
+        canAddFirstPolicy={canAddFirstPolicy}
+        canAddPolicyForEvent={canAddPolicyForEvent}
+        onStepPointerDown={canvasInteraction.handleStepPointerDown}
+        onStepPointerMove={canvasInteraction.handleStepPointerMove}
+        onStepPointerUp={canvasInteraction.handleStepPointerUp}
+        onStepPointerCancel={canvasInteraction.resetStepDrag}
+        onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
+        onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
+        onActionSelectionClear={clearActionSelection}
+        onPolicyChange={updateStep}
+        onActionStepSelect={selectActionStep}
+        onAddPolicyStep={addPolicyStep}
+      />
+      <WorkflowActionSheet
+        open={Boolean(selectedAction)}
+        action={selectedAction}
+        agents={agents}
+        config={config}
+        onOpenChange={(open) => {
+          if (!open) clearActionSelection();
+        }}
+        onActionChange={updateSelectedAction}
+        onCreateOutput={createOutput}
+      />
+    </>
   );
 }

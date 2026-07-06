@@ -43,6 +43,7 @@ export function WorkflowCanvas({
   workflowCanvasRef,
   onCanvasMoveStart,
   onCanvasMoveEnd,
+  onActionSelectionClear,
   ...nodeContextProps
 }: WorkflowCanvasProps) {
   const nodeContext = useWorkflowNodeContext(nodeContextProps);
@@ -94,6 +95,7 @@ export function WorkflowCanvas({
         multiSelectionKeyCode={null}
         proOptions={{ hideAttribution: true }}
         onEdgeClick={handleEdgeClick}
+        onPaneClick={onActionSelectionClear}
         onMoveStart={onCanvasMoveStart}
         onMoveEnd={onCanvasMoveEnd}
       >
@@ -121,6 +123,7 @@ function useWorkflowNodeContext({
   actionOptions,
   draggedStepIndex,
   dragOverStepIndex,
+  selectedActionStepIndex,
   canAddFirstPolicy,
   canAddPolicyForEvent,
   onStepPointerDown,
@@ -128,8 +131,7 @@ function useWorkflowNodeContext({
   onStepPointerUp,
   onStepPointerCancel,
   onPolicyChange,
-  onActionChange,
-  onEditPolicy,
+  onActionStepSelect,
   onAddPolicyStep
 }: WorkflowNodeContext) {
   return useMemo<WorkflowNodeContext>(() => ({
@@ -140,6 +142,7 @@ function useWorkflowNodeContext({
     actionOptions,
     draggedStepIndex,
     dragOverStepIndex,
+    selectedActionStepIndex,
     canAddFirstPolicy,
     canAddPolicyForEvent,
     onStepPointerDown,
@@ -147,8 +150,7 @@ function useWorkflowNodeContext({
     onStepPointerUp,
     onStepPointerCancel,
     onPolicyChange,
-    onActionChange,
-    onEditPolicy,
+    onActionStepSelect,
     onAddPolicyStep
   }), [
     actionOptions,
@@ -158,16 +160,16 @@ function useWorkflowNodeContext({
     draggedStepIndex,
     firstPolicy,
     noSelectionValue,
-    onActionChange,
     onAddPolicyStep,
-    onEditPolicy,
+    onActionStepSelect,
     onPolicyChange,
     onStepPointerCancel,
     onStepPointerDown,
     onStepPointerMove,
     onStepPointerUp,
     policyById,
-    policyOptions
+    policyOptions,
+    selectedActionStepIndex
   ]);
 }
 
