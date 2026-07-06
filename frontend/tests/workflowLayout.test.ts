@@ -4,7 +4,8 @@ import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
 import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
-import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowNodeSizes, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
+import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
+import { positionWorkflowNodes } from "../src/workspace/automation/workflows/workflowLayoutPositioning";
 
 const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
   id,
@@ -38,6 +39,46 @@ const workflowTestRectsOverlap = (
   firstNode.x + firstNode.width > secondNode.x &&
   firstNode.y < secondNode.y + secondNode.height &&
   firstNode.y + firstNode.height > secondNode.y;
+
+describe("workflow layout helper modules", () => {
+  it("keeps exported node anchor and output handle calculations stable", () => {
+    expect(workflowCanvasNodeAnchorY({ kind: "trigger", height: 99 })).toBe(workflowCanvasLayoutConfig.triggerAnchorY);
+    expect(workflowCanvasNodeAnchorY({ kind: "policy", height: 99 })).toBe(workflowCanvasLayoutConfig.policyAnchorY);
+    expect(workflowCanvasNodeAnchorY({ kind: "output-event", height: 46 })).toBe(23);
+    expect(workflowOutputSourceHandleId()).toBe("right");
+    expect(workflowPolicyOutputHandleY(-1, 3)).toBe(workflowCanvasLayoutConfig.policyAnchorY);
+    expect(workflowPolicyOutputHandleY(99, 3)).toBe(workflowNodeSizes.policy.height - workflowCanvasLayoutConfig.edgePad / 2);
+  });
+
+  it("positions primary nodes through the extracted dagre layout helper", () => {
+    const nodes = positionWorkflowNodes([
+      {
+        key: "trigger",
+        kind: "trigger",
+        width: workflowNodeSizes.trigger.minWidth,
+        height: workflowNodeSizes.trigger.height,
+        direction: "horizontal"
+      },
+      {
+        key: "policy-0",
+        kind: "policy",
+        width: workflowNodeSizes.policy.minWidth,
+        height: workflowNodeSizes.policy.height,
+        direction: "horizontal"
+      }
+    ], [{ source: "trigger", target: "policy-0", label: "project.updated" }], "horizontal");
+
+    const triggerNode = nodes.find((node) => node.key === "trigger");
+    const policyNode = nodes.find((node) => node.key === "policy-0");
+
+    expect(triggerNode).toMatchObject({
+      x: workflowCanvasLayoutConfig.startX,
+      y: workflowCanvasLayoutConfig.startY
+    });
+    expect(policyNode?.x).toBeGreaterThan((triggerNode?.x ?? 0) + workflowNodeSizes.trigger.minWidth);
+    expect(policyNode?.y).toBe(triggerNode?.y);
+  });
+});
 
 describe("calculateWorkflowCanvasLayout", () => {
   it("uses selected action outputs as policy output events", () => {
