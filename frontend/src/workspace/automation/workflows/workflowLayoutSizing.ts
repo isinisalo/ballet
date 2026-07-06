@@ -29,7 +29,7 @@ export function workflowOutputEventNodeWidth() {
 }
 
 export function workflowPolicyNodeWidth(record: WorkflowStepRecord) {
-  return workflowOutputNodeWidth(`then: ${record.policy?.action || record.policyId || "No policy"}`, workflowNodeSizes.policy.minWidth, workflowNodeSizes.policy.maxWidth);
+  return workflowOutputNodeWidth(record.policy?.action || record.policyId || "No policy", workflowNodeSizes.policy.minWidth, workflowNodeSizes.policy.maxWidth);
 }
 
 export function workflowTriggerNodeWidth() {
@@ -80,8 +80,9 @@ function workflowOutputNodeWidth(value: string, minWidth: number, maxWidth: numb
 }
 
 function workflowEdgeLabelWidth(label: string) {
+  const renderedLabel = `on: ${label} then`;
   return Math.min(
     workflowEdgeLabelLayout.maxWidth,
-    workflowEdgeLabelLayout.paddingX + label.length * workflowEdgeLabelLayout.characterWidth
+    workflowEdgeLabelLayout.paddingX + renderedLabel.length * workflowEdgeLabelLayout.characterWidth
   );
 }

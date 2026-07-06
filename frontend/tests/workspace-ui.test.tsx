@@ -196,6 +196,8 @@ const noContent = () => new Response(null, { status: 204 });
 const slug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
 
 const workflowEdgeLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-workflow-edge-label=\"true\"]"));
+const workflowEdgeStartLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-workflow-edge-start-label=\"true\"]"));
+const workflowEdgeEndLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-workflow-edge-end-label=\"true\"]"));
 
 const workflowEdgeLabelTexts = () => workflowEdgeLabels()
   .map((label) => label.dataset.workflowEdgeLabelValue ?? label.textContent);
@@ -648,19 +650,41 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByText("type:")).not.toBeInTheDocument();
     const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
     expect(implementationPolicyNode.parentElement).toHaveClass("w-full");
-    expect(within(implementationPolicyNode).queryByText("on:")).not.toBeInTheDocument();
-    expect(within(implementationPolicyNode).getByText("then:")).toHaveClass("text-foreground");
+    expect(within(implementationPolicyNode).queryByText("on")).not.toBeInTheDocument();
+    expect(within(implementationPolicyNode).queryByText("then:")).not.toBeInTheDocument();
     expect(implementationPolicyNode.querySelector("svg")).not.toBeInTheDocument();
     expect(screen.queryByText("start:")).not.toBeInTheDocument();
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
     expect(within(implementationPolicyNode).getByText("implementation")).toHaveAttribute("title", "Implement work");
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
-    const implementationFailedEdgeLabel = workflowEdgeLabels().find((label) => label.dataset.workflowEdgeLabelValue === "failed");
+    const implementationFailedEdgeLabel = workflowEdgeLabels().find((label) =>
+      label.dataset.workflowEdgeLabelValue === "failed" &&
+      label.dataset.workflowEdgeTargetKind === "policy"
+    );
+    const implementationFailedStartLabel = workflowEdgeStartLabels().find((label) =>
+      label.dataset.workflowEdgeLabelValue === "failed" &&
+      label.dataset.workflowEdgeTargetKind === "policy"
+    );
+    const implementationFailedEndLabel = workflowEdgeEndLabels().find((label) =>
+      label.dataset.workflowEdgeLabelValue === "failed" &&
+      label.dataset.workflowEdgeTargetKind === "policy"
+    );
+    expect(implementationFailedStartLabel).toBeDefined();
+    expect(implementationFailedStartLabel).toHaveTextContent("on");
+    expect(implementationFailedStartLabel).toHaveAttribute("data-workflow-edge-label-value", "failed");
     expect(implementationFailedEdgeLabel).toBeDefined();
     expect(implementationFailedEdgeLabel).toHaveTextContent("failed");
-    expect(implementationFailedEdgeLabel).not.toHaveTextContent("on:");
+    expect(implementationFailedEdgeLabel).toHaveAttribute("data-workflow-edge-label-value", "failed");
+    expect(implementationFailedEndLabel).toBeDefined();
+    expect(implementationFailedEndLabel).toHaveTextContent("then");
+    expect(implementationFailedEndLabel).toHaveAttribute("data-workflow-edge-label-value", "failed");
     expect(implementationFailedEdgeLabel).not.toHaveTextContent("implementation.failed");
+    expect(implementationFailedStartLabel?.children[0]).toHaveTextContent("on");
+    expect(implementationFailedStartLabel?.children[0]).toHaveClass("text-foreground");
+    expect(implementationFailedEdgeLabel?.children[0]).toHaveTextContent("failed");
     expect(implementationFailedEdgeLabel?.children[0]).toHaveClass("text-primary");
+    expect(implementationFailedEndLabel?.children[0]).toHaveTextContent("then");
+    expect(implementationFailedEndLabel?.children[0]).toHaveClass("text-foreground");
     expect(await screen.findByText("complete")).toBeInTheDocument();
     expect(screen.queryByText("implementation.blocked")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
@@ -1123,6 +1147,10 @@ describe("workspace entity UI flows", () => {
     expect(outputEvent).toHaveTextContent("+ Action");
     expect(outputEvent).not.toHaveTextContent("implementation.failed");
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
+    expect(workflowEdgeEndLabels().some((label) =>
+      label.dataset.workflowEdgeLabelValue === "failed" &&
+      label.dataset.workflowEdgeTargetKind === "output-event"
+    )).toBe(false);
     expect(outputEvent.querySelector("svg")).not.toBeInTheDocument();
     expect(summaryOutputEvent).toBeInTheDocument();
     expect(summaryOutputEvent).not.toHaveTextContent("implementation.summary");
@@ -1375,8 +1403,16 @@ describe("workspace entity UI flows", () => {
       label.dataset.workflowEdgeLabelTone === "return" &&
       label.dataset.workflowEdgeLabelValue === "complete"
     );
+    const returnEdgeEndLabel = workflowEdgeEndLabels().find((label) =>
+      label.dataset.workflowEdgeLabelTone === "return" &&
+      label.dataset.workflowEdgeLabelValue === "complete"
+    );
     expect(returnEdgeLabel).toBeDefined();
     expect(returnEdgeLabel).toHaveTextContent("complete");
+    expect(returnEdgeLabel).toHaveAttribute("data-workflow-edge-label-value", "complete");
+    expect(returnEdgeEndLabel).toBeDefined();
+    expect(returnEdgeEndLabel).toHaveTextContent("then");
+    expect(returnEdgeEndLabel).toHaveAttribute("data-workflow-edge-label-value", "complete");
     expect(workflowEdgeLabels().some((label) =>
       Array.from(label.classList).some((className) => className === "border" || className.startsWith("border-"))
     )).toBe(false);

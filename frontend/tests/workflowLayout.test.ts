@@ -99,7 +99,7 @@ describe("workflow layout helper modules", () => {
 
     const policyNode = nodes.find((node) => node.key === "policy-0");
 
-    expect(policyNode?.x).toBeLessThan(260);
+    expect(policyNode?.x).toBeLessThan(300);
   });
 });
 

@@ -2,7 +2,7 @@ import type { WorkflowLayoutDirection } from "./workflowLayoutTypes";
 
 export const workflowNodeSizes = {
   trigger: { minWidth: 28, maxWidth: 28, height: 22 },
-  policy: { minWidth: 136, maxWidth: 220, height: 22 },
+  policy: { minWidth: 112, maxWidth: 188, height: 22 },
   event: { width: 240, height: 46 },
   outputEvent: { minWidth: 76, maxWidth: 120, height: 22, rowGap: 16 },
   action: { width: 28, height: 28 }
@@ -21,10 +21,10 @@ export const workflowCanvasLayoutConfig = {
 
 export const workflowEdgeLabelLayout = {
   minGap: 80,
-  maxWidth: 160,
-  paddingX: 12,
+  maxWidth: 180,
+  paddingX: 8,
   characterWidth: 6.25,
-  clearance: 24
+  clearance: 32
 };
 
 export const workflowAddActionGhostLabel = "+ Action";

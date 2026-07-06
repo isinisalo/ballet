@@ -19,12 +19,11 @@ export function WorkflowPolicyNode({
   const selected = context.selectedActionStepIndex === record.index;
   const title = record.policy?.action || record.policyId || "No policy";
   const nodeClassName = cn(
-    "nodrag nopan flex h-[22px] w-full min-w-0 items-center gap-1 rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80",
+    "nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80",
     selected && "border-primary/80 ring-2 ring-primary/20"
   );
   const content = (
     <>
-      <span className="shrink-0 text-foreground">then:</span>
       {record.policy ? (
         <WorkflowPolicySummary
           policy={record.policy}
