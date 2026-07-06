@@ -229,7 +229,10 @@ function workflowNodeHandles(layoutNode: WorkflowCanvasProps["layout"]["nodes"][
 
   if (activeHandleIdSet.has("left")) handles.push({ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 });
   if (activeHandleIdSet.has("right")) handles.push({ id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 });
-  if (activeHandleIdSet.has("top")) handles.push({ id: "top", type: "target", position: Position.Top, x: layoutNode.width / 2, y: 0, width: 1, height: 1 });
+  if (activeHandleIdSet.has("top")) {
+    handles.push({ id: "top", type: "source", position: Position.Top, x: layoutNode.width / 2, y: 0, width: 1, height: 1 });
+    handles.push({ id: "top", type: "target", position: Position.Top, x: layoutNode.width / 2, y: 0, width: 1, height: 1 });
+  }
   if (activeHandleIdSet.has("bottom")) handles.push({ id: "bottom", type: "source", position: Position.Bottom, x: layoutNode.width / 2, y: layoutNode.height, width: 1, height: 1 });
 
   return handles;

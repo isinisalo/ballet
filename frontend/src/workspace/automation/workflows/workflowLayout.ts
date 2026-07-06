@@ -57,6 +57,7 @@ function workflowReturnEdgesWithTargetHandles(
 
     return {
       ...edge,
+      sourceHandleId: "top",
       targetHandleId: sourceNode.y + sourceNode.height / 2 > targetNode.y + targetNode.height / 2 ? "bottom" : "top"
     };
   });

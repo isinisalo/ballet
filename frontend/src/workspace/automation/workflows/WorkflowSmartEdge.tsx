@@ -6,6 +6,7 @@ const workflowEdgeLabelClassName = "pointer-events-none absolute z-20 inline-fle
 const workflowEdgeLabelCenterRatio = 0.5;
 const workflowEdgeLabelSourceOffset = 4;
 const workflowEdgeLabelTargetOffset = 4;
+const workflowEdgeLabelVerticalOffset = 4;
 
 export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
   const { data, sourceX, sourceY, targetX, targetY } = props;
@@ -79,12 +80,14 @@ function workflowEdgeLabelTransforms({
   const flowLabelX = sourceX + (targetX - sourceX) * workflowEdgeLabelCenterRatio;
 
   return {
-    startLabelTransform: `translate(0, -50%) translate(${startLabelX}px, ${startLabelY}px)`,
+    startLabelTransform: isReturnEdge
+      ? `translate(-50%, -100%) translate(${startLabelX}px, ${startLabelY}px)`
+      : `translate(0, -50%) translate(${startLabelX}px, ${startLabelY}px)`,
     labelTransform: isReturnEdge
       ? `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`
       : `translate(-50%, -50%) translate(${flowLabelX}px, ${targetY}px)`,
     endLabelTransform: isReturnEdge
-      ? `translate(-50%, -50%) translate(${endLabelX}px, ${endLabelY}px)`
+      ? `translate(-50%, -100%) translate(${endLabelX}px, ${endLabelY}px)`
       : `translate(-100%, -50%) translate(${targetX - workflowEdgeLabelTargetOffset}px, ${targetY}px)`
   };
 }
@@ -169,22 +172,22 @@ export function workflowReturnEdgePath({ data, sourceX, sourceY, targetX, target
   const sourceNode = data?.sourceNode;
   const targetNode = data?.targetNode;
   const targetHandleId = data?.workflowEdge.targetHandleId;
-  const resolvedSourceX = sourceNode ? sourceNode.x + sourceNode.width : sourceX;
-  const resolvedSourceY = sourceNode ? sourceNode.y + sourceNode.height / 2 : sourceY;
+  const resolvedSourceX = sourceNode ? sourceNode.x + sourceNode.width / 2 : sourceX;
+  const resolvedSourceY = sourceNode ? sourceNode.y : sourceY;
   const resolvedTargetX = targetNode ? targetNode.x + targetNode.width / 2 : targetX;
   const resolvedTargetY = targetNode
     ? targetHandleId === "bottom" ? targetNode.y + targetNode.height : targetNode.y
     : targetY;
   const sourcePad = 28;
   const targetPad = 28;
-  const sourceExitX = resolvedSourceX + sourcePad;
+  const sourceExitY = resolvedSourceY - sourcePad;
   const targetEntryY = targetHandleId === "bottom" ? resolvedTargetY + targetPad : resolvedTargetY - targetPad;
-  const labelX = Math.min(sourceExitX, resolvedTargetX) + Math.abs(resolvedTargetX - sourceExitX) / 2;
+  const labelX = Math.min(resolvedSourceX, resolvedTargetX) + Math.abs(resolvedTargetX - resolvedSourceX) / 2;
   const labelY = targetEntryY;
-  const startLabelX = resolvedSourceX + workflowEdgeLabelSourceOffset;
-  const startLabelY = resolvedSourceY;
+  const startLabelX = resolvedSourceX;
+  const startLabelY = resolvedSourceY - workflowEdgeLabelVerticalOffset;
   const endLabelX = resolvedTargetX;
-  const endLabelY = targetEntryY;
+  const endLabelY = resolvedTargetY - workflowEdgeLabelVerticalOffset;
 
   return {
     startLabelX,
@@ -195,8 +198,8 @@ export function workflowReturnEdgePath({ data, sourceX, sourceY, targetX, target
     labelY,
     path: [
       `M ${resolvedSourceX},${resolvedSourceY}`,
-      `L ${sourceExitX},${resolvedSourceY}`,
-      `L ${sourceExitX},${targetEntryY}`,
+      `L ${resolvedSourceX},${sourceExitY}`,
+      `L ${resolvedSourceX},${targetEntryY}`,
       `L ${resolvedTargetX},${targetEntryY}`,
       `L ${resolvedTargetX},${resolvedTargetY}`
     ].join(" ")

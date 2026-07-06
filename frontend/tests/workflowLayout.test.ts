@@ -499,7 +499,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(returnEdge).toMatchObject({
       sourceNodeKey: "policy-1",
       targetNodeKey: "policy-0",
-      sourceHandleId: "right",
+      sourceHandleId: "top",
       targetHandleId: "top",
       tone: "return",
       eventType: "review.rejected",
@@ -586,12 +586,34 @@ describe("toWorkflowReactFlowEdges", () => {
       source: "policy-2",
       target: "policy-1",
       selected: false,
-      sourceX: 440,
-      sourceY: 131,
+      sourceX: 370,
+      sourceY: 120,
       targetX: 190,
       targetY: 40
     };
 
+    const topReturnPath = workflowReturnEdgePath({
+      ...baseProps,
+      targetY: topTargetNode.y,
+      data: {
+        workflowEdge: {
+          key: "event-policy-2-1-complete",
+          sourceNodeKey: "policy-2",
+          targetNodeKey: "policy-1",
+          sourceHandleId: "top",
+          targetHandleId: "top",
+          tone: "return"
+        },
+        sourceNode,
+        targetNode: topTargetNode
+      }
+    });
+
+    expect(topReturnPath.labelY).toBe(topTargetNode.y - 28);
+    expect(topReturnPath.startLabelX).toBe(sourceNode.x + sourceNode.width / 2);
+    expect(topReturnPath.startLabelY).toBe(sourceNode.y - 4);
+    expect(topReturnPath.endLabelX).toBe(topTargetNode.x + topTargetNode.width / 2);
+    expect(topReturnPath.endLabelY).toBe(topTargetNode.y - 4);
     expect(workflowReturnEdgePath({
       ...baseProps,
       targetY: topTargetNode.y,
@@ -600,13 +622,14 @@ describe("toWorkflowReactFlowEdges", () => {
           key: "event-policy-2-1-complete",
           sourceNodeKey: "policy-2",
           targetNodeKey: "policy-1",
+          sourceHandleId: "top",
           targetHandleId: "top",
           tone: "return"
         },
         sourceNode,
         targetNode: topTargetNode
       }
-    }).labelY).toBe(topTargetNode.y - 28);
+    }).path.startsWith(`M ${sourceNode.x + sourceNode.width / 2},${sourceNode.y}`)).toBe(true);
     expect(workflowReturnEdgePath({
       ...baseProps,
       targetY: bottomTargetNode.y + bottomTargetNode.height,
@@ -615,6 +638,7 @@ describe("toWorkflowReactFlowEdges", () => {
           key: "event-policy-2-1-complete",
           sourceNodeKey: "policy-2",
           targetNodeKey: "policy-1",
+          sourceHandleId: "top",
           targetHandleId: "bottom",
           tone: "return"
         },
@@ -629,7 +653,7 @@ describe("toWorkflowReactFlowEdges", () => {
       key: "event-policy-2-1-implementation.complete",
       sourceNodeKey: "policy-2",
       targetNodeKey: "policy-1",
-      sourceHandleId: "right",
+      sourceHandleId: "top",
       targetHandleId: "top",
       dashed: true,
       tone: "return",
@@ -642,7 +666,7 @@ describe("toWorkflowReactFlowEdges", () => {
       type: "workflowSmart",
       source: "policy-2",
       target: "policy-1",
-      sourceHandle: "right",
+      sourceHandle: "top",
       targetHandle: "top",
       selectable: false,
       focusable: false,

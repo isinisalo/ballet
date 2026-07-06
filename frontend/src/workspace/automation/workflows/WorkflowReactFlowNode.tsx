@@ -26,7 +26,12 @@ function WorkflowNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds:
     <>
       {activeHandleIdSet.has("left") ? <Handle id="left" type="target" position={Position.Left} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} /> : null}
       {activeHandleIdSet.has("right") ? <Handle id="right" type="source" position={Position.Right} isConnectable={false} className="workflow-react-flow-handle" style={{ top: anchorTop }} /> : null}
-      {activeHandleIdSet.has("top") ? <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: "50%" }} /> : null}
+      {activeHandleIdSet.has("top") ? (
+        <>
+          <Handle id="top" type="source" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: "50%" }} />
+          <Handle id="top" type="target" position={Position.Top} isConnectable={false} className="workflow-react-flow-handle" style={{ left: "50%" }} />
+        </>
+      ) : null}
       {activeHandleIdSet.has("bottom") ? <Handle id="bottom" type="source" position={Position.Bottom} isConnectable={false} className="workflow-react-flow-handle" style={{ left: "50%" }} /> : null}
     </>
   );
