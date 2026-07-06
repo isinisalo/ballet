@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Code2, Save } from "lucide-react";
-import type { AppData, ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
+import type { AppData, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import { runtimePath } from "../../routing";

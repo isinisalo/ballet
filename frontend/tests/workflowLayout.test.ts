@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectPolicy } from "../../shared/api/workspace-contracts";
-import { policyOutputEventTypes } from "../../shared/policy-actions";
+import type { ProjectPolicy } from "@shared/api/workspace-contracts";
+import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
 import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";

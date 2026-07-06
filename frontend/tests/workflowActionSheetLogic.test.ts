@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectAutomationConfig, ProjectPolicy } from "../../shared/api/workspace-contracts";
-import { generatedPolicyId } from "../../shared/policy-actions";
+import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
+import { generatedPolicyId } from "@shared/policy-actions";
 import { nextConfigWithWorkflowStepAction } from "../src/workspace/automation/workflows/workflowActionSheetLogic";
 
 const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({

@@ -1,4 +1,4 @@
-import type { MarkdownDocument, ProjectDocumentTreeNode } from "../../../../shared/api/workspace-contracts";
+import type { MarkdownDocument, ProjectDocumentTreeNode } from "@shared/api/workspace-contracts";
 import type { ProjectDocumentCreateKind } from "../types";
 
 export const projectTreeContainsPath = (nodes: ProjectDocumentTreeNode[], relativePath?: string): boolean =>

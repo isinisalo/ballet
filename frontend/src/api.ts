@@ -1,6 +1,6 @@
-import type { AppData, CollectionName } from "../../shared/api/workspace-contracts";
-import type { ProjectAutomationConfig } from "../../shared/api/workspace-contracts";
-import type { MarkdownDocument } from "../../shared/api/workspace-contracts";
+import type { AppData, CollectionName } from "@shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import type { MarkdownDocument } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
 
 type ErrorResponseBody = {

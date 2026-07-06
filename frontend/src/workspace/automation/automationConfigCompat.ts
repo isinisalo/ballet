@@ -1,5 +1,5 @@
-import { defaultProjectAutomationConfig, type ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
-import { defaultPolicyOutputIds, defaultProjectOutputs, normalizePolicyToken } from "../../../../shared/policy-actions";
+import { defaultProjectAutomationConfig, type ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { defaultPolicyOutputIds, defaultProjectOutputs, normalizePolicyToken } from "@shared/policy-actions";
 
 export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefined): ProjectAutomationConfig => {
   const defaults = defaultProjectAutomationConfig();

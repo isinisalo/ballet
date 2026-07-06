@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import type { ProjectAutomationConfig, ProjectTrigger } from "../../../../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig, ProjectTrigger } from "@shared/api/workspace-contracts";
 import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
-import { generatedPolicyId } from "../../../../../shared/policy-actions";
+import { generatedPolicyId } from "@shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 

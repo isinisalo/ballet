@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import type { AutomationTab } from "../../types";
 import type { WorkflowNameMode } from "./WorkflowHeaderNameEditor";
 

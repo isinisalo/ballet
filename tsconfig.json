@@ -2,7 +2,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./frontend/src/*"]
+      "@/*": ["./frontend/src/*"],
+      "@shared/*": ["./shared/*"]
     }
   },
   "files": [],

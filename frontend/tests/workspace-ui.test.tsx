@@ -1,11 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppData, MarkdownDocument, ProjectDocumentTreeNode } from "../../shared/api/workspace-contracts";
-import type { Agent } from "../../shared/api/workspace-contracts";
-import type { ProjectAutomationConfig } from "../../shared/api/workspace-contracts";
-import type { Skill } from "../../shared/api/workspace-contracts";
-import { policyOutputEventTypes } from "../../shared/policy-actions";
+import type { AppData, MarkdownDocument, ProjectDocumentTreeNode } from "@shared/api/workspace-contracts";
+import type { Agent } from "@shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import type { Skill } from "@shared/api/workspace-contracts";
+import { policyOutputEventTypes } from "@shared/policy-actions";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 
 const now = "2026-06-26T10:00:00.000Z";

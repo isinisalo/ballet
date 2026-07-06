@@ -1,5 +1,5 @@
 import { Route } from "lucide-react";
-import type { Agent, ProjectAutomationConfig, ProjectDocumentTreeNode, Skill } from "../../../../shared/api/workspace-contracts";
+import type { Agent, ProjectAutomationConfig, ProjectDocumentTreeNode, Skill } from "@shared/api/workspace-contracts";
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,

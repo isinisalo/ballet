@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import type { Agent, ProjectAction, ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
-import { normalizePolicyToken } from "../../../../../shared/policy-actions";
+import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { normalizePolicyToken } from "@shared/policy-actions";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { ActionEditorFields } from "./ActionEditorFields";
 import { nextConfigWithActionPatch, normalizeActionDraft } from "./actionEditorLogic";

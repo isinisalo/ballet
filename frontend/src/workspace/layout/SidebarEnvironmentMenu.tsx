@@ -1,5 +1,5 @@
 import { Bot, ChevronRight, Code2, FileKey2 } from "lucide-react";
-import type { Agent, ProjectRuntime, Skill } from "../../../../shared/api/workspace-contracts";
+import type { Agent, ProjectRuntime, Skill } from "@shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   SidebarMenuButton,

@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^@xyflow\/react$/, replacement: path.resolve(__dirname, "node_modules/@xyflow/react/dist/esm/index.mjs") },
+      { find: "@shared", replacement: path.resolve(__dirname, "shared") },
       { find: "@", replacement: path.resolve(__dirname, "frontend/src") }
     ]
   },

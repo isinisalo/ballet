@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { X } from "lucide-react";
-import type { Agent, ProjectAction, ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
+import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { defaultPolicyOutputIds } from "../../../../../shared/policy-actions";
+import { defaultPolicyOutputIds } from "@shared/policy-actions";
 import { OutputSelector } from "../outputs/OutputSelector";
 
 export function ActionEditorFields({

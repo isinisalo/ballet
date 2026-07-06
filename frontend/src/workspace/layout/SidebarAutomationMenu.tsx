@@ -1,5 +1,5 @@
 import { Activity, ChevronRight, FileKey2, Route, Zap, type LucideIcon } from "lucide-react";
-import type { ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   SidebarMenuButton,

@@ -1,4 +1,4 @@
-import { normalizePolicyToken } from "../../../../../shared/policy-actions";
+import { normalizePolicyToken } from "@shared/policy-actions";
 
 export type OutputId = string;
 

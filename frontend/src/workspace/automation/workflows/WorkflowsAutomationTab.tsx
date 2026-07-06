@@ -4,8 +4,8 @@ import type {
   ProjectAutomationConfig,
   ProjectPolicy,
   ProjectWorkflow
-} from "../../../../../shared/api/workspace-contracts";
-import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "../../../../../shared/policy-actions";
+} from "@shared/api/workspace-contracts";
+import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "@shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
 import { uniquePolicyAction } from "../automationUtils";

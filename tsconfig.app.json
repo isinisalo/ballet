@@ -15,7 +15,8 @@
     "moduleResolution": "Bundler",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./frontend/src/*"]
+      "@/*": ["./frontend/src/*"],
+      "@shared/*": ["./shared/*"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,

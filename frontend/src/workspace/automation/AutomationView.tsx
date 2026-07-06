@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Route, Save } from "lucide-react";
-import type { AppData, ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
+import type { AppData, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import type { AutomationTab } from "../types";

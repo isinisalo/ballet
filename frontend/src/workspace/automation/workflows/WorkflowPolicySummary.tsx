@@ -1,4 +1,4 @@
-import type { ProjectPolicy } from "../../../../../shared/api/workspace-contracts";
+import type { ProjectPolicy } from "@shared/api/workspace-contracts";
 
 export function WorkflowPolicySummary({
   policy,

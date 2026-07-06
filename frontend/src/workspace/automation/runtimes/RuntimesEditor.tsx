@@ -1,4 +1,4 @@
-import type { ProjectAutomationConfig, ProjectRuntime } from "../../../../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig, ProjectRuntime } from "@shared/api/workspace-contracts";
 import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
 import { editablePolicyToken } from "../automationUtils";

@@ -1,5 +1,5 @@
-import type { ProjectPolicy } from "../../../../../shared/api/workspace-contracts";
-import { policyOutputEventTypes } from "../../../../../shared/policy-actions";
+import type { ProjectPolicy } from "@shared/api/workspace-contracts";
+import { policyOutputEventTypes } from "@shared/policy-actions";
 
 export type WorkflowOutputTarget = {
   outputId: string;

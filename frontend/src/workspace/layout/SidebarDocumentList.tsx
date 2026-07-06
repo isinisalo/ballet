@@ -1,4 +1,4 @@
-import type { Agent, Skill } from "../../../../shared/api/workspace-contracts";
+import type { Agent, Skill } from "@shared/api/workspace-contracts";
 import {
   SidebarMenuSub
 } from "@/components/ui/sidebar";

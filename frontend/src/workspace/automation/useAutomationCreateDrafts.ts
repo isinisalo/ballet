@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { Agent, ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
+import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import type { AutomationTab } from "../types";
 import { editablePolicyToken } from "./automationUtils";
 

@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import type { Agent } from "../../../../shared/api/workspace-contracts";
-import type { Runtime } from "../../../../shared/api/workspace-contracts";
+import type { Agent } from "@shared/api/workspace-contracts";
+import type { Runtime } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
 import { agentTemplate, codexModelOptions, reasoningEffortOptions } from "./agentOptions";
 

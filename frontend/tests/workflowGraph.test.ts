@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectPolicy } from "../../shared/api/workspace-contracts";
+import type { ProjectPolicy } from "@shared/api/workspace-contracts";
 import { buildWorkflowGraph, workflowOutputEvents, workflowTriggerLabel } from "../src/workspace/automation/workflows/workflowGraph";
 
 const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({

@@ -1,6 +1,6 @@
 import { Bot, ChartNoAxesColumnIncreasing } from "lucide-react";
-import type { Agent } from "../../../../shared/api/workspace-contracts";
-import type { Runtime } from "../../../../shared/api/workspace-contracts";
+import type { Agent } from "@shared/api/workspace-contracts";
+import type { Runtime } from "@shared/api/workspace-contracts";
 import { CrudActions, ErrorPreview, Panel, TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

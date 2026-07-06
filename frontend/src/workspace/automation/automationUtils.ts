@@ -1,5 +1,5 @@
-import type { ProjectPolicy } from "../../../../shared/api/workspace-contracts";
-import { generatedPolicyId, normalizePolicyToken } from "../../../../shared/policy-actions";
+import type { ProjectPolicy } from "@shared/api/workspace-contracts";
+import { generatedPolicyId, normalizePolicyToken } from "@shared/policy-actions";
 
 const slugValue = (value: string, fallback: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
+import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { ensureAutomationConfig } from "./automationConfigCompat";
 
 export type AutomationConfigUpdater = (updater: (config: ProjectAutomationConfig) => ProjectAutomationConfig) => void;

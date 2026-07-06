@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
-import type { Skill } from "../../../../shared/api/workspace-contracts";
+import type { Skill } from "@shared/api/workspace-contracts";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmDialog } from "@/components/shared/workspace-ui";
 import { toErrorMessage } from "@/lib/errors";

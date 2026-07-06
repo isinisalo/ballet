@@ -1,5 +1,5 @@
-import type { ProjectAction, ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
-import { generatedPolicyId, policyOutputEventType } from "../../../../../shared/policy-actions";
+import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { generatedPolicyId, policyOutputEventType } from "@shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 import { uniqueOutputIds } from "../outputs/outputSelectorUtils";
 

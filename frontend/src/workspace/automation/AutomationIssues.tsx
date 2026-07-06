@@ -1,4 +1,4 @@
-import type { ProjectAutomationIssue } from "../../../../shared/api/workspace-contracts";
+import type { ProjectAutomationIssue } from "@shared/api/workspace-contracts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function AutomationIssues({ issues }: { issues: ProjectAutomationIssue[] }) {

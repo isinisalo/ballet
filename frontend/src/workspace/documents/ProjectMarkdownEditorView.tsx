@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import type { MarkdownDocument } from "../../../../shared/api/workspace-contracts";
+import type { MarkdownDocument } from "@shared/api/workspace-contracts";
 import { EmptyState } from "@/components/shared/workspace-ui";
 import { toErrorMessage } from "@/lib/errors";
 import { frontmatterToYaml, parseFrontmatterYaml } from "./frontmatter";

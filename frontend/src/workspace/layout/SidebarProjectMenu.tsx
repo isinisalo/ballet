@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { Archive, CheckCircle2, ChevronRight, FileText } from "lucide-react";
-import type { ProjectDocumentTreeNode } from "../../../../shared/api/workspace-contracts";
+import type { ProjectDocumentTreeNode } from "@shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   SidebarMenuButton,

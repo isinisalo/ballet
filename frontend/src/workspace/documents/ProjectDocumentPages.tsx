@@ -1,4 +1,4 @@
-import type { MarkdownDocument, Project } from "../../../../shared/api/workspace-contracts";
+import type { MarkdownDocument, Project } from "@shared/api/workspace-contracts";
 import { EmptyState } from "@/components/shared/workspace-ui";
 import { ProjectMarkdownEditorView } from "./ProjectMarkdownEditorView";
 import { type MarkdownEntity } from "./markdownDocument";

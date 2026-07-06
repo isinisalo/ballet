@@ -7,7 +7,7 @@ import {
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import type { ProjectDocumentTreeNode } from "../../../../shared/api/workspace-contracts";
+import type { ProjectDocumentTreeNode } from "@shared/api/workspace-contracts";
 import { projectDocumentPath } from "../routing";
 import { projectTreeContainsPath } from "../documents/projectDocuments";
 import { SidebarNavLinkItem } from "./SidebarNavLinkItem";

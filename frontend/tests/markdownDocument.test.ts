@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { frontmatterToYaml, parseFrontmatterYaml } from "../src/workspace/documents/frontmatter";
 import { documentTitle, markdownPreviewDocument, removeMatchingLeadingH1 } from "../src/workspace/documents/markdownDocument";
 import { findProjectTreeDirectory, selectedProjectTreeDocument } from "../src/workspace/documents/projectDocuments";
-import type { ProjectDocumentTreeNode } from "../../shared/api/workspace-contracts";
+import type { ProjectDocumentTreeNode } from "@shared/api/workspace-contracts";
 
 describe("frontmatter helpers", () => {
   it("stringifies and parses YAML mappings", () => {

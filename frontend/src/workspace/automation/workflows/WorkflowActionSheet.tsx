@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { Agent, ProjectAction, ProjectAutomationConfig } from "../../../../../shared/api/workspace-contracts";
+import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

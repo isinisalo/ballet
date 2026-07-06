@@ -1,5 +1,5 @@
-import type { ProjectAutomationConfig, ProjectPolicy } from "../../../../../shared/api/workspace-contracts";
-import { generatedPolicyId } from "../../../../../shared/policy-actions";
+import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
+import { generatedPolicyId } from "@shared/policy-actions";
 
 export const nextConfigWithWorkflowStepAction = (
   current: ProjectAutomationConfig,

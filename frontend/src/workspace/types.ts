@@ -1,4 +1,4 @@
-import { defaultProjectAutomationConfig, type AppData } from "../../../shared/api/workspace-contracts";
+import { defaultProjectAutomationConfig, type AppData } from "@shared/api/workspace-contracts";
 
 export type View =
   | "projects"

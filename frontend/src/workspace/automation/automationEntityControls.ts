@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { Agent, ProjectAutomationConfig } from "../../../../shared/api/workspace-contracts";
-import { defaultPolicyOutputIds } from "../../../../shared/policy-actions";
+import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { defaultPolicyOutputIds } from "@shared/policy-actions";
 import { automationSectionPath } from "../routing";
 import type { AutomationTab } from "../types";
 import { uniqueAutomationId } from "./automationUtils";

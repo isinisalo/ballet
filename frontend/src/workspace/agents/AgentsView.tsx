@@ -1,4 +1,4 @@
-import type { AppData, Agent, Runtime } from "../../../../shared/api/workspace-contracts";
+import type { AppData, Agent, Runtime } from "@shared/api/workspace-contracts";
 import { agentDocumentPath } from "../routing";
 import type { SaveCollection } from "../types";
 import { AgentEditor } from "./AgentEditor";
