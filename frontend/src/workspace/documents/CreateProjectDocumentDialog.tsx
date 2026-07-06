@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { TextField } from "@/components/shared/workspace-ui";
+import { toErrorMessage } from "@/lib/errors";
 import { projectDocumentCreateConfig } from "./projectDocuments";
 import type { ProjectDocumentCreateKind } from "../types";
 
@@ -44,8 +45,8 @@ export function CreateProjectDocumentDialog({
       if (!kind) return;
       await onCreate(kind, trimmedTitle);
       onOpenChange(false);
-    } catch {
-      // Async create failures are surfaced by the shared mutation notification layer.
+    } catch (caughtError) {
+      setError(toErrorMessage(caughtError, "Unable to create project document."));
     } finally {
       setPending(false);
     }

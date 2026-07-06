@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import type { MarkdownDocument } from "../../../../shared/api/workspace-contracts";
 import { EmptyState } from "@/components/shared/workspace-ui";
+import { toErrorMessage } from "@/lib/errors";
 import { frontmatterToYaml, parseFrontmatterYaml } from "./frontmatter";
 import { MarkdownWorkbench } from "./MarkdownWorkbench";
 import { type MarkdownEntity } from "./markdownDocument";
@@ -63,7 +64,7 @@ export function ProjectMarkdownEditorView({
         body: bodyText
       });
     } catch (err) {
-      setValidationError(err instanceof Error ? err.message : "Invalid project document.");
+      setValidationError(toErrorMessage(err, "Invalid project document."));
     }
   };
 

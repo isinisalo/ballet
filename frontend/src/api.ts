@@ -1,6 +1,22 @@
 import type { AppData, CollectionName } from "../../shared/api/workspace-contracts";
 import type { ProjectAutomationConfig } from "../../shared/api/workspace-contracts";
 import type { MarkdownDocument } from "../../shared/api/workspace-contracts";
+import { toErrorMessage } from "@/lib/errors";
+
+type ErrorResponseBody = {
+  error?: string;
+  issues?: Array<{ path?: string; message?: string }>;
+};
+
+const parseJsonBody = async <T,>(response: Response): Promise<T | undefined> => {
+  const text = await response.text();
+  if (!text.trim()) return undefined;
+  try {
+    return JSON.parse(text) as T;
+  } catch (error) {
+    throw new Error(`Request failed with ${response.status}: ${toErrorMessage(error, "Invalid error response.")}`);
+  }
+};
 
 const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {
@@ -9,7 +25,7 @@ const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string; issues?: Array<{ path?: string; message?: string }> };
+    const body = (await parseJsonBody<ErrorResponseBody>(response)) ?? {};
     const issueMessage = body.issues
       ?.map((issue) => [issue.path, issue.message].filter(Boolean).join(": "))
       .filter(Boolean)
@@ -18,7 +34,7 @@ const request = async <T>(url: string, init?: RequestInit): Promise<T> => {
   }
 
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  return (await parseJsonBody<T>(response)) as T;
 };
 
 export const api = {

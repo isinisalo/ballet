@@ -234,10 +234,18 @@ const updateProjectTreeDocument = (
   return undefined;
 };
 
-function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
+type InstallApiOptions = {
+  failNextSave?: boolean;
+  failNextDelete?: boolean;
+  saveFailureBody?: unknown;
+  deleteFailureBody?: unknown;
+};
+
+function installApi(data: AppData, options: InstallApiOptions = {}) {
   let agentCounter = data.agents.length + 1;
   let projectDocumentCounter = 1;
   let failNextSave = options.failNextSave ?? false;
+  let failNextDelete = options.failNextDelete ?? false;
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -247,7 +255,11 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
     if (url === "/api/data" && method === "GET") return jsonResponse(data);
     if (failNextSave && (method === "POST" || method === "PUT")) {
       failNextSave = false;
-      return jsonResponse({ error: "Injected save failure" }, { status: 500 });
+      return jsonResponse(options.saveFailureBody ?? { error: "Injected save failure" }, { status: 500 });
+    }
+    if (failNextDelete && method === "DELETE") {
+      failNextDelete = false;
+      return jsonResponse(options.deleteFailureBody ?? { error: "Injected delete failure" }, { status: 500 });
     }
 
     if (url === "/api/agents" && method === "POST") {
@@ -373,7 +385,7 @@ function installApi(data: AppData, options: { failNextSave?: boolean } = {}) {
   return { fetchMock, data };
 }
 
-async function renderRoute(path: string, data = baseData(), options?: { failNextSave?: boolean }) {
+async function renderRoute(path: string, data = baseData(), options?: InstallApiOptions) {
   cleanup();
   window.history.pushState({}, "", path);
   const api = installApi(data, options);
@@ -426,6 +438,22 @@ describe("workspace entity UI flows", () => {
 
     await confirmDelete(user, "Delete agent");
     await waitFor(() => expect(data.agents.some((agent) => agent.name === "Review Agent")).toBe(false));
+    expect(window.location.pathname).toBe("/agents");
+  });
+
+  it("keeps agent delete confirmation open when the delete request fails", async () => {
+    const user = userEvent.setup();
+    const data = baseData();
+    await renderRoute("/agents?path=.codex%2Fagents%2Fexisting-agent.toml", data, { failNextDelete: true });
+
+    await user.click(screen.getByRole("button", { name: "Delete agent" }));
+    const confirmDialog = screen.getByRole("dialog", { name: "Delete agent?" });
+    await user.click(within(confirmDialog).getByRole("button", { name: "Delete" }));
+
+    const dialogError = await within(confirmDialog).findByText("Injected delete failure");
+    expect(dialogError.closest("[role='alert']")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Delete agent?" })).toBeInTheDocument();
+    expect(data.agents.some((agent) => agent.id === "agent-1")).toBe(true);
     expect(window.location.pathname).toBe("/agents");
   });
 
@@ -1470,14 +1498,34 @@ describe("workspace entity UI flows", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save agent" }));
     await flushAsyncUpdates();
 
-    const message = screen.getByText("Injected save failure");
+    const notifications = screen.getByLabelText("Notifications");
+    const message = within(notifications).getByText("Injected save failure");
     expect(message.closest("ol")).toHaveAttribute("aria-label", "Notifications");
 
     act(() => {
       vi.advanceTimersByTime(8000);
     });
 
-    expect(screen.queryByText("Injected save failure")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Notifications")).not.toBeInTheDocument();
+    expect(screen.getByText("Injected save failure")).toBeInTheDocument();
+  });
+
+  it("surfaces API validation issues from failed saves", async () => {
+    const user = userEvent.setup();
+    await renderRoute("/agents", baseData(), {
+      failNextSave: true,
+      saveFailureBody: {
+        error: "Invalid agent",
+        issues: [{ path: "name", message: "Agent name already exists." }]
+      }
+    });
+
+    await user.type(screen.getByLabelText("Name"), "Existing Agent");
+    await user.type(screen.getByLabelText("Instructions"), "Try to save.");
+    fireEvent.click(screen.getByRole("button", { name: "Save agent" }));
+    await flushAsyncUpdates();
+
+    expect(screen.getAllByText("Invalid agent: name: Agent name already exists.").length).toBeGreaterThan(0);
   });
 
   it("shows successful saves as auto-dismissing floating notifications", async () => {
@@ -1510,7 +1558,8 @@ describe("workspace entity UI flows", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save agent" }));
     await flushAsyncUpdates();
 
-    const message = screen.getByText("Injected save failure");
+    const notifications = screen.getByLabelText("Notifications");
+    const message = within(notifications).getByText("Injected save failure");
     const notification = message.closest("li");
     expect(notification).not.toBeNull();
 
@@ -1521,9 +1570,10 @@ describe("workspace entity UI flows", () => {
       vi.advanceTimersByTime(8000);
     });
 
-    expect(screen.getByText("Injected save failure")).toBeInTheDocument();
+    expect(within(notifications).getByText("Injected save failure")).toBeInTheDocument();
     fireEvent.click(within(notification!).getByRole("button", { name: "Dismiss notification" }));
-    expect(screen.queryByText("Injected save failure")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Notifications")).not.toBeInTheDocument();
+    expect(screen.getByText("Injected save failure")).toBeInTheDocument();
   });
 
   it("keeps automation config issues inline", async () => {

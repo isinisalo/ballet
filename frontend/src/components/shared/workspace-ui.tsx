@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Archive, Plus, Save, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { toErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
 export const statusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
@@ -262,7 +263,7 @@ export function HeaderCrudActions({
   deleteType: string;
   resourceName?: string;
   canDelete: boolean;
-  onDelete: () => void | Promise<void>;
+  onDelete: () => unknown | Promise<unknown>;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -310,11 +311,32 @@ export function DeleteConfirmDialog({
   onOpenChange: (open: boolean) => void;
   deleteType: string;
   resourceName?: string;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: () => unknown | Promise<unknown>;
 }) {
   const trimmedResourceName = resourceName?.trim();
   const fallbackName = `this ${deleteType}`;
   const displayedName = trimmedResourceName || fallbackName;
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) return;
+    setPending(false);
+    setError("");
+  }, [open]);
+
+  const confirm = async () => {
+    setPending(true);
+    setError("");
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } catch (caughtError) {
+      setError(toErrorMessage(caughtError, `Unable to delete ${deleteType}.`));
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -332,10 +354,15 @@ export function DeleteConfirmDialog({
               Delete <span className="font-medium text-foreground">{displayedName}</span>? This action cannot be undone.
             </DialogPrimitive.Description>
           </div>
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
           <div className="flex items-center justify-end gap-2">
             <DialogPrimitive.Close
               render={
-                <Button type="button" variant="outline" className="cursor-pointer">
+                <Button type="button" variant="outline" className="cursor-pointer" disabled={pending}>
                   Cancel
                 </Button>
               }
@@ -344,11 +371,11 @@ export function DeleteConfirmDialog({
               type="button"
               variant="destructive"
               className="cursor-pointer"
+              disabled={pending}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                onOpenChange(false);
-                void Promise.resolve(onConfirm()).catch(() => undefined);
+                void confirm();
               }}
             >
               Delete
@@ -384,7 +411,7 @@ export function CrudActions({
   deleteType?: string;
   resourceName?: string;
   onNew: () => void;
-  onDelete: () => void | Promise<void>;
+  onDelete: () => unknown | Promise<unknown>;
   showNew?: boolean;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);

@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import type { Skill } from "../../../../shared/api/workspace-contracts";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmDialog } from "@/components/shared/workspace-ui";
+import { toErrorMessage } from "@/lib/errors";
 import { frontmatterToYaml, parseFrontmatterYaml } from "../documents/frontmatter";
 import { MarkdownWorkbench } from "../documents/MarkdownWorkbench";
 import { skillDocumentPath } from "../routing";
@@ -76,7 +77,7 @@ export function SkillsView({
       setValidationError("");
       if (saved.relativePath) navigate(skillDocumentPath(saved.relativePath));
     } catch (err) {
-      setValidationError(err instanceof Error ? err.message : "Invalid skill document.");
+      setValidationError(toErrorMessage(err, "Invalid skill document."));
     }
   };
 

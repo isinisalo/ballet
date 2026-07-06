@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import type { Agent } from "../../../../shared/api/workspace-contracts";
 import type { Runtime } from "../../../../shared/api/workspace-contracts";
+import { toErrorMessage } from "@/lib/errors";
 import { agentTemplate, codexModelOptions, reasoningEffortOptions } from "./agentOptions";
 
 export type SaveAgent = (collection: "agents", item: Partial<Agent>) => Promise<Agent>;
@@ -26,9 +27,11 @@ export function useAgentEditor({
   const formId = useId();
   const instructionsId = useId();
   const [form, setForm] = useState<Partial<Agent>>(agent ?? agentTemplate());
+  const [validationError, setValidationError] = useState("");
 
   useEffect(() => {
     setForm(agent ?? agentTemplate());
+    setValidationError("");
   }, [agent]);
 
   const frontmatterRuntime = typeof form.frontmatter?.runtime === "string" ? form.frontmatter.runtime : "";
@@ -54,13 +57,19 @@ export function useAgentEditor({
 
   const newAgent = () => {
     setForm(agentTemplate());
+    setValidationError("");
     onNew?.();
   };
 
   const submit = async () => {
+    setValidationError("");
+    const name = form.name?.trim();
+    if (!name) {
+      setValidationError("Agent name is required.");
+      return false;
+    }
+
     try {
-      const name = form.name?.trim();
-      if (!name) throw new Error("Agent name is required.");
       const saved = await save("agents", {
         ...form,
         name,
@@ -74,20 +83,24 @@ export function useAgentEditor({
       });
       setForm(saved);
       onSaved?.(saved);
-    } catch {
-      // Save failures are surfaced by the shared mutation notification layer.
+      return true;
+    } catch (error) {
+      setValidationError(toErrorMessage(error, "Unable to save agent."));
+      return false;
     }
   };
 
   const deleteAgent = async () => {
     if (!form.id) return;
     const deletedId = form.id;
+    setValidationError("");
     try {
       await remove("agents", deletedId);
       setForm(agentTemplate());
       onDeleted?.(deletedId);
-    } catch {
-      // Delete failures are surfaced by the shared mutation notification layer.
+    } catch (error) {
+      setValidationError(toErrorMessage(error, "Unable to delete agent."));
+      throw error;
     }
   };
 
@@ -101,6 +114,7 @@ export function useAgentEditor({
     modelOptions,
     reasoningValue,
     reasoningOptions,
+    validationError,
     saveDisabled: !form.name?.trim(),
     updateForm,
     updateRuntime,

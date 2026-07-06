@@ -11,7 +11,8 @@ export const getStoredThemeMode = (): ThemeMode => {
   try {
     const storedThemeMode = window.localStorage.getItem(THEME_STORAGE_KEY);
     return isThemeMode(storedThemeMode) ? storedThemeMode : DEFAULT_THEME_MODE;
-  } catch {
+  } catch (error) {
+    console.warn("Unable to read stored theme mode.", error);
     return DEFAULT_THEME_MODE;
   }
 };
@@ -19,8 +20,8 @@ export const getStoredThemeMode = (): ThemeMode => {
 export const persistThemeMode = (mode: ThemeMode) => {
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, mode);
-  } catch {
-    // Theme persistence is best-effort; applying the class still keeps the UI usable.
+  } catch (error) {
+    console.warn("Unable to persist theme mode.", error);
   }
 };
 

@@ -22,13 +22,9 @@ export function useAutomationDraft({
   };
 
   const saveDraft = async (nextDraft: ProjectAutomationConfig = draft) => {
-    try {
-      const saved = await saveAutomation(nextDraft);
-      setDraft(saved);
-      return true;
-    } catch {
-      return false;
-    }
+    const saved = await saveAutomation(nextDraft);
+    setDraft(saved);
+    return true;
   };
 
   return {

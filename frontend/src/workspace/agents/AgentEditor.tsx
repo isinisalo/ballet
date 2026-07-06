@@ -2,6 +2,7 @@ import { Bot, ChartNoAxesColumnIncreasing } from "lucide-react";
 import type { Agent } from "../../../../shared/api/workspace-contracts";
 import type { Runtime } from "../../../../shared/api/workspace-contracts";
 import { CrudActions, ErrorPreview, Panel, TextAreaField, TextField } from "@/components/shared/workspace-ui";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +32,11 @@ function AgentEditorActions({ editor }: { editor: AgentEditorState }) {
 export function AgentEditorContent({ editor, showNameField = true }: { editor: AgentEditorState; showNameField?: boolean }) {
   return (
     <div className="grid gap-3">
+      {editor.validationError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{editor.validationError}</AlertDescription>
+        </Alert>
+      ) : null}
       {editor.form.errors?.length ? <ErrorPreview errors={editor.form.errors} /> : null}
       <form id={editor.formId} className="grid gap-3" onSubmit={(event) => { event.preventDefault(); void editor.submit(); }}>
         <div className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
