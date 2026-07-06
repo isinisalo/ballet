@@ -52,8 +52,13 @@ export function WorkflowCanvas({
   const edges = useWorkflowEdges(layout.edges, layout.nodes, nodeContext, animatedEdgeId);
   const handleEdgeClick = useCallback<EdgeMouseHandler<WorkflowReactFlowEdge>>((event, edge) => {
     event.stopPropagation();
+    if (edge.data?.workflowEdge.route?.handlerStepIndex !== undefined) {
+      nodeContext.onOutputHandlerSelect(edge.data.workflowEdge);
+      setAnimatedEdgeId(edge.id);
+      return;
+    }
     setAnimatedEdgeId((currentEdgeId) => currentEdgeId === edge.id ? null : edge.id);
-  }, []);
+  }, [nodeContext]);
 
   useEffect(() => {
     if (!animatedEdgeId || layout.edges.some((edge) => edge.key === animatedEdgeId)) return;
@@ -130,6 +135,7 @@ function useWorkflowNodeContext({
   onStepPointerCancel,
   onPolicyChange,
   onActionStepSelect,
+  onOutputHandlerSelect,
   onAddPolicyStep
 }: WorkflowNodeContext) {
   return useMemo<WorkflowNodeContext>(() => ({
@@ -149,6 +155,7 @@ function useWorkflowNodeContext({
     onStepPointerCancel,
     onPolicyChange,
     onActionStepSelect,
+    onOutputHandlerSelect,
     onAddPolicyStep
   }), [
     actionOptions,
@@ -160,6 +167,7 @@ function useWorkflowNodeContext({
     noSelectionValue,
     onAddPolicyStep,
     onActionStepSelect,
+    onOutputHandlerSelect,
     onPolicyChange,
     onStepPointerCancel,
     onStepPointerDown,

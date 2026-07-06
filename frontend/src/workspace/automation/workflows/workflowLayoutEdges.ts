@@ -10,12 +10,24 @@ export type WorkflowCanvasEdge = {
   tone?: "return";
   eventType?: string;
   label?: string;
+  route?: WorkflowCanvasEdgeRoute;
+};
+
+export type WorkflowCanvasEdgeRoute = {
+  sourceStepIndex?: number;
+  handlerStepIndex?: number;
+  sourcePolicyId?: string;
+  handlerPolicyId?: string;
+  eventType?: string;
+  outputId?: string;
 };
 
 export type WorkflowHandledEventNode = {
   eventType: string;
+  outputId?: string;
   label?: string;
   sourceIndex: number;
+  sourcePolicyId?: string;
   sourceNodeKey: string;
   sourceHandleId?: string;
 };
@@ -35,7 +47,7 @@ export const workflowExistingHandlerEdges = ({
 }): WorkflowCanvasEdge[] => {
   const edges: WorkflowCanvasEdge[] = [];
 
-  handledEventNodes.forEach(({ eventType, label, sourceIndex, sourceNodeKey, sourceHandleId: eventSourceHandleId }) => {
+  handledEventNodes.forEach(({ eventType, outputId, label, sourceIndex, sourcePolicyId, sourceNodeKey, sourceHandleId: eventSourceHandleId }) => {
     const handlerRecords = workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [];
     handlerRecords.forEach((handlerRecord) => {
       if (handlerRecord.index === sourceIndex) return;
@@ -50,7 +62,15 @@ export const workflowExistingHandlerEdges = ({
         targetHandleId: isReturnEdge ? "top" : targetHandleId,
         tone: isReturnEdge ? "return" : undefined,
         eventType,
-        label: label ?? workflowEventOutputLabel(eventType)
+        label: label ?? workflowEventOutputLabel(eventType),
+        route: {
+          sourceStepIndex: sourceIndex,
+          handlerStepIndex: handlerRecord.index,
+          sourcePolicyId,
+          handlerPolicyId: handlerRecord.policyId,
+          eventType,
+          outputId
+        }
       });
     });
   });

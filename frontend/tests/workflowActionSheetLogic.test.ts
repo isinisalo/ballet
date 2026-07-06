@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
 import { generatedPolicyId } from "@shared/policy-actions";
 import {
+  nextConfigWithWorkflowHandlerAction,
   nextConfigWithWorkflowStepAction,
   nextConfigWithWorkflowStepActions,
   nextConfigWithoutWorkflowStepIndexes
@@ -102,5 +103,37 @@ describe("nextConfigWithWorkflowStepAction", () => {
 
     expect(next.policies).toBe(current.policies);
     expect(next.workflows[0]?.steps).toEqual([reviewPolicy.id]);
+  });
+
+  it("updates only the selected output handler route", () => {
+    const startPolicy = policy({ id: "start-build", source: "trigger", trigger: "manual-start", action: "build" });
+    const reviewPolicy = policy({ id: "review-ready", source: "event", event: "build.ready", action: "review" });
+    const reworkPolicy = policy({ id: "rework-build", source: "event", event: "review.changes-requested", action: "build" });
+    const current = config([startPolicy, reviewPolicy, reworkPolicy]);
+    const next = nextConfigWithWorkflowHandlerAction(current, "delivery", 2, "review");
+    const expectedReworkPolicyId = generatedPolicyId({ ...reworkPolicy, action: "review" });
+
+    expect(next).not.toBe(current);
+    expect(next.workflows[0]?.steps).toEqual([
+      startPolicy.id,
+      reviewPolicy.id,
+      expectedReworkPolicyId
+    ]);
+    expect(next.policies).toContainEqual({ ...reworkPolicy, id: expectedReworkPolicyId, action: "review" });
+  });
+
+  it("reuses an existing policy for the selected output handler route", () => {
+    const startPolicy = policy({ source: "trigger", trigger: "manual-start", action: "build" });
+    const reworkBuildPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
+    const reworkReviewPolicy = policy({ source: "event", event: "review.changes-requested", action: "review" });
+    const current = config([startPolicy, reworkBuildPolicy, reworkReviewPolicy]);
+    const next = nextConfigWithWorkflowHandlerAction(current, "delivery", 1, "review");
+
+    expect(next.policies).toBe(current.policies);
+    expect(next.workflows[0]?.steps).toEqual([
+      startPolicy.id,
+      reworkReviewPolicy.id,
+      reworkReviewPolicy.id
+    ]);
   });
 });

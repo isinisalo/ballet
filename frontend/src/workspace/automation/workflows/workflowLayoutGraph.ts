@@ -169,8 +169,10 @@ function collectOutputTasks(
 function addHandledEventNode(context: WorkflowLayoutGraphDraftContext, record: WorkflowStepRecord, output: WorkflowOutputTarget) {
   context.handledEventNodes.push({
     eventType: output.eventType,
+    outputId: output.outputId,
     label: workflowOutputEdgeLabel(output),
     sourceIndex: record.index,
+    sourcePolicyId: record.policyId,
     sourceNodeKey: `policy-${record.index}`,
     sourceHandleId: workflowOutputSourceHandleId()
   });
@@ -196,7 +198,15 @@ function addChildPolicyEdge(
       targetHandleId: isReturnEdge ? "top" : context.targetHandleId,
       tone: isReturnEdge ? "return" : undefined,
       eventType: output.eventType,
-      label: workflowOutputEdgeLabel(output)
+      label: workflowOutputEdgeLabel(output),
+      route: {
+        sourceStepIndex: record.index,
+        handlerStepIndex: childRecord.index,
+        sourcePolicyId: record.policyId,
+        handlerPolicyId: childRecord.policyId,
+        eventType: output.eventType,
+        outputId: output.outputId
+      }
     });
     return;
   }
@@ -214,6 +224,14 @@ function addChildPolicyEdge(
     sourceHandleId: workflowOutputSourceHandleId(),
     targetHandleId: context.targetHandleId,
     eventType: output.eventType,
-    label: workflowOutputEdgeLabel(output)
+    label: workflowOutputEdgeLabel(output),
+    route: {
+      sourceStepIndex: record.index,
+      handlerStepIndex: childRecord.index,
+      sourcePolicyId: record.policyId,
+      handlerPolicyId: childRecord.policyId,
+      eventType: output.eventType,
+      outputId: output.outputId
+    }
   });
 }

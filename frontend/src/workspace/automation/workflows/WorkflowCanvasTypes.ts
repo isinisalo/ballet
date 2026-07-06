@@ -29,6 +29,7 @@ export type WorkflowCanvasProps = {
   onCanvasMoveEnd: () => void;
   onPolicyChange: (index: number, policyId: string) => void;
   onActionStepSelect: (records: WorkflowStepRecord[]) => void;
+  onOutputHandlerSelect: (edge: WorkflowCanvasEdge) => void;
   onAddPolicyStep: (eventType?: string, sourcePolicy?: ProjectPolicy) => void;
 };
 

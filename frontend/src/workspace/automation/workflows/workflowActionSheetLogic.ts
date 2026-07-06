@@ -6,39 +6,30 @@ export const nextConfigWithWorkflowStepAction = (
   workflowId: string,
   stepIndex: number,
   actionId: string
-): ProjectAutomationConfig => nextConfigWithWorkflowStepActions(current, workflowId, [stepIndex], actionId);
+): ProjectAutomationConfig => nextConfigWithWorkflowHandlerAction(current, workflowId, stepIndex, actionId);
 
-export const nextConfigWithWorkflowStepActions = (
+export const nextConfigWithWorkflowHandlerAction = (
   current: ProjectAutomationConfig,
   workflowId: string,
-  stepIndexes: number[],
+  handlerStepIndex: number,
   actionId: string
 ): ProjectAutomationConfig => {
   const workflow = current.workflows.find((candidate) => candidate.id === workflowId);
   const targetAction = current.actions.find((action) => action.id === actionId);
-  const uniqueStepIndexes = [...new Set(stepIndexes)].sort((first, second) => first - second);
 
-  if (!workflow || !targetAction || uniqueStepIndexes.length === 0) return current;
+  if (!workflow || !targetAction || handlerStepIndex < 0 || handlerStepIndex >= workflow.steps.length) return current;
 
-  const policyIdsByStepIndex = new Map<number, string>();
-  let policies = current.policies;
+  const stepPolicyId = workflow.steps[handlerStepIndex];
+  const currentPolicy = stepPolicyId ? current.policies.find((policy) => policy.id === stepPolicyId) : undefined;
+  if (!currentPolicy || currentPolicy.action === actionId) return current;
 
-  uniqueStepIndexes.forEach((stepIndex) => {
-    const stepPolicyId = workflow.steps[stepIndex];
-    const currentPolicy = stepPolicyId ? current.policies.find((policy) => policy.id === stepPolicyId) : undefined;
-    if (!currentPolicy || currentPolicy.action === actionId) return;
-
-    const nextPolicy: ProjectPolicy = {
-      ...currentPolicy,
-      action: targetAction.id
-    };
-    const nextPolicyId = generatedPolicyId(nextPolicy);
-    const existingPolicy = policies.find((policy) => policy.id === nextPolicyId);
-    if (!existingPolicy) policies = [...policies, { ...nextPolicy, id: nextPolicyId }];
-    policyIdsByStepIndex.set(stepIndex, nextPolicyId);
-  });
-
-  if (policyIdsByStepIndex.size === 0) return current;
+  const nextPolicy: ProjectPolicy = {
+    ...currentPolicy,
+    action: targetAction.id
+  };
+  const nextPolicyId = generatedPolicyId(nextPolicy);
+  const existingPolicy = current.policies.find((policy) => policy.id === nextPolicyId);
+  const policies = existingPolicy ? current.policies : [...current.policies, { ...nextPolicy, id: nextPolicyId }];
 
   return {
     ...current,
@@ -46,10 +37,25 @@ export const nextConfigWithWorkflowStepActions = (
     workflows: current.workflows.map((candidate) => candidate.id === workflow.id
       ? {
         ...candidate,
-        steps: candidate.steps.map((step, index) => policyIdsByStepIndex.get(index) ?? step)
+        steps: candidate.steps.map((step, index) => index === handlerStepIndex ? nextPolicyId : step)
       }
       : candidate)
   };
+};
+
+export const nextConfigWithWorkflowStepActions = (
+  current: ProjectAutomationConfig,
+  workflowId: string,
+  stepIndexes: number[],
+  actionId: string
+): ProjectAutomationConfig => {
+  const uniqueStepIndexes = [...new Set(stepIndexes)].sort((first, second) => first - second);
+
+  if (uniqueStepIndexes.length === 0) return current;
+  return uniqueStepIndexes.reduce(
+    (nextConfig, stepIndex) => nextConfigWithWorkflowHandlerAction(nextConfig, workflowId, stepIndex, actionId),
+    current
+  );
 };
 
 export const nextConfigWithoutWorkflowStepIndexes = (
