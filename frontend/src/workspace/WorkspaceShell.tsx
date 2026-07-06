@@ -1,16 +1,6 @@
-import { useMemo } from "react";
 import { Menu } from "lucide-react";
-import {
-  findProjectTreeDirectory,
-  findProjectTreeDocument,
-  selectedProjectTreeDocument
-} from "./documents/projectDocuments";
 import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
 import { AppSidebar } from "./layout/AppSidebar";
-import { AgentsView } from "./agents/AgentsView";
-import { SkillsView } from "./skills/SkillsView";
-import { AutomationView } from "./automation/AutomationView";
-import { RuntimesView } from "./automation/runtimes/RuntimesView";
 import { ensureAutomationConfig } from "./automation/automationConfigCompat";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,66 +14,21 @@ import { useRuntimeStream } from "../app/useRuntimeStream";
 import { useWorkspaceData } from "./data/useWorkspaceData";
 import { useWorkspaceMutations } from "./data/useWorkspaceMutations";
 import { useRuntimeNotifications } from "./data/useRuntimeNotifications";
-import {
-  AdrsPage,
-  GoalsPage,
-  InstructionsPage,
-  ProjectDocumentPage,
-  ProjectsOverview
-} from "./documents/ProjectDocumentPages";
+import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
+import { useWorkspaceSelection } from "./selection/useWorkspaceSelection";
 
 export function WorkspaceShell() {
   const { notifications, notify } = useNotifications();
   const { route, navigate } = useWorkspaceNavigation();
   const { data, loading, refresh, selectedProjectId } = useWorkspaceData({ notify, routeProjectId: route.projectId });
-
-  const project = data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId)) ?? data.projects.find((item) => item.id === selectedProjectId) ?? data.projects[0];
-  const projectDocumentTree = data.projectDocumentTree ?? [];
-  const selectedProjectDocument = useMemo(
-    () => findProjectTreeDocument(projectDocumentTree, route.documentPath),
-    [projectDocumentTree, route.documentPath]
-  );
-  const adrDirectory = useMemo(
-    () => findProjectTreeDirectory(projectDocumentTree, ".ballet/adr"),
-    [projectDocumentTree]
-  );
-  const goalsDirectory = useMemo(
-    () => findProjectTreeDirectory(projectDocumentTree, ".ballet/goals"),
-    [projectDocumentTree]
-  );
-  const instructionsDirectory = useMemo(
-    () => findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions"),
-    [projectDocumentTree]
-  );
-  const selectedAdr = useMemo(
-    () => route.documentPath ? selectedProjectTreeDocument(adrDirectory, route.documentPath) : undefined,
-    [adrDirectory, route.documentPath]
-  );
-  const selectedGoal = useMemo(
-    () => route.documentPath ? selectedProjectTreeDocument(goalsDirectory, route.documentPath) : undefined,
-    [goalsDirectory, route.documentPath]
-  );
-  const selectedInstruction = useMemo(
-    () => route.documentPath ? selectedProjectTreeDocument(instructionsDirectory, route.documentPath) : undefined,
-    [instructionsDirectory, route.documentPath]
-  );
-  const selectedAgent = useMemo(
-    () => route.view === "agents" && !route.documentPath
-      ? undefined
-      : data.agents.find((agent) => agent.relativePath === route.documentPath) ?? data.agents[0],
-    [data.agents, route.documentPath, route.view]
-  );
-  const selectedSkill = useMemo(
-    () => route.documentPath ? data.skills.find((skill) => skill.relativePath === route.documentPath) : undefined,
-    [data.skills, route.documentPath]
-  );
+  const selection = useWorkspaceSelection({ data, route, selectedProjectId });
 
   const runtimeStreamStatus = useRuntimeStream(refresh);
   useRuntimeNotifications({ notifications, notify, runtimeStreamStatus });
-  const { save, saveProjectDocument, createProjectDocument, remove, saveAutomation } = useWorkspaceMutations({
+  const mutations = useWorkspaceMutations({
     notify,
     refresh,
-    project,
+    project: selection.project,
     navigate
   });
 
@@ -91,8 +36,8 @@ export function WorkspaceShell() {
       <SidebarProvider>
         <AppSidebar
           route={route}
-          projectId={project?.id}
-          projectDocumentTree={projectDocumentTree}
+          projectId={selection.project?.id}
+          projectDocumentTree={selection.projectDocumentTree}
           automation={ensureAutomationConfig(data.automation)}
           agents={data.agents}
           skills={data.skills}
@@ -111,20 +56,13 @@ export function WorkspaceShell() {
 
               {loading ? <Alert><AlertDescription>Loading workspace data...</AlertDescription></Alert> : null}
 
-              {route.view === "projects" ? (
-                <ProjectsOverview
-                  project={project}
-                  saveProjectDocument={saveProjectDocument}
-                />
-              ) : null}
-              {route.view === "project-document" ? <ProjectDocumentPage document={selectedProjectDocument} saveProjectDocument={saveProjectDocument} /> : null}
-              {route.view === "project-goals" ? <GoalsPage project={project} selectedGoal={selectedGoal} saveProjectDocument={saveProjectDocument} createProjectDocument={createProjectDocument} /> : null}
-              {route.view === "project-adrs" ? <AdrsPage project={project} selectedAdr={selectedAdr} saveProjectDocument={saveProjectDocument} createProjectDocument={createProjectDocument} /> : null}
-              {route.view === "project-instructions" ? <InstructionsPage project={project} selectedInstruction={selectedInstruction} saveProjectDocument={saveProjectDocument} createProjectDocument={createProjectDocument} /> : null}
-              {route.view === "automation" ? <AutomationView data={data} activeTab={route.automationTab ?? "workflows"} selectedId={route.automationEntityId} saveAutomation={saveAutomation} navigate={navigate} /> : null}
-              {route.view === "runtimes" ? <RuntimesView data={data} selectedId={route.runtimeId} saveAutomation={saveAutomation} navigate={navigate} /> : null}
-              {route.view === "agents" ? <AgentsView agent={selectedAgent} runtimes={data.runtimes} save={save} remove={remove} navigate={navigate} /> : null}
-              {route.view === "skills" ? <SkillsView skill={selectedSkill} save={save} remove={remove} navigate={navigate} /> : null}
+              <WorkspaceRouteOutlet
+                route={route}
+                data={data}
+                selection={selection}
+                mutations={mutations}
+                navigate={navigate}
+              />
             </main>
           </ScrollArea>
         </SidebarInset>
