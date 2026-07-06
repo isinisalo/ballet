@@ -1,38 +1,29 @@
-import { workflowOutputEvents, type WorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
 import {
-  workflowExistingHandlerEdges,
-  workflowEventOutputLabel,
-  type WorkflowCanvasEdge,
-  type WorkflowHandledEventNode
-} from "./workflowLayoutEdges";
-import { workflowDirectionHandles, workflowNodeSizes } from "./workflowLayoutConfig";
+  workflowCanonicalRecord,
+  workflowFoldedOutputTargets,
+  workflowFoldedRecords,
+  type WorkflowGraph,
+  type WorkflowOutputTarget,
+  type WorkflowStepRecord
+} from "./workflowGraph";
+import { workflowExistingHandlerEdges } from "./workflowLayoutEdges";
+import { workflowDirectionHandles } from "./workflowLayoutConfig";
 import {
-  workflowOutputEventNodeWidth,
-  workflowOutputSourceHandleId,
-  workflowPolicyNodeWidth,
-  workflowTriggerNodeWidth
+  addCanvasEdge,
+  addDagreEdge,
+  addFirstPolicyGhost,
+  addOutputEventNode,
+  addPolicyNode,
+  addTriggerNode,
+  workflowOutputEdgeLabel,
+  workflowPolicyInputEdgeLabel,
+  type WorkflowLayoutGraphDraft,
+  type WorkflowLayoutGraphDraftContext
+} from "./workflowLayoutGraphDraft";
+import {
+  workflowOutputSourceHandleId
 } from "./workflowLayoutSizing";
-import type { WorkflowActiveOutputTask, WorkflowCanvasLayoutNodeDraft, WorkflowDagreEdge, WorkflowLayoutDirection } from "./workflowLayoutTypes";
-
-type WorkflowLayoutGraphDraft = {
-  nodes: WorkflowCanvasLayoutNodeDraft[];
-  dagreEdges: WorkflowDagreEdge[];
-  canvasEdges: WorkflowCanvasEdge[];
-};
-
-type WorkflowLayoutGraphDraftContext = {
-  workflowGraph: WorkflowGraph;
-  editingPolicyIndex: number | null;
-  direction: WorkflowLayoutDirection;
-  sourceHandleId: string;
-  targetHandleId: string;
-  nodeDrafts: Map<string, WorkflowCanvasLayoutNodeDraft>;
-  dagreEdges: WorkflowDagreEdge[];
-  canvasEdges: WorkflowCanvasEdge[];
-  edgeKeys: Set<string>;
-  policyNodeIndexes: Set<number>;
-  handledEventNodes: WorkflowHandledEventNode[];
-};
+import type { WorkflowActiveOutputTask, WorkflowLayoutDirection } from "./workflowLayoutTypes";
 
 export function buildWorkflowLayoutGraphDraft({
   workflowGraph,
@@ -79,88 +70,21 @@ export function buildWorkflowLayoutGraphDraft({
   };
 }
 
-function workflowPolicyInputEdgeLabel(record: WorkflowStepRecord) {
-  if (!record.policy) return undefined;
-  if (record.policy.source === "trigger") return record.policy.trigger || "Missing trigger";
-  return record.policy.event ? workflowEventOutputLabel(record.policy.event) : "Missing event";
-}
-
-function workflowOutputEdgeLabel(output: WorkflowOutputTarget) {
-  return output.outputId === output.eventType ? workflowEventOutputLabel(output.eventType) : output.outputId;
-}
-
-function addNode(context: WorkflowLayoutGraphDraftContext, node: WorkflowCanvasLayoutNodeDraft) {
-  if (context.nodeDrafts.has(node.key)) return;
-  context.nodeDrafts.set(node.key, node);
-}
-
-function addDagreEdge(context: WorkflowLayoutGraphDraftContext, edge: WorkflowDagreEdge) {
-  context.dagreEdges.push(edge);
-}
-
-function addCanvasEdge(context: WorkflowLayoutGraphDraftContext, edge: WorkflowCanvasEdge) {
-  if (context.edgeKeys.has(edge.key)) return;
-  context.edgeKeys.add(edge.key);
-  context.canvasEdges.push(edge);
-}
-
-function addPolicyNode(context: WorkflowLayoutGraphDraftContext, record: WorkflowStepRecord, outputHandleCount: number) {
-  const isEditingPolicy = context.editingPolicyIndex === record.index;
-  addNode(context, {
-    key: `policy-${record.index}`,
-    kind: "policy",
-    width: workflowPolicyNodeWidth(record),
-    height: workflowNodeSizes.policy.height,
-    direction: context.direction,
-    record,
-    isEditingPolicy,
-    outputHandleCount
-  });
-  context.policyNodeIndexes.add(record.index);
-}
-
-function addOutputEventNode(context: WorkflowLayoutGraphDraftContext, record: WorkflowStepRecord, output: WorkflowOutputTarget, outputIndex: number) {
-  const key = `output-event-${record.index}-${output.outputId}`;
-  addNode(context, {
-    key,
-    kind: "output-event",
-    width: workflowOutputEventNodeWidth(),
-    height: workflowNodeSizes.outputEvent.height,
-    direction: context.direction,
-    record,
-    outputEvent: {
-      outputId: output.outputId,
-      eventType: output.eventType,
-      outputType: output.type
-    },
-    sourcePolicyId: record.policyId,
-    outputIndex
-  });
-  addDagreEdge(context, { source: `policy-${record.index}`, target: key });
-  addCanvasEdge(context, {
-    key: `policy-output-event-${record.index}-${output.outputId}`,
-    sourceNodeKey: `policy-${record.index}`,
-    targetNodeKey: key,
-    sourceHandleId: workflowOutputSourceHandleId(),
-    targetHandleId: context.targetHandleId,
-    dashed: true,
-    eventType: output.eventType,
-    label: workflowOutputEdgeLabel(output)
-  });
-}
-
-function addTriggerNode(context: WorkflowLayoutGraphDraftContext) {
-  addNode(context, {
-    key: "trigger",
-    kind: "trigger",
-    width: workflowTriggerNodeWidth(),
-    height: workflowNodeSizes.trigger.height,
-    direction: context.direction
-  });
-}
-
 function addRootPolicyBranch(context: WorkflowLayoutGraphDraftContext, record: WorkflowStepRecord) {
-  layoutPolicyBranch(context, record);
+  const canonicalRecord = workflowCanonicalRecord(context.workflowGraph, record);
+  layoutPolicyBranch(context, canonicalRecord);
+  if (canonicalRecord.index !== record.index) {
+    addCanvasEdge(context, {
+      key: `trigger-policy-${record.index}`,
+      sourceNodeKey: "trigger",
+      targetNodeKey: `policy-${canonicalRecord.index}`,
+      sourceHandleId: context.sourceHandleId,
+      targetHandleId: context.targetHandleId,
+      dashed: !record.policy,
+      label: workflowPolicyInputEdgeLabel(record)
+    });
+    return;
+  }
   addDagreEdge(context, {
     source: "trigger",
     target: `policy-${record.index}`,
@@ -177,26 +101,9 @@ function addRootPolicyBranch(context: WorkflowLayoutGraphDraftContext, record: W
   });
 }
 
-function addFirstPolicyGhost(context: WorkflowLayoutGraphDraftContext) {
-  addNode(context, {
-    key: "first-policy-ghost",
-    kind: "first-policy-ghost",
-    width: workflowNodeSizes.event.width,
-    height: workflowNodeSizes.event.height,
-    direction: context.direction
-  });
-  addDagreEdge(context, { source: "trigger", target: "first-policy-ghost" });
-  addCanvasEdge(context, {
-    key: "trigger-first-policy",
-    sourceNodeKey: "trigger",
-    targetNodeKey: "first-policy-ghost",
-    sourceHandleId: context.sourceHandleId,
-    targetHandleId: context.targetHandleId,
-    dashed: true
-  });
-}
-
 function layoutPolicyBranch(context: WorkflowLayoutGraphDraftContext, record: WorkflowStepRecord, visitedPolicyIds = new Set<string>()) {
+  const canonicalRecord = workflowCanonicalRecord(context.workflowGraph, record);
+  if (canonicalRecord.index !== record.index) return;
   if (visitedPolicyIds.has(record.policyId)) return;
   const nextVisitedPolicyIds = new Set(visitedPolicyIds);
   const activeOutputTasks: WorkflowActiveOutputTask[] = [];
@@ -229,15 +136,14 @@ function collectOutputTasks(
   activeOutputTasks: WorkflowActiveOutputTask[],
   inactiveOutputTargets: WorkflowOutputTarget[]
 ) {
-  const recordOutputTargets = record.outputTargets ?? workflowOutputEvents(record).map((eventType) => ({
-    outputId: eventType,
-    eventType,
-    type: "event" as const
-  }));
+  const recordOutputTargets = workflowFoldedOutputTargets(context.workflowGraph, record);
+  const foldedRecords = workflowFoldedRecords(context.workflowGraph, record);
 
   recordOutputTargets.forEach((output) => {
     const { eventType } = output;
-    const childRecords = (context.workflowGraph.childRecordsByParentEvent.get(`${record.index}:${eventType}`) ?? [])
+    const childRecords = foldedRecords.flatMap((sourceRecord) =>
+      context.workflowGraph.childRecordsByParentEvent.get(`${sourceRecord.index}:${eventType}`) ?? []
+    )
       .filter((childRecord) => childRecord.policyId !== record.policyId && !nextVisitedPolicyIds.has(childRecord.policyId));
     const existingHandlerRecords = (context.workflowGraph.eventHandlerRecordsByEvent.get(eventType) ?? [])
       .filter((handlerRecord) => handlerRecord.index !== record.index);
@@ -277,6 +183,24 @@ function addChildPolicyEdge(
   childRecord: WorkflowStepRecord,
   nextVisitedPolicyIds: Set<string>
 ) {
+  const canonicalChildRecord = workflowCanonicalRecord(context.workflowGraph, childRecord);
+  const isFoldedChild = canonicalChildRecord.index !== childRecord.index;
+  if (isFoldedChild) {
+    const isReturnEdge = canonicalChildRecord.index <= record.index;
+    layoutPolicyBranch(context, canonicalChildRecord, nextVisitedPolicyIds);
+    addCanvasEdge(context, {
+      key: `policy-policy-${record.index}-${canonicalChildRecord.index}-${childRecord.index}-${output.eventType}`,
+      sourceNodeKey: `policy-${record.index}`,
+      targetNodeKey: `policy-${canonicalChildRecord.index}`,
+      sourceHandleId: workflowOutputSourceHandleId(),
+      targetHandleId: isReturnEdge ? "top" : context.targetHandleId,
+      tone: isReturnEdge ? "return" : undefined,
+      eventType: output.eventType,
+      label: workflowOutputEdgeLabel(output)
+    });
+    return;
+  }
+
   layoutPolicyBranch(context, childRecord, nextVisitedPolicyIds);
   addDagreEdge(context, {
     source: `policy-${record.index}`,

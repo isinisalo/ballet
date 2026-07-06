@@ -24,6 +24,7 @@ export type WorkflowCanvasLayoutNode = {
   height: number;
   direction: WorkflowLayoutDirection;
   record?: WorkflowStepRecord;
+  records?: WorkflowStepRecord[];
   eventType?: string;
   outputEvent?: WorkflowCanvasOutputEvent;
   sourcePolicyId?: string;

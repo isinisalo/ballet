@@ -15,7 +15,7 @@ export type WorkflowCanvasProps = {
   actionOptions: WorkflowCanvasOption[];
   draggedStepIndex: number | null;
   dragOverStepIndex: number | null;
-  selectedActionStepIndex: number | null;
+  selectedActionStepIndexes: number[];
   canvasHeight: number | null;
   isCanvasPanning: boolean;
   workflowCanvasRef: RefObject<HTMLDivElement>;
@@ -28,7 +28,7 @@ export type WorkflowCanvasProps = {
   onCanvasMoveStart: () => void;
   onCanvasMoveEnd: () => void;
   onPolicyChange: (index: number, policyId: string) => void;
-  onActionStepSelect: (record: WorkflowStepRecord) => void;
+  onActionStepSelect: (records: WorkflowStepRecord[]) => void;
   onAddPolicyStep: (eventType?: string, sourcePolicy?: ProjectPolicy) => void;
 };
 

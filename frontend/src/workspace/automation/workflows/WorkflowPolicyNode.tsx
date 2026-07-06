@@ -6,17 +6,22 @@ import { WorkflowPolicySummary } from "./WorkflowPolicySummary";
 
 export function WorkflowPolicyNode({
   context,
-  record
+  record,
+  records = [record]
 }: {
   context: WorkflowNodeContext;
   record: WorkflowStepRecord;
+  records?: WorkflowStepRecord[];
 }) {
+  const folded = records.length > 1;
   const stepDragClass = cn(
-    "w-full cursor-grab select-none active:cursor-grabbing",
-    context.draggedStepIndex === record.index && "opacity-60",
-    context.dragOverStepIndex === record.index && context.draggedStepIndex !== record.index && "ring-2 ring-primary/20"
+    "w-full select-none",
+    folded ? "cursor-default" : "cursor-grab active:cursor-grabbing",
+    !folded && context.draggedStepIndex === record.index && "opacity-60",
+    !folded && context.dragOverStepIndex === record.index && context.draggedStepIndex !== record.index && "ring-2 ring-primary/20"
   );
-  const selected = context.selectedActionStepIndex === record.index;
+  const selectedActionStepIndexSet = new Set(context.selectedActionStepIndexes);
+  const selected = records.some((candidate) => selectedActionStepIndexSet.has(candidate.index));
   const title = record.policy?.action || record.policyId || "No policy";
   const nodeClassName = cn(
     "nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80",
@@ -28,6 +33,7 @@ export function WorkflowPolicyNode({
         <WorkflowPolicySummary
           policy={record.policy}
           actionOptions={context.actionOptions}
+          count={records.length}
         />
       ) : (
         <Select value={record.policyId || context.noSelectionValue} onValueChange={(value) => context.onPolicyChange(record.index, value === context.noSelectionValue ? "" : value)}>
@@ -48,8 +54,8 @@ export function WorkflowPolicyNode({
 
   return (
     <div
-      data-workflow-step-index={record.index}
-      onPointerDown={(event) => context.onStepPointerDown(event, record.index)}
+      data-workflow-step-index={folded ? undefined : record.index}
+      onPointerDown={folded ? undefined : (event) => context.onStepPointerDown(event, record.index)}
       onPointerMove={context.onStepPointerMove}
       onPointerUp={context.onStepPointerUp}
       onPointerCancel={context.onStepPointerCancel}
@@ -64,7 +70,7 @@ export function WorkflowPolicyNode({
           className={cn(nodeClassName, "cursor-pointer")}
           onClick={(event) => {
             event.stopPropagation();
-            context.onActionStepSelect(record);
+            context.onActionStepSelect(records);
           }}
         >
           {content}

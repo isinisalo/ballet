@@ -13,7 +13,7 @@ import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { WorkflowActionSheet } from "./WorkflowActionSheet";
-import { nextConfigWithWorkflowStepAction } from "./workflowActionSheetLogic";
+import { nextConfigWithWorkflowStepActions, nextConfigWithoutWorkflowStepIndexes } from "./workflowActionSheetLogic";
 import { buildWorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
 import { calculateWorkflowCanvasLayout } from "./workflowLayout";
 import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
@@ -48,7 +48,7 @@ export function WorkflowsAutomationTab({
   const creating = selectedIndex < 0;
   const workflowIdError = selected ? automationTokenValidationMessage("Workflow ID", selected.id) : undefined;
   const titleError = selected ? automationStringValidationMessage("Title", selected.title, automationFieldLimits.name) : undefined;
-  const [selectedActionStepIndex, setSelectedActionStepIndex] = useState<number | null>(null);
+  const [selectedActionStepIndexes, setSelectedActionStepIndexes] = useState<number[]>([]);
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
   const actionOptions = [
@@ -85,7 +85,10 @@ export function WorkflowsAutomationTab({
     () => selected ? calculateWorkflowCanvasLayout({ workflowGraph, editingPolicyIndex: null, direction: "horizontal" }) : undefined,
     [selected, workflowGraph]
   );
-  const selectedActionRecord = selectedActionStepIndex === null ? undefined : workflowStepRecords.find((record) => record.index === selectedActionStepIndex);
+  const selectedActionRecords = selectedActionStepIndexes
+    .map((stepIndex) => workflowStepRecords.find((record) => record.index === stepIndex))
+    .filter((record): record is WorkflowStepRecord => Boolean(record));
+  const selectedActionRecord = selectedActionRecords[0];
   const selectedAction = selectedActionRecord?.policy
     ? config.actions.find((action) => action.id === selectedActionRecord.policy?.action)
     : undefined;
@@ -95,13 +98,15 @@ export function WorkflowsAutomationTab({
   }, [foundSelectedIndex]);
 
   useEffect(() => {
-    setSelectedActionStepIndex(null);
+    setSelectedActionStepIndexes([]);
   }, [selected?.id]);
 
   useEffect(() => {
-    if (selectedActionStepIndex === null) return;
-    if (!selectedActionRecord?.policy || !selectedAction) setSelectedActionStepIndex(null);
-  }, [selectedAction, selectedActionRecord, selectedActionStepIndex]);
+    if (selectedActionStepIndexes.length === 0) return;
+    if (selectedActionRecords.length !== selectedActionStepIndexes.length || !selectedActionRecord?.policy || !selectedAction) {
+      setSelectedActionStepIndexes([]);
+    }
+  }, [selectedAction, selectedActionRecord, selectedActionRecords.length, selectedActionStepIndexes]);
 
   const updateSelected = (patch: Partial<ProjectWorkflow>) => {
     if (!selected) return;
@@ -126,7 +131,7 @@ export function WorkflowsAutomationTab({
     const selectedPolicyIds = new Set(selected.steps);
     const addedStepIndex = selected.steps.length;
     const selectAddedOutputEventStep = () => {
-      if (eventType) setSelectedActionStepIndex(addedStepIndex);
+      if (eventType) setSelectedActionStepIndexes([addedStepIndex]);
     };
     const eventOutputId = eventType?.split(".").at(-1) ?? "";
     const isDoneEvent = normalizePolicyToken(eventOutputId) === "done";
@@ -190,9 +195,9 @@ export function WorkflowsAutomationTab({
   };
 
   const removeSelectedActionStep = () => {
-    if (!selected || selectedActionStepIndex === null) return;
-    updateSelected({ steps: selected.steps.filter((_, index) => index !== selectedActionStepIndex) });
-    setSelectedActionStepIndex(null);
+    if (!selected || selectedActionStepIndexes.length === 0) return;
+    updateConfig((current) => nextConfigWithoutWorkflowStepIndexes(current, selected.id, selectedActionStepIndexes));
+    setSelectedActionStepIndexes([]);
   };
 
   const canvasInteraction = useWorkflowCanvasInteraction({
@@ -205,14 +210,14 @@ export function WorkflowsAutomationTab({
     const action = policy?.action || defaultAction;
     return Boolean(action && selectedActionOutputIds(action).length > 0);
   };
-  const clearActionSelection = () => setSelectedActionStepIndex(null);
-  const selectActionStep = (record: WorkflowStepRecord) => {
-    setSelectedActionStepIndex(record.index);
+  const clearActionSelection = () => setSelectedActionStepIndexes([]);
+  const selectActionStep = (records: WorkflowStepRecord[]) => {
+    setSelectedActionStepIndexes(records.map((record) => record.index));
   };
 
   const updateSelectedActionStep = (actionId: string) => {
-    if (!selected || selectedActionStepIndex === null) return;
-    updateConfig((current) => nextConfigWithWorkflowStepAction(current, selected.id, selectedActionStepIndex, actionId));
+    if (!selected || selectedActionStepIndexes.length === 0) return;
+    updateConfig((current) => nextConfigWithWorkflowStepActions(current, selected.id, selectedActionStepIndexes, actionId));
   };
 
   if (!selected || !workflowLayout) return <EmptyState title="No workflow selected." />;
@@ -255,7 +260,7 @@ export function WorkflowsAutomationTab({
         actionOptions={actionOptions}
         draggedStepIndex={canvasInteraction.draggedStepIndex}
         dragOverStepIndex={canvasInteraction.dragOverStepIndex}
-        selectedActionStepIndex={selectedActionStepIndex}
+        selectedActionStepIndexes={selectedActionStepIndexes}
         canvasHeight={canvasInteraction.canvasHeight}
         isCanvasPanning={canvasInteraction.isCanvasPanning}
         workflowCanvasRef={canvasInteraction.workflowCanvasRef}

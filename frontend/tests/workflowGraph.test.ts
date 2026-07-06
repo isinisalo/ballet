@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectPolicy } from "@shared/api/workspace-contracts";
-import { buildWorkflowGraph, workflowOutputEvents, workflowTriggerLabel } from "../src/workspace/automation/workflows/workflowGraph";
+import { buildWorkflowGraph, workflowFoldedRecords, workflowOutputEvents, workflowTriggerLabel } from "../src/workspace/automation/workflows/workflowGraph";
 
 const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
   id: patch.id ?? "policy",
@@ -43,5 +43,24 @@ describe("workflow graph", () => {
     expect(workflowTriggerLabel(triggerPolicy)).toBe("manual-start");
     expect(workflowOutputEvents(undefined)).toEqual(["Missing policy"]);
     expect(buildWorkflowGraph([{ policyId: "orphan", index: 0 }]).rootRecords).toEqual([{ policyId: "orphan", index: 0 }]);
+  });
+
+  it("groups repeated policy records by action id for folded visualization", () => {
+    const first = policy({ id: "first-build", source: "trigger", trigger: "manual-start", event: undefined, action: "build" });
+    const review = policy({ id: "review", event: "build.ready", action: "review" });
+    const rework = policy({ id: "rework-build", event: "review.changes_requested", action: "build" });
+    const records = [
+      { policyId: first.id, index: 0, policy: first, outputEvents: ["build.ready"] },
+      { policyId: review.id, index: 1, policy: review, outputEvents: ["review.changes_requested"] },
+      { policyId: rework.id, index: 2, policy: rework, outputEvents: ["build.ready"] }
+    ];
+    const graph = buildWorkflowGraph(records);
+
+    expect(graph.actionFoldModel.canonicalIndexByRecordIndex.get(2)).toBe(0);
+    expect(graph.actionFoldModel.canonicalRecordByIndex.get(2)?.policyId).toBe("first-build");
+    expect(workflowFoldedRecords(graph, records[0]!).map((record) => record.policyId)).toEqual([
+      "first-build",
+      "rework-build"
+    ]);
   });
 });

@@ -121,7 +121,7 @@ function useWorkflowNodeContext({
   actionOptions,
   draggedStepIndex,
   dragOverStepIndex,
-  selectedActionStepIndex,
+  selectedActionStepIndexes,
   canAddFirstPolicy,
   canAddPolicyForEvent,
   onStepPointerDown,
@@ -140,7 +140,7 @@ function useWorkflowNodeContext({
     actionOptions,
     draggedStepIndex,
     dragOverStepIndex,
-    selectedActionStepIndex,
+    selectedActionStepIndexes,
     canAddFirstPolicy,
     canAddPolicyForEvent,
     onStepPointerDown,
@@ -167,7 +167,7 @@ function useWorkflowNodeContext({
     onStepPointerUp,
     policyById,
     policyOptions,
-    selectedActionStepIndex
+    selectedActionStepIndexes
   ]);
 }
 

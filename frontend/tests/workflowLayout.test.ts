@@ -480,20 +480,99 @@ describe("calculateWorkflowCanvasLayout", () => {
       editingPolicyIndex: null
     });
 
-    const repeatedHandlerEdge = layout.edges.find((edge) => edge.key === "event-policy-2-1-implement.completed");
+    const returnEdge = layout.edges.find((edge) => edge.key === "policy-policy-1-0-2-review.rejected");
+    const policyNodes = layout.nodes.filter((node) => node.kind === "policy");
+    const foldedImplementNode = layout.nodes.find((node) => node.key === "policy-0");
+    const reworkPolicyNode = layout.nodes.find((node) => node.key === "policy-2");
     const reworkOutputEventNodes = layout.nodes.filter((node) => node.kind === "output-event" && node.record?.index === 2);
 
-    expect(repeatedHandlerEdge).toBeDefined();
-    expect(repeatedHandlerEdge).toMatchObject({
-      sourceNodeKey: "policy-2",
-      targetNodeKey: "policy-1",
+    expect(policyNodes.map((node) => node.record?.policyId)).toEqual([
+      "developer-implement-initial",
+      "architect-review"
+    ]);
+    expect(foldedImplementNode?.records?.map((record) => record.policyId)).toEqual([
+      "developer-implement-initial",
+      "developer-implement-rework"
+    ]);
+    expect(reworkPolicyNode).toBeUndefined();
+    expect(returnEdge).toBeDefined();
+    expect(returnEdge).toMatchObject({
+      sourceNodeKey: "policy-1",
+      targetNodeKey: "policy-0",
       sourceHandleId: "right",
       targetHandleId: "top",
       tone: "return",
-      eventType: "implement.completed",
-      label: "completed"
+      eventType: "review.rejected",
+      label: "rejected"
     });
     expect(reworkOutputEventNodes).toHaveLength(0);
+  });
+
+  it("folds roadmap rework into the original create-roadmap node", () => {
+    const createRoadmap = policy("p05.on.project-brief-approved.create-roadmap", undefined, "create-roadmap");
+    createRoadmap.trigger = "project_brief_approved";
+    const challengeRoadmap = policy("p06.on.roadmap-ready.challenge-roadmap", "create-roadmap.ready", "challenge-roadmap");
+    const reworkRoadmap = policy("p07.on.roadmap-rework.create-roadmap", "challenge-roadmap.changes_requested", "create-roadmap");
+    const done = policy("p08.on.roadmap-approved.done", "challenge-roadmap.approved", "done");
+    const records: WorkflowStepRecord[] = [
+      {
+        policyId: createRoadmap.id,
+        index: 0,
+        policy: createRoadmap,
+        outputTargets: [
+          { outputId: "ready", eventType: "create-roadmap.ready", type: "event" },
+          { outputId: "blocked", eventType: "create-roadmap.blocked", type: "event" }
+        ]
+      },
+      {
+        policyId: challengeRoadmap.id,
+        index: 1,
+        policy: challengeRoadmap,
+        outputTargets: [
+          { outputId: "approved", eventType: "challenge-roadmap.approved", type: "event" },
+          { outputId: "changes_requested", eventType: "challenge-roadmap.changes_requested", type: "event" }
+        ]
+      },
+      {
+        policyId: reworkRoadmap.id,
+        index: 2,
+        policy: reworkRoadmap,
+        outputTargets: [
+          { outputId: "ready", eventType: "create-roadmap.ready", type: "event" },
+          { outputId: "blocked", eventType: "create-roadmap.blocked", type: "event" }
+        ]
+      },
+      {
+        policyId: done.id,
+        index: 3,
+        policy: done,
+        outputTargets: []
+      }
+    ];
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph(records),
+      editingPolicyIndex: null
+    });
+    const policyNodes = layout.nodes.filter((node) => node.kind === "policy");
+    const returnEdge = layout.edges.find((edge) => edge.eventType === "challenge-roadmap.changes_requested");
+
+    expect(policyNodes.map((node) => node.record?.policy?.action)).toEqual([
+      "create-roadmap",
+      "challenge-roadmap",
+      "done"
+    ]);
+    expect(layout.nodes.find((node) => node.key === "policy-2")).toBeUndefined();
+    expect(layout.nodes.filter((node) => node.kind === "output-event" && node.record?.index === 2)).toHaveLength(0);
+    expect(layout.nodes.find((node) => node.key === "policy-0")?.records?.map((record) => record.policyId)).toEqual([
+      "p05.on.project-brief-approved.create-roadmap",
+      "p07.on.roadmap-rework.create-roadmap"
+    ]);
+    expect(returnEdge).toMatchObject({
+      sourceNodeKey: "policy-1",
+      targetNodeKey: "policy-0",
+      tone: "return",
+      label: "changes_requested"
+    });
   });
 });
 

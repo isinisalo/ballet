@@ -717,6 +717,85 @@ describe("workspace entity UI flows", () => {
     });
   });
 
+  it("folds repeated workflow actions into one visible policy node", async () => {
+    const workflowData = baseData();
+    workflowData.automation.triggers = [{
+      id: "project_brief_approved",
+      description: "Project brief approved"
+    }];
+    workflowData.automation.outputs = [
+      { id: "ready" },
+      { id: "blocked" },
+      { id: "approved" },
+      { id: "changes_requested" }
+    ];
+    workflowData.automation.actions = [{
+      id: "create-roadmap",
+      description: "Create traceable delivery roadmap.",
+      outputIds: ["ready", "blocked"],
+      agentIds: ["agent-1"]
+    }, {
+      id: "challenge-roadmap",
+      description: "Challenge roadmap.",
+      outputIds: ["approved", "changes_requested"],
+      agentIds: ["agent-1"]
+    }, {
+      id: "done",
+      description: "Stop.",
+      outputIds: [],
+      agentIds: []
+    }];
+    workflowData.automation.policies = [{
+      id: "p05.on.project-brief-approved.create-roadmap",
+      source: "trigger",
+      trigger: "project_brief_approved",
+      action: "create-roadmap",
+      enabled: true
+    }, {
+      id: "p06.on.roadmap-ready.challenge-roadmap",
+      source: "event",
+      event: "create-roadmap.ready",
+      action: "challenge-roadmap",
+      enabled: true
+    }, {
+      id: "p07.on.roadmap-rework.create-roadmap",
+      source: "event",
+      event: "challenge-roadmap.changes_requested",
+      action: "create-roadmap",
+      enabled: true
+    }, {
+      id: "p08.on.roadmap-approved.done",
+      source: "event",
+      event: "challenge-roadmap.approved",
+      action: "done",
+      enabled: true
+    }];
+    workflowData.automation.workflows = [{
+      id: "roadmap-loop",
+      title: "Roadmap loop",
+      steps: workflowData.automation.policies.map((policy) => policy.id)
+    }];
+
+    await renderRoute("/automation/workflows?id=roadmap-loop", workflowData);
+
+    const createRoadmapNode = await screen.findByLabelText("Policy: p05.on.project-brief-approved.create-roadmap");
+    expect(createRoadmapNode).toBeInTheDocument();
+    expect(screen.queryByLabelText("Policy: p07.on.roadmap-rework.create-roadmap")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: p06.on.roadmap-ready.challenge-roadmap")).toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: p08.on.roadmap-approved.done")).toBeInTheDocument();
+    expect(within(createRoadmapNode).getByText("x2")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(document.querySelectorAll("[data-workflow-edge-tone=\"return\"]")).toHaveLength(1);
+    });
+    const returnEdgeLabel = workflowEdgeLabels().find((label) =>
+      label.dataset.workflowEdgeLabelTone === "return" &&
+      label.dataset.workflowEdgeLabelValue === "changes_requested"
+    );
+    expect(returnEdgeLabel).toBeDefined();
+    expect(returnEdgeLabel).toHaveTextContent("changes_requested");
+  });
+
   it("selects automation entities from the sidebar and stores query ids", async () => {
     const user = userEvent.setup();
     await renderRoute("/automation");
@@ -1329,7 +1408,10 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
 
     await user.click(await screen.findByRole("button", { name: "Add policy step for implementation.complete" }));
-    expect(screen.getByLabelText("Policy: on.implementation.complete.start.implementation")).toBeInTheDocument();
+    const foldedImplementationNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
+    expect(foldedImplementationNode).toBeInTheDocument();
+    expect(screen.queryByLabelText("Policy: on.implementation.complete.start.implementation")).not.toBeInTheDocument();
+    expect(within(foldedImplementationNode).getByText("x2")).toBeInTheDocument();
 
     expect(screen.queryByLabelText("Workflow policy source")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Workflow policy event")).not.toBeInTheDocument();
@@ -1339,7 +1421,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
     expectActionSelectValue("implementation");
     expect(screen.queryByLabelText("Workflow policy action")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Policy: on.implementation.complete.start.implementation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Action" })).not.toBeInTheDocument());
@@ -1424,7 +1506,8 @@ describe("workspace entity UI flows", () => {
     workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
 
     await renderRoute("/automation/workflows?id=workflow-1", workflowData);
-    await screen.findByLabelText("Policy: on.review.rejected.start.implementation");
+    await screen.findByLabelText("Policy: on.trigger.manual-start.start.implementation");
+    expect(screen.queryByLabelText("Policy: on.review.rejected.start.implementation")).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(document.querySelectorAll(".react-flow__edge-workflowSmart").length).toBeGreaterThan(0);
@@ -1434,8 +1517,8 @@ describe("workspace entity UI flows", () => {
     const connectionPoints = document.querySelectorAll(".workflow-react-flow-handle");
     expect(connectionPoints.length).toBeGreaterThan(0);
     expect(getComputedStyle(connectionPoints[0]!).opacity).toBe("1");
-    const returnSourcePolicyNode = screen.getByLabelText("Policy: on.review.rejected.start.implementation").closest(".react-flow__node");
-    const returnTargetPolicyNode = screen.getByLabelText("Policy: on.implementation.complete.start.review").closest(".react-flow__node");
+    const returnSourcePolicyNode = screen.getByLabelText("Policy: on.implementation.complete.start.review").closest(".react-flow__node");
+    const returnTargetPolicyNode = screen.getByLabelText("Policy: on.trigger.manual-start.start.implementation").closest(".react-flow__node");
     expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-right")).toHaveLength(1);
     expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-bottom")).toHaveLength(0);
     expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-top")).toHaveLength(0);
@@ -1453,18 +1536,18 @@ describe("workspace entity UI flows", () => {
     });
     const returnEdgeLabel = workflowEdgeLabels().find((label) =>
       label.dataset.workflowEdgeLabelTone === "return" &&
-      label.dataset.workflowEdgeLabelValue === "complete"
+      label.dataset.workflowEdgeLabelValue === "rejected"
     );
     const returnEdgeEndLabel = workflowEdgeEndLabels().find((label) =>
       label.dataset.workflowEdgeLabelTone === "return" &&
-      label.dataset.workflowEdgeLabelValue === "complete"
+      label.dataset.workflowEdgeLabelValue === "rejected"
     );
     expect(returnEdgeLabel).toBeDefined();
-    expect(returnEdgeLabel).toHaveTextContent("complete");
-    expect(returnEdgeLabel).toHaveAttribute("data-workflow-edge-label-value", "complete");
+    expect(returnEdgeLabel).toHaveTextContent("rejected");
+    expect(returnEdgeLabel).toHaveAttribute("data-workflow-edge-label-value", "rejected");
     expect(returnEdgeEndLabel).toBeDefined();
     expect(returnEdgeEndLabel).toHaveTextContent("then");
-    expect(returnEdgeEndLabel).toHaveAttribute("data-workflow-edge-label-value", "complete");
+    expect(returnEdgeEndLabel).toHaveAttribute("data-workflow-edge-label-value", "rejected");
     expect(workflowEdgeLabels().some((label) =>
       Array.from(label.classList).some((className) => className === "border" || className.startsWith("border-"))
     )).toBe(false);

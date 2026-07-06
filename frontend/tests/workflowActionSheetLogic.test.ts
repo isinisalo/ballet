@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
 import { generatedPolicyId } from "@shared/policy-actions";
-import { nextConfigWithWorkflowStepAction } from "../src/workspace/automation/workflows/workflowActionSheetLogic";
+import {
+  nextConfigWithWorkflowStepAction,
+  nextConfigWithWorkflowStepActions,
+  nextConfigWithoutWorkflowStepIndexes
+} from "../src/workspace/automation/workflows/workflowActionSheetLogic";
 
 const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
   id: patch.id ?? generatedPolicyId({
@@ -64,5 +68,39 @@ describe("nextConfigWithWorkflowStepAction", () => {
     expect(nextConfigWithWorkflowStepAction(current, "delivery", 5, "review")).toBe(current);
     expect(nextConfigWithWorkflowStepAction(current, "delivery", 0, "missing")).toBe(current);
     expect(nextConfigWithWorkflowStepAction(current, "delivery", 0, "build")).toBe(current);
+  });
+
+  it("creates replacement policies for every selected folded step", () => {
+    const startPolicy = policy({ source: "trigger", trigger: "manual-start", action: "build" });
+    const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
+    const reworkPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
+    const current = config([startPolicy, reviewPolicy, reworkPolicy]);
+    const next = nextConfigWithWorkflowStepActions(current, "delivery", [0, 2], "review");
+    const expectedStartPolicyId = generatedPolicyId({ ...startPolicy, action: "review" });
+    const expectedReworkPolicyId = generatedPolicyId({ ...reworkPolicy, action: "review" });
+
+    expect(next.policies).toEqual([
+      startPolicy,
+      reviewPolicy,
+      reworkPolicy,
+      { ...startPolicy, id: expectedStartPolicyId, action: "review" },
+      { ...reworkPolicy, id: expectedReworkPolicyId, action: "review" }
+    ]);
+    expect(next.workflows[0]?.steps).toEqual([
+      expectedStartPolicyId,
+      reviewPolicy.id,
+      expectedReworkPolicyId
+    ]);
+  });
+
+  it("removes every selected folded step from the workflow", () => {
+    const startPolicy = policy({ source: "trigger", trigger: "manual-start", action: "build" });
+    const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
+    const reworkPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
+    const current = config([startPolicy, reviewPolicy, reworkPolicy]);
+    const next = nextConfigWithoutWorkflowStepIndexes(current, "delivery", [0, 2]);
+
+    expect(next.policies).toBe(current.policies);
+    expect(next.workflows[0]?.steps).toEqual([reviewPolicy.id]);
   });
 });
