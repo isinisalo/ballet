@@ -121,7 +121,7 @@ const deleteEntityConfig = (
         label: "Delete workflow",
         type: "workflow",
         resourceName: selected?.title || selected?.id,
-        canDelete: false,
+        canDelete: Boolean(selected),
         onDelete: () => {
           if (!selected) return;
           const nextId = draft.workflows.find((workflow) => workflow.id !== selected.id)?.id;

@@ -604,7 +604,7 @@ describe("workspace entity UI flows", () => {
     expect(automationToggle.compareDocumentPosition(environmentToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(environmentToggle.compareDocumentPosition(projectToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete workflow" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete workflow" })).toBeInTheDocument();
 
     const triggerReactFlowNode = screen.getByLabelText("Trigger: implementation.failed").closest(".react-flow__node");
     expect(triggerReactFlowNode?.querySelectorAll(".react-flow__handle-right")).toHaveLength(1);
@@ -782,6 +782,47 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
+  it("deletes the selected workflow from the automation header after confirmation", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.automation.workflows.push({
+      id: "workflow-2",
+      title: "Second workflow",
+      steps: []
+    });
+    const { data } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
+
+    await user.click(screen.getByRole("button", { name: "Delete workflow" }));
+
+    const confirmDialog = screen.getByRole("dialog", { name: "Delete workflow?" });
+    expect(confirmDialog).toBeInTheDocument();
+    expect(within(confirmDialog).getByText("Default workflow")).toBeInTheDocument();
+    expect(within(confirmDialog).getByText(/This action cannot be undone./)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(window.location.search).toBe("?id=workflow-2"));
+    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(screen.getByRole("button", { name: "workflow-2" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+
+    await waitFor(() => expect(data.automation.workflows.map((workflow) => workflow.id)).toEqual(["workflow-2"]));
+    expect(screen.queryByRole("link", { name: "workflow-1" })).not.toBeInTheDocument();
+  });
+
+  it("clears workflow selection after deleting the only workflow", async () => {
+    const user = userEvent.setup();
+    await renderRoute("/automation/workflows?id=workflow-1");
+
+    await confirmDelete(user, "Delete workflow");
+
+    await waitFor(() => expect(window.location.search).toBe(""));
+    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(screen.queryByRole("button", { name: "Delete workflow" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Workflow ID")).toHaveValue("");
+  });
+
   it("renders the selected workflow action sheet in view mode", async () => {
     const user = userEvent.setup();
     const workflowData = baseData();
@@ -793,7 +834,7 @@ describe("workspace entity UI flows", () => {
     });
     const { data, fetchMock } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
-    expect(screen.queryByRole("button", { name: "Delete workflow" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete workflow" })).toBeInTheDocument();
     const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
     expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
     activateWorkflowNode(implementationPolicyNode);
