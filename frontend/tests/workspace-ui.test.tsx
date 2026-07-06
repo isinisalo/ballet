@@ -206,6 +206,10 @@ const activateWorkflowNode = (element: HTMLElement) => {
   fireEvent.click(element);
 };
 
+const expectActionSelectValue = (actionId: string) => {
+  expect(screen.getByLabelText("Action ID")).toHaveTextContent(actionId);
+};
+
 const updateProjectTreeDocument = (
   nodes: ProjectDocumentTreeNode[],
   document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">
@@ -640,7 +644,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByLabelText("Workflow policy trigger")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Action ID")).toHaveValue("implementation");
+    expectActionSelectValue("implementation");
     expect(screen.queryByLabelText("Workflow policy action")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit workflow policy" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save workflow policy" })).not.toBeInTheDocument();
@@ -649,7 +653,7 @@ describe("workspace entity UI flows", () => {
 
     activateWorkflowNode(implementationPolicyNode);
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Action ID")).toHaveValue("implementation");
+    expectActionSelectValue("implementation");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Action" })).not.toBeInTheDocument());
 
@@ -778,9 +782,16 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
-  it("edits the selected workflow action from the sheet", async () => {
+  it("renders the selected workflow action sheet in view mode", async () => {
     const user = userEvent.setup();
-    const { data, fetchMock } = await renderRoute("/automation/workflows?id=workflow-1");
+    const workflowData = baseData();
+    workflowData.automation.actions.push({
+      id: "review-pass",
+      description: "Review output",
+      outputIds: ["summary"],
+      agentIds: ["agent-1"]
+    });
+    const { data, fetchMock } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
     expect(screen.queryByRole("button", { name: "Delete workflow" })).not.toBeInTheDocument();
     const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
@@ -791,21 +802,27 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("button", { name: "Save workflow policy" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove workflow step" })).not.toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText("Action ID"));
-    await user.type(screen.getByLabelText("Action ID"), "review-pass");
-    await user.clear(screen.getByLabelText("Description"));
-    await user.type(screen.getByLabelText("Description"), "Review output");
+    expectActionSelectValue("implementation");
+    expect(screen.getByLabelText("Action ID")).toHaveAttribute("role", "combobox");
+    expect(screen.getByLabelText("Description")).toHaveValue("Implement work");
+    expect(screen.getByLabelText("Description")).toHaveProperty("readOnly", true);
+    expect(screen.queryByRole("button", { name: "Remove agent Existing Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove output complete" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Action" })).not.toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.policies[0]).toMatchObject({
-      action: "review-pass",
-      event: "review-pass.failed",
-      id: "on.review-pass.failed.start.review-pass"
+      action: "implementation",
+      event: "implementation.failed",
+      id: "on.implementation.failed.start.implementation"
     }));
-    expect(data.automation.workflows[0]?.steps).toEqual(["on.review-pass.failed.start.review-pass"]);
+    expect(data.automation.workflows[0]?.steps).toEqual(["on.implementation.failed.start.implementation"]);
     expect(data.automation.actions[0]).toMatchObject({
+      id: "implementation",
+      description: "Implement work"
+    });
+    expect(data.automation.actions[1]).toMatchObject({
       id: "review-pass",
       description: "Review output"
     });
@@ -815,7 +832,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("button", { name: "Remove workflow step" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
-      body: expect.stringContaining("\"steps\":[\"on.review-pass.failed.start.review-pass\"]")
+      body: expect.stringContaining("\"steps\":[\"on.implementation.failed.start.implementation\"]")
     }));
   });
 
@@ -879,16 +896,16 @@ describe("workspace entity UI flows", () => {
 
     activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Action ID")).toHaveValue("implementation");
+    expectActionSelectValue("implementation");
 
     activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.complete.start.review-pass"));
-    expect(screen.getByLabelText("Action ID")).toHaveValue("review-pass");
+    expectActionSelectValue("review-pass");
 
     const workflowPane = document.querySelector(".react-flow__pane");
     expect(workflowPane).toBeInTheDocument();
     fireEvent.click(workflowPane as Element);
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Action ID")).toHaveValue("review-pass");
+    expectActionSelectValue("review-pass");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Action" })).not.toBeInTheDocument());
   });
@@ -900,7 +917,7 @@ describe("workspace entity UI flows", () => {
     activateWorkflowNode(implementationPolicyNode);
 
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Action ID")).toHaveValue("implementation");
+    expectActionSelectValue("implementation");
   });
 
   it("creates an automation action and keeps workflow action editing sheet-based", async () => {
@@ -931,7 +948,7 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("link", { name: "workflow-1" }));
     activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Action ID")).toHaveValue("implementation");
+    expectActionSelectValue("implementation");
     expect(screen.queryByLabelText("Workflow policy action")).not.toBeInTheDocument();
     expect(data.automation.policies[0]?.action).toBe("implementation");
     expect(data.automation.policies[0]?.id).toBe("on.implementation.failed.start.implementation");
@@ -988,7 +1005,7 @@ describe("workspace entity UI flows", () => {
     activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.manual-gate"));
 
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Action ID")).toHaveValue("manual-gate");
+    expectActionSelectValue("manual-gate");
     expect(screen.queryByRole("button", { name: /Add policy step for manual-gate\./ })).not.toBeInTheDocument();
     expect(document.querySelector('[data-workflow-output-event^="manual-gate."]')).not.toBeInTheDocument();
   });
@@ -1171,7 +1188,7 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("complete"));
     expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Action" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Action ID")).toHaveValue("implementation");
+    expectActionSelectValue("implementation");
     expect(screen.queryByLabelText("Workflow policy action")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Policy: on.implementation.complete.start.implementation")).toBeInTheDocument();
 

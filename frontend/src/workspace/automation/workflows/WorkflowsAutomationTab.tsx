@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Agent,
-  ProjectAction,
   ProjectAutomationConfig,
   ProjectPolicy,
   ProjectWorkflow
@@ -9,11 +8,11 @@ import type {
 import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "../../../../../shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
-import { nextConfigWithActionPatch } from "../actions/actionEditorLogic";
 import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { WorkflowActionSheet } from "./WorkflowActionSheet";
+import { nextConfigWithWorkflowStepAction } from "./workflowActionSheetLogic";
 import { buildWorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
 import { calculateWorkflowCanvasLayout } from "./workflowLayout";
 import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
@@ -202,14 +201,9 @@ export function WorkflowsAutomationTab({
     setSelectedActionStepIndex(record.index);
   };
 
-  const updateSelectedAction = (patch: Partial<ProjectAction>) => {
-    if (!selectedAction) return;
-    updateConfig((current) => nextConfigWithActionPatch(current, selectedAction.id, patch).config);
-  };
-  const createOutput = (outputId: string) => {
-    const id = normalizePolicyToken(outputId);
-    if (!id || config.outputs.some((output) => normalizePolicyToken(output.id) === id)) return;
-    updateConfig((current) => ({ ...current, outputs: [...current.outputs, { id }] }));
+  const updateSelectedActionStep = (actionId: string) => {
+    if (!selected || selectedActionStepIndex === null) return;
+    updateConfig((current) => nextConfigWithWorkflowStepAction(current, selected.id, selectedActionStepIndex, actionId));
   };
 
   if (!selected || !workflowLayout) return <EmptyState title="No workflow selected." />;
@@ -260,8 +254,7 @@ export function WorkflowsAutomationTab({
         onOpenChange={(open, details) => {
           if (!open && details?.reason === "close-press") clearActionSelection();
         }}
-        onActionChange={updateSelectedAction}
-        onCreateOutput={createOutput}
+        onActionChange={updateSelectedActionStep}
         onRemoveFromWorkflow={removeSelectedActionStep}
       />
     </>
