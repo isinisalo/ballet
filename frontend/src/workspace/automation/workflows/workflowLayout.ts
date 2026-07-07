@@ -299,6 +299,14 @@ function workflowEdgesWithDynamicVerticalHandles(
     const sourceNode = nodeByKey.get(edge.sourceNodeKey);
     const targetNode = nodeByKey.get(edge.targetNodeKey);
     if (!sourceNode || !targetNode) return edge;
+    const isUpwardEdge = targetNode.y + targetNode.height / 2 < sourceNode.y + sourceNode.height / 2;
+    if (outputSlotKind === "rework" && (edge.tone === "return" || isUpwardEdge)) {
+      return {
+        ...edge,
+        sourceHandleId: "top",
+        targetHandleId: "top"
+      };
+    }
     const { sourceHandleId, targetHandleId } = workflowShortestVerticalHandles(
       sourceNode,
       targetNode,

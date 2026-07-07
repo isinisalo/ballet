@@ -945,8 +945,8 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(returnEdge).toMatchObject({
       sourceNodeKey: "policy-1",
       targetNodeKey: "policy-0",
-      sourceHandleId: "bottom",
-      targetHandleId: "bottom",
+      sourceHandleId: "top",
+      targetHandleId: "top",
       tone: "return",
       eventType: "review.rejected",
       label: "rejected"
@@ -1132,7 +1132,7 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
     expect(targetTrigger?.y).toBeLessThan(sourceTrigger?.y ?? 0);
   });
 
-  it("routes upward rework outputs from the source top to the target bottom", () => {
+  it("routes upward rework return outputs from the source top to the target top", () => {
     const config = compositeConfig(["target", "source"], [{
       sourcePolicyId: "source-start",
       outputId: "blocked",
@@ -1148,7 +1148,7 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       sourceNodeKey: "workflow:source:policy-0",
       targetNodeKey: "workflow:target:trigger",
       sourceHandleId: "top",
-      targetHandleId: "bottom",
+      targetHandleId: "top",
       label: "blocked",
       tone: "cross-workflow"
     });
