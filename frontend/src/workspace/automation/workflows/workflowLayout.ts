@@ -5,7 +5,7 @@ import { workflowCanvasLayoutConfig, workflowNodeSizes } from "./workflowLayoutC
 import type { WorkflowCanvasEdge } from "./workflowLayoutEdges";
 import { buildWorkflowLayoutGraphDraft } from "./workflowLayoutGraph";
 import { positionWorkflowNodes } from "./workflowLayoutPositioning";
-import { workflowOutputSourceHandleId, workflowShortestVerticalHandles, workflowVerticalTargetHandle } from "./workflowLayoutSizing";
+import { workflowOutputSourceHandleId, workflowShortestVerticalHandles } from "./workflowLayoutSizing";
 import type { WorkflowCanvasLayout, WorkflowCanvasLayoutNode, WorkflowLayoutDirection } from "./workflowLayoutTypes";
 
 export { workflowAddActionGhostLabel, workflowCanvasLayoutConfig, workflowNodeSizes } from "./workflowLayoutConfig";
@@ -288,16 +288,10 @@ function workflowEdgesWithDynamicVerticalHandles(
   return edges.map((edge) => {
     const outputSlotKind = workflowEdgeOutputSlotKind(edge);
     if (outputSlotKind === "approval") {
-      const sourceNode = nodeByKey.get(edge.sourceNodeKey);
-      const targetNode = nodeByKey.get(edge.targetNodeKey);
       return {
         ...edge,
         sourceHandleId: "right",
-        targetHandleId: edge.tone === "cross-workflow"
-          ? "left"
-          : sourceNode && targetNode
-          ? workflowVerticalTargetHandle(sourceNode, targetNode, "left")
-          : edge.targetHandleId
+        targetHandleId: "left"
       };
     }
     const isDynamicVerticalEdge = edge.tone === "return" || outputSlotKind === "rework";

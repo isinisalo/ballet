@@ -717,7 +717,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       : undefined).toBe(workflowCanvasLayoutConfig.outputEventLaneClearance + workflowCanvasLayoutConfig.branchGap);
   });
 
-  it("keeps folded approval edges sourced from the right even when they target a vertical handle", () => {
+  it("keeps folded approval edges on right-to-left handles even when they return to an earlier canonical node", () => {
     const createMilestones = policy("create-milestones", undefined, "create-milestones");
     createMilestones.trigger = "technical_plan_approved";
     const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
@@ -794,9 +794,67 @@ describe("calculateWorkflowCanvasLayout", () => {
       sourceNodeKey: "policy-5",
       targetNodeKey: "policy-3",
       sourceHandleId: "right",
-      targetHandleId: "bottom",
+      targetHandleId: "left",
       tone: "return",
       label: "approved"
+    });
+  });
+
+  it("keeps return approval edges away from top and bottom handles in implementation review loops", () => {
+    const implementTask = policy("implement-task", undefined, "implement-task");
+    implementTask.trigger = "task_specs_approved";
+    const runTests = policy("run-tests", "implement-task.ready", "run-tests");
+    const classifyFailure = policy("classify-failure", "implement-task.blocked", "classify-failure");
+    const reworkImplementTask = policy("rework-implement-task", "classify-failure.ready", "implement-task");
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph([
+        {
+          policyId: implementTask.id,
+          index: 0,
+          policy: implementTask,
+          outputTargets: [
+            { outputId: "ready", eventType: "implement-task.ready", type: "event" },
+            { outputId: "blocked", eventType: "implement-task.blocked", type: "event" }
+          ]
+        },
+        {
+          policyId: runTests.id,
+          index: 1,
+          policy: runTests,
+          outputTargets: [
+            { outputId: "ready", eventType: "run-tests.ready", type: "event" },
+            { outputId: "failed", eventType: "run-tests.failed", type: "event" }
+          ]
+        },
+        {
+          policyId: classifyFailure.id,
+          index: 2,
+          policy: classifyFailure,
+          outputTargets: [
+            { outputId: "ready", eventType: "classify-failure.ready", type: "event" },
+            { outputId: "blocked", eventType: "classify-failure.blocked", type: "event" }
+          ]
+        },
+        {
+          policyId: reworkImplementTask.id,
+          index: 7,
+          policy: reworkImplementTask,
+          outputTargets: [
+            { outputId: "ready", eventType: "implement-task.ready", type: "event" },
+            { outputId: "blocked", eventType: "implement-task.blocked", type: "event" }
+          ]
+        }
+      ]),
+      editingPolicyIndex: null
+    });
+
+    expect(layout.edges.find((edge) => edge.eventType === "classify-failure.ready")).toMatchObject({
+      sourceNodeKey: "policy-2",
+      targetNodeKey: "policy-0",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      tone: "return",
+      label: "ready"
     });
   });
 
@@ -823,7 +881,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-policy-0-1-build.complete",
       sourceHandleId: "right",
-      targetHandleId: "top"
+      targetHandleId: "left"
     }));
   });
 
