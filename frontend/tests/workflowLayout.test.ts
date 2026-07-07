@@ -1113,8 +1113,8 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(path.path.match(/Q/g)).toHaveLength(4);
     expect(path.path).toContain("M1000 76L 1040,76Q 1064,76 1064,100");
     expect(path.path).toContain("L -32,256Q -32,280 -8,280L32 280");
-    expect(path.labelX).toBe(1056);
-    expect(path.labelY).toBe(76);
+    expect(path.labelX).toBe(516);
+    expect(path.labelY).toBe(178);
   });
 
   it("marks one workflow edge as animated when requested", () => {

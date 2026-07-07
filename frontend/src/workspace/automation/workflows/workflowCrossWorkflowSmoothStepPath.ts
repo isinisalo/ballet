@@ -4,7 +4,6 @@ import type { WorkflowReactFlowEdge } from "./WorkflowCanvasTypes";
 const workflowCrossWorkflowSmoothStepRadius = 24;
 const workflowCrossWorkflowSmoothStepOffset = 64;
 const workflowCrossWorkflowSmoothStepPosition = 0.5;
-const workflowCrossWorkflowSmoothStepLabelOffset = 56;
 const workflowSmoothStepPathNumber = (value: number) => Number(value.toFixed(2));
 
 export function workflowCrossWorkflowSmoothStepPath({
@@ -15,7 +14,7 @@ export function workflowCrossWorkflowSmoothStepPath({
   targetX,
   targetY
 }: EdgeProps<WorkflowReactFlowEdge>) {
-  const [path] = getSmoothStepPath({
+  const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
@@ -26,11 +25,10 @@ export function workflowCrossWorkflowSmoothStepPath({
     offset: workflowCrossWorkflowSmoothStepOffset,
     stepPosition: workflowCrossWorkflowSmoothStepPosition
   });
-  const labelDirection = sourcePosition === Position.Left ? -1 : 1;
 
   return {
     path,
-    labelX: workflowSmoothStepPathNumber(sourceX + labelDirection * workflowCrossWorkflowSmoothStepLabelOffset),
-    labelY: workflowSmoothStepPathNumber(sourceY)
+    labelX: workflowSmoothStepPathNumber(labelX),
+    labelY: workflowSmoothStepPathNumber(labelY)
   };
 }
