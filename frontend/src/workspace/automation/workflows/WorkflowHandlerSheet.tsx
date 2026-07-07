@@ -7,15 +7,17 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { findProjectOutputRoute } from "@shared/policy-actions";
 import { ActionEditorFields } from "../actions/ActionEditorFields";
 import { HumanGateResponsePanel } from "./HumanGateResponsePanel";
+import {
+  workflowOutputTargetCanSelectTrigger,
+  workflowOutputTargetFromSelectValue,
+  workflowOutputTargetSelectValue
+} from "./workflowOutputTargetRules";
 
 type WorkflowHandlerSheetOpenChangeDetails = {
   reason?: string;
 };
-
-const triggerSelectPrefix = "trigger:";
 
 export type WorkflowHandlerSelectionSource = "node" | "edge";
 
@@ -218,8 +220,8 @@ function OutputTargetControls({
                 <span className="truncate">{outputId}</span>
               </Badge>
               <Select
-                value={outputTargetSelectValue(config, route.policyId, outputId)}
-                onValueChange={(value) => onOutputRouteTargetChange(route.policyId, outputId, outputTargetFromSelectValue(value))}
+                value={workflowOutputTargetSelectValue(config, route.policyId, outputId)}
+                onValueChange={(value) => onOutputRouteTargetChange(route.policyId, outputId, workflowOutputTargetFromSelectValue(value))}
               >
                 <SelectTrigger className="min-w-0 w-full font-mono">
                   <SelectValue />
@@ -227,11 +229,11 @@ function OutputTargetControls({
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="event">Event</SelectItem>
-                    {config.triggers.map((trigger) => (
+                    {workflowOutputTargetCanSelectTrigger(config, route.policyId, outputId) ? config.triggers.map((trigger) => (
                       <SelectItem key={trigger.id} value={`trigger:${trigger.id}`}>
                         Trigger · {trigger.id}
                       </SelectItem>
-                    ))}
+                    )) : null}
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -280,26 +282,6 @@ function ReadOnlyBadges({ label, values }: { label: string; values: string[] }) 
       </div>
     </Field>
   );
-}
-
-function outputTargetSelectValue(
-  config: Pick<ProjectAutomationConfig, "outputRoutes">,
-  sourcePolicyId: string,
-  outputId: string
-) {
-  const route = findProjectOutputRoute(config.outputRoutes, sourcePolicyId, outputId);
-  if (route?.target.type === "trigger") return `${triggerSelectPrefix}${route.target.trigger}`;
-  return "event";
-}
-
-function outputTargetFromSelectValue(value: string): ProjectOutputTarget | undefined {
-  if (value.startsWith(triggerSelectPrefix)) {
-    return {
-      type: "trigger",
-      trigger: value.slice(triggerSelectPrefix.length)
-    };
-  }
-  return undefined;
 }
 
 function workflowHandlerRouteDescription(route: WorkflowHandlerRoute | undefined) {

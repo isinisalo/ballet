@@ -139,6 +139,28 @@ export const actionOutputIds = (
   return normalizeActionOutputSlots(outputIds);
 };
 
+export const projectOutputRouteSlotKind = (
+  policy: Pick<ProjectPolicy, "action">,
+  outputId: PolicyOutputId,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>
+): ActionOutputSlotKind | undefined => {
+  const normalizedOutputId = normalizePolicyToken(outputId);
+  const outputIndex = actionOutputIds(actions, policy.action).indexOf(normalizedOutputId);
+  if (outputIndex === 0) return "approval";
+  if (outputIndex === 1) return "rework";
+  return undefined;
+};
+
+export const projectOutputRouteCanTargetTrigger = (
+  policy: Pick<ProjectPolicy, "action">,
+  outputId: PolicyOutputId,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>
+): boolean => {
+  const normalizedActionId = normalizePolicyToken(policy.action);
+  const action = actions.find((candidate) => normalizePolicyToken(candidate.id) === normalizedActionId);
+  return Boolean(action?.humanGate && projectOutputRouteSlotKind(policy, outputId, actions) === "approval");
+};
+
 export const policyOutputEventTypes = (
   input: Pick<ProjectPolicy, "action">,
   actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = [],

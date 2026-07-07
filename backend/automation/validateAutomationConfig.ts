@@ -17,6 +17,7 @@ import {
   normalizePolicyOutputEventType,
   normalizePolicyToken,
   policyEventTypesForActions,
+  projectOutputRouteCanTargetTrigger,
   projectOutputRouteKey
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
@@ -450,6 +451,14 @@ const validateOutputRoute = (
   if (!availableOutputIds.includes(outputId)) {
     issues.push({ path: `${base}.outputId`, message: `Output route references unavailable output ${outputId} for policy ${sourcePolicyId}.` });
   }
+
+  const outputIndex = availableOutputIds.indexOf(outputId);
+  if (outputIndex === 1 && isRecord(route.target) && route.target.type !== "event") {
+    issues.push({ path: `${base}.target.type`, message: "Rework output route target must be event." });
+  }
+  if (isRecord(route.target) && route.target.type === "trigger" && !projectOutputRouteCanTargetTrigger(sourcePolicy, outputId, context.normalizedActions)) {
+    issues.push({ path: `${base}.target.type`, message: "Only a human gate approval output can target a trigger." });
+  }
 };
 
 const policyValidationState = (
@@ -547,6 +556,23 @@ const validatePolicy = (policy: unknown, index: number, context: ValidationConte
   validatePolicyReference(policy, base, context, index, issues);
 };
 
+const validateSinglePolicyPerTrigger = (context: ValidationContext, issues: ProjectAutomationIssue[]) => {
+  const firstPolicyIndexByTrigger = new Map<string, number>();
+
+  context.normalizedPolicies.forEach((policy, index) => {
+    if (policy.source !== "trigger" || !policy.trigger) return;
+    const firstIndex = firstPolicyIndexByTrigger.get(policy.trigger);
+    if (firstIndex === undefined) {
+      firstPolicyIndexByTrigger.set(policy.trigger, index);
+      return;
+    }
+    issues.push({
+      path: `policies[${index}].trigger`,
+      message: `Trigger ${policy.trigger} can start only one policy/action.`
+    });
+  });
+};
+
 const validateRuntime = (runtime: unknown, index: number, issues: ProjectAutomationIssue[]) => {
   const base = `runtimes[${index}]`;
   if (!isRecord(runtime)) {
@@ -606,6 +632,14 @@ const validateWorkflow = (workflow: unknown, index: number, context: ValidationC
   workflow.steps.forEach((step, stepIndex) =>
     validateWorkflowStep(step, `${base}.steps[${stepIndex}]`, context.policyIdSet, issues)
   );
+  const triggerSteps = workflow.steps.filter((step): step is string => {
+    if (typeof step !== "string") return false;
+    const policy = context.normalizedPolicies.find((candidate) => candidate.id === step);
+    return policy?.source === "trigger";
+  });
+  if (triggerSteps.length > 1) {
+    issues.push({ path: `${base}.steps`, message: "Workflow can start from only one trigger policy." });
+  }
 };
 
 export const validateProjectAutomationConfig = (
@@ -628,6 +662,7 @@ export const validateProjectAutomationConfig = (
     context.rawOutputRoutes.forEach((route, index) => validateOutputRoute(route, index, context, issues, seenRouteKeys));
   }
   context.rawPolicies.forEach((policy, index) => validatePolicy(policy, index, context, issues));
+  validateSinglePolicyPerTrigger(context, issues);
   context.rawRuntimes.forEach((runtime, index) => validateRuntime(runtime, index, issues));
   context.rawWorkflows.forEach((workflow, index) => validateWorkflow(workflow, index, context, issues));
   return issues;

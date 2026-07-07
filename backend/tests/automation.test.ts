@@ -138,6 +138,11 @@ describe("project automation config", () => {
     }
   });
 
+  it("keeps the repository workflow config inside current validation rules", async () => {
+    const config = JSON.parse(await readFile(path.join(process.cwd(), ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
+    expect(validateProjectAutomationConfig(config)).toEqual([]);
+  });
+
   it("saves readable JSON without touching Markdown instructions", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
@@ -488,12 +493,52 @@ describe("project automation config", () => {
     expect(issues.some((issue) => issue.message === "Workflow references unknown policy: missing-policy.")).toBe(true);
   });
 
+  it("rejects workflows with multiple trigger entry policies", () => {
+    const firstPolicy = {
+      id: "on.trigger.manual-start.start.implementation",
+      source: "trigger" as const,
+      trigger: "manual-start",
+      action: "implementation",
+      enabled: true
+    };
+    const secondPolicy = {
+      id: "on.trigger.manual-retry.start.implementation",
+      source: "trigger" as const,
+      trigger: "manual-retry",
+      action: "implementation",
+      enabled: true
+    };
+    const issues = validateProjectAutomationConfig({
+      ...validConfig(),
+      triggers: [
+        { id: "manual-start", description: "Manual start" },
+        { id: "manual-retry", description: "Manual retry" }
+      ],
+      policies: [firstPolicy, secondPolicy],
+      workflows: [{ id: "bad-workflow", title: "Bad workflow", steps: [firstPolicy.id, secondPolicy.id] }]
+    }, [agent]);
+
+    expect(issues.some((issue) => issue.message === "Workflow can start from only one trigger policy.")).toBe(true);
+  });
+
   it("validates output route references", () => {
+    const humanGatePolicy = {
+      id: "on.implementation.failed.start.human-review",
+      source: "event" as const,
+      event: "implementation.failed",
+      action: "human-review",
+      enabled: true
+    };
     const routeConfig: ProjectAutomationConfig = {
       ...validConfig(),
       triggers: [{ id: "manual-start", description: "Manual start" }],
+      actions: [
+        ...validConfig().actions,
+        { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }
+      ],
+      policies: [...validConfig().policies, humanGatePolicy],
       outputRoutes: [{
-        sourcePolicyId: "on.implementation.failed.start.implementation",
+        sourcePolicyId: humanGatePolicy.id,
         outputId: "ok",
         target: { type: "trigger", trigger: "manual-start", workflowId: "delivery" }
       }]
@@ -512,8 +557,40 @@ describe("project automation config", () => {
       ...routeConfig,
       outputRoutes: [{ ...routeConfig.outputRoutes[0]!, outputId: "summary" }]
     }, [agent]).some((issue) =>
-      issue.message === "Output route references unavailable output summary for policy on.implementation.failed.start.implementation."
+      issue.message === "Output route references unavailable output summary for policy on.implementation.failed.start.human-review."
     )).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...routeConfig,
+      outputRoutes: [{
+        sourcePolicyId: "on.implementation.failed.start.implementation",
+        outputId: "ok",
+        target: { type: "trigger", trigger: "manual-start" }
+      }]
+    }, [agent]).some((issue) => issue.message === "Only a human gate approval output can target a trigger.")).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...routeConfig,
+      outputRoutes: [{ ...routeConfig.outputRoutes[0]!, outputId: "failed" }]
+    }, [agent]).some((issue) => issue.message === "Rework output route target must be event.")).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...routeConfig,
+      policies: [
+        ...routeConfig.policies,
+        {
+          id: "on.trigger.manual-start.start.human-review",
+          source: "trigger",
+          trigger: "manual-start",
+          action: "human-review",
+          enabled: true
+        },
+        {
+          id: "on.trigger.manual-start.start.implementation",
+          source: "trigger",
+          trigger: "manual-start",
+          action: "implementation",
+          enabled: true
+        }
+      ]
+    }, [agent]).some((issue) => issue.message === "Trigger manual-start can start only one policy/action.")).toBe(true);
   });
 
   it("migrates legacy gate output routes to human gate actions", () => {

@@ -215,6 +215,16 @@
       ]
     },
     {
+      "id": "code-human-gate",
+      "description": "Human approval of reviewed code before dev deployment starts.",
+      "outputIds": [
+        "approved",
+        "changes_requested"
+      ],
+      "agentIds": [],
+      "humanGate": true
+    },
+    {
       "id": "prepare-dev-deployment",
       "description": "Check dev deployment readiness: artifact, config, migrations, rollback, and validation plan.",
       "outputIds": [
@@ -284,7 +294,7 @@
   ],
   "outputRoutes": [
     {
-      "sourcePolicyId": "on.run-tests.ready.start.review-code",
+      "sourcePolicyId": "on.review-code.approved.start.code-human-gate",
       "outputId": "approved",
       "target": {
         "type": "trigger",
@@ -531,9 +541,16 @@
     {
       "source": "event",
       "event": "review-code.approved",
-      "action": "done",
+      "action": "code-human-gate",
       "enabled": true,
-      "id": "on.review-code.approved.start.done"
+      "id": "on.review-code.approved.start.code-human-gate"
+    },
+    {
+      "source": "event",
+      "event": "code-human-gate.changes_requested",
+      "action": "implement-task",
+      "enabled": true,
+      "id": "on.code-human-gate.changes_requested.start.implement-task"
     },
     {
       "source": "trigger",
@@ -657,13 +674,19 @@
       ]
     },
     {
-      "id": "milestone-task-spec-loop",
-      "title": "5. Milestone + task spec loop",
+      "id": "milestone-loop",
+      "title": "5. Milestone loop",
       "steps": [
         "on.trigger.technical_plan_approved.start.create-milestones",
         "on.create-milestones.ready.start.challenge-milestones",
         "on.challenge-milestones.changes_requested.start.create-milestones",
-        "on.challenge-milestones.approved.start.done",
+        "on.challenge-milestones.approved.start.done"
+      ]
+    },
+    {
+      "id": "task-spec-loop",
+      "title": "6. Task spec loop",
+      "steps": [
         "on.trigger.milestones_approved.start.create-task-specs",
         "on.create-task-specs.ready.start.challenge-task-specs",
         "on.challenge-task-specs.changes_requested.start.create-task-specs",
@@ -672,22 +695,23 @@
     },
     {
       "id": "implementation-review-test-loop",
-      "title": "6. Implementation + review + test loop",
+      "title": "7. Implementation + review + test loop",
       "steps": [
         "on.trigger.task_specs_approved.start.implement-task",
         "on.implement-task.ready.start.run-tests",
         "on.implement-task.blocked.start.classify-failure",
-      "on.run-tests.ready.start.review-code",
-      "on.run-tests.failed.start.classify-failure",
-      "on.review-code.changes_requested.start.implement-task",
-      "on.trigger.ci_or_validation_failed.start.classify-failure",
+        "on.run-tests.ready.start.review-code",
+        "on.run-tests.failed.start.classify-failure",
+        "on.review-code.changes_requested.start.implement-task",
+        "on.review-code.approved.start.code-human-gate",
+        "on.code-human-gate.changes_requested.start.implement-task",
         "on.classify-failure.ready.start.implement-task",
         "on.classify-failure.blocked.start.done"
       ]
     },
     {
       "id": "dev-deploy-validation-loop",
-      "title": "7. Dev deploy + validation loop",
+      "title": "8. Dev deploy + validation loop",
       "steps": [
         "on.trigger.code_approved.start.prepare-dev-deployment",
         "on.prepare-dev-deployment.ready.start.deploy-to-dev",
@@ -696,6 +720,14 @@
         "on.deploy-to-dev.failed.start.classify-failure",
         "on.validate-dev-deployment.changes_requested.start.prepare-dev-deployment",
         "on.validate-dev-deployment.approved.start.done",
+        "on.classify-failure.ready.start.implement-task",
+        "on.classify-failure.blocked.start.done"
+      ]
+    },
+    {
+      "id": "failure-classification-loop",
+      "title": "9. Failure classification loop",
+      "steps": [
         "on.trigger.ci_or_validation_failed.start.classify-failure",
         "on.classify-failure.ready.start.implement-task",
         "on.classify-failure.blocked.start.done"

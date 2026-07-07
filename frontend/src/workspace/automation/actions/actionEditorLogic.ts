@@ -1,5 +1,5 @@
 import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { actionOutputSlotCount, actionOutputSlotKind, generatedPolicyId, humanGateResponseId, normalizeActionOutputSlots, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
+import { actionOutputSlotCount, actionOutputSlotKind, generatedPolicyId, humanGateResponseId, normalizeActionOutputSlots, projectOutputRouteCanTargetTrigger, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 
 export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
@@ -66,7 +66,8 @@ export const nextConfigWithActionPatch = (
     const outputId = previousPolicy?.action === previousId ? outputIdMap.get(route.outputId) ?? route.outputId : route.outputId;
     const nextPolicy = policyById.get(sourcePolicyId);
     const nextAction = nextPolicy ? actionById.get(nextPolicy.action) : undefined;
-    if (!nextAction?.outputIds.includes(outputId)) return [];
+    if (!nextPolicy || !nextAction?.outputIds.includes(outputId)) return [];
+    if (route.target.type === "trigger" && !projectOutputRouteCanTargetTrigger(nextPolicy, outputId, nextActions)) return [];
     const nextRoute = { ...route, sourcePolicyId, outputId };
     return [[projectOutputRouteKey(nextRoute.sourcePolicyId, nextRoute.outputId), nextRoute] as const];
   }));

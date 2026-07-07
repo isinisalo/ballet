@@ -22,6 +22,7 @@ import { nextConfigWithWorkflowHandlerAction, nextConfigWithoutWorkflowStepIndex
 import type { WorkflowStepRecord } from "./workflowGraph";
 import { calculateCompositeWorkflowCanvasLayout, type WorkflowCanvasEdge } from "./workflowLayout";
 import { workflowOutputTargetsForPolicy } from "./workflowOutputTargets";
+import { workflowOutputTargetCanSelectTrigger } from "./workflowOutputTargetRules";
 import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
 
 const noSelection = "__none__";
@@ -264,10 +265,13 @@ export function WorkflowsAutomationTab({
     updateConfig((current) => {
       const routeKey = projectOutputRouteKey(sourcePolicyId, outputId);
       const outputRoutes = current.outputRoutes.filter((route) => projectOutputRouteKey(route.sourcePolicyId, route.outputId) !== routeKey);
+      const allowedTarget = target?.type === "trigger" && !workflowOutputTargetCanSelectTrigger(current, sourcePolicyId, outputId)
+        ? undefined
+        : target;
       return {
         ...current,
-        outputRoutes: target
-          ? [...outputRoutes, { sourcePolicyId, outputId: normalizePolicyToken(outputId), target }]
+        outputRoutes: allowedTarget
+          ? [...outputRoutes, { sourcePolicyId, outputId: normalizePolicyToken(outputId), target: allowedTarget }]
           : outputRoutes
       };
     });
