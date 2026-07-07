@@ -2,7 +2,7 @@ import { BaseEdge, EdgeLabelRenderer, useNodes, type EdgeProps, type Node } from
 import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
 import type { WorkflowReactFlowEdge } from "./WorkflowCanvasTypes";
-import { workflowCrossWorkflowEdgeSlotKind } from "./workflowCrossWorkflowEdgeSlot";
+import { workflowEdgeOutputSlotKind } from "./workflowEdgeOutputSlot";
 import { workflowCrossWorkflowSmoothStepPath } from "./workflowCrossWorkflowSmoothStepPath";
 import { workflowRoutedEdgeLabelAnchor, type WorkflowEdgePoint } from "./workflowEdgeLabelGeometry";
 import { workflowSmartEdgeRoutingOptions } from "./workflowSmartEdgeRouting";
@@ -19,7 +19,7 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
   const workflowEdge = data?.workflowEdge;
   const label = workflowEdge?.label;
   const edgeTone = workflowEdge?.tone ?? "flow";
-  const outputSlotKind = workflowCrossWorkflowEdgeSlotKind(workflowEdge);
+  const outputSlotKind = workflowEdgeOutputSlotKind(workflowEdge);
   const isReturnEdge = workflowEdge?.tone === "return";
   const isCrossWorkflowEdge = workflowEdge?.tone === "cross-workflow";
   const targetKind = data?.targetNode?.kind;
@@ -204,9 +204,9 @@ function WorkflowEdgeLabels({
     workflowEdgeLabelClassName,
     "pointer-events-none"
   );
-  const centerLabelToneClassName = tone === "cross-workflow"
-    ? outputSlotKind === "rework" ? "text-destructive" : "text-secondary"
-    : isGhostTarget ? "text-primary/55" : "text-primary";
+  const centerLabelToneClassName = outputSlotKind === "approval"
+    ? "text-secondary"
+    : outputSlotKind === "rework" ? "text-destructive" : isGhostTarget ? "text-primary/55" : "text-primary";
   const centerLabelContent = <span className={centerLabelToneClassName}>{label}</span>;
 
   return (

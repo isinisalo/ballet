@@ -1066,10 +1066,11 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(edge.data?.workflowEdge.eventType).toBe("implementation.complete");
     expect(edge.data?.workflowEdge.label).toBe("complete");
     expect(edge.style).toMatchObject({
-      stroke: "color-mix(in srgb, var(--tertiary) 85%, transparent)",
+      stroke: "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))",
       strokeWidth: 2
     });
     expect(edge.style?.strokeDasharray).toBeUndefined();
+    expect(edge.style?.strokeLinecap).toBeUndefined();
     expect(edge.markerEnd).toBeUndefined();
   });
 
@@ -1101,7 +1102,76 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(edges.map((edge) => edge.type)).toEqual(["workflowSmart", "workflowSmart", "workflowSmart"]);
   });
 
-  it("maps cross-workflow edges to the workflow highlight stroke", () => {
+  it("maps same-workflow approval edges to the green-gray output stroke", () => {
+    const [edge] = toWorkflowReactFlowEdges([{
+      key: "policy-policy-0-1-build.complete",
+      sourceNodeKey: "policy-0",
+      targetNodeKey: "policy-1",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      route: {
+        outputId: "complete"
+      }
+    }]);
+
+    expect(edge.domAttributes).toMatchObject({
+      "data-workflow-edge-output-slot-kind": "approval"
+    });
+    expect(edge.style).toMatchObject({
+      stroke: "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))",
+      strokeWidth: 2
+    });
+    expect(edge.style?.strokeDasharray).toBeUndefined();
+    expect(edge.style?.strokeLinecap).toBeUndefined();
+  });
+
+  it("maps same-workflow rework edges to the red-gray output stroke", () => {
+    const [edge] = toWorkflowReactFlowEdges([{
+      key: "policy-policy-0-1-build.failed",
+      sourceNodeKey: "policy-0",
+      targetNodeKey: "policy-1",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      route: {
+        outputId: "failed"
+      }
+    }]);
+
+    expect(edge.domAttributes).toMatchObject({
+      "data-workflow-edge-output-slot-kind": "rework"
+    });
+    expect(edge.style).toMatchObject({
+      stroke: "color-mix(in srgb, var(--destructive) 58%, var(--muted-foreground))",
+      strokeWidth: 2
+    });
+    expect(edge.style?.strokeDasharray).toBeUndefined();
+    expect(edge.style?.strokeLinecap).toBeUndefined();
+  });
+
+  it("keeps unclassified dashed output-event edges on the muted dashed fallback", () => {
+    const [edge] = toWorkflowReactFlowEdges([{
+      key: "policy-output-event-0-summary",
+      sourceNodeKey: "policy-0",
+      targetNodeKey: "output-event-0-summary",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      dashed: true,
+      label: "summary"
+    }]);
+
+    expect(edge.domAttributes).not.toHaveProperty("data-workflow-edge-output-slot-kind");
+    expect(edge.domAttributes).toMatchObject({
+      "data-dashed": "true"
+    });
+    expect(edge.style).toMatchObject({
+      stroke: "color-mix(in srgb, var(--muted-foreground) 35%, transparent)",
+      strokeWidth: 2,
+      strokeDasharray: "6 5"
+    });
+    expect(edge.style?.strokeLinecap).toBeUndefined();
+  });
+
+  it("maps cross-workflow approval edges to the green-gray dotted output stroke", () => {
     const [edge] = toWorkflowReactFlowEdges([{
       key: "workflow:source:output:0:ready:to:target:trigger",
       sourceNodeKey: "workflow:source:policy-0",
@@ -1119,12 +1189,14 @@ describe("toWorkflowReactFlowEdges", () => {
       "data-workflow-edge-output-slot-kind": "approval"
     });
     expect(edge.style).toMatchObject({
-      stroke: "color-mix(in srgb, var(--secondary) 72%, transparent)",
-      strokeWidth: 2
+      stroke: "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))",
+      strokeWidth: 2,
+      strokeDasharray: "1 5",
+      strokeLinecap: "round"
     });
   });
 
-  it("maps rework cross-workflow edges to the destructive stroke", () => {
+  it("maps cross-workflow rework edges to the red-gray dotted output stroke", () => {
     const [edge] = toWorkflowReactFlowEdges([{
       key: "workflow:source:output:0:changes_requested:to:target:trigger",
       sourceNodeKey: "workflow:source:policy-0",
@@ -1142,8 +1214,10 @@ describe("toWorkflowReactFlowEdges", () => {
       "data-workflow-edge-output-slot-kind": "rework"
     });
     expect(edge.style).toMatchObject({
-      stroke: "color-mix(in srgb, var(--destructive) 72%, transparent)",
-      strokeWidth: 2
+      stroke: "color-mix(in srgb, var(--destructive) 58%, var(--muted-foreground))",
+      strokeWidth: 2,
+      strokeDasharray: "1 5",
+      strokeLinecap: "round"
     });
   });
 
