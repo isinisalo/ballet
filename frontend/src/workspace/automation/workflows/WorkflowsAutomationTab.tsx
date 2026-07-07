@@ -6,11 +6,10 @@ import type {
   ProjectAutomationConfig,
   ProjectHumanGateResponse,
   ProjectPolicy,
-  ProjectOutputTarget,
   ProjectWorkflow
 } from "@shared/api/workspace-contracts";
 import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
-import { actionOutputIds, generatedPolicyId, humanGateResponseId, normalizePolicyToken, projectOutputRouteEventType, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
+import { actionOutputIds, generatedPolicyId, humanGateResponseId, normalizePolicyToken, projectOutputRouteEventType, policyOutputEventType } from "@shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
 import { nextConfigWithActionPatch } from "../actions/actionEditorLogic";
@@ -23,7 +22,6 @@ import { nextConfigWithWorkflowHandlerAction, nextConfigWithoutWorkflowStepIndex
 import type { WorkflowStepRecord } from "./workflowGraph";
 import { calculateCompositeWorkflowCanvasLayout, type WorkflowCanvasEdge } from "./workflowLayout";
 import { workflowOutputTargetsForPolicy } from "./workflowOutputTargets";
-import { workflowOutputTargetCanSelectTrigger } from "./workflowOutputTargetRules";
 import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
 
 const noSelection = "__none__";
@@ -264,21 +262,6 @@ export function WorkflowsAutomationTab({
     if (!id || config.outputs.some((output) => normalizePolicyToken(output.id) === id)) return;
     updateConfig((current) => ({ ...current, outputs: [...current.outputs, { id }] }));
   };
-  const updateOutputRouteTarget = (sourcePolicyId: string, outputId: string, target: ProjectOutputTarget | undefined) => {
-    updateConfig((current) => {
-      const routeKey = projectOutputRouteKey(sourcePolicyId, outputId);
-      const outputRoutes = current.outputRoutes.filter((route) => projectOutputRouteKey(route.sourcePolicyId, route.outputId) !== routeKey);
-      const allowedTarget = target?.type === "trigger" && !workflowOutputTargetCanSelectTrigger(current, sourcePolicyId, outputId)
-        ? undefined
-        : target;
-      return {
-        ...current,
-        outputRoutes: allowedTarget
-          ? [...outputRoutes, { sourcePolicyId, outputId: normalizePolicyToken(outputId), target: allowedTarget }]
-          : outputRoutes
-      };
-    });
-  };
   const submitHumanGateResponse = async (route: WorkflowHandlerRoute, outputId: string, prompt: string) => {
     const policy = config.policies.find((candidate) => candidate.id === route.policyId);
     const action = config.actions.find((candidate) => candidate.id === route.actionId);
@@ -400,7 +383,7 @@ export function WorkflowsAutomationTab({
         onActionPatch={updateActionPatch}
         onCreateOutput={createOutput}
         onRemoveRoute={removeHandlerRoute}
-        onOutputRouteTargetChange={updateOutputRouteTarget}
+        onOutputHandlerActionChange={updateHandlerRouteAction}
         onHumanGateSubmit={(route, outputId, prompt) => void submitHumanGateResponse(route, outputId, prompt)}
       />
     </>

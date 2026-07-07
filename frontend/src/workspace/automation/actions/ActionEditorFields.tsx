@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from "@/components/ui/switch";
 import { defaultPolicyOutputIds, normalizeActionOutputSlots } from "@shared/policy-actions";
 import { OutputSelector } from "../outputs/OutputSelector";
+import { ActionInputField } from "./ActionInputField";
+import { actionInputSources } from "./actionInputSources";
+import { actionOutputTargetsByOutputId } from "./actionOutputTargets";
 
 export function ActionEditorFields({
   agents,
@@ -70,6 +73,8 @@ export function ActionEditorFields({
     onChange({ outputIds: normalizeActionOutputSlots(nextOutputIds) });
   };
   const outputOptionIds = config.outputs.map((output) => output.id);
+  const inputSources = actionInputSources(config.policies, action.id);
+  const outputTargetById = actionOutputTargetsByOutputId(config, action.id, outputSlotIds);
 
   return (
     <FieldGroup>
@@ -90,6 +95,7 @@ export function ActionEditorFields({
         value={action.description}
         onChange={(description) => onChange({ description })}
       />
+      <ActionInputField sources={inputSources} />
       <Field orientation="horizontal">
         <FieldLabel htmlFor={`${action.id || "action"}-human-gate`}>Human gate</FieldLabel>
         <Switch
@@ -163,6 +169,7 @@ export function ActionEditorFields({
                 replaceWhenFull
                 openButtonLabel="Change approval output"
                 canRemove={false}
+                displayByOutputId={outputTargetById}
                 onChange={(outputIds) => updateOutputSlot(0, outputIds)}
                 onCreateOption={onCreateOutput}
               />
@@ -176,6 +183,7 @@ export function ActionEditorFields({
                 max={1}
                 replaceWhenFull
                 openButtonLabel={outputSlotIds[1] ? "Change rework output" : "Add rework output"}
+                displayByOutputId={outputTargetById}
                 onChange={(outputIds) => updateOutputSlot(1, outputIds)}
                 onCreateOption={onCreateOutput}
               />

@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { Agent, ProjectAction, ProjectAutomationConfig, ProjectHumanGateResponse, ProjectOutputTarget } from "@shared/api/workspace-contracts";
+import type { Agent, ProjectAction, ProjectAutomationConfig, ProjectHumanGateResponse } from "@shared/api/workspace-contracts";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Textarea } from "@/components/ui/textarea";
 import { ActionEditorFields } from "../actions/ActionEditorFields";
 import { HumanGateResponsePanel } from "./HumanGateResponsePanel";
-import {
-  workflowOutputTargetCanSelectTrigger,
-  workflowOutputTargetFromSelectValue,
-  workflowOutputTargetSelectValue
-} from "./workflowOutputTargetRules";
+import { WorkflowOutputHandlerControls } from "./WorkflowOutputHandlerControls";
 
 type WorkflowHandlerSheetOpenChangeDetails = {
   reason?: string;
@@ -43,7 +39,7 @@ export function WorkflowHandlerSheet({
   onActionPatch,
   onCreateOutput,
   onRemoveRoute,
-  onOutputRouteTargetChange,
+  onOutputHandlerActionChange,
   onHumanGateSubmit
 }: {
   open: boolean;
@@ -56,7 +52,7 @@ export function WorkflowHandlerSheet({
   onActionPatch: (actionId: string, patch: Partial<ProjectAction>) => void;
   onCreateOutput: (outputId: string) => void;
   onRemoveRoute: (workflowId: string, stepIndex: number) => void;
-  onOutputRouteTargetChange: (sourcePolicyId: string, outputId: string, target: ProjectOutputTarget | undefined) => void;
+  onOutputHandlerActionChange: (workflowId: string, stepIndex: number, actionId: string) => void;
   onHumanGateSubmit: (route: WorkflowHandlerRoute, outputId: string, prompt: string) => void;
 }) {
   const actionFieldId = useId();
@@ -78,11 +74,12 @@ export function WorkflowHandlerSheet({
         onChange={(patch) => onActionPatch(action.id, patch)}
         onCreateOutput={onCreateOutput}
       />
-      <OutputTargetControls
+      <WorkflowOutputHandlerControls
         config={config}
         route={route}
         outputIds={action.outputIds}
-        onOutputRouteTargetChange={onOutputRouteTargetChange}
+        label="Output routing"
+        onOutputHandlerActionChange={onOutputHandlerActionChange}
       />
       <HumanGateResponsePanel
         outputIds={action.outputIds}
@@ -121,7 +118,10 @@ export function WorkflowHandlerSheet({
                 return (
                   <div key={route.id} className="rounded-md border border-divider-strong bg-card/80 p-3">
                     <div className="flex min-w-0 items-start justify-between gap-2">
-                      <WorkflowHandlerRouteEvent route={route} />
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-sm font-medium leading-snug">Input</span>
+                        <WorkflowHandlerRouteEvent route={route} />
+                      </div>
                       {routes.length > 1 ? (
                         <Button
                           type="button"
@@ -143,8 +143,17 @@ export function WorkflowHandlerSheet({
                       <FieldGroup className="mt-3">
                         <Field className="gap-1.5">
                           <FieldLabel htmlFor={routeActionFieldId}>Handler action</FieldLabel>
-                          <Select value={route.actionId} onValueChange={(actionId) => onRouteActionChange(route.workflowId, route.stepIndex, actionId)}>
-                            <SelectTrigger id={routeActionFieldId} className="min-w-0 w-full font-mono">
+                          <Select
+                            value={route.actionId}
+                            items={config.actions.map((option) => ({ value: option.id, label: option.id }))}
+                            onValueChange={(actionId) => onRouteActionChange(route.workflowId, route.stepIndex, actionId)}
+                          >
+                            <SelectTrigger
+                              id={routeActionFieldId}
+                              size="sm"
+                              className="h-5 min-h-5 w-fit max-w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
+                              title={route.actionId}
+                            >
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -170,12 +179,12 @@ export function WorkflowHandlerSheet({
                           />
                         </Field>
                         <ReadOnlyBadges label="Agents" values={agentIds.map(agentLabel)} />
-                        <ReadOnlyBadges label="Outputs" values={outputIds} />
-                        <OutputTargetControls
+                        <WorkflowOutputHandlerControls
                           config={config}
                           route={route}
                           outputIds={outputIds}
-                          onOutputRouteTargetChange={onOutputRouteTargetChange}
+                          label="Outputs"
+                          onOutputHandlerActionChange={onOutputHandlerActionChange}
                         />
                       </FieldGroup>
                     )}
@@ -195,53 +204,6 @@ export function WorkflowHandlerSheet({
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function OutputTargetControls({
-  config,
-  route,
-  outputIds,
-  onOutputRouteTargetChange
-}: {
-  config: ProjectAutomationConfig;
-  route: WorkflowHandlerRoute;
-  outputIds: string[];
-  onOutputRouteTargetChange: (sourcePolicyId: string, outputId: string, target: ProjectOutputTarget | undefined) => void;
-}) {
-  return (
-    <Field>
-      <FieldLabel>Output targets</FieldLabel>
-      {outputIds.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          {outputIds.map((outputId) => (
-            <div key={outputId} className="grid grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)] items-center gap-2">
-              <Badge variant="outline" className="min-w-0 justify-start border-divider-strong bg-muted/50 font-mono">
-                <span className="truncate">{outputId}</span>
-              </Badge>
-              <Select
-                value={workflowOutputTargetSelectValue(config, route.policyId, outputId)}
-                onValueChange={(value) => onOutputRouteTargetChange(route.policyId, outputId, workflowOutputTargetFromSelectValue(value))}
-              >
-                <SelectTrigger className="min-w-0 w-full font-mono">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="event">Event</SelectItem>
-                    {workflowOutputTargetCanSelectTrigger(config, route.policyId, outputId) ? config.triggers.map((trigger) => (
-                      <SelectItem key={trigger.id} value={`trigger:${trigger.id}`}>
-                        Trigger · {trigger.id}
-                      </SelectItem>
-                    )) : null}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          ))}
-        </div>
-      ) : <span className="text-sm text-muted-foreground">None</span>}
-    </Field>
   );
 }
 

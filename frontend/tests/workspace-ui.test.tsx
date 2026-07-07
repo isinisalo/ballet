@@ -204,6 +204,16 @@ const workflowEdgeEndLabels = () => Array.from(document.querySelectorAll<HTMLEle
 const workflowEdgeLabelTexts = () => workflowEdgeLabels()
   .map((label) => label.dataset.workflowEdgeLabelValue ?? label.textContent);
 
+const badgeWithTextClass = (text: string, className: string) =>
+  screen.queryAllByText(text).find((element) =>
+    element.closest("[data-slot=\"badge\"]")?.className.includes(className)
+  );
+
+const controlWithTextClass = (container: HTMLElement, text: string, className: string) =>
+  within(container).queryAllByText(text).find((element) =>
+    element.closest("button")?.className.includes(className)
+  );
+
 const activateWorkflowNode = (element: HTMLElement) => {
   fireEvent.pointerDown(element, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
   fireEvent.pointerUp(element, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
@@ -807,9 +817,9 @@ describe("workspace entity UI flows", () => {
 
     activateWorkflowNode(createRoadmapNode);
     const workflowHandlerDialog = screen.getByRole("dialog", { name: "Workflow handler" });
-    expect(within(workflowHandlerDialog).getByText("project_brief_approved")).toBeInTheDocument();
-    expect(within(workflowHandlerDialog).getByText("challenge-roadmap")).toHaveClass("text-tertiary");
-    expect(within(workflowHandlerDialog).getByText("changes_requested")).toHaveClass("text-primary");
+    expect(within(workflowHandlerDialog).getAllByText("project_brief_approved").length).toBeGreaterThan(0);
+    expect(within(workflowHandlerDialog).getAllByText("challenge-roadmap").find((element) => element.className.includes("text-tertiary"))).toBeDefined();
+    expect(within(workflowHandlerDialog).getAllByText("changes_requested").find((element) => element.className.includes("text-primary"))).toBeDefined();
     expect(within(workflowHandlerDialog).getAllByLabelText("Handler action")).toHaveLength(2);
   });
 
@@ -826,6 +836,7 @@ describe("workspace entity UI flows", () => {
     expect(window.location.pathname).toBe("/automation/actions");
     expect(window.location.search).toBe("?id=implementation");
     expect(screen.getByDisplayValue("Implement work")).toBeInTheDocument();
+    expect(badgeWithTextClass("implementation.failed", "border-primary/60")).toBeDefined();
 
     let triggersToggle = screen.getByRole("link", { name: "Triggers" });
     expect(triggersToggle).toHaveAttribute("aria-expanded", "false");
@@ -1111,8 +1122,75 @@ describe("workspace entity UI flows", () => {
     const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
     activateWorkflowNode(implementationPolicyNode);
 
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
+    expect(dialog).toBeInTheDocument();
     expectActionSelectValue("implementation");
+    expect(within(dialog).getByLabelText("Handler action")).toHaveClass("border-primary/60", "bg-primary/10", "text-primary");
+    expect(within(dialog).getByLabelText("Handler action")).not.toHaveTextContent("Implement work");
+    expect(within(dialog).getByText("Input")).toBeInTheDocument();
+    expect(badgeWithTextClass("implementation.failed", "border-primary/60")).toBeUndefined();
+    expect(within(dialog).getByTitle("implementation.failed")).toBeInTheDocument();
+  });
+
+  it("renders workflow output handler actions instead of output event targets", async () => {
+    const workflowData = baseData();
+    workflowData.automation.actions.push({
+      id: "review-pass",
+      description: "Review output.",
+      outputIds: ["summary"],
+      agentIds: ["agent-1"]
+    });
+    workflowData.automation.policies.push({
+      id: "on.implementation.complete.start.review-pass",
+      source: "event",
+      event: "implementation.complete",
+      action: "review-pass",
+      enabled: true
+    });
+    workflowData.automation.workflows[0]!.steps = [
+      "on.implementation.failed.start.implementation",
+      "on.implementation.complete.start.review-pass"
+    ];
+    await renderRoute("/automation/workflows?id=workflow-1", workflowData);
+
+    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
+    const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
+
+    expect(within(dialog).getByText("Outputs")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Output targets")).not.toBeInTheDocument();
+    const reviewPassControl = controlWithTextClass(dialog, "review-pass", "border-primary/60");
+    expect(reviewPassControl).toBeDefined();
+    expect(within(dialog).queryByText("implementation.complete")).not.toBeInTheDocument();
+    const outputLabel = within(dialog).getByText("complete");
+    expect(outputLabel).toHaveClass("text-muted-foreground");
+    expect(outputLabel.closest("[data-slot=\"badge\"]")).toBeNull();
+    expect(outputLabel.closest("button")).toBeNull();
+  });
+
+  it("renders missing workflow output handlers as None", async () => {
+    const workflowData = baseData();
+    workflowData.automation.actions[0] = {
+      id: "implementation",
+      description: "Review generated evidence.",
+      outputIds: ["complete", "failed"],
+      agentIds: [],
+      humanGate: true
+    };
+    workflowData.automation.outputRoutes = [{
+      sourcePolicyId: "on.implementation.failed.start.implementation",
+      outputId: "complete",
+      target: { type: "trigger", trigger: "manual-start" }
+    }];
+
+    await renderRoute("/automation/workflows?id=workflow-1", workflowData);
+
+    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
+    const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
+
+    expect(within(dialog).queryByText("Output targets")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Output routing")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("None").length).toBeGreaterThan(0);
+    expect(controlWithTextClass(dialog, "manual-start", "border-tertiary/60")).toBeUndefined();
   });
 
   it("creates an automation action and keeps workflow action editing sheet-based", async () => {
@@ -1168,6 +1246,7 @@ describe("workspace entity UI flows", () => {
     workflowData.automation.workflows[0]!.steps = ["on.trigger.manual-start.start.implementation"];
     const { data } = await renderRoute("/automation/actions?id=implementation", workflowData);
 
+    expect(badgeWithTextClass("manual-start", "border-tertiary/60")).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Remove agent Existing Agent" }));
 
     await waitFor(() => expect(screen.queryByRole("button", { name: "Remove output complete" })).not.toBeInTheDocument());
@@ -1221,18 +1300,40 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Change approval output" }));
     await user.type(screen.getByLabelText("Search or create output"), "cancel");
     await user.keyboard("{Enter}");
-    expect(screen.getByText("cancelled")).toBeInTheDocument();
+    expect(badgeWithTextClass("implementation.cancelled", "border-primary/60")).toBeDefined();
 
     await user.click(screen.getByRole("button", { name: "Change rework output" }));
     await user.type(screen.getByLabelText("Search or create output"), "Warm");
     await user.keyboard("{Enter}");
     expect(screen.getByRole("button", { name: "Remove output warm" })).toBeInTheDocument();
+    expect(screen.getByText("implementation.warm")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add output" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.actions[0]?.outputIds).toEqual(["cancelled", "warm"]));
     expect(data.automation.outputs).toContainEqual({ id: "warm" });
     expect(data.automation.outputs.filter((output) => output.id === "ready")).toHaveLength(1);
+  });
+
+  it("renders action output badges by event and trigger target type", async () => {
+    const workflowData = baseData();
+    workflowData.automation.actions[0] = {
+      id: "implementation",
+      description: "Review generated evidence.",
+      outputIds: ["complete", "failed"],
+      agentIds: [],
+      humanGate: true
+    };
+    workflowData.automation.outputRoutes = [{
+      sourcePolicyId: "on.implementation.failed.start.implementation",
+      outputId: "complete",
+      target: { type: "trigger", trigger: "manual-start" }
+    }];
+
+    await renderRoute("/automation/actions?id=implementation", workflowData);
+
+    expect(badgeWithTextClass("manual-start", "border-tertiary/60")).toBeDefined();
+    expect(badgeWithTextClass("implementation.failed", "border-primary/60")).toBeDefined();
   });
 
   it("allows removing the optional rework output from an agent action", async () => {

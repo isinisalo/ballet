@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
@@ -25,6 +26,7 @@ type OutputSelectorProps = {
   openButtonLabel?: string;
   canRemove?: boolean;
   disabled?: boolean;
+  displayByOutputId?: Record<OutputId, { type: "event" | "trigger"; label: string }>;
   onCreateOption?: (id: OutputId) => void;
 };
 
@@ -38,6 +40,7 @@ export function OutputSelector({
   openButtonLabel,
   canRemove = true,
   disabled = false,
+  displayByOutputId = {},
   onCreateOption
 }: OutputSelectorProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -99,23 +102,37 @@ export function OutputSelector({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex min-h-7 flex-wrap items-center gap-2">
-        {selected.map((outputId) => (
-          <Badge key={outputId} variant="outline" className="border-divider-strong bg-muted/50 font-mono">
-            {outputId}
-            {canRemove ? (
-              <Button
-                type="button" size="icon-xs" variant="ghost"
-                aria-label={`Remove output ${outputId}`}
-                title={`Remove output ${outputId}`}
-                disabled={disabled}
-                onClick={() => removeOutput(outputId)}
-                className="-mr-1 size-4 rounded-full p-0"
-              >
-                <X data-icon="inline-end" />
-              </Button>
-            ) : null}
-          </Badge>
-        ))}
+        {selected.map((outputId) => {
+          const display = displayByOutputId[outputId];
+          return (
+            <Badge
+              key={outputId}
+              variant="outline"
+              className={cn(
+                "min-w-0 font-mono",
+                display
+                  ? display.type === "trigger"
+                    ? "border-tertiary/60 bg-tertiary/10 text-tertiary"
+                    : "border-primary/60 bg-primary/10 text-primary"
+                  : "border-divider-strong bg-muted/50"
+              )}
+            >
+              <span className="truncate">{display?.label ?? outputId}</span>
+              {canRemove ? (
+                <Button
+                  type="button" size="icon-xs" variant="ghost"
+                  aria-label={`Remove output ${outputId}`}
+                  title={`Remove output ${outputId}`}
+                  disabled={disabled}
+                  onClick={() => removeOutput(outputId)}
+                  className="-mr-1 size-4 rounded-full p-0"
+                >
+                  <X data-icon="inline-end" />
+                </Button>
+              ) : null}
+            </Badge>
+          );
+        })}
         {!editing && canOpenEditor ? (
           <Button
             type="button" size="xs" variant="outline"

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import {
   workflowOutputTargetCanSelectTrigger,
+  workflowOutputTargetDisplay,
+  workflowOutputEventTargetDisplay,
   workflowOutputTargetFromSelectValue,
   workflowOutputTargetSelectValue
 } from "../src/workspace/automation/workflows/workflowOutputTargetRules";
@@ -44,5 +46,22 @@ describe("workflow output target rules", () => {
     expect(workflowOutputTargetSelectValue(current, "human-review-policy", "changes_requested")).toBe("event");
     expect(workflowOutputTargetFromSelectValue("trigger:approved")).toEqual({ type: "trigger", trigger: "approved" });
     expect(workflowOutputTargetFromSelectValue("event")).toBeUndefined();
+  });
+
+  it("formats selected output targets for event and trigger badges", () => {
+    const current = config();
+
+    expect(workflowOutputTargetDisplay(current, "human-review-policy", "approved")).toEqual({
+      type: "trigger",
+      label: "approved"
+    });
+    expect(workflowOutputTargetDisplay(current, "human-review-policy", "changes_requested")).toEqual({
+      type: "event",
+      label: "human-review.changes_requested"
+    });
+    expect(workflowOutputEventTargetDisplay(current, "human-review-policy", "approved")).toEqual({
+      type: "event",
+      label: "human-review.approved"
+    });
   });
 });
