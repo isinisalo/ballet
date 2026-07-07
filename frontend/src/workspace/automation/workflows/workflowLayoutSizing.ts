@@ -15,6 +15,29 @@ export function workflowOutputSourceHandleId(output?: { outputId?: string; event
   return workflowOutputSlotKindForValues(outputId, eventType) === "rework" ? "bottom" : "right";
 }
 
+export function workflowOutputTargetHandleId(output?: { outputId?: string; eventType?: string } | string, fallback = "left") {
+  const outputId = typeof output === "string" ? output : output?.outputId;
+  const eventType = typeof output === "string" ? undefined : output?.eventType;
+  return workflowOutputSlotKindForValues(outputId, eventType) === "rework" ? "top" : fallback;
+}
+
+export function workflowShortestVerticalHandles(sourceNode: WorkflowCanvasLayoutNode, targetNode: WorkflowCanvasLayoutNode, preferBottomOnTie: boolean) {
+  const sourceCenterY = sourceNode.y + sourceNode.height / 2;
+  const targetCenterY = targetNode.y + targetNode.height / 2;
+  if (targetCenterY < sourceCenterY) return { sourceHandleId: "top", targetHandleId: "bottom" };
+  if (targetCenterY > sourceCenterY) return { sourceHandleId: "bottom", targetHandleId: "top" };
+  const handleId = preferBottomOnTie ? "bottom" : "top";
+  return { sourceHandleId: handleId, targetHandleId: handleId };
+}
+
+export function workflowVerticalTargetHandle(sourceNode: WorkflowCanvasLayoutNode, targetNode: WorkflowCanvasLayoutNode, fallback: string) {
+  const sourceCenterY = sourceNode.y + sourceNode.height / 2;
+  const targetCenterY = targetNode.y + targetNode.height / 2;
+  if (targetCenterY < sourceCenterY) return "bottom";
+  if (targetCenterY > sourceCenterY) return "top";
+  return fallback;
+}
+
 export function workflowPolicyOutputHandleY(outputIndex: number, outputHandleCount: number) {
   if (outputHandleCount <= 1) return workflowCanvasLayoutConfig.policyAnchorY;
   const firstHandleY = workflowCanvasLayoutConfig.policyAnchorY;

@@ -1,4 +1,4 @@
-import { BaseEdge, EdgeLabelRenderer, Position, useNodes, type EdgeProps, type Node } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, useNodes, type EdgeProps, type Node } from "@xyflow/react";
 import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
 import type { WorkflowReactFlowEdge } from "./WorkflowCanvasTypes";
@@ -9,42 +9,35 @@ import { workflowSmartEdgeRoutingOptions } from "./workflowSmartEdgeRouting";
 
 const workflowEdgeLabelClassName = "absolute z-20 inline-flex whitespace-nowrap bg-background/95 py-0.5 pl-1.5 pr-0.5 font-mono text-[0.58rem] leading-4";
 const workflowEdgeLabelCenterRatio = 0.5;
-const workflowEdgeLabelSourceOffset = 4;
-const workflowEdgeLabelTargetOffset = 4;
 const workflowEdgeLabelVerticalOffset = 4;
 
 export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
-  const { data, sourcePosition, sourceX, sourceY, targetX, targetY } = props;
+  const { data, sourceX, sourceY, targetX, targetY } = props;
   const nodes = useNodes();
   const workflowEdge = data?.workflowEdge;
   const label = workflowEdge?.label;
   const edgeTone = workflowEdge?.tone ?? "flow";
   const outputSlotKind = workflowEdgeOutputSlotKind(workflowEdge);
   const isReturnEdge = workflowEdge?.tone === "return";
-  const isCrossWorkflowEdge = workflowEdge?.tone === "cross-workflow";
   const targetKind = data?.targetNode?.kind;
-  const showEndLabel = targetKind === "policy";
-  const returnEdgePath = isReturnEdge ? workflowReturnEdgePath(props) : undefined;
-  const crossWorkflowEdgePath = !returnEdgePath && isCrossWorkflowEdge ? workflowCrossWorkflowSmoothStepPath(props) : undefined;
-  const smartEdgePath = returnEdgePath || crossWorkflowEdgePath ? undefined : workflowSmartEdgePath(props, nodes);
-  const { startLabelTransform, labelTransform, endLabelTransform } = workflowEdgeLabelTransforms({
+  const edgePaths = workflowEdgePaths(props, nodes, outputSlotKind);
+  const labelTransform = workflowEdgeLabelTransform({
     isReturnEdge,
-    returnEdgePath,
-    crossWorkflowEdgePath,
-    smartEdgePath,
-    sourcePosition,
+    returnEdgePath: edgePaths.returnEdgePath,
+    crossWorkflowEdgePath: edgePaths.crossWorkflowEdgePath,
+    approvalEdgePath: edgePaths.approvalEdgePath,
+    smartEdgePath: edgePaths.smartEdgePath,
     sourceX,
     sourceY,
     targetX,
     targetY
   });
-  const edgePath = returnEdgePath?.path ?? crossWorkflowEdgePath?.path ?? smartEdgePath?.path ?? `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
 
   return (
     <>
       <BaseEdge
         id={props.id}
-        path={edgePath}
+        path={edgePaths.path}
         style={props.style}
         markerStart={props.markerStart}
         markerEnd={props.markerEnd}
@@ -54,22 +47,42 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
         label={label}
         tone={edgeTone}
         outputSlotKind={outputSlotKind}
-        startLabelTransform={startLabelTransform}
         labelTransform={labelTransform}
-        endLabelTransform={endLabelTransform}
         targetKind={targetKind}
-        showEndLabel={showEndLabel}
       />
     </>
   );
 }
 
-export function workflowEdgeLabelTransforms({
+function workflowEdgePaths(
+  props: EdgeProps<WorkflowReactFlowEdge>,
+  nodes: Node[],
+  outputSlotKind: string | undefined
+) {
+  const { data, sourceX, sourceY, targetX, targetY } = props;
+  const crossWorkflowEdgePath = data?.workflowEdge.tone === "cross-workflow" ? workflowCrossWorkflowSmoothStepPath(props) : undefined;
+  const approvalEdgePath = outputSlotKind === "approval" && !crossWorkflowEdgePath
+    ? workflowApprovalEdgePath({ sourceX, sourceY, targetX, targetY })
+    : undefined;
+  const returnEdgePath = !approvalEdgePath && data?.workflowEdge.tone === "return" ? workflowReturnEdgePath(props) : undefined;
+  const smartEdgePath = returnEdgePath || crossWorkflowEdgePath || approvalEdgePath ? undefined : workflowSmartEdgePath(props, nodes);
+  const path = returnEdgePath?.path ?? crossWorkflowEdgePath?.path ?? approvalEdgePath?.path ?? smartEdgePath?.path ?? `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+
+  return {
+    path,
+    returnEdgePath,
+    crossWorkflowEdgePath,
+    approvalEdgePath,
+    smartEdgePath
+  };
+}
+
+export function workflowEdgeLabelTransform({
   isReturnEdge,
   returnEdgePath,
   crossWorkflowEdgePath,
+  approvalEdgePath,
   smartEdgePath,
-  sourcePosition,
   sourceX,
   sourceY,
   targetX,
@@ -78,31 +91,23 @@ export function workflowEdgeLabelTransforms({
   isReturnEdge: boolean;
   returnEdgePath?: ReturnType<typeof workflowReturnEdgePath>;
   crossWorkflowEdgePath?: ReturnType<typeof workflowCrossWorkflowSmoothStepPath>;
+  approvalEdgePath?: ReturnType<typeof workflowApprovalEdgePath>;
   smartEdgePath?: ReturnType<typeof workflowSmartEdgePath>;
-  sourcePosition?: Position;
   sourceX: number;
   sourceY: number;
   targetX: number;
   targetY: number;
 }) {
-  const startLabelX = returnEdgePath?.startLabelX ?? sourceX + (sourcePosition === Position.Bottom ? 0 : workflowEdgeLabelSourceOffset);
-  const startLabelY = returnEdgePath?.startLabelY ?? sourceY + (sourcePosition === Position.Bottom ? workflowEdgeLabelSourceOffset : 0);
-  const endLabelX = returnEdgePath?.endLabelX ?? targetX;
-  const endLabelY = returnEdgePath?.endLabelY ?? targetY;
-
   if (isReturnEdge) {
     const labelX = returnEdgePath?.labelX ?? (sourceX + targetX) / 2;
     const labelY = returnEdgePath?.labelY ?? (sourceY + targetY) / 2;
 
-    return {
-      startLabelTransform: `translate(-50%, -100%) translate(${startLabelX}px, ${startLabelY}px)`,
-      labelTransform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-      endLabelTransform: `translate(-50%, -100%) translate(${endLabelX}px, ${endLabelY}px)`
-    };
+    return `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`;
   }
 
   const { labelX: flowLabelX, labelY: flowLabelY } = workflowFlowLabelCoordinates({
     crossWorkflowEdgePath,
+    approvalEdgePath,
     smartEdgePath,
     sourceX,
     sourceY,
@@ -110,17 +115,12 @@ export function workflowEdgeLabelTransforms({
     targetY
   });
 
-  return {
-    startLabelTransform: sourcePosition === Position.Bottom
-      ? `translate(-50%, 0) translate(${startLabelX}px, ${startLabelY}px)`
-      : `translate(0, -50%) translate(${startLabelX}px, ${startLabelY}px)`,
-    labelTransform: `translate(-50%, -50%) translate(${flowLabelX}px, ${flowLabelY}px)`,
-    endLabelTransform: `translate(-100%, -50%) translate(${targetX - workflowEdgeLabelTargetOffset}px, ${targetY}px)`
-  };
+  return `translate(-50%, -50%) translate(${flowLabelX}px, ${flowLabelY}px)`;
 }
 
 function workflowFlowLabelCoordinates({
   crossWorkflowEdgePath,
+  approvalEdgePath,
   smartEdgePath,
   sourceX,
   sourceY,
@@ -128,6 +128,7 @@ function workflowFlowLabelCoordinates({
   targetY
 }: {
   crossWorkflowEdgePath?: ReturnType<typeof workflowCrossWorkflowSmoothStepPath>;
+  approvalEdgePath?: ReturnType<typeof workflowApprovalEdgePath>;
   smartEdgePath?: ReturnType<typeof workflowSmartEdgePath>;
   sourceX: number;
   sourceY: number;
@@ -135,6 +136,7 @@ function workflowFlowLabelCoordinates({
   targetY: number;
 }) {
   if (crossWorkflowEdgePath) return { labelX: crossWorkflowEdgePath.labelX, labelY: crossWorkflowEdgePath.labelY };
+  if (approvalEdgePath) return { labelX: approvalEdgePath.labelX, labelY: approvalEdgePath.labelY };
   if (!smartEdgePath) {
     return {
       labelX: sourceX + (targetX - sourceX) * workflowEdgeLabelCenterRatio,
@@ -184,24 +186,37 @@ function workflowSmartEdgePath(
   };
 }
 
+export function workflowApprovalEdgePath({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY
+}: Pick<EdgeProps<WorkflowReactFlowEdge>, "sourceX" | "sourceY" | "targetX" | "targetY">) {
+  const labelX = sourceX + (targetX - sourceX) * workflowEdgeLabelCenterRatio;
+  const labelY = sourceY + (targetY - sourceY) * workflowEdgeLabelCenterRatio;
+  const path = sourceY === targetY
+    ? `M ${sourceX},${sourceY} L ${targetX},${targetY}`
+    : `M ${sourceX},${sourceY} L ${labelX},${sourceY} L ${labelX},${targetY} L ${targetX},${targetY}`;
+
+  return {
+    path,
+    labelX,
+    labelY
+  };
+}
+
 function WorkflowEdgeLabels({
   label,
   tone,
   outputSlotKind,
-  startLabelTransform,
   labelTransform,
-  endLabelTransform,
-  targetKind,
-  showEndLabel
+  targetKind
 }: {
   label?: string;
   tone: string;
   outputSlotKind?: string;
-  startLabelTransform: string;
   labelTransform: string;
-  endLabelTransform: string;
   targetKind?: string;
-  showEndLabel: boolean;
 }) {
   if (!label) return null;
   const isGhostTarget = targetKind === "output-event" || targetKind === "first-policy-ghost";
@@ -218,22 +233,6 @@ function WorkflowEdgeLabels({
     <EdgeLabelRenderer>
       <div
         aria-hidden="true"
-        data-workflow-edge-start-label="true"
-        data-workflow-edge-label-tone={tone}
-        data-workflow-edge-label-value={label}
-        data-workflow-edge-target-kind={targetKind}
-        title="on"
-        className={cn(workflowEdgeLabelClassName, "pointer-events-none")}
-        style={{
-          position: "absolute",
-          pointerEvents: "none",
-          transform: startLabelTransform
-        }}
-      >
-        <span className="text-foreground">on</span>
-      </div>
-      <div
-        aria-hidden="true"
         data-workflow-edge-label="true"
         data-workflow-edge-label-tone={tone}
         data-workflow-edge-label-value={label}
@@ -248,24 +247,6 @@ function WorkflowEdgeLabels({
       >
         {centerLabelContent}
       </div>
-      {showEndLabel ? (
-        <div
-          aria-hidden="true"
-          data-workflow-edge-end-label="true"
-          data-workflow-edge-label-tone={tone}
-          data-workflow-edge-label-value={label}
-          data-workflow-edge-target-kind={targetKind}
-          title="then"
-          className={cn(workflowEdgeLabelClassName, "pointer-events-none")}
-          style={{
-            position: "absolute",
-            pointerEvents: "none",
-            transform: endLabelTransform
-          }}
-        >
-          <span className="text-foreground">then</span>
-        </div>
-      ) : null}
     </EdgeLabelRenderer>
   );
 }
@@ -273,21 +254,26 @@ function WorkflowEdgeLabels({
 export function workflowReturnEdgePath({ data, sourceX, sourceY, targetX, targetY }: EdgeProps<WorkflowReactFlowEdge>) {
   const sourceNode = data?.sourceNode;
   const targetNode = data?.targetNode;
+  const sourceHandleId = data?.workflowEdge.sourceHandleId;
   const targetHandleId = data?.workflowEdge.targetHandleId;
   const resolvedSourceX = sourceNode ? sourceNode.x + sourceNode.width / 2 : sourceX;
-  const resolvedSourceY = sourceNode ? sourceNode.y : sourceY;
+  const resolvedSourceY = sourceNode
+    ? sourceHandleId === "bottom" ? sourceNode.y + sourceNode.height : sourceNode.y
+    : sourceY;
   const resolvedTargetX = targetNode ? targetNode.x + targetNode.width / 2 : targetX;
   const resolvedTargetY = targetNode
     ? targetHandleId === "bottom" ? targetNode.y + targetNode.height : targetNode.y
     : targetY;
   const sourcePad = 28;
   const targetPad = 28;
-  const sourceExitY = resolvedSourceY - sourcePad;
+  const sourceExitY = sourceHandleId === "bottom" ? resolvedSourceY + sourcePad : resolvedSourceY - sourcePad;
   const targetEntryY = targetHandleId === "bottom" ? resolvedTargetY + targetPad : resolvedTargetY - targetPad;
   const labelX = Math.min(resolvedSourceX, resolvedTargetX) + Math.abs(resolvedTargetX - resolvedSourceX) / 2;
   const labelY = targetEntryY;
   const startLabelX = resolvedSourceX;
-  const startLabelY = resolvedSourceY - workflowEdgeLabelVerticalOffset;
+  const startLabelY = sourceHandleId === "bottom"
+    ? resolvedSourceY + workflowEdgeLabelVerticalOffset + 20
+    : resolvedSourceY - workflowEdgeLabelVerticalOffset;
   const endLabelX = resolvedTargetX;
   const endLabelY = resolvedTargetY - workflowEdgeLabelVerticalOffset;
 

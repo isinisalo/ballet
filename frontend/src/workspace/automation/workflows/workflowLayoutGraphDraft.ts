@@ -13,6 +13,7 @@ import { workflowNodeSizes } from "./workflowLayoutConfig";
 import {
   workflowOutputEventNodeWidth,
   workflowOutputSourceHandleId,
+  workflowOutputTargetHandleId,
   workflowPolicyNodeWidth,
   workflowTriggerNodeWidth
 } from "./workflowLayoutSizing";
@@ -104,7 +105,7 @@ export function addOutputEventNode(
     sourceNodeKey: `policy-${record.index}`,
     targetNodeKey: key,
     sourceHandleId: workflowOutputSourceHandleId(output),
-    targetHandleId: context.targetHandleId,
+    targetHandleId: workflowOutputTargetHandleId(output, context.targetHandleId),
     dashed: true,
     eventType: output.eventType,
     label: workflowOutputEdgeLabel(output)

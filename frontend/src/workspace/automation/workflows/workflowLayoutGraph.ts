@@ -21,7 +21,8 @@ import {
   type WorkflowLayoutGraphDraftContext
 } from "./workflowLayoutGraphDraft";
 import {
-  workflowOutputSourceHandleId
+  workflowOutputSourceHandleId,
+  workflowOutputTargetHandleId
 } from "./workflowLayoutSizing";
 import type { WorkflowActiveOutputTask, WorkflowLayoutDirection } from "./workflowLayoutTypes";
 
@@ -195,7 +196,7 @@ function addChildPolicyEdge(
       sourceNodeKey: `policy-${record.index}`,
       targetNodeKey: `policy-${canonicalChildRecord.index}`,
       sourceHandleId: workflowOutputSourceHandleId(output),
-      targetHandleId: isReturnEdge ? "top" : context.targetHandleId,
+      targetHandleId: isReturnEdge ? workflowOutputTargetHandleId(output, "top") : workflowOutputTargetHandleId(output, context.targetHandleId),
       tone: isReturnEdge ? "return" : undefined,
       eventType: output.eventType,
       label: workflowOutputEdgeLabel(output),
@@ -222,7 +223,7 @@ function addChildPolicyEdge(
     sourceNodeKey: `policy-${record.index}`,
     targetNodeKey: `policy-${childRecord.index}`,
     sourceHandleId: workflowOutputSourceHandleId(output),
-    targetHandleId: context.targetHandleId,
+    targetHandleId: workflowOutputTargetHandleId(output, context.targetHandleId),
     eventType: output.eventType,
     label: workflowOutputEdgeLabel(output),
     route: {

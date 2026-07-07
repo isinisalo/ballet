@@ -5,7 +5,7 @@ import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspa
 import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
-import { workflowEdgeLabelTransforms, workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
+import { workflowApprovalEdgePath, workflowEdgeLabelTransform, workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
 import { workflowCrossWorkflowSmoothStepPath } from "../src/workspace/automation/workflows/workflowCrossWorkflowSmoothStepPath";
 import { workflowRoutedEdgeLabelAnchor } from "../src/workspace/automation/workflows/workflowEdgeLabelGeometry";
 import { workflowSmartEdgeRoutingOptions } from "../src/workspace/automation/workflows/workflowSmartEdgeRouting";
@@ -238,15 +238,14 @@ describe("workflow layout helper modules", () => {
     })).toEqual({ x: 513, y: 326 });
   });
 
-  it("places bottom-source start labels below the connection point", () => {
-    expect(workflowEdgeLabelTransforms({
+  it("centers bottom-source edge labels on the routed edge", () => {
+    expect(workflowEdgeLabelTransform({
       isReturnEdge: false,
-      sourcePosition: Position.Bottom,
       sourceX: 371,
       sourceY: 295.5,
       targetX: 659.5,
       targetY: 327
-    }).startLabelTransform).toBe("translate(-50%, 0) translate(371px, 299.5px)");
+    })).toBe("translate(-50%, -50%) translate(515.25px, 311.25px)");
   });
 });
 
@@ -401,7 +400,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       sourceNodeKey: "policy-0",
       targetNodeKey: "output-event-0-failed",
       sourceHandleId: "bottom",
-      targetHandleId: "left",
+      targetHandleId: "bottom",
       dashed: true,
       eventType: "build.failed",
       label: "failed"
@@ -418,7 +417,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     }));
   });
 
-  it("routes approval outputs from the right and non-return rework outputs from the bottom", () => {
+  it("routes approval outputs from the right and same-row rework outputs through bottom handles", () => {
     const start = policy("start", undefined, "build");
     const completeHandler = policy("complete-handler", "build.complete", "done");
     const failedHandler = policy("failed-handler", "build.failed", "done");
@@ -437,7 +436,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(layout.edges.find((edge) => edge.eventType === "build.failed")).toMatchObject({
       sourceNodeKey: "policy-0",
       sourceHandleId: "bottom",
-      targetHandleId: "left",
+      targetHandleId: "bottom",
       label: "failed"
     });
   });
@@ -543,7 +542,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       sourceNodeKey: "policy-0",
       targetNodeKey: "output-event-0-build.failed",
       sourceHandleId: "bottom",
-      targetHandleId: "left",
+      targetHandleId: "top",
       dashed: true,
       eventType: "build.failed",
       label: "failed"
@@ -718,6 +717,89 @@ describe("calculateWorkflowCanvasLayout", () => {
       : undefined).toBe(workflowCanvasLayoutConfig.outputEventLaneClearance + workflowCanvasLayoutConfig.branchGap);
   });
 
+  it("keeps folded approval edges sourced from the right even when they target a vertical handle", () => {
+    const createMilestones = policy("create-milestones", undefined, "create-milestones");
+    createMilestones.trigger = "technical_plan_approved";
+    const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
+    const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes_requested", "create-milestones");
+    const doneMilestones = policy("done-milestones", "challenge-milestones.approved", "done");
+    const createTaskSpecs = policy("create-task-specs", undefined, "create-task-specs");
+    createTaskSpecs.trigger = "milestones_approved";
+    const challengeTaskSpecs = policy("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
+    const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes_requested", "create-task-specs");
+    const doneTaskSpecs = policy("done-task-specs", "challenge-task-specs.approved", "done");
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph([
+        {
+          policyId: createMilestones.id,
+          index: 0,
+          policy: createMilestones,
+          outputTargets: [
+            { outputId: "ready", eventType: "create-milestones.ready", type: "event" },
+            { outputId: "blocked", eventType: "create-milestones.blocked", type: "event" }
+          ]
+        },
+        {
+          policyId: challengeMilestones.id,
+          index: 1,
+          policy: challengeMilestones,
+          outputTargets: [
+            { outputId: "approved", eventType: "challenge-milestones.approved", type: "event" },
+            { outputId: "changes_requested", eventType: "challenge-milestones.changes_requested", type: "event" }
+          ]
+        },
+        {
+          policyId: reworkMilestones.id,
+          index: 2,
+          policy: reworkMilestones,
+          outputTargets: [
+            { outputId: "ready", eventType: "create-milestones.ready", type: "event" },
+            { outputId: "blocked", eventType: "create-milestones.blocked", type: "event" }
+          ]
+        },
+        { policyId: doneMilestones.id, index: 3, policy: doneMilestones, outputTargets: [] },
+        {
+          policyId: createTaskSpecs.id,
+          index: 4,
+          policy: createTaskSpecs,
+          outputTargets: [
+            { outputId: "ready", eventType: "create-task-specs.ready", type: "event" },
+            { outputId: "blocked", eventType: "create-task-specs.blocked", type: "event" }
+          ]
+        },
+        {
+          policyId: challengeTaskSpecs.id,
+          index: 5,
+          policy: challengeTaskSpecs,
+          outputTargets: [
+            { outputId: "approved", eventType: "challenge-task-specs.approved", type: "event" },
+            { outputId: "changes_requested", eventType: "challenge-task-specs.changes_requested", type: "event" }
+          ]
+        },
+        {
+          policyId: reworkTaskSpecs.id,
+          index: 6,
+          policy: reworkTaskSpecs,
+          outputTargets: [
+            { outputId: "ready", eventType: "create-task-specs.ready", type: "event" },
+            { outputId: "blocked", eventType: "create-task-specs.blocked", type: "event" }
+          ]
+        },
+        { policyId: doneTaskSpecs.id, index: 7, policy: doneTaskSpecs, outputTargets: [] }
+      ]),
+      editingPolicyIndex: null
+    });
+
+    expect(layout.edges.find((edge) => edge.eventType === "challenge-task-specs.approved")).toMatchObject({
+      sourceNodeKey: "policy-5",
+      targetNodeKey: "policy-3",
+      sourceHandleId: "right",
+      targetHandleId: "bottom",
+      tone: "return",
+      label: "approved"
+    });
+  });
+
   it("lays out child event policies below the source policy in vertical mode", () => {
     const first = policy("first", undefined, "build");
     const child = policy("child", "build.complete", "deploy");
@@ -741,7 +823,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-policy-0-1-build.complete",
       sourceHandleId: "right",
-      targetHandleId: "left"
+      targetHandleId: "top"
     }));
   });
 
@@ -805,8 +887,8 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(returnEdge).toMatchObject({
       sourceNodeKey: "policy-1",
       targetNodeKey: "policy-0",
-      sourceHandleId: "top",
-      targetHandleId: "top",
+      sourceHandleId: "bottom",
+      targetHandleId: "bottom",
       tone: "return",
       eventType: "review.rejected",
       label: "rejected"
@@ -966,7 +1048,7 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
     expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toMatchObject({
       sourceNodeKey: "workflow:source:policy-0",
       sourceHandleId: "bottom",
-      targetHandleId: "left",
+      targetHandleId: "top",
       label: "blocked",
       tone: "cross-workflow"
     });
@@ -990,6 +1072,28 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
     expect(targetTrigger).toBeDefined();
     expect(sourceTrigger?.x).toBe(targetTrigger?.x);
     expect(targetTrigger?.y).toBeLessThan(sourceTrigger?.y ?? 0);
+  });
+
+  it("routes upward rework outputs from the source top to the target bottom", () => {
+    const config = compositeConfig(["target", "source"], [{
+      sourcePolicyId: "source-start",
+      outputId: "blocked",
+      target: { type: "trigger", trigger: "target-trigger", workflowId: "target" }
+    }]);
+    const layout = calculateCompositeWorkflowCanvasLayout({
+      config,
+      selectedWorkflowId: "source",
+      recordsByWorkflowId: compositeRecords(config)
+    });
+
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toMatchObject({
+      sourceNodeKey: "workflow:source:policy-0",
+      targetNodeKey: "workflow:target:trigger",
+      sourceHandleId: "top",
+      targetHandleId: "bottom",
+      label: "blocked",
+      tone: "cross-workflow"
+    });
   });
 
   it("protects circular trigger-routed workflow references from recursive layout", () => {
@@ -1353,6 +1457,48 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(path.path).toContain("L 8,256Q 8,280 32,280L72 280");
     expect(path.labelX).toBe(536);
     expect(path.labelY).toBe(178);
+  });
+
+  it("keeps cross-workflow approval edges on the smoothstep workflow-to-workflow path", () => {
+    const path = workflowCrossWorkflowSmoothStepPath({
+      id: "workflow:source:output:0:approved:to:target:trigger",
+      source: "workflow:source:policy-0",
+      target: "workflow:target:trigger",
+      selected: false,
+      sourceX: 1000,
+      sourceY: 76,
+      targetX: workflowCanvasLayoutConfig.startX,
+      targetY: 280,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      data: {
+        workflowEdge: {
+          key: "workflow:source:output:0:approved:to:target:trigger",
+          sourceNodeKey: "workflow:source:policy-0",
+          targetNodeKey: "workflow:target:trigger",
+          tone: "cross-workflow",
+          route: { outputId: "approved" }
+        }
+      }
+    });
+
+    expect(path.path.match(/Q/g)).toHaveLength(4);
+    expect(path.path).toContain("M1000 76L 1040,76Q");
+  });
+
+  it("renders same-row approval outputs as direct right-to-left paths", () => {
+    const path = workflowApprovalEdgePath({
+      sourceX: 433.5,
+      sourceY: 75,
+      targetX: 652.5,
+      targetY: 75
+    });
+
+    expect(path).toEqual({
+      path: "M 433.5,75 L 652.5,75",
+      labelX: 543,
+      labelY: 75
+    });
   });
 
   it("marks one workflow edge as animated when requested", () => {

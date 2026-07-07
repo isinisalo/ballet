@@ -1,14 +1,15 @@
 import type { ProjectAutomationConfig, ProjectWorkflow } from "@shared/api/workspace-contracts";
+import { workflowEdgeOutputSlotKind } from "./workflowEdgeOutputSlot";
 import { buildWorkflowGraph, workflowCanonicalRecord, type WorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
+import { workflowCanvasLayoutConfig, workflowNodeSizes } from "./workflowLayoutConfig";
 import type { WorkflowCanvasEdge } from "./workflowLayoutEdges";
 import { buildWorkflowLayoutGraphDraft } from "./workflowLayoutGraph";
 import { positionWorkflowNodes } from "./workflowLayoutPositioning";
+import { workflowOutputSourceHandleId, workflowShortestVerticalHandles, workflowVerticalTargetHandle } from "./workflowLayoutSizing";
 import type { WorkflowCanvasLayout, WorkflowCanvasLayoutNode, WorkflowLayoutDirection } from "./workflowLayoutTypes";
-import { workflowCanvasLayoutConfig, workflowNodeSizes } from "./workflowLayoutConfig";
-import { workflowOutputSourceHandleId } from "./workflowLayoutSizing";
 
-export type { WorkflowCanvasEdge } from "./workflowLayoutEdges";
 export { workflowAddActionGhostLabel, workflowCanvasLayoutConfig, workflowNodeSizes } from "./workflowLayoutConfig";
+export type { WorkflowCanvasEdge } from "./workflowLayoutEdges";
 export {
   workflowCanvasNodeAnchorY,
   workflowOutputSourceHandleId,
@@ -41,7 +42,7 @@ export function calculateWorkflowCanvasLayout({
 
   return {
     nodes: positionedNodes,
-    edges: workflowReturnEdgesWithTargetHandles(graphDraft.canvasEdges, positionedNodes),
+    edges: workflowEdgesWithDynamicVerticalHandles(graphDraft.canvasEdges, positionedNodes),
     direction
   };
 }
@@ -122,7 +123,7 @@ export function calculateCompositeWorkflowCanvasLayout({
 
   return {
     nodes: namespacedNodes,
-    edges: workflowReturnEdgesWithTargetHandles(namespacedEdges, namespacedNodes),
+    edges: workflowEdgesWithDynamicVerticalHandles(namespacedEdges, namespacedNodes),
     direction
   };
 }
@@ -197,7 +198,7 @@ function workflowLayoutBounds(nodes: WorkflowCanvasLayoutNode[]) {
 }
 
 function compositeWorkflowRowGap() {
-  return workflowCanvasLayoutConfig.branchGap * 4 + workflowNodeSizes.policy.height;
+  return workflowCanvasLayoutConfig.branchGap * 2 + workflowNodeSizes.policy.height;
 }
 
 function shouldHideTriggerOutputNode(
@@ -278,22 +279,42 @@ function namespaceWorkflowKey(workflowId: string, key: string) {
   return `workflow:${workflowId}:${key}`;
 }
 
-function workflowReturnEdgesWithTargetHandles(
+function workflowEdgesWithDynamicVerticalHandles(
   edges: WorkflowCanvasEdge[],
   nodes: WorkflowCanvasLayoutNode[]
 ) {
   const nodeByKey = new Map(nodes.map((node) => [node.key, node]));
 
   return edges.map((edge) => {
-    if (edge.tone !== "return") return edge;
+    const outputSlotKind = workflowEdgeOutputSlotKind(edge);
+    if (outputSlotKind === "approval") {
+      const sourceNode = nodeByKey.get(edge.sourceNodeKey);
+      const targetNode = nodeByKey.get(edge.targetNodeKey);
+      return {
+        ...edge,
+        sourceHandleId: "right",
+        targetHandleId: edge.tone === "cross-workflow"
+          ? "left"
+          : sourceNode && targetNode
+          ? workflowVerticalTargetHandle(sourceNode, targetNode, "left")
+          : edge.targetHandleId
+      };
+    }
+    const isDynamicVerticalEdge = edge.tone === "return" || outputSlotKind === "rework";
+    if (!isDynamicVerticalEdge) return edge;
     const sourceNode = nodeByKey.get(edge.sourceNodeKey);
     const targetNode = nodeByKey.get(edge.targetNodeKey);
     if (!sourceNode || !targetNode) return edge;
+    const { sourceHandleId, targetHandleId } = workflowShortestVerticalHandles(
+      sourceNode,
+      targetNode,
+      outputSlotKind === "rework"
+    );
 
     return {
       ...edge,
-      sourceHandleId: "top",
-      targetHandleId: sourceNode.y + sourceNode.height / 2 > targetNode.y + targetNode.height / 2 ? "bottom" : "top"
+      sourceHandleId,
+      targetHandleId
     };
   });
 }

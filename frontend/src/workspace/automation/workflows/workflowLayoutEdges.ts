@@ -1,4 +1,5 @@
 import type { WorkflowGraph } from "./workflowGraph";
+import { workflowOutputSlotKindForValues } from "./workflowEdgeOutputSlot";
 
 export type WorkflowCanvasEdge = {
   key: string;
@@ -56,13 +57,14 @@ export const workflowExistingHandlerEdges = ({
       if (handlerRecord.index === sourceIndex) return;
       if (!policyNodeIndexes.has(handlerRecord.index)) return;
       const isReturnEdge = handlerRecord.index < sourceIndex;
+      const isReworkOutput = workflowOutputSlotKindForValues(outputId, label, eventType) === "rework";
 
       edges.push({
         key: `event-policy-${sourceIndex}-${handlerRecord.index}-${eventType}`,
         sourceNodeKey,
         targetNodeKey: `policy-${handlerRecord.index}`,
-        sourceHandleId: isReturnEdge ? sourceHandleId : eventSourceHandleId ?? sourceHandleId,
-        targetHandleId: isReturnEdge ? "top" : targetHandleId,
+        sourceHandleId: isReturnEdge && !isReworkOutput ? sourceHandleId : eventSourceHandleId ?? sourceHandleId,
+        targetHandleId: isReworkOutput ? "top" : isReturnEdge ? "top" : targetHandleId,
         tone: isReturnEdge ? "return" : undefined,
         eventType,
         label: label ?? workflowEventOutputLabel(eventType),

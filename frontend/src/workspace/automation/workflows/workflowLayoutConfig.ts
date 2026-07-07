@@ -4,7 +4,7 @@ export const workflowNodeSizes = {
   trigger: { minWidth: 28, maxWidth: 28, height: 22 },
   policy: { minWidth: 112, maxWidth: 188, height: 22 },
   event: { width: 240, height: 46 },
-  outputEvent: { minWidth: 76, maxWidth: 120, height: 22, rowGap: 24 },
+  outputEvent: { minWidth: 76, maxWidth: 120, height: 22, rowGap: 32 },
   action: { width: 28, height: 28 }
 };
 
@@ -12,7 +12,7 @@ export const workflowCanvasLayoutConfig = {
   startX: 72,
   startY: 64,
   columnGap: 72,
-  branchGap: 28,
+  branchGap: 72,
   edgePad: 18,
   triggerAnchorY: 11,
   policyAnchorY: 11,
