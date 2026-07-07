@@ -23,7 +23,8 @@ function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][
     "data-workflow-connector": "true",
     "data-dashed": edge.dashed && edge.tone !== "return" ? "true" : "false",
     "data-workflow-edge-tone": edge.tone ?? "flow",
-    "data-workflow-edge-animated": isAnimated ? "true" : "false"
+    "data-workflow-edge-animated": isAnimated ? "true" : "false",
+    ...(edge.label ? { "data-workflow-edge-label-value": edge.label } : {})
   } as WorkflowReactFlowEdge["domAttributes"];
 }
 
@@ -52,13 +53,8 @@ export function WorkflowCanvas({
   const edges = useWorkflowEdges(layout.edges, layout.nodes, nodeContext, animatedEdgeId);
   const handleEdgeClick = useCallback<EdgeMouseHandler<WorkflowReactFlowEdge>>((event, edge) => {
     event.stopPropagation();
-    if (edge.data?.workflowEdge.route?.handlerStepIndex !== undefined) {
-      nodeContext.onOutputHandlerSelect(edge.data.workflowEdge);
-      setAnimatedEdgeId(edge.id);
-      return;
-    }
     setAnimatedEdgeId((currentEdgeId) => currentEdgeId === edge.id ? null : edge.id);
-  }, [nodeContext]);
+  }, []);
 
   useEffect(() => {
     if (!animatedEdgeId || layout.edges.some((edge) => edge.key === animatedEdgeId)) return;

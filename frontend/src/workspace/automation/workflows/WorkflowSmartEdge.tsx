@@ -12,15 +12,11 @@ const workflowEdgeLabelVerticalOffset = 4;
 export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
   const { data, sourceX, sourceY, targetX, targetY } = props;
   const workflowEdge = data?.workflowEdge;
-  const workflowContext = data?.context;
   const label = workflowEdge?.label;
   const isReturnEdge = workflowEdge?.tone === "return";
   const targetKind = data?.targetNode?.kind;
   const showEndLabel = targetKind === "policy";
   const returnEdgePath = isReturnEdge ? workflowReturnEdgePath(props) : undefined;
-  const onSelectHandler = workflowEdge?.route?.handlerStepIndex !== undefined && workflowContext
-    ? () => workflowContext.onOutputHandlerSelect(workflowEdge)
-    : undefined;
   const { startLabelTransform, labelTransform, endLabelTransform } = workflowEdgeLabelTransforms({
     isReturnEdge,
     returnEdgePath,
@@ -57,13 +53,12 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
         endLabelTransform={endLabelTransform}
         targetKind={targetKind}
         showEndLabel={showEndLabel}
-        onSelectHandler={onSelectHandler}
       />
     </>
   );
 }
 
-function workflowEdgeLabelTransforms({
+export function workflowEdgeLabelTransforms({
   isReturnEdge,
   returnEdgePath,
   sourceX,
@@ -92,7 +87,7 @@ function workflowEdgeLabelTransforms({
       : `translate(0, -50%) translate(${startLabelX}px, ${startLabelY}px)`,
     labelTransform: isReturnEdge
       ? `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`
-      : `translate(-50%, -50%) translate(${flowLabelX}px, ${targetY}px)`,
+      : `translate(-50%, -50%) translate(${flowLabelX}px, ${labelY}px)`,
     endLabelTransform: isReturnEdge
       ? `translate(-50%, -100%) translate(${endLabelX}px, ${endLabelY}px)`
       : `translate(-100%, -50%) translate(${targetX - workflowEdgeLabelTargetOffset}px, ${targetY}px)`
@@ -106,8 +101,7 @@ function WorkflowEdgeLabels({
   labelTransform,
   endLabelTransform,
   targetKind,
-  showEndLabel,
-  onSelectHandler
+  showEndLabel
 }: {
   label?: string;
   tone: string;
@@ -116,15 +110,12 @@ function WorkflowEdgeLabels({
   endLabelTransform: string;
   targetKind?: string;
   showEndLabel: boolean;
-  onSelectHandler?: () => void;
 }) {
   if (!label) return null;
   const isGhostTarget = targetKind === "output-event" || targetKind === "first-policy-ghost";
   const centerLabelClassName = cn(
     workflowEdgeLabelClassName,
-    onSelectHandler
-      ? "pointer-events-auto cursor-pointer rounded-sm border border-transparent hover:border-primary/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-      : "pointer-events-none"
+    "pointer-events-none"
   );
   const centerLabelContent = <span className={isGhostTarget ? "text-primary/55" : "text-primary"}>{label}</span>;
 
@@ -146,45 +137,22 @@ function WorkflowEdgeLabels({
       >
         <span className="text-foreground">on</span>
       </div>
-      {onSelectHandler ? (
-        <button
-          type="button"
-          aria-label={`Edit output handler for ${label}`}
-          data-workflow-edge-label="true"
-          data-workflow-edge-label-tone={tone}
-          data-workflow-edge-label-value={label}
-          data-workflow-edge-target-kind={targetKind}
-          title={label}
-          className={centerLabelClassName}
-          style={{
-            position: "absolute",
-            transform: labelTransform
-          }}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelectHandler();
-          }}
-        >
-          {centerLabelContent}
-        </button>
-      ) : (
-        <div
-          aria-hidden="true"
-          data-workflow-edge-label="true"
-          data-workflow-edge-label-tone={tone}
-          data-workflow-edge-label-value={label}
-          data-workflow-edge-target-kind={targetKind}
-          title={label}
-          className={centerLabelClassName}
-          style={{
-            position: "absolute",
-            pointerEvents: "none",
-            transform: labelTransform
-          }}
-        >
-          {centerLabelContent}
-        </div>
-      )}
+      <div
+        aria-hidden="true"
+        data-workflow-edge-label="true"
+        data-workflow-edge-label-tone={tone}
+        data-workflow-edge-label-value={label}
+        data-workflow-edge-target-kind={targetKind}
+        title={label}
+        className={centerLabelClassName}
+        style={{
+          position: "absolute",
+          pointerEvents: "none",
+          transform: labelTransform
+        }}
+      >
+        {centerLabelContent}
+      </div>
       {showEndLabel ? (
         <div
           aria-hidden="true"

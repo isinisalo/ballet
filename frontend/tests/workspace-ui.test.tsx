@@ -796,12 +796,8 @@ describe("workspace entity UI flows", () => {
     expect(returnEdgeLabel).toHaveTextContent("changes_requested");
 
     fireEvent.click(returnEdgeLabel!);
-    const outputHandlerDialog = screen.getByRole("dialog", { name: "Output handler" });
-    expect(within(outputHandlerDialog).getByText("challenge-roadmap")).toHaveClass("text-tertiary");
-    expect(within(outputHandlerDialog).getByText("changes_requested")).toHaveClass("text-primary");
-    expect(within(outputHandlerDialog).getByLabelText("Handler action")).toHaveTextContent("create-roadmap");
-    fireEvent.click(within(outputHandlerDialog).getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument();
 
     activateWorkflowNode(createRoadmapNode);
     const workflowHandlerDialog = screen.getByRole("dialog", { name: "Workflow handler" });
@@ -1560,10 +1556,12 @@ describe("workspace entity UI flows", () => {
     expect(returnEdgeLabel).toBeDefined();
     expect(returnEdgeLabel).toHaveTextContent("rejected");
     expect(returnEdgeLabel).toHaveAttribute("data-workflow-edge-label-value", "rejected");
+    expect(returnEdgeLabel).not.toHaveAttribute("aria-label");
+    expect(returnEdgeLabel).toHaveAttribute("aria-hidden", "true");
+    expect(returnEdgeLabel).toHaveStyle({ pointerEvents: "none" });
     expect(returnEdgeEndLabel).toBeDefined();
     expect(returnEdgeEndLabel).toHaveTextContent("then");
     expect(returnEdgeEndLabel).toHaveAttribute("data-workflow-edge-label-value", "rejected");
-    expect(returnEdgeLabel).toHaveAttribute("aria-label", "Edit output handler for rejected");
   });
 
   it("toggles the workflow edge animation effect on click", async () => {
@@ -1589,7 +1587,7 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => {
       expect(document.querySelectorAll("[data-workflow-connector=\"true\"]").length).toBeGreaterThan(0);
     });
-    const edge = document.querySelector("[data-workflow-connector=\"true\"]");
+    const edge = document.querySelector("[data-workflow-connector=\"true\"][data-workflow-edge-label-value=\"complete\"]");
     expect(edge).not.toBeNull();
     expect(edge).toHaveAttribute("data-workflow-edge-animated", "false");
 
@@ -1599,6 +1597,8 @@ describe("workspace entity UI flows", () => {
       expect(edge).toHaveAttribute("data-workflow-edge-animated", "true");
     });
     expect(edge).toHaveClass("workflow-edge-animated");
+    expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument();
 
     fireEvent.click(edge!);
 
@@ -1606,6 +1606,8 @@ describe("workspace entity UI flows", () => {
       expect(edge).toHaveAttribute("data-workflow-edge-animated", "false");
     });
     expect(edge).not.toHaveClass("workflow-edge-animated");
+    expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument();
   });
 
   it("routes legacy policies paths to workflow configuration", async () => {

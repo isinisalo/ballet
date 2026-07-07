@@ -3,7 +3,7 @@ import type { ProjectPolicy } from "@shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
-import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
+import { workflowEdgeLabelTransforms, workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
 import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 import { positionWorkflowNodes } from "../src/workspace/automation/workflows/workflowLayoutPositioning";
 
@@ -577,6 +577,24 @@ describe("calculateWorkflowCanvasLayout", () => {
 });
 
 describe("toWorkflowReactFlowEdges", () => {
+  it("places cross-row forward edge labels between the source and target rows", () => {
+    expect(workflowEdgeLabelTransforms({
+      isReturnEdge: false,
+      sourceX: 100,
+      sourceY: 120,
+      targetX: 300,
+      targetY: 180
+    }).labelTransform).toBe("translate(-50%, -50%) translate(200px, 150px)");
+
+    expect(workflowEdgeLabelTransforms({
+      isReturnEdge: false,
+      sourceX: 100,
+      sourceY: 120,
+      targetX: 300,
+      targetY: 120
+    }).labelTransform).toBe("translate(-50%, -50%) translate(200px, 120px)");
+  });
+
   it("centers return edge labels on the top or bottom return segment", () => {
     const sourceNode = { key: "policy-2", kind: "policy" as const, x: 300, y: 120, width: 140, height: 22, direction: "horizontal" as const };
     const topTargetNode = { key: "policy-1", kind: "policy" as const, x: 120, y: 40, width: 140, height: 22, direction: "horizontal" as const };

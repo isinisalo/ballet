@@ -43,7 +43,8 @@
       "id": "create-project-brief",
       "description": "Create Project Brief from accepted ADRs and approved GOALS.",
       "outputIds": [
-        "ready"
+        "ready",
+        "blocked"
       ],
       "agentIds": [
         "brief-agent"
