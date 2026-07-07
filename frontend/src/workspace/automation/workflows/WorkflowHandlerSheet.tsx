@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { ShieldCheck, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,8 @@ export function WorkflowHandlerSheet({
     ? workflowHandlerRouteDescription(routes[0])
     : `${routes.length} inbound routes`;
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
+
+  useWorkflowHandlerEscapeClose(open, onOpenChange);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
@@ -144,6 +146,24 @@ export function WorkflowHandlerSheet({
       </SheetContent>
     </Sheet>
   );
+}
+
+function useWorkflowHandlerEscapeClose(
+  open: boolean,
+  onOpenChange: (open: boolean, details?: WorkflowHandlerSheetOpenChangeDetails) => void
+) {
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      onOpenChange(false, { reason: "escape-key" });
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onOpenChange, open]);
 }
 
 function WorkflowHandlerRouteEvent({ route }: { route: WorkflowHandlerRoute }) {

@@ -1066,7 +1066,8 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
-  it("switches workflow action sheet content and only closes with the sheet close button", async () => {
+  it("switches workflow action sheet content, ignores canvas clicks, and closes with Escape", async () => {
+    const user = userEvent.setup();
     const workflowData = baseData();
     workflowData.agents.push({
       id: "agent-2",
@@ -1112,7 +1113,7 @@ describe("workspace entity UI flows", () => {
     fireEvent.click(workflowPane as Element);
     expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
     expectActionSelectValue("review-pass");
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument());
   });
 

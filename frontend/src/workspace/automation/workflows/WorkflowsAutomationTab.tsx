@@ -368,7 +368,7 @@ export function WorkflowsAutomationTab({
         agents={agents}
         config={config}
         onOpenChange={(open, details) => {
-          if (!open && details?.reason === "close-press") clearHandlerSelection();
+          if (!open && (details?.reason === "close-press" || details?.reason === "escape-key")) clearHandlerSelection();
         }}
         onRouteActionChange={updateHandlerRouteAction}
         onRemoveRoute={removeHandlerRoute}
