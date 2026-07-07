@@ -116,7 +116,11 @@ const deleteEntityConfig = (
         onDelete: () => {
           if (!selected) return;
           const nextId = draft.actions.find((action) => action.id !== selected.id)?.id;
-          setDraft((current) => ({ ...current, actions: current.actions.filter((action) => action.id !== selected.id) }));
+          setDraft((current) => ({
+            ...current,
+            actions: current.actions.filter((action) => action.id !== selected.id),
+            humanGateResponses: current.humanGateResponses.filter((response) => response.actionId !== selected.id)
+          }));
           selectAutomationEntity("actions", nextId);
         }
       };
@@ -131,7 +135,11 @@ const deleteEntityConfig = (
         onDelete: () => {
           if (!selected) return;
           const nextId = draft.workflows.find((workflow) => workflow.id !== selected.id)?.id;
-          setDraft((current) => ({ ...current, workflows: current.workflows.filter((workflow) => workflow.id !== selected.id) }));
+          setDraft((current) => ({
+            ...current,
+            workflows: current.workflows.filter((workflow) => workflow.id !== selected.id),
+            humanGateResponses: current.humanGateResponses.filter((response) => response.workflowId !== selected.id)
+          }));
           selectAutomationEntity("workflows", nextId);
         }
       };

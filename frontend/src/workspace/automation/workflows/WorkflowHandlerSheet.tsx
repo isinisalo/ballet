@@ -1,6 +1,5 @@
 import { useId } from "react";
-import type { Agent, ProjectAutomationConfig, ProjectOutputTarget } from "@shared/api/workspace-contracts";
-import { findProjectOutputRoute } from "@shared/policy-actions";
+import type { Agent, ProjectAction, ProjectAutomationConfig, ProjectHumanGateResponse, ProjectOutputTarget } from "@shared/api/workspace-contracts";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,10 +7,15 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { findProjectOutputRoute } from "@shared/policy-actions";
+import { ActionEditorFields } from "../actions/ActionEditorFields";
+import { HumanGateResponsePanel } from "./HumanGateResponsePanel";
 
 type WorkflowHandlerSheetOpenChangeDetails = {
   reason?: string;
 };
+
+const triggerSelectPrefix = "trigger:";
 
 export type WorkflowHandlerSelectionSource = "node" | "edge";
 
@@ -34,8 +38,11 @@ export function WorkflowHandlerSheet({
   config,
   onOpenChange,
   onRouteActionChange,
+  onActionPatch,
+  onCreateOutput,
   onRemoveRoute,
-  onOutputRouteTargetChange
+  onOutputRouteTargetChange,
+  onHumanGateSubmit
 }: {
   open: boolean;
   routes: WorkflowHandlerRoute[];
@@ -44,8 +51,11 @@ export function WorkflowHandlerSheet({
   config: ProjectAutomationConfig;
   onOpenChange: (open: boolean, details?: WorkflowHandlerSheetOpenChangeDetails) => void;
   onRouteActionChange: (workflowId: string, stepIndex: number, actionId: string) => void;
+  onActionPatch: (actionId: string, patch: Partial<ProjectAction>) => void;
+  onCreateOutput: (outputId: string) => void;
   onRemoveRoute: (workflowId: string, stepIndex: number) => void;
   onOutputRouteTargetChange: (sourcePolicyId: string, outputId: string, target: ProjectOutputTarget | undefined) => void;
+  onHumanGateSubmit: (route: WorkflowHandlerRoute, outputId: string, prompt: string) => void;
 }) {
   const actionFieldId = useId();
   const title = selectionSource === "edge" && routes.length === 1 ? "Output handler" : "Workflow handler";
@@ -53,6 +63,32 @@ export function WorkflowHandlerSheet({
     ? workflowHandlerRouteDescription(routes[0])
     : `${routes.length} inbound routes`;
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
+  const singleRoute = routes.length === 1 ? routes[0] : undefined;
+  const singleRouteAction = singleRoute ? config.actions.find((candidate) => candidate.id === singleRoute.actionId) : undefined;
+  const singleRouteResponse = singleRoute ? humanGateResponseForRoute(config, singleRoute) : undefined;
+  const singleHumanGateRoute = Boolean(singleRoute && singleRouteAction?.humanGate);
+  const humanGateRouteEditor = (route: WorkflowHandlerRoute, action: ProjectAction, response?: ProjectHumanGateResponse) => (
+    <div className="flex flex-col gap-4">
+      <ActionEditorFields
+        agents={agents}
+        config={config}
+        action={action}
+        onChange={(patch) => onActionPatch(action.id, patch)}
+        onCreateOutput={onCreateOutput}
+      />
+      <OutputTargetControls
+        config={config}
+        route={route}
+        outputIds={action.outputIds}
+        onOutputRouteTargetChange={onOutputRouteTargetChange}
+      />
+      <HumanGateResponsePanel
+        outputIds={action.outputIds}
+        response={response}
+        onSubmit={(outputId, prompt) => onHumanGateSubmit(route, outputId, prompt)}
+      />
+    </div>
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
@@ -67,73 +103,85 @@ export function WorkflowHandlerSheet({
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-4">
-          <div className="flex flex-col gap-3">
-            {routes.map((route) => {
-              const action = config.actions.find((candidate) => candidate.id === route.actionId);
-              const outputIds = action?.outputIds ?? [];
-              const agentIds = action?.agentIds ?? [];
-              const routeActionFieldId = `${actionFieldId}-${route.stepIndex}`;
-              const routeDescriptionFieldId = `${actionFieldId}-${route.stepIndex}-description`;
+          {singleRoute && singleRouteAction && singleHumanGateRoute ? (
+            humanGateRouteEditor(singleRoute, singleRouteAction, singleRouteResponse)
+          ) : (
+            <div className="flex flex-col gap-3">
+              {routes.map((route) => {
+                const action = config.actions.find((candidate) => candidate.id === route.actionId);
+                const outputIds = action?.outputIds ?? [];
+                const agentIds = action?.agentIds ?? [];
+                const humanGate = Boolean(action?.humanGate);
+                const response = humanGateResponseForRoute(config, route);
+                const routeActionFieldId = `${actionFieldId}-${route.stepIndex}`;
+                const routeDescriptionFieldId = `${actionFieldId}-${route.stepIndex}-description`;
 
-              return (
-                <div key={route.id} className="rounded-md border border-divider-strong bg-card/80 p-3">
-                  <div className="flex min-w-0 items-start justify-between gap-2">
-                    <WorkflowHandlerRouteEvent route={route} />
-                    {routes.length > 1 ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`Remove route ${workflowHandlerRouteDescription(route)}`}
-                        title="Remove route"
-                        onClick={() => onRemoveRoute(route.workflowId, route.stepIndex)}
-                      >
-                        <Trash2 data-icon="inline-start" />
-                      </Button>
-                    ) : null}
+                return (
+                  <div key={route.id} className="rounded-md border border-divider-strong bg-card/80 p-3">
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <WorkflowHandlerRouteEvent route={route} />
+                      {routes.length > 1 ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`Remove route ${workflowHandlerRouteDescription(route)}`}
+                          title="Remove route"
+                          onClick={() => onRemoveRoute(route.workflowId, route.stepIndex)}
+                        >
+                          <Trash2 data-icon="inline-start" />
+                        </Button>
+                      ) : null}
+                    </div>
+                    {humanGate && action ? (
+                      <div className="mt-3">
+                        {humanGateRouteEditor(route, action, response)}
+                      </div>
+                    ) : (
+                      <FieldGroup className="mt-3">
+                        <Field className="gap-1.5">
+                          <FieldLabel htmlFor={routeActionFieldId}>Handler action</FieldLabel>
+                          <Select value={route.actionId} onValueChange={(actionId) => onRouteActionChange(route.workflowId, route.stepIndex, actionId)}>
+                            <SelectTrigger id={routeActionFieldId} className="min-w-0 w-full font-mono">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {config.actions.map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    {option.description ? `${option.id} · ${option.description}` : option.id}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field className="gap-1.5">
+                          <FieldLabel htmlFor={routeDescriptionFieldId}>Description</FieldLabel>
+                          <Textarea
+                            id={routeDescriptionFieldId}
+                            value={action?.description ?? ""}
+                            placeholder="No description."
+                            readOnly
+                            rows={3}
+                            className="resize-none text-muted-foreground"
+                          />
+                        </Field>
+                        <ReadOnlyBadges label="Agents" values={agentIds.map(agentLabel)} />
+                        <ReadOnlyBadges label="Outputs" values={outputIds} />
+                        <OutputTargetControls
+                          config={config}
+                          route={route}
+                          outputIds={outputIds}
+                          onOutputRouteTargetChange={onOutputRouteTargetChange}
+                        />
+                      </FieldGroup>
+                    )}
                   </div>
-                  <FieldGroup className="mt-3">
-                    <Field className="gap-1.5">
-                      <FieldLabel htmlFor={routeActionFieldId}>Handler action</FieldLabel>
-                      <Select value={route.actionId} onValueChange={(actionId) => onRouteActionChange(route.workflowId, route.stepIndex, actionId)}>
-                        <SelectTrigger id={routeActionFieldId} className="min-w-0 w-full font-mono">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {config.actions.map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                                {option.description ? `${option.id} · ${option.description}` : option.id}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field className="gap-1.5">
-                      <FieldLabel htmlFor={routeDescriptionFieldId}>Description</FieldLabel>
-                      <Textarea
-                        id={routeDescriptionFieldId}
-                        value={action?.description ?? ""}
-                        placeholder="No description."
-                        readOnly
-                        rows={3}
-                        className="resize-none text-muted-foreground"
-                      />
-                    </Field>
-                    <ReadOnlyBadges label="Agents" values={agentIds.map(agentLabel)} />
-                    <ReadOnlyBadges label="Outputs" values={outputIds} />
-                    <OutputTargetControls
-                      config={config}
-                      route={route}
-                      outputIds={outputIds}
-                      onOutputRouteTargetChange={onOutputRouteTargetChange}
-                    />
-                  </FieldGroup>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
           {routes.length === 1 && routes[0] ? (
             <div className="mt-4 border-t border-divider-strong pt-4">
               <Button type="button" variant="destructive" size="sm" onClick={() => onRemoveRoute(routes[0].workflowId, routes[0].stepIndex)}>
@@ -181,7 +229,7 @@ function OutputTargetControls({
                     <SelectItem value="event">Event</SelectItem>
                     {config.triggers.map((trigger) => (
                       <SelectItem key={trigger.id} value={`trigger:${trigger.id}`}>
-                        {trigger.id}
+                        Trigger · {trigger.id}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -193,20 +241,6 @@ function OutputTargetControls({
       ) : <span className="text-sm text-muted-foreground">None</span>}
     </Field>
   );
-}
-
-function outputTargetSelectValue(config: ProjectAutomationConfig, sourcePolicyId: string, outputId: string) {
-  const route = findProjectOutputRoute(config.outputRoutes, sourcePolicyId, outputId);
-  if (route?.target.type === "trigger") return `trigger:${route.target.trigger}`;
-  return "event";
-}
-
-function outputTargetFromSelectValue(value: string): ProjectOutputTarget | undefined {
-  if (!value.startsWith("trigger:")) return undefined;
-  return {
-    type: "trigger",
-    trigger: value.slice("trigger:".length)
-  };
 }
 
 function WorkflowHandlerRouteEvent({ route }: { route: WorkflowHandlerRoute }) {
@@ -225,6 +259,14 @@ function WorkflowHandlerRouteEvent({ route }: { route: WorkflowHandlerRoute }) {
   );
 }
 
+function humanGateResponseForRoute(config: ProjectAutomationConfig, route: WorkflowHandlerRoute) {
+  return config.humanGateResponses.find((candidate) =>
+    candidate.workflowId === route.workflowId &&
+    candidate.policyId === route.policyId &&
+    candidate.actionId === route.actionId
+  );
+}
+
 function ReadOnlyBadges({ label, values }: { label: string; values: string[] }) {
   return (
     <Field>
@@ -238,6 +280,26 @@ function ReadOnlyBadges({ label, values }: { label: string; values: string[] }) 
       </div>
     </Field>
   );
+}
+
+function outputTargetSelectValue(
+  config: Pick<ProjectAutomationConfig, "outputRoutes">,
+  sourcePolicyId: string,
+  outputId: string
+) {
+  const route = findProjectOutputRoute(config.outputRoutes, sourcePolicyId, outputId);
+  if (route?.target.type === "trigger") return `${triggerSelectPrefix}${route.target.trigger}`;
+  return "event";
+}
+
+function outputTargetFromSelectValue(value: string): ProjectOutputTarget | undefined {
+  if (value.startsWith(triggerSelectPrefix)) {
+    return {
+      type: "trigger",
+      trigger: value.slice(triggerSelectPrefix.length)
+    };
+  }
+  return undefined;
 }
 
 function workflowHandlerRouteDescription(route: WorkflowHandlerRoute | undefined) {

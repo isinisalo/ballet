@@ -63,6 +63,7 @@ const compositeConfig = (
     ],
     outputs: [{ id: "ready" }, { id: "blocked" }, { id: "done" }],
     outputRoutes,
+    humanGateResponses: [],
     policies: [sourcePolicy, targetPolicy],
     workflows: workflowIds.map((workflowId) => {
       const workflowPolicy = policyByWorkflowId.get(workflowId);
@@ -87,7 +88,7 @@ const compositeRecords = (config: ProjectAutomationConfig) => {
       workflowId: workflow.id,
       policy,
       outputTargets,
-      outputEvents: outputTargets?.map((output) => output.eventType)
+      outputEvents: outputTargets?.flatMap((output) => "eventType" in output ? [output.eventType] : [])
     };
   })] as const));
 };
@@ -378,6 +379,38 @@ describe("calculateWorkflowCanvasLayout", () => {
       dashed: true,
       eventType: "build.summary",
       label: "summary"
+    }));
+  });
+
+  it("renders human gate action outputs without requiring agents", () => {
+    const start = policy("human-review", undefined, "human-review");
+    const outputEvents = policyOutputEventTypes(start, [{
+      id: "human-review",
+      outputIds: ["approved", "changes-requested"],
+      agentIds: [],
+      humanGate: true
+    }]);
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph([{
+        policyId: start.id,
+        index: 0,
+        policy: start,
+        outputEvents
+      }]),
+      editingPolicyIndex: null
+    });
+    const outputEventNodes = layout.nodes.filter((node) => node.kind === "output-event");
+
+    expect(outputEvents).toEqual(["human-review.approved", "human-review.changes-requested"]);
+    expect(outputEventNodes.map((node) => node.outputEvent?.outputId)).toEqual(["human-review.approved", "human-review.changes-requested"]);
+    expect(layout.edges).toContainEqual(expect.objectContaining({
+      key: "policy-output-event-0-human-review.approved",
+      sourceNodeKey: "policy-0",
+      targetNodeKey: "output-event-0-human-review.approved",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      eventType: "human-review.approved",
+      label: "approved"
     }));
   });
 

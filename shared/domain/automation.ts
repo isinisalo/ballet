@@ -16,12 +16,23 @@ export interface ProjectAction {
   description: string;
   outputIds: string[];
   agentIds: string[];
+  humanGate?: boolean;
 }
 
 export type OutputId = string;
 
 export interface ProjectOutput {
   id: OutputId;
+}
+
+export interface ProjectHumanGateResponse {
+  id: string;
+  workflowId?: string;
+  policyId: string;
+  actionId: string;
+  outputId: string;
+  prompt: string;
+  submittedAt: string;
 }
 
 export type ProjectOutputTarget =
@@ -62,6 +73,7 @@ export interface ProjectAutomationConfig {
   actions: ProjectAction[];
   outputs: ProjectOutput[];
   outputRoutes: ProjectOutputRoute[];
+  humanGateResponses: ProjectHumanGateResponse[];
   policies: ProjectPolicy[];
   workflows: ProjectWorkflow[];
   runtimes: ProjectRuntime[];
@@ -73,6 +85,7 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   actions: [],
   outputs: defaultProjectOutputs(),
   outputRoutes: [],
+  humanGateResponses: [],
   policies: [],
   workflows: [],
   runtimes: []

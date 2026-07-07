@@ -31,6 +31,7 @@ const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
   ],
   outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes-requested" }],
   outputRoutes: [],
+  humanGateResponses: [],
   policies,
   workflows: [{ id: "delivery", title: "Delivery", steps: policies.map((item) => item.id) }],
   runtimes: []

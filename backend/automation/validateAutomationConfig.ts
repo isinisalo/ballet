@@ -13,6 +13,7 @@ import {
   actionOutputSlotCount,
   actionOutputSlotKind,
   defaultProjectOutputs,
+  humanGateResponseId,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
   policyEventTypesForActions,
@@ -20,6 +21,8 @@ import {
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
 
+// This legacy validation module intentionally stays centralized for now because
+// existing policy/action migration checks share one normalized context.
 export class AutomationValidationError extends Error {
   constructor(
     message: string,
@@ -38,6 +41,7 @@ interface ValidationContext {
   rawActions: unknown[];
   rawOutputs: unknown[];
   rawOutputRoutes: unknown[];
+  rawHumanGateResponses: unknown[];
   rawPolicies: unknown[];
   rawWorkflows: unknown[];
   rawRuntimes: unknown[];
@@ -114,8 +118,9 @@ const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: stri
 };
 
 const requireAutomationArrays = (input: RawAutomationConfig, issues: ProjectAutomationIssue[]) => {
-  for (const key of ["triggers", "actions", "outputs", "outputRoutes", "policies", "workflows", "runtimes"] as const) {
+  for (const key of ["triggers", "actions", "outputs", "outputRoutes", "humanGateResponses", "policies", "workflows", "runtimes"] as const) {
     if ((key === "triggers" || key === "actions" || key === "outputs") && input[key] === undefined) continue;
+    if (key === "humanGateResponses" && input[key] === undefined) continue;
     if (!Array.isArray(input[key])) issues.push({ path: key, message: `${key} must be an array.` });
   }
 };
@@ -140,6 +145,7 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
   addUniqueIssues(issues, normalized.triggers.map((trigger, index) => ({ id: trigger.id, path: `triggers[${index}].id` })), "trigger");
   addUniqueIssues(issues, normalized.actions.map((action, index) => ({ id: action.id, path: `actions[${index}].id` })), "action");
   addUniqueIssues(issues, outputIds.length > 0 ? outputIds : normalized.outputs.map((output, index) => ({ id: output.id, path: `outputs[${index}].id` })), "output");
+  addUniqueIssues(issues, normalized.humanGateResponses.map((response, index) => ({ id: response.id, path: `humanGateResponses[${index}].id` })), "human gate response");
   addUniqueIssues(issues, runtimeIds, "runtime");
   addUniqueIssues(issues, workflowIds, "workflow");
 };
@@ -163,6 +169,7 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     rawActions: Array.isArray(input.actions) ? input.actions : [],
     rawOutputs,
     rawOutputRoutes: Array.isArray(input.outputRoutes) ? input.outputRoutes : [],
+    rawHumanGateResponses: Array.isArray(input.humanGateResponses) ? input.humanGateResponses : [],
     rawPolicies,
     rawWorkflows,
     rawRuntimes: Array.isArray(input.runtimes) ? input.runtimes : [],
@@ -218,6 +225,10 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
   } else {
     addStringIssue(issues, `${base}.description`, action.description, "Action description", automationFieldLimits.description, { required: false });
   }
+  if (action.humanGate !== undefined && typeof action.humanGate !== "boolean") {
+    issues.push({ path: `${base}.humanGate`, message: "Action humanGate must be boolean." });
+  }
+  const isHumanGate = action.humanGate === true;
   if (action.outputIds !== undefined && !Array.isArray(action.outputIds)) {
     issues.push({ path: `${base}.outputIds`, message: "Action outputIds must be an array." });
     return;
@@ -240,16 +251,19 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
   const normalizedOutputIds = context.normalizedActions[index]?.outputIds ?? [];
   const rawNormalizedOutputIds = normalizedActionOutputIds(action);
   const normalizedAgentIds = context.normalizedActions[index]?.agentIds ?? [];
-  if (normalizedAgentIds.length === 0 && (rawNormalizedOutputIds ?? normalizedOutputIds).length > 0) {
+  if (!isHumanGate && normalizedAgentIds.length === 0 && (rawNormalizedOutputIds ?? normalizedOutputIds).length > 0) {
     issues.push({ path: `${base}.outputIds`, message: "Action without agents cannot select outputs." });
   }
   if (
-    normalizedAgentIds.length > 0 &&
+    (normalizedAgentIds.length > 0 || isHumanGate) &&
     rawNormalizedOutputIds &&
     (rawNormalizedOutputIds.length < actionOutputSlotMinCount || rawNormalizedOutputIds.length > actionOutputSlotCount) &&
     !legacyCompatibleOutputIds(rawNormalizedOutputIds)
   ) {
     issues.push({ path: `${base}.outputIds`, message: "Action must define 1 or 2 outputs: approval and optional rework." });
+  }
+  if (isHumanGate && (rawNormalizedOutputIds ?? normalizedOutputIds).length < actionOutputSlotMinCount) {
+    issues.push({ path: `${base}.outputIds`, message: "Human gate action must define an approval output." });
   }
   const seen = new Set<string>();
   const outputIdsToValidate = rawNormalizedOutputIds ?? normalizedOutputIds;
@@ -265,6 +279,9 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
     issues.push({ path: `${base}.agentIds`, message: "Action agentIds must be an array." });
     return;
   }
+  const rawAgentIds = Array.isArray(action.agentIds)
+    ? action.agentIds.filter((agentId) => typeof agentId === "string" && agentId.trim().length > 0)
+    : [];
   if (Array.isArray(action.agentIds)) {
     const seenRawAgentIds = new Set<string>();
     action.agentIds.forEach((agentId, agentIndex) => {
@@ -280,6 +297,9 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
   }
   if (normalizedAgentIds.length > 5) {
     issues.push({ path: `${base}.agentIds`, message: "Action can select at most 5 agents." });
+  }
+  if (isHumanGate && rawAgentIds.length > 0) {
+    issues.push({ path: `${base}.agentIds`, message: "Human gate action cannot select agents." });
   }
   const seenAgents = new Set<string>();
   normalizedAgentIds.forEach((agentId, agentIndex) => {
@@ -298,6 +318,61 @@ const validateOutput = (output: unknown, index: number, issues: ProjectAutomatio
     return;
   }
   addOutputIdIssue(issues, `${base}.id`, output.id);
+};
+
+const validateHumanGateResponse = (
+  response: unknown,
+  index: number,
+  context: ValidationContext,
+  issues: ProjectAutomationIssue[]
+) => {
+  const base = `humanGateResponses[${index}]`;
+  if (!isRecord(response)) {
+    issues.push({ path: base, message: "Human gate response must be an object." });
+    return;
+  }
+  addStringIssue(issues, `${base}.id`, response.id, "Human gate response id", { min: 1, max: 260 });
+  addStringIssue(issues, `${base}.policyId`, response.policyId, "Human gate response policy", automationFieldLimits.policyId);
+  addStringIssue(issues, `${base}.actionId`, response.actionId, "Human gate response action", automationFieldLimits.token, { token: true });
+  addOutputIdIssue(issues, `${base}.outputId`, response.outputId);
+  if (response.prompt !== undefined && typeof response.prompt !== "string") {
+    issues.push({ path: `${base}.prompt`, message: "Human gate response prompt must be a string." });
+  } else {
+    addStringIssue(issues, `${base}.prompt`, response.prompt, "Human gate response prompt", { min: 1, max: 2000 });
+  }
+  addStringIssue(issues, `${base}.submittedAt`, response.submittedAt, "Human gate response submittedAt", { min: 1, max: 80 });
+
+  const workflowId = normalizePolicyToken(stringValue(response.workflowId));
+  if (response.workflowId !== undefined) {
+    addStringIssue(issues, `${base}.workflowId`, response.workflowId, "Human gate response workflow", automationFieldLimits.token, { token: true });
+    if (workflowId && !context.workflowIdSet.has(workflowId)) {
+      issues.push({ path: `${base}.workflowId`, message: `Human gate response references unknown workflow: ${workflowId}.` });
+    }
+  }
+
+  const policyId = stringValue(response.policyId);
+  const policy = context.normalizedPolicies.find((candidate) => candidate.id === policyId);
+  if (policyId && !policy) {
+    issues.push({ path: `${base}.policyId`, message: `Human gate response references unknown policy: ${policyId}.` });
+  }
+  const actionId = normalizePolicyToken(stringValue(response.actionId));
+  const action = context.normalizedActions.find((candidate) => candidate.id === actionId);
+  if (actionId && !action) {
+    issues.push({ path: `${base}.actionId`, message: `Human gate response references unknown action: ${actionId}.` });
+  } else if (action && !action.humanGate) {
+    issues.push({ path: `${base}.actionId`, message: `Human gate response action is not a human gate: ${actionId}.` });
+  }
+  if (policy && actionId && policy.action !== actionId) {
+    issues.push({ path: `${base}.policyId`, message: `Human gate response policy does not run action: ${actionId}.` });
+  }
+  const outputId = normalizePolicyToken(stringValue(response.outputId));
+  if (action && outputId && !actionOutputIds(context.normalizedActions, action.id).includes(outputId)) {
+    issues.push({ path: `${base}.outputId`, message: `Human gate response references unavailable output ${outputId} for action ${action.id}.` });
+  }
+  const expectedId = policyId && actionId ? humanGateResponseId({ workflowId, policyId, actionId }) : "";
+  if (expectedId && stringValue(response.id) !== expectedId) {
+    issues.push({ path: `${base}.id`, message: `Human gate response id must be ${expectedId}.` });
+  }
 };
 
 const validateOutputRouteTarget = (
@@ -547,6 +622,7 @@ export const validateProjectAutomationConfig = (
   context.rawTriggers.forEach((trigger, index) => validateTrigger(trigger, index, issues));
   context.rawActions.forEach((action, index) => validateAction(action, index, context, issues));
   context.rawOutputs.forEach((output, index) => validateOutput(output, index, issues));
+  context.rawHumanGateResponses.forEach((response, index) => validateHumanGateResponse(response, index, context, issues));
   {
     const seenRouteKeys = new Set<string>();
     context.rawOutputRoutes.forEach((route, index) => validateOutputRoute(route, index, context, issues, seenRouteKeys));

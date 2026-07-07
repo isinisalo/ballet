@@ -8,7 +8,7 @@ type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
 
 type AutomationCreateDrafts = {
   trigger: { id: string; description: string };
-  action: { id: string; description: string; outputIds: string[]; agentIds: string[] };
+  action: { id: string; description: string; outputIds: string[]; agentIds: string[]; humanGate: boolean };
   workflow: { id: string; title: string; steps: string[] };
 };
 
@@ -30,7 +30,7 @@ export function useAutomationCreateDrafts({
   isCreateMode: boolean;
 }) {
   const [newTrigger, setNewTrigger] = useState({ id: "", description: "" });
-  const [newAction, setNewAction] = useState({ id: "", description: "", outputIds: [] as string[], agentIds: [] as string[] });
+  const [newAction, setNewAction] = useState({ id: "", description: "", outputIds: [] as string[], agentIds: [] as string[], humanGate: false });
   const [newWorkflow, setNewWorkflow] = useState({ id: "", title: "", steps: [] as string[] });
   const createDraftsRef = useRef<AutomationCreateDrafts>({
     trigger: newTrigger,
@@ -96,7 +96,7 @@ const syncDraft = <K extends keyof AutomationCreateDrafts>(
 
 const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): AutomationCreateDrafts => ({
   trigger: { id: "", description: "" },
-  action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id) },
+  action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id), humanGate: false },
   workflow: { id: "", title: "", steps: [] }
 });
 
@@ -119,12 +119,12 @@ const createDraftWithNewEntity = (
   if (activeTab === "actions") {
     const id = normalizeAutomationToken(drafts.action.id);
     if (automationTokenValidationMessage("Action ID", id) || automationStringValidationMessage("Description", drafts.action.description, automationFieldLimits.description, { required: false }) || draft.actions.some((action) => action.id === id)) return undefined;
-    const outputIds = drafts.action.agentIds.length > 0 ? drafts.action.outputIds : [];
+    const outputIds = drafts.action.agentIds.length > 0 || drafts.action.humanGate ? drafts.action.outputIds : [];
     const outputs = [...draft.outputs];
     outputIds.forEach((outputId) => {
       if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
     });
-    return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds }] } };
+    return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds, agentIds: drafts.action.humanGate ? [] : drafts.action.agentIds }] } };
   }
   const id = normalizeAutomationToken(drafts.workflow.id);
   if (automationTokenValidationMessage("Workflow ID", id) || automationStringValidationMessage("Title", drafts.workflow.title, automationFieldLimits.name) || draft.workflows.some((workflow) => workflow.id === id)) return undefined;

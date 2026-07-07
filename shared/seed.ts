@@ -187,6 +187,7 @@ export const seedData: AppData = {
       { id: "runbook" }
     ],
     outputRoutes: [],
+    humanGateResponses: [],
     policies: [
       {
         id: "on.remediation.failed.start.remediation",

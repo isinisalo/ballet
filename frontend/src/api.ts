@@ -1,4 +1,4 @@
-import type { AppData, CollectionName } from "@shared/api/workspace-contracts";
+import type { AppData, CollectionName, EventIntakeRequest, EventRecord } from "@shared/api/workspace-contracts";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import type { MarkdownDocument } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
@@ -43,6 +43,11 @@ export const api = {
     request<ProjectAutomationConfig>("/api/automation", {
       method: "PUT",
       body: JSON.stringify(config)
+    }),
+  createEvent: (event: EventIntakeRequest) =>
+    request<EventRecord>("/api/events/intake", {
+      method: "POST",
+      body: JSON.stringify(event)
     }),
   save: <T extends CollectionName>(collection: T, item: Partial<AppData[T][number]>) =>
     request<AppData[T][number]>(`/api/${collection}`, {

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Route, Save } from "lucide-react";
-import type { AppData, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import type { AppData, EventIntakeRequest, EventRecord, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import type { AutomationTab } from "../types";
@@ -19,12 +19,14 @@ export function AutomationView({
   activeTab,
   selectedId,
   saveAutomation,
+  createEvent,
   navigate
 }: {
   data: AppData;
   activeTab: AutomationTab;
   selectedId?: string;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
+  createEvent: (event: EventIntakeRequest) => Promise<EventRecord>;
   navigate: (path: string) => void;
 }) {
   const { draft, setDraft, updateConfig, saveDraft } = useAutomationDraft({
@@ -94,7 +96,7 @@ export function AutomationView({
                 <AutomationIssues issues={data.automationIssues} />
               </div>
             ) : null}
-            <WorkflowsAutomationTab agents={data.agents} config={draft} selectedId={selectedWorkflowId} createDraft={createDrafts.newWorkflow} onCreateDraftChange={createDrafts.updateNewWorkflow} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} />
+            <WorkflowsAutomationTab agents={data.agents} projectId={data.projects[0]?.id ?? "project"} config={draft} selectedId={selectedWorkflowId} createDraft={createDrafts.newWorkflow} onCreateDraftChange={createDrafts.updateNewWorkflow} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} createEvent={createEvent} />
           </>
         ) : (
           <div className="grid gap-4">

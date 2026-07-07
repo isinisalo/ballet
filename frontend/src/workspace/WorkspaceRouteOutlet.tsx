@@ -47,7 +47,7 @@ export function WorkspaceRouteOutlet({
     case "project-instructions":
       return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
     case "automation":
-      return <AutomationView data={data} activeTab={route.automationTab ?? "workflows"} selectedId={route.automationEntityId} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
+      return <AutomationView data={data} activeTab={route.automationTab ?? "workflows"} selectedId={route.automationEntityId} saveAutomation={mutations.saveAutomation} createEvent={mutations.createEvent} navigate={navigate} />;
     case "runtimes":
       return <RuntimesView data={data} selectedId={route.runtimeId} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
     case "agents":

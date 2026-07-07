@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import { humanGateResponseId } from "../../shared/policy-actions.js";
 import {
   automationPoliciesToEventDefinitions,
   automationPoliciesToPolicies,
@@ -50,6 +51,7 @@ const validConfig = (): ProjectAutomationConfig => ({
   ],
   outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }],
   outputRoutes: [],
+  humanGateResponses: [],
   policies: [
     {
       id: "on.implementation.failed.start.implementation",
@@ -87,6 +89,7 @@ describe("project automation config", () => {
         { id: "rework" }
       ],
       outputRoutes: [],
+      humanGateResponses: [],
       policies: [],
       workflows: [],
       runtimes: []
@@ -108,10 +111,30 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig(oldRawConfig).some((issue) => issue.path === "outputRoutes")).toBe(true);
   });
 
+  it("normalizes missing humanGateResponses to an empty array", () => {
+    const oldRawConfig = {
+      version: 1,
+      triggers: [],
+      actions: [],
+      outputs: [],
+      outputRoutes: [],
+      policies: [],
+      workflows: [],
+      runtimes: []
+    };
+
+    expect(normalizeProjectAutomationConfig(oldRawConfig)).toMatchObject({
+      humanGateResponses: []
+    });
+  });
+
   it("keeps repository automation configs in the current outputRoutes shape", async () => {
     for (const relativePath of [".ballet/project.json", ".fixture-ballet-project/.ballet/project.json"]) {
-      const config = JSON.parse(await readFile(path.join(process.cwd(), relativePath), "utf8")) as { outputRoutes?: unknown };
+      const config = JSON.parse(await readFile(path.join(process.cwd(), relativePath), "utf8")) as { outputRoutes?: unknown; humanGateResponses?: unknown };
       expect(Array.isArray(config.outputRoutes)).toBe(true);
+      expect(Array.isArray(config.humanGateResponses)).toBe(true);
+      expect(config).not.toHaveProperty("gates");
+      expect(config).not.toHaveProperty("gateDecisions");
     }
   });
 
@@ -126,6 +149,8 @@ describe("project automation config", () => {
     const saved = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     expect(saved).not.toHaveProperty("events");
     expect(saved).not.toHaveProperty("gates");
+    expect(saved).not.toHaveProperty("gateDecisions");
+    expect(saved.humanGateResponses).toEqual([]);
     expect(saved.policies[0]?.id).toBe("on.implementation.failed.start.implementation");
     expect(saved.workflows[0]?.steps).toEqual(["on.implementation.failed.start.implementation"]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
@@ -153,6 +178,8 @@ describe("project automation config", () => {
     const loaded = await loadProjectAutomationConfig(root, [agent]);
     expect(loaded).not.toHaveProperty("events");
     expect(loaded).not.toHaveProperty("gates");
+    expect(loaded).not.toHaveProperty("gateDecisions");
+    expect(loaded.humanGateResponses).toEqual([]);
     expect(loaded.actions).toEqual([{ id: "run", description: "", outputIds: ["ok", "rework"], agentIds: ["developer-agent"] }]);
     expect(loaded.outputs).toEqual([
       { id: "ok" },
@@ -175,7 +202,8 @@ describe("project automation config", () => {
     await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({
       version: 1,
       triggers: [],
-      gates: [{ id: "intent_changed", description: "Intent changed gate" }],
+      gates: [{ id: "intent_changed", title: "Intent changed", description: "Intent changed gate" }],
+      gateDecisions: [],
       actions: [{ id: "implementation", description: "Implement approved work." }],
       outputs: [],
       policies: [{
@@ -201,6 +229,9 @@ describe("project automation config", () => {
       event: "implementation.ok"
     });
     expect(loaded).not.toHaveProperty("gates");
+    expect(loaded).not.toHaveProperty("gateDecisions");
+    expect(loaded.humanGateResponses).toEqual([]);
+    expect(loaded.actions.some((action) => action.id === "intent_changed" && action.humanGate)).toBe(true);
     expect(loaded.outputs).toEqual([{ id: "ok" }, { id: "rework" }]);
     expect(loaded.outputRoutes).toEqual([]);
     expect(loaded.actions[0]?.outputIds).toEqual(["ok", "rework"]);
@@ -328,6 +359,45 @@ describe("project automation config", () => {
       agentlessConfig.outputs
     ).map((event) => event.eventType)).toEqual(["trigger.manual-start"]);
 
+    const humanGatePolicy = {
+      id: "on.trigger.manual-start.start.human-review",
+      source: "trigger" as const,
+      trigger: "manual-start",
+      action: "human-review",
+      enabled: true
+    };
+    const humanGateConfig: ProjectAutomationConfig = {
+      ...validConfig(),
+      triggers: [{ id: "manual-start", description: "Manual workflow start" }],
+      actions: [{ id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }],
+      policies: [humanGatePolicy],
+      workflows: [{ id: "delivery", title: "Delivery", steps: [humanGatePolicy.id] }]
+    };
+    const humanGateResponseBase = {
+      workflowId: "delivery",
+      policyId: humanGatePolicy.id,
+      actionId: "human-review",
+      outputId: "ok",
+      prompt: "Continue with the approved path.",
+      submittedAt: "2026-07-07T10:00:00.000Z"
+    };
+    const humanGateResponse = {
+      ...humanGateResponseBase,
+      id: humanGateResponseId(humanGateResponseBase)
+    };
+    expect(validateProjectAutomationConfig({
+      ...humanGateConfig,
+      humanGateResponses: [humanGateResponse]
+    }, [agent])).toEqual([]);
+    expect(validateProjectAutomationConfig({
+      ...humanGateConfig,
+      actions: [{ ...humanGateConfig.actions[0]!, agentIds: ["developer-agent"] }]
+    }, [agent]).some((issue) => issue.message === "Human gate action cannot select agents.")).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...humanGateConfig,
+      humanGateResponses: [{ ...humanGateResponse, prompt: "" }]
+    }, [agent]).some((issue) => issue.message === "Human gate response prompt is required.")).toBe(true);
+
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, outputIds: ["failed", "summary", "extra", "too-many"] }],
@@ -444,6 +514,41 @@ describe("project automation config", () => {
     }, [agent]).some((issue) =>
       issue.message === "Output route references unavailable output summary for policy on.implementation.failed.start.implementation."
     )).toBe(true);
+  });
+
+  it("migrates legacy gate output routes to human gate actions", () => {
+    const gateRouteConfig = {
+      ...validConfig(),
+      gates: [{ id: "human-review", title: "Human review", description: "Review generated output." }],
+      outputRoutes: [{
+        sourcePolicyId: "on.implementation.failed.start.implementation",
+        outputId: "ok",
+        target: { type: "gate", gate: "human-review" }
+      }]
+    };
+    const normalized = normalizeProjectAutomationConfig(gateRouteConfig);
+
+    expect(normalized).not.toHaveProperty("gates");
+    expect(normalized.outputRoutes).toEqual([]);
+    expect(normalized.actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "human-review", humanGate: true, agentIds: [], outputIds: ["ok", "rework"] })
+    ]));
+    expect(normalized.policies).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "on.implementation.ok.start.human-review",
+        source: "event",
+        event: "implementation.ok",
+        action: "human-review"
+      })
+    ]));
+    expect(normalized.workflows[0]?.steps).toEqual([
+      "on.implementation.failed.start.implementation",
+      "on.implementation.ok.start.human-review"
+    ]);
+    expect(validateProjectAutomationConfig(gateRouteConfig, [agent]).some((issue) =>
+      issue.message === "Output route target type must be event or trigger."
+    )).toBe(true);
+    expect(validateProjectAutomationConfig(normalized, [agent])).toEqual([]);
   });
 
   it("validates automation field lengths", () => {

@@ -122,6 +122,8 @@ const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits
 const automationOutputIdSchema = z.string().min(automationFieldLimits.outputId.min).max(automationFieldLimits.outputId.max);
 const automationEventTypeSchema = z.string().min(automationFieldLimits.eventType.min).max(automationFieldLimits.eventType.max);
 const automationPolicyIdSchema = z.string().min(automationFieldLimits.policyId.min).max(automationFieldLimits.policyId.max);
+const automationHumanGateResponseIdSchema = z.string().min(1).max(260);
+const automationHumanGatePromptSchema = z.string().min(1).max(2000);
 const automationCommandSchema = z.string().min(automationFieldLimits.command.min).max(automationFieldLimits.command.max);
 const automationArgSchema = z.string().min(automationFieldLimits.arg.min).max(automationFieldLimits.arg.max);
 
@@ -134,7 +136,8 @@ const projectActionSchema = z.object({
   id: automationTokenSchema,
   description: optionalAutomationDescriptionSchema,
   outputIds: z.array(automationOutputIdSchema),
-  agentIds: z.array(z.string().min(1))
+  agentIds: z.array(z.string().min(1)),
+  humanGate: z.boolean().optional()
 }).strict();
 
 const projectOutputSchema = z.object({
@@ -174,6 +177,16 @@ const projectWorkflowSchema = z.object({
   steps: z.array(automationPolicyIdSchema)
 }).strict();
 
+const projectHumanGateResponseSchema = z.object({
+  id: automationHumanGateResponseIdSchema,
+  workflowId: automationTokenSchema.optional(),
+  policyId: automationPolicyIdSchema,
+  actionId: automationTokenSchema,
+  outputId: automationOutputIdSchema,
+  prompt: automationHumanGatePromptSchema,
+  submittedAt: z.string()
+}).strict();
+
 const projectRuntimeSchema = z.object({
   id: automationTokenSchema,
   title: automationNameSchema,
@@ -187,6 +200,7 @@ export const automationConfigSchema = z.object({
   actions: z.array(projectActionSchema),
   outputs: z.array(projectOutputSchema),
   outputRoutes: z.array(projectOutputRouteSchema),
+  humanGateResponses: z.array(projectHumanGateResponseSchema),
   policies: z.array(projectPolicySchema),
   workflows: z.array(projectWorkflowSchema),
   runtimes: z.array(projectRuntimeSchema)

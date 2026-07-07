@@ -1,6 +1,6 @@
 import type { PointerEvent, RefObject } from "react";
 import type { Edge, Node } from "@xyflow/react";
-import type { ProjectPolicy } from "@shared/api/workspace-contracts";
+import type { ProjectAction, ProjectPolicy } from "@shared/api/workspace-contracts";
 import type { WorkflowStepRecord } from "./workflowGraph";
 import type { WorkflowCanvasEdge, WorkflowCanvasLayout, WorkflowCanvasLayoutNode } from "./workflowLayout";
 
@@ -10,6 +10,7 @@ export type WorkflowCanvasProps = {
   layout: WorkflowCanvasLayout;
   selectedWorkflowId: string;
   policyById: Map<string, ProjectPolicy>;
+  actionById: Map<string, ProjectAction>;
   firstPolicy?: ProjectPolicy;
   noSelectionValue: string;
   policyOptions: WorkflowCanvasOption[];

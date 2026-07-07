@@ -25,8 +25,10 @@ export function WorkflowPolicyNode({
   const selectedActionStepIndexSet = new Set(context.selectedActionStepIndexes);
   const selected = editable && records.some((candidate) => selectedActionStepIndexSet.has(candidate.index));
   const title = record.policy?.action || record.policyId || "No policy";
+  const humanGate = Boolean(record.policy ? context.actionById.get(record.policy.action)?.humanGate : false);
   const nodeClassName = cn(
     "nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80",
+    humanGate && "border-tertiary/60",
     selected && "border-primary/80 ring-2 ring-primary/20"
   );
   const content = (

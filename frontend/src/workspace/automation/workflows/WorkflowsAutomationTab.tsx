@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Agent,
+  EventIntakeRequest,
+  EventRecord,
   ProjectAutomationConfig,
+  ProjectHumanGateResponse,
   ProjectPolicy,
   ProjectOutputTarget,
   ProjectWorkflow
 } from "@shared/api/workspace-contracts";
 import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
-import { actionOutputIds, generatedPolicyId, normalizePolicyToken, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
+import { actionOutputIds, generatedPolicyId, humanGateResponseId, normalizePolicyToken, projectOutputRouteEventType, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
+import { nextConfigWithActionPatch } from "../actions/actionEditorLogic";
 import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
@@ -29,20 +33,26 @@ type WorkflowHandlerSelection = {
 
 export function WorkflowsAutomationTab({
   agents,
+  projectId,
   config,
   selectedId,
   createDraft,
   onCreateDraftChange,
   onSelect,
-  updateConfig
+  updateConfig,
+  saveDraft,
+  createEvent
 }: {
   agents: Agent[];
+  projectId: string;
   config: ProjectAutomationConfig;
   selectedId?: string;
   createDraft: ProjectWorkflow;
   onCreateDraftChange: (patch: Partial<ProjectWorkflow>) => void;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
+  saveDraft: (nextDraft?: ProjectAutomationConfig) => Promise<boolean>;
+  createEvent: (event: EventIntakeRequest) => Promise<EventRecord>;
 }) {
   const foundSelectedIndex = config.workflows.findIndex((workflow) => workflow.id === selectedId);
   const lastSelectedIndexRef = useRef<number | undefined>(foundSelectedIndex >= 0 ? foundSelectedIndex : undefined);
@@ -58,6 +68,7 @@ export function WorkflowsAutomationTab({
   const [selectedHandlerSelection, setSelectedHandlerSelection] = useState<WorkflowHandlerSelection | null>(null);
   const selectedHandlerStepIndexes = selectedHandlerSelection?.stepIndexes ?? [];
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
+  const actionById = useMemo(() => new Map(config.actions.map((action) => [action.id, action])), [config.actions]);
   const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
   const actionOptions = [
     { value: noSelection, label: "No action" },
@@ -241,6 +252,14 @@ export function WorkflowsAutomationTab({
     if (!selected || workflowId !== selected.id) return;
     updateConfig((current) => nextConfigWithWorkflowHandlerAction(current, selected.id, stepIndex, actionId));
   };
+  const updateActionPatch = (actionId: string, patch: Partial<ProjectAutomationConfig["actions"][number]>) => {
+    updateConfig((current) => nextConfigWithActionPatch(current, actionId, patch).config);
+  };
+  const createOutput = (outputId: string) => {
+    const id = normalizePolicyToken(outputId);
+    if (!id || config.outputs.some((output) => normalizePolicyToken(output.id) === id)) return;
+    updateConfig((current) => ({ ...current, outputs: [...current.outputs, { id }] }));
+  };
   const updateOutputRouteTarget = (sourcePolicyId: string, outputId: string, target: ProjectOutputTarget | undefined) => {
     updateConfig((current) => {
       const routeKey = projectOutputRouteKey(sourcePolicyId, outputId);
@@ -251,6 +270,50 @@ export function WorkflowsAutomationTab({
           ? [...outputRoutes, { sourcePolicyId, outputId: normalizePolicyToken(outputId), target }]
           : outputRoutes
       };
+    });
+  };
+  const submitHumanGateResponse = async (route: WorkflowHandlerRoute, outputId: string, prompt: string) => {
+    const policy = config.policies.find((candidate) => candidate.id === route.policyId);
+    const action = config.actions.find((candidate) => candidate.id === route.actionId);
+    if (!policy || !action?.humanGate || !action.outputIds.includes(outputId)) return;
+    const responseBase = {
+      workflowId: route.workflowId,
+      policyId: route.policyId,
+      actionId: route.actionId,
+      outputId,
+      prompt,
+      submittedAt: new Date().toISOString()
+    };
+    const response: ProjectHumanGateResponse = {
+      ...responseBase,
+      id: humanGateResponseId(responseBase)
+    };
+    const nextConfig: ProjectAutomationConfig = {
+      ...config,
+      humanGateResponses: [
+        ...config.humanGateResponses.filter((candidate) => !sameHumanGateResponseTarget(candidate, response)),
+        response
+      ]
+    };
+    updateConfig(() => nextConfig);
+    const saved = await saveDraft(nextConfig);
+    if (!saved) return;
+    const eventType = projectOutputRouteEventType(policy, outputId, nextConfig.outputRoutes);
+    await createEvent({
+      projectId,
+      eventType,
+      source: "human-gate",
+      subject: route.actionId,
+      dedupeKey: `human-gate:${response.id}:${response.submittedAt}`,
+      tags: ["human-gate"],
+      payload: {
+        workflow_id: route.workflowId,
+        policy_id: route.policyId,
+        action: route.actionId,
+        output_id: outputId,
+        prompt
+      },
+      body: `Human gate ${route.actionId} selected ${outputId}.\n\n${prompt}`
     });
   };
 
@@ -291,6 +354,7 @@ export function WorkflowsAutomationTab({
         layout={workflowLayout}
         selectedWorkflowId={selected.id}
         policyById={policyById}
+        actionById={actionById}
         firstPolicy={policyById.get(selected.steps[0] ?? "")}
         noSelectionValue={noSelection}
         policyOptions={policyOptions}
@@ -324,11 +388,20 @@ export function WorkflowsAutomationTab({
           if (!open && details?.reason === "close-press") clearHandlerSelection();
         }}
         onRouteActionChange={updateHandlerRouteAction}
+        onActionPatch={updateActionPatch}
+        onCreateOutput={createOutput}
         onRemoveRoute={removeHandlerRoute}
         onOutputRouteTargetChange={updateOutputRouteTarget}
+        onHumanGateSubmit={(route, outputId, prompt) => void submitHumanGateResponse(route, outputId, prompt)}
       />
     </>
   );
+}
+
+function sameHumanGateResponseTarget(first: ProjectHumanGateResponse, second: ProjectHumanGateResponse) {
+  return first.policyId === second.policyId &&
+    first.actionId === second.actionId &&
+    (first.workflowId ?? "") === (second.workflowId ?? "");
 }
 
 function workflowHandlerRoute(record: WorkflowStepRecord): WorkflowHandlerRoute | undefined {

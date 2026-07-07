@@ -30,7 +30,6 @@ const legacyRouteAliases: Record<string, (url: URL) => RouteState> = {
   "/policies": (url) => automationRoute("workflows", url),
   "/actions": (url) => automationRoute("actions", url),
   "/workflow": (url) => automationRoute("workflows", url),
-  "/automation/gates": (url) => automationRoute("actions", url),
   "/automation/outputs": (url) => automationRoute("actions", url),
   "/automation/runtimes": runtimeRoute,
   "/agent-runs": (url) => automationRoute("workflows", url)

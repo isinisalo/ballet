@@ -62,6 +62,16 @@
       ]
     },
     {
+      "id": "project-brief-human-gate",
+      "description": "Human approval of the agent-reviewed Project Brief before roadmap planning continues.",
+      "outputIds": [
+        "approved",
+        "changes_requested"
+      ],
+      "agentIds": [],
+      "humanGate": true
+    },
+    {
       "id": "create-roadmap",
       "description": "Create traceable delivery roadmap from approved Project Brief.",
       "outputIds": [
@@ -281,8 +291,18 @@
         "trigger": "code_approved",
         "workflowId": "dev-deploy-validation-loop"
       }
+    },
+    {
+      "sourcePolicyId": "on.challenge-project-brief.approved.start.project-brief-human-gate",
+      "outputId": "approved",
+      "target": {
+        "type": "trigger",
+        "trigger": "project_brief_approved",
+        "workflowId": "roadmap-loop"
+      }
     }
   ],
+  "humanGateResponses": [],
   "policies": [
     {
       "source": "trigger",
@@ -290,6 +310,13 @@
       "action": "create-project-brief",
       "enabled": true,
       "id": "on.trigger.adr_goals_changed.start.create-project-brief"
+    },
+    {
+      "source": "event",
+      "event": "create-project-brief.blocked",
+      "action": "done",
+      "enabled": true,
+      "id": "on.create-project-brief.blocked.start.done"
     },
     {
       "source": "event",
@@ -308,9 +335,16 @@
     {
       "source": "event",
       "event": "challenge-project-brief.approved",
-      "action": "done",
+      "action": "project-brief-human-gate",
       "enabled": true,
-      "id": "on.challenge-project-brief.approved.start.done"
+      "id": "on.challenge-project-brief.approved.start.project-brief-human-gate"
+    },
+    {
+      "source": "event",
+      "event": "project-brief-human-gate.changes_requested",
+      "action": "create-project-brief",
+      "enabled": true,
+      "id": "on.project-brief-human-gate.changes_requested.start.create-project-brief"
     },
     {
       "source": "trigger",
@@ -586,8 +620,10 @@
       "steps": [
         "on.trigger.adr_goals_changed.start.create-project-brief",
         "on.create-project-brief.ready.start.challenge-project-brief",
+        "on.challenge-project-brief.approved.start.project-brief-human-gate",
+        "on.project-brief-human-gate.changes_requested.start.create-project-brief",
         "on.challenge-project-brief.changes_requested.start.create-project-brief",
-        "on.challenge-project-brief.approved.start.done"
+        "on.create-project-brief.blocked.start.done"
       ]
     },
     {

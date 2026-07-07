@@ -46,11 +46,7 @@ describe("workspace routing", () => {
       automationTab: "actions",
       automationEntityId: "artifact"
     });
-    expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({
-      view: "automation",
-      automationTab: "actions",
-      automationEntityId: "gate-1"
-    });
+    expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({ view: "projects" });
     expect(routeFromPath("/runtimes?id=codex")).toEqual({ view: "runtimes", runtimeId: "codex" });
   });
 

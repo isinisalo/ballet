@@ -108,6 +108,7 @@ const baseData = (): AppData => ({
       { id: "summary" }
     ],
     outputRoutes: [],
+    humanGateResponses: [],
     policies: [{
       id: "on.implementation.failed.start.implementation",
       source: "event",
@@ -362,6 +363,31 @@ function installApi(data: AppData, options: InstallApiOptions = {}) {
       }));
       data.automationIssues = [];
       return jsonResponse(saved);
+    }
+
+    if (url === "/api/events/intake" && method === "POST") {
+      const incoming = body as Partial<AppData["events"][number]> & { projectId: string; eventType: string };
+      const saved: AppData["events"][number] = {
+        id: `event-${data.events.length + 1}`,
+        projectId: incoming.projectId,
+        source: incoming.source ?? "test",
+        eventType: incoming.eventType,
+        subject: incoming.subject,
+        correlationId: incoming.correlationId,
+        causationId: incoming.causationId,
+        dedupeKey: incoming.dedupeKey,
+        correlationDepth: incoming.correlationDepth,
+        occurredAt: incoming.occurredAt,
+        tags: incoming.tags ?? [],
+        payload: incoming.payload ?? {},
+        status: "received",
+        createdAt: now,
+        relativePath: `.ballet/events/event-${data.events.length + 1}.json`,
+        frontmatter: {},
+        body: typeof body.body === "string" ? body.body : ""
+      };
+      data.events = [...data.events, saved];
+      return jsonResponse(saved, { status: 201 });
     }
 
     if (url === "/api/project-documents" && method === "POST") {
@@ -852,6 +878,7 @@ describe("workspace entity UI flows", () => {
     const legacyData = baseData();
     delete (legacyData.automation as Partial<ProjectAutomationConfig>).outputs;
     delete (legacyData.automation as Partial<ProjectAutomationConfig>).outputRoutes;
+    delete (legacyData.automation as Partial<ProjectAutomationConfig>).humanGateResponses;
 
     await renderRoute("/automation/workflows?id=workflow-1", legacyData);
 
@@ -1278,7 +1305,56 @@ describe("workspace entity UI flows", () => {
     expect(summaryOutputEvent).not.toHaveTextContent("implementation.summary");
     expect(summaryOutputEvent.querySelector("svg")).not.toBeInTheDocument();
     await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("summary"));
-    expect(document.querySelector("[data-workflow-gate-output]")).not.toBeInTheDocument();
+  });
+
+  it("renders human gate actions and records prompt responses", async () => {
+    const user = userEvent.setup();
+    const workflowData = baseData();
+    workflowData.automation.actions[0] = {
+      id: "implementation",
+      description: "Review generated evidence.",
+      outputIds: ["complete", "failed"],
+      agentIds: [],
+      humanGate: true
+    };
+    const { data } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
+
+    const policyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
+    expect(policyNode).toHaveTextContent("implementation");
+    expect(policyNode).not.toHaveTextContent("Human Gate");
+    expect(policyNode).toHaveClass("border-tertiary/60");
+    expect(screen.getByRole("button", { name: "Add policy step for implementation.complete" })).toBeInTheDocument();
+
+    activateWorkflowNode(policyNode);
+    const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
+    expect(within(dialog).getByLabelText("Action ID")).toHaveValue("implementation");
+    expect(within(dialog).getByLabelText("Description")).toHaveValue("Review generated evidence.");
+    expect(within(dialog).getByText("Human operator")).toBeInTheDocument();
+    expect(within(dialog).getByText("Waiting for human")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Approval · complete" }));
+    expect(within(dialog).getByText("Prompt to agent is required before continuing.")).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Prompt to agent"), "Approved with trace evidence.");
+    await user.click(within(dialog).getByRole("button", { name: "Approval · complete" }));
+
+    await waitFor(() => expect(data.automation.humanGateResponses).toContainEqual(expect.objectContaining({
+      policyId: "on.implementation.failed.start.implementation",
+      actionId: "implementation",
+      outputId: "complete",
+      workflowId: "workflow-1",
+      prompt: "Approved with trace evidence."
+    })));
+    await waitFor(() => expect(data.events).toContainEqual(expect.objectContaining({
+      eventType: "implementation.complete",
+      source: "human-gate",
+      payload: expect.objectContaining({
+        workflow_id: "workflow-1",
+        policy_id: "on.implementation.failed.start.implementation",
+        action: "implementation",
+        output_id: "complete",
+        prompt: "Approved with trace evidence."
+      })
+    })));
   });
 
   it("renders only the approval endpoint for one-output workflow actions", async () => {
@@ -1390,6 +1466,36 @@ describe("workspace entity UI flows", () => {
     await confirmDelete(user, "Delete trigger");
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.triggers.some((trigger) => trigger.id === "release-ready")).toBe(false));
+  });
+
+  it("creates, toggles, deletes, and saves human gate actions", async () => {
+    const user = userEvent.setup();
+    const { data } = await renderRoute("/automation/actions");
+
+    expect(screen.getByRole("link", { name: "Actions" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Gates" })).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Action ID"), "human-review");
+    await user.type(screen.getByLabelText("Description"), "Review generated evidence.");
+    await user.click(screen.getByRole("switch", { name: "Human gate" }));
+    expect(screen.getByText("Human operator")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove agent Existing Agent" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+
+    await waitFor(() => expect(data.automation.actions).toContainEqual(expect.objectContaining({
+      id: "human-review",
+      description: "Review generated evidence.",
+      outputIds: ["ok", "rework"],
+      agentIds: [],
+      humanGate: true
+    })));
+    expect(data.automation.outputs).toEqual(expect.arrayContaining([{ id: "ok" }, { id: "rework" }]));
+    expect(window.location.pathname).toBe("/automation/actions");
+    expect(window.location.search).toBe("?id=human-review");
+
+    await confirmDelete(user, "Delete action");
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+    await waitFor(() => expect(data.automation.actions.some((action) => action.id === "human-review")).toBe(false));
   });
 
   it("creates a policy from a ghost event and opens its action sheet", async () => {

@@ -3,6 +3,12 @@ import { defaultPolicyOutputIds, defaultProjectOutputs, normalizeActionOutputSlo
 
 export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefined): ProjectAutomationConfig => {
   const defaults = defaultProjectAutomationConfig();
+  const configWithoutLegacy = { ...(config ?? {}) } as ProjectAutomationConfig & {
+    gates?: unknown;
+    gateDecisions?: unknown;
+  };
+  delete configWithoutLegacy.gates;
+  delete configWithoutLegacy.gateDecisions;
   const baseOutputs = Array.isArray(config?.outputs) && config.outputs.length > 0
     ? [...new Map(config.outputs
       .map((output) => ({ id: normalizePolicyToken(output.id) }))
@@ -19,8 +25,8 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
         : fallbackOutputIds.length === defaultPolicyOutputIds.length ? fallbackOutputIds : [...defaultPolicyOutputIds];
       return {
         ...action,
-        outputIds: agentIds.length === 0 ? [] : selectedOutputIds,
-        agentIds
+        outputIds: agentIds.length === 0 && !action.humanGate ? [] : selectedOutputIds,
+        agentIds: action.humanGate ? [] : agentIds
       };
     })
     : defaults.actions;
@@ -30,11 +36,12 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
   });
   return {
     ...defaults,
-    ...config,
+    ...configWithoutLegacy,
     triggers: Array.isArray(config?.triggers) ? config.triggers : defaults.triggers,
     actions,
     outputs: [...outputById.values()],
     outputRoutes: Array.isArray(config?.outputRoutes) ? config.outputRoutes : defaults.outputRoutes,
+    humanGateResponses: Array.isArray(config?.humanGateResponses) ? config.humanGateResponses : defaults.humanGateResponses,
     policies: Array.isArray(config?.policies) ? config.policies : defaults.policies,
     workflows: Array.isArray(config?.workflows) ? config.workflows : defaults.workflows,
     runtimes: Array.isArray(config?.runtimes) ? config.runtimes : defaults.runtimes

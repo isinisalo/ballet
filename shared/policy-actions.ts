@@ -1,5 +1,5 @@
 import type { Agent } from "./domain/agents.js";
-import type { ProjectAction, ProjectOutput, ProjectOutputRoute, ProjectOutputTarget, ProjectPolicy } from "./domain/automation.js";
+import type { ProjectAction, ProjectHumanGateResponse, ProjectOutput, ProjectOutputRoute, ProjectOutputTarget, ProjectPolicy } from "./domain/automation.js";
 
 export const actionOutputSlotCount = 2;
 export const actionOutputSlotMinCount = 1;
@@ -129,19 +129,19 @@ const outputIdSet = (outputs: Array<Pick<ProjectOutput, "id">>): Set<string> =>
     .filter(Boolean));
 
 export const actionOutputIds = (
-  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>,
   actionId: string
 ): string[] => {
   const normalizedActionId = normalizePolicyToken(actionId);
   const action = actions.find((candidate) => normalizePolicyToken(candidate.id) === normalizedActionId);
-  if (action && Array.isArray(action.agentIds) && action.agentIds.length === 0) return [];
+  if (action && Array.isArray(action.agentIds) && action.agentIds.length === 0 && !action.humanGate) return [];
   const outputIds = action?.outputIds ?? defaultPolicyOutputIds;
   return normalizeActionOutputSlots(outputIds);
 };
 
 export const policyOutputEventTypes = (
   input: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }> = [],
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = [],
   outputs: Array<Pick<ProjectOutput, "id">> = []
 ): string[] => {
   const outputIds = actions.length > 0 ? actionOutputIds(actions, input.action) : [...defaultPolicyOutputIds];
@@ -154,6 +154,14 @@ export const policyOutputEventTypes = (
 export const normalizePolicyOutputEventType = (value: string): string => {
   return value.replace(/^([a-z0-9_-]+)\.([a-z0-9_-]+)\.([a-z0-9_-]+)\.v1$/, "$1.$2.$3");
 };
+
+export const humanGateResponseId = (
+  input: Pick<ProjectHumanGateResponse, "policyId" | "actionId"> & { workflowId?: string }
+): string => [
+  input.workflowId ? normalizePolicyToken(input.workflowId) : "workflow",
+  normalizePolicyToken(input.policyId),
+  normalizePolicyToken(input.actionId)
+].filter(Boolean).join(":");
 
 export const policyActionTokens = (policies: Array<Pick<ProjectPolicy, "action">>): string[] =>
   [...new Set(policies.map((policy) => normalizePolicyToken(policy.action)).filter(Boolean))];
@@ -184,7 +192,7 @@ export const uniqueAgentPolicyTokens = (agents: Agent[]): string[] => {
 };
 
 export const policyEventTypesForActions = (
-  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>,
   outputs: Array<Pick<ProjectOutput, "id">> = []
 ): string[] => {
   const normalizedActions = [...new Map(actions
@@ -196,7 +204,7 @@ export const policyEventTypesForActions = (
 
 export const policyEventTypesForAgentsAndActions = (
   _agents: Agent[],
-  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>,
   outputs: Array<Pick<ProjectOutput, "id">> = []
 ): string[] => policyEventTypesForActions(actions, outputs);
 

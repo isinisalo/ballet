@@ -37,6 +37,7 @@ describe("HTTP Zod validation", () => {
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "summary" }],
       outputRoutes: [],
+      humanGateResponses: [],
       policies: [{
         id: "on.trigger.manual-start.start.implementation",
         source: "trigger",
@@ -48,10 +49,44 @@ describe("HTTP Zod validation", () => {
       runtimes: [{ id: "codex", title: "Codex", command: "codex", args: [] }]
     };
     expect(parseUnknown(automationConfigSchema, valid)).toEqual(valid);
+    const humanGateConfig = {
+      ...valid,
+      actions: [...valid.actions, { id: "human-review", description: "Human review", outputIds: ["summary"], agentIds: [], humanGate: true }],
+      humanGateResponses: [{
+        id: "delivery:on-trigger-manual-start-start-human-review:human-review",
+        workflowId: "delivery",
+        policyId: "on.trigger.manual-start.start.human-review",
+        actionId: "human-review",
+        outputId: "summary",
+        prompt: "Continue with the approved brief.",
+        submittedAt: "2026-07-07T10:00:00.000Z"
+      }],
+      policies: [...valid.policies, {
+        id: "on.trigger.manual-start.start.human-review",
+        source: "trigger",
+        trigger: "manual-start",
+        action: "human-review",
+        enabled: true
+      }]
+    };
+    expect(parseUnknown(automationConfigSchema, humanGateConfig)).toMatchObject({
+      actions: expect.arrayContaining([expect.objectContaining({ id: "human-review", humanGate: true })]),
+      humanGateResponses: [expect.objectContaining({ actionId: "human-review", prompt: "Continue with the approved brief." })]
+    });
+    expectValidationError(() => parseUnknown(automationConfigSchema, {
+      ...humanGateConfig,
+      humanGateResponses: [{ ...humanGateConfig.humanGateResponses[0], prompt: "" }]
+    }), "humanGateResponses.0.prompt");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, events: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: undefined }), "actions");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: undefined }), "outputs");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputRoutes: undefined }), "outputRoutes");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, humanGateResponses: undefined }), "humanGateResponses");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, gates: [] }), "$");
+    expectValidationError(() => parseUnknown(automationConfigSchema, {
+      ...valid,
+      outputRoutes: [{ sourcePolicyId: "on.trigger.manual-start.start.implementation", outputId: "summary", target: { type: "gate", gate: "human-review" } }]
+    }), "outputRoutes.0.target.type");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"] }] }), "actions.0.agentIds");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", description: "Summary" }] }), "outputs.0");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", type: "event" }] }), "outputs.0");

@@ -1,6 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { automationTokenValidationMessage, normalizeAutomationToken } from "@shared/api/automationValidation";
+import { humanGateResponseId } from "@shared/policy-actions";
 import type { AutomationTab } from "../../types";
 import type { WorkflowNameMode } from "./WorkflowHeaderNameEditor";
 
@@ -86,5 +87,10 @@ const renameWorkflowDraft = (draft: ProjectAutomationConfig, currentId: string |
   ...draft,
   workflows: draft.workflows.map((workflow) =>
     workflow.id === currentId ? { ...workflow, id, title: id } : workflow
-  )
+  ),
+  humanGateResponses: draft.humanGateResponses.map((response) => {
+    if (response.workflowId !== currentId) return response;
+    const nextResponse = { ...response, workflowId: id };
+    return { ...nextResponse, id: humanGateResponseId(nextResponse) };
+  })
 });

@@ -1,5 +1,5 @@
 import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { actionOutputSlotCount, actionOutputSlotKind, generatedPolicyId, normalizeActionOutputSlots, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
+import { actionOutputSlotCount, actionOutputSlotKind, generatedPolicyId, humanGateResponseId, normalizeActionOutputSlots, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 
 export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
@@ -7,9 +7,9 @@ export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
     ...action,
     id: editablePolicyToken(action.id),
     outputIds: normalizeActionOutputSlots(action.outputIds),
-    agentIds: [...new Set(action.agentIds)].slice(0, 5)
+    agentIds: action.humanGate ? [] : [...new Set(action.agentIds)].slice(0, 5)
   };
-  if (normalized.agentIds.length === 0) normalized.outputIds = [];
+  if (normalized.agentIds.length === 0 && !normalized.humanGate) normalized.outputIds = [];
   return normalized;
 };
 
@@ -70,6 +70,17 @@ export const nextConfigWithActionPatch = (
     const nextRoute = { ...route, sourcePolicyId, outputId };
     return [[projectOutputRouteKey(nextRoute.sourcePolicyId, nextRoute.outputId), nextRoute] as const];
   }));
+  const humanGateResponses = current.humanGateResponses.flatMap((response) => {
+    const previousPolicy = current.policies.find((policy) => policy.id === response.policyId);
+    const policyId = policyIdMap.get(response.policyId) ?? response.policyId;
+    const nextPolicy = policyById.get(policyId);
+    const actionId = response.actionId === previousId ? normalized.id : response.actionId;
+    const nextAction = actionById.get(actionId);
+    const outputId = previousPolicy?.action === previousId ? outputIdMap.get(response.outputId) ?? response.outputId : response.outputId;
+    if (!nextPolicy || !nextAction?.humanGate || !nextAction.outputIds.includes(outputId)) return [];
+    const nextResponse = { ...response, policyId, actionId, outputId };
+    return [{ ...nextResponse, id: humanGateResponseId(nextResponse) }];
+  });
 
   return {
     action: normalized,
@@ -81,7 +92,8 @@ export const nextConfigWithActionPatch = (
         ...workflow,
         steps: workflow.steps.map((step) => policyIdMap.get(step) ?? step)
       })),
-      outputRoutes: [...outputRouteByKey.values()]
+      outputRoutes: [...outputRouteByKey.values()],
+      humanGateResponses
     }
   };
 };

@@ -181,6 +181,7 @@ describe("API routes", () => {
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }],
       outputRoutes: [],
+      humanGateResponses: [],
       policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
       runtimes: []
@@ -237,6 +238,7 @@ describe("API routes", () => {
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }],
       outputRoutes: [],
+      humanGateResponses: [],
       policies: [{ id: "on.trigger.plan_approved.start.implementation", source: "trigger", trigger: "plan_approved", action: "implementation", enabled: true }],
       workflows: [],
       runtimes: []
@@ -287,6 +289,7 @@ describe("API routes", () => {
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }],
       outputRoutes: [],
+      humanGateResponses: [],
       triggers: [{ id: "manual_start", description: "Manual start" }],
       policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
@@ -307,7 +310,9 @@ describe("API routes", () => {
       expect(automation.status).toBe(200);
       const automationBody = await automation.json() as { config: Record<string, unknown> };
       expect(automationBody.config).not.toHaveProperty("events");
+      expect(automationBody.config).toHaveProperty("humanGateResponses");
       expect(automationBody.config).not.toHaveProperty("gates");
+      expect(automationBody.config).not.toHaveProperty("gateDecisions");
       expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
 
       const legacyPolicy = await fetch(url + "/api/policies", {

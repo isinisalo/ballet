@@ -66,6 +66,7 @@ export const nextConfigWithoutWorkflowStepIndexes = (
   const workflow = current.workflows.find((candidate) => candidate.id === workflowId);
   const stepIndexSet = new Set(stepIndexes);
   if (!workflow || stepIndexSet.size === 0) return current;
+  const removedPolicyIds = new Set(workflow.steps.filter((_, index) => stepIndexSet.has(index)));
 
   return {
     ...current,
@@ -74,6 +75,9 @@ export const nextConfigWithoutWorkflowStepIndexes = (
         ...candidate,
         steps: candidate.steps.filter((_, index) => !stepIndexSet.has(index))
       }
-      : candidate)
+      : candidate),
+    humanGateResponses: current.humanGateResponses.filter((response) =>
+      response.workflowId !== workflow.id || !removedPolicyIds.has(response.policyId)
+    )
   };
 };

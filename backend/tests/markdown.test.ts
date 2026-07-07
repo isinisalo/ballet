@@ -107,6 +107,7 @@ describe("Markdown collection loading", () => {
         { id: "rework" }
       ],
       outputRoutes: [],
+      humanGateResponses: [],
       policies: [],
       workflows: [],
       runtimes: []

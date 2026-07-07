@@ -33,6 +33,7 @@
     }
   ],
   "outputRoutes": [],
+  "humanGateResponses": [],
   "policies": [
     {
       "id": "test-policy",
