@@ -43,8 +43,7 @@
       "id": "create-project-brief",
       "description": "Create Project Brief from accepted ADRs and approved GOALS.",
       "outputIds": [
-        "ready",
-        "blocked"
+        "ready"
       ],
       "agentIds": [
         "brief-agent"
@@ -274,291 +273,298 @@
   ],
   "policies": [
     {
-      "id": "p01.on.adr-goals-changed.create-project-brief",
       "source": "trigger",
       "trigger": "adr_goals_changed",
       "action": "create-project-brief",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.adr_goals_changed.start.create-project-brief"
     },
     {
-      "id": "p02.on.project-brief-ready.challenge-project-brief",
       "source": "event",
       "event": "create-project-brief.ready",
       "action": "challenge-project-brief",
-      "enabled": true
+      "enabled": true,
+      "id": "on.create-project-brief.ready.start.challenge-project-brief"
     },
     {
-      "id": "p03.on.project-brief-rework.create-project-brief",
       "source": "event",
       "event": "challenge-project-brief.changes_requested",
       "action": "create-project-brief",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-project-brief.changes_requested.start.create-project-brief"
     },
     {
-      "id": "p04.on.project-brief-approved.done",
       "source": "event",
       "event": "challenge-project-brief.approved",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-project-brief.approved.start.done"
     },
     {
-      "id": "p05.on.project-brief-approved.create-roadmap",
       "source": "trigger",
       "trigger": "project_brief_approved",
       "action": "create-roadmap",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.project_brief_approved.start.create-roadmap"
     },
     {
-      "id": "p06.on.roadmap-ready.challenge-roadmap",
       "source": "event",
       "event": "create-roadmap.ready",
       "action": "challenge-roadmap",
-      "enabled": true
+      "enabled": true,
+      "id": "on.create-roadmap.ready.start.challenge-roadmap"
     },
     {
-      "id": "p07.on.roadmap-rework.create-roadmap",
       "source": "event",
       "event": "challenge-roadmap.changes_requested",
       "action": "create-roadmap",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-roadmap.changes_requested.start.create-roadmap"
     },
     {
-      "id": "p08.on.roadmap-approved.done",
       "source": "event",
       "event": "challenge-roadmap.approved",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-roadmap.approved.start.done"
     },
     {
-      "id": "p09.on.roadmap-approved.create-ui-design",
       "source": "trigger",
       "trigger": "roadmap_approved",
       "action": "create-ui-design",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.roadmap_approved.start.create-ui-design"
     },
     {
-      "id": "p10.on.ui-design-ready.challenge-ui-design",
       "source": "event",
       "event": "create-ui-design.ready",
       "action": "challenge-ui-design",
-      "enabled": true
+      "enabled": true,
+      "id": "on.create-ui-design.ready.start.challenge-ui-design"
     },
     {
-      "id": "p11.on.ui-design-rework.create-ui-design",
       "source": "event",
       "event": "challenge-ui-design.changes_requested",
       "action": "create-ui-design",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-ui-design.changes_requested.start.create-ui-design"
     },
     {
-      "id": "p12.on.ui-design-approved.done",
       "source": "event",
       "event": "challenge-ui-design.approved",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-ui-design.approved.start.done"
     },
     {
-      "id": "p13.on.ui-design-approved.create-technical-plan",
       "source": "trigger",
       "trigger": "ui_design_approved",
       "action": "create-technical-plan",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.ui_design_approved.start.create-technical-plan"
     },
     {
-      "id": "p14.on.technical-plan-ready.challenge-technical-plan",
       "source": "event",
       "event": "create-technical-plan.ready",
       "action": "challenge-technical-plan",
-      "enabled": true
+      "enabled": true,
+      "id": "on.create-technical-plan.ready.start.challenge-technical-plan"
     },
     {
-      "id": "p15.on.technical-plan-rework.create-technical-plan",
       "source": "event",
       "event": "challenge-technical-plan.changes_requested",
       "action": "create-technical-plan",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-technical-plan.changes_requested.start.create-technical-plan"
     },
     {
-      "id": "p16.on.technical-plan-approved.done",
       "source": "event",
       "event": "challenge-technical-plan.approved",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-technical-plan.approved.start.done"
     },
     {
-      "id": "p17.on.technical-plan-approved.create-milestones",
       "source": "trigger",
       "trigger": "technical_plan_approved",
       "action": "create-milestones",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.technical_plan_approved.start.create-milestones"
     },
     {
-      "id": "p18.on.milestones-ready.challenge-milestones",
       "source": "event",
       "event": "create-milestones.ready",
       "action": "challenge-milestones",
-      "enabled": true
+      "enabled": true,
+      "id": "on.create-milestones.ready.start.challenge-milestones"
     },
     {
-      "id": "p19.on.milestones-rework.create-milestones",
       "source": "event",
       "event": "challenge-milestones.changes_requested",
       "action": "create-milestones",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-milestones.changes_requested.start.create-milestones"
     },
     {
-      "id": "p20.on.milestones-approved.done",
       "source": "event",
       "event": "challenge-milestones.approved",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-milestones.approved.start.done"
     },
     {
-      "id": "p21.on.milestones-approved.create-task-specs",
       "source": "trigger",
       "trigger": "milestones_approved",
       "action": "create-task-specs",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.milestones_approved.start.create-task-specs"
     },
     {
-      "id": "p22.on.task-specs-ready.challenge-task-specs",
       "source": "event",
       "event": "create-task-specs.ready",
       "action": "challenge-task-specs",
-      "enabled": true
+      "enabled": true,
+      "id": "on.create-task-specs.ready.start.challenge-task-specs"
     },
     {
-      "id": "p23.on.task-specs-rework.create-task-specs",
       "source": "event",
       "event": "challenge-task-specs.changes_requested",
       "action": "create-task-specs",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-task-specs.changes_requested.start.create-task-specs"
     },
     {
-      "id": "p24.on.task-specs-approved.done",
       "source": "event",
       "event": "challenge-task-specs.approved",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.challenge-task-specs.approved.start.done"
     },
     {
-      "id": "p25.on.task-specs-approved.implement-task",
       "source": "trigger",
       "trigger": "task_specs_approved",
       "action": "implement-task",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.task_specs_approved.start.implement-task"
     },
     {
-      "id": "p26.on.implementation-ready.run-tests",
       "source": "event",
       "event": "implement-task.ready",
       "action": "run-tests",
-      "enabled": true
+      "enabled": true,
+      "id": "on.implement-task.ready.start.run-tests"
     },
     {
-      "id": "p27.on.implementation-blocked.classify-failure",
       "source": "event",
       "event": "implement-task.blocked",
       "action": "classify-failure",
-      "enabled": true
+      "enabled": true,
+      "id": "on.implement-task.blocked.start.classify-failure"
     },
     {
-      "id": "p28.on.tests-ready.review-code",
       "source": "event",
       "event": "run-tests.ready",
       "action": "review-code",
-      "enabled": true
+      "enabled": true,
+      "id": "on.run-tests.ready.start.review-code"
     },
     {
-      "id": "p29.on.tests-failed.classify-failure",
       "source": "event",
       "event": "run-tests.failed",
       "action": "classify-failure",
-      "enabled": true
+      "enabled": true,
+      "id": "on.run-tests.failed.start.classify-failure"
     },
     {
-      "id": "p30.on.code-review-rework.implement-task",
       "source": "event",
       "event": "review-code.changes_requested",
       "action": "implement-task",
-      "enabled": true
+      "enabled": true,
+      "id": "on.review-code.changes_requested.start.implement-task"
     },
     {
-      "id": "p31.on.code-review-approved.done",
       "source": "event",
       "event": "review-code.approved",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.review-code.approved.start.done"
     },
     {
-      "id": "p32.on.code-approved.prepare-dev-deployment",
       "source": "trigger",
       "trigger": "code_approved",
       "action": "prepare-dev-deployment",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.code_approved.start.prepare-dev-deployment"
     },
     {
-      "id": "p33.on.dev-deployment-ready.deploy-to-dev",
       "source": "event",
       "event": "prepare-dev-deployment.ready",
       "action": "deploy-to-dev",
-      "enabled": true
+      "enabled": true,
+      "id": "on.prepare-dev-deployment.ready.start.deploy-to-dev"
     },
     {
-      "id": "p34.on.dev-deployment-blocked.classify-failure",
       "source": "event",
       "event": "prepare-dev-deployment.blocked",
       "action": "classify-failure",
-      "enabled": true
+      "enabled": true,
+      "id": "on.prepare-dev-deployment.blocked.start.classify-failure"
     },
     {
-      "id": "p35.on.dev-deploy-ready.validate-dev-deployment",
       "source": "event",
       "event": "deploy-to-dev.ready",
       "action": "validate-dev-deployment",
-      "enabled": true
+      "enabled": true,
+      "id": "on.deploy-to-dev.ready.start.validate-dev-deployment"
     },
     {
-      "id": "p36.on.dev-deploy-failed.classify-failure",
       "source": "event",
       "event": "deploy-to-dev.failed",
       "action": "classify-failure",
-      "enabled": true
+      "enabled": true,
+      "id": "on.deploy-to-dev.failed.start.classify-failure"
     },
     {
-      "id": "p37.on.dev-validation-rework.prepare-dev-deployment",
       "source": "event",
       "event": "validate-dev-deployment.changes_requested",
       "action": "prepare-dev-deployment",
-      "enabled": true
+      "enabled": true,
+      "id": "on.validate-dev-deployment.changes_requested.start.prepare-dev-deployment"
     },
     {
-      "id": "p38.on.dev-validation-approved.done",
       "source": "event",
       "event": "validate-dev-deployment.approved",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.validate-dev-deployment.approved.start.done"
     },
     {
-      "id": "p39.on.ci-or-validation-failed.classify-failure",
       "source": "trigger",
       "trigger": "ci_or_validation_failed",
       "action": "classify-failure",
-      "enabled": true
+      "enabled": true,
+      "id": "on.trigger.ci_or_validation_failed.start.classify-failure"
     },
     {
-      "id": "p40.on.failure-route-ready.implement-task",
       "source": "event",
       "event": "classify-failure.ready",
       "action": "implement-task",
-      "enabled": true
+      "enabled": true,
+      "id": "on.classify-failure.ready.start.implement-task"
     },
     {
-      "id": "p41.on.failure-route-blocked.done",
       "source": "event",
       "event": "classify-failure.blocked",
       "action": "done",
-      "enabled": true
+      "enabled": true,
+      "id": "on.classify-failure.blocked.start.done"
+    },
+    {
+      "source": "event",
+      "event": "create-ui-design.blocked",
+      "action": "create-ui-design",
+      "enabled": true,
+      "id": "on.create-ui-design.blocked.start.create-ui-design"
     }
   ],
   "workflows": [
@@ -566,86 +572,86 @@
       "id": "brief-loop",
       "title": "1. Brief loop",
       "steps": [
-        "p01.on.adr-goals-changed.create-project-brief",
-        "p02.on.project-brief-ready.challenge-project-brief",
-        "p03.on.project-brief-rework.create-project-brief",
-        "p04.on.project-brief-approved.done"
+        "on.trigger.adr_goals_changed.start.create-project-brief",
+        "on.create-project-brief.ready.start.challenge-project-brief",
+        "on.challenge-project-brief.changes_requested.start.create-project-brief",
+        "on.challenge-project-brief.approved.start.done"
       ]
     },
     {
       "id": "roadmap-loop",
       "title": "2. Roadmap loop",
       "steps": [
-        "p05.on.project-brief-approved.create-roadmap",
-        "p06.on.roadmap-ready.challenge-roadmap",
-        "p07.on.roadmap-rework.create-roadmap",
-        "p08.on.roadmap-approved.done"
+        "on.trigger.project_brief_approved.start.create-roadmap",
+        "on.create-roadmap.ready.start.challenge-roadmap",
+        "on.challenge-roadmap.changes_requested.start.create-roadmap",
+        "on.challenge-roadmap.approved.start.done"
       ]
     },
     {
       "id": "ui-design-loop",
       "title": "3. UI design loop",
       "steps": [
-        "p09.on.roadmap-approved.create-ui-design",
-        "p10.on.ui-design-ready.challenge-ui-design",
-        "p11.on.ui-design-rework.create-ui-design",
-        "p12.on.ui-design-approved.done"
+        "on.trigger.roadmap_approved.start.create-ui-design",
+        "on.create-ui-design.ready.start.challenge-ui-design",
+        "on.challenge-ui-design.changes_requested.start.create-ui-design",
+        "on.challenge-ui-design.approved.start.done"
       ]
     },
     {
       "id": "technical-planning-loop",
       "title": "4. Technical planning loop",
       "steps": [
-        "p13.on.ui-design-approved.create-technical-plan",
-        "p14.on.technical-plan-ready.challenge-technical-plan",
-        "p15.on.technical-plan-rework.create-technical-plan",
-        "p16.on.technical-plan-approved.done"
+        "on.trigger.ui_design_approved.start.create-technical-plan",
+        "on.create-technical-plan.ready.start.challenge-technical-plan",
+        "on.challenge-technical-plan.changes_requested.start.create-technical-plan",
+        "on.challenge-technical-plan.approved.start.done"
       ]
     },
     {
       "id": "milestone-task-spec-loop",
       "title": "5. Milestone + task spec loop",
       "steps": [
-        "p17.on.technical-plan-approved.create-milestones",
-        "p18.on.milestones-ready.challenge-milestones",
-        "p19.on.milestones-rework.create-milestones",
-        "p20.on.milestones-approved.done",
-        "p21.on.milestones-approved.create-task-specs",
-        "p22.on.task-specs-ready.challenge-task-specs",
-        "p23.on.task-specs-rework.create-task-specs",
-        "p24.on.task-specs-approved.done"
+        "on.trigger.technical_plan_approved.start.create-milestones",
+        "on.create-milestones.ready.start.challenge-milestones",
+        "on.challenge-milestones.changes_requested.start.create-milestones",
+        "on.challenge-milestones.approved.start.done",
+        "on.trigger.milestones_approved.start.create-task-specs",
+        "on.create-task-specs.ready.start.challenge-task-specs",
+        "on.challenge-task-specs.changes_requested.start.create-task-specs",
+        "on.challenge-task-specs.approved.start.done"
       ]
     },
     {
       "id": "implementation-review-test-loop",
       "title": "6. Implementation + review + test loop",
       "steps": [
-        "p25.on.task-specs-approved.implement-task",
-        "p26.on.implementation-ready.run-tests",
-        "p27.on.implementation-blocked.classify-failure",
-        "p28.on.tests-ready.review-code",
-        "p29.on.tests-failed.classify-failure",
-        "p30.on.code-review-rework.implement-task",
-        "p31.on.code-review-approved.done",
-        "p39.on.ci-or-validation-failed.classify-failure",
-        "p40.on.failure-route-ready.implement-task",
-        "p41.on.failure-route-blocked.done"
+        "on.trigger.task_specs_approved.start.implement-task",
+        "on.implement-task.ready.start.run-tests",
+        "on.implement-task.blocked.start.classify-failure",
+        "on.run-tests.ready.start.review-code",
+        "on.run-tests.failed.start.classify-failure",
+        "on.review-code.changes_requested.start.implement-task",
+        "on.review-code.approved.start.done",
+        "on.trigger.ci_or_validation_failed.start.classify-failure",
+        "on.classify-failure.ready.start.implement-task",
+        "on.classify-failure.blocked.start.done"
       ]
     },
     {
       "id": "dev-deploy-validation-loop",
       "title": "7. Dev deploy + validation loop",
       "steps": [
-        "p32.on.code-approved.prepare-dev-deployment",
-        "p33.on.dev-deployment-ready.deploy-to-dev",
-        "p34.on.dev-deployment-blocked.classify-failure",
-        "p35.on.dev-deploy-ready.validate-dev-deployment",
-        "p36.on.dev-deploy-failed.classify-failure",
-        "p37.on.dev-validation-rework.prepare-dev-deployment",
-        "p38.on.dev-validation-approved.done",
-        "p39.on.ci-or-validation-failed.classify-failure",
-        "p40.on.failure-route-ready.implement-task",
-        "p41.on.failure-route-blocked.done"
+        "on.trigger.code_approved.start.prepare-dev-deployment",
+        "on.prepare-dev-deployment.ready.start.deploy-to-dev",
+        "on.prepare-dev-deployment.blocked.start.classify-failure",
+        "on.deploy-to-dev.ready.start.validate-dev-deployment",
+        "on.deploy-to-dev.failed.start.classify-failure",
+        "on.validate-dev-deployment.changes_requested.start.prepare-dev-deployment",
+        "on.validate-dev-deployment.approved.start.done",
+        "on.trigger.ci_or_validation_failed.start.classify-failure",
+        "on.classify-failure.ready.start.implement-task",
+        "on.classify-failure.blocked.start.done"
       ]
     }
   ],
