@@ -24,6 +24,23 @@ export interface ProjectOutput {
   id: OutputId;
 }
 
+export type ProjectOutputTarget =
+  | {
+      type: "event";
+      eventType?: string;
+    }
+  | {
+      type: "trigger";
+      trigger: string;
+      workflowId?: string;
+    };
+
+export interface ProjectOutputRoute {
+  sourcePolicyId: string;
+  outputId: string;
+  target: ProjectOutputTarget;
+}
+
 export interface ProjectPolicy {
   id: string;
   source: "event" | "trigger";
@@ -44,6 +61,7 @@ export interface ProjectAutomationConfig {
   triggers: ProjectTrigger[];
   actions: ProjectAction[];
   outputs: ProjectOutput[];
+  outputRoutes: ProjectOutputRoute[];
   policies: ProjectPolicy[];
   workflows: ProjectWorkflow[];
   runtimes: ProjectRuntime[];
@@ -54,6 +72,7 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   triggers: [],
   actions: [],
   outputs: defaultProjectOutputs(),
+  outputRoutes: [],
   policies: [],
   workflows: [],
   runtimes: []

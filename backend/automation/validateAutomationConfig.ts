@@ -8,13 +8,15 @@ import {
   type AutomationFieldLimit
 } from "../../shared/api/automationValidation.js";
 import {
+  actionOutputIds,
   actionOutputSlotMinCount,
   actionOutputSlotCount,
   actionOutputSlotKind,
   defaultProjectOutputs,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
-  policyEventTypesForActions
+  policyEventTypesForActions,
+  projectOutputRouteKey
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
 
@@ -35,6 +37,7 @@ interface ValidationContext {
   rawTriggers: unknown[];
   rawActions: unknown[];
   rawOutputs: unknown[];
+  rawOutputRoutes: unknown[];
   rawPolicies: unknown[];
   rawWorkflows: unknown[];
   rawRuntimes: unknown[];
@@ -43,6 +46,7 @@ interface ValidationContext {
   actionIdSet: Set<string>;
   outputIdSet: Set<string>;
   policyIdSet: Set<string>;
+  workflowIdSet: Set<string>;
   agentIdSet: Set<string>;
   normalizedPolicies: ReturnType<typeof normalizeProjectAutomationConfig>["policies"];
   normalizedActions: ReturnType<typeof normalizeProjectAutomationConfig>["actions"];
@@ -110,7 +114,7 @@ const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: stri
 };
 
 const requireAutomationArrays = (input: RawAutomationConfig, issues: ProjectAutomationIssue[]) => {
-  for (const key of ["triggers", "actions", "outputs", "policies", "workflows", "runtimes"] as const) {
+  for (const key of ["triggers", "actions", "outputs", "outputRoutes", "policies", "workflows", "runtimes"] as const) {
     if ((key === "triggers" || key === "actions" || key === "outputs") && input[key] === undefined) continue;
     if (!Array.isArray(input[key])) issues.push({ path: key, message: `${key} must be an array.` });
   }
@@ -144,6 +148,7 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
   const normalized = normalizeProjectAutomationConfig(input, agents);
   const rawPolicies = Array.isArray(input.policies) ? input.policies : [];
   const rawOutputs = Array.isArray(input.outputs) ? input.outputs : [];
+  const rawWorkflows = Array.isArray(input.workflows) ? input.workflows : [];
   const rawPolicyIds = rawPolicies
     .map((policy) => isRecord(policy) ? stringValue(policy.id) : "")
     .filter(Boolean);
@@ -157,14 +162,18 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     rawTriggers: Array.isArray(input.triggers) ? input.triggers : [],
     rawActions: Array.isArray(input.actions) ? input.actions : [],
     rawOutputs,
+    rawOutputRoutes: Array.isArray(input.outputRoutes) ? input.outputRoutes : [],
     rawPolicies,
-    rawWorkflows: Array.isArray(input.workflows) ? input.workflows : [],
+    rawWorkflows,
     rawRuntimes: Array.isArray(input.runtimes) ? input.runtimes : [],
     eventIdSet: new Set(generatedEventIds),
     triggerIdSet: new Set(normalized.triggers.map((trigger) => trigger.id)),
     actionIdSet: new Set(normalized.actions.map((action) => action.id)),
     outputIdSet: new Set(configuredOutputIds),
     policyIdSet: new Set([...policyIds, ...rawPolicyIds]),
+    workflowIdSet: new Set(rawWorkflows
+      .map((workflow) => isRecord(workflow) ? normalizePolicyToken(stringValue(workflow.id)) : "")
+      .filter(Boolean)),
     agentIdSet: new Set(agents.map((agent) => agent.id)),
     normalizedPolicies: normalized.policies,
     normalizedActions: normalized.actions
@@ -289,6 +298,83 @@ const validateOutput = (output: unknown, index: number, issues: ProjectAutomatio
     return;
   }
   addOutputIdIssue(issues, `${base}.id`, output.id);
+};
+
+const validateOutputRouteTarget = (
+  target: unknown,
+  base: string,
+  context: ValidationContext,
+  issues: ProjectAutomationIssue[]
+) => {
+  if (!isRecord(target)) {
+    issues.push({ path: base, message: "Output route target must be an object." });
+    return;
+  }
+
+  if (target.type !== "event" && target.type !== "trigger") {
+    issues.push({ path: `${base}.type`, message: "Output route target type must be event or trigger." });
+    return;
+  }
+
+  if (target.type === "event") {
+    if (target.eventType !== undefined) {
+      addStringIssue(issues, `${base}.eventType`, target.eventType, "Output route event type", automationFieldLimits.eventType);
+    }
+    return;
+  }
+
+  addStringIssue(issues, `${base}.trigger`, target.trigger, "Output route trigger", automationFieldLimits.token, { token: true });
+  const normalizedTrigger = normalizePolicyToken(stringValue(target.trigger));
+  if (normalizedTrigger && !context.triggerIdSet.has(normalizedTrigger)) {
+    issues.push({ path: `${base}.trigger`, message: `Output route references unknown trigger: ${normalizedTrigger}.` });
+  }
+
+  if (target.workflowId !== undefined) {
+    addStringIssue(issues, `${base}.workflowId`, target.workflowId, "Output route workflow", automationFieldLimits.token, { token: true });
+    const normalizedWorkflowId = normalizePolicyToken(stringValue(target.workflowId));
+    if (normalizedWorkflowId && !context.workflowIdSet.has(normalizedWorkflowId)) {
+      issues.push({ path: `${base}.workflowId`, message: `Output route references unknown workflow: ${normalizedWorkflowId}.` });
+    }
+  }
+};
+
+const validateOutputRoute = (
+  route: unknown,
+  index: number,
+  context: ValidationContext,
+  issues: ProjectAutomationIssue[],
+  seenRouteKeys: Set<string>
+) => {
+  const base = `outputRoutes[${index}]`;
+  if (!isRecord(route)) {
+    issues.push({ path: base, message: "Output route must be an object." });
+    return;
+  }
+
+  addStringIssue(issues, `${base}.sourcePolicyId`, route.sourcePolicyId, "Output route source policy", automationFieldLimits.policyId);
+  addOutputIdIssue(issues, `${base}.outputId`, route.outputId);
+  validateOutputRouteTarget(route.target, `${base}.target`, context, issues);
+
+  const sourcePolicyId = stringValue(route.sourcePolicyId);
+  const outputId = normalizePolicyToken(stringValue(route.outputId));
+  if (!sourcePolicyId || !outputId) return;
+
+  const routeKey = projectOutputRouteKey(sourcePolicyId, outputId);
+  if (seenRouteKeys.has(routeKey)) {
+    issues.push({ path: base, message: `Duplicate output route: ${routeKey}.` });
+  }
+  seenRouteKeys.add(routeKey);
+
+  const sourcePolicy = context.normalizedPolicies.find((policy) => policy.id === sourcePolicyId);
+  if (!sourcePolicy) {
+    issues.push({ path: `${base}.sourcePolicyId`, message: `Output route references unknown policy: ${sourcePolicyId}.` });
+    return;
+  }
+
+  const availableOutputIds = actionOutputIds(context.normalizedActions, sourcePolicy.action);
+  if (!availableOutputIds.includes(outputId)) {
+    issues.push({ path: `${base}.outputId`, message: `Output route references unavailable output ${outputId} for policy ${sourcePolicyId}.` });
+  }
 };
 
 const policyValidationState = (
@@ -461,6 +547,10 @@ export const validateProjectAutomationConfig = (
   context.rawTriggers.forEach((trigger, index) => validateTrigger(trigger, index, issues));
   context.rawActions.forEach((action, index) => validateAction(action, index, context, issues));
   context.rawOutputs.forEach((output, index) => validateOutput(output, index, issues));
+  {
+    const seenRouteKeys = new Set<string>();
+    context.rawOutputRoutes.forEach((route, index) => validateOutputRoute(route, index, context, issues, seenRouteKeys));
+  }
   context.rawPolicies.forEach((policy, index) => validatePolicy(policy, index, context, issues));
   context.rawRuntimes.forEach((runtime, index) => validateRuntime(runtime, index, issues));
   context.rawWorkflows.forEach((workflow, index) => validateWorkflow(workflow, index, context, issues));

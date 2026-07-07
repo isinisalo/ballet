@@ -32,6 +32,7 @@
       "source": "runtime"
     }
   ],
+  "outputRoutes": [],
   "policies": [
     {
       "id": "test-policy",

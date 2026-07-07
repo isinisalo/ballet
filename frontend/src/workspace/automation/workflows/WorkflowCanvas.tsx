@@ -116,6 +116,7 @@ function WorkflowNodeInternalsUpdater({ nodeIds }: { nodeIds: string[] }) {
 
 function useWorkflowNodeContext({
   policyById,
+  selectedWorkflowId,
   firstPolicy,
   noSelectionValue,
   policyOptions,
@@ -136,6 +137,7 @@ function useWorkflowNodeContext({
 }: WorkflowNodeContext) {
   return useMemo<WorkflowNodeContext>(() => ({
     policyById,
+    selectedWorkflowId,
     firstPolicy,
     noSelectionValue,
     policyOptions,
@@ -170,6 +172,7 @@ function useWorkflowNodeContext({
     onStepPointerMove,
     onStepPointerUp,
     policyById,
+    selectedWorkflowId,
     policyOptions,
     selectedActionStepIndexes
   ]);

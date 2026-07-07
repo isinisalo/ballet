@@ -8,6 +8,7 @@ export type WorkflowCanvasOption = { value: string; label: string; description?:
 
 export type WorkflowCanvasProps = {
   layout: WorkflowCanvasLayout;
+  selectedWorkflowId: string;
   policyById: Map<string, ProjectPolicy>;
   firstPolicy?: ProjectPolicy;
   noSelectionValue: string;
@@ -21,13 +22,13 @@ export type WorkflowCanvasProps = {
   workflowCanvasRef: RefObject<HTMLDivElement>;
   canAddFirstPolicy: boolean;
   canAddPolicyForEvent: (policy?: ProjectPolicy) => boolean;
-  onStepPointerDown: (event: PointerEvent<HTMLDivElement>, index: number) => void;
+  onStepPointerDown: (event: PointerEvent<HTMLDivElement>, workflowId: string, index: number) => void;
   onStepPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onStepPointerUp: (event: PointerEvent<HTMLDivElement>) => boolean;
   onStepPointerCancel: () => void;
   onCanvasMoveStart: () => void;
   onCanvasMoveEnd: () => void;
-  onPolicyChange: (index: number, policyId: string) => void;
+  onPolicyChange: (workflowId: string, index: number, policyId: string) => void;
   onActionStepSelect: (records: WorkflowStepRecord[]) => void;
   onOutputHandlerSelect: (edge: WorkflowCanvasEdge) => void;
   onAddPolicyStep: (eventType?: string, sourcePolicy?: ProjectPolicy) => void;

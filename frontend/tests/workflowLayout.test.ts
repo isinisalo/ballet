@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { Position, type Node } from "@xyflow/react";
 import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
-import type { ProjectPolicy } from "@shared/api/workspace-contracts";
+import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
 import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
 import { workflowRoutedEdgeLabelAnchor } from "../src/workspace/automation/workflows/workflowEdgeLabelGeometry";
 import { workflowSmartEdgeRoutingOptions } from "../src/workspace/automation/workflows/workflowSmartEdgeRouting";
-import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
+import { calculateCompositeWorkflowCanvasLayout, calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 import { positionWorkflowNodes } from "../src/workspace/automation/workflows/workflowLayoutPositioning";
+import { workflowOutputTargetsForPolicy } from "../src/workspace/automation/workflows/workflowOutputTargets";
 
 const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
   id,
@@ -34,6 +35,60 @@ const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyInde
     editingPolicyIndex,
     direction
   });
+};
+
+const compositeConfig = (
+  workflowIds: string[],
+  outputRoutes: ProjectAutomationConfig["outputRoutes"] = []
+): ProjectAutomationConfig => {
+  const sourcePolicy = policy("source-start", undefined, "build");
+  sourcePolicy.trigger = "source-trigger";
+  const targetPolicy = policy("target-start", undefined, "deploy");
+  targetPolicy.trigger = "target-trigger";
+  const policyByWorkflowId = new Map([
+    ["source", sourcePolicy],
+    ["target", targetPolicy]
+  ]);
+
+  return {
+    version: 1,
+    triggers: [
+      { id: "source-trigger", description: "Source trigger" },
+      { id: "target-trigger", description: "Target trigger" }
+    ],
+    actions: [
+      { id: "build", description: "Build", outputIds: ["ready", "blocked"], agentIds: ["builder-agent"] },
+      { id: "deploy", description: "Deploy", outputIds: ["done"], agentIds: ["deployer-agent"] }
+    ],
+    outputs: [{ id: "ready" }, { id: "blocked" }, { id: "done" }],
+    outputRoutes,
+    policies: [sourcePolicy, targetPolicy],
+    workflows: workflowIds.map((workflowId) => {
+      const workflowPolicy = policyByWorkflowId.get(workflowId);
+      return {
+        id: workflowId,
+        title: workflowId,
+        steps: workflowPolicy ? [workflowPolicy.id] : []
+      };
+    }),
+    runtimes: []
+  };
+};
+
+const compositeRecords = (config: ProjectAutomationConfig) => {
+  const policyById = new Map(config.policies.map((item) => [item.id, item]));
+  return new Map(config.workflows.map((workflow) => [workflow.id, workflow.steps.map((policyId, index) => {
+    const policy = policyById.get(policyId);
+    const outputTargets = policy ? workflowOutputTargetsForPolicy(config, policy) : undefined;
+    return {
+      policyId,
+      index,
+      workflowId: workflow.id,
+      policy,
+      outputTargets,
+      outputEvents: outputTargets?.map((output) => output.eventType)
+    };
+  })] as const));
 };
 
 const workflowTestRectsOverlap = (
@@ -730,6 +785,106 @@ describe("calculateWorkflowCanvasLayout", () => {
       tone: "return",
       label: "changes_requested"
     });
+  });
+});
+
+describe("calculateCompositeWorkflowCanvasLayout", () => {
+  it("keeps a selected workflow alone when outputRoutes is empty", () => {
+    const config = compositeConfig(["source", "target"]);
+    const layout = calculateCompositeWorkflowCanvasLayout({
+      config,
+      selectedWorkflowId: "source",
+      recordsByWorkflowId: compositeRecords(config)
+    });
+
+    expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
+      "workflow:source:trigger",
+      "workflow:source:policy-0",
+      "workflow:source:output-event-0-ready",
+      "workflow:source:output-event-0-blocked"
+    ]));
+    expect(layout.nodes.some((node) => node.key.startsWith("workflow:target:"))).toBe(false);
+  });
+
+  it("renders a trigger-routed target workflow below the selected workflow with namespaced keys", () => {
+    const config = compositeConfig(["source", "target"], [{
+      sourcePolicyId: "source-start",
+      outputId: "ready",
+      target: { type: "trigger", trigger: "target-trigger" }
+    }]);
+    const layout = calculateCompositeWorkflowCanvasLayout({
+      config,
+      selectedWorkflowId: "source",
+      recordsByWorkflowId: compositeRecords(config)
+    });
+    const sourceTrigger = layout.nodes.find((node) => node.key === "workflow:source:trigger");
+    const targetTrigger = layout.nodes.find((node) => node.key === "workflow:target:trigger");
+    const crossEdge = layout.edges.find((edge) => edge.key === "workflow:source:output:0:ready:to:target:trigger");
+
+    expect(layout.nodes.every((node) => node.key.startsWith("workflow:"))).toBe(true);
+    expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
+    expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
+      "workflow:source:trigger",
+      "workflow:source:policy-0",
+      "workflow:target:trigger",
+      "workflow:target:policy-0"
+    ]));
+    expect(layout.nodes.find((node) => node.key === "workflow:source:output-event-0-ready")).toBeUndefined();
+    expect(sourceTrigger?.x).toBe(targetTrigger?.x);
+    expect(targetTrigger?.y).toBeGreaterThan(sourceTrigger?.y ?? 0);
+    expect(crossEdge).toMatchObject({
+      sourceNodeKey: "workflow:source:policy-0",
+      targetNodeKey: "workflow:target:trigger",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      eventType: "trigger.target-trigger",
+      label: "ready"
+    });
+  });
+
+  it("renders a trigger-routed target workflow above the selected workflow when config order is above", () => {
+    const config = compositeConfig(["target", "source"], [{
+      sourcePolicyId: "source-start",
+      outputId: "ready",
+      target: { type: "trigger", trigger: "target-trigger", workflowId: "target" }
+    }]);
+    const layout = calculateCompositeWorkflowCanvasLayout({
+      config,
+      selectedWorkflowId: "source",
+      recordsByWorkflowId: compositeRecords(config)
+    });
+    const sourceTrigger = layout.nodes.find((node) => node.key === "workflow:source:trigger");
+    const targetTrigger = layout.nodes.find((node) => node.key === "workflow:target:trigger");
+
+    expect(sourceTrigger).toBeDefined();
+    expect(targetTrigger).toBeDefined();
+    expect(sourceTrigger?.x).toBe(targetTrigger?.x);
+    expect(targetTrigger?.y).toBeLessThan(sourceTrigger?.y ?? 0);
+  });
+
+  it("protects circular trigger-routed workflow references from recursive layout", () => {
+    const config = compositeConfig(["source", "target"], [
+      {
+        sourcePolicyId: "source-start",
+        outputId: "ready",
+        target: { type: "trigger", trigger: "target-trigger" }
+      },
+      {
+        sourcePolicyId: "target-start",
+        outputId: "done",
+        target: { type: "trigger", trigger: "source-trigger" }
+      }
+    ]);
+    const layout = calculateCompositeWorkflowCanvasLayout({
+      config,
+      selectedWorkflowId: "source",
+      recordsByWorkflowId: compositeRecords(config)
+    });
+
+    expect(layout.nodes.filter((node) => node.kind === "trigger")).toHaveLength(2);
+    expect(layout.nodes.filter((node) => node.kind === "policy")).toHaveLength(2);
+    expect(layout.edges.filter((edge) => edge.targetNodeKey.endsWith(":trigger"))).toHaveLength(2);
+    expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
   });
 });
 

@@ -107,6 +107,7 @@ const baseData = (): AppData => ({
       { id: "failed" },
       { id: "summary" }
     ],
+    outputRoutes: [],
     policies: [{
       id: "on.implementation.failed.start.implementation",
       source: "event",
@@ -850,6 +851,7 @@ describe("workspace entity UI flows", () => {
   it("renders automation when loaded data is missing newer outputs field", async () => {
     const legacyData = baseData();
     delete (legacyData.automation as Partial<ProjectAutomationConfig>).outputs;
+    delete (legacyData.automation as Partial<ProjectAutomationConfig>).outputRoutes;
 
     await renderRoute("/automation/workflows?id=workflow-1", legacyData);
 

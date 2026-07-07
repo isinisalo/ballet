@@ -272,6 +272,7 @@
       "id": "failed"
     }
   ],
+  "outputRoutes": [],
   "policies": [
     {
       "source": "trigger",

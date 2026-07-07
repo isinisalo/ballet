@@ -141,6 +141,24 @@ const projectOutputSchema = z.object({
   id: automationOutputIdSchema
 }).strict();
 
+const projectOutputTargetSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("event"),
+    eventType: automationEventTypeSchema.optional()
+  }).strict(),
+  z.object({
+    type: z.literal("trigger"),
+    trigger: automationTokenSchema,
+    workflowId: automationTokenSchema.optional()
+  }).strict()
+]);
+
+const projectOutputRouteSchema = z.object({
+  sourcePolicyId: automationPolicyIdSchema,
+  outputId: automationOutputIdSchema,
+  target: projectOutputTargetSchema
+}).strict();
+
 const projectPolicySchema = z.object({
   id: automationPolicyIdSchema,
   source: z.enum(["event", "trigger"]),
@@ -168,6 +186,7 @@ export const automationConfigSchema = z.object({
   triggers: z.array(projectTriggerSchema),
   actions: z.array(projectActionSchema),
   outputs: z.array(projectOutputSchema),
+  outputRoutes: z.array(projectOutputRouteSchema),
   policies: z.array(projectPolicySchema),
   workflows: z.array(projectWorkflowSchema),
   runtimes: z.array(projectRuntimeSchema)

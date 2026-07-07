@@ -38,15 +38,15 @@ function WorkflowNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds:
 }
 
 function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
-  if (node.kind === "trigger") return renderTriggerNode(context);
-  if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(context);
+  if (node.kind === "trigger") return renderTriggerNode(node, context);
+  if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(node, context);
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (!node.record) return null;
   return <WorkflowPolicyNode context={context} record={node.record} records={node.records ?? [node.record]} />;
 }
 
-function renderTriggerNode(context: WorkflowNodeContext) {
-  const value = workflowTriggerLabel(context.firstPolicy);
+function renderTriggerNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
+  const value = workflowTriggerLabel(node.triggerPolicy ?? context.firstPolicy);
 
   return (
     <div
@@ -63,14 +63,15 @@ function renderTriggerNode(context: WorkflowNodeContext) {
   );
 }
 
-function renderFirstPolicyGhost(context: WorkflowNodeContext) {
+function renderFirstPolicyGhost(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
+  const editable = (node.workflowId ?? context.selectedWorkflowId) === context.selectedWorkflowId;
   return (
     <WorkflowGhostNode
       value="Add first policy"
       icon={Route}
       ariaLabel="Add first policy"
       onClick={() => context.onAddPolicyStep()}
-      disabled={!context.canAddFirstPolicy}
+      disabled={!editable || !context.canAddFirstPolicy}
       className="nodrag w-60"
     />
   );
@@ -80,6 +81,7 @@ function renderOutputEventNode(node: WorkflowCanvasLayoutNode, context: Workflow
   const outputEvent = node.outputEvent;
   const eventType = outputEvent?.eventType ?? "Output event";
   const sourcePolicy = node.sourcePolicyId ? context.policyById.get(node.sourcePolicyId) : undefined;
+  const editable = (node.workflowId ?? context.selectedWorkflowId) === context.selectedWorkflowId;
 
   return (
     <button
@@ -87,7 +89,7 @@ function renderOutputEventNode(node: WorkflowCanvasLayoutNode, context: Workflow
       data-workflow-output-event={eventType}
       aria-label={`Add policy step for ${eventType}`}
       title={`Add action for ${eventType}`}
-      disabled={!context.canAddPolicyForEvent(sourcePolicy)}
+      disabled={!editable || !context.canAddPolicyForEvent(sourcePolicy)}
       onClick={() => context.onAddPolicyStep(eventType, sourcePolicy)}
       className="nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-dashed border-muted-foreground/50 bg-background/60 px-1.5 text-left font-mono text-[0.66rem] leading-4 text-muted-foreground opacity-60 transition-colors hover:border-primary/65 hover:bg-card hover:text-foreground hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-muted-foreground/50 disabled:hover:bg-background/60"
     >

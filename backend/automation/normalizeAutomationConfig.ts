@@ -3,6 +3,7 @@ import type {
   ProjectAction,
   ProjectAutomationConfig,
   ProjectOutput,
+  ProjectOutputRoute,
   ProjectPolicy,
   ProjectTrigger,
   ProjectWorkflow
@@ -19,6 +20,7 @@ import {
   normalizeActionOutputSlots,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
+  projectOutputRouteKey,
   policyActionTokens,
   policyOutputEventType,
   uniquePolicyOutputIds,
@@ -36,6 +38,11 @@ const stringArray = (value: unknown): string[] =>
 
 const recordArray = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value) ? value.filter(isRecord) : [];
+
+export const migrateProjectAutomationConfigInput = (value: unknown): unknown => {
+  if (!isRecord(value)) return value;
+  return value.outputRoutes === undefined ? { ...value, outputRoutes: [] } : value;
+};
 
 const normalizeAgentPolicyToken = (value: string): string =>
   normalizePolicyToken(value).replace(/-agent$/, "");
@@ -293,6 +300,46 @@ const normalizeWorkflow = (value: Record<string, unknown>, policyIdMap: Map<stri
   steps: stringArray(value.steps).map((step) => policyIdMap.get(step) ?? step)
 });
 
+const normalizeOutputRouteTarget = (value: unknown): ProjectOutputRoute["target"] | undefined => {
+  if (!isRecord(value)) return undefined;
+  if (value.type === "trigger") {
+    return {
+      type: "trigger",
+      trigger: normalizePolicyToken(stringValue(value.trigger)),
+      ...(typeof value.workflowId === "string" && value.workflowId.trim() ? { workflowId: normalizePolicyToken(value.workflowId) } : {})
+    };
+  }
+  if (value.type === "event") {
+    const eventType = normalizePolicyOutputEventType(stringValue(value.eventType));
+    return {
+      type: "event",
+      ...(eventType ? { eventType } : {})
+    };
+  }
+  return undefined;
+};
+
+const normalizeOutputRoutes = (
+  value: unknown,
+  policyIdMap: Map<string, string>
+): ProjectOutputRoute[] => {
+  const routesByKey = new Map<string, ProjectOutputRoute>();
+
+  recordArray(value).forEach((route) => {
+    const sourcePolicyId = policyIdMap.get(stringValue(route.sourcePolicyId)) ?? stringValue(route.sourcePolicyId);
+    const outputId = normalizePolicyToken(stringValue(route.outputId));
+    const target = normalizeOutputRouteTarget(route.target);
+    if (!sourcePolicyId || !outputId || !target) return;
+    routesByKey.set(projectOutputRouteKey(sourcePolicyId, outputId), {
+      sourcePolicyId,
+      outputId,
+      target
+    });
+  });
+
+  return [...routesByKey.values()];
+};
+
 const outputsWithActionOutputIds = (outputs: ProjectOutput[], actions: ProjectAction[]): ProjectOutput[] => {
   const outputById = new Map(outputs.map((output) => [output.id, output]));
   actions.flatMap((action) => action.outputIds).forEach((outputId) => {
@@ -302,16 +349,17 @@ const outputsWithActionOutputIds = (outputs: ProjectOutput[], actions: ProjectAc
 };
 
 export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[] = []): ProjectAutomationConfig => {
-  if (!isRecord(value)) return defaultProjectAutomationConfig();
-  const rawPolicies = recordArray(value.policies);
+  const input = migrateProjectAutomationConfigInput(value);
+  if (!isRecord(input)) return defaultProjectAutomationConfig();
+  const rawPolicies = recordArray(input.policies);
   const legacyPolicies = rawPolicies.map(readLegacyPolicy);
 
-  const rawOutputs = Array.isArray(value.outputs) && recordArray(value.outputs).length > 0
-    ? recordArray(value.outputs).map(normalizeOutput)
+  const rawOutputs = Array.isArray(input.outputs) && recordArray(input.outputs).length > 0
+    ? recordArray(input.outputs).map(normalizeOutput)
     : defaultProjectOutputs();
   const availableOutputIds = rawOutputs.map((output) => output.id).filter(Boolean);
   const { actions, rewrite } = createActions(
-    Array.isArray(value.actions) ? recordArray(value.actions) : [],
+    Array.isArray(input.actions) ? recordArray(input.actions) : [],
     legacyPolicies,
     availableOutputIds,
     agents
@@ -328,11 +376,12 @@ export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[]
 
   return {
     version: 1,
-    triggers: recordArray(value.triggers).map(normalizeTrigger),
+    triggers: recordArray(input.triggers).map(normalizeTrigger),
     actions,
     outputs,
+    outputRoutes: normalizeOutputRoutes(input.outputRoutes, policyIdMap),
     policies: policyPairs.map((pair) => pair.normalized),
-    workflows: recordArray(value.workflows).map((workflow) => normalizeWorkflow(workflow, policyIdMap)),
-    runtimes: recordArray(value.runtimes).map(normalizeRuntime)
+    workflows: recordArray(input.workflows).map((workflow) => normalizeWorkflow(workflow, policyIdMap)),
+    runtimes: recordArray(input.runtimes).map(normalizeRuntime)
   };
 };

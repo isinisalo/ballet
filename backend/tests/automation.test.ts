@@ -8,6 +8,7 @@ import {
   automationPoliciesToEventDefinitions,
   automationPoliciesToPolicies,
   loadProjectAutomationConfig,
+  normalizeProjectAutomationConfig,
   saveProjectAutomationConfig,
   validateProjectAutomationConfig
 } from "../automation.js";
@@ -48,6 +49,7 @@ const validConfig = (): ProjectAutomationConfig => ({
     }
   ],
   outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }],
+  outputRoutes: [],
   policies: [
     {
       id: "on.implementation.failed.start.implementation",
@@ -84,10 +86,33 @@ describe("project automation config", () => {
         { id: "ok" },
         { id: "rework" }
       ],
+      outputRoutes: [],
       policies: [],
       workflows: [],
       runtimes: []
     });
+  });
+
+  it("upgrades old raw config shape with outputRoutes at the normalization boundary", () => {
+    const oldRawConfig = {
+      version: 1,
+      triggers: [],
+      actions: [],
+      outputs: [],
+      policies: [],
+      workflows: [],
+      runtimes: []
+    };
+
+    expect(normalizeProjectAutomationConfig(oldRawConfig).outputRoutes).toEqual([]);
+    expect(validateProjectAutomationConfig(oldRawConfig).some((issue) => issue.path === "outputRoutes")).toBe(true);
+  });
+
+  it("keeps repository automation configs in the current outputRoutes shape", async () => {
+    for (const relativePath of [".ballet/project.json", ".fixture-ballet-project/.ballet/project.json"]) {
+      const config = JSON.parse(await readFile(path.join(process.cwd(), relativePath), "utf8")) as { outputRoutes?: unknown };
+      expect(Array.isArray(config.outputRoutes)).toBe(true);
+    }
   });
 
   it("saves readable JSON without touching Markdown instructions", async () => {
@@ -133,6 +158,7 @@ describe("project automation config", () => {
       { id: "ok" },
       { id: "rework" }
     ]);
+    expect(loaded.outputRoutes).toEqual([]);
     expect(loaded.policies[0]).toMatchObject({
       id: "on.run.ok.start.run",
       source: "event",
@@ -176,6 +202,7 @@ describe("project automation config", () => {
     });
     expect(loaded).not.toHaveProperty("gates");
     expect(loaded.outputs).toEqual([{ id: "ok" }, { id: "rework" }]);
+    expect(loaded.outputRoutes).toEqual([]);
     expect(loaded.actions[0]?.outputIds).toEqual(["ok", "rework"]);
     expect(loaded.workflows[0]?.steps).toEqual(["on.implementation.ok.start.implementation"]);
   });
@@ -389,6 +416,34 @@ describe("project automation config", () => {
     }, [agent]);
 
     expect(issues.some((issue) => issue.message === "Workflow references unknown policy: missing-policy.")).toBe(true);
+  });
+
+  it("validates output route references", () => {
+    const routeConfig: ProjectAutomationConfig = {
+      ...validConfig(),
+      triggers: [{ id: "manual-start", description: "Manual start" }],
+      outputRoutes: [{
+        sourcePolicyId: "on.implementation.failed.start.implementation",
+        outputId: "ok",
+        target: { type: "trigger", trigger: "manual-start", workflowId: "delivery" }
+      }]
+    };
+
+    expect(validateProjectAutomationConfig(routeConfig, [agent])).toEqual([]);
+    expect(validateProjectAutomationConfig({
+      ...routeConfig,
+      outputRoutes: [{ ...routeConfig.outputRoutes[0]!, target: { type: "trigger", trigger: "missing-trigger" } }]
+    }, [agent]).some((issue) => issue.message === "Output route references unknown trigger: missing-trigger.")).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...routeConfig,
+      outputRoutes: [{ ...routeConfig.outputRoutes[0]!, target: { type: "trigger", trigger: "manual-start", workflowId: "missing-workflow" } }]
+    }, [agent]).some((issue) => issue.message === "Output route references unknown workflow: missing-workflow.")).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...routeConfig,
+      outputRoutes: [{ ...routeConfig.outputRoutes[0]!, outputId: "summary" }]
+    }, [agent]).some((issue) =>
+      issue.message === "Output route references unavailable output summary for policy on.implementation.failed.start.implementation."
+    )).toBe(true);
   });
 
   it("validates automation field lengths", () => {

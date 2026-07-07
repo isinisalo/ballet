@@ -34,6 +34,7 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
     triggers: Array.isArray(config?.triggers) ? config.triggers : defaults.triggers,
     actions,
     outputs: [...outputById.values()],
+    outputRoutes: Array.isArray(config?.outputRoutes) ? config.outputRoutes : defaults.outputRoutes,
     policies: Array.isArray(config?.policies) ? config.policies : defaults.policies,
     workflows: Array.isArray(config?.workflows) ? config.workflows : defaults.workflows,
     runtimes: Array.isArray(config?.runtimes) ? config.runtimes : defaults.runtimes

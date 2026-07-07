@@ -1,5 +1,6 @@
 import { useId } from "react";
-import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import type { Agent, ProjectAutomationConfig, ProjectOutputTarget } from "@shared/api/workspace-contracts";
+import { findProjectOutputRoute } from "@shared/policy-actions";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ export type WorkflowHandlerSelectionSource = "node" | "edge";
 
 export type WorkflowHandlerRoute = {
   id: string;
+  workflowId: string;
   stepIndex: number;
   policyId: string;
   sourceLabel: string;
@@ -32,7 +34,8 @@ export function WorkflowHandlerSheet({
   config,
   onOpenChange,
   onRouteActionChange,
-  onRemoveRoute
+  onRemoveRoute,
+  onOutputRouteTargetChange
 }: {
   open: boolean;
   routes: WorkflowHandlerRoute[];
@@ -40,8 +43,9 @@ export function WorkflowHandlerSheet({
   agents: Agent[];
   config: ProjectAutomationConfig;
   onOpenChange: (open: boolean, details?: WorkflowHandlerSheetOpenChangeDetails) => void;
-  onRouteActionChange: (stepIndex: number, actionId: string) => void;
-  onRemoveRoute: (stepIndex: number) => void;
+  onRouteActionChange: (workflowId: string, stepIndex: number, actionId: string) => void;
+  onRemoveRoute: (workflowId: string, stepIndex: number) => void;
+  onOutputRouteTargetChange: (sourcePolicyId: string, outputId: string, target: ProjectOutputTarget | undefined) => void;
 }) {
   const actionFieldId = useId();
   const title = selectionSource === "edge" && routes.length === 1 ? "Output handler" : "Workflow handler";
@@ -82,7 +86,7 @@ export function WorkflowHandlerSheet({
                         size="icon-xs"
                         aria-label={`Remove route ${workflowHandlerRouteDescription(route)}`}
                         title="Remove route"
-                        onClick={() => onRemoveRoute(route.stepIndex)}
+                        onClick={() => onRemoveRoute(route.workflowId, route.stepIndex)}
                       >
                         <Trash2 data-icon="inline-start" />
                       </Button>
@@ -91,7 +95,7 @@ export function WorkflowHandlerSheet({
                   <FieldGroup className="mt-3">
                     <Field className="gap-1.5">
                       <FieldLabel htmlFor={routeActionFieldId}>Handler action</FieldLabel>
-                      <Select value={route.actionId} onValueChange={(actionId) => onRouteActionChange(route.stepIndex, actionId)}>
+                      <Select value={route.actionId} onValueChange={(actionId) => onRouteActionChange(route.workflowId, route.stepIndex, actionId)}>
                         <SelectTrigger id={routeActionFieldId} className="min-w-0 w-full font-mono">
                           <SelectValue />
                         </SelectTrigger>
@@ -119,6 +123,12 @@ export function WorkflowHandlerSheet({
                     </Field>
                     <ReadOnlyBadges label="Agents" values={agentIds.map(agentLabel)} />
                     <ReadOnlyBadges label="Outputs" values={outputIds} />
+                    <OutputTargetControls
+                      config={config}
+                      route={route}
+                      outputIds={outputIds}
+                      onOutputRouteTargetChange={onOutputRouteTargetChange}
+                    />
                   </FieldGroup>
                 </div>
               );
@@ -126,7 +136,7 @@ export function WorkflowHandlerSheet({
           </div>
           {routes.length === 1 && routes[0] ? (
             <div className="mt-4 border-t border-divider-strong pt-4">
-              <Button type="button" variant="destructive" size="sm" onClick={() => onRemoveRoute(routes[0].stepIndex)}>
+              <Button type="button" variant="destructive" size="sm" onClick={() => onRemoveRoute(routes[0].workflowId, routes[0].stepIndex)}>
                 <Trash2 data-icon="inline-start" />
                 Remove from workflow
               </Button>
@@ -136,6 +146,67 @@ export function WorkflowHandlerSheet({
       </SheetContent>
     </Sheet>
   );
+}
+
+function OutputTargetControls({
+  config,
+  route,
+  outputIds,
+  onOutputRouteTargetChange
+}: {
+  config: ProjectAutomationConfig;
+  route: WorkflowHandlerRoute;
+  outputIds: string[];
+  onOutputRouteTargetChange: (sourcePolicyId: string, outputId: string, target: ProjectOutputTarget | undefined) => void;
+}) {
+  return (
+    <Field>
+      <FieldLabel>Output targets</FieldLabel>
+      {outputIds.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {outputIds.map((outputId) => (
+            <div key={outputId} className="grid grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)] items-center gap-2">
+              <Badge variant="outline" className="min-w-0 justify-start border-divider-strong bg-muted/50 font-mono">
+                <span className="truncate">{outputId}</span>
+              </Badge>
+              <Select
+                value={outputTargetSelectValue(config, route.policyId, outputId)}
+                onValueChange={(value) => onOutputRouteTargetChange(route.policyId, outputId, outputTargetFromSelectValue(value))}
+              >
+                <SelectTrigger className="min-w-0 w-full font-mono">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="event">Event</SelectItem>
+                    {config.triggers.map((trigger) => (
+                      <SelectItem key={trigger.id} value={`trigger:${trigger.id}`}>
+                        {trigger.id}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+      ) : <span className="text-sm text-muted-foreground">None</span>}
+    </Field>
+  );
+}
+
+function outputTargetSelectValue(config: ProjectAutomationConfig, sourcePolicyId: string, outputId: string) {
+  const route = findProjectOutputRoute(config.outputRoutes, sourcePolicyId, outputId);
+  if (route?.target.type === "trigger") return `trigger:${route.target.trigger}`;
+  return "event";
+}
+
+function outputTargetFromSelectValue(value: string): ProjectOutputTarget | undefined {
+  if (!value.startsWith("trigger:")) return undefined;
+  return {
+    type: "trigger",
+    trigger: value.slice("trigger:".length)
+  };
 }
 
 function WorkflowHandlerRouteEvent({ route }: { route: WorkflowHandlerRoute }) {

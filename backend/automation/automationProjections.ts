@@ -1,6 +1,7 @@
 import type {
   Policy,
   ProjectAction,
+  ProjectOutputRoute,
   ProjectPolicy,
   ProjectTrigger
 } from "../../shared/domain/automation.js";
@@ -10,6 +11,7 @@ import {
   defaultPolicyOutputIds,
   policyActionTokens,
   policyEventTypesForActions,
+  projectOutputRouteEventType,
   policySourceKey,
 } from "../../shared/policy-actions.js";
 
@@ -19,7 +21,8 @@ export const automationPoliciesToEventDefinitions = (
   policies: ProjectPolicy[] = [],
   triggers: ProjectTrigger[] = [],
   actions: ProjectAction[] = [],
-  outputs: Array<{ id: string }> = []
+  outputs: Array<{ id: string }> = [],
+  outputRoutes: ProjectOutputRoute[] = []
 ): EventDefinition[] =>
   [...new Set([
     ...policyEventTypesForActions(
@@ -28,6 +31,10 @@ export const automationPoliciesToEventDefinitions = (
         : policyActionTokens(policies).map((id) => ({ id, outputIds: [...defaultPolicyOutputIds], agentIds: [] })),
       outputs
     ),
+    ...outputRoutes.flatMap((route) => {
+      const policy = policies.find((candidate) => candidate.id === route.sourcePolicyId);
+      return policy ? [projectOutputRouteEventType(policy, route.outputId, outputRoutes)] : [];
+    }),
     ...triggers.map((trigger) => `trigger.${trigger.id}`)
   ])]
     .map((eventType) => ({

@@ -1,5 +1,5 @@
 import type { Agent } from "./domain/agents.js";
-import type { ProjectAction, ProjectOutput, ProjectPolicy } from "./domain/automation.js";
+import type { ProjectAction, ProjectOutput, ProjectOutputRoute, ProjectOutputTarget, ProjectPolicy } from "./domain/automation.js";
 
 export const actionOutputSlotCount = 2;
 export const actionOutputSlotMinCount = 1;
@@ -32,6 +32,38 @@ export const policyOutputEventType = (
   input: Pick<ProjectPolicy, "action">,
   outputId: PolicyOutputId
 ): string => `${input.action}.${normalizePolicyToken(outputId)}`;
+
+export const projectOutputRouteKey = (sourcePolicyId: string, outputId: string): string =>
+  `${sourcePolicyId}:${normalizePolicyToken(outputId)}`;
+
+export const findProjectOutputRoute = (
+  outputRoutes: readonly ProjectOutputRoute[],
+  sourcePolicyId: string,
+  outputId: string
+): ProjectOutputRoute | undefined => {
+  const key = projectOutputRouteKey(sourcePolicyId, outputId);
+  return outputRoutes.find((route) => projectOutputRouteKey(route.sourcePolicyId, route.outputId) === key);
+};
+
+export const projectOutputTargetEventType = (
+  policy: Pick<ProjectPolicy, "action">,
+  outputId: PolicyOutputId,
+  target?: ProjectOutputTarget
+): string => {
+  if (target?.type === "trigger") return triggerEventType(target.trigger);
+  if (target?.type === "event" && target.eventType) return normalizePolicyOutputEventType(target.eventType);
+  return policyOutputEventType(policy, outputId);
+};
+
+export const projectOutputRouteEventType = (
+  policy: Pick<ProjectPolicy, "id" | "action">,
+  outputId: PolicyOutputId,
+  outputRoutes: readonly ProjectOutputRoute[]
+): string => projectOutputTargetEventType(
+  policy,
+  outputId,
+  findProjectOutputRoute(outputRoutes, policy.id, outputId)?.target
+);
 
 export type ActionOutputSlotKind = "approval" | "rework";
 

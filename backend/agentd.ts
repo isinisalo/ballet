@@ -53,6 +53,7 @@ const completeFailed = (run: AgentRun, error: unknown, data?: AppData) => {
     projectPolicy: policy,
     actions: data?.automation.actions,
     outputs: data?.automation.outputs,
+    outputRoutes: data?.automation.outputRoutes ?? [],
     policies: data?.policies,
     agents: data?.agents
   });
@@ -89,6 +90,7 @@ const completeWithOutcome = (
     projectPolicy: error ? undefined : policy,
     actions: data.automation.actions,
     outputs: data.automation.outputs,
+    outputRoutes: data.automation.outputRoutes,
     policies: data.policies,
     agents: data.agents
   });

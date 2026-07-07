@@ -228,7 +228,8 @@ describe("runtime database", () => {
       outcome: readyOutcome,
       projectPolicy,
       actions: [implementationAction],
-      outputs: implementationOutputs
+      outputs: implementationOutputs,
+      outputRoutes: []
     });
 
     expect(firstCompletion.event).toBeUndefined();
@@ -241,7 +242,8 @@ describe("runtime database", () => {
       outcome: readyOutcome,
       projectPolicy,
       actions: [implementationAction],
-      outputs: implementationOutputs
+      outputs: implementationOutputs,
+      outputRoutes: []
     });
 
     expect(secondCompletion.event).toMatchObject({
@@ -286,7 +288,8 @@ describe("runtime database", () => {
         type: "implementation.complete",
         source: "agentd",
         payload: { agent: "developer", action: "implementation", status: "complete", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
-      }
+      },
+      outputRoutes: []
     });
 
     expect(completed.run.status).toBe("completed");
@@ -319,6 +322,7 @@ describe("runtime database", () => {
         source: "agentd",
         payload: { agent: "developer", action: "implementation", status: "complete", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
+      outputRoutes: [],
       policies: [policy, architectureReviewPolicy, qaReviewPolicy],
       agents: [agent, architectureAgent, qaAgent]
     });
@@ -383,6 +387,7 @@ describe("runtime database", () => {
         source: "agentd",
         payload: { agent: "developer", action: "implementation", status: "complete", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
       },
+      outputRoutes: [],
       policies: [architectureReviewPolicy],
       agents: [architectureAgent]
     });
@@ -402,10 +407,15 @@ describe("runtime output mapping", () => {
   });
 
   it("maps agent output statuses through policy action output events", () => {
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "complete" }).id).toBe("implementation.complete");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "failed" }).id).toBe("implementation.failed");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "blocked" }).id).toBe("implementation.blocked");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }).id).toBe("implementation.ready");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "complete" }, []).id).toBe("implementation.complete");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "failed" }, []).id).toBe("implementation.failed");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "blocked" }, []).id).toBe("implementation.blocked");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }, []).id).toBe("implementation.ready");
+    expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }, [{
+      sourcePolicyId: projectPolicy.id,
+      outputId: "ready",
+      target: { type: "trigger", trigger: "manual-start" }
+    }]).id).toBe("trigger.manual-start");
   });
 
   it("maps structured outcomes to configured action outputs", () => {
@@ -464,7 +474,8 @@ describe("runtime output mapping", () => {
       outcome: readyOutcome,
       projectPolicy,
       actions: [{ ...implementationAction, outputIds: ["complete", "failed"] }],
-      outputs: [{ id: "complete" }, { id: "failed" }]
+      outputs: [{ id: "complete" }, { id: "failed" }],
+      outputRoutes: []
     });
 
     expect(completed.event?.type).toBe("implementation.complete");
@@ -490,7 +501,8 @@ describe("runtime output mapping", () => {
       outcome: { ...readyOutcome, outcome: "failed" },
       projectPolicy,
       actions: [{ ...implementationAction, outputIds: ["complete"] }],
-      outputs: [{ id: "complete" }]
+      outputs: [{ id: "complete" }],
+      outputRoutes: []
     });
 
     expect(completed.event).toBeUndefined();
@@ -507,7 +519,7 @@ describe("runtime output mapping", () => {
       status: "complete",
       outcome: "ready",
       summary: "Done."
-    });
+    }, []);
 
     expect(routed).toMatchObject({
       id: "implementation.complete",

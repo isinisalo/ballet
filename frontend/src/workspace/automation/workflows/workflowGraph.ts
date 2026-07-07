@@ -1,15 +1,24 @@
 import type { ProjectPolicy } from "@shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "@shared/policy-actions";
 
-export type WorkflowOutputTarget = {
-  outputId: string;
-  eventType: string;
-  type: "event";
-};
+export type WorkflowOutputTarget =
+  | {
+      outputId: string;
+      eventType: string;
+      type: "event";
+    }
+  | {
+      outputId: string;
+      eventType: string;
+      type: "trigger";
+      trigger: string;
+      workflowId?: string;
+    };
 
 export type WorkflowStepRecord = {
   policyId: string;
   index: number;
+  workflowId?: string;
   policy?: ProjectPolicy;
   outputEvents?: string[];
   outputTargets?: WorkflowOutputTarget[];

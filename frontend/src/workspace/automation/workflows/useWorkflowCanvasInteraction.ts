@@ -5,9 +5,9 @@ export function useWorkflowCanvasInteraction({
   reorderStep
 }: {
   selectedId?: string;
-  reorderStep: (fromIndex: number, toIndex: number) => void;
+  reorderStep: (workflowId: string, fromIndex: number, toIndex: number) => void;
 }) {
-  const draggedStepIndexRef = useRef<number | null>(null);
+  const draggedStepRef = useRef<{ workflowId: string; index: number } | null>(null);
   const dragStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedStepRef = useRef(false);
   const workflowCanvasRef = useRef<HTMLDivElement | null>(null);
@@ -39,25 +39,28 @@ export function useWorkflowCanvasInteraction({
   }, [selectedId]);
 
   const resetStepDrag = () => {
-    draggedStepIndexRef.current = null;
+    draggedStepRef.current = null;
     dragStartPointRef.current = null;
     hasDraggedStepRef.current = false;
     setDraggedStepIndex(null);
     setDragOverStepIndex(null);
   };
 
-  const stepIndexFromPoint = (event: PointerEvent<HTMLDivElement>) => {
+  const stepFromPoint = (event: PointerEvent<HTMLDivElement>) => {
     if (typeof document.elementFromPoint !== "function") return null;
     const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-workflow-step-index]");
     if (!(target instanceof HTMLElement)) return null;
     const targetIndex = Number(target.dataset.workflowStepIndex);
-    return Number.isNaN(targetIndex) ? null : targetIndex;
+    const workflowId = target.dataset.workflowId;
+    if (!workflowId || Number.isNaN(targetIndex)) return null;
+    return { workflowId, index: targetIndex };
   };
 
-  const handleStepPointerDown = (event: PointerEvent<HTMLDivElement>, index: number) => {
+  const handleStepPointerDown = (event: PointerEvent<HTMLDivElement>, workflowId: string, index: number) => {
     if (event.button !== 0) return;
+    if (workflowId !== selectedId) return;
     if (event.target instanceof Element && event.target.closest("button, input, select, textarea, [role='combobox']")) return;
-    draggedStepIndexRef.current = index;
+    draggedStepRef.current = { workflowId, index };
     dragStartPointRef.current = { x: event.clientX, y: event.clientY };
     hasDraggedStepRef.current = false;
     setDraggedStepIndex(index);
@@ -66,21 +69,23 @@ export function useWorkflowCanvasInteraction({
   };
 
   const handleStepPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (draggedStepIndexRef.current === null) return;
+    const draggedStep = draggedStepRef.current;
+    if (draggedStep === null) return;
     const startPoint = dragStartPointRef.current;
     if (startPoint && Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 4) {
       hasDraggedStepRef.current = true;
     }
-    const targetIndex = stepIndexFromPoint(event);
-    if (targetIndex !== null) setDragOverStepIndex(targetIndex);
+    const targetStep = stepFromPoint(event);
+    if (targetStep && targetStep.workflowId === draggedStep.workflowId) setDragOverStepIndex(targetStep.index);
   };
 
   const handleStepPointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    const fromIndex = draggedStepIndexRef.current;
-    if (fromIndex === null) return false;
-    const toIndex = stepIndexFromPoint(event) ?? dragOverStepIndex ?? fromIndex;
-    const shouldActivate = !hasDraggedStepRef.current && toIndex === fromIndex;
-    reorderStep(fromIndex, toIndex);
+    const draggedStep = draggedStepRef.current;
+    if (draggedStep === null) return false;
+    const targetStep = stepFromPoint(event);
+    const toIndex = targetStep?.workflowId === draggedStep.workflowId ? targetStep.index : dragOverStepIndex ?? draggedStep.index;
+    const shouldActivate = !hasDraggedStepRef.current && toIndex === draggedStep.index;
+    reorderStep(draggedStep.workflowId, draggedStep.index, toIndex);
     resetStepDrag();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     return shouldActivate;

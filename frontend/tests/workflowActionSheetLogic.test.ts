@@ -30,6 +30,7 @@ const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
     { id: "review", description: "Review the change.", outputIds: ["approved", "changes-requested"], agentIds: ["reviewer-agent"] }
   ],
   outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes-requested" }],
+  outputRoutes: [],
   policies,
   workflows: [{ id: "delivery", title: "Delivery", steps: policies.map((item) => item.id) }],
   runtimes: []

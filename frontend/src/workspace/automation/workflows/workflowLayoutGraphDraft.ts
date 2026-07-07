@@ -92,7 +92,8 @@ export function addOutputEventNode(
     outputEvent: {
       outputId: output.outputId,
       eventType: output.eventType,
-      outputType: output.type
+      outputType: output.type,
+      ...(output.type === "trigger" ? { trigger: output.trigger, workflowId: output.workflowId } : {})
     },
     sourcePolicyId: record.policyId,
     outputIndex

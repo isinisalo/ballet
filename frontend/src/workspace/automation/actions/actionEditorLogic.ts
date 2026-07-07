@@ -1,5 +1,5 @@
 import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { actionOutputSlotCount, actionOutputSlotKind, generatedPolicyId, normalizeActionOutputSlots, policyOutputEventType } from "@shared/policy-actions";
+import { actionOutputSlotCount, actionOutputSlotKind, generatedPolicyId, normalizeActionOutputSlots, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
 import { editablePolicyToken } from "../automationUtils";
 
 export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
@@ -34,11 +34,13 @@ export const nextConfigWithActionPatch = (
   const previousId = previousAction.id;
   const nextActions = current.actions.map((action, index) => index === selectedIndex ? normalized : action);
   const eventIdMap = new Map<string, string>();
+  const outputIdMap = new Map<string, string>();
   if (previousId !== normalized.id || previousAction.outputIds.join("\0") !== normalized.outputIds.join("\0")) {
     previousAction.outputIds.forEach((outputId, outputIndex) => {
       const slotIndex = previousOutputSlotIndex(outputId, outputIndex, previousAction.outputIds.length);
       const nextOutputId = slotIndex === undefined ? undefined : normalized.outputIds[slotIndex];
       if (!nextOutputId) return;
+      outputIdMap.set(outputId, nextOutputId);
       eventIdMap.set(
         policyOutputEventType({ action: previousId }, outputId),
         policyOutputEventType({ action: normalized.id }, nextOutputId)
@@ -56,6 +58,18 @@ export const nextConfigWithActionPatch = (
     policyIdMap.set(policy.id, nextPolicyId);
     return { ...nextPolicy, id: nextPolicyId };
   });
+  const policyById = new Map(policies.map((policy) => [policy.id, policy]));
+  const actionById = new Map(nextActions.map((action) => [action.id, action]));
+  const outputRouteByKey = new Map(current.outputRoutes.flatMap((route) => {
+    const previousPolicy = current.policies.find((policy) => policy.id === route.sourcePolicyId);
+    const sourcePolicyId = policyIdMap.get(route.sourcePolicyId) ?? route.sourcePolicyId;
+    const outputId = previousPolicy?.action === previousId ? outputIdMap.get(route.outputId) ?? route.outputId : route.outputId;
+    const nextPolicy = policyById.get(sourcePolicyId);
+    const nextAction = nextPolicy ? actionById.get(nextPolicy.action) : undefined;
+    if (!nextAction?.outputIds.includes(outputId)) return [];
+    const nextRoute = { ...route, sourcePolicyId, outputId };
+    return [[projectOutputRouteKey(nextRoute.sourcePolicyId, nextRoute.outputId), nextRoute] as const];
+  }));
 
   return {
     action: normalized,
@@ -66,7 +80,8 @@ export const nextConfigWithActionPatch = (
       workflows: current.workflows.map((workflow) => ({
         ...workflow,
         steps: workflow.steps.map((step) => policyIdMap.get(step) ?? step)
-      }))
+      })),
+      outputRoutes: [...outputRouteByKey.values()]
     }
   };
 };

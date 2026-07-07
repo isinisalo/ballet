@@ -180,6 +180,7 @@ describe("API routes", () => {
       triggers: [],
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }],
+      outputRoutes: [],
       policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
       runtimes: []
@@ -235,6 +236,7 @@ describe("API routes", () => {
       triggers: [{ id: "plan_approved", description: "Plan approved" }],
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }],
+      outputRoutes: [],
       policies: [{ id: "on.trigger.plan_approved.start.implementation", source: "trigger", trigger: "plan_approved", action: "implementation", enabled: true }],
       workflows: [],
       runtimes: []
@@ -284,6 +286,7 @@ describe("API routes", () => {
       version: 1,
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }],
+      outputRoutes: [],
       triggers: [{ id: "manual_start", description: "Manual start" }],
       policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],

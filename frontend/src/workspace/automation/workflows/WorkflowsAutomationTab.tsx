@@ -3,10 +3,11 @@ import type {
   Agent,
   ProjectAutomationConfig,
   ProjectPolicy,
+  ProjectOutputTarget,
   ProjectWorkflow
 } from "@shared/api/workspace-contracts";
 import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
-import { actionOutputIds, generatedPolicyId, normalizePolicyToken, policyOutputEventType } from "@shared/policy-actions";
+import { actionOutputIds, generatedPolicyId, normalizePolicyToken, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
 import { uniquePolicyAction } from "../automationUtils";
@@ -14,8 +15,9 @@ import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { WorkflowHandlerSheet, type WorkflowHandlerRoute, type WorkflowHandlerSelectionSource } from "./WorkflowHandlerSheet";
 import { nextConfigWithWorkflowHandlerAction, nextConfigWithoutWorkflowStepIndexes } from "./workflowActionSheetLogic";
-import { buildWorkflowGraph, type WorkflowOutputTarget, type WorkflowStepRecord } from "./workflowGraph";
-import { calculateWorkflowCanvasLayout, type WorkflowCanvasEdge } from "./workflowLayout";
+import type { WorkflowStepRecord } from "./workflowGraph";
+import { calculateCompositeWorkflowCanvasLayout, type WorkflowCanvasEdge } from "./workflowLayout";
+import { workflowOutputTargetsForPolicy } from "./workflowOutputTargets";
 import { useWorkflowCanvasInteraction } from "./useWorkflowCanvasInteraction";
 
 const noSelection = "__none__";
@@ -67,29 +69,32 @@ export function WorkflowsAutomationTab({
   ];
   const defaultAction = config.actions[0]?.id ?? "";
   const selectedActionOutputIds = (actionId: string) => actionOutputIds(config.actions, actionId);
-  const workflowOutputTargets = (policy: ProjectPolicy): WorkflowOutputTarget[] =>
-    selectedActionOutputIds(policy.action).map((outputId) => ({
-      outputId,
-      eventType: policyOutputEventType(policy, outputId),
-      type: "event"
-    }));
-  const workflowStepRecords = useMemo<WorkflowStepRecord[]>(() =>
-    selected?.steps.map((policyId, index) => {
+  const workflowStepRecordsByWorkflowId = useMemo<Map<string, WorkflowStepRecord[]>>(() => new Map(config.workflows.map((workflow) => {
+    const records: WorkflowStepRecord[] = workflow.steps.map((policyId, index) => {
       const policy = policyById.get(policyId);
-      const outputTargets = policy ? workflowOutputTargets(policy) : undefined;
+      const outputTargets = policy ? workflowOutputTargetsForPolicy(config, policy) : undefined;
       return {
         policyId,
         index,
+        workflowId: workflow.id,
         policy,
         outputEvents: outputTargets?.map((output) => output.eventType),
         outputTargets
       };
-    }) ?? [],
-  [config.actions, config.outputs, policyById, selected?.steps]);
-  const workflowGraph = useMemo(() => buildWorkflowGraph(workflowStepRecords), [workflowStepRecords]);
+    });
+    return [workflow.id, records] as const;
+  })), [config, policyById]);
+  const workflowStepRecords: WorkflowStepRecord[] = selected ? workflowStepRecordsByWorkflowId.get(selected.id) ?? [] : [];
   const workflowLayout = useMemo(
-    () => selected ? calculateWorkflowCanvasLayout({ workflowGraph, editingPolicyIndex: null, direction: "horizontal" }) : undefined,
-    [selected, workflowGraph]
+    () => selected && !creating
+      ? calculateCompositeWorkflowCanvasLayout({
+        config,
+        selectedWorkflowId: selected.id,
+        recordsByWorkflowId: workflowStepRecordsByWorkflowId,
+        direction: "horizontal"
+      })
+      : undefined,
+    [config, creating, selected, workflowStepRecordsByWorkflowId]
   );
   const selectedHandlerRecords = selectedHandlerStepIndexes
     .map((stepIndex) => workflowStepRecords.find((record) => record.index === stepIndex))
@@ -129,8 +134,8 @@ export function WorkflowsAutomationTab({
     if (patch.id) onSelect(patch.id);
   };
 
-  const updateStep = (index: number, policyId: string) => {
-    if (!selected) return;
+  const updateStep = (workflowId: string, index: number, policyId: string) => {
+    if (!selected || workflowId !== selected.id) return;
     updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? policyId : step) });
   };
 
@@ -193,8 +198,8 @@ export function WorkflowsAutomationTab({
     selectAddedOutputEventStep();
   };
 
-  const reorderStep = (fromIndex: number, toIndex: number) => {
-    if (!selected) return;
+  const reorderStep = (workflowId: string, fromIndex: number, toIndex: number) => {
+    if (!selected || workflowId !== selected.id) return;
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= selected.steps.length || toIndex >= selected.steps.length) return;
     const steps = [...selected.steps];
     const [movedStep] = steps.splice(fromIndex, 1);
@@ -202,8 +207,8 @@ export function WorkflowsAutomationTab({
     updateSelected({ steps });
   };
 
-  const removeHandlerRoute = (stepIndex: number) => {
-    if (!selected) return;
+  const removeHandlerRoute = (workflowId: string, stepIndex: number) => {
+    if (!selected || workflowId !== selected.id) return;
     updateConfig((current) => nextConfigWithoutWorkflowStepIndexes(current, selected.id, [stepIndex]));
     setSelectedHandlerSelection((current) => {
       if (!current) return current;
@@ -227,16 +232,29 @@ export function WorkflowsAutomationTab({
     setSelectedHandlerSelection({ source: "node", stepIndexes: records.map((record) => record.index) });
   };
   const selectOutputHandler = (edge: WorkflowCanvasEdge) => {
+    if (!selected || (edge.route?.handlerWorkflowId ?? selected.id) !== selected.id) return;
     const handlerStepIndex = edge.route?.handlerStepIndex;
     if (handlerStepIndex === undefined) return;
     setSelectedHandlerSelection({ source: "edge", stepIndexes: [handlerStepIndex] });
   };
-  const updateHandlerRouteAction = (stepIndex: number, actionId: string) => {
-    if (!selected) return;
+  const updateHandlerRouteAction = (workflowId: string, stepIndex: number, actionId: string) => {
+    if (!selected || workflowId !== selected.id) return;
     updateConfig((current) => nextConfigWithWorkflowHandlerAction(current, selected.id, stepIndex, actionId));
   };
+  const updateOutputRouteTarget = (sourcePolicyId: string, outputId: string, target: ProjectOutputTarget | undefined) => {
+    updateConfig((current) => {
+      const routeKey = projectOutputRouteKey(sourcePolicyId, outputId);
+      const outputRoutes = current.outputRoutes.filter((route) => projectOutputRouteKey(route.sourcePolicyId, route.outputId) !== routeKey);
+      return {
+        ...current,
+        outputRoutes: target
+          ? [...outputRoutes, { sourcePolicyId, outputId: normalizePolicyToken(outputId), target }]
+          : outputRoutes
+      };
+    });
+  };
 
-  if (!selected || !workflowLayout) return <EmptyState title="No workflow selected." />;
+  if (!selected) return <EmptyState title="No workflow selected." />;
 
   if (creating) {
     return (
@@ -265,10 +283,13 @@ export function WorkflowsAutomationTab({
     );
   }
 
+  if (!workflowLayout) return <EmptyState title="No workflow selected." />;
+
   return (
     <>
       <WorkflowCanvas
         layout={workflowLayout}
+        selectedWorkflowId={selected.id}
         policyById={policyById}
         firstPolicy={policyById.get(selected.steps[0] ?? "")}
         noSelectionValue={noSelection}
@@ -304,6 +325,7 @@ export function WorkflowsAutomationTab({
         }}
         onRouteActionChange={updateHandlerRouteAction}
         onRemoveRoute={removeHandlerRoute}
+        onOutputRouteTargetChange={updateOutputRouteTarget}
       />
     </>
   );
@@ -314,7 +336,8 @@ function workflowHandlerRoute(record: WorkflowStepRecord): WorkflowHandlerRoute 
   const eventParts = record.policy.source === "event" ? workflowEventParts(record.policy.event) : undefined;
 
   return {
-    id: `${record.index}-${record.policyId}`,
+    id: `${record.workflowId ?? "workflow"}-${record.index}-${record.policyId}`,
+    workflowId: record.workflowId ?? "",
     stepIndex: record.index,
     policyId: record.policyId,
     sourceLabel: record.policy.source === "trigger"

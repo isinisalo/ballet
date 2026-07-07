@@ -106,6 +106,7 @@ describe("Markdown collection loading", () => {
         { id: "ok" },
         { id: "rework" }
       ],
+      outputRoutes: [],
       policies: [],
       workflows: [],
       runtimes: []

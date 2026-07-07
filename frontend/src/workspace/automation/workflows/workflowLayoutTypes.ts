@@ -12,11 +12,14 @@ export type WorkflowCanvasNodeKind =
 export type WorkflowCanvasOutputEvent = {
   outputId: string;
   eventType: string;
-  outputType: "event";
+  outputType: WorkflowOutputTarget["type"];
+  trigger?: string;
+  workflowId?: string;
 };
 
 export type WorkflowCanvasLayoutNode = {
   key: string;
+  workflowId?: string;
   kind: WorkflowCanvasNodeKind;
   x: number;
   y: number;
@@ -25,6 +28,7 @@ export type WorkflowCanvasLayoutNode = {
   direction: WorkflowLayoutDirection;
   record?: WorkflowStepRecord;
   records?: WorkflowStepRecord[];
+  triggerPolicy?: WorkflowStepRecord["policy"];
   eventType?: string;
   outputEvent?: WorkflowCanvasOutputEvent;
   sourcePolicyId?: string;

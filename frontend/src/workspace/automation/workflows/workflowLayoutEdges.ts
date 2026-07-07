@@ -14,6 +14,9 @@ export type WorkflowCanvasEdge = {
 };
 
 export type WorkflowCanvasEdgeRoute = {
+  sourceWorkflowId?: string;
+  handlerWorkflowId?: string;
+  targetWorkflowId?: string;
   sourceStepIndex?: number;
   handlerStepIndex?: number;
   sourcePolicyId?: string;

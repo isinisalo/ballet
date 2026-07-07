@@ -1,6 +1,6 @@
-import type { ProjectAction, ProjectPolicy } from "../../shared/domain/automation.js";
+import type { ProjectAction, ProjectOutputRoute, ProjectPolicy } from "../../shared/domain/automation.js";
 import type { AgentOutcome, AgentOutputEventStatus, AgentRun } from "../../shared/domain/runtime.js";
-import { actionOutputIds, defaultPolicyOutputIds, policyOutputEventType } from "../../shared/policy-actions.js";
+import { actionOutputIds, defaultPolicyOutputIds, projectOutputRouteEventType } from "../../shared/policy-actions.js";
 
 const terminalRunStatuses = new Set(["completed", "failed", "blocked", "needs_input", "cancelled"]);
 
@@ -57,6 +57,7 @@ export const aggregateActionOutputStatus = (
 };
 
 export const actionOutputEventType = (
-  policy: Pick<ProjectPolicy, "action">,
-  outputId: AgentOutputEventStatus
-): string => policyOutputEventType(policy, outputId);
+  policy: Pick<ProjectPolicy, "id" | "action">,
+  outputId: AgentOutputEventStatus,
+  outputRoutes: ProjectOutputRoute[]
+): string => projectOutputRouteEventType(policy, outputId, outputRoutes);

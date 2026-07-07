@@ -1,14 +1,15 @@
-import type { ProjectPolicy } from "../../shared/domain/automation.js";
+import type { ProjectOutputRoute, ProjectPolicy } from "../../shared/domain/automation.js";
 import type { RoutedEvent } from "../../shared/domain/events.js";
 import type { AgentRunOutput } from "../../shared/domain/runtime.js";
-import { policyOutputEventType } from "../../shared/policy-actions.js";
+import { projectOutputRouteEventType } from "../../shared/policy-actions.js";
 
 export function mapAgentOutputToEvent(
   policy: ProjectPolicy,
-  output: AgentRunOutput
+  output: AgentRunOutput,
+  outputRoutes: ProjectOutputRoute[]
 ): RoutedEvent {
   return {
-    id: policyOutputEventType(policy, output.status),
+    id: projectOutputRouteEventType(policy, output.status, outputRoutes),
     source: "agentd",
     timestamp: new Date().toISOString(),
     payload: {

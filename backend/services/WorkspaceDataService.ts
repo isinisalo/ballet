@@ -19,7 +19,13 @@ export class WorkspaceDataService {
     const automation = await loadProjectAutomationConfigWithIssues(this.root(), data.agents);
     data.automation = automation.config;
     data.automationIssues = automation.issues;
-    data.eventDefinitions = automationPoliciesToEventDefinitions(automation.config.policies, automation.config.triggers, automation.config.actions, automation.config.outputs);
+    data.eventDefinitions = automationPoliciesToEventDefinitions(
+      automation.config.policies,
+      automation.config.triggers,
+      automation.config.actions,
+      automation.config.outputs,
+      automation.config.outputRoutes
+    );
     data.policies = automationPoliciesToPolicies(automation.config.policies, automation.config.actions);
     data.runtimes = automationRuntimesToRuntimes(automation.config.runtimes);
     data.events = this.runtimeDatabaseProvider.runtimeDatabase().listEventRecords();
