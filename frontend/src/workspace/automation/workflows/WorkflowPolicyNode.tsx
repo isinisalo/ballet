@@ -38,6 +38,7 @@ export function WorkflowPolicyNode({
           policy={record.policy}
           actionOptions={context.actionOptions}
           count={records.length}
+          humanGate={humanGate}
         />
       ) : editable ? (
         <Select value={record.policyId || context.noSelectionValue} onValueChange={(value) => context.onPolicyChange(workflowId, record.index, value === context.noSelectionValue ? "" : value)}>
