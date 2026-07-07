@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { Position, type Node } from "@xyflow/react";
+import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
 import type { ProjectPolicy } from "@shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
 import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
 import { workflowRoutedEdgeLabelAnchor } from "../src/workspace/automation/workflows/workflowEdgeLabelGeometry";
+import { workflowSmartEdgeRoutingOptions } from "../src/workspace/automation/workflows/workflowSmartEdgeRouting";
 import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 import { positionWorkflowNodes } from "../src/workspace/automation/workflows/workflowLayoutPositioning";
 
@@ -40,6 +43,18 @@ const workflowTestRectsOverlap = (
   firstNode.x + firstNode.width > secondNode.x &&
   firstNode.y < secondNode.y + secondNode.height &&
   firstNode.y + firstNode.height > secondNode.y;
+
+const workflowRoutingTestNode = ({ id, x, y, width, height }: { id: string; x: number; y: number; width: number; height: number }): Node => ({
+  id,
+  position: { x, y },
+  data: {},
+  measured: { width, height },
+  width,
+  height
+} as Node);
+
+const firstRoutedPointMovingVertically = (points: number[][], sourceY: number) =>
+  points.find((point) => typeof point[1] === "number" && Math.abs(point[1] - sourceY) > 0.5);
 
 describe("workflow layout helper modules", () => {
   it("keeps exported node anchor and output handle calculations stable", () => {
@@ -101,6 +116,54 @@ describe("workflow layout helper modules", () => {
     const policyNode = nodes.find((node) => node.key === "policy-0");
 
     expect(policyNode?.x).toBeLessThan(300);
+  });
+
+  it("keeps default smart edge routing for same-row edges and tightens cross-row routing", () => {
+    expect(workflowSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 125.5 })).toBe(smartEdgePresets.step);
+    expect(workflowSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 75.5 })).toMatchObject({
+      gridRatio: 5,
+      nodePadding: 6,
+      drawEdge: smartEdgePresets.step.drawEdge,
+      generatePath: smartEdgePresets.step.generatePath
+    });
+  });
+
+  it("routes dev deployment cross-row forward edges toward the target row first", () => {
+    const sourceY = 125.5;
+    const targetY = 75.5;
+    const nodes = [
+      workflowRoutingTestNode({ id: "trigger", x: 32, y: 64, width: 28, height: 22 }),
+      workflowRoutingTestNode({ id: "policy-0", x: 238, y: 64, width: 174, height: 22 }),
+      workflowRoutingTestNode({ id: "policy-1", x: 597, y: 64, width: 112, height: 22 }),
+      workflowRoutingTestNode({ id: "policy-3", x: 956, y: 64, width: 181, height: 22 }),
+      workflowRoutingTestNode({ id: "policy-6", x: 1315, y: 64, width: 112, height: 22 }),
+      workflowRoutingTestNode({ id: "policy-2", x: 597, y: 114, width: 132, height: 22 }),
+      workflowRoutingTestNode({ id: "policy-8", x: 956, y: 114, width: 118, height: 22 }),
+      workflowRoutingTestNode({ id: "output-event-8-ready", x: 1315, y: 114, width: 76, height: 22 }),
+      workflowRoutingTestNode({ id: "output-event-8-blocked", x: 1315, y: 160, width: 76, height: 22 })
+    ];
+    const baseParams = {
+      sourceX: 730,
+      sourceY,
+      sourcePosition: Position.Right,
+      targetX: 1315,
+      targetY,
+      targetPosition: Position.Left,
+      nodes
+    };
+    const defaultRoute = getSmartEdge({
+      ...baseParams,
+      options: smartEdgePresets.step
+    });
+    const directedRoute = getSmartEdge({
+      ...baseParams,
+      options: workflowSmartEdgeRoutingOptions({ sourceY, targetY })
+    });
+
+    expect(defaultRoute).not.toBeInstanceOf(Error);
+    expect(directedRoute).not.toBeInstanceOf(Error);
+    expect(defaultRoute instanceof Error ? undefined : firstRoutedPointMovingVertically(defaultRoute.points, sourceY)?.[1]).toBeGreaterThan(sourceY);
+    expect(directedRoute instanceof Error ? undefined : firstRoutedPointMovingVertically(directedRoute.points, sourceY)?.[1]).toBeLessThan(sourceY);
   });
 });
 

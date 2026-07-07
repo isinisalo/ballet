@@ -1,8 +1,9 @@
 import { BaseEdge, EdgeLabelRenderer, useNodes, type EdgeProps, type Node } from "@xyflow/react";
-import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
+import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
 import type { WorkflowReactFlowEdge } from "./WorkflowCanvasTypes";
 import { workflowRoutedEdgeLabelAnchor, type WorkflowEdgePoint } from "./workflowEdgeLabelGeometry";
+import { workflowSmartEdgeRoutingOptions } from "./workflowSmartEdgeRouting";
 
 const workflowEdgeLabelClassName = "absolute z-20 inline-flex whitespace-nowrap bg-background/95 py-0.5 pl-1.5 pr-0.5 font-mono text-[0.58rem] leading-4";
 const workflowEdgeLabelCenterRatio = 0.5;
@@ -144,7 +145,7 @@ function workflowSmartEdgePath(
     targetX,
     targetY,
     nodes,
-    options: smartEdgePresets.step
+    options: workflowSmartEdgeRoutingOptions({ sourceY, targetY })
   });
 
   if (smartEdgeResponse instanceof Error) return undefined;
