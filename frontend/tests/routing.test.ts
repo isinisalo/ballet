@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   agentDocumentPath,
+  automationAllWorkflowsPath,
   automationSectionPath,
   projectCollectionDocumentPath,
   projectDocumentPath,
@@ -46,6 +47,11 @@ describe("workspace routing", () => {
       automationTab: "actions",
       automationEntityId: "artifact"
     });
+    expect(routeFromPath("/automation/workflows?view=all")).toEqual({
+      view: "automation",
+      automationTab: "workflows",
+      automationWorkflowView: "all"
+    });
     expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({ view: "projects" });
     expect(routeFromPath("/runtimes?id=codex")).toEqual({ view: "runtimes", runtimeId: "codex" });
   });
@@ -86,6 +92,7 @@ describe("workspace routing", () => {
     expect(projectCollectionDocumentPath("project 1", "instruction", ".ballet/instructions/a b.md")).toBe("/projects/project%201/instructions?path=.ballet%2Finstructions%2Fa%20b.md");
     expect(agentDocumentPath(".codex/agents/a b.toml")).toBe("/agents?path=.codex%2Fagents%2Fa%20b.toml");
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
+    expect(automationAllWorkflowsPath()).toBe("/automation/workflows?view=all");
     expect(automationSectionPath("workflows", "wf 1")).toBe("/automation/workflows?id=wf%201");
     expect(automationSectionPath("actions", "action 1")).toBe("/automation/actions?id=action%201");
     expect(runtimePath("runtime 1")).toBe("/runtimes?id=runtime%201");

@@ -8,6 +8,8 @@ import { positionWorkflowNodes } from "./workflowLayoutPositioning";
 import { workflowOutputSourceHandleId, workflowShortestVerticalHandles } from "./workflowLayoutSizing";
 import type { WorkflowCanvasLayout, WorkflowCanvasLayoutNode, WorkflowLayoutDirection } from "./workflowLayoutTypes";
 
+// This module intentionally centralizes workflow graph layout rules because
+// cross-workflow routing depends on the same node, row, and edge geometry.
 export { workflowAddActionGhostLabel, workflowCanvasLayoutConfig, workflowNodeSizes } from "./workflowLayoutConfig";
 export type { WorkflowCanvasEdge } from "./workflowLayoutEdges";
 export {
@@ -64,7 +66,53 @@ export function calculateCompositeWorkflowCanvasLayout({
   if (!selectedWorkflow) return { nodes: [], edges: [], direction };
 
   const policyById = new Map(config.policies.map((policy) => [policy.id, policy]));
-  const workflowIds = reachableWorkflowIds(config, selectedWorkflowId, recordsByWorkflowId, policyById);
+  return calculateWorkflowCanvasLayoutRows({
+    config,
+    workflowIds: reachableWorkflowIds(config, selectedWorkflowId, recordsByWorkflowId, policyById),
+    recordsByWorkflowId,
+    editingPolicyIndexByWorkflowId,
+    direction,
+    policyById
+  });
+}
+
+export function calculateAllWorkflowsCanvasLayout({
+  config,
+  recordsByWorkflowId,
+  editingPolicyIndexByWorkflowId = new Map(),
+  direction = "horizontal"
+}: {
+  config: ProjectAutomationConfig;
+  recordsByWorkflowId: ReadonlyMap<string, WorkflowStepRecord[]>;
+  editingPolicyIndexByWorkflowId?: ReadonlyMap<string, number | null>;
+  direction?: WorkflowLayoutDirection;
+}): WorkflowCanvasLayout {
+  const policyById = new Map(config.policies.map((policy) => [policy.id, policy]));
+  return calculateWorkflowCanvasLayoutRows({
+    config,
+    workflowIds: new Set(config.workflows.map((workflow) => workflow.id)),
+    recordsByWorkflowId,
+    editingPolicyIndexByWorkflowId,
+    direction,
+    policyById
+  });
+}
+
+function calculateWorkflowCanvasLayoutRows({
+  config,
+  workflowIds,
+  recordsByWorkflowId,
+  editingPolicyIndexByWorkflowId,
+  direction,
+  policyById
+}: {
+  config: ProjectAutomationConfig;
+  workflowIds: ReadonlySet<string>;
+  recordsByWorkflowId: ReadonlyMap<string, WorkflowStepRecord[]>;
+  editingPolicyIndexByWorkflowId: ReadonlyMap<string, number | null>;
+  direction: WorkflowLayoutDirection;
+  policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>;
+}): WorkflowCanvasLayout {
   const rows = config.workflows
     .filter((workflow) => workflowIds.has(workflow.id))
     .map((workflow) => {

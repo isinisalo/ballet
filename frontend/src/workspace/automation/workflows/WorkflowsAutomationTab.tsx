@@ -16,6 +16,7 @@ import { FieldGroup } from "@/components/ui/field";
 import { nextConfigWithActionPatch } from "../actions/actionEditorLogic";
 import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
+import { AllWorkflowsCanvas } from "./AllWorkflowsCanvas";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { WorkflowHandlerSheet, type WorkflowHandlerRoute, type WorkflowHandlerSelectionSource } from "./WorkflowHandlerSheet";
 import { nextConfigWithWorkflowHandlerAction, nextConfigWithoutWorkflowStepIndexes } from "./workflowActionSheetLogic";
@@ -38,6 +39,7 @@ export function WorkflowsAutomationTab({
   config,
   selectedId,
   createDraft,
+  showAll = false,
   onCreateDraftChange,
   onSelect,
   updateConfig,
@@ -49,6 +51,7 @@ export function WorkflowsAutomationTab({
   config: ProjectAutomationConfig;
   selectedId?: string;
   createDraft: ProjectWorkflow;
+  showAll?: boolean;
   onCreateDraftChange: (patch: Partial<ProjectWorkflow>) => void;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
@@ -320,6 +323,8 @@ export function WorkflowsAutomationTab({
       body: `Human gate ${route.actionId} selected ${outputId}.\n\n${prompt}`
     });
   };
+
+  if (showAll) return <AllWorkflowsCanvas config={config} />;
 
   if (!selected) return <EmptyState title="No workflow selected." />;
 

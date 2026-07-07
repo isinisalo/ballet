@@ -3,7 +3,7 @@ import { Route, Save } from "lucide-react";
 import type { AppData, EventIntakeRequest, EventRecord, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
-import type { AutomationTab } from "../types";
+import type { AutomationTab, AutomationWorkflowView } from "../types";
 import { ActionsAutomationTab } from "./actions/ActionsAutomationTab";
 import { createAutomationEntityControls } from "./automationEntityControls";
 import { AutomationIssues } from "./AutomationIssues";
@@ -18,6 +18,7 @@ export function AutomationView({
   data,
   activeTab,
   selectedId,
+  workflowView,
   saveAutomation,
   createEvent,
   navigate
@@ -25,6 +26,7 @@ export function AutomationView({
   data: AppData;
   activeTab: AutomationTab;
   selectedId?: string;
+  workflowView?: AutomationWorkflowView;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
   createEvent: (event: EventIntakeRequest) => Promise<EventRecord>;
   navigate: (path: string) => void;
@@ -40,11 +42,12 @@ export function AutomationView({
     selectedWorkflowId,
     selectAutomationEntity
   } = createAutomationEntityControls({ activeTab, selectedId, draft, agents: data.agents, setDraft, navigate });
+  const showAllWorkflows = activeTab === "workflows" && workflowView === "all";
   const isCreateMode = useMemo(() => {
     if (activeTab === "triggers") return !selectedTriggerId;
     if (activeTab === "actions") return !selectedActionId;
-    return !selectedWorkflowId;
-  }, [activeTab, selectedActionId, selectedTriggerId, selectedWorkflowId]);
+    return !showAllWorkflows && !selectedWorkflowId;
+  }, [activeTab, selectedActionId, selectedTriggerId, selectedWorkflowId, showAllWorkflows]);
   const workflowNameEditor = useWorkflowHeaderNameEditor({
     activeTab,
     draft,
@@ -67,7 +70,7 @@ export function AutomationView({
     <div className="grid gap-4">
       <Panel
         title="Automation"
-        titleExtra={activeTab === "workflows" && !isCreateMode ? (
+        titleExtra={activeTab === "workflows" && !isCreateMode && !showAllWorkflows ? (
           <WorkflowHeaderNameEditor {...workflowNameEditor.editorProps} />
         ) : null}
         icon={<Route data-icon="inline-start" />}
@@ -96,7 +99,7 @@ export function AutomationView({
                 <AutomationIssues issues={data.automationIssues} />
               </div>
             ) : null}
-            <WorkflowsAutomationTab agents={data.agents} projectId={data.projects[0]?.id ?? "project"} config={draft} selectedId={selectedWorkflowId} createDraft={createDrafts.newWorkflow} onCreateDraftChange={createDrafts.updateNewWorkflow} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} createEvent={createEvent} />
+            <WorkflowsAutomationTab agents={data.agents} projectId={data.projects[0]?.id ?? "project"} config={draft} selectedId={selectedWorkflowId} createDraft={createDrafts.newWorkflow} showAll={showAllWorkflows} onCreateDraftChange={createDrafts.updateNewWorkflow} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} createEvent={createEvent} />
           </>
         ) : (
           <div className="grid gap-4">

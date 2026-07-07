@@ -7,7 +7,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
-import { automationSectionPath } from "../routing";
+import { automationAllWorkflowsPath, automationSectionPath } from "../routing";
 import type { AutomationTab, RouteState } from "../types";
 import { SidebarCollapsibleLinkSection } from "./SidebarCollapsibleLinkSection";
 import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
@@ -45,6 +45,7 @@ function SidebarAutomationSection({
   const entities = automationEntities(automation, section.id);
   const selectedId = activeAutomationEntityId(automation, section.id, route.automationTab === section.id ? route.automationEntityId : undefined);
   const sectionActive = route.view === "automation" && route.automationTab === section.id;
+  const allWorkflowsActive = sectionActive && section.id === "workflows" && route.automationWorkflowView === "all";
   const sectionPath = automationSectionPath(section.id);
   const Icon = section.icon;
 
@@ -59,6 +60,16 @@ function SidebarAutomationSection({
       chevronClassName="group-data-[state=open]/automation-section:rotate-90"
     >
       <SidebarMenuSub className="mx-2 gap-0.5 border-sidebar-border/60 px-2 py-1">
+        {section.id === "workflows" ? (
+          <SidebarNavLinkItem
+            path={automationAllWorkflowsPath()}
+            isActive={allWorkflowsActive}
+            navigate={navigate}
+            className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
+          >
+            <span className="truncate">All workflows</span>
+          </SidebarNavLinkItem>
+        ) : null}
         {entities.length === 0 ? (
           <SidebarMenuSubItem>
             <span className="block px-2 py-1 text-xs text-muted-foreground">{section.emptyLabel}</span>

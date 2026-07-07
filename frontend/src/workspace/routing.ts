@@ -16,7 +16,9 @@ const projectCollectionRoute = (view: "project-adrs" | "project-goals" | "projec
 const automationRoute = (automationTab: AutomationTab, url: URL): RouteState => ({
   view: "automation",
   automationTab,
-  automationEntityId: url.searchParams.get("id") ?? undefined
+  ...(automationTab === "workflows" && url.searchParams.get("view") === "all"
+    ? { automationWorkflowView: "all" as const }
+    : { automationEntityId: url.searchParams.get("id") ?? undefined })
 });
 
 const runtimeRoute = (url: URL): RouteState => ({
@@ -68,4 +70,5 @@ export const projectCollectionDocumentPath = (projectId: string, kind: ProjectDo
 export const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
 export const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
 export const automationSectionPath = (tab: AutomationTab, id?: string) => `/automation/${tab}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
+export const automationAllWorkflowsPath = () => "/automation/workflows?view=all";
 export const runtimePath = (id?: string) => `/runtimes${id ? `?id=${encodeURIComponent(id)}` : ""}`;

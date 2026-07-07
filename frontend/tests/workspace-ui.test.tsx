@@ -847,6 +847,9 @@ describe("workspace entity UI flows", () => {
     expect(workflowsToggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("link", { name: "workflow-1" })).not.toBeInTheDocument();
     await user.click(workflowsToggle);
+    await user.click(screen.getByRole("link", { name: "All workflows" }));
+    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(window.location.search).toBe("?view=all");
     await user.click(screen.getByRole("link", { name: "workflow-1" }));
     expect(window.location.pathname).toBe("/automation/workflows");
     expect(window.location.search).toBe("?id=workflow-1");
@@ -1615,8 +1618,8 @@ describe("workspace entity UI flows", () => {
     const returnSourcePolicyNode = screen.getByLabelText("Policy: on.implementation.complete.start.review").closest(".react-flow__node");
     const returnTargetPolicyNode = screen.getByLabelText("Policy: on.trigger.manual-start.start.implementation").closest(".react-flow__node");
     expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-right")).toHaveLength(1);
-    expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-bottom").length).toBeGreaterThan(0);
-    expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-top")).toHaveLength(0);
+    expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-bottom")).toHaveLength(0);
+    expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-top").length).toBeGreaterThan(0);
     expect(returnTargetPolicyNode?.querySelectorAll(".react-flow__handle").length).toBeGreaterThan(0);
     expect(document.querySelectorAll("[data-handleid^=\"right-output-\"]")).toHaveLength(0);
     expect(document.querySelectorAll("[data-workflow-edge-endpoint]").length).toBe(0);

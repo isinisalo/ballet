@@ -9,7 +9,7 @@ import { workflowApprovalEdgePath, workflowEdgeLabelTransform, workflowReturnEdg
 import { workflowCrossWorkflowSmoothStepPath } from "../src/workspace/automation/workflows/workflowCrossWorkflowSmoothStepPath";
 import { workflowRoutedEdgeLabelAnchor } from "../src/workspace/automation/workflows/workflowEdgeLabelGeometry";
 import { workflowSmartEdgeRoutingOptions } from "../src/workspace/automation/workflows/workflowSmartEdgeRouting";
-import { calculateCompositeWorkflowCanvasLayout, calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
+import { calculateAllWorkflowsCanvasLayout, calculateCompositeWorkflowCanvasLayout, calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 import { positionWorkflowNodes } from "../src/workspace/automation/workflows/workflowLayoutPositioning";
 import { workflowOutputTargetsForPolicy } from "../src/workspace/automation/workflows/workflowOutputTargets";
 
@@ -1177,6 +1177,37 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
     expect(layout.nodes.filter((node) => node.kind === "policy")).toHaveLength(2);
     expect(layout.edges.filter((edge) => edge.targetNodeKey.endsWith(":trigger"))).toHaveLength(2);
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
+  });
+});
+
+describe("calculateAllWorkflowsCanvasLayout", () => {
+  it("renders every configured workflow row and keeps cross-workflow trigger edges", () => {
+    const config = compositeConfig(["source", "target", "observer"], [{
+      sourcePolicyId: "source-start",
+      outputId: "ready",
+      target: { type: "trigger", trigger: "target-trigger", workflowId: "target" }
+    }]);
+    const layout = calculateAllWorkflowsCanvasLayout({
+      config,
+      recordsByWorkflowId: compositeRecords(config)
+    });
+    const sourceTrigger = layout.nodes.find((node) => node.key === "workflow:source:trigger");
+    const targetTrigger = layout.nodes.find((node) => node.key === "workflow:target:trigger");
+    const observerTrigger = layout.nodes.find((node) => node.key === "workflow:observer:trigger");
+    const crossEdge = layout.edges.find((edge) => edge.key === "workflow:source:output:0:ready:to:target:trigger");
+
+    expect(sourceTrigger).toBeDefined();
+    expect(targetTrigger).toBeDefined();
+    expect(observerTrigger).toBeDefined();
+    expect(layout.nodes.find((node) => node.key === "workflow:source:output-event-0-ready")).toBeUndefined();
+    expect(crossEdge).toMatchObject({
+      sourceNodeKey: "workflow:source:policy-0",
+      targetNodeKey: "workflow:target:trigger",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      label: "ready",
+      tone: "cross-workflow"
+    });
   });
 });
 

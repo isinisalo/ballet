@@ -13,6 +13,7 @@ export type View =
 
 export type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
 export type AutomationTab = "triggers" | "actions" | "workflows";
+export type AutomationWorkflowView = "all";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
@@ -21,6 +22,7 @@ export interface RouteState {
   documentPath?: string;
   automationTab?: AutomationTab;
   automationEntityId?: string;
+  automationWorkflowView?: AutomationWorkflowView;
   runtimeId?: string;
 }
 

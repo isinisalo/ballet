@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
-import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
-import { humanGateResponseId } from "../../shared/policy-actions.js";
+import type { ProjectAutomationConfig, ProjectPolicy } from "../../shared/domain/automation.js";
+import { actionOutputIds, findProjectOutputRoute, humanGateResponseId, policyOutputEventType } from "../../shared/policy-actions.js";
 import {
   automationPoliciesToEventDefinitions,
   automationPoliciesToPolicies,
@@ -141,6 +141,53 @@ describe("project automation config", () => {
   it("keeps the repository workflow config inside current validation rules", async () => {
     const config = JSON.parse(await readFile(path.join(process.cwd(), ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     expect(validateProjectAutomationConfig(config)).toEqual([]);
+  });
+
+  it("keeps the repository workflow gates and outputs fully routed", async () => {
+    const config = JSON.parse(await readFile(path.join(process.cwd(), ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
+    const humanGateIds = config.actions.filter((action) => action.humanGate).map((action) => action.id);
+    const expectedGateIds = [
+      "project-brief-human-gate",
+      "roadmap-human-gate",
+      "ui-design-human-gate",
+      "technical-plan-human-gate",
+      "milestones-human-gate",
+      "task-specs-human-gate",
+      "code-human-gate",
+      "dev-deployment-validation-human-gate"
+    ];
+    const expectedApprovalRoutes = new Map([
+      ["on.challenge-project-brief.approved.start.project-brief-human-gate", ["project_brief_approved", "roadmap-loop"]],
+      ["on.challenge-roadmap.approved.start.roadmap-human-gate", ["roadmap_approved", "ui-design-loop"]],
+      ["on.challenge-ui-design.approved.start.ui-design-human-gate", ["ui_design_approved", "technical-planning-loop"]],
+      ["on.challenge-technical-plan.approved.start.technical-plan-human-gate", ["technical_plan_approved", "milestone-loop"]],
+      ["on.challenge-milestones.approved.start.milestones-human-gate", ["milestones_approved", "task-spec-loop"]],
+      ["on.challenge-task-specs.approved.start.task-specs-human-gate", ["task_specs_approved", "implementation-review-test-loop"]],
+      ["on.review-code.approved.start.code-human-gate", ["code_approved", "dev-deploy-validation-loop"]]
+    ]);
+    const eventPoliciesByEvent = new Map(config.policies
+      .filter((policy): policy is ProjectPolicy & { event: string } => policy.source === "event" && Boolean(policy.event))
+      .map((policy) => [policy.event, policy]));
+
+    expect(humanGateIds).toEqual(expectedGateIds);
+    expectedApprovalRoutes.forEach(([trigger, workflowId], sourcePolicyId) => {
+      expect(findProjectOutputRoute(config.outputRoutes, sourcePolicyId, "approved")).toMatchObject({
+        target: { type: "trigger", trigger, workflowId }
+      });
+    });
+    expect(eventPoliciesByEvent.get("dev-deployment-validation-human-gate.approved")?.action).toBe("done");
+
+    config.policies.forEach((policy) => {
+      actionOutputIds(config.actions, policy.action).forEach((outputId) => {
+        const route = findProjectOutputRoute(config.outputRoutes, policy.id, outputId);
+        if (route) {
+          expect(route.target.type).toBe("trigger");
+          return;
+        }
+        const eventType = policyOutputEventType(policy, outputId);
+        expect(eventPoliciesByEvent.has(eventType)).toBe(true);
+      });
+    });
   });
 
   it("saves readable JSON without touching Markdown instructions", async () => {
