@@ -31,7 +31,7 @@ export function workflowEdgeStyle(
   isAnimated: boolean
 ): WorkflowReactFlowEdge["style"] {
   return {
-    stroke: workflowEdgeStroke(edge),
+    stroke: workflowEdgeStroke(edge, targetNode),
     strokeWidth: 2,
     strokeDasharray: workflowEdgeStrokeDasharray(edge),
     strokeLinecap: workflowEdgeStrokeLinecap(edge),
@@ -39,7 +39,8 @@ export function workflowEdgeStyle(
   };
 }
 
-function workflowEdgeStroke(edge: WorkflowCanvasEdge) {
+function workflowEdgeStroke(edge: WorkflowCanvasEdge, targetNode: WorkflowCanvasLayoutNode | undefined) {
+  if (workflowEdgeTargetsGhostNode(edge, targetNode)) return workflowDashedEdgeStroke;
   const outputSlotKind = workflowEdgeOutputSlotKind(edge);
   if (outputSlotKind === "approval") return workflowApprovalOutputEdgeStroke;
   if (outputSlotKind === "rework") return workflowReworkOutputEdgeStroke;

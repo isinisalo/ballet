@@ -204,9 +204,9 @@ function WorkflowEdgeLabels({
     workflowEdgeLabelClassName,
     "pointer-events-none"
   );
-  const centerLabelToneClassName = outputSlotKind === "approval"
-    ? "text-secondary"
-    : outputSlotKind === "rework" ? "text-destructive" : isGhostTarget ? "text-primary/55" : "text-primary";
+  const centerLabelToneClassName = isGhostTarget
+    ? "text-primary/55"
+    : outputSlotKind === "approval" ? "text-secondary" : outputSlotKind === "rework" ? "text-destructive" : "text-primary";
   const centerLabelContent = <span className={centerLabelToneClassName}>{label}</span>;
 
   return (

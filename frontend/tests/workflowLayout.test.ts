@@ -1151,20 +1151,23 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(edge.style?.strokeLinecap).toBeUndefined();
   });
 
-  it("keeps unclassified dashed output-event edges on the muted dashed fallback", () => {
+  it("keeps dashed output-event edges on the muted ghost fallback even for rework outputs", () => {
     const [edge] = toWorkflowReactFlowEdges([{
-      key: "policy-output-event-0-summary",
+      key: "policy-output-event-0-blocked",
       sourceNodeKey: "policy-0",
-      targetNodeKey: "output-event-0-summary",
+      targetNodeKey: "output-event-0-blocked",
       sourceHandleId: "right",
       targetHandleId: "left",
       dashed: true,
-      label: "summary"
+      route: {
+        outputId: "blocked"
+      },
+      label: "blocked"
     }]);
 
-    expect(edge.domAttributes).not.toHaveProperty("data-workflow-edge-output-slot-kind");
     expect(edge.domAttributes).toMatchObject({
-      "data-dashed": "true"
+      "data-dashed": "true",
+      "data-workflow-edge-output-slot-kind": "rework"
     });
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--muted-foreground) 35%, transparent)",
