@@ -6,6 +6,7 @@ import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
 import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
+import { workflowCrossWorkflowSmoothStepPath } from "../src/workspace/automation/workflows/workflowCrossWorkflowSmoothStepPath";
 import { workflowRoutedEdgeLabelAnchor } from "../src/workspace/automation/workflows/workflowEdgeLabelGeometry";
 import { workflowSmartEdgeRoutingOptions } from "../src/workspace/automation/workflows/workflowSmartEdgeRouting";
 import { calculateCompositeWorkflowCanvasLayout, calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
@@ -838,7 +839,8 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       sourceHandleId: "right",
       targetHandleId: "left",
       eventType: "trigger.target-trigger",
-      label: "ready"
+      label: "ready",
+      tone: "cross-workflow"
     });
   });
 
@@ -1064,6 +1066,55 @@ describe("toWorkflowReactFlowEdges", () => {
     ]);
 
     expect(edges.map((edge) => edge.type)).toEqual(["workflowSmart", "workflowSmart", "workflowSmart"]);
+  });
+
+  it("maps cross-workflow edges to the workflow highlight stroke", () => {
+    const [edge] = toWorkflowReactFlowEdges([{
+      key: "workflow:source:output:0:ready:to:target:trigger",
+      sourceNodeKey: "workflow:source:policy-0",
+      targetNodeKey: "workflow:target:trigger",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      tone: "cross-workflow"
+    }]);
+
+    expect(edge.domAttributes).toMatchObject({
+      "data-workflow-edge-tone": "cross-workflow"
+    });
+    expect(edge.style).toMatchObject({
+      stroke: "color-mix(in srgb, var(--secondary) 72%, transparent)",
+      strokeWidth: 2
+    });
+  });
+
+  it("renders cross-workflow edges as smoothstep paths", () => {
+    const path = workflowCrossWorkflowSmoothStepPath({
+      id: "workflow:source:output:0:ready:to:target:trigger",
+      source: "workflow:source:policy-0",
+      target: "workflow:target:trigger",
+      selected: false,
+      sourceX: 1000,
+      sourceY: 76,
+      targetX: 32,
+      targetY: 280,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      data: {
+        workflowEdge: {
+          key: "workflow:source:output:0:ready:to:target:trigger",
+          sourceNodeKey: "workflow:source:policy-0",
+          targetNodeKey: "workflow:target:trigger",
+          tone: "cross-workflow"
+        }
+      }
+    });
+
+    expect(path.path).not.toContain("C");
+    expect(path.path.match(/Q/g)).toHaveLength(4);
+    expect(path.path).toContain("M1000 76L 1040,76Q 1064,76 1064,100");
+    expect(path.path).toContain("L -32,256Q -32,280 -8,280L32 280");
+    expect(path.labelX).toBe(1056);
+    expect(path.labelY).toBe(76);
   });
 
   it("marks one workflow edge as animated when requested", () => {

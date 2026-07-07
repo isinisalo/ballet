@@ -197,7 +197,7 @@ function workflowLayoutBounds(nodes: WorkflowCanvasLayoutNode[]) {
 }
 
 function compositeWorkflowRowGap() {
-  return workflowCanvasLayoutConfig.branchGap * 2 + workflowNodeSizes.policy.height;
+  return workflowCanvasLayoutConfig.branchGap * 4 + workflowNodeSizes.policy.height;
 }
 
 function shouldHideTriggerOutputNode(
@@ -244,6 +244,7 @@ function crossWorkflowTriggerEdges(
           targetHandleId: "left",
           eventType: target.eventType,
           label: target.outputId,
+          tone: "cross-workflow",
           route: {
             sourceWorkflowId: row.workflow.id,
             targetWorkflowId: targetWorkflow.id,

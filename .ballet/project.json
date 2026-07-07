@@ -272,7 +272,17 @@
       "id": "failed"
     }
   ],
-  "outputRoutes": [],
+  "outputRoutes": [
+    {
+      "sourcePolicyId": "on.run-tests.ready.start.review-code",
+      "outputId": "approved",
+      "target": {
+        "type": "trigger",
+        "trigger": "code_approved",
+        "workflowId": "dev-deploy-validation-loop"
+      }
+    }
+  ],
   "policies": [
     {
       "source": "trigger",
@@ -631,11 +641,10 @@
         "on.trigger.task_specs_approved.start.implement-task",
         "on.implement-task.ready.start.run-tests",
         "on.implement-task.blocked.start.classify-failure",
-        "on.run-tests.ready.start.review-code",
-        "on.run-tests.failed.start.classify-failure",
-        "on.review-code.changes_requested.start.implement-task",
-        "on.review-code.approved.start.done",
-        "on.trigger.ci_or_validation_failed.start.classify-failure",
+      "on.run-tests.ready.start.review-code",
+      "on.run-tests.failed.start.classify-failure",
+      "on.review-code.changes_requested.start.implement-task",
+      "on.trigger.ci_or_validation_failed.start.classify-failure",
         "on.classify-failure.ready.start.implement-task",
         "on.classify-failure.blocked.start.done"
       ]

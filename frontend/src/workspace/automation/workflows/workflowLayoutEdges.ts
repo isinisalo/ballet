@@ -7,7 +7,7 @@ export type WorkflowCanvasEdge = {
   sourceHandleId?: string;
   targetHandleId?: string;
   dashed?: boolean;
-  tone?: "return";
+  tone?: "return" | "cross-workflow";
   eventType?: string;
   label?: string;
   route?: WorkflowCanvasEdgeRoute;
