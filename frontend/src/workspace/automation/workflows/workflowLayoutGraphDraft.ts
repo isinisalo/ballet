@@ -103,7 +103,7 @@ export function addOutputEventNode(
     key: `policy-output-event-${record.index}-${output.outputId}`,
     sourceNodeKey: `policy-${record.index}`,
     targetNodeKey: key,
-    sourceHandleId: workflowOutputSourceHandleId(),
+    sourceHandleId: workflowOutputSourceHandleId(output),
     targetHandleId: context.targetHandleId,
     dashed: true,
     eventType: output.eventType,

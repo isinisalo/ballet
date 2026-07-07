@@ -5,7 +5,7 @@ import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspa
 import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
-import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
+import { workflowEdgeLabelTransforms, workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
 import { workflowCrossWorkflowSmoothStepPath } from "../src/workspace/automation/workflows/workflowCrossWorkflowSmoothStepPath";
 import { workflowRoutedEdgeLabelAnchor } from "../src/workspace/automation/workflows/workflowEdgeLabelGeometry";
 import { workflowSmartEdgeRoutingOptions } from "../src/workspace/automation/workflows/workflowSmartEdgeRouting";
@@ -222,6 +222,32 @@ describe("workflow layout helper modules", () => {
     expect(defaultRoute instanceof Error ? undefined : firstRoutedPointMovingVertically(defaultRoute.points, sourceY)?.[1]).toBeGreaterThan(sourceY);
     expect(directedRoute instanceof Error ? undefined : firstRoutedPointMovingVertically(directedRoute.points, sourceY)?.[1]).toBeLessThan(sourceY);
   });
+
+  it("centers labels on long nearly-horizontal routed edge segments", () => {
+    expect(workflowRoutedEdgeLabelAnchor({
+      source: { x: 371, y: 295.5 },
+      points: [
+        { x: 371, y: 300 },
+        { x: 371, y: 305 },
+        { x: 371, y: 325 },
+        { x: 655, y: 327 },
+        { x: 659.5, y: 327 }
+      ],
+      target: { x: 659.5, y: 327 },
+      fallback: { x: 640, y: 327 }
+    })).toEqual({ x: 513, y: 326 });
+  });
+
+  it("places bottom-source start labels below the connection point", () => {
+    expect(workflowEdgeLabelTransforms({
+      isReturnEdge: false,
+      sourcePosition: Position.Bottom,
+      sourceX: 371,
+      sourceY: 295.5,
+      targetX: 659.5,
+      targetY: 327
+    }).startLabelTransform).toBe("translate(-50%, 0) translate(371px, 299.5px)");
+  });
 });
 
 describe("calculateWorkflowCanvasLayout", () => {
@@ -371,6 +397,16 @@ describe("calculateWorkflowCanvasLayout", () => {
       ? outputEventNode.y + workflowNodeSizes.outputEvent.height + workflowNodeSizes.outputEvent.rowGap
       : undefined);
     expect(layout.edges).toContainEqual(expect.objectContaining({
+      key: "policy-output-event-0-failed",
+      sourceNodeKey: "policy-0",
+      targetNodeKey: "output-event-0-failed",
+      sourceHandleId: "bottom",
+      targetHandleId: "left",
+      dashed: true,
+      eventType: "build.failed",
+      label: "failed"
+    }));
+    expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-output-event-0-summary",
       sourceNodeKey: "policy-0",
       targetNodeKey: "output-event-0-summary",
@@ -380,6 +416,30 @@ describe("calculateWorkflowCanvasLayout", () => {
       eventType: "build.summary",
       label: "summary"
     }));
+  });
+
+  it("routes approval outputs from the right and non-return rework outputs from the bottom", () => {
+    const start = policy("start", undefined, "build");
+    const completeHandler = policy("complete-handler", "build.complete", "done");
+    const failedHandler = policy("failed-handler", "build.failed", "done");
+    const layout = layoutFor([start, completeHandler, failedHandler], [
+      start.id,
+      completeHandler.id,
+      failedHandler.id
+    ]);
+
+    expect(layout.edges.find((edge) => edge.eventType === "build.complete")).toMatchObject({
+      sourceNodeKey: "policy-0",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      label: "complete"
+    });
+    expect(layout.edges.find((edge) => edge.eventType === "build.failed")).toMatchObject({
+      sourceNodeKey: "policy-0",
+      sourceHandleId: "bottom",
+      targetHandleId: "left",
+      label: "failed"
+    });
   });
 
   it("renders human gate action outputs without requiring agents", () => {
@@ -482,7 +542,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(outputEventEdge).toMatchObject({
       sourceNodeKey: "policy-0",
       targetNodeKey: "output-event-0-build.failed",
-      sourceHandleId: "right",
+      sourceHandleId: "bottom",
       targetHandleId: "left",
       dashed: true,
       eventType: "build.failed",
@@ -873,6 +933,41 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       targetHandleId: "left",
       eventType: "trigger.target-trigger",
       label: "ready",
+      tone: "cross-workflow"
+    });
+  });
+
+  it("routes cross-workflow approval outputs from the right and rework outputs from the bottom", () => {
+    const config = compositeConfig(["source", "target"], [
+      {
+        sourcePolicyId: "source-start",
+        outputId: "ready",
+        target: { type: "trigger", trigger: "target-trigger" }
+      },
+      {
+        sourcePolicyId: "source-start",
+        outputId: "blocked",
+        target: { type: "trigger", trigger: "target-trigger" }
+      }
+    ]);
+    const layout = calculateCompositeWorkflowCanvasLayout({
+      config,
+      selectedWorkflowId: "source",
+      recordsByWorkflowId: compositeRecords(config)
+    });
+
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:ready:to:target:trigger")).toMatchObject({
+      sourceNodeKey: "workflow:source:policy-0",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      label: "ready",
+      tone: "cross-workflow"
+    });
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toMatchObject({
+      sourceNodeKey: "workflow:source:policy-0",
+      sourceHandleId: "bottom",
+      targetHandleId: "left",
+      label: "blocked",
       tone: "cross-workflow"
     });
   });

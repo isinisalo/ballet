@@ -174,7 +174,7 @@ function addHandledEventNode(context: WorkflowLayoutGraphDraftContext, record: W
     sourceIndex: record.index,
     sourcePolicyId: record.policyId,
     sourceNodeKey: `policy-${record.index}`,
-    sourceHandleId: workflowOutputSourceHandleId()
+    sourceHandleId: workflowOutputSourceHandleId(output)
   });
 }
 
@@ -194,7 +194,7 @@ function addChildPolicyEdge(
       key: `policy-policy-${record.index}-${canonicalChildRecord.index}-${childRecord.index}-${output.eventType}`,
       sourceNodeKey: `policy-${record.index}`,
       targetNodeKey: `policy-${canonicalChildRecord.index}`,
-      sourceHandleId: workflowOutputSourceHandleId(),
+      sourceHandleId: workflowOutputSourceHandleId(output),
       targetHandleId: isReturnEdge ? "top" : context.targetHandleId,
       tone: isReturnEdge ? "return" : undefined,
       eventType: output.eventType,
@@ -221,7 +221,7 @@ function addChildPolicyEdge(
     key: `policy-policy-${record.index}-${childRecord.index}-${output.eventType}`,
     sourceNodeKey: `policy-${record.index}`,
     targetNodeKey: `policy-${childRecord.index}`,
-    sourceHandleId: workflowOutputSourceHandleId(),
+    sourceHandleId: workflowOutputSourceHandleId(output),
     targetHandleId: context.targetHandleId,
     eventType: output.eventType,
     label: workflowOutputEdgeLabel(output),

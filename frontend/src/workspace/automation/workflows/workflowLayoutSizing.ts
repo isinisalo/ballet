@@ -1,4 +1,5 @@
 import type { WorkflowStepRecord } from "./workflowGraph";
+import { workflowOutputSlotKindForValues } from "./workflowEdgeOutputSlot";
 import { workflowAddActionGhostLabel, workflowCanvasLayoutConfig, workflowEdgeLabelLayout, workflowNodeSizes } from "./workflowLayoutConfig";
 import type { WorkflowCanvasLayoutNode, WorkflowDagreEdge } from "./workflowLayoutTypes";
 
@@ -8,8 +9,10 @@ export function workflowCanvasNodeAnchorY(layoutNode: Pick<WorkflowCanvasLayoutN
   return layoutNode.height / 2;
 }
 
-export function workflowOutputSourceHandleId() {
-  return "right";
+export function workflowOutputSourceHandleId(output?: { outputId?: string; eventType?: string } | string) {
+  const outputId = typeof output === "string" ? output : output?.outputId;
+  const eventType = typeof output === "string" ? undefined : output?.eventType;
+  return workflowOutputSlotKindForValues(outputId, eventType) === "rework" ? "bottom" : "right";
 }
 
 export function workflowPolicyOutputHandleY(outputIndex: number, outputHandleCount: number) {

@@ -3,7 +3,7 @@ export type WorkflowEdgePoint = {
   y: number;
 };
 
-const workflowHorizontalSegmentEpsilon = 0.5;
+const workflowHorizontalSegmentEpsilon = 4;
 const workflowMinimumLabelSegmentLength = 1;
 
 export function workflowRoutedEdgeLabelAnchor({

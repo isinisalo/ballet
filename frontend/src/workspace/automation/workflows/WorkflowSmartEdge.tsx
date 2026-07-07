@@ -1,4 +1,4 @@
-import { BaseEdge, EdgeLabelRenderer, useNodes, type EdgeProps, type Node } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, Position, useNodes, type EdgeProps, type Node } from "@xyflow/react";
 import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
 import type { WorkflowReactFlowEdge } from "./WorkflowCanvasTypes";
@@ -14,7 +14,7 @@ const workflowEdgeLabelTargetOffset = 4;
 const workflowEdgeLabelVerticalOffset = 4;
 
 export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
-  const { data, sourceX, sourceY, targetX, targetY } = props;
+  const { data, sourcePosition, sourceX, sourceY, targetX, targetY } = props;
   const nodes = useNodes();
   const workflowEdge = data?.workflowEdge;
   const label = workflowEdge?.label;
@@ -32,6 +32,7 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
     returnEdgePath,
     crossWorkflowEdgePath,
     smartEdgePath,
+    sourcePosition,
     sourceX,
     sourceY,
     targetX,
@@ -68,6 +69,7 @@ export function workflowEdgeLabelTransforms({
   returnEdgePath,
   crossWorkflowEdgePath,
   smartEdgePath,
+  sourcePosition,
   sourceX,
   sourceY,
   targetX,
@@ -77,13 +79,14 @@ export function workflowEdgeLabelTransforms({
   returnEdgePath?: ReturnType<typeof workflowReturnEdgePath>;
   crossWorkflowEdgePath?: ReturnType<typeof workflowCrossWorkflowSmoothStepPath>;
   smartEdgePath?: ReturnType<typeof workflowSmartEdgePath>;
+  sourcePosition?: Position;
   sourceX: number;
   sourceY: number;
   targetX: number;
   targetY: number;
 }) {
-  const startLabelX = returnEdgePath?.startLabelX ?? sourceX + workflowEdgeLabelSourceOffset;
-  const startLabelY = returnEdgePath?.startLabelY ?? sourceY;
+  const startLabelX = returnEdgePath?.startLabelX ?? sourceX + (sourcePosition === Position.Bottom ? 0 : workflowEdgeLabelSourceOffset);
+  const startLabelY = returnEdgePath?.startLabelY ?? sourceY + (sourcePosition === Position.Bottom ? workflowEdgeLabelSourceOffset : 0);
   const endLabelX = returnEdgePath?.endLabelX ?? targetX;
   const endLabelY = returnEdgePath?.endLabelY ?? targetY;
 
@@ -108,7 +111,9 @@ export function workflowEdgeLabelTransforms({
   });
 
   return {
-    startLabelTransform: `translate(0, -50%) translate(${startLabelX}px, ${startLabelY}px)`,
+    startLabelTransform: sourcePosition === Position.Bottom
+      ? `translate(-50%, 0) translate(${startLabelX}px, ${startLabelY}px)`
+      : `translate(0, -50%) translate(${startLabelX}px, ${startLabelY}px)`,
     labelTransform: `translate(-50%, -50%) translate(${flowLabelX}px, ${flowLabelY}px)`,
     endLabelTransform: `translate(-100%, -50%) translate(${targetX - workflowEdgeLabelTargetOffset}px, ${targetY}px)`
   };

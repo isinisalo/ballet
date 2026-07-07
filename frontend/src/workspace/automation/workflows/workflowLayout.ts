@@ -240,7 +240,7 @@ function crossWorkflowTriggerEdges(
           key: `workflow:${row.workflow.id}:output:${record.index}:${target.outputId}:to:${targetWorkflow.id}:trigger`,
           sourceNodeKey,
           targetNodeKey,
-          sourceHandleId: workflowOutputSourceHandleId(),
+          sourceHandleId: workflowOutputSourceHandleId(target),
           targetHandleId: "left",
           eventType: target.eventType,
           label: target.outputId,
