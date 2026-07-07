@@ -9,7 +9,7 @@ export const workflowNodeSizes = {
 };
 
 export const workflowCanvasLayoutConfig = {
-  startX: 32,
+  startX: 72,
   startY: 64,
   columnGap: 72,
   branchGap: 28,

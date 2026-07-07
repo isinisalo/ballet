@@ -172,7 +172,7 @@ describe("workflow layout helper modules", () => {
 
     const policyNode = nodes.find((node) => node.key === "policy-0");
 
-    expect(policyNode?.x).toBeLessThan(300);
+    expect(policyNode ? policyNode.x - workflowCanvasLayoutConfig.startX : undefined).toBeLessThan(300);
   });
 
   it("keeps default smart edge routing for same-row edges and tightens cross-row routing", () => {
@@ -1238,7 +1238,7 @@ describe("toWorkflowReactFlowEdges", () => {
       selected: false,
       sourceX: 1000,
       sourceY: 76,
-      targetX: 32,
+      targetX: workflowCanvasLayoutConfig.startX,
       targetY: 280,
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -1255,8 +1255,8 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(path.path).not.toContain("C");
     expect(path.path.match(/Q/g)).toHaveLength(4);
     expect(path.path).toContain("M1000 76L 1040,76Q 1064,76 1064,100");
-    expect(path.path).toContain("L -32,256Q -32,280 -8,280L32 280");
-    expect(path.labelX).toBe(516);
+    expect(path.path).toContain("L 8,256Q 8,280 32,280L72 280");
+    expect(path.labelX).toBe(536);
     expect(path.labelY).toBe(178);
   });
 
