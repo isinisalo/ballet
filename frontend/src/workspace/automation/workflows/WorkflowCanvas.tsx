@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { WorkflowReactFlowNodeComponent } from "./WorkflowReactFlowNode";
 import { WorkflowSmartEdge } from "./WorkflowSmartEdge";
 import type { WorkflowCanvasProps, WorkflowNodeContext, WorkflowReactFlowEdge, WorkflowReactFlowNode } from "./WorkflowCanvasTypes";
+import { workflowCrossWorkflowEdgeSlotKind } from "./workflowCrossWorkflowEdgeSlot";
 import { workflowCanvasNodeAnchorY } from "./workflowLayout";
 
 const workflowNodeTypes = {
@@ -17,21 +18,28 @@ const workflowEdgeTypes = {
 const workflowSolidEdgeStroke = "color-mix(in srgb, var(--primary) 70%, transparent)";
 const workflowDashedEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 35%, transparent)";
 const workflowReturnEdgeStroke = "color-mix(in srgb, var(--tertiary) 85%, transparent)";
-const workflowCrossWorkflowEdgeStroke = "color-mix(in srgb, var(--secondary) 72%, transparent)";
+const workflowCrossWorkflowApprovalEdgeStroke = "color-mix(in srgb, var(--secondary) 72%, transparent)";
+const workflowCrossWorkflowReworkEdgeStroke = "color-mix(in srgb, var(--destructive) 72%, transparent)";
 
 function workflowEdgeDomAttributes(edge: WorkflowCanvasProps["layout"]["edges"][number], isAnimated = false): WorkflowReactFlowEdge["domAttributes"] {
+  const outputSlotKind = workflowCrossWorkflowEdgeSlotKind(edge);
   return {
     "data-workflow-connector": "true",
     "data-dashed": edge.dashed && edge.tone !== "return" ? "true" : "false",
     "data-workflow-edge-tone": edge.tone ?? "flow",
     "data-workflow-edge-animated": isAnimated ? "true" : "false",
+    ...(outputSlotKind ? { "data-workflow-edge-output-slot-kind": outputSlotKind } : {}),
     ...(edge.label ? { "data-workflow-edge-label-value": edge.label } : {})
   } as WorkflowReactFlowEdge["domAttributes"];
 }
 
 function workflowEdgeStroke(edge: WorkflowCanvasProps["layout"]["edges"][number]) {
   if (edge.tone === "return") return workflowReturnEdgeStroke;
-  if (edge.tone === "cross-workflow") return workflowCrossWorkflowEdgeStroke;
+  if (edge.tone === "cross-workflow") {
+    return workflowCrossWorkflowEdgeSlotKind(edge) === "rework"
+      ? workflowCrossWorkflowReworkEdgeStroke
+      : workflowCrossWorkflowApprovalEdgeStroke;
+  }
   return edge.dashed ? workflowDashedEdgeStroke : workflowSolidEdgeStroke;
 }
 

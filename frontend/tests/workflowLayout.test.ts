@@ -1075,14 +1075,41 @@ describe("toWorkflowReactFlowEdges", () => {
       targetNodeKey: "workflow:target:trigger",
       sourceHandleId: "right",
       targetHandleId: "left",
-      tone: "cross-workflow"
+      tone: "cross-workflow",
+      route: {
+        outputId: "approved"
+      }
     }]);
 
     expect(edge.domAttributes).toMatchObject({
-      "data-workflow-edge-tone": "cross-workflow"
+      "data-workflow-edge-tone": "cross-workflow",
+      "data-workflow-edge-output-slot-kind": "approval"
     });
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--secondary) 72%, transparent)",
+      strokeWidth: 2
+    });
+  });
+
+  it("maps rework cross-workflow edges to the destructive stroke", () => {
+    const [edge] = toWorkflowReactFlowEdges([{
+      key: "workflow:source:output:0:changes_requested:to:target:trigger",
+      sourceNodeKey: "workflow:source:policy-0",
+      targetNodeKey: "workflow:target:trigger",
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      tone: "cross-workflow",
+      route: {
+        outputId: "changes_requested"
+      }
+    }]);
+
+    expect(edge.domAttributes).toMatchObject({
+      "data-workflow-edge-tone": "cross-workflow",
+      "data-workflow-edge-output-slot-kind": "rework"
+    });
+    expect(edge.style).toMatchObject({
+      stroke: "color-mix(in srgb, var(--destructive) 72%, transparent)",
       strokeWidth: 2
     });
   });
