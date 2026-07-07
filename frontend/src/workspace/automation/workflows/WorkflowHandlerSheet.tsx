@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ActionEditorFields } from "../actions/ActionEditorFields";
 import { HumanGateResponsePanel } from "./HumanGateResponsePanel";
 import { WorkflowOutputHandlerControls } from "./WorkflowOutputHandlerControls";
+import { workflowActionTokenClassName, workflowOutputTokenClassName } from "./workflowSheetTokenStyles";
 
 type WorkflowHandlerSheetOpenChangeDetails = {
   reason?: string;
@@ -154,7 +155,7 @@ export function WorkflowHandlerSheet({
                               className="h-5 min-h-5 w-fit max-w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
                               title={route.actionId}
                             >
-                              <SelectValue />
+                              <SelectValue className={workflowActionTokenClassName()} />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
@@ -212,12 +213,12 @@ function WorkflowHandlerRouteEvent({ route }: { route: WorkflowHandlerRoute }) {
     <div className="min-w-0 truncate font-mono text-xs" title={route.eventType ?? route.sourceLabel}>
       {route.outputId ? (
         <>
-          <span className="text-tertiary">{route.sourceLabel}</span>
+          <span className={workflowActionTokenClassName()}>{route.sourceLabel}</span>
           <span className="text-muted-foreground">.</span>
-          <span className="text-primary">{route.outputId}</span>
+          <span className={workflowOutputTokenClassName(route.outputId)}>{route.outputId}</span>
         </>
       ) : (
-        <span className="text-tertiary">{route.sourceLabel}</span>
+        <span className={workflowActionTokenClassName()}>{route.sourceLabel}</span>
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { WorkflowHandlerRoute } from "./WorkflowHandlerSheet";
 import { workflowOutputHandlerForOutput } from "./workflowOutputHandlers";
+import { workflowActionTokenClassName, workflowOutputTokenClassName } from "./workflowSheetTokenStyles";
 
 export function WorkflowOutputHandlerControls({
   config,
@@ -26,7 +27,7 @@ export function WorkflowOutputHandlerControls({
             const handler = workflowOutputHandlerForOutput(config, route.workflowId, route.policyId, outputId);
             return (
               <div key={outputId} className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] items-center gap-2">
-                <span className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={outputId}>
+                <span className={`min-w-0 truncate font-mono text-xs ${workflowOutputTokenClassName(outputId)}`} title={outputId}>
                   {outputId}
                 </span>
                 {handler ? (
@@ -40,7 +41,7 @@ export function WorkflowOutputHandlerControls({
                       className="h-5 min-h-5 min-w-0 w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
                       title={handler.label}
                     >
-                      <SelectValue />
+                      <SelectValue className={workflowActionTokenClassName()} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>

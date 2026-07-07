@@ -819,7 +819,7 @@ describe("workspace entity UI flows", () => {
     const workflowHandlerDialog = screen.getByRole("dialog", { name: "Workflow handler" });
     expect(within(workflowHandlerDialog).getAllByText("project_brief_approved").length).toBeGreaterThan(0);
     expect(within(workflowHandlerDialog).getAllByText("challenge-roadmap").find((element) => element.className.includes("text-tertiary"))).toBeDefined();
-    expect(within(workflowHandlerDialog).getAllByText("changes_requested").find((element) => element.className.includes("text-primary"))).toBeDefined();
+    expect(within(workflowHandlerDialog).getAllByText("changes_requested").find((element) => element.className.includes("text-destructive"))).toBeDefined();
     expect(within(workflowHandlerDialog).getAllByLabelText("Handler action")).toHaveLength(2);
   });
 
@@ -1127,13 +1127,29 @@ describe("workspace entity UI flows", () => {
     expectActionSelectValue("implementation");
     expect(within(dialog).getByLabelText("Handler action")).toHaveClass("border-primary/60", "bg-primary/10", "text-primary");
     expect(within(dialog).getByLabelText("Handler action")).not.toHaveTextContent("Implement work");
+    expect(within(dialog).getByLabelText("Handler action").querySelector("[data-slot=\"select-value\"]")).toHaveClass(
+      "text-tertiary",
+      "decoration-tertiary",
+      "underline",
+      "underline-offset-4",
+      "decoration-2"
+    );
     expect(within(dialog).getByText("Input")).toBeInTheDocument();
     expect(badgeWithTextClass("implementation.failed", "border-primary/60")).toBeUndefined();
-    expect(within(dialog).getByTitle("implementation.failed")).toBeInTheDocument();
+    const inputRoute = within(dialog).getByTitle("implementation.failed");
+    expect(inputRoute).toBeInTheDocument();
+    expect(within(inputRoute).getByText("implementation")).toHaveClass("text-tertiary", "decoration-tertiary", "underline");
+    expect(within(inputRoute).getByText("failed")).toHaveClass("text-destructive", "decoration-destructive", "underline");
   });
 
   it("renders workflow output handler actions instead of output event targets", async () => {
     const workflowData = baseData();
+    workflowData.automation.actions[0] = {
+      id: "implementation",
+      description: "Implement work",
+      outputIds: ["approved", "changes_requested"],
+      agentIds: ["agent-1"]
+    };
     workflowData.automation.actions.push({
       id: "review-pass",
       description: "Review output.",
@@ -1141,15 +1157,22 @@ describe("workspace entity UI flows", () => {
       agentIds: ["agent-1"]
     });
     workflowData.automation.policies.push({
-      id: "on.implementation.complete.start.review-pass",
+      id: "on.implementation.approved.start.review-pass",
       source: "event",
-      event: "implementation.complete",
+      event: "implementation.approved",
+      action: "review-pass",
+      enabled: true
+    }, {
+      id: "on.implementation.changes_requested.start.review-pass",
+      source: "event",
+      event: "implementation.changes_requested",
       action: "review-pass",
       enabled: true
     });
     workflowData.automation.workflows[0]!.steps = [
       "on.implementation.failed.start.implementation",
-      "on.implementation.complete.start.review-pass"
+      "on.implementation.approved.start.review-pass",
+      "on.implementation.changes_requested.start.review-pass"
     ];
     await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
@@ -1160,11 +1183,20 @@ describe("workspace entity UI flows", () => {
     expect(within(dialog).queryByText("Output targets")).not.toBeInTheDocument();
     const reviewPassControl = controlWithTextClass(dialog, "review-pass", "border-primary/60");
     expect(reviewPassControl).toBeDefined();
-    expect(within(dialog).queryByText("implementation.complete")).not.toBeInTheDocument();
-    const outputLabel = within(dialog).getByText("complete");
-    expect(outputLabel).toHaveClass("text-muted-foreground");
-    expect(outputLabel.closest("[data-slot=\"badge\"]")).toBeNull();
-    expect(outputLabel.closest("button")).toBeNull();
+    expect(reviewPassControl!.closest("button")?.querySelector("[data-slot=\"select-value\"]")).toHaveClass(
+      "text-tertiary",
+      "decoration-tertiary",
+      "underline"
+    );
+    expect(within(dialog).queryByText("implementation.approved")).not.toBeInTheDocument();
+    const approvedLabel = within(dialog).getByText("approved");
+    expect(approvedLabel).toHaveClass("text-secondary", "decoration-secondary", "underline");
+    expect(approvedLabel.closest("[data-slot=\"badge\"]")).toBeNull();
+    expect(approvedLabel.closest("button")).toBeNull();
+    const changesRequestedLabel = within(dialog).getByText("changes_requested");
+    expect(changesRequestedLabel).toHaveClass("text-destructive", "decoration-destructive", "underline");
+    expect(changesRequestedLabel.closest("[data-slot=\"badge\"]")).toBeNull();
+    expect(changesRequestedLabel.closest("button")).toBeNull();
   });
 
   it("renders missing workflow output handlers as None", async () => {
