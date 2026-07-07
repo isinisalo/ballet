@@ -3,7 +3,8 @@ import type { ProjectPolicy } from "@shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "@shared/policy-actions";
 import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
-import { workflowEdgeLabelTransforms, workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
+import { workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
+import { workflowRoutedEdgeLabelAnchor } from "../src/workspace/automation/workflows/workflowEdgeLabelGeometry";
 import { calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 import { positionWorkflowNodes } from "../src/workspace/automation/workflows/workflowLayoutPositioning";
 
@@ -412,6 +413,99 @@ describe("calculateWorkflowCanvasLayout", () => {
       : undefined);
   });
 
+  it("reserves clearance below output ghost nodes before the next horizontal lane", () => {
+    const createMilestones = policy("create-milestones", undefined, "create-milestones");
+    createMilestones.trigger = "technical_plan_approved";
+    const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
+    const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes_requested", "create-milestones");
+    const createTaskSpecs = policy("create-task-specs", undefined, "create-task-specs");
+    createTaskSpecs.trigger = "milestones_approved";
+    const challengeTaskSpecs = policy("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
+    const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes_requested", "create-task-specs");
+    const layout = calculateWorkflowCanvasLayout({
+      workflowGraph: buildWorkflowGraph([
+        {
+          policyId: createMilestones.id,
+          index: 0,
+          policy: createMilestones,
+          outputTargets: [
+            { outputId: "ready", eventType: "create-milestones.ready", type: "event" },
+            { outputId: "blocked", eventType: "create-milestones.blocked", type: "event" }
+          ]
+        },
+        {
+          policyId: challengeMilestones.id,
+          index: 1,
+          policy: challengeMilestones,
+          outputTargets: [
+            { outputId: "approved", eventType: "challenge-milestones.approved", type: "event" },
+            { outputId: "changes_requested", eventType: "challenge-milestones.changes_requested", type: "event" }
+          ]
+        },
+        {
+          policyId: reworkMilestones.id,
+          index: 2,
+          policy: reworkMilestones,
+          outputTargets: [
+            { outputId: "ready", eventType: "create-milestones.ready", type: "event" },
+            { outputId: "blocked", eventType: "create-milestones.blocked", type: "event" }
+          ]
+        },
+        {
+          policyId: createTaskSpecs.id,
+          index: 3,
+          policy: createTaskSpecs,
+          outputTargets: [
+            { outputId: "ready", eventType: "create-task-specs.ready", type: "event" },
+            { outputId: "blocked", eventType: "create-task-specs.blocked", type: "event" }
+          ]
+        },
+        {
+          policyId: challengeTaskSpecs.id,
+          index: 4,
+          policy: challengeTaskSpecs,
+          outputTargets: [
+            { outputId: "approved", eventType: "challenge-task-specs.approved", type: "event" },
+            { outputId: "changes_requested", eventType: "challenge-task-specs.changes_requested", type: "event" }
+          ]
+        },
+        {
+          policyId: reworkTaskSpecs.id,
+          index: 5,
+          policy: reworkTaskSpecs,
+          outputTargets: [
+            { outputId: "ready", eventType: "create-task-specs.ready", type: "event" },
+            { outputId: "blocked", eventType: "create-task-specs.blocked", type: "event" }
+          ]
+        }
+      ]),
+      editingPolicyIndex: null
+    });
+    const createMilestonesNode = layout.nodes.find((node) => node.key === "policy-0");
+    const challengeMilestonesNode = layout.nodes.find((node) => node.key === "policy-1");
+    const createTaskSpecsNode = layout.nodes.find((node) => node.key === "policy-3");
+    const blockedOutputNode = layout.nodes.find((node) => node.key === "output-event-0-blocked");
+
+    expect(createMilestonesNode).toBeDefined();
+    expect(challengeMilestonesNode).toBeDefined();
+    expect(createTaskSpecsNode).toBeDefined();
+    expect(blockedOutputNode).toBeDefined();
+    expect(blockedOutputNode?.y).toBe(challengeMilestonesNode
+      ? challengeMilestonesNode.y + workflowPolicyStackHeight() + workflowNodeSizes.outputEvent.rowGap
+      : undefined);
+    expect(createTaskSpecsNode?.y).toBe(createMilestonesNode
+      ? createMilestonesNode.y +
+        workflowPolicyStackHeight() +
+        workflowNodeSizes.outputEvent.rowGap +
+        workflowNodeSizes.outputEvent.height +
+        workflowCanvasLayoutConfig.outputEventLaneClearance +
+        workflowCanvasLayoutConfig.branchGap
+      : undefined);
+    expect(createTaskSpecsNode && blockedOutputNode
+      ? createTaskSpecsNode.y - (blockedOutputNode.y + blockedOutputNode.height)
+      : undefined).toBe(workflowCanvasLayoutConfig.outputEventLaneClearance + workflowCanvasLayoutConfig.branchGap);
+  });
+
   it("lays out child event policies below the source policy in vertical mode", () => {
     const first = policy("first", undefined, "build");
     const child = policy("child", "build.complete", "deploy");
@@ -577,22 +671,39 @@ describe("calculateWorkflowCanvasLayout", () => {
 });
 
 describe("toWorkflowReactFlowEdges", () => {
-  it("places cross-row forward edge labels between the source and target rows", () => {
-    expect(workflowEdgeLabelTransforms({
-      isReturnEdge: false,
-      sourceX: 100,
-      sourceY: 120,
-      targetX: 300,
-      targetY: 180
-    }).labelTransform).toBe("translate(-50%, -50%) translate(200px, 150px)");
+  it("anchors stepped workflow edge labels to the longest horizontal segment", () => {
+    expect(workflowRoutedEdgeLabelAnchor({
+      source: { x: 412, y: 75.5 },
+      points: [
+        { x: 420, y: 75.5 },
+        { x: 430, y: 75.5 },
+        { x: 430, y: 100 },
+        { x: 430, y: 113.5 },
+        { x: 630, y: 113.5 }
+      ],
+      target: { x: 644, y: 113.5 },
+      fallback: { x: 785, y: 145 }
+    })).toEqual({ x: 530, y: 113.5 });
 
-    expect(workflowEdgeLabelTransforms({
-      isReturnEdge: false,
-      sourceX: 100,
-      sourceY: 120,
-      targetX: 300,
-      targetY: 120
-    }).labelTransform).toBe("translate(-50%, -50%) translate(200px, 120px)");
+    expect(workflowRoutedEdgeLabelAnchor({
+      source: { x: 412, y: 75.5 },
+      points: [
+        { x: 420, y: 75.5 },
+        { x: 430, y: 75.5 },
+        { x: 630, y: 75.5 }
+      ],
+      target: { x: 644, y: 75.5 },
+      fallback: { x: 785, y: 126 }
+    })).toEqual({ x: 530, y: 75.5 });
+  });
+
+  it("falls back to the smart edge center when there is no horizontal label segment", () => {
+    expect(workflowRoutedEdgeLabelAnchor({
+      source: { x: 0, y: 0 },
+      points: [{ x: 10, y: 10 }],
+      target: { x: 20, y: 20 },
+      fallback: { x: 11, y: 12 }
+    })).toEqual({ x: 11, y: 12 });
   });
 
   it("centers return edge labels on the top or bottom return segment", () => {

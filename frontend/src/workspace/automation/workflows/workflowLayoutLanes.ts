@@ -88,7 +88,10 @@ export function workflowHorizontalLaneYOffsets(
     if (childLaneIndex === undefined) return;
     laneHeights[childLaneIndex] = Math.max(
       laneHeights[childLaneIndex],
-      workflowBranchStackHeight(lastChildNode) + workflowNodeSizes.outputEvent.rowGap + outputStackHeightValue
+      workflowBranchStackHeight(lastChildNode) +
+        workflowNodeSizes.outputEvent.rowGap +
+        outputStackHeightValue +
+        workflowCanvasLayoutConfig.outputEventLaneClearance
     );
   });
 

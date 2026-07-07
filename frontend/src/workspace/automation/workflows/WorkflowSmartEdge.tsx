@@ -1,7 +1,8 @@
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
-import { SmartStepEdge } from "@tisoap/react-flow-smart-edge";
+import { BaseEdge, EdgeLabelRenderer, useNodes, type EdgeProps, type Node } from "@xyflow/react";
+import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
 import { cn } from "@/lib/utils";
 import type { WorkflowReactFlowEdge } from "./WorkflowCanvasTypes";
+import { workflowRoutedEdgeLabelAnchor, type WorkflowEdgePoint } from "./workflowEdgeLabelGeometry";
 
 const workflowEdgeLabelClassName = "absolute z-20 inline-flex whitespace-nowrap bg-background/95 py-0.5 pl-1.5 pr-0.5 font-mono text-[0.58rem] leading-4";
 const workflowEdgeLabelCenterRatio = 0.5;
@@ -11,25 +12,23 @@ const workflowEdgeLabelVerticalOffset = 4;
 
 export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
   const { data, sourceX, sourceY, targetX, targetY } = props;
+  const nodes = useNodes();
   const workflowEdge = data?.workflowEdge;
   const label = workflowEdge?.label;
   const isReturnEdge = workflowEdge?.tone === "return";
   const targetKind = data?.targetNode?.kind;
   const showEndLabel = targetKind === "policy";
   const returnEdgePath = isReturnEdge ? workflowReturnEdgePath(props) : undefined;
+  const smartEdgePath = returnEdgePath ? undefined : workflowSmartEdgePath(props, nodes);
   const { startLabelTransform, labelTransform, endLabelTransform } = workflowEdgeLabelTransforms({
     isReturnEdge,
     returnEdgePath,
+    smartEdgePath,
     sourceX,
     sourceY,
     targetX,
     targetY
   });
-  const smartStepEdgeProps = {
-    ...props,
-    data: data ?? {},
-    type: props.type ?? "workflowSmart"
-  };
 
   return (
     <>
@@ -42,9 +41,26 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
           markerEnd={props.markerEnd}
           interactionWidth={props.interactionWidth}
         />
-      ) : (
-        <SmartStepEdge {...smartStepEdgeProps} />
-      )}
+      ) : smartEdgePath ? (
+        <BaseEdge
+          id={props.id}
+          path={smartEdgePath.path}
+          style={props.style}
+          markerStart={props.markerStart}
+          markerEnd={props.markerEnd}
+          interactionWidth={props.interactionWidth}
+        />
+      ) : null}
+      {!returnEdgePath && !smartEdgePath ? (
+        <BaseEdge
+          id={props.id}
+          path={`M ${sourceX},${sourceY} L ${targetX},${targetY}`}
+          style={props.style}
+          markerStart={props.markerStart}
+          markerEnd={props.markerEnd}
+          interactionWidth={props.interactionWidth}
+        />
+      ) : null}
       <WorkflowEdgeLabels
         label={label}
         tone={data?.workflowEdge.tone ?? "flow"}
@@ -61,6 +77,7 @@ export function WorkflowSmartEdge(props: EdgeProps<WorkflowReactFlowEdge>) {
 export function workflowEdgeLabelTransforms({
   isReturnEdge,
   returnEdgePath,
+  smartEdgePath,
   sourceX,
   sourceY,
   targetX,
@@ -68,29 +85,76 @@ export function workflowEdgeLabelTransforms({
 }: {
   isReturnEdge: boolean;
   returnEdgePath?: ReturnType<typeof workflowReturnEdgePath>;
+  smartEdgePath?: ReturnType<typeof workflowSmartEdgePath>;
   sourceX: number;
   sourceY: number;
   targetX: number;
   targetY: number;
 }) {
-  const labelX = returnEdgePath?.labelX ?? (sourceX + targetX) / 2;
-  const labelY = returnEdgePath?.labelY ?? (sourceY + targetY) / 2;
   const startLabelX = returnEdgePath?.startLabelX ?? sourceX + workflowEdgeLabelSourceOffset;
   const startLabelY = returnEdgePath?.startLabelY ?? sourceY;
   const endLabelX = returnEdgePath?.endLabelX ?? targetX;
   const endLabelY = returnEdgePath?.endLabelY ?? targetY;
-  const flowLabelX = sourceX + (targetX - sourceX) * workflowEdgeLabelCenterRatio;
+
+  if (isReturnEdge) {
+    const labelX = returnEdgePath?.labelX ?? (sourceX + targetX) / 2;
+    const labelY = returnEdgePath?.labelY ?? (sourceY + targetY) / 2;
+
+    return {
+      startLabelTransform: `translate(-50%, -100%) translate(${startLabelX}px, ${startLabelY}px)`,
+      labelTransform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+      endLabelTransform: `translate(-50%, -100%) translate(${endLabelX}px, ${endLabelY}px)`
+    };
+  }
+
+  const smartLabelAnchor = smartEdgePath
+    ? workflowRoutedEdgeLabelAnchor({
+      source: { x: sourceX, y: sourceY },
+      points: smartEdgePath.points,
+      target: { x: targetX, y: targetY },
+      fallback: smartEdgePath.fallbackLabelAnchor
+    })
+    : undefined;
+  const flowLabelX = smartLabelAnchor?.x ?? sourceX + (targetX - sourceX) * workflowEdgeLabelCenterRatio;
+  const flowLabelY = smartLabelAnchor?.y ?? (sourceY + targetY) / 2;
 
   return {
-    startLabelTransform: isReturnEdge
-      ? `translate(-50%, -100%) translate(${startLabelX}px, ${startLabelY}px)`
-      : `translate(0, -50%) translate(${startLabelX}px, ${startLabelY}px)`,
-    labelTransform: isReturnEdge
-      ? `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`
-      : `translate(-50%, -50%) translate(${flowLabelX}px, ${labelY}px)`,
-    endLabelTransform: isReturnEdge
-      ? `translate(-50%, -100%) translate(${endLabelX}px, ${endLabelY}px)`
-      : `translate(-100%, -50%) translate(${targetX - workflowEdgeLabelTargetOffset}px, ${targetY}px)`
+    startLabelTransform: `translate(0, -50%) translate(${startLabelX}px, ${startLabelY}px)`,
+    labelTransform: `translate(-50%, -50%) translate(${flowLabelX}px, ${flowLabelY}px)`,
+    endLabelTransform: `translate(-100%, -50%) translate(${targetX - workflowEdgeLabelTargetOffset}px, ${targetY}px)`
+  };
+}
+
+function workflowSmartEdgePath(
+  {
+    sourcePosition,
+    targetPosition,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY
+  }: EdgeProps<WorkflowReactFlowEdge>,
+  nodes: Node[]
+) {
+  const smartEdgeResponse = getSmartEdge({
+    sourcePosition,
+    targetPosition,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    nodes,
+    options: smartEdgePresets.step
+  });
+
+  if (smartEdgeResponse instanceof Error) return undefined;
+  return {
+    path: smartEdgeResponse.svgPathString,
+    points: smartEdgeResponse.points.map(([x, y]): WorkflowEdgePoint => ({ x: x ?? 0, y: y ?? 0 })),
+    fallbackLabelAnchor: {
+      x: smartEdgeResponse.edgeCenterX,
+      y: smartEdgeResponse.edgeCenterY
+    }
   };
 }
 
