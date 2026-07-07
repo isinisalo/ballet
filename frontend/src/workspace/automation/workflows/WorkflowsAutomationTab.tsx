@@ -12,7 +12,6 @@ import { automationFieldLimits, automationStringValidationMessage, automationTok
 import { actionOutputIds, generatedPolicyId, humanGateResponseId, normalizePolicyToken, projectOutputRouteEventType, policyOutputEventType } from "@shared/policy-actions";
 import { EmptyState, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
-import { nextConfigWithActionPatch } from "../actions/actionEditorLogic";
 import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { AllWorkflowsCanvas } from "./AllWorkflowsCanvas";
@@ -254,14 +253,6 @@ export function WorkflowsAutomationTab({
     if (!selected || workflowId !== selected.id) return;
     updateConfig((current) => nextConfigWithWorkflowHandlerAction(current, selected.id, stepIndex, actionId));
   };
-  const updateActionPatch = (actionId: string, patch: Partial<ProjectAutomationConfig["actions"][number]>) => {
-    updateConfig((current) => nextConfigWithActionPatch(current, actionId, patch).config);
-  };
-  const createOutput = (outputId: string) => {
-    const id = normalizePolicyToken(outputId);
-    if (!id || config.outputs.some((output) => normalizePolicyToken(output.id) === id)) return;
-    updateConfig((current) => ({ ...current, outputs: [...current.outputs, { id }] }));
-  };
   const submitHumanGateResponse = async (route: WorkflowHandlerRoute, outputId: string, prompt: string) => {
     const policy = config.policies.find((candidate) => candidate.id === route.policyId);
     const action = config.actions.find((candidate) => candidate.id === route.actionId);
@@ -380,8 +371,6 @@ export function WorkflowsAutomationTab({
           if (!open && details?.reason === "close-press") clearHandlerSelection();
         }}
         onRouteActionChange={updateHandlerRouteAction}
-        onActionPatch={updateActionPatch}
-        onCreateOutput={createOutput}
         onRemoveRoute={removeHandlerRoute}
         onOutputHandlerActionChange={updateHandlerRouteAction}
         onHumanGateSubmit={(route, outputId, prompt) => void submitHumanGateResponse(route, outputId, prompt)}

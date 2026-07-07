@@ -30,7 +30,7 @@ export function WorkflowOutputHandlerControls({
                 <span className={`min-w-0 truncate font-mono text-xs ${workflowOutputTokenClassName(outputId)}`} title={outputId}>
                   {outputId}
                 </span>
-                {handler ? (
+                {handler?.type === "action" ? (
                   <Select
                     value={handler.actionId}
                     items={config.actions.map((option) => ({ value: option.id, label: option.id }))}
@@ -53,6 +53,13 @@ export function WorkflowOutputHandlerControls({
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                ) : handler?.type === "trigger" ? (
+                  <span
+                    className="min-w-0 truncate rounded-xl border border-tertiary/60 bg-tertiary/10 px-2 py-0.5 font-mono text-xs text-tertiary"
+                    title={handler.label}
+                  >
+                    {handler.label}
+                  </span>
                 ) : (
                   <span className="font-mono text-xs text-muted-foreground">None</span>
                 )}

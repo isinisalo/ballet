@@ -1204,13 +1204,13 @@ describe("workspace entity UI flows", () => {
     workflowData.automation.actions[0] = {
       id: "implementation",
       description: "Review generated evidence.",
-      outputIds: ["complete", "failed"],
+      outputIds: ["approved", "changes_requested"],
       agentIds: [],
       humanGate: true
     };
     workflowData.automation.outputRoutes = [{
       sourcePolicyId: "on.implementation.failed.start.implementation",
-      outputId: "complete",
+      outputId: "approved",
       target: { type: "trigger", trigger: "manual-start" }
     }];
 
@@ -1221,8 +1221,10 @@ describe("workspace entity UI flows", () => {
 
     expect(within(dialog).queryByText("Output targets")).not.toBeInTheDocument();
     expect(within(dialog).getByText("Output routing")).toBeInTheDocument();
-    expect(within(dialog).getAllByText("None").length).toBeGreaterThan(0);
-    expect(controlWithTextClass(dialog, "manual-start", "border-tertiary/60")).toBeUndefined();
+    const manualStartTarget = within(dialog).getByText("manual-start");
+    expect(manualStartTarget).toHaveClass("border-tertiary/60", "bg-tertiary/10", "text-tertiary");
+    expect(manualStartTarget.closest("button")).toBeNull();
+    expect(within(dialog).getAllByText("None").length).toBe(1);
   });
 
   it("creates an automation action and keeps workflow action editing sheet-based", async () => {
@@ -1425,45 +1427,61 @@ describe("workspace entity UI flows", () => {
     workflowData.automation.actions[0] = {
       id: "implementation",
       description: "Review generated evidence.",
-      outputIds: ["complete", "failed"],
+      outputIds: ["approved", "changes_requested"],
       agentIds: [],
       humanGate: true
     };
+    workflowData.automation.triggers.push({
+      id: "project_brief_approved",
+      description: "Project brief approved"
+    });
+    workflowData.automation.outputRoutes = [{
+      sourcePolicyId: "on.implementation.failed.start.implementation",
+      outputId: "approved",
+      target: { type: "trigger", trigger: "project_brief_approved", workflowId: "next-workflow" }
+    }];
     const { data } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
     const policyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
     expect(policyNode).toHaveTextContent("implementation");
     expect(policyNode).not.toHaveTextContent("Human Gate");
     expect(policyNode).toHaveClass("border-tertiary/60");
-    expect(screen.getByRole("button", { name: "Add policy step for implementation.complete" })).toBeInTheDocument();
-
     activateWorkflowNode(policyNode);
     const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
-    expect(within(dialog).getByLabelText("Action ID")).toHaveValue("implementation");
+    expect(within(dialog).queryByLabelText("Action ID")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("switch", { name: "Human gate" })).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Handler action")).toHaveTextContent("implementation");
+    expect(within(dialog).getByLabelText("Handler action")).toHaveClass("border-primary/60", "bg-primary/10", "text-primary");
     expect(within(dialog).getByLabelText("Description")).toHaveValue("Review generated evidence.");
     expect(within(dialog).getByText("Human operator")).toBeInTheDocument();
+    expect(within(dialog).getByText("Output routing")).toBeInTheDocument();
+    const approvalTarget = within(dialog).getByText("project_brief_approved");
+    expect(approvalTarget).toHaveClass("border-tertiary/60", "bg-tertiary/10", "text-tertiary");
+    expect(approvalTarget.closest("button")).toBeNull();
+    expect(within(dialog).getByText("changes_requested")).toBeInTheDocument();
+    expect(within(dialog).getByText("None")).toBeInTheDocument();
     expect(within(dialog).getByText("Waiting for human")).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "Approval · complete" }));
+    await user.click(within(dialog).getByRole("button", { name: "Approval · approved" }));
     expect(within(dialog).getByText("Prompt to agent is required before continuing.")).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Prompt to agent"), "Approved with trace evidence.");
-    await user.click(within(dialog).getByRole("button", { name: "Approval · complete" }));
+    await user.click(within(dialog).getByRole("button", { name: "Approval · approved" }));
 
     await waitFor(() => expect(data.automation.humanGateResponses).toContainEqual(expect.objectContaining({
       policyId: "on.implementation.failed.start.implementation",
       actionId: "implementation",
-      outputId: "complete",
+      outputId: "approved",
       workflowId: "workflow-1",
       prompt: "Approved with trace evidence."
     })));
     await waitFor(() => expect(data.events).toContainEqual(expect.objectContaining({
-      eventType: "implementation.complete",
+      eventType: "trigger.project_brief_approved",
       source: "human-gate",
       payload: expect.objectContaining({
         workflow_id: "workflow-1",
         policy_id: "on.implementation.failed.start.implementation",
         action: "implementation",
-        output_id: "complete",
+        output_id: "approved",
         prompt: "Approved with trace evidence."
       })
     })));
