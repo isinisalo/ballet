@@ -1067,7 +1067,8 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(edge.data?.workflowEdge.label).toBe("complete");
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))",
-      strokeWidth: 2
+      strokeWidth: 2,
+      opacity: 0.75
     });
     expect(edge.style?.strokeDasharray).toBeUndefined();
     expect(edge.style?.strokeLinecap).toBeUndefined();
@@ -1119,7 +1120,8 @@ describe("toWorkflowReactFlowEdges", () => {
     });
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))",
-      strokeWidth: 2
+      strokeWidth: 2,
+      opacity: 0.75
     });
     expect(edge.style?.strokeDasharray).toBeUndefined();
     expect(edge.style?.strokeLinecap).toBeUndefined();
@@ -1142,7 +1144,8 @@ describe("toWorkflowReactFlowEdges", () => {
     });
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--destructive) 58%, var(--muted-foreground))",
-      strokeWidth: 2
+      strokeWidth: 2,
+      opacity: 0.75
     });
     expect(edge.style?.strokeDasharray).toBeUndefined();
     expect(edge.style?.strokeLinecap).toBeUndefined();
@@ -1166,7 +1169,8 @@ describe("toWorkflowReactFlowEdges", () => {
     expect(edge.style).toMatchObject({
       stroke: "color-mix(in srgb, var(--muted-foreground) 35%, transparent)",
       strokeWidth: 2,
-      strokeDasharray: "6 5"
+      strokeDasharray: "6 5",
+      opacity: 0.6
     });
     expect(edge.style?.strokeLinecap).toBeUndefined();
   });
@@ -1192,7 +1196,8 @@ describe("toWorkflowReactFlowEdges", () => {
       stroke: "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))",
       strokeWidth: 2,
       strokeDasharray: "1 5",
-      strokeLinecap: "round"
+      strokeLinecap: "round",
+      opacity: 0.75
     });
   });
 
@@ -1217,7 +1222,8 @@ describe("toWorkflowReactFlowEdges", () => {
       stroke: "color-mix(in srgb, var(--destructive) 58%, var(--muted-foreground))",
       strokeWidth: 2,
       strokeDasharray: "1 5",
-      strokeLinecap: "round"
+      strokeLinecap: "round",
+      opacity: 0.75
     });
   });
 
@@ -1272,9 +1278,13 @@ describe("toWorkflowReactFlowEdges", () => {
 
     expect(edges.map((edge) => edge.animated)).toEqual([false, true]);
     expect(edges[0]?.domAttributes?.["data-workflow-edge-animated"]).toBe("false");
+    expect(edges[0]?.style?.opacity).toBe(0.75);
     expect(edges[1]).toMatchObject({
       animated: true,
       className: "workflow-edge-animated",
+      style: {
+        opacity: 1
+      },
       domAttributes: {
         "data-workflow-edge-animated": "true"
       }
