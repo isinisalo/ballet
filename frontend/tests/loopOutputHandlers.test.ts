@@ -1,10 +1,10 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { loopIdFromTrigger } from "@shared/policy-actions";
+import { loopIdForPolicy } from "@shared/policy-actions";
 import { describe, expect, it } from "vitest";
 import { loopOutputHandlerForOutput } from "../src/workspace/automation/loops/loopOutputHandlers";
 
-const loopId = loopIdFromTrigger("manual-start");
-const returnLoopId = loopIdFromTrigger("manual-rework");
+const loopId = loopIdForPolicy({ event: "manual-start" });
+const returnLoopId = loopIdForPolicy({ event: "manual-rework" });
 
 const config = (): ProjectAutomationConfig => ({
   version: 1,
@@ -22,10 +22,10 @@ const config = (): ProjectAutomationConfig => ({
   }],
   humanGateResponses: [],
   policies: [
-    { id: "start-policy", source: "trigger", trigger: "manual-start", action: "build", enabled: true },
+    { id: "start-policy", source: "event", event: "manual-start", action: "build", enabled: true },
     { id: "review-policy", source: "event", event: "build.ready", action: "review", enabled: true },
     { id: "human-review-policy", source: "event", event: "review.approved", action: "human-review", enabled: true },
-    { id: "return-start-policy", source: "trigger", trigger: "manual-rework", action: "build", enabled: true },
+    { id: "return-start-policy", source: "event", event: "manual-rework", action: "build", enabled: true },
     { id: "rework-policy", source: "event", event: "review.changes-requested", action: "build", enabled: true },
     { id: "done-policy", source: "event", event: "external.approved", action: "done", enabled: true }
   ],
@@ -76,15 +76,8 @@ describe("loopOutputHandlerForOutput", () => {
     });
   });
 
-  it("returns derived human gate approval outputs as read-only trigger targets", () => {
-    expect(loopOutputHandlerForOutput(config(), loopId, "human-review-policy", "approved")).toEqual({
-      type: "trigger",
-      outputId: "approved",
-      eventType: "trigger.human-review.approved",
-      triggerId: "human-review.approved",
-      loopId: undefined,
-      label: "human-review.approved"
-    });
+  it("returns undefined for human gate approval outputs without a loop handler", () => {
+    expect(loopOutputHandlerForOutput(config(), loopId, "human-review-policy", "approved")).toBeUndefined();
   });
 
   it("returns undefined when an output has no loop handler", () => {

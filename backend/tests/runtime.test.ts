@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { Policy, ProjectPolicy } from "../../shared/domain/automation.js";
@@ -422,7 +423,7 @@ describe("runtime output mapping", () => {
       { status: "approved" },
       [],
       [{ id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true }]
-    ).id).toBe("trigger.human-review.approved");
+    ).id).toBe("human-review.approved");
   });
 
   it("maps structured outcomes to configured action outputs", () => {
@@ -520,7 +521,7 @@ describe("runtime output mapping", () => {
   it("does not require an event id in agent output", () => {
     const routed = mapAgentOutputToEvent(projectPolicy, {
       runId: "run-1",
-      triggerEventId: "event-1",
+      inputEventId: "event-1",
       policyId: projectPolicy.id,
       policyVersion: 123,
       status: "complete",
@@ -537,10 +538,84 @@ describe("runtime output mapping", () => {
         outcome: "ready",
         summary: "Done.",
         run_id: "run-1",
-        trigger_event_id: "event-1",
+        input_event_id: "event-1",
         policy_id: projectPolicy.id,
         policy_version: 123
       }
     });
+  });
+
+  it("migrates legacy trigger event run columns to input event columns", async () => {
+    const root = await tempRoot();
+    const dbPath = path.join(root, "runtime.sqlite");
+    const legacy = new Database(dbPath);
+    legacy.exec(`
+      CREATE TABLE events (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id TEXT NOT NULL UNIQUE,
+        type TEXT NOT NULL,
+        source TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        correlation_id TEXT NOT NULL,
+        causation_id TEXT,
+        occurred_at TEXT NOT NULL,
+        project_id TEXT NOT NULL,
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'received',
+        matched_policy_id TEXT,
+        assigned_agent_id TEXT,
+        handling_result TEXT,
+        payload_json TEXT NOT NULL
+      );
+      CREATE TABLE agent_runs (
+        run_id TEXT PRIMARY KEY,
+        trigger_event_id TEXT NOT NULL,
+        trigger_event_seq INTEGER,
+        policy_id TEXT NOT NULL,
+        policy_version INTEGER NOT NULL,
+        agent_role TEXT NOT NULL,
+        status TEXT NOT NULL,
+        attempt INTEGER NOT NULL DEFAULT 0,
+        lease_owner TEXT,
+        lease_until TEXT,
+        thread_id TEXT,
+        turn_id TEXT,
+        outcome_json TEXT,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        UNIQUE(trigger_event_id, policy_id, policy_version, agent_role),
+        FOREIGN KEY(trigger_event_seq) REFERENCES events(seq) ON DELETE SET NULL
+      );
+      CREATE INDEX idx_agent_runs_trigger ON agent_runs(trigger_event_id);
+      INSERT INTO events (
+        event_id, type, source, subject, correlation_id, occurred_at, project_id, tags_json, payload_json
+      ) VALUES (
+        'event-1', 'plan_approved', 'test', 'work-1', 'event-1', '2026-07-07T10:00:00.000Z', 'project', '[]', '{}'
+      );
+      INSERT INTO agent_runs (
+        run_id, trigger_event_id, trigger_event_seq, policy_id, policy_version, agent_role, status,
+        attempt, created_at, updated_at
+      ) VALUES (
+        'run-1', 'event-1', 1, 'policy-1', 1, 'developer-agent', 'queued',
+        0, '2026-07-07T10:00:00.000Z', '2026-07-07T10:00:00.000Z'
+      );
+    `);
+    legacy.close();
+
+    const runtime = new RuntimeDatabase(dbPath);
+    const columns = new Set((runtime.connection().prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>).map((column) => column.name));
+    expect(columns.has("input_event_id")).toBe(true);
+    expect(columns.has("input_event_seq")).toBe(true);
+    expect(columns.has("trigger_event_id")).toBe(false);
+    expect(columns.has("trigger_event_seq")).toBe(false);
+    expect(runtime.listRuns()[0]).toMatchObject({
+      runId: "run-1",
+      inputEventId: "event-1",
+      inputEventSeq: 1
+    });
+    expect(runtime.getInputEvent(runtime.listRuns()[0]!)).toMatchObject({ eventId: "event-1" });
+    runtime.close();
   });
 });

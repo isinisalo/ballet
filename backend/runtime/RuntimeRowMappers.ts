@@ -53,8 +53,8 @@ export const toEventRecord = (row: EventRow): EventRecord =>
 
 export const toAgentRun = (row: AgentRunRow): AgentRun => ({
   runId: row.run_id,
-  triggerEventId: row.trigger_event_id,
-  triggerEventSeq: row.trigger_event_seq ?? undefined,
+  inputEventId: row.input_event_id,
+  inputEventSeq: row.input_event_seq ?? undefined,
   policyId: row.policy_id,
   policyVersion: row.policy_version,
   agentRole: row.agent_role,

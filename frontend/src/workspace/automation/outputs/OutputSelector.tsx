@@ -26,7 +26,7 @@ type OutputSelectorProps = {
   openButtonLabel?: string;
   canRemove?: boolean;
   disabled?: boolean;
-  displayByOutputId?: Record<OutputId, { type: "event" | "trigger"; label: string }>;
+  displayByOutputId?: Record<OutputId, { type: "event"; label: string }>;
   onCreateOption?: (id: OutputId) => void;
 };
 
@@ -111,9 +111,7 @@ export function OutputSelector({
               className={cn(
                 "min-w-0 font-mono",
                 display
-                  ? display.type === "trigger"
-                    ? "border-tertiary/60 bg-tertiary/10 text-tertiary"
-                    : "border-primary/60 bg-primary/10 text-primary"
+                  ? "border-primary/60 bg-primary/10 text-primary"
                   : "border-divider-strong bg-muted/50"
               )}
             >

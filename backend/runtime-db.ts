@@ -115,7 +115,7 @@ export class RuntimeDatabase {
     return this.runStore.listRunLogs(runId, limit);
   }
 
-  getTriggerEvent(run: AgentRun): RuntimeEvent | undefined {
-    return this.eventStore.getTriggerEvent(run);
+  getInputEvent(run: AgentRun): RuntimeEvent | undefined {
+    return this.eventStore.getInputEvent(run);
   }
 }

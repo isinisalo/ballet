@@ -1,15 +1,18 @@
 import type { Agent, AppData, MarkdownDocument, ProjectAutomationConfig, ProjectDocumentTreeNode, Skill } from "@shared/api/workspace-contracts";
-import { generatedPolicyId, policyOutputEventType, policyOutputEventTypes, loopIdFromTrigger } from "@shared/policy-actions";
+import { generatedPolicyId, loopIdForPolicy, policyOutputEventType, policyOutputEventTypes } from "@shared/policy-actions";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 
 const now = "2026-06-26T10:00:00.000Z";
-const loopTrigger = "project-brief-gate.approved";
-const loopId = loopIdFromTrigger(loopTrigger);
+const loopEvent = "project-brief-gate.approved";
+const loopId = loopIdForPolicy({ event: loopEvent });
 const loopStartActionId = "start-loop";
-const loopStartPolicyId = `on.trigger.${loopTrigger}.start.${loopStartActionId}`;
+const loopStartPolicyId = generatedPolicyId({ loopId, event: loopEvent, action: loopStartActionId });
+const manualStartEvent = "manual-start";
+const manualStartLoopId = loopIdForPolicy({ event: manualStartEvent });
+const manualStartPolicyId = generatedPolicyId({ loopId: manualStartLoopId, event: manualStartEvent, action: "implementation" });
 
 const baseData = (): AppData => ({
   projects: [{
@@ -121,8 +124,8 @@ const baseData = (): AppData => ({
     humanGateResponses: [],
     policies: [{
       id: loopStartPolicyId,
-      source: "trigger",
-      trigger: loopTrigger,
+      source: "event",
+      event: loopEvent,
       action: loopStartActionId,
       enabled: true
     }, {
@@ -367,10 +370,10 @@ function installApi(data: AppData, options: InstallApiOptions = {}) {
         name: policy.id,
         description: "",
         active: policy.enabled,
-        match: { eventTypes: [policy.source === "trigger" ? `trigger.${policy.trigger}` : policy.event ?? ""], projectId: "*", source: "*" },
+        match: { eventTypes: [policy.event], projectId: "*", source: "*" },
         action: { type: "start_agent_run", targetAgentId: agentId },
         projectId: "*",
-        eventTypes: [policy.source === "trigger" ? `trigger.${policy.trigger}` : policy.event ?? ""],
+        eventTypes: [policy.event],
         source: "*",
         payloadMetadata: {},
         targetAgentId: agentId,
@@ -451,8 +454,8 @@ async function renderRoute(path: string, data = baseData(), options?: InstallApi
   return api;
 }
 
-async function confirmDelete(user: ReturnType<typeof userEvent.setup>, triggerName: string) {
-  await user.click(screen.getByRole("button", { name: triggerName }));
+async function confirmDelete(user: ReturnType<typeof userEvent.setup>, entityName: string) {
+  await user.click(screen.getByRole("button", { name: entityName }));
   const confirmButtons = screen.getAllByRole("button", { name: "Delete" });
   await user.click(confirmButtons[confirmButtons.length - 1]);
 }
@@ -690,9 +693,9 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete loop" })).toBeInTheDocument();
 
-    const triggerReactFlowNode = screen.getByLabelText(`Trigger: ${loopTrigger}`).closest(".react-flow__node");
-    expect(triggerReactFlowNode?.querySelectorAll(".react-flow__handle").length).toBeGreaterThan(0);
-    expect(within(triggerReactFlowNode as HTMLElement).queryByText(loopTrigger)).not.toBeInTheDocument();
+    const inputEventReactFlowNode = screen.getByLabelText(`Input event: ${loopEvent}`).closest(".react-flow__node");
+    expect(inputEventReactFlowNode?.querySelectorAll(".react-flow__handle").length).toBeGreaterThan(0);
+    expect(within(inputEventReactFlowNode as HTMLElement).queryByText(loopEvent)).not.toBeInTheDocument();
 
     expect(screen.getByLabelText("Policy: on.implementation.rejected.start.implementation")).toBeInTheDocument();
     expect(screen.queryByLabelText("Agent: existing")).not.toBeInTheDocument();
@@ -724,7 +727,7 @@ describe("workspace entity UI flows", () => {
     activateLoopNode(implementationPolicyNode);
     expect(screen.queryByLabelText("Loop policy source")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy event")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Loop policy trigger")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy event")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy agent")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
     expectActionSelectValue("implementation");
@@ -764,33 +767,33 @@ describe("workspace entity UI flows", () => {
       agentIds: ["agent-1"]
     });
     loopData.automation.policies.push({
-      id: "on.trigger.manual-start.start.project-brief-gate",
-      source: "trigger",
-      trigger: "manual-start",
+      id: generatedPolicyId({ loopId: manualStartLoopId, event: manualStartEvent, action: "project-brief-gate" }),
+      source: "event",
+      event: manualStartEvent,
       action: "project-brief-gate",
       enabled: true
     }, {
-      id: "on.trigger.implementation.approved.start.next-step",
-      source: "trigger",
-      trigger: "implementation.approved",
+      id: generatedPolicyId({ loopId: loopIdForPolicy({ event: "implementation.approved" }), event: "implementation.approved", action: "next-step" }),
+      source: "event",
+      event: "implementation.approved",
       action: "next-step",
       enabled: true
     });
     loopData.automation.loops.push({
-      id: "manual-start.loop",
-      steps: ["on.trigger.manual-start.start.project-brief-gate"]
+      id: manualStartLoopId,
+      steps: [generatedPolicyId({ loopId: manualStartLoopId, event: manualStartEvent, action: "project-brief-gate" })]
     }, {
       id: "implementation.approved.loop",
-      steps: ["on.trigger.implementation.approved.start.next-step"]
+      steps: [generatedPolicyId({ loopId: loopIdForPolicy({ event: "implementation.approved" }), event: "implementation.approved", action: "next-step" })]
     });
 
     await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    expect(screen.getByLabelText("Loop: manual-start.loop")).toHaveTextContent("manual-start.loop");
+    expect(screen.getByLabelText("Loop: manual-start.loop")).toHaveTextContent(manualStartLoopId);
     expect(screen.getByLabelText("Loop: implementation.approved.loop")).toHaveTextContent("implementation.approved.loop");
     expect(screen.getByLabelText("Policy: on.implementation.rejected.start.implementation")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Policy: on.trigger.manual-start.start.project-brief-gate")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Policy: on.trigger.implementation.approved.start.next-step")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(`Policy: ${generatedPolicyId({ loopId: manualStartLoopId, event: manualStartEvent, action: "project-brief-gate" })}`)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(`Policy: ${generatedPolicyId({ loopId: loopIdForPolicy({ event: "implementation.approved" }), event: "implementation.approved", action: "next-step" })}`)).not.toBeInTheDocument();
     await waitFor(() => expect(loopEdgeLabelTexts()).toContain("approved"));
   });
 
@@ -820,8 +823,8 @@ describe("workspace entity UI flows", () => {
     }];
     loopData.automation.policies = [{
       id: "p05.on.project-brief-gate-approved.create-roadmap",
-      source: "trigger",
-      trigger: "project-brief-gate.approved",
+      source: "event",
+      event: "project-brief-gate.approved",
       action: "create-roadmap",
       enabled: true
     }, {
@@ -873,7 +876,7 @@ describe("workspace entity UI flows", () => {
 
     activateLoopNode(createRoadmapNode);
     const loopHandlerDialog = screen.getByRole("dialog", { name: "Loop handler" });
-    expect(within(loopHandlerDialog).getAllByText("project-brief-gate.approved").length).toBeGreaterThan(0);
+    expect(within(loopHandlerDialog).getAllByTitle("project-brief-gate.approved").length).toBeGreaterThan(0);
     expect(within(loopHandlerDialog).getAllByText("challenge-roadmap").find((element) => element.className.includes("text-tertiary"))).toBeDefined();
     expect(within(loopHandlerDialog).getAllByText("rejected").find((element) => element.className.includes("text-destructive"))).toBeDefined();
     expect(within(loopHandlerDialog).getAllByLabelText("Handler action")).toHaveLength(2);
@@ -930,16 +933,16 @@ describe("workspace entity UI flows", () => {
 
   it("shows the selected loop id in the automation header without editing", async () => {
     const loopData = baseData();
-    loopData.automation.policies.push({
-      id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+    loopData.automation.policies = [{
+      id: manualStartPolicyId,
+      source: "event",
+      event: manualStartEvent,
       action: "implementation",
       enabled: true
-    });
+    }, ...loopData.automation.policies];
     loopData.automation.loops.push({
-      id: "manual-start.loop",
-      steps: ["on.trigger.manual-start.start.implementation"]
+      id: manualStartLoopId,
+      steps: [manualStartPolicyId]
     });
     await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
@@ -949,36 +952,36 @@ describe("workspace entity UI flows", () => {
     expect(screen.getAllByText("project-brief-gate.approved.loop").length).toBeGreaterThan(0);
   });
 
-  it("creates a loop from a selected starting trigger", async () => {
+  it("creates a loop from a selected starting event", async () => {
     const user = userEvent.setup();
     const loopData = baseData();
-    loopData.automation.policies.push({
-      id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+    loopData.automation.policies = [{
+      id: manualStartPolicyId,
+      source: "event",
+      event: manualStartEvent,
       action: "implementation",
       enabled: true
-    });
+    }, ...loopData.automation.policies];
     const { data, fetchMock } = await renderRoute("/automation/loops", loopData);
 
     expect(screen.queryByRole("button", { name: "Add loop" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop ID")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Starting trigger")).toHaveTextContent("manual-start");
-    expect(screen.getAllByText("manual-start.loop").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Starting event")).toHaveTextContent("manual-start");
+    expect(screen.getAllByText(manualStartLoopId).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Title")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.loops.some((loop) =>
-      loop.id === "manual-start.loop" &&
-      loop.steps[0] === "on.trigger.manual-start.start.implementation"
+      loop.id === manualStartLoopId &&
+      loop.steps[0] === manualStartPolicyId
     )).toBe(true));
     expect(window.location.pathname).toBe("/automation/loops");
-    expect(window.location.search).toBe("?id=manual-start.loop");
-    expect(screen.getAllByText("manual-start.loop").length).toBeGreaterThan(0);
+    expect(window.location.search).toBe(`?id=${manualStartLoopId}`);
+    expect(screen.getAllByText(manualStartLoopId).length).toBeGreaterThan(0);
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
-      body: expect.stringContaining("\"id\":\"manual-start.loop\"")
+      body: expect.stringContaining(`"id":"${manualStartLoopId}"`)
     }));
   });
 
@@ -986,15 +989,15 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const loopData = baseData();
     loopData.automation.policies.push({
-      id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+      id: manualStartPolicyId,
+      source: "event",
+      event: manualStartEvent,
       action: "implementation",
       enabled: true
     });
     loopData.automation.loops.push({
-      id: "manual-start.loop",
-      steps: ["on.trigger.manual-start.start.implementation"]
+      id: manualStartLoopId,
+      steps: [manualStartPolicyId]
     });
     const { data } = await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
@@ -1009,11 +1012,11 @@ describe("workspace entity UI flows", () => {
 
     await waitFor(() => expect(window.location.search).toBe("?id=manual-start.loop"));
     expect(window.location.pathname).toBe("/automation/loops");
-    expect(screen.getAllByText("manual-start.loop").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(manualStartLoopId).length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
-    await waitFor(() => expect(data.automation.loops.map((loop) => loop.id)).toEqual(["manual-start.loop"]));
+    await waitFor(() => expect(data.automation.loops.map((loop) => loop.id)).toEqual([manualStartLoopId]));
     expect(screen.queryByRole("link", { name: "project-brief-gate.approved.loop" })).not.toBeInTheDocument();
   });
 
@@ -1265,10 +1268,8 @@ describe("workspace entity UI flows", () => {
 
     expect(within(dialog).queryByText("Output targets")).not.toBeInTheDocument();
     expect(within(dialog).getByText("Output routing")).toBeInTheDocument();
-    const approvalTarget = within(dialog).getByText("implementation.approved");
-    expect(approvalTarget).toHaveClass("border-tertiary/60", "bg-tertiary/10", "text-tertiary");
-    expect(approvalTarget.closest("button")).toBeNull();
-    expect(within(dialog).getAllByText("None").length).toBe(1);
+    expect(within(dialog).queryByText("implementation.approved")).not.toBeInTheDocument();
+    expect(within(dialog).getAllByText("None").length).toBeGreaterThan(0);
   });
 
   it("creates an automation action and keeps loop action editing sheet-based", async () => {
@@ -1313,16 +1314,16 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const loopData = baseData();
     loopData.automation.policies[0] = {
-      id: "on.trigger.manual-start.start.implementation",
+      id: manualStartPolicyId,
       source: "event",
-      event: "trigger.manual-start",
+      event: "manual-start",
       action: "implementation",
       enabled: true
     };
-    loopData.automation.loops[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    loopData.automation.loops[0]!.steps = [manualStartPolicyId];
     const { data } = await renderRoute("/automation/actions?id=implementation", loopData);
 
-    expect(badgeWithTextClass("trigger.manual-start", "border-primary/60")).toBeDefined();
+    expect(badgeWithTextClass("manual-start", "border-primary/60")).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Remove agent Existing Agent" }));
 
     await waitFor(() => expect(screen.queryByRole("button", { name: "Remove output approved" })).not.toBeInTheDocument());
@@ -1387,7 +1388,7 @@ describe("workspace entity UI flows", () => {
     expect(data.automation.outputs.filter((output) => output.id === "approved")).toHaveLength(1);
   });
 
-  it("renders action output badges by event and trigger target type", async () => {
+  it("renders action output badges by event and event target type", async () => {
     const loopData = baseData();
     loopData.automation.actions[0] = {
       id: "implementation",
@@ -1399,7 +1400,7 @@ describe("workspace entity UI flows", () => {
 
     await renderRoute("/automation/actions?id=implementation", loopData);
 
-    expect(badgeWithTextClass("implementation.approved", "border-tertiary/60")).toBeDefined();
+    expect(badgeWithTextClass("implementation.approved", "border-primary/60")).toBeDefined();
     expect(badgeWithTextClass("implementation.rejected", "border-primary/60")).toBeDefined();
   });
 
@@ -1407,13 +1408,13 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const loopData = baseData();
     loopData.automation.policies[0] = {
-      id: "on.trigger.manual-start.start.implementation",
+      id: manualStartPolicyId,
       source: "event",
       event: "implementation.approved",
       action: "implementation",
       enabled: true
     };
-    loopData.automation.loops[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    loopData.automation.loops[0]!.steps = [manualStartPolicyId];
     const { data } = await renderRoute("/automation/actions?id=implementation", loopData);
 
     expect(screen.queryByRole("button", { name: "Remove output approved" })).not.toBeInTheDocument();
@@ -1431,13 +1432,13 @@ describe("workspace entity UI flows", () => {
   it("renders every action output as a loop event endpoint", async () => {
     const loopData = baseData();
     loopData.automation.policies[0] = {
-      id: "on.trigger.manual-start.start.implementation",
+      id: manualStartPolicyId,
       source: "event",
-      event: "trigger.manual-start",
+      event: "manual-start",
       action: "implementation",
       enabled: true
     };
-    loopData.automation.loops[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    loopData.automation.loops[0]!.steps = [manualStartPolicyId];
     loopData.automation.actions[0]!.outputIds = ["approved", "rejected"];
 
     await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
@@ -1487,11 +1488,9 @@ describe("workspace entity UI flows", () => {
     expect(within(dialog).getByLabelText("Description")).toHaveValue("Review generated evidence.");
     expect(within(dialog).getByText("Human operator")).toBeInTheDocument();
     expect(within(dialog).getByText("Output routing")).toBeInTheDocument();
-    const approvalTarget = within(dialog).getByText("implementation.approved");
-    expect(approvalTarget).toHaveClass("border-tertiary/60", "bg-tertiary/10", "text-tertiary");
-    expect(approvalTarget.closest("button")).toBeNull();
+    expect(within(dialog).queryByText("implementation.approved")).not.toBeInTheDocument();
     expect(within(dialog).getAllByText("rejected").length).toBeGreaterThan(0);
-    expect(within(dialog).getByText("None")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("None").length).toBeGreaterThan(0);
     expect(within(dialog).getByText("Waiting for human")).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", { name: "Approved · approved" }));
@@ -1507,7 +1506,7 @@ describe("workspace entity UI flows", () => {
       prompt: "Approved with trace evidence."
     })));
     await waitFor(() => expect(data.events).toContainEqual(expect.objectContaining({
-      eventType: "trigger.implementation.approved",
+      eventType: "implementation.approved",
       source: "human-gate",
       payload: expect.objectContaining({
         loop_id: "project-brief-gate.approved.loop",
@@ -1522,13 +1521,13 @@ describe("workspace entity UI flows", () => {
   it("renders only the approval endpoint for one-output loop actions", async () => {
     const loopData = baseData();
     loopData.automation.policies[0] = {
-      id: "on.trigger.manual-start.start.implementation",
+      id: manualStartPolicyId,
       source: "event",
-      event: "trigger.manual-start",
+      event: "manual-start",
       action: "implementation",
       enabled: true
     };
-    loopData.automation.loops[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    loopData.automation.loops[0]!.steps = [manualStartPolicyId];
     loopData.automation.actions[0]!.outputIds = ["approved"];
 
     await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
@@ -1543,13 +1542,13 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const loopData = baseData();
     loopData.automation.policies[0] = {
-      id: "on.trigger.manual-start.start.implementation",
+      id: manualStartPolicyId,
       source: "event",
-      event: "trigger.manual-start",
+      event: "manual-start",
       action: "implementation",
       enabled: true
     };
-    loopData.automation.loops[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    loopData.automation.loops[0]!.steps = [manualStartPolicyId];
     loopData.automation.actions[0]!.outputIds = ["approved", "rejected"];
     await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
@@ -1601,14 +1600,6 @@ describe("workspace entity UI flows", () => {
       "on.implement.rejected.start.implement",
       "on.implement.approved.start.review"
     ]);
-  });
-
-  it("treats the removed automation triggers route as a loops alias", async () => {
-    await renderRoute("/automation/triggers");
-
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Triggers" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
   });
 
   it("creates, toggles, deletes, and saves human gate actions", async () => {
@@ -1677,7 +1668,7 @@ describe("workspace entity UI flows", () => {
 
     expect(screen.queryByLabelText("Loop policy source")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy event")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Loop policy trigger")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy event")).not.toBeInTheDocument();
     await waitFor(() => expect(loopEdgeLabelTexts()).toContain("approved"));
     expect(screen.queryByLabelText("Loop policy agent")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Output handler" })).toBeInTheDocument();
@@ -1688,8 +1679,8 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Save automation" }));
-    const approvedPolicyId = generatedPolicyId({ loopId, source: "event", event: "implementation.approved", action: "implementation" });
     const approvedEvent = policyOutputEventType({ action: "implementation", loopId }, "approved");
+    const approvedPolicyId = generatedPolicyId({ loopId, event: approvedEvent, action: "implementation" });
     await waitFor(() => expect(data.automation.policies).toContainEqual(expect.objectContaining({
       source: "event",
       event: approvedEvent,
@@ -1714,9 +1705,9 @@ describe("workspace entity UI flows", () => {
       agentIds: ["agent-1"]
     });
     loopData.automation.policies = [{
-      id: "on.trigger.manual-start.start.implementation",
+      id: manualStartPolicyId,
       source: "event",
-      event: "trigger.manual-start",
+      event: "manual-start",
       action: "implementation",
       enabled: true
     }, {
@@ -1751,9 +1742,9 @@ describe("workspace entity UI flows", () => {
       agentIds: ["agent-1"]
     });
     loopData.automation.policies = [{
-      id: "on.trigger.manual-start.start.implementation",
+      id: manualStartPolicyId,
       source: "event",
-      event: "trigger.manual-start",
+      event: "manual-start",
       action: "implementation",
       enabled: true
     }, {
@@ -1772,7 +1763,7 @@ describe("workspace entity UI flows", () => {
     loopData.automation.loops[0]!.steps = loopData.automation.policies.map((policy) => policy.id);
 
     await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
-    await screen.findByLabelText("Policy: on.trigger.manual-start.start.implementation");
+    await screen.findByLabelText(`Policy: ${manualStartPolicyId}`);
     expect(screen.queryByLabelText("Policy: on.review.rejected.start.implementation")).not.toBeInTheDocument();
 
     await waitFor(() => {
@@ -1784,7 +1775,7 @@ describe("workspace entity UI flows", () => {
     expect(connectionPoints.length).toBeGreaterThan(0);
     expect(getComputedStyle(connectionPoints[0]!).opacity).toBe("1");
     const returnSourcePolicyNode = screen.getByLabelText("Policy: on.implementation.approved.start.review").closest(".react-flow__node");
-    const returnTargetPolicyNode = screen.getByLabelText("Policy: on.trigger.manual-start.start.implementation").closest(".react-flow__node");
+    const returnTargetPolicyNode = screen.getByLabelText(`Policy: ${manualStartPolicyId}`).closest(".react-flow__node");
     expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-right")).toHaveLength(1);
     expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-bottom")).toHaveLength(0);
     expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-top").length).toBeGreaterThan(0);
@@ -1813,9 +1804,9 @@ describe("workspace entity UI flows", () => {
   it("toggles the loop edge animation effect on click", async () => {
     const loopData = baseData();
     loopData.automation.policies = [{
-      id: "on.trigger.manual-start.start.implementation",
+      id: manualStartPolicyId,
       source: "event",
-      event: "trigger.manual-start",
+      event: "manual-start",
       action: "implementation",
       enabled: true
     }, {
@@ -1880,11 +1871,11 @@ describe("workspace entity UI flows", () => {
   it("creates the first event loop policy from the loop canvas", async () => {
     const user = userEvent.setup();
     const loopData = baseData();
-    const implementationStartPolicyId = `on.trigger.${loopTrigger}.start.implementation`;
+    const implementationStartPolicyId = generatedPolicyId({ loopId, event: loopEvent, action: "implementation" });
     loopData.automation.policies = [{
       id: implementationStartPolicyId,
-      source: "trigger",
-      trigger: loopTrigger,
+      source: "event",
+      event: loopEvent,
       action: "implementation",
       enabled: true
     }];
@@ -1895,8 +1886,8 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.policies).toHaveLength(2));
-    const implementationApprovedPolicyId = generatedPolicyId({ loopId, source: "event", event: "implementation.approved", action: "implementation" });
     const implementationApprovedEvent = policyOutputEventType({ action: "implementation", loopId }, "approved");
+    const implementationApprovedPolicyId = generatedPolicyId({ loopId, event: implementationApprovedEvent, action: "implementation" });
     expect(data.automation.policies[1]).toMatchObject({
       source: "event",
       event: implementationApprovedEvent,

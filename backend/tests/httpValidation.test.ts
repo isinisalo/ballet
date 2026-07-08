@@ -95,12 +95,12 @@ describe("HTTP Zod validation", () => {
   it("accepts valid event intake payloads and defaults payload to an object", () => {
     expect(parseUnknown(eventIntakeSchema, {
       projectId: "project",
-      eventType: "trigger.manual-start",
+      eventType: "manual-start",
       tags: ["manual"],
       correlationDepth: 0
     })).toEqual({
       projectId: "project",
-      eventType: "trigger.manual-start",
+      eventType: "manual-start",
       tags: ["manual"],
       correlationDepth: 0,
       payload: {}
@@ -108,7 +108,7 @@ describe("HTTP Zod validation", () => {
 
     expectValidationError(() => parseUnknown(eventIntakeSchema, {
       projectId: "project",
-      eventType: "trigger.manual-start",
+      eventType: "manual-start",
       correlationDepth: -1
     }), "correlationDepth");
   });

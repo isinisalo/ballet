@@ -2,7 +2,6 @@ import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { describe, expect, it } from "vitest";
 import {
     loopOutputEventTargetDisplay,
-    loopOutputTargetCanSelectTrigger,
     loopOutputTargetDisplay,
     loopOutputTargetFromSelectValue,
     loopOutputTargetSelectValue
@@ -26,28 +25,19 @@ const config = (): ProjectAutomationConfig => ({
 });
 
 describe("loop output target rules", () => {
-  it("does not expose manual trigger target selection", () => {
-    const current = config();
-
-    expect(loopOutputTargetCanSelectTrigger(current, "human-review-policy", "approved")).toBe(false);
-    expect(loopOutputTargetCanSelectTrigger(current, "human-review-policy", "changes-requested")).toBe(false);
-    expect(loopOutputTargetCanSelectTrigger(current, "agent-review-policy", "approved")).toBe(false);
-  });
-
   it("keeps output target select values event-only", () => {
     const current = config();
 
     expect(loopOutputTargetSelectValue(current, "human-review-policy", "approved")).toBe("event");
     expect(loopOutputTargetSelectValue(current, "human-review-policy", "changes-requested")).toBe("event");
-    expect(loopOutputTargetFromSelectValue("trigger:approved")).toBeUndefined();
     expect(loopOutputTargetFromSelectValue("event")).toBeUndefined();
   });
 
-  it("formats selected output targets for event and trigger badges", () => {
+  it("formats selected output targets for event badges", () => {
     const current = config();
 
     expect(loopOutputTargetDisplay(current, "human-review-policy", "approved")).toEqual({
-      type: "trigger",
+      type: "event",
       label: "human-review.approved"
     });
     expect(loopOutputTargetDisplay(current, "human-review-policy", "changes-requested")).toEqual({

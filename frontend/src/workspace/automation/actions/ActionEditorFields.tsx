@@ -71,11 +71,10 @@ export function ActionEditorFields({
   const outputTargetById = actionOutputTargetsByOutputId(config, action.id, outputSlotIds);
   const outputDisplayTargets = (outputId: string): ActionOutputTarget[] =>
     outputTargetById[outputId] ?? [{ type: "event", id: outputId, label: outputId }];
-  const outputDisplayClassName = (target: ActionOutputTarget) => target.type === "trigger"
-    ? "border-tertiary/60 bg-tertiary/10 font-mono text-tertiary"
-    : "border-primary/60 bg-primary/10 font-mono text-primary";
+  const outputDisplayClassName = () =>
+    "border-primary/60 bg-primary/10 font-mono text-primary";
   const outputBadges = (outputId: string) => outputDisplayTargets(outputId).map((target) => (
-    <Badge key={`${target.type}:${target.id}`} variant="outline" className={`${outputDisplayClassName(target)} max-w-full`}>
+    <Badge key={`${target.type}:${target.id}`} variant="outline" className={`${outputDisplayClassName()} max-w-full`}>
       <span className="truncate" title={target.label}>{target.label}</span>
     </Badge>
   ));

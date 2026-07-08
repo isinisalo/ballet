@@ -57,9 +57,9 @@ export class RuntimeRunCompletion {
         ? this.aggregateDomainEvent(run, input)
         : input.domainEvent;
       if (domainEvent) {
-        const trigger = this.eventStore.getEventById(run.triggerEventId);
-        if (!trigger) throw new Error("Trigger event not found.");
-        const nextDepth = trigger.correlation_depth + 1;
+        const inputEvent = this.eventStore.getEventById(run.inputEventId);
+        if (!inputEvent) throw new Error("Input event not found.");
+        const nextDepth = inputEvent.correlation_depth + 1;
         if (nextDepth > MAX_CORRELATION_DEPTH) {
           this.runStore.appendRunLog(run.runId, "warn", "Domain event publication skipped because correlation depth exceeded the runtime limit.", {
             event_type: domainEvent.type,
@@ -68,21 +68,21 @@ export class RuntimeRunCompletion {
           });
         } else {
           const published = this.projector.insertEventAndProjectPolicies({
-            projectId: trigger.project_id,
+            projectId: inputEvent.project_id,
             eventType: domainEvent.type,
             source: domainEvent.source ?? "agentd",
-            subject: trigger.subject,
-            correlationId: trigger.correlation_id,
-            causationId: trigger.event_id,
+            subject: inputEvent.subject,
+            correlationId: inputEvent.correlation_id,
+            causationId: inputEvent.event_id,
             dedupeKey: input.projectPolicy
-              ? `domain:${run.triggerEventId}:${run.policyId}:${domainEvent.type}`
+              ? `domain:${run.inputEventId}:${run.policyId}:${domainEvent.type}`
               : `domain:${run.runId}:${domainEvent.type}`,
             correlationDepth: nextDepth,
             tags: [],
             payload: {
               ...domainEvent.payload,
               run_id: run.runId,
-              trigger_event_id: run.triggerEventId,
+              input_event_id: run.inputEventId,
               policy_id: run.policyId,
               policy_version: run.policyVersion
             },
@@ -109,7 +109,7 @@ export class RuntimeRunCompletion {
   ): CompleteRunInput["domainEvent"] | undefined {
     const policy = input.projectPolicy;
     if (!policy || !input.actions || !input.outputs) return undefined;
-    const policyRuns = this.runStore.getRunsForPolicyTrigger(run.triggerEventId, run.policyId);
+    const policyRuns = this.runStore.getRunsForPolicyInputEvent(run.inputEventId, run.policyId);
     if (!allPolicyRunsTerminal(policyRuns)) return undefined;
 
     const outputStatus = aggregateActionOutputStatus(policyRuns, policy, input.actions);

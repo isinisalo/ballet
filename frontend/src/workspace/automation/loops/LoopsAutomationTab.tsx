@@ -80,18 +80,18 @@ export function LoopsAutomationTab({
     const ids = new Set<string>();
     config.loops.forEach((loop) => {
       const firstPolicy = policyById.get(loop.steps[0] ?? "");
-      if (firstPolicy?.source === "trigger") ids.add(firstPolicy.id);
+      if (firstPolicy?.source === "event") ids.add(firstPolicy.id);
     });
     return ids;
   }, [config.loops, policyById]);
-  const availableStartingTriggerPolicies = useMemo(() => config.policies.filter((policy) =>
-    policy.source === "trigger" &&
-    Boolean(policy.trigger) &&
+  const availableStartingEventPolicies = useMemo(() => config.policies.filter((policy) =>
+    policy.source === "event" &&
+    Boolean(policy.event) &&
     (!usedStartingPolicyIds.has(policy.id) || createDraft.steps[0] === policy.id)
   ), [config.policies, createDraft.steps, usedStartingPolicyIds]);
-  const startingTriggerOptions = availableStartingTriggerPolicies.map((policy) => ({
+  const startingEventOptions = availableStartingEventPolicies.map((policy) => ({
     value: policy.id,
-    label: policy.trigger ? `${policy.trigger} · ${policy.action}` : policy.id
+    label: policy.event ? `${policy.event} · ${policy.action}` : policy.id
   }));
   const defaultAction = config.actions[0]?.id ?? "";
   const selectedActionOutputIds = (actionId: string) => actionOutputIds(config.actions, actionId);
@@ -154,10 +154,7 @@ export function LoopsAutomationTab({
       return;
     }
     const nextLoopBase = { ...selected, ...patch };
-    const derivedId = loopIdForPolicy(policyById.get(nextLoopBase.steps[0] ?? ""));
-    const nextLoop = derivedId && derivedId !== selected.id
-      ? { ...nextLoopBase, id: derivedId }
-      : nextLoopBase;
+    const nextLoop = nextLoopBase;
     updateConfig((current) => {
       const currentLoop = current.loops[selectedIndex];
       if (!currentLoop) return current;
@@ -208,7 +205,6 @@ export function LoopsAutomationTab({
       const generatedPolicy: ProjectPolicy = {
         id: generatedPolicyId({
           loopId: selected.id,
-          source: "event",
           event: generatedEvent,
           action
         }),
@@ -334,10 +330,10 @@ export function LoopsAutomationTab({
     const selectedStartingPolicyId = selected.steps[0] ?? "";
     const selectedStartingPolicy = policyById.get(selectedStartingPolicyId);
     const derivedLoopId = loopIdForPolicy(selectedStartingPolicy);
-    if (startingTriggerOptions.length === 0) {
+    if (startingEventOptions.length === 0) {
       return (
         <div className="p-4">
-          <EmptyState title="No unused starting triggers." action="Create a trigger policy before adding a loop." />
+          <EmptyState title="No unused starting events." action="Create an event policy before adding a loop." />
         </div>
       );
     }
@@ -345,15 +341,15 @@ export function LoopsAutomationTab({
       <div className="grid gap-4 p-4">
         <FieldGroup>
           <SelectField
-            label="Starting trigger"
-            value={selectedStartingPolicyId || startingTriggerOptions[0]?.value || noSelection}
-            options={startingTriggerOptions}
+            label="Starting event"
+            value={selectedStartingPolicyId || startingEventOptions[0]?.value || noSelection}
+            options={startingEventOptions}
             onChange={(policyId) => updateSelected({ steps: [policyId] })}
           />
           <Field className="gap-1.5">
             <FieldLabel>Derived ID</FieldLabel>
             <div className="min-h-9 rounded border border-input bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
-              {derivedLoopId || "Select a starting trigger"}
+              {derivedLoopId || "Select a starting event"}
             </div>
           </Field>
         </FieldGroup>
@@ -412,7 +408,7 @@ export function LoopsAutomationTab({
 }
 
 function loopScopedEventType(eventType: string, loopId: string) {
-  return eventType.startsWith(`${loopId}.`) || eventType.includes(".loop.") || eventType.startsWith("trigger.")
+  return eventType.startsWith(`${loopId}.`) || eventType.includes(".loop.")
     ? eventType
     : `${loopId}.${eventType}`;
 }
@@ -432,9 +428,7 @@ function loopHandlerRoute(record: LoopStepRecord): LoopHandlerRoute | undefined 
     loopId: record.loopId ?? "",
     stepIndex: record.index,
     policyId: record.policyId,
-    sourceLabel: record.policy.source === "trigger"
-      ? record.policy.trigger || "Missing trigger"
-      : eventParts?.sourceLabel ?? "Missing event",
+    sourceLabel: eventParts?.sourceLabel ?? "Missing event",
     outputId: eventParts?.outputId,
     eventType: record.policy.source === "event" ? record.policy.event : undefined,
     actionId: record.policy.action

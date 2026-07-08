@@ -8,7 +8,7 @@ import { apiRouter } from "../routes.js";
 import { store } from "../store.js";
 import { notifyRuntimeChanged } from "../runtime-events.js";
 import type { AgentRun, AgentRunLog } from "../../shared/domain/runtime.js";
-import { generatedPolicyId, loopIdFromTrigger, policyOutputEventType } from "../../shared/policy-actions.js";
+import { generatedPolicyId, loopIdForPolicy, policyOutputEventType } from "../../shared/policy-actions.js";
 
 const listen = async (app: express.Express): Promise<{ server: Server; url: string }> => {
   const server = createServer(app);
@@ -122,7 +122,7 @@ describe("API routes", () => {
     app.use("/api", apiRouter);
     const run: AgentRun = {
       runId: "run-1",
-      triggerEventId: "event-1",
+      inputEventId: "event-1",
       policyId: "policy-1",
       policyVersion: 1,
       agentRole: "developer-agent",
@@ -238,7 +238,7 @@ describe("API routes", () => {
       outputs: [{ id: "ok" }, { id: "failed" }],
       outputRoutes: [],
       humanGateResponses: [],
-      policies: [{ id: "on.trigger.plan_approved.start.implementation", source: "event", event: "trigger.plan_approved", action: "implementation", enabled: true }],
+      policies: [{ id: "on.plan_approved.start.implementation", source: "event", event: "plan_approved", action: "implementation", enabled: true }],
       loops: [],
       runtimes: []
     }, null, 2), "utf8");
@@ -252,10 +252,10 @@ describe("API routes", () => {
       const allowed = await fetch(url + "/api/events/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: "project", eventType: "trigger.plan_approved", source: "test", payload: {} })
+        body: JSON.stringify({ projectId: "project", eventType: "plan_approved", source: "test", payload: {} })
       });
       expect(allowed.status).toBe(201);
-      expect(await allowed.json()).toMatchObject({ eventType: "trigger.plan_approved" });
+      expect(await allowed.json()).toMatchObject({ eventType: "plan_approved" });
 
       const blocked = await fetch(url + "/api/events/intake", {
         method: "POST",
@@ -283,13 +283,13 @@ describe("API routes", () => {
     app.use("/api", apiRouter);
     const { server, url } = await listen(app);
 
-    const loopTrigger = "project-brief-gate.approved";
-    const loopId = loopIdFromTrigger(loopTrigger);
-    const rawLoopStartPolicyId = `on.trigger.${loopTrigger}.start.implementation`;
+    const loopEvent = "project-brief-gate.approved";
+    const loopId = loopIdForPolicy({ event: loopEvent });
+    const rawLoopStartPolicyId = generatedPolicyId({ loopId, event: loopEvent, action: "implementation" });
     const rawLoopRejectedPolicyId = "on.implementation.failed.start.implementation";
-    const loopStartPolicyId = generatedPolicyId({ loopId, source: "trigger", trigger: loopTrigger, action: "implementation" });
-    const loopRejectedPolicyId = generatedPolicyId({ loopId, source: "event", event: "implementation.rejected", action: "implementation" });
+    const loopStartPolicyId = generatedPolicyId({ loopId, event: loopEvent, action: "implementation" });
     const loopRejectedEvent = policyOutputEventType({ action: "implementation", loopId }, "rejected");
+    const loopRejectedPolicyId = generatedPolicyId({ loopId, event: loopRejectedEvent, action: "implementation" });
     const config = {
       version: 1,
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
@@ -297,7 +297,7 @@ describe("API routes", () => {
       outputRoutes: [],
       humanGateResponses: [],
       policies: [
-        { id: rawLoopStartPolicyId, source: "trigger", trigger: loopTrigger, action: "implementation", enabled: true },
+        { id: rawLoopStartPolicyId, source: "event", event: loopEvent, action: "implementation", enabled: true },
         { id: rawLoopRejectedPolicyId, source: "event", event: "implementation.failed", action: "implementation", enabled: true }
       ],
       loops: [{ id: loopId, steps: [rawLoopStartPolicyId, rawLoopRejectedPolicyId] }],
@@ -331,7 +331,7 @@ describe("API routes", () => {
         config: {
           outputs: [{ id: "approved" }, { id: "rejected" }],
           policies: [
-            { id: loopStartPolicyId, loopId, source: "trigger", trigger: loopTrigger },
+            { id: loopStartPolicyId, loopId, source: "event", event: loopEvent },
             { id: loopRejectedPolicyId, loopId, source: "event", event: loopRejectedEvent }
           ]
         },
@@ -358,6 +358,16 @@ describe("API routes", () => {
         body: JSON.stringify({ ...config, triggers: [{ id: "manual_start", description: "Manual start" }] })
       });
       expect(legacyTriggers.status).toBe(400);
+      const legacyTriggerPolicy = await fetch(url + "/api/automation", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...config,
+          policies: [{ id: "legacy-start", source: "trigger", trigger: loopEvent, action: "implementation", enabled: true }],
+          loops: [{ id: loopId, steps: ["legacy-start"] }]
+        })
+      });
+      expect(legacyTriggerPolicy.status).toBe(400);
       expect(await invalid.json()).toMatchObject({ error: "Request validation failed.", issues: expect.arrayContaining([expect.objectContaining({ path: "loops.0.steps.0" })]) });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

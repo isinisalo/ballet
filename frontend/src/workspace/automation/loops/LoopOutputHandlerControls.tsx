@@ -53,13 +53,6 @@ export function LoopOutputHandlerControls({
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                ) : handler?.type === "trigger" ? (
-                  <span
-                    className="min-w-0 truncate rounded-xl border border-tertiary/60 bg-tertiary/10 px-2 py-0.5 font-mono text-xs text-tertiary"
-                    title={handler.label}
-                  >
-                    {handler.label}
-                  </span>
                 ) : (
                   <span className="font-mono text-xs text-muted-foreground">None</span>
                 )}

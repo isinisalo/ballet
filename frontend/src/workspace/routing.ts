@@ -28,7 +28,6 @@ const runtimeRoute = (url: URL): RouteState => ({
 
 const legacyRouteAliases: Record<string, (url: URL) => RouteState> = {
   // Compatibility aliases for routes used before the automation/runtimes navigation split.
-  "/automation/triggers": (url) => automationRoute("loops", url),
   "/automation/policies": (url) => automationRoute("loops", url),
   "/policies": (url) => automationRoute("loops", url),
   "/actions": (url) => automationRoute("actions", url),

@@ -4,7 +4,7 @@ import { loopAddActionGhostLabel, loopCanvasLayoutConfig, loopNodeSizes } from "
 import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
 export function loopCanvasNodeAnchorY(layoutNode: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
-  if (layoutNode.kind === "trigger") return loopCanvasLayoutConfig.triggerAnchorY;
+  if (layoutNode.kind === "input-event") return loopCanvasLayoutConfig.inputEventAnchorY;
   if (layoutNode.kind === "policy") return loopCanvasLayoutConfig.policyAnchorY;
   return layoutNode.height / 2;
 }
@@ -50,8 +50,8 @@ export function loopPolicyNodeWidth(record: LoopStepRecord) {
   return loopOutputNodeWidth(record.policy?.action || record.policyId || "No policy", loopNodeSizes.policy.minWidth, loopNodeSizes.policy.maxWidth);
 }
 
-export function loopTriggerNodeWidth() {
-  return loopOutputNodeWidth("", loopNodeSizes.trigger.minWidth, loopNodeSizes.trigger.maxWidth);
+export function loopInputEventNodeWidth() {
+  return loopOutputNodeWidth("", loopNodeSizes.inputEvent.minWidth, loopNodeSizes.inputEvent.maxWidth);
 }
 
 export function loopSummaryNodeWidth(value: string) {

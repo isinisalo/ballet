@@ -14,9 +14,7 @@ export function ActionInputField({ sources }: { sources: ActionInputSource[] }) 
             variant="outline"
             className={cn(
               "min-w-0 font-mono",
-              source.type === "trigger"
-                ? "border-tertiary/60 bg-tertiary/10 text-tertiary"
-                : "border-primary/60 bg-primary/10 text-primary"
+              "border-primary/60 bg-primary/10 text-primary"
             )}
           >
             <span className="truncate">{source.label}</span>

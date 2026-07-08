@@ -12,9 +12,9 @@ import {
   addCanvasEdge,
   addDagreEdge,
   addFirstPolicyGhost,
+  addInputEventNode,
   addOutputEventNode,
   addPolicyNode,
-  addTriggerNode,
   loopOutputEdgeLabel,
   loopPolicyInputEdgeLabel,
   type LoopLayoutGraphDraft,
@@ -50,7 +50,7 @@ export function buildLoopLayoutGraphDraft({
     handledEventNodes: []
   };
 
-  addTriggerNode(context);
+  addInputEventNode(context);
   if (loopGraph.rootRecords.length > 0) {
     loopGraph.rootRecords.forEach((record) => addRootPolicyBranch(context, record));
   } else {
@@ -76,8 +76,8 @@ function addRootPolicyBranch(context: LoopLayoutGraphDraftContext, record: LoopS
   layoutPolicyBranch(context, canonicalRecord);
   if (canonicalRecord.index !== record.index) {
     addCanvasEdge(context, {
-      key: `trigger-policy-${record.index}`,
-      sourceNodeKey: "trigger",
+      key: `input-event-policy-${record.index}`,
+      sourceNodeKey: "input-event",
       targetNodeKey: `policy-${canonicalRecord.index}`,
       sourceHandleId: context.sourceHandleId,
       targetHandleId: context.targetHandleId,
@@ -87,13 +87,13 @@ function addRootPolicyBranch(context: LoopLayoutGraphDraftContext, record: LoopS
     return;
   }
   addDagreEdge(context, {
-    source: "trigger",
+    source: "input-event",
     target: `policy-${record.index}`,
     label: loopPolicyInputEdgeLabel(record)
   });
   addCanvasEdge(context, {
-    key: `trigger-policy-${record.index}`,
-    sourceNodeKey: "trigger",
+    key: `input-event-policy-${record.index}`,
+    sourceNodeKey: "input-event",
     targetNodeKey: `policy-${record.index}`,
     sourceHandleId: context.sourceHandleId,
     targetHandleId: context.targetHandleId,

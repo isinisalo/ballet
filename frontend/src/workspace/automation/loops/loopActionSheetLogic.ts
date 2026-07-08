@@ -1,5 +1,5 @@
 import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
-import { generatedPolicyId, projectOutputRouteCanTargetTrigger, projectOutputRouteKey } from "@shared/policy-actions";
+import { generatedPolicyId, projectOutputRouteKey } from "@shared/policy-actions";
 
 export const nextConfigWithLoopStepAction = (
   current: ProjectAutomationConfig,
@@ -48,7 +48,6 @@ export const nextConfigWithLoopHandlerAction = (
     if (!sourcePolicy || !policyById.has(targetPolicyId)) return [];
     if (route.sourcePolicyId === currentPolicy.id) {
       if (!targetAction.outputIds.includes(route.outputId)) return [];
-      if (projectOutputRouteCanTargetTrigger(sourcePolicy, route.outputId, current.actions)) return [];
     }
     const nextRoute = {
       ...route,

@@ -40,7 +40,7 @@ export class RuntimeProjector {
     const prepared = this.prepareEvent(input, policies, agents);
     const duplicate = this.eventStore.getEventByDedupeKey(prepared.dedupeKey);
     if (duplicate) {
-      const runs = this.runStore.getRunsForTrigger(duplicate.event_id);
+      const runs = this.runStore.getRunsForInputEvent(duplicate.event_id);
       return { event: this.eventStore.toEventRecord(duplicate), run: runs[0], runs, duplicate: true };
     }
 
@@ -159,11 +159,11 @@ export class RuntimeProjector {
     });
   }
 
-  private insertAgentRuns(triggerEventId: string, triggerEventSeq: number, prepared: PreparedEvent): AgentRun[] {
+  private insertAgentRuns(inputEventId: string, inputEventSeq: number, prepared: PreparedEvent): AgentRun[] {
     const runs: AgentRun[] = [];
     for (const decision of prepared.routedDecisions) {
-      this.insertAgentRun(triggerEventId, triggerEventSeq, prepared.createdAt, decision);
-      const run = this.runStore.getRunByDedupe(triggerEventId, decision.policyId, decision.policyVersion, decision.targetAgentId);
+      this.insertAgentRun(inputEventId, inputEventSeq, prepared.createdAt, decision);
+      const run = this.runStore.getRunByDedupe(inputEventId, decision.policyId, decision.policyVersion, decision.targetAgentId);
       if (run) {
         decision.runId = run.runId;
         runs.push(run);
@@ -172,20 +172,20 @@ export class RuntimeProjector {
     return runs;
   }
 
-  private insertAgentRun(triggerEventId: string, triggerEventSeq: number, createdAt: string, decision: RouteDecision): void {
+  private insertAgentRun(inputEventId: string, inputEventSeq: number, createdAt: string, decision: RouteDecision): void {
     this.connection().prepare(`
       INSERT OR IGNORE INTO agent_runs (
-        run_id, trigger_event_id, trigger_event_seq, policy_id, policy_version,
+        run_id, input_event_id, input_event_seq, policy_id, policy_version,
         agent_role, status, attempt, created_at, updated_at
       )
       VALUES (
-        @runId, @triggerEventId, @triggerEventSeq, @policyId, @policyVersion,
+        @runId, @inputEventId, @inputEventSeq, @policyId, @policyVersion,
         @agentRole, 'queued', 0, @createdAt, @updatedAt
       )
     `).run({
       runId: uuid(),
-      triggerEventId,
-      triggerEventSeq,
+      inputEventId,
+      inputEventSeq,
       policyId: decision.policyId,
       policyVersion: decision.policyVersion,
       agentRole: decision.targetAgentId,

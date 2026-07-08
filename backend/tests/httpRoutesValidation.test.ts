@@ -40,7 +40,7 @@ describe("API route validation", () => {
 
       const invalidEvent = await postJson(`${url}/api/events/intake`, {
         projectId: "project",
-        eventType: "trigger.manual-start",
+        eventType: "manual-start",
         correlationDepth: -1
       });
       expect(invalidEvent.status).toBe(400);

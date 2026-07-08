@@ -15,22 +15,17 @@ const loopEvent = (event: string | undefined, scopedLoopId = loopId) =>
 
 const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => {
   const policyLoopId = patch.loopId ?? loopId;
-  const source = patch.source ?? "event";
-  const event = source === "event" ? loopEvent(patch.event, policyLoopId) : undefined;
-  const trigger = source === "trigger" ? patch.trigger : undefined;
+  const event = loopEvent(patch.event ?? "manual-start", policyLoopId) ?? "manual-start";
   const action = patch.action ?? "build";
   return {
     id: patch.id ?? generatedPolicyId({
       loopId: policyLoopId,
-      source,
       event,
-      trigger,
       action
     }),
     loopId: policyLoopId,
-    source,
+    source: "event",
     event,
-    trigger,
     action,
     enabled: patch.enabled ?? true
   };
@@ -52,7 +47,7 @@ const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
 
 describe("nextConfigWithLoopStepAction", () => {
   it("creates a policy for the selected step with the new action", () => {
-    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "manual-start", action: "build" });
     const current = config([startPolicy]);
     const next = nextConfigWithLoopStepAction(current, loopId, 0, "review");
     const expectedPolicyId = generatedPolicyId({ ...startPolicy, action: "review" });
@@ -76,7 +71,7 @@ describe("nextConfigWithLoopStepAction", () => {
   });
 
   it("returns the current config for invalid loop, step, or action", () => {
-    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "manual-start", action: "build" });
     const current = config([startPolicy]);
 
     expect(nextConfigWithLoopStepAction(current, "missing", 0, "review")).toBe(current);
@@ -86,7 +81,7 @@ describe("nextConfigWithLoopStepAction", () => {
   });
 
   it("creates replacement policies for every selected folded step", () => {
-    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "manual-start", action: "build" });
     const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
@@ -107,7 +102,7 @@ describe("nextConfigWithLoopStepAction", () => {
   });
 
   it("removes every selected folded step from the loop", () => {
-    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "manual-start", action: "build" });
     const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
@@ -118,7 +113,7 @@ describe("nextConfigWithLoopStepAction", () => {
   });
 
   it("updates only the selected output handler route", () => {
-    const startPolicy = policy({ id: "start-build", source: "event", event: "trigger.manual-start", action: "build" });
+    const startPolicy = policy({ id: "start-build", source: "event", event: "manual-start", action: "build" });
     const reviewPolicy = policy({ id: "review-ready", source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ id: "rework-build", source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
@@ -135,7 +130,7 @@ describe("nextConfigWithLoopStepAction", () => {
   });
 
   it("reuses an existing policy for the selected output handler route", () => {
-    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "manual-start", action: "build" });
     const reworkBuildPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const reworkReviewPolicy = policy({ source: "event", event: "review.changes-requested", action: "review" });
     const current = config([startPolicy, reworkBuildPolicy, reworkReviewPolicy]);
@@ -153,7 +148,7 @@ describe("nextConfigWithLoopStepAction", () => {
 describe("nextConfigWithLoopHandlerAction route cleanup", () => {
   it("rewrites routes and removes stale human gate responses when a loop step action changes", () => {
     const scopedLoopId = "delivery.loop";
-    const startPolicy = policy({ loopId: scopedLoopId, source: "trigger", trigger: "start", action: "review" });
+    const startPolicy = policy({ loopId: scopedLoopId, source: "event", event: "start", action: "review" });
     const gatePolicy = policy({
       loopId: scopedLoopId,
       source: "event",

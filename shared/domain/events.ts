@@ -22,7 +22,7 @@ export interface RoutedEvent {
       summary?: string;
     }>;
     run_id?: string;
-    trigger_event_id?: string;
+    input_event_id?: string;
     policy_id?: string;
     policy_version?: number;
     payload?: Record<string, unknown>;

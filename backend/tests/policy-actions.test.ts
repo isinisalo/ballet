@@ -4,7 +4,6 @@ import { generatedPolicyId, policyOutputEventType } from "../../shared/policy-ac
 describe("loop-aware policy action ids", () => {
   it("keeps legacy policy ids and output events unchanged without loop context", () => {
     expect(generatedPolicyId({
-      source: "event",
       event: "create-roadmap.approved",
       action: "challenge-roadmap"
     })).toBe("on.create-roadmap.approved.start.challenge-roadmap");
@@ -14,10 +13,9 @@ describe("loop-aware policy action ids", () => {
   it("includes the loop id in generated policy ids and output events", () => {
     expect(generatedPolicyId({
       loopId: "project-brief-gate.approved.loop",
-      source: "event",
       event: "create-roadmap.approved",
       action: "challenge-roadmap"
-    })).toBe("on.project-brief-gate.approved.loop.create-roadmap.approved.start.project-brief-gate.approved.loop.challenge-roadmap");
+    })).toBe("on.create-roadmap.approved.start.project-brief-gate.approved.loop.challenge-roadmap");
     expect(policyOutputEventType({
       loopId: "project-brief-gate.approved.loop",
       action: "create-roadmap"

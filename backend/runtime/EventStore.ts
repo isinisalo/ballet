@@ -19,8 +19,8 @@ export class EventStore {
     this.connection().prepare("DELETE FROM events WHERE event_id = ?").run(eventId);
   }
 
-  getTriggerEvent(run: import("../../shared/domain/runtime.js").AgentRun): RuntimeEvent | undefined {
-    const row = this.getEventById(run.triggerEventId);
+  getInputEvent(run: import("../../shared/domain/runtime.js").AgentRun): RuntimeEvent | undefined {
+    const row = this.getEventById(run.inputEventId);
     return row ? toRuntimeEvent(row) : undefined;
   }
 

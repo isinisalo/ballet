@@ -15,9 +15,8 @@ import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/l
 
 const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
   id,
-  source: event ? "event" : "trigger",
-  event,
-  trigger: event ? undefined : "project.updated",
+  source: "event",
+  event: event ?? "project.updated",
   action,
   enabled: true
 });
@@ -41,16 +40,16 @@ const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyInde
 const compositeConfig = (
   loopIds: string[],
   outputRoutes: ProjectAutomationConfig["outputRoutes"] = [],
-  sourceStartTrigger = "source-trigger"
+  sourceStartEvent = "source-event"
 ): ProjectAutomationConfig => {
   const upstreamPolicy = policy("upstream-start", undefined, "upstream-gate");
-  upstreamPolicy.trigger = "upstream-trigger";
+  upstreamPolicy.event = "upstream-event";
   const sourcePolicy = policy("source-start", undefined, "source-gate");
-  sourcePolicy.trigger = sourceStartTrigger;
+  sourcePolicy.event = sourceStartEvent;
   const targetPolicy = policy("target-start", undefined, "target-gate");
-  targetPolicy.trigger = "source-gate.approved";
+  targetPolicy.event = "source-gate.approved";
   const downstreamPolicy = policy("downstream-start", undefined, "final-gate");
-  downstreamPolicy.trigger = "target-gate.approved";
+  downstreamPolicy.event = "target-gate.approved";
   const policyByLoopId = new Map([
     ["upstream", upstreamPolicy],
     ["source", sourcePolicy],
@@ -119,7 +118,7 @@ const firstRoutedPointMovingVertically = (points: number[][], sourceY: number) =
 
 describe("loop layout helper modules", () => {
   it("keeps exported node anchor and output handle calculations stable", () => {
-    expect(loopCanvasNodeAnchorY({ kind: "trigger", height: 99 })).toBe(loopCanvasLayoutConfig.triggerAnchorY);
+    expect(loopCanvasNodeAnchorY({ kind: "input-event", height: 99 })).toBe(loopCanvasLayoutConfig.inputEventAnchorY);
     expect(loopCanvasNodeAnchorY({ kind: "policy", height: 99 })).toBe(loopCanvasLayoutConfig.policyAnchorY);
     expect(loopCanvasNodeAnchorY({ kind: "output-event", height: 46 })).toBe(23);
     expect(loopOutputSourceHandleId()).toBe("right");
@@ -130,10 +129,10 @@ describe("loop layout helper modules", () => {
   it("positions primary nodes through the extracted dagre layout helper", () => {
     const nodes = positionLoopNodes([
       {
-        key: "trigger",
-        kind: "trigger",
-        width: loopNodeSizes.trigger.minWidth,
-        height: loopNodeSizes.trigger.height,
+        key: "input-event",
+        kind: "input-event",
+        width: loopNodeSizes.inputEvent.minWidth,
+        height: loopNodeSizes.inputEvent.height,
         direction: "horizontal"
       },
       {
@@ -143,26 +142,26 @@ describe("loop layout helper modules", () => {
         height: loopNodeSizes.policy.height,
         direction: "horizontal"
       }
-    ], [{ source: "trigger", target: "policy-0", label: "project.updated" }], "horizontal");
+    ], [{ source: "input-event", target: "policy-0", label: "updated" }], "horizontal");
 
-    const triggerNode = nodes.find((node) => node.key === "trigger");
+    const inputEventNode = nodes.find((node) => node.key === "input-event");
     const policyNode = nodes.find((node) => node.key === "policy-0");
 
-    expect(triggerNode).toMatchObject({
+    expect(inputEventNode).toMatchObject({
       x: loopCanvasLayoutConfig.startX,
       y: loopCanvasLayoutConfig.startY
     });
-    expect(policyNode?.x).toBeGreaterThan((triggerNode?.x ?? 0) + loopNodeSizes.trigger.minWidth);
-    expect(policyNode?.y).toBe(triggerNode?.y);
+    expect(policyNode?.x).toBeGreaterThan((inputEventNode?.x ?? 0) + loopNodeSizes.inputEvent.minWidth);
+    expect(policyNode?.y).toBe(inputEventNode?.y);
   });
 
   it("keeps horizontal spacing independent from edge label length", () => {
     const nodeDrafts = [
       {
-        key: "trigger",
-        kind: "trigger",
-        width: loopNodeSizes.trigger.minWidth,
-        height: loopNodeSizes.trigger.height,
+        key: "input-event",
+        kind: "input-event",
+        width: loopNodeSizes.inputEvent.minWidth,
+        height: loopNodeSizes.inputEvent.height,
         direction: "horizontal"
       },
       {
@@ -173,14 +172,14 @@ describe("loop layout helper modules", () => {
         direction: "horizontal"
       }
     ];
-    const shortLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "trigger", target: "policy-0", label: "x" }], "horizontal");
-    const longLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "trigger", target: "policy-0", label: "x".repeat(500) }], "horizontal");
+    const shortLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "input-event", target: "policy-0", label: "x" }], "horizontal");
+    const longLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "input-event", target: "policy-0", label: "x".repeat(500) }], "horizontal");
 
     const shortLabelPolicyNode = shortLabelNodes.find((node) => node.key === "policy-0");
     const longLabelPolicyNode = longLabelNodes.find((node) => node.key === "policy-0");
 
     expect(longLabelPolicyNode?.x).toBe(shortLabelPolicyNode?.x);
-    expect(shortLabelPolicyNode?.x).toBe(loopCanvasLayoutConfig.startX + loopNodeSizes.trigger.minWidth + loopCanvasLayoutConfig.horizontalEdgeGap);
+    expect(shortLabelPolicyNode?.x).toBe(loopCanvasLayoutConfig.startX + loopNodeSizes.inputEvent.minWidth + loopCanvasLayoutConfig.horizontalEdgeGap);
   });
 
   it("keeps default smart edge routing for same-row edges and tightens cross-row routing", () => {
@@ -197,7 +196,7 @@ describe("loop layout helper modules", () => {
     const sourceY = 125.5;
     const targetY = 75.5;
     const nodes = [
-      loopRoutingTestNode({ id: "trigger", x: 32, y: 64, width: 28, height: 22 }),
+      loopRoutingTestNode({ id: "input-event", x: 32, y: 64, width: 28, height: 22 }),
       loopRoutingTestNode({ id: "policy-0", x: 238, y: 64, width: 174, height: 22 }),
       loopRoutingTestNode({ id: "policy-1", x: 597, y: 64, width: 112, height: 22 }),
       loopRoutingTestNode({ id: "policy-3", x: 956, y: 64, width: 181, height: 22 }),
@@ -256,19 +255,19 @@ describe("calculateLoopCanvasLayout", () => {
     ]);
   });
 
-  it("creates a trigger and first-policy ghost for an empty loop", () => {
+  it("creates an input event and first-policy ghost for an empty loop", () => {
     const layout = layoutFor([], []);
-    const triggerNode = layout.nodes.find((node) => node.key === "trigger");
+    const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
 
-    expect(layout.nodes.map((node) => node.kind)).toEqual(["trigger", "first-policy-ghost"]);
-    expect(triggerNode).toMatchObject({
-      width: loopNodeSizes.trigger.minWidth,
-      height: loopNodeSizes.trigger.height
+    expect(layout.nodes.map((node) => node.kind)).toEqual(["input-event", "first-policy-ghost"]);
+    expect(inputEventNode).toMatchObject({
+      width: loopNodeSizes.inputEvent.minWidth,
+      height: loopNodeSizes.inputEvent.height
     });
     expect(layout.edges).toEqual([
       expect.objectContaining({
-        key: "trigger-first-policy",
-        sourceNodeKey: "trigger",
+        key: "input-event-first-policy",
+        sourceNodeKey: "input-event",
         targetNodeKey: "first-policy-ghost",
         sourceHandleId: "right",
         targetHandleId: "left",
@@ -459,15 +458,15 @@ describe("calculateLoopCanvasLayout", () => {
     });
     const outputEventNodes = layout.nodes.filter((node) => node.kind === "output-event");
 
-    expect(outputEvents).toEqual(["trigger.human-review.approved", "human-review.rejected"]);
-    expect(outputEventNodes.map((node) => node.outputEvent?.outputId)).toEqual(["trigger.human-review.approved", "human-review.rejected"]);
+    expect(outputEvents).toEqual(["human-review.approved", "human-review.rejected"]);
+    expect(outputEventNodes.map((node) => node.outputEvent?.outputId)).toEqual(["human-review.approved", "human-review.rejected"]);
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-output-event-0-trigger.human-review.approved",
+      key: "policy-output-event-0-human-review.approved",
       sourceNodeKey: "policy-0",
-      targetNodeKey: "output-event-0-trigger.human-review.approved",
+      targetNodeKey: "output-event-0-human-review.approved",
       sourceHandleId: "right",
       targetHandleId: "left",
-      eventType: "trigger.human-review.approved",
+      eventType: "human-review.approved",
       label: "approved"
     }));
   });
@@ -516,7 +515,7 @@ describe("calculateLoopCanvasLayout", () => {
     const childNode = layout.nodes.find((node) => node.key === "policy-1");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.rejected");
     const outputEventEdge = layout.edges.find((edge) => edge.key === "policy-output-event-0-build.rejected");
-    const triggerPolicyEdge = layout.edges.find((edge) => edge.key === "trigger-policy-0");
+    const inputEventPolicyEdge = layout.edges.find((edge) => edge.key === "input-event-policy-0");
     const childPolicyEdge = layout.edges.find((edge) => edge.key === "policy-policy-0-1-build.approved");
 
     expect(layout.nodes.filter((node) => node.kind === "policy").map((node) => node.record?.policyId)).toEqual(["first", "child"]);
@@ -530,7 +529,7 @@ describe("calculateLoopCanvasLayout", () => {
       targetHandleId: "left",
       eventType: "build.approved"
     }));
-    expect(triggerPolicyEdge?.label).toBe("project.updated");
+    expect(inputEventPolicyEdge?.label).toBe("updated");
     expect(childPolicyEdge?.label).toBe("approved");
     expect(outputEventNode).toMatchObject({
       kind: "output-event",
@@ -582,7 +581,7 @@ describe("calculateLoopCanvasLayout", () => {
     expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeLessThan(80);
   });
 
-  it("keeps the primary horizontal policy path on the trigger baseline and stacks branches compactly below it", () => {
+  it("keeps the primary horizontal policy path on the input event baseline and stacks branches compactly below it", () => {
     const first = policy("first", undefined, "build");
     const completeChild = policy("complete-child", "build.complete", "deploy");
     const failedChild = policy("failed-child", "build.failed", "debug");
@@ -609,13 +608,13 @@ describe("calculateLoopCanvasLayout", () => {
       ]),
       editingPolicyIndex: null
     });
-    const triggerNode = layout.nodes.find((node) => node.key === "trigger");
+    const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
     const firstNode = layout.nodes.find((node) => node.key === "policy-0");
     const completeChildNode = layout.nodes.find((node) => node.key === "policy-1");
     const failedChildNode = layout.nodes.find((node) => node.key === "policy-2");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.blocked");
 
-    expect(firstNode?.y).toBe(triggerNode?.y);
+    expect(firstNode?.y).toBe(inputEventNode?.y);
     expect(completeChildNode?.y).toBe(firstNode?.y);
     expect(failedChildNode?.y).toBe(firstNode ? firstNode.y + loopPolicyStackHeight() + loopCanvasLayoutConfig.branchGap : undefined);
     expect(outputEventNode?.x).toBe(completeChildNode?.x);
@@ -626,11 +625,11 @@ describe("calculateLoopCanvasLayout", () => {
 
   it("reserves clearance below output ghost nodes before the next horizontal lane", () => {
     const createMilestones = policy("create-milestones", undefined, "create-milestones");
-    createMilestones.trigger = "technical_plan_approved";
+    createMilestones.event = "technical_plan_approved";
     const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
     const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes-requested", "create-milestones");
     const createTaskSpecs = policy("create-task-specs", undefined, "create-task-specs");
-    createTaskSpecs.trigger = "milestones_approved";
+    createTaskSpecs.event = "milestones_approved";
     const challengeTaskSpecs = policy("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
     const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes-requested", "create-task-specs");
     const layout = calculateLoopCanvasLayout({
@@ -719,12 +718,12 @@ describe("calculateLoopCanvasLayout", () => {
 
   it("keeps folded approval edges on right-to-left handles even when they return to an earlier canonical node", () => {
     const createMilestones = policy("create-milestones", undefined, "create-milestones");
-    createMilestones.trigger = "technical_plan_approved";
+    createMilestones.event = "technical_plan_approved";
     const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
     const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes-requested", "create-milestones");
     const doneMilestones = policy("done-milestones", "challenge-milestones.approved", "done");
     const createTaskSpecs = policy("create-task-specs", undefined, "create-task-specs");
-    createTaskSpecs.trigger = "milestones_approved";
+    createTaskSpecs.event = "milestones_approved";
     const challengeTaskSpecs = policy("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
     const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes-requested", "create-task-specs");
     const doneTaskSpecs = policy("done-task-specs", "challenge-task-specs.approved", "done");
@@ -802,7 +801,7 @@ describe("calculateLoopCanvasLayout", () => {
 
   it("keeps return approval edges away from top and bottom handles in implementation review loops", () => {
     const implementTask = policy("implement-task", undefined, "implement-task");
-    implementTask.trigger = "task_specs_approved";
+    implementTask.event = "task_specs_approved";
     const runTests = policy("run-tests", "implement-task.ready", "run-tests");
     const classifyFailure = policy("classify-failure", "implement-task.blocked", "classify-failure");
     const reworkImplementTask = policy("rework-implement-task", "classify-failure.ready", "implement-task");
@@ -862,21 +861,21 @@ describe("calculateLoopCanvasLayout", () => {
     const first = policy("first", undefined, "build");
     const child = policy("child", "build.approved", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id], null, "vertical");
-    const triggerNode = layout.nodes.find((node) => node.key === "trigger");
+    const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
     const firstNode = layout.nodes.find((node) => node.key === "policy-0");
     const childNode = layout.nodes.find((node) => node.key === "policy-1");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.rejected");
-    const triggerPolicyEdge = layout.edges.find((edge) => edge.key === "trigger-policy-0");
+    const inputEventPolicyEdge = layout.edges.find((edge) => edge.key === "input-event-policy-0");
 
     expect(layout.direction).toBe("vertical");
-    expect(triggerNode ? triggerNode.x + triggerNode.width / 2 : undefined).toBe(firstNode ? firstNode.x + firstNode.width / 2 : undefined);
+    expect(inputEventNode ? inputEventNode.x + inputEventNode.width / 2 : undefined).toBe(firstNode ? firstNode.x + firstNode.width / 2 : undefined);
     expect(childNode?.y).toBeGreaterThan(firstNode?.y ?? 0);
     expect(outputEventNode?.x).toBe(childNode ? childNode.x + childNode.width + loopCanvasLayoutConfig.branchGap : undefined);
     expect(outputEventNode?.y).toBe(childNode?.y);
-    expect(triggerPolicyEdge).toMatchObject({
+    expect(inputEventPolicyEdge).toMatchObject({
       sourceHandleId: "right",
       targetHandleId: "left",
-      label: "project.updated"
+      label: "updated"
     });
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-policy-0-1-build.approved",
@@ -888,9 +887,8 @@ describe("calculateLoopCanvasLayout", () => {
   it("links repeated output events directly to existing handler policies", () => {
     const implement = (id: string, event: string | undefined): ProjectPolicy => ({
       id,
-      source: event ? "event" : "trigger",
-      event,
-      trigger: event ? undefined : "plan_approved",
+      source: "event",
+      event: event ?? "plan_approved",
       action: "implement",
       enabled: true
     });
@@ -956,7 +954,7 @@ describe("calculateLoopCanvasLayout", () => {
 
   it("folds roadmap rework into the original create-roadmap node", () => {
     const createRoadmap = policy("p05.on.project-brief-gate-approved.create-roadmap", undefined, "create-roadmap");
-    createRoadmap.trigger = "project-brief-gate.approved";
+    createRoadmap.event = "project-brief-gate.approved";
     const challengeRoadmap = policy("p06.on.roadmap-ready.challenge-roadmap", "create-roadmap.ready", "challenge-roadmap");
     const reworkRoadmap = policy("p07.on.roadmap-rework.create-roadmap", "challenge-roadmap.changes-requested", "create-roadmap");
     const done = policy("p08.on.roadmap-approved.done", "challenge-roadmap.approved", "done");
@@ -1023,7 +1021,7 @@ describe("calculateLoopCanvasLayout", () => {
 });
 
 describe("calculateCompositeLoopCanvasLayout", () => {
-  it("keeps a selected loop alone when no loop starts from its derived trigger", () => {
+  it("keeps a selected loop alone when no loop starts from its output event", () => {
     const config = compositeConfig(["source", "observer"]);
     const layout = calculateCompositeLoopCanvasLayout({
       config,
@@ -1032,7 +1030,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     });
 
     expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
-      "loop:source:trigger",
+      "loop:source:input-event",
       "loop:source:policy-0",
       "loop:source:output-event-0-approved",
       "loop:source:output-event-0-rejected"
@@ -1040,25 +1038,25 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(layout.nodes.some((node) => node.key.startsWith("loop:observer:"))).toBe(false);
   });
 
-  it("renders a derived trigger target loop as a compact loop node below the selected loop", () => {
+  it("renders a derived event target loop as a compact loop node below the selected loop", () => {
     const config = compositeConfig(["source", "target"]);
     const layout = calculateCompositeLoopCanvasLayout({
       config,
       selectedLoopId: "source",
       recordsByLoopId: compositeRecords(config)
     });
-    const sourceTrigger = layout.nodes.find((node) => node.key === "loop:source:trigger");
+    const sourceInputEvent = layout.nodes.find((node) => node.key === "loop:source:input-event");
     const targetLoop = layout.nodes.find((node) => node.key === "loop:target:loop");
     const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:loop");
 
     expect(layout.nodes.every((node) => node.key.startsWith("loop:"))).toBe(true);
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
     expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
-      "loop:source:trigger",
+      "loop:source:input-event",
       "loop:source:policy-0",
       "loop:target:loop"
     ]));
-    expect(layout.nodes.find((node) => node.key === "loop:target:trigger")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:target:input-event")).toBeUndefined();
     expect(layout.nodes.find((node) => node.key === "loop:target:policy-0")).toBeUndefined();
     expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toBeUndefined();
     expect(targetLoop).toMatchObject({
@@ -1068,11 +1066,11 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       loopSummary: {
         loopId: "target",
         label: "target gate loop",
-        trigger: "source-gate.approved",
+        inputEvent: "source-gate.approved",
         action: "target-gate"
       }
     });
-    expect(targetLoop?.y).toBeGreaterThan(sourceTrigger?.y ?? 0);
+    expect(targetLoop?.y).toBeGreaterThan(sourceInputEvent?.y ?? 0);
     expect(targetLoop?.y).toBe(
       Math.max(
         ...layout.nodes
@@ -1085,7 +1083,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       targetNodeKey: "loop:target:loop",
       sourceHandleId: "right",
       targetHandleId: "left",
-      eventType: "trigger.source-gate.approved",
+      eventType: "source-gate.approved",
       label: "approved",
       tone: "cross-loop"
     });
@@ -1118,11 +1116,11 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       selectedLoopId: "source",
       recordsByLoopId: compositeRecords(config)
     });
-    const sourceTrigger = layout.nodes.find((node) => node.key === "loop:source:trigger");
+    const sourceInputEvent = layout.nodes.find((node) => node.key === "loop:source:input-event");
     const upstreamLoop = layout.nodes.find((node) => node.key === "loop:upstream:loop");
     const crossEdge = layout.edges.find((edge) => edge.key === "loop:upstream:output:0:approved:to:source:loop");
 
-    expect(sourceTrigger).toBeDefined();
+    expect(sourceInputEvent).toBeDefined();
     expect(upstreamLoop).toMatchObject({
       kind: "loop",
       loopSummary: {
@@ -1130,14 +1128,14 @@ describe("calculateCompositeLoopCanvasLayout", () => {
         label: "upstream gate loop"
       }
     });
-    expect(upstreamLoop?.y).toBeLessThan(sourceTrigger?.y ?? 0);
-    expect((sourceTrigger?.y ?? 0) - ((upstreamLoop?.y ?? 0) + loopNodeSizes.loop.height)).toBe(
+    expect(upstreamLoop?.y).toBeLessThan(sourceInputEvent?.y ?? 0);
+    expect((sourceInputEvent?.y ?? 0) - ((upstreamLoop?.y ?? 0) + loopNodeSizes.loop.height)).toBe(
       loopCanvasLayoutConfig.selectedCompactLoopRowGap
     );
     expect(layout.nodes.find((node) => node.key === "loop:upstream:policy-0")).toBeUndefined();
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "loop:upstream:loop",
-      targetNodeKey: "loop:source:trigger",
+      targetNodeKey: "loop:source:input-event",
       label: "approved",
       tone: "cross-loop"
     });
@@ -1155,7 +1153,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:rejected:to:target:loop")).toBeUndefined();
   });
 
-  it("protects circular derived trigger loop references from recursive layout", () => {
+  it("protects circular event loop references from recursive layout", () => {
     const config = compositeConfig(["source", "target"], [], "target-gate.approved");
     const layout = calculateCompositeLoopCanvasLayout({
       config,
@@ -1163,7 +1161,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       recordsByLoopId: compositeRecords(config)
     });
 
-    expect(layout.nodes.filter((node) => node.kind === "trigger")).toHaveLength(1);
+    expect(layout.nodes.filter((node) => node.kind === "input-event")).toHaveLength(1);
     expect(layout.nodes.filter((node) => node.kind === "policy")).toHaveLength(1);
     expect(layout.nodes.filter((node) => node.kind === "loop")).toHaveLength(1);
     expect(layout.edges.filter((edge) => edge.tone === "cross-loop")).toHaveLength(2);
@@ -1189,7 +1187,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     const sourceLoop = config.loops.find((loop) => loop.id === "source");
     sourceLoop?.steps.push("branch-source");
     const branchPolicy = policy("branch-start", undefined, "final-gate");
-    branchPolicy.trigger = "branch-gate.approved";
+    branchPolicy.event = "branch-gate.approved";
     config.policies.push(branchPolicy);
     config.loops.push({ id: "branch", steps: [branchPolicy.id] });
     const layout = calculateCompositeLoopCanvasLayout({
@@ -1216,24 +1214,24 @@ describe("calculateCompositeLoopCanvasLayout", () => {
 });
 
 describe("calculateAllLoopsCanvasLayout", () => {
-  it("renders every configured loop row and keeps cross-loop trigger edges", () => {
+  it("renders every configured loop row and keeps cross-loop event edges", () => {
     const config = compositeConfig(["source", "target", "observer"]);
     const layout = calculateAllLoopsCanvasLayout({
       config,
       recordsByLoopId: compositeRecords(config)
     });
-    const sourceTrigger = layout.nodes.find((node) => node.key === "loop:source:trigger");
-    const targetTrigger = layout.nodes.find((node) => node.key === "loop:target:trigger");
-    const observerTrigger = layout.nodes.find((node) => node.key === "loop:observer:trigger");
-    const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:trigger");
+    const sourceInputEvent = layout.nodes.find((node) => node.key === "loop:source:input-event");
+    const targetInputEvent = layout.nodes.find((node) => node.key === "loop:target:input-event");
+    const observerInputEvent = layout.nodes.find((node) => node.key === "loop:observer:input-event");
+    const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:input-event");
 
-    expect(sourceTrigger).toBeDefined();
-    expect(targetTrigger).toBeDefined();
-    expect(observerTrigger).toBeDefined();
+    expect(sourceInputEvent).toBeDefined();
+    expect(targetInputEvent).toBeDefined();
+    expect(observerInputEvent).toBeDefined();
     expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toBeUndefined();
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "loop:source:policy-0",
-      targetNodeKey: "loop:target:trigger",
+      targetNodeKey: "loop:target:input-event",
       sourceHandleId: "right",
       targetHandleId: "left",
       label: "approved",
@@ -1499,9 +1497,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("maps cross-loop approval edges to the green-gray dotted output stroke", () => {
     const [edge] = toLoopReactFlowEdges([{
-      key: "loop:source:output:0:ready:to:target:trigger",
+      key: "loop:source:output:0:ready:to:target:input-event",
       sourceNodeKey: "loop:source:policy-0",
-      targetNodeKey: "loop:target:trigger",
+      targetNodeKey: "loop:target:input-event",
       sourceHandleId: "right",
       targetHandleId: "left",
       tone: "cross-loop",
@@ -1525,9 +1523,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("maps cross-loop rework edges to the red-gray dotted output stroke", () => {
     const [edge] = toLoopReactFlowEdges([{
-      key: "loop:source:output:0:changes-requested:to:target:trigger",
+      key: "loop:source:output:0:changes-requested:to:target:input-event",
       sourceNodeKey: "loop:source:policy-0",
-      targetNodeKey: "loop:target:trigger",
+      targetNodeKey: "loop:target:input-event",
       sourceHandleId: "right",
       targetHandleId: "left",
       tone: "cross-loop",
@@ -1551,9 +1549,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("renders cross-loop edges as smoothstep paths", () => {
     const path = loopCrossLoopSmoothStepPath({
-      id: "loop:source:output:0:ready:to:target:trigger",
+      id: "loop:source:output:0:ready:to:target:input-event",
       source: "loop:source:policy-0",
-      target: "loop:target:trigger",
+      target: "loop:target:input-event",
       selected: false,
       sourceX: 1000,
       sourceY: 76,
@@ -1563,9 +1561,9 @@ describe("toLoopReactFlowEdges", () => {
       targetPosition: Position.Left,
       data: {
         loopEdge: {
-          key: "loop:source:output:0:ready:to:target:trigger",
+          key: "loop:source:output:0:ready:to:target:input-event",
           sourceNodeKey: "loop:source:policy-0",
-          targetNodeKey: "loop:target:trigger",
+          targetNodeKey: "loop:target:input-event",
           tone: "cross-loop"
         }
       }
@@ -1581,9 +1579,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("keeps cross-loop approval edges on the smoothstep loop-to-loop path", () => {
     const path = loopCrossLoopSmoothStepPath({
-      id: "loop:source:output:0:approved:to:target:trigger",
+      id: "loop:source:output:0:approved:to:target:input-event",
       source: "loop:source:policy-0",
-      target: "loop:target:trigger",
+      target: "loop:target:input-event",
       selected: false,
       sourceX: 1000,
       sourceY: 76,
@@ -1593,9 +1591,9 @@ describe("toLoopReactFlowEdges", () => {
       targetPosition: Position.Left,
       data: {
         loopEdge: {
-          key: "loop:source:output:0:approved:to:target:trigger",
+          key: "loop:source:output:0:approved:to:target:input-event",
           sourceNodeKey: "loop:source:policy-0",
-          targetNodeKey: "loop:target:trigger",
+          targetNodeKey: "loop:target:input-event",
           tone: "cross-loop",
           route: { outputId: "approved" }
         }

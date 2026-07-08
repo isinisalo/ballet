@@ -1,7 +1,7 @@
 import { Route, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
-import { loopTriggerLabel } from "./loopGraph";
+import { loopInputEventLabel } from "./loopGraph";
 import { loopAddActionGhostLabel, loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
 import { LoopPolicyNode } from "./LoopPolicyNode";
@@ -44,7 +44,7 @@ function LoopNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds: str
 
 function renderNodeContent(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   if (node.kind === "loop") return renderLoopNode(node);
-  if (node.kind === "trigger") return renderTriggerNode(node, context);
+  if (node.kind === "input-event") return renderInputEventNode(node, context);
   if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(node, context);
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (!node.record) return null;
@@ -69,13 +69,13 @@ function renderLoopNode(node: LoopCanvasLayoutNode) {
   );
 }
 
-function renderTriggerNode(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
-  const value = loopTriggerLabel(node.triggerPolicy ?? context.firstPolicy);
+function renderInputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
+  const value = loopInputEventLabel(node.inputEventPolicy ?? context.firstPolicy);
 
   return (
     <div
       data-loop-node
-      aria-label={`Trigger: ${value}`}
+      aria-label={`Input event: ${value}`}
       title={value}
       className={cn(
         "flex h-[22px] w-full min-w-0 items-center justify-center rounded-md border border-divider-strong bg-card text-foreground",

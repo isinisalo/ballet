@@ -21,21 +21,18 @@ import {
   defaultProjectOutputs,
   generatedPolicyId,
   humanGateResponseId,
-  humanGateApprovalTriggerIdForPolicy,
   normalizeActionOutputSlots,
+  normalizeEventTypeToken,
+  loopQualifiedEventType,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
-  normalizeTriggerToken,
   normalizeLoopId,
   projectOutputRouteKey,
-  projectOutputRouteCanTargetTrigger,
   policyActionTokens,
   policySourceKey,
   policyOutputEventType,
-  triggerEventType,
   uniquePolicyOutputIds,
-  resolvePolicyAgent,
-  loopIdForPolicy
+  resolvePolicyAgent
 } from "../../shared/policy-actions.js";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -150,25 +147,29 @@ const inferLegacyPolicyAction = (value: Record<string, unknown>): string => {
 type LegacyPolicy = {
   rawId: string;
   loopId?: string;
-  source: ProjectPolicy["source"];
-  event?: string;
-  trigger?: string;
+  source: "event";
+  event: string;
   action: string;
   agentToken: string;
   enabled: boolean;
 };
 
+const stripLegacyTriggerEventPrefix = (value: string): string =>
+  value.startsWith("trigger.") ? value.slice("trigger.".length) : value;
+
+const normalizeLegacyEventType = (value: string): string =>
+  normalizeEventTypeToken(stripLegacyTriggerEventPrefix(normalizePolicyOutputEventType(value)));
+
 const readLegacyPolicy = (value: Record<string, unknown>): LegacyPolicy => {
   const run = isRecord(value.run) ? value.run : {};
-  const event = normalizePolicyOutputEventType(stringValue(value.event) || stringValue(value.on));
-  const trigger = normalizeTriggerToken(stringValue(value.trigger));
-  const source: ProjectPolicy["source"] = stringValue(value.source) === "trigger" || trigger ? "trigger" : "event";
+  const rawEvent = stringValue(value.event) || stringValue(value.on);
+  const rawTrigger = stringValue(value.trigger);
+  const event = normalizeLegacyEventType(rawTrigger || rawEvent);
   return {
     rawId: stringValue(value.id),
     loopId: normalizeLoopId(stringValue(value.loopId)) || undefined,
-    source,
-    event: source === "event" ? event : undefined,
-    trigger: source === "trigger" ? trigger : undefined,
+    source: "event",
+    event,
     action: normalizePolicyToken(stringValue(value.action) || inferLegacyPolicyAction(value)),
     agentToken: normalizeAgentPolicyToken(stringValue(value.agent) || stringValue(run.agent)),
     enabled: typeof value.enabled === "boolean" ? value.enabled : false
@@ -197,7 +198,7 @@ const addOutputEventRewrite = (
   outputId: string
 ) => {
   rewrite.eventIdByLegacyEvent.set(
-    normalizePolicyOutputEventType(legacyEvent),
+    normalizeLegacyEventType(legacyEvent),
     policyOutputEventType({ action: action.id }, outputId)
   );
 };
@@ -331,44 +332,21 @@ const createActions = (
 
 const normalizeEvent = (event: string | undefined, rewrite: ActionRewrite): string | undefined => {
   if (!event) return event;
-  const normalized = normalizePolicyOutputEventType(event);
+  const normalized = normalizeLegacyEventType(event);
   return rewrite.eventIdByLegacyEvent.get(normalized) ?? normalized;
-};
-
-const loopQualifiedPolicyEvent = (event: string | undefined, loopId: string | undefined): string | undefined => {
-  const normalizedEvent = normalizeTriggerToken(event ?? "");
-  const normalizedLoopId = normalizeLoopId(loopId ?? "");
-  if (!normalizedEvent) return undefined;
-  if (!normalizedLoopId || normalizedEvent.startsWith(`${normalizedLoopId}.`)) return normalizedEvent;
-  return `${normalizedLoopId}.${normalizedEvent}`;
 };
 
 const normalizePolicy = (
   value: LegacyPolicy,
-  rewrite: ActionRewrite,
-  legacyTriggerIdMap: ReadonlyMap<string, string> = new Map(),
-  derivedTriggerIdSet: ReadonlySet<string> = new Set(),
-  approvalEventTriggerIdMap: ReadonlyMap<string, string> = new Map()
+  rewrite: ActionRewrite
 ): ProjectPolicy => {
   const action = rewrite.actionIdByLegacyAgent.get(`${value.action}:${value.agentToken}`) ?? value.action;
   const loopId = normalizeLoopId(value.loopId ?? "") || undefined;
-  const event = value.source === "event" ? normalizeEvent(value.event, rewrite) : undefined;
-  const eventTrigger = event ? approvalEventTriggerIdMap.get(event) : undefined;
-  const explicitTriggerEvent = event?.startsWith("trigger.") ? normalizeTriggerToken(event.slice("trigger.".length)) : undefined;
-  const normalizedTrigger = value.trigger ? normalizeTriggerToken(normalizeEvent(value.trigger, rewrite) ?? value.trigger) : undefined;
-  const mappedTrigger = normalizedTrigger ? legacyTriggerIdMap.get(normalizedTrigger) : undefined;
-  const currentDerivedTrigger = normalizedTrigger && derivedTriggerIdSet.has(normalizedTrigger) ? normalizedTrigger : undefined;
-  const explicitPolicyTrigger = normalizedTrigger || undefined;
-  const trigger = mappedTrigger ?? currentDerivedTrigger ?? eventTrigger ?? explicitTriggerEvent ?? explicitPolicyTrigger;
+  const event = normalizeEvent(value.event, rewrite) ?? "";
   const normalized = {
     ...(loopId ? { loopId } : {}),
-    source: trigger ? "trigger" as const : value.source === "trigger" ? "event" as const : value.source,
-    event: value.source === "event" && !eventTrigger && !explicitTriggerEvent
-      ? loopQualifiedPolicyEvent(event, loopId)
-      : !trigger && value.trigger
-        ? triggerEventType(value.trigger)
-        : undefined,
-    trigger: trigger || undefined,
+    source: "event" as const,
+    event,
     action,
     enabled: value.enabled
   };
@@ -390,21 +368,10 @@ const normalizeLoop = (value: Record<string, unknown>, policyIdMap: Map<string, 
   steps: stringArray(value.steps).map((step) => policyIdMap.get(step) ?? step)
 });
 
-const normalizeLoopsFromStartingTriggers = (
-  loops: ProjectLoop[],
-  policies: ProjectPolicy[]
-): { loops: ProjectLoop[]; loopIdMap: Map<string, string> } => {
-  const policyById = new Map(policies.map((policy) => [policy.id, policy]));
-  const loopIdMap = new Map<string, string>();
-  const normalizedLoops = loops.map((loop) => {
-    const oldId = normalizeLoopId(loop.id);
-    const derivedId = loopIdForPolicy(policyById.get(loop.steps[0] ?? ""));
-    const id = derivedId || oldId;
-    if (oldId && derivedId && oldId !== derivedId) loopIdMap.set(oldId, derivedId);
-    return { ...loop, id };
-  });
-  return { loops: normalizedLoops, loopIdMap };
-};
+const normalizeLoopIds = (loops: ProjectLoop[]): { loops: ProjectLoop[]; loopIdMap: Map<string, string> } => ({
+  loops: loops.map((loop) => ({ ...loop, id: normalizeLoopId(loop.id) })),
+  loopIdMap: new Map()
+});
 
 type LoopScopedPolicies = {
   policies: ProjectPolicy[];
@@ -422,12 +389,12 @@ const uniqueLoopIds = (loopIds: string[]): string[] =>
 const uniqueStrings = (values: string[]): string[] =>
   [...new Set(values.filter(Boolean))];
 
-const policyWithLoopId = (policy: ProjectPolicy, loopId: string): ProjectPolicy => {
+const policyWithLoopId = (policy: ProjectPolicy, loopId: string, options: { keepInputEvent?: boolean } = {}): ProjectPolicy => {
   const normalizedLoopId = normalizeLoopId(loopId);
   const scoped: ProjectPolicy = {
     ...policy,
     loopId: normalizedLoopId,
-    event: policy.source === "event" ? loopQualifiedPolicyEvent(policy.event, normalizedLoopId) : policy.event
+    event: options.keepInputEvent ? policy.event : loopQualifiedEventType({ event: policy.event, loopId: normalizedLoopId })
   };
   return {
     ...scoped,
@@ -460,7 +427,8 @@ const normalizeLoopScopedPolicies = (
   const policyIdByLoopAndBaseId = new Map<string, string>();
 
   const addScopedPolicy = (basePolicyId: string, policy: ProjectPolicy, loopId?: string): ProjectPolicy => {
-    const scopedPolicy = loopId ? policyWithLoopId(policy, loopId) : policyWithoutLoopId(policy);
+    const keepInputEvent = Boolean(loopId && loops.some((loop) => loop.id === loopId && loop.steps[0] === basePolicyId));
+    const scopedPolicy = loopId ? policyWithLoopId(policy, loopId, { keepInputEvent }) : policyWithoutLoopId(policy);
     scopedById.set(scopedPolicy.id, scopedById.get(scopedPolicy.id) ?? scopedPolicy);
     policyIdsByBaseId.set(basePolicyId, uniqueStrings([...(policyIdsByBaseId.get(basePolicyId) ?? []), scopedPolicy.id]));
     if (loopId) policyIdByLoopAndBaseId.set(loopPolicyKey(loopId, basePolicyId), scopedPolicy.id);
@@ -526,6 +494,12 @@ const policyTargetForSource = (
     return targetPolicy ? { type: "policy", policyId: targetPolicy.id } : undefined;
   }
 
+  if (value.type === "trigger") {
+    const eventType = normalizeEvent(stringValue(value.trigger), rewrite);
+    const targetPolicy = eventType ? eventPolicyForEventType(policies, eventType) : undefined;
+    return targetPolicy ? { type: "policy", policyId: targetPolicy.id } : undefined;
+  }
+
   return undefined;
 };
 
@@ -553,7 +527,6 @@ const normalizeOutputRoutes = (
         ? canonicalOutputIdForLegacyOutput(rawOutputId, action.outputIds.indexOf(rawOutputId), action)
         : canonicalOutputIdForLegacyOutput(rawOutputId, 0);
       if (!sourcePolicyId || !outputId || !target) return;
-      if (policy && projectOutputRouteCanTargetTrigger(policy, outputId, actions)) return;
       routesByKey.set(projectOutputRouteKey(sourcePolicyId, outputId), {
         sourcePolicyId,
         outputId,
@@ -579,7 +552,6 @@ const inferLoopScopedOutputRoutes = (
   policies.forEach((policy) => {
     if (!policy.loopId) return;
     actionOutputIds(actions, policy.action).forEach((outputId) => {
-      if (projectOutputRouteCanTargetTrigger(policy, outputId, actions)) return;
       const routeKey = projectOutputRouteKey(policy.id, outputId);
       if (routesByKey.has(routeKey)) return;
       const loopEventType = policyOutputEventType(policy, outputId);
@@ -589,6 +561,9 @@ const inferLoopScopedOutputRoutes = (
       const targetPolicy = eventPolicies.find((candidate) =>
         candidate.loopId &&
         candidate.event === policyOutputEventType({ action: policy.action, loopId: candidate.loopId }, outputId)
+      ) ?? eventPolicies.find((candidate) =>
+        candidate.loopId &&
+        candidate.event === legacyEventType
       );
       if (!targetPolicy || targetPolicy.event === loopEventType || !targetPolicy.event.endsWith(legacyEventType)) return;
       routesByKey.set(routeKey, {
@@ -603,39 +578,6 @@ const inferLoopScopedOutputRoutes = (
   });
 
   return [...routesByKey.values()];
-};
-
-const legacyTriggerTarget = (target: unknown): string | undefined => {
-  if (!isRecord(target) || target.type !== "trigger") return undefined;
-  const trigger = normalizeTriggerToken(stringValue(target.trigger));
-  return trigger || undefined;
-};
-
-const legacyTriggerIdMapFromOutputRoutes = (
-  value: unknown,
-  policyIdMap: Map<string, string>,
-  policies: ProjectPolicy[],
-  actions: ProjectAction[]
-): Map<string, string> => {
-  const policyById = new Map(policies.map((policy) => [policy.id, policy]));
-  const triggerIdMap = new Map<string, string>();
-
-  recordArray(value).forEach((route) => {
-    const legacyTrigger = legacyTriggerTarget(route.target);
-    if (!legacyTrigger) return;
-    const sourcePolicyId = policyIdMap.get(stringValue(route.sourcePolicyId)) ?? stringValue(route.sourcePolicyId);
-    const sourcePolicy = policyById.get(sourcePolicyId);
-    const sourceAction = sourcePolicy ? actions.find((action) => action.id === sourcePolicy.action) : undefined;
-    const rawOutputId = normalizePolicyToken(stringValue(route.outputId));
-    const outputId = sourceAction
-      ? canonicalOutputIdForLegacyOutput(rawOutputId, sourceAction.outputIds.indexOf(rawOutputId), sourceAction)
-      : canonicalOutputIdForLegacyOutput(rawOutputId, 0);
-    if (!sourcePolicy || !outputId) return;
-    const derivedTrigger = humanGateApprovalTriggerIdForPolicy(sourcePolicy, outputId, actions);
-    if (derivedTrigger) triggerIdMap.set(legacyTrigger, derivedTrigger);
-  });
-
-  return triggerIdMap;
 };
 
 type LegacyGateRouteMigration = {
@@ -851,22 +793,6 @@ const outputsWithActionOutputIds = (outputs: ProjectOutput[], actions: ProjectAc
   return [...outputById.values()];
 };
 
-const derivedHumanGateTriggerIds = (actions: ProjectAction[]): Set<string> =>
-  new Set(actions.flatMap((action) => {
-    if (!action.humanGate) return [];
-    const approvalOutputId = action.outputIds[0];
-    const trigger = approvalOutputId ? humanGateApprovalTriggerIdForPolicy({ action: action.id }, approvalOutputId, actions) : undefined;
-    return trigger ? [trigger] : [];
-  }));
-
-const humanGateApprovalEventTriggerIdMap = (actions: ProjectAction[]): Map<string, string> =>
-  new Map(actions.flatMap((action) => {
-    if (!action.humanGate) return [];
-    const approvalOutputId = action.outputIds[0];
-    const trigger = approvalOutputId ? humanGateApprovalTriggerIdForPolicy({ action: action.id }, approvalOutputId, actions) : undefined;
-    return trigger ? [[policyOutputEventType({ action: action.id }, approvalOutputId), trigger] as const] : [];
-  }));
-
 export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[] = []): ProjectAutomationConfig => {
   const input = migrateProjectAutomationConfigInput(value);
   if (!isRecord(input)) return defaultProjectAutomationConfig();
@@ -888,31 +814,13 @@ export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[]
     agents
   );
   const outputs = outputsWithActionOutputIds(rawOutputs, actions);
-  const derivedTriggerIdSet = derivedHumanGateTriggerIds(actions);
-  const approvalEventTriggerIdMap = humanGateApprovalEventTriggerIdMap(actions);
-
-  const initialPolicyPairs = legacyPolicies.map((policy) => ({
+  const policyPairs = legacyPolicies.map((policy) => ({
     rawId: policy.rawId,
-    normalized: normalizePolicy(policy, rewrite, new Map(), derivedTriggerIdSet, approvalEventTriggerIdMap)
-  }));
-  const initialPolicyIdMap = new Map(initialPolicyPairs
-    .filter((pair) => pair.rawId && pair.rawId !== pair.normalized.id)
-    .map((pair) => [pair.rawId, pair.normalized.id]));
-  const legacyTriggerIdMap = legacyTriggerIdMapFromOutputRoutes(
-    input.outputRoutes,
-    initialPolicyIdMap,
-    initialPolicyPairs.map((pair) => pair.normalized),
-    actions
-  );
-  const policyPairs = legacyPolicies.map((policy, index) => ({
-    rawId: policy.rawId,
-    initialId: initialPolicyPairs[index]?.normalized.id,
-    normalized: normalizePolicy(policy, rewrite, legacyTriggerIdMap, derivedTriggerIdSet, approvalEventTriggerIdMap)
+    normalized: normalizePolicy(policy, rewrite)
   }));
   const policyIdMap = new Map<string, string>();
   policyPairs.forEach((pair) => {
     if (pair.rawId && pair.rawId !== pair.normalized.id) policyIdMap.set(pair.rawId, pair.normalized.id);
-    if (pair.initialId && pair.initialId !== pair.normalized.id) policyIdMap.set(pair.initialId, pair.normalized.id);
   });
   const loops = recordArray(input.loops).map((loop) => normalizeLoop(loop, policyIdMap));
   const migratedGateRoutes = migrateLegacyGateRoutes({
@@ -923,10 +831,7 @@ export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[]
     gateActionIdByLegacyGateId,
     actions
   });
-  const normalizedLoops = normalizeLoopsFromStartingTriggers(
-    migratedGateRoutes.loops,
-    migratedGateRoutes.policies
-  );
+  const normalizedLoops = normalizeLoopIds(migratedGateRoutes.loops);
   const loopScoped = normalizeLoopScopedPolicies(migratedGateRoutes.policies, normalizedLoops.loops);
   const actionById = new Map(actions.map((action) => [action.id, action]));
   const outputRoutes = normalizeOutputRoutes(input.outputRoutes, policyIdMap, loopScoped.policyIdsByBaseId, loopScoped.policies, actions, rewrite);

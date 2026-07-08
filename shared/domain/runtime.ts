@@ -30,7 +30,7 @@ export interface AgentRunOutput {
   status: AgentOutputEventStatus;
   outcome?: AgentOutcomeStatus;
   summary?: string;
-  triggerEventId?: string;
+  inputEventId?: string;
   policyId?: string;
   policyVersion?: number;
   payload?: Record<string, unknown>;
@@ -56,8 +56,8 @@ export interface AgentOutcome {
 
 export interface AgentRun {
   runId: string;
-  triggerEventId: string;
-  triggerEventSeq?: number;
+  inputEventId: string;
+  inputEventSeq?: number;
   policyId: string;
   policyVersion: number;
   agentRole: string;

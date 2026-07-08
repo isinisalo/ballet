@@ -16,7 +16,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const findAgent = (data: AppData, role: string): Agent | undefined => data.agents.find((agent) => agent.id === role);
 
-const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): string => {
+const buildRunPrompt = (run: AgentRun, inputEvent: RuntimeEvent, agent: Agent): string => {
   return [
     "Käsittele seuraava Ballet runtime -agent_run.",
     "",
@@ -30,8 +30,8 @@ const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): str
     `policy_id: ${run.policyId}`,
     `policy_version: ${run.policyVersion}`,
     "",
-    "Trigger event:",
-    JSON.stringify(trigger, null, 2),
+    "Input event:",
+    JSON.stringify(inputEvent, null, 2),
     "",
     "Outcome-ohje:",
     "- Käytä outcome=ready vain, kun työ on valmis ja olet validoinut olennaiset tarkistukset.",
@@ -64,7 +64,7 @@ const completeFailed = (run: AgentRun, error: unknown, data?: AppData) => {
 
 const completeWithOutcome = (
   run: AgentRun,
-  trigger: RuntimeEvent,
+  inputEvent: RuntimeEvent,
   outcome: AgentOutcome,
   data: AppData,
   threadId?: string,
@@ -98,7 +98,7 @@ const completeWithOutcome = (
   });
 
   if (threadId) {
-    store.runtimeDatabase().upsertThreadBinding(trigger.subject, run.agentRole, threadId);
+    store.runtimeDatabase().upsertThreadBinding(inputEvent.subject, run.agentRole, threadId);
   }
   store.runtimeDatabase().appendRunLog(run.runId, error ? "error" : "info", error ?? `Run completed with outcome ${outcome.outcome}.`, {
     domain_event_type: result.event?.type
@@ -120,14 +120,14 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
     const agent = findAgent(data, run.agentRole);
     if (!agent) throw new Error(`Agent role ${run.agentRole} was not found in .codex/agents.`);
     if (!agent.enabled) throw new Error(`Agent role ${run.agentRole} is disabled.`);
-    const trigger = runtime.getTriggerEvent(run);
-    if (!trigger) throw new Error(`Trigger event ${run.triggerEventId} was not found.`);
-    const resumeThreadId = runtime.getThreadBinding(trigger.subject, run.agentRole) ?? run.threadId;
-    const prompt = buildRunPrompt(run, trigger, agent);
+    const inputEvent = runtime.getInputEvent(run);
+    if (!inputEvent) throw new Error(`Input event ${run.inputEventId} was not found.`);
+    const resumeThreadId = runtime.getThreadBinding(inputEvent.subject, run.agentRole) ?? run.threadId;
+    const prompt = buildRunPrompt(run, inputEvent, agent);
 
     const result = await runCodexAgent({
       runId: run.runId,
-      workItemId: trigger.subject,
+      workItemId: inputEvent.subject,
       agentRole: run.agentRole,
       agent,
       prompt,
@@ -141,7 +141,7 @@ export const runAgentWorkerOnce = async (): Promise<boolean> => {
       onLog: (level, message, details) => runtime.appendRunLog(run.runId, level, message, details)
     });
 
-    completeWithOutcome(run, trigger, result.outcome, data, result.threadId, result.turnId);
+    completeWithOutcome(run, inputEvent, result.outcome, data, result.threadId, result.turnId);
   } catch (error) {
     completeFailed(run, error, data);
   }

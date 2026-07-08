@@ -1,8 +1,8 @@
 import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
-import { humanGateApprovalTriggerIdForPolicy, policyOutputEventType, projectOutputRouteTargetPolicy } from "@shared/policy-actions";
+import { policyOutputEventType, projectOutputRouteTargetPolicy } from "@shared/policy-actions";
 
 export type ActionOutputTarget = {
-  type: "event" | "policy" | "trigger";
+  type: "event" | "policy";
   id: string;
   label: string;
 };
@@ -12,11 +12,6 @@ const outputTargetsForPolicy = (
   outputId: string,
   config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "policies">
 ): ActionOutputTarget[] => {
-  const derivedTriggerId = humanGateApprovalTriggerIdForPolicy(policy, outputId, config.actions);
-  if (derivedTriggerId) {
-    return [{ type: "trigger", id: derivedTriggerId, label: derivedTriggerId }];
-  }
-
   const targetPolicy = projectOutputRouteTargetPolicy(policy, outputId, config.outputRoutes, config.actions, config.policies);
   if (targetPolicy) {
     return [{ type: "policy", id: targetPolicy.id, label: targetPolicy.id }];

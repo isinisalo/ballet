@@ -1,12 +1,11 @@
 import type { ProjectPolicy } from "@shared/api/workspace-contracts";
 import { describe, expect, it } from "vitest";
-import { buildLoopGraph, loopFoldedRecords, loopOutputEvents, loopTriggerLabel } from "../src/workspace/automation/loops/loopGraph";
+import { buildLoopGraph, loopFoldedRecords, loopInputEventLabel, loopOutputEvents } from "../src/workspace/automation/loops/loopGraph";
 
 const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
   id: patch.id ?? "policy",
-  source: patch.source ?? "event",
-  event: patch.event,
-  trigger: patch.trigger,
+  source: "event",
+  event: patch.event ?? "manual-start",
   action: patch.action ?? "build",
   enabled: true
 });
@@ -38,15 +37,15 @@ describe("loop graph", () => {
     ]);
   });
 
-  it("keeps orphan policies as roots and labels triggers", () => {
-    const triggerPolicy = policy({ source: "trigger", trigger: "manual-start", event: undefined });
-    expect(loopTriggerLabel(triggerPolicy)).toBe("manual-start");
+  it("keeps orphan policies as roots and labels input events", () => {
+    const eventPolicy = policy({ event: "manual-start" });
+    expect(loopInputEventLabel(eventPolicy)).toBe("manual-start");
     expect(loopOutputEvents(undefined)).toEqual(["Missing policy"]);
     expect(buildLoopGraph([{ policyId: "orphan", index: 0 }]).rootRecords).toEqual([{ policyId: "orphan", index: 0 }]);
   });
 
   it("groups repeated policy records by action id for folded visualization", () => {
-    const first = policy({ id: "first-build", source: "trigger", trigger: "manual-start", event: undefined, action: "build" });
+    const first = policy({ id: "first-build", event: "manual-start", action: "build" });
     const review = policy({ id: "review", event: "build.ready", action: "review" });
     const rework = policy({ id: "rework-build", event: "review.changes-requested", action: "build" });
     const records = [

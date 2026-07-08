@@ -1,23 +1,10 @@
 import type { ProjectAutomationConfig, ProjectOutputTarget } from "@shared/api/workspace-contracts";
-import { humanGateApprovalTriggerIdForPolicy, policyOutputEventType, projectOutputRouteTargetPolicy } from "@shared/policy-actions";
-
-export const loopTriggerTargetSelectPrefix = "trigger:";
+import { policyOutputEventType, projectOutputRouteTargetPolicy } from "@shared/policy-actions";
 
 export type LoopOutputTargetDisplay = {
-  type: "event" | "trigger";
+  type: "event";
   label: string;
 };
-
-export function loopOutputTargetCanSelectTrigger(
-  _config: Pick<ProjectAutomationConfig, "actions" | "policies">,
-  _sourcePolicyId: string,
-  _outputId: string
-): boolean {
-  void _config;
-  void _sourcePolicyId;
-  void _outputId;
-  return false;
-}
 
 export function loopOutputTargetSelectValue(
   config: Pick<ProjectAutomationConfig, "outputRoutes">,
@@ -45,11 +32,6 @@ export function loopOutputTargetDisplay(
   outputId: string
 ): LoopOutputTargetDisplay {
   const policy = config.policies.find((candidate) => candidate.id === sourcePolicyId);
-  const derivedTriggerId = policy ? humanGateApprovalTriggerIdForPolicy(policy, outputId, config.actions) : undefined;
-  if (derivedTriggerId) {
-    return { type: "trigger", label: derivedTriggerId };
-  }
-
   const targetPolicy = policy
     ? projectOutputRouteTargetPolicy(policy, outputId, config.outputRoutes, config.actions, config.policies)
     : undefined;

@@ -127,32 +127,32 @@ export class AgentRunStore {
     return rows.map(toAgentRunLog);
   }
 
-  getRunsForTrigger(triggerEventId: string): AgentRun[] {
+  getRunsForInputEvent(inputEventId: string): AgentRun[] {
     const rows = this.connection().prepare(`
       SELECT *
       FROM agent_runs
-      WHERE trigger_event_id = ?
+      WHERE input_event_id = ?
       ORDER BY created_at ASC, run_id ASC
-    `).all(triggerEventId) as AgentRunRow[];
+    `).all(inputEventId) as AgentRunRow[];
     return rows.map(toAgentRun);
   }
 
-  getRunsForPolicyTrigger(triggerEventId: string, policyId: string): AgentRun[] {
+  getRunsForPolicyInputEvent(inputEventId: string, policyId: string): AgentRun[] {
     const rows = this.connection().prepare(`
       SELECT *
       FROM agent_runs
-      WHERE trigger_event_id = ? AND policy_id = ?
+      WHERE input_event_id = ? AND policy_id = ?
       ORDER BY created_at ASC, run_id ASC
-    `).all(triggerEventId, policyId) as AgentRunRow[];
+    `).all(inputEventId, policyId) as AgentRunRow[];
     return rows.map(toAgentRun);
   }
 
-  getRunByDedupe(triggerEventId: string, policyId: string, policyVersion: number, agentRole: string): AgentRun | undefined {
+  getRunByDedupe(inputEventId: string, policyId: string, policyVersion: number, agentRole: string): AgentRun | undefined {
     const row = this.connection().prepare(`
       SELECT *
       FROM agent_runs
-      WHERE trigger_event_id = ? AND policy_id = ? AND policy_version = ? AND agent_role = ?
-    `).get(triggerEventId, policyId, policyVersion, agentRole) as AgentRunRow | undefined;
+      WHERE input_event_id = ? AND policy_id = ? AND policy_version = ? AND agent_role = ?
+    `).get(inputEventId, policyId, policyVersion, agentRole) as AgentRunRow | undefined;
     return row ? toAgentRun(row) : undefined;
   }
 }

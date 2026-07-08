@@ -31,8 +31,8 @@ export class RuntimeMigrator {
 
       CREATE TABLE IF NOT EXISTS agent_runs (
         run_id TEXT PRIMARY KEY,
-        trigger_event_id TEXT NOT NULL,
-        trigger_event_seq INTEGER,
+        input_event_id TEXT NOT NULL,
+        input_event_seq INTEGER,
         policy_id TEXT NOT NULL,
         policy_version INTEGER NOT NULL,
         agent_role TEXT NOT NULL,
@@ -47,8 +47,8 @@ export class RuntimeMigrator {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         completed_at TEXT,
-        UNIQUE(trigger_event_id, policy_id, policy_version, agent_role),
-        FOREIGN KEY(trigger_event_seq) REFERENCES events(seq) ON DELETE SET NULL
+        UNIQUE(input_event_id, policy_id, policy_version, agent_role),
+        FOREIGN KEY(input_event_seq) REFERENCES events(seq) ON DELETE SET NULL
       );
 
       CREATE TABLE IF NOT EXISTS agent_run_logs (
@@ -72,7 +72,6 @@ export class RuntimeMigrator {
       CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
       CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_id);
       CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status, lease_until);
-      CREATE INDEX IF NOT EXISTS idx_agent_runs_trigger ON agent_runs(trigger_event_id);
     `);
 
     const eventColumns = new Set((db.prepare("PRAGMA table_info(events)").all() as Array<{ name: string }>).map((column) => column.name));
@@ -80,5 +79,15 @@ export class RuntimeMigrator {
     if (!eventColumns.has("correlation_depth")) db.exec("ALTER TABLE events ADD COLUMN correlation_depth INTEGER NOT NULL DEFAULT 0");
     if (!eventColumns.has("routing_json")) db.exec("ALTER TABLE events ADD COLUMN routing_json TEXT");
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedupe_key ON events(dedupe_key) WHERE dedupe_key IS NOT NULL");
+
+    const agentRunColumns = new Set((db.prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>).map((column) => column.name));
+    if (agentRunColumns.has("trigger_event_id") && !agentRunColumns.has("input_event_id")) {
+      db.exec("ALTER TABLE agent_runs RENAME COLUMN trigger_event_id TO input_event_id");
+    }
+    if (agentRunColumns.has("trigger_event_seq") && !agentRunColumns.has("input_event_seq")) {
+      db.exec("ALTER TABLE agent_runs RENAME COLUMN trigger_event_seq TO input_event_seq");
+    }
+    db.exec("DROP INDEX IF EXISTS idx_agent_runs_trigger");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_agent_runs_input_event ON agent_runs(input_event_id)");
   }
 }

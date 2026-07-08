@@ -31,8 +31,8 @@ export interface EventRow {
 
 export interface AgentRunRow {
   run_id: string;
-  trigger_event_id: string;
-  trigger_event_seq: number | null;
+  input_event_id: string;
+  input_event_seq: number | null;
   policy_id: string;
   policy_version: number;
   agent_role: string;

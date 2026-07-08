@@ -12,10 +12,10 @@ import {
 import { loopNodeSizes } from "./loopLayoutConfig";
 import {
   loopOutputEventNodeWidth,
+  loopInputEventNodeWidth,
   loopOutputSourceHandleId,
   loopOutputTargetHandleId,
-  loopPolicyNodeWidth,
-  loopTriggerNodeWidth
+  loopPolicyNodeWidth
 } from "./loopLayoutSizing";
 import type { LoopCanvasLayoutNodeDraft, LoopDagreEdge, LoopLayoutDirection } from "./loopLayoutTypes";
 
@@ -41,7 +41,6 @@ export type LoopLayoutGraphDraftContext = {
 
 export function loopPolicyInputEdgeLabel(record: LoopStepRecord) {
   if (!record.policy) return undefined;
-  if (record.policy.source === "trigger") return record.policy.trigger || "Missing trigger";
   return record.policy.event ? loopEventOutputLabel(record.policy.event) : "Missing event";
 }
 
@@ -93,8 +92,7 @@ export function addOutputEventNode(
     outputEvent: {
       outputId: output.outputId,
       eventType: output.eventType,
-      outputType: output.type,
-      ...(output.type === "trigger" ? { trigger: output.trigger, loopId: output.loopId } : {})
+      outputType: output.type
     },
     sourcePolicyId: record.policyId,
     outputIndex
@@ -112,12 +110,12 @@ export function addOutputEventNode(
   });
 }
 
-export function addTriggerNode(context: LoopLayoutGraphDraftContext) {
+export function addInputEventNode(context: LoopLayoutGraphDraftContext) {
   addNode(context, {
-    key: "trigger",
-    kind: "trigger",
-    width: loopTriggerNodeWidth(),
-    height: loopNodeSizes.trigger.height,
+    key: "input-event",
+    kind: "input-event",
+    width: loopInputEventNodeWidth(),
+    height: loopNodeSizes.inputEvent.height,
     direction: context.direction
   });
 }
@@ -130,10 +128,10 @@ export function addFirstPolicyGhost(context: LoopLayoutGraphDraftContext) {
     height: loopNodeSizes.event.height,
     direction: context.direction
   });
-  addDagreEdge(context, { source: "trigger", target: "first-policy-ghost" });
+  addDagreEdge(context, { source: "input-event", target: "first-policy-ghost" });
   addCanvasEdge(context, {
-    key: "trigger-first-policy",
-    sourceNodeKey: "trigger",
+    key: "input-event-first-policy",
+    sourceNodeKey: "input-event",
     targetNodeKey: "first-policy-ghost",
     sourceHandleId: context.sourceHandleId,
     targetHandleId: context.targetHandleId,

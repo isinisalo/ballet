@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type LoopNodeTone = "trigger" | "policy" | "agent" | "event";
+type LoopNodeTone = "input-event" | "policy" | "agent" | "event";
 
 const loopNodeToneClasses: Record<LoopNodeTone, string> = {
-  trigger: "text-tertiary",
+  "input-event": "text-tertiary",
   policy: "text-primary",
   agent: "text-secondary",
   event: "text-primary"

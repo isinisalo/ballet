@@ -36,7 +36,7 @@ export function mapAgentOutputToEvent(
       ...(output.outcome ? { outcome: output.outcome } : {}),
       ...(output.summary ? { summary: output.summary } : {}),
       ...(output.runId ? { run_id: output.runId } : {}),
-      ...(output.triggerEventId ? { trigger_event_id: output.triggerEventId } : {}),
+      ...(output.inputEventId ? { input_event_id: output.inputEventId } : {}),
       ...(output.policyId ? { policy_id: output.policyId } : {}),
       ...(output.policyVersion ? { policy_version: output.policyVersion } : {}),
       ...(output.payload ? { payload: output.payload } : {})

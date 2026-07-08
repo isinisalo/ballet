@@ -1,5 +1,5 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { humanGateApprovalTriggerIdForPolicy, projectOutputRouteEventType, triggerEventType } from "@shared/policy-actions";
+import { projectOutputRouteEventType } from "@shared/policy-actions";
 
 export type LoopOutputActionHandler = {
   type: "action";
@@ -11,16 +11,7 @@ export type LoopOutputActionHandler = {
   label: string;
 };
 
-export type LoopOutputTriggerHandler = {
-  type: "trigger";
-  outputId: string;
-  eventType: string;
-  triggerId: string;
-  loopId?: string;
-  label: string;
-};
-
-export type LoopOutputHandler = LoopOutputActionHandler | LoopOutputTriggerHandler;
+export type LoopOutputHandler = LoopOutputActionHandler;
 
 export function loopOutputHandlerForOutput(
   config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "policies" | "loops">,
@@ -31,17 +22,6 @@ export function loopOutputHandlerForOutput(
   const loop = config.loops.find((candidate) => candidate.id === loopId);
   const sourcePolicy = config.policies.find((candidate) => candidate.id === sourcePolicyId);
   if (!loop || !sourcePolicy) return undefined;
-
-  const derivedTriggerId = humanGateApprovalTriggerIdForPolicy(sourcePolicy, outputId, config.actions);
-  if (derivedTriggerId) {
-    return {
-      type: "trigger",
-      outputId,
-      eventType: triggerEventType(derivedTriggerId),
-      triggerId: derivedTriggerId,
-      label: derivedTriggerId
-    };
-  }
 
   const eventType = projectOutputRouteEventType(sourcePolicy, outputId, config.outputRoutes, config.actions, config.policies);
   const handler = loop.steps

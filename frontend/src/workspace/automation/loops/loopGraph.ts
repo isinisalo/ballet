@@ -2,18 +2,11 @@ import type { ProjectPolicy } from "@shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "@shared/policy-actions";
 
 export type LoopOutputTarget =
-  | {
-      outputId: string;
-      eventType: string;
-      type: "event";
-    }
-  | {
-      outputId: string;
-      eventType: string;
-      type: "trigger";
-      trigger: string;
-      loopId?: string;
-    };
+  {
+    outputId: string;
+    eventType: string;
+    type: "event";
+  };
 
 export type LoopStepRecord = {
   policyId: string;
@@ -44,10 +37,9 @@ export type LoopGraph = {
   rootRecords: LoopStepRecord[];
 };
 
-export const loopTriggerLabel = (policy?: ProjectPolicy) => {
-  if (!policy) return "Next trigger";
-  if (policy.source === "trigger") return policy.trigger || "Missing trigger";
-  return policy.event || "External event";
+export const loopInputEventLabel = (policy?: ProjectPolicy) => {
+  if (!policy) return "Next event";
+  return policy.event || "Missing event";
 };
 
 export const loopOutputEvents = (recordOrPolicy: LoopStepRecord | ProjectPolicy | undefined, continuationEvent?: string) => {

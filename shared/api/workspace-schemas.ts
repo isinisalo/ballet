@@ -120,7 +120,6 @@ const automationNameSchema = z.string().min(automationFieldLimits.name.min).max(
 const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits.description.max);
 const automationOutputIdSchema = z.string().min(automationFieldLimits.outputId.min).max(automationFieldLimits.outputId.max);
 const automationEventTypeSchema = z.string().min(automationFieldLimits.eventType.min).max(automationFieldLimits.eventType.max);
-const automationTriggerIdSchema = z.string().min(1).max(automationFieldLimits.eventType.max);
 const automationLoopIdSchema = z.string().min(automationFieldLimits.loopId.min).max(automationFieldLimits.loopId.max);
 const automationPolicyIdSchema = z.string().min(automationFieldLimits.policyId.min).max(automationFieldLimits.policyId.max);
 const automationHumanGateResponseIdSchema = z.string().min(1).max(260);
@@ -154,9 +153,8 @@ const projectOutputRouteSchema = z.object({
 const projectPolicySchema = z.object({
   id: automationPolicyIdSchema,
   loopId: automationLoopIdSchema.optional(),
-  source: z.enum(["event", "trigger"]),
-  event: automationEventTypeSchema.optional(),
-  trigger: automationTriggerIdSchema.optional(),
+  source: z.literal("event"),
+  event: automationEventTypeSchema,
   action: automationTokenSchema,
   enabled: z.boolean()
 }).strict();

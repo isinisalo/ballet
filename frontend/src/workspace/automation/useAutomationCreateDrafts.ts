@@ -50,7 +50,7 @@ export function useAutomationCreateDrafts({
   }, [agents, draft.outputs]);
 
   useEffect(() => {
-    setNewLoop((current) => syncDraft(createDraftsRef, "loop", loopCreateDraftWithDefaultTrigger(draft, current)));
+    setNewLoop((current) => syncDraft(createDraftsRef, "loop", loopCreateDraftWithDefaultEvent(draft, current)));
   }, [draft.policies, draft.loops]);
 
   const saveAutomationFromHeader = async () => {
@@ -91,50 +91,51 @@ const syncDraft = <K extends keyof AutomationCreateDrafts>(
 
 const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): AutomationCreateDrafts => ({
   action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id), humanGate: false },
-  loop: loopCreateDraftWithDefaultTrigger(draft, { id: "", steps: [] })
+  loop: loopCreateDraftWithDefaultEvent(draft, { id: "", steps: [] })
 });
 
-const loopStartingTriggerPolicy = (draft: ProjectAutomationConfig, loop: Pick<ProjectLoop, "steps">): ProjectPolicy | undefined => {
+const loopStartingEventPolicy = (draft: ProjectAutomationConfig, loop: Pick<ProjectLoop, "steps">): ProjectPolicy | undefined => {
   const firstPolicyId = loop.steps[0] ?? "";
-  return draft.policies.find((policy) => policy.id === firstPolicyId && policy.source === "trigger" && Boolean(policy.trigger));
+  return draft.policies.find((policy) => policy.id === firstPolicyId && policy.source === "event" && Boolean(policy.event));
 };
 
-const usedLoopTriggerPolicyIds = (draft: ProjectAutomationConfig): Set<string> => {
+const usedLoopStartingPolicyIds = (draft: ProjectAutomationConfig): Set<string> => {
   const policyById = new Map(draft.policies.map((policy) => [policy.id, policy]));
   return new Set(draft.loops.flatMap((loop) => {
     const firstPolicy = policyById.get(loop.steps[0] ?? "");
-    return firstPolicy?.source === "trigger" ? [firstPolicy.id] : [];
+    return firstPolicy?.source === "event" ? [firstPolicy.id] : [];
   }));
 };
 
-const firstUnusedTriggerPolicy = (draft: ProjectAutomationConfig): ProjectPolicy | undefined => {
-  const usedPolicyIds = usedLoopTriggerPolicyIds(draft);
+const firstUnusedEventPolicy = (draft: ProjectAutomationConfig): ProjectPolicy | undefined => {
+  const usedPolicyIds = usedLoopStartingPolicyIds(draft);
   return draft.policies.find((policy) =>
-    policy.source === "trigger" &&
-    Boolean(policy.trigger) &&
+    policy.source === "event" &&
+    Boolean(policy.event) &&
     !usedPolicyIds.has(policy.id)
   );
 };
 
 const loopCreateDraftWithDerivedId = (draft: ProjectAutomationConfig, loop: ProjectLoop): ProjectLoop => {
-  const triggerPolicy = loopStartingTriggerPolicy(draft, loop);
-  const id = loopIdForPolicy(triggerPolicy);
+  const eventPolicy = loopStartingEventPolicy(draft, loop);
+  const id = loop.id || loopIdForPolicy(eventPolicy);
   return {
     ...loop,
     id,
-    steps: triggerPolicy ? [triggerPolicy.id] : []
+    steps: eventPolicy ? [eventPolicy.id] : []
   };
 };
 
-const loopCreateDraftWithDefaultTrigger = (draft: ProjectAutomationConfig, loop: ProjectLoop): ProjectLoop => {
-  const selectedPolicy = loopStartingTriggerPolicy(draft, loop);
-  if (selectedPolicy && !usedLoopTriggerPolicyIds(draft).has(selectedPolicy.id)) {
+const loopCreateDraftWithDefaultEvent = (draft: ProjectAutomationConfig, loop: ProjectLoop): ProjectLoop => {
+  const selectedPolicy = loopStartingEventPolicy(draft, loop);
+  if (selectedPolicy && !usedLoopStartingPolicyIds(draft).has(selectedPolicy.id)) {
     return loopCreateDraftWithDerivedId(draft, loop);
   }
-  const triggerPolicy = firstUnusedTriggerPolicy(draft);
+  const eventPolicy = firstUnusedEventPolicy(draft);
   return loopCreateDraftWithDerivedId(draft, {
     ...loop,
-    steps: triggerPolicy ? [triggerPolicy.id] : []
+    id: "",
+    steps: eventPolicy ? [eventPolicy.id] : []
   });
 };
 
@@ -159,10 +160,10 @@ const createDraftWithNewEntity = (
     });
     return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds, agentIds: drafts.action.humanGate ? [] : drafts.action.agentIds }] } };
   }
-  const triggerPolicy = loopStartingTriggerPolicy(draft, drafts.loop);
-  const id = loopIdForPolicy(triggerPolicy);
-  if (!triggerPolicy || !id || draft.loops.some((loop) => loop.id === id)) return undefined;
-  return { id, config: { ...draft, loops: [...draft.loops, { id, steps: [triggerPolicy.id] }] } };
+  const eventPolicy = loopStartingEventPolicy(draft, drafts.loop);
+  const id = drafts.loop.id || loopIdForPolicy(eventPolicy);
+  if (!eventPolicy || !id || draft.loops.some((loop) => loop.id === id)) return undefined;
+  return { id, config: { ...draft, loops: [...draft.loops, { id, steps: [eventPolicy.id] }] } };
 };
 
 const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectAutomationConfig): boolean => {
@@ -172,9 +173,5 @@ const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectA
       Boolean(automationStringValidationMessage("Description", action.description, automationFieldLimits.description, { required: false }))
     );
   }
-  const policyById = new Map(draft.policies.map((policy) => [policy.id, policy]));
-  return draft.loops.some((loop) => {
-    const startingPolicy = policyById.get(loop.steps[0] ?? "");
-    return loop.id !== loopIdForPolicy(startingPolicy);
-  });
+  return false;
 };

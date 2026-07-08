@@ -15,7 +15,7 @@ type LoopLayoutRow = {
   layout: LoopCanvasLayout;
 };
 
-type LoopTriggerLink = {
+type LoopEventLink = {
   sourceLoopId: string;
   targetLoopId: string;
   sourceStepIndex: number;
@@ -145,7 +145,7 @@ function calculateLoopCanvasLayoutRows({
 
   rows.forEach((row) => {
     row.layout.nodes.forEach((node) => {
-      if (shouldHideTriggerOutputNode(config, node, loopIds, policyById)) {
+      if (shouldHideLinkedOutputNode(config, node, loopIds, policyById)) {
         hiddenLocalNodeKeys.add(namespaceLoopKey(row.loop.id, node.key));
         return;
       }
@@ -156,7 +156,7 @@ function calculateLoopCanvasLayoutRows({
         y: node.y + (rowOffsetByLoopId.get(row.loop.id) ?? 0),
         record: node.record ? { ...node.record, loopId: row.loop.id } : undefined,
         records: node.records?.map((record) => ({ ...record, loopId: row.loop.id })),
-        triggerPolicy: node.kind === "trigger" ? policyById.get(row.loop.steps[0] ?? "") : node.triggerPolicy
+        inputEventPolicy: node.kind === "input-event" ? policyById.get(row.loop.steps[0] ?? "") : node.inputEventPolicy
       });
     });
   });
@@ -171,7 +171,7 @@ function calculateLoopCanvasLayoutRows({
   });
 
   rows.forEach((row) => {
-    crossLoopTriggerEdges(config, row, loopIds, policyById).forEach((edge) => namespacedEdges.push(edge));
+    crossLoopEventEdges(config, row, loopIds, policyById).forEach((edge) => namespacedEdges.push(edge));
   });
 
   return {
@@ -203,7 +203,7 @@ function calculateSelectedLoopCanvasLayout({
     direction,
     policyById
   });
-  const links = loopTriggerLinks(config, recordsByLoopId, policyById);
+  const links = loopEventLinks(config, recordsByLoopId, policyById);
   const downstreamLoopIds = linkedLoopIds(config, links, selectedLoop.id, "downstream");
   const downstreamLoopIdSet = new Set(downstreamLoopIds);
   const upstreamLoopIds = linkedLoopIds(config, links, selectedLoop.id, "upstream")
@@ -226,7 +226,7 @@ function calculateSelectedLoopCanvasLayout({
   const edges: LoopCanvasEdge[] = [];
 
   selectedRow.layout.nodes.forEach((node) => {
-    if (shouldHideTriggerOutputNode(config, node, visibleCompactLoopIds, policyById)) {
+    if (shouldHideLinkedOutputNode(config, node, visibleCompactLoopIds, policyById)) {
       hiddenSelectedNodeKeys.add(namespaceLoopKey(selectedLoop.id, node.key));
       return;
     }
@@ -237,7 +237,7 @@ function calculateSelectedLoopCanvasLayout({
       y: node.y + selectedOffsetY,
       record: node.record ? { ...node.record, loopId: selectedLoop.id } : undefined,
       records: node.records?.map((record) => ({ ...record, loopId: selectedLoop.id })),
-      triggerPolicy: node.kind === "trigger" ? policyById.get(selectedLoop.steps[0] ?? "") : node.triggerPolicy
+      inputEventPolicy: node.kind === "input-event" ? policyById.get(selectedLoop.steps[0] ?? "") : node.inputEventPolicy
     });
   });
 
@@ -259,12 +259,12 @@ function calculateSelectedLoopCanvasLayout({
   nodes.push(...downstreamNodes);
 
   edges.push(
-    ...compactLoopTriggerEdges({
+    ...compactLoopEventEdges({
       links,
       compactLoopIds: visibleCompactLoopIds,
       selectedLoopId: selectedLoop.id
     }),
-    ...selectedToCompactLoopTriggerEdges({
+    ...selectedToCompactLoopEventEdges({
       selectedRow,
       targetLoopIds: downstreamLoopIdSet,
       links
@@ -310,18 +310,17 @@ function loopLayoutRow({
   };
 }
 
-function loopTriggerLinks(
+function loopEventLinks(
   config: ProjectAutomationConfig,
   recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>,
   policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>
-): LoopTriggerLink[] {
+): LoopEventLink[] {
   return config.loops.flatMap((loop) => {
     const records = recordsByLoopId.get(loop.id) ?? [];
     return records.flatMap((record) =>
       (record.outputTargets ?? [])
-        .filter((target): target is Extract<LoopOutputTarget, { type: "trigger" }> => target.type === "trigger")
         .flatMap((target) => {
-          const targetLoop = resolveTriggerTargetLoop(config, target, policyById);
+          const targetLoop = resolveEventTargetLoop(config, target, policyById);
           if (!targetLoop || targetLoop.id === loop.id) return [];
           return [{
             sourceLoopId: loop.id,
@@ -330,7 +329,7 @@ function loopTriggerLinks(
             sourcePolicyId: record.policyId,
             outputId: target.outputId,
             eventType: target.eventType
-          } satisfies LoopTriggerLink];
+          } satisfies LoopEventLink];
         })
     );
   });
@@ -338,7 +337,7 @@ function loopTriggerLinks(
 
 function linkedLoopIds(
   config: ProjectAutomationConfig,
-  links: LoopTriggerLink[],
+  links: LoopEventLink[],
   selectedLoopId: string,
   direction: "upstream" | "downstream"
 ): string[] {
@@ -397,7 +396,7 @@ function compactLoopNodes({
       loopSummary: {
         loopId: loop.id,
         label,
-        trigger: firstPolicy?.source === "trigger" ? firstPolicy.trigger : undefined,
+        inputEvent: firstPolicy?.event,
         action: firstPolicy?.action
       }
     };
@@ -406,12 +405,12 @@ function compactLoopNodes({
   });
 }
 
-function compactLoopTriggerEdges({
+function compactLoopEventEdges({
   links,
   compactLoopIds,
   selectedLoopId
 }: {
-  links: LoopTriggerLink[];
+  links: LoopEventLink[];
   compactLoopIds: ReadonlySet<string>;
   selectedLoopId: string;
 }): LoopCanvasEdge[] {
@@ -424,7 +423,7 @@ function compactLoopTriggerEdges({
     return [{
       key: `loop:${link.sourceLoopId}:output:${link.sourceStepIndex}:${link.outputId}:to:${link.targetLoopId}:loop`,
       sourceNodeKey: compactLoopNodeKey(link.sourceLoopId),
-      targetNodeKey: targetIsSelected ? namespaceLoopKey(selectedLoopId, "trigger") : compactLoopNodeKey(link.targetLoopId),
+      targetNodeKey: targetIsSelected ? namespaceLoopKey(selectedLoopId, "input-event") : compactLoopNodeKey(link.targetLoopId),
       sourceHandleId: "right",
       targetHandleId: "left",
       eventType: link.eventType,
@@ -442,14 +441,14 @@ function compactLoopTriggerEdges({
   });
 }
 
-function selectedToCompactLoopTriggerEdges({
+function selectedToCompactLoopEventEdges({
   selectedRow,
   targetLoopIds,
   links
 }: {
   selectedRow: LoopLayoutRow;
   targetLoopIds: ReadonlySet<string>;
-  links: LoopTriggerLink[];
+  links: LoopEventLink[];
 }): LoopCanvasEdge[] {
   return links
     .filter((link) => link.sourceLoopId === selectedRow.loop.id && targetLoopIds.has(link.targetLoopId))
@@ -502,19 +501,14 @@ function compactLoopColumnGap() {
   return loopCanvasLayoutConfig.columnGap * 2;
 }
 
-function resolveTriggerTargetLoop(
+function resolveEventTargetLoop(
   config: ProjectAutomationConfig,
-  target: Extract<LoopOutputTarget, { type: "trigger" }>,
+  target: LoopOutputTarget,
   policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>
 ): ProjectLoop | undefined {
-  if (target.loopId) {
-    const explicitLoop = config.loops.find((loop) => loop.id === target.loopId);
-    if (explicitLoop) return explicitLoop;
-  }
-
   return config.loops.find((loop) => {
     const firstPolicy = policyById.get(loop.steps[0] ?? "");
-    return firstPolicy?.source === "trigger" && firstPolicy.trigger === target.trigger;
+    return firstPolicy?.event === target.eventType;
   });
 }
 
@@ -536,7 +530,7 @@ function loopLayoutBounds(nodes: LoopCanvasLayoutNode[]) {
     return {
       minY: loopCanvasLayoutConfig.startY,
       maxY: loopCanvasLayoutConfig.startY,
-      height: loopNodeSizes.trigger.height
+      height: loopNodeSizes.inputEvent.height
     };
   }
   const minY = Math.min(...nodes.map((node) => node.y));
@@ -548,24 +542,22 @@ function compositeLoopRowGap() {
   return loopCanvasLayoutConfig.branchGap * 2 + loopNodeSizes.policy.height;
 }
 
-function shouldHideTriggerOutputNode(
+function shouldHideLinkedOutputNode(
   config: ProjectAutomationConfig,
   node: LoopCanvasLayoutNode,
   loopIds: ReadonlySet<string>,
   policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>
 ) {
-  if (node.kind !== "output-event" || node.outputEvent?.outputType !== "trigger" || !node.outputEvent.trigger) return false;
-  const targetLoop = resolveTriggerTargetLoop(config, {
+  if (node.kind !== "output-event" || !node.outputEvent?.eventType) return false;
+  const targetLoop = resolveEventTargetLoop(config, {
     outputId: node.outputEvent.outputId,
     eventType: node.outputEvent.eventType,
-    type: "trigger",
-    trigger: node.outputEvent.trigger,
-    loopId: node.outputEvent.loopId
+    type: "event"
   }, policyById);
   return Boolean(targetLoop && loopIds.has(targetLoop.id));
 }
 
-function crossLoopTriggerEdges(
+function crossLoopEventEdges(
   config: ProjectAutomationConfig,
   row: {
     loop: ProjectLoop;
@@ -577,15 +569,14 @@ function crossLoopTriggerEdges(
 ): LoopCanvasEdge[] {
   return row.records.flatMap((record) =>
     (record.outputTargets ?? [])
-      .filter((target): target is Extract<LoopOutputTarget, { type: "trigger" }> => target.type === "trigger")
       .flatMap((target) => {
-        const targetLoop = resolveTriggerTargetLoop(config, target, policyById);
+        const targetLoop = resolveEventTargetLoop(config, target, policyById);
         if (!targetLoop || !loopIds.has(targetLoop.id)) return [];
         const canonicalRecord = loopCanonicalRecord(row.loopGraph, record);
         const sourceNodeKey = namespaceLoopKey(row.loop.id, `policy-${canonicalRecord.index}`);
-        const targetNodeKey = namespaceLoopKey(targetLoop.id, "trigger");
+        const targetNodeKey = namespaceLoopKey(targetLoop.id, "input-event");
         return [{
-          key: `loop:${row.loop.id}:output:${record.index}:${target.outputId}:to:${targetLoop.id}:trigger`,
+          key: `loop:${row.loop.id}:output:${record.index}:${target.outputId}:to:${targetLoop.id}:input-event`,
           sourceNodeKey,
           targetNodeKey,
           sourceHandleId: loopOutputSourceHandleId(target),

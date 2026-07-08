@@ -13,16 +13,15 @@ import {
   actionOutputSlotMinCount,
   actionOutputSlotCount,
   actionOutputSlotKind,
-  humanGateApprovalTriggerId,
   humanGateResponseId,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
-  normalizeTriggerToken,
   normalizeLoopId,
+  normalizeEventTypeToken,
   policyEventTypesForActions,
   policyOutputEventTypes,
   projectOutputRouteKey,
-  loopIdForPolicy
+  policySourceKey
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
 
@@ -50,7 +49,6 @@ interface ValidationContext {
   rawLoops: unknown[];
   rawRuntimes: unknown[];
   eventIdSet: Set<string>;
-  triggerIdSet: Set<string>;
   actionIdSet: Set<string>;
   outputIdSet: Set<string>;
   policyIdSet: Set<string>;
@@ -66,13 +64,10 @@ interface PolicyValidationState {
   run?: Record<string, unknown>;
   rawEvent: string;
   normalizedEvent: string;
-  rawTrigger: string;
-  rawExplicitTrigger: string;
   rawSource: string;
   rawAction: string;
   legacyPolicy: boolean;
   normalizedPolicy?: ValidationContext["normalizedPolicies"][number];
-  isTriggerPolicy: boolean;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -135,7 +130,7 @@ const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: stri
 
 const requireAutomationArrays = (input: RawAutomationConfig, issues: ProjectAutomationIssue[]) => {
   if (input.triggers !== undefined) {
-    issues.push({ path: "triggers", message: "Triggers are derived from human gate approval outputs." });
+    issues.push({ path: "triggers", message: "Automation triggers are no longer supported. Use event policies." });
   }
   for (const key of ["actions", "outputs", "outputRoutes", "humanGateResponses", "policies", "loops", "runtimes"] as const) {
     if ((key === "actions" || key === "outputs") && input[key] === undefined) continue;
@@ -184,15 +179,9 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     ...normalized.policies.flatMap((policy) =>
       policyOutputEventTypes(policy, normalized.actions, normalized.outputs)
     ),
-    ...normalized.policies.flatMap((policy) =>
-      policy.source === "event" && policy.event?.startsWith("trigger.") ? [policy.event] : []
-    )
+    ...normalized.policies.map(policySourceKey)
   ];
   const policyIds = normalized.policies.map((policy) => policy.id).filter(Boolean);
-  const triggerIds = [
-    ...derivedHumanGateTriggerIds(normalized.actions),
-    ...normalized.policies.flatMap((policy) => policy.source === "trigger" && policy.trigger ? [policy.trigger] : [])
-  ];
   return {
     input,
     rawActions: Array.isArray(input.actions) ? input.actions : [],
@@ -203,7 +192,6 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     rawLoops,
     rawRuntimes: Array.isArray(input.runtimes) ? input.runtimes : [],
     eventIdSet: new Set(generatedEventIds),
-    triggerIdSet: new Set(triggerIds),
     actionIdSet: new Set(normalized.actions.map((action) => action.id)),
     outputIdSet: new Set(configuredOutputIds),
     policyIdSet: new Set([...policyIds, ...rawPolicyIds]),
@@ -215,13 +203,6 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     normalizedOutputRoutes: normalized.outputRoutes
   };
 };
-
-const derivedHumanGateTriggerIds = (actions: ValidationContext["normalizedActions"]): string[] =>
-  actions.flatMap((action) => {
-    if (!action.humanGate) return [];
-    const approvalOutputId = actionOutputIds(actions, action.id)[0];
-    return approvalOutputId ? [humanGateApprovalTriggerId(action.id, approvalOutputId)] : [];
-  });
 
 const normalizedActionOutputIds = (action: Record<string, unknown>): string[] | undefined =>
   Array.isArray(action.outputIds)
@@ -487,12 +468,6 @@ const validateOutputRoute = (
     issues.push({ path: `${base}.outputId`, message: `Output route references unavailable output ${outputId} for policy ${sourcePolicyId}.` });
   }
 
-  const outputIndex = availableOutputIds.indexOf(outputId);
-  const sourceAction = context.normalizedActions.find((action) => action.id === sourcePolicy.action);
-  if (sourceAction?.humanGate && outputIndex === 0) {
-    issues.push({ path: base, message: "Human gate approval output routes are derived automatically." });
-  }
-
   const normalizedRoute = context.normalizedOutputRoutes.find((candidate) =>
     projectOutputRouteKey(candidate.sourcePolicyId, candidate.outputId) === routeKey
   );
@@ -517,14 +492,11 @@ const policyValidationState = (
   return {
     run,
     rawEvent,
-    normalizedEvent: normalizedPolicy?.event ?? normalizePolicyOutputEventType(rawEvent),
-    rawTrigger: stringValue(policy.trigger) || (normalizedPolicy?.source === "trigger" ? normalizedPolicy.trigger ?? "" : ""),
-    rawExplicitTrigger: stringValue(policy.trigger),
+    normalizedEvent: normalizedPolicy?.event ?? normalizeEventTypeToken(normalizePolicyOutputEventType(rawEvent)),
     rawSource: stringValue(policy.source),
     rawAction: stringValue(policy.action),
     legacyPolicy: policy.event === undefined && policy.agent === undefined && run !== undefined,
-    normalizedPolicy,
-    isTriggerPolicy: stringValue(policy.source) === "trigger" || typeof policy.trigger === "string" || normalizedPolicy?.source === "trigger"
+    normalizedPolicy
   };
 };
 
@@ -533,11 +505,8 @@ const validatePolicySource = (
   base: string,
   issues: ProjectAutomationIssue[]
 ) => {
-  if (state.rawSource && !["event", "trigger"].includes(state.rawSource)) {
-    issues.push({ path: `${base}.source`, message: "Policy source must be event or trigger." });
-  }
-  if (state.rawEvent && state.rawExplicitTrigger) {
-    issues.push({ path: base, message: "Policy must reference either event or trigger, not both." });
+  if (state.rawSource && state.rawSource !== "event") {
+    issues.push({ path: `${base}.source`, message: "Policy source must be event." });
   }
 };
 
@@ -547,14 +516,15 @@ const validatePolicyRequiredFields = (
   base: string,
   issues: ProjectAutomationIssue[]
 ) => {
-  const sourceField = state.isTriggerPolicy ? "trigger" : "event";
-  const sourceValue = state.isTriggerPolicy ? state.rawTrigger : state.rawEvent;
-  addRequiredStringIssue(issues, `${base}.${sourceField}`, sourceValue, `Policy ${sourceField}`);
+  if ("trigger" in policy) {
+    issues.push({ path: `${base}.trigger`, message: "Policy trigger is no longer supported. Use event." });
+  }
+  addRequiredStringIssue(issues, `${base}.event`, state.rawEvent, "Policy event");
   addStringIssue(
     issues,
-    `${base}.${sourceField}`,
-    sourceValue,
-    `Policy ${sourceField}`,
+    `${base}.event`,
+    state.rawEvent,
+    "Policy event",
     automationFieldLimits.eventType
   );
   if (!state.legacyPolicy) addRequiredStringIssue(issues, `${base}.action`, state.rawAction, "Policy action");
@@ -572,16 +542,8 @@ const validatePolicyKnownReferences = (
   if (state.normalizedPolicy?.action && !context.actionIdSet.has(state.normalizedPolicy.action)) {
     issues.push({ path: `${base}.action`, message: `Policy references unknown action: ${state.rawAction || state.normalizedPolicy.action}.` });
   }
-  if (!state.isTriggerPolicy && state.normalizedEvent && !context.eventIdSet.has(state.normalizedEvent)) {
+  if (state.normalizedEvent && !context.eventIdSet.has(state.normalizedEvent)) {
     issues.push({ path: `${base}.event`, message: `Policy references unknown event: ${state.rawEvent}.` });
-  }
-  if (state.isTriggerPolicy) {
-    const triggerId = state.normalizedPolicy?.source === "trigger"
-      ? state.normalizedPolicy.trigger
-      : normalizeTriggerToken(state.rawTrigger);
-    if (triggerId && !context.triggerIdSet.has(triggerId)) {
-      issues.push({ path: `${base}.trigger`, message: `Policy references unknown trigger: ${normalizeTriggerToken(state.rawTrigger)}.` });
-    }
   }
 };
 
@@ -605,23 +567,6 @@ const validatePolicy = (policy: unknown, index: number, context: ValidationConte
     return;
   }
   validatePolicyReference(policy, base, context, index, issues);
-};
-
-const validateSinglePolicyPerTrigger = (context: ValidationContext, issues: ProjectAutomationIssue[]) => {
-  const firstPolicyIndexByTrigger = new Map<string, number>();
-
-  context.normalizedPolicies.forEach((policy, index) => {
-    if (policy.source !== "trigger" || !policy.trigger) return;
-    const firstIndex = firstPolicyIndexByTrigger.get(policy.trigger);
-    if (firstIndex === undefined) {
-      firstPolicyIndexByTrigger.set(policy.trigger, index);
-      return;
-    }
-    issues.push({
-      path: `policies[${index}].trigger`,
-      message: `Trigger ${policy.trigger} can start only one policy/action.`
-    });
-  });
 };
 
 const validateRuntime = (runtime: unknown, index: number, issues: ProjectAutomationIssue[]) => {
@@ -685,34 +630,9 @@ const validateLoop = (loop: unknown, index: number, context: ValidationContext, 
   const rawPolicyById = new Map(context.rawPolicies.flatMap((policy) =>
     isRecord(policy) && stringValue(policy.id) ? [[stringValue(policy.id), policy] as const] : []
   ));
-  const policyForStep = (step: string): Pick<ValidationContext["normalizedPolicies"][number], "source" | "trigger"> | undefined => {
-    const normalizedPolicy = context.normalizedPolicies.find((candidate) => candidate.id === step);
-    if (normalizedPolicy) return normalizedPolicy;
-    const rawPolicy = rawPolicyById.get(step);
-    if (!rawPolicy) return undefined;
-    const trigger = normalizeTriggerToken(stringValue(rawPolicy.trigger));
-    const source = stringValue(rawPolicy.source) === "trigger" || trigger ? "trigger" as const : "event" as const;
-    return {
-      source,
-      trigger: trigger || undefined
-    };
-  };
-  const firstNonTriggerIndex = loop.steps.findIndex((step) => {
-    if (typeof step !== "string") return true;
-    const policy = policyForStep(step);
-    return policy?.source !== "trigger";
-  });
-  const triggerSteps = loop.steps.filter((step, stepIndex): step is string => {
-    if (typeof step !== "string") return false;
-    const policy = policyForStep(step);
-    return policy?.source === "trigger" && (firstNonTriggerIndex === -1 || stepIndex < firstNonTriggerIndex);
-  });
-  if (triggerSteps.length > 1) {
-    issues.push({ path: `${base}.steps`, message: "Loop can start from only one trigger policy." });
-  }
   const normalizedLoop = context.normalizedLoops[index];
   if (!normalizedLoop || normalizedLoop.steps.length === 0) {
-    issues.push({ path: `${base}.steps`, message: "Loop must start from a trigger policy." });
+    issues.push({ path: `${base}.steps`, message: "Loop must start from an event policy." });
     return;
   }
   const firstPolicyId = normalizedLoop.steps[0] ?? "";
@@ -721,14 +641,9 @@ const validateLoop = (loop: unknown, index: number, context: ValidationContext, 
     issues.push({ path: `${base}.steps[0]`, message: `Loop references unknown starting policy: ${firstPolicyId}.` });
     return;
   }
-  if (firstPolicy.source !== "trigger" || !firstPolicy.trigger) {
-    issues.push({ path: `${base}.steps[0]`, message: "Loop must start from a trigger policy." });
+  if (firstPolicy.source !== "event" || !firstPolicy.event) {
+    issues.push({ path: `${base}.steps[0]`, message: "Loop must start from an event policy." });
     return;
-  }
-  const expectedId = loopIdForPolicy(firstPolicy);
-  const actualId = normalizeLoopId(stringValue(loop.id));
-  if (expectedId && actualId !== expectedId) {
-    issues.push({ path: `${base}.id`, message: `Loop id must be ${expectedId}.` });
   }
   loop.steps.forEach((step, stepIndex) => {
     if (typeof step !== "string") return;
@@ -762,7 +677,6 @@ export const validateProjectAutomationConfig = (
     context.rawOutputRoutes.forEach((route, index) => validateOutputRoute(route, index, context, issues, seenRouteKeys));
   }
   context.rawPolicies.forEach((policy, index) => validatePolicy(policy, index, context, issues));
-  validateSinglePolicyPerTrigger(context, issues);
   context.rawRuntimes.forEach((runtime, index) => validateRuntime(runtime, index, issues));
   context.rawLoops.forEach((loop, index) => validateLoop(loop, index, context, issues));
   return issues;
