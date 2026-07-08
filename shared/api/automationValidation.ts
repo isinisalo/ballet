@@ -1,4 +1,4 @@
-import { normalizePolicyToken } from "../policy-actions.js";
+import { normalizePolicyToken, normalizeWorkflowId } from "../policy-actions.js";
 
 export type AutomationFieldLimit = {
   min?: number;
@@ -13,11 +13,15 @@ export const automationFieldLimits = {
   command: { min: 1, max: 120 },
   arg: { min: 1, max: 120 },
   eventType: { min: 1, max: 96 },
+  workflowId: { min: 2, max: 101 },
   policyId: { min: 1, max: 160 }
 } as const satisfies Record<string, AutomationFieldLimit>;
 
 export const normalizeAutomationToken = (value: string): string =>
   normalizePolicyToken(value);
+
+export const normalizeAutomationWorkflowId = (value: string): string =>
+  normalizeWorkflowId(value);
 
 export const automationStringValidationMessage = (
   label: string,
@@ -35,6 +39,9 @@ export const automationStringValidationMessage = (
 
 export const automationTokenValidationMessage = (label: string, value: string): string | undefined =>
   automationStringValidationMessage(label, value, automationFieldLimits.token, { normalize: normalizeAutomationToken });
+
+export const automationWorkflowIdValidationMessage = (label: string, value: string): string | undefined =>
+  automationStringValidationMessage(label, value, automationFieldLimits.workflowId, { normalize: normalizeAutomationWorkflowId });
 
 export const automationOutputIdValidationMessage = (value: string): string | undefined =>
   automationStringValidationMessage("Output id", value, automationFieldLimits.outputId, { normalize: normalizeAutomationToken });

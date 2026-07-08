@@ -1,14 +1,14 @@
-import { useMemo } from "react";
-import { ShieldCheck, X } from "lucide-react";
-import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
 import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
+import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { defaultPolicyOutputIds, normalizeActionOutputSlots } from "@shared/policy-actions";
+import { ShieldCheck, X } from "lucide-react";
+import { useMemo } from "react";
 import { OutputSelector } from "../outputs/OutputSelector";
 import { ActionInputField } from "./ActionInputField";
 import { actionInputSources } from "./actionInputSources";
@@ -97,9 +97,9 @@ export function ActionEditorFields({
       />
       <ActionInputField sources={inputSources} />
       <Field orientation="horizontal">
-        <FieldLabel htmlFor={`${action.id || "action"}-human-gate`}>Human gate</FieldLabel>
+        <FieldLabel htmlFor={`${action.id || "action"}-gate`}>Human gate</FieldLabel>
         <Switch
-          id={`${action.id || "action"}-human-gate`}
+          id={`${action.id || "action"}-gate`}
           checked={humanGate}
           aria-label="Human gate"
           onCheckedChange={updateHumanGate}

@@ -9,8 +9,6 @@ import { createAutomationEntityControls } from "./automationEntityControls";
 import { AutomationIssues } from "./AutomationIssues";
 import { useAutomationDraft } from "./useAutomationDraft";
 import { useAutomationCreateDrafts } from "./useAutomationCreateDrafts";
-import { useWorkflowHeaderNameEditor } from "./workflows/useWorkflowHeaderNameEditor";
-import { WorkflowHeaderNameEditor } from "./workflows/WorkflowHeaderNameEditor";
 import { WorkflowsAutomationTab } from "./workflows/WorkflowsAutomationTab";
 
 export function AutomationView({
@@ -45,14 +43,6 @@ export function AutomationView({
     if (activeTab === "actions") return !selectedActionId;
     return !showAllWorkflows && !selectedWorkflowId;
   }, [activeTab, selectedActionId, selectedWorkflowId, showAllWorkflows]);
-  const workflowNameEditor = useWorkflowHeaderNameEditor({
-    activeTab,
-    draft,
-    setDraft,
-    saveDraft,
-    selectedWorkflowId,
-    selectAutomationEntity
-  });
   const createDrafts = useAutomationCreateDrafts({
     activeTab,
     agents: data.agents,
@@ -68,7 +58,9 @@ export function AutomationView({
       <Panel
         title="Automation"
         titleExtra={activeTab === "workflows" && !isCreateMode && !showAllWorkflows ? (
-          <WorkflowHeaderNameEditor {...workflowNameEditor.editorProps} />
+          <span className="min-w-0 truncate rounded px-1 py-0.5 font-mono text-xs font-medium text-muted-foreground" title={selectedWorkflowId}>
+            {selectedWorkflowId}
+          </span>
         ) : null}
         icon={<Route data-icon="inline-start" />}
         action={(

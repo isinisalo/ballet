@@ -66,9 +66,7 @@ const addEntityConfig = (
       return {
         label: "Add workflow",
         onAdd: () => {
-          const id = uniqueAutomationId("new-workflow", draft.workflows.map((workflow) => workflow.id));
-          setDraft((current) => ({ ...current, workflows: [...current.workflows, { id, title: "New workflow", steps: [] }] }));
-          selectAutomationEntity("workflows", id);
+          selectAutomationEntity("workflows");
         }
       };
   }

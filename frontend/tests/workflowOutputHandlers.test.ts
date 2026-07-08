@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { workflowIdFromTrigger } from "@shared/policy-actions";
 import { workflowOutputHandlerForOutput } from "../src/workspace/automation/workflows/workflowOutputHandlers";
+
+const workflowId = workflowIdFromTrigger("manual-start");
+const returnWorkflowId = workflowIdFromTrigger("manual-rework");
 
 const config = (): ProjectAutomationConfig => ({
   version: 1,
@@ -18,27 +22,28 @@ const config = (): ProjectAutomationConfig => ({
   }],
   humanGateResponses: [],
   policies: [
-    { id: "start-policy", source: "event", event: "manual.start", action: "build", enabled: true },
+    { id: "start-policy", source: "trigger", trigger: "manual-start", action: "build", enabled: true },
     { id: "review-policy", source: "event", event: "build.ready", action: "review", enabled: true },
     { id: "human-review-policy", source: "event", event: "review.approved", action: "human-review", enabled: true },
+    { id: "return-start-policy", source: "trigger", trigger: "manual-rework", action: "build", enabled: true },
     { id: "rework-policy", source: "event", event: "review.changes_requested", action: "build", enabled: true },
     { id: "done-policy", source: "event", event: "external.approved", action: "done", enabled: true }
   ],
   workflows: [{
-    id: "workflow-1",
+    id: workflowId,
     title: "Workflow",
     steps: ["start-policy", "review-policy", "done-policy"]
   }, {
-    id: "return-workflow",
+    id: returnWorkflowId,
     title: "Return workflow",
-    steps: ["rework-policy", "review-policy"]
+    steps: ["return-start-policy", "rework-policy", "review-policy"]
   }],
   runtimes: []
 });
 
 describe("workflowOutputHandlerForOutput", () => {
   it("finds the next event-policy action for an output event", () => {
-    expect(workflowOutputHandlerForOutput(config(), "workflow-1", "start-policy", "ready")).toEqual({
+    expect(workflowOutputHandlerForOutput(config(), workflowId, "start-policy", "ready")).toEqual({
       type: "action",
       outputId: "ready",
       eventType: "build.ready",
@@ -50,19 +55,19 @@ describe("workflowOutputHandlerForOutput", () => {
   });
 
   it("finds an earlier return handler action for a rework output", () => {
-    expect(workflowOutputHandlerForOutput(config(), "return-workflow", "review-policy", "changes_requested")).toEqual({
+    expect(workflowOutputHandlerForOutput(config(), returnWorkflowId, "review-policy", "changes_requested")).toEqual({
       type: "action",
       outputId: "changes_requested",
       eventType: "review.changes_requested",
       policyId: "rework-policy",
-      stepIndex: 0,
+      stepIndex: 1,
       actionId: "build",
       label: "build"
     });
   });
 
   it("uses custom output route event types", () => {
-    expect(workflowOutputHandlerForOutput(config(), "workflow-1", "review-policy", "approved")).toEqual({
+    expect(workflowOutputHandlerForOutput(config(), workflowId, "review-policy", "approved")).toEqual({
       type: "action",
       outputId: "approved",
       eventType: "external.approved",
@@ -74,7 +79,7 @@ describe("workflowOutputHandlerForOutput", () => {
   });
 
   it("returns derived human gate approval outputs as read-only trigger targets", () => {
-    expect(workflowOutputHandlerForOutput(config(), "workflow-1", "human-review-policy", "approved")).toEqual({
+    expect(workflowOutputHandlerForOutput(config(), workflowId, "human-review-policy", "approved")).toEqual({
       type: "trigger",
       outputId: "approved",
       eventType: "trigger.human-review.approved",
@@ -85,6 +90,6 @@ describe("workflowOutputHandlerForOutput", () => {
   });
 
   it("returns undefined when an output has no workflow handler", () => {
-    expect(workflowOutputHandlerForOutput(config(), "workflow-1", "start-policy", "blocked")).toBeUndefined();
+    expect(workflowOutputHandlerForOutput(config(), workflowId, "start-policy", "blocked")).toBeUndefined();
   });
 });

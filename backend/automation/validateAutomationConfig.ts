@@ -5,6 +5,7 @@ import {
   automationStringValidationMessage,
   automationTokenValidationMessage,
   automationOutputIdValidationMessage,
+  automationWorkflowIdValidationMessage,
   type AutomationFieldLimit
 } from "../../shared/api/automationValidation.js";
 import {
@@ -18,8 +19,10 @@ import {
   normalizePolicyOutputEventType,
   normalizePolicyToken,
   normalizeTriggerToken,
+  normalizeWorkflowId,
   policyEventTypesForActions,
-  projectOutputRouteKey
+  projectOutputRouteKey,
+  workflowIdForPolicy
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
 
@@ -54,6 +57,7 @@ interface ValidationContext {
   workflowIdSet: Set<string>;
   agentIdSet: Set<string>;
   normalizedPolicies: ReturnType<typeof normalizeProjectAutomationConfig>["policies"];
+  normalizedWorkflows: ReturnType<typeof normalizeProjectAutomationConfig>["workflows"];
   normalizedActions: ReturnType<typeof normalizeProjectAutomationConfig>["actions"];
 }
 
@@ -109,6 +113,15 @@ const addOutputIdIssue = (issues: ProjectAutomationIssue[], pathName: string, va
   if (message) issues.push({ path: pathName, message });
 };
 
+const addWorkflowIdIssue = (issues: ProjectAutomationIssue[], pathName: string, value: unknown, label: string) => {
+  if (typeof value !== "string") {
+    issues.push({ path: pathName, message: `${label} is required.` });
+    return;
+  }
+  const message = automationWorkflowIdValidationMessage(label, value);
+  if (message) issues.push({ path: pathName, message });
+};
+
 const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: string; path: string }>, label: string) => {
   const seen = new Map<string, string>();
   for (const item of ids) {
@@ -141,8 +154,8 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
     id: isRecord(output) ? normalizePolicyToken(stringValue(output.id)) : "",
     path: `outputs[${index}].id`
   }));
-  const workflowIds = context.rawWorkflows.map((workflow, index) => ({
-    id: isRecord(workflow) ? stringValue(workflow.id) : "",
+  const workflowIds = normalized.workflows.map((workflow, index) => ({
+    id: workflow.id,
     path: `workflows[${index}].id`
   }));
 
@@ -172,6 +185,10 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     )
   ];
   const policyIds = normalized.policies.map((policy) => policy.id).filter(Boolean);
+  const triggerIds = [
+    ...derivedHumanGateTriggerIds(normalized.actions),
+    ...normalized.policies.flatMap((policy) => policy.source === "trigger" && policy.trigger ? [policy.trigger] : [])
+  ];
   return {
     input,
     rawActions: Array.isArray(input.actions) ? input.actions : [],
@@ -182,15 +199,14 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     rawWorkflows,
     rawRuntimes: Array.isArray(input.runtimes) ? input.runtimes : [],
     eventIdSet: new Set(generatedEventIds),
-    triggerIdSet: new Set(derivedHumanGateTriggerIds(normalized.actions)),
+    triggerIdSet: new Set(triggerIds),
     actionIdSet: new Set(normalized.actions.map((action) => action.id)),
     outputIdSet: new Set(configuredOutputIds),
     policyIdSet: new Set([...policyIds, ...rawPolicyIds]),
-    workflowIdSet: new Set(rawWorkflows
-      .map((workflow) => isRecord(workflow) ? normalizePolicyToken(stringValue(workflow.id)) : "")
-      .filter(Boolean)),
+    workflowIdSet: new Set(normalized.workflows.map((workflow) => workflow.id).filter(Boolean)),
     agentIdSet: new Set(agents.map((agent) => agent.id)),
     normalizedPolicies: normalized.policies,
+    normalizedWorkflows: normalized.workflows,
     normalizedActions: normalized.actions
   };
 };
@@ -347,9 +363,9 @@ const validateHumanGateResponse = (
   }
   addStringIssue(issues, `${base}.submittedAt`, response.submittedAt, "Human gate response submittedAt", { min: 1, max: 80 });
 
-  const workflowId = normalizePolicyToken(stringValue(response.workflowId));
+  const workflowId = normalizeWorkflowId(stringValue(response.workflowId));
   if (response.workflowId !== undefined) {
-    addStringIssue(issues, `${base}.workflowId`, response.workflowId, "Human gate response workflow", automationFieldLimits.token, { token: true });
+    addWorkflowIdIssue(issues, `${base}.workflowId`, response.workflowId, "Human gate response workflow");
     if (workflowId && !context.workflowIdSet.has(workflowId)) {
       issues.push({ path: `${base}.workflowId`, message: `Human gate response references unknown workflow: ${workflowId}.` });
     }
@@ -618,7 +634,7 @@ const validateWorkflow = (workflow: unknown, index: number, context: ValidationC
     issues.push({ path: base, message: "Workflow must be an object." });
     return;
   }
-  addStringIssue(issues, `${base}.id`, workflow.id, "Workflow id", automationFieldLimits.token, { token: true });
+  addWorkflowIdIssue(issues, `${base}.id`, workflow.id, "Workflow id");
   addStringIssue(issues, `${base}.title`, workflow.title, "Workflow title", automationFieldLimits.name);
   if (!Array.isArray(workflow.steps)) {
     issues.push({ path: `${base}.steps`, message: "Workflow steps must be an array." });
@@ -639,6 +655,26 @@ const validateWorkflow = (workflow: unknown, index: number, context: ValidationC
   });
   if (triggerSteps.length > 1) {
     issues.push({ path: `${base}.steps`, message: "Workflow can start from only one trigger policy." });
+  }
+  const normalizedWorkflow = context.normalizedWorkflows[index];
+  if (!normalizedWorkflow || normalizedWorkflow.steps.length === 0) {
+    issues.push({ path: `${base}.steps`, message: "Workflow must start from a trigger policy." });
+    return;
+  }
+  const firstPolicyId = normalizedWorkflow.steps[0] ?? "";
+  const firstPolicy = context.normalizedPolicies.find((candidate) => candidate.id === firstPolicyId);
+  if (!firstPolicy) {
+    issues.push({ path: `${base}.steps[0]`, message: `Workflow references unknown starting policy: ${firstPolicyId}.` });
+    return;
+  }
+  if (firstPolicy.source !== "trigger" || !firstPolicy.trigger) {
+    issues.push({ path: `${base}.steps[0]`, message: "Workflow must start from a trigger policy." });
+    return;
+  }
+  const expectedId = workflowIdForPolicy(firstPolicy);
+  const actualId = normalizeWorkflowId(stringValue(workflow.id));
+  if (expectedId && actualId !== expectedId) {
+    issues.push({ path: `${base}.id`, message: `Workflow id must be ${expectedId}.` });
   }
 };
 

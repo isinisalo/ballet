@@ -8,10 +8,10 @@ import type {
   ProjectPolicy,
   ProjectWorkflow
 } from "@shared/api/workspace-contracts";
-import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
-import { actionOutputIds, generatedPolicyId, humanGateResponseId, normalizePolicyToken, projectOutputRouteEventType, policyOutputEventType } from "@shared/policy-actions";
-import { EmptyState, TextField } from "@/components/shared/workspace-ui";
-import { FieldGroup } from "@/components/ui/field";
+import { automationFieldLimits, automationStringValidationMessage } from "@shared/api/automationValidation";
+import { actionOutputIds, generatedPolicyId, humanGateResponseId, normalizePolicyToken, projectOutputRouteEventType, policyOutputEventType, workflowIdForPolicy } from "@shared/policy-actions";
+import { EmptyState, SelectField, TextField } from "@/components/shared/workspace-ui";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { AllWorkflowsCanvas } from "./AllWorkflowsCanvas";
@@ -64,7 +64,6 @@ export function WorkflowsAutomationTab({
       : -1;
   const selected = selectedIndex >= 0 ? config.workflows[selectedIndex] : createDraft;
   const creating = selectedIndex < 0;
-  const workflowIdError = selected ? automationTokenValidationMessage("Workflow ID", selected.id) : undefined;
   const titleError = selected ? automationStringValidationMessage("Title", selected.title, automationFieldLimits.name) : undefined;
   const [selectedHandlerSelection, setSelectedHandlerSelection] = useState<WorkflowHandlerSelection | null>(null);
   const selectedHandlerStepIndexes = selectedHandlerSelection?.stepIndexes ?? [];
@@ -79,6 +78,23 @@ export function WorkflowsAutomationTab({
       description: action.description
     }))
   ];
+  const usedStartingPolicyIds = useMemo(() => {
+    const ids = new Set<string>();
+    config.workflows.forEach((workflow) => {
+      const firstPolicy = policyById.get(workflow.steps[0] ?? "");
+      if (firstPolicy?.source === "trigger") ids.add(firstPolicy.id);
+    });
+    return ids;
+  }, [config.workflows, policyById]);
+  const availableStartingTriggerPolicies = useMemo(() => config.policies.filter((policy) =>
+    policy.source === "trigger" &&
+    Boolean(policy.trigger) &&
+    (!usedStartingPolicyIds.has(policy.id) || createDraft.steps[0] === policy.id)
+  ), [config.policies, createDraft.steps, usedStartingPolicyIds]);
+  const startingTriggerOptions = availableStartingTriggerPolicies.map((policy) => ({
+    value: policy.id,
+    label: policy.trigger ? `${policy.trigger} · ${policy.action}` : policy.id
+  }));
   const defaultAction = config.actions[0]?.id ?? "";
   const selectedActionOutputIds = (actionId: string) => actionOutputIds(config.actions, actionId);
   const workflowStepRecordsByWorkflowId = useMemo<Map<string, WorkflowStepRecord[]>>(() => new Map(config.workflows.map((workflow) => {
@@ -136,14 +152,30 @@ export function WorkflowsAutomationTab({
   const updateSelected = (patch: Partial<ProjectWorkflow>) => {
     if (!selected) return;
     if (creating) {
-      onCreateDraftChange(patch.id === undefined ? patch : { ...patch, id: normalizePolicyToken(patch.id) });
+      onCreateDraftChange(patch);
       return;
     }
-    updateConfig((current) => ({
-      ...current,
-      workflows: current.workflows.map((workflow, index) => index === selectedIndex ? { ...workflow, ...patch } : workflow)
-    }));
-    if (patch.id) onSelect(patch.id);
+    const nextWorkflowBase = { ...selected, ...patch };
+    const derivedId = workflowIdForPolicy(policyById.get(nextWorkflowBase.steps[0] ?? ""));
+    const nextWorkflow = derivedId && derivedId !== selected.id
+      ? { ...nextWorkflowBase, id: derivedId }
+      : nextWorkflowBase;
+    updateConfig((current) => {
+      const currentWorkflow = current.workflows[selectedIndex];
+      if (!currentWorkflow) return current;
+      return {
+        ...current,
+        workflows: current.workflows.map((workflow, index) => index === selectedIndex ? nextWorkflow : workflow),
+        humanGateResponses: nextWorkflow.id === currentWorkflow.id
+          ? current.humanGateResponses
+          : current.humanGateResponses.map((response) => {
+            if (response.workflowId !== currentWorkflow.id) return response;
+            const nextResponse = { ...response, workflowId: nextWorkflow.id };
+            return { ...nextResponse, id: humanGateResponseId(nextResponse) };
+          })
+      };
+    });
+    if (nextWorkflow.id !== selected.id) onSelect(nextWorkflow.id);
   };
 
   const updateStep = (workflowId: string, index: number, policyId: string) => {
@@ -298,18 +330,31 @@ export function WorkflowsAutomationTab({
   if (!selected) return <EmptyState title="No workflow selected." />;
 
   if (creating) {
+    const selectedStartingPolicyId = selected.steps[0] ?? "";
+    const selectedStartingPolicy = policyById.get(selectedStartingPolicyId);
+    const derivedWorkflowId = workflowIdForPolicy(selectedStartingPolicy);
+    if (startingTriggerOptions.length === 0) {
+      return (
+        <div className="p-4">
+          <EmptyState title="No unused starting triggers." action="Create a trigger policy before adding a workflow." />
+        </div>
+      );
+    }
     return (
       <div className="grid gap-4 p-4">
         <FieldGroup>
-          <TextField
-            label="Workflow ID"
-            required
-            minLength={automationFieldLimits.token.min}
-            maxLength={automationFieldLimits.token.max}
-            error={workflowIdError}
-            value={selected.id}
-            onChange={(id) => updateSelected({ id })}
+          <SelectField
+            label="Starting trigger"
+            value={selectedStartingPolicyId || startingTriggerOptions[0]?.value || noSelection}
+            options={startingTriggerOptions}
+            onChange={(policyId) => updateSelected({ steps: [policyId] })}
           />
+          <Field className="gap-1.5">
+            <FieldLabel>Derived ID</FieldLabel>
+            <div className="min-h-9 rounded border border-input bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
+              {derivedWorkflowId || "Select a starting trigger"}
+            </div>
+          </Field>
           <TextField
             label="Title"
             required

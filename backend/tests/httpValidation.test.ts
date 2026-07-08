@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseUnknown, HttpValidationError } from "../http/validation/httpValidation.js";
 import {
-  automationConfigSchema,
-  collectionUpsertSchema,
-  eventIntakeSchema,
-  projectDocumentSaveSchema
+    automationConfigSchema,
+    collectionUpsertSchema,
+    eventIntakeSchema,
+    projectDocumentSaveSchema
 } from "../../shared/api/workspace-schemas.js";
+import { HttpValidationError, parseUnknown } from "../http/validation/httpValidation.js";
 
 const expectValidationError = (callback: () => unknown, path: string) => {
   expect(callback).toThrow(HttpValidationError);
@@ -52,7 +52,7 @@ describe("HTTP Zod validation", () => {
       ...valid,
       actions: [...valid.actions, { id: "human-review", description: "Human review", outputIds: ["summary"], agentIds: [], humanGate: true }],
       humanGateResponses: [{
-        id: "delivery:on-implementation-summary-start-human-review:human-review",
+        id: "delivery:on-implementation-summary-start-review:human-review",
         workflowId: "delivery",
         policyId: "on.implementation.summary.start.human-review",
         actionId: "human-review",

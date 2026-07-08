@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import type { Agent, ProjectAutomationConfig, ProjectPolicy, ProjectWorkflow } from "@shared/api/workspace-contracts";
 import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage, normalizeAutomationToken } from "@shared/api/automationValidation";
-import { defaultPolicyOutputIds } from "@shared/policy-actions";
+import { defaultPolicyOutputIds, workflowIdForPolicy } from "@shared/policy-actions";
 import type { AutomationTab } from "../types";
 
 type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
 
 type AutomationCreateDrafts = {
   action: { id: string; description: string; outputIds: string[]; agentIds: string[]; humanGate: boolean };
-  workflow: { id: string; title: string; steps: string[] };
+  workflow: ProjectWorkflow;
 };
 
 export function useAutomationCreateDrafts({
@@ -39,7 +39,7 @@ export function useAutomationCreateDrafts({
     setNewAction((current) => syncDraft(createDraftsRef, "action", { ...current, ...patch }));
   };
   const updateNewWorkflow = (patch: Partial<typeof newWorkflow>) => {
-    setNewWorkflow((current) => syncDraft(createDraftsRef, "workflow", { ...current, ...patch }));
+    setNewWorkflow((current) => syncDraft(createDraftsRef, "workflow", workflowCreateDraftWithDerivedId(draft, { ...current, ...patch })));
   };
 
   useEffect(() => {
@@ -48,6 +48,10 @@ export function useAutomationCreateDrafts({
       agentIds: newAction.agentIds.length > 0 ? newAction.agentIds : agents.slice(0, 1).map((agent) => agent.id)
     });
   }, [agents, draft.outputs]);
+
+  useEffect(() => {
+    setNewWorkflow((current) => syncDraft(createDraftsRef, "workflow", workflowCreateDraftWithDefaultTrigger(draft, current)));
+  }, [draft.policies, draft.workflows]);
 
   const saveAutomationFromHeader = async () => {
     if (!isCreateMode) {
@@ -60,7 +64,7 @@ export function useAutomationCreateDrafts({
     const saved = await saveDraft(nextDraft.config);
     if (!saved) return false;
     selectAutomationEntity(activeTab, nextDraft.id);
-    const resetDrafts = createInitialDrafts(draft, agents);
+    const resetDrafts = createInitialDrafts(nextDraft.config, agents);
     createDraftsRef.current = resetDrafts;
     setNewAction(resetDrafts.action);
     setNewWorkflow(resetDrafts.workflow);
@@ -87,8 +91,52 @@ const syncDraft = <K extends keyof AutomationCreateDrafts>(
 
 const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): AutomationCreateDrafts => ({
   action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id), humanGate: false },
-  workflow: { id: "", title: "", steps: [] }
+  workflow: workflowCreateDraftWithDefaultTrigger(draft, { id: "", title: "", steps: [] })
 });
+
+const workflowStartingTriggerPolicy = (draft: ProjectAutomationConfig, workflow: Pick<ProjectWorkflow, "steps">): ProjectPolicy | undefined => {
+  const firstPolicyId = workflow.steps[0] ?? "";
+  return draft.policies.find((policy) => policy.id === firstPolicyId && policy.source === "trigger" && Boolean(policy.trigger));
+};
+
+const usedWorkflowTriggerPolicyIds = (draft: ProjectAutomationConfig): Set<string> => {
+  const policyById = new Map(draft.policies.map((policy) => [policy.id, policy]));
+  return new Set(draft.workflows.flatMap((workflow) => {
+    const firstPolicy = policyById.get(workflow.steps[0] ?? "");
+    return firstPolicy?.source === "trigger" ? [firstPolicy.id] : [];
+  }));
+};
+
+const firstUnusedTriggerPolicy = (draft: ProjectAutomationConfig): ProjectPolicy | undefined => {
+  const usedPolicyIds = usedWorkflowTriggerPolicyIds(draft);
+  return draft.policies.find((policy) =>
+    policy.source === "trigger" &&
+    Boolean(policy.trigger) &&
+    !usedPolicyIds.has(policy.id)
+  );
+};
+
+const workflowCreateDraftWithDerivedId = (draft: ProjectAutomationConfig, workflow: ProjectWorkflow): ProjectWorkflow => {
+  const triggerPolicy = workflowStartingTriggerPolicy(draft, workflow);
+  const id = workflowIdForPolicy(triggerPolicy);
+  return {
+    ...workflow,
+    id,
+    steps: triggerPolicy ? [triggerPolicy.id] : []
+  };
+};
+
+const workflowCreateDraftWithDefaultTrigger = (draft: ProjectAutomationConfig, workflow: ProjectWorkflow): ProjectWorkflow => {
+  const selectedPolicy = workflowStartingTriggerPolicy(draft, workflow);
+  if (selectedPolicy && !usedWorkflowTriggerPolicyIds(draft).has(selectedPolicy.id)) {
+    return workflowCreateDraftWithDerivedId(draft, workflow);
+  }
+  const triggerPolicy = firstUnusedTriggerPolicy(draft);
+  return workflowCreateDraftWithDerivedId(draft, {
+    ...workflow,
+    steps: triggerPolicy ? [triggerPolicy.id] : []
+  });
+};
 
 const defaultActionOutputIds = (draft: ProjectAutomationConfig): string[] => {
   const availableOutputIds = draft.outputs.map((output) => output.id);
@@ -111,9 +159,10 @@ const createDraftWithNewEntity = (
     });
     return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds, agentIds: drafts.action.humanGate ? [] : drafts.action.agentIds }] } };
   }
-  const id = normalizeAutomationToken(drafts.workflow.id);
-  if (automationTokenValidationMessage("Workflow ID", id) || automationStringValidationMessage("Title", drafts.workflow.title, automationFieldLimits.name) || draft.workflows.some((workflow) => workflow.id === id)) return undefined;
-  return { id, config: { ...draft, workflows: [...draft.workflows, { ...drafts.workflow, id, title: drafts.workflow.title.trim() }] } };
+  const triggerPolicy = workflowStartingTriggerPolicy(draft, drafts.workflow);
+  const id = workflowIdForPolicy(triggerPolicy);
+  if (!triggerPolicy || !id || automationStringValidationMessage("Title", drafts.workflow.title, automationFieldLimits.name) || draft.workflows.some((workflow) => workflow.id === id)) return undefined;
+  return { id, config: { ...draft, workflows: [...draft.workflows, { id, title: drafts.workflow.title.trim(), steps: [triggerPolicy.id] }] } };
 };
 
 const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectAutomationConfig): boolean => {
@@ -123,8 +172,10 @@ const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectA
       Boolean(automationStringValidationMessage("Description", action.description, automationFieldLimits.description, { required: false }))
     );
   }
-  return draft.workflows.some((workflow) =>
-    Boolean(automationTokenValidationMessage("Workflow ID", workflow.id)) ||
-    Boolean(automationStringValidationMessage("Title", workflow.title, automationFieldLimits.name))
-  );
+  const policyById = new Map(draft.policies.map((policy) => [policy.id, policy]));
+  return draft.workflows.some((workflow) => {
+    const startingPolicy = policyById.get(workflow.steps[0] ?? "");
+    return workflow.id !== workflowIdForPolicy(startingPolicy) ||
+      Boolean(automationStringValidationMessage("Title", workflow.title, automationFieldLimits.name));
+  });
 };

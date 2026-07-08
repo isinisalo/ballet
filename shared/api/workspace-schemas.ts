@@ -121,6 +121,7 @@ const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits
 const automationOutputIdSchema = z.string().min(automationFieldLimits.outputId.min).max(automationFieldLimits.outputId.max);
 const automationEventTypeSchema = z.string().min(automationFieldLimits.eventType.min).max(automationFieldLimits.eventType.max);
 const automationTriggerIdSchema = z.string().min(1).max(automationFieldLimits.eventType.max);
+const automationWorkflowIdSchema = z.string().min(automationFieldLimits.workflowId.min).max(automationFieldLimits.workflowId.max);
 const automationPolicyIdSchema = z.string().min(automationFieldLimits.policyId.min).max(automationFieldLimits.policyId.max);
 const automationHumanGateResponseIdSchema = z.string().min(1).max(260);
 const automationHumanGatePromptSchema = z.string().min(1).max(2000);
@@ -160,14 +161,14 @@ const projectPolicySchema = z.object({
 }).strict();
 
 const projectWorkflowSchema = z.object({
-  id: automationTokenSchema,
+  id: automationWorkflowIdSchema,
   title: automationNameSchema,
   steps: z.array(automationPolicyIdSchema)
 }).strict();
 
 const projectHumanGateResponseSchema = z.object({
   id: automationHumanGateResponseIdSchema,
-  workflowId: automationTokenSchema.optional(),
+  workflowId: automationWorkflowIdSchema.optional(),
   policyId: automationPolicyIdSchema,
   actionId: automationTokenSchema,
   outputId: automationOutputIdSchema,

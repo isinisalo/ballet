@@ -8,6 +8,7 @@ import { apiRouter } from "../routes.js";
 import { store } from "../store.js";
 import { notifyRuntimeChanged } from "../runtime-events.js";
 import type { AgentRun, AgentRunLog } from "../../shared/domain/runtime.js";
+import { workflowIdFromTrigger } from "../../shared/policy-actions.js";
 
 const listen = async (app: express.Express): Promise<{ server: Server; url: string }> => {
   const server = createServer(app);
@@ -282,14 +283,20 @@ describe("API routes", () => {
     app.use("/api", apiRouter);
     const { server, url } = await listen(app);
 
+    const workflowTrigger = "project-brief-gate.approved";
+    const workflowStartPolicyId = `on.trigger.${workflowTrigger}.start.implementation`;
+    const workflowId = workflowIdFromTrigger(workflowTrigger);
     const config = {
       version: 1,
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }],
       outputRoutes: [],
       humanGateResponses: [],
-      policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
-      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
+      policies: [
+        { id: workflowStartPolicyId, source: "trigger", trigger: workflowTrigger, action: "implementation", enabled: true },
+        { id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }
+      ],
+      workflows: [{ id: workflowId, title: "Delivery", steps: [workflowStartPolicyId, "on.implementation.failed.start.implementation"] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
     };
 
@@ -301,7 +308,7 @@ describe("API routes", () => {
       });
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
-      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }], outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], workflows: [{ steps: ["on.implementation.failed.start.implementation"] }] });
+      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }], outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], workflows: [{ id: workflowId, steps: [workflowStartPolicyId, "on.implementation.failed.start.implementation"] }] });
       expect(savedBody).not.toHaveProperty("triggers");
 
       const automation = await fetch(url + "/api/automation");
@@ -312,7 +319,7 @@ describe("API routes", () => {
       expect(automationBody.config).toHaveProperty("humanGateResponses");
       expect(automationBody.config).not.toHaveProperty("gates");
       expect(automationBody.config).not.toHaveProperty("gateDecisions");
-      expect(automationBody).toMatchObject({ config: { outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
+      expect(automationBody).toMatchObject({ config: { outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], policies: [{ id: workflowStartPolicyId, source: "trigger", trigger: workflowTrigger }, { id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
 
       const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",
