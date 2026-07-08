@@ -1,52 +1,64 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { describe, expect, it } from "vitest";
 import {
-    loopOutputEventTargetDisplay,
-    loopOutputTargetDisplay,
-    loopOutputTargetFromSelectValue,
-    loopOutputTargetSelectValue
+  loopOutputEventTargetDisplay,
+  loopOutputTargetDisplay,
+  loopOutputTargetSelectValue
 } from "../src/workspace/automation/loops/loopOutputTargetRules";
 
-const config = (): ProjectAutomationConfig => ({
-  version: 1,
+const loopId = "review.loop";
+
+const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes"> => ({
   actions: [
-    { id: "review", description: "Review.", outputIds: ["approved", "changes-requested"], agentIds: ["reviewer-agent"] },
-    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes-requested"], agentIds: [], humanGate: true }
+    {
+      id: "review",
+      description: "Review.",
+      outputIds: ["approved", "changes-requested"],
+      agentIds: ["reviewer-agent"]
+    },
+    {
+      id: "human-review",
+      description: "Human review.",
+      outputIds: ["approved", "changes-requested"],
+      agentIds: [],
+      humanGate: true
+    }
   ],
-  outputs: [{ id: "approved" }, { id: "changes-requested" }],
-  outputRoutes: [],
-  humanGateResponses: [],
-  policies: [
-    { id: "agent-review-policy", source: "event", event: "review.ready", action: "review", enabled: true },
-    { id: "human-review-policy", source: "event", event: "review.approved", action: "human-review", enabled: true }
-  ],
-  loops: [],
-  runtimes: []
+  outputRoutes: []
 });
 
 describe("loop output target rules", () => {
   it("keeps output target select values event-only", () => {
-    const current = config();
-
-    expect(loopOutputTargetSelectValue(current, "human-review-policy", "approved")).toBe("event");
-    expect(loopOutputTargetSelectValue(current, "human-review-policy", "changes-requested")).toBe("event");
-    expect(loopOutputTargetFromSelectValue("event")).toBeUndefined();
+    expect(loopOutputTargetSelectValue(config(), loopId, "human-review", "approved")).toBe("event");
+    expect(loopOutputTargetSelectValue(config(), loopId, "human-review", "changes-requested")).toBe("event");
   });
 
   it("formats selected output targets for event badges", () => {
-    const current = config();
+    expect(loopOutputTargetDisplay(config(), loopId, "human-review", "approved")).toEqual({
+      type: "event",
+      label: "review.loop.human-review.approved"
+    });
+    expect(loopOutputEventTargetDisplay(config(), loopId, "human-review", "approved")).toEqual({
+      type: "event",
+      label: "review.loop.human-review.approved"
+    });
+  });
 
-    expect(loopOutputTargetDisplay(current, "human-review-policy", "approved")).toEqual({
-      type: "event",
-      label: "human-review.approved"
-    });
-    expect(loopOutputTargetDisplay(current, "human-review-policy", "changes-requested")).toEqual({
-      type: "event",
-      label: "human-review.changes-requested"
-    });
-    expect(loopOutputEventTargetDisplay(current, "human-review-policy", "approved")).toEqual({
-      type: "event",
-      label: "human-review.approved"
+  it("formats explicit action output targets", () => {
+    const current = {
+      ...config(),
+      outputRoutes: [{
+        sourceLoopId: loopId,
+        sourceActionId: "review",
+        outputId: "approved",
+        targetLoopId: loopId,
+        targetActionId: "human-review"
+      }]
+    };
+
+    expect(loopOutputTargetDisplay(current, loopId, "review", "approved")).toEqual({
+      type: "action",
+      label: "human-review"
     });
   });
 });

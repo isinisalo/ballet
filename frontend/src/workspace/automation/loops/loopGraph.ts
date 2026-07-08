@@ -1,18 +1,24 @@
-import type { ProjectPolicy } from "@shared/api/workspace-contracts";
-import { policyOutputEventTypes } from "@shared/policy-actions";
+import type { ProjectAction } from "@shared/api/workspace-contracts";
+import { actionOutputEventTypes } from "@shared/policy-actions";
 
 export type LoopOutputTarget =
   {
     outputId: string;
     eventType: string;
     type: "event";
+  } | {
+    outputId: string;
+    eventType: string;
+    type: "action";
+    targetLoopId: string;
+    targetActionId: string;
   };
 
 export type LoopStepRecord = {
-  policyId: string;
+  actionId: string;
   index: number;
   loopId?: string;
-  policy?: ProjectPolicy;
+  action?: ProjectAction;
   outputEvents?: string[];
   outputTargets?: LoopOutputTarget[];
 };
@@ -37,18 +43,19 @@ export type LoopGraph = {
   rootRecords: LoopStepRecord[];
 };
 
-export const loopInputEventLabel = (policy?: ProjectPolicy) => {
-  if (!policy) return "Next event";
-  return policy.event || "Missing event";
+export const loopInputEventLabel = (action?: ProjectAction) => {
+  if (!action) return "Next event";
+  return action.id || "Missing action";
 };
 
-export const loopOutputEvents = (recordOrPolicy: LoopStepRecord | ProjectPolicy | undefined, continuationEvent?: string) => {
-  if (!recordOrPolicy) return ["Missing policy"];
-  const policy = "policyId" in recordOrPolicy ? recordOrPolicy.policy : recordOrPolicy;
-  if (!policy) return ["Missing policy"];
-  const events = "policyId" in recordOrPolicy
-    ? recordOrPolicy.outputEvents ?? recordOrPolicy.outputTargets?.map((output) => output.eventType) ?? policyOutputEventTypes(policy)
-    : policyOutputEventTypes(policy);
+export const loopOutputEvents = (recordOrAction: LoopStepRecord | ProjectAction | undefined, continuationEvent?: string) => {
+  if (!recordOrAction) return ["Missing action"];
+  const action = "actionId" in recordOrAction ? recordOrAction.action : recordOrAction;
+  if (!action) return ["Missing action"];
+  const events = "actionId" in recordOrAction
+    ? recordOrAction.outputEvents ?? recordOrAction.outputTargets?.map((output) => output.eventType) ??
+      actionOutputEventTypes({ loopId: recordOrAction.loopId, actionId: recordOrAction.actionId }, [action])
+    : actionOutputEventTypes({ actionId: action.id }, [action]);
   return continuationEvent && !events.includes(continuationEvent) ? [continuationEvent, ...events] : events;
 };
 
@@ -83,26 +90,23 @@ export const buildLoopGraph = (loopStepRecords: LoopStepRecord[]): LoopGraph => 
   const childRecordIndexes = new Set<number>();
 
   loopStepRecords.forEach((record) => {
-    if (record.policy?.source !== "event" || !record.policy.event) return;
-    eventHandlerRecordsByEvent.set(record.policy.event, [
-      ...(eventHandlerRecordsByEvent.get(record.policy.event) ?? []),
-      record
-    ]);
-
-    const parentRecord = loopStepRecords
-      .filter((candidate) =>
-        candidate.index < record.index &&
-        candidate.policy &&
-        loopOutputEvents(candidate).includes(record.policy?.event ?? "")
-      )
-      .at(-1);
-    if (!parentRecord) return;
-    const key = `${parentRecord.index}:${record.policy.event}`;
-    childRecordsByParentEvent.set(key, [...(childRecordsByParentEvent.get(key) ?? []), record]);
-    childRecordIndexes.add(record.index);
+    record.outputTargets?.forEach((target) => {
+      if (target.type !== "action" || target.targetLoopId !== record.loopId) return;
+      const childRecord = loopStepRecords.find((candidate) => candidate.actionId === target.targetActionId);
+      if (!childRecord) return;
+      eventHandlerRecordsByEvent.set(target.eventType, [
+        ...(eventHandlerRecordsByEvent.get(target.eventType) ?? []),
+        childRecord
+      ]);
+      const key = `${record.index}:${target.eventType}`;
+      childRecordsByParentEvent.set(key, [...(childRecordsByParentEvent.get(key) ?? []), childRecord]);
+      childRecordIndexes.add(childRecord.index);
+    });
   });
 
-  const rootRecords = loopStepRecords.filter((record) => !childRecordIndexes.has(record.index));
+  const rootRecords = loopStepRecords.length > 0
+    ? [loopStepRecords[0]]
+    : loopStepRecords.filter((record) => !childRecordIndexes.has(record.index));
   return {
     actionFoldModel,
     childRecordsByParentEvent,
@@ -115,7 +119,7 @@ function buildLoopActionFoldModel(loopStepRecords: LoopStepRecord[]): LoopAction
   const recordsByActionId = new Map<string, LoopStepRecord[]>();
 
   loopStepRecords.forEach((record) => {
-    const actionId = record.policy?.action;
+    const actionId = record.actionId;
     if (!actionId) return;
     recordsByActionId.set(actionId, [...(recordsByActionId.get(actionId) ?? []), record]);
   });

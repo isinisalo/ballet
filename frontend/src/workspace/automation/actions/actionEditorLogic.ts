@@ -1,13 +1,21 @@
 import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { actionOutputSlotCount, actionOutputSlotKind, generatedPolicyId, humanGateResponseId, normalizeActionOutputSlots, projectOutputRouteKey, policyOutputEventType } from "@shared/policy-actions";
-import { editablePolicyToken } from "../automationUtils";
+import {
+  actionOutputRouteKey,
+  actionOutputSlotCount,
+  actionOutputSlotKind,
+  humanGateResponseId,
+  normalizeActionOutputSlots,
+} from "@shared/policy-actions";
+
+const editableActionId = (value: string): string =>
+  value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+/, "");
 
 export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
   const normalized = {
     ...action,
-    id: editablePolicyToken(action.id),
+    id: editableActionId(action.id),
     outputIds: normalizeActionOutputSlots(action.outputIds),
-    agentIds: action.humanGate ? [] : [...new Set(action.agentIds)].slice(0, 5)
+    agentIds: action.humanGate ? [] : [...new Set(action.agentIds)].slice(0, 5),
   };
   if (normalized.agentIds.length === 0 && !normalized.humanGate) normalized.outputIds = [];
   return normalized;
@@ -28,76 +36,45 @@ export const nextConfigWithActionPatch = (
 ): { config: ProjectAutomationConfig; action: ProjectAction } => {
   const selectedIndex = current.actions.findIndex((action) => action.id === actionId);
   const previousAction = current.actions[selectedIndex];
-  if (!previousAction) return { config: current, action: normalizeActionDraft({ id: actionId, description: "", outputIds: [], agentIds: [] }) };
-
-  const normalized = normalizeActionDraft({ ...previousAction, ...patch });
-  const previousId = previousAction.id;
-  const nextActions = current.actions.map((action, index) => index === selectedIndex ? normalized : action);
-  const eventIdMap = new Map<string, string>();
-  const outputIdMap = new Map<string, string>();
-  if (previousId !== normalized.id || previousAction.outputIds.join("\0") !== normalized.outputIds.join("\0")) {
-    previousAction.outputIds.forEach((outputId, outputIndex) => {
-      const slotIndex = previousOutputSlotIndex(outputId, outputIndex, previousAction.outputIds.length);
-      const nextOutputId = slotIndex === undefined ? undefined : normalized.outputIds[slotIndex];
-      if (!nextOutputId) return;
-      outputIdMap.set(outputId, nextOutputId);
-      eventIdMap.set(
-        policyOutputEventType({ action: previousId }, outputId),
-        policyOutputEventType({ action: normalized.id }, nextOutputId)
-      );
-    });
+  if (!previousAction) {
+    return {
+      config: current,
+      action: normalizeActionDraft({
+        id: actionId,
+        description: "",
+        outputIds: [],
+        agentIds: []
+      })
+    };
   }
 
-  const policyIdMap = new Map<string, string>();
-  const policies = current.policies.map((policy) => {
-    const nextAction = policy.action === previousId ? normalized.id : policy.action;
-    if (policy.loopId) {
-      previousAction.outputIds.forEach((outputId, outputIndex) => {
-        const slotIndex = previousOutputSlotIndex(outputId, outputIndex, previousAction.outputIds.length);
-        const nextOutputId = slotIndex === undefined ? undefined : normalized.outputIds[slotIndex];
-        if (!nextOutputId) return;
-        eventIdMap.set(
-          policyOutputEventType({ action: previousId, loopId: policy.loopId }, outputId),
-          policyOutputEventType({ action: normalized.id, loopId: policy.loopId }, nextOutputId)
-        );
-      });
-    }
-    const nextEvent = policy.source === "event" && policy.event ? eventIdMap.get(policy.event) ?? policy.event : policy.event;
-    if (nextAction === policy.action && nextEvent === policy.event) return policy;
-    const nextPolicy = { ...policy, action: nextAction, event: nextEvent };
-    const nextPolicyId = generatedPolicyId(nextPolicy);
-    policyIdMap.set(policy.id, nextPolicyId);
-    return { ...nextPolicy, id: nextPolicyId };
+  const normalized = normalizeActionDraft({ ...previousAction, ...patch });
+  const actionIdMap = new Map([[previousAction.id, normalized.id]]);
+  const outputIdMap = new Map<string, string>();
+  previousAction.outputIds.forEach((outputId, outputIndex) => {
+    const slotIndex = previousOutputSlotIndex(outputId, outputIndex, previousAction.outputIds.length);
+    const nextOutputId = slotIndex === undefined ? undefined : normalized.outputIds[slotIndex];
+    if (!nextOutputId) return;
+    outputIdMap.set(outputId, nextOutputId);
   });
-  const policyById = new Map(policies.map((policy) => [policy.id, policy]));
-  const actionById = new Map(nextActions.map((action) => [action.id, action]));
+
+  const actions = current.actions.map((action, index) => index === selectedIndex ? normalized : action);
+  const actionById = new Map(actions.map((action) => [action.id, action]));
   const outputRouteByKey = new Map(current.outputRoutes.flatMap((route) => {
-    const previousPolicy = current.policies.find((policy) => policy.id === route.sourcePolicyId);
-    const sourcePolicyId = policyIdMap.get(route.sourcePolicyId) ?? route.sourcePolicyId;
-    const outputId = previousPolicy?.action === previousId ? outputIdMap.get(route.outputId) ?? route.outputId : route.outputId;
-    const nextPolicy = policyById.get(sourcePolicyId);
-    const nextAction = nextPolicy ? actionById.get(nextPolicy.action) : undefined;
-    if (!nextPolicy || !nextAction?.outputIds.includes(outputId)) return [];
-    const nextRoute = {
-      ...route,
-      sourcePolicyId,
-      outputId,
-      target: {
-        ...route.target,
-        policyId: policyIdMap.get(route.target.policyId) ?? route.target.policyId
-      }
-    };
-    return [[projectOutputRouteKey(nextRoute.sourcePolicyId, nextRoute.outputId), nextRoute] as const];
+    const sourceActionId = actionIdMap.get(route.sourceActionId) ?? route.sourceActionId;
+    const targetActionId = actionIdMap.get(route.targetActionId) ?? route.targetActionId;
+    const sourceAction = actionById.get(sourceActionId);
+    const outputId = route.sourceActionId === previousAction.id ? outputIdMap.get(route.outputId) ?? route.outputId : route.outputId;
+    if (!sourceAction || !actionById.has(targetActionId) || !sourceAction.outputIds.includes(outputId)) return [];
+    const nextRoute = { ...route, sourceActionId, outputId, targetActionId };
+    return [[actionOutputRouteKey(nextRoute.sourceLoopId, nextRoute.sourceActionId, nextRoute.outputId), nextRoute] as const];
   }));
   const humanGateResponses = current.humanGateResponses.flatMap((response) => {
-    const previousPolicy = current.policies.find((policy) => policy.id === response.policyId);
-    const policyId = policyIdMap.get(response.policyId) ?? response.policyId;
-    const nextPolicy = policyById.get(policyId);
-    const actionId = response.actionId === previousId ? normalized.id : response.actionId;
-    const nextAction = actionById.get(actionId);
-    const outputId = previousPolicy?.action === previousId ? outputIdMap.get(response.outputId) ?? response.outputId : response.outputId;
-    if (!nextPolicy || !nextAction?.humanGate || !nextAction.outputIds.includes(outputId)) return [];
-    const nextResponse = { ...response, policyId, actionId, outputId };
+    const actionIdForResponse = actionIdMap.get(response.actionId) ?? response.actionId;
+    const action = actionById.get(actionIdForResponse);
+    const outputId = response.actionId === previousAction.id ? outputIdMap.get(response.outputId) ?? response.outputId : response.outputId;
+    if (!action?.humanGate || !action.outputIds.includes(outputId)) return [];
+    const nextResponse = { ...response, actionId: actionIdForResponse, outputId };
     return [{ ...nextResponse, id: humanGateResponseId(nextResponse) }];
   });
 
@@ -105,11 +82,10 @@ export const nextConfigWithActionPatch = (
     action: normalized,
     config: {
       ...current,
-      actions: nextActions,
-      policies,
+      actions,
       loops: current.loops.map((loop) => ({
         ...loop,
-        steps: loop.steps.map((step) => policyIdMap.get(step) ?? step)
+        steps: loop.steps.map((step) => actionIdMap.get(step) ?? step)
       })),
       outputRoutes: [...outputRouteByKey.values()],
       humanGateResponses

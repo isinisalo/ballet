@@ -33,39 +33,35 @@ describe("HTTP Zod validation", () => {
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
       version: 1,
-      actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"], agentIds: ["developer-agent"] }],
+      actions: [{
+        id: "implementation",
+        description: "Implementation",
+        outputIds: ["summary"],
+        agentIds: ["developer-agent"]
+      }],
       outputs: [{ id: "summary" }],
       outputRoutes: [],
       humanGateResponses: [],
-      policies: [{
-        id: "on.implementation.summary.start.implementation",
-        source: "event",
-        event: "implementation.summary",
-        action: "implementation",
-        enabled: true
-      }],
-      loops: [{ id: "delivery", steps: ["on.implementation.summary.start.implementation"] }],
+      loops: [{ id: "delivery.loop", steps: ["implementation"] }],
       runtimes: [{ id: "codex", title: "Codex", command: "codex", args: [] }]
     };
     expect(parseUnknown(automationConfigSchema, valid)).toEqual(valid);
     const humanGateConfig = {
       ...valid,
-      actions: [...valid.actions, { id: "human-review", description: "Human review", outputIds: ["summary"], agentIds: [], humanGate: true }],
+      actions: [...valid.actions, {
+        id: "human-review",
+        description: "Human review",
+        outputIds: ["summary"],
+        agentIds: [],
+        humanGate: true
+      }],
       humanGateResponses: [{
-        id: "delivery:on-implementation-summary-start-review:human-review",
-        loopId: "delivery",
-        policyId: "on.implementation.summary.start.human-review",
+        id: "delivery.loop:human-review",
+        loopId: "delivery.loop",
         actionId: "human-review",
         outputId: "summary",
         prompt: "Continue with the approved brief.",
         submittedAt: "2026-07-07T10:00:00.000Z"
-      }],
-      policies: [...valid.policies, {
-        id: "on.implementation.summary.start.human-review",
-        source: "event",
-        event: "implementation.summary",
-        action: "human-review",
-        enabled: true
       }]
     };
     expect(parseUnknown(automationConfigSchema, humanGateConfig)).toMatchObject({
@@ -85,8 +81,8 @@ describe("HTTP Zod validation", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, gates: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
       ...valid,
-      outputRoutes: [{ sourcePolicyId: "on.implementation.summary.start.implementation", outputId: "summary", target: { type: "gate", gate: "human-review" } }]
-    }), "outputRoutes.0.target.type");
+      outputRoutes: [{ sourceLoopId: "delivery.loop", sourceActionId: "implementation", outputId: "summary", targetLoopId: "delivery.loop", targetActionId: "" }]
+    }), "outputRoutes.0.targetActionId");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"] }] }), "actions.0.agentIds");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", description: "Summary" }] }), "outputs.0");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", type: "event" }] }), "outputs.0");

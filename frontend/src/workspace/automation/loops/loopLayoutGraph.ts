@@ -11,12 +11,12 @@ import { loopDirectionHandles } from "./loopLayoutConfig";
 import {
   addCanvasEdge,
   addDagreEdge,
-  addFirstPolicyGhost,
+  addFirstActionGhost,
   addInputEventNode,
   addOutputEventNode,
-  addPolicyNode,
+  addActionNode,
   loopOutputEdgeLabel,
-  loopPolicyInputEdgeLabel,
+  loopActionInputEdgeLabel,
   type LoopLayoutGraphDraft,
   type LoopLayoutGraphDraftContext
 } from "./loopLayoutGraphDraft";
@@ -28,17 +28,17 @@ import type { LoopActiveOutputTask, LoopLayoutDirection } from "./loopLayoutType
 
 export function buildLoopLayoutGraphDraft({
   loopGraph,
-  editingPolicyIndex,
+  editingActionIndex,
   direction
 }: {
   loopGraph: LoopGraph;
-  editingPolicyIndex: number | null;
+  editingActionIndex: number | null;
   direction: LoopLayoutDirection;
 }): LoopLayoutGraphDraft {
   const { sourceHandleId, targetHandleId } = loopDirectionHandles[direction];
   const context: LoopLayoutGraphDraftContext = {
     loopGraph,
-    editingPolicyIndex,
+    editingActionIndex,
     direction,
     sourceHandleId,
     targetHandleId,
@@ -46,7 +46,7 @@ export function buildLoopLayoutGraphDraft({
     dagreEdges: [],
     canvasEdges: [],
     edgeKeys: new Set(),
-    policyNodeIndexes: new Set(),
+    actionNodeIndexes: new Set(),
     handledEventNodes: []
   };
 
@@ -54,11 +54,11 @@ export function buildLoopLayoutGraphDraft({
   if (loopGraph.rootRecords.length > 0) {
     loopGraph.rootRecords.forEach((record) => addRootPolicyBranch(context, record));
   } else {
-    addFirstPolicyGhost(context);
+    addFirstActionGhost(context);
   }
   loopExistingHandlerEdges({
     loopGraph,
-    policyNodeIndexes: context.policyNodeIndexes,
+    actionNodeIndexes: context.actionNodeIndexes,
     handledEventNodes: context.handledEventNodes,
     sourceHandleId,
     targetHandleId
@@ -76,53 +76,53 @@ function addRootPolicyBranch(context: LoopLayoutGraphDraftContext, record: LoopS
   layoutPolicyBranch(context, canonicalRecord);
   if (canonicalRecord.index !== record.index) {
     addCanvasEdge(context, {
-      key: `input-event-policy-${record.index}`,
+      key: `input-event-action-${record.index}`,
       sourceNodeKey: "input-event",
-      targetNodeKey: `policy-${canonicalRecord.index}`,
+      targetNodeKey: `action-${canonicalRecord.index}`,
       sourceHandleId: context.sourceHandleId,
       targetHandleId: context.targetHandleId,
-      dashed: !record.policy,
-      label: loopPolicyInputEdgeLabel(record)
+      dashed: !record.action,
+      label: loopActionInputEdgeLabel(record)
     });
     return;
   }
   addDagreEdge(context, {
     source: "input-event",
-    target: `policy-${record.index}`,
-    label: loopPolicyInputEdgeLabel(record)
+    target: `action-${record.index}`,
+    label: loopActionInputEdgeLabel(record)
   });
   addCanvasEdge(context, {
-    key: `input-event-policy-${record.index}`,
+    key: `input-event-action-${record.index}`,
     sourceNodeKey: "input-event",
-    targetNodeKey: `policy-${record.index}`,
+    targetNodeKey: `action-${record.index}`,
     sourceHandleId: context.sourceHandleId,
     targetHandleId: context.targetHandleId,
-    dashed: !record.policy,
-    label: loopPolicyInputEdgeLabel(record)
+    dashed: !record.action,
+    label: loopActionInputEdgeLabel(record)
   });
 }
 
-function layoutPolicyBranch(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, visitedPolicyIds = new Set<string>()) {
+function layoutPolicyBranch(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, visitedActionIds = new Set<string>()) {
   const canonicalRecord = loopCanonicalRecord(context.loopGraph, record);
   if (canonicalRecord.index !== record.index) return;
-  if (visitedPolicyIds.has(record.policyId)) return;
-  const nextVisitedPolicyIds = new Set(visitedPolicyIds);
+  if (visitedActionIds.has(record.actionId)) return;
+  const nextVisitedActionIds = new Set(visitedActionIds);
   const activeOutputTasks: LoopActiveOutputTask[] = [];
   const inactiveOutputTargets: LoopOutputTarget[] = [];
-  nextVisitedPolicyIds.add(record.policyId);
+  nextVisitedActionIds.add(record.actionId);
 
-  collectOutputTasks(context, record, nextVisitedPolicyIds, activeOutputTasks, inactiveOutputTargets);
+  collectOutputTasks(context, record, nextVisitedActionIds, activeOutputTasks, inactiveOutputTargets);
   const visibleInactiveOutputTargets = activeOutputTasks.some((task) => task.kind === "existing-handler" && task.hasBackwardHandler)
     ? []
     : inactiveOutputTargets;
-  addPolicyNode(context, record, activeOutputTasks.length + visibleInactiveOutputTargets.length);
+  addActionNode(context, record, activeOutputTasks.length + visibleInactiveOutputTargets.length);
 
   activeOutputTasks.forEach((task) => {
     if (task.kind === "existing-handler") {
       addHandledEventNode(context, record, task.output);
       return;
     }
-    task.childRecords.forEach((childRecord) => addChildPolicyEdge(context, record, task.output, childRecord, nextVisitedPolicyIds));
+    task.childRecords.forEach((childRecord) => addChildPolicyEdge(context, record, task.output, childRecord, nextVisitedActionIds));
   });
 
   visibleInactiveOutputTargets.forEach((output, inactiveIndex) => {
@@ -133,7 +133,7 @@ function layoutPolicyBranch(context: LoopLayoutGraphDraftContext, record: LoopSt
 function collectOutputTasks(
   context: LoopLayoutGraphDraftContext,
   record: LoopStepRecord,
-  nextVisitedPolicyIds: ReadonlySet<string>,
+  nextVisitedActionIds: ReadonlySet<string>,
   activeOutputTasks: LoopActiveOutputTask[],
   inactiveOutputTargets: LoopOutputTarget[]
 ) {
@@ -145,7 +145,7 @@ function collectOutputTasks(
     const childRecords = foldedRecords.flatMap((sourceRecord) =>
       context.loopGraph.childRecordsByParentEvent.get(`${sourceRecord.index}:${eventType}`) ?? []
     )
-      .filter((childRecord) => childRecord.policyId !== record.policyId && !nextVisitedPolicyIds.has(childRecord.policyId));
+      .filter((childRecord) => childRecord.actionId !== record.actionId && !nextVisitedActionIds.has(childRecord.actionId));
     const existingHandlerRecords = (context.loopGraph.eventHandlerRecordsByEvent.get(eventType) ?? [])
       .filter((handlerRecord) => handlerRecord.index !== record.index);
 
@@ -173,8 +173,8 @@ function addHandledEventNode(context: LoopLayoutGraphDraftContext, record: LoopS
     outputId: output.outputId,
     label: loopOutputEdgeLabel(output),
     sourceIndex: record.index,
-    sourcePolicyId: record.policyId,
-    sourceNodeKey: `policy-${record.index}`,
+    sourceActionId: record.actionId,
+    sourceNodeKey: `action-${record.index}`,
     sourceHandleId: loopOutputSourceHandleId(output)
   });
 }
@@ -184,17 +184,17 @@ function addChildPolicyEdge(
   record: LoopStepRecord,
   output: LoopOutputTarget,
   childRecord: LoopStepRecord,
-  nextVisitedPolicyIds: Set<string>
+  nextVisitedActionIds: Set<string>
 ) {
   const canonicalChildRecord = loopCanonicalRecord(context.loopGraph, childRecord);
   const isFoldedChild = canonicalChildRecord.index !== childRecord.index;
   if (isFoldedChild) {
     const isReturnEdge = canonicalChildRecord.index <= record.index;
-    layoutPolicyBranch(context, canonicalChildRecord, nextVisitedPolicyIds);
+    layoutPolicyBranch(context, canonicalChildRecord, nextVisitedActionIds);
     addCanvasEdge(context, {
-      key: `policy-policy-${record.index}-${canonicalChildRecord.index}-${childRecord.index}-${output.eventType}`,
-      sourceNodeKey: `policy-${record.index}`,
-      targetNodeKey: `policy-${canonicalChildRecord.index}`,
+      key: `action-action-${record.index}-${canonicalChildRecord.index}-${childRecord.index}-${output.eventType}`,
+      sourceNodeKey: `action-${record.index}`,
+      targetNodeKey: `action-${canonicalChildRecord.index}`,
       sourceHandleId: loopOutputSourceHandleId(output),
       targetHandleId: isReturnEdge ? loopOutputTargetHandleId(output, "top") : loopOutputTargetHandleId(output, context.targetHandleId),
       tone: isReturnEdge ? "return" : undefined,
@@ -203,8 +203,8 @@ function addChildPolicyEdge(
       route: {
         sourceStepIndex: record.index,
         handlerStepIndex: childRecord.index,
-        sourcePolicyId: record.policyId,
-        handlerPolicyId: childRecord.policyId,
+        sourceActionId: record.actionId,
+        handlerActionId: childRecord.actionId,
         eventType: output.eventType,
         outputId: output.outputId
       }
@@ -212,16 +212,16 @@ function addChildPolicyEdge(
     return;
   }
 
-  layoutPolicyBranch(context, childRecord, nextVisitedPolicyIds);
+  layoutPolicyBranch(context, childRecord, nextVisitedActionIds);
   addDagreEdge(context, {
-    source: `policy-${record.index}`,
-    target: `policy-${childRecord.index}`,
+    source: `action-${record.index}`,
+    target: `action-${childRecord.index}`,
     label: loopOutputEdgeLabel(output)
   });
   addCanvasEdge(context, {
-    key: `policy-policy-${record.index}-${childRecord.index}-${output.eventType}`,
-    sourceNodeKey: `policy-${record.index}`,
-    targetNodeKey: `policy-${childRecord.index}`,
+    key: `action-action-${record.index}-${childRecord.index}-${output.eventType}`,
+    sourceNodeKey: `action-${record.index}`,
+    targetNodeKey: `action-${childRecord.index}`,
     sourceHandleId: loopOutputSourceHandleId(output),
     targetHandleId: loopOutputTargetHandleId(output, context.targetHandleId),
     eventType: output.eventType,
@@ -229,8 +229,8 @@ function addChildPolicyEdge(
     route: {
       sourceStepIndex: record.index,
       handlerStepIndex: childRecord.index,
-      sourcePolicyId: record.policyId,
-      handlerPolicyId: childRecord.policyId,
+      sourceActionId: record.actionId,
+      handlerActionId: childRecord.actionId,
       eventType: output.eventType,
       outputId: output.outputId
     }

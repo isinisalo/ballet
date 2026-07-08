@@ -1,10 +1,10 @@
 import type Database from "better-sqlite3";
 import { v4 as uuid } from "uuid";
 import type { Agent } from "../../shared/domain/agents.js";
-import type { EventRoutingSummary, Policy, RouteDecision } from "../../shared/domain/automation.js";
+import type { EventRoutingSummary, ProjectAutomationConfig, RouteDecision } from "../../shared/domain/automation.js";
 import type { EventRecord, EventStatus } from "../../shared/domain/events.js";
 import type { AgentRun } from "../../shared/domain/runtime.js";
-import { routeEvent } from "../../shared/policy.js";
+import { routeAutomationEvent } from "../automation/automationRouting.js";
 import { EventStore } from "./EventStore.js";
 import { AgentRunStore } from "./AgentRunStore.js";
 import { hashDedupeKey, stringifyJson } from "./RuntimeJson.js";
@@ -31,13 +31,13 @@ export class RuntimeProjector {
     private readonly runStore: AgentRunStore
   ) {}
 
-  publishEventAndProjectPolicies(input: IntakeEventInput, policies: Policy[], agents: Agent[]): PublishEventResult {
-    const transaction = this.connection().transaction(() => this.insertEventAndProjectPolicies(input, policies, agents));
+  publishEventAndProjectActions(input: IntakeEventInput, automation: ProjectAutomationConfig, agents: Agent[]): PublishEventResult {
+    const transaction = this.connection().transaction(() => this.insertEventAndProjectActions(input, automation, agents));
     return transaction() as PublishEventResult;
   }
 
-  insertEventAndProjectPolicies(input: IntakeEventInput, policies: Policy[], agents: Agent[]): PublishEventResult {
-    const prepared = this.prepareEvent(input, policies, agents);
+  insertEventAndProjectActions(input: IntakeEventInput, automation: ProjectAutomationConfig, agents: Agent[]): PublishEventResult {
+    const prepared = this.prepareEvent(input, automation, agents);
     const duplicate = this.eventStore.getEventByDedupeKey(prepared.dedupeKey);
     if (duplicate) {
       const runs = this.runStore.getRunsForInputEvent(duplicate.event_id);
@@ -58,7 +58,7 @@ export class RuntimeProjector {
     return { event: this.eventStore.toEventRecord(updated), run: runs[0], runs, duplicate: false };
   }
 
-  private prepareEvent(input: IntakeEventInput, policies: Policy[], agents: Agent[]): PreparedEvent {
+  private prepareEvent(input: IntakeEventInput, automation: ProjectAutomationConfig, agents: Agent[]): PreparedEvent {
     const createdAt = now();
     const eventId = uuid();
     const payload = input.payload ?? {};
@@ -91,7 +91,7 @@ export class RuntimeProjector {
       handlingResult: input.body,
       createdAt
     };
-    const decisions = routeEvent(baseEvent, policies, agents);
+    const decisions = routeAutomationEvent(baseEvent, automation, agents);
     return {
       baseEvent,
       dedupeKey,
@@ -151,7 +151,7 @@ export class RuntimeProjector {
       projectId: prepared.baseEvent.projectId,
       tagsJson: stringifyJson(prepared.baseEvent.tags),
       status,
-      matchedPolicyId: routedDecision?.policyId ?? prepared.decisions[0]?.policyId ?? null,
+      matchedPolicyId: routedDecision?.routeId ?? prepared.decisions[0]?.routeId ?? null,
       assignedAgentId: routedDecision?.targetAgentId ?? null,
       routingJson: stringifyJson(routing),
       handlingResult,
@@ -163,7 +163,7 @@ export class RuntimeProjector {
     const runs: AgentRun[] = [];
     for (const decision of prepared.routedDecisions) {
       this.insertAgentRun(inputEventId, inputEventSeq, prepared.createdAt, decision);
-      const run = this.runStore.getRunByDedupe(inputEventId, decision.policyId, decision.policyVersion, decision.targetAgentId);
+      const run = this.runStore.getRunByDedupe(inputEventId, decision.routeId, decision.actionVersion, decision.targetAgentId);
       if (run) {
         decision.runId = run.runId;
         runs.push(run);
@@ -186,8 +186,8 @@ export class RuntimeProjector {
       runId: uuid(),
       inputEventId,
       inputEventSeq,
-      policyId: decision.policyId,
-      policyVersion: decision.policyVersion,
+      policyId: decision.routeId,
+      policyVersion: decision.actionVersion,
       agentRole: decision.targetAgentId,
       createdAt,
       updatedAt: createdAt
@@ -217,18 +217,18 @@ export class RuntimeProjector {
 
   private routingSummary(decisions: RouteDecision[]): EventRoutingSummary {
     const routedRuns = decisions.filter((decision) => decision.status === "routed").length;
-    const skippedPolicies = decisions.filter((decision) => decision.status === "skipped").length;
-    let message = "No active policy matched project, event type, source, subject, tags, and payload predicates.";
+    const skippedActions = decisions.filter((decision) => decision.status === "skipped").length;
+    let message = "No automation action matched the event.";
     if (routedRuns > 0) {
-      message = `Routed to ${routedRuns} agent run${routedRuns === 1 ? "" : "s"} by ${decisions.length} matching polic${decisions.length === 1 ? "y" : "ies"}.`;
-    } else if (skippedPolicies > 0) {
-      message = `${skippedPolicies} matching polic${skippedPolicies === 1 ? "y was" : "ies were"} skipped because target agents were disabled or missing.`;
+      message = `Routed to ${routedRuns} agent run${routedRuns === 1 ? "" : "s"} by ${decisions.length} matching action${decisions.length === 1 ? "" : "s"}.`;
+    } else if (skippedActions > 0) {
+      message = `${skippedActions} matching action${skippedActions === 1 ? " was" : "s were"} skipped because target agents were disabled, missing, or human-gated.`;
     }
 
     return {
-      matchedPolicies: decisions.length,
+      matchedActions: decisions.length,
       routedRuns,
-      skippedPolicies,
+      skippedActions,
       decisions: decisions.map((decision) => ({ ...decision })),
       message
     };

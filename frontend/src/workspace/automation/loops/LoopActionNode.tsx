@@ -2,9 +2,9 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { cn } from "@/lib/utils";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopNodeContext } from "./LoopCanvasTypes";
-import { LoopPolicySummary } from "./LoopPolicySummary";
+import { LoopActionSummary } from "./LoopActionSummary";
 
-export function LoopPolicyNode({
+export function LoopActionNode({
   context,
   record,
   records = [record]
@@ -24,8 +24,8 @@ export function LoopPolicyNode({
   );
   const selectedActionStepIndexSet = new Set(context.selectedActionStepIndexes);
   const selected = editable && records.some((candidate) => selectedActionStepIndexSet.has(candidate.index));
-  const title = record.policy?.action || record.policyId || "No policy";
-  const humanGate = Boolean(record.policy ? context.actionById.get(record.policy.action)?.humanGate : false);
+  const title = record.action?.id || record.actionId || "No action";
+  const humanGate = Boolean(record.action?.humanGate);
   const nodeClassName = cn(
     "nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground transition-colors hover:border-primary/80",
     humanGate && "border-tertiary/60",
@@ -33,28 +33,28 @@ export function LoopPolicyNode({
   );
   const content = (
     <>
-      {record.policy ? (
-        <LoopPolicySummary
-          policy={record.policy}
+      {record.action ? (
+        <LoopActionSummary
+          action={record.action}
           actionOptions={context.actionOptions}
           count={records.length}
           humanGate={humanGate}
         />
       ) : editable ? (
-        <Select value={record.policyId || context.noSelectionValue} onValueChange={(value) => context.onPolicyChange(loopId, record.index, value === context.noSelectionValue ? "" : value)}>
-          <SelectTrigger className="nodrag h-[18px] min-h-[18px] w-full min-w-0 border-0 bg-transparent px-0 py-0 font-mono text-[0.62rem] shadow-none focus-visible:ring-0" title={record.policyId || "No policy"} onDragStart={(event) => event.stopPropagation()}>
+        <Select value={record.actionId || context.noSelectionValue} onValueChange={(value) => context.onActionChange(loopId, record.index, value === context.noSelectionValue ? "" : value)}>
+          <SelectTrigger className="nodrag h-[18px] min-h-[18px] w-full min-w-0 border-0 bg-transparent px-0 py-0 font-mono text-[0.62rem] shadow-none focus-visible:ring-0" title={record.actionId || "No action"} onDragStart={(event) => event.stopPropagation()}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              {context.policyOptions.map((option) => (
+              {context.stepActionOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
               ))}
             </SelectGroup>
           </SelectContent>
         </Select>
       ) : (
-        <span className="block min-w-0 truncate">{record.policyId || "No policy"}</span>
+        <span className="block min-w-0 truncate">{record.actionId || "No action"}</span>
       )}
     </>
   );
@@ -69,11 +69,11 @@ export function LoopPolicyNode({
       onPointerCancel={context.onStepPointerCancel}
       className={stepDragClass}
     >
-      {record.policy && editable ? (
+      {record.action && editable ? (
         <button
           type="button"
           data-loop-node
-          aria-label={`Policy: ${record.policyId || "No policy"}`}
+          aria-label={`Action: ${record.actionId || "No action"}`}
           title={title}
           className={cn(nodeClassName, "cursor-pointer")}
           onClick={(event) => {
@@ -86,7 +86,7 @@ export function LoopPolicyNode({
       ) : (
         <div
           data-loop-node
-          aria-label={`Policy: ${record.policyId || "No policy"}`}
+          aria-label={`Action: ${record.actionId || "No action"}`}
           title={title}
           className={nodeClassName}
         >

@@ -8,8 +8,7 @@ export {
   saveProjectAutomationConfig
 } from "./automation/automationRepository.js";
 export {
-  automationPoliciesToEventDefinitions,
-  automationPoliciesToPolicies,
+  automationActionsToEventDefinitions,
   automationRuntimesToRuntimes
 } from "./automation/automationProjections.js";
 export { mapAgentOutputToEvent } from "./automation/agentOutputEventMapper.js";

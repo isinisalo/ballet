@@ -1,5 +1,5 @@
-import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
-import { generatedPolicyId, projectOutputRouteKey } from "@shared/policy-actions";
+import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { actionOutputRouteKey, humanGateResponseId } from "@shared/policy-actions";
 
 export const nextConfigWithLoopStepAction = (
   current: ProjectAutomationConfig,
@@ -15,57 +15,46 @@ export const nextConfigWithLoopHandlerAction = (
   actionId: string
 ): ProjectAutomationConfig => {
   const loop = current.loops.find((candidate) => candidate.id === loopId);
-  const targetAction = current.actions.find((action) => action.id === actionId);
+  const templateAction = current.actions.find((action) => action.id === actionId);
+  if (!loop || !templateAction || handlerStepIndex < 0 || handlerStepIndex >= loop.steps.length) return current;
 
-  if (!loop || !targetAction || handlerStepIndex < 0 || handlerStepIndex >= loop.steps.length) return current;
+  const currentActionId = loop.steps[handlerStepIndex];
+  const currentAction = current.actions.find((action) => action.id === currentActionId);
+  if (!currentAction || currentAction.id === templateAction.id) return current;
 
-  const stepPolicyId = loop.steps[handlerStepIndex];
-  const currentPolicy = stepPolicyId ? current.policies.find((policy) => policy.id === stepPolicyId) : undefined;
-  if (!currentPolicy || currentPolicy.action === actionId) return current;
-
-  const nextPolicy: ProjectPolicy = {
-    ...currentPolicy,
-    loopId: loop.id,
-    action: targetAction.id
-  };
-  const nextPolicyId = generatedPolicyId(nextPolicy);
-  const existingPolicy = current.policies.find((policy) => policy.id === nextPolicyId);
+  const nextActionId = templateAction.id;
   const nextLoops = current.loops.map((candidate) => candidate.id === loop.id
     ? {
       ...candidate,
-      steps: candidate.steps.map((step, index) => index === handlerStepIndex ? nextPolicyId : step)
+      steps: candidate.steps.map((step, index) => index === handlerStepIndex ? nextActionId : step)
     }
     : candidate);
-  const oldPolicyStillReferenced = nextLoops.some((candidate) => candidate.steps.includes(currentPolicy.id));
-  const policies = (existingPolicy ? current.policies : [...current.policies, { ...nextPolicy, id: nextPolicyId }])
-    .filter((policy) => policy.id !== currentPolicy.id || oldPolicyStillReferenced);
-  const policyIdMap = new Map([[currentPolicy.id, nextPolicyId]]);
-  const policyById = new Map(policies.map((policy) => [policy.id, policy]));
+  const actions = current.actions;
+  const actionIdMap = new Map([[currentAction.id, nextActionId]]);
+  const actionById = new Map(actions.map((action) => [action.id, action]));
   const outputRouteByKey = new Map(current.outputRoutes.flatMap((route) => {
-    const sourcePolicyId = policyIdMap.get(route.sourcePolicyId) ?? route.sourcePolicyId;
-    const targetPolicyId = policyIdMap.get(route.target.policyId) ?? route.target.policyId;
-    const sourcePolicy = policyById.get(sourcePolicyId);
-    if (!sourcePolicy || !policyById.has(targetPolicyId)) return [];
-    if (route.sourcePolicyId === currentPolicy.id) {
-      if (!targetAction.outputIds.includes(route.outputId)) return [];
-    }
-    const nextRoute = {
-      ...route,
-      sourcePolicyId,
-      target: {
-        ...route.target,
-        policyId: targetPolicyId
-      }
-    };
-    return [[projectOutputRouteKey(nextRoute.sourcePolicyId, nextRoute.outputId), nextRoute] as const];
+    const sourceActionId = route.sourceLoopId === loop.id ? actionIdMap.get(route.sourceActionId) ?? route.sourceActionId : route.sourceActionId;
+    const targetActionId = route.targetLoopId === loop.id ? actionIdMap.get(route.targetActionId) ?? route.targetActionId : route.targetActionId;
+    const sourceAction = actionById.get(sourceActionId);
+    if (!sourceAction || !actionById.has(targetActionId)) return [];
+    if (route.sourceLoopId === loop.id && route.sourceActionId === currentAction.id && !sourceAction.outputIds.includes(route.outputId)) return [];
+    const nextRoute = { ...route, sourceActionId, targetActionId };
+    return [[actionOutputRouteKey(nextRoute.sourceLoopId, nextRoute.sourceActionId, nextRoute.outputId), nextRoute] as const];
   }));
+  const humanGateResponses = current.humanGateResponses.flatMap((response) => {
+    if (response.loopId !== loop.id || response.actionId !== currentAction.id) return [response];
+    const action = actionById.get(nextActionId);
+    if (!action?.humanGate || !action.outputIds.includes(response.outputId)) return [];
+    const nextResponse = { ...response, actionId: nextActionId };
+    return [{ ...nextResponse, id: humanGateResponseId(nextResponse) }];
+  });
 
   return {
     ...current,
-    policies,
+    actions,
     loops: nextLoops,
     outputRoutes: [...outputRouteByKey.values()],
-    humanGateResponses: current.humanGateResponses.filter((response) => response.policyId !== currentPolicy.id)
+    humanGateResponses
   };
 };
 
@@ -76,7 +65,6 @@ export const nextConfigWithLoopStepActions = (
   actionId: string
 ): ProjectAutomationConfig => {
   const uniqueStepIndexes = [...new Set(stepIndexes)].sort((first, second) => first - second);
-
   if (uniqueStepIndexes.length === 0) return current;
   return uniqueStepIndexes.reduce(
     (nextConfig, stepIndex) => nextConfigWithLoopHandlerAction(nextConfig, loopId, stepIndex, actionId),
@@ -92,7 +80,7 @@ export const nextConfigWithoutLoopStepIndexes = (
   const loop = current.loops.find((candidate) => candidate.id === loopId);
   const stepIndexSet = new Set(stepIndexes);
   if (!loop || stepIndexSet.size === 0) return current;
-  const removedPolicyIds = new Set(loop.steps.filter((_, index) => stepIndexSet.has(index)));
+  const removedActionIds = new Set(loop.steps.filter((_, index) => stepIndexSet.has(index)));
 
   return {
     ...current,
@@ -103,7 +91,7 @@ export const nextConfigWithoutLoopStepIndexes = (
       }
       : candidate),
     humanGateResponses: current.humanGateResponses.filter((response) =>
-      response.loopId !== loop.id || !removedPolicyIds.has(response.policyId)
+      response.loopId !== loop.id || !removedActionIds.has(response.actionId)
     )
   };
 };

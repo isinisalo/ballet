@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { loopInputEventLabel } from "./loopGraph";
 import { loopAddActionGhostLabel, loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
-import { LoopPolicyNode } from "./LoopPolicyNode";
+import { LoopActionNode } from "./LoopActionNode";
 import type { LoopNodeContext, LoopReactFlowNode } from "./LoopCanvasTypes";
 
 export function LoopReactFlowNodeComponent({ data }: NodeProps<LoopReactFlowNode>) {
@@ -45,10 +45,10 @@ function LoopNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds: str
 function renderNodeContent(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   if (node.kind === "loop") return renderLoopNode(node);
   if (node.kind === "input-event") return renderInputEventNode(node, context);
-  if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(node, context);
+  if (node.kind === "first-action-ghost") return renderFirstPolicyGhost(node, context);
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (!node.record) return null;
-  return <LoopPolicyNode context={context} record={node.record} records={node.records ?? [node.record]} />;
+  return <LoopActionNode context={context} record={node.record} records={node.records ?? [node.record]} />;
 }
 
 function renderLoopNode(node: LoopCanvasLayoutNode) {
@@ -70,7 +70,7 @@ function renderLoopNode(node: LoopCanvasLayoutNode) {
 }
 
 function renderInputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
-  const value = loopInputEventLabel(node.inputEventPolicy ?? context.firstPolicy);
+  const value = loopInputEventLabel(node.inputEventAction ?? context.firstAction);
 
   return (
     <div
@@ -79,7 +79,7 @@ function renderInputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeConte
       title={value}
       className={cn(
         "flex h-[22px] w-full min-w-0 items-center justify-center rounded-md border border-divider-strong bg-card text-foreground",
-        !context.firstPolicy && "border-dashed border-muted-foreground/70 bg-background/80 text-muted-foreground"
+        !context.firstAction && "border-dashed border-muted-foreground/70 bg-background/80 text-muted-foreground"
       )}
     >
       <Zap className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
@@ -91,11 +91,11 @@ function renderFirstPolicyGhost(node: LoopCanvasLayoutNode, context: LoopNodeCon
   const editable = (node.loopId ?? context.selectedLoopId) === context.selectedLoopId;
   return (
     <LoopGhostNode
-      value="Add first policy"
+      value="Add first action"
       icon={Route}
-      ariaLabel="Add first policy"
-      onClick={() => context.onAddPolicyStep()}
-      disabled={!editable || !context.canAddFirstPolicy}
+      ariaLabel="Add first action"
+      onClick={() => context.onAddActionStep()}
+      disabled={!editable || !context.canAddFirstAction}
       className="nodrag w-60"
     />
   );
@@ -104,17 +104,17 @@ function renderFirstPolicyGhost(node: LoopCanvasLayoutNode, context: LoopNodeCon
 function renderOutputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   const outputEvent = node.outputEvent;
   const eventType = outputEvent?.eventType ?? "Output event";
-  const sourcePolicy = node.sourcePolicyId ? context.policyById.get(node.sourcePolicyId) : undefined;
+  const sourcePolicy = node.sourceActionId ? context.actionById.get(node.sourceActionId) : undefined;
   const editable = (node.loopId ?? context.selectedLoopId) === context.selectedLoopId;
 
   return (
     <button
       type="button"
       data-loop-output-event={eventType}
-      aria-label={`Add policy step for ${eventType}`}
+      aria-label={`Add action step for ${eventType}`}
       title={`Add action for ${eventType}`}
-      disabled={!editable || !context.canAddPolicyForEvent(sourcePolicy)}
-      onClick={() => context.onAddPolicyStep(eventType, sourcePolicy)}
+      disabled={!editable || !context.canAddActionForEvent(sourcePolicy)}
+      onClick={() => context.onAddActionStep(eventType, sourcePolicy)}
       className="nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-dashed border-muted-foreground/50 bg-background/60 px-1.5 text-left font-mono text-[0.66rem] leading-4 text-muted-foreground opacity-60 transition-colors hover:border-primary/65 hover:bg-card hover:text-foreground hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-muted-foreground/50 disabled:hover:bg-background/60"
     >
       <span className="block min-w-0 truncate">{loopAddActionGhostLabel}</span>

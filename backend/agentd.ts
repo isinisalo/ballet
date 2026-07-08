@@ -27,8 +27,9 @@ const buildRunPrompt = (run: AgentRun, inputEvent: RuntimeEvent, agent: Agent): 
     `agent_name: ${agent.name}`,
     `run_id: ${run.runId}`,
     `attempt: ${run.attempt}`,
-    `policy_id: ${run.policyId}`,
-    `policy_version: ${run.policyVersion}`,
+    `loop_id: ${run.loopId}`,
+    `action_id: ${run.actionId}`,
+    `action_version: ${run.actionVersion}`,
     "",
     "Input event:",
     JSON.stringify(inputEvent, null, 2),
@@ -44,18 +45,19 @@ const buildRunPrompt = (run: AgentRun, inputEvent: RuntimeEvent, agent: Agent): 
 
 const completeFailed = (run: AgentRun, error: unknown, data?: AppData) => {
   const message = error instanceof Error ? error.message : String(error);
-  const policy = data?.automation.policies.find((candidate) => candidate.id === run.policyId);
+  const action = data?.automation.actions.find((candidate) => candidate.id === run.actionId);
   store.runtimeDatabase().appendRunLog(run.runId, "error", message);
   const result = store.runtimeDatabase().completeRun({
     runId: run.runId,
     status: "failed",
     error: message,
-    projectPolicy: policy,
-    projectPolicies: data?.automation.policies,
+    projectAction: action,
+    projectActions: data?.automation.actions,
     actions: data?.automation.actions,
     outputs: data?.automation.outputs,
     outputRoutes: data?.automation.outputRoutes ?? [],
-    policies: data?.policies,
+    loops: data?.automation.loops,
+    automation: data?.automation,
     agents: data?.agents
   });
   notifyRuntimeChanged("agent-runs");
@@ -72,10 +74,10 @@ const completeWithOutcome = (
 ) => {
   let status = outcomeToRunStatus(outcome);
   let error: string | undefined;
-  const policy = data.automation.policies.find((candidate) => candidate.id === run.policyId);
+  const action = data.automation.actions.find((candidate) => candidate.id === run.actionId);
 
   try {
-    if (!policy) throw new Error(`Automation policy ${run.policyId} was not found.`);
+    if (!action) throw new Error(`Automation action ${run.loopId}/${run.actionId} was not found.`);
   } catch (mappingError) {
     status = "failed";
     error = mappingError instanceof Error ? mappingError.message : "Agent output could not be mapped to an event.";
@@ -88,12 +90,13 @@ const completeWithOutcome = (
     error,
     threadId,
     turnId,
-    projectPolicy: error ? undefined : policy,
-    projectPolicies: data.automation.policies,
+    projectAction: error ? undefined : action,
+    projectActions: data.automation.actions,
     actions: data.automation.actions,
     outputs: data.automation.outputs,
     outputRoutes: data.automation.outputRoutes,
-    policies: data.policies,
+    loops: data.automation.loops,
+    automation: data.automation,
     agents: data.agents
   });
 

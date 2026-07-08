@@ -107,7 +107,6 @@ describe("Markdown collection loading", () => {
       ],
       outputRoutes: [],
       humanGateResponses: [],
-      policies: [],
       loops: [],
       runtimes: []
     });

@@ -15,7 +15,7 @@ import {
   loopInputEventNodeWidth,
   loopOutputSourceHandleId,
   loopOutputTargetHandleId,
-  loopPolicyNodeWidth
+  loopActionNodeWidth
 } from "./loopLayoutSizing";
 import type { LoopCanvasLayoutNodeDraft, LoopDagreEdge, LoopLayoutDirection } from "./loopLayoutTypes";
 
@@ -27,7 +27,7 @@ export type LoopLayoutGraphDraft = {
 
 export type LoopLayoutGraphDraftContext = {
   loopGraph: LoopGraph;
-  editingPolicyIndex: number | null;
+  editingActionIndex: number | null;
   direction: LoopLayoutDirection;
   sourceHandleId: string;
   targetHandleId: string;
@@ -35,13 +35,13 @@ export type LoopLayoutGraphDraftContext = {
   dagreEdges: LoopDagreEdge[];
   canvasEdges: LoopCanvasEdge[];
   edgeKeys: Set<string>;
-  policyNodeIndexes: Set<number>;
+  actionNodeIndexes: Set<number>;
   handledEventNodes: LoopHandledEventNode[];
 };
 
-export function loopPolicyInputEdgeLabel(record: LoopStepRecord) {
-  if (!record.policy) return undefined;
-  return record.policy.event ? loopEventOutputLabel(record.policy.event) : "Missing event";
+export function loopActionInputEdgeLabel(record: LoopStepRecord) {
+  if (!record.action) return undefined;
+  return record.action.id ? loopEventOutputLabel(record.action.id) : "Missing action";
 }
 
 export function loopOutputEdgeLabel(output: LoopOutputTarget) {
@@ -58,21 +58,21 @@ export function addCanvasEdge(context: LoopLayoutGraphDraftContext, edge: LoopCa
   context.canvasEdges.push(edge);
 }
 
-export function addPolicyNode(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, outputHandleCount: number) {
+export function addActionNode(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, outputHandleCount: number) {
   const records = loopFoldedRecords(context.loopGraph, record);
-  const isEditingPolicy = context.editingPolicyIndex === record.index;
+  const isEditingAction = context.editingActionIndex === record.index;
   addNode(context, {
-    key: `policy-${record.index}`,
-    kind: "policy",
-    width: loopPolicyNodeWidth(record),
-    height: loopNodeSizes.policy.height,
+    key: `action-${record.index}`,
+    kind: "action",
+    width: loopActionNodeWidth(record),
+    height: loopNodeSizes.action.height,
     direction: context.direction,
     record,
     records,
-    isEditingPolicy,
+    isEditingAction,
     outputHandleCount
   });
-  context.policyNodeIndexes.add(record.index);
+  context.actionNodeIndexes.add(record.index);
 }
 
 export function addOutputEventNode(
@@ -94,13 +94,13 @@ export function addOutputEventNode(
       eventType: output.eventType,
       outputType: output.type
     },
-    sourcePolicyId: record.policyId,
+    sourceActionId: record.actionId,
     outputIndex
   });
-  addDagreEdge(context, { source: `policy-${record.index}`, target: key });
+  addDagreEdge(context, { source: `action-${record.index}`, target: key });
   addCanvasEdge(context, {
-    key: `policy-output-event-${record.index}-${output.outputId}`,
-    sourceNodeKey: `policy-${record.index}`,
+    key: `action-output-event-${record.index}-${output.outputId}`,
+    sourceNodeKey: `action-${record.index}`,
     targetNodeKey: key,
     sourceHandleId: loopOutputSourceHandleId(output),
     targetHandleId: loopOutputTargetHandleId(output, context.targetHandleId),
@@ -120,19 +120,19 @@ export function addInputEventNode(context: LoopLayoutGraphDraftContext) {
   });
 }
 
-export function addFirstPolicyGhost(context: LoopLayoutGraphDraftContext) {
+export function addFirstActionGhost(context: LoopLayoutGraphDraftContext) {
   addNode(context, {
-    key: "first-policy-ghost",
-    kind: "first-policy-ghost",
+    key: "first-action-ghost",
+    kind: "first-action-ghost",
     width: loopNodeSizes.event.width,
     height: loopNodeSizes.event.height,
     direction: context.direction
   });
-  addDagreEdge(context, { source: "input-event", target: "first-policy-ghost" });
+  addDagreEdge(context, { source: "input-event", target: "first-action-ghost" });
   addCanvasEdge(context, {
-    key: "input-event-first-policy",
+    key: "input-event-first-action",
     sourceNodeKey: "input-event",
-    targetNodeKey: "first-policy-ghost",
+    targetNodeKey: "first-action-ghost",
     sourceHandleId: context.sourceHandleId,
     targetHandleId: context.targetHandleId,
     dashed: true

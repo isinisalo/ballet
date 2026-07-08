@@ -20,8 +20,8 @@ export type LoopCanvasEdgeRoute = {
   targetLoopId?: string;
   sourceStepIndex?: number;
   handlerStepIndex?: number;
-  sourcePolicyId?: string;
-  handlerPolicyId?: string;
+  sourceActionId?: string;
+  handlerActionId?: string;
   eventType?: string;
   outputId?: string;
 };
@@ -31,38 +31,38 @@ export type LoopHandledEventNode = {
   outputId?: string;
   label?: string;
   sourceIndex: number;
-  sourcePolicyId?: string;
+  sourceActionId?: string;
   sourceNodeKey: string;
   sourceHandleId?: string;
 };
 
 export const loopExistingHandlerEdges = ({
   loopGraph,
-  policyNodeIndexes,
+  actionNodeIndexes,
   handledEventNodes,
   sourceHandleId,
   targetHandleId
 }: {
   loopGraph: LoopGraph;
-  policyNodeIndexes: ReadonlySet<number>;
+  actionNodeIndexes: ReadonlySet<number>;
   handledEventNodes: LoopHandledEventNode[];
   sourceHandleId: string;
   targetHandleId: string;
 }): LoopCanvasEdge[] => {
   const edges: LoopCanvasEdge[] = [];
 
-  handledEventNodes.forEach(({ eventType, outputId, label, sourceIndex, sourcePolicyId, sourceNodeKey, sourceHandleId: eventSourceHandleId }) => {
+  handledEventNodes.forEach(({ eventType, outputId, label, sourceIndex, sourceActionId, sourceNodeKey, sourceHandleId: eventSourceHandleId }) => {
     const handlerRecords = loopGraph.eventHandlerRecordsByEvent.get(eventType) ?? [];
     handlerRecords.forEach((handlerRecord) => {
       if (handlerRecord.index === sourceIndex) return;
-      if (!policyNodeIndexes.has(handlerRecord.index)) return;
+      if (!actionNodeIndexes.has(handlerRecord.index)) return;
       const isReturnEdge = handlerRecord.index < sourceIndex;
       const isReworkOutput = loopOutputSlotKindForValues(outputId, label, eventType) === "rework";
 
       edges.push({
-        key: `event-policy-${sourceIndex}-${handlerRecord.index}-${eventType}`,
+        key: `event-action-${sourceIndex}-${handlerRecord.index}-${eventType}`,
         sourceNodeKey,
-        targetNodeKey: `policy-${handlerRecord.index}`,
+        targetNodeKey: `action-${handlerRecord.index}`,
         sourceHandleId: isReturnEdge && !isReworkOutput ? sourceHandleId : eventSourceHandleId ?? sourceHandleId,
         targetHandleId: isReworkOutput ? "top" : isReturnEdge ? "top" : targetHandleId,
         tone: isReturnEdge ? "return" : undefined,
@@ -71,8 +71,8 @@ export const loopExistingHandlerEdges = ({
         route: {
           sourceStepIndex: sourceIndex,
           handlerStepIndex: handlerRecord.index,
-          sourcePolicyId,
-          handlerPolicyId: handlerRecord.policyId,
+          sourceActionId,
+          handlerActionId: handlerRecord.actionId,
           eventType,
           outputId
         }

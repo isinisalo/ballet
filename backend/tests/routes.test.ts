@@ -8,7 +8,7 @@ import { apiRouter } from "../routes.js";
 import { store } from "../store.js";
 import { notifyRuntimeChanged } from "../runtime-events.js";
 import type { AgentRun, AgentRunLog } from "../../shared/domain/runtime.js";
-import { generatedPolicyId, loopIdForPolicy, policyOutputEventType } from "../../shared/policy-actions.js";
+import { actionRouteId } from "../../shared/policy-actions.js";
 
 const listen = async (app: express.Express): Promise<{ server: Server; url: string }> => {
   const server = createServer(app);
@@ -123,8 +123,10 @@ describe("API routes", () => {
     const run: AgentRun = {
       runId: "run-1",
       inputEventId: "event-1",
-      policyId: "policy-1",
-      policyVersion: 1,
+      actionId: "implementation",
+      loopId: "plan-approved.loop",
+      routeId: actionRouteId("plan-approved.loop", "implementation"),
+      actionVersion: 1,
       agentRole: "developer-agent",
       status: "failed",
       attempt: 1,
@@ -166,7 +168,7 @@ describe("API routes", () => {
     }
   });
 
-  it("returns runtime events in /api/data with policy-derived automation definitions from project.json", async () => {
+  it("returns runtime events in /api/data with automation definitions from project.json", async () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
@@ -176,23 +178,40 @@ describe("API routes", () => {
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
     await writeFile(path.join(root, ".ballet/events/markdown-event.md"), "---\nid: markdown-event\neventType: markdown.event\n---\n\nIgnored automation event.", "utf8");
     await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-      version: 1,
-      events: [{ id: "runtime.event", title: "Runtime event", source: "runtime" }],
-      actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
-      outputs: [{ id: "ok" }, { id: "failed" }],
+      version: 1 as const,
+      actions: [{
+        id: "implementation",
+        description: "Implementation",
+        outputIds: ["approved", "rejected"],
+        agentIds: ["developer-agent"]
+      }],
+      outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
       humanGateResponses: [],
-      policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
-      loops: [{ id: "delivery", steps: ["on.implementation.failed.start.implementation"] }],
+      loops: [{ id: "implementation.failed.loop", steps: ["implementation"] }],
       runtimes: []
     }, null, 2), "utf8");
+    const automation = {
+      version: 1 as const,
+      actions: [{
+        id: "implementation",
+        description: "Implementation",
+        outputIds: ["approved", "rejected"],
+        agentIds: ["developer-agent"]
+      }],
+      outputs: [{ id: "approved" }, { id: "rejected" }],
+      outputRoutes: [],
+      humanGateResponses: [],
+      loops: [{ id: "implementation.failed.loop", steps: ["implementation"] }],
+      runtimes: []
+    };
 
     store.runtimeDatabase().intakeEvent({
       projectId: "project",
       eventType: "implementation.failed",
       source: "runtime",
       payload: {}
-    }, [], []);
+    }, automation, []);
 
     const app = express();
     app.use(express.json());
@@ -204,26 +223,27 @@ describe("API routes", () => {
       expect(response.status).toBe(200);
       const data = await response.json() as {
         eventDefinitions: Array<{ id: string; eventType: string; relativePath?: string }>;
-        events: Array<{ id: string; eventType: string; relativePath?: string; routing?: { matchedPolicies: number } }>;
+        events: Array<{ id: string; eventType: string; relativePath?: string; routing?: { matchedActions: number } }>;
         documents?: { events: Array<{ id: string; relativePath?: string }> };
         automation: Record<string, unknown>;
       };
 
       expect(data.automation).not.toHaveProperty("events");
+      expect(data.automation).not.toHaveProperty("policies");
       expect(data.eventDefinitions).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: "implementation.approved", eventType: "implementation.approved" }),
-        expect.objectContaining({ id: "implementation.rejected", eventType: "implementation.rejected" }),
-        expect.objectContaining({ id: "delivery.implementation.rejected", eventType: "delivery.implementation.rejected" })
+        expect.objectContaining({ id: "implementation.failed", eventType: "implementation.failed" }),
+        expect.objectContaining({ id: "implementation.failed.loop.implementation.approved", eventType: "implementation.failed.loop.implementation.approved" }),
+        expect.objectContaining({ id: "implementation.failed.loop.implementation.rejected", eventType: "implementation.failed.loop.implementation.rejected" })
       ]));
       expect(data.eventDefinitions.some((definition) => definition.relativePath)).toBe(false);
       expect(data.documents?.events).toEqual([]);
-      expect(data.events[0]).toMatchObject({ eventType: "implementation.failed", routing: { matchedPolicies: 0 } });
+      expect(data.events[0]).toMatchObject({ eventType: "implementation.failed", routing: { matchedActions: 1 } });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     }
   });
 
-  it("validates intake event types against policy-derived automation events", async () => {
+  it("validates intake event types against automation events", async () => {
     const root = await tempRoot();
     process.env.BALLET_PROJECT_ROOT = root;
     process.env.BALLET_DB_PATH = path.join(root, "runtime.sqlite");
@@ -233,13 +253,16 @@ describe("API routes", () => {
     await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n\nProject body.", "utf8");
     await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
       version: 1,
-      events: [{ id: "plan_approved", title: "Plan approved", source: "user" }],
-      actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
-      outputs: [{ id: "ok" }, { id: "failed" }],
+      actions: [{
+        id: "implementation",
+        description: "Implementation",
+        outputIds: ["approved", "rejected"],
+        agentIds: ["developer-agent"]
+      }],
+      outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
       humanGateResponses: [],
-      policies: [{ id: "on.plan_approved.start.implementation", source: "event", event: "plan_approved", action: "implementation", enabled: true }],
-      loops: [],
+      loops: [{ id: "plan-approved.loop", steps: ["implementation"] }],
       runtimes: []
     }, null, 2), "utf8");
 
@@ -252,10 +275,10 @@ describe("API routes", () => {
       const allowed = await fetch(url + "/api/events/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: "project", eventType: "plan_approved", source: "test", payload: {} })
+        body: JSON.stringify({ projectId: "project", eventType: "plan-approved", source: "test", payload: {} })
       });
       expect(allowed.status).toBe(201);
-      expect(await allowed.json()).toMatchObject({ eventType: "plan_approved" });
+      expect(await allowed.json()).toMatchObject({ eventType: "plan-approved" });
 
       const blocked = await fetch(url + "/api/events/intake", {
         method: "POST",
@@ -283,24 +306,21 @@ describe("API routes", () => {
     app.use("/api", apiRouter);
     const { server, url } = await listen(app);
 
+    const loopId = "project-brief-gate.approved.loop";
+    const loopStartActionId = "implementation";
     const loopEvent = "project-brief-gate.approved";
-    const loopId = loopIdForPolicy({ event: loopEvent });
-    const rawLoopStartPolicyId = generatedPolicyId({ loopId, event: loopEvent, action: "implementation" });
-    const rawLoopRejectedPolicyId = "on.implementation.failed.start.implementation";
-    const loopStartPolicyId = generatedPolicyId({ loopId, event: loopEvent, action: "implementation" });
-    const loopRejectedEvent = policyOutputEventType({ action: "implementation", loopId }, "rejected");
-    const loopRejectedPolicyId = generatedPolicyId({ loopId, event: loopRejectedEvent, action: "implementation" });
     const config = {
       version: 1,
-      actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
-      outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }],
+      actions: [{
+        id: loopStartActionId,
+        description: "Implementation",
+        outputIds: ["approved", "rejected"],
+        agentIds: ["developer-agent"]
+      }],
+      outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
       humanGateResponses: [],
-      policies: [
-        { id: rawLoopStartPolicyId, source: "event", event: loopEvent, action: "implementation", enabled: true },
-        { id: rawLoopRejectedPolicyId, source: "event", event: "implementation.failed", action: "implementation", enabled: true }
-      ],
-      loops: [{ id: loopId, steps: [rawLoopStartPolicyId, rawLoopRejectedPolicyId] }],
+      loops: [{ id: loopId, steps: [loopStartActionId] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
     };
 
@@ -313,26 +333,29 @@ describe("API routes", () => {
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
       expect(savedBody).toMatchObject({
-        actions: [{ id: "implementation", outputIds: ["approved", "rejected"], agentIds: ["developer-agent"] }],
+        actions: [
+          expect.objectContaining({ id: loopStartActionId, agentIds: ["developer-agent"] })
+        ],
         outputs: [{ id: "approved" }, { id: "rejected" }],
-        loops: [{ id: loopId, steps: [loopStartPolicyId, loopRejectedPolicyId] }]
+        loops: [{ id: loopId, steps: [loopStartActionId] }]
       });
       expect(savedBody).not.toHaveProperty("triggers");
+      expect(savedBody).not.toHaveProperty("policies");
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);
       const automationBody = await automation.json() as { config: Record<string, unknown> };
       expect(automationBody.config).not.toHaveProperty("events");
       expect(automationBody.config).not.toHaveProperty("triggers");
+      expect(automationBody.config).not.toHaveProperty("policies");
       expect(automationBody.config).toHaveProperty("humanGateResponses");
       expect(automationBody.config).not.toHaveProperty("gates");
       expect(automationBody.config).not.toHaveProperty("gateDecisions");
       expect(automationBody).toMatchObject({
         config: {
           outputs: [{ id: "approved" }, { id: "rejected" }],
-          policies: [
-            { id: loopStartPolicyId, loopId, source: "event", event: loopEvent },
-            { id: loopRejectedPolicyId, loopId, source: "event", event: loopRejectedEvent }
+          actions: [
+            expect.objectContaining({ id: loopStartActionId, agentIds: ["developer-agent"] })
           ]
         },
         issues: []
@@ -363,8 +386,7 @@ describe("API routes", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...config,
-          policies: [{ id: "legacy-start", source: "trigger", trigger: loopEvent, action: "implementation", enabled: true }],
-          loops: [{ id: loopId, steps: ["legacy-start"] }]
+          policies: [{ id: "legacy-start", source: "trigger", trigger: loopEvent, action: "implementation", enabled: true }]
         })
       });
       expect(legacyTriggerPolicy.status).toBe(400);

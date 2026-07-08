@@ -23,8 +23,9 @@ export interface RoutedEvent {
     }>;
     run_id?: string;
     input_event_id?: string;
-    policy_id?: string;
-    policy_version?: number;
+    action_id?: string;
+    loop_id?: string;
+    action_version?: number;
     payload?: Record<string, unknown>;
   };
 }

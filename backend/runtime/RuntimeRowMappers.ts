@@ -1,5 +1,6 @@
 import type { EventRecord, RuntimeEvent } from "../../shared/domain/events.js";
 import type { AgentOutcome, AgentRun, AgentRunLog } from "../../shared/domain/runtime.js";
+import { parseActionRouteId } from "../../shared/policy-actions.js";
 import { parseJsonArray, parseJsonObject, parseRoutingSummary } from "./RuntimeJson.js";
 import type { AgentRunLogRow, AgentRunRow, EventRow } from "./RuntimeDbTypes.js";
 
@@ -51,25 +52,30 @@ export const runtimeEventToEventRecord = (event: RuntimeEvent): EventRecord => (
 export const toEventRecord = (row: EventRow): EventRecord =>
   runtimeEventToEventRecord(toRuntimeEvent(row));
 
-export const toAgentRun = (row: AgentRunRow): AgentRun => ({
-  runId: row.run_id,
-  inputEventId: row.input_event_id,
-  inputEventSeq: row.input_event_seq ?? undefined,
-  policyId: row.policy_id,
-  policyVersion: row.policy_version,
-  agentRole: row.agent_role,
-  status: row.status,
-  attempt: row.attempt,
-  leaseOwner: row.lease_owner ?? undefined,
-  leaseUntil: row.lease_until ?? undefined,
-  threadId: row.thread_id ?? undefined,
-  turnId: row.turn_id ?? undefined,
-  outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
-  error: row.error ?? undefined,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  completedAt: row.completed_at ?? undefined
-});
+export const toAgentRun = (row: AgentRunRow): AgentRun => {
+  const parsedRoute = parseActionRouteId(row.policy_id);
+  return {
+    runId: row.run_id,
+    inputEventId: row.input_event_id,
+    inputEventSeq: row.input_event_seq ?? undefined,
+    actionId: parsedRoute.actionId || row.policy_id,
+    loopId: parsedRoute.loopId,
+    routeId: row.policy_id,
+    actionVersion: row.policy_version,
+    agentRole: row.agent_role,
+    status: row.status,
+    attempt: row.attempt,
+    leaseOwner: row.lease_owner ?? undefined,
+    leaseUntil: row.lease_until ?? undefined,
+    threadId: row.thread_id ?? undefined,
+    turnId: row.turn_id ?? undefined,
+    outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
+    error: row.error ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at ?? undefined
+  };
+};
 
 export const toAgentRunLog = (row: AgentRunLogRow): AgentRunLog => ({
   id: row.id,

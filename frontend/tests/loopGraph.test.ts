@@ -1,65 +1,97 @@
-import type { ProjectPolicy } from "@shared/api/workspace-contracts";
+import type { ProjectAction } from "@shared/api/workspace-contracts";
 import { describe, expect, it } from "vitest";
 import { buildLoopGraph, loopFoldedRecords, loopInputEventLabel, loopOutputEvents } from "../src/workspace/automation/loops/loopGraph";
 
-const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
-  id: patch.id ?? "policy",
-  source: "event",
-  event: patch.event ?? "manual-start",
-  action: patch.action ?? "build",
-  enabled: true
+const loopId = "delivery.loop";
+
+const action = (patch: Partial<ProjectAction>): ProjectAction => ({
+  id: patch.id ?? "action",
+  description: patch.description ?? "",
+  outputIds: patch.outputIds ?? ["complete"],
+  agentIds: patch.agentIds ?? []
 });
 
 describe("loop graph", () => {
-  it("groups event policies under the latest parent output event", () => {
-    const parent = policy({ id: "parent", event: "external.start", action: "deploy" });
-    const child = policy({ id: "child", event: "deploy.failed", action: "repair" });
+  it("groups routed action targets under the latest parent output event", () => {
+    const parent = action({ id: "parent", outputIds: ["failed"] });
+    const child = action({ id: "child" });
     const graph = buildLoopGraph([
-      { policyId: parent.id, index: 0, policy: parent, outputEvents: ["deploy.failed"] },
-      { policyId: child.id, index: 1, policy: child, outputEvents: ["repair.complete"] }
+      {
+        actionId: parent.id,
+        index: 0,
+        loopId,
+        action: parent,
+        outputTargets: [{
+          outputId: "failed",
+          eventType: "delivery.loop.parent.failed",
+          type: "action",
+          targetLoopId: loopId,
+          targetActionId: child.id
+        }]
+      },
+      { actionId: child.id, index: 1, loopId, action: child, outputEvents: ["delivery.loop.child.complete"] }
     ]);
 
-    expect(graph.rootRecords.map((record) => record.policyId)).toEqual(["parent"]);
-    expect(graph.childRecordsByParentEvent.get("0:deploy.failed")?.map((record) => record.policyId)).toEqual(["child"]);
+    expect(graph.rootRecords.map((record) => record.actionId)).toEqual(["parent"]);
+    expect(graph.childRecordsByParentEvent.get("0:delivery.loop.parent.failed")?.map((record) => record.actionId)).toEqual(["child"]);
   });
 
-  it("indexes every existing policy handler by input event", () => {
-    const first = policy({ id: "first-handler", event: "deploy.completed", action: "review" });
-    const second = policy({ id: "second-handler", event: "deploy.completed", action: "audit" });
+  it("indexes every existing routed action target by output event", () => {
+    const source = action({ id: "source", outputIds: ["done"] });
+    const first = action({ id: "first-handler" });
+    const second = action({ id: "second-handler" });
     const graph = buildLoopGraph([
-      { policyId: first.id, index: 0, policy: first, outputEvents: ["review.complete"] },
-      { policyId: second.id, index: 1, policy: second, outputEvents: ["audit.complete"] }
+      {
+        actionId: source.id,
+        index: 0,
+        loopId,
+        action: source,
+        outputTargets: [{
+          outputId: "done",
+          eventType: "delivery.loop.source.done",
+          type: "action",
+          targetLoopId: loopId,
+          targetActionId: first.id
+        }, {
+          outputId: "done",
+          eventType: "delivery.loop.source.done",
+          type: "action",
+          targetLoopId: loopId,
+          targetActionId: second.id
+        }]
+      },
+      { actionId: first.id, index: 1, loopId, action: first },
+      { actionId: second.id, index: 2, loopId, action: second }
     ]);
 
-    expect(graph.eventHandlerRecordsByEvent.get("deploy.completed")?.map((record) => record.policyId)).toEqual([
+    expect(graph.eventHandlerRecordsByEvent.get("delivery.loop.source.done")?.map((record) => record.actionId)).toEqual([
       "first-handler",
       "second-handler"
     ]);
   });
 
-  it("keeps orphan policies as roots and labels input events", () => {
-    const eventPolicy = policy({ event: "manual-start" });
-    expect(loopInputEventLabel(eventPolicy)).toBe("manual-start");
-    expect(loopOutputEvents(undefined)).toEqual(["Missing policy"]);
-    expect(buildLoopGraph([{ policyId: "orphan", index: 0 }]).rootRecords).toEqual([{ policyId: "orphan", index: 0 }]);
+  it("keeps the first loop action as root and labels actions by id", () => {
+    const currentAction = action({ id: "manual-start" });
+    expect(loopInputEventLabel(currentAction)).toBe("manual-start");
+    expect(loopOutputEvents(undefined)).toEqual(["Missing action"]);
+    expect(buildLoopGraph([{ actionId: "orphan", index: 0 }]).rootRecords).toEqual([{ actionId: "orphan", index: 0 }]);
   });
 
-  it("groups repeated policy records by action id for folded visualization", () => {
-    const first = policy({ id: "first-build", event: "manual-start", action: "build" });
-    const review = policy({ id: "review", event: "build.ready", action: "review" });
-    const rework = policy({ id: "rework-build", event: "review.changes-requested", action: "build" });
+  it("groups repeated action records by action id for folded visualization", () => {
+    const build = action({ id: "build" });
+    const review = action({ id: "review" });
     const records = [
-      { policyId: first.id, index: 0, policy: first, outputEvents: ["build.ready"] },
-      { policyId: review.id, index: 1, policy: review, outputEvents: ["review.changes-requested"] },
-      { policyId: rework.id, index: 2, policy: rework, outputEvents: ["build.ready"] }
+      { actionId: build.id, index: 0, loopId, action: build, outputEvents: ["delivery.loop.build.ready"] },
+      { actionId: review.id, index: 1, loopId, action: review, outputEvents: ["delivery.loop.review.changes-requested"] },
+      { actionId: build.id, index: 2, loopId, action: build, outputEvents: ["delivery.loop.build.ready"] }
     ];
     const graph = buildLoopGraph(records);
 
     expect(graph.actionFoldModel.canonicalIndexByRecordIndex.get(2)).toBe(0);
-    expect(graph.actionFoldModel.canonicalRecordByIndex.get(2)?.policyId).toBe("first-build");
-    expect(loopFoldedRecords(graph, records[0]!).map((record) => record.policyId)).toEqual([
-      "first-build",
-      "rework-build"
+    expect(graph.actionFoldModel.canonicalRecordByIndex.get(2)?.actionId).toBe("build");
+    expect(loopFoldedRecords(graph, records[0]!).map((record) => record.actionId)).toEqual([
+      "build",
+      "build"
     ]);
   });
 });

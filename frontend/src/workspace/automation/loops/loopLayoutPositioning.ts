@@ -7,8 +7,8 @@ import {
   loopBranchStackHeight,
   loopCanvasNodeAnchorY,
   loopHorizontalEdgeGap,
-  loopPolicyOutputHandleY,
-  loopPolicyStackHeight
+  loopActionOutputHandleY,
+  loopActionStackHeight
 } from "./loopLayoutSizing";
 import type { LoopCanvasLayoutNode, LoopCanvasLayoutNodeDraft, LoopDagreEdge, LoopLayoutDirection, LoopLayoutMetrics } from "./loopLayoutTypes";
 
@@ -61,12 +61,12 @@ function positionOutputEventNodes(
   const nodesBySourceKey = new Map<string, LoopCanvasLayoutNodeDraft[]>();
 
   nodes.forEach((node) => {
-    const sourceKey = node.record ? `policy-${node.record.index}` : "";
+    const sourceKey = node.record ? `action-${node.record.index}` : "";
     nodesBySourceKey.set(sourceKey, [...(nodesBySourceKey.get(sourceKey) ?? []), node]);
   });
 
   return nodes.flatMap((node) => {
-    const sourceKey = node.record ? `policy-${node.record.index}` : undefined;
+    const sourceKey = node.record ? `action-${node.record.index}` : undefined;
     const sourceNodes = sourceKey ? nodesBySourceKey.get(sourceKey) ?? [] : [];
     const outputOrderIndex = sourceNodes.findIndex((sourceNode) => sourceNode.key === node.key);
     return positionOutputEventNode(node, nodeByKey, edges, direction, metrics, Math.max(0, outputOrderIndex));
@@ -81,13 +81,13 @@ function positionOutputEventNode(
   metrics: LoopLayoutMetrics,
   outputOrderIndex: number
 ): LoopCanvasLayoutNode {
-  const sourceKey = node.record ? `policy-${node.record.index}` : undefined;
+  const sourceKey = node.record ? `action-${node.record.index}` : undefined;
   const sourceNode = sourceKey ? nodeByKey.get(sourceKey) : undefined;
   if (!sourceNode) {
     return { ...node, x: loopCanvasLayoutConfig.startX, y: loopCanvasLayoutConfig.startY };
   }
   const childNodes = edges
-    .filter((edge) => edge.source === sourceKey && edge.target.startsWith("policy-"))
+    .filter((edge) => edge.source === sourceKey && edge.target.startsWith("action-"))
     .map((edge) => nodeByKey.get(edge.target))
     .filter((childNode): childNode is LoopCanvasLayoutNode => Boolean(childNode));
 
@@ -112,13 +112,13 @@ function nextHorizontalOutputEventsY(
     return sourceNode.y + loopCanvasNodeAnchorY(sourceNode) - node.height / 2 + outputOrderIndex * outputEventStackStep();
   }
 
-  const hasPolicyChild = childNodes.some((childNode) => childNode.kind === "policy");
+  const hasPolicyChild = childNodes.some((childNode) => childNode.kind === "action");
   const childStackBottom = Math.max(...childNodes.map((childNode) => childNode.y + loopBranchStackHeight(childNode)));
   const outputStackTop = childStackBottom + loopNodeSizes.outputEvent.rowGap;
   const stackedY = outputStackTop + outputOrderIndex * outputEventStackStep();
 
   if (hasPolicyChild || !canAlignTerminalOutputEvents(sourceNode.outputHandleCount ?? 0)) return stackedY;
-  return sourceNode.y + loopPolicyOutputHandleY(node.outputIndex ?? outputOrderIndex, sourceNode.outputHandleCount ?? 0) - node.height / 2;
+  return sourceNode.y + loopActionOutputHandleY(node.outputIndex ?? outputOrderIndex, sourceNode.outputHandleCount ?? 0) - node.height / 2;
 }
 
 function nextVerticalOutputEventsX(childNodes: LoopCanvasLayoutNode[], sourceNode: LoopCanvasLayoutNode) {
@@ -131,16 +131,16 @@ function loopLayoutMetrics(
   outputNodes: LoopCanvasLayoutNodeDraft[]
 ): LoopLayoutMetrics {
   const outputStackHeights = [...new Map(outputNodes.map((node) => {
-    const sourceKey = node.record ? `policy-${node.record.index}` : node.key;
+    const sourceKey = node.record ? `action-${node.record.index}` : node.key;
     return [sourceKey, outputNodes.filter((candidate) => candidate.record?.index === node.record?.index).length];
   })).values()].map(outputEventStackHeight);
   const maxOutputHeight = Math.max(loopNodeSizes.outputEvent.height, ...outputStackHeights);
-  const policyStackHeight = loopPolicyStackHeight();
+  const policyStackHeight = loopActionStackHeight();
   const inputEventWidth = primaryNodes.find((node) => node.kind === "input-event")?.width ?? loopNodeSizes.inputEvent.minWidth;
   const horizontalEdgeGap = loopHorizontalEdgeGap();
   const horizontalPolicyColumnWidth = Math.max(
-    loopNodeSizes.policy.minWidth,
-    ...primaryNodes.filter((node) => node.kind === "policy").map((node) => node.width)
+    loopNodeSizes.action.minWidth,
+    ...primaryNodes.filter((node) => node.kind === "action").map((node) => node.width)
   );
 
   return {
@@ -149,7 +149,7 @@ function loopLayoutMetrics(
     horizontalRowStep: Math.max(policyStackHeight, loopNodeSizes.inputEvent.height) + loopCanvasLayoutConfig.branchGap,
     verticalRootPolicyY: loopCanvasLayoutConfig.startY + loopNodeSizes.inputEvent.height + loopCanvasLayoutConfig.branchGap,
     verticalPolicyRankStep: policyStackHeight + maxOutputHeight + loopCanvasLayoutConfig.branchGap,
-    verticalColumnStep: Math.max(loopNodeSizes.policy.maxWidth, loopNodeSizes.outputEvent.maxWidth) + loopCanvasLayoutConfig.branchGap
+    verticalColumnStep: Math.max(loopNodeSizes.action.maxWidth, loopNodeSizes.outputEvent.maxWidth) + loopCanvasLayoutConfig.branchGap
   };
 }
 

@@ -4,28 +4,30 @@
     {
       "id": "run",
       "description": "",
+      "outputIds": [
+        "approved",
+        "rejected"
+      ],
       "agentIds": [
         "reviewer"
       ]
     }
   ],
-  "outputRoutes": [],
-  "humanGateResponses": [],
-  "policies": [
+  "outputs": [
     {
-      "source": "event",
-      "event": "adr.created",
-      "action": "run",
-      "enabled": true,
-      "id": "on.adr.created.start.run"
+      "id": "approved"
+    },
+    {
+      "id": "rejected"
     }
   ],
+  "outputRoutes": [],
+  "humanGateResponses": [],
   "loops": [
     {
       "id": "adr-review",
-      "title": "ADR review",
       "steps": [
-        "on.adr.created.start.run"
+        "run"
       ]
     }
   ],

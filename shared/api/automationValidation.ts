@@ -1,4 +1,4 @@
-import { normalizePolicyToken, normalizeLoopId } from "../policy-actions.js";
+import { normalizeActionToken, normalizeLoopId } from "../policy-actions.js";
 
 export type AutomationFieldLimit = {
   min?: number;
@@ -18,7 +18,7 @@ export const automationFieldLimits = {
 } as const satisfies Record<string, AutomationFieldLimit>;
 
 export const normalizeAutomationToken = (value: string): string =>
-  normalizePolicyToken(value);
+  normalizeActionToken(value);
 
 export const normalizeAutomationLoopId = (value: string): string =>
   normalizeLoopId(value);

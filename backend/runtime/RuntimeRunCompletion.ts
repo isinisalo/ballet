@@ -9,7 +9,7 @@ import { MAX_CORRELATION_DEPTH, now, type CompleteRunInput } from "./RuntimeDbTy
 import {
   actionOutputEventType,
   aggregateActionOutputStatus,
-  allPolicyRunsTerminal
+  allActionRunsTerminal
 } from "../automation/actionOutputAggregator.js";
 
 export class RuntimeRunCompletion {
@@ -53,7 +53,7 @@ export class RuntimeRunCompletion {
       if (!run) throw new Error("Agent run not found after update.");
       let event: RuntimeEvent | undefined;
       let runs: AgentRun[] = [];
-      const domainEvent = input.projectPolicy && input.actions && input.outputs
+      const domainEvent = input.projectAction && input.actions && input.outputs
         ? this.aggregateDomainEvent(run, input)
         : input.domainEvent;
       if (domainEvent) {
@@ -67,15 +67,15 @@ export class RuntimeRunCompletion {
             next_correlation_depth: nextDepth
           });
         } else {
-          const published = this.projector.insertEventAndProjectPolicies({
+          const published = this.projector.insertEventAndProjectActions({
             projectId: inputEvent.project_id,
             eventType: domainEvent.type,
             source: domainEvent.source ?? "agentd",
             subject: inputEvent.subject,
             correlationId: inputEvent.correlation_id,
             causationId: inputEvent.event_id,
-            dedupeKey: input.projectPolicy
-              ? `domain:${run.inputEventId}:${run.policyId}:${domainEvent.type}`
+            dedupeKey: input.projectAction
+              ? `domain:${run.inputEventId}:${run.routeId}:${domainEvent.type}`
               : `domain:${run.runId}:${domainEvent.type}`,
             correlationDepth: nextDepth,
             tags: [],
@@ -83,13 +83,22 @@ export class RuntimeRunCompletion {
               ...domainEvent.payload,
               run_id: run.runId,
               input_event_id: run.inputEventId,
-              policy_id: run.policyId,
-              policy_version: run.policyVersion
+              action_id: run.actionId,
+              loop_id: run.loopId,
+              action_version: run.actionVersion
             },
-            body: input.projectPolicy
-              ? `Agent runs for policy ${run.policyId} produced ${domainEvent.type}.`
+            body: input.projectAction
+              ? `Agent runs for action ${run.loopId}/${run.actionId} produced ${domainEvent.type}.`
               : `Agent run ${run.runId} produced ${domainEvent.type}.`
-          }, input.policies ?? [], input.agents ?? []);
+          }, input.automation ?? {
+            version: 1,
+            actions: input.actions ?? [],
+            outputs: input.outputs ?? [],
+            outputRoutes: input.outputRoutes,
+            humanGateResponses: [],
+            loops: input.loops ?? [],
+            runtimes: []
+          }, input.agents ?? []);
           const publishedRow = this.eventStore.getEventById(published.event.eventId ?? published.event.id);
           event = publishedRow ? this.eventStore.toRuntimeEvent(publishedRow) : undefined;
           runs = published.runs;
@@ -107,26 +116,27 @@ export class RuntimeRunCompletion {
     run: AgentRun,
     input: CompleteRunInput
   ): CompleteRunInput["domainEvent"] | undefined {
-    const policy = input.projectPolicy;
-    if (!policy || !input.actions || !input.outputs) return undefined;
-    const policyRuns = this.runStore.getRunsForPolicyInputEvent(run.inputEventId, run.policyId);
-    if (!allPolicyRunsTerminal(policyRuns)) return undefined;
+    const action = input.projectAction;
+    if (!action || !input.actions || !input.outputs) return undefined;
+    const actionRuns = this.runStore.getRunsForActionInputEvent(run.inputEventId, run.routeId);
+    if (!allActionRunsTerminal(actionRuns)) return undefined;
 
-    const outputStatus = aggregateActionOutputStatus(policyRuns, policy, input.actions);
+    const outputStatus = aggregateActionOutputStatus(actionRuns, action, input.actions);
     if (!outputStatus) return undefined;
 
     return {
-      type: actionOutputEventType(policy, outputStatus, input.outputRoutes, input.actions, input.projectPolicies),
+      type: actionOutputEventType({ ...action, loopId: run.loopId }, outputStatus, input.outputRoutes, input.actions),
       source: "agentd",
       payload: {
-        action: policy.action,
+        action: action.id,
+        loop_id: run.loopId,
         status: outputStatus,
-        agents: policyRuns.map((policyRun) => ({
-          agent: policyRun.agentRole,
-          run_id: policyRun.runId,
-          status: policyRun.status,
-          outcome: policyRun.outcome?.outcome,
-          summary: policyRun.outcome?.summary
+        agents: actionRuns.map((actionRun) => ({
+          agent: actionRun.agentRole,
+          run_id: actionRun.runId,
+          status: actionRun.status,
+          outcome: actionRun.outcome?.outcome,
+          summary: actionRun.outcome?.summary
         }))
       }
     };

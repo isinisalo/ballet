@@ -6,9 +6,9 @@ export type LoopLayoutDirection = "horizontal" | "vertical";
 export type LoopCanvasNodeKind =
   | "loop"
   | "input-event"
-  | "policy"
+  | "action"
   | "output-event"
-  | "first-policy-ghost";
+  | "first-action-ghost";
 
 export type LoopCanvasOutputEvent = {
   outputId: string;
@@ -34,12 +34,12 @@ export type LoopCanvasLayoutNode = {
   direction: LoopLayoutDirection;
   record?: LoopStepRecord;
   records?: LoopStepRecord[];
-  inputEventPolicy?: LoopStepRecord["policy"];
+  inputEventAction?: LoopStepRecord["action"];
   eventType?: string;
   outputEvent?: LoopCanvasOutputEvent;
   loopSummary?: LoopCanvasLoopSummary;
-  sourcePolicyId?: string;
-  isEditingPolicy?: boolean;
+  sourceActionId?: string;
+  isEditingAction?: boolean;
   outputIndex?: number;
   outputHandleCount?: number;
 };

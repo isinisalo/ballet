@@ -5,13 +5,12 @@ import type {
   EventRecord,
   ProjectAutomationConfig,
   ProjectHumanGateResponse,
-  ProjectPolicy,
+  ProjectAction,
   ProjectLoop
 } from "@shared/api/workspace-contracts";
-import { actionOutputIds, generatedPolicyId, humanGateResponseId, normalizePolicyToken, projectOutputRouteEventType, policyOutputEventType, loopIdForPolicy } from "@shared/policy-actions";
-import { EmptyState, SelectField } from "@/components/shared/workspace-ui";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { uniquePolicyAction } from "../automationUtils";
+import { actionOutputEventType, actionOutputIds, actionOutputRouteKey, eventTypeFromLoopId, humanGateResponseId, normalizeActionToken } from "@shared/policy-actions";
+import { EmptyState, SelectField, TextField } from "@/components/shared/workspace-ui";
+import { FieldGroup } from "@/components/ui/field";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { AllLoopsCanvas } from "./AllLoopsCanvas";
 import { LoopCanvas } from "./LoopCanvas";
@@ -65,9 +64,8 @@ export function LoopsAutomationTab({
   const creating = selectedIndex < 0;
   const [selectedHandlerSelection, setSelectedHandlerSelection] = useState<LoopHandlerSelection | null>(null);
   const selectedHandlerStepIndexes = selectedHandlerSelection?.stepIndexes ?? [];
-  const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const actionById = useMemo(() => new Map(config.actions.map((action) => [action.id, action])), [config.actions]);
-  const policyOptions = [{ value: noSelection, label: "No policy" }, ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))];
+  const stepActionOptions = [{ value: noSelection, label: "No action" }, ...config.actions.map((action) => ({ value: action.id, label: action.id }))];
   const actionOptions = [
     { value: noSelection, label: "No action" },
     ...config.actions.map((action) => ({
@@ -76,40 +74,27 @@ export function LoopsAutomationTab({
       description: action.description
     }))
   ];
-  const usedStartingPolicyIds = useMemo(() => {
-    const ids = new Set<string>();
-    config.loops.forEach((loop) => {
-      const firstPolicy = policyById.get(loop.steps[0] ?? "");
-      if (firstPolicy?.source === "event") ids.add(firstPolicy.id);
-    });
-    return ids;
-  }, [config.loops, policyById]);
-  const availableStartingEventPolicies = useMemo(() => config.policies.filter((policy) =>
-    policy.source === "event" &&
-    Boolean(policy.event) &&
-    (!usedStartingPolicyIds.has(policy.id) || createDraft.steps[0] === policy.id)
-  ), [config.policies, createDraft.steps, usedStartingPolicyIds]);
-  const startingEventOptions = availableStartingEventPolicies.map((policy) => ({
-    value: policy.id,
-    label: policy.event ? `${policy.event} · ${policy.action}` : policy.id
+  const startingActionOptions = config.actions.map((action) => ({
+    value: action.id,
+    label: action.description ? `${action.id} · ${action.description}` : action.id
   }));
   const defaultAction = config.actions[0]?.id ?? "";
   const selectedActionOutputIds = (actionId: string) => actionOutputIds(config.actions, actionId);
   const loopStepRecordsByLoopId = useMemo<Map<string, LoopStepRecord[]>>(() => new Map(config.loops.map((loop) => {
-    const records: LoopStepRecord[] = loop.steps.map((policyId, index) => {
-      const policy = policyById.get(policyId);
-      const outputTargets = policy ? loopOutputTargetsForPolicy(config, policy) : undefined;
+    const records: LoopStepRecord[] = loop.steps.map((actionId, index) => {
+      const action = actionById.get(actionId);
+      const outputTargets = action ? loopOutputTargetsForPolicy(config, action, loop.id) : undefined;
       return {
-        policyId,
+        actionId,
         index,
         loopId: loop.id,
-        policy,
+        action,
         outputEvents: outputTargets?.map((output) => output.eventType),
         outputTargets
       };
     });
     return [loop.id, records] as const;
-  })), [config, policyById]);
+  })), [config, actionById]);
   const loopStepRecords: LoopStepRecord[] = selected ? loopStepRecordsByLoopId.get(selected.id) ?? [] : [];
   const loopLayout = useMemo(
     () => selected && !creating
@@ -173,64 +158,43 @@ export function LoopsAutomationTab({
     if (nextLoop.id !== selected.id) onSelect(nextLoop.id);
   };
 
-  const updateStep = (loopId: string, index: number, policyId: string) => {
+  const updateStep = (loopId: string, index: number, actionId: string) => {
     if (!selected || loopId !== selected.id) return;
-    updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? policyId : step) });
+    updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? actionId : step) });
   };
 
-  const addPolicyStep = (eventType?: string, sourcePolicy?: ProjectPolicy) => {
+  const addActionStep = (eventType?: string, sourceAction?: ProjectAction) => {
     if (!selected) return;
-    const selectedPolicyIds = new Set(selected.steps);
+    const selectedActionIds = new Set(selected.steps);
     const addedStepIndex = selected.steps.length;
-    const scopedEventType = eventType ? loopScopedEventType(eventType, selected.id) : undefined;
     const selectAddedOutputEventStep = () => {
-      if (scopedEventType) setSelectedHandlerSelection({ source: "edge", stepIndexes: [addedStepIndex] });
+      if (eventType) setSelectedHandlerSelection({ source: "edge", stepIndexes: [addedStepIndex] });
     };
-    const eventOutputId = scopedEventType?.split(".").at(-1) ?? "";
-    const isDoneEvent = normalizePolicyToken(eventOutputId) === "done";
-    const nextPolicy = scopedEventType
-      ? config.policies.find((policy) =>
-        policy.source === "event" &&
-        policy.event === scopedEventType &&
-        (!isDoneEvent || policy.action === "done") &&
-        !selectedPolicyIds.has(policy.id)
-      )
-      : config.policies.find((policy) => !selectedPolicyIds.has(policy.id)) ?? config.policies[0];
-    if (!nextPolicy) {
-      const baseAction = sourcePolicy?.action || defaultAction;
-      if (!baseAction) return;
-      const generatedEvent = scopedEventType || policyOutputEventType({ action: baseAction, loopId: selected.id }, selectedActionOutputIds(baseAction)[0] ?? "");
-      const action = isDoneEvent ? "done" : uniquePolicyAction(generatedEvent, baseAction, config.policies, selected.id);
-      const outputIds = selectedActionOutputIds(action);
-      const generatedPolicy: ProjectPolicy = {
-        id: generatedPolicyId({
-          loopId: selected.id,
-          event: generatedEvent,
-          action
-        }),
-        loopId: selected.id,
-        source: "event",
-        event: generatedEvent,
-        action,
-        enabled: true
-      };
+    const nextAction = config.actions.find((action) => !selectedActionIds.has(action.id)) ?? config.actions[0];
+    if (!nextAction) return;
+    const outputId = eventType ? normalizeActionToken(eventType.split(".").at(-1) ?? "") : "";
+    const shouldAppendStep = !selected.steps.includes(nextAction.id);
+    if (eventType && sourceAction && outputId) {
       updateConfig((current) => ({
         ...current,
-        actions: current.actions.some((candidate) => candidate.id === action)
-          ? current.actions
-          : [...current.actions, {
-            id: action,
-            description: action === "done" ? "No further actions." : "",
-            outputIds: action === "done" ? [] : outputIds,
-            agentIds: action === "done" ? [] : current.actions.find((candidate) => candidate.id === baseAction)?.agentIds ?? []
-          }],
-        policies: [...current.policies, generatedPolicy],
-        loops: current.loops.map((loop) => loop.id === selected.id ? { ...loop, steps: [...loop.steps, generatedPolicy.id] } : loop)
+        loops: current.loops.map((loop) => loop.id === selected.id && shouldAppendStep ? { ...loop, steps: [...loop.steps, nextAction.id] } : loop),
+        outputRoutes: [
+          ...current.outputRoutes.filter((route) =>
+            actionOutputRouteKey(route.sourceLoopId, route.sourceActionId, route.outputId) !== actionOutputRouteKey(selected.id, sourceAction.id, outputId)
+          ),
+          {
+            sourceLoopId: selected.id,
+            sourceActionId: sourceAction.id,
+            outputId,
+            targetLoopId: selected.id,
+            targetActionId: nextAction.id
+          }
+        ]
       }));
       selectAddedOutputEventStep();
       return;
     }
-    updateSelected({ steps: [...selected.steps, nextPolicy.id] });
+    if (shouldAppendStep) updateSelected({ steps: [...selected.steps, nextAction.id] });
     selectAddedOutputEventStep();
   };
 
@@ -258,10 +222,10 @@ export function LoopsAutomationTab({
     reorderStep
   });
 
-  const canAddFirstPolicy = Boolean(defaultAction);
-  const canAddPolicyForEvent = (policy?: ProjectPolicy) => {
-    const action = policy?.action || defaultAction;
-    return Boolean(action && selectedActionOutputIds(action).length > 0);
+  const canAddFirstAction = Boolean(defaultAction);
+  const canAddActionForEvent = (sourceAction?: ProjectAction) => {
+    const actionId = sourceAction?.id || defaultAction;
+    return Boolean(actionId && selectedActionOutputIds(actionId).length > 0);
   };
   const clearHandlerSelection = () => setSelectedHandlerSelection(null);
   const selectActionStep = (records: LoopStepRecord[]) => {
@@ -278,12 +242,10 @@ export function LoopsAutomationTab({
     updateConfig((current) => nextConfigWithLoopHandlerAction(current, selected.id, stepIndex, actionId));
   };
   const submitHumanGateResponse = async (route: LoopHandlerRoute, outputId: string, prompt: string) => {
-    const policy = config.policies.find((candidate) => candidate.id === route.policyId);
     const action = config.actions.find((candidate) => candidate.id === route.actionId);
-    if (!policy || !action?.humanGate || !action.outputIds.includes(outputId)) return;
+    if (!action?.humanGate || !action.outputIds.includes(outputId)) return;
     const responseBase = {
       loopId: route.loopId,
-      policyId: route.policyId,
       actionId: route.actionId,
       outputId,
       prompt,
@@ -303,7 +265,7 @@ export function LoopsAutomationTab({
     updateConfig(() => nextConfig);
     const saved = await saveDraft(nextConfig);
     if (!saved) return;
-    const eventType = projectOutputRouteEventType(policy, outputId, nextConfig.outputRoutes, nextConfig.actions, nextConfig.policies);
+    const eventType = actionOutputEventType({ loopId: route.loopId, actionId: action.id }, outputId);
     await createEvent({
       projectId,
       eventType,
@@ -313,12 +275,12 @@ export function LoopsAutomationTab({
       tags: ["human-gate"],
       payload: {
         loop_id: route.loopId,
-        policy_id: route.policyId,
-        action: route.actionId,
+        action_id: route.actionId,
+        action: route.actionLabel,
         output_id: outputId,
         prompt
       },
-      body: `Human gate ${route.actionId} selected ${outputId}.\n\n${prompt}`
+      body: `Human gate ${route.actionLabel} selected ${outputId}.\n\n${prompt}`
     });
   };
 
@@ -327,31 +289,29 @@ export function LoopsAutomationTab({
   if (!selected) return <EmptyState title="No loop selected." />;
 
   if (creating) {
-    const selectedStartingPolicyId = selected.steps[0] ?? "";
-    const selectedStartingPolicy = policyById.get(selectedStartingPolicyId);
-    const derivedLoopId = loopIdForPolicy(selectedStartingPolicy);
-    if (startingEventOptions.length === 0) {
+    const selectedStartingActionId = selected.steps[0] ?? "";
+    if (startingActionOptions.length === 0) {
       return (
         <div className="p-4">
-          <EmptyState title="No unused starting events." action="Create an event policy before adding a loop." />
+          <EmptyState title="No actions configured." action="Create an action before adding a loop." />
         </div>
       );
     }
     return (
       <div className="grid gap-4 p-4">
         <FieldGroup>
-          <SelectField
-            label="Starting event"
-            value={selectedStartingPolicyId || startingEventOptions[0]?.value || noSelection}
-            options={startingEventOptions}
-            onChange={(policyId) => updateSelected({ steps: [policyId] })}
+          <TextField
+            label="Loop ID"
+            required
+            value={selected.id}
+            onChange={(id) => updateSelected({ id })}
           />
-          <Field className="gap-1.5">
-            <FieldLabel>Derived ID</FieldLabel>
-            <div className="min-h-9 rounded border border-input bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
-              {derivedLoopId || "Select a starting event"}
-            </div>
-          </Field>
+          <SelectField
+            label="Starting action"
+            value={selectedStartingActionId || startingActionOptions[0]?.value || noSelection}
+            options={startingActionOptions}
+            onChange={(actionId) => updateSelected({ steps: [actionId] })}
+          />
         </FieldGroup>
       </div>
     );
@@ -364,11 +324,10 @@ export function LoopsAutomationTab({
       <LoopCanvas
         layout={loopLayout}
         selectedLoopId={selected.id}
-        policyById={policyById}
         actionById={actionById}
-        firstPolicy={policyById.get(selected.steps[0] ?? "")}
+        firstAction={actionById.get(selected.steps[0] ?? "")}
         noSelectionValue={noSelection}
-        policyOptions={policyOptions}
+        stepActionOptions={stepActionOptions}
         actionOptions={actionOptions}
         draggedStepIndex={canvasInteraction.draggedStepIndex}
         dragOverStepIndex={canvasInteraction.dragOverStepIndex}
@@ -376,18 +335,18 @@ export function LoopsAutomationTab({
         canvasHeight={canvasInteraction.canvasHeight}
         isCanvasPanning={canvasInteraction.isCanvasPanning}
         loopCanvasRef={canvasInteraction.loopCanvasRef}
-        canAddFirstPolicy={canAddFirstPolicy}
-        canAddPolicyForEvent={canAddPolicyForEvent}
+        canAddFirstAction={canAddFirstAction}
+        canAddActionForEvent={canAddActionForEvent}
         onStepPointerDown={canvasInteraction.handleStepPointerDown}
         onStepPointerMove={canvasInteraction.handleStepPointerMove}
         onStepPointerUp={canvasInteraction.handleStepPointerUp}
         onStepPointerCancel={canvasInteraction.resetStepDrag}
         onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
         onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-        onPolicyChange={updateStep}
+        onActionChange={updateStep}
         onActionStepSelect={selectActionStep}
         onOutputHandlerSelect={selectOutputHandler}
-        onAddPolicyStep={addPolicyStep}
+        onAddActionStep={addActionStep}
       />
       <LoopHandlerSheet
         open={selectedHandlerRoutes.length > 0}
@@ -407,31 +366,24 @@ export function LoopsAutomationTab({
   );
 }
 
-function loopScopedEventType(eventType: string, loopId: string) {
-  return eventType.startsWith(`${loopId}.`) || eventType.includes(".loop.")
-    ? eventType
-    : `${loopId}.${eventType}`;
-}
-
 function sameHumanGateResponseTarget(first: ProjectHumanGateResponse, second: ProjectHumanGateResponse) {
-  return first.policyId === second.policyId &&
-    first.actionId === second.actionId &&
+  return first.actionId === second.actionId &&
     (first.loopId ?? "") === (second.loopId ?? "");
 }
 
 function loopHandlerRoute(record: LoopStepRecord): LoopHandlerRoute | undefined {
-  if (!record.policy) return undefined;
-  const eventParts = record.policy.source === "event" ? loopEventParts(record.policy.event) : undefined;
+  if (!record.action) return undefined;
+  const eventParts = loopEventParts(record.outputEvents?.[0] ?? eventTypeFromLoopId(record.loopId ?? ""));
 
   return {
-    id: `${record.loopId ?? "loop"}-${record.index}-${record.policyId}`,
+    id: `${record.loopId ?? "loop"}-${record.index}-${record.actionId}`,
     loopId: record.loopId ?? "",
     stepIndex: record.index,
-    policyId: record.policyId,
+    actionId: record.actionId,
     sourceLabel: eventParts?.sourceLabel ?? "Missing event",
     outputId: eventParts?.outputId,
-    eventType: record.policy.source === "event" ? record.policy.event : undefined,
-    actionId: record.policy.action
+    eventType: record.outputEvents?.[0],
+    actionLabel: record.action.id
   };
 }
 

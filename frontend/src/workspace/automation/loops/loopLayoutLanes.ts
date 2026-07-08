@@ -67,7 +67,7 @@ export function loopHorizontalLaneYOffsets(
     if (!sourceNode || sourceLaneIndex === undefined) return;
     const outputStackHeightValue = outputEventStackHeight(sourceOutputNodes.length);
     const childNodes = edges
-      .filter((edge) => edge.source === sourceKey && edge.target.startsWith("policy-"))
+      .filter((edge) => edge.source === sourceKey && edge.target.startsWith("action-"))
       .map((edge) => primaryNodeByKey.get(edge.target))
       .filter((childNode): childNode is LoopCanvasLayoutNodeDraft => Boolean(childNode));
 
@@ -156,7 +156,7 @@ function outputNodesBySourceKey(outputNodes: LoopCanvasLayoutNodeDraft[]) {
   const nodesBySourceKey = new Map<string, LoopCanvasLayoutNodeDraft[]>();
 
   outputNodes.forEach((node) => {
-    const sourceKey = node.record ? `policy-${node.record.index}` : "";
+    const sourceKey = node.record ? `action-${node.record.index}` : "";
     if (!sourceKey) return;
     nodesBySourceKey.set(sourceKey, [...(nodesBySourceKey.get(sourceKey) ?? []), node]);
   });

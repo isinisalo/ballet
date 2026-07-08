@@ -21,11 +21,11 @@ export type LoopHandlerRoute = {
   id: string;
   loopId: string;
   stepIndex: number;
-  policyId: string;
   sourceLabel: string;
   outputId?: string;
   eventType?: string;
   actionId: string;
+  actionLabel: string;
 };
 
 export function LoopHandlerSheet({
@@ -205,7 +205,7 @@ function LoopRouteActionSelect({
           id={id}
           size="sm"
           className="h-5 min-h-5 w-fit max-w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
-          title={route.actionId}
+          title={route.actionLabel}
         >
           <SelectValue className={loopActionTokenClassName()} />
         </SelectTrigger>
@@ -256,7 +256,6 @@ function HumanOperatorField() {
 function humanGateResponseForRoute(config: ProjectAutomationConfig, route: LoopHandlerRoute) {
   return config.humanGateResponses.find((candidate) =>
     candidate.loopId === route.loopId &&
-    candidate.policyId === route.policyId &&
     candidate.actionId === route.actionId
   );
 }
@@ -279,6 +278,6 @@ function ReadOnlyBadges({ label, values }: { label: string; values: string[] }) 
 function loopHandlerRouteDescription(route: LoopHandlerRoute | undefined) {
   if (!route) return "Edit selected loop handler.";
   return route.outputId
-    ? `${route.sourceLabel} -> ${route.outputId} -> ${route.actionId}`
-    : `${route.sourceLabel} -> ${route.actionId}`;
+    ? `${route.sourceLabel} -> ${route.outputId} -> ${route.actionLabel}`
+    : `${route.sourceLabel} -> ${route.actionLabel}`;
 }

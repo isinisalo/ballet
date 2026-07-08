@@ -1,5 +1,5 @@
-import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
-import { policyOutputEventTypes } from "@shared/policy-actions";
+import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { actionOutputEventTypes } from "@shared/policy-actions";
 import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
 import { Position, type Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
@@ -8,30 +8,76 @@ import { loopApprovalEdgePath, loopReturnEdgePath } from "../src/workspace/autom
 import { loopCrossLoopSmoothStepPath } from "../src/workspace/automation/loops/loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor } from "../src/workspace/automation/loops/loopEdgeLabelGeometry";
 import { buildLoopGraph, type LoopStepRecord } from "../src/workspace/automation/loops/loopGraph";
-import { calculateAllLoopsCanvasLayout, calculateCompositeLoopCanvasLayout, calculateLoopCanvasLayout, loopCanvasLayoutConfig, loopCanvasNodeAnchorY, loopNodeSizes, loopOutputSourceHandleId, loopPolicyOutputHandleY, loopPolicyStackHeight, type LoopLayoutDirection } from "../src/workspace/automation/loops/loopLayout";
+import { calculateAllLoopsCanvasLayout, calculateCompositeLoopCanvasLayout, calculateLoopCanvasLayout, loopCanvasLayoutConfig, loopCanvasNodeAnchorY, loopNodeSizes, loopOutputSourceHandleId, loopActionOutputHandleY, loopActionStackHeight, type LoopLayoutDirection } from "../src/workspace/automation/loops/loopLayout";
 import { positionLoopNodes } from "../src/workspace/automation/loops/loopLayoutPositioning";
 import { loopOutputTargetsForPolicy } from "../src/workspace/automation/loops/loopOutputTargets";
 import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/loopSmartEdgeRouting";
 
-const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
+const action = (id: string, event: string | undefined, action = "build"): ProjectAction => ({
   id,
-  source: "event",
+  key: action,
   event: event ?? "project.updated",
-  action,
-  enabled: true
+  enabled: true,
+  description: `${action} handler`,
+  outputIds: ["approved", "rejected"],
+  agentIds: ["agent-1"]
 });
 
-const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyIndex: number | null = null, direction: LoopLayoutDirection = "horizontal") => {
-  const policyById = new Map(policies.map((item) => [item.id, item]));
-  const records: LoopStepRecord[] = steps.map((policyId, index) => ({
-    policyId,
-    index,
-    policy: policyById.get(policyId),
-    outputEvents: policyById.get(policyId) ? policyOutputEventTypes(policyById.get(policyId)!, [{ id: policyById.get(policyId)!.action, outputIds: ["approved", "rejected"] }]) : undefined
+const graphFor = (records: LoopStepRecord[]) => {
+  const recordByEvent = new Map(records.flatMap((record) => {
+    const eventType = (record.action as { event?: string } | undefined)?.event;
+    return eventType ? [[eventType, record] as const] : [];
   }));
 
+  return buildLoopGraph(records.map((record) => {
+    const recordLoopId = record.loopId ?? "test.loop";
+    const outputTargets = (record.outputTargets ?? record.outputEvents?.map((eventType) => ({
+      outputId: eventType,
+      eventType,
+      type: "event" as const
+    })) ?? []).map((target) => {
+      if (target.type === "action") return target;
+      const targetRecord = recordByEvent.get(target.eventType);
+      return targetRecord
+        ? {
+          ...target,
+          type: "action" as const,
+          targetLoopId: targetRecord.loopId ?? recordLoopId,
+          targetActionId: targetRecord.actionId
+        }
+        : target;
+    });
+    return { ...record, loopId: recordLoopId, outputTargets };
+  }));
+};
+
+const layoutFor = (actions: ProjectAction[], steps: string[], editingPolicyIndex: number | null = null, direction: LoopLayoutDirection = "horizontal") => {
+  const actionById = new Map(actions.map((item) => [item.id, item]));
+  const loopId = "test.loop";
+  const records: LoopStepRecord[] = steps.map((actionId, index) => ({
+    actionId,
+    index,
+    loopId,
+    action: actionById.get(actionId),
+    outputEvents: actionById.get(actionId) ? actionOutputEventTypes(actionById.get(actionId)!, [actionById.get(actionId)!]) : undefined
+  }));
+  const legacyEventByRecordIndex = new Map(records.flatMap((record) => {
+    const eventType = (record.action as { event?: string } | undefined)?.event;
+    return eventType ? [[record.index, eventType] as const] : [];
+  }));
+  records.forEach((record) => {
+    const outputEvents = record.outputEvents ?? [];
+    record.outputTargets = outputEvents.map((eventType) => {
+      const targetRecord = records.find((candidate) => legacyEventByRecordIndex.get(candidate.index) === eventType);
+      const outputId = eventType;
+      return targetRecord
+        ? { outputId, eventType, type: "action" as const, targetLoopId: loopId, targetActionId: targetRecord.actionId }
+        : { outputId, eventType, type: "event" as const };
+    });
+  });
+
   return calculateLoopCanvasLayout({
-    loopGraph: buildLoopGraph(records),
+    loopGraph: graphFor(records),
     editingPolicyIndex,
     direction
   });
@@ -42,14 +88,22 @@ const compositeConfig = (
   outputRoutes: ProjectAutomationConfig["outputRoutes"] = [],
   sourceStartEvent = "source-event"
 ): ProjectAutomationConfig => {
-  const upstreamPolicy = policy("upstream-start", undefined, "upstream-gate");
+  const upstreamPolicy = action("upstream-start", undefined, "upstream-gate");
   upstreamPolicy.event = "upstream-event";
-  const sourcePolicy = policy("source-start", undefined, "source-gate");
+  upstreamPolicy.agentIds = [];
+  upstreamPolicy.humanGate = true;
+  const sourcePolicy = action("source-start", undefined, "source-gate");
   sourcePolicy.event = sourceStartEvent;
-  const targetPolicy = policy("target-start", undefined, "target-gate");
+  sourcePolicy.agentIds = [];
+  sourcePolicy.humanGate = true;
+  const targetPolicy = action("target-start", undefined, "target-gate");
   targetPolicy.event = "source-gate.approved";
-  const downstreamPolicy = policy("downstream-start", undefined, "final-gate");
+  targetPolicy.agentIds = [];
+  targetPolicy.humanGate = true;
+  const downstreamPolicy = action("downstream-start", undefined, "final-gate");
   downstreamPolicy.event = "target-gate.approved";
+  downstreamPolicy.agentIds = [];
+  downstreamPolicy.humanGate = true;
   const policyByLoopId = new Map([
     ["upstream", upstreamPolicy],
     ["source", sourcePolicy],
@@ -59,21 +113,29 @@ const compositeConfig = (
 
   return {
     version: 1,
-    actions: [
-      { id: "upstream-gate", description: "Upstream gate", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true },
-      { id: "source-gate", description: "Source gate", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true },
-      { id: "target-gate", description: "Target gate", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true },
-      { id: "final-gate", description: "Final gate", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true }
-    ],
+    actions: [upstreamPolicy, sourcePolicy, targetPolicy, downstreamPolicy],
     outputs: [{ id: "approved" }, { id: "rejected" }],
-    outputRoutes,
+    outputRoutes: [
+      ...(loopIds.includes("source") && loopIds.includes("target")
+        ? [{ sourceLoopId: "source", sourceActionId: "source-start", outputId: "approved", targetLoopId: "target", targetActionId: "target-start" }]
+        : []),
+      ...(loopIds.includes("target") && loopIds.includes("downstream")
+        ? [{ sourceLoopId: "target", sourceActionId: "target-start", outputId: "approved", targetLoopId: "downstream", targetActionId: "downstream-start" }]
+        : []),
+      ...(loopIds.includes("upstream") && loopIds.includes("source") && sourceStartEvent === "upstream-gate.approved"
+        ? [{ sourceLoopId: "upstream", sourceActionId: "upstream-start", outputId: "approved", targetLoopId: "source", targetActionId: "source-start" }]
+        : []),
+      ...(loopIds.includes("target") && loopIds.includes("source") && sourceStartEvent === "target-gate.approved"
+        ? [{ sourceLoopId: "target", sourceActionId: "target-start", outputId: "approved", targetLoopId: "source", targetActionId: "source-start" }]
+        : []),
+      ...outputRoutes
+    ],
     humanGateResponses: [],
-    policies: [upstreamPolicy, sourcePolicy, targetPolicy, downstreamPolicy],
     loops: loopIds.map((loopId) => {
-      const loopPolicy = policyByLoopId.get(loopId);
+      const loopAction = policyByLoopId.get(loopId);
       return {
         id: loopId,
-        steps: loopPolicy ? [loopPolicy.id] : []
+        steps: loopAction ? [loopAction.id] : []
       };
     }),
     runtimes: []
@@ -81,15 +143,15 @@ const compositeConfig = (
 };
 
 const compositeRecords = (config: ProjectAutomationConfig) => {
-  const policyById = new Map(config.policies.map((item) => [item.id, item]));
-  return new Map(config.loops.map((loop) => [loop.id, loop.steps.map((policyId, index) => {
-    const policy = policyById.get(policyId);
-    const outputTargets = policy ? loopOutputTargetsForPolicy(config, policy) : undefined;
+  const actionById = new Map(config.actions.map((item) => [item.id, item]));
+  return new Map(config.loops.map((loop) => [loop.id, loop.steps.map((actionId, index) => {
+    const action = actionById.get(actionId);
+      const outputTargets = action ? loopOutputTargetsForPolicy(config, action, loop.id) : undefined;
     return {
-      policyId,
+      actionId,
       index,
       loopId: loop.id,
-      policy,
+      action,
       outputTargets,
       outputEvents: outputTargets?.flatMap((output) => "eventType" in output ? [output.eventType] : [])
     };
@@ -119,11 +181,11 @@ const firstRoutedPointMovingVertically = (points: number[][], sourceY: number) =
 describe("loop layout helper modules", () => {
   it("keeps exported node anchor and output handle calculations stable", () => {
     expect(loopCanvasNodeAnchorY({ kind: "input-event", height: 99 })).toBe(loopCanvasLayoutConfig.inputEventAnchorY);
-    expect(loopCanvasNodeAnchorY({ kind: "policy", height: 99 })).toBe(loopCanvasLayoutConfig.policyAnchorY);
+    expect(loopCanvasNodeAnchorY({ kind: "action", height: 99 })).toBe(loopCanvasLayoutConfig.actionAnchorY);
     expect(loopCanvasNodeAnchorY({ kind: "output-event", height: 46 })).toBe(23);
     expect(loopOutputSourceHandleId()).toBe("right");
-    expect(loopPolicyOutputHandleY(-1, 3)).toBe(loopCanvasLayoutConfig.policyAnchorY);
-    expect(loopPolicyOutputHandleY(99, 3)).toBe(loopNodeSizes.policy.height - loopCanvasLayoutConfig.edgePad / 2);
+    expect(loopActionOutputHandleY(-1, 3)).toBe(loopCanvasLayoutConfig.actionAnchorY);
+    expect(loopActionOutputHandleY(99, 3)).toBe(loopNodeSizes.action.height - loopCanvasLayoutConfig.edgePad / 2);
   });
 
   it("positions primary nodes through the extracted dagre layout helper", () => {
@@ -136,23 +198,23 @@ describe("loop layout helper modules", () => {
         direction: "horizontal"
       },
       {
-        key: "policy-0",
-        kind: "policy",
-        width: loopNodeSizes.policy.minWidth,
-        height: loopNodeSizes.policy.height,
+        key: "action-0",
+        kind: "action",
+        width: loopNodeSizes.action.minWidth,
+        height: loopNodeSizes.action.height,
         direction: "horizontal"
       }
-    ], [{ source: "input-event", target: "policy-0", label: "updated" }], "horizontal");
+    ], [{ source: "input-event", target: "action-0", label: "updated" }], "horizontal");
 
     const inputEventNode = nodes.find((node) => node.key === "input-event");
-    const policyNode = nodes.find((node) => node.key === "policy-0");
+    const actionNode = nodes.find((node) => node.key === "action-0");
 
     expect(inputEventNode).toMatchObject({
       x: loopCanvasLayoutConfig.startX,
       y: loopCanvasLayoutConfig.startY
     });
-    expect(policyNode?.x).toBeGreaterThan((inputEventNode?.x ?? 0) + loopNodeSizes.inputEvent.minWidth);
-    expect(policyNode?.y).toBe(inputEventNode?.y);
+    expect(actionNode?.x).toBeGreaterThan((inputEventNode?.x ?? 0) + loopNodeSizes.inputEvent.minWidth);
+    expect(actionNode?.y).toBe(inputEventNode?.y);
   });
 
   it("keeps horizontal spacing independent from edge label length", () => {
@@ -165,21 +227,21 @@ describe("loop layout helper modules", () => {
         direction: "horizontal"
       },
       {
-        key: "policy-0",
-        kind: "policy",
-        width: loopNodeSizes.policy.minWidth,
-        height: loopNodeSizes.policy.height,
+        key: "action-0",
+        kind: "action",
+        width: loopNodeSizes.action.minWidth,
+        height: loopNodeSizes.action.height,
         direction: "horizontal"
       }
     ];
-    const shortLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "input-event", target: "policy-0", label: "x" }], "horizontal");
-    const longLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "input-event", target: "policy-0", label: "x".repeat(500) }], "horizontal");
+    const shortLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "input-event", target: "action-0", label: "x" }], "horizontal");
+    const longLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "input-event", target: "action-0", label: "x".repeat(500) }], "horizontal");
 
-    const shortLabelPolicyNode = shortLabelNodes.find((node) => node.key === "policy-0");
-    const longLabelPolicyNode = longLabelNodes.find((node) => node.key === "policy-0");
+    const shortLabelActionNode = shortLabelNodes.find((node) => node.key === "action-0");
+    const longLabelActionNode = longLabelNodes.find((node) => node.key === "action-0");
 
-    expect(longLabelPolicyNode?.x).toBe(shortLabelPolicyNode?.x);
-    expect(shortLabelPolicyNode?.x).toBe(loopCanvasLayoutConfig.startX + loopNodeSizes.inputEvent.minWidth + loopCanvasLayoutConfig.horizontalEdgeGap);
+    expect(longLabelActionNode?.x).toBe(shortLabelActionNode?.x);
+    expect(shortLabelActionNode?.x).toBe(loopCanvasLayoutConfig.startX + loopNodeSizes.inputEvent.minWidth + loopCanvasLayoutConfig.horizontalEdgeGap);
   });
 
   it("keeps default smart edge routing for same-row edges and tightens cross-row routing", () => {
@@ -197,12 +259,12 @@ describe("loop layout helper modules", () => {
     const targetY = 75.5;
     const nodes = [
       loopRoutingTestNode({ id: "input-event", x: 32, y: 64, width: 28, height: 22 }),
-      loopRoutingTestNode({ id: "policy-0", x: 238, y: 64, width: 174, height: 22 }),
-      loopRoutingTestNode({ id: "policy-1", x: 597, y: 64, width: 112, height: 22 }),
-      loopRoutingTestNode({ id: "policy-3", x: 956, y: 64, width: 181, height: 22 }),
-      loopRoutingTestNode({ id: "policy-6", x: 1315, y: 64, width: 112, height: 22 }),
-      loopRoutingTestNode({ id: "policy-2", x: 597, y: 114, width: 132, height: 22 }),
-      loopRoutingTestNode({ id: "policy-8", x: 956, y: 114, width: 118, height: 22 }),
+      loopRoutingTestNode({ id: "action-0", x: 238, y: 64, width: 174, height: 22 }),
+      loopRoutingTestNode({ id: "action-1", x: 597, y: 64, width: 112, height: 22 }),
+      loopRoutingTestNode({ id: "action-3", x: 956, y: 64, width: 181, height: 22 }),
+      loopRoutingTestNode({ id: "action-6", x: 1315, y: 64, width: 112, height: 22 }),
+      loopRoutingTestNode({ id: "action-2", x: 597, y: 114, width: 132, height: 22 }),
+      loopRoutingTestNode({ id: "action-8", x: 956, y: 114, width: 118, height: 22 }),
       loopRoutingTestNode({ id: "output-event-8-ready", x: 1315, y: 114, width: 76, height: 22 }),
       loopRoutingTestNode({ id: "output-event-8-blocked", x: 1315, y: 160, width: 76, height: 22 })
     ];
@@ -248,27 +310,27 @@ describe("loop layout helper modules", () => {
 });
 
 describe("calculateLoopCanvasLayout", () => {
-  it("uses selected action outputs as policy output events", () => {
-    expect(policyOutputEventTypes({ action: "build" }, [{ id: "build", outputIds: ["complete", "failed"] }])).toEqual([
+  it("uses selected action outputs as action output events", () => {
+    expect(actionOutputEventTypes({ key: "build" }, [{ id: "build", key: "build", outputIds: ["complete", "failed"] }])).toEqual([
       "build.approved",
       "build.rejected"
     ]);
   });
 
-  it("creates an input event and first-policy ghost for an empty loop", () => {
+  it("creates an input event and first-action ghost for an empty loop", () => {
     const layout = layoutFor([], []);
     const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
 
-    expect(layout.nodes.map((node) => node.kind)).toEqual(["input-event", "first-policy-ghost"]);
+    expect(layout.nodes.map((node) => node.kind)).toEqual(["input-event", "first-action-ghost"]);
     expect(inputEventNode).toMatchObject({
       width: loopNodeSizes.inputEvent.minWidth,
       height: loopNodeSizes.inputEvent.height
     });
     expect(layout.edges).toEqual([
       expect.objectContaining({
-        key: "input-event-first-policy",
+        key: "input-event-first-action",
         sourceNodeKey: "input-event",
-        targetNodeKey: "first-policy-ghost",
+        targetNodeKey: "first-action-ghost",
         sourceHandleId: "right",
         targetHandleId: "left",
         dashed: true
@@ -277,12 +339,12 @@ describe("calculateLoopCanvasLayout", () => {
   });
 
   it("renders multiple unhandled outputs as separate output-event nodes", () => {
-    const start = policy("start", undefined, "build");
+    const start = action("start", undefined, "build");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([{
-        policyId: start.id,
+      loopGraph: graphFor([{
+        actionId: start.id,
         index: 0,
-        policy: start,
+        action: start,
         outputEvents: ["build.complete", "build.failed", "build.blocked"]
       }]),
       editingPolicyIndex: null
@@ -299,40 +361,40 @@ describe("calculateLoopCanvasLayout", () => {
       "output-event-0-build.failed",
       "output-event-0-build.blocked"
     ]);
-    expect(layout.edges.filter((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey.startsWith("output-event-"))).toHaveLength(3);
+    expect(layout.edges.filter((edge) => edge.sourceNodeKey === "action-0" && edge.targetNodeKey.startsWith("output-event-"))).toHaveLength(3);
   });
 
   it("does not render output nodes for an agentless action", () => {
-    const start = policy("manual-gate", undefined, "manual-gate");
+    const start = action("manual-gate", undefined, "manual-gate");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([{
-        policyId: start.id,
+      loopGraph: graphFor([{
+        actionId: start.id,
         index: 0,
-        policy: start,
-        outputEvents: policyOutputEventTypes(start, [{ id: "manual-gate", outputIds: ["complete"], agentIds: [] }])
+        action: start,
+        outputEvents: actionOutputEventTypes(start, [{ id: "manual-gate", outputIds: ["complete"], agentIds: [] }])
       }]),
       editingPolicyIndex: null
     });
 
     expect(layout.nodes.some((node) => node.kind === "output-event")).toBe(false);
-    expect(layout.edges.some((edge) => edge.sourceNodeKey === "policy-0" && edge.targetNodeKey.startsWith("output-event-"))).toBe(false);
+    expect(layout.edges.some((edge) => edge.sourceNodeKey === "action-0" && edge.targetNodeKey.startsWith("output-event-"))).toBe(false);
   });
 
-  it("keeps terminal output events beside the source policy edge", () => {
-    const routeProject = policy("route-project", undefined, "route-project");
-    const aggregateReview = policy("aggregate-review", "route-project.blocked", "aggregate-review");
+  it("keeps terminal output events beside the source action edge", () => {
+    const routeProject = action("route-project", undefined, "route-project");
+    const aggregateReview = action("aggregate-review", "route-project.blocked", "aggregate-review");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([
+      loopGraph: graphFor([
         {
-          policyId: routeProject.id,
+          actionId: routeProject.id,
           index: 0,
-          policy: routeProject,
+          action: routeProject,
           outputEvents: ["route-project.blocked"]
         },
         {
-          policyId: aggregateReview.id,
+          actionId: aggregateReview.id,
           index: 1,
-          policy: aggregateReview,
+          action: aggregateReview,
           outputEvents: [
             "aggregate-review.approved",
             "aggregate-review.changes-requested",
@@ -342,7 +404,7 @@ describe("calculateLoopCanvasLayout", () => {
       ]),
       editingPolicyIndex: null
     });
-    const sourceNode = layout.nodes.find((node) => node.key === "policy-1");
+    const sourceNode = layout.nodes.find((node) => node.key === "action-1");
     const outputEventNodes = [
       layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.approved"),
       layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.changes-requested"),
@@ -361,12 +423,12 @@ describe("calculateLoopCanvasLayout", () => {
   });
 
   it("renders every output target as an output-event node", () => {
-    const start = policy("start", undefined, "build");
+    const start = action("start", undefined, "build");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([{
-        policyId: start.id,
+      loopGraph: graphFor([{
+        actionId: start.id,
         index: 0,
-        policy: start,
+        action: start,
         outputEvents: ["build.failed"],
         outputTargets: [
           { outputId: "failed", eventType: "build.failed", type: "event" },
@@ -375,11 +437,11 @@ describe("calculateLoopCanvasLayout", () => {
       }]),
       editingPolicyIndex: null
     });
-    const policyNode = layout.nodes.find((node) => node.key === "policy-0");
+    const actionNode = layout.nodes.find((node) => node.key === "action-0");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-failed");
     const summaryOutputNode = layout.nodes.find((node) => node.key === "output-event-0-summary");
 
-    expect(policyNode?.outputHandleCount).toBe(2);
+    expect(actionNode?.outputHandleCount).toBe(2);
     expect(outputEventNode).toMatchObject({
       kind: "output-event",
       outputEvent: { outputId: "failed", eventType: "build.failed", outputType: "event" },
@@ -394,8 +456,8 @@ describe("calculateLoopCanvasLayout", () => {
       ? outputEventNode.y + loopNodeSizes.outputEvent.height + loopNodeSizes.outputEvent.rowGap
       : undefined);
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-output-event-0-failed",
-      sourceNodeKey: "policy-0",
+      key: "action-output-event-0-failed",
+      sourceNodeKey: "action-0",
       targetNodeKey: "output-event-0-failed",
       sourceHandleId: "bottom",
       targetHandleId: "bottom",
@@ -404,8 +466,8 @@ describe("calculateLoopCanvasLayout", () => {
       label: "failed"
     }));
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-output-event-0-summary",
-      sourceNodeKey: "policy-0",
+      key: "action-output-event-0-summary",
+      sourceNodeKey: "action-0",
       targetNodeKey: "output-event-0-summary",
       sourceHandleId: "right",
       targetHandleId: "left",
@@ -416,9 +478,9 @@ describe("calculateLoopCanvasLayout", () => {
   });
 
   it("routes approval outputs from the right and same-row rework outputs through bottom handles", () => {
-    const start = policy("start", undefined, "build");
-    const completeHandler = policy("complete-handler", "build.approved", "done");
-    const failedHandler = policy("failed-handler", "build.rejected", "done");
+    const start = action("start", undefined, "build");
+    const completeHandler = action("complete-handler", "build.approved", "done");
+    const failedHandler = action("failed-handler", "build.rejected", "done");
     const layout = layoutFor([start, completeHandler, failedHandler], [
       start.id,
       completeHandler.id,
@@ -426,32 +488,32 @@ describe("calculateLoopCanvasLayout", () => {
     ]);
 
     expect(layout.edges.find((edge) => edge.eventType === "build.approved")).toMatchObject({
-      sourceNodeKey: "policy-0",
+      sourceNodeKey: "action-0",
       sourceHandleId: "right",
       targetHandleId: "left",
       label: "approved"
     });
     expect(layout.edges.find((edge) => edge.eventType === "build.rejected")).toMatchObject({
-      sourceNodeKey: "policy-0",
+      sourceNodeKey: "action-0",
       sourceHandleId: "bottom",
-      targetHandleId: "bottom",
+      targetHandleId: "top",
       label: "rejected"
     });
   });
 
   it("renders human gate action outputs without requiring agents", () => {
-    const start = policy("human-review", undefined, "human-review");
-    const outputEvents = policyOutputEventTypes(start, [{
+    const start = action("human-review", undefined, "human-review");
+    const outputEvents = actionOutputEventTypes(start, [{
       id: "human-review",
       outputIds: ["approved", "changes-requested"],
       agentIds: [],
       humanGate: true
     }]);
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([{
-        policyId: start.id,
+      loopGraph: graphFor([{
+        actionId: start.id,
         index: 0,
-        policy: start,
+        action: start,
         outputEvents
       }]),
       editingPolicyIndex: null
@@ -461,8 +523,8 @@ describe("calculateLoopCanvasLayout", () => {
     expect(outputEvents).toEqual(["human-review.approved", "human-review.rejected"]);
     expect(outputEventNodes.map((node) => node.outputEvent?.outputId)).toEqual(["human-review.approved", "human-review.rejected"]);
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-output-event-0-human-review.approved",
-      sourceNodeKey: "policy-0",
+      key: "action-output-event-0-human-review.approved",
+      sourceNodeKey: "action-0",
       targetNodeKey: "output-event-0-human-review.approved",
       sourceHandleId: "right",
       targetHandleId: "left",
@@ -471,15 +533,15 @@ describe("calculateLoopCanvasLayout", () => {
     }));
   });
 
-  it("places unhandled done output events after active child policies", () => {
-    const start = policy("start", undefined, "design");
-    const child = policy("release", "design.ready", "release");
+  it("places unhandled done output events after active child actions", () => {
+    const start = action("start", undefined, "design");
+    const child = action("release", "design.ready", "release");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([
+      loopGraph: graphFor([
         {
-          policyId: start.id,
+          actionId: start.id,
           index: 0,
-          policy: start,
+          action: start,
           outputEvents: ["design.ready"],
           outputTargets: [
             { outputId: "ready", eventType: "design.ready", type: "event" },
@@ -487,16 +549,16 @@ describe("calculateLoopCanvasLayout", () => {
           ]
         },
         {
-          policyId: child.id,
+          actionId: child.id,
           index: 1,
-          policy: child,
+          action: child,
           outputEvents: ["release.complete"]
         }
       ]),
       editingPolicyIndex: null
     });
-    const sourceNode = layout.nodes.find((node) => node.key === "policy-0");
-    const childNode = layout.nodes.find((node) => node.key === "policy-1");
+    const sourceNode = layout.nodes.find((node) => node.key === "action-0");
+    const childNode = layout.nodes.find((node) => node.key === "action-1");
     const doneOutputNode = layout.nodes.find((node) => node.key === "output-event-0-done");
 
     expect(doneOutputNode).toBeDefined();
@@ -507,37 +569,37 @@ describe("calculateLoopCanvasLayout", () => {
     expect(doneOutputNode!.y).toBe(childNode!.y + childNode!.height + loopNodeSizes.outputEvent.rowGap);
   });
 
-  it("places unhandled output events in the next policy column after active policies", () => {
-    const first = policy("first", undefined, "build");
-    const child = policy("child", "build.approved", "deploy");
+  it("places unhandled output events in the next action column after active actions", () => {
+    const first = action("first", undefined, "build");
+    const child = action("child", "build.approved", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id]);
-    const firstNode = layout.nodes.find((node) => node.key === "policy-0");
-    const childNode = layout.nodes.find((node) => node.key === "policy-1");
+    const firstNode = layout.nodes.find((node) => node.key === "action-0");
+    const childNode = layout.nodes.find((node) => node.key === "action-1");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.rejected");
-    const outputEventEdge = layout.edges.find((edge) => edge.key === "policy-output-event-0-build.rejected");
-    const inputEventPolicyEdge = layout.edges.find((edge) => edge.key === "input-event-policy-0");
-    const childPolicyEdge = layout.edges.find((edge) => edge.key === "policy-policy-0-1-build.approved");
+    const outputEventEdge = layout.edges.find((edge) => edge.key === "action-output-event-0-build.rejected");
+    const inputEventPolicyEdge = layout.edges.find((edge) => edge.key === "input-event-action-0");
+    const childPolicyEdge = layout.edges.find((edge) => edge.key === "action-action-0-1-build.approved");
 
-    expect(layout.nodes.filter((node) => node.kind === "policy").map((node) => node.record?.policyId)).toEqual(["first", "child"]);
+    expect(layout.nodes.filter((node) => node.kind === "action").map((node) => node.record?.actionId)).toEqual(["first", "child"]);
     expect(childNode?.x).toBeGreaterThan(firstNode?.x ?? 0);
     expect(childNode?.y).toBe(firstNode?.y);
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-policy-0-1-build.approved",
-      sourceNodeKey: "policy-0",
-      targetNodeKey: "policy-1",
+      key: "action-action-0-1-build.approved",
+      sourceNodeKey: "action-0",
+      targetNodeKey: "action-1",
       sourceHandleId: "right",
       targetHandleId: "left",
       eventType: "build.approved"
     }));
-    expect(inputEventPolicyEdge?.label).toBe("updated");
+    expect(inputEventPolicyEdge?.label).toBe("first");
     expect(childPolicyEdge?.label).toBe("approved");
     expect(outputEventNode).toMatchObject({
       kind: "output-event",
-      sourcePolicyId: first.id,
+      sourceActionId: first.id,
       outputEvent: { eventType: "build.rejected" }
     });
     expect(outputEventEdge).toMatchObject({
-      sourceNodeKey: "policy-0",
+      sourceNodeKey: "action-0",
       targetNodeKey: "output-event-0-build.rejected",
       sourceHandleId: "bottom",
       targetHandleId: "top",
@@ -547,33 +609,33 @@ describe("calculateLoopCanvasLayout", () => {
     });
     expect(outputEventNode?.x).toBe(childNode?.x);
     expect(outputEventNode?.y).toBe(childNode
-      ? childNode.y + loopPolicyStackHeight() + loopNodeSizes.outputEvent.rowGap
+      ? childNode.y + loopActionStackHeight() + loopNodeSizes.outputEvent.rowGap
       : undefined);
     expect(layout.nodes.some((node) => node.kind === "output-event" && node.outputEvent?.eventType === "build.complete")).toBe(false);
   });
 
-  it("uses compact horizontal space between connected policies without visible edge labels", () => {
-    const first = policy("first", undefined, "route-project");
-    const child = policy("child", "review-intent.changes-requested", "analyze-intent");
+  it("uses compact horizontal space between connected actions without visible edge labels", () => {
+    const first = action("first", undefined, "route-project");
+    const child = action("child", "review-intent.changes-requested", "analyze-intent");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([
+      loopGraph: graphFor([
         {
-          policyId: first.id,
+          actionId: first.id,
           index: 0,
-          policy: first,
+          action: first,
           outputEvents: ["review-intent.changes-requested"]
         },
         {
-          policyId: child.id,
+          actionId: child.id,
           index: 1,
-          policy: child,
+          action: child,
           outputEvents: ["analyze-intent.ready"]
         }
       ]),
       editingPolicyIndex: null
     });
-    const firstNode = layout.nodes.find((node) => node.key === "policy-0");
-    const childNode = layout.nodes.find((node) => node.key === "policy-1");
+    const firstNode = layout.nodes.find((node) => node.key === "action-0");
+    const childNode = layout.nodes.find((node) => node.key === "action-1");
 
     expect(firstNode).toBeDefined();
     expect(childNode).toBeDefined();
@@ -581,108 +643,108 @@ describe("calculateLoopCanvasLayout", () => {
     expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeLessThan(80);
   });
 
-  it("keeps the primary horizontal policy path on the input event baseline and stacks branches compactly below it", () => {
-    const first = policy("first", undefined, "build");
-    const completeChild = policy("complete-child", "build.complete", "deploy");
-    const failedChild = policy("failed-child", "build.failed", "debug");
+  it("keeps the primary horizontal action path on the input event baseline and stacks branches compactly below it", () => {
+    const first = action("first", undefined, "build");
+    const completeChild = action("complete-child", "build.complete", "deploy");
+    const failedChild = action("failed-child", "build.failed", "debug");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([
+      loopGraph: graphFor([
         {
-          policyId: first.id,
+          actionId: first.id,
           index: 0,
-          policy: first,
+          action: first,
           outputEvents: ["build.complete", "build.failed", "build.blocked"]
         },
         {
-          policyId: completeChild.id,
+          actionId: completeChild.id,
           index: 1,
-          policy: completeChild,
+          action: completeChild,
           outputEvents: ["deploy.complete"]
         },
         {
-          policyId: failedChild.id,
+          actionId: failedChild.id,
           index: 2,
-          policy: failedChild,
+          action: failedChild,
           outputEvents: ["debug.complete"]
         }
       ]),
       editingPolicyIndex: null
     });
     const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
-    const firstNode = layout.nodes.find((node) => node.key === "policy-0");
-    const completeChildNode = layout.nodes.find((node) => node.key === "policy-1");
-    const failedChildNode = layout.nodes.find((node) => node.key === "policy-2");
+    const firstNode = layout.nodes.find((node) => node.key === "action-0");
+    const completeChildNode = layout.nodes.find((node) => node.key === "action-1");
+    const failedChildNode = layout.nodes.find((node) => node.key === "action-2");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.blocked");
 
     expect(firstNode?.y).toBe(inputEventNode?.y);
     expect(completeChildNode?.y).toBe(firstNode?.y);
-    expect(failedChildNode?.y).toBe(firstNode ? firstNode.y + loopPolicyStackHeight() + loopCanvasLayoutConfig.branchGap : undefined);
+    expect(failedChildNode?.y).toBe(firstNode ? firstNode.y + loopActionStackHeight() + loopCanvasLayoutConfig.branchGap : undefined);
     expect(outputEventNode?.x).toBe(completeChildNode?.x);
     expect(outputEventNode?.y).toBe(failedChildNode
-      ? failedChildNode.y + loopPolicyStackHeight() + loopNodeSizes.outputEvent.rowGap
+      ? failedChildNode.y + loopActionStackHeight() + loopNodeSizes.outputEvent.rowGap
       : undefined);
   });
 
-  it("reserves clearance below output ghost nodes before the next horizontal lane", () => {
-    const createMilestones = policy("create-milestones", undefined, "create-milestones");
+  it("keeps routed next actions on the primary lane with unhandled outputs below", () => {
+    const createMilestones = action("create-milestones", undefined, "create-milestones");
     createMilestones.event = "technical_plan_approved";
-    const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
-    const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes-requested", "create-milestones");
-    const createTaskSpecs = policy("create-task-specs", undefined, "create-task-specs");
-    createTaskSpecs.event = "milestones_approved";
-    const challengeTaskSpecs = policy("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
-    const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes-requested", "create-task-specs");
+    const challengeMilestones = action("challenge-milestones", "create-milestones.ready", "challenge-milestones");
+    const reworkMilestones = action("rework-milestones", "challenge-milestones.changes-requested", "create-milestones");
+    const createTaskSpecs = action("create-task-specs", undefined, "create-task-specs");
+    createTaskSpecs.event = "challenge-milestones.approved";
+    const challengeTaskSpecs = action("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
+    const reworkTaskSpecs = action("rework-task-specs", "challenge-task-specs.changes-requested", "create-task-specs");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([
+      loopGraph: graphFor([
         {
-          policyId: createMilestones.id,
+          actionId: createMilestones.id,
           index: 0,
-          policy: createMilestones,
+          action: createMilestones,
           outputTargets: [
             { outputId: "ready", eventType: "create-milestones.ready", type: "event" },
             { outputId: "blocked", eventType: "create-milestones.blocked", type: "event" }
           ]
         },
         {
-          policyId: challengeMilestones.id,
+          actionId: challengeMilestones.id,
           index: 1,
-          policy: challengeMilestones,
+          action: challengeMilestones,
           outputTargets: [
             { outputId: "approved", eventType: "challenge-milestones.approved", type: "event" },
             { outputId: "changes-requested", eventType: "challenge-milestones.changes-requested", type: "event" }
           ]
         },
         {
-          policyId: reworkMilestones.id,
+          actionId: reworkMilestones.id,
           index: 2,
-          policy: reworkMilestones,
+          action: reworkMilestones,
           outputTargets: [
             { outputId: "ready", eventType: "create-milestones.ready", type: "event" },
             { outputId: "blocked", eventType: "create-milestones.blocked", type: "event" }
           ]
         },
         {
-          policyId: createTaskSpecs.id,
+          actionId: createTaskSpecs.id,
           index: 3,
-          policy: createTaskSpecs,
+          action: createTaskSpecs,
           outputTargets: [
             { outputId: "ready", eventType: "create-task-specs.ready", type: "event" },
             { outputId: "blocked", eventType: "create-task-specs.blocked", type: "event" }
           ]
         },
         {
-          policyId: challengeTaskSpecs.id,
+          actionId: challengeTaskSpecs.id,
           index: 4,
-          policy: challengeTaskSpecs,
+          action: challengeTaskSpecs,
           outputTargets: [
             { outputId: "approved", eventType: "challenge-task-specs.approved", type: "event" },
             { outputId: "changes-requested", eventType: "challenge-task-specs.changes-requested", type: "event" }
           ]
         },
         {
-          policyId: reworkTaskSpecs.id,
+          actionId: reworkTaskSpecs.id,
           index: 5,
-          policy: reworkTaskSpecs,
+          action: reworkTaskSpecs,
           outputTargets: [
             { outputId: "ready", eventType: "create-task-specs.ready", type: "event" },
             { outputId: "blocked", eventType: "create-task-specs.blocked", type: "event" }
@@ -691,9 +753,9 @@ describe("calculateLoopCanvasLayout", () => {
       ]),
       editingPolicyIndex: null
     });
-    const createMilestonesNode = layout.nodes.find((node) => node.key === "policy-0");
-    const challengeMilestonesNode = layout.nodes.find((node) => node.key === "policy-1");
-    const createTaskSpecsNode = layout.nodes.find((node) => node.key === "policy-3");
+    const createMilestonesNode = layout.nodes.find((node) => node.key === "action-0");
+    const challengeMilestonesNode = layout.nodes.find((node) => node.key === "action-1");
+    const createTaskSpecsNode = layout.nodes.find((node) => node.key === "action-3");
     const blockedOutputNode = layout.nodes.find((node) => node.key === "output-event-0-blocked");
 
     expect(createMilestonesNode).toBeDefined();
@@ -701,143 +763,133 @@ describe("calculateLoopCanvasLayout", () => {
     expect(createTaskSpecsNode).toBeDefined();
     expect(blockedOutputNode).toBeDefined();
     expect(blockedOutputNode?.y).toBe(challengeMilestonesNode
-      ? challengeMilestonesNode.y + loopPolicyStackHeight() + loopNodeSizes.outputEvent.rowGap
+      ? challengeMilestonesNode.y + loopActionStackHeight() + loopNodeSizes.outputEvent.rowGap
       : undefined);
-    expect(createTaskSpecsNode?.y).toBe(createMilestonesNode
-      ? createMilestonesNode.y +
-        loopPolicyStackHeight() +
-        loopNodeSizes.outputEvent.rowGap +
-        loopNodeSizes.outputEvent.height +
-        loopCanvasLayoutConfig.outputEventLaneClearance +
-        loopCanvasLayoutConfig.branchGap
-      : undefined);
-    expect(createTaskSpecsNode && blockedOutputNode
-      ? createTaskSpecsNode.y - (blockedOutputNode.y + blockedOutputNode.height)
-      : undefined).toBe(loopCanvasLayoutConfig.outputEventLaneClearance + loopCanvasLayoutConfig.branchGap);
+    expect(createTaskSpecsNode?.y).toBe(createMilestonesNode?.y);
+    expect(createTaskSpecsNode?.x).toBeGreaterThan(challengeMilestonesNode?.x ?? 0);
   });
 
   it("keeps folded approval edges on right-to-left handles even when they return to an earlier canonical node", () => {
-    const createMilestones = policy("create-milestones", undefined, "create-milestones");
+    const createMilestones = action("create-milestones", undefined, "create-milestones");
     createMilestones.event = "technical_plan_approved";
-    const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
-    const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes-requested", "create-milestones");
-    const doneMilestones = policy("done-milestones", "challenge-milestones.approved", "done");
-    const createTaskSpecs = policy("create-task-specs", undefined, "create-task-specs");
-    createTaskSpecs.event = "milestones_approved";
-    const challengeTaskSpecs = policy("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
-    const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes-requested", "create-task-specs");
-    const doneTaskSpecs = policy("done-task-specs", "challenge-task-specs.approved", "done");
+    const challengeMilestones = action("challenge-milestones", "create-milestones.ready", "challenge-milestones");
+    const reworkMilestones = action("rework-milestones", "challenge-milestones.changes-requested", "create-milestones");
+    const doneMilestones = action("done-milestones", "challenge-task-specs.approved", "done");
+    const createTaskSpecs = action("create-task-specs", undefined, "create-task-specs");
+    createTaskSpecs.event = "challenge-milestones.approved";
+    const challengeTaskSpecs = action("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
+    const reworkTaskSpecs = action("rework-task-specs", "challenge-task-specs.changes-requested", "create-task-specs");
+    const doneTaskSpecs = action(doneMilestones.id, "challenge-task-specs.approved", "done");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([
+      loopGraph: graphFor([
         {
-          policyId: createMilestones.id,
+          actionId: createMilestones.id,
           index: 0,
-          policy: createMilestones,
+          action: createMilestones,
           outputTargets: [
             { outputId: "ready", eventType: "create-milestones.ready", type: "event" },
             { outputId: "blocked", eventType: "create-milestones.blocked", type: "event" }
           ]
         },
         {
-          policyId: challengeMilestones.id,
+          actionId: challengeMilestones.id,
           index: 1,
-          policy: challengeMilestones,
+          action: challengeMilestones,
           outputTargets: [
             { outputId: "approved", eventType: "challenge-milestones.approved", type: "event" },
             { outputId: "changes-requested", eventType: "challenge-milestones.changes-requested", type: "event" }
           ]
         },
         {
-          policyId: reworkMilestones.id,
+          actionId: reworkMilestones.id,
           index: 2,
-          policy: reworkMilestones,
+          action: reworkMilestones,
           outputTargets: [
             { outputId: "ready", eventType: "create-milestones.ready", type: "event" },
             { outputId: "blocked", eventType: "create-milestones.blocked", type: "event" }
           ]
         },
-        { policyId: doneMilestones.id, index: 3, policy: doneMilestones, outputTargets: [] },
+        { actionId: doneMilestones.id, index: 3, action: doneMilestones, outputTargets: [] },
         {
-          policyId: createTaskSpecs.id,
+          actionId: createTaskSpecs.id,
           index: 4,
-          policy: createTaskSpecs,
+          action: createTaskSpecs,
           outputTargets: [
             { outputId: "ready", eventType: "create-task-specs.ready", type: "event" },
             { outputId: "blocked", eventType: "create-task-specs.blocked", type: "event" }
           ]
         },
         {
-          policyId: challengeTaskSpecs.id,
+          actionId: challengeTaskSpecs.id,
           index: 5,
-          policy: challengeTaskSpecs,
+          action: challengeTaskSpecs,
           outputTargets: [
             { outputId: "approved", eventType: "challenge-task-specs.approved", type: "event" },
             { outputId: "changes-requested", eventType: "challenge-task-specs.changes-requested", type: "event" }
           ]
         },
         {
-          policyId: reworkTaskSpecs.id,
+          actionId: reworkTaskSpecs.id,
           index: 6,
-          policy: reworkTaskSpecs,
+          action: reworkTaskSpecs,
           outputTargets: [
             { outputId: "ready", eventType: "create-task-specs.ready", type: "event" },
             { outputId: "blocked", eventType: "create-task-specs.blocked", type: "event" }
           ]
         },
-        { policyId: doneTaskSpecs.id, index: 7, policy: doneTaskSpecs, outputTargets: [] }
+        { actionId: doneTaskSpecs.id, index: 7, action: doneTaskSpecs, outputTargets: [] }
       ]),
       editingPolicyIndex: null
     });
 
     expect(layout.edges.find((edge) => edge.eventType === "challenge-task-specs.approved")).toMatchObject({
-      sourceNodeKey: "policy-5",
-      targetNodeKey: "policy-3",
+      sourceNodeKey: "action-5",
+      targetNodeKey: "action-3",
       sourceHandleId: "right",
       targetHandleId: "left",
-      tone: "return",
       label: "approved"
     });
   });
 
   it("keeps return approval edges away from top and bottom handles in implementation review loops", () => {
-    const implementTask = policy("implement-task", undefined, "implement-task");
+    const implementTask = action("implement-task", undefined, "implement-task");
     implementTask.event = "task_specs_approved";
-    const runTests = policy("run-tests", "implement-task.ready", "run-tests");
-    const classifyFailure = policy("classify-failure", "implement-task.blocked", "classify-failure");
-    const reworkImplementTask = policy("rework-implement-task", "classify-failure.ready", "implement-task");
+    const runTests = action("run-tests", "implement-task.ready", "run-tests");
+    const classifyFailure = action("classify-failure", "implement-task.blocked", "classify-failure");
+    const reworkImplementTask = action(implementTask.id, "classify-failure.ready", "implement-task");
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph([
+      loopGraph: graphFor([
         {
-          policyId: implementTask.id,
+          actionId: implementTask.id,
           index: 0,
-          policy: implementTask,
+          action: implementTask,
           outputTargets: [
             { outputId: "ready", eventType: "implement-task.ready", type: "event" },
             { outputId: "blocked", eventType: "implement-task.blocked", type: "event" }
           ]
         },
         {
-          policyId: runTests.id,
+          actionId: runTests.id,
           index: 1,
-          policy: runTests,
+          action: runTests,
           outputTargets: [
             { outputId: "ready", eventType: "run-tests.ready", type: "event" },
             { outputId: "failed", eventType: "run-tests.failed", type: "event" }
           ]
         },
         {
-          policyId: classifyFailure.id,
+          actionId: classifyFailure.id,
           index: 2,
-          policy: classifyFailure,
+          action: classifyFailure,
           outputTargets: [
             { outputId: "ready", eventType: "classify-failure.ready", type: "event" },
             { outputId: "blocked", eventType: "classify-failure.blocked", type: "event" }
           ]
         },
         {
-          policyId: reworkImplementTask.id,
+          actionId: reworkImplementTask.id,
           index: 7,
-          policy: reworkImplementTask,
+          action: reworkImplementTask,
           outputTargets: [
             { outputId: "ready", eventType: "implement-task.ready", type: "event" },
             { outputId: "blocked", eventType: "implement-task.blocked", type: "event" }
@@ -848,8 +900,8 @@ describe("calculateLoopCanvasLayout", () => {
     });
 
     expect(layout.edges.find((edge) => edge.eventType === "classify-failure.ready")).toMatchObject({
-      sourceNodeKey: "policy-2",
-      targetNodeKey: "policy-0",
+      sourceNodeKey: "action-2",
+      targetNodeKey: "action-0",
       sourceHandleId: "right",
       targetHandleId: "left",
       tone: "return",
@@ -857,15 +909,15 @@ describe("calculateLoopCanvasLayout", () => {
     });
   });
 
-  it("lays out child event policies below the source policy in vertical mode", () => {
-    const first = policy("first", undefined, "build");
-    const child = policy("child", "build.approved", "deploy");
+  it("lays out child event actions below the source action in vertical mode", () => {
+    const first = action("first", undefined, "build");
+    const child = action("child", "build.approved", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id], null, "vertical");
     const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
-    const firstNode = layout.nodes.find((node) => node.key === "policy-0");
-    const childNode = layout.nodes.find((node) => node.key === "policy-1");
+    const firstNode = layout.nodes.find((node) => node.key === "action-0");
+    const childNode = layout.nodes.find((node) => node.key === "action-1");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.rejected");
-    const inputEventPolicyEdge = layout.edges.find((edge) => edge.key === "input-event-policy-0");
+    const inputEventPolicyEdge = layout.edges.find((edge) => edge.key === "input-event-action-0");
 
     expect(layout.direction).toBe("vertical");
     expect(inputEventNode ? inputEventNode.x + inputEventNode.width / 2 : undefined).toBe(firstNode ? firstNode.x + firstNode.width / 2 : undefined);
@@ -875,74 +927,78 @@ describe("calculateLoopCanvasLayout", () => {
     expect(inputEventPolicyEdge).toMatchObject({
       sourceHandleId: "right",
       targetHandleId: "left",
-      label: "updated"
+      label: "first"
     });
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-policy-0-1-build.approved",
+      key: "action-action-0-1-build.approved",
       sourceHandleId: "right",
       targetHandleId: "left"
     }));
   });
 
-  it("links repeated output events directly to existing handler policies", () => {
-    const implement = (id: string, event: string | undefined): ProjectPolicy => ({
+  it("links repeated output events directly to existing handler actions", () => {
+    const implement = (id: string, event: string | undefined): ProjectAction => ({
       id,
-      source: "event",
       event: event ?? "plan_approved",
-      action: "implement",
-      enabled: true
+      key: "implement",
+      enabled: true,
+      description: "Implement",
+      outputIds: ["completed", "failed"],
+      agentIds: ["developer-agent"]
     });
-    const review: ProjectPolicy = {
+    const review: ProjectAction = {
       id: "architect-review",
-      source: "event",
       event: "implement.completed",
-      action: "review",
-      enabled: true
+      key: "review",
+      enabled: true,
+      description: "Review",
+      outputIds: ["accepted", "rejected"],
+      agentIds: ["architect"]
     };
     const records: LoopStepRecord[] = [
       {
-        policyId: "developer-implement-initial",
+        actionId: "developer-implement-initial",
         index: 0,
-        policy: implement("developer-implement-initial", undefined),
+        action: implement("developer-implement-initial", undefined),
         outputEvents: ["implement.completed", "implement.failed"]
       },
       {
-        policyId: review.id,
+        actionId: review.id,
         index: 1,
-        policy: review,
+        action: review,
         outputEvents: ["review.accepted", "review.rejected"]
       },
       {
-        policyId: "developer-implement-rework",
+        actionId: "developer-implement-initial",
         index: 2,
-        policy: implement("developer-implement-rework", "review.rejected"),
+        action: implement("developer-implement-initial", "review.rejected"),
         outputEvents: ["implement.completed", "implement.failed"]
       }
     ];
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph(records),
+      loopGraph: graphFor(records),
       editingPolicyIndex: null
     });
 
-    const returnEdge = layout.edges.find((edge) => edge.key === "policy-policy-1-0-2-review.rejected");
-    const policyNodes = layout.nodes.filter((node) => node.kind === "policy");
-    const foldedImplementNode = layout.nodes.find((node) => node.key === "policy-0");
-    const reworkPolicyNode = layout.nodes.find((node) => node.key === "policy-2");
+    const returnEdge = layout.edges.find((edge) => edge.eventType === "review.rejected");
+    const actionNodes = layout.nodes.filter((node) => node.kind === "action");
+    const foldedImplementNode = layout.nodes.find((node) => node.key === "action-0");
+    const reworkActionNode = layout.nodes.find((node) => node.key === "action-2");
     const reworkOutputEventNodes = layout.nodes.filter((node) => node.kind === "output-event" && node.record?.index === 2);
 
-    expect(policyNodes.map((node) => node.record?.policyId)).toEqual([
+    expect(actionNodes.map((node) => node.record?.actionId)).toEqual([
       "developer-implement-initial",
       "architect-review"
     ]);
-    expect(foldedImplementNode?.records?.map((record) => record.policyId)).toEqual([
+    expect(foldedImplementNode?.records?.map((record) => record.actionId)).toEqual([
       "developer-implement-initial",
-      "developer-implement-rework"
+      "developer-implement-initial"
     ]);
-    expect(reworkPolicyNode).toBeUndefined();
+    expect(reworkActionNode).toBeUndefined();
     expect(returnEdge).toBeDefined();
     expect(returnEdge).toMatchObject({
-      sourceNodeKey: "policy-1",
-      targetNodeKey: "policy-0",
+      sourceNodeKey: "action-1",
+      targetNodeKey: "action-0",
       sourceHandleId: "top",
       targetHandleId: "top",
       tone: "return",
@@ -953,67 +1009,67 @@ describe("calculateLoopCanvasLayout", () => {
   });
 
   it("folds roadmap rework into the original create-roadmap node", () => {
-    const createRoadmap = policy("p05.on.project-brief-gate-approved.create-roadmap", undefined, "create-roadmap");
+    const createRoadmap = action("p05.on.project-brief-gate-approved.create-roadmap", undefined, "create-roadmap");
     createRoadmap.event = "project-brief-gate.approved";
-    const challengeRoadmap = policy("p06.on.roadmap-ready.challenge-roadmap", "create-roadmap.ready", "challenge-roadmap");
-    const reworkRoadmap = policy("p07.on.roadmap-rework.create-roadmap", "challenge-roadmap.changes-requested", "create-roadmap");
-    const done = policy("p08.on.roadmap-approved.done", "challenge-roadmap.approved", "done");
+    const challengeRoadmap = action("p06.on.roadmap-ready.challenge-roadmap", "create-roadmap.ready", "challenge-roadmap");
+    const reworkRoadmap = action(createRoadmap.id, "challenge-roadmap.changes-requested", "create-roadmap");
+    const done = action("p08.on.roadmap-approved.done", "challenge-roadmap.approved", "done");
     const records: LoopStepRecord[] = [
       {
-        policyId: createRoadmap.id,
+        actionId: createRoadmap.id,
         index: 0,
-        policy: createRoadmap,
+        action: createRoadmap,
         outputTargets: [
           { outputId: "ready", eventType: "create-roadmap.ready", type: "event" },
           { outputId: "blocked", eventType: "create-roadmap.blocked", type: "event" }
         ]
       },
       {
-        policyId: challengeRoadmap.id,
+        actionId: challengeRoadmap.id,
         index: 1,
-        policy: challengeRoadmap,
+        action: challengeRoadmap,
         outputTargets: [
           { outputId: "approved", eventType: "challenge-roadmap.approved", type: "event" },
           { outputId: "changes-requested", eventType: "challenge-roadmap.changes-requested", type: "event" }
         ]
       },
       {
-        policyId: reworkRoadmap.id,
+        actionId: reworkRoadmap.id,
         index: 2,
-        policy: reworkRoadmap,
+        action: reworkRoadmap,
         outputTargets: [
           { outputId: "ready", eventType: "create-roadmap.ready", type: "event" },
           { outputId: "blocked", eventType: "create-roadmap.blocked", type: "event" }
         ]
       },
       {
-        policyId: done.id,
+        actionId: done.id,
         index: 3,
-        policy: done,
+        action: done,
         outputTargets: []
       }
     ];
     const layout = calculateLoopCanvasLayout({
-      loopGraph: buildLoopGraph(records),
+      loopGraph: graphFor(records),
       editingPolicyIndex: null
     });
-    const policyNodes = layout.nodes.filter((node) => node.kind === "policy");
+    const actionNodes = layout.nodes.filter((node) => node.kind === "action");
     const returnEdge = layout.edges.find((edge) => edge.eventType === "challenge-roadmap.changes-requested");
 
-    expect(policyNodes.map((node) => node.record?.policy?.action)).toEqual([
+    expect(actionNodes.map((node) => node.record?.action?.key)).toEqual([
       "create-roadmap",
       "challenge-roadmap",
       "done"
     ]);
-    expect(layout.nodes.find((node) => node.key === "policy-2")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "action-2")).toBeUndefined();
     expect(layout.nodes.filter((node) => node.kind === "output-event" && node.record?.index === 2)).toHaveLength(0);
-    expect(layout.nodes.find((node) => node.key === "policy-0")?.records?.map((record) => record.policyId)).toEqual([
+    expect(layout.nodes.find((node) => node.key === "action-0")?.records?.map((record) => record.actionId)).toEqual([
       "p05.on.project-brief-gate-approved.create-roadmap",
-      "p07.on.roadmap-rework.create-roadmap"
+      createRoadmap.id
     ]);
     expect(returnEdge).toMatchObject({
-      sourceNodeKey: "policy-1",
-      targetNodeKey: "policy-0",
+      sourceNodeKey: "action-1",
+      targetNodeKey: "action-0",
       tone: "return",
       label: "changes-requested"
     });
@@ -1031,7 +1087,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
 
     expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
       "loop:source:input-event",
-      "loop:source:policy-0",
+      "loop:source:action-0",
       "loop:source:output-event-0-approved",
       "loop:source:output-event-0-rejected"
     ]));
@@ -1053,21 +1109,24 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
     expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
       "loop:source:input-event",
-      "loop:source:policy-0",
+      "loop:source:action-0",
       "loop:target:loop"
     ]));
     expect(layout.nodes.find((node) => node.key === "loop:target:input-event")).toBeUndefined();
-    expect(layout.nodes.find((node) => node.key === "loop:target:policy-0")).toBeUndefined();
-    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:target:action-0")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toMatchObject({
+      kind: "output-event",
+      outputEvent: { outputId: "approved", outputType: "action" }
+    });
     expect(targetLoop).toMatchObject({
       kind: "loop",
       width: loopNodeSizes.loop.minWidth,
       height: loopNodeSizes.loop.height,
       loopSummary: {
         loopId: "target",
-        label: "target gate loop",
-        inputEvent: "source-gate.approved",
-        action: "target-gate"
+        label: "target start loop",
+        inputEvent: "target",
+        action: "target-start"
       }
     });
     expect(targetLoop?.y).toBeGreaterThan(sourceInputEvent?.y ?? 0);
@@ -1079,11 +1138,11 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       ) + loopCanvasLayoutConfig.selectedCompactLoopRowGap
     );
     expect(crossEdge).toMatchObject({
-      sourceNodeKey: "loop:source:policy-0",
+      sourceNodeKey: "loop:source:action-0",
       targetNodeKey: "loop:target:loop",
       sourceHandleId: "right",
       targetHandleId: "left",
-      eventType: "source-gate.approved",
+      eventType: "source.source-start.approved",
       label: "approved",
       tone: "cross-loop"
     });
@@ -1098,7 +1157,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     });
 
     expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:loop")).toMatchObject({
-      sourceNodeKey: "loop:source:policy-0",
+      sourceNodeKey: "loop:source:action-0",
       targetNodeKey: "loop:target:loop",
       sourceHandleId: "right",
       targetHandleId: "left",
@@ -1125,14 +1184,14 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       kind: "loop",
       loopSummary: {
         loopId: "upstream",
-        label: "upstream gate loop"
+        label: "upstream start loop"
       }
     });
     expect(upstreamLoop?.y).toBeLessThan(sourceInputEvent?.y ?? 0);
     expect((sourceInputEvent?.y ?? 0) - ((upstreamLoop?.y ?? 0) + loopNodeSizes.loop.height)).toBe(
       loopCanvasLayoutConfig.selectedCompactLoopRowGap
     );
-    expect(layout.nodes.find((node) => node.key === "loop:upstream:policy-0")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:upstream:action-0")).toBeUndefined();
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "loop:upstream:loop",
       targetNodeKey: "loop:source:input-event",
@@ -1162,7 +1221,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     });
 
     expect(layout.nodes.filter((node) => node.kind === "input-event")).toHaveLength(1);
-    expect(layout.nodes.filter((node) => node.kind === "policy")).toHaveLength(1);
+    expect(layout.nodes.filter((node) => node.kind === "action")).toHaveLength(1);
     expect(layout.nodes.filter((node) => node.kind === "loop")).toHaveLength(1);
     expect(layout.edges.filter((edge) => edge.tone === "cross-loop")).toHaveLength(2);
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
@@ -1172,24 +1231,29 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     const config = compositeConfig(["source", "target", "downstream"]);
     config.actions.push({
       id: "branch-gate",
+      key: "branch-gate",
+      event: "source-gate.rejected",
+      enabled: true,
       description: "Branch gate",
       outputIds: ["approved", "rejected"],
       agentIds: [],
       humanGate: true
     });
-    config.policies.push({
-      id: "branch-source",
-      source: "event",
-      event: "source-gate.rejected",
-      action: "branch-gate",
-      enabled: true
-    });
     const sourceLoop = config.loops.find((loop) => loop.id === "source");
-    sourceLoop?.steps.push("branch-source");
-    const branchPolicy = policy("branch-start", undefined, "final-gate");
+    sourceLoop?.steps.push("branch-gate");
+    const branchPolicy = action("branch-start", undefined, "final-gate");
     branchPolicy.event = "branch-gate.approved";
-    config.policies.push(branchPolicy);
+    branchPolicy.agentIds = [];
+    branchPolicy.humanGate = true;
+    config.actions.push(branchPolicy);
     config.loops.push({ id: "branch", steps: [branchPolicy.id] });
+    config.outputRoutes.push({
+      sourceLoopId: "source",
+      sourceActionId: "branch-gate",
+      outputId: "approved",
+      targetLoopId: "branch",
+      targetActionId: branchPolicy.id
+    });
     const layout = calculateCompositeLoopCanvasLayout({
       config,
       selectedLoopId: "source",
@@ -1228,9 +1292,12 @@ describe("calculateAllLoopsCanvasLayout", () => {
     expect(sourceInputEvent).toBeDefined();
     expect(targetInputEvent).toBeDefined();
     expect(observerInputEvent).toBeDefined();
-    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toMatchObject({
+      kind: "output-event",
+      outputEvent: { outputId: "approved", outputType: "action" }
+    });
     expect(crossEdge).toMatchObject({
-      sourceNodeKey: "loop:source:policy-0",
+      sourceNodeKey: "loop:source:action-0",
       targetNodeKey: "loop:target:input-event",
       sourceHandleId: "right",
       targetHandleId: "left",
@@ -1277,13 +1344,13 @@ describe("toLoopReactFlowEdges", () => {
   });
 
   it("centers return edge labels on the top or bottom return segment", () => {
-    const sourceNode = { key: "policy-2", kind: "policy" as const, x: 300, y: 120, width: 140, height: 22, direction: "horizontal" as const };
-    const topTargetNode = { key: "policy-1", kind: "policy" as const, x: 120, y: 40, width: 140, height: 22, direction: "horizontal" as const };
+    const sourceNode = { key: "action-2", kind: "action" as const, x: 300, y: 120, width: 140, height: 22, direction: "horizontal" as const };
+    const topTargetNode = { key: "action-1", kind: "action" as const, x: 120, y: 40, width: 140, height: 22, direction: "horizontal" as const };
     const bottomTargetNode = { ...topTargetNode, y: 220 };
     const baseProps = {
-      id: "event-policy-2-1-complete",
-      source: "policy-2",
-      target: "policy-1",
+      id: "event-action-2-1-complete",
+      source: "action-2",
+      target: "action-1",
       selected: false,
       sourceX: 370,
       sourceY: 120,
@@ -1296,9 +1363,9 @@ describe("toLoopReactFlowEdges", () => {
       targetY: topTargetNode.y,
       data: {
         loopEdge: {
-          key: "event-policy-2-1-complete",
-          sourceNodeKey: "policy-2",
-          targetNodeKey: "policy-1",
+          key: "event-action-2-1-complete",
+          sourceNodeKey: "action-2",
+          targetNodeKey: "action-1",
           sourceHandleId: "top",
           targetHandleId: "top",
           tone: "return"
@@ -1318,9 +1385,9 @@ describe("toLoopReactFlowEdges", () => {
       targetY: topTargetNode.y,
       data: {
         loopEdge: {
-          key: "event-policy-2-1-complete",
-          sourceNodeKey: "policy-2",
-          targetNodeKey: "policy-1",
+          key: "event-action-2-1-complete",
+          sourceNodeKey: "action-2",
+          targetNodeKey: "action-1",
           sourceHandleId: "top",
           targetHandleId: "top",
           tone: "return"
@@ -1334,9 +1401,9 @@ describe("toLoopReactFlowEdges", () => {
       targetY: bottomTargetNode.y + bottomTargetNode.height,
       data: {
         loopEdge: {
-          key: "event-policy-2-1-complete",
-          sourceNodeKey: "policy-2",
-          targetNodeKey: "policy-1",
+          key: "event-action-2-1-complete",
+          sourceNodeKey: "action-2",
+          targetNodeKey: "action-1",
           sourceHandleId: "top",
           targetHandleId: "bottom",
           tone: "return"
@@ -1349,9 +1416,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("maps loop layout edges to smart ReactFlow edges", () => {
     const [edge] = toLoopReactFlowEdges([{
-      key: "event-policy-2-1-implementation.complete",
-      sourceNodeKey: "policy-2",
-      targetNodeKey: "policy-1",
+      key: "event-action-2-1-implementation.complete",
+      sourceNodeKey: "action-2",
+      targetNodeKey: "action-1",
       sourceHandleId: "top",
       targetHandleId: "top",
       dashed: true,
@@ -1361,10 +1428,10 @@ describe("toLoopReactFlowEdges", () => {
     }]);
 
     expect(edge).toMatchObject({
-      id: "event-policy-2-1-implementation.complete",
+      id: "event-action-2-1-implementation.complete",
       type: "loopSmart",
-      source: "policy-2",
-      target: "policy-1",
+      source: "action-2",
+      target: "action-1",
       sourceHandle: "top",
       targetHandle: "top",
       selectable: false,
@@ -1395,22 +1462,22 @@ describe("toLoopReactFlowEdges", () => {
   it("maps every loop edge to SmartStepEdge", () => {
     const edges = toLoopReactFlowEdges([
       {
-        key: "policy-policy-0-1-build.complete",
-        sourceNodeKey: "policy-0",
-        targetNodeKey: "policy-1",
+        key: "action-action-0-1-build.complete",
+        sourceNodeKey: "action-0",
+        targetNodeKey: "action-1",
         sourceHandleId: "right",
         targetHandleId: "left"
       },
       {
-        key: "policy-output-event-0-done",
-        sourceNodeKey: "policy-0",
+        key: "action-output-event-0-done",
+        sourceNodeKey: "action-0",
         targetNodeKey: "output-event-0-done",
         sourceHandleId: "right",
         targetHandleId: "left"
       },
       {
-        key: "policy-output-event-0-build.failed",
-        sourceNodeKey: "policy-0",
+        key: "action-output-event-0-build.failed",
+        sourceNodeKey: "action-0",
         targetNodeKey: "output-event-0-build.failed",
         sourceHandleId: "right",
         targetHandleId: "left"
@@ -1422,9 +1489,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("maps same-loop approval edges to the green-gray output stroke", () => {
     const [edge] = toLoopReactFlowEdges([{
-      key: "policy-policy-0-1-build.complete",
-      sourceNodeKey: "policy-0",
-      targetNodeKey: "policy-1",
+      key: "action-action-0-1-build.complete",
+      sourceNodeKey: "action-0",
+      targetNodeKey: "action-1",
       sourceHandleId: "right",
       targetHandleId: "left",
       route: {
@@ -1446,9 +1513,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("maps same-loop rework edges to the red-gray output stroke", () => {
     const [edge] = toLoopReactFlowEdges([{
-      key: "policy-policy-0-1-build.failed",
-      sourceNodeKey: "policy-0",
-      targetNodeKey: "policy-1",
+      key: "action-action-0-1-build.failed",
+      sourceNodeKey: "action-0",
+      targetNodeKey: "action-1",
       sourceHandleId: "right",
       targetHandleId: "left",
       route: {
@@ -1470,8 +1537,8 @@ describe("toLoopReactFlowEdges", () => {
 
   it("keeps dashed output-event edges on the muted ghost fallback even for rework outputs", () => {
     const [edge] = toLoopReactFlowEdges([{
-      key: "policy-output-event-0-blocked",
-      sourceNodeKey: "policy-0",
+      key: "action-output-event-0-blocked",
+      sourceNodeKey: "action-0",
       targetNodeKey: "output-event-0-blocked",
       sourceHandleId: "right",
       targetHandleId: "left",
@@ -1498,7 +1565,7 @@ describe("toLoopReactFlowEdges", () => {
   it("maps cross-loop approval edges to the green-gray dotted output stroke", () => {
     const [edge] = toLoopReactFlowEdges([{
       key: "loop:source:output:0:ready:to:target:input-event",
-      sourceNodeKey: "loop:source:policy-0",
+      sourceNodeKey: "loop:source:action-0",
       targetNodeKey: "loop:target:input-event",
       sourceHandleId: "right",
       targetHandleId: "left",
@@ -1524,7 +1591,7 @@ describe("toLoopReactFlowEdges", () => {
   it("maps cross-loop rework edges to the red-gray dotted output stroke", () => {
     const [edge] = toLoopReactFlowEdges([{
       key: "loop:source:output:0:changes-requested:to:target:input-event",
-      sourceNodeKey: "loop:source:policy-0",
+      sourceNodeKey: "loop:source:action-0",
       targetNodeKey: "loop:target:input-event",
       sourceHandleId: "right",
       targetHandleId: "left",
@@ -1550,7 +1617,7 @@ describe("toLoopReactFlowEdges", () => {
   it("renders cross-loop edges as smoothstep paths", () => {
     const path = loopCrossLoopSmoothStepPath({
       id: "loop:source:output:0:ready:to:target:input-event",
-      source: "loop:source:policy-0",
+      source: "loop:source:action-0",
       target: "loop:target:input-event",
       selected: false,
       sourceX: 1000,
@@ -1562,7 +1629,7 @@ describe("toLoopReactFlowEdges", () => {
       data: {
         loopEdge: {
           key: "loop:source:output:0:ready:to:target:input-event",
-          sourceNodeKey: "loop:source:policy-0",
+          sourceNodeKey: "loop:source:action-0",
           targetNodeKey: "loop:target:input-event",
           tone: "cross-loop"
         }
@@ -1580,7 +1647,7 @@ describe("toLoopReactFlowEdges", () => {
   it("keeps cross-loop approval edges on the smoothstep loop-to-loop path", () => {
     const path = loopCrossLoopSmoothStepPath({
       id: "loop:source:output:0:approved:to:target:input-event",
-      source: "loop:source:policy-0",
+      source: "loop:source:action-0",
       target: "loop:target:input-event",
       selected: false,
       sourceX: 1000,
@@ -1592,7 +1659,7 @@ describe("toLoopReactFlowEdges", () => {
       data: {
         loopEdge: {
           key: "loop:source:output:0:approved:to:target:input-event",
-          sourceNodeKey: "loop:source:policy-0",
+          sourceNodeKey: "loop:source:action-0",
           targetNodeKey: "loop:target:input-event",
           tone: "cross-loop",
           route: { outputId: "approved" }
@@ -1622,21 +1689,21 @@ describe("toLoopReactFlowEdges", () => {
   it("marks one loop edge as animated when requested", () => {
     const edges = toLoopReactFlowEdges([
       {
-        key: "policy-policy-0-1-build.complete",
-        sourceNodeKey: "policy-0",
-        targetNodeKey: "policy-1",
+        key: "action-action-0-1-build.complete",
+        sourceNodeKey: "action-0",
+        targetNodeKey: "action-1",
         sourceHandleId: "right",
         targetHandleId: "left"
       },
       {
-        key: "policy-output-event-0-build.failed",
-        sourceNodeKey: "policy-0",
+        key: "action-output-event-0-build.failed",
+        sourceNodeKey: "action-0",
         targetNodeKey: "output-event-0-build.failed",
         sourceHandleId: "right",
         targetHandleId: "left",
         dashed: true
       }
-    ], [], undefined, "policy-output-event-0-build.failed");
+    ], [], undefined, "action-output-event-0-build.failed");
 
     expect(edges.map((edge) => edge.animated)).toEqual([false, true]);
     expect(edges[0]?.domAttributes?.["data-loop-edge-animated"]).toBe("false");

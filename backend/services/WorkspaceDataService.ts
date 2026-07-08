@@ -1,8 +1,7 @@
 import type { AppData } from "../../shared/api/workspaceData.js";
 import { loadMarkdownAppData } from "../markdown-adapter.js";
 import {
-  automationPoliciesToEventDefinitions,
-  automationPoliciesToPolicies,
+  automationActionsToEventDefinitions,
   automationRuntimesToRuntimes,
   loadProjectAutomationConfigWithIssues
 } from "../automation.js";
@@ -19,13 +18,12 @@ export class WorkspaceDataService {
     const automation = await loadProjectAutomationConfigWithIssues(this.root(), data.agents);
     data.automation = automation.config;
     data.automationIssues = automation.issues;
-    data.eventDefinitions = automationPoliciesToEventDefinitions(
-      automation.config.policies,
+    data.eventDefinitions = automationActionsToEventDefinitions(
       automation.config.actions,
       automation.config.outputs,
-      automation.config.outputRoutes
+      automation.config.outputRoutes,
+      automation.config.loops
     );
-    data.policies = automationPoliciesToPolicies(automation.config.policies, automation.config.actions);
     data.runtimes = automationRuntimesToRuntimes(automation.config.runtimes);
     data.events = this.runtimeDatabaseProvider.runtimeDatabase().listEventRecords();
     data.agentRuns = this.runtimeDatabaseProvider.runtimeDatabase().listRuns();

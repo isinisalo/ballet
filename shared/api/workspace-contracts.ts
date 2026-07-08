@@ -6,8 +6,6 @@ import type {
   ProjectHumanGateResponse,
   ProjectOutput,
   ProjectOutputRoute,
-  ProjectOutputTarget,
-  ProjectPolicy,
   ProjectLoop,
   Policy
 } from "../domain/automation.js";
@@ -89,8 +87,6 @@ export type {
   ProjectHumanGateResponse,
   ProjectOutput,
   ProjectOutputRoute,
-  ProjectOutputTarget,
-  ProjectPolicy,
   ProjectRuntime,
   ProjectLoop,
   Runtime,

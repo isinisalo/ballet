@@ -119,7 +119,6 @@ const automationTokenSchema = z.string().min(automationFieldLimits.token.min).ma
 const automationNameSchema = z.string().min(automationFieldLimits.name.min).max(automationFieldLimits.name.max);
 const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits.description.max);
 const automationOutputIdSchema = z.string().min(automationFieldLimits.outputId.min).max(automationFieldLimits.outputId.max);
-const automationEventTypeSchema = z.string().min(automationFieldLimits.eventType.min).max(automationFieldLimits.eventType.max);
 const automationLoopIdSchema = z.string().min(automationFieldLimits.loopId.min).max(automationFieldLimits.loopId.max);
 const automationPolicyIdSchema = z.string().min(automationFieldLimits.policyId.min).max(automationFieldLimits.policyId.max);
 const automationHumanGateResponseIdSchema = z.string().min(1).max(260);
@@ -128,7 +127,7 @@ const automationCommandSchema = z.string().min(automationFieldLimits.command.min
 const automationArgSchema = z.string().min(automationFieldLimits.arg.min).max(automationFieldLimits.arg.max);
 
 const projectActionSchema = z.object({
-  id: automationTokenSchema,
+  id: automationPolicyIdSchema,
   description: optionalAutomationDescriptionSchema,
   outputIds: z.array(automationOutputIdSchema),
   agentIds: z.array(z.string().min(1)),
@@ -139,24 +138,12 @@ const projectOutputSchema = z.object({
   id: automationOutputIdSchema
 }).strict();
 
-const projectOutputTargetSchema = z.object({
-  type: z.literal("policy"),
-  policyId: automationPolicyIdSchema
-}).strict();
-
 const projectOutputRouteSchema = z.object({
-  sourcePolicyId: automationPolicyIdSchema,
+  sourceLoopId: automationLoopIdSchema,
+  sourceActionId: automationPolicyIdSchema,
   outputId: automationOutputIdSchema,
-  target: projectOutputTargetSchema
-}).strict();
-
-const projectPolicySchema = z.object({
-  id: automationPolicyIdSchema,
-  loopId: automationLoopIdSchema.optional(),
-  source: z.literal("event"),
-  event: automationEventTypeSchema,
-  action: automationTokenSchema,
-  enabled: z.boolean()
+  targetLoopId: automationLoopIdSchema,
+  targetActionId: automationPolicyIdSchema
 }).strict();
 
 const projectLoopSchema = z.object({
@@ -167,8 +154,7 @@ const projectLoopSchema = z.object({
 const projectHumanGateResponseSchema = z.object({
   id: automationHumanGateResponseIdSchema,
   loopId: automationLoopIdSchema.optional(),
-  policyId: automationPolicyIdSchema,
-  actionId: automationTokenSchema,
+  actionId: automationPolicyIdSchema,
   outputId: automationOutputIdSchema,
   prompt: automationHumanGatePromptSchema,
   submittedAt: z.string()
@@ -187,7 +173,6 @@ export const automationConfigSchema = z.object({
   outputs: z.array(projectOutputSchema),
   outputRoutes: z.array(projectOutputRouteSchema),
   humanGateResponses: z.array(projectHumanGateResponseSchema),
-  policies: z.array(projectPolicySchema),
   loops: z.array(projectLoopSchema),
   runtimes: z.array(projectRuntimeSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;

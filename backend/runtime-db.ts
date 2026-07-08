@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { Agent } from "../shared/domain/agents.js";
-import type { Policy } from "../shared/domain/automation.js";
+import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { EventRecord, RuntimeEvent } from "../shared/domain/events.js";
 import type { AgentRun, AgentRunLog } from "../shared/domain/runtime.js";
 import { AgentRunStore } from "./runtime/AgentRunStore.js";
@@ -55,12 +55,12 @@ export class RuntimeDatabase {
     return this.connectionManager.health();
   }
 
-  intakeEvent(input: IntakeEventInput, policies: Policy[], agents: Agent[]): PublishEventResult {
-    return this.publishEventAndProjectPolicies(input, policies, agents);
+  intakeEvent(input: IntakeEventInput, automation: ProjectAutomationConfig, agents: Agent[]): PublishEventResult {
+    return this.publishEventAndProjectActions(input, automation, agents);
   }
 
-  publishEventAndProjectPolicies(input: IntakeEventInput, policies: Policy[], agents: Agent[]): PublishEventResult {
-    return this.projector.publishEventAndProjectPolicies(input, policies, agents);
+  publishEventAndProjectActions(input: IntakeEventInput, automation: ProjectAutomationConfig, agents: Agent[]): PublishEventResult {
+    return this.projector.publishEventAndProjectActions(input, automation, agents);
   }
 
   listRuntimeEvents(limit = 500): RuntimeEvent[] {

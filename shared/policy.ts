@@ -1,8 +1,8 @@
 import type {
   Policy,
+  PolicyRouteDecision,
   PolicyPredicate,
-  PolicyPredicateScalar,
-  RouteDecision
+  PolicyPredicateScalar
 } from "./domain/automation.js";
 import type { Agent } from "./domain/agents.js";
 import type { EventRecord } from "./domain/events.js";
@@ -147,7 +147,7 @@ export const policyMatchesEvent = (policy: Policy, event: EventRecord): boolean 
   return payloadMatches(policy, event.payload);
 };
 
-export const routeEvent = (event: EventRecord, policies: Policy[], agents: Agent[]): RouteDecision[] =>
+export const routeEvent = (event: EventRecord, policies: Policy[], agents: Agent[]): PolicyRouteDecision[] =>
   policies
     .filter((policy) => policyMatchesEvent(policy, event))
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))

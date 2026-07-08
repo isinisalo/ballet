@@ -1,24 +1,24 @@
-import type { ProjectAction, ProjectOutputRoute, ProjectPolicy } from "../../shared/domain/automation.js";
+import type { ProjectAction, ProjectOutputRoute } from "../../shared/domain/automation.js";
 import type { AgentOutcome, AgentOutputEventStatus, AgentRun } from "../../shared/domain/runtime.js";
-import { actionOutputIds, defaultPolicyOutputIds, projectOutputRouteEventType } from "../../shared/policy-actions.js";
+import { actionOutputIds, actionOutputRouteEventType, defaultActionOutputIds } from "../../shared/policy-actions.js";
 
 const terminalRunStatuses = new Set(["completed", "failed", "blocked", "needs_input", "cancelled"]);
 
 const approvalOutput = (allowedOutputIds: string[]): AgentOutputEventStatus =>
-  allowedOutputIds[0] ?? defaultPolicyOutputIds[0];
+  allowedOutputIds[0] ?? defaultActionOutputIds[0];
 
 const reworkOutput = (allowedOutputIds: string[]): AgentOutputEventStatus | undefined =>
   allowedOutputIds[1];
 
-export const allPolicyRunsTerminal = (runs: AgentRun[]): boolean =>
+export const allActionRunsTerminal = (runs: AgentRun[]): boolean =>
   runs.length > 0 && runs.every((run) => terminalRunStatuses.has(run.status));
 
 export const outcomeToOutputEventStatus = (
   outcome: AgentOutcome,
-  policy: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>
+  action: Pick<ProjectAction, "id">,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>
 ): AgentOutputEventStatus | undefined => {
-  const allowedOutputIds = actionOutputIds(actions, policy.action);
+  const allowedOutputIds = actionOutputIds(actions, action.id);
   switch (outcome.outcome) {
     case "failed":
       return reworkOutput(allowedOutputIds);
@@ -36,10 +36,10 @@ export const outcomeToOutputEventStatus = (
 
 export const aggregateActionOutputStatus = (
   runs: AgentRun[],
-  policy: Pick<ProjectPolicy, "action">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds"> & { agentIds?: string[] }>
+  action: Pick<ProjectAction, "id">,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>
 ): AgentOutputEventStatus | undefined => {
-  const allowedOutputIds = actionOutputIds(actions, policy.action);
+  const allowedOutputIds = actionOutputIds(actions, action.id);
   const outcomes = runs.map((run) => run.outcome?.outcome).filter(Boolean);
   if (runs.some((run) => run.status === "failed" || run.status === "cancelled" || run.outcome?.outcome === "failed")) {
     return reworkOutput(allowedOutputIds);
@@ -57,9 +57,8 @@ export const aggregateActionOutputStatus = (
 };
 
 export const actionOutputEventType = (
-  policy: Pick<ProjectPolicy, "id" | "action">,
+  action: Pick<ProjectAction, "id"> & { loopId?: string },
   outputId: AgentOutputEventStatus,
   outputRoutes: ProjectOutputRoute[],
   actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = [],
-  policies: Array<Pick<ProjectPolicy, "id" | "source" | "event" | "action"> & { loopId?: string }> = []
-): string => projectOutputRouteEventType(policy, outputId, outputRoutes, actions, policies);
+): string => actionOutputRouteEventType(action, outputId, outputRoutes, actions);

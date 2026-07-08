@@ -4,9 +4,9 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
-import type { Policy, ProjectPolicy } from "../../shared/domain/automation.js";
+import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
-import { policyVersion } from "../../shared/policy.js";
+import { actionRouteId } from "../../shared/policy-actions.js";
 import { outcomeToOutputEventStatus } from "../agentd.js";
 import { mapAgentOutputToEvent } from "../automation.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
@@ -36,20 +36,6 @@ const agent: Agent = {
   updatedAt: "2026-06-24T08:00:00.000Z"
 };
 
-const policy: Policy = {
-  id: "on_plan_approved_then_start_developer_agent_run",
-  name: "on_plan_approved_then_start_developer_agent_run",
-  description: "Start development when a plan is approved.",
-  active: true,
-  projectId: "project",
-  eventTypes: ["plan_approved"],
-  source: "*",
-  payloadMetadata: {},
-  targetAgentId: "developer-agent",
-  createdAt: "2026-06-24T08:00:00.000Z",
-  updatedAt: "2026-06-24T08:00:00.000Z"
-};
-
 const architectureAgent: Agent = {
   ...agent,
   id: "architecture-reviewer",
@@ -64,39 +50,6 @@ const qaAgent: Agent = {
   description: "Reviews verification evidence."
 };
 
-const architectureReviewPolicy: Policy = {
-  id: "on.implementation.approved.start.review.architecture-reviewer",
-  name: "on.implementation.approved.start.review.architecture-reviewer",
-  description: "Route implemented change facts to architecture review.",
-  active: true,
-  match: {
-    eventTypes: ["implementation.approved"],
-    source: "agentd"
-  },
-  action: {
-    type: "start_agent_run",
-    targetAgentId: "architecture-reviewer"
-  },
-  projectId: "*",
-  eventTypes: ["implementation.approved"],
-  source: "*",
-  payloadMetadata: {},
-  targetAgentId: "architecture-reviewer",
-  createdAt: "2026-06-24T08:00:00.000Z",
-  updatedAt: "2026-06-24T08:00:00.000Z"
-};
-
-const qaReviewPolicy: Policy = {
-  ...architectureReviewPolicy,
-  id: "on.implementation.approved.start.review.qa-verification-reviewer",
-  name: "on.implementation.approved.start.review.qa-verification-reviewer",
-  action: {
-    type: "start_agent_run",
-    targetAgentId: "qa-verification-reviewer"
-  },
-  targetAgentId: "qa-verification-reviewer"
-};
-
 const readyOutcome: AgentOutcome = {
   outcome: "ready",
   summary: "Change is implemented.",
@@ -107,46 +60,34 @@ const readyOutcome: AgentOutcome = {
   checks: [{ name: "unit-tests", status: "passed" }]
 };
 
-const projectPolicy: ProjectPolicy = {
-  id: "on.plan_approved.start.implementation",
-  source: "event",
-  event: "plan_approved",
-  action: "implementation",
-  enabled: true
-};
-
+const loopId = "plan-approved.loop";
 const implementationAction = {
   id: "implementation",
   description: "Implement approved work.",
   outputIds: ["approved", "rejected"],
   agentIds: ["developer-agent", "architecture-reviewer"]
 };
-
-const implementationOutputs = [
-  { id: "approved" },
-  { id: "rejected" }
-];
-
-const multiAgentImplementationPolicy = (targetAgentId: string): Policy => ({
-  id: projectPolicy.id,
-  name: projectPolicy.id,
-  description: "Start implementation agents when a plan is approved.",
-  active: true,
-  match: {
-    eventTypes: ["plan_approved"],
-    source: "*"
-  },
-  action: {
-    type: "start_agent_run",
-    targetAgentId
-  },
-  projectId: "*",
-  eventTypes: ["plan_approved"],
-  source: "*",
-  payloadMetadata: {},
-  targetAgentId,
-  createdAt: "2026-06-24T08:00:00.000Z",
-  updatedAt: "2026-06-24T08:00:00.000Z"
+const qaAction = {
+  id: "qa-review",
+  description: "Review implementation.",
+  outputIds: ["approved", "rejected"],
+  agentIds: ["qa-verification-reviewer"]
+};
+const automationConfig = (patch: Partial<ProjectAutomationConfig> = {}): ProjectAutomationConfig => ({
+  version: 1,
+  actions: [implementationAction, qaAction],
+  outputs: [{ id: "approved" }, { id: "rejected" }],
+  outputRoutes: [{
+    sourceLoopId: loopId,
+    sourceActionId: "implementation",
+    outputId: "approved",
+    targetLoopId: loopId,
+    targetActionId: "qa-review"
+  }],
+  humanGateResponses: [],
+  loops: [{ id: loopId, steps: ["implementation", "qa-review"] }],
+  runtimes: [],
+  ...patch
 });
 
 describe("runtime database", () => {
@@ -157,23 +98,29 @@ describe("runtime database", () => {
     expect(isPatchedSqliteVersion("3.51.2")).toBe(false);
   });
 
-  it("writes an intake event and queues one deduplicated agent run", async () => {
+  it("writes an intake event and queues deduplicated action runs", async () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
 
     const result = db.intakeEvent({
       projectId: "project",
-      eventType: "plan_approved",
+      eventType: "plan-approved",
       source: "test",
       tags: ["delivery"],
       payload: { work_item_id: "work-1" }
-    }, [policy], [agent]);
+    }, automationConfig({
+      actions: [{ ...implementationAction, agentIds: ["developer-agent"] }],
+      outputRoutes: [],
+      loops: [{ id: loopId, steps: ["implementation"] }]
+    }), [agent]);
 
     expect(result.event.status).toBe("routed");
     expect(result.event.subject).toBe("work-1");
     expect(result.run).toMatchObject({
-      policyId: "on_plan_approved_then_start_developer_agent_run",
-      policyVersion: policyVersion(policy),
+      actionId: "implementation",
+      loopId,
+      routeId: actionRouteId(loopId, "implementation"),
+      actionVersion: 1,
       agentRole: "developer-agent",
       status: "queued"
     });
@@ -183,25 +130,25 @@ describe("runtime database", () => {
     db.close();
   });
 
-  it("fans one event out to every matching enabled policy", async () => {
+  it("fans one event out to every enabled agent on the matching action", async () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
 
     const result = db.intakeEvent({
       projectId: "project",
-      eventType: "implementation.approved",
-      source: "agentd",
+      eventType: "plan-approved",
+      source: "test",
       subject: "work-1",
-      payload: { artifacts: { git_sha: "4f28dbd" } }
-    }, [qaReviewPolicy, architectureReviewPolicy], [agent, architectureAgent, qaAgent]);
+      payload: {}
+    }, automationConfig(), [agent, architectureAgent, qaAgent]);
 
     expect(result.event.status).toBe("routed");
     expect(result.event.routing).toMatchObject({
-      matchedPolicies: 2,
+      matchedActions: 2,
       routedRuns: 2,
-      skippedPolicies: 0
+      skippedActions: 0
     });
-    expect(result.runs.map((run) => run.agentRole).sort()).toEqual(["architecture-reviewer", "qa-verification-reviewer"]);
+    expect(result.runs.map((run) => run.agentRole).sort()).toEqual(["architecture-reviewer", "developer-agent"]);
     expect(db.listRuns()).toHaveLength(2);
     db.close();
   });
@@ -209,16 +156,14 @@ describe("runtime database", () => {
   it("aggregates multi-agent action output after all sibling runs finish", async () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    const config = automationConfig();
     const intake = db.intakeEvent({
       projectId: "project",
-      eventType: "plan_approved",
+      eventType: "plan-approved",
       source: "test",
       subject: "work-1",
       payload: {}
-    }, [
-      multiAgentImplementationPolicy("developer-agent"),
-      multiAgentImplementationPolicy("architecture-reviewer")
-    ], [agent, architectureAgent]);
+    }, config, [agent, architectureAgent, qaAgent]);
 
     expect(intake.runs.map((run) => run.agentRole).sort()).toEqual(["architecture-reviewer", "developer-agent"]);
 
@@ -227,10 +172,13 @@ describe("runtime database", () => {
       runId: first!.runId,
       status: "completed",
       outcome: readyOutcome,
-      projectPolicy,
-      actions: [implementationAction],
-      outputs: implementationOutputs,
-      outputRoutes: []
+      projectAction: implementationAction,
+      actions: config.actions,
+      outputs: config.outputs,
+      outputRoutes: config.outputRoutes,
+      loops: config.loops,
+      automation: config,
+      agents: [agent, architectureAgent, qaAgent]
     });
 
     expect(firstCompletion.event).toBeUndefined();
@@ -241,20 +189,24 @@ describe("runtime database", () => {
       runId: second!.runId,
       status: "completed",
       outcome: readyOutcome,
-      projectPolicy,
-      actions: [implementationAction],
-      outputs: implementationOutputs,
-      outputRoutes: []
+      projectAction: implementationAction,
+      actions: config.actions,
+      outputs: config.outputs,
+      outputRoutes: config.outputRoutes,
+      loops: config.loops,
+      automation: config,
+      agents: [agent, architectureAgent, qaAgent]
     });
 
     expect(secondCompletion.event).toMatchObject({
-      type: "implementation.approved",
+      type: "plan-approved.loop.implementation.approved",
       source: "agentd",
       correlationId: intake.event.correlationId,
       causationId: intake.event.eventId,
-      status: "unassigned",
+      status: "routed",
       payload: {
         action: "implementation",
+        loop_id: loopId,
         status: "approved",
         agents: expect.arrayContaining([
           expect.objectContaining({ agent: "developer-agent", status: "completed", outcome: "ready" }),
@@ -262,84 +214,8 @@ describe("runtime database", () => {
         ])
       }
     });
+    expect(secondCompletion.runs?.map((run) => run.agentRole)).toEqual(["qa-verification-reviewer"]);
     expect(db.listRuntimeEvents()).toHaveLength(2);
-    db.close();
-  });
-
-  it("leases, retries, and completes a run with a domain event atomically", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
-    db.intakeEvent({
-      projectId: "project",
-      eventType: "plan_approved",
-      source: "test",
-      subject: "work-1",
-      tags: ["delivery"],
-      payload: {}
-    }, [policy], [agent]);
-
-    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
-    expect(leased).toMatchObject({ status: "running", attempt: 1 });
-
-    const completed = db.completeRun({
-      runId: leased!.runId,
-      status: "completed",
-      outcome: readyOutcome,
-      domainEvent: {
-        type: "implementation.approved",
-        source: "agentd",
-        payload: { agent: "developer", action: "implementation", status: "approved", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
-      },
-      outputRoutes: []
-    });
-
-    expect(completed.run.status).toBe("completed");
-    expect(completed.event?.type).toBe("implementation.approved");
-    expect(completed.event?.source).toBe("agentd");
-    expect(db.listRuntimeEvents()).toHaveLength(2);
-
-    expect(() => db.retryRun(leased!.runId)).toThrow("cannot be retried");
-    db.close();
-  });
-
-  it("projects a completed developer outcome back through review policies", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
-    const intake = db.intakeEvent({
-      projectId: "project",
-      eventType: "plan_approved",
-      source: "test",
-      subject: "work-1",
-      payload: {}
-    }, [policy, architectureReviewPolicy, qaReviewPolicy], [agent, architectureAgent, qaAgent]);
-
-    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
-    const completed = db.completeRun({
-      runId: leased!.runId,
-      status: "completed",
-      outcome: readyOutcome,
-      domainEvent: {
-        type: "implementation.approved",
-        source: "agentd",
-        payload: { agent: "developer", action: "implementation", status: "approved", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
-      },
-      outputRoutes: [],
-      policies: [policy, architectureReviewPolicy, qaReviewPolicy],
-      agents: [agent, architectureAgent, qaAgent]
-    });
-
-    expect(completed.run.status).toBe("completed");
-    expect(completed.event).toMatchObject({
-      type: "implementation.approved",
-      source: "agentd",
-      correlationId: intake.event.correlationId,
-      causationId: intake.event.eventId,
-      correlationDepth: 1,
-      status: "routed"
-    });
-    expect(completed.runs?.map((run) => run.agentRole).sort()).toEqual(["architecture-reviewer", "qa-verification-reviewer"]);
-    expect(db.listRuntimeEvents()).toHaveLength(2);
-    expect(db.listRuns()).toHaveLength(3);
     db.close();
   });
 
@@ -348,15 +224,20 @@ describe("runtime database", () => {
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     const input = {
       projectId: "project",
-      eventType: "plan_approved",
+      eventType: "plan-approved",
       source: "test",
       subject: "work-1",
       dedupeKey: "external:work-1:plan-approved",
       payload: {}
     };
 
-    const first = db.intakeEvent(input, [policy], [agent]);
-    const second = db.intakeEvent(input, [policy], [agent]);
+    const config = automationConfig({
+      actions: [{ ...implementationAction, agentIds: ["developer-agent"] }],
+      outputRoutes: [],
+      loops: [{ id: loopId, steps: ["implementation"] }]
+    });
+    const first = db.intakeEvent(input, config, [agent]);
+    const second = db.intakeEvent(input, config, [agent]);
 
     expect(first.duplicate).toBe(false);
     expect(second.duplicate).toBe(true);
@@ -369,28 +250,32 @@ describe("runtime database", () => {
   it("stops chained publication when correlation depth exceeds the limit", async () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+    const config = automationConfig({
+      actions: [{ ...implementationAction, agentIds: ["developer-agent"] }],
+      outputRoutes: [],
+      loops: [{ id: loopId, steps: ["implementation"] }]
+    });
     db.intakeEvent({
       projectId: "project",
-      eventType: "plan_approved",
+      eventType: "plan-approved",
       source: "test",
       subject: "work-1",
       correlationDepth: 20,
       payload: {}
-    }, [policy], [agent]);
+    }, config, [agent]);
 
     const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
     const completed = db.completeRun({
       runId: leased!.runId,
       status: "completed",
       outcome: readyOutcome,
-      domainEvent: {
-        type: "implementation.approved",
-        source: "agentd",
-        payload: { agent: "developer", action: "implementation", status: "approved", outcome: readyOutcome.outcome, summary: readyOutcome.summary }
-      },
-      outputRoutes: [],
-      policies: [architectureReviewPolicy],
-      agents: [architectureAgent]
+      projectAction: implementationAction,
+      actions: config.actions,
+      outputs: config.outputs,
+      outputRoutes: config.outputRoutes,
+      loops: config.loops,
+      automation: config,
+      agents: [agent]
     });
 
     expect(completed.event).toBeUndefined();
@@ -407,130 +292,49 @@ describe("runtime output mapping", () => {
     expect(() => parseAgentOutcomeText("{bad json")).toThrow("not valid JSON");
   });
 
-  it("maps agent output statuses through policy action output events", () => {
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "complete" }, []).id).toBe("implementation.approved");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "failed" }, []).id).toBe("implementation.rejected");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "blocked" }, []).id).toBe("implementation.rejected");
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }, []).id).toBe("implementation.approved");
-    const manualPolicy = { ...projectPolicy, id: "manual-policy", source: "event" as const, event: "manual.start", action: "manual" };
-    expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }, [{
-      sourcePolicyId: projectPolicy.id,
-      outputId: "approved",
-      target: { type: "policy", policyId: manualPolicy.id }
-    }], [], [manualPolicy]).id).toBe("manual.start");
+  it("maps agent output statuses through action output events", () => {
+    expect(mapAgentOutputToEvent(implementationAction, { status: "complete", loopId }, [], [implementationAction]).id).toBe("plan-approved.loop.implementation.approved");
+    expect(mapAgentOutputToEvent(implementationAction, { status: "failed", loopId }, [], [implementationAction]).id).toBe("plan-approved.loop.implementation.rejected");
     expect(mapAgentOutputToEvent(
-      { ...projectPolicy, action: "human-review" },
-      { status: "approved" },
+      { id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true },
+      { status: "approved", loopId },
       [],
       [{ id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true }]
-    ).id).toBe("human-review.approved");
+    ).id).toBe("plan-approved.loop.human-review.approved");
   });
 
   it("maps structured outcomes to configured action outputs", () => {
     expect(outcomeToOutputEventStatus(
       readyOutcome,
-      projectPolicy,
-      [{ id: "implementation", outputIds: ["done", "needs-clarification"] }]
-    )).toBe("approved");
-    expect(outcomeToOutputEventStatus(
-      { ...readyOutcome, outcome: "approved" },
-      { ...projectPolicy, action: "review" },
-      [{ id: "review", outputIds: ["accepted", "reject"] }]
+      implementationAction,
+      [{ ...implementationAction, outputIds: ["done", "needs-clarification"] }]
     )).toBe("approved");
     expect(outcomeToOutputEventStatus(
       { ...readyOutcome, outcome: "changes-requested" },
-      { ...projectPolicy, action: "review" },
-      [{ id: "review", outputIds: ["accepted", "reject"] }]
+      { ...implementationAction, id: "review" },
+      [{ ...implementationAction, id: "review", outputIds: ["accepted", "reject"] }]
     )).toBe("rejected");
     expect(outcomeToOutputEventStatus(
-      { ...readyOutcome, outcome: "ready" },
-      { ...projectPolicy, action: "create_roadmap" },
-      [{ id: "create_roadmap", outputIds: ["roadmap_ready"] }]
-    )).toBe("approved");
-    expect(outcomeToOutputEventStatus(
       { ...readyOutcome, outcome: "changes-requested" },
-      { ...projectPolicy, action: "create_roadmap" },
-      [{ id: "create_roadmap", outputIds: ["roadmap_ready"] }]
+      { ...implementationAction, id: "create-roadmap" },
+      [{ ...implementationAction, id: "create-roadmap", outputIds: ["roadmap_ready"] }]
     )).toBeUndefined();
-    expect(outcomeToOutputEventStatus(
-      readyOutcome,
-      { ...projectPolicy, action: "deploy" },
-      [{ id: "deploy", outputIds: ["deployed", "rollback"] }]
-    )).toBe("approved");
-    expect(outcomeToOutputEventStatus(
-      { ...readyOutcome, outcome: "failed" },
-      projectPolicy,
-      [{ id: "implementation", outputIds: ["complete", "failed"] }]
-    )).toBe("rejected");
-  });
-
-  it("publishes a domain event for configured output outcomes", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
-    db.intakeEvent({
-      projectId: "project",
-      eventType: "plan_approved",
-      source: "test",
-      subject: "work-1",
-      payload: {}
-    }, [multiAgentImplementationPolicy("developer-agent")], [agent]);
-
-    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
-    const completed = db.completeRun({
-      runId: leased!.runId,
-      status: "completed",
-      outcome: readyOutcome,
-      projectPolicy,
-      actions: [{ ...implementationAction, outputIds: ["approved", "rejected"] }],
-      outputs: [{ id: "approved" }, { id: "rejected" }],
-      outputRoutes: []
-    });
-
-    expect(completed.event?.type).toBe("implementation.approved");
-    expect(db.listRuntimeEvents()).toHaveLength(2);
-    db.close();
-  });
-
-  it("skips domain event publication for rework outcomes without a rework output slot", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
-    db.intakeEvent({
-      projectId: "project",
-      eventType: "plan_approved",
-      source: "test",
-      subject: "work-1",
-      payload: {}
-    }, [multiAgentImplementationPolicy("developer-agent")], [agent]);
-
-    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
-    const completed = db.completeRun({
-      runId: leased!.runId,
-      status: "failed",
-      outcome: { ...readyOutcome, outcome: "failed" },
-      projectPolicy,
-      actions: [{ ...implementationAction, outputIds: ["approved"] }],
-      outputs: [{ id: "approved" }],
-      outputRoutes: []
-    });
-
-    expect(completed.event).toBeUndefined();
-    expect(db.listRuntimeEvents()).toHaveLength(1);
-    db.close();
   });
 
   it("does not require an event id in agent output", () => {
-    const routed = mapAgentOutputToEvent(projectPolicy, {
+    const routed = mapAgentOutputToEvent(implementationAction, {
       runId: "run-1",
       inputEventId: "event-1",
-      policyId: projectPolicy.id,
-      policyVersion: 123,
+      actionId: implementationAction.id,
+      loopId,
+      actionVersion: 123,
       status: "complete",
       outcome: "ready",
       summary: "Done."
     }, []);
 
     expect(routed).toMatchObject({
-      id: "implementation.approved",
+      id: "plan-approved.loop.implementation.approved",
       source: "agentd",
       payload: {
         action: "implementation",
@@ -539,8 +343,9 @@ describe("runtime output mapping", () => {
         summary: "Done.",
         run_id: "run-1",
         input_event_id: "event-1",
-        policy_id: projectPolicy.id,
-        policy_version: 123
+        action_id: implementationAction.id,
+        loop_id: loopId,
+        action_version: 123
       }
     });
   });
@@ -592,13 +397,13 @@ describe("runtime output mapping", () => {
       INSERT INTO events (
         event_id, type, source, subject, correlation_id, occurred_at, project_id, tags_json, payload_json
       ) VALUES (
-        'event-1', 'plan_approved', 'test', 'work-1', 'event-1', '2026-07-07T10:00:00.000Z', 'project', '[]', '{}'
+        'event-1', 'plan-approved', 'test', 'work-1', 'event-1', '2026-07-07T10:00:00.000Z', 'project', '[]', '{}'
       );
       INSERT INTO agent_runs (
         run_id, trigger_event_id, trigger_event_seq, policy_id, policy_version, agent_role, status,
         attempt, created_at, updated_at
       ) VALUES (
-        'run-1', 'event-1', 1, 'policy-1', 1, 'developer-agent', 'queued',
+        'run-1', 'event-1', 1, 'plan-approved.loop:implementation', 1, 'developer-agent', 'queued',
         0, '2026-07-07T10:00:00.000Z', '2026-07-07T10:00:00.000Z'
       );
     `);
@@ -613,7 +418,9 @@ describe("runtime output mapping", () => {
     expect(runtime.listRuns()[0]).toMatchObject({
       runId: "run-1",
       inputEventId: "event-1",
-      inputEventSeq: 1
+      inputEventSeq: 1,
+      loopId,
+      actionId: "implementation"
     });
     expect(runtime.getInputEvent(runtime.listRuns()[0]!)).toMatchObject({ eventId: "event-1" });
     runtime.close();

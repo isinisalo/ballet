@@ -5,7 +5,7 @@ import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
 export function loopCanvasNodeAnchorY(layoutNode: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
   if (layoutNode.kind === "input-event") return loopCanvasLayoutConfig.inputEventAnchorY;
-  if (layoutNode.kind === "policy") return loopCanvasLayoutConfig.policyAnchorY;
+  if (layoutNode.kind === "action") return loopCanvasLayoutConfig.actionAnchorY;
   return layoutNode.height / 2;
 }
 
@@ -30,24 +30,24 @@ export function loopShortestVerticalHandles(sourceNode: LoopCanvasLayoutNode, ta
   return { sourceHandleId: handleId, targetHandleId: handleId };
 }
 
-export function loopPolicyOutputHandleY(outputIndex: number, outputHandleCount: number) {
-  if (outputHandleCount <= 1) return loopCanvasLayoutConfig.policyAnchorY;
-  const firstHandleY = loopCanvasLayoutConfig.policyAnchorY;
-  const lastHandleY = loopNodeSizes.policy.height - loopCanvasLayoutConfig.edgePad / 2;
+export function loopActionOutputHandleY(outputIndex: number, outputHandleCount: number) {
+  if (outputHandleCount <= 1) return loopCanvasLayoutConfig.actionAnchorY;
+  const firstHandleY = loopCanvasLayoutConfig.actionAnchorY;
+  const lastHandleY = loopNodeSizes.action.height - loopCanvasLayoutConfig.edgePad / 2;
   const clampedIndex = Math.min(Math.max(outputIndex, 0), outputHandleCount - 1);
   return firstHandleY + (lastHandleY - firstHandleY) * (clampedIndex / (outputHandleCount - 1));
 }
 
-export function loopPolicyStackHeight() {
-  return loopNodeSizes.policy.height;
+export function loopActionStackHeight() {
+  return loopNodeSizes.action.height;
 }
 
 export function loopOutputEventNodeWidth() {
   return loopOutputNodeWidth(loopAddActionGhostLabel, loopNodeSizes.outputEvent.minWidth, loopNodeSizes.outputEvent.maxWidth);
 }
 
-export function loopPolicyNodeWidth(record: LoopStepRecord) {
-  return loopOutputNodeWidth(record.policy?.action || record.policyId || "No policy", loopNodeSizes.policy.minWidth, loopNodeSizes.policy.maxWidth);
+export function loopActionNodeWidth(record: LoopStepRecord) {
+  return loopOutputNodeWidth(record.action?.id || record.actionId || "No action", loopNodeSizes.action.minWidth, loopNodeSizes.action.maxWidth);
 }
 
 export function loopInputEventNodeWidth() {
@@ -73,15 +73,15 @@ export function outputEventStackHeight(count: number) {
 
 export function canAlignTerminalOutputEvents(outputHandleCount: number) {
   if (outputHandleCount <= 1) return true;
-  const firstHandleY = loopPolicyOutputHandleY(0, outputHandleCount);
-  const secondHandleY = loopPolicyOutputHandleY(1, outputHandleCount);
+  const firstHandleY = loopActionOutputHandleY(0, outputHandleCount);
+  const secondHandleY = loopActionOutputHandleY(1, outputHandleCount);
   const rowGap = secondHandleY - firstHandleY - loopNodeSizes.outputEvent.height;
   return rowGap >= loopNodeSizes.outputEvent.rowGap / 2;
 }
 
 export function loopBranchStackHeight(node: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
-  return node.kind === "policy"
-    ? loopPolicyStackHeight()
+  return node.kind === "action"
+    ? loopActionStackHeight()
     : node.height;
 }
 

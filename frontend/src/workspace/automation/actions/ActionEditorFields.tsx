@@ -4,13 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
+import { automationFieldLimits, automationStringValidationMessage } from "@shared/api/automationValidation";
 import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { defaultPolicyOutputIds, normalizeActionOutputSlots } from "@shared/policy-actions";
+import { defaultActionOutputIds, normalizeActionOutputSlots } from "@shared/policy-actions";
 import { Plus, ShieldCheck, X } from "lucide-react";
 import { useMemo } from "react";
-import { ActionInputField } from "./ActionInputField";
-import { actionInputSources } from "./actionInputSources";
 import { actionOutputTargetsByOutputId, type ActionOutputTarget } from "./actionOutputTargets";
 
 export function ActionEditorFields({
@@ -28,14 +26,14 @@ export function ActionEditorFields({
   const selectedOutputIds = action.outputIds ?? [];
   const humanGate = Boolean(action.humanGate);
   const outputSlotIds = humanGate || selectedAgentIds.length > 0 ? normalizeActionOutputSlots(selectedOutputIds) : [];
-  const actionIdError = automationTokenValidationMessage("Action ID", action.id);
+  const actionIdError = automationStringValidationMessage("Action ID", action.id, automationFieldLimits.policyId);
   const descriptionError = automationStringValidationMessage("Description", action.description, automationFieldLimits.description, { required: false });
   const selectableAgents = useMemo(() => agents.filter((agent) => !selectedAgentIds.includes(agent.id)), [agents, selectedAgentIds]);
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
   const fallbackOutputIds = () => {
     const availableOutputIds = config.outputs.map((output) => output.id);
-    const defaultOutputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
-    return defaultOutputIds.length === defaultPolicyOutputIds.length ? defaultOutputIds : [...defaultPolicyOutputIds];
+    const defaultOutputIds = defaultActionOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
+    return defaultOutputIds.length === defaultActionOutputIds.length ? defaultOutputIds : [...defaultActionOutputIds];
   };
   const canAddAgent = selectedAgentIds.length < 5 && selectableAgents.length > 0;
   const addAgent = (agentId: string) => {
@@ -61,13 +59,12 @@ export function ActionEditorFields({
         outputIds: agents[0]?.id ? (selectedOutputIds.length > 0 ? normalizeActionOutputSlots(selectedOutputIds) : fallbackOutputIds()) : []
       });
   };
-  const approvedOutputId = defaultPolicyOutputIds[0];
-  const rejectedOutputId = defaultPolicyOutputIds[1];
+  const approvedOutputId = defaultActionOutputIds[0];
+  const rejectedOutputId = defaultActionOutputIds[1];
   const hasRejectedOutput = outputSlotIds.includes(rejectedOutputId);
   const setRejectedOutput = (enabled: boolean) => {
     onChange({ outputIds: enabled ? [approvedOutputId, rejectedOutputId] : [approvedOutputId] });
   };
-  const inputSources = actionInputSources(config.policies, action.id);
   const outputTargetById = actionOutputTargetsByOutputId(config, action.id, outputSlotIds);
   const outputDisplayTargets = (outputId: string): ActionOutputTarget[] =>
     outputTargetById[outputId] ?? [{ type: "event", id: outputId, label: outputId }];
@@ -84,8 +81,8 @@ export function ActionEditorFields({
       <TextField
         label="Action ID"
         required
-        minLength={automationFieldLimits.token.min}
-        maxLength={automationFieldLimits.token.max}
+        minLength={automationFieldLimits.policyId.min}
+        maxLength={automationFieldLimits.policyId.max}
         error={actionIdError}
         value={action.id}
         onChange={(id) => onChange({ id })}
@@ -98,7 +95,6 @@ export function ActionEditorFields({
         value={action.description}
         onChange={(description) => onChange({ description })}
       />
-      <ActionInputField sources={inputSources} />
       <Field orientation="horizontal">
         <FieldLabel htmlFor={`${action.id || "action"}-gate`}>Human gate</FieldLabel>
         <Switch

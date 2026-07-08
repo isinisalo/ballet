@@ -186,19 +186,10 @@ export const seedData: AppData = {
     ],
     outputRoutes: [],
     humanGateResponses: [],
-    policies: [
-      {
-        id: "on.remediation.rejected.start.remediation",
-        source: "event",
-        event: "remediation.rejected",
-        action: "remediation",
-        enabled: true
-      }
-    ],
     loops: [
       {
-        id: "deployment-response",
-        steps: ["on.remediation.rejected.start.remediation"]
+        id: "remediation.rejected.loop",
+        steps: ["remediation"]
       }
     ],
     runtimes: [

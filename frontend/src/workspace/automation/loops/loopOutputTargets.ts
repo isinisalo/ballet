@@ -1,18 +1,31 @@
-import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
+import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import {
+  actionOutputEventType,
   actionOutputIds,
-  projectOutputRouteEventType
+  findActionOutputRoute
 } from "@shared/policy-actions";
 import type { LoopOutputTarget } from "./loopGraph";
 
 export function loopOutputTargetsForPolicy(
   config: ProjectAutomationConfig,
-  policy: ProjectPolicy
+  action: ProjectAction,
+  loopId: string
 ): LoopOutputTarget[] {
-  return actionOutputIds(config.actions, policy.action).map((outputId) => {
+  return actionOutputIds(config.actions, action.id).map((outputId) => {
+    const route = findActionOutputRoute(config.outputRoutes, loopId, action.id, outputId);
+    const eventType = actionOutputEventType({ loopId, actionId: action.id }, outputId);
+    if (route) {
+      return {
+        outputId,
+        eventType,
+        type: "action",
+        targetLoopId: route.targetLoopId,
+        targetActionId: route.targetActionId
+      };
+    }
     return {
       outputId,
-      eventType: projectOutputRouteEventType(policy, outputId, config.outputRoutes, config.actions, config.policies),
+      eventType,
       type: "event"
     };
   });

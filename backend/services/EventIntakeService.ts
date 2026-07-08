@@ -36,7 +36,7 @@ export class EventIntakeService {
       tags: input.tags,
       payload: input.payload,
       body: input.body
-    }, data.policies, data.agents);
+    }, data.automation, data.agents);
     notifyRuntimeChanged("events");
     if (result.runs.length > 0) notifyRuntimeChanged("agent-runs");
     return result.event;

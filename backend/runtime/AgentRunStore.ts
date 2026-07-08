@@ -137,22 +137,22 @@ export class AgentRunStore {
     return rows.map(toAgentRun);
   }
 
-  getRunsForPolicyInputEvent(inputEventId: string, policyId: string): AgentRun[] {
+  getRunsForActionInputEvent(inputEventId: string, routeId: string): AgentRun[] {
     const rows = this.connection().prepare(`
       SELECT *
       FROM agent_runs
       WHERE input_event_id = ? AND policy_id = ?
       ORDER BY created_at ASC, run_id ASC
-    `).all(inputEventId, policyId) as AgentRunRow[];
+    `).all(inputEventId, routeId) as AgentRunRow[];
     return rows.map(toAgentRun);
   }
 
-  getRunByDedupe(inputEventId: string, policyId: string, policyVersion: number, agentRole: string): AgentRun | undefined {
+  getRunByDedupe(inputEventId: string, routeId: string, actionVersion: number, agentRole: string): AgentRun | undefined {
     const row = this.connection().prepare(`
       SELECT *
       FROM agent_runs
       WHERE input_event_id = ? AND policy_id = ? AND policy_version = ? AND agent_role = ?
-    `).get(inputEventId, policyId, policyVersion, agentRole) as AgentRunRow | undefined;
+    `).get(inputEventId, routeId, actionVersion, agentRole) as AgentRunRow | undefined;
     return row ? toAgentRun(row) : undefined;
   }
 }

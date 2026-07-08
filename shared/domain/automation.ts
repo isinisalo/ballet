@@ -23,34 +23,18 @@ export interface ProjectOutput {
 export interface ProjectHumanGateResponse {
   id: string;
   loopId?: string;
-  policyId: string;
   actionId: string;
   outputId: string;
   prompt: string;
   submittedAt: string;
 }
 
-export type ProjectOutputTarget = {
-  type: "policy";
-  policyId: string;
-};
-
 export interface ProjectOutputRoute {
-  sourcePolicyId: string;
+  sourceLoopId: string;
+  sourceActionId: string;
   outputId: string;
-  target: ProjectOutputTarget;
-}
-
-// ProjectPolicy is the persisted loop handler/transition binding: it connects an
-// input source to a project action. Runtime policies are projected from this
-// shape plus the selected action agents.
-export interface ProjectPolicy {
-  id: string;
-  loopId?: string;
-  source: "event";
-  event: string;
-  action: string;
-  enabled: boolean;
+  targetLoopId: string;
+  targetActionId: string;
 }
 
 export interface ProjectLoop {
@@ -64,7 +48,6 @@ export interface ProjectAutomationConfig {
   outputs: ProjectOutput[];
   outputRoutes: ProjectOutputRoute[];
   humanGateResponses: ProjectHumanGateResponse[];
-  policies: ProjectPolicy[];
   loops: ProjectLoop[];
   runtimes: ProjectRuntime[];
 }
@@ -75,7 +58,6 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   outputs: defaultProjectOutputs(),
   outputRoutes: [],
   humanGateResponses: [],
-  policies: [],
   loops: [],
   runtimes: []
 });
@@ -104,10 +86,11 @@ export interface PolicyAction {
   targetAgentId: string;
 }
 
-export interface EventRoutingPolicyDecision {
-  policyId: string;
-  policyName: string;
-  policyVersion: number;
+export interface EventRoutingActionDecision {
+  actionId: string;
+  loopId: string;
+  routeId: string;
+  actionVersion: number;
   targetAgentId: string;
   status: "routed" | "skipped";
   runId?: string;
@@ -115,10 +98,10 @@ export interface EventRoutingPolicyDecision {
 }
 
 export interface EventRoutingSummary {
-  matchedPolicies: number;
+  matchedActions: number;
   routedRuns: number;
-  skippedPolicies: number;
-  decisions: EventRoutingPolicyDecision[];
+  skippedActions: number;
+  decisions: EventRoutingActionDecision[];
   message: string;
 }
 
@@ -144,6 +127,17 @@ export interface Policy {
 }
 
 export interface RouteDecision {
+  actionId: string;
+  loopId: string;
+  routeId: string;
+  actionVersion: number;
+  targetAgentId: string;
+  status: "routed" | "skipped";
+  runId?: string;
+  reason: string;
+}
+
+export interface PolicyRouteDecision {
   policyId: string;
   policyName: string;
   policyVersion: number;

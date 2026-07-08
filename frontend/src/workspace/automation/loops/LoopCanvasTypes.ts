@@ -1,6 +1,6 @@
 import type { PointerEvent, RefObject } from "react";
 import type { Edge, Node } from "@xyflow/react";
-import type { ProjectAction, ProjectPolicy } from "@shared/api/workspace-contracts";
+import type { ProjectAction } from "@shared/api/workspace-contracts";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopCanvasEdge, LoopCanvasLayout, LoopCanvasLayoutNode } from "./loopLayout";
 
@@ -9,11 +9,10 @@ export type LoopCanvasOption = { value: string; label: string; description?: str
 export type LoopCanvasProps = {
   layout: LoopCanvasLayout;
   selectedLoopId: string;
-  policyById: Map<string, ProjectPolicy>;
   actionById: Map<string, ProjectAction>;
-  firstPolicy?: ProjectPolicy;
+  firstAction?: ProjectAction;
   noSelectionValue: string;
-  policyOptions: LoopCanvasOption[];
+  stepActionOptions: LoopCanvasOption[];
   actionOptions: LoopCanvasOption[];
   draggedStepIndex: number | null;
   dragOverStepIndex: number | null;
@@ -21,18 +20,18 @@ export type LoopCanvasProps = {
   canvasHeight: number | null;
   isCanvasPanning: boolean;
   loopCanvasRef: RefObject<HTMLDivElement>;
-  canAddFirstPolicy: boolean;
-  canAddPolicyForEvent: (policy?: ProjectPolicy) => boolean;
+  canAddFirstAction: boolean;
+  canAddActionForEvent: (action?: ProjectAction) => boolean;
   onStepPointerDown: (event: PointerEvent<HTMLDivElement>, loopId: string, index: number) => void;
   onStepPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onStepPointerUp: (event: PointerEvent<HTMLDivElement>) => boolean;
   onStepPointerCancel: () => void;
   onCanvasMoveStart: () => void;
   onCanvasMoveEnd: () => void;
-  onPolicyChange: (loopId: string, index: number, policyId: string) => void;
+  onActionChange: (loopId: string, index: number, actionId: string) => void;
   onActionStepSelect: (records: LoopStepRecord[]) => void;
   onOutputHandlerSelect: (edge: LoopCanvasEdge) => void;
-  onAddPolicyStep: (eventType?: string, sourcePolicy?: ProjectPolicy) => void;
+  onAddActionStep: (eventType?: string, sourceAction?: ProjectAction) => void;
 };
 
 export type LoopNodeContext = Omit<LoopCanvasProps, "layout" | "canvasHeight" | "isCanvasPanning" | "loopCanvasRef" | "onCanvasMoveStart" | "onCanvasMoveEnd">;

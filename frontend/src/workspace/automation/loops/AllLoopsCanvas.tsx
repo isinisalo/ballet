@@ -11,12 +11,11 @@ const allLoopsReadOnlyId = "__all_loops__";
 const noSelection = "__none__";
 
 export function AllLoopsCanvas({ config }: { config: ProjectAutomationConfig }) {
-  const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
   const actionById = useMemo(() => new Map(config.actions.map((action) => [action.id, action])), [config.actions]);
-  const policyOptions = useMemo(() => [
-    { value: noSelection, label: "No policy" },
-    ...config.policies.map((policy) => ({ value: policy.id, label: policy.id }))
-  ], [config.policies]);
+  const stepActionOptions = useMemo(() => [
+    { value: noSelection, label: "No action" },
+    ...config.actions.map((action) => ({ value: action.id, label: action.id }))
+  ], [config.actions]);
   const actionOptions = useMemo(() => [
     { value: noSelection, label: "No action" },
     ...config.actions.map((action) => ({
@@ -25,7 +24,7 @@ export function AllLoopsCanvas({ config }: { config: ProjectAutomationConfig }) 
       description: action.description
     }))
   ], [config.actions]);
-  const recordsByLoopId = useMemo(() => loopStepRecordsByLoopId(config, policyById), [config, policyById]);
+  const recordsByLoopId = useMemo(() => loopStepRecordsByLoopId(config, actionById), [config, actionById]);
   const layout = useMemo(() => calculateAllLoopsCanvasLayout({
     config,
     recordsByLoopId,
@@ -42,10 +41,9 @@ export function AllLoopsCanvas({ config }: { config: ProjectAutomationConfig }) 
     <LoopCanvas
       layout={layout}
       selectedLoopId={allLoopsReadOnlyId}
-      policyById={policyById}
       actionById={actionById}
       noSelectionValue={noSelection}
-      policyOptions={policyOptions}
+      stepActionOptions={stepActionOptions}
       actionOptions={actionOptions}
       draggedStepIndex={canvasInteraction.draggedStepIndex}
       dragOverStepIndex={canvasInteraction.dragOverStepIndex}
@@ -53,35 +51,35 @@ export function AllLoopsCanvas({ config }: { config: ProjectAutomationConfig }) 
       canvasHeight={canvasInteraction.canvasHeight}
       isCanvasPanning={canvasInteraction.isCanvasPanning}
       loopCanvasRef={canvasInteraction.loopCanvasRef}
-      canAddFirstPolicy={false}
-      canAddPolicyForEvent={() => false}
+      canAddFirstAction={false}
+      canAddActionForEvent={() => false}
       onStepPointerDown={canvasInteraction.handleStepPointerDown}
       onStepPointerMove={canvasInteraction.handleStepPointerMove}
       onStepPointerUp={canvasInteraction.handleStepPointerUp}
       onStepPointerCancel={canvasInteraction.resetStepDrag}
       onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
       onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-      onPolicyChange={() => undefined}
+      onActionChange={() => undefined}
       onActionStepSelect={() => undefined}
       onOutputHandlerSelect={() => undefined}
-      onAddPolicyStep={() => undefined}
+      onAddActionStep={() => undefined}
     />
   );
 }
 
 function loopStepRecordsByLoopId(
   config: ProjectAutomationConfig,
-  policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>
+  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>
 ) {
   return new Map(config.loops.map((loop) => {
-    const records: LoopStepRecord[] = loop.steps.map((policyId, index) => {
-      const policy = policyById.get(policyId);
-      const outputTargets = policy ? loopOutputTargetsForPolicy(config, policy) : undefined;
+    const records: LoopStepRecord[] = loop.steps.map((actionId, index) => {
+      const action = actionById.get(actionId);
+      const outputTargets = action ? loopOutputTargetsForPolicy(config, action, loop.id) : undefined;
       return {
-        policyId,
+        actionId,
         index,
         loopId: loop.id,
-        policy,
+        action,
         outputEvents: outputTargets?.map((output) => output.eventType),
         outputTargets
       };

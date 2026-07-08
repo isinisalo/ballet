@@ -48,7 +48,6 @@ export const compactProjectAutomationConfigForSave = (
     ...(isDefaultProjectOutputs(config.outputs) ? {} : { outputs: config.outputs }),
     outputRoutes: config.outputRoutes,
     humanGateResponses: config.humanGateResponses,
-    policies: config.policies,
     loops: config.loops,
     runtimes: config.runtimes
   };

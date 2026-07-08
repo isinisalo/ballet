@@ -1,44 +1,44 @@
-import type { ProjectAction, ProjectOutputRoute, ProjectPolicy } from "../../shared/domain/automation.js";
+import type { ProjectAction, ProjectOutputRoute } from "../../shared/domain/automation.js";
 import type { RoutedEvent } from "../../shared/domain/events.js";
 import type { AgentRunOutput } from "../../shared/domain/runtime.js";
-import { actionOutputIds, actionOutputSlotKind, defaultPolicyOutputIds, normalizePolicyToken, projectOutputRouteEventType } from "../../shared/policy-actions.js";
+import { actionOutputIds, actionOutputRouteEventType, actionOutputSlotKind, defaultActionOutputIds, normalizeActionToken } from "../../shared/policy-actions.js";
 
 const canonicalOutputStatus = (
   status: string,
-  policy: Pick<ProjectPolicy, "action">,
+  action: Pick<ProjectAction, "id">,
   actions: ProjectAction[]
 ): string => {
-  const allowedOutputIds = actionOutputIds(actions, policy.action);
-  const normalizedStatus = normalizePolicyToken(status);
+  const allowedOutputIds = actionOutputIds(actions, action.id);
+  const normalizedStatus = normalizeActionToken(status);
   if (allowedOutputIds.includes(normalizedStatus)) return normalizedStatus;
   const slot = actionOutputSlotKind(normalizedStatus);
-  if (slot === "approval") return allowedOutputIds[0] ?? defaultPolicyOutputIds[0];
-  if (slot === "rework") return allowedOutputIds[1] ?? defaultPolicyOutputIds[1];
-  return allowedOutputIds[0] ?? defaultPolicyOutputIds[0];
+  if (slot === "approval") return allowedOutputIds[0] ?? defaultActionOutputIds[0];
+  if (slot === "rework") return allowedOutputIds[1] ?? defaultActionOutputIds[1];
+  return allowedOutputIds[0] ?? defaultActionOutputIds[0];
 };
 
 export function mapAgentOutputToEvent(
-  policy: ProjectPolicy,
+  action: ProjectAction,
   output: AgentRunOutput,
   outputRoutes: ProjectOutputRoute[],
   actions: ProjectAction[] = [],
-  policies: ProjectPolicy[] = []
 ): RoutedEvent {
-  const status = canonicalOutputStatus(output.status, policy, actions);
+  const status = canonicalOutputStatus(output.status, action, actions);
   return {
-    id: projectOutputRouteEventType(policy, status, outputRoutes, actions, policies),
+    id: actionOutputRouteEventType({ ...action, loopId: output.loopId }, status, outputRoutes, actions),
     source: "agentd",
     timestamp: new Date().toISOString(),
     payload: {
-      action: policy.action,
+      action: action.id,
       status,
       ...(output.agent ? { agent: output.agent } : {}),
       ...(output.outcome ? { outcome: output.outcome } : {}),
       ...(output.summary ? { summary: output.summary } : {}),
       ...(output.runId ? { run_id: output.runId } : {}),
       ...(output.inputEventId ? { input_event_id: output.inputEventId } : {}),
-      ...(output.policyId ? { policy_id: output.policyId } : {}),
-      ...(output.policyVersion ? { policy_version: output.policyVersion } : {}),
+      ...(output.actionId ? { action_id: output.actionId } : {}),
+      ...(output.loopId ? { loop_id: output.loopId } : {}),
+      ...(output.actionVersion ? { action_version: output.actionVersion } : {}),
       ...(output.payload ? { payload: output.payload } : {})
     }
   };

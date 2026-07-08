@@ -31,8 +31,9 @@ export interface AgentRunOutput {
   outcome?: AgentOutcomeStatus;
   summary?: string;
   inputEventId?: string;
-  policyId?: string;
-  policyVersion?: number;
+  actionId?: string;
+  loopId?: string;
+  actionVersion?: number;
   payload?: Record<string, unknown>;
   raw?: unknown;
 }
@@ -58,8 +59,10 @@ export interface AgentRun {
   runId: string;
   inputEventId: string;
   inputEventSeq?: number;
-  policyId: string;
-  policyVersion: number;
+  actionId: string;
+  loopId: string;
+  routeId: string;
+  actionVersion: number;
   agentRole: string;
   status: AgentRunStatus;
   attempt: number;

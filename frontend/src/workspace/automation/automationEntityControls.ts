@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { defaultPolicyOutputIds } from "@shared/policy-actions";
+import { defaultActionOutputIds } from "@shared/policy-actions";
 import { automationSectionPath } from "../routing";
 import type { AutomationTab } from "../types";
 import { uniqueAutomationId } from "./automationUtils";
@@ -41,8 +41,8 @@ const addEntityConfig = (
           const id = uniqueAutomationId("new-action", draft.actions.map((action) => action.id));
           setDraft((current) => {
             const availableOutputIds = current.outputs.map((output) => output.id);
-            const outputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
-            const selectedOutputIds = outputIds.length === defaultPolicyOutputIds.length ? outputIds : [...defaultPolicyOutputIds];
+            const outputIds = defaultActionOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
+            const selectedOutputIds = outputIds.length === defaultActionOutputIds.length ? outputIds : [...defaultActionOutputIds];
             const outputs = [...current.outputs];
             selectedOutputIds.forEach((outputId) => {
               if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
@@ -92,6 +92,13 @@ const deleteEntityConfig = (
           setDraft((current) => ({
             ...current,
             actions: current.actions.filter((action) => action.id !== selected.id),
+            outputRoutes: current.outputRoutes.filter((route) =>
+              route.sourceActionId !== selected.id && route.targetActionId !== selected.id
+            ),
+            loops: current.loops.map((loop) => ({
+              ...loop,
+              steps: loop.steps.filter((step) => step !== selected.id)
+            })),
             humanGateResponses: current.humanGateResponses.filter((response) => response.actionId !== selected.id)
           }));
           selectAutomationEntity("actions", nextId);
@@ -111,6 +118,9 @@ const deleteEntityConfig = (
           setDraft((current) => ({
             ...current,
             loops: current.loops.filter((loop) => loop.id !== selected.id),
+            outputRoutes: current.outputRoutes.filter((route) =>
+              route.sourceLoopId !== selected.id && route.targetLoopId !== selected.id
+            ),
             humanGateResponses: current.humanGateResponses.filter((response) => response.loopId !== selected.id)
           }));
           selectAutomationEntity("loops", nextId);

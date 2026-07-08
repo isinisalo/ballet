@@ -1,86 +1,93 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { loopIdForPolicy } from "@shared/policy-actions";
 import { describe, expect, it } from "vitest";
 import { loopOutputHandlerForOutput } from "../src/workspace/automation/loops/loopOutputHandlers";
 
-const loopId = loopIdForPolicy({ event: "manual-start" });
-const returnLoopId = loopIdForPolicy({ event: "manual-rework" });
+const loopId = "delivery.loop";
+const returnLoopId = "return.loop";
 
 const config = (): ProjectAutomationConfig => ({
   version: 1,
   actions: [
-    { id: "build", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
+    { id: "start", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
     { id: "review", description: "Review.", outputIds: ["approved", "changes-requested"], agentIds: ["agent-1"] },
     { id: "human-review", description: "Human review.", outputIds: ["approved", "changes-requested"], agentIds: [], humanGate: true },
+    { id: "return-start", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
+    { id: "rework", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
     { id: "done", description: "Done.", outputIds: [], agentIds: [] }
   ],
   outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes-requested" }],
   outputRoutes: [{
-    sourcePolicyId: "review-policy",
+    sourceLoopId: loopId,
+    sourceActionId: "start",
+    outputId: "ready",
+    targetLoopId: loopId,
+    targetActionId: "review"
+  }, {
+    sourceLoopId: returnLoopId,
+    sourceActionId: "review",
+    outputId: "changes-requested",
+    targetLoopId: returnLoopId,
+    targetActionId: "rework"
+  }, {
+    sourceLoopId: loopId,
+    sourceActionId: "review",
     outputId: "approved",
-    target: { type: "policy", policyId: "done-policy" }
+    targetLoopId: loopId,
+    targetActionId: "done"
   }],
   humanGateResponses: [],
-  policies: [
-    { id: "start-policy", source: "event", event: "manual-start", action: "build", enabled: true },
-    { id: "review-policy", source: "event", event: "build.ready", action: "review", enabled: true },
-    { id: "human-review-policy", source: "event", event: "review.approved", action: "human-review", enabled: true },
-    { id: "return-start-policy", source: "event", event: "manual-rework", action: "build", enabled: true },
-    { id: "rework-policy", source: "event", event: "review.changes-requested", action: "build", enabled: true },
-    { id: "done-policy", source: "event", event: "external.approved", action: "done", enabled: true }
-  ],
   loops: [{
     id: loopId,
-    steps: ["start-policy", "review-policy", "done-policy"]
+    steps: ["start", "review", "done"]
   }, {
     id: returnLoopId,
-    steps: ["return-start-policy", "rework-policy", "review-policy"]
+    steps: ["return-start", "rework", "review"]
   }],
   runtimes: []
 });
 
 describe("loopOutputHandlerForOutput", () => {
-  it("finds the next event-policy action for an output event", () => {
-    expect(loopOutputHandlerForOutput(config(), loopId, "start-policy", "ready")).toEqual({
+  it("finds the next action handler for an output route", () => {
+    expect(loopOutputHandlerForOutput(config(), loopId, "start", "ready")).toEqual({
       type: "action",
       outputId: "ready",
-      eventType: "build.ready",
-      policyId: "review-policy",
-      stepIndex: 1,
+      eventType: "delivery.loop.start.ready",
       actionId: "review",
+      loopId,
+      stepIndex: 1,
       label: "review"
     });
   });
 
-  it("finds an earlier return handler action for a rework output", () => {
-    expect(loopOutputHandlerForOutput(config(), returnLoopId, "review-policy", "changes-requested")).toEqual({
+  it("finds an earlier return handler action for a rework route", () => {
+    expect(loopOutputHandlerForOutput(config(), returnLoopId, "review", "changes-requested")).toEqual({
       type: "action",
       outputId: "changes-requested",
-      eventType: "review.changes-requested",
-      policyId: "rework-policy",
+      eventType: "return.loop.review.changes-requested",
+      actionId: "rework",
+      loopId: returnLoopId,
       stepIndex: 1,
-      actionId: "build",
-      label: "build"
+      label: "rework"
     });
   });
 
-  it("uses custom output route event types", () => {
-    expect(loopOutputHandlerForOutput(config(), loopId, "review-policy", "approved")).toEqual({
+  it("uses custom scoped output route target actions", () => {
+    expect(loopOutputHandlerForOutput(config(), loopId, "review", "approved")).toEqual({
       type: "action",
       outputId: "approved",
-      eventType: "external.approved",
-      policyId: "done-policy",
-      stepIndex: 2,
+      eventType: "delivery.loop.review.approved",
       actionId: "done",
+      loopId,
+      stepIndex: 2,
       label: "done"
     });
   });
 
   it("returns undefined for human gate approval outputs without a loop handler", () => {
-    expect(loopOutputHandlerForOutput(config(), loopId, "human-review-policy", "approved")).toBeUndefined();
+    expect(loopOutputHandlerForOutput(config(), loopId, "human-review", "approved")).toBeUndefined();
   });
 
   it("returns undefined when an output has no loop handler", () => {
-    expect(loopOutputHandlerForOutput(config(), loopId, "start-policy", "blocked")).toBeUndefined();
+    expect(loopOutputHandlerForOutput(config(), loopId, "start", "blocked")).toBeUndefined();
   });
 });

@@ -24,7 +24,7 @@ export function LoopOutputHandlerControls({
       {outputIds.length > 0 ? (
         <div className="flex flex-col gap-2">
           {outputIds.map((outputId) => {
-            const handler = loopOutputHandlerForOutput(config, route.loopId, route.policyId, outputId);
+            const handler = loopOutputHandlerForOutput(config, route.loopId, route.actionId, outputId);
             return (
               <div key={outputId} className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] items-center gap-2">
                 <span className={`min-w-0 truncate font-mono text-xs ${loopOutputTokenClassName(outputId)}`} title={outputId}>
@@ -34,7 +34,7 @@ export function LoopOutputHandlerControls({
                   <Select
                     value={handler.actionId}
                     items={config.actions.map((option) => ({ value: option.id, label: option.id }))}
-                    onValueChange={(actionId) => onOutputHandlerActionChange(route.loopId, handler.stepIndex, actionId)}
+                    onValueChange={(actionId) => onOutputHandlerActionChange(handler.loopId, handler.stepIndex, actionId)}
                   >
                     <SelectTrigger
                       size="sm"

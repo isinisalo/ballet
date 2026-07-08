@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { Agent, ProjectAutomationConfig, ProjectPolicy, ProjectLoop } from "@shared/api/workspace-contracts";
-import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage, normalizeAutomationToken } from "@shared/api/automationValidation";
-import { defaultPolicyOutputIds, loopIdForPolicy } from "@shared/policy-actions";
+import type { Agent, ProjectAutomationConfig, ProjectAction, ProjectLoop } from "@shared/api/workspace-contracts";
+import { automationFieldLimits, automationLoopIdValidationMessage, automationStringValidationMessage, normalizeAutomationLoopId, normalizeAutomationToken } from "@shared/api/automationValidation";
+import { defaultActionOutputIds } from "@shared/policy-actions";
 import type { AutomationTab } from "../types";
 
 type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
 
 type AutomationCreateDrafts = {
-  action: { id: string; description: string; outputIds: string[]; agentIds: string[]; humanGate: boolean };
+  action: ProjectAction;
   loop: ProjectLoop;
 };
 
@@ -28,7 +28,13 @@ export function useAutomationCreateDrafts({
   selectAutomationEntity: SelectAutomationEntity;
   isCreateMode: boolean;
 }) {
-  const [newAction, setNewAction] = useState({ id: "", description: "", outputIds: [] as string[], agentIds: [] as string[], humanGate: false });
+  const [newAction, setNewAction] = useState<ProjectAction>({
+    id: "",
+    description: "",
+    outputIds: [],
+    agentIds: [],
+    humanGate: false
+  });
   const [newLoop, setNewLoop] = useState({ id: "", steps: [] as string[] });
   const createDraftsRef = useRef<AutomationCreateDrafts>({
     action: newAction,
@@ -44,14 +50,14 @@ export function useAutomationCreateDrafts({
 
   useEffect(() => {
     updateNewAction({
-      outputIds: newAction.outputIds.length > 0 ? newAction.outputIds : defaultActionOutputIds(draft),
+      outputIds: newAction.outputIds.length > 0 ? newAction.outputIds : defaultOutputIdsForDraft(draft),
       agentIds: newAction.agentIds.length > 0 ? newAction.agentIds : agents.slice(0, 1).map((agent) => agent.id)
     });
   }, [agents, draft.outputs]);
 
   useEffect(() => {
     setNewLoop((current) => syncDraft(createDraftsRef, "loop", loopCreateDraftWithDefaultEvent(draft, current)));
-  }, [draft.policies, draft.loops]);
+  }, [draft.actions, draft.loops]);
 
   const saveAutomationFromHeader = async () => {
     if (!isCreateMode) {
@@ -90,59 +96,52 @@ const syncDraft = <K extends keyof AutomationCreateDrafts>(
 };
 
 const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): AutomationCreateDrafts => ({
-  action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id), humanGate: false },
+  action: {
+    id: "",
+    description: "",
+    outputIds: defaultOutputIdsForDraft(draft),
+    agentIds: agents.slice(0, 1).map((agent) => agent.id),
+    humanGate: false
+  },
   loop: loopCreateDraftWithDefaultEvent(draft, { id: "", steps: [] })
 });
 
-const loopStartingEventPolicy = (draft: ProjectAutomationConfig, loop: Pick<ProjectLoop, "steps">): ProjectPolicy | undefined => {
-  const firstPolicyId = loop.steps[0] ?? "";
-  return draft.policies.find((policy) => policy.id === firstPolicyId && policy.source === "event" && Boolean(policy.event));
+const loopStartingAction = (draft: ProjectAutomationConfig, loop: Pick<ProjectLoop, "steps">): ProjectAction | undefined => {
+  const firstActionId = loop.steps[0] ?? "";
+  return draft.actions.find((action) => action.id === firstActionId);
 };
 
-const usedLoopStartingPolicyIds = (draft: ProjectAutomationConfig): Set<string> => {
-  const policyById = new Map(draft.policies.map((policy) => [policy.id, policy]));
-  return new Set(draft.loops.flatMap((loop) => {
-    const firstPolicy = policyById.get(loop.steps[0] ?? "");
-    return firstPolicy?.source === "event" ? [firstPolicy.id] : [];
-  }));
-};
-
-const firstUnusedEventPolicy = (draft: ProjectAutomationConfig): ProjectPolicy | undefined => {
-  const usedPolicyIds = usedLoopStartingPolicyIds(draft);
-  return draft.policies.find((policy) =>
-    policy.source === "event" &&
-    Boolean(policy.event) &&
-    !usedPolicyIds.has(policy.id)
-  );
+const firstUnusedEventAction = (draft: ProjectAutomationConfig): ProjectAction | undefined => {
+  return draft.actions[0];
 };
 
 const loopCreateDraftWithDerivedId = (draft: ProjectAutomationConfig, loop: ProjectLoop): ProjectLoop => {
-  const eventPolicy = loopStartingEventPolicy(draft, loop);
-  const id = loop.id || loopIdForPolicy(eventPolicy);
+  const eventAction = loopStartingAction(draft, loop);
+  const id = normalizeAutomationLoopId(loop.id);
   return {
     ...loop,
     id,
-    steps: eventPolicy ? [eventPolicy.id] : []
+    steps: eventAction ? [eventAction.id] : []
   };
 };
 
 const loopCreateDraftWithDefaultEvent = (draft: ProjectAutomationConfig, loop: ProjectLoop): ProjectLoop => {
-  const selectedPolicy = loopStartingEventPolicy(draft, loop);
-  if (selectedPolicy && !usedLoopStartingPolicyIds(draft).has(selectedPolicy.id)) {
+  const selectedAction = loopStartingAction(draft, loop);
+  if (selectedAction) {
     return loopCreateDraftWithDerivedId(draft, loop);
   }
-  const eventPolicy = firstUnusedEventPolicy(draft);
+  const eventAction = firstUnusedEventAction(draft);
   return loopCreateDraftWithDerivedId(draft, {
     ...loop,
     id: "",
-    steps: eventPolicy ? [eventPolicy.id] : []
+    steps: eventAction ? [eventAction.id] : []
   });
 };
 
-const defaultActionOutputIds = (draft: ProjectAutomationConfig): string[] => {
+const defaultOutputIdsForDraft = (draft: ProjectAutomationConfig): string[] => {
   const availableOutputIds = draft.outputs.map((output) => output.id);
-  const defaultOutputIds = defaultPolicyOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
-  return defaultOutputIds.length === defaultPolicyOutputIds.length ? defaultOutputIds : [...defaultPolicyOutputIds];
+  const defaultOutputIds = defaultActionOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
+  return defaultOutputIds.length === defaultActionOutputIds.length ? defaultOutputIds : [...defaultActionOutputIds];
 };
 
 const createDraftWithNewEntity = (
@@ -152,7 +151,11 @@ const createDraftWithNewEntity = (
 ): { config: ProjectAutomationConfig; id: string } | undefined => {
   if (activeTab === "actions") {
     const id = normalizeAutomationToken(drafts.action.id);
-    if (automationTokenValidationMessage("Action ID", id) || automationStringValidationMessage("Description", drafts.action.description, automationFieldLimits.description, { required: false }) || draft.actions.some((action) => action.id === id)) return undefined;
+    if (
+      automationStringValidationMessage("Action ID", id, automationFieldLimits.policyId) ||
+      automationStringValidationMessage("Description", drafts.action.description, automationFieldLimits.description, { required: false }) ||
+      draft.actions.some((action) => action.id === id)
+    ) return undefined;
     const outputIds = drafts.action.agentIds.length > 0 || drafts.action.humanGate ? drafts.action.outputIds : [];
     const outputs = [...draft.outputs];
     outputIds.forEach((outputId) => {
@@ -160,16 +163,16 @@ const createDraftWithNewEntity = (
     });
     return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds, agentIds: drafts.action.humanGate ? [] : drafts.action.agentIds }] } };
   }
-  const eventPolicy = loopStartingEventPolicy(draft, drafts.loop);
-  const id = drafts.loop.id || loopIdForPolicy(eventPolicy);
-  if (!eventPolicy || !id || draft.loops.some((loop) => loop.id === id)) return undefined;
-  return { id, config: { ...draft, loops: [...draft.loops, { id, steps: [eventPolicy.id] }] } };
+  const eventAction = loopStartingAction(draft, drafts.loop);
+  const id = normalizeAutomationLoopId(drafts.loop.id);
+  if (!eventAction || !id || automationLoopIdValidationMessage("Loop", id) || draft.loops.some((loop) => loop.id === id)) return undefined;
+  return { id, config: { ...draft, loops: [...draft.loops, { id, steps: [eventAction.id] }] } };
 };
 
 const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectAutomationConfig): boolean => {
   if (activeTab === "actions") {
     return draft.actions.some((action) =>
-      Boolean(automationTokenValidationMessage("Action ID", action.id)) ||
+      Boolean(automationStringValidationMessage("Action ID", action.id, automationFieldLimits.policyId)) ||
       Boolean(automationStringValidationMessage("Description", action.description, automationFieldLimits.description, { required: false }))
     );
   }
