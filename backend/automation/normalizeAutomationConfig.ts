@@ -71,6 +71,33 @@ const normalizeOutput = (value: Record<string, unknown>): ProjectOutput => ({
 const normalizeRawOutputIds = (value: unknown): string[] | undefined =>
   Array.isArray(value) ? uniquePolicyOutputIds(stringArray(value)) : undefined;
 
+const canonicalOutputIdForSlot = (slot: "approval" | "rework"): string =>
+  slot === "approval" ? defaultPolicyOutputIds[0] : defaultPolicyOutputIds[1];
+
+const canonicalOutputIdForLegacyOutput = (
+  legacyOutputId: string,
+  outputIndex: number,
+  action?: Pick<ProjectAction, "outputIds">
+): string | undefined => {
+  const normalizedLegacyOutputId = normalizePolicyToken(legacyOutputId);
+  const semanticSlot = actionOutputSlotKind(normalizedLegacyOutputId);
+  const positionalSlot = outputIndex === 0 ? "approval" : outputIndex === 1 ? "rework" : undefined;
+  const slot = semanticSlot ?? positionalSlot;
+  if (slot === "approval") return action?.outputIds[0] ?? canonicalOutputIdForSlot("approval");
+  if (slot === "rework") return action?.outputIds[1] ?? canonicalOutputIdForSlot("rework");
+  return undefined;
+};
+
+const canonicalOutputIdsForOutputs = (outputs: ProjectOutput[]): ProjectOutput[] => {
+  const ids = new Set<string>();
+  outputs.forEach((output, index) => {
+    const canonicalOutputId = canonicalOutputIdForLegacyOutput(output.id, index);
+    if (canonicalOutputId) ids.add(canonicalOutputId);
+  });
+  defaultPolicyOutputIds.forEach((outputId) => ids.add(outputId));
+  return [...ids].map((id) => ({ id }));
+};
+
 const normalizeOutputIds = (value: unknown): string[] | undefined => {
   const rawOutputIds = normalizeRawOutputIds(value);
   return rawOutputIds ? normalizeActionOutputSlots(rawOutputIds) : undefined;
@@ -154,13 +181,8 @@ const semanticOutputIds = (): string[] =>
     ...reworkOutputCandidates
   ]);
 
-const targetOutputIdForLegacyOutput = (legacyOutputId: string, action: ProjectAction): string | undefined => {
-  const normalizedLegacyOutputId = normalizePolicyToken(legacyOutputId);
-  const slot = actionOutputSlotKind(normalizedLegacyOutputId);
-  if (slot === "approval") return action.outputIds[0];
-  if (slot === "rework") return action.outputIds[1];
-  return action.outputIds.includes(normalizedLegacyOutputId) ? normalizedLegacyOutputId : undefined;
-};
+const targetOutputIdForLegacyOutput = (legacyOutputId: string, outputIndex: number, action: ProjectAction): string | undefined =>
+  canonicalOutputIdForLegacyOutput(legacyOutputId, outputIndex, action);
 
 const addOutputEventRewrite = (
   rewrite: ActionRewrite,
@@ -246,8 +268,8 @@ const createActions = (
     rawOutputIds: string[]
   ) => {
     const legacyOutputIds = uniquePolicyOutputIds([...rawOutputIds, ...semanticOutputIds()]);
-    legacyOutputIds.forEach((legacyOutputId) => {
-      const outputId = targetOutputIdForLegacyOutput(legacyOutputId, action);
+    legacyOutputIds.forEach((legacyOutputId, outputIndex) => {
+      const outputId = targetOutputIdForLegacyOutput(legacyOutputId, outputIndex, action);
       if (!outputId) return;
       addOutputEventRewrite(rewrite, `${legacyActionId}.${legacyOutputId}`, action, outputId);
       if (legacyAgentToken) addOutputEventRewrite(rewrite, `${legacyAgentToken}.${legacyActionId}.${legacyOutputId}`, action, outputId);
@@ -314,9 +336,10 @@ const normalizePolicy = (
   const event = value.source === "event" ? normalizeEvent(value.event, rewrite) : undefined;
   const eventTrigger = event ? approvalEventTriggerIdMap.get(event) : undefined;
   const explicitTriggerEvent = event?.startsWith("trigger.") ? normalizeTriggerToken(event.slice("trigger.".length)) : undefined;
-  const mappedTrigger = value.trigger ? legacyTriggerIdMap.get(value.trigger) : undefined;
-  const currentDerivedTrigger = value.trigger && derivedTriggerIdSet.has(value.trigger) ? value.trigger : undefined;
-  const explicitPolicyTrigger = value.trigger || undefined;
+  const normalizedTrigger = value.trigger ? normalizeTriggerToken(normalizeEvent(value.trigger, rewrite) ?? value.trigger) : undefined;
+  const mappedTrigger = normalizedTrigger ? legacyTriggerIdMap.get(normalizedTrigger) : undefined;
+  const currentDerivedTrigger = normalizedTrigger && derivedTriggerIdSet.has(normalizedTrigger) ? normalizedTrigger : undefined;
+  const explicitPolicyTrigger = normalizedTrigger || undefined;
   const trigger = mappedTrigger ?? currentDerivedTrigger ?? eventTrigger ?? explicitTriggerEvent ?? explicitPolicyTrigger;
   const normalized = {
     source: trigger ? "trigger" as const : value.source === "trigger" ? "event" as const : value.source,
@@ -363,10 +386,10 @@ const normalizeLoopsFromStartingTriggers = (
   return { loops: normalizedLoops, loopIdMap };
 };
 
-const normalizeOutputRouteTarget = (value: unknown): ProjectOutputRoute["target"] | undefined => {
+const normalizeOutputRouteTarget = (value: unknown, rewrite: ActionRewrite): ProjectOutputRoute["target"] | undefined => {
   if (!isRecord(value)) return undefined;
   if (value.type === "event") {
-    const eventType = normalizePolicyOutputEventType(stringValue(value.eventType));
+    const eventType = normalizeEvent(stringValue(value.eventType), rewrite);
     return {
       type: "event",
       ...(eventType ? { eventType } : {})
@@ -379,18 +402,24 @@ const normalizeOutputRoutes = (
   value: unknown,
   policyIdMap: Map<string, string>,
   policies: ProjectPolicy[],
-  actions: ProjectAction[]
+  actions: ProjectAction[],
+  rewrite: ActionRewrite
 ): ProjectOutputRoute[] => {
   const routesByKey = new Map<string, ProjectOutputRoute>();
   const policyById = new Map(policies.map((policy) => [policy.id, policy]));
+  const actionById = new Map(actions.map((action) => [action.id, action]));
 
   recordArray(value).forEach((route) => {
     const sourcePolicyId = policyIdMap.get(stringValue(route.sourcePolicyId)) ?? stringValue(route.sourcePolicyId);
-    const outputId = normalizePolicyToken(stringValue(route.outputId));
-    const target = normalizeOutputRouteTarget(route.target);
+    const rawOutputId = normalizePolicyToken(stringValue(route.outputId));
     const policy = policyById.get(sourcePolicyId);
-    if (policy && projectOutputRouteCanTargetTrigger(policy, outputId, actions)) return;
+    const action = policy ? actionById.get(policy.action) : undefined;
+    const outputId = action
+      ? canonicalOutputIdForLegacyOutput(rawOutputId, action.outputIds.indexOf(rawOutputId), action)
+      : canonicalOutputIdForLegacyOutput(rawOutputId, 0);
+    const target = normalizeOutputRouteTarget(route.target, rewrite);
     if (!sourcePolicyId || !outputId || !target) return;
+    if (policy && projectOutputRouteCanTargetTrigger(policy, outputId, actions)) return;
     routesByKey.set(projectOutputRouteKey(sourcePolicyId, outputId), {
       sourcePolicyId,
       outputId,
@@ -421,7 +450,11 @@ const legacyTriggerIdMapFromOutputRoutes = (
     if (!legacyTrigger) return;
     const sourcePolicyId = policyIdMap.get(stringValue(route.sourcePolicyId)) ?? stringValue(route.sourcePolicyId);
     const sourcePolicy = policyById.get(sourcePolicyId);
-    const outputId = normalizePolicyToken(stringValue(route.outputId));
+    const sourceAction = sourcePolicy ? actions.find((action) => action.id === sourcePolicy.action) : undefined;
+    const rawOutputId = normalizePolicyToken(stringValue(route.outputId));
+    const outputId = sourceAction
+      ? canonicalOutputIdForLegacyOutput(rawOutputId, sourceAction.outputIds.indexOf(rawOutputId), sourceAction)
+      : canonicalOutputIdForLegacyOutput(rawOutputId, 0);
     if (!sourcePolicy || !outputId) return;
     const derivedTrigger = humanGateApprovalTriggerIdForPolicy(sourcePolicy, outputId, actions);
     if (derivedTrigger) triggerIdMap.set(legacyTrigger, derivedTrigger);
@@ -444,15 +477,18 @@ const migrateLegacyGateRoutes = ({
   sourcePolicies,
   loops,
   policyIdMap,
-  gateActionIdByLegacyGateId
+  gateActionIdByLegacyGateId,
+  actions
 }: {
   rawOutputRoutes: unknown;
   sourcePolicies: ProjectPolicy[];
   loops: ProjectLoop[];
   policyIdMap: Map<string, string>;
   gateActionIdByLegacyGateId: Map<string, string>;
+  actions: ProjectAction[];
 }): LegacyGateRouteMigration => {
   const policyById = new Map(sourcePolicies.map((policy) => [policy.id, policy]));
+  const actionById = new Map(actions.map((action) => [action.id, action]));
   const nextPoliciesById = new Map(sourcePolicies.map((policy) => [policy.id, policy]));
   const routePolicyIdByGateRouteKey = new Map<string, string>();
 
@@ -460,10 +496,14 @@ const migrateLegacyGateRoutes = ({
     const target = isRecord(route.target) ? route.target : undefined;
     if (target?.type !== "gate") return;
     const sourcePolicyId = policyIdMap.get(stringValue(route.sourcePolicyId)) ?? stringValue(route.sourcePolicyId);
-    const outputId = normalizePolicyToken(stringValue(route.outputId));
     const gateId = normalizePolicyToken(stringValue(target.gate));
     const actionId = gateActionIdByLegacyGateId.get(gateId) ?? gateId;
     const sourcePolicy = policyById.get(sourcePolicyId);
+    const sourceAction = sourcePolicy ? actionById.get(sourcePolicy.action) : undefined;
+    const rawOutputId = normalizePolicyToken(stringValue(route.outputId));
+    const outputId = sourceAction
+      ? canonicalOutputIdForLegacyOutput(rawOutputId, sourceAction.outputIds.indexOf(rawOutputId), sourceAction)
+      : canonicalOutputIdForLegacyOutput(rawOutputId, 0);
     if (!sourcePolicy || !outputId || !actionId) return;
 
     const event = policyOutputEventType({ action: sourcePolicy.action }, outputId);
@@ -479,6 +519,9 @@ const migrateLegacyGateRoutes = ({
     };
     nextPoliciesById.set(gatePolicy.id, nextPoliciesById.get(gatePolicy.id) ?? gatePolicy);
     routePolicyIdByGateRouteKey.set(legacyGateRouteKey(sourcePolicyId, outputId, gateId), gatePolicy.id);
+    if (rawOutputId && rawOutputId !== outputId) {
+      routePolicyIdByGateRouteKey.set(legacyGateRouteKey(sourcePolicyId, rawOutputId, gateId), gatePolicy.id);
+    }
   });
 
   const loopsWithLegacyGateSteps = loops.map((loop) => {
@@ -505,11 +548,17 @@ const migrateLegacyGateRoutes = ({
 
 const normalizeHumanGateResponse = (
   value: Record<string, unknown>,
-  loopIdMap: ReadonlyMap<string, string>
+  loopIdMap: ReadonlyMap<string, string>,
+  policyIdMap: ReadonlyMap<string, string>,
+  actionById: ReadonlyMap<string, ProjectAction>
 ): ProjectHumanGateResponse | undefined => {
-  const policyId = stringValue(value.policyId);
+  const policyId = policyIdMap.get(stringValue(value.policyId)) ?? stringValue(value.policyId);
   const actionId = normalizePolicyToken(stringValue(value.actionId));
-  const outputId = normalizePolicyToken(stringValue(value.outputId));
+  const rawOutputId = normalizePolicyToken(stringValue(value.outputId));
+  const action = actionById.get(actionId);
+  const outputId = action
+    ? canonicalOutputIdForLegacyOutput(rawOutputId, action.outputIds.indexOf(rawOutputId), action)
+    : canonicalOutputIdForLegacyOutput(rawOutputId, 0);
   const rawLoopId = normalizeLoopId(stringValue(value.loopId));
   const loopId = loopIdMap.get(rawLoopId) ?? rawLoopId;
   if (!policyId || !actionId || !outputId) return undefined;
@@ -586,7 +635,7 @@ const normalizeHumanGateResponses = ({
 }): ProjectHumanGateResponse[] => {
   const responseById = new Map<string, ProjectHumanGateResponse>();
   [
-    ...recordArray(rawResponses).flatMap((response) => normalizeHumanGateResponse(response, loopIdMap) ?? []),
+    ...recordArray(rawResponses).flatMap((response) => normalizeHumanGateResponse(response, loopIdMap, policyIdMap, actionById) ?? []),
     ...migrateLegacyGateDecisions({
       rawGateDecisions,
       policyIdMap,
@@ -600,7 +649,7 @@ const normalizeHumanGateResponses = ({
 };
 
 const outputsWithActionOutputIds = (outputs: ProjectOutput[], actions: ProjectAction[]): ProjectOutput[] => {
-  const outputById = new Map(outputs.map((output) => [output.id, output]));
+  const outputById = new Map(canonicalOutputIdsForOutputs(outputs).map((output) => [output.id, output]));
   actions.flatMap((action) => action.outputIds).forEach((outputId) => {
     if (!outputById.has(outputId)) outputById.set(outputId, { id: outputId });
   });
@@ -676,7 +725,8 @@ export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[]
     sourcePolicies: policyPairs.map((pair) => pair.normalized),
     loops,
     policyIdMap,
-    gateActionIdByLegacyGateId
+    gateActionIdByLegacyGateId,
+    actions
   });
   const normalizedLoops = normalizeLoopsFromStartingTriggers(
     migratedGateRoutes.loops,
@@ -688,7 +738,7 @@ export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[]
     version: 1,
     actions,
     outputs,
-    outputRoutes: normalizeOutputRoutes(input.outputRoutes, policyIdMap, migratedGateRoutes.policies, actions),
+    outputRoutes: normalizeOutputRoutes(input.outputRoutes, policyIdMap, migratedGateRoutes.policies, actions, rewrite),
     humanGateResponses: normalizeHumanGateResponses({
       rawResponses: input.humanGateResponses,
       rawGateDecisions: input.gateDecisions,

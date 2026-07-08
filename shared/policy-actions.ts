@@ -3,14 +3,14 @@ import type { ProjectAction, ProjectHumanGateResponse, ProjectOutput, ProjectOut
 
 export const actionOutputSlotCount = 2;
 export const actionOutputSlotMinCount = 1;
-export const defaultPolicyOutputIds = ["ok", "rework"] as const;
+export const defaultPolicyOutputIds = ["approved", "rejected"] as const;
 export type PolicyOutputId = string;
 export const policyOutputStatuses = defaultPolicyOutputIds;
 export type PolicyOutputStatus = typeof defaultPolicyOutputIds[number];
 
 export const defaultProjectOutputs = (): ProjectOutput[] => [
-  { id: "ok" },
-  { id: "rework" }
+  { id: defaultPolicyOutputIds[0] },
+  { id: defaultPolicyOutputIds[1] }
 ];
 
 export const normalizePolicyToken = (value: string): string =>
@@ -106,21 +106,25 @@ export const actionOutputSlotKind = (outputId: string): ActionOutputSlotKind | u
 export const uniquePolicyOutputIds = (outputIds: readonly string[], max = Number.POSITIVE_INFINITY): string[] =>
   [...new Set(outputIds.map(normalizePolicyToken).filter(Boolean))].slice(0, max);
 
+const canonicalOutputIdForSlot = (slot: ActionOutputSlotKind): PolicyOutputStatus =>
+  slot === "approval" ? defaultPolicyOutputIds[0] : defaultPolicyOutputIds[1];
+
 export const normalizeActionOutputSlots = (outputIds: readonly string[] = defaultPolicyOutputIds): string[] => {
   const normalized = uniquePolicyOutputIds(outputIds);
-  if (normalized.length > 0 && normalized.length <= actionOutputSlotCount) {
-    return normalized;
-  }
+  if (normalized.length === 0) return [...defaultPolicyOutputIds];
 
-  const approvalOutputId = normalized.find((outputId) => actionOutputSlotKind(outputId) === "approval") ?? defaultPolicyOutputIds[0];
-  const reworkOutputId = normalized.find((outputId) =>
-    outputId !== approvalOutputId && actionOutputSlotKind(outputId) === "rework"
-  ) ?? defaultPolicyOutputIds[1];
+  const slots = new Set<ActionOutputSlotKind>();
+  normalized.forEach((outputId, index) => {
+    const semanticSlot = actionOutputSlotKind(outputId);
+    const positionalSlot = index === 0 ? "approval" : index === 1 ? "rework" : undefined;
+    const slot = semanticSlot ?? positionalSlot;
+    if (slot) slots.add(slot);
+  });
 
-  if (approvalOutputId === reworkOutputId) {
-    return [approvalOutputId, defaultPolicyOutputIds.find((outputId) => outputId !== approvalOutputId) ?? "rework"];
-  }
-  return [approvalOutputId, reworkOutputId];
+  if (!slots.has("approval")) slots.add("approval");
+  return slots.has("rework")
+    ? [canonicalOutputIdForSlot("approval"), canonicalOutputIdForSlot("rework")]
+    : [canonicalOutputIdForSlot("approval")];
 };
 
 const outputIdSet = (outputs: Array<Pick<ProjectOutput, "id">>): Set<string> =>

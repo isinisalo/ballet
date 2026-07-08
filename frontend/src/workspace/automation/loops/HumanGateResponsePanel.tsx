@@ -70,13 +70,13 @@ export function HumanGateResponsePanel({
         {reworkOutputId ? (
           <Button type="button" variant="outline" onClick={() => submit(reworkOutputId)}>
             <SendHorizontal data-icon="inline-start" />
-            Rework · {reworkOutputId}
+            Rejected · {reworkOutputId}
           </Button>
         ) : null}
         {approvalOutputId ? (
           <Button type="button" onClick={() => submit(approvalOutputId)}>
             <SendHorizontal data-icon="inline-start" />
-            Approval · {approvalOutputId}
+            Approved · {approvalOutputId}
           </Button>
         ) : null}
       </div>

@@ -7,9 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
 import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { defaultPolicyOutputIds, normalizeActionOutputSlots } from "@shared/policy-actions";
-import { ShieldCheck, X } from "lucide-react";
+import { Plus, ShieldCheck, X } from "lucide-react";
 import { useMemo } from "react";
-import { OutputSelector } from "../outputs/OutputSelector";
 import { ActionInputField } from "./ActionInputField";
 import { actionInputSources } from "./actionInputSources";
 import { actionOutputTargetsByOutputId } from "./actionOutputTargets";
@@ -18,14 +17,12 @@ export function ActionEditorFields({
   agents,
   config,
   action,
-  onChange,
-  onCreateOutput
+  onChange
 }: {
   agents: Agent[];
   config: ProjectAutomationConfig;
   action: ProjectAction;
   onChange: (patch: Partial<ProjectAction>) => void;
-  onCreateOutput: (id: string) => void;
 }) {
   const selectedAgentIds = action.agentIds ?? [];
   const selectedOutputIds = action.outputIds ?? [];
@@ -64,17 +61,18 @@ export function ActionEditorFields({
         outputIds: agents[0]?.id ? (selectedOutputIds.length > 0 ? normalizeActionOutputSlots(selectedOutputIds) : fallbackOutputIds()) : []
       });
   };
-  const updateOutputSlot = (slotIndex: 0 | 1, outputIds: string[]) => {
-    const approvalOutputId = slotIndex === 0
-      ? outputIds[0] ?? outputSlotIds[0] ?? defaultPolicyOutputIds[0]
-      : outputSlotIds[0] ?? defaultPolicyOutputIds[0];
-    const reworkOutputId = slotIndex === 1 ? outputIds[0] : outputSlotIds[1];
-    const nextOutputIds = reworkOutputId ? [approvalOutputId, reworkOutputId] : [approvalOutputId];
-    onChange({ outputIds: normalizeActionOutputSlots(nextOutputIds) });
+  const approvedOutputId = defaultPolicyOutputIds[0];
+  const rejectedOutputId = defaultPolicyOutputIds[1];
+  const hasRejectedOutput = outputSlotIds.includes(rejectedOutputId);
+  const setRejectedOutput = (enabled: boolean) => {
+    onChange({ outputIds: enabled ? [approvedOutputId, rejectedOutputId] : [approvedOutputId] });
   };
-  const outputOptionIds = config.outputs.map((output) => output.id);
   const inputSources = actionInputSources(config.policies, action.id);
   const outputTargetById = actionOutputTargetsByOutputId(config, action.id, outputSlotIds);
+  const outputDisplayLabel = (outputId: string) => outputTargetById[outputId]?.label ?? outputId;
+  const outputDisplayClassName = (outputId: string) => outputTargetById[outputId]?.type === "trigger"
+    ? "border-tertiary/60 bg-tertiary/10 font-mono text-tertiary"
+    : "border-primary/60 bg-primary/10 font-mono text-primary";
 
   return (
     <FieldGroup>
@@ -160,33 +158,45 @@ export function ActionEditorFields({
         ) : (
           <div className="grid gap-3">
             <div className="grid gap-1.5">
-              <FieldLabel className="text-xs text-muted-foreground">Approval output</FieldLabel>
-              <OutputSelector
-                value={outputSlotIds[0] ? [outputSlotIds[0]] : []}
-                initialOptions={outputOptionIds}
-                blockedOptions={outputSlotIds[1] ? [outputSlotIds[1]] : []}
-                max={1}
-                replaceWhenFull
-                openButtonLabel="Change approval output"
-                canRemove={false}
-                displayByOutputId={outputTargetById}
-                onChange={(outputIds) => updateOutputSlot(0, outputIds)}
-                onCreateOption={onCreateOutput}
-              />
+              <FieldLabel className="text-xs text-muted-foreground">Approved output</FieldLabel>
+              <div className="flex min-h-7 flex-wrap items-center gap-2">
+                <Badge variant="outline" className={outputDisplayClassName(approvedOutputId)}>
+                  <span className="truncate">{outputDisplayLabel(approvedOutputId)}</span>
+                </Badge>
+              </div>
             </div>
             <div className="grid gap-1.5">
-              <FieldLabel className="text-xs text-muted-foreground">Rework output</FieldLabel>
-              <OutputSelector
-                value={outputSlotIds[1] ? [outputSlotIds[1]] : []}
-                initialOptions={outputOptionIds}
-                blockedOptions={outputSlotIds[0] ? [outputSlotIds[0]] : []}
-                max={1}
-                replaceWhenFull
-                openButtonLabel={outputSlotIds[1] ? "Change rework output" : "Add rework output"}
-                displayByOutputId={outputTargetById}
-                onChange={(outputIds) => updateOutputSlot(1, outputIds)}
-                onCreateOption={onCreateOutput}
-              />
+              <FieldLabel className="text-xs text-muted-foreground">Rejected output</FieldLabel>
+              <div className="flex min-h-7 flex-wrap items-center gap-2">
+                {hasRejectedOutput ? (
+                  <Badge variant="outline" className={outputDisplayClassName(rejectedOutputId)}>
+                    <span className="truncate">{outputDisplayLabel(rejectedOutputId)}</span>
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label={`Remove output ${rejectedOutputId}`}
+                      title={`Remove output ${rejectedOutputId}`}
+                      onClick={() => setRejectedOutput(false)}
+                      className="-mr-1 size-4 rounded-full p-0"
+                    >
+                      <X data-icon="inline-end" />
+                    </Button>
+                  </Badge>
+                ) : (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    aria-label="Add rejected output"
+                    onClick={() => setRejectedOutput(true)}
+                    className="h-5 rounded-xl border-dashed border-divider-strong bg-transparent px-2 py-0.5 font-mono text-xs text-muted-foreground shadow-none hover:bg-muted"
+                  >
+                    <Plus data-icon="inline-start" />
+                    Output
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}

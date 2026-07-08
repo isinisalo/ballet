@@ -176,22 +176,21 @@ export const seedData: AppData = {
       {
         id: "remediation",
         description: "Remediate failed infrastructure or deployment state.",
-        outputIds: ["ok", "failed"],
+        outputIds: ["approved", "rejected"],
         agentIds: ["agent-k8s"]
       }
     ],
     outputs: [
-      { id: "ok" },
-      { id: "failed" },
-      { id: "runbook" }
+      { id: "approved" },
+      { id: "rejected" }
     ],
     outputRoutes: [],
     humanGateResponses: [],
     policies: [
       {
-        id: "on.remediation.failed.start.remediation",
+        id: "on.remediation.rejected.start.remediation",
         source: "event",
-        event: "remediation.failed",
+        event: "remediation.rejected",
         action: "remediation",
         enabled: true
       }
@@ -199,7 +198,7 @@ export const seedData: AppData = {
     loops: [
       {
         id: "deployment-response",
-        steps: ["on.remediation.failed.start.remediation"]
+        steps: ["on.remediation.rejected.start.remediation"]
       }
     ],
     runtimes: [

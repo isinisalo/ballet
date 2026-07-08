@@ -5,8 +5,8 @@
       "id": "run",
       "description": "",
       "outputIds": [
-        "ok",
-        "rework"
+        "approved",
+        "rejected"
       ],
       "agentIds": [
         "reviewer"
@@ -15,10 +15,10 @@
   ],
   "outputs": [
     {
-      "id": "ok"
+      "id": "approved"
     },
     {
-      "id": "rework"
+      "id": "rejected"
     }
   ],
   "outputRoutes": [],

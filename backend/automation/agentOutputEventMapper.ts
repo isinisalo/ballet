@@ -1,7 +1,21 @@
 import type { ProjectAction, ProjectOutputRoute, ProjectPolicy } from "../../shared/domain/automation.js";
 import type { RoutedEvent } from "../../shared/domain/events.js";
 import type { AgentRunOutput } from "../../shared/domain/runtime.js";
-import { projectOutputRouteEventType } from "../../shared/policy-actions.js";
+import { actionOutputIds, actionOutputSlotKind, defaultPolicyOutputIds, normalizePolicyToken, projectOutputRouteEventType } from "../../shared/policy-actions.js";
+
+const canonicalOutputStatus = (
+  status: string,
+  policy: Pick<ProjectPolicy, "action">,
+  actions: ProjectAction[]
+): string => {
+  const allowedOutputIds = actionOutputIds(actions, policy.action);
+  const normalizedStatus = normalizePolicyToken(status);
+  if (allowedOutputIds.includes(normalizedStatus)) return normalizedStatus;
+  const slot = actionOutputSlotKind(normalizedStatus);
+  if (slot === "approval") return allowedOutputIds[0] ?? defaultPolicyOutputIds[0];
+  if (slot === "rework") return allowedOutputIds[1] ?? defaultPolicyOutputIds[1];
+  return allowedOutputIds[0] ?? defaultPolicyOutputIds[0];
+};
 
 export function mapAgentOutputToEvent(
   policy: ProjectPolicy,
@@ -9,13 +23,14 @@ export function mapAgentOutputToEvent(
   outputRoutes: ProjectOutputRoute[],
   actions: ProjectAction[] = []
 ): RoutedEvent {
+  const status = canonicalOutputStatus(output.status, policy, actions);
   return {
-    id: projectOutputRouteEventType(policy, output.status, outputRoutes, actions),
+    id: projectOutputRouteEventType(policy, status, outputRoutes, actions),
     source: "agentd",
     timestamp: new Date().toISOString(),
     payload: {
       action: policy.action,
-      status: output.status,
+      status,
       ...(output.agent ? { agent: output.agent } : {}),
       ...(output.outcome ? { outcome: output.outcome } : {}),
       ...(output.summary ? { summary: output.summary } : {}),

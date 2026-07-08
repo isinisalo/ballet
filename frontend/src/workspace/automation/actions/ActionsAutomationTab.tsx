@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { normalizePolicyToken } from "@shared/policy-actions";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { ActionEditorFields } from "./ActionEditorFields";
 import { nextConfigWithActionPatch, normalizeActionDraft } from "./actionEditorLogic";
@@ -49,15 +48,9 @@ export function ActionsAutomationTab({
     if (normalized.id) onSelect(normalized.id);
   };
 
-  const createOutput = (outputId: string) => {
-    const id = normalizePolicyToken(outputId);
-    if (!id || config.outputs.some((output) => normalizePolicyToken(output.id) === id)) return;
-    updateConfig((current) => ({ ...current, outputs: [...current.outputs, { id }] }));
-  };
-
   return (
     <div className="grid gap-4">
-      <ActionEditorFields agents={agents} config={config} action={selected} onChange={updateSelected} onCreateOutput={createOutput} />
+      <ActionEditorFields agents={agents} config={config} action={selected} onChange={updateSelected} />
     </div>
   );
 }

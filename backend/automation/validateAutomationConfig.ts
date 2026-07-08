@@ -13,7 +13,6 @@ import {
   actionOutputSlotMinCount,
   actionOutputSlotCount,
   actionOutputSlotKind,
-  defaultProjectOutputs,
   humanGateApprovalTriggerId,
   humanGateResponseId,
   normalizePolicyOutputEventType,
@@ -175,8 +174,8 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
   const rawPolicyIds = rawPolicies
     .map((policy) => isRecord(policy) ? stringValue(policy.id) : "")
     .filter(Boolean);
-  const configuredOutputIds = (rawOutputs.length > 0 ? rawOutputs : defaultProjectOutputs())
-    .map((output) => isRecord(output) ? normalizePolicyToken(stringValue(output.id)) : "")
+  const configuredOutputIds = normalized.outputs
+    .map((output) => normalizePolicyToken(output.id))
     .filter(Boolean);
   const generatedEventIds = [
     ...policyEventTypesForActions(normalized.actions, normalized.outputs),
@@ -225,6 +224,9 @@ const normalizedActionOutputIds = (action: Record<string, unknown>): string[] | 
       .map(normalizePolicyToken)
       .filter(Boolean))]
     : undefined;
+
+const isLegacyCompatibleOutputId = (outputId: string, outputIndex: number): boolean =>
+  Boolean(actionOutputSlotKind(outputId)) || outputIndex < actionOutputSlotCount;
 
 const legacyCompatibleOutputIds = (outputIds: string[]): boolean => {
   const slotKinds = new Set(outputIds.map(actionOutputSlotKind).filter(Boolean));
@@ -291,7 +293,7 @@ const validateAction = (action: unknown, index: number, context: ValidationConte
   outputIdsToValidate.forEach((outputId, outputIndex) => {
     if (seen.has(outputId)) issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Duplicate action output id: ${outputId}.` });
     seen.add(outputId);
-    if (!context.outputIdSet.has(outputId) && !actionOutputSlotKind(outputId)) {
+    if (!context.outputIdSet.has(outputId) && !isLegacyCompatibleOutputId(outputId, outputIndex)) {
       issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Action references unknown output: ${outputId}.` });
     }
   });
@@ -386,7 +388,13 @@ const validateHumanGateResponse = (
   if (policy && actionId && policy.action !== actionId) {
     issues.push({ path: `${base}.policyId`, message: `Human gate response policy does not run action: ${actionId}.` });
   }
-  const outputId = normalizePolicyToken(stringValue(response.outputId));
+  const rawOutputId = normalizePolicyToken(stringValue(response.outputId));
+  const responseSlot = actionOutputSlotKind(rawOutputId);
+  const outputId = responseSlot === "approval"
+    ? action?.outputIds[0] ?? rawOutputId
+    : responseSlot === "rework"
+      ? action?.outputIds[1] ?? rawOutputId
+      : rawOutputId;
   if (action && outputId && !actionOutputIds(context.normalizedActions, action.id).includes(outputId)) {
     issues.push({ path: `${base}.outputId`, message: `Human gate response references unavailable output ${outputId} for action ${action.id}.` });
   }
@@ -440,14 +448,8 @@ const validateOutputRoute = (
   validateOutputRouteTarget(route.target, `${base}.target`, context, issues);
 
   const sourcePolicyId = stringValue(route.sourcePolicyId);
-  const outputId = normalizePolicyToken(stringValue(route.outputId));
-  if (!sourcePolicyId || !outputId) return;
-
-  const routeKey = projectOutputRouteKey(sourcePolicyId, outputId);
-  if (seenRouteKeys.has(routeKey)) {
-    issues.push({ path: base, message: `Duplicate output route: ${routeKey}.` });
-  }
-  seenRouteKeys.add(routeKey);
+  const rawOutputId = normalizePolicyToken(stringValue(route.outputId));
+  if (!sourcePolicyId || !rawOutputId) return;
 
   const sourcePolicy = context.normalizedPolicies.find((policy) => policy.id === sourcePolicyId);
   if (!sourcePolicy) {
@@ -456,6 +458,18 @@ const validateOutputRoute = (
   }
 
   const availableOutputIds = actionOutputIds(context.normalizedActions, sourcePolicy.action);
+  const routeSlot = actionOutputSlotKind(rawOutputId);
+  const outputId = routeSlot === "approval"
+    ? availableOutputIds[0] ?? rawOutputId
+    : routeSlot === "rework"
+      ? availableOutputIds[1] ?? rawOutputId
+      : rawOutputId;
+  const routeKey = projectOutputRouteKey(sourcePolicyId, outputId);
+  if (seenRouteKeys.has(routeKey)) {
+    issues.push({ path: base, message: `Duplicate output route: ${routeKey}.` });
+  }
+  seenRouteKeys.add(routeKey);
+
   if (!availableOutputIds.includes(outputId)) {
     issues.push({ path: `${base}.outputId`, message: `Output route references unavailable output ${outputId} for policy ${sourcePolicyId}.` });
   }
