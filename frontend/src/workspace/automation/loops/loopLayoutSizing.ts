@@ -1,7 +1,7 @@
 import type { LoopStepRecord } from "./loopGraph";
 import { loopOutputSlotKindForValues } from "./loopEdgeOutputSlot";
-import { loopAddActionGhostLabel, loopCanvasLayoutConfig, loopEdgeLabelLayout, loopNodeSizes } from "./loopLayoutConfig";
-import type { LoopCanvasLayoutNode, LoopDagreEdge } from "./loopLayoutTypes";
+import { loopAddActionGhostLabel, loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
+import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
 export function loopCanvasNodeAnchorY(layoutNode: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
   if (layoutNode.kind === "trigger") return loopCanvasLayoutConfig.triggerAnchorY;
@@ -58,15 +58,8 @@ export function loopSummaryNodeWidth(value: string) {
   return loopOutputNodeWidth(value, loopNodeSizes.loop.minWidth, loopNodeSizes.loop.maxWidth);
 }
 
-export function loopHorizontalEdgeGap(edges: LoopDagreEdge[]) {
-  const maxLabelWidth = Math.max(
-    0,
-    ...edges.map((edge) => edge.label ? loopEdgeLabelWidth(edge.label) : 0)
-  );
-  return Math.max(
-    loopEdgeLabelLayout.minGap,
-    Math.ceil(maxLabelWidth + loopEdgeLabelLayout.clearance)
-  );
+export function loopHorizontalEdgeGap() {
+  return loopCanvasLayoutConfig.horizontalEdgeGap;
 }
 
 export function outputEventStackStep() {
@@ -98,13 +91,5 @@ function loopOutputNodeWidth(value: string, minWidth: number, maxWidth: number) 
   return Math.min(
     maxWidth,
     Math.max(minWidth, iconAndGapWidth + value.length * estimatedCharacterWidth)
-  );
-}
-
-function loopEdgeLabelWidth(label: string) {
-  const renderedLabel = `on: ${label} then`;
-  return Math.min(
-    loopEdgeLabelLayout.maxWidth,
-    loopEdgeLabelLayout.paddingX + renderedLabel.length * loopEdgeLabelLayout.characterWidth
   );
 }

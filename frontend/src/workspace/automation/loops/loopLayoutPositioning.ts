@@ -15,7 +15,7 @@ import type { LoopCanvasLayoutNode, LoopCanvasLayoutNodeDraft, LoopDagreEdge, Lo
 export function positionLoopNodes(nodes: LoopCanvasLayoutNodeDraft[], edges: LoopDagreEdge[], direction: LoopLayoutDirection): LoopCanvasLayoutNode[] {
   const primaryNodes = nodes.filter((node) => node.kind !== "output-event");
   const outputNodes = nodes.filter((node) => node.kind === "output-event");
-  const metrics = loopLayoutMetrics(primaryNodes, outputNodes, edges);
+  const metrics = loopLayoutMetrics(primaryNodes, outputNodes);
   const positionedPrimaryNodes = positionPrimaryNodes(primaryNodes, outputNodes, edges, direction, metrics);
   const primaryNodeByKey = new Map(positionedPrimaryNodes.map((node) => [node.key, node]));
   const positionedOutputNodes = positionOutputEventNodes(outputNodes, primaryNodeByKey, edges, direction, metrics);
@@ -128,8 +128,7 @@ function nextVerticalOutputEventsX(childNodes: LoopCanvasLayoutNode[], sourceNod
 
 function loopLayoutMetrics(
   primaryNodes: LoopCanvasLayoutNodeDraft[],
-  outputNodes: LoopCanvasLayoutNodeDraft[],
-  edges: LoopDagreEdge[]
+  outputNodes: LoopCanvasLayoutNodeDraft[]
 ): LoopLayoutMetrics {
   const outputStackHeights = [...new Map(outputNodes.map((node) => {
     const sourceKey = node.record ? `policy-${node.record.index}` : node.key;
@@ -138,7 +137,7 @@ function loopLayoutMetrics(
   const maxOutputHeight = Math.max(loopNodeSizes.outputEvent.height, ...outputStackHeights);
   const policyStackHeight = loopPolicyStackHeight();
   const triggerWidth = primaryNodes.find((node) => node.kind === "trigger")?.width ?? loopNodeSizes.trigger.minWidth;
-  const horizontalEdgeGap = loopHorizontalEdgeGap(edges);
+  const horizontalEdgeGap = loopHorizontalEdgeGap();
   const horizontalPolicyColumnWidth = Math.max(
     loopNodeSizes.policy.minWidth,
     ...primaryNodes.filter((node) => node.kind === "policy").map((node) => node.width)

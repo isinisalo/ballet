@@ -13,6 +13,7 @@ export const loopCanvasLayoutConfig = {
   startX: 72,
   startY: 64,
   columnGap: 72,
+  horizontalEdgeGap: 64,
   branchGap: 72,
   edgePad: 18,
   triggerAnchorY: 11,
@@ -20,14 +21,6 @@ export const loopCanvasLayoutConfig = {
   selectedCompactLoopRowGap: 112,
   outputEventsLaneGap: 24,
   outputEventLaneClearance: 24
-};
-
-export const loopEdgeLabelLayout = {
-  minGap: 80,
-  maxWidth: 180,
-  paddingX: 8,
-  characterWidth: 6.25,
-  clearance: 32
 };
 
 export const loopAddActionGhostLabel = "+ Action";

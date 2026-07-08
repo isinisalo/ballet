@@ -212,12 +212,14 @@ const noContent = () => new Response(null, { status: 204 });
 
 const slug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
 
+const loopEdgeConnectors = () => Array.from(document.querySelectorAll<HTMLElement>("[data-loop-connector=\"true\"]"));
 const loopEdgeLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-loop-edge-label=\"true\"]"));
 const loopEdgeStartLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-loop-edge-start-label=\"true\"]"));
 const loopEdgeEndLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-loop-edge-end-label=\"true\"]"));
 
-const loopEdgeLabelTexts = () => loopEdgeLabels()
-  .map((label) => label.dataset.loopEdgeLabelValue ?? label.textContent);
+const loopEdgeLabelTexts = () => loopEdgeConnectors()
+  .map((edge) => edge.dataset.loopEdgeLabelValue)
+  .filter((value): value is string => Boolean(value));
 
 const badgeWithTextClass = (text: string, className: string) =>
   screen.queryAllByText(text).find((element) =>
@@ -706,19 +708,15 @@ describe("workspace entity UI flows", () => {
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
     expect(within(implementationPolicyNode).getByText("implementation")).toHaveAttribute("title", "Implement work");
     await waitFor(() => expect(loopEdgeLabelTexts()).toContain("rejected"));
-    const implementationFailedEdgeLabel = loopEdgeLabels().find((label) =>
-      label.dataset.loopEdgeLabelValue === "rejected" &&
-      label.dataset.loopEdgeTargetKind === "policy"
+    const implementationFailedEdge = loopEdgeConnectors().find((edge) =>
+      edge.dataset.loopEdgeLabelValue === "rejected"
     );
-    expect(implementationFailedEdgeLabel).toBeDefined();
-    expect(implementationFailedEdgeLabel).toHaveTextContent("rejected");
-    expect(implementationFailedEdgeLabel).toHaveAttribute("data-loop-edge-label-value", "rejected");
-    expect(implementationFailedEdgeLabel).not.toHaveTextContent("implementation.rejected");
-    expect(implementationFailedEdgeLabel?.children[0]).toHaveTextContent("rejected");
-    expect(implementationFailedEdgeLabel?.children[0]).toHaveClass("text-destructive");
+    expect(implementationFailedEdge).toBeDefined();
+    expect(implementationFailedEdge).toHaveAttribute("data-loop-edge-label-value", "rejected");
+    expect(loopEdgeLabels()).toHaveLength(0);
     expect(loopEdgeStartLabels()).toHaveLength(0);
     expect(loopEdgeEndLabels()).toHaveLength(0);
-    expect((await screen.findAllByText("approved")).length).toBeGreaterThan(0);
+    expect(loopEdgeLabelTexts()).toContain("approved");
     expect(screen.queryByText("implementation.blocked")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();
@@ -861,14 +859,15 @@ describe("workspace entity UI flows", () => {
     expect(within(createRoadmapNode).getByText("x2")).toBeInTheDocument();
 
     await waitFor(() => expect(loopEdgeLabelTexts()).toContain("rejected"));
-    const returnEdgeLabel = loopEdgeLabels().find((label) =>
-      label.dataset.loopEdgeLabelTone === "return" &&
-      label.dataset.loopEdgeLabelValue === "rejected"
+    const returnEdge = loopEdgeConnectors().find((edge) =>
+      edge.dataset.loopEdgeTone === "return" &&
+      edge.dataset.loopEdgeLabelValue === "rejected"
     );
-    expect(returnEdgeLabel).toBeDefined();
-    expect(returnEdgeLabel).toHaveTextContent("rejected");
+    expect(returnEdge).toBeDefined();
+    expect(returnEdge).toHaveAttribute("data-loop-edge-label-value", "rejected");
+    expect(loopEdgeLabels()).toHaveLength(0);
 
-    fireEvent.click(returnEdgeLabel!);
+    fireEvent.click(returnEdge!);
     expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Loop handler" })).not.toBeInTheDocument();
 
@@ -1450,12 +1449,12 @@ describe("workspace entity UI flows", () => {
     expect(approvedOutputEvent).toHaveTextContent("+ Action");
     expect(approvedOutputEvent).not.toHaveTextContent("implementation.approved");
     await waitFor(() => expect(loopEdgeLabelTexts().length).toBeGreaterThan(0));
+    expect(loopEdgeLabels()).toHaveLength(0);
     expect(loopEdgeEndLabels()).toHaveLength(0);
-    const implementationRejectedGhostEdgeLabel = loopEdgeLabels().find((label) =>
-      label.dataset.loopEdgeLabelValue === "rejected" &&
-      label.dataset.loopEdgeTargetKind === "output-event"
+    const implementationRejectedGhostEdge = loopEdgeConnectors().find((edge) =>
+      edge.dataset.loopEdgeLabelValue === "rejected"
     );
-    if (implementationRejectedGhostEdgeLabel) expect(implementationRejectedGhostEdgeLabel.children[0]).toHaveClass("text-primary/55");
+    expect(implementationRejectedGhostEdge).toBeDefined();
     expect(approvedOutputEvent.querySelector("svg")).not.toBeInTheDocument();
     expect(rejectedOutputEvent).toBeInTheDocument();
     expect(rejectedOutputEvent).not.toHaveTextContent("implementation.rejected");
@@ -1797,16 +1796,13 @@ describe("workspace entity UI flows", () => {
         "rejected"
       ]));
     });
-    const returnEdgeLabel = loopEdgeLabels().find((label) =>
-      label.dataset.loopEdgeLabelTone === "return" &&
-      label.dataset.loopEdgeLabelValue === "rejected"
+    const returnEdge = loopEdgeConnectors().find((edge) =>
+      edge.dataset.loopEdgeTone === "return" &&
+      edge.dataset.loopEdgeLabelValue === "rejected"
     );
-    expect(returnEdgeLabel).toBeDefined();
-    expect(returnEdgeLabel).toHaveTextContent("rejected");
-    expect(returnEdgeLabel).toHaveAttribute("data-loop-edge-label-value", "rejected");
-    expect(returnEdgeLabel).not.toHaveAttribute("aria-label");
-    expect(returnEdgeLabel).toHaveAttribute("aria-hidden", "true");
-    expect(returnEdgeLabel).toHaveStyle({ pointerEvents: "none" });
+    expect(returnEdge).toBeDefined();
+    expect(returnEdge).toHaveAttribute("data-loop-edge-label-value", "rejected");
+    expect(loopEdgeLabels()).toHaveLength(0);
     expect(loopEdgeStartLabels()).toHaveLength(0);
     expect(loopEdgeEndLabels()).toHaveLength(0);
   });

@@ -4,7 +4,7 @@ import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
 import { Position, type Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import { toLoopReactFlowEdges } from "../src/workspace/automation/loops/LoopCanvas";
-import { loopApprovalEdgePath, loopEdgeLabelTransform, loopReturnEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
+import { loopApprovalEdgePath, loopReturnEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
 import { loopCrossLoopSmoothStepPath } from "../src/workspace/automation/loops/loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor } from "../src/workspace/automation/loops/loopEdgeLabelGeometry";
 import { buildLoopGraph, type LoopStepRecord } from "../src/workspace/automation/loops/loopGraph";
@@ -156,8 +156,8 @@ describe("loop layout helper modules", () => {
     expect(policyNode?.y).toBe(triggerNode?.y);
   });
 
-  it("caps horizontal spacing for long edge labels", () => {
-    const nodes = positionLoopNodes([
+  it("keeps horizontal spacing independent from edge label length", () => {
+    const nodeDrafts = [
       {
         key: "trigger",
         kind: "trigger",
@@ -172,11 +172,15 @@ describe("loop layout helper modules", () => {
         height: loopNodeSizes.policy.height,
         direction: "horizontal"
       }
-    ], [{ source: "trigger", target: "policy-0", label: "x".repeat(500) }], "horizontal");
+    ];
+    const shortLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "trigger", target: "policy-0", label: "x" }], "horizontal");
+    const longLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "trigger", target: "policy-0", label: "x".repeat(500) }], "horizontal");
 
-    const policyNode = nodes.find((node) => node.key === "policy-0");
+    const shortLabelPolicyNode = shortLabelNodes.find((node) => node.key === "policy-0");
+    const longLabelPolicyNode = longLabelNodes.find((node) => node.key === "policy-0");
 
-    expect(policyNode ? policyNode.x - loopCanvasLayoutConfig.startX : undefined).toBeLessThan(300);
+    expect(longLabelPolicyNode?.x).toBe(shortLabelPolicyNode?.x);
+    expect(shortLabelPolicyNode?.x).toBe(loopCanvasLayoutConfig.startX + loopNodeSizes.trigger.minWidth + loopCanvasLayoutConfig.horizontalEdgeGap);
   });
 
   it("keeps default smart edge routing for same-row edges and tightens cross-row routing", () => {
@@ -242,15 +246,6 @@ describe("loop layout helper modules", () => {
     })).toEqual({ x: 513, y: 326 });
   });
 
-  it("centers bottom-source edge labels on the routed edge", () => {
-    expect(loopEdgeLabelTransform({
-      isReturnEdge: false,
-      sourceX: 371,
-      sourceY: 295.5,
-      targetX: 659.5,
-      targetY: 327
-    })).toBe("translate(-50%, -50%) translate(515.25px, 311.25px)");
-  });
 });
 
 describe("calculateLoopCanvasLayout", () => {
@@ -558,7 +553,7 @@ describe("calculateLoopCanvasLayout", () => {
     expect(layout.nodes.some((node) => node.kind === "output-event" && node.outputEvent?.eventType === "build.complete")).toBe(false);
   });
 
-  it("reserves horizontal space for incoming policy edge labels", () => {
+  it("uses compact horizontal space between connected policies without visible edge labels", () => {
     const first = policy("first", undefined, "route-project");
     const child = policy("child", "review-intent.changes-requested", "analyze-intent");
     const layout = calculateLoopCanvasLayout({
@@ -583,7 +578,8 @@ describe("calculateLoopCanvasLayout", () => {
 
     expect(firstNode).toBeDefined();
     expect(childNode).toBeDefined();
-    expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeGreaterThan(120);
+    expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeGreaterThanOrEqual(loopCanvasLayoutConfig.horizontalEdgeGap);
+    expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeLessThan(80);
   });
 
   it("keeps the primary horizontal policy path on the trigger baseline and stacks branches compactly below it", () => {
