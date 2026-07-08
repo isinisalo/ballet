@@ -16,8 +16,8 @@ const projectCollectionRoute = (view: "project-adrs" | "project-goals" | "projec
 const automationRoute = (automationTab: AutomationTab, url: URL): RouteState => ({
   view: "automation",
   automationTab,
-  ...(automationTab === "workflows" && url.searchParams.get("view") === "all"
-    ? { automationWorkflowView: "all" as const }
+  ...(automationTab === "loops" && url.searchParams.get("view") === "all"
+    ? { automationLoopView: "all" as const }
     : { automationEntityId: url.searchParams.get("id") ?? undefined })
 });
 
@@ -28,14 +28,13 @@ const runtimeRoute = (url: URL): RouteState => ({
 
 const legacyRouteAliases: Record<string, (url: URL) => RouteState> = {
   // Compatibility aliases for routes used before the automation/runtimes navigation split.
-  "/automation/triggers": (url) => automationRoute("workflows", url),
-  "/automation/policies": (url) => automationRoute("workflows", url),
-  "/policies": (url) => automationRoute("workflows", url),
+  "/automation/triggers": (url) => automationRoute("loops", url),
+  "/automation/policies": (url) => automationRoute("loops", url),
+  "/policies": (url) => automationRoute("loops", url),
   "/actions": (url) => automationRoute("actions", url),
-  "/workflow": (url) => automationRoute("workflows", url),
   "/automation/outputs": (url) => automationRoute("actions", url),
   "/automation/runtimes": runtimeRoute,
-  "/agent-runs": (url) => automationRoute("workflows", url)
+  "/agent-runs": (url) => automationRoute("loops", url)
 };
 
 export const routeFromPath = (path: string): RouteState => {
@@ -55,9 +54,9 @@ export const routeFromPath = (path: string): RouteState => {
   }
 
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
-  const automationMatch = url.pathname.match(/^\/automation\/(actions|workflows)\/?$/);
+  const automationMatch = url.pathname.match(/^\/automation\/(actions|loops)\/?$/);
   if (automationMatch) return automationRoute(automationMatch[1] as AutomationTab, url);
-  if (url.pathname === "/automation") return automationRoute("workflows", url);
+  if (url.pathname === "/automation") return automationRoute("loops", url);
   if (url.pathname === "/runtimes") return runtimeRoute(url);
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
   const legacyRoute = legacyRouteAliases[url.pathname];
@@ -71,5 +70,5 @@ export const projectCollectionDocumentPath = (projectId: string, kind: ProjectDo
 export const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
 export const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
 export const automationSectionPath = (tab: AutomationTab, id?: string) => `/automation/${tab}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
-export const automationAllWorkflowsPath = () => "/automation/workflows?view=all";
+export const automationAllLoopsPath = () => "/automation/loops?view=all";
 export const runtimePath = (id?: string) => `/runtimes${id ? `?id=${encodeURIComponent(id)}` : ""}`;

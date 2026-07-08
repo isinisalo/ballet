@@ -32,7 +32,7 @@
       "id": "on.adr.created.start.run"
     }
   ],
-  "workflows": [
+  "loops": [
     {
       "id": "adr-review",
       "title": "ADR review",

@@ -7,14 +7,14 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
-import { automationAllWorkflowsPath, automationSectionPath } from "../routing";
+import { automationAllLoopsPath, automationSectionPath } from "../routing";
 import type { AutomationTab, RouteState } from "../types";
 import { SidebarCollapsibleLinkSection } from "./SidebarCollapsibleLinkSection";
 import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
 function automationEntities(config: ProjectAutomationConfig, tab: AutomationTab): Array<{ id: string; label: string }> {
   if (tab === "actions") return config.actions.map((action) => ({ id: action.id, label: action.id }));
-  return config.workflows.map((workflow) => ({ id: workflow.id, label: workflow.id }));
+  return config.loops.map((loop) => ({ id: loop.id, label: loop.id }));
 }
 
 function activeAutomationEntityId(config: ProjectAutomationConfig, tab: AutomationTab, routeId?: string) {
@@ -26,7 +26,7 @@ type AutomationSidebarSection = { id: AutomationTab; label: string; icon: Lucide
 
 const automationSidebarSections: AutomationSidebarSection[] = [
   { id: "actions", label: "Actions", icon: FileKey2, emptyLabel: "No actions." },
-  { id: "workflows", label: "Workflows", icon: Activity, emptyLabel: "No workflows." }
+  { id: "loops", label: "Loops", icon: Activity, emptyLabel: "No loops." }
 ];
 
 function SidebarAutomationSection({
@@ -43,7 +43,7 @@ function SidebarAutomationSection({
   const entities = automationEntities(automation, section.id);
   const selectedId = activeAutomationEntityId(automation, section.id, route.automationTab === section.id ? route.automationEntityId : undefined);
   const sectionActive = route.view === "automation" && route.automationTab === section.id;
-  const allWorkflowsActive = sectionActive && section.id === "workflows" && route.automationWorkflowView === "all";
+  const allLoopsActive = sectionActive && section.id === "loops" && route.automationLoopView === "all";
   const sectionPath = automationSectionPath(section.id);
   const Icon = section.icon;
 
@@ -58,14 +58,14 @@ function SidebarAutomationSection({
       chevronClassName="group-data-[state=open]/automation-section:rotate-90"
     >
       <SidebarMenuSub className="mx-2 gap-0.5 border-sidebar-border/60 px-2 py-1">
-        {section.id === "workflows" ? (
+        {section.id === "loops" ? (
           <SidebarNavLinkItem
-            path={automationAllWorkflowsPath()}
-            isActive={allWorkflowsActive}
+            path={automationAllLoopsPath()}
+            isActive={allLoopsActive}
             navigate={navigate}
             className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
           >
-            <span className="truncate">All workflows</span>
+            <span className="truncate">All loops</span>
           </SidebarNavLinkItem>
         ) : null}
         {entities.length === 0 ? (

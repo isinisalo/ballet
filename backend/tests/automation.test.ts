@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig, ProjectPolicy } from "../../shared/domain/automation.js";
-import { actionOutputIds, findProjectOutputRoute, humanGateApprovalTriggerId, humanGateResponseId, policyOutputEventType, workflowIdFromTrigger } from "../../shared/policy-actions.js";
+import { actionOutputIds, findProjectOutputRoute, humanGateApprovalTriggerId, humanGateResponseId, policyOutputEventType, loopIdFromTrigger } from "../../shared/policy-actions.js";
 import {
     automationPoliciesToEventDefinitions,
     automationPoliciesToPolicies,
@@ -39,7 +39,7 @@ const agent: Agent = {
 };
 
 const startTrigger = "project-brief-gate.approved";
-const startWorkflowId = workflowIdFromTrigger(startTrigger);
+const startLoopId = loopIdFromTrigger(startTrigger);
 const startPolicyId = `on.trigger.${startTrigger}.start.implementation`;
 
 const startGateAction = () => ({
@@ -82,9 +82,9 @@ const validConfig = (): ProjectAutomationConfig => ({
       enabled: true
     }
   ],
-  workflows: [
+  loops: [
     {
-      id: startWorkflowId,
+      id: startLoopId,
       steps: [startPolicyId, "on.implementation.failed.start.implementation"]
     }
   ],
@@ -110,7 +110,7 @@ describe("project automation config", () => {
       outputRoutes: [],
       humanGateResponses: [],
       policies: [],
-      workflows: [],
+      loops: [],
       runtimes: []
     });
   });
@@ -122,7 +122,7 @@ describe("project automation config", () => {
       actions: [],
       outputs: [],
       policies: [],
-      workflows: [],
+      loops: [],
       runtimes: []
     };
 
@@ -137,7 +137,7 @@ describe("project automation config", () => {
       outputs: [],
       outputRoutes: [],
       policies: [],
-      workflows: [],
+      loops: [],
       runtimes: []
     };
 
@@ -156,12 +156,12 @@ describe("project automation config", () => {
     }
   });
 
-  it("keeps the repository workflow config inside current validation rules", async () => {
+  it("keeps the repository loop config inside current validation rules", async () => {
     const config = JSON.parse(await readFile(path.join(process.cwd(), ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     expect(validateProjectAutomationConfig(config)).toEqual([]);
   });
 
-  it("keeps the repository workflow gates and outputs fully routed", async () => {
+  it("keeps the repository loop gates and outputs fully routed", async () => {
     const config = JSON.parse(await readFile(path.join(process.cwd(), ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     const humanGateIds = config.actions.filter((action) => action.humanGate).map((action) => action.id);
     const expectedGateIds = [
@@ -220,8 +220,8 @@ describe("project automation config", () => {
     expect(saved).not.toHaveProperty("gateDecisions");
     expect(saved.humanGateResponses).toEqual([]);
     expect(saved.policies[0]?.id).toBe(startPolicyId);
-    expect(saved.workflows[0]?.id).toBe(startWorkflowId);
-    expect(saved.workflows[0]?.steps).toEqual([startPolicyId, "on.implementation.failed.start.implementation"]);
+    expect(saved.loops[0]?.id).toBe(startLoopId);
+    expect(saved.loops[0]?.steps).toEqual([startPolicyId, "on.implementation.failed.start.implementation"]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
   });
 
@@ -251,7 +251,7 @@ describe("project automation config", () => {
           enabled: true
         }
       ],
-      workflows: [{ id: "delivery", steps: ["start-delivery", "assign-developer"] }],
+      loops: [{ id: "delivery", steps: ["start-delivery", "assign-developer"] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [], outputEvents: { completed: "agent.output.completed" } }]
     };
 
@@ -287,12 +287,12 @@ describe("project automation config", () => {
       action: "run"
       })
     ]));
-    expect(loaded.workflows[0]?.id).toBe(startWorkflowId);
-    expect(loaded.workflows[0]?.steps).toEqual([startPolicyId.replace(".start.implementation", ".start.run"), "on.run.ok.start.run"]);
+    expect(loaded.loops[0]?.id).toBe(startLoopId);
+    expect(loaded.loops[0]?.steps).toEqual([startPolicyId.replace(".start.implementation", ".start.run"), "on.run.ok.start.run"]);
     expect(loaded.runtimes[0]).not.toHaveProperty("outputEvents");
   });
 
-  it("normalizes legacy v1 output events and remaps workflow policy ids", async () => {
+  it("normalizes legacy v1 output events and remaps loop policy ids", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".ballet"), { recursive: true });
     await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({
@@ -319,7 +319,7 @@ describe("project automation config", () => {
           enabled: true
         }
       ],
-      workflows: [{
+      loops: [{
         id: "delivery",
         steps: ["start-delivery", "on.developer.implementation.ready.v1.then.developer.start.implementation"]
       }],
@@ -345,8 +345,8 @@ describe("project automation config", () => {
     expect(loaded.outputs).toEqual([{ id: "ok" }, { id: "rework" }]);
     expect(loaded.outputRoutes).toEqual([]);
     expect(loaded.actions[0]?.outputIds).toEqual(["ok", "rework"]);
-    expect(loaded.workflows[0]?.id).toBe("intent_changed.ok.loop");
-    expect(loaded.workflows[0]?.steps).toEqual(["on.trigger.intent_changed.ok.start.implementation", "on.implementation.ok.start.implementation"]);
+    expect(loaded.loops[0]?.id).toBe("intent_changed.ok.loop");
+    expect(loaded.loops[0]?.steps).toEqual(["on.trigger.intent_changed.ok.start.implementation", "on.implementation.ok.start.implementation"]);
   });
 
   it("preserves one-output agent actions as approval-only actions", async () => {
@@ -373,8 +373,8 @@ describe("project automation config", () => {
           enabled: true
         }
       ],
-      workflows: [{
-        id: startWorkflowId,
+      loops: [{
+        id: startLoopId,
         steps: [startPolicyId, "on.implementation.roadmap_ready.start.implementation"]
       }]
     };
@@ -390,7 +390,7 @@ describe("project automation config", () => {
     ).map((event) => event.eventType)).toEqual(expect.arrayContaining(["implementation.roadmap_ready"]));
   });
 
-  it("validates policy, runtime, and workflow references while ignoring legacy event definitions", () => {
+  it("validates policy, runtime, and loop references while ignoring legacy event definitions", () => {
     expect(validateProjectAutomationConfig(validConfig(), [agent])).toEqual([]);
 
     expect(validateProjectAutomationConfig({
@@ -451,7 +451,7 @@ describe("project automation config", () => {
 
     const agentlessConfig: ProjectAutomationConfig = {
       ...validConfig(),
-      actions: [...validConfig().actions, { id: "manual-gate", description: "Manual workflow stop.", outputIds: [], agentIds: [] }]
+      actions: [...validConfig().actions, { id: "manual-gate", description: "Manual loop stop.", outputIds: [], agentIds: [] }]
     };
     expect(validateProjectAutomationConfig(agentlessConfig, [agent])).toEqual([]);
     expect(validateProjectAutomationConfig({
@@ -472,10 +472,10 @@ describe("project automation config", () => {
       ...validConfig(),
       actions: [{ id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }],
       policies: [humanGatePolicy],
-      workflows: [{ id: workflowIdFromTrigger(humanGateTrigger), steps: [humanGatePolicy.id] }]
+      loops: [{ id: loopIdFromTrigger(humanGateTrigger), steps: [humanGatePolicy.id] }]
     };
     const humanGateResponseBase = {
-      workflowId: workflowIdFromTrigger(humanGateTrigger),
+      loopId: loopIdFromTrigger(humanGateTrigger),
       policyId: humanGatePolicy.id,
       actionId: "human-review",
       outputId: "ok",
@@ -535,7 +535,7 @@ describe("project automation config", () => {
           enabled: true
         }
       ],
-      workflows: [{ id: startWorkflowId, steps: [startPolicyId, "on.implementation.ready.start.implementation"] }]
+      loops: [{ id: startLoopId, steps: [startPolicyId, "on.implementation.ready.start.implementation"] }]
     }, [agent])).toEqual([]);
 
     const completedConfig: ProjectAutomationConfig = {
@@ -556,8 +556,8 @@ describe("project automation config", () => {
           enabled: true
         }
       ],
-      workflows: [{
-        id: startWorkflowId,
+      loops: [{
+        id: startLoopId,
         steps: [startPolicyId, "on.implementation.completed.start.implementation"]
       }]
     };
@@ -568,32 +568,32 @@ describe("project automation config", () => {
   }, [agent]).some((issue) => issue.message === "Policy references unknown event: implementation.unknown-output.")).toBe(true);
   });
 
-  it("rejects object workflow steps instead of migrating them", () => {
+  it("rejects object loop steps instead of migrating them", () => {
     const issues = validateProjectAutomationConfig({
       ...validConfig(),
-      workflows: [{
+      loops: [{
         id: "legacy",
         steps: [{ policy: "assign-developer", on: "task.created", agent: "developer-agent", action: "implementation", runtime: "codex-runtime" }]
       }]
     }, [agent]);
 
-    expect(issues.some((issue) => issue.message === "Workflow step must be a policy id string.")).toBe(true);
-    expect(issues.some((issue) => issue.message === "Workflow step must not contain on.")).toBe(true);
-    expect(issues.some((issue) => issue.message === "Workflow step must not contain agent.")).toBe(true);
-    expect(issues.some((issue) => issue.message === "Workflow step must not contain action.")).toBe(true);
-    expect(issues.some((issue) => issue.message === "Workflow step must not contain runtime.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Loop step must be a policy id string.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Loop step must not contain on.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Loop step must not contain agent.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Loop step must not contain action.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Loop step must not contain runtime.")).toBe(true);
   });
 
-  it("rejects workflow steps that reference missing policies", () => {
+  it("rejects loop steps that reference missing policies", () => {
     const issues = validateProjectAutomationConfig({
       ...validConfig(),
-      workflows: [{ id: "bad-workflow", steps: ["missing-policy"] }]
+      loops: [{ id: "bad-loop", steps: ["missing-policy"] }]
     }, [agent]);
 
-    expect(issues.some((issue) => issue.message === "Workflow references unknown policy: missing-policy.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Loop references unknown policy: missing-policy.")).toBe(true);
   });
 
-  it("rejects workflows with multiple trigger entry policies", () => {
+  it("rejects loops with multiple trigger entry policies", () => {
     const triggerId = humanGateApprovalTriggerId("human-review", "ok");
     const firstPolicy = {
       id: `on.trigger.${triggerId}.start.implementation`,
@@ -616,10 +616,10 @@ describe("project automation config", () => {
         { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }
       ],
       policies: [firstPolicy, secondPolicy],
-      workflows: [{ id: "bad-workflow", steps: [firstPolicy.id, secondPolicy.id] }]
+      loops: [{ id: "bad-loop", steps: [firstPolicy.id, secondPolicy.id] }]
     }, [agent]);
 
-    expect(issues.some((issue) => issue.message === "Workflow can start from only one trigger policy.")).toBe(true);
+    expect(issues.some((issue) => issue.message === "Loop can start from only one trigger policy.")).toBe(true);
   });
 
   it("validates output route references", () => {
@@ -714,7 +714,7 @@ describe("project automation config", () => {
         action: "human-review"
       })
     ]));
-    expect(normalized.workflows[0]?.steps).toEqual([
+    expect(normalized.loops[0]?.steps).toEqual([
       startPolicyId,
       "on.implementation.failed.start.implementation",
       "on.implementation.ok.start.human-review"
@@ -761,7 +761,7 @@ describe("project automation config", () => {
         action: "implementation",
         enabled: true
       }],
-      workflows: [{ id: workflowIdFromTrigger(triggerId), steps: [`on.trigger.${triggerId}.start.implementation`] }]
+      loops: [{ id: loopIdFromTrigger(triggerId), steps: [`on.trigger.${triggerId}.start.implementation`] }]
     }, [agent])).toEqual([]);
 
     expect(validateProjectAutomationConfig({
@@ -773,7 +773,7 @@ describe("project automation config", () => {
         action: "implementation",
         enabled: true
       }],
-      workflows: [{ id: workflowIdFromTrigger("missing"), steps: ["on.trigger.missing.start.implementation"] }]
+      loops: [{ id: loopIdFromTrigger("missing"), steps: ["on.trigger.missing.start.implementation"] }]
     }, [agent])).toEqual([]);
 
     expect(validateProjectAutomationConfig({
@@ -809,7 +809,7 @@ describe("project automation config", () => {
         action: "implementation",
         enabled: true
       }],
-      workflows: [{ id: workflowIdFromTrigger("plan-approved"), steps: ["on.trigger.plan-approved.start.implementation"] }]
+      loops: [{ id: loopIdFromTrigger("plan-approved"), steps: ["on.trigger.plan-approved.start.implementation"] }]
     }, [agent])).toEqual([]);
   });
 });

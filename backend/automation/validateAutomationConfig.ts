@@ -5,7 +5,7 @@ import {
   automationStringValidationMessage,
   automationTokenValidationMessage,
   automationOutputIdValidationMessage,
-  automationWorkflowIdValidationMessage,
+  automationLoopIdValidationMessage,
   type AutomationFieldLimit
 } from "../../shared/api/automationValidation.js";
 import {
@@ -19,10 +19,10 @@ import {
   normalizePolicyOutputEventType,
   normalizePolicyToken,
   normalizeTriggerToken,
-  normalizeWorkflowId,
+  normalizeLoopId,
   policyEventTypesForActions,
   projectOutputRouteKey,
-  workflowIdForPolicy
+  loopIdForPolicy
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
 
@@ -47,17 +47,17 @@ interface ValidationContext {
   rawOutputRoutes: unknown[];
   rawHumanGateResponses: unknown[];
   rawPolicies: unknown[];
-  rawWorkflows: unknown[];
+  rawLoops: unknown[];
   rawRuntimes: unknown[];
   eventIdSet: Set<string>;
   triggerIdSet: Set<string>;
   actionIdSet: Set<string>;
   outputIdSet: Set<string>;
   policyIdSet: Set<string>;
-  workflowIdSet: Set<string>;
+  loopIdSet: Set<string>;
   agentIdSet: Set<string>;
   normalizedPolicies: ReturnType<typeof normalizeProjectAutomationConfig>["policies"];
-  normalizedWorkflows: ReturnType<typeof normalizeProjectAutomationConfig>["workflows"];
+  normalizedLoops: ReturnType<typeof normalizeProjectAutomationConfig>["loops"];
   normalizedActions: ReturnType<typeof normalizeProjectAutomationConfig>["actions"];
 }
 
@@ -113,12 +113,12 @@ const addOutputIdIssue = (issues: ProjectAutomationIssue[], pathName: string, va
   if (message) issues.push({ path: pathName, message });
 };
 
-const addWorkflowIdIssue = (issues: ProjectAutomationIssue[], pathName: string, value: unknown, label: string) => {
+const addLoopIdIssue = (issues: ProjectAutomationIssue[], pathName: string, value: unknown, label: string) => {
   if (typeof value !== "string") {
     issues.push({ path: pathName, message: `${label} is required.` });
     return;
   }
-  const message = automationWorkflowIdValidationMessage(label, value);
+  const message = automationLoopIdValidationMessage(label, value);
   if (message) issues.push({ path: pathName, message });
 };
 
@@ -136,7 +136,7 @@ const requireAutomationArrays = (input: RawAutomationConfig, issues: ProjectAuto
   if (input.triggers !== undefined) {
     issues.push({ path: "triggers", message: "Triggers are derived from human gate approval outputs." });
   }
-  for (const key of ["actions", "outputs", "outputRoutes", "humanGateResponses", "policies", "workflows", "runtimes"] as const) {
+  for (const key of ["actions", "outputs", "outputRoutes", "humanGateResponses", "policies", "loops", "runtimes"] as const) {
     if ((key === "actions" || key === "outputs") && input[key] === undefined) continue;
     if (key === "humanGateResponses" && input[key] === undefined) continue;
     if (!Array.isArray(input[key])) issues.push({ path: key, message: `${key} must be an array.` });
@@ -154,9 +154,9 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
     id: isRecord(output) ? normalizePolicyToken(stringValue(output.id)) : "",
     path: `outputs[${index}].id`
   }));
-  const workflowIds = normalized.workflows.map((workflow, index) => ({
-    id: workflow.id,
-    path: `workflows[${index}].id`
+  const loopIds = normalized.loops.map((loop, index) => ({
+    id: loop.id,
+    path: `loops[${index}].id`
   }));
 
   addUniqueIssues(issues, policyIds, "policy");
@@ -164,14 +164,14 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
   addUniqueIssues(issues, outputIds.length > 0 ? outputIds : normalized.outputs.map((output, index) => ({ id: output.id, path: `outputs[${index}].id` })), "output");
   addUniqueIssues(issues, normalized.humanGateResponses.map((response, index) => ({ id: response.id, path: `humanGateResponses[${index}].id` })), "human gate response");
   addUniqueIssues(issues, runtimeIds, "runtime");
-  addUniqueIssues(issues, workflowIds, "workflow");
+  addUniqueIssues(issues, loopIds, "loop");
 };
 
 const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): ValidationContext => {
   const normalized = normalizeProjectAutomationConfig(input, agents);
   const rawPolicies = Array.isArray(input.policies) ? input.policies : [];
   const rawOutputs = Array.isArray(input.outputs) ? input.outputs : [];
-  const rawWorkflows = Array.isArray(input.workflows) ? input.workflows : [];
+  const rawLoops = Array.isArray(input.loops) ? input.loops : [];
   const rawPolicyIds = rawPolicies
     .map((policy) => isRecord(policy) ? stringValue(policy.id) : "")
     .filter(Boolean);
@@ -196,17 +196,17 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     rawOutputRoutes: Array.isArray(input.outputRoutes) ? input.outputRoutes : [],
     rawHumanGateResponses: Array.isArray(input.humanGateResponses) ? input.humanGateResponses : [],
     rawPolicies,
-    rawWorkflows,
+    rawLoops,
     rawRuntimes: Array.isArray(input.runtimes) ? input.runtimes : [],
     eventIdSet: new Set(generatedEventIds),
     triggerIdSet: new Set(triggerIds),
     actionIdSet: new Set(normalized.actions.map((action) => action.id)),
     outputIdSet: new Set(configuredOutputIds),
     policyIdSet: new Set([...policyIds, ...rawPolicyIds]),
-    workflowIdSet: new Set(normalized.workflows.map((workflow) => workflow.id).filter(Boolean)),
+    loopIdSet: new Set(normalized.loops.map((loop) => loop.id).filter(Boolean)),
     agentIdSet: new Set(agents.map((agent) => agent.id)),
     normalizedPolicies: normalized.policies,
-    normalizedWorkflows: normalized.workflows,
+    normalizedLoops: normalized.loops,
     normalizedActions: normalized.actions
   };
 };
@@ -363,11 +363,11 @@ const validateHumanGateResponse = (
   }
   addStringIssue(issues, `${base}.submittedAt`, response.submittedAt, "Human gate response submittedAt", { min: 1, max: 80 });
 
-  const workflowId = normalizeWorkflowId(stringValue(response.workflowId));
-  if (response.workflowId !== undefined) {
-    addWorkflowIdIssue(issues, `${base}.workflowId`, response.workflowId, "Human gate response workflow");
-    if (workflowId && !context.workflowIdSet.has(workflowId)) {
-      issues.push({ path: `${base}.workflowId`, message: `Human gate response references unknown workflow: ${workflowId}.` });
+  const loopId = normalizeLoopId(stringValue(response.loopId));
+  if (response.loopId !== undefined) {
+    addLoopIdIssue(issues, `${base}.loopId`, response.loopId, "Human gate response loop");
+    if (loopId && !context.loopIdSet.has(loopId)) {
+      issues.push({ path: `${base}.loopId`, message: `Human gate response references unknown loop: ${loopId}.` });
     }
   }
 
@@ -390,7 +390,7 @@ const validateHumanGateResponse = (
   if (action && outputId && !actionOutputIds(context.normalizedActions, action.id).includes(outputId)) {
     issues.push({ path: `${base}.outputId`, message: `Human gate response references unavailable output ${outputId} for action ${action.id}.` });
   }
-  const expectedId = policyId && actionId ? humanGateResponseId({ workflowId, policyId, actionId }) : "";
+  const expectedId = policyId && actionId ? humanGateResponseId({ loopId, policyId, actionId }) : "";
   if (expectedId && stringValue(response.id) !== expectedId) {
     issues.push({ path: `${base}.id`, message: `Human gate response id must be ${expectedId}.` });
   }
@@ -602,78 +602,78 @@ const validateRuntime = (runtime: unknown, index: number, issues: ProjectAutomat
   }
 };
 
-const validateWorkflowStep = (
+const validateLoopStep = (
   step: unknown,
   stepPath: string,
   policyIdSet: Set<string>,
   issues: ProjectAutomationIssue[]
 ) => {
   if (typeof step !== "string") {
-    issues.push({ path: stepPath, message: "Workflow step must be a policy id string." });
+    issues.push({ path: stepPath, message: "Loop step must be a policy id string." });
     if (isRecord(step)) {
       for (const forbidden of ["on", "event", "agent", "runtime", "action"]) {
-        if (forbidden in step) issues.push({ path: `${stepPath}.${forbidden}`, message: `Workflow step must not contain ${forbidden}.` });
+        if (forbidden in step) issues.push({ path: `${stepPath}.${forbidden}`, message: `Loop step must not contain ${forbidden}.` });
       }
     }
     return;
   }
   if (!step.trim()) {
-    issues.push({ path: stepPath, message: "Workflow step policy id is required." });
+    issues.push({ path: stepPath, message: "Loop step policy id is required." });
     return;
   }
   if (step.length > automationFieldLimits.policyId.max) {
-    issues.push({ path: stepPath, message: `Workflow step policy id must be ${automationFieldLimits.policyId.max} characters or fewer.` });
+    issues.push({ path: stepPath, message: `Loop step policy id must be ${automationFieldLimits.policyId.max} characters or fewer.` });
     return;
   }
-  if (!policyIdSet.has(step)) issues.push({ path: stepPath, message: `Workflow references unknown policy: ${step}.` });
+  if (!policyIdSet.has(step)) issues.push({ path: stepPath, message: `Loop references unknown policy: ${step}.` });
 };
 
-const validateWorkflow = (workflow: unknown, index: number, context: ValidationContext, issues: ProjectAutomationIssue[]) => {
-  const base = `workflows[${index}]`;
-  if (!isRecord(workflow)) {
-    issues.push({ path: base, message: "Workflow must be an object." });
+const validateLoop = (loop: unknown, index: number, context: ValidationContext, issues: ProjectAutomationIssue[]) => {
+  const base = `loops[${index}]`;
+  if (!isRecord(loop)) {
+    issues.push({ path: base, message: "Loop must be an object." });
     return;
   }
-  addWorkflowIdIssue(issues, `${base}.id`, workflow.id, "Workflow id");
-  if (!Array.isArray(workflow.steps)) {
-    issues.push({ path: `${base}.steps`, message: "Workflow steps must be an array." });
+  addLoopIdIssue(issues, `${base}.id`, loop.id, "Loop id");
+  if (!Array.isArray(loop.steps)) {
+    issues.push({ path: `${base}.steps`, message: "Loop steps must be an array." });
     return;
   }
-  workflow.steps.forEach((step, stepIndex) =>
-    validateWorkflowStep(step, `${base}.steps[${stepIndex}]`, context.policyIdSet, issues)
+  loop.steps.forEach((step, stepIndex) =>
+    validateLoopStep(step, `${base}.steps[${stepIndex}]`, context.policyIdSet, issues)
   );
-  const firstNonTriggerIndex = workflow.steps.findIndex((step) => {
+  const firstNonTriggerIndex = loop.steps.findIndex((step) => {
     if (typeof step !== "string") return true;
     const policy = context.normalizedPolicies.find((candidate) => candidate.id === step);
     return policy?.source !== "trigger";
   });
-  const triggerSteps = workflow.steps.filter((step, stepIndex): step is string => {
+  const triggerSteps = loop.steps.filter((step, stepIndex): step is string => {
     if (typeof step !== "string") return false;
     const policy = context.normalizedPolicies.find((candidate) => candidate.id === step);
     return policy?.source === "trigger" && (firstNonTriggerIndex === -1 || stepIndex < firstNonTriggerIndex);
   });
   if (triggerSteps.length > 1) {
-    issues.push({ path: `${base}.steps`, message: "Workflow can start from only one trigger policy." });
+    issues.push({ path: `${base}.steps`, message: "Loop can start from only one trigger policy." });
   }
-  const normalizedWorkflow = context.normalizedWorkflows[index];
-  if (!normalizedWorkflow || normalizedWorkflow.steps.length === 0) {
-    issues.push({ path: `${base}.steps`, message: "Workflow must start from a trigger policy." });
+  const normalizedLoop = context.normalizedLoops[index];
+  if (!normalizedLoop || normalizedLoop.steps.length === 0) {
+    issues.push({ path: `${base}.steps`, message: "Loop must start from a trigger policy." });
     return;
   }
-  const firstPolicyId = normalizedWorkflow.steps[0] ?? "";
+  const firstPolicyId = normalizedLoop.steps[0] ?? "";
   const firstPolicy = context.normalizedPolicies.find((candidate) => candidate.id === firstPolicyId);
   if (!firstPolicy) {
-    issues.push({ path: `${base}.steps[0]`, message: `Workflow references unknown starting policy: ${firstPolicyId}.` });
+    issues.push({ path: `${base}.steps[0]`, message: `Loop references unknown starting policy: ${firstPolicyId}.` });
     return;
   }
   if (firstPolicy.source !== "trigger" || !firstPolicy.trigger) {
-    issues.push({ path: `${base}.steps[0]`, message: "Workflow must start from a trigger policy." });
+    issues.push({ path: `${base}.steps[0]`, message: "Loop must start from a trigger policy." });
     return;
   }
-  const expectedId = workflowIdForPolicy(firstPolicy);
-  const actualId = normalizeWorkflowId(stringValue(workflow.id));
+  const expectedId = loopIdForPolicy(firstPolicy);
+  const actualId = normalizeLoopId(stringValue(loop.id));
   if (expectedId && actualId !== expectedId) {
-    issues.push({ path: `${base}.id`, message: `Workflow id must be ${expectedId}.` });
+    issues.push({ path: `${base}.id`, message: `Loop id must be ${expectedId}.` });
   }
 };
 
@@ -698,6 +698,6 @@ export const validateProjectAutomationConfig = (
   context.rawPolicies.forEach((policy, index) => validatePolicy(policy, index, context, issues));
   validateSinglePolicyPerTrigger(context, issues);
   context.rawRuntimes.forEach((runtime, index) => validateRuntime(runtime, index, issues));
-  context.rawWorkflows.forEach((workflow, index) => validateWorkflow(workflow, index, context, issues));
+  context.rawLoops.forEach((loop, index) => validateLoop(loop, index, context, issues));
   return issues;
 };

@@ -1,15 +1,15 @@
 import type { Agent, AppData, MarkdownDocument, ProjectAutomationConfig, ProjectDocumentTreeNode, Skill } from "@shared/api/workspace-contracts";
-import { policyOutputEventTypes, workflowIdFromTrigger } from "@shared/policy-actions";
+import { policyOutputEventTypes, loopIdFromTrigger } from "@shared/policy-actions";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 
 const now = "2026-06-26T10:00:00.000Z";
-const workflowTrigger = "project-brief-gate.approved";
-const workflowId = workflowIdFromTrigger(workflowTrigger);
-const workflowStartActionId = "start-workflow";
-const workflowStartPolicyId = `on.trigger.${workflowTrigger}.start.${workflowStartActionId}`;
+const loopTrigger = "project-brief-gate.approved";
+const loopId = loopIdFromTrigger(loopTrigger);
+const loopStartActionId = "start-loop";
+const loopStartPolicyId = `on.trigger.${loopTrigger}.start.${loopStartActionId}`;
 
 const baseData = (): AppData => ({
   projects: [{
@@ -99,8 +99,8 @@ const baseData = (): AppData => ({
       outputIds: ["complete", "failed"],
       agentIds: ["agent-1"]
     }, {
-      id: workflowStartActionId,
-      description: "Start workflow",
+      id: loopStartActionId,
+      description: "Start loop",
       outputIds: ["complete", "failed"],
       agentIds: ["agent-1"]
     }, {
@@ -120,10 +120,10 @@ const baseData = (): AppData => ({
     outputRoutes: [],
     humanGateResponses: [],
     policies: [{
-      id: workflowStartPolicyId,
+      id: loopStartPolicyId,
       source: "trigger",
-      trigger: workflowTrigger,
-      action: workflowStartActionId,
+      trigger: loopTrigger,
+      action: loopStartActionId,
       enabled: true
     }, {
       id: "on.implementation.failed.start.implementation",
@@ -132,9 +132,9 @@ const baseData = (): AppData => ({
       action: "implementation",
       enabled: true
     }],
-    workflows: [{
-      id: workflowId,
-      steps: [workflowStartPolicyId, "on.implementation.failed.start.implementation"]
+    loops: [{
+      id: loopId,
+      steps: [loopStartPolicyId, "on.implementation.failed.start.implementation"]
     }],
     runtimes: [{
       id: "runtime-1",
@@ -212,12 +212,12 @@ const noContent = () => new Response(null, { status: 204 });
 
 const slug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
 
-const workflowEdgeLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-workflow-edge-label=\"true\"]"));
-const workflowEdgeStartLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-workflow-edge-start-label=\"true\"]"));
-const workflowEdgeEndLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-workflow-edge-end-label=\"true\"]"));
+const loopEdgeLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-loop-edge-label=\"true\"]"));
+const loopEdgeStartLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-loop-edge-start-label=\"true\"]"));
+const loopEdgeEndLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-loop-edge-end-label=\"true\"]"));
 
-const workflowEdgeLabelTexts = () => workflowEdgeLabels()
-  .map((label) => label.dataset.workflowEdgeLabelValue ?? label.textContent);
+const loopEdgeLabelTexts = () => loopEdgeLabels()
+  .map((label) => label.dataset.loopEdgeLabelValue ?? label.textContent);
 
 const badgeWithTextClass = (text: string, className: string) =>
   screen.queryAllByText(text).find((element) =>
@@ -229,7 +229,7 @@ const controlWithTextClass = (container: HTMLElement, text: string, className: s
     element.closest("button")?.className.includes(className)
   );
 
-const activateWorkflowNode = (element: HTMLElement) => {
+const activateLoopNode = (element: HTMLElement) => {
   fireEvent.pointerDown(element, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
   fireEvent.pointerUp(element, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
   fireEvent.click(element);
@@ -518,7 +518,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("button", { name: "Dark theme" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "System theme" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
   });
 
   it("toggles project document sidebar menus closed after they have been opened", async () => {
@@ -671,8 +671,8 @@ describe("workspace entity UI flows", () => {
     expect(window.location.pathname).toBe("/skills");
   });
 
-  it("defaults automation to workflows and locks policy input fields on the canvas", async () => {
-    const { data } = await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop");
+  it("defaults automation to loops and locks policy input fields on the canvas", async () => {
+    const { data } = await renderRoute("/automation/loops?id=project-brief-gate.approved.loop");
 
     expect(screen.queryByRole("tab", { name: /events/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /add event/i })).not.toBeInTheDocument();
@@ -685,12 +685,12 @@ describe("workspace entity UI flows", () => {
     expect(environmentToggle).toHaveAttribute("aria-expanded", "false");
     expect(automationToggle.compareDocumentPosition(environmentToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(environmentToggle.compareDocumentPosition(projectToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete workflow" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete loop" })).toBeInTheDocument();
 
-    const triggerReactFlowNode = screen.getByLabelText(`Trigger: ${workflowTrigger}`).closest(".react-flow__node");
+    const triggerReactFlowNode = screen.getByLabelText(`Trigger: ${loopTrigger}`).closest(".react-flow__node");
     expect(triggerReactFlowNode?.querySelectorAll(".react-flow__handle").length).toBeGreaterThan(0);
-    expect(within(triggerReactFlowNode as HTMLElement).queryByText(workflowTrigger)).not.toBeInTheDocument();
+    expect(within(triggerReactFlowNode as HTMLElement).queryByText(loopTrigger)).not.toBeInTheDocument();
 
     expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
     expect(screen.queryByLabelText("Agent: existing")).not.toBeInTheDocument();
@@ -705,42 +705,42 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByText("start:")).not.toBeInTheDocument();
     expect(screen.getAllByText("implementation").length).toBeGreaterThan(0);
     expect(within(implementationPolicyNode).getByText("implementation")).toHaveAttribute("title", "Implement work");
-    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("failed"));
-    const implementationFailedEdgeLabel = workflowEdgeLabels().find((label) =>
-      label.dataset.workflowEdgeLabelValue === "failed" &&
-      label.dataset.workflowEdgeTargetKind === "policy"
+    await waitFor(() => expect(loopEdgeLabelTexts()).toContain("failed"));
+    const implementationFailedEdgeLabel = loopEdgeLabels().find((label) =>
+      label.dataset.loopEdgeLabelValue === "failed" &&
+      label.dataset.loopEdgeTargetKind === "policy"
     );
     expect(implementationFailedEdgeLabel).toBeDefined();
     expect(implementationFailedEdgeLabel).toHaveTextContent("failed");
-    expect(implementationFailedEdgeLabel).toHaveAttribute("data-workflow-edge-label-value", "failed");
+    expect(implementationFailedEdgeLabel).toHaveAttribute("data-loop-edge-label-value", "failed");
     expect(implementationFailedEdgeLabel).not.toHaveTextContent("implementation.failed");
     expect(implementationFailedEdgeLabel?.children[0]).toHaveTextContent("failed");
     expect(implementationFailedEdgeLabel?.children[0]).toHaveClass("text-destructive");
-    expect(workflowEdgeStartLabels()).toHaveLength(0);
-    expect(workflowEdgeEndLabels()).toHaveLength(0);
+    expect(loopEdgeStartLabels()).toHaveLength(0);
+    expect(loopEdgeEndLabels()).toHaveLength(0);
     expect((await screen.findAllByText("complete")).length).toBeGreaterThan(0);
     expect(screen.queryByText("implementation.blocked")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /add policy step for/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText("Output events")).not.toBeInTheDocument();
 
-    activateWorkflowNode(implementationPolicyNode);
-    expect(screen.queryByLabelText("Workflow policy source")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow policy event")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow policy trigger")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
+    activateLoopNode(implementationPolicyNode);
+    expect(screen.queryByLabelText("Loop policy source")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy event")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy trigger")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy agent")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
     expectActionSelectValue("implementation");
-    expect(screen.queryByLabelText("Workflow policy action")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit workflow policy" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save workflow policy" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Remove workflow step" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy action")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit loop policy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save loop policy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove loop step" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
 
-    activateWorkflowNode(implementationPolicyNode);
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
+    activateLoopNode(implementationPolicyNode);
+    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
     expectActionSelectValue("implementation");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Loop handler" })).not.toBeInTheDocument());
 
     await waitFor(() => expect(data.automation).not.toHaveProperty("events"));
     expect(data.automation.policies.find((policy) => policy.id === "on.implementation.failed.start.implementation")).toMatchObject({
@@ -750,22 +750,22 @@ describe("workspace entity UI flows", () => {
     });
   });
 
-  it("renders surrounding workflows as compact nodes around the selected workflow", async () => {
-    const workflowData = baseData();
-    workflowData.automation.actions[0] = {
+  it("renders surrounding loops as compact nodes around the selected loop", async () => {
+    const loopData = baseData();
+    loopData.automation.actions[0] = {
       id: "implementation",
       description: "Review generated evidence.",
       outputIds: ["approved", "changes-requested"],
       agentIds: [],
       humanGate: true
     };
-    workflowData.automation.actions.push({
+    loopData.automation.actions.push({
       id: "next-step",
-      description: "Continue the next workflow.",
+      description: "Continue the next loop.",
       outputIds: ["complete", "failed"],
       agentIds: ["agent-1"]
     });
-    workflowData.automation.policies.push({
+    loopData.automation.policies.push({
       id: "on.trigger.manual-start.start.project-brief-gate",
       source: "trigger",
       trigger: "manual-start",
@@ -778,7 +778,7 @@ describe("workspace entity UI flows", () => {
       action: "next-step",
       enabled: true
     });
-    workflowData.automation.workflows.push({
+    loopData.automation.loops.push({
       id: "manual-start.loop",
       steps: ["on.trigger.manual-start.start.project-brief-gate"]
     }, {
@@ -786,25 +786,25 @@ describe("workspace entity UI flows", () => {
       steps: ["on.trigger.implementation.approved.start.next-step"]
     });
 
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    expect(screen.getByLabelText("Workflow: manual-start.loop")).toHaveTextContent("manual-start.loop");
-    expect(screen.getByLabelText("Workflow: implementation.approved.loop")).toHaveTextContent("implementation.approved.loop");
+    expect(screen.getByLabelText("Loop: manual-start.loop")).toHaveTextContent("manual-start.loop");
+    expect(screen.getByLabelText("Loop: implementation.approved.loop")).toHaveTextContent("implementation.approved.loop");
     expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
     expect(screen.queryByLabelText("Policy: on.trigger.manual-start.start.project-brief-gate")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Policy: on.trigger.implementation.approved.start.next-step")).not.toBeInTheDocument();
-    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("approved"));
+    await waitFor(() => expect(loopEdgeLabelTexts()).toContain("approved"));
   });
 
-  it("folds repeated workflow actions into one visible policy node", async () => {
-    const workflowData = baseData();
-    workflowData.automation.outputs = [
+  it("folds repeated loop actions into one visible policy node", async () => {
+    const loopData = baseData();
+    loopData.automation.outputs = [
       { id: "ready" },
       { id: "blocked" },
       { id: "approved" },
       { id: "changes-requested" }
     ];
-    workflowData.automation.actions = [{
+    loopData.automation.actions = [{
       id: "create-roadmap",
       description: "Create traceable delivery roadmap.",
       outputIds: ["ready", "blocked"],
@@ -820,7 +820,7 @@ describe("workspace entity UI flows", () => {
       outputIds: [],
       agentIds: []
     }];
-    workflowData.automation.policies = [{
+    loopData.automation.policies = [{
       id: "p05.on.project-brief-gate-approved.create-roadmap",
       source: "trigger",
       trigger: "project-brief-gate.approved",
@@ -845,13 +845,13 @@ describe("workspace entity UI flows", () => {
       action: "done",
       enabled: true
     }];
-    workflowData.automation.workflows = [{
-      id: workflowId,
+    loopData.automation.loops = [{
+      id: loopId,
       title: "Roadmap loop",
-      steps: workflowData.automation.policies.map((policy) => policy.id)
+      steps: loopData.automation.policies.map((policy) => policy.id)
     }];
 
-    await renderRoute(`/automation/workflows?id=${workflowId}`, workflowData);
+    await renderRoute(`/automation/loops?id=${loopId}`, loopData);
 
     const createRoadmapNode = await screen.findByLabelText("Policy: p05.on.project-brief-gate-approved.create-roadmap");
     expect(createRoadmapNode).toBeInTheDocument();
@@ -860,24 +860,24 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByLabelText("Policy: p08.on.roadmap-approved.done")).toBeInTheDocument();
     expect(within(createRoadmapNode).getByText("x2")).toBeInTheDocument();
 
-    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("changes-requested"));
-    const returnEdgeLabel = workflowEdgeLabels().find((label) =>
-      label.dataset.workflowEdgeLabelTone === "return" &&
-      label.dataset.workflowEdgeLabelValue === "changes-requested"
+    await waitFor(() => expect(loopEdgeLabelTexts()).toContain("changes-requested"));
+    const returnEdgeLabel = loopEdgeLabels().find((label) =>
+      label.dataset.loopEdgeLabelTone === "return" &&
+      label.dataset.loopEdgeLabelValue === "changes-requested"
     );
     expect(returnEdgeLabel).toBeDefined();
     expect(returnEdgeLabel).toHaveTextContent("changes-requested");
 
     fireEvent.click(returnEdgeLabel!);
     expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Loop handler" })).not.toBeInTheDocument();
 
-    activateWorkflowNode(createRoadmapNode);
-    const workflowHandlerDialog = screen.getByRole("dialog", { name: "Workflow handler" });
-    expect(within(workflowHandlerDialog).getAllByText("project-brief-gate.approved").length).toBeGreaterThan(0);
-    expect(within(workflowHandlerDialog).getAllByText("challenge-roadmap").find((element) => element.className.includes("text-tertiary"))).toBeDefined();
-    expect(within(workflowHandlerDialog).getAllByText("changes-requested").find((element) => element.className.includes("text-destructive"))).toBeDefined();
-    expect(within(workflowHandlerDialog).getAllByLabelText("Handler action")).toHaveLength(2);
+    activateLoopNode(createRoadmapNode);
+    const loopHandlerDialog = screen.getByRole("dialog", { name: "Loop handler" });
+    expect(within(loopHandlerDialog).getAllByText("project-brief-gate.approved").length).toBeGreaterThan(0);
+    expect(within(loopHandlerDialog).getAllByText("challenge-roadmap").find((element) => element.className.includes("text-tertiary"))).toBeDefined();
+    expect(within(loopHandlerDialog).getAllByText("changes-requested").find((element) => element.className.includes("text-destructive"))).toBeDefined();
+    expect(within(loopHandlerDialog).getAllByLabelText("Handler action")).toHaveLength(2);
   });
 
   it("selects automation entities from the sidebar and stores query ids", async () => {
@@ -896,21 +896,21 @@ describe("workspace entity UI flows", () => {
     expect(badgeWithTextClass("implementation.failed", "border-primary/60")).toBeDefined();
     expect(screen.queryByRole("link", { name: "Triggers" })).not.toBeInTheDocument();
 
-    let workflowsToggle = screen.getByRole("link", { name: "Workflows" });
-    expect(workflowsToggle).toHaveAttribute("aria-expanded", "true");
-    await user.click(workflowsToggle);
-    workflowsToggle = screen.getByRole("link", { name: "Workflows" });
-    expect(workflowsToggle).toHaveAttribute("aria-expanded", "true");
-    await user.click(workflowsToggle);
-    workflowsToggle = screen.getByRole("link", { name: "Workflows" });
-    expect(workflowsToggle).toHaveAttribute("aria-expanded", "false");
+    let loopsToggle = screen.getByRole("link", { name: "Loops" });
+    expect(loopsToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(loopsToggle);
+    loopsToggle = screen.getByRole("link", { name: "Loops" });
+    expect(loopsToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(loopsToggle);
+    loopsToggle = screen.getByRole("link", { name: "Loops" });
+    expect(loopsToggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("link", { name: "project-brief-gate.approved.loop" })).not.toBeInTheDocument();
-    await user.click(workflowsToggle);
-    await user.click(screen.getByRole("link", { name: "All workflows" }));
-    expect(window.location.pathname).toBe("/automation/workflows");
+    await user.click(loopsToggle);
+    await user.click(screen.getByRole("link", { name: "All loops" }));
+    expect(window.location.pathname).toBe("/automation/loops");
     expect(window.location.search).toBe("?view=all");
     await user.click(screen.getByRole("link", { name: "project-brief-gate.approved.loop" }));
-    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(window.location.pathname).toBe("/automation/loops");
     expect(window.location.search).toBe("?id=project-brief-gate.approved.loop");
     expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
   });
@@ -921,7 +921,7 @@ describe("workspace entity UI flows", () => {
     delete (legacyData.automation as Partial<ProjectAutomationConfig>).outputRoutes;
     delete (legacyData.automation as Partial<ProjectAutomationConfig>).humanGateResponses;
 
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", legacyData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", legacyData);
 
     expect(screen.getByRole("link", { name: "Actions" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Outputs" })).not.toBeInTheDocument();
@@ -929,52 +929,52 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
   });
 
-  it("shows the selected workflow id in the automation header without editing", async () => {
-    const workflowData = baseData();
-    workflowData.automation.policies.push({
+  it("shows the selected loop id in the automation header without editing", async () => {
+    const loopData = baseData();
+    loopData.automation.policies.push({
       id: "on.trigger.manual-start.start.implementation",
       source: "trigger",
       trigger: "manual-start",
       action: "implementation",
       enabled: true
     });
-    workflowData.automation.workflows.push({
+    loopData.automation.loops.push({
       id: "manual-start.loop",
       steps: ["on.trigger.manual-start.start.implementation"]
     });
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    expect(screen.queryByLabelText("Workflow ID")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow name")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop name")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "project-brief-gate.approved.loop" })).not.toBeInTheDocument();
     expect(screen.getAllByText("project-brief-gate.approved.loop").length).toBeGreaterThan(0);
   });
 
-  it("creates a workflow from a selected starting trigger", async () => {
+  it("creates a loop from a selected starting trigger", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.automation.policies.push({
+    const loopData = baseData();
+    loopData.automation.policies.push({
       id: "on.trigger.manual-start.start.implementation",
       source: "trigger",
       trigger: "manual-start",
       action: "implementation",
       enabled: true
     });
-    const { data, fetchMock } = await renderRoute("/automation/workflows", workflowData);
+    const { data, fetchMock } = await renderRoute("/automation/loops", loopData);
 
-    expect(screen.queryByRole("button", { name: "Add workflow" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow ID")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add loop" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop ID")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Starting trigger")).toHaveTextContent("manual-start");
     expect(screen.getAllByText("manual-start.loop").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Title")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
-    await waitFor(() => expect(data.automation.workflows.some((workflow) =>
-      workflow.id === "manual-start.loop" &&
-      workflow.steps[0] === "on.trigger.manual-start.start.implementation"
+    await waitFor(() => expect(data.automation.loops.some((loop) =>
+      loop.id === "manual-start.loop" &&
+      loop.steps[0] === "on.trigger.manual-start.start.implementation"
     )).toBe(true));
-    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(window.location.pathname).toBe("/automation/loops");
     expect(window.location.search).toBe("?id=manual-start.loop");
     expect(screen.getAllByText("manual-start.loop").length).toBeGreaterThan(0);
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
@@ -983,25 +983,25 @@ describe("workspace entity UI flows", () => {
     }));
   });
 
-  it("deletes the selected workflow from the automation header after confirmation", async () => {
+  it("deletes the selected loop from the automation header after confirmation", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.automation.policies.push({
+    const loopData = baseData();
+    loopData.automation.policies.push({
       id: "on.trigger.manual-start.start.implementation",
       source: "trigger",
       trigger: "manual-start",
       action: "implementation",
       enabled: true
     });
-    workflowData.automation.workflows.push({
+    loopData.automation.loops.push({
       id: "manual-start.loop",
       steps: ["on.trigger.manual-start.start.implementation"]
     });
-    const { data } = await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    const { data } = await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    await user.click(screen.getByRole("button", { name: "Delete workflow" }));
+    await user.click(screen.getByRole("button", { name: "Delete loop" }));
 
-    const confirmDialog = screen.getByRole("dialog", { name: "Delete workflow?" });
+    const confirmDialog = screen.getByRole("dialog", { name: "Delete loop?" });
     expect(confirmDialog).toBeInTheDocument();
     expect(within(confirmDialog).getByText("project-brief-gate.approved.loop")).toBeInTheDocument();
     expect(within(confirmDialog).getByText(/This action cannot be undone./)).toBeInTheDocument();
@@ -1009,46 +1009,46 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(window.location.search).toBe("?id=manual-start.loop"));
-    expect(window.location.pathname).toBe("/automation/workflows");
+    expect(window.location.pathname).toBe("/automation/loops");
     expect(screen.getAllByText("manual-start.loop").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
-    await waitFor(() => expect(data.automation.workflows.map((workflow) => workflow.id)).toEqual(["manual-start.loop"]));
+    await waitFor(() => expect(data.automation.loops.map((loop) => loop.id)).toEqual(["manual-start.loop"]));
     expect(screen.queryByRole("link", { name: "project-brief-gate.approved.loop" })).not.toBeInTheDocument();
   });
 
-  it("clears workflow selection after deleting the only workflow", async () => {
+  it("clears loop selection after deleting the only loop", async () => {
     const user = userEvent.setup();
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop");
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop");
 
-    await confirmDelete(user, "Delete workflow");
+    await confirmDelete(user, "Delete loop");
 
     await waitFor(() => expect(window.location.search).toBe(""));
-    expect(window.location.pathname).toBe("/automation/workflows");
-    expect(screen.queryByRole("button", { name: "Delete workflow" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow ID")).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/automation/loops");
+    expect(screen.queryByRole("button", { name: "Delete loop" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop ID")).not.toBeInTheDocument();
   });
 
-  it("renders the selected workflow action sheet in view mode", async () => {
+  it("renders the selected loop action sheet in view mode", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.automation.actions.push({
+    const loopData = baseData();
+    loopData.automation.actions.push({
       id: "review-pass",
       description: "Review output",
       outputIds: ["summary", "failed"],
       agentIds: ["agent-1"]
     });
-    const { data, fetchMock } = await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    const { data, fetchMock } = await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    expect(screen.getByRole("button", { name: "Delete workflow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete loop" })).toBeInTheDocument();
     const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
-    expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
-    activateWorkflowNode(implementationPolicyNode);
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit workflow policy" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save workflow policy" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Remove workflow step" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy agent")).not.toBeInTheDocument();
+    activateLoopNode(implementationPolicyNode);
+    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit loop policy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save loop policy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove loop step" })).not.toBeInTheDocument();
 
     expectActionSelectValue("implementation");
     expect(screen.getByLabelText("Handler action")).toHaveAttribute("role", "combobox");
@@ -1057,7 +1057,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("button", { name: "Remove agent Existing Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove output complete" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Loop handler" })).not.toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.policies.find((policy) =>
@@ -1067,8 +1067,8 @@ describe("workspace entity UI flows", () => {
       event: "implementation.failed",
       id: "on.implementation.failed.start.implementation"
     }));
-    expect(data.automation.workflows[0]?.steps).toEqual([
-      workflowStartPolicyId,
+    expect(data.automation.loops[0]?.steps).toEqual([
+      loopStartPolicyId,
       "on.implementation.failed.start.implementation"
     ]);
     expect(data.automation.actions.find((action) => action.id === "implementation")).toMatchObject({
@@ -1079,44 +1079,44 @@ describe("workspace entity UI flows", () => {
       id: "review-pass",
       description: "Review output"
     });
-    expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save workflow policy" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit workflow policy" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Remove workflow step" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy agent")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save loop policy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit loop policy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove loop step" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
-      body: expect.stringContaining(`"steps":["${workflowStartPolicyId}","on.implementation.failed.start.implementation"]`)
+      body: expect.stringContaining(`"steps":["${loopStartPolicyId}","on.implementation.failed.start.implementation"]`)
     }));
   });
 
-  it("removes the selected action node from the workflow sheet without deleting global config", async () => {
+  it("removes the selected action node from the loop sheet without deleting global config", async () => {
     const user = userEvent.setup();
-    const { data, fetchMock } = await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop");
+    const { data, fetchMock } = await renderRoute("/automation/loops?id=project-brief-gate.approved.loop");
     const policyId = "on.implementation.failed.start.implementation";
 
-    activateWorkflowNode(screen.getByLabelText(`Policy: ${policyId}`));
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
+    activateLoopNode(screen.getByLabelText(`Policy: ${policyId}`));
+    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Remove from workflow" }));
+    await user.click(screen.getByRole("button", { name: "Remove from loop" }));
 
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Loop handler" })).not.toBeInTheDocument());
     expect(screen.queryByLabelText(`Policy: ${policyId}`)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
-    await waitFor(() => expect(data.automation.workflows[0]?.steps).toEqual([workflowStartPolicyId]));
+    await waitFor(() => expect(data.automation.loops[0]?.steps).toEqual([loopStartPolicyId]));
     expect(data.automation.policies).toContainEqual(expect.objectContaining({ id: policyId }));
     expect(data.automation.actions).toContainEqual(expect.objectContaining({ id: "implementation" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
-      body: expect.stringContaining(`"steps":["${workflowStartPolicyId}"]`)
+      body: expect.stringContaining(`"steps":["${loopStartPolicyId}"]`)
     }));
   });
 
-  it("switches workflow action sheet content, ignores canvas clicks, and closes with Escape", async () => {
+  it("switches loop action sheet content, ignores canvas clicks, and closes with Escape", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.agents.push({
+    const loopData = baseData();
+    loopData.agents.push({
       id: "agent-2",
       name: "Review Agent",
       description: "Reviews work",
@@ -1129,48 +1129,48 @@ describe("workspace entity UI flows", () => {
       relativePath: ".codex/agents/review-agent.toml",
       frontmatter: { runtime: "runtime-1" }
     });
-    workflowData.automation.actions.push({
+    loopData.automation.actions.push({
       id: "review-pass",
       description: "Review output",
       outputIds: ["summary", "failed"],
       agentIds: ["agent-2"]
     });
-    workflowData.automation.policies.push({
+    loopData.automation.policies.push({
       id: "on.implementation.complete.start.review-pass",
       source: "event",
       event: "implementation.complete",
       action: "review-pass",
       enabled: true
     });
-    workflowData.automation.workflows[0]!.steps = [
+    loopData.automation.loops[0]!.steps = [
       "on.implementation.failed.start.implementation",
       "on.implementation.complete.start.review-pass"
     ];
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
+    activateLoopNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
+    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
     expectActionSelectValue("implementation");
 
-    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.complete.start.review-pass"));
+    activateLoopNode(screen.getByLabelText("Policy: on.implementation.complete.start.review-pass"));
     expectActionSelectValue("review-pass");
 
-    const workflowPane = document.querySelector(".react-flow__pane");
-    expect(workflowPane).toBeInTheDocument();
-    fireEvent.click(workflowPane as Element);
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
+    const loopPane = document.querySelector(".react-flow__pane");
+    expect(loopPane).toBeInTheDocument();
+    fireEvent.click(loopPane as Element);
+    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
     expectActionSelectValue("review-pass");
     await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Loop handler" })).not.toBeInTheDocument());
   });
 
-  it("opens the workflow action sheet from node click activation", async () => {
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop");
+  it("opens the loop action sheet from node click activation", async () => {
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop");
 
     const implementationPolicyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
-    activateWorkflowNode(implementationPolicyNode);
+    activateLoopNode(implementationPolicyNode);
 
-    const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
+    const dialog = screen.getByRole("dialog", { name: "Loop handler" });
     expect(dialog).toBeInTheDocument();
     expectActionSelectValue("implementation");
     expect(within(dialog).getByLabelText("Handler action")).toHaveClass("border-primary/60", "bg-primary/10", "text-primary");
@@ -1190,21 +1190,21 @@ describe("workspace entity UI flows", () => {
     expect(within(inputRoute).getByText("failed")).toHaveClass("text-destructive", "decoration-destructive", "underline");
   });
 
-  it("renders workflow output handler actions instead of output event targets", async () => {
-    const workflowData = baseData();
-    workflowData.automation.actions[0] = {
+  it("renders loop output handler actions instead of output event targets", async () => {
+    const loopData = baseData();
+    loopData.automation.actions[0] = {
       id: "implementation",
       description: "Implement work",
       outputIds: ["approved", "changes-requested"],
       agentIds: ["agent-1"]
     };
-    workflowData.automation.actions.push({
+    loopData.automation.actions.push({
       id: "review-pass",
       description: "Review output.",
       outputIds: ["summary"],
       agentIds: ["agent-1"]
     });
-    workflowData.automation.policies.push({
+    loopData.automation.policies.push({
       id: "on.implementation.approved.start.review-pass",
       source: "event",
       event: "implementation.approved",
@@ -1217,15 +1217,15 @@ describe("workspace entity UI flows", () => {
       action: "review-pass",
       enabled: true
     });
-    workflowData.automation.workflows[0]!.steps = [
+    loopData.automation.loops[0]!.steps = [
       "on.implementation.failed.start.implementation",
       "on.implementation.approved.start.review-pass",
       "on.implementation.changes-requested.start.review-pass"
     ];
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
-    const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
+    activateLoopNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
+    const dialog = screen.getByRole("dialog", { name: "Loop handler" });
 
     expect(within(dialog).getByText("Outputs")).toBeInTheDocument();
     expect(within(dialog).queryByText("Output targets")).not.toBeInTheDocument();
@@ -1247,9 +1247,9 @@ describe("workspace entity UI flows", () => {
     expect(changesRequestedLabel.closest("button")).toBeNull();
   });
 
-  it("renders missing workflow output handlers as None", async () => {
-    const workflowData = baseData();
-    workflowData.automation.actions[0] = {
+  it("renders missing loop output handlers as None", async () => {
+    const loopData = baseData();
+    loopData.automation.actions[0] = {
       id: "implementation",
       description: "Review generated evidence.",
       outputIds: ["approved", "changes-requested"],
@@ -1257,10 +1257,10 @@ describe("workspace entity UI flows", () => {
       humanGate: true
     };
 
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
-    const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
+    activateLoopNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
+    const dialog = screen.getByRole("dialog", { name: "Loop handler" });
 
     expect(within(dialog).queryByText("Output targets")).not.toBeInTheDocument();
     expect(within(dialog).getByText("Output routing")).toBeInTheDocument();
@@ -1270,7 +1270,7 @@ describe("workspace entity UI flows", () => {
     expect(within(dialog).getAllByText("None").length).toBe(1);
   });
 
-  it("creates an automation action and keeps workflow action editing sheet-based", async () => {
+  it("creates an automation action and keeps loop action editing sheet-based", async () => {
     const user = userEvent.setup();
     const { data } = await renderRoute("/automation/actions");
 
@@ -1299,12 +1299,12 @@ describe("workspace entity UI flows", () => {
     )).toBe(true));
     expect(data.automation.outputs).toContainEqual({ id: "needs-clarification" });
 
-    await user.click(screen.getByRole("link", { name: "Workflows" }));
+    await user.click(screen.getByRole("link", { name: "Loops" }));
     await user.click(screen.getByRole("link", { name: "project-brief-gate.approved.loop" }));
-    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
+    activateLoopNode(screen.getByLabelText("Policy: on.implementation.failed.start.implementation"));
+    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
     expectActionSelectValue("implementation");
-    expect(screen.queryByLabelText("Workflow policy action")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy action")).not.toBeInTheDocument();
     const implementationPolicy = data.automation.policies.find((policy) =>
       policy.id === "on.implementation.failed.start.implementation"
     );
@@ -1315,16 +1315,16 @@ describe("workspace entity UI flows", () => {
 
   it("allows saving an agentless action without outputs", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.automation.policies[0] = {
+    const loopData = baseData();
+    loopData.automation.policies[0] = {
       id: "on.trigger.manual-start.start.implementation",
       source: "event",
       event: "trigger.manual-start",
       action: "implementation",
       enabled: true
     };
-    workflowData.automation.workflows[0]!.steps = ["on.trigger.manual-start.start.implementation"];
-    const { data } = await renderRoute("/automation/actions?id=implementation", workflowData);
+    loopData.automation.loops[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    const { data } = await renderRoute("/automation/actions?id=implementation", loopData);
 
     expect(badgeWithTextClass("trigger.manual-start", "border-primary/60")).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Remove agent Existing Agent" }));
@@ -1344,30 +1344,30 @@ describe("workspace entity UI flows", () => {
     expect(data.eventDefinitions.map((event) => event.eventType)).not.toContain("implementation.failed");
   });
 
-  it("selects an agentless workflow action without rendering output events", async () => {
-    const workflowData = baseData();
-    workflowData.automation.actions.push({
+  it("selects an agentless loop action without rendering output events", async () => {
+    const loopData = baseData();
+    loopData.automation.actions.push({
       id: "manual-gate",
-      description: "Manual workflow stop",
+      description: "Manual loop stop",
       outputIds: [],
       agentIds: []
     });
-    workflowData.automation.policies[0] = {
+    loopData.automation.policies[0] = {
       id: "on.implementation.failed.start.manual-gate",
       source: "event",
       event: "implementation.failed",
       action: "manual-gate",
       enabled: true
     };
-    workflowData.automation.workflows[0]!.steps = ["on.implementation.failed.start.manual-gate"];
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    loopData.automation.loops[0]!.steps = ["on.implementation.failed.start.manual-gate"];
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
-    activateWorkflowNode(screen.getByLabelText("Policy: on.implementation.failed.start.manual-gate"));
+    activateLoopNode(screen.getByLabelText("Policy: on.implementation.failed.start.manual-gate"));
 
-    expect(screen.getByRole("dialog", { name: "Workflow handler" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
     expectActionSelectValue("manual-gate");
     expect(screen.queryByRole("button", { name: /Add policy step for manual-gate\./ })).not.toBeInTheDocument();
-    expect(document.querySelector('[data-workflow-output-event^="manual-gate."]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-loop-output-event^="manual-gate."]')).not.toBeInTheDocument();
   });
 
   it("selects, creates, normalizes, and preserves action output slots", async () => {
@@ -1396,8 +1396,8 @@ describe("workspace entity UI flows", () => {
   });
 
   it("renders action output badges by event and trigger target type", async () => {
-    const workflowData = baseData();
-    workflowData.automation.actions[0] = {
+    const loopData = baseData();
+    loopData.automation.actions[0] = {
       id: "implementation",
       description: "Review generated evidence.",
       outputIds: ["complete", "failed"],
@@ -1405,7 +1405,7 @@ describe("workspace entity UI flows", () => {
       humanGate: true
     };
 
-    await renderRoute("/automation/actions?id=implementation", workflowData);
+    await renderRoute("/automation/actions?id=implementation", loopData);
 
     expect(badgeWithTextClass("implementation.complete", "border-tertiary/60")).toBeDefined();
     expect(badgeWithTextClass("implementation.failed", "border-primary/60")).toBeDefined();
@@ -1413,16 +1413,16 @@ describe("workspace entity UI flows", () => {
 
   it("allows removing the optional rework output from an agent action", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.automation.policies[0] = {
+    const loopData = baseData();
+    loopData.automation.policies[0] = {
       id: "on.trigger.manual-start.start.implementation",
       source: "event",
       event: "implementation.complete",
       action: "implementation",
       enabled: true
     };
-    workflowData.automation.workflows[0]!.steps = ["on.trigger.manual-start.start.implementation"];
-    const { data } = await renderRoute("/automation/actions?id=implementation", workflowData);
+    loopData.automation.loops[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    const { data } = await renderRoute("/automation/actions?id=implementation", loopData);
 
     expect(screen.queryByRole("button", { name: "Remove output complete" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove output failed" }));
@@ -1436,11 +1436,11 @@ describe("workspace entity UI flows", () => {
     expect(data.eventDefinitions.map((event) => event.eventType)).not.toContain("implementation.failed");
   });
 
-  it("renders every action output as a workflow event endpoint", async () => {
-    const workflowData = baseData();
-    workflowData.automation.actions[0]!.outputIds = ["failed", "summary"];
+  it("renders every action output as a loop event endpoint", async () => {
+    const loopData = baseData();
+    loopData.automation.actions[0]!.outputIds = ["failed", "summary"];
 
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
     const outputEvent = screen.getByRole("button", { name: "Add policy step for implementation.failed" });
     const summaryOutputEvent = screen.getByRole("button", { name: "Add policy step for implementation.summary" });
@@ -1448,38 +1448,38 @@ describe("workspace entity UI flows", () => {
     expect(outputEvent).toBeInTheDocument();
     expect(outputEvent).toHaveTextContent("+ Action");
     expect(outputEvent).not.toHaveTextContent("implementation.failed");
-    await waitFor(() => expect(workflowEdgeLabelTexts().length).toBeGreaterThan(0));
-    expect(workflowEdgeEndLabels()).toHaveLength(0);
-    const implementationFailedGhostEdgeLabel = workflowEdgeLabels().find((label) =>
-      label.dataset.workflowEdgeLabelValue === "failed" &&
-      label.dataset.workflowEdgeTargetKind === "output-event"
+    await waitFor(() => expect(loopEdgeLabelTexts().length).toBeGreaterThan(0));
+    expect(loopEdgeEndLabels()).toHaveLength(0);
+    const implementationFailedGhostEdgeLabel = loopEdgeLabels().find((label) =>
+      label.dataset.loopEdgeLabelValue === "failed" &&
+      label.dataset.loopEdgeTargetKind === "output-event"
     );
     if (implementationFailedGhostEdgeLabel) expect(implementationFailedGhostEdgeLabel.children[0]).toHaveClass("text-primary/55");
     expect(outputEvent.querySelector("svg")).not.toBeInTheDocument();
     expect(summaryOutputEvent).toBeInTheDocument();
     expect(summaryOutputEvent).not.toHaveTextContent("implementation.summary");
     expect(summaryOutputEvent.querySelector("svg")).not.toBeInTheDocument();
-    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("summary"));
+    await waitFor(() => expect(loopEdgeLabelTexts()).toContain("summary"));
   });
 
   it("renders human gate actions and records prompt responses", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.automation.actions[0] = {
+    const loopData = baseData();
+    loopData.automation.actions[0] = {
       id: "implementation",
       description: "Review generated evidence.",
       outputIds: ["approved", "changes-requested"],
       agentIds: [],
       humanGate: true
     };
-    const { data } = await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    const { data } = await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
     const policyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
     expect(policyNode).toHaveTextContent("implementation");
     expect(policyNode).not.toHaveTextContent("Human Gate");
     expect(policyNode).toHaveClass("border-tertiary/60");
-    activateWorkflowNode(policyNode);
-    const dialog = screen.getByRole("dialog", { name: "Workflow handler" });
+    activateLoopNode(policyNode);
+    const dialog = screen.getByRole("dialog", { name: "Loop handler" });
     expect(within(dialog).queryByLabelText("Action ID")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("switch", { name: "Human gate" })).not.toBeInTheDocument();
     expect(within(dialog).getByLabelText("Handler action")).toHaveTextContent("implementation");
@@ -1503,14 +1503,14 @@ describe("workspace entity UI flows", () => {
       policyId: "on.implementation.failed.start.implementation",
       actionId: "implementation",
       outputId: "approved",
-      workflowId: "project-brief-gate.approved.loop",
+      loopId: "project-brief-gate.approved.loop",
       prompt: "Approved with trace evidence."
     })));
     await waitFor(() => expect(data.events).toContainEqual(expect.objectContaining({
       eventType: "trigger.implementation.approved",
       source: "human-gate",
       payload: expect.objectContaining({
-        workflow_id: "project-brief-gate.approved.loop",
+        loop_id: "project-brief-gate.approved.loop",
         policy_id: "on.implementation.failed.start.implementation",
         action: "implementation",
         output_id: "approved",
@@ -1519,38 +1519,38 @@ describe("workspace entity UI flows", () => {
     })));
   });
 
-  it("renders only the approval endpoint for one-output workflow actions", async () => {
-    const workflowData = baseData();
-    workflowData.automation.policies[0] = {
+  it("renders only the approval endpoint for one-output loop actions", async () => {
+    const loopData = baseData();
+    loopData.automation.policies[0] = {
       id: "on.trigger.manual-start.start.implementation",
       source: "event",
       event: "trigger.manual-start",
       action: "implementation",
       enabled: true
     };
-    workflowData.automation.workflows[0]!.steps = ["on.trigger.manual-start.start.implementation"];
-    workflowData.automation.actions[0]!.outputIds = ["summary"];
+    loopData.automation.loops[0]!.steps = ["on.trigger.manual-start.start.implementation"];
+    loopData.automation.actions[0]!.outputIds = ["summary"];
 
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
     expect(screen.getByRole("button", { name: "Add policy step for implementation.summary" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add policy step for implementation.failed" })).not.toBeInTheDocument();
-    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("summary"));
-    expect(workflowEdgeLabelTexts()).not.toContain("failed");
+    await waitFor(() => expect(loopEdgeLabelTexts()).toContain("summary"));
+    expect(loopEdgeLabelTexts()).not.toContain("failed");
   });
 
-  it("creates done workflow handlers with the done action", async () => {
+  it("creates done loop handlers with the done action", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.automation.outputs.push({ id: "done" });
-    workflowData.automation.actions[0]!.outputIds = ["failed", "done"];
-    workflowData.automation.actions.push({
+    const loopData = baseData();
+    loopData.automation.outputs.push({ id: "done" });
+    loopData.automation.actions[0]!.outputIds = ["failed", "done"];
+    loopData.automation.actions.push({
       id: "done",
       description: "No further actions.",
       outputIds: [],
       agentIds: []
     });
-    const { data } = await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    const { data } = await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
     await user.click(screen.getByRole("button", { name: "Add policy step for implementation.done" }));
     expect(screen.getByLabelText("Policy: on.implementation.done.start.done")).toBeInTheDocument();
@@ -1564,31 +1564,31 @@ describe("workspace entity UI flows", () => {
       event: "implementation.done",
       action: "done"
     })));
-    expect(data.automation.workflows[0]?.steps).toContain("on.implementation.done.start.done");
+    expect(data.automation.loops[0]?.steps).toContain("on.implementation.done.start.done");
   });
 
   it("renames an automation action and rewrites derived policy events", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.automation.actions.push({
+    const loopData = baseData();
+    loopData.automation.actions.push({
       id: "review",
       description: "Review implementation output.",
       outputIds: ["complete", "failed"],
       agentIds: ["agent-1"]
     });
-    workflowData.automation.policies.push({
+    loopData.automation.policies.push({
       id: "on.implementation.complete.start.review",
       source: "event",
       event: "implementation.complete",
       action: "review",
       enabled: true
     });
-    workflowData.automation.workflows[0]!.steps = [
-      workflowStartPolicyId,
+    loopData.automation.loops[0]!.steps = [
+      loopStartPolicyId,
       "on.implementation.failed.start.implementation",
       "on.implementation.complete.start.review"
     ];
-    const { data } = await renderRoute("/automation/actions?id=implementation", workflowData);
+    const { data } = await renderRoute("/automation/actions?id=implementation", loopData);
 
     fireEvent.change(screen.getByLabelText("Action ID"), { target: { value: "implement" } });
     await user.click(screen.getByRole("button", { name: "Save automation" }));
@@ -1605,19 +1605,19 @@ describe("workspace entity UI flows", () => {
       event: "implement.complete",
       action: "review"
     });
-    expect(data.automation.workflows[0]?.steps).toEqual([
-      workflowStartPolicyId,
+    expect(data.automation.loops[0]?.steps).toEqual([
+      loopStartPolicyId,
       "on.implement.failed.start.implement",
       "on.implement.complete.start.review"
     ]);
   });
 
-  it("treats the removed automation triggers route as a workflows alias", async () => {
+  it("treats the removed automation triggers route as a loops alias", async () => {
     await renderRoute("/automation/triggers");
 
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Triggers" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
   });
 
   it("creates, toggles, deletes, and saves human gate actions", async () => {
@@ -1652,8 +1652,8 @@ describe("workspace entity UI flows", () => {
 
   it("creates a policy from a ghost event and opens its action sheet", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    workflowData.agents.push({
+    const loopData = baseData();
+    loopData.agents.push({
       id: "agent-2",
       name: "Review Agent",
       description: "Reviews work",
@@ -1666,17 +1666,17 @@ describe("workspace entity UI flows", () => {
       relativePath: ".codex/agents/review-agent.toml",
       frontmatter: { runtime: "runtime-1" }
     });
-    workflowData.automation.actions.push({
+    loopData.automation.actions.push({
       id: "review-pass",
       description: "Review output",
       outputIds: ["complete", "failed"],
       agentIds: ["agent-2"]
     });
-    const { data } = await renderRoute("/automation/policies?id=project-brief-gate.approved.loop", workflowData);
+    const { data } = await renderRoute("/automation/policies?id=project-brief-gate.approved.loop", loopData);
 
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
 
     await user.click(await screen.findByRole("button", { name: "Add policy step for implementation.complete" }));
     const foldedImplementationNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
@@ -1684,14 +1684,14 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByLabelText("Policy: on.implementation.complete.start.implementation")).not.toBeInTheDocument();
     expect(within(foldedImplementationNode).getByText("x2")).toBeInTheDocument();
 
-    expect(screen.queryByLabelText("Workflow policy source")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow policy event")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow policy trigger")).not.toBeInTheDocument();
-    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("complete"));
-    expect(screen.queryByLabelText("Workflow policy agent")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy source")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy event")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy trigger")).not.toBeInTheDocument();
+    await waitFor(() => expect(loopEdgeLabelTexts()).toContain("complete"));
+    expect(screen.queryByLabelText("Loop policy agent")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Output handler" })).toBeInTheDocument();
     expectActionSelectValue("implementation");
-    expect(screen.queryByLabelText("Workflow policy action")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop policy action")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
@@ -1703,23 +1703,23 @@ describe("workspace entity UI flows", () => {
       action: "implementation",
       id: "on.implementation.complete.start.implementation"
     })));
-    expect(data.automation.workflows[0]?.steps).toEqual([
-      workflowStartPolicyId,
+    expect(data.automation.loops[0]?.steps).toEqual([
+      loopStartPolicyId,
       "on.implementation.failed.start.implementation",
       "on.implementation.complete.start.implementation"
     ]);
   });
 
-  it("does not activate repeated workflow events that already have a policy handler", async () => {
-    const workflowData = baseData();
-    workflowData.automation.outputs.push({ id: "accepted" }, { id: "rejected" });
-    workflowData.automation.actions.push({
+  it("does not activate repeated loop events that already have a policy handler", async () => {
+    const loopData = baseData();
+    loopData.automation.outputs.push({ id: "accepted" }, { id: "rejected" });
+    loopData.automation.actions.push({
       id: "review",
       description: "Review implementation output.",
       outputIds: ["accepted", "rejected"],
       agentIds: ["agent-1"]
     });
-    workflowData.automation.policies = [{
+    loopData.automation.policies = [{
       id: "on.trigger.manual-start.start.implementation",
       source: "event",
       event: "trigger.manual-start",
@@ -1738,25 +1738,25 @@ describe("workspace entity UI flows", () => {
       action: "implementation",
       enabled: true
     }];
-    workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
+    loopData.automation.loops[0]!.steps = loopData.automation.policies.map((policy) => policy.id);
 
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
     expect(screen.getByLabelText("Policy: on.implementation.complete.start.review")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add policy step for implementation.complete" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Add policy step for implementation.failed" }).length).toBeGreaterThan(0);
   });
 
-  it("renders workflow edges with the smart step edge type", async () => {
-    const workflowData = baseData();
-    workflowData.automation.outputs.push({ id: "accepted" }, { id: "rejected" });
-    workflowData.automation.actions.push({
+  it("renders loop edges with the smart step edge type", async () => {
+    const loopData = baseData();
+    loopData.automation.outputs.push({ id: "accepted" }, { id: "rejected" });
+    loopData.automation.actions.push({
       id: "review",
       description: "Review implementation output.",
       outputIds: ["accepted", "rejected"],
       agentIds: ["agent-1"]
     });
-    workflowData.automation.policies = [{
+    loopData.automation.policies = [{
       id: "on.trigger.manual-start.start.implementation",
       source: "event",
       event: "trigger.manual-start",
@@ -1775,18 +1775,18 @@ describe("workspace entity UI flows", () => {
       action: "implementation",
       enabled: true
     }];
-    workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
+    loopData.automation.loops[0]!.steps = loopData.automation.policies.map((policy) => policy.id);
 
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
     await screen.findByLabelText("Policy: on.trigger.manual-start.start.implementation");
     expect(screen.queryByLabelText("Policy: on.review.rejected.start.implementation")).not.toBeInTheDocument();
 
     await waitFor(() => {
-      expect(document.querySelectorAll(".react-flow__edge-workflowSmart").length).toBeGreaterThan(0);
+      expect(document.querySelectorAll(".react-flow__edge-loopSmart").length).toBeGreaterThan(0);
     });
     expect(document.querySelectorAll(".react-flow__edge-smoothstep")).toHaveLength(0);
-    expect(document.querySelectorAll("[data-workflow-connector=\"true\"]").length).toBeGreaterThan(0);
-    const connectionPoints = document.querySelectorAll(".workflow-react-flow-handle");
+    expect(document.querySelectorAll("[data-loop-connector=\"true\"]").length).toBeGreaterThan(0);
+    const connectionPoints = document.querySelectorAll(".loop-react-flow-handle");
     expect(connectionPoints.length).toBeGreaterThan(0);
     expect(getComputedStyle(connectionPoints[0]!).opacity).toBe("1");
     const returnSourcePolicyNode = screen.getByLabelText("Policy: on.implementation.complete.start.review").closest(".react-flow__node");
@@ -1796,32 +1796,32 @@ describe("workspace entity UI flows", () => {
     expect(returnSourcePolicyNode?.querySelectorAll(".react-flow__handle-top").length).toBeGreaterThan(0);
     expect(returnTargetPolicyNode?.querySelectorAll(".react-flow__handle").length).toBeGreaterThan(0);
     expect(document.querySelectorAll("[data-handleid^=\"right-output-\"]")).toHaveLength(0);
-    expect(document.querySelectorAll("[data-workflow-edge-endpoint]").length).toBe(0);
-    expect(document.querySelectorAll("[data-workflow-edge-tone=\"return\"]")).toHaveLength(1);
+    expect(document.querySelectorAll("[data-loop-edge-endpoint]").length).toBe(0);
+    expect(document.querySelectorAll("[data-loop-edge-tone=\"return\"]")).toHaveLength(1);
     await waitFor(() => {
-      expect(workflowEdgeLabelTexts()).toEqual(expect.arrayContaining([
+      expect(loopEdgeLabelTexts()).toEqual(expect.arrayContaining([
         "manual-start",
         "complete",
         "rejected"
       ]));
     });
-    const returnEdgeLabel = workflowEdgeLabels().find((label) =>
-      label.dataset.workflowEdgeLabelTone === "return" &&
-      label.dataset.workflowEdgeLabelValue === "rejected"
+    const returnEdgeLabel = loopEdgeLabels().find((label) =>
+      label.dataset.loopEdgeLabelTone === "return" &&
+      label.dataset.loopEdgeLabelValue === "rejected"
     );
     expect(returnEdgeLabel).toBeDefined();
     expect(returnEdgeLabel).toHaveTextContent("rejected");
-    expect(returnEdgeLabel).toHaveAttribute("data-workflow-edge-label-value", "rejected");
+    expect(returnEdgeLabel).toHaveAttribute("data-loop-edge-label-value", "rejected");
     expect(returnEdgeLabel).not.toHaveAttribute("aria-label");
     expect(returnEdgeLabel).toHaveAttribute("aria-hidden", "true");
     expect(returnEdgeLabel).toHaveStyle({ pointerEvents: "none" });
-    expect(workflowEdgeStartLabels()).toHaveLength(0);
-    expect(workflowEdgeEndLabels()).toHaveLength(0);
+    expect(loopEdgeStartLabels()).toHaveLength(0);
+    expect(loopEdgeEndLabels()).toHaveLength(0);
   });
 
-  it("toggles the workflow edge animation effect on click", async () => {
-    const workflowData = baseData();
-    workflowData.automation.policies = [{
+  it("toggles the loop edge animation effect on click", async () => {
+    const loopData = baseData();
+    loopData.automation.policies = [{
       id: "on.trigger.manual-start.start.implementation",
       source: "event",
       event: "trigger.manual-start",
@@ -1834,71 +1834,71 @@ describe("workspace entity UI flows", () => {
       action: "review",
       enabled: true
     }];
-    workflowData.automation.workflows[0]!.steps = workflowData.automation.policies.map((policy) => policy.id);
+    loopData.automation.loops[0]!.steps = loopData.automation.policies.map((policy) => policy.id);
 
-    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
     await screen.findByLabelText("Policy: on.implementation.complete.start.review");
 
     await waitFor(() => {
-      expect(document.querySelectorAll("[data-workflow-connector=\"true\"]").length).toBeGreaterThan(0);
+      expect(document.querySelectorAll("[data-loop-connector=\"true\"]").length).toBeGreaterThan(0);
     });
-    const edge = document.querySelector("[data-workflow-connector=\"true\"][data-workflow-edge-label-value=\"complete\"]");
+    const edge = document.querySelector("[data-loop-connector=\"true\"][data-loop-edge-label-value=\"complete\"]");
     expect(edge).not.toBeNull();
-    expect(edge).toHaveAttribute("data-workflow-edge-animated", "false");
+    expect(edge).toHaveAttribute("data-loop-edge-animated", "false");
 
     fireEvent.click(edge!);
 
     await waitFor(() => {
-      expect(edge).toHaveAttribute("data-workflow-edge-animated", "true");
+      expect(edge).toHaveAttribute("data-loop-edge-animated", "true");
     });
-    expect(edge).toHaveClass("workflow-edge-animated");
+    expect(edge).toHaveClass("loop-edge-animated");
     expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Loop handler" })).not.toBeInTheDocument();
 
     fireEvent.click(edge!);
 
     await waitFor(() => {
-      expect(edge).toHaveAttribute("data-workflow-edge-animated", "false");
+      expect(edge).toHaveAttribute("data-loop-edge-animated", "false");
     });
-    expect(edge).not.toHaveClass("workflow-edge-animated");
+    expect(edge).not.toHaveClass("loop-edge-animated");
     expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "Workflow handler" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Loop handler" })).not.toBeInTheDocument();
   });
 
-  it("routes legacy policies paths to workflow configuration", async () => {
+  it("routes legacy policies paths to loop configuration", async () => {
     await renderRoute("/policies");
 
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow ID")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop ID")).not.toBeInTheDocument();
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
   });
 
-  it("routes the removed agent runs page to workflow configuration", async () => {
+  it("routes the removed agent runs page to loop configuration", async () => {
     await renderRoute("/agent-runs");
 
     expect(screen.queryByRole("link", { name: /agent runs/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Agent runs")).not.toBeInTheDocument();
     expect(screen.queryByText("Run detail")).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Workflow ID")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Loop ID")).not.toBeInTheDocument();
   });
 
-  it("creates the first event workflow policy from the workflow canvas", async () => {
+  it("creates the first event loop policy from the loop canvas", async () => {
     const user = userEvent.setup();
-    const workflowData = baseData();
-    const implementationStartPolicyId = `on.trigger.${workflowTrigger}.start.implementation`;
-    workflowData.automation.policies = [{
+    const loopData = baseData();
+    const implementationStartPolicyId = `on.trigger.${loopTrigger}.start.implementation`;
+    loopData.automation.policies = [{
       id: implementationStartPolicyId,
       source: "trigger",
-      trigger: workflowTrigger,
+      trigger: loopTrigger,
       action: "implementation",
       enabled: true
     }];
-    workflowData.automation.workflows[0]!.steps = [implementationStartPolicyId];
-    const { data } = await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+    loopData.automation.loops[0]!.steps = [implementationStartPolicyId];
+    const { data } = await renderRoute("/automation/loops?id=project-brief-gate.approved.loop", loopData);
 
     await user.click(screen.getByRole("button", { name: "Add policy step for implementation.complete" }));
     await user.click(screen.getByRole("button", { name: "Save automation" }));
@@ -1910,7 +1910,7 @@ describe("workspace entity UI flows", () => {
       action: "implementation",
       id: "on.implementation.complete.start.implementation"
     });
-    expect(data.automation.workflows[0]?.steps).toEqual([implementationStartPolicyId, "on.implementation.complete.start.implementation"]);
+    expect(data.automation.loops[0]?.steps).toEqual([implementationStartPolicyId, "on.implementation.complete.start.implementation"]);
   });
 
   it("falls back from the removed automation events route", async () => {

@@ -6,7 +6,7 @@ import type {
   ProjectOutput,
   ProjectOutputRoute,
   ProjectPolicy,
-  ProjectWorkflow
+  ProjectLoop
 } from "../../shared/domain/automation.js";
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
 import type { ProjectRuntime } from "../../shared/domain/runtime.js";
@@ -23,7 +23,7 @@ import {
   normalizePolicyOutputEventType,
   normalizePolicyToken,
   normalizeTriggerToken,
-  normalizeWorkflowId,
+  normalizeLoopId,
   projectOutputRouteKey,
   projectOutputRouteCanTargetTrigger,
   policyActionTokens,
@@ -31,7 +31,7 @@ import {
   triggerEventType,
   uniquePolicyOutputIds,
   resolvePolicyAgent,
-  workflowIdForPolicy
+  loopIdForPolicy
 } from "../../shared/policy-actions.js";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -342,25 +342,25 @@ const normalizeRuntime = (value: Record<string, unknown>): ProjectRuntime => ({
   args: stringArray(value.args)
 });
 
-const normalizeWorkflow = (value: Record<string, unknown>, policyIdMap: Map<string, string>): ProjectWorkflow => ({
-  id: normalizeWorkflowId(stringValue(value.id)),
+const normalizeLoop = (value: Record<string, unknown>, policyIdMap: Map<string, string>): ProjectLoop => ({
+  id: normalizeLoopId(stringValue(value.id)),
   steps: stringArray(value.steps).map((step) => policyIdMap.get(step) ?? step)
 });
 
-const normalizeWorkflowsFromStartingTriggers = (
-  workflows: ProjectWorkflow[],
+const normalizeLoopsFromStartingTriggers = (
+  loops: ProjectLoop[],
   policies: ProjectPolicy[]
-): { workflows: ProjectWorkflow[]; workflowIdMap: Map<string, string> } => {
+): { loops: ProjectLoop[]; loopIdMap: Map<string, string> } => {
   const policyById = new Map(policies.map((policy) => [policy.id, policy]));
-  const workflowIdMap = new Map<string, string>();
-  const normalizedWorkflows = workflows.map((workflow) => {
-    const oldId = normalizeWorkflowId(workflow.id);
-    const derivedId = workflowIdForPolicy(policyById.get(workflow.steps[0] ?? ""));
+  const loopIdMap = new Map<string, string>();
+  const normalizedLoops = loops.map((loop) => {
+    const oldId = normalizeLoopId(loop.id);
+    const derivedId = loopIdForPolicy(policyById.get(loop.steps[0] ?? ""));
     const id = derivedId || oldId;
-    if (oldId && derivedId && oldId !== derivedId) workflowIdMap.set(oldId, derivedId);
-    return { ...workflow, id };
+    if (oldId && derivedId && oldId !== derivedId) loopIdMap.set(oldId, derivedId);
+    return { ...loop, id };
   });
-  return { workflows: normalizedWorkflows, workflowIdMap };
+  return { loops: normalizedLoops, loopIdMap };
 };
 
 const normalizeOutputRouteTarget = (value: unknown): ProjectOutputRoute["target"] | undefined => {
@@ -432,7 +432,7 @@ const legacyTriggerIdMapFromOutputRoutes = (
 
 type LegacyGateRouteMigration = {
   policies: ProjectPolicy[];
-  workflows: ProjectWorkflow[];
+  loops: ProjectLoop[];
   routePolicyIdByGateRouteKey: Map<string, string>;
 };
 
@@ -442,13 +442,13 @@ const legacyGateRouteKey = (sourcePolicyId: string, outputId: string, gateId: st
 const migrateLegacyGateRoutes = ({
   rawOutputRoutes,
   sourcePolicies,
-  workflows,
+  loops,
   policyIdMap,
   gateActionIdByLegacyGateId
 }: {
   rawOutputRoutes: unknown;
   sourcePolicies: ProjectPolicy[];
-  workflows: ProjectWorkflow[];
+  loops: ProjectLoop[];
   policyIdMap: Map<string, string>;
   gateActionIdByLegacyGateId: Map<string, string>;
 }): LegacyGateRouteMigration => {
@@ -481,8 +481,8 @@ const migrateLegacyGateRoutes = ({
     routePolicyIdByGateRouteKey.set(legacyGateRouteKey(sourcePolicyId, outputId, gateId), gatePolicy.id);
   });
 
-  const workflowsWithLegacyGateSteps = workflows.map((workflow) => {
-    let nextSteps = [...workflow.steps];
+  const loopsWithLegacyGateSteps = loops.map((loop) => {
+    let nextSteps = [...loop.steps];
     [...routePolicyIdByGateRouteKey].forEach(([key, gatePolicyId]) => {
       const [sourcePolicyId] = key.split(":");
       const sourceIndex = nextSteps.indexOf(sourcePolicyId ?? "");
@@ -493,28 +493,28 @@ const migrateLegacyGateRoutes = ({
         ...nextSteps.slice(sourceIndex + 1)
       ];
     });
-    return { ...workflow, steps: nextSteps };
+    return { ...loop, steps: nextSteps };
   });
 
   return {
     policies: [...nextPoliciesById.values()],
-    workflows: workflowsWithLegacyGateSteps,
+    loops: loopsWithLegacyGateSteps,
     routePolicyIdByGateRouteKey
   };
 };
 
 const normalizeHumanGateResponse = (
   value: Record<string, unknown>,
-  workflowIdMap: ReadonlyMap<string, string>
+  loopIdMap: ReadonlyMap<string, string>
 ): ProjectHumanGateResponse | undefined => {
   const policyId = stringValue(value.policyId);
   const actionId = normalizePolicyToken(stringValue(value.actionId));
   const outputId = normalizePolicyToken(stringValue(value.outputId));
-  const rawWorkflowId = normalizeWorkflowId(stringValue(value.workflowId));
-  const workflowId = workflowIdMap.get(rawWorkflowId) ?? rawWorkflowId;
+  const rawLoopId = normalizeLoopId(stringValue(value.loopId));
+  const loopId = loopIdMap.get(rawLoopId) ?? rawLoopId;
   if (!policyId || !actionId || !outputId) return undefined;
   const responseBase = {
-    ...(workflowId ? { workflowId } : {}),
+    ...(loopId ? { loopId } : {}),
     policyId,
     actionId,
     outputId,
@@ -530,14 +530,14 @@ const migrateLegacyGateDecisions = ({
   gateActionIdByLegacyGateId,
   routePolicyIdByGateRouteKey,
   actionById,
-  workflowIdMap
+  loopIdMap
 }: {
   rawGateDecisions: unknown;
   policyIdMap: Map<string, string>;
   gateActionIdByLegacyGateId: Map<string, string>;
   routePolicyIdByGateRouteKey: Map<string, string>;
   actionById: Map<string, ProjectAction>;
-  workflowIdMap: ReadonlyMap<string, string>;
+  loopIdMap: ReadonlyMap<string, string>;
 }): ProjectHumanGateResponse[] =>
   recordArray(rawGateDecisions).flatMap((decision) => {
     const status = stringValue(decision.status);
@@ -553,11 +553,11 @@ const migrateLegacyGateDecisions = ({
       ? action.outputIds[0]
       : action.outputIds[1] ?? action.outputIds[0];
     if (!outputId) return [];
-    const rawWorkflowId = normalizeWorkflowId(stringValue(decision.workflowId));
-    const workflowId = workflowIdMap.get(rawWorkflowId) ?? rawWorkflowId;
+    const rawLoopId = normalizeLoopId(stringValue(decision.loopId));
+    const loopId = loopIdMap.get(rawLoopId) ?? rawLoopId;
     const prompt = stringValue(decision.comment).trim() || (status === "approved" ? "Approved." : "Rework requested.");
     const response = {
-      ...(workflowId ? { workflowId } : {}),
+      ...(loopId ? { loopId } : {}),
       policyId,
       actionId,
       outputId,
@@ -574,7 +574,7 @@ const normalizeHumanGateResponses = ({
   gateActionIdByLegacyGateId,
   routePolicyIdByGateRouteKey,
   actionById,
-  workflowIdMap
+  loopIdMap
 }: {
   rawResponses: unknown;
   rawGateDecisions: unknown;
@@ -582,18 +582,18 @@ const normalizeHumanGateResponses = ({
   gateActionIdByLegacyGateId: Map<string, string>;
   routePolicyIdByGateRouteKey: Map<string, string>;
   actionById: Map<string, ProjectAction>;
-  workflowIdMap: ReadonlyMap<string, string>;
+  loopIdMap: ReadonlyMap<string, string>;
 }): ProjectHumanGateResponse[] => {
   const responseById = new Map<string, ProjectHumanGateResponse>();
   [
-    ...recordArray(rawResponses).flatMap((response) => normalizeHumanGateResponse(response, workflowIdMap) ?? []),
+    ...recordArray(rawResponses).flatMap((response) => normalizeHumanGateResponse(response, loopIdMap) ?? []),
     ...migrateLegacyGateDecisions({
       rawGateDecisions,
       policyIdMap,
       gateActionIdByLegacyGateId,
       routePolicyIdByGateRouteKey,
       actionById,
-      workflowIdMap
+      loopIdMap
     })
   ].forEach((response) => responseById.set(response.id, response));
   return [...responseById.values()];
@@ -670,16 +670,16 @@ export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[]
     if (pair.rawId && pair.rawId !== pair.normalized.id) policyIdMap.set(pair.rawId, pair.normalized.id);
     if (pair.initialId && pair.initialId !== pair.normalized.id) policyIdMap.set(pair.initialId, pair.normalized.id);
   });
-  const workflows = recordArray(input.workflows).map((workflow) => normalizeWorkflow(workflow, policyIdMap));
+  const loops = recordArray(input.loops).map((loop) => normalizeLoop(loop, policyIdMap));
   const migratedGateRoutes = migrateLegacyGateRoutes({
     rawOutputRoutes: input.outputRoutes,
     sourcePolicies: policyPairs.map((pair) => pair.normalized),
-    workflows,
+    loops,
     policyIdMap,
     gateActionIdByLegacyGateId
   });
-  const normalizedWorkflows = normalizeWorkflowsFromStartingTriggers(
-    migratedGateRoutes.workflows,
+  const normalizedLoops = normalizeLoopsFromStartingTriggers(
+    migratedGateRoutes.loops,
     migratedGateRoutes.policies
   );
   const actionById = new Map(actions.map((action) => [action.id, action]));
@@ -696,10 +696,10 @@ export const normalizeProjectAutomationConfig = (value: unknown, agents: Agent[]
       gateActionIdByLegacyGateId,
       routePolicyIdByGateRouteKey: migratedGateRoutes.routePolicyIdByGateRouteKey,
       actionById,
-      workflowIdMap: normalizedWorkflows.workflowIdMap
+      loopIdMap: normalizedLoops.loopIdMap
     }),
     policies: migratedGateRoutes.policies,
-    workflows: normalizedWorkflows.workflows,
+    loops: normalizedLoops.loops,
     runtimes: recordArray(input.runtimes).map(normalizeRuntime)
   };
 };

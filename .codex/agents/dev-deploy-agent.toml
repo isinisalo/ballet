@@ -21,7 +21,7 @@ Lue ennen päätöstä:
 
 Säännöt:
 - Älä deployaa ennen `code_approved`-triggeriä.
-- Älä deployaa tuotantoon tästä workflowsta.
+- Älä deployaa tuotantoon tästä loopsta.
 - Tarkista config, secrets-malli, migraatiot, rollback ja observability ennen deployta.
 - Validationissa tarkista vähintään health check, smoke path, acceptance criteria ja virhelokit.
 - Jos deploy tai validation epäonnistuu, palauta outcome=failed tai changes-requested actionin mukaan.

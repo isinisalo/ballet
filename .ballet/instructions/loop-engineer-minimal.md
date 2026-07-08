@@ -1,5 +1,5 @@
 ---
-title: Loop Engineer Minimal Workflow
+title: Loop Engineer Minimal Loop
 createdAt: 2026-07-06
 tags:
   - ballet
@@ -7,9 +7,9 @@ tags:
   - governance
 ---
 
-# Loop Engineer Minimal Workflow
+# Loop Engineer Minimal Loop
 
-This project configuration implements the minimum agentic delivery workflow:
+This project configuration implements the minimum agentic delivery loop:
 
 1. Brief loop
 2. Roadmap loop
@@ -21,7 +21,7 @@ This project configuration implements the minimum agentic delivery workflow:
 
 ## Governance gates
 
-The workflow intentionally stops after each agent challenge approval and waits for the next human-approved trigger:
+The loop intentionally stops after each agent challenge approval and waits for the next human-approved trigger:
 
 | Gate | Human trigger | Meaning |
 |---|---|---|
@@ -34,7 +34,7 @@ The workflow intentionally stops after each agent challenge approval and waits f
 | Gate 7 | `code-approved` | Reviewed and tested code accepted; dev deployment may start. |
 | Gate 8 | `validate-dev-deployment.approved` | Dev deployment validated. |
 
-No implementation action is reachable from the planning workflows. Implementation starts only from `task-specs-approved`.
+No implementation action is reachable from the planning loops. Implementation starts only from `task-specs-approved`.
 
 ## Expected evidence artifacts
 

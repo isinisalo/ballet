@@ -296,29 +296,29 @@ body {
   margin-top: 1.35rem;
 }
 
-.workflow-react-flow {
+.loop-react-flow {
   background: transparent;
 }
 
-.workflow-react-flow .react-flow__node,
-.workflow-react-flow .react-flow__edge {
+.loop-react-flow .react-flow__node,
+.loop-react-flow .react-flow__edge {
   outline: none;
 }
 
-.workflow-react-flow .react-flow__node:focus,
-.workflow-react-flow .react-flow__node:focus-visible,
-.workflow-react-flow .react-flow__edge:focus,
-.workflow-react-flow .react-flow__edge:focus-visible {
+.loop-react-flow .react-flow__node:focus,
+.loop-react-flow .react-flow__node:focus-visible,
+.loop-react-flow .react-flow__edge:focus,
+.loop-react-flow .react-flow__edge:focus-visible {
   outline: none;
 }
 
-.workflow-react-flow .workflow-edge-animated .react-flow__edge-path {
+.loop-react-flow .loop-edge-animated .react-flow__edge-path {
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 70%, transparent));
   stroke-dasharray: 8 6;
-  animation: workflow-edge-flow 0.85s linear infinite;
+  animation: loop-edge-flow 0.85s linear infinite;
 }
 
-.workflow-react-flow .workflow-react-flow-handle {
+.loop-react-flow .loop-react-flow-handle {
   width: 7px;
   height: 7px;
   min-width: 7px;
@@ -331,7 +331,7 @@ body {
   z-index: 20;
 }
 
-@keyframes workflow-edge-flow {
+@keyframes loop-edge-flow {
   to {
     stroke-dashoffset: -28;
   }

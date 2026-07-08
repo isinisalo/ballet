@@ -27,18 +27,18 @@ export const normalizeTriggerToken = (value: string): string =>
     .filter(Boolean)
     .join(".");
 
-export const workflowLoopSuffix = ".loop";
+export const loopSuffix = ".loop";
 
-export const normalizeWorkflowId = (value: string): string =>
+export const normalizeLoopId = (value: string): string =>
   normalizeTriggerToken(value);
 
-export const workflowIdFromTrigger = (triggerId: string): string => {
+export const loopIdFromTrigger = (triggerId: string): string => {
   const trigger = normalizeTriggerToken(triggerId);
-  return trigger ? `${trigger}${workflowLoopSuffix}` : "";
+  return trigger ? `${trigger}${loopSuffix}` : "";
 };
 
-export const workflowIdForPolicy = (policy: Pick<ProjectPolicy, "source" | "trigger"> | undefined): string =>
-  policy?.source === "trigger" && policy.trigger ? workflowIdFromTrigger(policy.trigger) : "";
+export const loopIdForPolicy = (policy: Pick<ProjectPolicy, "source" | "trigger"> | undefined): string =>
+  policy?.source === "trigger" && policy.trigger ? loopIdFromTrigger(policy.trigger) : "";
 
 export const triggerEventType = (triggerId: string): string => `trigger.${normalizeTriggerToken(triggerId)}`;
 
@@ -214,9 +214,9 @@ export const normalizePolicyOutputEventType = (value: string): string => {
 };
 
 export const humanGateResponseId = (
-  input: Pick<ProjectHumanGateResponse, "policyId" | "actionId"> & { workflowId?: string }
+  input: Pick<ProjectHumanGateResponse, "policyId" | "actionId"> & { loopId?: string }
 ): string => [
-  input.workflowId ? normalizeWorkflowId(input.workflowId) : "workflow",
+  input.loopId ? normalizeLoopId(input.loopId) : "loop",
   normalizePolicyToken(input.policyId),
   normalizePolicyToken(input.actionId)
 ].filter(Boolean).join(":");

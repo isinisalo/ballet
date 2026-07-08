@@ -12,8 +12,8 @@ export type View =
   | "skills";
 
 export type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
-export type AutomationTab = "actions" | "workflows";
-export type AutomationWorkflowView = "all";
+export type AutomationTab = "actions" | "loops";
+export type AutomationLoopView = "all";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
@@ -22,7 +22,7 @@ export interface RouteState {
   documentPath?: string;
   automationTab?: AutomationTab;
   automationEntityId?: string;
-  automationWorkflowView?: AutomationWorkflowView;
+  automationLoopView?: AutomationLoopView;
   runtimeId?: string;
 }
 

@@ -44,7 +44,7 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
     outputRoutes: Array.isArray(config?.outputRoutes) ? config.outputRoutes : defaults.outputRoutes,
     humanGateResponses: Array.isArray(config?.humanGateResponses) ? config.humanGateResponses : defaults.humanGateResponses,
     policies: Array.isArray(config?.policies) ? config.policies : defaults.policies,
-    workflows: Array.isArray(config?.workflows) ? config.workflows : defaults.workflows,
+    loops: Array.isArray(config?.loops) ? config.loops : defaults.loops,
     runtimes: Array.isArray(config?.runtimes) ? config.runtimes : defaults.runtimes
   };
 };

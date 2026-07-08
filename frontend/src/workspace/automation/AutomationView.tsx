@@ -3,19 +3,19 @@ import { Route, Save } from "lucide-react";
 import type { AppData, EventIntakeRequest, EventRecord, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
-import type { AutomationTab, AutomationWorkflowView } from "../types";
+import type { AutomationTab, AutomationLoopView } from "../types";
 import { ActionsAutomationTab } from "./actions/ActionsAutomationTab";
 import { createAutomationEntityControls } from "./automationEntityControls";
 import { AutomationIssues } from "./AutomationIssues";
 import { useAutomationDraft } from "./useAutomationDraft";
 import { useAutomationCreateDrafts } from "./useAutomationCreateDrafts";
-import { WorkflowsAutomationTab } from "./workflows/WorkflowsAutomationTab";
+import { LoopsAutomationTab } from "./loops/LoopsAutomationTab";
 
 export function AutomationView({
   data,
   activeTab,
   selectedId,
-  workflowView,
+  loopView,
   saveAutomation,
   createEvent,
   navigate
@@ -23,7 +23,7 @@ export function AutomationView({
   data: AppData;
   activeTab: AutomationTab;
   selectedId?: string;
-  workflowView?: AutomationWorkflowView;
+  loopView?: AutomationLoopView;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
   createEvent: (event: EventIntakeRequest) => Promise<EventRecord>;
   navigate: (path: string) => void;
@@ -35,14 +35,14 @@ export function AutomationView({
   const {
     deleteConfig,
     selectedActionId,
-    selectedWorkflowId,
+    selectedLoopId,
     selectAutomationEntity
   } = createAutomationEntityControls({ activeTab, selectedId, draft, agents: data.agents, setDraft, navigate });
-  const showAllWorkflows = activeTab === "workflows" && workflowView === "all";
+  const showAllLoops = activeTab === "loops" && loopView === "all";
   const isCreateMode = useMemo(() => {
     if (activeTab === "actions") return !selectedActionId;
-    return !showAllWorkflows && !selectedWorkflowId;
-  }, [activeTab, selectedActionId, selectedWorkflowId, showAllWorkflows]);
+    return !showAllLoops && !selectedLoopId;
+  }, [activeTab, selectedActionId, selectedLoopId, showAllLoops]);
   const createDrafts = useAutomationCreateDrafts({
     activeTab,
     agents: data.agents,
@@ -57,9 +57,9 @@ export function AutomationView({
     <div className="grid gap-4">
       <Panel
         title="Automation"
-        titleExtra={activeTab === "workflows" && !isCreateMode && !showAllWorkflows ? (
-          <span className="min-w-0 truncate rounded px-1 py-0.5 font-mono text-xs font-medium text-muted-foreground" title={selectedWorkflowId}>
-            {selectedWorkflowId}
+        titleExtra={activeTab === "loops" && !isCreateMode && !showAllLoops ? (
+          <span className="min-w-0 truncate rounded px-1 py-0.5 font-mono text-xs font-medium text-muted-foreground" title={selectedLoopId}>
+            {selectedLoopId}
           </span>
         ) : null}
         icon={<Route data-icon="inline-start" />}
@@ -79,16 +79,16 @@ export function AutomationView({
             />
           </div>
         )}
-        contentClassName={activeTab === "workflows" ? "p-0" : undefined}
+        contentClassName={activeTab === "loops" ? "p-0" : undefined}
       >
-        {activeTab === "workflows" ? (
+        {activeTab === "loops" ? (
           <>
             {data.automationIssues.length > 0 ? (
               <div className="px-4 py-4">
                 <AutomationIssues issues={data.automationIssues} />
               </div>
             ) : null}
-            <WorkflowsAutomationTab agents={data.agents} projectId={data.projects[0]?.id ?? "project"} config={draft} selectedId={selectedWorkflowId} createDraft={createDrafts.newWorkflow} showAll={showAllWorkflows} onCreateDraftChange={createDrafts.updateNewWorkflow} onSelect={(id) => selectAutomationEntity("workflows", id)} updateConfig={updateConfig} saveDraft={saveDraft} createEvent={createEvent} />
+            <LoopsAutomationTab agents={data.agents} projectId={data.projects[0]?.id ?? "project"} config={draft} selectedId={selectedLoopId} createDraft={createDrafts.newLoop} showAll={showAllLoops} onCreateDraftChange={createDrafts.updateNewLoop} onSelect={(id) => selectAutomationEntity("loops", id)} updateConfig={updateConfig} saveDraft={saveDraft} createEvent={createEvent} />
           </>
         ) : (
           <div className="grid gap-4">

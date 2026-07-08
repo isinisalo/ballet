@@ -20,7 +20,7 @@
         "changes-requested"
       ],
       "agentIds": [
-        "workflow-critic-agent"
+        "loop-critic-agent"
       ]
     },
     {
@@ -52,7 +52,7 @@
         "changes-requested"
       ],
       "agentIds": [
-        "workflow-critic-agent"
+        "loop-critic-agent"
       ]
     },
     {
@@ -84,7 +84,7 @@
         "changes-requested"
       ],
       "agentIds": [
-        "workflow-critic-agent"
+        "loop-critic-agent"
       ]
     },
     {
@@ -116,7 +116,7 @@
         "changes-requested"
       ],
       "agentIds": [
-        "workflow-critic-agent"
+        "loop-critic-agent"
       ]
     },
     {
@@ -148,7 +148,7 @@
         "changes-requested"
       ],
       "agentIds": [
-        "workflow-critic-agent"
+        "loop-critic-agent"
       ]
     },
     {
@@ -180,7 +180,7 @@
         "changes-requested"
       ],
       "agentIds": [
-        "workflow-critic-agent"
+        "loop-critic-agent"
       ]
     },
     {
@@ -271,7 +271,7 @@
     },
     {
       "id": "dev-deployment-validation-gate",
-      "description": "Gate 8: Human approval of validated dev deployment before the workflow is done.",
+      "description": "Gate 8: Human approval of validated dev deployment before the loop is done.",
       "outputIds": [
         "approved",
         "changes-requested"
@@ -292,7 +292,7 @@
     },
     {
       "id": "done",
-      "description": "No further workflow action.",
+      "description": "No further loop action.",
       "outputIds": [],
       "agentIds": []
     }
@@ -710,7 +710,7 @@
       "id": "on.classify-failure.blocked.start.done"
     }
   ],
-  "workflows": [
+  "loops": [
     {
       "id": "adr-goals-changed.loop",
       "steps": [

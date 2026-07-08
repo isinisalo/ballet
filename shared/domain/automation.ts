@@ -22,7 +22,7 @@ export interface ProjectOutput {
 
 export interface ProjectHumanGateResponse {
   id: string;
-  workflowId?: string;
+  loopId?: string;
   policyId: string;
   actionId: string;
   outputId: string;
@@ -50,7 +50,7 @@ export interface ProjectPolicy {
   enabled: boolean;
 }
 
-export interface ProjectWorkflow {
+export interface ProjectLoop {
   id: string;
   steps: string[];
 }
@@ -62,7 +62,7 @@ export interface ProjectAutomationConfig {
   outputRoutes: ProjectOutputRoute[];
   humanGateResponses: ProjectHumanGateResponse[];
   policies: ProjectPolicy[];
-  workflows: ProjectWorkflow[];
+  loops: ProjectLoop[];
   runtimes: ProjectRuntime[];
 }
 
@@ -73,7 +73,7 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   outputRoutes: [],
   humanGateResponses: [],
   policies: [],
-  workflows: [],
+  loops: [],
   runtimes: []
 });
 

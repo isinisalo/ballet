@@ -52,7 +52,7 @@ describe("API route validation", () => {
       const invalidAutomation = await fetch(`${url}/api/automation`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version: 1, triggers: [], policies: [], workflows: [], runtimes: [], events: [] })
+        body: JSON.stringify({ version: 1, triggers: [], policies: [], loops: [], runtimes: [], events: [] })
       });
       expect(invalidAutomation.status).toBe(400);
       expect(await invalidAutomation.json()).toMatchObject({

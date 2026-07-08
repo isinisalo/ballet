@@ -9,7 +9,7 @@ Minimal TypeScript web application for managing projects, goals, ADRs, agents, s
 - Project-local TOML/Markdown persistence under `.codex/agents`, `.agents/skills`, and `.ballet/*`.
 - Vitest for policy interpreter tests.
 
-The repository was empty, so this stack was chosen as a small full-stack TypeScript default that supports both browser workflows and API event intake without external services.
+The repository was empty, so this stack was chosen as a small full-stack TypeScript default that supports both browser loops and API event intake without external services.
 
 ## Repository Structure
 

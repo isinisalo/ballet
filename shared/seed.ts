@@ -196,7 +196,7 @@ export const seedData: AppData = {
         enabled: true
       }
     ],
-    workflows: [
+    loops: [
       {
         id: "deployment-response",
         steps: ["on.remediation.failed.start.remediation"]

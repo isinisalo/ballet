@@ -24,7 +24,7 @@ export default defineConfig({
           }
 
           if (id.includes("@xyflow/react") || id.includes("@tisoap/react-flow-smart-edge") || id.includes("@dagrejs/dagre")) {
-            return "vendor-workflow";
+            return "vendor-loop";
           }
 
           if (id.includes("react-markdown") || id.includes("remark-gfm") || id.includes("mdast-util-") || id.includes("micromark")) {

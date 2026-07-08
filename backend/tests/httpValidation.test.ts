@@ -44,7 +44,7 @@ describe("HTTP Zod validation", () => {
         action: "implementation",
         enabled: true
       }],
-      workflows: [{ id: "delivery", steps: ["on.implementation.summary.start.implementation"] }],
+      loops: [{ id: "delivery", steps: ["on.implementation.summary.start.implementation"] }],
       runtimes: [{ id: "codex", title: "Codex", command: "codex", args: [] }]
     };
     expect(parseUnknown(automationConfigSchema, valid)).toEqual(valid);
@@ -53,7 +53,7 @@ describe("HTTP Zod validation", () => {
       actions: [...valid.actions, { id: "human-review", description: "Human review", outputIds: ["summary"], agentIds: [], humanGate: true }],
       humanGateResponses: [{
         id: "delivery:on-implementation-summary-start-review:human-review",
-        workflowId: "delivery",
+        loopId: "delivery",
         policyId: "on.implementation.summary.start.human-review",
         actionId: "human-review",
         outputId: "summary",

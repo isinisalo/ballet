@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { Agent, ProjectAutomationConfig, ProjectPolicy, ProjectWorkflow } from "@shared/api/workspace-contracts";
+import type { Agent, ProjectAutomationConfig, ProjectPolicy, ProjectLoop } from "@shared/api/workspace-contracts";
 import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage, normalizeAutomationToken } from "@shared/api/automationValidation";
-import { defaultPolicyOutputIds, workflowIdForPolicy } from "@shared/policy-actions";
+import { defaultPolicyOutputIds, loopIdForPolicy } from "@shared/policy-actions";
 import type { AutomationTab } from "../types";
 
 type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
 
 type AutomationCreateDrafts = {
   action: { id: string; description: string; outputIds: string[]; agentIds: string[]; humanGate: boolean };
-  workflow: ProjectWorkflow;
+  loop: ProjectLoop;
 };
 
 export function useAutomationCreateDrafts({
@@ -29,17 +29,17 @@ export function useAutomationCreateDrafts({
   isCreateMode: boolean;
 }) {
   const [newAction, setNewAction] = useState({ id: "", description: "", outputIds: [] as string[], agentIds: [] as string[], humanGate: false });
-  const [newWorkflow, setNewWorkflow] = useState({ id: "", steps: [] as string[] });
+  const [newLoop, setNewLoop] = useState({ id: "", steps: [] as string[] });
   const createDraftsRef = useRef<AutomationCreateDrafts>({
     action: newAction,
-    workflow: newWorkflow
+    loop: newLoop
   });
 
   const updateNewAction = (patch: Partial<typeof newAction>) => {
     setNewAction((current) => syncDraft(createDraftsRef, "action", { ...current, ...patch }));
   };
-  const updateNewWorkflow = (patch: Partial<typeof newWorkflow>) => {
-    setNewWorkflow((current) => syncDraft(createDraftsRef, "workflow", workflowCreateDraftWithDerivedId(draft, { ...current, ...patch })));
+  const updateNewLoop = (patch: Partial<typeof newLoop>) => {
+    setNewLoop((current) => syncDraft(createDraftsRef, "loop", loopCreateDraftWithDerivedId(draft, { ...current, ...patch })));
   };
 
   useEffect(() => {
@@ -50,8 +50,8 @@ export function useAutomationCreateDrafts({
   }, [agents, draft.outputs]);
 
   useEffect(() => {
-    setNewWorkflow((current) => syncDraft(createDraftsRef, "workflow", workflowCreateDraftWithDefaultTrigger(draft, current)));
-  }, [draft.policies, draft.workflows]);
+    setNewLoop((current) => syncDraft(createDraftsRef, "loop", loopCreateDraftWithDefaultTrigger(draft, current)));
+  }, [draft.policies, draft.loops]);
 
   const saveAutomationFromHeader = async () => {
     if (!isCreateMode) {
@@ -67,15 +67,15 @@ export function useAutomationCreateDrafts({
     const resetDrafts = createInitialDrafts(nextDraft.config, agents);
     createDraftsRef.current = resetDrafts;
     setNewAction(resetDrafts.action);
-    setNewWorkflow(resetDrafts.workflow);
+    setNewLoop(resetDrafts.loop);
     return true;
   };
 
   return {
     newAction,
-    newWorkflow,
+    newLoop,
     updateNewAction,
-    updateNewWorkflow,
+    updateNewLoop,
     saveAutomationFromHeader
   };
 }
@@ -91,24 +91,24 @@ const syncDraft = <K extends keyof AutomationCreateDrafts>(
 
 const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): AutomationCreateDrafts => ({
   action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id), humanGate: false },
-  workflow: workflowCreateDraftWithDefaultTrigger(draft, { id: "", steps: [] })
+  loop: loopCreateDraftWithDefaultTrigger(draft, { id: "", steps: [] })
 });
 
-const workflowStartingTriggerPolicy = (draft: ProjectAutomationConfig, workflow: Pick<ProjectWorkflow, "steps">): ProjectPolicy | undefined => {
-  const firstPolicyId = workflow.steps[0] ?? "";
+const loopStartingTriggerPolicy = (draft: ProjectAutomationConfig, loop: Pick<ProjectLoop, "steps">): ProjectPolicy | undefined => {
+  const firstPolicyId = loop.steps[0] ?? "";
   return draft.policies.find((policy) => policy.id === firstPolicyId && policy.source === "trigger" && Boolean(policy.trigger));
 };
 
-const usedWorkflowTriggerPolicyIds = (draft: ProjectAutomationConfig): Set<string> => {
+const usedLoopTriggerPolicyIds = (draft: ProjectAutomationConfig): Set<string> => {
   const policyById = new Map(draft.policies.map((policy) => [policy.id, policy]));
-  return new Set(draft.workflows.flatMap((workflow) => {
-    const firstPolicy = policyById.get(workflow.steps[0] ?? "");
+  return new Set(draft.loops.flatMap((loop) => {
+    const firstPolicy = policyById.get(loop.steps[0] ?? "");
     return firstPolicy?.source === "trigger" ? [firstPolicy.id] : [];
   }));
 };
 
 const firstUnusedTriggerPolicy = (draft: ProjectAutomationConfig): ProjectPolicy | undefined => {
-  const usedPolicyIds = usedWorkflowTriggerPolicyIds(draft);
+  const usedPolicyIds = usedLoopTriggerPolicyIds(draft);
   return draft.policies.find((policy) =>
     policy.source === "trigger" &&
     Boolean(policy.trigger) &&
@@ -116,24 +116,24 @@ const firstUnusedTriggerPolicy = (draft: ProjectAutomationConfig): ProjectPolicy
   );
 };
 
-const workflowCreateDraftWithDerivedId = (draft: ProjectAutomationConfig, workflow: ProjectWorkflow): ProjectWorkflow => {
-  const triggerPolicy = workflowStartingTriggerPolicy(draft, workflow);
-  const id = workflowIdForPolicy(triggerPolicy);
+const loopCreateDraftWithDerivedId = (draft: ProjectAutomationConfig, loop: ProjectLoop): ProjectLoop => {
+  const triggerPolicy = loopStartingTriggerPolicy(draft, loop);
+  const id = loopIdForPolicy(triggerPolicy);
   return {
-    ...workflow,
+    ...loop,
     id,
     steps: triggerPolicy ? [triggerPolicy.id] : []
   };
 };
 
-const workflowCreateDraftWithDefaultTrigger = (draft: ProjectAutomationConfig, workflow: ProjectWorkflow): ProjectWorkflow => {
-  const selectedPolicy = workflowStartingTriggerPolicy(draft, workflow);
-  if (selectedPolicy && !usedWorkflowTriggerPolicyIds(draft).has(selectedPolicy.id)) {
-    return workflowCreateDraftWithDerivedId(draft, workflow);
+const loopCreateDraftWithDefaultTrigger = (draft: ProjectAutomationConfig, loop: ProjectLoop): ProjectLoop => {
+  const selectedPolicy = loopStartingTriggerPolicy(draft, loop);
+  if (selectedPolicy && !usedLoopTriggerPolicyIds(draft).has(selectedPolicy.id)) {
+    return loopCreateDraftWithDerivedId(draft, loop);
   }
   const triggerPolicy = firstUnusedTriggerPolicy(draft);
-  return workflowCreateDraftWithDerivedId(draft, {
-    ...workflow,
+  return loopCreateDraftWithDerivedId(draft, {
+    ...loop,
     steps: triggerPolicy ? [triggerPolicy.id] : []
   });
 };
@@ -159,10 +159,10 @@ const createDraftWithNewEntity = (
     });
     return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds, agentIds: drafts.action.humanGate ? [] : drafts.action.agentIds }] } };
   }
-  const triggerPolicy = workflowStartingTriggerPolicy(draft, drafts.workflow);
-  const id = workflowIdForPolicy(triggerPolicy);
-  if (!triggerPolicy || !id || draft.workflows.some((workflow) => workflow.id === id)) return undefined;
-  return { id, config: { ...draft, workflows: [...draft.workflows, { id, steps: [triggerPolicy.id] }] } };
+  const triggerPolicy = loopStartingTriggerPolicy(draft, drafts.loop);
+  const id = loopIdForPolicy(triggerPolicy);
+  if (!triggerPolicy || !id || draft.loops.some((loop) => loop.id === id)) return undefined;
+  return { id, config: { ...draft, loops: [...draft.loops, { id, steps: [triggerPolicy.id] }] } };
 };
 
 const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectAutomationConfig): boolean => {
@@ -173,8 +173,8 @@ const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectA
     );
   }
   const policyById = new Map(draft.policies.map((policy) => [policy.id, policy]));
-  return draft.workflows.some((workflow) => {
-    const startingPolicy = policyById.get(workflow.steps[0] ?? "");
-    return workflow.id !== workflowIdForPolicy(startingPolicy);
+  return draft.loops.some((loop) => {
+    const startingPolicy = policyById.get(loop.steps[0] ?? "");
+    return loop.id !== loopIdForPolicy(startingPolicy);
   });
 };

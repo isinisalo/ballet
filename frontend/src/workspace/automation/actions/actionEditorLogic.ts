@@ -89,9 +89,9 @@ export const nextConfigWithActionPatch = (
       ...current,
       actions: nextActions,
       policies,
-      workflows: current.workflows.map((workflow) => ({
-        ...workflow,
-        steps: workflow.steps.map((step) => policyIdMap.get(step) ?? step)
+      loops: current.loops.map((loop) => ({
+        ...loop,
+        steps: loop.steps.map((step) => policyIdMap.get(step) ?? step)
       })),
       outputRoutes: [...outputRouteByKey.values()],
       humanGateResponses

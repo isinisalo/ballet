@@ -6,4 +6,4 @@ category: fixture
 
 # Fixture Skill
 
-Follow the fixture workflow.
+Follow the fixture loop.

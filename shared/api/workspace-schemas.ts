@@ -121,7 +121,7 @@ const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits
 const automationOutputIdSchema = z.string().min(automationFieldLimits.outputId.min).max(automationFieldLimits.outputId.max);
 const automationEventTypeSchema = z.string().min(automationFieldLimits.eventType.min).max(automationFieldLimits.eventType.max);
 const automationTriggerIdSchema = z.string().min(1).max(automationFieldLimits.eventType.max);
-const automationWorkflowIdSchema = z.string().min(automationFieldLimits.workflowId.min).max(automationFieldLimits.workflowId.max);
+const automationLoopIdSchema = z.string().min(automationFieldLimits.loopId.min).max(automationFieldLimits.loopId.max);
 const automationPolicyIdSchema = z.string().min(automationFieldLimits.policyId.min).max(automationFieldLimits.policyId.max);
 const automationHumanGateResponseIdSchema = z.string().min(1).max(260);
 const automationHumanGatePromptSchema = z.string().min(1).max(2000);
@@ -160,14 +160,14 @@ const projectPolicySchema = z.object({
   enabled: z.boolean()
 }).strict();
 
-const projectWorkflowSchema = z.object({
-  id: automationWorkflowIdSchema,
+const projectLoopSchema = z.object({
+  id: automationLoopIdSchema,
   steps: z.array(automationPolicyIdSchema)
 }).strict();
 
 const projectHumanGateResponseSchema = z.object({
   id: automationHumanGateResponseIdSchema,
-  workflowId: automationWorkflowIdSchema.optional(),
+  loopId: automationLoopIdSchema.optional(),
   policyId: automationPolicyIdSchema,
   actionId: automationTokenSchema,
   outputId: automationOutputIdSchema,
@@ -189,7 +189,7 @@ export const automationConfigSchema = z.object({
   outputRoutes: z.array(projectOutputRouteSchema),
   humanGateResponses: z.array(projectHumanGateResponseSchema),
   policies: z.array(projectPolicySchema),
-  workflows: z.array(projectWorkflowSchema),
+  loops: z.array(projectLoopSchema),
   runtimes: z.array(projectRuntimeSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 

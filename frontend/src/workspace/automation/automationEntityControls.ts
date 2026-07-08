@@ -23,7 +23,7 @@ const selectedCollectionId = <T extends { id: string }>(isActive: boolean, selec
 
 const selectedEntityIds = (activeTab: AutomationTab, selectedId: string | undefined, draft: ProjectAutomationConfig) => ({
   selectedActionId: selectedCollectionId(activeTab === "actions", selectedId, draft.actions),
-  selectedWorkflowId: selectedCollectionId(activeTab === "workflows", selectedId, draft.workflows)
+  selectedLoopId: selectedCollectionId(activeTab === "loops", selectedId, draft.loops)
 });
 
 const addEntityConfig = (
@@ -62,11 +62,11 @@ const addEntityConfig = (
           selectAutomationEntity("actions", id);
         }
       };
-    case "workflows":
+    case "loops":
       return {
-        label: "Add workflow",
+        label: "Add loop",
         onAdd: () => {
-          selectAutomationEntity("workflows");
+          selectAutomationEntity("loops");
         }
       };
   }
@@ -98,22 +98,22 @@ const deleteEntityConfig = (
         }
       };
     }
-    case "workflows": {
-      const selected = draft.workflows.find((workflow) => workflow.id === ids.selectedWorkflowId);
+    case "loops": {
+      const selected = draft.loops.find((loop) => loop.id === ids.selectedLoopId);
       return {
-        label: "Delete workflow",
-        type: "workflow",
+        label: "Delete loop",
+        type: "loop",
         resourceName: selected?.id,
         canDelete: Boolean(selected),
         onDelete: () => {
           if (!selected) return;
-          const nextId = draft.workflows.find((workflow) => workflow.id !== selected.id)?.id;
+          const nextId = draft.loops.find((loop) => loop.id !== selected.id)?.id;
           setDraft((current) => ({
             ...current,
-            workflows: current.workflows.filter((workflow) => workflow.id !== selected.id),
-            humanGateResponses: current.humanGateResponses.filter((response) => response.workflowId !== selected.id)
+            loops: current.loops.filter((loop) => loop.id !== selected.id),
+            humanGateResponses: current.humanGateResponses.filter((response) => response.loopId !== selected.id)
           }));
-          selectAutomationEntity("workflows", nextId);
+          selectAutomationEntity("loops", nextId);
         }
       };
     }
