@@ -25,6 +25,7 @@ export const nextConfigWithLoopHandlerAction = (
 
   const nextPolicy: ProjectPolicy = {
     ...currentPolicy,
+    loopId: loop.id,
     action: targetAction.id
   };
   const nextPolicyId = generatedPolicyId(nextPolicy);

@@ -8,7 +8,7 @@ import { apiRouter } from "../routes.js";
 import { store } from "../store.js";
 import { notifyRuntimeChanged } from "../runtime-events.js";
 import type { AgentRun, AgentRunLog } from "../../shared/domain/runtime.js";
-import { loopIdFromTrigger } from "../../shared/policy-actions.js";
+import { generatedPolicyId, loopIdFromTrigger, policyOutputEventType } from "../../shared/policy-actions.js";
 
 const listen = async (app: express.Express): Promise<{ server: Server; url: string }> => {
   const server = createServer(app);
@@ -210,10 +210,10 @@ describe("API routes", () => {
       };
 
       expect(data.automation).not.toHaveProperty("events");
-      expect(data.eventDefinitions).toHaveLength(2);
       expect(data.eventDefinitions).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: "implementation.ok", eventType: "implementation.ok" }),
-        expect.objectContaining({ id: "implementation.failed", eventType: "implementation.failed" })
+        expect.objectContaining({ id: "implementation.approved", eventType: "implementation.approved" }),
+        expect.objectContaining({ id: "implementation.rejected", eventType: "implementation.rejected" }),
+        expect.objectContaining({ id: "delivery.implementation.rejected", eventType: "delivery.implementation.rejected" })
       ]));
       expect(data.eventDefinitions.some((definition) => definition.relativePath)).toBe(false);
       expect(data.documents?.events).toEqual([]);
@@ -284,8 +284,12 @@ describe("API routes", () => {
     const { server, url } = await listen(app);
 
     const loopTrigger = "project-brief-gate.approved";
-    const loopStartPolicyId = `on.trigger.${loopTrigger}.start.implementation`;
     const loopId = loopIdFromTrigger(loopTrigger);
+    const rawLoopStartPolicyId = `on.trigger.${loopTrigger}.start.implementation`;
+    const rawLoopRejectedPolicyId = "on.implementation.failed.start.implementation";
+    const loopStartPolicyId = generatedPolicyId({ loopId, source: "trigger", trigger: loopTrigger, action: "implementation" });
+    const loopRejectedPolicyId = generatedPolicyId({ loopId, source: "event", event: "implementation.rejected", action: "implementation" });
+    const loopRejectedEvent = policyOutputEventType({ action: "implementation", loopId }, "rejected");
     const config = {
       version: 1,
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
@@ -293,10 +297,10 @@ describe("API routes", () => {
       outputRoutes: [],
       humanGateResponses: [],
       policies: [
-        { id: loopStartPolicyId, source: "trigger", trigger: loopTrigger, action: "implementation", enabled: true },
-        { id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }
+        { id: rawLoopStartPolicyId, source: "trigger", trigger: loopTrigger, action: "implementation", enabled: true },
+        { id: rawLoopRejectedPolicyId, source: "event", event: "implementation.failed", action: "implementation", enabled: true }
       ],
-      loops: [{ id: loopId, steps: [loopStartPolicyId, "on.implementation.failed.start.implementation"] }],
+      loops: [{ id: loopId, steps: [rawLoopStartPolicyId, rawLoopRejectedPolicyId] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
     };
 
@@ -308,7 +312,11 @@ describe("API routes", () => {
       });
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
-      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }], outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], loops: [{ id: loopId, steps: [loopStartPolicyId, "on.implementation.failed.start.implementation"] }] });
+      expect(savedBody).toMatchObject({
+        actions: [{ id: "implementation", outputIds: ["approved", "rejected"], agentIds: ["developer-agent"] }],
+        outputs: [{ id: "approved" }, { id: "rejected" }],
+        loops: [{ id: loopId, steps: [loopStartPolicyId, loopRejectedPolicyId] }]
+      });
       expect(savedBody).not.toHaveProperty("triggers");
 
       const automation = await fetch(url + "/api/automation");
@@ -319,7 +327,16 @@ describe("API routes", () => {
       expect(automationBody.config).toHaveProperty("humanGateResponses");
       expect(automationBody.config).not.toHaveProperty("gates");
       expect(automationBody.config).not.toHaveProperty("gateDecisions");
-      expect(automationBody).toMatchObject({ config: { outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], policies: [{ id: loopStartPolicyId, source: "trigger", trigger: loopTrigger }, { id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
+      expect(automationBody).toMatchObject({
+        config: {
+          outputs: [{ id: "approved" }, { id: "rejected" }],
+          policies: [
+            { id: loopStartPolicyId, loopId, source: "trigger", trigger: loopTrigger },
+            { id: loopRejectedPolicyId, loopId, source: "event", event: loopRejectedEvent }
+          ]
+        },
+        issues: []
+      });
 
       const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",

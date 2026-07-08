@@ -20,6 +20,7 @@ import {
   normalizeTriggerToken,
   normalizeLoopId,
   policyEventTypesForActions,
+  policyOutputEventTypes,
   projectOutputRouteKey,
   loopIdForPolicy
 } from "../../shared/policy-actions.js";
@@ -179,6 +180,9 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     .filter(Boolean);
   const generatedEventIds = [
     ...policyEventTypesForActions(normalized.actions, normalized.outputs),
+    ...normalized.policies.flatMap((policy) =>
+      policyOutputEventTypes(policy, normalized.actions, normalized.outputs)
+    ),
     ...normalized.policies.flatMap((policy) =>
       policy.source === "event" && policy.event?.startsWith("trigger.") ? [policy.event] : []
     )
@@ -534,6 +538,7 @@ const validatePolicyRequiredFields = (
   );
   if (!state.legacyPolicy) addRequiredStringIssue(issues, `${base}.action`, state.rawAction, "Policy action");
   if (!state.legacyPolicy) addStringIssue(issues, `${base}.action`, state.rawAction, "Policy action", automationFieldLimits.token, { token: true });
+  if (policy.loopId !== undefined) addLoopIdIssue(issues, `${base}.loopId`, policy.loopId, "Policy loop");
   if (typeof policy.enabled !== "boolean") issues.push({ path: `${base}.enabled`, message: "Policy enabled must be boolean." });
 };
 
@@ -656,14 +661,29 @@ const validateLoop = (loop: unknown, index: number, context: ValidationContext, 
   loop.steps.forEach((step, stepIndex) =>
     validateLoopStep(step, `${base}.steps[${stepIndex}]`, context.policyIdSet, issues)
   );
+  const rawPolicyById = new Map(context.rawPolicies.flatMap((policy) =>
+    isRecord(policy) && stringValue(policy.id) ? [[stringValue(policy.id), policy] as const] : []
+  ));
+  const policyForStep = (step: string): Pick<ValidationContext["normalizedPolicies"][number], "source" | "trigger"> | undefined => {
+    const normalizedPolicy = context.normalizedPolicies.find((candidate) => candidate.id === step);
+    if (normalizedPolicy) return normalizedPolicy;
+    const rawPolicy = rawPolicyById.get(step);
+    if (!rawPolicy) return undefined;
+    const trigger = normalizeTriggerToken(stringValue(rawPolicy.trigger));
+    const source = stringValue(rawPolicy.source) === "trigger" || trigger ? "trigger" as const : "event" as const;
+    return {
+      source,
+      trigger: trigger || undefined
+    };
+  };
   const firstNonTriggerIndex = loop.steps.findIndex((step) => {
     if (typeof step !== "string") return true;
-    const policy = context.normalizedPolicies.find((candidate) => candidate.id === step);
+    const policy = policyForStep(step);
     return policy?.source !== "trigger";
   });
   const triggerSteps = loop.steps.filter((step, stepIndex): step is string => {
     if (typeof step !== "string") return false;
-    const policy = context.normalizedPolicies.find((candidate) => candidate.id === step);
+    const policy = policyForStep(step);
     return policy?.source === "trigger" && (firstNonTriggerIndex === -1 || stepIndex < firstNonTriggerIndex);
   });
   if (triggerSteps.length > 1) {
@@ -689,6 +709,17 @@ const validateLoop = (loop: unknown, index: number, context: ValidationContext, 
   if (expectedId && actualId !== expectedId) {
     issues.push({ path: `${base}.id`, message: `Loop id must be ${expectedId}.` });
   }
+  loop.steps.forEach((step, stepIndex) => {
+    if (typeof step !== "string") return;
+    const rawPolicy = rawPolicyById.get(step);
+    const rawLoopId = rawPolicy ? normalizeLoopId(stringValue(rawPolicy.loopId)) : "";
+    if (rawLoopId && rawLoopId !== normalizedLoop.id) {
+      issues.push({
+        path: `${base}.steps[${stepIndex}]`,
+        message: `Loop step policy loopId must be ${normalizedLoop.id}.`
+      });
+    }
+  });
 };
 
 export const validateProjectAutomationConfig = (

@@ -305,506 +305,627 @@
       "id": "rejected"
     }
   ],
-  "outputRoutes": [],
+  "outputRoutes": [
+    {
+      "sourcePolicyId": "on.code-gate.approved.loop.classify-failure.approved.start.code-gate.approved.loop.implement-task",
+      "outputId": "approved",
+      "target": {
+        "type": "event",
+        "eventType": "task-specs-gate.approved.loop.implement-task.approved"
+      }
+    },
+    {
+      "sourcePolicyId": "on.code-gate.approved.loop.classify-failure.approved.start.code-gate.approved.loop.implement-task",
+      "outputId": "rejected",
+      "target": {
+        "type": "event",
+        "eventType": "task-specs-gate.approved.loop.implement-task.rejected"
+      }
+    },
+    {
+      "sourcePolicyId": "on.ci-or-validation-failed.loop.classify-failure.approved.start.ci-or-validation-failed.loop.implement-task",
+      "outputId": "approved",
+      "target": {
+        "type": "event",
+        "eventType": "task-specs-gate.approved.loop.implement-task.approved"
+      }
+    },
+    {
+      "sourcePolicyId": "on.ci-or-validation-failed.loop.classify-failure.approved.start.ci-or-validation-failed.loop.implement-task",
+      "outputId": "rejected",
+      "target": {
+        "type": "event",
+        "eventType": "task-specs-gate.approved.loop.implement-task.rejected"
+      }
+    }
+  ],
   "humanGateResponses": [],
   "policies": [
     {
+      "loopId": "adr-goals-changed.loop",
       "source": "trigger",
       "trigger": "adr-goals-changed",
       "action": "create-project-brief",
       "enabled": true,
-      "id": "on.trigger.adr-goals-changed.start.create-project-brief"
+      "id": "on.trigger.adr-goals-changed.start.adr-goals-changed.loop.create-project-brief"
     },
     {
+      "loopId": "adr-goals-changed.loop",
       "source": "event",
-      "event": "create-project-brief.approved",
+      "event": "adr-goals-changed.loop.create-project-brief.approved",
       "action": "challenge-project-brief",
       "enabled": true,
-      "id": "on.create-project-brief.approved.start.challenge-project-brief"
+      "id": "on.adr-goals-changed.loop.create-project-brief.approved.start.adr-goals-changed.loop.challenge-project-brief"
     },
     {
+      "loopId": "adr-goals-changed.loop",
       "source": "event",
-      "event": "challenge-project-brief.approved",
+      "event": "adr-goals-changed.loop.challenge-project-brief.approved",
       "action": "project-brief-gate",
       "enabled": true,
-      "id": "on.challenge-project-brief.approved.start.project-brief-gate"
+      "id": "on.adr-goals-changed.loop.challenge-project-brief.approved.start.adr-goals-changed.loop.project-brief-gate"
     },
     {
+      "loopId": "adr-goals-changed.loop",
       "source": "event",
-      "event": "project-brief-gate.rejected",
+      "event": "adr-goals-changed.loop.project-brief-gate.rejected",
       "action": "create-project-brief",
       "enabled": true,
-      "id": "on.project-brief-gate.rejected.start.create-project-brief"
+      "id": "on.adr-goals-changed.loop.project-brief-gate.rejected.start.adr-goals-changed.loop.create-project-brief"
     },
     {
+      "loopId": "adr-goals-changed.loop",
       "source": "event",
-      "event": "challenge-project-brief.rejected",
+      "event": "adr-goals-changed.loop.challenge-project-brief.rejected",
       "action": "create-project-brief",
       "enabled": true,
-      "id": "on.challenge-project-brief.rejected.start.create-project-brief"
+      "id": "on.adr-goals-changed.loop.challenge-project-brief.rejected.start.adr-goals-changed.loop.create-project-brief"
     },
     {
+      "loopId": "adr-goals-changed.loop",
       "source": "event",
-      "event": "create-project-brief.rejected",
+      "event": "adr-goals-changed.loop.create-project-brief.rejected",
       "action": "done",
       "enabled": true,
-      "id": "on.create-project-brief.rejected.start.done"
+      "id": "on.adr-goals-changed.loop.create-project-brief.rejected.start.adr-goals-changed.loop.done"
     },
     {
+      "loopId": "project-brief-gate.approved.loop",
       "source": "trigger",
       "trigger": "project-brief-gate.approved",
       "action": "create-roadmap",
       "enabled": true,
-      "id": "on.trigger.project-brief-gate.approved.start.create-roadmap"
+      "id": "on.trigger.project-brief-gate.approved.start.project-brief-gate.approved.loop.create-roadmap"
     },
     {
+      "loopId": "project-brief-gate.approved.loop",
       "source": "event",
-      "event": "create-roadmap.approved",
+      "event": "project-brief-gate.approved.loop.create-roadmap.approved",
       "action": "challenge-roadmap",
       "enabled": true,
-      "id": "on.create-roadmap.approved.start.challenge-roadmap"
+      "id": "on.project-brief-gate.approved.loop.create-roadmap.approved.start.project-brief-gate.approved.loop.challenge-roadmap"
     },
     {
+      "loopId": "project-brief-gate.approved.loop",
       "source": "event",
-      "event": "challenge-roadmap.approved",
+      "event": "project-brief-gate.approved.loop.challenge-roadmap.approved",
       "action": "roadmap-gate",
       "enabled": true,
-      "id": "on.challenge-roadmap.approved.start.roadmap-gate"
+      "id": "on.project-brief-gate.approved.loop.challenge-roadmap.approved.start.project-brief-gate.approved.loop.roadmap-gate"
     },
     {
+      "loopId": "project-brief-gate.approved.loop",
       "source": "event",
-      "event": "roadmap-gate.rejected",
+      "event": "project-brief-gate.approved.loop.roadmap-gate.rejected",
       "action": "create-roadmap",
       "enabled": true,
-      "id": "on.roadmap-gate.rejected.start.create-roadmap"
+      "id": "on.project-brief-gate.approved.loop.roadmap-gate.rejected.start.project-brief-gate.approved.loop.create-roadmap"
     },
     {
+      "loopId": "project-brief-gate.approved.loop",
       "source": "event",
-      "event": "challenge-roadmap.rejected",
+      "event": "project-brief-gate.approved.loop.challenge-roadmap.rejected",
       "action": "create-roadmap",
       "enabled": true,
-      "id": "on.challenge-roadmap.rejected.start.create-roadmap"
+      "id": "on.project-brief-gate.approved.loop.challenge-roadmap.rejected.start.project-brief-gate.approved.loop.create-roadmap"
     },
     {
+      "loopId": "project-brief-gate.approved.loop",
       "source": "event",
-      "event": "create-roadmap.rejected",
+      "event": "project-brief-gate.approved.loop.create-roadmap.rejected",
       "action": "done",
       "enabled": true,
-      "id": "on.create-roadmap.rejected.start.done"
+      "id": "on.project-brief-gate.approved.loop.create-roadmap.rejected.start.project-brief-gate.approved.loop.done"
     },
     {
+      "loopId": "roadmap-gate.approved.loop",
       "source": "trigger",
       "trigger": "roadmap-gate.approved",
       "action": "create-ui-design",
       "enabled": true,
-      "id": "on.trigger.roadmap-gate.approved.start.create-ui-design"
+      "id": "on.trigger.roadmap-gate.approved.start.roadmap-gate.approved.loop.create-ui-design"
     },
     {
+      "loopId": "roadmap-gate.approved.loop",
       "source": "event",
-      "event": "create-ui-design.approved",
+      "event": "roadmap-gate.approved.loop.create-ui-design.approved",
       "action": "challenge-ui-design",
       "enabled": true,
-      "id": "on.create-ui-design.approved.start.challenge-ui-design"
+      "id": "on.roadmap-gate.approved.loop.create-ui-design.approved.start.roadmap-gate.approved.loop.challenge-ui-design"
     },
     {
+      "loopId": "roadmap-gate.approved.loop",
       "source": "event",
-      "event": "challenge-ui-design.approved",
+      "event": "roadmap-gate.approved.loop.challenge-ui-design.approved",
       "action": "ui-design-gate",
       "enabled": true,
-      "id": "on.challenge-ui-design.approved.start.ui-design-gate"
+      "id": "on.roadmap-gate.approved.loop.challenge-ui-design.approved.start.roadmap-gate.approved.loop.ui-design-gate"
     },
     {
+      "loopId": "roadmap-gate.approved.loop",
       "source": "event",
-      "event": "ui-design-gate.rejected",
+      "event": "roadmap-gate.approved.loop.ui-design-gate.rejected",
       "action": "create-ui-design",
       "enabled": true,
-      "id": "on.ui-design-gate.rejected.start.create-ui-design"
+      "id": "on.roadmap-gate.approved.loop.ui-design-gate.rejected.start.roadmap-gate.approved.loop.create-ui-design"
     },
     {
+      "loopId": "roadmap-gate.approved.loop",
       "source": "event",
-      "event": "challenge-ui-design.rejected",
+      "event": "roadmap-gate.approved.loop.challenge-ui-design.rejected",
       "action": "create-ui-design",
       "enabled": true,
-      "id": "on.challenge-ui-design.rejected.start.create-ui-design"
+      "id": "on.roadmap-gate.approved.loop.challenge-ui-design.rejected.start.roadmap-gate.approved.loop.create-ui-design"
     },
     {
+      "loopId": "roadmap-gate.approved.loop",
       "source": "event",
-      "event": "create-ui-design.rejected",
+      "event": "roadmap-gate.approved.loop.create-ui-design.rejected",
       "action": "done",
       "enabled": true,
-      "id": "on.create-ui-design.rejected.start.done"
+      "id": "on.roadmap-gate.approved.loop.create-ui-design.rejected.start.roadmap-gate.approved.loop.done"
     },
     {
+      "loopId": "ui-design-gate.approved.loop",
       "source": "trigger",
       "trigger": "ui-design-gate.approved",
       "action": "create-technical-plan",
       "enabled": true,
-      "id": "on.trigger.ui-design-gate.approved.start.create-technical-plan"
+      "id": "on.trigger.ui-design-gate.approved.start.ui-design-gate.approved.loop.create-technical-plan"
     },
     {
+      "loopId": "ui-design-gate.approved.loop",
       "source": "event",
-      "event": "create-technical-plan.approved",
+      "event": "ui-design-gate.approved.loop.create-technical-plan.approved",
       "action": "challenge-technical-plan",
       "enabled": true,
-      "id": "on.create-technical-plan.approved.start.challenge-technical-plan"
+      "id": "on.ui-design-gate.approved.loop.create-technical-plan.approved.start.ui-design-gate.approved.loop.challenge-technical-plan"
     },
     {
+      "loopId": "ui-design-gate.approved.loop",
       "source": "event",
-      "event": "challenge-technical-plan.approved",
+      "event": "ui-design-gate.approved.loop.challenge-technical-plan.approved",
       "action": "technical-plan-gate",
       "enabled": true,
-      "id": "on.challenge-technical-plan.approved.start.technical-plan-gate"
+      "id": "on.ui-design-gate.approved.loop.challenge-technical-plan.approved.start.ui-design-gate.approved.loop.technical-plan-gate"
     },
     {
+      "loopId": "ui-design-gate.approved.loop",
       "source": "event",
-      "event": "technical-plan-gate.rejected",
+      "event": "ui-design-gate.approved.loop.technical-plan-gate.rejected",
       "action": "create-technical-plan",
       "enabled": true,
-      "id": "on.technical-plan-gate.rejected.start.create-technical-plan"
+      "id": "on.ui-design-gate.approved.loop.technical-plan-gate.rejected.start.ui-design-gate.approved.loop.create-technical-plan"
     },
     {
+      "loopId": "ui-design-gate.approved.loop",
       "source": "event",
-      "event": "challenge-technical-plan.rejected",
+      "event": "ui-design-gate.approved.loop.challenge-technical-plan.rejected",
       "action": "create-technical-plan",
       "enabled": true,
-      "id": "on.challenge-technical-plan.rejected.start.create-technical-plan"
+      "id": "on.ui-design-gate.approved.loop.challenge-technical-plan.rejected.start.ui-design-gate.approved.loop.create-technical-plan"
     },
     {
+      "loopId": "ui-design-gate.approved.loop",
       "source": "event",
-      "event": "create-technical-plan.rejected",
+      "event": "ui-design-gate.approved.loop.create-technical-plan.rejected",
       "action": "done",
       "enabled": true,
-      "id": "on.create-technical-plan.rejected.start.done"
+      "id": "on.ui-design-gate.approved.loop.create-technical-plan.rejected.start.ui-design-gate.approved.loop.done"
     },
     {
+      "loopId": "technical-plan-gate.approved.loop",
       "source": "trigger",
       "trigger": "technical-plan-gate.approved",
       "action": "create-milestones",
       "enabled": true,
-      "id": "on.trigger.technical-plan-gate.approved.start.create-milestones"
+      "id": "on.trigger.technical-plan-gate.approved.start.technical-plan-gate.approved.loop.create-milestones"
     },
     {
+      "loopId": "technical-plan-gate.approved.loop",
       "source": "event",
-      "event": "create-milestones.approved",
+      "event": "technical-plan-gate.approved.loop.create-milestones.approved",
       "action": "challenge-milestones",
       "enabled": true,
-      "id": "on.create-milestones.approved.start.challenge-milestones"
+      "id": "on.technical-plan-gate.approved.loop.create-milestones.approved.start.technical-plan-gate.approved.loop.challenge-milestones"
     },
     {
+      "loopId": "technical-plan-gate.approved.loop",
       "source": "event",
-      "event": "challenge-milestones.approved",
+      "event": "technical-plan-gate.approved.loop.challenge-milestones.approved",
       "action": "milestones-gate",
       "enabled": true,
-      "id": "on.challenge-milestones.approved.start.milestones-gate"
+      "id": "on.technical-plan-gate.approved.loop.challenge-milestones.approved.start.technical-plan-gate.approved.loop.milestones-gate"
     },
     {
+      "loopId": "technical-plan-gate.approved.loop",
       "source": "event",
-      "event": "milestones-gate.rejected",
+      "event": "technical-plan-gate.approved.loop.milestones-gate.rejected",
       "action": "create-milestones",
       "enabled": true,
-      "id": "on.milestones-gate.rejected.start.create-milestones"
+      "id": "on.technical-plan-gate.approved.loop.milestones-gate.rejected.start.technical-plan-gate.approved.loop.create-milestones"
     },
     {
+      "loopId": "technical-plan-gate.approved.loop",
       "source": "event",
-      "event": "challenge-milestones.rejected",
+      "event": "technical-plan-gate.approved.loop.challenge-milestones.rejected",
       "action": "create-milestones",
       "enabled": true,
-      "id": "on.challenge-milestones.rejected.start.create-milestones"
+      "id": "on.technical-plan-gate.approved.loop.challenge-milestones.rejected.start.technical-plan-gate.approved.loop.create-milestones"
     },
     {
+      "loopId": "technical-plan-gate.approved.loop",
       "source": "event",
-      "event": "create-milestones.rejected",
+      "event": "technical-plan-gate.approved.loop.create-milestones.rejected",
       "action": "done",
       "enabled": true,
-      "id": "on.create-milestones.rejected.start.done"
+      "id": "on.technical-plan-gate.approved.loop.create-milestones.rejected.start.technical-plan-gate.approved.loop.done"
     },
     {
+      "loopId": "milestones-gate.approved.loop",
       "source": "trigger",
       "trigger": "milestones-gate.approved",
       "action": "create-task-specs",
       "enabled": true,
-      "id": "on.trigger.milestones-gate.approved.start.create-task-specs"
+      "id": "on.trigger.milestones-gate.approved.start.milestones-gate.approved.loop.create-task-specs"
     },
     {
+      "loopId": "milestones-gate.approved.loop",
       "source": "event",
-      "event": "create-task-specs.approved",
+      "event": "milestones-gate.approved.loop.create-task-specs.approved",
       "action": "challenge-task-specs",
       "enabled": true,
-      "id": "on.create-task-specs.approved.start.challenge-task-specs"
+      "id": "on.milestones-gate.approved.loop.create-task-specs.approved.start.milestones-gate.approved.loop.challenge-task-specs"
     },
     {
+      "loopId": "milestones-gate.approved.loop",
       "source": "event",
-      "event": "challenge-task-specs.approved",
+      "event": "milestones-gate.approved.loop.challenge-task-specs.approved",
       "action": "task-specs-gate",
       "enabled": true,
-      "id": "on.challenge-task-specs.approved.start.task-specs-gate"
+      "id": "on.milestones-gate.approved.loop.challenge-task-specs.approved.start.milestones-gate.approved.loop.task-specs-gate"
     },
     {
+      "loopId": "milestones-gate.approved.loop",
       "source": "event",
-      "event": "task-specs-gate.rejected",
+      "event": "milestones-gate.approved.loop.task-specs-gate.rejected",
       "action": "create-task-specs",
       "enabled": true,
-      "id": "on.task-specs-gate.rejected.start.create-task-specs"
+      "id": "on.milestones-gate.approved.loop.task-specs-gate.rejected.start.milestones-gate.approved.loop.create-task-specs"
     },
     {
+      "loopId": "milestones-gate.approved.loop",
       "source": "event",
-      "event": "challenge-task-specs.rejected",
+      "event": "milestones-gate.approved.loop.challenge-task-specs.rejected",
       "action": "create-task-specs",
       "enabled": true,
-      "id": "on.challenge-task-specs.rejected.start.create-task-specs"
+      "id": "on.milestones-gate.approved.loop.challenge-task-specs.rejected.start.milestones-gate.approved.loop.create-task-specs"
     },
     {
+      "loopId": "milestones-gate.approved.loop",
       "source": "event",
-      "event": "create-task-specs.rejected",
+      "event": "milestones-gate.approved.loop.create-task-specs.rejected",
       "action": "done",
       "enabled": true,
-      "id": "on.create-task-specs.rejected.start.done"
+      "id": "on.milestones-gate.approved.loop.create-task-specs.rejected.start.milestones-gate.approved.loop.done"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "trigger",
       "trigger": "task-specs-gate.approved",
       "action": "implement-task",
       "enabled": true,
-      "id": "on.trigger.task-specs-gate.approved.start.implement-task"
+      "id": "on.trigger.task-specs-gate.approved.start.task-specs-gate.approved.loop.implement-task"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "event",
-      "event": "implement-task.approved",
+      "event": "task-specs-gate.approved.loop.implement-task.approved",
       "action": "run-tests",
       "enabled": true,
-      "id": "on.implement-task.approved.start.run-tests"
+      "id": "on.task-specs-gate.approved.loop.implement-task.approved.start.task-specs-gate.approved.loop.run-tests"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "event",
-      "event": "implement-task.rejected",
+      "event": "task-specs-gate.approved.loop.implement-task.rejected",
       "action": "classify-failure",
       "enabled": true,
-      "id": "on.implement-task.rejected.start.classify-failure"
+      "id": "on.task-specs-gate.approved.loop.implement-task.rejected.start.task-specs-gate.approved.loop.classify-failure"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "event",
-      "event": "run-tests.approved",
+      "event": "task-specs-gate.approved.loop.run-tests.approved",
       "action": "review-code",
       "enabled": true,
-      "id": "on.run-tests.approved.start.review-code"
+      "id": "on.task-specs-gate.approved.loop.run-tests.approved.start.task-specs-gate.approved.loop.review-code"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "event",
-      "event": "run-tests.rejected",
+      "event": "task-specs-gate.approved.loop.run-tests.rejected",
       "action": "classify-failure",
       "enabled": true,
-      "id": "on.run-tests.rejected.start.classify-failure"
+      "id": "on.task-specs-gate.approved.loop.run-tests.rejected.start.task-specs-gate.approved.loop.classify-failure"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "event",
-      "event": "review-code.rejected",
+      "event": "task-specs-gate.approved.loop.review-code.rejected",
       "action": "implement-task",
       "enabled": true,
-      "id": "on.review-code.rejected.start.implement-task"
+      "id": "on.task-specs-gate.approved.loop.review-code.rejected.start.task-specs-gate.approved.loop.implement-task"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "event",
-      "event": "review-code.approved",
+      "event": "task-specs-gate.approved.loop.review-code.approved",
       "action": "code-gate",
       "enabled": true,
-      "id": "on.review-code.approved.start.code-gate"
+      "id": "on.task-specs-gate.approved.loop.review-code.approved.start.task-specs-gate.approved.loop.code-gate"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "event",
-      "event": "code-gate.rejected",
+      "event": "task-specs-gate.approved.loop.code-gate.rejected",
       "action": "implement-task",
       "enabled": true,
-      "id": "on.code-gate.rejected.start.implement-task"
+      "id": "on.task-specs-gate.approved.loop.code-gate.rejected.start.task-specs-gate.approved.loop.implement-task"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "trigger",
       "trigger": "code-gate.approved",
       "action": "prepare-dev-deployment",
       "enabled": true,
-      "id": "on.trigger.code-gate.approved.start.prepare-dev-deployment"
+      "id": "on.trigger.code-gate.approved.start.code-gate.approved.loop.prepare-dev-deployment"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "event",
-      "event": "prepare-dev-deployment.approved",
+      "event": "code-gate.approved.loop.prepare-dev-deployment.approved",
       "action": "deploy-to-dev",
       "enabled": true,
-      "id": "on.prepare-dev-deployment.approved.start.deploy-to-dev"
+      "id": "on.code-gate.approved.loop.prepare-dev-deployment.approved.start.code-gate.approved.loop.deploy-to-dev"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "event",
-      "event": "prepare-dev-deployment.rejected",
+      "event": "code-gate.approved.loop.prepare-dev-deployment.rejected",
       "action": "classify-failure",
       "enabled": true,
-      "id": "on.prepare-dev-deployment.rejected.start.classify-failure"
+      "id": "on.code-gate.approved.loop.prepare-dev-deployment.rejected.start.code-gate.approved.loop.classify-failure"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "event",
-      "event": "deploy-to-dev.approved",
+      "event": "code-gate.approved.loop.deploy-to-dev.approved",
       "action": "validate-dev-deployment",
       "enabled": true,
-      "id": "on.deploy-to-dev.approved.start.validate-dev-deployment"
+      "id": "on.code-gate.approved.loop.deploy-to-dev.approved.start.code-gate.approved.loop.validate-dev-deployment"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "event",
-      "event": "deploy-to-dev.rejected",
+      "event": "code-gate.approved.loop.deploy-to-dev.rejected",
       "action": "classify-failure",
       "enabled": true,
-      "id": "on.deploy-to-dev.rejected.start.classify-failure"
+      "id": "on.code-gate.approved.loop.deploy-to-dev.rejected.start.code-gate.approved.loop.classify-failure"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "event",
-      "event": "validate-dev-deployment.approved",
+      "event": "code-gate.approved.loop.validate-dev-deployment.approved",
       "action": "dev-deployment-validation-gate",
       "enabled": true,
-      "id": "on.validate-dev-deployment.approved.start.dev-deployment-validation-gate"
+      "id": "on.code-gate.approved.loop.validate-dev-deployment.approved.start.code-gate.approved.loop.dev-deployment-validation-gate"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "event",
-      "event": "validate-dev-deployment.rejected",
+      "event": "code-gate.approved.loop.validate-dev-deployment.rejected",
       "action": "prepare-dev-deployment",
       "enabled": true,
-      "id": "on.validate-dev-deployment.rejected.start.prepare-dev-deployment"
+      "id": "on.code-gate.approved.loop.validate-dev-deployment.rejected.start.code-gate.approved.loop.prepare-dev-deployment"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "trigger",
       "trigger": "dev-deployment-validation-gate.approved",
       "action": "done",
       "enabled": true,
-      "id": "on.trigger.dev-deployment-validation-gate.approved.start.done"
+      "id": "on.trigger.dev-deployment-validation-gate.approved.start.code-gate.approved.loop.done"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "event",
-      "event": "dev-deployment-validation-gate.rejected",
+      "event": "code-gate.approved.loop.dev-deployment-validation-gate.rejected",
       "action": "prepare-dev-deployment",
       "enabled": true,
-      "id": "on.dev-deployment-validation-gate.rejected.start.prepare-dev-deployment"
+      "id": "on.code-gate.approved.loop.dev-deployment-validation-gate.rejected.start.code-gate.approved.loop.prepare-dev-deployment"
     },
     {
+      "loopId": "ci-or-validation-failed.loop",
       "source": "trigger",
       "trigger": "ci-or-validation-failed",
       "action": "classify-failure",
       "enabled": true,
-      "id": "on.trigger.ci-or-validation-failed.start.classify-failure"
+      "id": "on.trigger.ci-or-validation-failed.start.ci-or-validation-failed.loop.classify-failure"
     },
     {
+      "loopId": "task-specs-gate.approved.loop",
       "source": "event",
-      "event": "classify-failure.approved",
+      "event": "task-specs-gate.approved.loop.classify-failure.approved",
       "action": "implement-task",
       "enabled": true,
-      "id": "on.classify-failure.approved.start.implement-task"
+      "id": "on.task-specs-gate.approved.loop.classify-failure.approved.start.task-specs-gate.approved.loop.implement-task"
     },
     {
+      "loopId": "code-gate.approved.loop",
       "source": "event",
-      "event": "classify-failure.rejected",
+      "event": "code-gate.approved.loop.classify-failure.approved",
+      "action": "implement-task",
+      "enabled": true,
+      "id": "on.code-gate.approved.loop.classify-failure.approved.start.code-gate.approved.loop.implement-task"
+    },
+    {
+      "loopId": "ci-or-validation-failed.loop",
+      "source": "event",
+      "event": "ci-or-validation-failed.loop.classify-failure.approved",
+      "action": "implement-task",
+      "enabled": true,
+      "id": "on.ci-or-validation-failed.loop.classify-failure.approved.start.ci-or-validation-failed.loop.implement-task"
+    },
+    {
+      "loopId": "task-specs-gate.approved.loop",
+      "source": "event",
+      "event": "task-specs-gate.approved.loop.classify-failure.rejected",
       "action": "done",
       "enabled": true,
-      "id": "on.classify-failure.rejected.start.done"
+      "id": "on.task-specs-gate.approved.loop.classify-failure.rejected.start.task-specs-gate.approved.loop.done"
+    },
+    {
+      "loopId": "code-gate.approved.loop",
+      "source": "event",
+      "event": "code-gate.approved.loop.classify-failure.rejected",
+      "action": "done",
+      "enabled": true,
+      "id": "on.code-gate.approved.loop.classify-failure.rejected.start.code-gate.approved.loop.done"
+    },
+    {
+      "loopId": "ci-or-validation-failed.loop",
+      "source": "event",
+      "event": "ci-or-validation-failed.loop.classify-failure.rejected",
+      "action": "done",
+      "enabled": true,
+      "id": "on.ci-or-validation-failed.loop.classify-failure.rejected.start.ci-or-validation-failed.loop.done"
     }
   ],
   "loops": [
     {
       "id": "adr-goals-changed.loop",
       "steps": [
-        "on.trigger.adr-goals-changed.start.create-project-brief",
-        "on.create-project-brief.approved.start.challenge-project-brief",
-        "on.challenge-project-brief.approved.start.project-brief-gate",
-        "on.project-brief-gate.rejected.start.create-project-brief",
-        "on.challenge-project-brief.rejected.start.create-project-brief",
-        "on.create-project-brief.rejected.start.done"
+        "on.trigger.adr-goals-changed.start.adr-goals-changed.loop.create-project-brief",
+        "on.adr-goals-changed.loop.create-project-brief.approved.start.adr-goals-changed.loop.challenge-project-brief",
+        "on.adr-goals-changed.loop.challenge-project-brief.approved.start.adr-goals-changed.loop.project-brief-gate",
+        "on.adr-goals-changed.loop.project-brief-gate.rejected.start.adr-goals-changed.loop.create-project-brief",
+        "on.adr-goals-changed.loop.challenge-project-brief.rejected.start.adr-goals-changed.loop.create-project-brief",
+        "on.adr-goals-changed.loop.create-project-brief.rejected.start.adr-goals-changed.loop.done"
       ]
     },
     {
       "id": "project-brief-gate.approved.loop",
       "steps": [
-        "on.trigger.project-brief-gate.approved.start.create-roadmap",
-        "on.create-roadmap.approved.start.challenge-roadmap",
-        "on.challenge-roadmap.approved.start.roadmap-gate",
-        "on.roadmap-gate.rejected.start.create-roadmap",
-        "on.challenge-roadmap.rejected.start.create-roadmap",
-        "on.create-roadmap.rejected.start.done"
+        "on.trigger.project-brief-gate.approved.start.project-brief-gate.approved.loop.create-roadmap",
+        "on.project-brief-gate.approved.loop.create-roadmap.approved.start.project-brief-gate.approved.loop.challenge-roadmap",
+        "on.project-brief-gate.approved.loop.challenge-roadmap.approved.start.project-brief-gate.approved.loop.roadmap-gate",
+        "on.project-brief-gate.approved.loop.roadmap-gate.rejected.start.project-brief-gate.approved.loop.create-roadmap",
+        "on.project-brief-gate.approved.loop.challenge-roadmap.rejected.start.project-brief-gate.approved.loop.create-roadmap",
+        "on.project-brief-gate.approved.loop.create-roadmap.rejected.start.project-brief-gate.approved.loop.done"
       ]
     },
     {
       "id": "roadmap-gate.approved.loop",
       "steps": [
-        "on.trigger.roadmap-gate.approved.start.create-ui-design",
-        "on.create-ui-design.approved.start.challenge-ui-design",
-        "on.challenge-ui-design.approved.start.ui-design-gate",
-        "on.ui-design-gate.rejected.start.create-ui-design",
-        "on.challenge-ui-design.rejected.start.create-ui-design",
-        "on.create-ui-design.rejected.start.done"
+        "on.trigger.roadmap-gate.approved.start.roadmap-gate.approved.loop.create-ui-design",
+        "on.roadmap-gate.approved.loop.create-ui-design.approved.start.roadmap-gate.approved.loop.challenge-ui-design",
+        "on.roadmap-gate.approved.loop.challenge-ui-design.approved.start.roadmap-gate.approved.loop.ui-design-gate",
+        "on.roadmap-gate.approved.loop.ui-design-gate.rejected.start.roadmap-gate.approved.loop.create-ui-design",
+        "on.roadmap-gate.approved.loop.challenge-ui-design.rejected.start.roadmap-gate.approved.loop.create-ui-design",
+        "on.roadmap-gate.approved.loop.create-ui-design.rejected.start.roadmap-gate.approved.loop.done"
       ]
     },
     {
       "id": "ui-design-gate.approved.loop",
       "steps": [
-        "on.trigger.ui-design-gate.approved.start.create-technical-plan",
-        "on.create-technical-plan.approved.start.challenge-technical-plan",
-        "on.challenge-technical-plan.approved.start.technical-plan-gate",
-        "on.technical-plan-gate.rejected.start.create-technical-plan",
-        "on.challenge-technical-plan.rejected.start.create-technical-plan",
-        "on.create-technical-plan.rejected.start.done"
+        "on.trigger.ui-design-gate.approved.start.ui-design-gate.approved.loop.create-technical-plan",
+        "on.ui-design-gate.approved.loop.create-technical-plan.approved.start.ui-design-gate.approved.loop.challenge-technical-plan",
+        "on.ui-design-gate.approved.loop.challenge-technical-plan.approved.start.ui-design-gate.approved.loop.technical-plan-gate",
+        "on.ui-design-gate.approved.loop.technical-plan-gate.rejected.start.ui-design-gate.approved.loop.create-technical-plan",
+        "on.ui-design-gate.approved.loop.challenge-technical-plan.rejected.start.ui-design-gate.approved.loop.create-technical-plan",
+        "on.ui-design-gate.approved.loop.create-technical-plan.rejected.start.ui-design-gate.approved.loop.done"
       ]
     },
     {
       "id": "technical-plan-gate.approved.loop",
       "steps": [
-        "on.trigger.technical-plan-gate.approved.start.create-milestones",
-        "on.create-milestones.approved.start.challenge-milestones",
-        "on.challenge-milestones.approved.start.milestones-gate",
-        "on.milestones-gate.rejected.start.create-milestones",
-        "on.challenge-milestones.rejected.start.create-milestones",
-        "on.create-milestones.rejected.start.done"
+        "on.trigger.technical-plan-gate.approved.start.technical-plan-gate.approved.loop.create-milestones",
+        "on.technical-plan-gate.approved.loop.create-milestones.approved.start.technical-plan-gate.approved.loop.challenge-milestones",
+        "on.technical-plan-gate.approved.loop.challenge-milestones.approved.start.technical-plan-gate.approved.loop.milestones-gate",
+        "on.technical-plan-gate.approved.loop.milestones-gate.rejected.start.technical-plan-gate.approved.loop.create-milestones",
+        "on.technical-plan-gate.approved.loop.challenge-milestones.rejected.start.technical-plan-gate.approved.loop.create-milestones",
+        "on.technical-plan-gate.approved.loop.create-milestones.rejected.start.technical-plan-gate.approved.loop.done"
       ]
     },
     {
       "id": "milestones-gate.approved.loop",
       "steps": [
-        "on.trigger.milestones-gate.approved.start.create-task-specs",
-        "on.create-task-specs.approved.start.challenge-task-specs",
-        "on.challenge-task-specs.approved.start.task-specs-gate",
-        "on.task-specs-gate.rejected.start.create-task-specs",
-        "on.challenge-task-specs.rejected.start.create-task-specs",
-        "on.create-task-specs.rejected.start.done"
+        "on.trigger.milestones-gate.approved.start.milestones-gate.approved.loop.create-task-specs",
+        "on.milestones-gate.approved.loop.create-task-specs.approved.start.milestones-gate.approved.loop.challenge-task-specs",
+        "on.milestones-gate.approved.loop.challenge-task-specs.approved.start.milestones-gate.approved.loop.task-specs-gate",
+        "on.milestones-gate.approved.loop.task-specs-gate.rejected.start.milestones-gate.approved.loop.create-task-specs",
+        "on.milestones-gate.approved.loop.challenge-task-specs.rejected.start.milestones-gate.approved.loop.create-task-specs",
+        "on.milestones-gate.approved.loop.create-task-specs.rejected.start.milestones-gate.approved.loop.done"
       ]
     },
     {
       "id": "task-specs-gate.approved.loop",
       "steps": [
-        "on.trigger.task-specs-gate.approved.start.implement-task",
-        "on.implement-task.approved.start.run-tests",
-        "on.implement-task.rejected.start.classify-failure",
-        "on.run-tests.approved.start.review-code",
-        "on.run-tests.rejected.start.classify-failure",
-        "on.review-code.rejected.start.implement-task",
-        "on.review-code.approved.start.code-gate",
-        "on.code-gate.rejected.start.implement-task",
-        "on.classify-failure.approved.start.implement-task",
-        "on.classify-failure.rejected.start.done"
+        "on.trigger.task-specs-gate.approved.start.task-specs-gate.approved.loop.implement-task",
+        "on.task-specs-gate.approved.loop.implement-task.approved.start.task-specs-gate.approved.loop.run-tests",
+        "on.task-specs-gate.approved.loop.implement-task.rejected.start.task-specs-gate.approved.loop.classify-failure",
+        "on.task-specs-gate.approved.loop.run-tests.approved.start.task-specs-gate.approved.loop.review-code",
+        "on.task-specs-gate.approved.loop.run-tests.rejected.start.task-specs-gate.approved.loop.classify-failure",
+        "on.task-specs-gate.approved.loop.review-code.rejected.start.task-specs-gate.approved.loop.implement-task",
+        "on.task-specs-gate.approved.loop.review-code.approved.start.task-specs-gate.approved.loop.code-gate",
+        "on.task-specs-gate.approved.loop.code-gate.rejected.start.task-specs-gate.approved.loop.implement-task",
+        "on.task-specs-gate.approved.loop.classify-failure.approved.start.task-specs-gate.approved.loop.implement-task",
+        "on.task-specs-gate.approved.loop.classify-failure.rejected.start.task-specs-gate.approved.loop.done"
       ]
     },
     {
       "id": "code-gate.approved.loop",
       "steps": [
-        "on.trigger.code-gate.approved.start.prepare-dev-deployment",
-        "on.prepare-dev-deployment.approved.start.deploy-to-dev",
-        "on.prepare-dev-deployment.rejected.start.classify-failure",
-        "on.deploy-to-dev.approved.start.validate-dev-deployment",
-        "on.deploy-to-dev.rejected.start.classify-failure",
-        "on.validate-dev-deployment.approved.start.dev-deployment-validation-gate",
-        "on.validate-dev-deployment.rejected.start.prepare-dev-deployment",
-        "on.trigger.dev-deployment-validation-gate.approved.start.done",
-        "on.dev-deployment-validation-gate.rejected.start.prepare-dev-deployment",
-        "on.classify-failure.approved.start.implement-task",
-        "on.classify-failure.rejected.start.done"
+        "on.trigger.code-gate.approved.start.code-gate.approved.loop.prepare-dev-deployment",
+        "on.code-gate.approved.loop.prepare-dev-deployment.approved.start.code-gate.approved.loop.deploy-to-dev",
+        "on.code-gate.approved.loop.prepare-dev-deployment.rejected.start.code-gate.approved.loop.classify-failure",
+        "on.code-gate.approved.loop.deploy-to-dev.approved.start.code-gate.approved.loop.validate-dev-deployment",
+        "on.code-gate.approved.loop.deploy-to-dev.rejected.start.code-gate.approved.loop.classify-failure",
+        "on.code-gate.approved.loop.validate-dev-deployment.approved.start.code-gate.approved.loop.dev-deployment-validation-gate",
+        "on.code-gate.approved.loop.validate-dev-deployment.rejected.start.code-gate.approved.loop.prepare-dev-deployment",
+        "on.trigger.dev-deployment-validation-gate.approved.start.code-gate.approved.loop.done",
+        "on.code-gate.approved.loop.dev-deployment-validation-gate.rejected.start.code-gate.approved.loop.prepare-dev-deployment",
+        "on.code-gate.approved.loop.classify-failure.approved.start.code-gate.approved.loop.implement-task",
+        "on.code-gate.approved.loop.classify-failure.rejected.start.code-gate.approved.loop.done"
       ]
     },
     {
       "id": "ci-or-validation-failed.loop",
       "steps": [
-        "on.trigger.ci-or-validation-failed.start.classify-failure",
-        "on.classify-failure.approved.start.implement-task",
-        "on.classify-failure.rejected.start.done"
+        "on.trigger.ci-or-validation-failed.start.ci-or-validation-failed.loop.classify-failure",
+        "on.ci-or-validation-failed.loop.classify-failure.approved.start.ci-or-validation-failed.loop.implement-task",
+        "on.ci-or-validation-failed.loop.classify-failure.rejected.start.ci-or-validation-failed.loop.done"
       ]
     }
   ],

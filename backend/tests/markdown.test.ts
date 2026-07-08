@@ -102,8 +102,8 @@ describe("Markdown collection loading", () => {
       version: 1,
       actions: [],
       outputs: [
-        { id: "ok" },
-        { id: "rework" }
+        { id: "approved" },
+        { id: "rejected" }
       ],
       outputRoutes: [],
       humanGateResponses: [],

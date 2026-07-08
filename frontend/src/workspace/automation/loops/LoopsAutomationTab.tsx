@@ -185,15 +185,16 @@ export function LoopsAutomationTab({
     if (!selected) return;
     const selectedPolicyIds = new Set(selected.steps);
     const addedStepIndex = selected.steps.length;
+    const scopedEventType = eventType ? loopScopedEventType(eventType, selected.id) : undefined;
     const selectAddedOutputEventStep = () => {
-      if (eventType) setSelectedHandlerSelection({ source: "edge", stepIndexes: [addedStepIndex] });
+      if (scopedEventType) setSelectedHandlerSelection({ source: "edge", stepIndexes: [addedStepIndex] });
     };
-    const eventOutputId = eventType?.split(".").at(-1) ?? "";
+    const eventOutputId = scopedEventType?.split(".").at(-1) ?? "";
     const isDoneEvent = normalizePolicyToken(eventOutputId) === "done";
-    const nextPolicy = eventType
+    const nextPolicy = scopedEventType
       ? config.policies.find((policy) =>
         policy.source === "event" &&
-        policy.event === eventType &&
+        policy.event === scopedEventType &&
         (!isDoneEvent || policy.action === "done") &&
         !selectedPolicyIds.has(policy.id)
       )
@@ -201,15 +202,17 @@ export function LoopsAutomationTab({
     if (!nextPolicy) {
       const baseAction = sourcePolicy?.action || defaultAction;
       if (!baseAction) return;
-      const generatedEvent = eventType || policyOutputEventType({ action: baseAction }, selectedActionOutputIds(baseAction)[0] ?? "");
-      const action = isDoneEvent ? "done" : uniquePolicyAction(generatedEvent, baseAction, config.policies);
+      const generatedEvent = scopedEventType || policyOutputEventType({ action: baseAction, loopId: selected.id }, selectedActionOutputIds(baseAction)[0] ?? "");
+      const action = isDoneEvent ? "done" : uniquePolicyAction(generatedEvent, baseAction, config.policies, selected.id);
       const outputIds = selectedActionOutputIds(action);
       const generatedPolicy: ProjectPolicy = {
         id: generatedPolicyId({
+          loopId: selected.id,
           source: "event",
           event: generatedEvent,
           action
         }),
+        loopId: selected.id,
         source: "event",
         event: generatedEvent,
         action,
@@ -406,6 +409,12 @@ export function LoopsAutomationTab({
       />
     </>
   );
+}
+
+function loopScopedEventType(eventType: string, loopId: string) {
+  return eventType.startsWith(`${loopId}.`) || eventType.includes(".loop.") || eventType.startsWith("trigger.")
+    ? eventType
+    : `${loopId}.${eventType}`;
 }
 
 function sameHumanGateResponseTarget(first: ProjectHumanGateResponse, second: ProjectHumanGateResponse) {

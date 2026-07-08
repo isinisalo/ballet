@@ -43,6 +43,7 @@ export interface ProjectOutputRoute {
 
 export interface ProjectPolicy {
   id: string;
+  loopId?: string;
   source: "event" | "trigger";
   event?: string;
   trigger?: string;

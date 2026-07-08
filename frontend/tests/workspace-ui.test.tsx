@@ -1,5 +1,5 @@
 import type { Agent, AppData, MarkdownDocument, ProjectAutomationConfig, ProjectDocumentTreeNode, Skill } from "@shared/api/workspace-contracts";
-import { policyOutputEventTypes, loopIdFromTrigger } from "@shared/policy-actions";
+import { generatedPolicyId, policyOutputEventType, policyOutputEventTypes, loopIdFromTrigger } from "@shared/policy-actions";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1688,16 +1688,19 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Output handler" })).not.toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Save automation" }));
+    const approvedPolicyId = generatedPolicyId({ loopId, source: "event", event: "implementation.approved", action: "implementation" });
+    const approvedEvent = policyOutputEventType({ action: "implementation", loopId }, "approved");
     await waitFor(() => expect(data.automation.policies).toContainEqual(expect.objectContaining({
       source: "event",
-      event: "implementation.approved",
+      event: approvedEvent,
       action: "implementation",
-      id: "on.implementation.approved.start.implementation"
+      id: approvedPolicyId,
+      loopId
     })));
     expect(data.automation.loops[0]?.steps).toEqual([
       loopStartPolicyId,
       "on.implementation.rejected.start.implementation",
-      "on.implementation.approved.start.implementation"
+      approvedPolicyId
     ]);
   });
 
@@ -1892,13 +1895,16 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.policies).toHaveLength(2));
+    const implementationApprovedPolicyId = generatedPolicyId({ loopId, source: "event", event: "implementation.approved", action: "implementation" });
+    const implementationApprovedEvent = policyOutputEventType({ action: "implementation", loopId }, "approved");
     expect(data.automation.policies[1]).toMatchObject({
       source: "event",
-      event: "implementation.approved",
+      event: implementationApprovedEvent,
       action: "implementation",
-      id: "on.implementation.approved.start.implementation"
+      id: implementationApprovedPolicyId,
+      loopId
     });
-    expect(data.automation.loops[0]?.steps).toEqual([implementationStartPolicyId, "on.implementation.approved.start.implementation"]);
+    expect(data.automation.loops[0]?.steps).toEqual([implementationStartPolicyId, implementationApprovedPolicyId]);
   });
 
   it("falls back from the removed automation events route", async () => {

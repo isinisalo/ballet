@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig, ProjectPolicy } from "../../shared/domain/automation.js";
-import { actionOutputIds, findProjectOutputRoute, humanGateApprovalTriggerId, humanGateResponseId, policyOutputEventType, loopIdFromTrigger } from "../../shared/policy-actions.js";
+import { actionOutputIds, findProjectOutputRoute, generatedPolicyId, humanGateApprovalTriggerId, humanGateResponseId, policyOutputEventType, loopIdFromTrigger } from "../../shared/policy-actions.js";
 import {
     automationPoliciesToEventDefinitions,
     automationPoliciesToPolicies,
@@ -40,7 +40,8 @@ const agent: Agent = {
 
 const startTrigger = "project-brief-gate.approved";
 const startLoopId = loopIdFromTrigger(startTrigger);
-const startPolicyId = `on.trigger.${startTrigger}.start.implementation`;
+const startPolicyId = generatedPolicyId({ loopId: startLoopId, source: "trigger", trigger: startTrigger, action: "implementation" });
+const startRejectedPolicyId = generatedPolicyId({ loopId: startLoopId, source: "event", event: "implementation.rejected", action: "implementation" });
 
 const startGateAction = () => ({
   id: "project-brief-gate",
@@ -52,6 +53,7 @@ const startGateAction = () => ({
 
 const startPolicy = (): ProjectPolicy => ({
   id: startPolicyId,
+  loopId: startLoopId,
   source: "trigger",
   trigger: startTrigger,
   action: "implementation",
@@ -75,9 +77,10 @@ const validConfig = (): ProjectAutomationConfig => ({
   policies: [
     startPolicy(),
     {
-      id: "on.implementation.rejected.start.implementation",
+      id: startRejectedPolicyId,
+      loopId: startLoopId,
       source: "event",
-      event: "implementation.rejected",
+      event: policyOutputEventType({ action: "implementation", loopId: startLoopId }, "rejected"),
       action: "implementation",
       enabled: true
     }
@@ -85,7 +88,7 @@ const validConfig = (): ProjectAutomationConfig => ({
   loops: [
     {
       id: startLoopId,
-      steps: [startPolicyId, "on.implementation.rejected.start.implementation"]
+      steps: [startPolicyId, startRejectedPolicyId]
     }
   ],
   runtimes: [
@@ -199,9 +202,9 @@ describe("project automation config", () => {
     config.policies.forEach((policy) => {
       actionOutputIds(config.actions, policy.action).forEach((outputId) => {
         const route = findProjectOutputRoute(config.outputRoutes, policy.id, outputId);
-        const eventType = policyOutputEventType(policy, outputId);
+        const eventType = route?.target.eventType ?? policyOutputEventType(policy, outputId);
         if (eventType.endsWith(".approved") && config.actions.find((action) => action.id === policy.action)?.humanGate) return;
-        expect(route || eventPoliciesByEvent.has(eventType)).toBeTruthy();
+        expect(eventPoliciesByEvent.has(eventType)).toBeTruthy();
       });
     });
   });
@@ -221,7 +224,7 @@ describe("project automation config", () => {
     expect(saved.humanGateResponses).toEqual([]);
     expect(saved.policies[0]?.id).toBe(startPolicyId);
     expect(saved.loops[0]?.id).toBe(startLoopId);
-    expect(saved.loops[0]?.steps).toEqual([startPolicyId, "on.implementation.rejected.start.implementation"]);
+    expect(saved.loops[0]?.steps).toEqual([startPolicyId, startRejectedPolicyId]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
   });
 
@@ -271,22 +274,26 @@ describe("project automation config", () => {
       { id: "rejected" }
     ]));
     expect(loaded.outputRoutes).toEqual([]);
+    const startRunPolicyId = generatedPolicyId({ loopId: startLoopId, source: "trigger", trigger: startTrigger, action: "run" });
+    const runApprovedPolicyId = generatedPolicyId({ loopId: startLoopId, source: "event", event: "run.approved", action: "run" });
     expect(loaded.policies).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        id: startPolicyId.replace(".start.implementation", ".start.run"),
+        id: startRunPolicyId,
+        loopId: startLoopId,
         source: "trigger",
         trigger: startTrigger,
         action: "run"
       }),
       expect.objectContaining({
-      id: "on.run.approved.start.run",
-      source: "event",
-      event: "run.approved",
-      action: "run"
+        id: runApprovedPolicyId,
+        loopId: startLoopId,
+        source: "event",
+        event: policyOutputEventType({ action: "run", loopId: startLoopId }, "approved"),
+        action: "run"
       })
     ]));
     expect(loaded.loops[0]?.id).toBe(startLoopId);
-    expect(loaded.loops[0]?.steps).toEqual([startPolicyId.replace(".start.implementation", ".start.run"), "on.run.approved.start.run"]);
+    expect(loaded.loops[0]?.steps).toEqual([startRunPolicyId, runApprovedPolicyId]);
     expect(loaded.runtimes[0]).not.toHaveProperty("outputEvents");
   });
 
@@ -325,15 +332,20 @@ describe("project automation config", () => {
     }), "utf8");
 
     const loaded = await loadProjectAutomationConfig(root, [agent]);
+    const intentLoopId = "intent_changed.approved.loop";
+    const intentStartPolicyId = generatedPolicyId({ loopId: intentLoopId, source: "trigger", trigger: "intent_changed.approved", action: "implementation" });
+    const intentApprovedPolicyId = generatedPolicyId({ loopId: intentLoopId, source: "event", event: "implementation.approved", action: "implementation" });
 
     expect(loaded.policies).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        id: "on.trigger.intent_changed.approved.start.implementation",
+        id: intentStartPolicyId,
+        loopId: intentLoopId,
         trigger: "intent_changed.approved"
       }),
       expect.objectContaining({
-      id: "on.implementation.approved.start.implementation",
-      event: "implementation.approved"
+        id: intentApprovedPolicyId,
+        loopId: intentLoopId,
+        event: policyOutputEventType({ action: "implementation", loopId: intentLoopId }, "approved")
       })
     ]));
     expect(loaded).not.toHaveProperty("gates");
@@ -344,7 +356,7 @@ describe("project automation config", () => {
     expect(loaded.outputRoutes).toEqual([]);
     expect(loaded.actions[0]?.outputIds).toEqual(["approved", "rejected"]);
     expect(loaded.loops[0]?.id).toBe("intent_changed.approved.loop");
-    expect(loaded.loops[0]?.steps).toEqual(["on.trigger.intent_changed.approved.start.implementation", "on.implementation.approved.start.implementation"]);
+    expect(loaded.loops[0]?.steps).toEqual([intentStartPolicyId, intentApprovedPolicyId]);
   });
 
   it("preserves one-output agent actions as approval-only actions", async () => {
@@ -459,8 +471,10 @@ describe("project automation config", () => {
     expect(agentlessConfig.actions.some((action) => action.id === "manual-gate")).toBe(true);
 
     const humanGateTrigger = humanGateApprovalTriggerId("human-review", "approved");
+    const humanGateLoopId = loopIdFromTrigger(humanGateTrigger);
     const humanGatePolicy = {
-      id: `on.trigger.${humanGateTrigger}.start.human-review`,
+      id: generatedPolicyId({ loopId: humanGateLoopId, source: "trigger", trigger: humanGateTrigger, action: "human-review" }),
+      loopId: humanGateLoopId,
       source: "trigger" as const,
       trigger: humanGateTrigger,
       action: "human-review",
@@ -470,10 +484,10 @@ describe("project automation config", () => {
       ...validConfig(),
       actions: [{ id: "human-review", description: "Human review.", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true }],
       policies: [humanGatePolicy],
-      loops: [{ id: loopIdFromTrigger(humanGateTrigger), steps: [humanGatePolicy.id] }]
+      loops: [{ id: humanGateLoopId, steps: [humanGatePolicy.id] }]
     };
     const humanGateResponseBase = {
-      loopId: loopIdFromTrigger(humanGateTrigger),
+      loopId: humanGateLoopId,
       policyId: humanGatePolicy.id,
       actionId: "human-review",
       outputId: "approved",
@@ -687,12 +701,13 @@ describe("project automation config", () => {
       ...validConfig(),
       gates: [{ id: "human-review", title: "Human review", description: "Review generated output." }],
       outputRoutes: [{
-        sourcePolicyId: "on.implementation.rejected.start.implementation",
+        sourcePolicyId: startRejectedPolicyId,
         outputId: "ok",
         target: { type: "gate", gate: "human-review" }
       }]
     };
     const normalized = normalizeProjectAutomationConfig(gateRouteConfig);
+    const humanReviewPolicyId = generatedPolicyId({ loopId: startLoopId, source: "event", event: "implementation.approved", action: "human-review" });
 
     expect(normalized).not.toHaveProperty("gates");
     expect(normalized.outputRoutes).toEqual([]);
@@ -701,16 +716,17 @@ describe("project automation config", () => {
     ]));
     expect(normalized.policies).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        id: "on.implementation.approved.start.human-review",
+        id: humanReviewPolicyId,
+        loopId: startLoopId,
         source: "event",
-        event: "implementation.approved",
+        event: policyOutputEventType({ action: "implementation", loopId: startLoopId }, "approved"),
         action: "human-review"
       })
     ]));
     expect(normalized.loops[0]?.steps).toEqual([
       startPolicyId,
-      "on.implementation.rejected.start.implementation",
-      "on.implementation.approved.start.human-review"
+      startRejectedPolicyId,
+      humanReviewPolicyId
     ]);
     expect(validateProjectAutomationConfig(gateRouteConfig, [agent]).some((issue) =>
       issue.message === "Output route target type must be event."

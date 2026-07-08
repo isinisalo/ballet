@@ -28,7 +28,7 @@ const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyInde
     policyId,
     index,
     policy: policyById.get(policyId),
-    outputEvents: policyById.get(policyId) ? policyOutputEventTypes(policyById.get(policyId)!, [{ id: policyById.get(policyId)!.action, outputIds: ["complete", "failed"] }]) : undefined
+    outputEvents: policyById.get(policyId) ? policyOutputEventTypes(policyById.get(policyId)!, [{ id: policyById.get(policyId)!.action, outputIds: ["approved", "rejected"] }]) : undefined
   }));
 
   return calculateLoopCanvasLayout({
@@ -48,9 +48,9 @@ const compositeConfig = (
   const sourcePolicy = policy("source-start", undefined, "source-gate");
   sourcePolicy.trigger = sourceStartTrigger;
   const targetPolicy = policy("target-start", undefined, "target-gate");
-  targetPolicy.trigger = "source-gate.ready";
+  targetPolicy.trigger = "source-gate.approved";
   const downstreamPolicy = policy("downstream-start", undefined, "final-gate");
-  downstreamPolicy.trigger = "target-gate.done";
+  downstreamPolicy.trigger = "target-gate.approved";
   const policyByLoopId = new Map([
     ["upstream", upstreamPolicy],
     ["source", sourcePolicy],
@@ -61,12 +61,12 @@ const compositeConfig = (
   return {
     version: 1,
     actions: [
-      { id: "upstream-gate", description: "Upstream gate", outputIds: ["ready", "blocked"], agentIds: [], humanGate: true },
-      { id: "source-gate", description: "Source gate", outputIds: ["ready", "blocked"], agentIds: [], humanGate: true },
-      { id: "target-gate", description: "Target gate", outputIds: ["done", "blocked"], agentIds: [], humanGate: true },
-      { id: "final-gate", description: "Final gate", outputIds: ["done", "blocked"], agentIds: [], humanGate: true }
+      { id: "upstream-gate", description: "Upstream gate", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true },
+      { id: "source-gate", description: "Source gate", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true },
+      { id: "target-gate", description: "Target gate", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true },
+      { id: "final-gate", description: "Final gate", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true }
     ],
-    outputs: [{ id: "ready" }, { id: "blocked" }, { id: "done" }],
+    outputs: [{ id: "approved" }, { id: "rejected" }],
     outputRoutes,
     humanGateResponses: [],
     policies: [upstreamPolicy, sourcePolicy, targetPolicy, downstreamPolicy],
@@ -251,8 +251,8 @@ describe("loop layout helper modules", () => {
 describe("calculateLoopCanvasLayout", () => {
   it("uses selected action outputs as policy output events", () => {
     expect(policyOutputEventTypes({ action: "build" }, [{ id: "build", outputIds: ["complete", "failed"] }])).toEqual([
-      "build.complete",
-      "build.failed"
+      "build.approved",
+      "build.rejected"
     ]);
   });
 
@@ -418,25 +418,25 @@ describe("calculateLoopCanvasLayout", () => {
 
   it("routes approval outputs from the right and same-row rework outputs through bottom handles", () => {
     const start = policy("start", undefined, "build");
-    const completeHandler = policy("complete-handler", "build.complete", "done");
-    const failedHandler = policy("failed-handler", "build.failed", "done");
+    const completeHandler = policy("complete-handler", "build.approved", "done");
+    const failedHandler = policy("failed-handler", "build.rejected", "done");
     const layout = layoutFor([start, completeHandler, failedHandler], [
       start.id,
       completeHandler.id,
       failedHandler.id
     ]);
 
-    expect(layout.edges.find((edge) => edge.eventType === "build.complete")).toMatchObject({
+    expect(layout.edges.find((edge) => edge.eventType === "build.approved")).toMatchObject({
       sourceNodeKey: "policy-0",
       sourceHandleId: "right",
       targetHandleId: "left",
-      label: "complete"
+      label: "approved"
     });
-    expect(layout.edges.find((edge) => edge.eventType === "build.failed")).toMatchObject({
+    expect(layout.edges.find((edge) => edge.eventType === "build.rejected")).toMatchObject({
       sourceNodeKey: "policy-0",
       sourceHandleId: "bottom",
       targetHandleId: "bottom",
-      label: "failed"
+      label: "rejected"
     });
   });
 
@@ -459,8 +459,8 @@ describe("calculateLoopCanvasLayout", () => {
     });
     const outputEventNodes = layout.nodes.filter((node) => node.kind === "output-event");
 
-    expect(outputEvents).toEqual(["trigger.human-review.approved", "human-review.changes-requested"]);
-    expect(outputEventNodes.map((node) => node.outputEvent?.outputId)).toEqual(["trigger.human-review.approved", "human-review.changes-requested"]);
+    expect(outputEvents).toEqual(["trigger.human-review.approved", "human-review.rejected"]);
+    expect(outputEventNodes.map((node) => node.outputEvent?.outputId)).toEqual(["trigger.human-review.approved", "human-review.rejected"]);
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "policy-output-event-0-trigger.human-review.approved",
       sourceNodeKey: "policy-0",
@@ -510,41 +510,41 @@ describe("calculateLoopCanvasLayout", () => {
 
   it("places unhandled output events in the next policy column after active policies", () => {
     const first = policy("first", undefined, "build");
-    const child = policy("child", "build.complete", "deploy");
+    const child = policy("child", "build.approved", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id]);
     const firstNode = layout.nodes.find((node) => node.key === "policy-0");
     const childNode = layout.nodes.find((node) => node.key === "policy-1");
-    const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.failed");
-    const outputEventEdge = layout.edges.find((edge) => edge.key === "policy-output-event-0-build.failed");
+    const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.rejected");
+    const outputEventEdge = layout.edges.find((edge) => edge.key === "policy-output-event-0-build.rejected");
     const triggerPolicyEdge = layout.edges.find((edge) => edge.key === "trigger-policy-0");
-    const childPolicyEdge = layout.edges.find((edge) => edge.key === "policy-policy-0-1-build.complete");
+    const childPolicyEdge = layout.edges.find((edge) => edge.key === "policy-policy-0-1-build.approved");
 
     expect(layout.nodes.filter((node) => node.kind === "policy").map((node) => node.record?.policyId)).toEqual(["first", "child"]);
     expect(childNode?.x).toBeGreaterThan(firstNode?.x ?? 0);
     expect(childNode?.y).toBe(firstNode?.y);
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-policy-0-1-build.complete",
+      key: "policy-policy-0-1-build.approved",
       sourceNodeKey: "policy-0",
       targetNodeKey: "policy-1",
       sourceHandleId: "right",
       targetHandleId: "left",
-      eventType: "build.complete"
+      eventType: "build.approved"
     }));
     expect(triggerPolicyEdge?.label).toBe("project.updated");
-    expect(childPolicyEdge?.label).toBe("complete");
+    expect(childPolicyEdge?.label).toBe("approved");
     expect(outputEventNode).toMatchObject({
       kind: "output-event",
       sourcePolicyId: first.id,
-      outputEvent: { eventType: "build.failed" }
+      outputEvent: { eventType: "build.rejected" }
     });
     expect(outputEventEdge).toMatchObject({
       sourceNodeKey: "policy-0",
-      targetNodeKey: "output-event-0-build.failed",
+      targetNodeKey: "output-event-0-build.rejected",
       sourceHandleId: "bottom",
       targetHandleId: "top",
       dashed: true,
-      eventType: "build.failed",
-      label: "failed"
+      eventType: "build.rejected",
+      label: "rejected"
     });
     expect(outputEventNode?.x).toBe(childNode?.x);
     expect(outputEventNode?.y).toBe(childNode
@@ -860,12 +860,12 @@ describe("calculateLoopCanvasLayout", () => {
 
   it("lays out child event policies below the source policy in vertical mode", () => {
     const first = policy("first", undefined, "build");
-    const child = policy("child", "build.complete", "deploy");
+    const child = policy("child", "build.approved", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id], null, "vertical");
     const triggerNode = layout.nodes.find((node) => node.key === "trigger");
     const firstNode = layout.nodes.find((node) => node.key === "policy-0");
     const childNode = layout.nodes.find((node) => node.key === "policy-1");
-    const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.failed");
+    const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.rejected");
     const triggerPolicyEdge = layout.edges.find((edge) => edge.key === "trigger-policy-0");
 
     expect(layout.direction).toBe("vertical");
@@ -879,7 +879,7 @@ describe("calculateLoopCanvasLayout", () => {
       label: "project.updated"
     });
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-policy-0-1-build.complete",
+      key: "policy-policy-0-1-build.approved",
       sourceHandleId: "right",
       targetHandleId: "left"
     }));
@@ -1034,8 +1034,8 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
       "loop:source:trigger",
       "loop:source:policy-0",
-      "loop:source:output-event-0-ready",
-      "loop:source:output-event-0-blocked"
+      "loop:source:output-event-0-approved",
+      "loop:source:output-event-0-rejected"
     ]));
     expect(layout.nodes.some((node) => node.key.startsWith("loop:observer:"))).toBe(false);
   });
@@ -1049,7 +1049,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     });
     const sourceTrigger = layout.nodes.find((node) => node.key === "loop:source:trigger");
     const targetLoop = layout.nodes.find((node) => node.key === "loop:target:loop");
-    const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:ready:to:target:loop");
+    const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:loop");
 
     expect(layout.nodes.every((node) => node.key.startsWith("loop:"))).toBe(true);
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
@@ -1060,7 +1060,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     ]));
     expect(layout.nodes.find((node) => node.key === "loop:target:trigger")).toBeUndefined();
     expect(layout.nodes.find((node) => node.key === "loop:target:policy-0")).toBeUndefined();
-    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-ready")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toBeUndefined();
     expect(targetLoop).toMatchObject({
       kind: "loop",
       width: loopNodeSizes.loop.minWidth,
@@ -1068,7 +1068,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       loopSummary: {
         loopId: "target",
         label: "target gate loop",
-        trigger: "source-gate.ready",
+        trigger: "source-gate.approved",
         action: "target-gate"
       }
     });
@@ -1085,8 +1085,8 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       targetNodeKey: "loop:target:loop",
       sourceHandleId: "right",
       targetHandleId: "left",
-      eventType: "trigger.source-gate.ready",
-      label: "ready",
+      eventType: "trigger.source-gate.approved",
+      label: "approved",
       tone: "cross-loop"
     });
   });
@@ -1099,20 +1099,20 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       recordsByLoopId: compositeRecords(config)
     });
 
-    expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:ready:to:target:loop")).toMatchObject({
+    expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:loop")).toMatchObject({
       sourceNodeKey: "loop:source:policy-0",
       targetNodeKey: "loop:target:loop",
       sourceHandleId: "right",
       targetHandleId: "left",
-      label: "ready",
+      label: "approved",
       tone: "cross-loop"
     });
-    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-blocked")).toBeDefined();
-    expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:blocked:to:target:loop")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-rejected")).toBeDefined();
+    expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:rejected:to:target:loop")).toBeUndefined();
   });
 
   it("renders upstream loops as compact loop nodes above the selected loop", () => {
-    const config = compositeConfig(["upstream", "source"], [], "upstream-gate.ready");
+    const config = compositeConfig(["upstream", "source"], [], "upstream-gate.approved");
     const layout = calculateCompositeLoopCanvasLayout({
       config,
       selectedLoopId: "source",
@@ -1120,7 +1120,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     });
     const sourceTrigger = layout.nodes.find((node) => node.key === "loop:source:trigger");
     const upstreamLoop = layout.nodes.find((node) => node.key === "loop:upstream:loop");
-    const crossEdge = layout.edges.find((edge) => edge.key === "loop:upstream:output:0:ready:to:source:loop");
+    const crossEdge = layout.edges.find((edge) => edge.key === "loop:upstream:output:0:approved:to:source:loop");
 
     expect(sourceTrigger).toBeDefined();
     expect(upstreamLoop).toMatchObject({
@@ -1138,7 +1138,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "loop:upstream:loop",
       targetNodeKey: "loop:source:trigger",
-      label: "ready",
+      label: "approved",
       tone: "cross-loop"
     });
   });
@@ -1151,12 +1151,12 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       recordsByLoopId: compositeRecords(config)
     });
 
-    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-blocked")).toBeDefined();
-    expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:blocked:to:target:loop")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-rejected")).toBeDefined();
+    expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:rejected:to:target:loop")).toBeUndefined();
   });
 
   it("protects circular derived trigger loop references from recursive layout", () => {
-    const config = compositeConfig(["source", "target"], [], "target-gate.done");
+    const config = compositeConfig(["source", "target"], [], "target-gate.approved");
     const layout = calculateCompositeLoopCanvasLayout({
       config,
       selectedLoopId: "source",
@@ -1175,21 +1175,21 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     config.actions.push({
       id: "branch-gate",
       description: "Branch gate",
-      outputIds: ["ready", "blocked"],
+      outputIds: ["approved", "rejected"],
       agentIds: [],
       humanGate: true
     });
     config.policies.push({
       id: "branch-source",
       source: "event",
-      event: "source-gate.blocked",
+      event: "source-gate.rejected",
       action: "branch-gate",
       enabled: true
     });
     const sourceLoop = config.loops.find((loop) => loop.id === "source");
     sourceLoop?.steps.push("branch-source");
     const branchPolicy = policy("branch-start", undefined, "final-gate");
-    branchPolicy.trigger = "branch-gate.ready";
+    branchPolicy.trigger = "branch-gate.approved";
     config.policies.push(branchPolicy);
     config.loops.push({ id: "branch", steps: [branchPolicy.id] });
     const layout = calculateCompositeLoopCanvasLayout({
@@ -1204,12 +1204,12 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(branchLoop).toBeDefined();
     expect(targetLoop?.y).toBe(branchLoop?.y);
     expect(targetLoop ? branchLoop?.x : undefined).toBeGreaterThan(targetLoop?.x ?? 0);
-    expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:ready:to:target:loop")).toMatchObject({
-      label: "ready",
+    expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:loop")).toMatchObject({
+      label: "approved",
       tone: "cross-loop"
     });
-    expect(layout.edges.find((edge) => edge.key === "loop:source:output:1:ready:to:branch:loop")).toMatchObject({
-      label: "ready",
+    expect(layout.edges.find((edge) => edge.key === "loop:source:output:1:approved:to:branch:loop")).toMatchObject({
+      label: "approved",
       tone: "cross-loop"
     });
   });
@@ -1225,18 +1225,18 @@ describe("calculateAllLoopsCanvasLayout", () => {
     const sourceTrigger = layout.nodes.find((node) => node.key === "loop:source:trigger");
     const targetTrigger = layout.nodes.find((node) => node.key === "loop:target:trigger");
     const observerTrigger = layout.nodes.find((node) => node.key === "loop:observer:trigger");
-    const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:ready:to:target:trigger");
+    const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:trigger");
 
     expect(sourceTrigger).toBeDefined();
     expect(targetTrigger).toBeDefined();
     expect(observerTrigger).toBeDefined();
-    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-ready")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toBeUndefined();
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "loop:source:policy-0",
       targetNodeKey: "loop:target:trigger",
       sourceHandleId: "right",
       targetHandleId: "left",
-      label: "ready",
+      label: "approved",
       tone: "cross-loop"
     });
   });

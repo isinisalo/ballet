@@ -17,11 +17,11 @@ export const uniqueAutomationId = (base: string, ids: string[]) => {
   return candidate;
 };
 
-export const uniquePolicyAction = (event: string, baseAction: string, policies: ProjectPolicy[]) => {
+export const uniquePolicyAction = (event: string, baseAction: string, policies: ProjectPolicy[], loopId?: string) => {
   const base = normalizePolicyToken(baseAction) || "action";
   let action = base;
   let suffix = 2;
-  while (policies.some((policy) => policy.id === generatedPolicyId({ source: "event", event, action }))) {
+  while (policies.some((policy) => policy.id === generatedPolicyId({ loopId, source: "event", event, action }))) {
     action = `${base}-${suffix}`;
     suffix += 1;
   }

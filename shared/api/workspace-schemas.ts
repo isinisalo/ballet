@@ -153,6 +153,7 @@ const projectOutputRouteSchema = z.object({
 
 const projectPolicySchema = z.object({
   id: automationPolicyIdSchema,
+  loopId: automationLoopIdSchema.optional(),
   source: z.enum(["event", "trigger"]),
   event: automationEventTypeSchema.optional(),
   trigger: automationTriggerIdSchema.optional(),

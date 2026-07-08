@@ -8,19 +8,33 @@ import {
   nextConfigWithoutLoopStepIndexes
 } from "../src/workspace/automation/loops/loopActionSheetLogic";
 
-const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
-  id: patch.id ?? generatedPolicyId({
-    source: patch.source ?? "event",
-    event: patch.event,
-    trigger: patch.trigger,
-    action: patch.action ?? "build"
-  }),
-  source: patch.source ?? "event",
-  event: patch.event,
-  trigger: patch.trigger,
-  action: patch.action ?? "build",
-  enabled: patch.enabled ?? true
-});
+const loopId = "delivery";
+
+const loopEvent = (event: string | undefined, scopedLoopId = loopId) =>
+  event && !event.startsWith(`${scopedLoopId}.`) ? `${scopedLoopId}.${event}` : event;
+
+const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => {
+  const policyLoopId = patch.loopId ?? loopId;
+  const source = patch.source ?? "event";
+  const event = source === "event" ? loopEvent(patch.event, policyLoopId) : undefined;
+  const trigger = source === "trigger" ? patch.trigger : undefined;
+  const action = patch.action ?? "build";
+  return {
+    id: patch.id ?? generatedPolicyId({
+      loopId: policyLoopId,
+      source,
+      event,
+      trigger,
+      action
+    }),
+    loopId: policyLoopId,
+    source,
+    event,
+    trigger,
+    action,
+    enabled: patch.enabled ?? true
+  };
+};
 
 const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
   version: 1,
@@ -32,7 +46,7 @@ const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
   outputRoutes: [],
   humanGateResponses: [],
   policies,
-  loops: [{ id: "delivery", steps: policies.map((item) => item.id) }],
+  loops: [{ id: loopId, steps: policies.map((item) => item.id) }],
   runtimes: []
 });
 
@@ -40,7 +54,7 @@ describe("nextConfigWithLoopStepAction", () => {
   it("creates a policy for the selected step with the new action", () => {
     const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
     const current = config([startPolicy]);
-    const next = nextConfigWithLoopStepAction(current, "delivery", 0, "review");
+    const next = nextConfigWithLoopStepAction(current, loopId, 0, "review");
     const expectedPolicyId = generatedPolicyId({ ...startPolicy, action: "review" });
 
     expect(next).not.toBe(current);
@@ -56,7 +70,7 @@ describe("nextConfigWithLoopStepAction", () => {
     const buildPolicy = policy({ source: "event", event: "build.ready", action: "build" });
     const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
     const current = config([buildPolicy, reviewPolicy]);
-    const next = nextConfigWithLoopStepAction(current, "delivery", 0, "review");
+    const next = nextConfigWithLoopStepAction(current, loopId, 0, "review");
 
     expect(next.policies).toBe(current.policies);
     expect(next.loops[0]?.steps).toEqual([reviewPolicy.id, reviewPolicy.id]);
@@ -67,9 +81,9 @@ describe("nextConfigWithLoopStepAction", () => {
     const current = config([startPolicy]);
 
     expect(nextConfigWithLoopStepAction(current, "missing", 0, "review")).toBe(current);
-    expect(nextConfigWithLoopStepAction(current, "delivery", 5, "review")).toBe(current);
-    expect(nextConfigWithLoopStepAction(current, "delivery", 0, "missing")).toBe(current);
-    expect(nextConfigWithLoopStepAction(current, "delivery", 0, "build")).toBe(current);
+    expect(nextConfigWithLoopStepAction(current, loopId, 5, "review")).toBe(current);
+    expect(nextConfigWithLoopStepAction(current, loopId, 0, "missing")).toBe(current);
+    expect(nextConfigWithLoopStepAction(current, loopId, 0, "build")).toBe(current);
   });
 
   it("creates replacement policies for every selected folded step", () => {
@@ -77,7 +91,7 @@ describe("nextConfigWithLoopStepAction", () => {
     const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
-    const next = nextConfigWithLoopStepActions(current, "delivery", [0, 2], "review");
+    const next = nextConfigWithLoopStepActions(current, loopId, [0, 2], "review");
     const expectedStartPolicyId = generatedPolicyId({ ...startPolicy, action: "review" });
     const expectedReworkPolicyId = generatedPolicyId({ ...reworkPolicy, action: "review" });
 
@@ -100,7 +114,7 @@ describe("nextConfigWithLoopStepAction", () => {
     const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
-    const next = nextConfigWithoutLoopStepIndexes(current, "delivery", [0, 2]);
+    const next = nextConfigWithoutLoopStepIndexes(current, loopId, [0, 2]);
 
     expect(next.policies).toBe(current.policies);
     expect(next.loops[0]?.steps).toEqual([reviewPolicy.id]);
@@ -111,7 +125,7 @@ describe("nextConfigWithLoopStepAction", () => {
     const reviewPolicy = policy({ id: "review-ready", source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ id: "rework-build", source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
-    const next = nextConfigWithLoopHandlerAction(current, "delivery", 2, "review");
+    const next = nextConfigWithLoopHandlerAction(current, loopId, 2, "review");
     const expectedReworkPolicyId = generatedPolicyId({ ...reworkPolicy, action: "review" });
 
     expect(next).not.toBe(current);
@@ -128,7 +142,7 @@ describe("nextConfigWithLoopStepAction", () => {
     const reworkBuildPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const reworkReviewPolicy = policy({ source: "event", event: "review.changes-requested", action: "review" });
     const current = config([startPolicy, reworkBuildPolicy, reworkReviewPolicy]);
-    const next = nextConfigWithLoopHandlerAction(current, "delivery", 1, "review");
+    const next = nextConfigWithLoopHandlerAction(current, loopId, 1, "review");
 
     expect(next.policies).toBe(current.policies);
     expect(next.loops[0]?.steps).toEqual([

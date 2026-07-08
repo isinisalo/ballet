@@ -10,6 +10,7 @@ import {
   defaultPolicyOutputIds,
   policyActionTokens,
   policyEventTypesForActions,
+  policyOutputEventTypes,
   projectOutputRouteEventType,
   policySourceKey,
 } from "../../shared/policy-actions.js";
@@ -29,6 +30,7 @@ export const automationPoliciesToEventDefinitions = (
         : policyActionTokens(policies).map((id) => ({ id, outputIds: [...defaultPolicyOutputIds], agentIds: [] })),
       outputs
     ),
+    ...policies.flatMap((policy) => policyOutputEventTypes(policy, actions, outputs)),
     ...outputRoutes.flatMap((route) => {
       const policy = policies.find((candidate) => candidate.id === route.sourcePolicyId);
       return policy ? [projectOutputRouteEventType(policy, route.outputId, outputRoutes, actions)] : [];

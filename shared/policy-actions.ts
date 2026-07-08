@@ -42,16 +42,32 @@ export const loopIdForPolicy = (policy: Pick<ProjectPolicy, "source" | "trigger"
 
 export const triggerEventType = (triggerId: string): string => `trigger.${normalizeTriggerToken(triggerId)}`;
 
-export const policySourceKey = (input: Pick<ProjectPolicy, "source" | "event" | "trigger">): string =>
-  input.source === "trigger" ? triggerEventType(input.trigger ?? "") : (input.event ?? "");
+const policyLoopId = (input: { loopId?: string }): string =>
+  input.loopId ? normalizeLoopId(input.loopId) : "";
 
-export const generatedPolicyId = (input: Pick<ProjectPolicy, "source" | "event" | "trigger" | "action">): string =>
-  `on.${input.source === "trigger" ? `trigger.${input.trigger ?? ""}` : input.event ?? ""}.start.${input.action}`;
+const loopQualifiedActionToken = (input: Pick<ProjectPolicy, "action"> & { loopId?: string }): string => {
+  const action = normalizePolicyToken(input.action);
+  const loopId = policyLoopId(input);
+  return loopId && action ? `${loopId}.${action}` : action;
+};
+
+const loopQualifiedEventType = (input: Pick<ProjectPolicy, "event"> & { loopId?: string }): string => {
+  const event = normalizeTriggerToken(input.event ?? "");
+  const loopId = policyLoopId(input);
+  if (!loopId || !event || event.startsWith(`${loopId}.`)) return event;
+  return `${loopId}.${event}`;
+};
+
+export const policySourceKey = (input: Pick<ProjectPolicy, "source" | "event" | "trigger"> & { loopId?: string }): string =>
+  input.source === "trigger" ? triggerEventType(input.trigger ?? "") : loopQualifiedEventType(input);
+
+export const generatedPolicyId = (input: Pick<ProjectPolicy, "source" | "event" | "trigger" | "action"> & { loopId?: string }): string =>
+  `on.${input.source === "trigger" ? `trigger.${input.trigger ?? ""}` : loopQualifiedEventType(input)}.start.${loopQualifiedActionToken(input)}`;
 
 export const policyOutputEventType = (
-  input: Pick<ProjectPolicy, "action">,
+  input: Pick<ProjectPolicy, "action"> & { loopId?: string },
   outputId: PolicyOutputId
-): string => `${input.action}.${normalizePolicyToken(outputId)}`;
+): string => `${loopQualifiedActionToken(input)}.${normalizePolicyToken(outputId)}`;
 
 export const projectOutputRouteKey = (sourcePolicyId: string, outputId: string): string =>
   `${sourcePolicyId}:${normalizePolicyToken(outputId)}`;
@@ -178,7 +194,7 @@ export const humanGateApprovalTriggerIdForPolicy = (
 };
 
 export const projectOutputTargetEventType = (
-  policy: Pick<ProjectPolicy, "action">,
+  policy: Pick<ProjectPolicy, "action"> & { loopId?: string },
   outputId: PolicyOutputId,
   target?: ProjectOutputTarget,
   actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
@@ -190,7 +206,7 @@ export const projectOutputTargetEventType = (
 };
 
 export const projectOutputRouteEventType = (
-  policy: Pick<ProjectPolicy, "id" | "action">,
+  policy: Pick<ProjectPolicy, "id" | "action"> & { loopId?: string },
   outputId: PolicyOutputId,
   outputRoutes: readonly ProjectOutputRoute[],
   actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
@@ -202,7 +218,7 @@ export const projectOutputRouteEventType = (
 );
 
 export const policyOutputEventTypes = (
-  input: Pick<ProjectPolicy, "action">,
+  input: Pick<ProjectPolicy, "action"> & { loopId?: string },
   actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = [],
   outputs: Array<Pick<ProjectOutput, "id">> = []
 ): string[] => {

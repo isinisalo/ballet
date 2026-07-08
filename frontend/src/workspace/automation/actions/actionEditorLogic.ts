@@ -51,6 +51,17 @@ export const nextConfigWithActionPatch = (
   const policyIdMap = new Map<string, string>();
   const policies = current.policies.map((policy) => {
     const nextAction = policy.action === previousId ? normalized.id : policy.action;
+    if (policy.loopId) {
+      previousAction.outputIds.forEach((outputId, outputIndex) => {
+        const slotIndex = previousOutputSlotIndex(outputId, outputIndex, previousAction.outputIds.length);
+        const nextOutputId = slotIndex === undefined ? undefined : normalized.outputIds[slotIndex];
+        if (!nextOutputId) return;
+        eventIdMap.set(
+          policyOutputEventType({ action: previousId, loopId: policy.loopId }, outputId),
+          policyOutputEventType({ action: normalized.id, loopId: policy.loopId }, nextOutputId)
+        );
+      });
+    }
     const nextEvent = policy.source === "event" && policy.event ? eventIdMap.get(policy.event) ?? policy.event : policy.event;
     if (nextAction === policy.action && nextEvent === policy.event) return policy;
     const nextPolicy = { ...policy, action: nextAction, event: nextEvent };
