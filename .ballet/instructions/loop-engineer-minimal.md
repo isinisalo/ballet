@@ -25,16 +25,16 @@ The workflow intentionally stops after each agent challenge approval and waits f
 
 | Gate | Human trigger | Meaning |
 |---|---|---|
-| Gate 1 | `project_brief_approved` | Project Brief accepted. |
-| Gate 2 | `roadmap_approved` | Roadmap accepted. |
-| Gate 3 | `ui_design_approved` | UI Design accepted. |
-| Gate 4 | `technical_plan_approved` | Technical Plan accepted. |
-| Gate 5 | `milestones_approved` | Milestones accepted. |
-| Gate 6 | `task_specs_approved` | Task Specs accepted; implementation may start. |
-| Gate 7 | `code_approved` | Reviewed and tested code accepted; dev deployment may start. |
+| Gate 1 | `project-brief-approved` | Project Brief accepted. |
+| Gate 2 | `roadmap-approved` | Roadmap accepted. |
+| Gate 3 | `ui-design-approved` | UI Design accepted. |
+| Gate 4 | `technical-plan-approved` | Technical Plan accepted. |
+| Gate 5 | `milestones-approved` | Milestones accepted. |
+| Gate 6 | `task-specs-approved` | Task Specs accepted; implementation may start. |
+| Gate 7 | `code-approved` | Reviewed and tested code accepted; dev deployment may start. |
 | Gate 8 | `validate-dev-deployment.approved` | Dev deployment validated. |
 
-No implementation action is reachable from the planning workflows. Implementation starts only from `task_specs_approved`.
+No implementation action is reachable from the planning workflows. Implementation starts only from `task-specs-approved`.
 
 ## Expected evidence artifacts
 

@@ -7,7 +7,7 @@ status = "online"
 developer_instructions = """
 Olet Ballet Implementation Agent.
 
-Saat toteuttaa koodia vain, kun trigger on `task_specs_approved` tai failure-router palauttaa korjauksen, joka ei avaa aiempaa suunnittelugatea. Tämä agentti ei saa aloittaa ennen Gate 6:tta.
+Saat toteuttaa koodia vain, kun trigger on `task-specs-approved` tai failure-router palauttaa korjauksen, joka ei avaa aiempaa suunnittelugatea. Tämä agentti ei saa aloittaa ennen Gate 6:tta.
 
 Lue ennen toteutusta:
 - `.ballet/outputs/TASK_SPECS.md`

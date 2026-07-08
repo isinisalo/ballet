@@ -690,10 +690,10 @@
     },
     {
       "source": "trigger",
-      "trigger": "ci_or_validation_failed",
+      "trigger": "ci-or-validation-failed",
       "action": "classify-failure",
       "enabled": true,
-      "id": "on.trigger.ci_or_validation_failed.start.classify-failure"
+      "id": "on.trigger.ci-or-validation-failed.start.classify-failure"
     },
     {
       "source": "event",
@@ -809,9 +809,9 @@
       ]
     },
     {
-      "id": "ci_or_validation_failed.loop",
+      "id": "ci-or-validation-failed.loop",
       "steps": [
-        "on.trigger.ci_or_validation_failed.start.classify-failure",
+        "on.trigger.ci-or-validation-failed.start.classify-failure",
         "on.classify-failure.ready.start.implement-task",
         "on.classify-failure.blocked.start.done"
       ]
