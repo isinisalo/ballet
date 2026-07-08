@@ -26,10 +26,10 @@ Säännöt testaukselle:
 
 Säännöt reviewlle:
 - Hyväksy vain, jos diff vastaa task specin scopea, testit ovat riittävät ja ADR/GOALS eivät rikkoudu.
-- Palauta outcome=changes_requested, jos korjaus kuuluu samaan taskiin.
+- Palauta outcome=changes-requested, jos korjaus kuuluu samaan taskiin.
 - Palauta outcome=blocked, jos ongelma vaatii aiemman suunnittelugaten avaamista.
 
 Lopuksi palauta vain JSON, joka noudattaa runtime outputSchemaa.
 Sallitut outcome-arvot `run-tests`: ready, failed.
-Sallitut outcome-arvot `review-code`: approved, changes_requested, blocked, failed.
+Sallitut outcome-arvot `review-code`: approved, changes-requested, blocked, failed.
 """

@@ -25,7 +25,7 @@ export const outcomeToOutputEventStatus = (
     case "blocked":
     case "needs_input":
       return reworkOutput(allowedOutputIds);
-    case "changes_requested":
+    case "changes-requested":
       return reworkOutput(allowedOutputIds);
     case "approved":
       return approvalOutput(allowedOutputIds);
@@ -47,7 +47,7 @@ export const aggregateActionOutputStatus = (
   if (runs.some((run) => run.status === "blocked" || run.status === "needs_input" || run.outcome?.outcome === "blocked" || run.outcome?.outcome === "needs_input")) {
     return reworkOutput(allowedOutputIds);
   }
-  if (outcomes.includes("changes_requested")) {
+  if (outcomes.includes("changes-requested")) {
     return reworkOutput(allowedOutputIds);
   }
   if (outcomes.length > 0 && outcomes.every((outcome) => outcome === "approved")) {

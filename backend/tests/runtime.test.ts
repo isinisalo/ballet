@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { Policy, ProjectPolicy } from "../../shared/domain/automation.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
+import { policyVersion } from "../../shared/policy.js";
+import { outcomeToOutputEventStatus } from "../agentd.js";
+import { mapAgentOutputToEvent } from "../automation.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
 import { parseAgentOutcomeText } from "../runtime-policy.js";
-import { policyVersion } from "../../shared/policy.js";
-import { mapAgentOutputToEvent } from "../automation.js";
-import { outcomeToOutputEventStatus } from "../agentd.js";
 
 const tempRoots: string[] = [];
 
@@ -420,7 +420,7 @@ describe("runtime output mapping", () => {
       { ...projectPolicy, action: "human-review" },
       { status: "approved" },
       [],
-      [{ id: "human-review", description: "Human review", outputIds: ["approved", "changes_requested"], agentIds: [], humanGate: true }]
+      [{ id: "human-review", description: "Human review", outputIds: ["approved", "changes-requested"], agentIds: [], humanGate: true }]
     ).id).toBe("trigger.human-review.approved");
   });
 
@@ -436,7 +436,7 @@ describe("runtime output mapping", () => {
       [{ id: "review", outputIds: ["accepted", "reject"] }]
     )).toBe("accepted");
     expect(outcomeToOutputEventStatus(
-      { ...readyOutcome, outcome: "changes_requested" },
+      { ...readyOutcome, outcome: "changes-requested" },
       { ...projectPolicy, action: "review" },
       [{ id: "review", outputIds: ["accepted", "reject"] }]
     )).toBe("reject");
@@ -446,7 +446,7 @@ describe("runtime output mapping", () => {
       [{ id: "create_roadmap", outputIds: ["roadmap_ready"] }]
     )).toBe("roadmap_ready");
     expect(outcomeToOutputEventStatus(
-      { ...readyOutcome, outcome: "changes_requested" },
+      { ...readyOutcome, outcome: "changes-requested" },
       { ...projectPolicy, action: "create_roadmap" },
       [{ id: "create_roadmap", outputIds: ["roadmap_ready"] }]
     )).toBeUndefined();

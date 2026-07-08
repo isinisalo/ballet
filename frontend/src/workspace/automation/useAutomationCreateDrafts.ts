@@ -29,7 +29,7 @@ export function useAutomationCreateDrafts({
   isCreateMode: boolean;
 }) {
   const [newAction, setNewAction] = useState({ id: "", description: "", outputIds: [] as string[], agentIds: [] as string[], humanGate: false });
-  const [newWorkflow, setNewWorkflow] = useState({ id: "", title: "", steps: [] as string[] });
+  const [newWorkflow, setNewWorkflow] = useState({ id: "", steps: [] as string[] });
   const createDraftsRef = useRef<AutomationCreateDrafts>({
     action: newAction,
     workflow: newWorkflow
@@ -91,7 +91,7 @@ const syncDraft = <K extends keyof AutomationCreateDrafts>(
 
 const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): AutomationCreateDrafts => ({
   action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id), humanGate: false },
-  workflow: workflowCreateDraftWithDefaultTrigger(draft, { id: "", title: "", steps: [] })
+  workflow: workflowCreateDraftWithDefaultTrigger(draft, { id: "", steps: [] })
 });
 
 const workflowStartingTriggerPolicy = (draft: ProjectAutomationConfig, workflow: Pick<ProjectWorkflow, "steps">): ProjectPolicy | undefined => {
@@ -161,8 +161,8 @@ const createDraftWithNewEntity = (
   }
   const triggerPolicy = workflowStartingTriggerPolicy(draft, drafts.workflow);
   const id = workflowIdForPolicy(triggerPolicy);
-  if (!triggerPolicy || !id || automationStringValidationMessage("Title", drafts.workflow.title, automationFieldLimits.name) || draft.workflows.some((workflow) => workflow.id === id)) return undefined;
-  return { id, config: { ...draft, workflows: [...draft.workflows, { id, title: drafts.workflow.title.trim(), steps: [triggerPolicy.id] }] } };
+  if (!triggerPolicy || !id || draft.workflows.some((workflow) => workflow.id === id)) return undefined;
+  return { id, config: { ...draft, workflows: [...draft.workflows, { id, steps: [triggerPolicy.id] }] } };
 };
 
 const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectAutomationConfig): boolean => {
@@ -175,7 +175,6 @@ const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectA
   const policyById = new Map(draft.policies.map((policy) => [policy.id, policy]));
   return draft.workflows.some((workflow) => {
     const startingPolicy = policyById.get(workflow.steps[0] ?? "");
-    return workflow.id !== workflowIdForPolicy(startingPolicy) ||
-      Boolean(automationStringValidationMessage("Title", workflow.title, automationFieldLimits.name));
+    return workflow.id !== workflowIdForPolicy(startingPolicy);
   });
 };

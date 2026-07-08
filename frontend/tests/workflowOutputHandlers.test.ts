@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { workflowIdFromTrigger } from "@shared/policy-actions";
+import { describe, expect, it } from "vitest";
 import { workflowOutputHandlerForOutput } from "../src/workspace/automation/workflows/workflowOutputHandlers";
 
 const workflowId = workflowIdFromTrigger("manual-start");
@@ -10,11 +10,11 @@ const config = (): ProjectAutomationConfig => ({
   version: 1,
   actions: [
     { id: "build", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
-    { id: "review", description: "Review.", outputIds: ["approved", "changes_requested"], agentIds: ["agent-1"] },
-    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes_requested"], agentIds: [], humanGate: true },
+    { id: "review", description: "Review.", outputIds: ["approved", "changes-requested"], agentIds: ["agent-1"] },
+    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes-requested"], agentIds: [], humanGate: true },
     { id: "done", description: "Done.", outputIds: [], agentIds: [] }
   ],
-  outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes_requested" }],
+  outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes-requested" }],
   outputRoutes: [{
     sourcePolicyId: "review-policy",
     outputId: "approved",
@@ -26,16 +26,14 @@ const config = (): ProjectAutomationConfig => ({
     { id: "review-policy", source: "event", event: "build.ready", action: "review", enabled: true },
     { id: "human-review-policy", source: "event", event: "review.approved", action: "human-review", enabled: true },
     { id: "return-start-policy", source: "trigger", trigger: "manual-rework", action: "build", enabled: true },
-    { id: "rework-policy", source: "event", event: "review.changes_requested", action: "build", enabled: true },
+    { id: "rework-policy", source: "event", event: "review.changes-requested", action: "build", enabled: true },
     { id: "done-policy", source: "event", event: "external.approved", action: "done", enabled: true }
   ],
   workflows: [{
     id: workflowId,
-    title: "Workflow",
     steps: ["start-policy", "review-policy", "done-policy"]
   }, {
     id: returnWorkflowId,
-    title: "Return workflow",
     steps: ["return-start-policy", "rework-policy", "review-policy"]
   }],
   runtimes: []
@@ -55,10 +53,10 @@ describe("workflowOutputHandlerForOutput", () => {
   });
 
   it("finds an earlier return handler action for a rework output", () => {
-    expect(workflowOutputHandlerForOutput(config(), returnWorkflowId, "review-policy", "changes_requested")).toEqual({
+    expect(workflowOutputHandlerForOutput(config(), returnWorkflowId, "review-policy", "changes-requested")).toEqual({
       type: "action",
-      outputId: "changes_requested",
-      eventType: "review.changes_requested",
+      outputId: "changes-requested",
+      eventType: "review.changes-requested",
       policyId: "rework-policy",
       stepIndex: 1,
       actionId: "build",

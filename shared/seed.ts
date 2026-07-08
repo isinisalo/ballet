@@ -199,7 +199,6 @@ export const seedData: AppData = {
     workflows: [
       {
         id: "deployment-response",
-        title: "Deployment response",
         steps: ["on.remediation.failed.start.remediation"]
       }
     ],

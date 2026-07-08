@@ -87,7 +87,7 @@ export const reworkOutputCandidates = [
   "needs_input",
   "needs-input",
   "needs-clarification",
-  "changes_requested",
+  "changes-requested",
   "changes-requested",
   "cancelled",
   "warn"

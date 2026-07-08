@@ -8,9 +8,8 @@ import type {
   ProjectPolicy,
   ProjectWorkflow
 } from "@shared/api/workspace-contracts";
-import { automationFieldLimits, automationStringValidationMessage } from "@shared/api/automationValidation";
 import { actionOutputIds, generatedPolicyId, humanGateResponseId, normalizePolicyToken, projectOutputRouteEventType, policyOutputEventType, workflowIdForPolicy } from "@shared/policy-actions";
-import { EmptyState, SelectField, TextField } from "@/components/shared/workspace-ui";
+import { EmptyState, SelectField } from "@/components/shared/workspace-ui";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { uniquePolicyAction } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
@@ -64,7 +63,6 @@ export function WorkflowsAutomationTab({
       : -1;
   const selected = selectedIndex >= 0 ? config.workflows[selectedIndex] : createDraft;
   const creating = selectedIndex < 0;
-  const titleError = selected ? automationStringValidationMessage("Title", selected.title, automationFieldLimits.name) : undefined;
   const [selectedHandlerSelection, setSelectedHandlerSelection] = useState<WorkflowHandlerSelection | null>(null);
   const selectedHandlerStepIndexes = selectedHandlerSelection?.stepIndexes ?? [];
   const policyById = useMemo(() => new Map(config.policies.map((policy) => [policy.id, policy])), [config.policies]);
@@ -355,15 +353,6 @@ export function WorkflowsAutomationTab({
               {derivedWorkflowId || "Select a starting trigger"}
             </div>
           </Field>
-          <TextField
-            label="Title"
-            required
-            minLength={automationFieldLimits.name.min}
-            maxLength={automationFieldLimits.name.max}
-            error={titleError}
-            value={selected.title}
-            onChange={(title) => updateSelected({ title })}
-          />
         </FieldGroup>
       </div>
     );

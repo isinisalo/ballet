@@ -1,17 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { Position, type Node } from "@xyflow/react";
-import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
 import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
 import { policyOutputEventTypes } from "@shared/policy-actions";
-import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
+import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
+import { Position, type Node } from "@xyflow/react";
+import { describe, expect, it } from "vitest";
 import { toWorkflowReactFlowEdges } from "../src/workspace/automation/workflows/WorkflowCanvas";
 import { workflowApprovalEdgePath, workflowEdgeLabelTransform, workflowReturnEdgePath } from "../src/workspace/automation/workflows/WorkflowSmartEdge";
 import { workflowCrossWorkflowSmoothStepPath } from "../src/workspace/automation/workflows/workflowCrossWorkflowSmoothStepPath";
 import { workflowRoutedEdgeLabelAnchor } from "../src/workspace/automation/workflows/workflowEdgeLabelGeometry";
-import { workflowSmartEdgeRoutingOptions } from "../src/workspace/automation/workflows/workflowSmartEdgeRouting";
+import { buildWorkflowGraph, type WorkflowStepRecord } from "../src/workspace/automation/workflows/workflowGraph";
 import { calculateAllWorkflowsCanvasLayout, calculateCompositeWorkflowCanvasLayout, calculateWorkflowCanvasLayout, workflowCanvasLayoutConfig, workflowCanvasNodeAnchorY, workflowNodeSizes, workflowOutputSourceHandleId, workflowPolicyOutputHandleY, workflowPolicyStackHeight, type WorkflowLayoutDirection } from "../src/workspace/automation/workflows/workflowLayout";
 import { positionWorkflowNodes } from "../src/workspace/automation/workflows/workflowLayoutPositioning";
 import { workflowOutputTargetsForPolicy } from "../src/workspace/automation/workflows/workflowOutputTargets";
+import { workflowSmartEdgeRoutingOptions } from "../src/workspace/automation/workflows/workflowSmartEdgeRouting";
 
 const policy = (id: string, event: string | undefined, action = "build"): ProjectPolicy => ({
   id,
@@ -66,7 +66,6 @@ const compositeConfig = (
       const workflowPolicy = policyByWorkflowId.get(workflowId);
       return {
         id: workflowId,
-        title: workflowId,
         steps: workflowPolicy ? [workflowPolicy.id] : []
       };
     }),
@@ -334,7 +333,7 @@ describe("calculateWorkflowCanvasLayout", () => {
           policy: aggregateReview,
           outputEvents: [
             "aggregate-review.approved",
-            "aggregate-review.changes_requested",
+            "aggregate-review.changes-requested",
             "aggregate-review.blocked"
           ]
         }
@@ -344,7 +343,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     const sourceNode = layout.nodes.find((node) => node.key === "policy-1");
     const outputEventNodes = [
       layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.approved"),
-      layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.changes_requested"),
+      layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.changes-requested"),
       layout.nodes.find((node) => node.key === "output-event-1-aggregate-review.blocked")
     ];
 
@@ -553,14 +552,14 @@ describe("calculateWorkflowCanvasLayout", () => {
 
   it("reserves horizontal space for incoming policy edge labels", () => {
     const first = policy("first", undefined, "route-project");
-    const child = policy("child", "review-intent.changes_requested", "analyze-intent");
+    const child = policy("child", "review-intent.changes-requested", "analyze-intent");
     const layout = calculateWorkflowCanvasLayout({
       workflowGraph: buildWorkflowGraph([
         {
           policyId: first.id,
           index: 0,
           policy: first,
-          outputEvents: ["review-intent.changes_requested"]
+          outputEvents: ["review-intent.changes-requested"]
         },
         {
           policyId: child.id,
@@ -625,11 +624,11 @@ describe("calculateWorkflowCanvasLayout", () => {
     const createMilestones = policy("create-milestones", undefined, "create-milestones");
     createMilestones.trigger = "technical_plan_approved";
     const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
-    const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes_requested", "create-milestones");
+    const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes-requested", "create-milestones");
     const createTaskSpecs = policy("create-task-specs", undefined, "create-task-specs");
     createTaskSpecs.trigger = "milestones_approved";
     const challengeTaskSpecs = policy("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
-    const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes_requested", "create-task-specs");
+    const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes-requested", "create-task-specs");
     const layout = calculateWorkflowCanvasLayout({
       workflowGraph: buildWorkflowGraph([
         {
@@ -647,7 +646,7 @@ describe("calculateWorkflowCanvasLayout", () => {
           policy: challengeMilestones,
           outputTargets: [
             { outputId: "approved", eventType: "challenge-milestones.approved", type: "event" },
-            { outputId: "changes_requested", eventType: "challenge-milestones.changes_requested", type: "event" }
+            { outputId: "changes-requested", eventType: "challenge-milestones.changes-requested", type: "event" }
           ]
         },
         {
@@ -674,7 +673,7 @@ describe("calculateWorkflowCanvasLayout", () => {
           policy: challengeTaskSpecs,
           outputTargets: [
             { outputId: "approved", eventType: "challenge-task-specs.approved", type: "event" },
-            { outputId: "changes_requested", eventType: "challenge-task-specs.changes_requested", type: "event" }
+            { outputId: "changes-requested", eventType: "challenge-task-specs.changes-requested", type: "event" }
           ]
         },
         {
@@ -718,12 +717,12 @@ describe("calculateWorkflowCanvasLayout", () => {
     const createMilestones = policy("create-milestones", undefined, "create-milestones");
     createMilestones.trigger = "technical_plan_approved";
     const challengeMilestones = policy("challenge-milestones", "create-milestones.ready", "challenge-milestones");
-    const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes_requested", "create-milestones");
+    const reworkMilestones = policy("rework-milestones", "challenge-milestones.changes-requested", "create-milestones");
     const doneMilestones = policy("done-milestones", "challenge-milestones.approved", "done");
     const createTaskSpecs = policy("create-task-specs", undefined, "create-task-specs");
     createTaskSpecs.trigger = "milestones_approved";
     const challengeTaskSpecs = policy("challenge-task-specs", "create-task-specs.ready", "challenge-task-specs");
-    const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes_requested", "create-task-specs");
+    const reworkTaskSpecs = policy("rework-task-specs", "challenge-task-specs.changes-requested", "create-task-specs");
     const doneTaskSpecs = policy("done-task-specs", "challenge-task-specs.approved", "done");
     const layout = calculateWorkflowCanvasLayout({
       workflowGraph: buildWorkflowGraph([
@@ -742,7 +741,7 @@ describe("calculateWorkflowCanvasLayout", () => {
           policy: challengeMilestones,
           outputTargets: [
             { outputId: "approved", eventType: "challenge-milestones.approved", type: "event" },
-            { outputId: "changes_requested", eventType: "challenge-milestones.changes_requested", type: "event" }
+            { outputId: "changes-requested", eventType: "challenge-milestones.changes-requested", type: "event" }
           ]
         },
         {
@@ -770,7 +769,7 @@ describe("calculateWorkflowCanvasLayout", () => {
           policy: challengeTaskSpecs,
           outputTargets: [
             { outputId: "approved", eventType: "challenge-task-specs.approved", type: "event" },
-            { outputId: "changes_requested", eventType: "challenge-task-specs.changes_requested", type: "event" }
+            { outputId: "changes-requested", eventType: "challenge-task-specs.changes-requested", type: "event" }
           ]
         },
         {
@@ -955,7 +954,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     const createRoadmap = policy("p05.on.project-brief-gate-approved.create-roadmap", undefined, "create-roadmap");
     createRoadmap.trigger = "project-brief-gate.approved";
     const challengeRoadmap = policy("p06.on.roadmap-ready.challenge-roadmap", "create-roadmap.ready", "challenge-roadmap");
-    const reworkRoadmap = policy("p07.on.roadmap-rework.create-roadmap", "challenge-roadmap.changes_requested", "create-roadmap");
+    const reworkRoadmap = policy("p07.on.roadmap-rework.create-roadmap", "challenge-roadmap.changes-requested", "create-roadmap");
     const done = policy("p08.on.roadmap-approved.done", "challenge-roadmap.approved", "done");
     const records: WorkflowStepRecord[] = [
       {
@@ -973,7 +972,7 @@ describe("calculateWorkflowCanvasLayout", () => {
         policy: challengeRoadmap,
         outputTargets: [
           { outputId: "approved", eventType: "challenge-roadmap.approved", type: "event" },
-          { outputId: "changes_requested", eventType: "challenge-roadmap.changes_requested", type: "event" }
+          { outputId: "changes-requested", eventType: "challenge-roadmap.changes-requested", type: "event" }
         ]
       },
       {
@@ -997,7 +996,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       editingPolicyIndex: null
     });
     const policyNodes = layout.nodes.filter((node) => node.kind === "policy");
-    const returnEdge = layout.edges.find((edge) => edge.eventType === "challenge-roadmap.changes_requested");
+    const returnEdge = layout.edges.find((edge) => edge.eventType === "challenge-roadmap.changes-requested");
 
     expect(policyNodes.map((node) => node.record?.policy?.action)).toEqual([
       "create-roadmap",
@@ -1014,7 +1013,7 @@ describe("calculateWorkflowCanvasLayout", () => {
       sourceNodeKey: "policy-1",
       targetNodeKey: "policy-0",
       tone: "return",
-      label: "changes_requested"
+      label: "changes-requested"
     });
   });
 });
@@ -1442,14 +1441,14 @@ describe("toWorkflowReactFlowEdges", () => {
 
   it("maps cross-workflow rework edges to the red-gray dotted output stroke", () => {
     const [edge] = toWorkflowReactFlowEdges([{
-      key: "workflow:source:output:0:changes_requested:to:target:trigger",
+      key: "workflow:source:output:0:changes-requested:to:target:trigger",
       sourceNodeKey: "workflow:source:policy-0",
       targetNodeKey: "workflow:target:trigger",
       sourceHandleId: "right",
       targetHandleId: "left",
       tone: "cross-workflow",
       route: {
-        outputId: "changes_requested"
+        outputId: "changes-requested"
       }
     }]);
 

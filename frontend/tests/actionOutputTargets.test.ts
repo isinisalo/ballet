@@ -5,7 +5,7 @@ import { actionOutputTargetsByOutputId } from "../src/workspace/automation/actio
 const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "policies"> => ({
   actions: [
     { id: "review", description: "Review.", outputIds: ["accepted"], agentIds: ["reviewer-agent"] },
-    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes_requested"], agentIds: [], humanGate: true }
+    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes-requested"], agentIds: [], humanGate: true }
   ],
   outputRoutes: [],
   policies: [
@@ -22,9 +22,9 @@ describe("actionOutputTargetsByOutputId", () => {
   });
 
   it("derives trigger targets for human gate approval outputs", () => {
-    expect(actionOutputTargetsByOutputId(config(), "human-review", ["approved", "changes_requested"])).toEqual({
+    expect(actionOutputTargetsByOutputId(config(), "human-review", ["approved", "changes-requested"])).toEqual({
       approved: { type: "trigger", id: "human-review.approved", label: "human-review.approved" },
-      changes_requested: { type: "event", id: "human-review.changes_requested", label: "human-review.changes_requested" }
+      changes-requested: { type: "event", id: "human-review.changes-requested", label: "human-review.changes-requested" }
     });
   });
 });

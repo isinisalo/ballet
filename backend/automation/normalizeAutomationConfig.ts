@@ -344,7 +344,6 @@ const normalizeRuntime = (value: Record<string, unknown>): ProjectRuntime => ({
 
 const normalizeWorkflow = (value: Record<string, unknown>, policyIdMap: Map<string, string>): ProjectWorkflow => ({
   id: normalizeWorkflowId(stringValue(value.id)),
-  title: stringValue(value.title),
   steps: stringArray(value.steps).map((step) => policyIdMap.get(step) ?? step)
 });
 

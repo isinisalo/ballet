@@ -55,7 +55,7 @@ describe.skipIf(process.env.RUN_CODEX_SMOKE !== "1")("Codex app-server smoke", (
       ].join("\n")
     });
 
-    expect(["ready", "blocked", "needs_input", "approved", "changes_requested", "failed"] satisfies AgentOutcomeStatus[]).toContain(result.outcome.outcome);
+    expect(["ready", "blocked", "needs_input", "approved", "changes-requested", "failed"] satisfies AgentOutcomeStatus[]).toContain(result.outcome.outcome);
     expect(result.threadId).toBeTruthy();
     expect(result.outcome.summary).toBeTruthy();
   });

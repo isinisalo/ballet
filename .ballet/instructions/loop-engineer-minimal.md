@@ -55,7 +55,7 @@ Each agent must return only JSON in this shape:
 
 ```json
 {
-  "outcome": "ready | approved | changes_requested | blocked | failed",
+  "outcome": "ready | approved | changes-requested | blocked | failed",
   "summary": "Short decision summary.",
   "artifacts": {
     "documents": [".ballet/outputs/..."]

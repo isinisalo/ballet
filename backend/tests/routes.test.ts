@@ -183,7 +183,7 @@ describe("API routes", () => {
       outputRoutes: [],
       humanGateResponses: [],
       policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
-      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
+      workflows: [{ id: "delivery", steps: ["on.implementation.failed.start.implementation"] }],
       runtimes: []
     }, null, 2), "utf8");
 
@@ -296,7 +296,7 @@ describe("API routes", () => {
         { id: workflowStartPolicyId, source: "trigger", trigger: workflowTrigger, action: "implementation", enabled: true },
         { id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }
       ],
-      workflows: [{ id: workflowId, title: "Delivery", steps: [workflowStartPolicyId, "on.implementation.failed.start.implementation"] }],
+      workflows: [{ id: workflowId, steps: [workflowStartPolicyId, "on.implementation.failed.start.implementation"] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
     };
 
@@ -331,7 +331,7 @@ describe("API routes", () => {
       const invalid = await fetch(url + "/api/automation", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...config, workflows: [{ id: "legacy", title: "Legacy", steps: [{ policy: "assign-developer", on: "task.created" }] }] })
+        body: JSON.stringify({ ...config, workflows: [{ id: "legacy", steps: [{ policy: "assign-developer", on: "task.created" }] }] })
       });
       expect(invalid.status).toBe(400);
 

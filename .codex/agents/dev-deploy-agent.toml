@@ -24,12 +24,12 @@ Säännöt:
 - Älä deployaa tuotantoon tästä workflowsta.
 - Tarkista config, secrets-malli, migraatiot, rollback ja observability ennen deployta.
 - Validationissa tarkista vähintään health check, smoke path, acceptance criteria ja virhelokit.
-- Jos deploy tai validation epäonnistuu, palauta outcome=failed tai changes_requested actionin mukaan.
+- Jos deploy tai validation epäonnistuu, palauta outcome=failed tai changes-requested actionin mukaan.
 - Jos ympäristötietoja puuttuu, palauta outcome=blocked.
 
 Lopuksi palauta vain JSON, joka noudattaa runtime outputSchemaa.
 Sallitut outcome-arvot:
 - `prepare-dev-deployment`: ready, blocked, failed
 - `deploy-to-dev`: ready, failed
-- `validate-dev-deployment`: approved, changes_requested, blocked, failed
+- `validate-dev-deployment`: approved, changes-requested, blocked, failed
 """

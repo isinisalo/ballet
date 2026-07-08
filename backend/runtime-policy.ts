@@ -7,7 +7,7 @@ export const agentOutcomeSchema = {
   properties: {
     outcome: {
       type: "string",
-      enum: ["ready", "blocked", "needs_input", "approved", "changes_requested", "failed"]
+      enum: ["ready", "blocked", "needs_input", "approved", "changes-requested", "failed"]
     },
     summary: { type: "string", minLength: 1 },
     artifacts: {
@@ -37,7 +37,7 @@ export const agentOutcomeSchema = {
   }
 } as const;
 
-const outcomeStatuses = new Set(["ready", "blocked", "needs_input", "approved", "changes_requested", "failed"]);
+const outcomeStatuses = new Set(["ready", "blocked", "needs_input", "approved", "changes-requested", "failed"]);
 const checkStatuses = new Set(["passed", "failed", "skipped"]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

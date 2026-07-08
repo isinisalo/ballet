@@ -44,7 +44,7 @@ describe("HTTP Zod validation", () => {
         action: "implementation",
         enabled: true
       }],
-      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.summary.start.implementation"] }],
+      workflows: [{ id: "delivery", steps: ["on.implementation.summary.start.implementation"] }],
       runtimes: [{ id: "codex", title: "Codex", command: "codex", args: [] }]
     };
     expect(parseUnknown(automationConfigSchema, valid)).toEqual(valid);

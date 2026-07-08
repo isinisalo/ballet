@@ -1,6 +1,6 @@
 const tokenUnderlineClassName = "underline underline-offset-4 decoration-2";
 const successOutputs = new Set(["ready", "approved", "complete", "done"]);
-const failureOutputs = new Set(["changes_requested", "failed", "blocked", "rejected"]);
+const failureOutputs = new Set(["changes-requested", "failed", "blocked", "rejected"]);
 
 export function workflowActionTokenClassName() {
   return `text-tertiary decoration-tertiary ${tokenUnderlineClassName}`;

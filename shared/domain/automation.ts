@@ -52,7 +52,6 @@ export interface ProjectPolicy {
 
 export interface ProjectWorkflow {
   id: string;
-  title: string;
   steps: string[];
 }
 

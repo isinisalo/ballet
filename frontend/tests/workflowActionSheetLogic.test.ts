@@ -32,7 +32,7 @@ const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
   outputRoutes: [],
   humanGateResponses: [],
   policies,
-  workflows: [{ id: "delivery", title: "Delivery", steps: policies.map((item) => item.id) }],
+  workflows: [{ id: "delivery", steps: policies.map((item) => item.id) }],
   runtimes: []
 });
 

@@ -103,7 +103,7 @@ const deleteEntityConfig = (
       return {
         label: "Delete workflow",
         type: "workflow",
-        resourceName: selected?.title || selected?.id,
+        resourceName: selected?.id,
         canDelete: Boolean(selected),
         onDelete: () => {
           if (!selected) return;

@@ -635,7 +635,6 @@ const validateWorkflow = (workflow: unknown, index: number, context: ValidationC
     return;
   }
   addWorkflowIdIssue(issues, `${base}.id`, workflow.id, "Workflow id");
-  addStringIssue(issues, `${base}.title`, workflow.title, "Workflow title", automationFieldLimits.name);
   if (!Array.isArray(workflow.steps)) {
     issues.push({ path: `${base}.steps`, message: "Workflow steps must be an array." });
     return;

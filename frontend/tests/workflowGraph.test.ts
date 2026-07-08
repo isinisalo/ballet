@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { ProjectPolicy } from "@shared/api/workspace-contracts";
+import { describe, expect, it } from "vitest";
 import { buildWorkflowGraph, workflowFoldedRecords, workflowOutputEvents, workflowTriggerLabel } from "../src/workspace/automation/workflows/workflowGraph";
 
 const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
@@ -48,10 +48,10 @@ describe("workflow graph", () => {
   it("groups repeated policy records by action id for folded visualization", () => {
     const first = policy({ id: "first-build", source: "trigger", trigger: "manual-start", event: undefined, action: "build" });
     const review = policy({ id: "review", event: "build.ready", action: "review" });
-    const rework = policy({ id: "rework-build", event: "review.changes_requested", action: "build" });
+    const rework = policy({ id: "rework-build", event: "review.changes-requested", action: "build" });
     const records = [
       { policyId: first.id, index: 0, policy: first, outputEvents: ["build.ready"] },
-      { policyId: review.id, index: 1, policy: review, outputEvents: ["review.changes_requested"] },
+      { policyId: review.id, index: 1, policy: review, outputEvents: ["review.changes-requested"] },
       { policyId: rework.id, index: 2, policy: rework, outputEvents: ["build.ready"] }
     ];
     const graph = buildWorkflowGraph(records);

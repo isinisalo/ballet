@@ -162,7 +162,6 @@ const projectPolicySchema = z.object({
 
 const projectWorkflowSchema = z.object({
   id: automationWorkflowIdSchema,
-  title: automationNameSchema,
   steps: z.array(automationPolicyIdSchema)
 }).strict();
 

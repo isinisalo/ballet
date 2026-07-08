@@ -4,10 +4,10 @@ import type { AppData } from "../shared/api/workspaceData.js";
 import type { Agent } from "../shared/domain/agents.js";
 import type { RuntimeEvent } from "../shared/domain/events.js";
 import type { AgentOutcome, AgentRun } from "../shared/domain/runtime.js";
-import { store } from "./store.js";
-import { notifyRuntimeChanged } from "./runtime-events.js";
 import { runCodexAgent } from "./codex-adapter.js";
+import { notifyRuntimeChanged } from "./runtime-events.js";
 import { outcomeToRunStatus } from "./runtime-policy.js";
+import { store } from "./store.js";
 export { outcomeToOutputEventStatus } from "./automation/actionOutputAggregator.js";
 
 const workerId = process.env.BALLET_AGENTD_WORKER_ID ?? `agentd-${process.pid}`;
@@ -37,7 +37,7 @@ const buildRunPrompt = (run: AgentRun, trigger: RuntimeEvent, agent: Agent): str
     "- Käytä outcome=ready vain, kun työ on valmis ja olet validoinut olennaiset tarkistukset.",
     "- Käytä outcome=blocked, kun eteneminen ei ole mahdollista ilman ulkoista muutosta.",
     "- Käytä outcome=needs_input, kun tarvitset käyttäjältä tai ylläpidolta päätöksen.",
-    "- Review-roolit käyttävät outcome=approved tai outcome=changes_requested varsinaiseen review-päätökseen.",
+    "- Review-roolit käyttävät outcome=approved tai outcome=changes-requested varsinaiseen review-päätökseen.",
     "- checks-listassa pitää näkyä ajamasi tai perustellusti skippaamasi tarkistukset."
   ].join("\n");
 };
