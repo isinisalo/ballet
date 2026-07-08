@@ -4,10 +4,10 @@ import { workflowOutputHandlerForOutput } from "../src/workspace/automation/work
 
 const config = (): ProjectAutomationConfig => ({
   version: 1,
-  triggers: [{ id: "manual-start", description: "Manual start" }],
   actions: [
     { id: "build", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
     { id: "review", description: "Review.", outputIds: ["approved", "changes_requested"], agentIds: ["agent-1"] },
+    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes_requested"], agentIds: [], humanGate: true },
     { id: "done", description: "Done.", outputIds: [], agentIds: [] }
   ],
   outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes_requested" }],
@@ -15,15 +15,12 @@ const config = (): ProjectAutomationConfig => ({
     sourcePolicyId: "review-policy",
     outputId: "approved",
     target: { type: "event", eventType: "external.approved" }
-  }, {
-    sourcePolicyId: "review-policy",
-    outputId: "blocked",
-    target: { type: "trigger", trigger: "manual-start", workflowId: "workflow-2" }
   }],
   humanGateResponses: [],
   policies: [
-    { id: "start-policy", source: "trigger", trigger: "manual-start", action: "build", enabled: true },
+    { id: "start-policy", source: "event", event: "manual.start", action: "build", enabled: true },
     { id: "review-policy", source: "event", event: "build.ready", action: "review", enabled: true },
+    { id: "human-review-policy", source: "event", event: "review.approved", action: "human-review", enabled: true },
     { id: "rework-policy", source: "event", event: "review.changes_requested", action: "build", enabled: true },
     { id: "done-policy", source: "event", event: "external.approved", action: "done", enabled: true }
   ],
@@ -76,32 +73,14 @@ describe("workflowOutputHandlerForOutput", () => {
     });
   });
 
-  it("returns trigger output routes as read-only trigger targets", () => {
-    expect(workflowOutputHandlerForOutput(config(), "workflow-1", "review-policy", "blocked")).toEqual({
+  it("returns derived human gate approval outputs as read-only trigger targets", () => {
+    expect(workflowOutputHandlerForOutput(config(), "workflow-1", "human-review-policy", "approved")).toEqual({
       type: "trigger",
-      outputId: "blocked",
-      eventType: "trigger.manual-start",
-      triggerId: "manual-start",
-      workflowId: "workflow-2",
-      label: "manual-start"
-    });
-  });
-
-  it("prefers trigger output routes over matching event-policy handlers", () => {
-    const current = config();
-    current.outputRoutes.push({
-      sourcePolicyId: "start-policy",
-      outputId: "ready",
-      target: { type: "trigger", trigger: "manual-start" }
-    });
-
-    expect(workflowOutputHandlerForOutput(current, "workflow-1", "start-policy", "ready")).toEqual({
-      type: "trigger",
-      outputId: "ready",
-      eventType: "trigger.manual-start",
-      triggerId: "manual-start",
+      outputId: "approved",
+      eventType: "trigger.human-review.approved",
+      triggerId: "human-review.approved",
       workflowId: undefined,
-      label: "manual-start"
+      label: "human-review.approved"
     });
   });
 

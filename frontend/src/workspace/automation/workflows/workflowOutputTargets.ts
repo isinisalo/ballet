@@ -2,6 +2,7 @@ import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspa
 import {
   actionOutputIds,
   findProjectOutputRoute,
+  humanGateApprovalTriggerIdForPolicy,
   policyOutputEventType,
   triggerEventType
 } from "@shared/policy-actions";
@@ -12,17 +13,17 @@ export function workflowOutputTargetsForPolicy(
   policy: ProjectPolicy
 ): WorkflowOutputTarget[] {
   return actionOutputIds(config.actions, policy.action).map((outputId) => {
-    const route = findProjectOutputRoute(config.outputRoutes, policy.id, outputId);
-
-    if (route?.target.type === "trigger") {
+    const derivedTriggerId = humanGateApprovalTriggerIdForPolicy(policy, outputId, config.actions);
+    if (derivedTriggerId) {
       return {
         outputId,
-        eventType: triggerEventType(route.target.trigger),
+        eventType: triggerEventType(derivedTriggerId),
         type: "trigger",
-        trigger: route.target.trigger,
-        workflowId: route.target.workflowId
+        trigger: derivedTriggerId
       };
     }
+
+    const route = findProjectOutputRoute(config.outputRoutes, policy.id, outputId);
 
     return {
       outputId,

@@ -40,12 +40,13 @@ const layoutFor = (policies: ProjectPolicy[], steps: string[], editingPolicyInde
 
 const compositeConfig = (
   workflowIds: string[],
-  outputRoutes: ProjectAutomationConfig["outputRoutes"] = []
+  outputRoutes: ProjectAutomationConfig["outputRoutes"] = [],
+  sourceStartTrigger = "source-trigger"
 ): ProjectAutomationConfig => {
-  const sourcePolicy = policy("source-start", undefined, "build");
-  sourcePolicy.trigger = "source-trigger";
-  const targetPolicy = policy("target-start", undefined, "deploy");
-  targetPolicy.trigger = "target-trigger";
+  const sourcePolicy = policy("source-start", undefined, "source-gate");
+  sourcePolicy.trigger = sourceStartTrigger;
+  const targetPolicy = policy("target-start", undefined, "target-gate");
+  targetPolicy.trigger = "source-gate.ready";
   const policyByWorkflowId = new Map([
     ["source", sourcePolicy],
     ["target", targetPolicy]
@@ -53,13 +54,9 @@ const compositeConfig = (
 
   return {
     version: 1,
-    triggers: [
-      { id: "source-trigger", description: "Source trigger" },
-      { id: "target-trigger", description: "Target trigger" }
-    ],
     actions: [
-      { id: "build", description: "Build", outputIds: ["ready", "blocked"], agentIds: ["builder-agent"] },
-      { id: "deploy", description: "Deploy", outputIds: ["done"], agentIds: ["deployer-agent"] }
+      { id: "source-gate", description: "Source gate", outputIds: ["ready", "blocked"], agentIds: [], humanGate: true },
+      { id: "target-gate", description: "Target gate", outputIds: ["done", "blocked"], agentIds: [], humanGate: true }
     ],
     outputs: [{ id: "ready" }, { id: "blocked" }, { id: "done" }],
     outputRoutes,
@@ -460,15 +457,15 @@ describe("calculateWorkflowCanvasLayout", () => {
     });
     const outputEventNodes = layout.nodes.filter((node) => node.kind === "output-event");
 
-    expect(outputEvents).toEqual(["human-review.approved", "human-review.changes-requested"]);
-    expect(outputEventNodes.map((node) => node.outputEvent?.outputId)).toEqual(["human-review.approved", "human-review.changes-requested"]);
+    expect(outputEvents).toEqual(["trigger.human-review.approved", "human-review.changes-requested"]);
+    expect(outputEventNodes.map((node) => node.outputEvent?.outputId)).toEqual(["trigger.human-review.approved", "human-review.changes-requested"]);
     expect(layout.edges).toContainEqual(expect.objectContaining({
-      key: "policy-output-event-0-human-review.approved",
+      key: "policy-output-event-0-trigger.human-review.approved",
       sourceNodeKey: "policy-0",
-      targetNodeKey: "output-event-0-human-review.approved",
+      targetNodeKey: "output-event-0-trigger.human-review.approved",
       sourceHandleId: "right",
       targetHandleId: "left",
-      eventType: "human-review.approved",
+      eventType: "trigger.human-review.approved",
       label: "approved"
     }));
   });
@@ -955,8 +952,8 @@ describe("calculateWorkflowCanvasLayout", () => {
   });
 
   it("folds roadmap rework into the original create-roadmap node", () => {
-    const createRoadmap = policy("p05.on.project-brief-approved.create-roadmap", undefined, "create-roadmap");
-    createRoadmap.trigger = "project_brief_approved";
+    const createRoadmap = policy("p05.on.project-brief-gate-approved.create-roadmap", undefined, "create-roadmap");
+    createRoadmap.trigger = "project-brief-gate.approved";
     const challengeRoadmap = policy("p06.on.roadmap-ready.challenge-roadmap", "create-roadmap.ready", "challenge-roadmap");
     const reworkRoadmap = policy("p07.on.roadmap-rework.create-roadmap", "challenge-roadmap.changes_requested", "create-roadmap");
     const done = policy("p08.on.roadmap-approved.done", "challenge-roadmap.approved", "done");
@@ -1010,7 +1007,7 @@ describe("calculateWorkflowCanvasLayout", () => {
     expect(layout.nodes.find((node) => node.key === "policy-2")).toBeUndefined();
     expect(layout.nodes.filter((node) => node.kind === "output-event" && node.record?.index === 2)).toHaveLength(0);
     expect(layout.nodes.find((node) => node.key === "policy-0")?.records?.map((record) => record.policyId)).toEqual([
-      "p05.on.project-brief-approved.create-roadmap",
+      "p05.on.project-brief-gate-approved.create-roadmap",
       "p07.on.roadmap-rework.create-roadmap"
     ]);
     expect(returnEdge).toMatchObject({
@@ -1023,8 +1020,8 @@ describe("calculateWorkflowCanvasLayout", () => {
 });
 
 describe("calculateCompositeWorkflowCanvasLayout", () => {
-  it("keeps a selected workflow alone when outputRoutes is empty", () => {
-    const config = compositeConfig(["source", "target"]);
+  it("keeps a selected workflow alone when no workflow starts from its derived trigger", () => {
+    const config = compositeConfig(["source", "observer"]);
     const layout = calculateCompositeWorkflowCanvasLayout({
       config,
       selectedWorkflowId: "source",
@@ -1037,15 +1034,11 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       "workflow:source:output-event-0-ready",
       "workflow:source:output-event-0-blocked"
     ]));
-    expect(layout.nodes.some((node) => node.key.startsWith("workflow:target:"))).toBe(false);
+    expect(layout.nodes.some((node) => node.key.startsWith("workflow:observer:"))).toBe(false);
   });
 
-  it("renders a trigger-routed target workflow below the selected workflow with namespaced keys", () => {
-    const config = compositeConfig(["source", "target"], [{
-      sourcePolicyId: "source-start",
-      outputId: "ready",
-      target: { type: "trigger", trigger: "target-trigger" }
-    }]);
+  it("renders a derived trigger target workflow below the selected workflow with namespaced keys", () => {
+    const config = compositeConfig(["source", "target"]);
     const layout = calculateCompositeWorkflowCanvasLayout({
       config,
       selectedWorkflowId: "source",
@@ -1071,25 +1064,14 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       targetNodeKey: "workflow:target:trigger",
       sourceHandleId: "right",
       targetHandleId: "left",
-      eventType: "trigger.target-trigger",
+      eventType: "trigger.source-gate.ready",
       label: "ready",
       tone: "cross-workflow"
     });
   });
 
-  it("routes cross-workflow approval outputs from the right and rework outputs from the bottom", () => {
-    const config = compositeConfig(["source", "target"], [
-      {
-        sourcePolicyId: "source-start",
-        outputId: "ready",
-        target: { type: "trigger", trigger: "target-trigger" }
-      },
-      {
-        sourcePolicyId: "source-start",
-        outputId: "blocked",
-        target: { type: "trigger", trigger: "target-trigger" }
-      }
-    ]);
+  it("routes cross-workflow approval outputs and keeps rework outputs local", () => {
+    const config = compositeConfig(["source", "target"]);
     const layout = calculateCompositeWorkflowCanvasLayout({
       config,
       selectedWorkflowId: "source",
@@ -1103,21 +1085,12 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       label: "ready",
       tone: "cross-workflow"
     });
-    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toMatchObject({
-      sourceNodeKey: "workflow:source:policy-0",
-      sourceHandleId: "bottom",
-      targetHandleId: "top",
-      label: "blocked",
-      tone: "cross-workflow"
-    });
+    expect(layout.nodes.find((node) => node.key === "workflow:source:output-event-0-blocked")).toBeDefined();
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toBeUndefined();
   });
 
-  it("renders a trigger-routed target workflow above the selected workflow when config order is above", () => {
-    const config = compositeConfig(["target", "source"], [{
-      sourcePolicyId: "source-start",
-      outputId: "ready",
-      target: { type: "trigger", trigger: "target-trigger", workflowId: "target" }
-    }]);
+  it("renders a derived trigger target workflow above the selected workflow when config order is above", () => {
+    const config = compositeConfig(["target", "source"]);
     const layout = calculateCompositeWorkflowCanvasLayout({
       config,
       selectedWorkflowId: "source",
@@ -1132,41 +1105,20 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
     expect(targetTrigger?.y).toBeLessThan(sourceTrigger?.y ?? 0);
   });
 
-  it("routes upward rework return outputs from the source top to the target top", () => {
-    const config = compositeConfig(["target", "source"], [{
-      sourcePolicyId: "source-start",
-      outputId: "blocked",
-      target: { type: "trigger", trigger: "target-trigger", workflowId: "target" }
-    }]);
+  it("does not route rework outputs to target workflows automatically", () => {
+    const config = compositeConfig(["target", "source"]);
     const layout = calculateCompositeWorkflowCanvasLayout({
       config,
       selectedWorkflowId: "source",
       recordsByWorkflowId: compositeRecords(config)
     });
 
-    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toMatchObject({
-      sourceNodeKey: "workflow:source:policy-0",
-      targetNodeKey: "workflow:target:trigger",
-      sourceHandleId: "top",
-      targetHandleId: "top",
-      label: "blocked",
-      tone: "cross-workflow"
-    });
+    expect(layout.nodes.find((node) => node.key === "workflow:source:output-event-0-blocked")).toBeDefined();
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toBeUndefined();
   });
 
-  it("protects circular trigger-routed workflow references from recursive layout", () => {
-    const config = compositeConfig(["source", "target"], [
-      {
-        sourcePolicyId: "source-start",
-        outputId: "ready",
-        target: { type: "trigger", trigger: "target-trigger" }
-      },
-      {
-        sourcePolicyId: "target-start",
-        outputId: "done",
-        target: { type: "trigger", trigger: "source-trigger" }
-      }
-    ]);
+  it("protects circular derived trigger workflow references from recursive layout", () => {
+    const config = compositeConfig(["source", "target"], [], "target-gate.done");
     const layout = calculateCompositeWorkflowCanvasLayout({
       config,
       selectedWorkflowId: "source",
@@ -1182,11 +1134,7 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
 
 describe("calculateAllWorkflowsCanvasLayout", () => {
   it("renders every configured workflow row and keeps cross-workflow trigger edges", () => {
-    const config = compositeConfig(["source", "target", "observer"], [{
-      sourcePolicyId: "source-start",
-      outputId: "ready",
-      target: { type: "trigger", trigger: "target-trigger", workflowId: "target" }
-    }]);
+    const config = compositeConfig(["source", "target", "observer"]);
     const layout = calculateAllWorkflowsCanvasLayout({
       config,
       recordsByWorkflowId: compositeRecords(config)

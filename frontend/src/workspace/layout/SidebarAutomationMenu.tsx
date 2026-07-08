@@ -1,4 +1,4 @@
-import { Activity, ChevronRight, FileKey2, Route, Zap, type LucideIcon } from "lucide-react";
+import { Activity, ChevronRight, FileKey2, Route, type LucideIcon } from "lucide-react";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -14,7 +14,6 @@ import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
 function automationEntities(config: ProjectAutomationConfig, tab: AutomationTab): Array<{ id: string; label: string }> {
   if (tab === "actions") return config.actions.map((action) => ({ id: action.id, label: action.id }));
-  if (tab === "triggers") return config.triggers.map((trigger) => ({ id: trigger.id, label: trigger.id }));
   return config.workflows.map((workflow) => ({ id: workflow.id, label: workflow.id }));
 }
 
@@ -27,7 +26,6 @@ type AutomationSidebarSection = { id: AutomationTab; label: string; icon: Lucide
 
 const automationSidebarSections: AutomationSidebarSection[] = [
   { id: "actions", label: "Actions", icon: FileKey2, emptyLabel: "No actions." },
-  { id: "triggers", label: "Triggers", icon: Zap, emptyLabel: "No triggers." },
   { id: "workflows", label: "Workflows", icon: Activity, emptyLabel: "No workflows." }
 ];
 

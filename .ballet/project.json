@@ -1,43 +1,5 @@
 {
   "version": 1,
-  "triggers": [
-    {
-      "id": "adr_goals_changed",
-      "description": "ADR or GOALS changed. Starts Gate 1 planning by producing Project Brief evidence."
-    },
-    {
-      "id": "project_brief_approved",
-      "description": "Gate 1: Human approved Project Brief. Roadmap planning may start."
-    },
-    {
-      "id": "roadmap_approved",
-      "description": "Gate 2: Human approved Roadmap. UI design planning may start."
-    },
-    {
-      "id": "ui_design_approved",
-      "description": "Gate 3: Human approved UI Design. Technical planning may start."
-    },
-    {
-      "id": "technical_plan_approved",
-      "description": "Gate 4: Human approved Technical Plan. Milestone planning may start."
-    },
-    {
-      "id": "milestones_approved",
-      "description": "Gate 5: Human approved Milestones. Task specification may start."
-    },
-    {
-      "id": "task_specs_approved",
-      "description": "Gate 6: Human approved Task Specs. Implementation may start."
-    },
-    {
-      "id": "code_approved",
-      "description": "Gate 7: Human approved code after review and tests. Dev deployment may start."
-    },
-    {
-      "id": "ci_or_validation_failed",
-      "description": "CI, tests, code review, deployment, or validation failed and needs failure classification."
-    }
-  ],
   "actions": [
     {
       "id": "create-project-brief",
@@ -62,7 +24,7 @@
       ]
     },
     {
-      "id": "project-brief-human-gate",
+      "id": "project-brief-gate",
       "description": "Gate 1: Human approval of the agent-reviewed Project Brief before roadmap planning continues.",
       "outputIds": [
         "approved",
@@ -352,76 +314,12 @@
       "id": "failed"
     }
   ],
-  "outputRoutes": [
-    {
-      "sourcePolicyId": "on.challenge-project-brief.approved.start.project-brief-human-gate",
-      "outputId": "approved",
-      "target": {
-        "type": "trigger",
-        "trigger": "project_brief_approved",
-        "workflowId": "roadmap-loop"
-      }
-    },
-    {
-      "sourcePolicyId": "on.challenge-roadmap.approved.start.roadmap-human-gate",
-      "outputId": "approved",
-      "target": {
-        "type": "trigger",
-        "trigger": "roadmap_approved",
-        "workflowId": "ui-design-loop"
-      }
-    },
-    {
-      "sourcePolicyId": "on.challenge-ui-design.approved.start.ui-design-human-gate",
-      "outputId": "approved",
-      "target": {
-        "type": "trigger",
-        "trigger": "ui_design_approved",
-        "workflowId": "technical-planning-loop"
-      }
-    },
-    {
-      "sourcePolicyId": "on.challenge-technical-plan.approved.start.technical-plan-human-gate",
-      "outputId": "approved",
-      "target": {
-        "type": "trigger",
-        "trigger": "technical_plan_approved",
-        "workflowId": "milestone-loop"
-      }
-    },
-    {
-      "sourcePolicyId": "on.challenge-milestones.approved.start.milestones-human-gate",
-      "outputId": "approved",
-      "target": {
-        "type": "trigger",
-        "trigger": "milestones_approved",
-        "workflowId": "task-spec-loop"
-      }
-    },
-    {
-      "sourcePolicyId": "on.challenge-task-specs.approved.start.task-specs-human-gate",
-      "outputId": "approved",
-      "target": {
-        "type": "trigger",
-        "trigger": "task_specs_approved",
-        "workflowId": "implementation-review-test-loop"
-      }
-    },
-    {
-      "sourcePolicyId": "on.review-code.approved.start.code-human-gate",
-      "outputId": "approved",
-      "target": {
-        "type": "trigger",
-        "trigger": "code_approved",
-        "workflowId": "dev-deploy-validation-loop"
-      }
-    }
-  ],
+  "outputRoutes": [],
   "humanGateResponses": [],
   "policies": [
     {
-      "source": "trigger",
-      "trigger": "adr_goals_changed",
+      "source": "event",
+      "event": "trigger.adr_goals_changed",
       "action": "create-project-brief",
       "enabled": true,
       "id": "on.trigger.adr_goals_changed.start.create-project-brief"
@@ -436,16 +334,16 @@
     {
       "source": "event",
       "event": "challenge-project-brief.approved",
-      "action": "project-brief-human-gate",
+      "action": "project-brief-gate",
       "enabled": true,
-      "id": "on.challenge-project-brief.approved.start.project-brief-human-gate"
+      "id": "on.challenge-project-brief.approved.start.project-brief-gate"
     },
     {
       "source": "event",
-      "event": "project-brief-human-gate.changes_requested",
+      "event": "project-brief-gate.changes_requested",
       "action": "create-project-brief",
       "enabled": true,
-      "id": "on.project-brief-human-gate.changes_requested.start.create-project-brief"
+      "id": "on.project-brief-gate.changes_requested.start.create-project-brief"
     },
     {
       "source": "event",
@@ -463,10 +361,10 @@
     },
     {
       "source": "trigger",
-      "trigger": "project_brief_approved",
+      "trigger": "project-brief-gate.approved",
       "action": "create-roadmap",
       "enabled": true,
-      "id": "on.trigger.project_brief_approved.start.create-roadmap"
+      "id": "on.trigger.project-brief-gate.approved.start.create-roadmap"
     },
     {
       "source": "event",
@@ -505,10 +403,10 @@
     },
     {
       "source": "trigger",
-      "trigger": "roadmap_approved",
+      "trigger": "roadmap-human-gate.approved",
       "action": "create-ui-design",
       "enabled": true,
-      "id": "on.trigger.roadmap_approved.start.create-ui-design"
+      "id": "on.trigger.roadmap-human-gate.approved.start.create-ui-design"
     },
     {
       "source": "event",
@@ -547,10 +445,10 @@
     },
     {
       "source": "trigger",
-      "trigger": "ui_design_approved",
+      "trigger": "ui-design-human-gate.approved",
       "action": "create-technical-plan",
       "enabled": true,
-      "id": "on.trigger.ui_design_approved.start.create-technical-plan"
+      "id": "on.trigger.ui-design-human-gate.approved.start.create-technical-plan"
     },
     {
       "source": "event",
@@ -589,10 +487,10 @@
     },
     {
       "source": "trigger",
-      "trigger": "technical_plan_approved",
+      "trigger": "technical-plan-human-gate.approved",
       "action": "create-milestones",
       "enabled": true,
-      "id": "on.trigger.technical_plan_approved.start.create-milestones"
+      "id": "on.trigger.technical-plan-human-gate.approved.start.create-milestones"
     },
     {
       "source": "event",
@@ -631,10 +529,10 @@
     },
     {
       "source": "trigger",
-      "trigger": "milestones_approved",
+      "trigger": "milestones-human-gate.approved",
       "action": "create-task-specs",
       "enabled": true,
-      "id": "on.trigger.milestones_approved.start.create-task-specs"
+      "id": "on.trigger.milestones-human-gate.approved.start.create-task-specs"
     },
     {
       "source": "event",
@@ -673,10 +571,10 @@
     },
     {
       "source": "trigger",
-      "trigger": "task_specs_approved",
+      "trigger": "task-specs-human-gate.approved",
       "action": "implement-task",
       "enabled": true,
-      "id": "on.trigger.task_specs_approved.start.implement-task"
+      "id": "on.trigger.task-specs-human-gate.approved.start.implement-task"
     },
     {
       "source": "event",
@@ -729,10 +627,10 @@
     },
     {
       "source": "trigger",
-      "trigger": "code_approved",
+      "trigger": "code-human-gate.approved",
       "action": "prepare-dev-deployment",
       "enabled": true,
-      "id": "on.trigger.code_approved.start.prepare-dev-deployment"
+      "id": "on.trigger.code-human-gate.approved.start.prepare-dev-deployment"
     },
     {
       "source": "event",
@@ -777,11 +675,11 @@
       "id": "on.validate-dev-deployment.changes_requested.start.prepare-dev-deployment"
     },
     {
-      "source": "event",
-      "event": "dev-deployment-validation-human-gate.approved",
+      "source": "trigger",
+      "trigger": "dev-deployment-validation-human-gate.approved",
       "action": "done",
       "enabled": true,
-      "id": "on.dev-deployment-validation-human-gate.approved.start.done"
+      "id": "on.trigger.dev-deployment-validation-human-gate.approved.start.done"
     },
     {
       "source": "event",
@@ -791,8 +689,8 @@
       "id": "on.dev-deployment-validation-human-gate.changes_requested.start.prepare-dev-deployment"
     },
     {
-      "source": "trigger",
-      "trigger": "ci_or_validation_failed",
+      "source": "event",
+      "event": "trigger.ci_or_validation_failed",
       "action": "classify-failure",
       "enabled": true,
       "id": "on.trigger.ci_or_validation_failed.start.classify-failure"
@@ -819,8 +717,8 @@
       "steps": [
         "on.trigger.adr_goals_changed.start.create-project-brief",
         "on.create-project-brief.ready.start.challenge-project-brief",
-        "on.challenge-project-brief.approved.start.project-brief-human-gate",
-        "on.project-brief-human-gate.changes_requested.start.create-project-brief",
+        "on.challenge-project-brief.approved.start.project-brief-gate",
+        "on.project-brief-gate.changes_requested.start.create-project-brief",
         "on.challenge-project-brief.changes_requested.start.create-project-brief",
         "on.create-project-brief.blocked.start.done"
       ]
@@ -829,7 +727,7 @@
       "id": "roadmap-loop",
       "title": "2. Roadmap loop",
       "steps": [
-        "on.trigger.project_brief_approved.start.create-roadmap",
+        "on.trigger.project-brief-gate.approved.start.create-roadmap",
         "on.create-roadmap.ready.start.challenge-roadmap",
         "on.challenge-roadmap.approved.start.roadmap-human-gate",
         "on.roadmap-human-gate.changes_requested.start.create-roadmap",
@@ -841,7 +739,7 @@
       "id": "ui-design-loop",
       "title": "3. UI design loop",
       "steps": [
-        "on.trigger.roadmap_approved.start.create-ui-design",
+        "on.trigger.roadmap-human-gate.approved.start.create-ui-design",
         "on.create-ui-design.ready.start.challenge-ui-design",
         "on.challenge-ui-design.approved.start.ui-design-human-gate",
         "on.ui-design-human-gate.changes_requested.start.create-ui-design",
@@ -853,7 +751,7 @@
       "id": "technical-planning-loop",
       "title": "4. Technical planning loop",
       "steps": [
-        "on.trigger.ui_design_approved.start.create-technical-plan",
+        "on.trigger.ui-design-human-gate.approved.start.create-technical-plan",
         "on.create-technical-plan.ready.start.challenge-technical-plan",
         "on.challenge-technical-plan.approved.start.technical-plan-human-gate",
         "on.technical-plan-human-gate.changes_requested.start.create-technical-plan",
@@ -865,7 +763,7 @@
       "id": "milestone-loop",
       "title": "5. Milestone loop",
       "steps": [
-        "on.trigger.technical_plan_approved.start.create-milestones",
+        "on.trigger.technical-plan-human-gate.approved.start.create-milestones",
         "on.create-milestones.ready.start.challenge-milestones",
         "on.challenge-milestones.approved.start.milestones-human-gate",
         "on.milestones-human-gate.changes_requested.start.create-milestones",
@@ -877,7 +775,7 @@
       "id": "task-spec-loop",
       "title": "6. Task spec loop",
       "steps": [
-        "on.trigger.milestones_approved.start.create-task-specs",
+        "on.trigger.milestones-human-gate.approved.start.create-task-specs",
         "on.create-task-specs.ready.start.challenge-task-specs",
         "on.challenge-task-specs.approved.start.task-specs-human-gate",
         "on.task-specs-human-gate.changes_requested.start.create-task-specs",
@@ -889,7 +787,7 @@
       "id": "implementation-review-test-loop",
       "title": "7. Implementation + review + test loop",
       "steps": [
-        "on.trigger.task_specs_approved.start.implement-task",
+        "on.trigger.task-specs-human-gate.approved.start.implement-task",
         "on.implement-task.ready.start.run-tests",
         "on.implement-task.blocked.start.classify-failure",
         "on.run-tests.ready.start.review-code",
@@ -905,14 +803,14 @@
       "id": "dev-deploy-validation-loop",
       "title": "8. Dev deploy + validation loop",
       "steps": [
-        "on.trigger.code_approved.start.prepare-dev-deployment",
+        "on.trigger.code-human-gate.approved.start.prepare-dev-deployment",
         "on.prepare-dev-deployment.ready.start.deploy-to-dev",
         "on.prepare-dev-deployment.blocked.start.classify-failure",
         "on.deploy-to-dev.ready.start.validate-dev-deployment",
         "on.deploy-to-dev.failed.start.classify-failure",
         "on.validate-dev-deployment.approved.start.dev-deployment-validation-human-gate",
         "on.validate-dev-deployment.changes_requested.start.prepare-dev-deployment",
-        "on.dev-deployment-validation-human-gate.approved.start.done",
+        "on.trigger.dev-deployment-validation-human-gate.approved.start.done",
         "on.dev-deployment-validation-human-gate.changes_requested.start.prepare-dev-deployment",
         "on.classify-failure.ready.start.implement-task",
         "on.classify-failure.blocked.start.done"

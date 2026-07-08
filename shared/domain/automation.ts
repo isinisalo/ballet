@@ -6,11 +6,6 @@ export type PolicyPredicateScalar = string | number | boolean | null;
 
 export type JsonSchemaObject = Record<string, unknown>;
 
-export interface ProjectTrigger {
-  id: string;
-  description: string;
-}
-
 export interface ProjectAction {
   id: string;
   description: string;
@@ -35,16 +30,10 @@ export interface ProjectHumanGateResponse {
   submittedAt: string;
 }
 
-export type ProjectOutputTarget =
-  | {
-      type: "event";
-      eventType?: string;
-    }
-  | {
-      type: "trigger";
-      trigger: string;
-      workflowId?: string;
-    };
+export type ProjectOutputTarget = {
+  type: "event";
+  eventType?: string;
+};
 
 export interface ProjectOutputRoute {
   sourcePolicyId: string;
@@ -69,7 +58,6 @@ export interface ProjectWorkflow {
 
 export interface ProjectAutomationConfig {
   version: 1;
-  triggers: ProjectTrigger[];
   actions: ProjectAction[];
   outputs: ProjectOutput[];
   outputRoutes: ProjectOutputRoute[];
@@ -81,7 +69,6 @@ export interface ProjectAutomationConfig {
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: 1,
-  triggers: [],
   actions: [],
   outputs: defaultProjectOutputs(),
   outputRoutes: [],

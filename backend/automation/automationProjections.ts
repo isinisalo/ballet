@@ -2,8 +2,7 @@ import type {
   Policy,
   ProjectAction,
   ProjectOutputRoute,
-  ProjectPolicy,
-  ProjectTrigger
+  ProjectPolicy
 } from "../../shared/domain/automation.js";
 import type { EventDefinition } from "../../shared/domain/events.js";
 import type { ProjectRuntime, Runtime } from "../../shared/domain/runtime.js";
@@ -19,7 +18,6 @@ const timestamp = "1970-01-01T00:00:00.000Z";
 
 export const automationPoliciesToEventDefinitions = (
   policies: ProjectPolicy[] = [],
-  triggers: ProjectTrigger[] = [],
   actions: ProjectAction[] = [],
   outputs: Array<{ id: string }> = [],
   outputRoutes: ProjectOutputRoute[] = []
@@ -33,9 +31,9 @@ export const automationPoliciesToEventDefinitions = (
     ),
     ...outputRoutes.flatMap((route) => {
       const policy = policies.find((candidate) => candidate.id === route.sourcePolicyId);
-      return policy ? [projectOutputRouteEventType(policy, route.outputId, outputRoutes)] : [];
+      return policy ? [projectOutputRouteEventType(policy, route.outputId, outputRoutes, actions)] : [];
     }),
-    ...triggers.map((trigger) => `trigger.${trigger.id}`)
+    ...policies.map(policySourceKey)
   ])]
     .map((eventType) => ({
       id: eventType,

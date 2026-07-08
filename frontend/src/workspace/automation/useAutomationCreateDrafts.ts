@@ -7,7 +7,6 @@ import type { AutomationTab } from "../types";
 type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
 
 type AutomationCreateDrafts = {
-  trigger: { id: string; description: string };
   action: { id: string; description: string; outputIds: string[]; agentIds: string[]; humanGate: boolean };
   workflow: { id: string; title: string; steps: string[] };
 };
@@ -29,18 +28,13 @@ export function useAutomationCreateDrafts({
   selectAutomationEntity: SelectAutomationEntity;
   isCreateMode: boolean;
 }) {
-  const [newTrigger, setNewTrigger] = useState({ id: "", description: "" });
   const [newAction, setNewAction] = useState({ id: "", description: "", outputIds: [] as string[], agentIds: [] as string[], humanGate: false });
   const [newWorkflow, setNewWorkflow] = useState({ id: "", title: "", steps: [] as string[] });
   const createDraftsRef = useRef<AutomationCreateDrafts>({
-    trigger: newTrigger,
     action: newAction,
     workflow: newWorkflow
   });
 
-  const updateNewTrigger = (patch: Partial<typeof newTrigger>) => {
-    setNewTrigger((current) => syncDraft(createDraftsRef, "trigger", { ...current, ...patch }));
-  };
   const updateNewAction = (patch: Partial<typeof newAction>) => {
     setNewAction((current) => syncDraft(createDraftsRef, "action", { ...current, ...patch }));
   };
@@ -68,17 +62,14 @@ export function useAutomationCreateDrafts({
     selectAutomationEntity(activeTab, nextDraft.id);
     const resetDrafts = createInitialDrafts(draft, agents);
     createDraftsRef.current = resetDrafts;
-    setNewTrigger(resetDrafts.trigger);
     setNewAction(resetDrafts.action);
     setNewWorkflow(resetDrafts.workflow);
     return true;
   };
 
   return {
-    newTrigger,
     newAction,
     newWorkflow,
-    updateNewTrigger,
     updateNewAction,
     updateNewWorkflow,
     saveAutomationFromHeader
@@ -95,7 +86,6 @@ const syncDraft = <K extends keyof AutomationCreateDrafts>(
 };
 
 const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): AutomationCreateDrafts => ({
-  trigger: { id: "", description: "" },
   action: { id: "", description: "", outputIds: defaultActionOutputIds(draft), agentIds: agents.slice(0, 1).map((agent) => agent.id), humanGate: false },
   workflow: { id: "", title: "", steps: [] }
 });
@@ -111,11 +101,6 @@ const createDraftWithNewEntity = (
   draft: ProjectAutomationConfig,
   drafts: AutomationCreateDrafts
 ): { config: ProjectAutomationConfig; id: string } | undefined => {
-  if (activeTab === "triggers") {
-    const id = normalizeAutomationToken(drafts.trigger.id);
-    if (automationTokenValidationMessage("Trigger ID", id) || automationStringValidationMessage("Description", drafts.trigger.description, automationFieldLimits.description) || draft.triggers.some((trigger) => trigger.id === id)) return undefined;
-    return { id, config: { ...draft, triggers: [...draft.triggers, { ...drafts.trigger, id }] } };
-  }
   if (activeTab === "actions") {
     const id = normalizeAutomationToken(drafts.action.id);
     if (automationTokenValidationMessage("Action ID", id) || automationStringValidationMessage("Description", drafts.action.description, automationFieldLimits.description, { required: false }) || draft.actions.some((action) => action.id === id)) return undefined;
@@ -132,12 +117,6 @@ const createDraftWithNewEntity = (
 };
 
 const hasAutomationDraftFieldErrors = (activeTab: AutomationTab, draft: ProjectAutomationConfig): boolean => {
-  if (activeTab === "triggers") {
-    return draft.triggers.some((trigger) =>
-      Boolean(automationTokenValidationMessage("Trigger ID", trigger.id)) ||
-      Boolean(automationStringValidationMessage("Description", trigger.description, automationFieldLimits.description))
-    );
-  }
   if (activeTab === "actions") {
     return draft.actions.some((action) =>
       Boolean(automationTokenValidationMessage("Action ID", action.id)) ||

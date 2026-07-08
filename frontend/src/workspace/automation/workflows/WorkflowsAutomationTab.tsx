@@ -171,22 +171,17 @@ export function WorkflowsAutomationTab({
     if (!nextPolicy) {
       const baseAction = sourcePolicy?.action || defaultAction;
       if (!baseAction) return;
-      const generatedSource: ProjectPolicy["source"] = eventType || !config.triggers[0]?.id ? "event" : "trigger";
       const generatedEvent = eventType || policyOutputEventType({ action: baseAction }, selectedActionOutputIds(baseAction)[0] ?? "");
-      const action = generatedSource === "event"
-        ? isDoneEvent ? "done" : uniquePolicyAction(generatedEvent, baseAction, config.policies)
-        : baseAction;
+      const action = isDoneEvent ? "done" : uniquePolicyAction(generatedEvent, baseAction, config.policies);
       const outputIds = selectedActionOutputIds(action);
       const generatedPolicy: ProjectPolicy = {
         id: generatedPolicyId({
-          source: generatedSource,
-          event: generatedSource === "event" ? generatedEvent : undefined,
-          trigger: generatedSource === "trigger" ? config.triggers[0]?.id ?? "" : undefined,
+          source: "event",
+          event: generatedEvent,
           action
         }),
-        source: generatedSource,
-        event: generatedSource === "event" ? generatedEvent : undefined,
-        trigger: generatedSource === "trigger" ? config.triggers[0]?.id ?? "" : undefined,
+        source: "event",
+        event: generatedEvent,
         action,
         enabled: true
       };
@@ -279,7 +274,7 @@ export function WorkflowsAutomationTab({
     updateConfig(() => nextConfig);
     const saved = await saveDraft(nextConfig);
     if (!saved) return;
-    const eventType = projectOutputRouteEventType(policy, outputId, nextConfig.outputRoutes);
+    const eventType = projectOutputRouteEventType(policy, outputId, nextConfig.outputRoutes, nextConfig.actions);
     await createEvent({
       projectId,
       eventType,

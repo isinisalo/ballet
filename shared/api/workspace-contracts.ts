@@ -8,7 +8,6 @@ import type {
   ProjectOutputRoute,
   ProjectOutputTarget,
   ProjectPolicy,
-  ProjectTrigger,
   ProjectWorkflow,
   Policy
 } from "../domain/automation.js";
@@ -93,7 +92,6 @@ export type {
   ProjectOutputTarget,
   ProjectPolicy,
   ProjectRuntime,
-  ProjectTrigger,
   ProjectWorkflow,
   Runtime,
   Skill

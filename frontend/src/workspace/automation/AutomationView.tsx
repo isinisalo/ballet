@@ -7,7 +7,6 @@ import type { AutomationTab, AutomationWorkflowView } from "../types";
 import { ActionsAutomationTab } from "./actions/ActionsAutomationTab";
 import { createAutomationEntityControls } from "./automationEntityControls";
 import { AutomationIssues } from "./AutomationIssues";
-import { TriggersAutomationTab } from "./triggers/TriggersAutomationTab";
 import { useAutomationDraft } from "./useAutomationDraft";
 import { useAutomationCreateDrafts } from "./useAutomationCreateDrafts";
 import { useWorkflowHeaderNameEditor } from "./workflows/useWorkflowHeaderNameEditor";
@@ -38,16 +37,14 @@ export function AutomationView({
   const {
     deleteConfig,
     selectedActionId,
-    selectedTriggerId,
     selectedWorkflowId,
     selectAutomationEntity
   } = createAutomationEntityControls({ activeTab, selectedId, draft, agents: data.agents, setDraft, navigate });
   const showAllWorkflows = activeTab === "workflows" && workflowView === "all";
   const isCreateMode = useMemo(() => {
-    if (activeTab === "triggers") return !selectedTriggerId;
     if (activeTab === "actions") return !selectedActionId;
     return !showAllWorkflows && !selectedWorkflowId;
-  }, [activeTab, selectedActionId, selectedTriggerId, selectedWorkflowId, showAllWorkflows]);
+  }, [activeTab, selectedActionId, selectedWorkflowId, showAllWorkflows]);
   const workflowNameEditor = useWorkflowHeaderNameEditor({
     activeTab,
     draft,
@@ -105,9 +102,6 @@ export function AutomationView({
           <div className="grid gap-4">
             {data.automationIssues.length > 0 ? (
               <AutomationIssues issues={data.automationIssues} />
-            ) : null}
-            {activeTab === "triggers" ? (
-              <TriggersAutomationTab config={draft} selectedId={selectedTriggerId} createDraft={createDrafts.newTrigger} onCreateDraftChange={createDrafts.updateNewTrigger} onSelect={(id) => selectAutomationEntity("triggers", id)} updateConfig={updateConfig} />
             ) : null}
             {activeTab === "actions" ? (
               <ActionsAutomationTab agents={data.agents} config={draft} selectedId={selectedActionId} createDraft={createDrafts.newAction} onCreateDraftChange={createDrafts.updateNewAction} onSelect={(id) => selectAutomationEntity("actions", id)} updateConfig={updateConfig} />

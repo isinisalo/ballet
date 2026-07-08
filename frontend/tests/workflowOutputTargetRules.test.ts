@@ -10,17 +10,12 @@ import {
 
 const config = (): ProjectAutomationConfig => ({
   version: 1,
-  triggers: [{ id: "approved", description: "Approved" }],
   actions: [
     { id: "review", description: "Review.", outputIds: ["approved", "changes_requested"], agentIds: ["reviewer-agent"] },
     { id: "human-review", description: "Human review.", outputIds: ["approved", "changes_requested"], agentIds: [], humanGate: true }
   ],
   outputs: [{ id: "approved" }, { id: "changes_requested" }],
-  outputRoutes: [{
-    sourcePolicyId: "human-review-policy",
-    outputId: "approved",
-    target: { type: "trigger", trigger: "approved" }
-  }],
+  outputRoutes: [],
   humanGateResponses: [],
   policies: [
     { id: "agent-review-policy", source: "event", event: "review.ready", action: "review", enabled: true },
@@ -31,20 +26,20 @@ const config = (): ProjectAutomationConfig => ({
 });
 
 describe("workflow output target rules", () => {
-  it("allows trigger targets only for human gate approval outputs", () => {
+  it("does not expose manual trigger target selection", () => {
     const current = config();
 
-    expect(workflowOutputTargetCanSelectTrigger(current, "human-review-policy", "approved")).toBe(true);
+    expect(workflowOutputTargetCanSelectTrigger(current, "human-review-policy", "approved")).toBe(false);
     expect(workflowOutputTargetCanSelectTrigger(current, "human-review-policy", "changes_requested")).toBe(false);
     expect(workflowOutputTargetCanSelectTrigger(current, "agent-review-policy", "approved")).toBe(false);
   });
 
-  it("reads and writes trigger target select values", () => {
+  it("keeps output target select values event-only", () => {
     const current = config();
 
-    expect(workflowOutputTargetSelectValue(current, "human-review-policy", "approved")).toBe("trigger:approved");
+    expect(workflowOutputTargetSelectValue(current, "human-review-policy", "approved")).toBe("event");
     expect(workflowOutputTargetSelectValue(current, "human-review-policy", "changes_requested")).toBe("event");
-    expect(workflowOutputTargetFromSelectValue("trigger:approved")).toEqual({ type: "trigger", trigger: "approved" });
+    expect(workflowOutputTargetFromSelectValue("trigger:approved")).toBeUndefined();
     expect(workflowOutputTargetFromSelectValue("event")).toBeUndefined();
   });
 
@@ -53,7 +48,7 @@ describe("workflow output target rules", () => {
 
     expect(workflowOutputTargetDisplay(current, "human-review-policy", "approved")).toEqual({
       type: "trigger",
-      label: "approved"
+      label: "human-review.approved"
     });
     expect(workflowOutputTargetDisplay(current, "human-review-policy", "changes_requested")).toEqual({
       type: "event",

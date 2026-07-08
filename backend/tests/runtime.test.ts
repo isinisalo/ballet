@@ -414,8 +414,14 @@ describe("runtime output mapping", () => {
     expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }, [{
       sourcePolicyId: projectPolicy.id,
       outputId: "ready",
-      target: { type: "trigger", trigger: "manual-start" }
-    }]).id).toBe("trigger.manual-start");
+      target: { type: "event", eventType: "manual.start" }
+    }]).id).toBe("manual.start");
+    expect(mapAgentOutputToEvent(
+      { ...projectPolicy, action: "human-review" },
+      { status: "approved" },
+      [],
+      [{ id: "human-review", description: "Human review", outputIds: ["approved", "changes_requested"], agentIds: [], humanGate: true }]
+    ).id).toBe("trigger.human-review.approved");
   });
 
   it("maps structured outcomes to configured action outputs", () => {

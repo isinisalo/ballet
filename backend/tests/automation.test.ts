@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig, ProjectPolicy } from "../../shared/domain/automation.js";
-import { actionOutputIds, findProjectOutputRoute, humanGateResponseId, policyOutputEventType } from "../../shared/policy-actions.js";
+import { actionOutputIds, findProjectOutputRoute, humanGateApprovalTriggerId, humanGateResponseId, policyOutputEventType } from "../../shared/policy-actions.js";
 import {
   automationPoliciesToEventDefinitions,
   automationPoliciesToPolicies,
@@ -40,7 +40,6 @@ const agent: Agent = {
 
 const validConfig = (): ProjectAutomationConfig => ({
   version: 1,
-  triggers: [],
   actions: [
     {
       id: "implementation",
@@ -82,7 +81,6 @@ describe("project automation config", () => {
   it("returns default config when .ballet/project.json is missing", async () => {
     await expect(loadProjectAutomationConfig(await tempRoot())).resolves.toEqual({
       version: 1,
-      triggers: [],
       actions: [],
       outputs: [
         { id: "ok" },
@@ -108,13 +106,12 @@ describe("project automation config", () => {
     };
 
     expect(normalizeProjectAutomationConfig(oldRawConfig).outputRoutes).toEqual([]);
-    expect(validateProjectAutomationConfig(oldRawConfig).some((issue) => issue.path === "outputRoutes")).toBe(true);
+    expect(validateProjectAutomationConfig(oldRawConfig).some((issue) => issue.path === "triggers")).toBe(true);
   });
 
   it("normalizes missing humanGateResponses to an empty array", () => {
     const oldRawConfig = {
       version: 1,
-      triggers: [],
       actions: [],
       outputs: [],
       outputRoutes: [],
@@ -147,7 +144,7 @@ describe("project automation config", () => {
     const config = JSON.parse(await readFile(path.join(process.cwd(), ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
     const humanGateIds = config.actions.filter((action) => action.humanGate).map((action) => action.id);
     const expectedGateIds = [
-      "project-brief-human-gate",
+      "project-brief-gate",
       "roadmap-human-gate",
       "ui-design-human-gate",
       "technical-plan-human-gate",
@@ -156,36 +153,34 @@ describe("project automation config", () => {
       "code-human-gate",
       "dev-deployment-validation-human-gate"
     ];
-    const expectedApprovalRoutes = new Map([
-      ["on.challenge-project-brief.approved.start.project-brief-human-gate", ["project_brief_approved", "roadmap-loop"]],
-      ["on.challenge-roadmap.approved.start.roadmap-human-gate", ["roadmap_approved", "ui-design-loop"]],
-      ["on.challenge-ui-design.approved.start.ui-design-human-gate", ["ui_design_approved", "technical-planning-loop"]],
-      ["on.challenge-technical-plan.approved.start.technical-plan-human-gate", ["technical_plan_approved", "milestone-loop"]],
-      ["on.challenge-milestones.approved.start.milestones-human-gate", ["milestones_approved", "task-spec-loop"]],
-      ["on.challenge-task-specs.approved.start.task-specs-human-gate", ["task_specs_approved", "implementation-review-test-loop"]],
-      ["on.review-code.approved.start.code-human-gate", ["code_approved", "dev-deploy-validation-loop"]]
-    ]);
     const eventPoliciesByEvent = new Map(config.policies
       .filter((policy): policy is ProjectPolicy & { event: string } => policy.source === "event" && Boolean(policy.event))
       .map((policy) => [policy.event, policy]));
+    const triggerPoliciesByTrigger = new Map(config.policies
+      .filter((policy): policy is ProjectPolicy & { trigger: string } => policy.source === "trigger" && Boolean(policy.trigger))
+      .map((policy) => [policy.trigger, policy]));
 
     expect(humanGateIds).toEqual(expectedGateIds);
-    expectedApprovalRoutes.forEach(([trigger, workflowId], sourcePolicyId) => {
-      expect(findProjectOutputRoute(config.outputRoutes, sourcePolicyId, "approved")).toMatchObject({
-        target: { type: "trigger", trigger, workflowId }
-      });
-    });
-    expect(eventPoliciesByEvent.get("dev-deployment-validation-human-gate.approved")?.action).toBe("done");
+    expect(config).not.toHaveProperty("triggers");
+    expect(config.outputRoutes.every((route) => route.target.type === "event")).toBe(true);
+    expect(triggerPoliciesByTrigger.get("dev-deployment-validation-human-gate.approved")?.action).toBe("done");
+    expect(automationPoliciesToEventDefinitions(
+      config.policies,
+      config.actions,
+      config.outputs,
+      config.outputRoutes
+    ).map((event) => event.eventType)).toEqual(expect.arrayContaining([
+      "trigger.project-brief-gate.approved",
+      "trigger.roadmap-human-gate.approved",
+      "trigger.code-human-gate.approved"
+    ]));
 
     config.policies.forEach((policy) => {
       actionOutputIds(config.actions, policy.action).forEach((outputId) => {
         const route = findProjectOutputRoute(config.outputRoutes, policy.id, outputId);
-        if (route) {
-          expect(route.target.type).toBe("trigger");
-          return;
-        }
         const eventType = policyOutputEventType(policy, outputId);
-        expect(eventPoliciesByEvent.has(eventType)).toBe(true);
+        if (eventType.endsWith(".approved") && config.actions.find((action) => action.id === policy.action)?.humanGate) return;
+        expect(route || eventPoliciesByEvent.has(eventType)).toBeTruthy();
       });
     });
   });
@@ -321,7 +316,6 @@ describe("project automation config", () => {
     expect(saved.outputs).toEqual([{ id: "roadmap_ready" }]);
     expect(automationPoliciesToEventDefinitions(
       saved.policies,
-      saved.triggers,
       saved.actions,
       saved.outputs
     ).map((event) => event.eventType)).toEqual(["implementation.roadmap_ready"]);
@@ -391,12 +385,11 @@ describe("project automation config", () => {
       actions: [{ id: "manual-gate", description: "Manual workflow stop.", outputIds: [], agentIds: [] }],
       policies: [{
         id: "on.trigger.manual-start.start.manual-gate",
-        source: "trigger",
-        trigger: "manual-start",
+        source: "event",
+        event: "trigger.manual-start",
         action: "manual-gate",
         enabled: true
       }],
-      triggers: [{ id: "manual-start", description: "Manual workflow start" }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.trigger.manual-start.start.manual-gate"] }]
     };
     expect(validateProjectAutomationConfig(agentlessConfig, [agent])).toEqual([]);
@@ -406,21 +399,20 @@ describe("project automation config", () => {
     }, [agent]).some((issue) => issue.message === "Action without agents cannot select outputs.")).toBe(true);
     expect(automationPoliciesToEventDefinitions(
       agentlessConfig.policies,
-      agentlessConfig.triggers,
       agentlessConfig.actions,
       agentlessConfig.outputs
     ).map((event) => event.eventType)).toEqual(["trigger.manual-start"]);
 
+    const humanGateTrigger = humanGateApprovalTriggerId("human-review", "ok");
     const humanGatePolicy = {
-      id: "on.trigger.manual-start.start.human-review",
+      id: `on.trigger.${humanGateTrigger}.start.human-review`,
       source: "trigger" as const,
-      trigger: "manual-start",
+      trigger: humanGateTrigger,
       action: "human-review",
       enabled: true
     };
     const humanGateConfig: ProjectAutomationConfig = {
       ...validConfig(),
-      triggers: [{ id: "manual-start", description: "Manual workflow start" }],
       actions: [{ id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }],
       policies: [humanGatePolicy],
       workflows: [{ id: "delivery", title: "Delivery", steps: [humanGatePolicy.id] }]
@@ -541,25 +533,26 @@ describe("project automation config", () => {
   });
 
   it("rejects workflows with multiple trigger entry policies", () => {
+    const triggerId = humanGateApprovalTriggerId("human-review", "ok");
     const firstPolicy = {
-      id: "on.trigger.manual-start.start.implementation",
+      id: `on.trigger.${triggerId}.start.implementation`,
       source: "trigger" as const,
-      trigger: "manual-start",
+      trigger: triggerId,
       action: "implementation",
       enabled: true
     };
     const secondPolicy = {
-      id: "on.trigger.manual-retry.start.implementation",
+      id: `on.trigger.${triggerId}.start.human-review`,
       source: "trigger" as const,
-      trigger: "manual-retry",
-      action: "implementation",
+      trigger: triggerId,
+      action: "human-review",
       enabled: true
     };
     const issues = validateProjectAutomationConfig({
       ...validConfig(),
-      triggers: [
-        { id: "manual-start", description: "Manual start" },
-        { id: "manual-retry", description: "Manual retry" }
+      actions: [
+        ...validConfig().actions,
+        { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }
       ],
       policies: [firstPolicy, secondPolicy],
       workflows: [{ id: "bad-workflow", title: "Bad workflow", steps: [firstPolicy.id, secondPolicy.id] }]
@@ -578,7 +571,6 @@ describe("project automation config", () => {
     };
     const routeConfig: ProjectAutomationConfig = {
       ...validConfig(),
-      triggers: [{ id: "manual-start", description: "Manual start" }],
       actions: [
         ...validConfig().actions,
         { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }
@@ -586,8 +578,8 @@ describe("project automation config", () => {
       policies: [...validConfig().policies, humanGatePolicy],
       outputRoutes: [{
         sourcePolicyId: humanGatePolicy.id,
-        outputId: "ok",
-        target: { type: "trigger", trigger: "manual-start", workflowId: "delivery" }
+        outputId: "failed",
+        target: { type: "event", eventType: "human-review.failed.external" }
       }]
     };
 
@@ -595,11 +587,7 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...routeConfig,
       outputRoutes: [{ ...routeConfig.outputRoutes[0]!, target: { type: "trigger", trigger: "missing-trigger" } }]
-    }, [agent]).some((issue) => issue.message === "Output route references unknown trigger: missing-trigger.")).toBe(true);
-    expect(validateProjectAutomationConfig({
-      ...routeConfig,
-      outputRoutes: [{ ...routeConfig.outputRoutes[0]!, target: { type: "trigger", trigger: "manual-start", workflowId: "missing-workflow" } }]
-    }, [agent]).some((issue) => issue.message === "Output route references unknown workflow: missing-workflow.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Output route target type must be event.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...routeConfig,
       outputRoutes: [{ ...routeConfig.outputRoutes[0]!, outputId: "summary" }]
@@ -613,31 +601,31 @@ describe("project automation config", () => {
         outputId: "ok",
         target: { type: "trigger", trigger: "manual-start" }
       }]
-    }, [agent]).some((issue) => issue.message === "Only a human gate approval output can target a trigger.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Output route target type must be event.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...routeConfig,
-      outputRoutes: [{ ...routeConfig.outputRoutes[0]!, outputId: "failed" }]
-    }, [agent]).some((issue) => issue.message === "Rework output route target must be event.")).toBe(true);
+      outputRoutes: [{ ...routeConfig.outputRoutes[0]!, outputId: "ok" }]
+    }, [agent]).some((issue) => issue.message === "Human gate approval output routes are derived automatically.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...routeConfig,
       policies: [
         ...routeConfig.policies,
         {
-          id: "on.trigger.manual-start.start.human-review",
+          id: "on.trigger.human-review.ok.start.human-review",
           source: "trigger",
-          trigger: "manual-start",
+          trigger: "human-review.ok",
           action: "human-review",
           enabled: true
         },
         {
-          id: "on.trigger.manual-start.start.implementation",
+          id: "on.trigger.human-review.ok.start.implementation",
           source: "trigger",
-          trigger: "manual-start",
+          trigger: "human-review.ok",
           action: "implementation",
           enabled: true
         }
       ]
-    }, [agent]).some((issue) => issue.message === "Trigger manual-start can start only one policy/action.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Trigger human-review.ok can start only one policy/action.")).toBe(true);
   });
 
   it("migrates legacy gate output routes to human gate actions", () => {
@@ -670,7 +658,7 @@ describe("project automation config", () => {
       "on.implementation.ok.start.human-review"
     ]);
     expect(validateProjectAutomationConfig(gateRouteConfig, [agent]).some((issue) =>
-      issue.message === "Output route target type must be event or trigger."
+      issue.message === "Output route target type must be event."
     )).toBe(true);
     expect(validateProjectAutomationConfig(normalized, [agent])).toEqual([]);
   });
@@ -712,18 +700,22 @@ describe("project automation config", () => {
     }, [agent, reviewer])).toEqual([]);
   });
 
-  it("validates trigger-backed policies", () => {
+  it("validates derived trigger-backed policies", () => {
+    const triggerId = humanGateApprovalTriggerId("human-review", "ok");
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      triggers: [{ id: "plan_approved", description: "Plan approved" }],
+      actions: [
+        ...validConfig().actions,
+        { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }
+      ],
       policies: [{
-        id: "on.trigger.plan_approved.start.implementation",
+        id: `on.trigger.${triggerId}.start.implementation`,
         source: "trigger",
-        trigger: "plan_approved",
+        trigger: triggerId,
         action: "implementation",
         enabled: true
       }],
-      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.trigger.plan_approved.start.implementation"] }]
+      workflows: [{ id: "delivery", title: "Delivery", steps: [`on.trigger.${triggerId}.start.implementation`] }]
     }, [agent])).toEqual([]);
 
     expect(validateProjectAutomationConfig({
@@ -739,23 +731,38 @@ describe("project automation config", () => {
 
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      triggers: [{ id: "plan_approved", description: "Plan approved" }],
+      actions: [
+        ...validConfig().actions,
+        { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }
+      ],
       policies: [{
         id: "bad-policy",
         source: "trigger",
         event: "implementation.failed",
-        trigger: "plan_approved",
+        trigger: triggerId,
         action: "implementation",
         enabled: true
       }]
     }, [agent]).some((issue) => issue.message === "Policy must reference either event or trigger, not both.")).toBe(true);
 
     expect(automationPoliciesToPolicies([{
-      id: "on.trigger.plan_approved.start.implementation",
+      id: `on.trigger.${triggerId}.start.implementation`,
       source: "trigger",
-      trigger: "plan_approved",
+      trigger: triggerId,
       action: "implementation",
       enabled: true
-    }], [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }])[0]?.eventTypes).toEqual(["trigger.plan_approved"]);
+    }], [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }])[0]?.eventTypes).toEqual([`trigger.${triggerId}`]);
+
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      policies: [{
+        id: "on.trigger.plan-approved.start.implementation",
+        source: "event",
+        event: "trigger.plan-approved",
+        action: "implementation",
+        enabled: true
+      }],
+      workflows: [{ id: "delivery", title: "Delivery", steps: ["on.trigger.plan-approved.start.implementation"] }]
+    }, [agent])).toEqual([]);
   });
 });

@@ -22,7 +22,6 @@ const selectedCollectionId = <T extends { id: string }>(isActive: boolean, selec
   isActive && items.some((item) => item.id === selectedId) ? selectedId : undefined;
 
 const selectedEntityIds = (activeTab: AutomationTab, selectedId: string | undefined, draft: ProjectAutomationConfig) => ({
-  selectedTriggerId: selectedCollectionId(activeTab === "triggers", selectedId, draft.triggers),
   selectedActionId: selectedCollectionId(activeTab === "actions", selectedId, draft.actions),
   selectedWorkflowId: selectedCollectionId(activeTab === "workflows", selectedId, draft.workflows)
 });
@@ -35,15 +34,6 @@ const addEntityConfig = (
   selectAutomationEntity: SelectAutomationEntity
 ) => {
   switch (activeTab) {
-    case "triggers":
-      return {
-        label: "Add trigger",
-        onAdd: () => {
-          const id = uniqueAutomationId("new-trigger", draft.triggers.map((trigger) => trigger.id));
-          setDraft((current) => ({ ...current, triggers: [...current.triggers, { id, description: "New trigger" }] }));
-          selectAutomationEntity("triggers", id);
-        }
-      };
     case "actions":
       return {
         label: "Add action",
@@ -91,21 +81,6 @@ const deleteEntityConfig = (
 ) => {
   const { activeTab, draft, setDraft } = input;
   switch (activeTab) {
-    case "triggers": {
-      const selected = draft.triggers.find((trigger) => trigger.id === ids.selectedTriggerId);
-      return {
-        label: "Delete trigger",
-        type: "trigger",
-        resourceName: selected?.id,
-        canDelete: Boolean(selected),
-        onDelete: () => {
-          if (!selected) return;
-          const nextId = draft.triggers.find((trigger) => trigger.id !== selected.id)?.id;
-          setDraft((current) => ({ ...current, triggers: current.triggers.filter((trigger) => trigger.id !== selected.id) }));
-          selectAutomationEntity("triggers", nextId);
-        }
-      };
-    }
     case "actions": {
       const selected = draft.actions.find((action) => action.id === ids.selectedActionId);
       return {

@@ -100,7 +100,6 @@ describe("Markdown collection loading", () => {
     expect(data.policies).toEqual([]);
     expect(data.automation).toEqual({
       version: 1,
-      triggers: [],
       actions: [],
       outputs: [
         { id: "ok" },

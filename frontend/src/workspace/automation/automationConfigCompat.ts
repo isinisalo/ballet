@@ -4,9 +4,11 @@ import { defaultPolicyOutputIds, defaultProjectOutputs, normalizeActionOutputSlo
 export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefined): ProjectAutomationConfig => {
   const defaults = defaultProjectAutomationConfig();
   const configWithoutLegacy = { ...(config ?? {}) } as ProjectAutomationConfig & {
+    triggers?: unknown;
     gates?: unknown;
     gateDecisions?: unknown;
   };
+  delete configWithoutLegacy.triggers;
   delete configWithoutLegacy.gates;
   delete configWithoutLegacy.gateDecisions;
   const baseOutputs = Array.isArray(config?.outputs) && config.outputs.length > 0
@@ -37,7 +39,6 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
   return {
     ...defaults,
     ...configWithoutLegacy,
-    triggers: Array.isArray(config?.triggers) ? config.triggers : defaults.triggers,
     actions,
     outputs: [...outputById.values()],
     outputRoutes: Array.isArray(config?.outputRoutes) ? config.outputRoutes : defaults.outputRoutes,

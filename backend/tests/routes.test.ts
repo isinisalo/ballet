@@ -177,7 +177,6 @@ describe("API routes", () => {
     await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
       version: 1,
       events: [{ id: "runtime.event", title: "Runtime event", source: "runtime" }],
-      triggers: [],
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }],
       outputRoutes: [],
@@ -234,12 +233,11 @@ describe("API routes", () => {
     await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
       version: 1,
       events: [{ id: "plan_approved", title: "Plan approved", source: "user" }],
-      triggers: [{ id: "plan_approved", description: "Plan approved" }],
       actions: [{ id: "implementation", description: "Implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }],
       outputs: [{ id: "ok" }, { id: "failed" }],
       outputRoutes: [],
       humanGateResponses: [],
-      policies: [{ id: "on.trigger.plan_approved.start.implementation", source: "trigger", trigger: "plan_approved", action: "implementation", enabled: true }],
+      policies: [{ id: "on.trigger.plan_approved.start.implementation", source: "event", event: "trigger.plan_approved", action: "implementation", enabled: true }],
       workflows: [],
       runtimes: []
     }, null, 2), "utf8");
@@ -290,7 +288,6 @@ describe("API routes", () => {
       outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }],
       outputRoutes: [],
       humanGateResponses: [],
-      triggers: [{ id: "manual_start", description: "Manual start" }],
       policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed", action: "implementation", enabled: true }],
       workflows: [{ id: "delivery", title: "Delivery", steps: ["on.implementation.failed.start.implementation"] }],
       runtimes: [{ id: "codex-runtime", title: "Codex runtime", command: "codex", args: [] }]
@@ -304,16 +301,18 @@ describe("API routes", () => {
       });
       expect(saved.status).toBe(200);
       const savedBody = await saved.json();
-      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }], outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], triggers: [{ id: "manual_start" }], workflows: [{ steps: ["on.implementation.failed.start.implementation"] }] });
+      expect(savedBody).toMatchObject({ actions: [{ id: "implementation", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] }], outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], workflows: [{ steps: ["on.implementation.failed.start.implementation"] }] });
+      expect(savedBody).not.toHaveProperty("triggers");
 
       const automation = await fetch(url + "/api/automation");
       expect(automation.status).toBe(200);
       const automationBody = await automation.json() as { config: Record<string, unknown> };
       expect(automationBody.config).not.toHaveProperty("events");
+      expect(automationBody.config).not.toHaveProperty("triggers");
       expect(automationBody.config).toHaveProperty("humanGateResponses");
       expect(automationBody.config).not.toHaveProperty("gates");
       expect(automationBody.config).not.toHaveProperty("gateDecisions");
-      expect(automationBody).toMatchObject({ config: { triggers: [{ id: "manual_start" }], outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
+      expect(automationBody).toMatchObject({ config: { outputs: [{ id: "ok" }, { id: "failed" }, { id: "summary" }], policies: [{ id: "on.implementation.failed.start.implementation", source: "event", event: "implementation.failed" }] }, issues: [] });
 
       const legacyPolicy = await fetch(url + "/api/policies", {
         method: "POST",
@@ -328,6 +327,13 @@ describe("API routes", () => {
         body: JSON.stringify({ ...config, workflows: [{ id: "legacy", title: "Legacy", steps: [{ policy: "assign-developer", on: "task.created" }] }] })
       });
       expect(invalid.status).toBe(400);
+
+      const legacyTriggers = await fetch(url + "/api/automation", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...config, triggers: [{ id: "manual_start", description: "Manual start" }] })
+      });
+      expect(legacyTriggers.status).toBe(400);
       expect(await invalid.json()).toMatchObject({ error: "Request validation failed.", issues: expect.arrayContaining([expect.objectContaining({ path: "workflows.0.steps.0" })]) });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

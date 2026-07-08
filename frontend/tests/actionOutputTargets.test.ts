@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { actionOutputTargetsByOutputId } from "../src/workspace/automation/actions/actionOutputTargets";
 
-const config = (): Pick<ProjectAutomationConfig, "outputRoutes" | "policies"> => ({
-  outputRoutes: [{
-    sourcePolicyId: "human-review-policy",
-    outputId: "approved",
-    target: { type: "trigger", trigger: "approved" }
-  }],
+const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "policies"> => ({
+  actions: [
+    { id: "review", description: "Review.", outputIds: ["accepted"], agentIds: ["reviewer-agent"] },
+    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes_requested"], agentIds: [], humanGate: true }
+  ],
+  outputRoutes: [],
   policies: [
     { id: "review-policy", source: "event", event: "review.ready", action: "review", enabled: true },
     { id: "human-review-policy", source: "event", event: "review.approved", action: "human-review", enabled: true }
@@ -21,9 +21,9 @@ describe("actionOutputTargetsByOutputId", () => {
     });
   });
 
-  it("prefers trigger output routes for trigger-targeted outputs", () => {
+  it("derives trigger targets for human gate approval outputs", () => {
     expect(actionOutputTargetsByOutputId(config(), "human-review", ["approved", "changes_requested"])).toEqual({
-      approved: { type: "trigger", id: "approved", label: "approved" },
+      approved: { type: "trigger", id: "human-review.approved", label: "human-review.approved" },
       changes_requested: { type: "event", id: "human-review.changes_requested", label: "human-review.changes_requested" }
     });
   });

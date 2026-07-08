@@ -24,7 +24,6 @@ const policy = (patch: Partial<ProjectPolicy>): ProjectPolicy => ({
 
 const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
   version: 1,
-  triggers: [{ id: "manual-start", description: "Manual start" }],
   actions: [
     { id: "build", description: "Build the change.", outputIds: ["ready", "blocked"], agentIds: ["builder-agent"] },
     { id: "review", description: "Review the change.", outputIds: ["approved", "changes-requested"], agentIds: ["reviewer-agent"] }
@@ -39,7 +38,7 @@ const config = (policies: ProjectPolicy[]): ProjectAutomationConfig => ({
 
 describe("nextConfigWithWorkflowStepAction", () => {
   it("creates a policy for the selected step with the new action", () => {
-    const startPolicy = policy({ source: "trigger", trigger: "manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
     const current = config([startPolicy]);
     const next = nextConfigWithWorkflowStepAction(current, "delivery", 0, "review");
     const expectedPolicyId = generatedPolicyId({ ...startPolicy, action: "review" });
@@ -64,7 +63,7 @@ describe("nextConfigWithWorkflowStepAction", () => {
   });
 
   it("returns the current config for invalid workflow, step, or action", () => {
-    const startPolicy = policy({ source: "trigger", trigger: "manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
     const current = config([startPolicy]);
 
     expect(nextConfigWithWorkflowStepAction(current, "missing", 0, "review")).toBe(current);
@@ -74,7 +73,7 @@ describe("nextConfigWithWorkflowStepAction", () => {
   });
 
   it("creates replacement policies for every selected folded step", () => {
-    const startPolicy = policy({ source: "trigger", trigger: "manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
     const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
@@ -97,7 +96,7 @@ describe("nextConfigWithWorkflowStepAction", () => {
   });
 
   it("removes every selected folded step from the workflow", () => {
-    const startPolicy = policy({ source: "trigger", trigger: "manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
     const reviewPolicy = policy({ source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
@@ -108,7 +107,7 @@ describe("nextConfigWithWorkflowStepAction", () => {
   });
 
   it("updates only the selected output handler route", () => {
-    const startPolicy = policy({ id: "start-build", source: "trigger", trigger: "manual-start", action: "build" });
+    const startPolicy = policy({ id: "start-build", source: "event", event: "trigger.manual-start", action: "build" });
     const reviewPolicy = policy({ id: "review-ready", source: "event", event: "build.ready", action: "review" });
     const reworkPolicy = policy({ id: "rework-build", source: "event", event: "review.changes-requested", action: "build" });
     const current = config([startPolicy, reviewPolicy, reworkPolicy]);
@@ -125,7 +124,7 @@ describe("nextConfigWithWorkflowStepAction", () => {
   });
 
   it("reuses an existing policy for the selected output handler route", () => {
-    const startPolicy = policy({ source: "trigger", trigger: "manual-start", action: "build" });
+    const startPolicy = policy({ source: "event", event: "trigger.manual-start", action: "build" });
     const reworkBuildPolicy = policy({ source: "event", event: "review.changes-requested", action: "build" });
     const reworkReviewPolicy = policy({ source: "event", event: "review.changes-requested", action: "review" });
     const current = config([startPolicy, reworkBuildPolicy, reworkReviewPolicy]);

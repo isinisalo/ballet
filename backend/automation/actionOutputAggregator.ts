@@ -59,5 +59,6 @@ export const aggregateActionOutputStatus = (
 export const actionOutputEventType = (
   policy: Pick<ProjectPolicy, "id" | "action">,
   outputId: AgentOutputEventStatus,
-  outputRoutes: ProjectOutputRoute[]
-): string => projectOutputRouteEventType(policy, outputId, outputRoutes);
+  outputRoutes: ProjectOutputRoute[],
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
+): string => projectOutputRouteEventType(policy, outputId, outputRoutes, actions);

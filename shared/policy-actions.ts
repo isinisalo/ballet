@@ -20,7 +20,14 @@ export const normalizePolicyToken = (value: string): string =>
     .replace(/[^a-z0-9_-]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-export const triggerEventType = (triggerId: string): string => `trigger.${normalizePolicyToken(triggerId)}`;
+export const normalizeTriggerToken = (value: string): string =>
+  value
+    .split(".")
+    .map(normalizePolicyToken)
+    .filter(Boolean)
+    .join(".");
+
+export const triggerEventType = (triggerId: string): string => `trigger.${normalizeTriggerToken(triggerId)}`;
 
 export const policySourceKey = (input: Pick<ProjectPolicy, "source" | "event" | "trigger">): string =>
   input.source === "trigger" ? triggerEventType(input.trigger ?? "") : (input.event ?? "");
@@ -44,26 +51,6 @@ export const findProjectOutputRoute = (
   const key = projectOutputRouteKey(sourcePolicyId, outputId);
   return outputRoutes.find((route) => projectOutputRouteKey(route.sourcePolicyId, route.outputId) === key);
 };
-
-export const projectOutputTargetEventType = (
-  policy: Pick<ProjectPolicy, "action">,
-  outputId: PolicyOutputId,
-  target?: ProjectOutputTarget
-): string => {
-  if (target?.type === "trigger") return triggerEventType(target.trigger);
-  if (target?.type === "event" && target.eventType) return normalizePolicyOutputEventType(target.eventType);
-  return policyOutputEventType(policy, outputId);
-};
-
-export const projectOutputRouteEventType = (
-  policy: Pick<ProjectPolicy, "id" | "action">,
-  outputId: PolicyOutputId,
-  outputRoutes: readonly ProjectOutputRoute[]
-): string => projectOutputTargetEventType(
-  policy,
-  outputId,
-  findProjectOutputRoute(outputRoutes, policy.id, outputId)?.target
-);
 
 export type ActionOutputSlotKind = "approval" | "rework";
 
@@ -161,6 +148,42 @@ export const projectOutputRouteCanTargetTrigger = (
   return Boolean(action?.humanGate && projectOutputRouteSlotKind(policy, outputId, actions) === "approval");
 };
 
+export const humanGateApprovalTriggerId = (actionId: string, approvalOutputId: string): string =>
+  normalizeTriggerToken(`${normalizePolicyToken(actionId)}.${normalizePolicyToken(approvalOutputId)}`);
+
+export const humanGateApprovalTriggerIdForPolicy = (
+  policy: Pick<ProjectPolicy, "action">,
+  outputId: PolicyOutputId,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>
+): string | undefined => {
+  if (!projectOutputRouteCanTargetTrigger(policy, outputId, actions)) return undefined;
+  return humanGateApprovalTriggerId(policy.action, outputId);
+};
+
+export const projectOutputTargetEventType = (
+  policy: Pick<ProjectPolicy, "action">,
+  outputId: PolicyOutputId,
+  target?: ProjectOutputTarget,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
+): string => {
+  const derivedTriggerId = humanGateApprovalTriggerIdForPolicy(policy, outputId, actions);
+  if (derivedTriggerId) return triggerEventType(derivedTriggerId);
+  if (target?.type === "event" && target.eventType) return normalizePolicyOutputEventType(target.eventType);
+  return policyOutputEventType(policy, outputId);
+};
+
+export const projectOutputRouteEventType = (
+  policy: Pick<ProjectPolicy, "id" | "action">,
+  outputId: PolicyOutputId,
+  outputRoutes: readonly ProjectOutputRoute[],
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
+): string => projectOutputTargetEventType(
+  policy,
+  outputId,
+  findProjectOutputRoute(outputRoutes, policy.id, outputId)?.target,
+  actions
+);
+
 export const policyOutputEventTypes = (
   input: Pick<ProjectPolicy, "action">,
   actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = [],
@@ -170,7 +193,7 @@ export const policyOutputEventTypes = (
   const availableOutputIds = outputs.length > 0 ? outputIdSet(outputs) : undefined;
   return outputIds
     .filter((outputId) => !availableOutputIds || availableOutputIds.has(outputId))
-    .map((outputId) => policyOutputEventType(input, outputId));
+    .map((outputId) => projectOutputTargetEventType(input, outputId, undefined, actions));
 };
 
 export const normalizePolicyOutputEventType = (value: string): string => {

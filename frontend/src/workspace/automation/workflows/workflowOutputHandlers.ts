@@ -1,5 +1,5 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { findProjectOutputRoute, projectOutputRouteEventType, triggerEventType } from "@shared/policy-actions";
+import { humanGateApprovalTriggerIdForPolicy, projectOutputRouteEventType, triggerEventType } from "@shared/policy-actions";
 
 export type WorkflowOutputActionHandler = {
   type: "action";
@@ -23,7 +23,7 @@ export type WorkflowOutputTriggerHandler = {
 export type WorkflowOutputHandler = WorkflowOutputActionHandler | WorkflowOutputTriggerHandler;
 
 export function workflowOutputHandlerForOutput(
-  config: Pick<ProjectAutomationConfig, "outputRoutes" | "policies" | "workflows">,
+  config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "policies" | "workflows">,
   workflowId: string,
   sourcePolicyId: string,
   outputId: string
@@ -32,19 +32,18 @@ export function workflowOutputHandlerForOutput(
   const sourcePolicy = config.policies.find((candidate) => candidate.id === sourcePolicyId);
   if (!workflow || !sourcePolicy) return undefined;
 
-  const outputRoute = findProjectOutputRoute(config.outputRoutes, sourcePolicy.id, outputId);
-  if (outputRoute?.target.type === "trigger") {
+  const derivedTriggerId = humanGateApprovalTriggerIdForPolicy(sourcePolicy, outputId, config.actions);
+  if (derivedTriggerId) {
     return {
       type: "trigger",
       outputId,
-      eventType: triggerEventType(outputRoute.target.trigger),
-      triggerId: outputRoute.target.trigger,
-      workflowId: outputRoute.target.workflowId,
-      label: outputRoute.target.trigger
+      eventType: triggerEventType(derivedTriggerId),
+      triggerId: derivedTriggerId,
+      label: derivedTriggerId
     };
   }
 
-  const eventType = projectOutputRouteEventType(sourcePolicy, outputId, config.outputRoutes);
+  const eventType = projectOutputRouteEventType(sourcePolicy, outputId, config.outputRoutes, config.actions);
   const handler = workflow.steps
     .map((policyId, stepIndex) => ({
       policy: config.policies.find((candidate) => candidate.id === policyId),

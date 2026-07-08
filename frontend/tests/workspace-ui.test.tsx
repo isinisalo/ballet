@@ -92,10 +92,6 @@ const baseData = (): AppData => ({
   agentRuns: [],
   automation: {
     version: 1,
-    triggers: [{
-      id: "manual-start",
-      description: "Manual workflow start"
-    }],
     actions: [{
       id: "implementation",
       description: "Implement work",
@@ -737,10 +733,6 @@ describe("workspace entity UI flows", () => {
 
   it("folds repeated workflow actions into one visible policy node", async () => {
     const workflowData = baseData();
-    workflowData.automation.triggers = [{
-      id: "project_brief_approved",
-      description: "Project brief approved"
-    }];
     workflowData.automation.outputs = [
       { id: "ready" },
       { id: "blocked" },
@@ -764,9 +756,9 @@ describe("workspace entity UI flows", () => {
       agentIds: []
     }];
     workflowData.automation.policies = [{
-      id: "p05.on.project-brief-approved.create-roadmap",
+      id: "p05.on.project-brief-gate-approved.create-roadmap",
       source: "trigger",
-      trigger: "project_brief_approved",
+      trigger: "project-brief-gate.approved",
       action: "create-roadmap",
       enabled: true
     }, {
@@ -796,7 +788,7 @@ describe("workspace entity UI flows", () => {
 
     await renderRoute("/automation/workflows?id=roadmap-loop", workflowData);
 
-    const createRoadmapNode = await screen.findByLabelText("Policy: p05.on.project-brief-approved.create-roadmap");
+    const createRoadmapNode = await screen.findByLabelText("Policy: p05.on.project-brief-gate-approved.create-roadmap");
     expect(createRoadmapNode).toBeInTheDocument();
     expect(screen.queryByLabelText("Policy: p07.on.roadmap-rework.create-roadmap")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Policy: p06.on.roadmap-ready.challenge-roadmap")).toBeInTheDocument();
@@ -817,7 +809,7 @@ describe("workspace entity UI flows", () => {
 
     activateWorkflowNode(createRoadmapNode);
     const workflowHandlerDialog = screen.getByRole("dialog", { name: "Workflow handler" });
-    expect(within(workflowHandlerDialog).getAllByText("project_brief_approved").length).toBeGreaterThan(0);
+    expect(within(workflowHandlerDialog).getAllByText("project-brief-gate.approved").length).toBeGreaterThan(0);
     expect(within(workflowHandlerDialog).getAllByText("challenge-roadmap").find((element) => element.className.includes("text-tertiary"))).toBeDefined();
     expect(within(workflowHandlerDialog).getAllByText("changes_requested").find((element) => element.className.includes("text-destructive"))).toBeDefined();
     expect(within(workflowHandlerDialog).getAllByLabelText("Handler action")).toHaveLength(2);
@@ -837,16 +829,7 @@ describe("workspace entity UI flows", () => {
     expect(window.location.search).toBe("?id=implementation");
     expect(screen.getByDisplayValue("Implement work")).toBeInTheDocument();
     expect(badgeWithTextClass("implementation.failed", "border-primary/60")).toBeDefined();
-
-    let triggersToggle = screen.getByRole("link", { name: "Triggers" });
-    expect(triggersToggle).toHaveAttribute("aria-expanded", "false");
-    await user.click(triggersToggle);
-    triggersToggle = screen.getByRole("link", { name: "Triggers" });
-    expect(triggersToggle).toHaveAttribute("aria-expanded", "true");
-    await user.click(screen.getByRole("link", { name: "manual-start" }));
-    expect(window.location.pathname).toBe("/automation/triggers");
-    expect(window.location.search).toBe("?id=manual-start");
-    expect(screen.getByDisplayValue("Manual workflow start")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Triggers" })).not.toBeInTheDocument();
 
     let workflowsToggle = screen.getByRole("link", { name: "Workflows" });
     expect(workflowsToggle).toHaveAttribute("aria-expanded", "true");
@@ -1209,11 +1192,6 @@ describe("workspace entity UI flows", () => {
       agentIds: [],
       humanGate: true
     };
-    workflowData.automation.outputRoutes = [{
-      sourcePolicyId: "on.implementation.failed.start.implementation",
-      outputId: "approved",
-      target: { type: "trigger", trigger: "manual-start" }
-    }];
 
     await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
@@ -1222,9 +1200,9 @@ describe("workspace entity UI flows", () => {
 
     expect(within(dialog).queryByText("Output targets")).not.toBeInTheDocument();
     expect(within(dialog).getByText("Output routing")).toBeInTheDocument();
-    const manualStartTarget = within(dialog).getByText("manual-start");
-    expect(manualStartTarget).toHaveClass("border-tertiary/60", "bg-tertiary/10", "text-tertiary");
-    expect(manualStartTarget.closest("button")).toBeNull();
+    const approvalTarget = within(dialog).getByText("implementation.approved");
+    expect(approvalTarget).toHaveClass("border-tertiary/60", "bg-tertiary/10", "text-tertiary");
+    expect(approvalTarget.closest("button")).toBeNull();
     expect(within(dialog).getAllByText("None").length).toBe(1);
   });
 
@@ -1273,15 +1251,15 @@ describe("workspace entity UI flows", () => {
     const workflowData = baseData();
     workflowData.automation.policies[0] = {
       id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+      source: "event",
+      event: "trigger.manual-start",
       action: "implementation",
       enabled: true
     };
     workflowData.automation.workflows[0]!.steps = ["on.trigger.manual-start.start.implementation"];
     const { data } = await renderRoute("/automation/actions?id=implementation", workflowData);
 
-    expect(badgeWithTextClass("manual-start", "border-tertiary/60")).toBeDefined();
+    expect(badgeWithTextClass("trigger.manual-start", "border-primary/60")).toBeDefined();
     await user.click(screen.getByRole("button", { name: "Remove agent Existing Agent" }));
 
     await waitFor(() => expect(screen.queryByRole("button", { name: "Remove output complete" })).not.toBeInTheDocument());
@@ -1359,15 +1337,10 @@ describe("workspace entity UI flows", () => {
       agentIds: [],
       humanGate: true
     };
-    workflowData.automation.outputRoutes = [{
-      sourcePolicyId: "on.implementation.failed.start.implementation",
-      outputId: "complete",
-      target: { type: "trigger", trigger: "manual-start" }
-    }];
 
     await renderRoute("/automation/actions?id=implementation", workflowData);
 
-    expect(badgeWithTextClass("manual-start", "border-tertiary/60")).toBeDefined();
+    expect(badgeWithTextClass("implementation.complete", "border-tertiary/60")).toBeDefined();
     expect(badgeWithTextClass("implementation.failed", "border-primary/60")).toBeDefined();
   });
 
@@ -1376,8 +1349,8 @@ describe("workspace entity UI flows", () => {
     const workflowData = baseData();
     workflowData.automation.policies[0] = {
       id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+      source: "event",
+      event: "implementation.complete",
       action: "implementation",
       enabled: true
     };
@@ -1432,15 +1405,6 @@ describe("workspace entity UI flows", () => {
       agentIds: [],
       humanGate: true
     };
-    workflowData.automation.triggers.push({
-      id: "project_brief_approved",
-      description: "Project brief approved"
-    });
-    workflowData.automation.outputRoutes = [{
-      sourcePolicyId: "on.implementation.failed.start.implementation",
-      outputId: "approved",
-      target: { type: "trigger", trigger: "project_brief_approved", workflowId: "next-workflow" }
-    }];
     const { data } = await renderRoute("/automation/workflows?id=workflow-1", workflowData);
 
     const policyNode = screen.getByLabelText("Policy: on.implementation.failed.start.implementation");
@@ -1456,7 +1420,7 @@ describe("workspace entity UI flows", () => {
     expect(within(dialog).getByLabelText("Description")).toHaveValue("Review generated evidence.");
     expect(within(dialog).getByText("Human operator")).toBeInTheDocument();
     expect(within(dialog).getByText("Output routing")).toBeInTheDocument();
-    const approvalTarget = within(dialog).getByText("project_brief_approved");
+    const approvalTarget = within(dialog).getByText("implementation.approved");
     expect(approvalTarget).toHaveClass("border-tertiary/60", "bg-tertiary/10", "text-tertiary");
     expect(approvalTarget.closest("button")).toBeNull();
     expect(within(dialog).getByText("changes_requested")).toBeInTheDocument();
@@ -1476,7 +1440,7 @@ describe("workspace entity UI flows", () => {
       prompt: "Approved with trace evidence."
     })));
     await waitFor(() => expect(data.events).toContainEqual(expect.objectContaining({
-      eventType: "trigger.project_brief_approved",
+      eventType: "trigger.implementation.approved",
       source: "human-gate",
       payload: expect.objectContaining({
         workflow_id: "workflow-1",
@@ -1492,8 +1456,8 @@ describe("workspace entity UI flows", () => {
     const workflowData = baseData();
     workflowData.automation.policies[0] = {
       id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+      source: "event",
+      event: "trigger.manual-start",
       action: "implementation",
       enabled: true
     };
@@ -1579,24 +1543,12 @@ describe("workspace entity UI flows", () => {
     ]);
   });
 
-  it("creates, edits, deletes, and saves automation triggers", async () => {
-    const user = userEvent.setup();
-    const { data } = await renderRoute("/automation/triggers");
+  it("treats the removed automation triggers route as a workflows alias", async () => {
+    await renderRoute("/automation/triggers");
 
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Triggers" })).toBeInTheDocument();
-    expect(screen.queryByDisplayValue("Manual workflow start")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add trigger" })).not.toBeInTheDocument();
-
-    await user.type(screen.getByLabelText("Trigger ID"), "release-ready");
-    await user.type(screen.getByLabelText("Description"), "Release can start.");
-    expect(screen.getByLabelText("Trigger ID")).toHaveValue("release-ready");
-    await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.triggers.some((trigger) => trigger.id === "release-ready")).toBe(true));
-
-    await confirmDelete(user, "Delete trigger");
-    await user.click(screen.getByRole("button", { name: "Save automation" }));
-    await waitFor(() => expect(data.automation.triggers.some((trigger) => trigger.id === "release-ready")).toBe(false));
+    expect(screen.queryByRole("link", { name: "Triggers" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workflows" })).toBeInTheDocument();
   });
 
   it("creates, toggles, deletes, and saves human gate actions", async () => {
@@ -1699,8 +1651,8 @@ describe("workspace entity UI flows", () => {
     });
     workflowData.automation.policies = [{
       id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+      source: "event",
+      event: "trigger.manual-start",
       action: "implementation",
       enabled: true
     }, {
@@ -1736,8 +1688,8 @@ describe("workspace entity UI flows", () => {
     });
     workflowData.automation.policies = [{
       id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+      source: "event",
+      event: "trigger.manual-start",
       action: "implementation",
       enabled: true
     }, {
@@ -1801,8 +1753,8 @@ describe("workspace entity UI flows", () => {
     const workflowData = baseData();
     workflowData.automation.policies = [{
       id: "on.trigger.manual-start.start.implementation",
-      source: "trigger",
-      trigger: "manual-start",
+      source: "event",
+      event: "trigger.manual-start",
       action: "implementation",
       enabled: true
     }, {
@@ -1876,12 +1828,12 @@ describe("workspace entity UI flows", () => {
 
     await waitFor(() => expect(data.automation.policies).toHaveLength(1));
     expect(data.automation.policies[0]).toMatchObject({
-      source: "trigger",
-      trigger: "manual-start",
+      source: "event",
+      event: "implementation.complete",
       action: "implementation",
-      id: "on.trigger.manual-start.start.implementation"
+      id: "on.implementation.complete.start.implementation"
     });
-    expect(data.automation.workflows[0]?.steps).toEqual(["on.trigger.manual-start.start.implementation"]);
+    expect(data.automation.workflows[0]?.steps).toEqual(["on.implementation.complete.start.implementation"]);
   });
 
   it("falls back from the removed automation events route", async () => {

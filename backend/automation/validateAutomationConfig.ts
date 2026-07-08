@@ -13,11 +13,12 @@ import {
   actionOutputSlotCount,
   actionOutputSlotKind,
   defaultProjectOutputs,
+  humanGateApprovalTriggerId,
   humanGateResponseId,
   normalizePolicyOutputEventType,
   normalizePolicyToken,
+  normalizeTriggerToken,
   policyEventTypesForActions,
-  projectOutputRouteCanTargetTrigger,
   projectOutputRouteKey
 } from "../../shared/policy-actions.js";
 import { normalizeProjectAutomationConfig } from "./normalizeAutomationConfig.js";
@@ -38,7 +39,6 @@ type RawAutomationConfig = Record<string, unknown>;
 
 interface ValidationContext {
   input: RawAutomationConfig;
-  rawTriggers: unknown[];
   rawActions: unknown[];
   rawOutputs: unknown[];
   rawOutputRoutes: unknown[];
@@ -62,6 +62,7 @@ interface PolicyValidationState {
   rawEvent: string;
   normalizedEvent: string;
   rawTrigger: string;
+  rawExplicitTrigger: string;
   rawSource: string;
   rawAction: string;
   legacyPolicy: boolean;
@@ -119,8 +120,11 @@ const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: stri
 };
 
 const requireAutomationArrays = (input: RawAutomationConfig, issues: ProjectAutomationIssue[]) => {
-  for (const key of ["triggers", "actions", "outputs", "outputRoutes", "humanGateResponses", "policies", "workflows", "runtimes"] as const) {
-    if ((key === "triggers" || key === "actions" || key === "outputs") && input[key] === undefined) continue;
+  if (input.triggers !== undefined) {
+    issues.push({ path: "triggers", message: "Triggers are derived from human gate approval outputs." });
+  }
+  for (const key of ["actions", "outputs", "outputRoutes", "humanGateResponses", "policies", "workflows", "runtimes"] as const) {
+    if ((key === "actions" || key === "outputs") && input[key] === undefined) continue;
     if (key === "humanGateResponses" && input[key] === undefined) continue;
     if (!Array.isArray(input[key])) issues.push({ path: key, message: `${key} must be an array.` });
   }
@@ -143,7 +147,6 @@ const collectIdentityIssues = (context: ValidationContext, issues: ProjectAutoma
   }));
 
   addUniqueIssues(issues, policyIds, "policy");
-  addUniqueIssues(issues, normalized.triggers.map((trigger, index) => ({ id: trigger.id, path: `triggers[${index}].id` })), "trigger");
   addUniqueIssues(issues, normalized.actions.map((action, index) => ({ id: action.id, path: `actions[${index}].id` })), "action");
   addUniqueIssues(issues, outputIds.length > 0 ? outputIds : normalized.outputs.map((output, index) => ({ id: output.id, path: `outputs[${index}].id` })), "output");
   addUniqueIssues(issues, normalized.humanGateResponses.map((response, index) => ({ id: response.id, path: `humanGateResponses[${index}].id` })), "human gate response");
@@ -162,11 +165,15 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
   const configuredOutputIds = (rawOutputs.length > 0 ? rawOutputs : defaultProjectOutputs())
     .map((output) => isRecord(output) ? normalizePolicyToken(stringValue(output.id)) : "")
     .filter(Boolean);
-  const generatedEventIds = policyEventTypesForActions(normalized.actions, normalized.outputs);
+  const generatedEventIds = [
+    ...policyEventTypesForActions(normalized.actions, normalized.outputs),
+    ...normalized.policies.flatMap((policy) =>
+      policy.source === "event" && policy.event?.startsWith("trigger.") ? [policy.event] : []
+    )
+  ];
   const policyIds = normalized.policies.map((policy) => policy.id).filter(Boolean);
   return {
     input,
-    rawTriggers: Array.isArray(input.triggers) ? input.triggers : [],
     rawActions: Array.isArray(input.actions) ? input.actions : [],
     rawOutputs,
     rawOutputRoutes: Array.isArray(input.outputRoutes) ? input.outputRoutes : [],
@@ -175,7 +182,7 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     rawWorkflows,
     rawRuntimes: Array.isArray(input.runtimes) ? input.runtimes : [],
     eventIdSet: new Set(generatedEventIds),
-    triggerIdSet: new Set(normalized.triggers.map((trigger) => trigger.id)),
+    triggerIdSet: new Set(derivedHumanGateTriggerIds(normalized.actions)),
     actionIdSet: new Set(normalized.actions.map((action) => action.id)),
     outputIdSet: new Set(configuredOutputIds),
     policyIdSet: new Set([...policyIds, ...rawPolicyIds]),
@@ -187,6 +194,13 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     normalizedActions: normalized.actions
   };
 };
+
+const derivedHumanGateTriggerIds = (actions: ValidationContext["normalizedActions"]): string[] =>
+  actions.flatMap((action) => {
+    if (!action.humanGate) return [];
+    const approvalOutputId = actionOutputIds(actions, action.id)[0];
+    return approvalOutputId ? [humanGateApprovalTriggerId(action.id, approvalOutputId)] : [];
+  });
 
 const normalizedActionOutputIds = (action: Record<string, unknown>): string[] | undefined =>
   Array.isArray(action.outputIds)
@@ -202,16 +216,6 @@ const legacyCompatibleOutputIds = (outputIds: string[]): boolean => {
     outputIds.every((outputId) => Boolean(actionOutputSlotKind(outputId))) &&
     slotKinds.has("approval") &&
     slotKinds.has("rework");
-};
-
-const validateTrigger = (trigger: unknown, index: number, issues: ProjectAutomationIssue[]) => {
-  const base = `triggers[${index}]`;
-  if (!isRecord(trigger)) {
-    issues.push({ path: base, message: "Trigger must be an object." });
-    return;
-  }
-  addStringIssue(issues, `${base}.id`, trigger.id, "Trigger id", automationFieldLimits.token, { token: true });
-  addStringIssue(issues, `${base}.description`, trigger.description, "Trigger description", automationFieldLimits.description);
 };
 
 const validateAction = (action: unknown, index: number, context: ValidationContext, issues: ProjectAutomationIssue[]) => {
@@ -388,7 +392,7 @@ const validateOutputRouteTarget = (
   }
 
   if (target.type !== "event" && target.type !== "trigger") {
-    issues.push({ path: `${base}.type`, message: "Output route target type must be event or trigger." });
+    issues.push({ path: `${base}.type`, message: "Output route target type must be event." });
     return;
   }
 
@@ -399,19 +403,7 @@ const validateOutputRouteTarget = (
     return;
   }
 
-  addStringIssue(issues, `${base}.trigger`, target.trigger, "Output route trigger", automationFieldLimits.token, { token: true });
-  const normalizedTrigger = normalizePolicyToken(stringValue(target.trigger));
-  if (normalizedTrigger && !context.triggerIdSet.has(normalizedTrigger)) {
-    issues.push({ path: `${base}.trigger`, message: `Output route references unknown trigger: ${normalizedTrigger}.` });
-  }
-
-  if (target.workflowId !== undefined) {
-    addStringIssue(issues, `${base}.workflowId`, target.workflowId, "Output route workflow", automationFieldLimits.token, { token: true });
-    const normalizedWorkflowId = normalizePolicyToken(stringValue(target.workflowId));
-    if (normalizedWorkflowId && !context.workflowIdSet.has(normalizedWorkflowId)) {
-      issues.push({ path: `${base}.workflowId`, message: `Output route references unknown workflow: ${normalizedWorkflowId}.` });
-    }
-  }
+  issues.push({ path: `${base}.type`, message: "Output route target type must be event." });
 };
 
 const validateOutputRoute = (
@@ -453,11 +445,9 @@ const validateOutputRoute = (
   }
 
   const outputIndex = availableOutputIds.indexOf(outputId);
-  if (outputIndex === 1 && isRecord(route.target) && route.target.type !== "event") {
-    issues.push({ path: `${base}.target.type`, message: "Rework output route target must be event." });
-  }
-  if (isRecord(route.target) && route.target.type === "trigger" && !projectOutputRouteCanTargetTrigger(sourcePolicy, outputId, context.normalizedActions)) {
-    issues.push({ path: `${base}.target.type`, message: "Only a human gate approval output can target a trigger." });
+  const sourceAction = context.normalizedActions.find((action) => action.id === sourcePolicy.action);
+  if (sourceAction?.humanGate && outputIndex === 0) {
+    issues.push({ path: base, message: "Human gate approval output routes are derived automatically." });
   }
 };
 
@@ -473,12 +463,13 @@ const policyValidationState = (
     run,
     rawEvent,
     normalizedEvent: normalizedPolicy?.event ?? normalizePolicyOutputEventType(rawEvent),
-    rawTrigger: stringValue(policy.trigger),
+    rawTrigger: stringValue(policy.trigger) || (normalizedPolicy?.source === "trigger" ? normalizedPolicy.trigger ?? "" : ""),
+    rawExplicitTrigger: stringValue(policy.trigger),
     rawSource: stringValue(policy.source),
     rawAction: stringValue(policy.action),
     legacyPolicy: policy.event === undefined && policy.agent === undefined && run !== undefined,
     normalizedPolicy,
-    isTriggerPolicy: normalizedPolicy?.source === "trigger"
+    isTriggerPolicy: stringValue(policy.source) === "trigger" || typeof policy.trigger === "string" || normalizedPolicy?.source === "trigger"
   };
 };
 
@@ -490,7 +481,7 @@ const validatePolicySource = (
   if (state.rawSource && !["event", "trigger"].includes(state.rawSource)) {
     issues.push({ path: `${base}.source`, message: "Policy source must be event or trigger." });
   }
-  if (state.rawEvent && state.rawTrigger) {
+  if (state.rawEvent && state.rawExplicitTrigger) {
     issues.push({ path: base, message: "Policy must reference either event or trigger, not both." });
   }
 };
@@ -509,8 +500,7 @@ const validatePolicyRequiredFields = (
     `${base}.${sourceField}`,
     sourceValue,
     `Policy ${sourceField}`,
-    state.isTriggerPolicy ? automationFieldLimits.token : automationFieldLimits.eventType,
-    { token: state.isTriggerPolicy }
+    automationFieldLimits.eventType
   );
   if (!state.legacyPolicy) addRequiredStringIssue(issues, `${base}.action`, state.rawAction, "Policy action");
   if (!state.legacyPolicy) addStringIssue(issues, `${base}.action`, state.rawAction, "Policy action", automationFieldLimits.token, { token: true });
@@ -529,8 +519,13 @@ const validatePolicyKnownReferences = (
   if (!state.isTriggerPolicy && state.normalizedEvent && !context.eventIdSet.has(state.normalizedEvent)) {
     issues.push({ path: `${base}.event`, message: `Policy references unknown event: ${state.rawEvent}.` });
   }
-  if (state.isTriggerPolicy && state.normalizedPolicy?.trigger && !context.triggerIdSet.has(state.normalizedPolicy.trigger)) {
-    issues.push({ path: `${base}.trigger`, message: `Policy references unknown trigger: ${state.rawTrigger}.` });
+  if (state.isTriggerPolicy) {
+    const triggerId = state.normalizedPolicy?.source === "trigger"
+      ? state.normalizedPolicy.trigger
+      : normalizeTriggerToken(state.rawTrigger);
+    if (triggerId && !context.triggerIdSet.has(triggerId)) {
+      issues.push({ path: `${base}.trigger`, message: `Policy references unknown trigger: ${normalizeTriggerToken(state.rawTrigger)}.` });
+    }
   }
 };
 
@@ -632,10 +627,15 @@ const validateWorkflow = (workflow: unknown, index: number, context: ValidationC
   workflow.steps.forEach((step, stepIndex) =>
     validateWorkflowStep(step, `${base}.steps[${stepIndex}]`, context.policyIdSet, issues)
   );
-  const triggerSteps = workflow.steps.filter((step): step is string => {
+  const firstNonTriggerIndex = workflow.steps.findIndex((step) => {
+    if (typeof step !== "string") return true;
+    const policy = context.normalizedPolicies.find((candidate) => candidate.id === step);
+    return policy?.source !== "trigger";
+  });
+  const triggerSteps = workflow.steps.filter((step, stepIndex): step is string => {
     if (typeof step !== "string") return false;
     const policy = context.normalizedPolicies.find((candidate) => candidate.id === step);
-    return policy?.source === "trigger";
+    return policy?.source === "trigger" && (firstNonTriggerIndex === -1 || stepIndex < firstNonTriggerIndex);
   });
   if (triggerSteps.length > 1) {
     issues.push({ path: `${base}.steps`, message: "Workflow can start from only one trigger policy." });
@@ -653,7 +653,6 @@ export const validateProjectAutomationConfig = (
   requireAutomationArrays(input, issues);
   const context = createValidationContext(input, agents);
   collectIdentityIssues(context, issues);
-  context.rawTriggers.forEach((trigger, index) => validateTrigger(trigger, index, issues));
   context.rawActions.forEach((action, index) => validateAction(action, index, context, issues));
   context.rawOutputs.forEach((output, index) => validateOutput(output, index, issues));
   context.rawHumanGateResponses.forEach((response, index) => validateHumanGateResponse(response, index, context, issues));

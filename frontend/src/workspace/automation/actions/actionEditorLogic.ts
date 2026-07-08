@@ -67,7 +67,7 @@ export const nextConfigWithActionPatch = (
     const nextPolicy = policyById.get(sourcePolicyId);
     const nextAction = nextPolicy ? actionById.get(nextPolicy.action) : undefined;
     if (!nextPolicy || !nextAction?.outputIds.includes(outputId)) return [];
-    if (route.target.type === "trigger" && !projectOutputRouteCanTargetTrigger(nextPolicy, outputId, nextActions)) return [];
+    if (projectOutputRouteCanTargetTrigger(nextPolicy, outputId, nextActions)) return [];
     const nextRoute = { ...route, sourcePolicyId, outputId };
     return [[projectOutputRouteKey(nextRoute.sourcePolicyId, nextRoute.outputId), nextRoute] as const];
   }));
