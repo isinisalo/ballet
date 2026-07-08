@@ -28,7 +28,7 @@ const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes"> => 
 });
 
 describe("loop output target rules", () => {
-  it("keeps output target select values event-only", () => {
+  it("uses event select values until an explicit output route exists", () => {
     expect(loopOutputTargetSelectValue(config(), loopId, "human-review", "approved")).toBe("event");
     expect(loopOutputTargetSelectValue(config(), loopId, "human-review", "changes-requested")).toBe("event");
   });
@@ -59,6 +59,25 @@ describe("loop output target rules", () => {
     expect(loopOutputTargetDisplay(current, loopId, "review", "approved")).toEqual({
       type: "action",
       label: "human-review"
+    });
+    expect(loopOutputTargetSelectValue(current, loopId, "review", "approved")).toBe("action");
+  });
+
+  it("formats cross-loop action output targets with loop and action", () => {
+    const current = {
+      ...config(),
+      outputRoutes: [{
+        sourceLoopId: loopId,
+        sourceActionId: "review",
+        outputId: "approved",
+        targetLoopId: "return.loop",
+        targetActionId: "human-review"
+      }]
+    };
+
+    expect(loopOutputTargetDisplay(current, loopId, "review", "approved")).toEqual({
+      type: "action",
+      label: "return.loop:human-review"
     });
   });
 });

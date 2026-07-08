@@ -12,11 +12,7 @@ export function loopOutputTargetSelectValue(
   sourceActionId: string,
   outputId: string
 ) {
-  void config;
-  void sourceLoopId;
-  void sourceActionId;
-  void outputId;
-  return "event";
+  return findActionOutputRoute(config.outputRoutes, sourceLoopId, sourceActionId, outputId) ? "action" : "event";
 }
 
 export function loopOutputEventTargetDisplay(
@@ -37,7 +33,12 @@ export function loopOutputTargetDisplay(
 ): LoopOutputTargetDisplay {
   const route = findActionOutputRoute(config.outputRoutes, sourceLoopId, sourceActionId, outputId);
   const targetAction = route ? config.actions.find((candidate) => candidate.id === route.targetActionId) : undefined;
-  return targetAction
-    ? { type: "action", label: targetAction.id }
-    : loopOutputEventTargetDisplay(config, sourceLoopId, sourceActionId, outputId);
+  if (route && targetAction) {
+    return {
+      type: "action",
+      label: route.targetLoopId === sourceLoopId ? targetAction.id : `${route.targetLoopId}:${targetAction.id}`
+    };
+  }
+
+  return loopOutputEventTargetDisplay(config, sourceLoopId, sourceActionId, outputId);
 }

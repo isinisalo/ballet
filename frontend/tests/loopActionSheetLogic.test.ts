@@ -3,6 +3,7 @@ import type { ProjectAction, ProjectAutomationConfig } from "@shared/api/workspa
 import { humanGateResponseId } from "@shared/policy-actions";
 import {
   nextConfigWithLoopHandlerAction,
+  nextConfigWithLoopOutputRouteTarget,
   nextConfigWithLoopStepAction,
   nextConfigWithLoopStepActions,
   nextConfigWithoutLoopStepIndexes
@@ -125,5 +126,61 @@ describe("nextConfigWithLoopHandlerAction route cleanup", () => {
       { sourceLoopId: loopId, sourceActionId: start.id, outputId: "rejected", targetLoopId: loopId, targetActionId: done.id }
     ]);
     expect(next.humanGateResponses).toEqual([]);
+  });
+});
+
+describe("nextConfigWithLoopOutputRouteTarget", () => {
+  it("upserts scoped output routes by source loop, source action, and output", () => {
+    const build = action({ id: "build", outputIds: ["ready", "blocked"] });
+    const review = action({ id: "review" });
+    const done = action({ id: "done", outputIds: [] });
+    const current: ProjectAutomationConfig = {
+      ...config([build, review, done], [build.id, review.id, done.id]),
+      outputRoutes: [
+        { sourceLoopId: loopId, sourceActionId: build.id, outputId: "ready", targetLoopId: loopId, targetActionId: review.id }
+      ]
+    };
+
+    const next = nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", loopId, done.id);
+
+    expect(next.outputRoutes).toEqual([
+      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "ready", targetLoopId: loopId, targetActionId: done.id }
+    ]);
+  });
+
+  it("creates cross-loop output routes when the target action belongs to the target loop", () => {
+    const build = action({ id: "build", outputIds: ["ready", "blocked"] });
+    const review = action({ id: "review" });
+    const rework = action({ id: "rework" });
+    const returnLoopId = "return.loop";
+    const current: ProjectAutomationConfig = {
+      ...config([build, review, rework], [build.id]),
+      loops: [
+        { id: loopId, steps: [build.id] },
+        { id: returnLoopId, steps: [review.id, rework.id] }
+      ]
+    };
+
+    const next = nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "blocked", returnLoopId, rework.id);
+
+    expect(next.outputRoutes).toEqual([
+      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "blocked", targetLoopId: returnLoopId, targetActionId: rework.id }
+    ]);
+  });
+
+  it("does not create invalid routes for empty target loops or actions outside the target loop", () => {
+    const build = action({ id: "build", outputIds: ["ready", "blocked"] });
+    const review = action({ id: "review" });
+    const emptyLoopId = "empty.loop";
+    const current: ProjectAutomationConfig = {
+      ...config([build, review], [build.id]),
+      loops: [
+        { id: loopId, steps: [build.id] },
+        { id: emptyLoopId, steps: [] }
+      ]
+    };
+
+    expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", emptyLoopId, review.id)).toBe(current);
+    expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", loopId, review.id)).toBe(current);
   });
 });

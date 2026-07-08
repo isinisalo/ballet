@@ -232,6 +232,11 @@ const expectActionSelectValue = (actionId: string) => {
   expect(screen.getByLabelText("Handler action")).toHaveTextContent(actionId);
 };
 
+const selectOption = async (user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement, optionName: string) => {
+  await user.click(trigger);
+  await user.click(await screen.findByRole("option", { name: optionName }));
+};
+
 const updateProjectTreeDocument = (
   nodes: ProjectDocumentTreeNode[],
   document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">
@@ -667,8 +672,10 @@ describe("workspace entity UI flows", () => {
     expect(screen.getAllByRole("button", { name: /add action step for/i }).length).toBeGreaterThan(0);
 
     activateLoopNode(screen.getByLabelText(`Action: ${implementationActionId}`));
-    expect(screen.getByRole("dialog", { name: "Loop handler" })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Loop handler" });
+    expect(dialog).toBeInTheDocument();
     expectActionSelectValue(implementationActionId);
+    expect(within(dialog).queryByText("Input")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy action")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit loop policy" })).not.toBeInTheDocument();
     expect(data.automation.actions[0]).not.toHaveProperty("key");
@@ -758,6 +765,51 @@ describe("workspace entity UI flows", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/automation", expect.objectContaining({
       method: "PUT",
       body: expect.not.stringContaining('"key"')
+    }));
+  });
+
+  it("selects output action targets by loop before action", async () => {
+    const user = userEvent.setup();
+    const loopData = baseData();
+    const triageActionId = "triage";
+    const reworkActionId = "rework";
+    const returnLoopId = "return.loop";
+    loopData.automation.actions = [
+      loopData.automation.actions[0]!,
+      testAction({
+        id: triageActionId,
+        description: "Triage rejected output.",
+        outputIds: ["approved", "rejected"],
+        agentIds: ["agent-1"]
+      }),
+      testAction({
+        id: reworkActionId,
+        description: "Rework implementation.",
+        outputIds: ["approved", "rejected"],
+        agentIds: ["agent-1"]
+      })
+    ];
+    loopData.automation.loops.push({ id: returnLoopId, steps: [triageActionId, reworkActionId] });
+    const { data } = await renderRoute(`/automation/loops?id=${loopId}`, loopData);
+
+    activateLoopNode(screen.getByLabelText(`Action: ${implementationActionId}`));
+    const dialog = screen.getByRole("dialog", { name: "Loop handler" });
+    expect(within(dialog).getByLabelText("Target loop for rejected")).toHaveTextContent(loopId);
+    expect(within(dialog).getByLabelText("Target action for rejected")).toHaveTextContent("Action");
+
+    await selectOption(user, within(dialog).getByLabelText("Target loop for rejected"), returnLoopId);
+    expect(within(dialog).getByLabelText("Target loop for rejected")).toHaveTextContent(returnLoopId);
+    expect(within(dialog).getByLabelText("Target action for rejected")).toHaveTextContent(triageActionId);
+
+    await selectOption(user, within(dialog).getByLabelText("Target action for rejected"), `${reworkActionId} · Rework implementation.`);
+    await user.click(screen.getByRole("button", { name: "Save automation" }));
+
+    await waitFor(() => expect(data.automation.outputRoutes).toContainEqual({
+      sourceLoopId: loopId,
+      sourceActionId: implementationActionId,
+      outputId: "rejected",
+      targetLoopId: returnLoopId,
+      targetActionId: reworkActionId
     }));
   });
 

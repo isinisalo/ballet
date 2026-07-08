@@ -1,6 +1,10 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { describe, expect, it } from "vitest";
-import { loopOutputHandlerForOutput } from "../src/workspace/automation/loops/loopOutputHandlers";
+import {
+  loopOutputHandlerForOutput,
+  loopOutputHandlerSelection,
+  loopOutputTargetActionOptions
+} from "../src/workspace/automation/loops/loopOutputHandlers";
 
 const loopId = "delivery.loop";
 const returnLoopId = "return.loop";
@@ -89,5 +93,50 @@ describe("loopOutputHandlerForOutput", () => {
 
   it("returns undefined when an output has no loop handler", () => {
     expect(loopOutputHandlerForOutput(config(), loopId, "start", "blocked")).toBeUndefined();
+  });
+});
+
+describe("loop output handler selection", () => {
+  it("defaults the target loop to the edited action loop without selecting an action", () => {
+    expect(loopOutputHandlerSelection(config(), loopId, "start", "blocked")).toEqual({
+      targetLoopId: loopId,
+      targetActionId: "",
+      actionOptions: [
+        { id: "start", label: "start · Build." },
+        { id: "review", label: "review · Review." },
+        { id: "done", label: "done · Done." }
+      ]
+    });
+  });
+
+  it("limits target action options to the selected loop steps", () => {
+    expect(loopOutputTargetActionOptions(config(), returnLoopId)).toEqual([
+      { id: "return-start", label: "return-start · Build." },
+      { id: "rework", label: "rework · Build." },
+      { id: "review", label: "review · Review." }
+    ]);
+  });
+
+  it("returns cross-loop route selections", () => {
+    const current = {
+      ...config(),
+      outputRoutes: [{
+        sourceLoopId: loopId,
+        sourceActionId: "start",
+        outputId: "blocked",
+        targetLoopId: returnLoopId,
+        targetActionId: "rework"
+      }]
+    };
+
+    expect(loopOutputHandlerSelection(current, loopId, "start", "blocked")).toEqual({
+      targetLoopId: returnLoopId,
+      targetActionId: "rework",
+      actionOptions: [
+        { id: "return-start", label: "return-start · Build." },
+        { id: "rework", label: "rework · Build." },
+        { id: "review", label: "review · Review." }
+      ]
+    });
   });
 });

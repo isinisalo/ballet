@@ -15,7 +15,11 @@ import type { AutomationConfigUpdater } from "../useAutomationDraft";
 import { AllLoopsCanvas } from "./AllLoopsCanvas";
 import { LoopCanvas } from "./LoopCanvas";
 import { LoopHandlerSheet, type LoopHandlerRoute, type LoopHandlerSelectionSource } from "./LoopHandlerSheet";
-import { nextConfigWithLoopHandlerAction, nextConfigWithoutLoopStepIndexes } from "./loopActionSheetLogic";
+import {
+  nextConfigWithLoopHandlerAction,
+  nextConfigWithLoopOutputRouteTarget,
+  nextConfigWithoutLoopStepIndexes
+} from "./loopActionSheetLogic";
 import type { LoopStepRecord } from "./loopGraph";
 import { calculateCompositeLoopCanvasLayout, type LoopCanvasEdge } from "./loopLayout";
 import { loopOutputTargetsForPolicy } from "./loopOutputTargets";
@@ -241,6 +245,17 @@ export function LoopsAutomationTab({
     if (!selected || loopId !== selected.id) return;
     updateConfig((current) => nextConfigWithLoopHandlerAction(current, selected.id, stepIndex, actionId));
   };
+  const updateOutputHandlerRoute = (
+    sourceLoopId: string,
+    sourceActionId: string,
+    outputId: string,
+    targetLoopId: string,
+    targetActionId: string
+  ) => {
+    updateConfig((current) =>
+      nextConfigWithLoopOutputRouteTarget(current, sourceLoopId, sourceActionId, outputId, targetLoopId, targetActionId)
+    );
+  };
   const submitHumanGateResponse = async (route: LoopHandlerRoute, outputId: string, prompt: string) => {
     const action = config.actions.find((candidate) => candidate.id === route.actionId);
     if (!action?.humanGate || !action.outputIds.includes(outputId)) return;
@@ -359,7 +374,7 @@ export function LoopsAutomationTab({
         }}
         onRouteActionChange={updateHandlerRouteAction}
         onRemoveRoute={removeHandlerRoute}
-        onOutputHandlerActionChange={updateHandlerRouteAction}
+        onOutputHandlerRouteChange={updateOutputHandlerRoute}
         onHumanGateSubmit={(route, outputId, prompt) => void submitHumanGateResponse(route, outputId, prompt)}
       />
     </>

@@ -72,6 +72,40 @@ export const nextConfigWithLoopStepActions = (
   );
 };
 
+export const nextConfigWithLoopOutputRouteTarget = (
+  current: ProjectAutomationConfig,
+  sourceLoopId: string,
+  sourceActionId: string,
+  outputId: string,
+  targetLoopId: string,
+  targetActionId: string
+): ProjectAutomationConfig => {
+  const sourceLoop = current.loops.find((loop) => loop.id === sourceLoopId);
+  const targetLoop = current.loops.find((loop) => loop.id === targetLoopId);
+  const sourceAction = current.actions.find((action) => action.id === sourceActionId);
+  const targetAction = current.actions.find((action) => action.id === targetActionId);
+
+  if (!sourceLoop || !targetLoop || !sourceAction || !targetAction) return current;
+  if (!sourceAction.outputIds.includes(outputId) || !targetLoop.steps.includes(targetAction.id)) return current;
+
+  const routeKey = actionOutputRouteKey(sourceLoop.id, sourceAction.id, outputId);
+  return {
+    ...current,
+    outputRoutes: [
+      ...current.outputRoutes.filter((route) =>
+        actionOutputRouteKey(route.sourceLoopId, route.sourceActionId, route.outputId) !== routeKey
+      ),
+      {
+        sourceLoopId: sourceLoop.id,
+        sourceActionId: sourceAction.id,
+        outputId,
+        targetLoopId: targetLoop.id,
+        targetActionId: targetAction.id
+      }
+    ]
+  };
+};
+
 export const nextConfigWithoutLoopStepIndexes = (
   current: ProjectAutomationConfig,
   loopId: string,

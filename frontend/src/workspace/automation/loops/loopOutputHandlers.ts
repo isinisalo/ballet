@@ -13,6 +13,58 @@ export type LoopOutputActionHandler = {
 
 export type LoopOutputHandler = LoopOutputActionHandler;
 
+export type LoopOutputTargetActionOption = {
+  id: string;
+  label: string;
+};
+
+export type LoopOutputHandlerSelection = {
+  targetLoopId: string;
+  targetActionId: string;
+  actionOptions: LoopOutputTargetActionOption[];
+};
+
+export function loopOutputTargetActionOptions(
+  config: Pick<ProjectAutomationConfig, "actions" | "loops">,
+  targetLoopId: string
+): LoopOutputTargetActionOption[] {
+  const targetLoop = config.loops.find((candidate) => candidate.id === targetLoopId);
+  if (!targetLoop) return [];
+
+  const actionsById = new Map(config.actions.map((action) => [action.id, action]));
+  const seenActionIds = new Set<string>();
+  return targetLoop.steps.flatMap((actionId) => {
+    if (seenActionIds.has(actionId)) return [];
+    const action = actionsById.get(actionId);
+    if (!action) return [];
+    seenActionIds.add(action.id);
+    return [{
+      id: action.id,
+      label: action.description ? `${action.id} · ${action.description}` : action.id
+    }];
+  });
+}
+
+export function loopOutputHandlerSelection(
+  config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "loops">,
+  sourceLoopId: string,
+  sourceActionId: string,
+  outputId: string
+): LoopOutputHandlerSelection {
+  const route = findActionOutputRoute(config.outputRoutes, sourceLoopId, sourceActionId, outputId);
+  const targetLoopId = route?.targetLoopId ?? sourceLoopId;
+  const actionOptions = loopOutputTargetActionOptions(config, targetLoopId);
+  const routeActionId = route && actionOptions.some((option) => option.id === route.targetActionId)
+    ? route.targetActionId
+    : "";
+
+  return {
+    targetLoopId,
+    targetActionId: routeActionId,
+    actionOptions
+  };
+}
+
 export function loopOutputHandlerForOutput(
   config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "loops">,
   loopId: string,

@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Textarea } from "@/components/ui/textarea";
 import { HumanGateResponsePanel } from "./HumanGateResponsePanel";
 import { LoopOutputHandlerControls } from "./LoopOutputHandlerControls";
-import { loopActionTokenClassName, loopOutputTokenClassName } from "./loopSheetTokenStyles";
+import { loopActionTokenClassName } from "./loopSheetTokenStyles";
 
 type LoopHandlerSheetOpenChangeDetails = {
   reason?: string;
@@ -37,7 +37,7 @@ export function LoopHandlerSheet({
   onOpenChange,
   onRouteActionChange,
   onRemoveRoute,
-  onOutputHandlerActionChange,
+  onOutputHandlerRouteChange,
   onHumanGateSubmit
 }: {
   open: boolean;
@@ -48,14 +48,20 @@ export function LoopHandlerSheet({
   onOpenChange: (open: boolean, details?: LoopHandlerSheetOpenChangeDetails) => void;
   onRouteActionChange: (loopId: string, stepIndex: number, actionId: string) => void;
   onRemoveRoute: (loopId: string, stepIndex: number) => void;
-  onOutputHandlerActionChange: (loopId: string, stepIndex: number, actionId: string) => void;
+  onOutputHandlerRouteChange: (
+    sourceLoopId: string,
+    sourceActionId: string,
+    outputId: string,
+    targetLoopId: string,
+    targetActionId: string
+  ) => void;
   onHumanGateSubmit: (route: LoopHandlerRoute, outputId: string, prompt: string) => void;
 }) {
   const actionFieldId = useId();
   const title = selectionSource === "edge" && routes.length === 1 ? "Output handler" : "Loop handler";
   const description = routes.length === 1
-    ? loopHandlerRouteDescription(routes[0])
-    : `${routes.length} inbound routes`;
+    ? "Edit selected loop handler."
+    : `${routes.length} selected loop handlers`;
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
 
   useLoopHandlerEscapeClose(open, onOpenChange);
@@ -85,25 +91,21 @@ export function LoopHandlerSheet({
 
               return (
                 <div key={route.id} className="rounded-md border border-divider-strong bg-card/80 p-3">
-                  <div className="flex min-w-0 items-start justify-between gap-2">
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="text-sm font-medium leading-snug">Input</span>
-                      <LoopHandlerRouteEvent route={route} />
-                    </div>
-                    {routes.length > 1 ? (
+                  {routes.length > 1 ? (
+                    <div className="flex justify-end">
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon-xs"
-                        aria-label={`Remove route ${loopHandlerRouteDescription(route)}`}
+                        aria-label={`Remove route ${route.actionLabel}`}
                         title="Remove route"
                         onClick={() => onRemoveRoute(route.loopId, route.stepIndex)}
                       >
                         <Trash2 data-icon="inline-start" />
                       </Button>
-                    ) : null}
-                  </div>
-                  <FieldGroup className="mt-3">
+                    </div>
+                  ) : null}
+                  <FieldGroup className={routes.length > 1 ? "mt-2" : undefined}>
                     <LoopRouteActionSelect
                       id={routeActionFieldId}
                       route={route}
@@ -120,7 +122,7 @@ export function LoopHandlerSheet({
                       route={route}
                       outputIds={outputIds}
                       label={humanGate ? "Output routing" : "Outputs"}
-                      onOutputHandlerActionChange={onOutputHandlerActionChange}
+                      onOutputHandlerRouteChange={onOutputHandlerRouteChange}
                     />
                     {humanGate ? (
                       <HumanGateResponsePanel
@@ -164,22 +166,6 @@ function useLoopHandlerEscapeClose(
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onOpenChange, open]);
-}
-
-function LoopHandlerRouteEvent({ route }: { route: LoopHandlerRoute }) {
-  return (
-    <div className="min-w-0 truncate font-mono text-xs" title={route.eventType ?? route.sourceLabel}>
-      {route.outputId ? (
-        <>
-          <span className={loopActionTokenClassName()}>{route.sourceLabel}</span>
-          <span className="text-muted-foreground">.</span>
-          <span className={loopOutputTokenClassName(route.outputId)}>{route.outputId}</span>
-        </>
-      ) : (
-        <span className={loopActionTokenClassName()}>{route.sourceLabel}</span>
-      )}
-    </div>
-  );
 }
 
 function LoopRouteActionSelect({
@@ -273,11 +259,4 @@ function ReadOnlyBadges({ label, values }: { label: string; values: string[] }) 
       </div>
     </Field>
   );
-}
-
-function loopHandlerRouteDescription(route: LoopHandlerRoute | undefined) {
-  if (!route) return "Edit selected loop handler.";
-  return route.outputId
-    ? `${route.sourceLabel} -> ${route.outputId} -> ${route.actionLabel}`
-    : `${route.sourceLabel} -> ${route.actionLabel}`;
 }
