@@ -59,6 +59,7 @@ interface ValidationContext {
   normalizedPolicies: ReturnType<typeof normalizeProjectAutomationConfig>["policies"];
   normalizedLoops: ReturnType<typeof normalizeProjectAutomationConfig>["loops"];
   normalizedActions: ReturnType<typeof normalizeProjectAutomationConfig>["actions"];
+  normalizedOutputRoutes: ReturnType<typeof normalizeProjectAutomationConfig>["outputRoutes"];
 }
 
 interface PolicyValidationState {
@@ -210,7 +211,8 @@ const createValidationContext = (input: RawAutomationConfig, agents: Agent[]): V
     agentIdSet: new Set(agents.map((agent) => agent.id)),
     normalizedPolicies: normalized.policies,
     normalizedLoops: normalized.loops,
-    normalizedActions: normalized.actions
+    normalizedActions: normalized.actions,
+    normalizedOutputRoutes: normalized.outputRoutes
   };
 };
 
@@ -419,8 +421,13 @@ const validateOutputRouteTarget = (
     return;
   }
 
-  if (target.type !== "event" && target.type !== "trigger") {
-    issues.push({ path: `${base}.type`, message: "Output route target type must be event." });
+  if (target.type !== "policy" && target.type !== "event" && target.type !== "trigger") {
+    issues.push({ path: `${base}.type`, message: "Output route target type must be policy." });
+    return;
+  }
+
+  if (target.type === "policy") {
+    addStringIssue(issues, `${base}.policyId`, target.policyId, "Output route target policy", automationFieldLimits.policyId);
     return;
   }
 
@@ -431,7 +438,7 @@ const validateOutputRouteTarget = (
     return;
   }
 
-  issues.push({ path: `${base}.type`, message: "Output route target type must be event." });
+  issues.push({ path: `${base}.type`, message: "Output route target type must be policy." });
 };
 
 const validateOutputRoute = (
@@ -482,6 +489,18 @@ const validateOutputRoute = (
   const sourceAction = context.normalizedActions.find((action) => action.id === sourcePolicy.action);
   if (sourceAction?.humanGate && outputIndex === 0) {
     issues.push({ path: base, message: "Human gate approval output routes are derived automatically." });
+  }
+
+  const normalizedRoute = context.normalizedOutputRoutes.find((candidate) =>
+    projectOutputRouteKey(candidate.sourcePolicyId, candidate.outputId) === routeKey
+  );
+  const targetPolicy = normalizedRoute
+    ? context.normalizedPolicies.find((policy) => policy.id === normalizedRoute.target.policyId)
+    : undefined;
+  if (!targetPolicy) {
+    issues.push({ path: `${base}.target`, message: "Output route target must reference an event policy." });
+  } else if (targetPolicy.source !== "event") {
+    issues.push({ path: `${base}.target.policyId`, message: `Output route target policy must be an event policy: ${targetPolicy.id}.` });
   }
 };
 

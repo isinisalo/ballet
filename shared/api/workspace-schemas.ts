@@ -141,8 +141,8 @@ const projectOutputSchema = z.object({
 }).strict();
 
 const projectOutputTargetSchema = z.object({
-  type: z.literal("event"),
-  eventType: automationEventTypeSchema.optional()
+  type: z.literal("policy"),
+  policyId: automationPolicyIdSchema
 }).strict();
 
 const projectOutputRouteSchema = z.object({

@@ -1,46 +1,54 @@
 import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
-import { findProjectOutputRoute, humanGateApprovalTriggerIdForPolicy, normalizePolicyOutputEventType, policyOutputEventType } from "@shared/policy-actions";
-import type { ActionInputSource } from "./actionInputSources";
+import { humanGateApprovalTriggerIdForPolicy, policyOutputEventType, projectOutputRouteTargetPolicy } from "@shared/policy-actions";
 
-export type ActionOutputTarget = ActionInputSource;
-
-const outputTargetForPolicy = (
-  policy: Pick<ProjectPolicy, "id" | "action">,
-  outputId: string,
-  config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes">
-): ActionOutputTarget => {
-  const derivedTriggerId = humanGateApprovalTriggerIdForPolicy(policy, outputId, config.actions);
-  if (derivedTriggerId) {
-    return { type: "trigger", id: derivedTriggerId, label: derivedTriggerId };
-  }
-
-  const route = findProjectOutputRoute(config.outputRoutes, policy.id, outputId);
-  const eventType = route?.target.type === "event" && route.target.eventType
-    ? normalizePolicyOutputEventType(route.target.eventType)
-    : policyOutputEventType(policy, outputId);
-  return { type: "event", id: eventType, label: eventType };
+export type ActionOutputTarget = {
+  type: "event" | "policy" | "trigger";
+  id: string;
+  label: string;
 };
 
-export function actionOutputTargetForOutput(
+const outputTargetsForPolicy = (
+  policy: Pick<ProjectPolicy, "id" | "action"> & { loopId?: string },
+  outputId: string,
+  config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "policies">
+): ActionOutputTarget[] => {
+  const derivedTriggerId = humanGateApprovalTriggerIdForPolicy(policy, outputId, config.actions);
+  if (derivedTriggerId) {
+    return [{ type: "trigger", id: derivedTriggerId, label: derivedTriggerId }];
+  }
+
+  const targetPolicy = projectOutputRouteTargetPolicy(policy, outputId, config.outputRoutes, config.actions, config.policies);
+  if (targetPolicy) {
+    return [{ type: "policy", id: targetPolicy.id, label: targetPolicy.id }];
+  }
+
+  const eventType = policyOutputEventType(policy, outputId);
+  return [{ type: "event", id: eventType, label: eventType }];
+};
+
+const uniqueTargets = (targets: ActionOutputTarget[]): ActionOutputTarget[] =>
+  [...new Map(targets.map((target) => [`${target.type}:${target.id}`, target])).values()];
+
+export function actionOutputTargetsForOutput(
   config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "policies">,
   actionId: string,
   outputId: string
-): ActionOutputTarget | undefined {
-  if (!actionId || !outputId) return undefined;
+): ActionOutputTarget[] {
+  if (!actionId || !outputId) return [];
   const policies = config.policies.filter((policy) => policy.action === actionId);
-  const targets = policies.length > 0
-    ? policies.map((policy) => outputTargetForPolicy(policy, outputId, config))
-    : [{ type: "event" as const, id: policyOutputEventType({ action: actionId }, outputId), label: policyOutputEventType({ action: actionId }, outputId) }];
-  return targets.find((target) => target.type === "trigger") ?? targets[0];
+  return uniqueTargets(policies.length > 0
+    ? policies.flatMap((policy) => outputTargetsForPolicy(policy, outputId, config))
+    : [{ type: "event" as const, id: policyOutputEventType({ action: actionId }, outputId), label: policyOutputEventType({ action: actionId }, outputId) }]
+  );
 }
 
 export function actionOutputTargetsByOutputId(
   config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes" | "policies">,
   actionId: string,
   outputIds: string[]
-): Record<string, ActionOutputTarget> {
+): Record<string, ActionOutputTarget[]> {
   return Object.fromEntries(outputIds.flatMap((outputId) => {
-    const target = actionOutputTargetForOutput(config, actionId, outputId);
-    return target ? [[outputId, target]] : [];
+    const targets = actionOutputTargetsForOutput(config, actionId, outputId);
+    return targets.length > 0 ? [[outputId, targets]] : [];
   }));
 }

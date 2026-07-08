@@ -90,6 +90,7 @@ export interface CompleteRunInput {
     payload: Record<string, unknown>;
   };
   projectPolicy?: ProjectPolicy;
+  projectPolicies?: ProjectPolicy[];
   actions?: ProjectAction[];
   outputs?: ProjectOutput[];
   outputRoutes: ProjectOutputRoute[];

@@ -411,11 +411,12 @@ describe("runtime output mapping", () => {
     expect(mapAgentOutputToEvent(projectPolicy, { status: "failed" }, []).id).toBe("implementation.rejected");
     expect(mapAgentOutputToEvent(projectPolicy, { status: "blocked" }, []).id).toBe("implementation.rejected");
     expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }, []).id).toBe("implementation.approved");
+    const manualPolicy = { ...projectPolicy, id: "manual-policy", source: "event" as const, event: "manual.start", action: "manual" };
     expect(mapAgentOutputToEvent(projectPolicy, { status: "ready" }, [{
       sourcePolicyId: projectPolicy.id,
       outputId: "approved",
-      target: { type: "event", eventType: "manual.start" }
-    }]).id).toBe("manual.start");
+      target: { type: "policy", policyId: manualPolicy.id }
+    }], [], [manualPolicy]).id).toBe("manual.start");
     expect(mapAgentOutputToEvent(
       { ...projectPolicy, action: "human-review" },
       { status: "approved" },

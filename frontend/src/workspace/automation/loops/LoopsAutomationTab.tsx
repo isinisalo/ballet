@@ -307,7 +307,7 @@ export function LoopsAutomationTab({
     updateConfig(() => nextConfig);
     const saved = await saveDraft(nextConfig);
     if (!saved) return;
-    const eventType = projectOutputRouteEventType(policy, outputId, nextConfig.outputRoutes, nextConfig.actions);
+    const eventType = projectOutputRouteEventType(policy, outputId, nextConfig.outputRoutes, nextConfig.actions, nextConfig.policies);
     await createEvent({
       projectId,
       eventType,

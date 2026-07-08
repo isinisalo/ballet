@@ -31,8 +31,8 @@ export interface ProjectHumanGateResponse {
 }
 
 export type ProjectOutputTarget = {
-  type: "event";
-  eventType?: string;
+  type: "policy";
+  policyId: string;
 };
 
 export interface ProjectOutputRoute {

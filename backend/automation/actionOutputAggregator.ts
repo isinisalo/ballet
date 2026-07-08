@@ -60,5 +60,6 @@ export const actionOutputEventType = (
   policy: Pick<ProjectPolicy, "id" | "action">,
   outputId: AgentOutputEventStatus,
   outputRoutes: ProjectOutputRoute[],
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
-): string => projectOutputRouteEventType(policy, outputId, outputRoutes, actions);
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = [],
+  policies: Array<Pick<ProjectPolicy, "id" | "source" | "event" | "trigger" | "action"> & { loopId?: string }> = []
+): string => projectOutputRouteEventType(policy, outputId, outputRoutes, actions, policies);

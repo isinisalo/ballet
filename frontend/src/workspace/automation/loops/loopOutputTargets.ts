@@ -1,9 +1,8 @@
 import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
 import {
   actionOutputIds,
-  findProjectOutputRoute,
   humanGateApprovalTriggerIdForPolicy,
-  policyOutputEventType,
+  projectOutputRouteEventType,
   triggerEventType
 } from "@shared/policy-actions";
 import type { LoopOutputTarget } from "./loopGraph";
@@ -23,13 +22,9 @@ export function loopOutputTargetsForPolicy(
       };
     }
 
-    const route = findProjectOutputRoute(config.outputRoutes, policy.id, outputId);
-
     return {
       outputId,
-      eventType: route?.target.type === "event" && route.target.eventType
-        ? route.target.eventType
-        : policyOutputEventType(policy, outputId),
+      eventType: projectOutputRouteEventType(policy, outputId, config.outputRoutes, config.actions, config.policies),
       type: "event"
     };
   });

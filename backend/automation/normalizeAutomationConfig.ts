@@ -28,6 +28,7 @@ import {
   projectOutputRouteKey,
   projectOutputRouteCanTargetTrigger,
   policyActionTokens,
+  policySourceKey,
   policyOutputEventType,
   triggerEventType,
   uniquePolicyOutputIds,
@@ -487,15 +488,38 @@ const normalizeLoopScopedPolicies = (
   };
 };
 
-const normalizeOutputRouteTarget = (value: unknown, rewrite: ActionRewrite): ProjectOutputRoute["target"] | undefined => {
+const eventPolicyForEventType = (policies: ProjectPolicy[], eventType: string): ProjectPolicy | undefined =>
+  policies.find((policy) =>
+    policy.source === "event" &&
+    policySourceKey(policy) === normalizePolicyOutputEventType(eventType)
+  );
+
+const policyTargetForSource = (
+  value: unknown,
+  sourcePolicy: ProjectPolicy | undefined,
+  policies: ProjectPolicy[],
+  policyIdMap: ReadonlyMap<string, string>,
+  policyIdsByBaseId: ReadonlyMap<string, string[]>,
+  rewrite: ActionRewrite
+): ProjectOutputRoute["target"] | undefined => {
   if (!isRecord(value)) return undefined;
+
+  if (value.type === "policy") {
+    const basePolicyId = policyIdMap.get(stringValue(value.policyId)) ?? stringValue(value.policyId);
+    const targetPolicyIds = policyIdsByBaseId.get(basePolicyId) ?? [basePolicyId];
+    const targetPolicy = targetPolicyIds
+      .map((policyId) => policies.find((policy) => policy.id === policyId))
+      .find((policy) => policy?.source === "event" && (!sourcePolicy?.loopId || policy.loopId === sourcePolicy.loopId)) ??
+      policies.find((policy) => policy.id === basePolicyId && policy.source === "event");
+    return targetPolicy ? { type: "policy", policyId: targetPolicy.id } : undefined;
+  }
+
   if (value.type === "event") {
     const eventType = normalizeEvent(stringValue(value.eventType), rewrite);
-    return {
-      type: "event",
-      ...(eventType ? { eventType } : {})
-    };
+    const targetPolicy = eventType ? eventPolicyForEventType(policies, eventType) : undefined;
+    return targetPolicy ? { type: "policy", policyId: targetPolicy.id } : undefined;
   }
+
   return undefined;
 };
 
@@ -515,10 +539,10 @@ const normalizeOutputRoutes = (
     const baseSourcePolicyId = policyIdMap.get(stringValue(route.sourcePolicyId)) ?? stringValue(route.sourcePolicyId);
     const sourcePolicyIds = policyIdsByBaseId.get(baseSourcePolicyId) ?? [baseSourcePolicyId];
     const rawOutputId = normalizePolicyToken(stringValue(route.outputId));
-    const target = normalizeOutputRouteTarget(route.target, rewrite);
     sourcePolicyIds.forEach((sourcePolicyId) => {
       const policy = policyById.get(sourcePolicyId);
       const action = policy ? actionById.get(policy.action) : undefined;
+      const target = policyTargetForSource(route.target, policy, policies, policyIdMap, policyIdsByBaseId, rewrite);
       const outputId = action
         ? canonicalOutputIdForLegacyOutput(rawOutputId, action.outputIds.indexOf(rawOutputId), action)
         : canonicalOutputIdForLegacyOutput(rawOutputId, 0);
@@ -565,8 +589,8 @@ const inferLoopScopedOutputRoutes = (
         sourcePolicyId: policy.id,
         outputId,
         target: {
-          type: "event",
-          eventType: targetPolicy.event
+          type: "policy",
+          policyId: targetPolicy.id
         }
       });
     });

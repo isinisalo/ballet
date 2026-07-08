@@ -79,7 +79,15 @@ export const nextConfigWithActionPatch = (
     const nextAction = nextPolicy ? actionById.get(nextPolicy.action) : undefined;
     if (!nextPolicy || !nextAction?.outputIds.includes(outputId)) return [];
     if (projectOutputRouteCanTargetTrigger(nextPolicy, outputId, nextActions)) return [];
-    const nextRoute = { ...route, sourcePolicyId, outputId };
+    const nextRoute = {
+      ...route,
+      sourcePolicyId,
+      outputId,
+      target: {
+        ...route.target,
+        policyId: policyIdMap.get(route.target.policyId) ?? route.target.policyId
+      }
+    };
     return [[projectOutputRouteKey(nextRoute.sourcePolicyId, nextRoute.outputId), nextRoute] as const];
   }));
   const humanGateResponses = current.humanGateResponses.flatMap((response) => {

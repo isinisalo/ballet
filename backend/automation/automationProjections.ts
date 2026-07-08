@@ -33,7 +33,7 @@ export const automationPoliciesToEventDefinitions = (
     ...policies.flatMap((policy) => policyOutputEventTypes(policy, actions, outputs)),
     ...outputRoutes.flatMap((route) => {
       const policy = policies.find((candidate) => candidate.id === route.sourcePolicyId);
-      return policy ? [projectOutputRouteEventType(policy, route.outputId, outputRoutes, actions)] : [];
+      return policy ? [projectOutputRouteEventType(policy, route.outputId, outputRoutes, actions, policies)] : [];
     }),
     ...policies.map(policySourceKey)
   ])]

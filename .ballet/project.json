@@ -310,32 +310,32 @@
       "sourcePolicyId": "on.code-gate.approved.loop.classify-failure.approved.start.code-gate.approved.loop.implement-task",
       "outputId": "approved",
       "target": {
-        "type": "event",
-        "eventType": "task-specs-gate.approved.loop.implement-task.approved"
+        "type": "policy",
+        "policyId": "on.task-specs-gate.approved.loop.implement-task.approved.start.task-specs-gate.approved.loop.run-tests"
       }
     },
     {
       "sourcePolicyId": "on.code-gate.approved.loop.classify-failure.approved.start.code-gate.approved.loop.implement-task",
       "outputId": "rejected",
       "target": {
-        "type": "event",
-        "eventType": "task-specs-gate.approved.loop.implement-task.rejected"
+        "type": "policy",
+        "policyId": "on.task-specs-gate.approved.loop.implement-task.rejected.start.task-specs-gate.approved.loop.classify-failure"
       }
     },
     {
       "sourcePolicyId": "on.ci-or-validation-failed.loop.classify-failure.approved.start.ci-or-validation-failed.loop.implement-task",
       "outputId": "approved",
       "target": {
-        "type": "event",
-        "eventType": "task-specs-gate.approved.loop.implement-task.approved"
+        "type": "policy",
+        "policyId": "on.task-specs-gate.approved.loop.implement-task.approved.start.task-specs-gate.approved.loop.run-tests"
       }
     },
     {
       "sourcePolicyId": "on.ci-or-validation-failed.loop.classify-failure.approved.start.ci-or-validation-failed.loop.implement-task",
       "outputId": "rejected",
       "target": {
-        "type": "event",
-        "eventType": "task-specs-gate.approved.loop.implement-task.rejected"
+        "type": "policy",
+        "policyId": "on.task-specs-gate.approved.loop.implement-task.rejected.start.task-specs-gate.approved.loop.classify-failure"
       }
     }
   ],

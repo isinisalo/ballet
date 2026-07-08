@@ -18,7 +18,7 @@ const config = (): ProjectAutomationConfig => ({
   outputRoutes: [{
     sourcePolicyId: "review-policy",
     outputId: "approved",
-    target: { type: "event", eventType: "external.approved" }
+    target: { type: "policy", policyId: "done-policy" }
   }],
   humanGateResponses: [],
   policies: [

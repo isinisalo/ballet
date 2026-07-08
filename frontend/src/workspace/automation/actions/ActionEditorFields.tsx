@@ -11,7 +11,7 @@ import { Plus, ShieldCheck, X } from "lucide-react";
 import { useMemo } from "react";
 import { ActionInputField } from "./ActionInputField";
 import { actionInputSources } from "./actionInputSources";
-import { actionOutputTargetsByOutputId } from "./actionOutputTargets";
+import { actionOutputTargetsByOutputId, type ActionOutputTarget } from "./actionOutputTargets";
 
 export function ActionEditorFields({
   agents,
@@ -69,10 +69,16 @@ export function ActionEditorFields({
   };
   const inputSources = actionInputSources(config.policies, action.id);
   const outputTargetById = actionOutputTargetsByOutputId(config, action.id, outputSlotIds);
-  const outputDisplayLabel = (outputId: string) => outputTargetById[outputId]?.label ?? outputId;
-  const outputDisplayClassName = (outputId: string) => outputTargetById[outputId]?.type === "trigger"
+  const outputDisplayTargets = (outputId: string): ActionOutputTarget[] =>
+    outputTargetById[outputId] ?? [{ type: "event", id: outputId, label: outputId }];
+  const outputDisplayClassName = (target: ActionOutputTarget) => target.type === "trigger"
     ? "border-tertiary/60 bg-tertiary/10 font-mono text-tertiary"
     : "border-primary/60 bg-primary/10 font-mono text-primary";
+  const outputBadges = (outputId: string) => outputDisplayTargets(outputId).map((target) => (
+    <Badge key={`${target.type}:${target.id}`} variant="outline" className={`${outputDisplayClassName(target)} max-w-full`}>
+      <span className="truncate" title={target.label}>{target.label}</span>
+    </Badge>
+  ));
 
   return (
     <FieldGroup>
@@ -160,17 +166,15 @@ export function ActionEditorFields({
             <div className="grid gap-1.5">
               <FieldLabel className="text-xs text-muted-foreground">Approved output</FieldLabel>
               <div className="flex min-h-7 flex-wrap items-center gap-2">
-                <Badge variant="outline" className={outputDisplayClassName(approvedOutputId)}>
-                  <span className="truncate">{outputDisplayLabel(approvedOutputId)}</span>
-                </Badge>
+                {outputBadges(approvedOutputId)}
               </div>
             </div>
             <div className="grid gap-1.5">
               <FieldLabel className="text-xs text-muted-foreground">Rejected output</FieldLabel>
               <div className="flex min-h-7 flex-wrap items-center gap-2">
                 {hasRejectedOutput ? (
-                  <Badge variant="outline" className={outputDisplayClassName(rejectedOutputId)}>
-                    <span className="truncate">{outputDisplayLabel(rejectedOutputId)}</span>
+                  <>
+                    {outputBadges(rejectedOutputId)}
                     <Button
                       type="button"
                       size="icon-xs"
@@ -182,7 +186,7 @@ export function ActionEditorFields({
                     >
                       <X data-icon="inline-end" />
                     </Button>
-                  </Badge>
+                  </>
                 ) : (
                   <Button
                     type="button"

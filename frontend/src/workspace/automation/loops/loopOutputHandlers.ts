@@ -43,7 +43,7 @@ export function loopOutputHandlerForOutput(
     };
   }
 
-  const eventType = projectOutputRouteEventType(sourcePolicy, outputId, config.outputRoutes, config.actions);
+  const eventType = projectOutputRouteEventType(sourcePolicy, outputId, config.outputRoutes, config.actions, config.policies);
   const handler = loop.steps
     .map((policyId, stepIndex) => ({
       policy: config.policies.find((candidate) => candidate.id === policyId),

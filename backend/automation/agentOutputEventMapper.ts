@@ -21,11 +21,12 @@ export function mapAgentOutputToEvent(
   policy: ProjectPolicy,
   output: AgentRunOutput,
   outputRoutes: ProjectOutputRoute[],
-  actions: ProjectAction[] = []
+  actions: ProjectAction[] = [],
+  policies: ProjectPolicy[] = []
 ): RoutedEvent {
   const status = canonicalOutputStatus(output.status, policy, actions);
   return {
-    id: projectOutputRouteEventType(policy, status, outputRoutes, actions),
+    id: projectOutputRouteEventType(policy, status, outputRoutes, actions, policies),
     source: "agentd",
     timestamp: new Date().toISOString(),
     payload: {

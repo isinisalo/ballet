@@ -116,7 +116,7 @@ export class RuntimeRunCompletion {
     if (!outputStatus) return undefined;
 
     return {
-      type: actionOutputEventType(policy, outputStatus, input.outputRoutes, input.actions),
+      type: actionOutputEventType(policy, outputStatus, input.outputRoutes, input.actions, input.projectPolicies),
       source: "agentd",
       payload: {
         action: policy.action,

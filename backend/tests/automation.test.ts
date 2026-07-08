@@ -186,7 +186,7 @@ describe("project automation config", () => {
 
     expect(humanGateIds).toEqual(expectedGateIds);
     expect(config).not.toHaveProperty("triggers");
-    expect(config.outputRoutes.every((route) => route.target.type === "event")).toBe(true);
+    expect(config.outputRoutes.every((route) => route.target.type === "policy")).toBe(true);
     expect(triggerPoliciesByTrigger.get("dev-deployment-validation-gate.approved")?.action).toBe("done");
     expect(automationPoliciesToEventDefinitions(
       config.policies,
@@ -202,7 +202,10 @@ describe("project automation config", () => {
     config.policies.forEach((policy) => {
       actionOutputIds(config.actions, policy.action).forEach((outputId) => {
         const route = findProjectOutputRoute(config.outputRoutes, policy.id, outputId);
-        const eventType = route?.target.eventType ?? policyOutputEventType(policy, outputId);
+        const targetPolicy = route
+          ? config.policies.find((candidate) => candidate.id === route.target.policyId)
+          : undefined;
+        const eventType = targetPolicy?.event ?? policyOutputEventType(policy, outputId);
         if (eventType.endsWith(".approved") && config.actions.find((action) => action.id === policy.action)?.humanGate) return;
         expect(eventPoliciesByEvent.has(eventType)).toBeTruthy();
       });
@@ -647,7 +650,7 @@ describe("project automation config", () => {
       outputRoutes: [{
         sourcePolicyId: humanGatePolicy.id,
         outputId: "rejected",
-        target: { type: "event", eventType: "human-review.rejected.external" }
+        target: { type: "policy", policyId: startRejectedPolicyId }
       }]
     };
 
@@ -655,7 +658,11 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({
       ...routeConfig,
       outputRoutes: [{ ...routeConfig.outputRoutes[0]!, target: { type: "trigger", trigger: "missing-trigger" } }]
-    }, [agent]).some((issue) => issue.message === "Output route target type must be event.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Output route target type must be policy.")).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...routeConfig,
+      outputRoutes: [{ ...routeConfig.outputRoutes[0]!, target: { type: "policy", policyId: "missing-policy" } }]
+    }, [agent]).some((issue) => issue.message === "Output route target must reference an event policy.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...routeConfig,
       outputRoutes: [{ ...routeConfig.outputRoutes[0]!, outputId: "summary" }]
@@ -669,7 +676,7 @@ describe("project automation config", () => {
         outputId: "approved",
         target: { type: "trigger", trigger: "manual-start" }
       }]
-    }, [agent]).some((issue) => issue.message === "Output route target type must be event.")).toBe(true);
+    }, [agent]).some((issue) => issue.message === "Output route target type must be policy.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...routeConfig,
       outputRoutes: [{ ...routeConfig.outputRoutes[0]!, outputId: "approved" }]
@@ -694,6 +701,36 @@ describe("project automation config", () => {
         }
       ]
     }, [agent]).some((issue) => issue.message === "Trigger human-review.approved can start only one policy/action.")).toBe(true);
+  });
+
+  it("normalizes legacy output route event targets to policy targets", () => {
+    const humanGatePolicy = {
+      id: "on.implementation.rejected.start.human-review",
+      source: "event" as const,
+      event: "implementation.rejected",
+      action: "human-review",
+      enabled: true
+    };
+    const legacyRouteConfig = {
+      ...validConfig(),
+      actions: [
+        ...validConfig().actions,
+        { id: "human-review", description: "Human review.", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true }
+      ],
+      policies: [...validConfig().policies, humanGatePolicy],
+      outputRoutes: [{
+        sourcePolicyId: humanGatePolicy.id,
+        outputId: "rejected",
+        target: { type: "event", eventType: policyOutputEventType({ action: "implementation", loopId: startLoopId }, "rejected") }
+      }]
+    };
+
+    expect(normalizeProjectAutomationConfig(legacyRouteConfig).outputRoutes).toEqual([{
+      sourcePolicyId: humanGatePolicy.id,
+      outputId: "rejected",
+      target: { type: "policy", policyId: startRejectedPolicyId }
+    }]);
+    expect(validateProjectAutomationConfig(legacyRouteConfig, [agent])).toEqual([]);
   });
 
   it("migrates legacy gate output routes to human gate actions", () => {
@@ -729,7 +766,7 @@ describe("project automation config", () => {
       humanReviewPolicyId
     ]);
     expect(validateProjectAutomationConfig(gateRouteConfig, [agent]).some((issue) =>
-      issue.message === "Output route target type must be event."
+      issue.message === "Output route target type must be policy."
     )).toBe(true);
     expect(validateProjectAutomationConfig(normalized, [agent])).toEqual([]);
   });
