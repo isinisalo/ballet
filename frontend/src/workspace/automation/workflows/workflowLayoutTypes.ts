@@ -4,6 +4,7 @@ import type { WorkflowCanvasEdge } from "./workflowLayoutEdges";
 export type WorkflowLayoutDirection = "horizontal" | "vertical";
 
 export type WorkflowCanvasNodeKind =
+  | "workflow"
   | "trigger"
   | "policy"
   | "output-event"
@@ -15,6 +16,13 @@ export type WorkflowCanvasOutputEvent = {
   outputType: WorkflowOutputTarget["type"];
   trigger?: string;
   workflowId?: string;
+};
+
+export type WorkflowCanvasWorkflowSummary = {
+  workflowId: string;
+  label: string;
+  trigger?: string;
+  action?: string;
 };
 
 export type WorkflowCanvasLayoutNode = {
@@ -31,6 +39,7 @@ export type WorkflowCanvasLayoutNode = {
   triggerPolicy?: WorkflowStepRecord["policy"];
   eventType?: string;
   outputEvent?: WorkflowCanvasOutputEvent;
+  workflowSummary?: WorkflowCanvasWorkflowSummary;
   sourcePolicyId?: string;
   isEditingPolicy?: boolean;
   outputIndex?: number;

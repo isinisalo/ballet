@@ -5,8 +5,24 @@ import { workflowCanvasLayoutConfig, workflowNodeSizes } from "./workflowLayoutC
 import type { WorkflowCanvasEdge } from "./workflowLayoutEdges";
 import { buildWorkflowLayoutGraphDraft } from "./workflowLayoutGraph";
 import { positionWorkflowNodes } from "./workflowLayoutPositioning";
-import { workflowOutputSourceHandleId, workflowShortestVerticalHandles } from "./workflowLayoutSizing";
+import { workflowOutputSourceHandleId, workflowShortestVerticalHandles, workflowSummaryNodeWidth } from "./workflowLayoutSizing";
 import type { WorkflowCanvasLayout, WorkflowCanvasLayoutNode, WorkflowLayoutDirection } from "./workflowLayoutTypes";
+
+type WorkflowLayoutRow = {
+  workflow: ProjectWorkflow;
+  records: WorkflowStepRecord[];
+  workflowGraph: WorkflowGraph;
+  layout: WorkflowCanvasLayout;
+};
+
+type WorkflowTriggerLink = {
+  sourceWorkflowId: string;
+  targetWorkflowId: string;
+  sourceStepIndex: number;
+  sourcePolicyId: string;
+  outputId: string;
+  eventType: string;
+};
 
 // This module intentionally centralizes workflow graph layout rules because
 // cross-workflow routing depends on the same node, row, and edge geometry.
@@ -66,9 +82,9 @@ export function calculateCompositeWorkflowCanvasLayout({
   if (!selectedWorkflow) return { nodes: [], edges: [], direction };
 
   const policyById = new Map(config.policies.map((policy) => [policy.id, policy]));
-  return calculateWorkflowCanvasLayoutRows({
+  return calculateSelectedWorkflowCanvasLayout({
     config,
-    workflowIds: reachableWorkflowIds(config, selectedWorkflowId, recordsByWorkflowId, policyById),
+    selectedWorkflow,
     recordsByWorkflowId,
     editingPolicyIndexByWorkflowId,
     direction,
@@ -115,24 +131,13 @@ function calculateWorkflowCanvasLayoutRows({
 }): WorkflowCanvasLayout {
   const rows = config.workflows
     .filter((workflow) => workflowIds.has(workflow.id))
-    .map((workflow) => {
-      const records = (recordsByWorkflowId.get(workflow.id) ?? []).map((record) => ({
-        ...record,
-        workflowId: workflow.id,
-        policy: record.policy ?? policyById.get(record.policyId)
-      }));
-      const workflowGraph = buildWorkflowGraph(records);
-      return {
-        workflow,
-        records,
-        workflowGraph,
-        layout: calculateWorkflowCanvasLayout({
-          workflowGraph,
-          editingPolicyIndex: editingPolicyIndexByWorkflowId.get(workflow.id) ?? null,
-          direction
-        })
-      };
-    });
+    .map((workflow) => workflowLayoutRow({
+      workflow,
+      recordsByWorkflowId,
+      editingPolicyIndexByWorkflowId,
+      direction,
+      policyById
+    }));
   const rowOffsetByWorkflowId = workflowRowOffsets(rows);
   const hiddenLocalNodeKeys = new Set<string>();
   const namespacedNodes: WorkflowCanvasLayoutNode[] = [];
@@ -176,31 +181,325 @@ function calculateWorkflowCanvasLayoutRows({
   };
 }
 
-function reachableWorkflowIds(
+function calculateSelectedWorkflowCanvasLayout({
+  config,
+  selectedWorkflow,
+  recordsByWorkflowId,
+  editingPolicyIndexByWorkflowId,
+  direction,
+  policyById
+}: {
+  config: ProjectAutomationConfig;
+  selectedWorkflow: ProjectWorkflow;
+  recordsByWorkflowId: ReadonlyMap<string, WorkflowStepRecord[]>;
+  editingPolicyIndexByWorkflowId: ReadonlyMap<string, number | null>;
+  direction: WorkflowLayoutDirection;
+  policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>;
+}): WorkflowCanvasLayout {
+  const selectedRow = workflowLayoutRow({
+    workflow: selectedWorkflow,
+    recordsByWorkflowId,
+    editingPolicyIndexByWorkflowId,
+    direction,
+    policyById
+  });
+  const links = workflowTriggerLinks(config, recordsByWorkflowId, policyById);
+  const downstreamWorkflowIds = linkedWorkflowIds(config, links, selectedWorkflow.id, "downstream");
+  const downstreamWorkflowIdSet = new Set(downstreamWorkflowIds);
+  const upstreamWorkflowIds = linkedWorkflowIds(config, links, selectedWorkflow.id, "upstream")
+    .filter((workflowId) => !downstreamWorkflowIdSet.has(workflowId));
+  const visibleCompactWorkflowIds = new Set([...upstreamWorkflowIds, ...downstreamWorkflowIds]);
+  const upstreamNodes = compactWorkflowNodes({
+    config,
+    workflowIds: upstreamWorkflowIds,
+    y: workflowCanvasLayoutConfig.startY,
+    direction,
+    policyById
+  });
+  const selectedStartY = upstreamNodes.length > 0
+    ? workflowCanvasLayoutConfig.startY + workflowNodeSizes.workflow.height + workflowCanvasLayoutConfig.selectedCompactWorkflowRowGap
+    : workflowCanvasLayoutConfig.startY;
+  const selectedBounds = workflowLayoutBounds(selectedRow.layout.nodes);
+  const selectedOffsetY = selectedStartY - selectedBounds.minY;
+  const hiddenSelectedNodeKeys = new Set<string>();
+  const nodes: WorkflowCanvasLayoutNode[] = [...upstreamNodes];
+  const edges: WorkflowCanvasEdge[] = [];
+
+  selectedRow.layout.nodes.forEach((node) => {
+    if (shouldHideTriggerOutputNode(config, node, visibleCompactWorkflowIds, policyById)) {
+      hiddenSelectedNodeKeys.add(namespaceWorkflowKey(selectedWorkflow.id, node.key));
+      return;
+    }
+    nodes.push({
+      ...node,
+      key: namespaceWorkflowKey(selectedWorkflow.id, node.key),
+      workflowId: selectedWorkflow.id,
+      y: node.y + selectedOffsetY,
+      record: node.record ? { ...node.record, workflowId: selectedWorkflow.id } : undefined,
+      records: node.records?.map((record) => ({ ...record, workflowId: selectedWorkflow.id })),
+      triggerPolicy: node.kind === "trigger" ? policyById.get(selectedWorkflow.steps[0] ?? "") : node.triggerPolicy
+    });
+  });
+
+  selectedRow.layout.edges.forEach((edge) => {
+    const sourceNodeKey = namespaceWorkflowKey(selectedWorkflow.id, edge.sourceNodeKey);
+    const targetNodeKey = namespaceWorkflowKey(selectedWorkflow.id, edge.targetNodeKey);
+    if (hiddenSelectedNodeKeys.has(sourceNodeKey) || hiddenSelectedNodeKeys.has(targetNodeKey)) return;
+    edges.push(namespaceWorkflowEdge(selectedWorkflow.id, edge));
+  });
+
+  const selectedVisibleBounds = workflowLayoutBounds(nodes.filter((node) => node.workflowId === selectedWorkflow.id && node.kind !== "workflow"));
+  const downstreamNodes = compactWorkflowNodes({
+    config,
+    workflowIds: downstreamWorkflowIds,
+    y: selectedVisibleBounds.maxY + workflowCanvasLayoutConfig.selectedCompactWorkflowRowGap,
+    direction,
+    policyById
+  });
+  nodes.push(...downstreamNodes);
+
+  edges.push(
+    ...compactWorkflowTriggerEdges({
+      links,
+      compactWorkflowIds: visibleCompactWorkflowIds,
+      selectedWorkflowId: selectedWorkflow.id
+    }),
+    ...selectedToCompactWorkflowTriggerEdges({
+      selectedRow,
+      targetWorkflowIds: downstreamWorkflowIdSet,
+      links
+    })
+  );
+
+  return {
+    nodes,
+    edges: workflowEdgesWithDynamicVerticalHandles(edges, nodes),
+    direction
+  };
+}
+
+function workflowLayoutRow({
+  workflow,
+  recordsByWorkflowId,
+  editingPolicyIndexByWorkflowId,
+  direction,
+  policyById
+}: {
+  workflow: ProjectWorkflow;
+  recordsByWorkflowId: ReadonlyMap<string, WorkflowStepRecord[]>;
+  editingPolicyIndexByWorkflowId: ReadonlyMap<string, number | null>;
+  direction: WorkflowLayoutDirection;
+  policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>;
+}): WorkflowLayoutRow {
+  const records = (recordsByWorkflowId.get(workflow.id) ?? []).map((record) => ({
+    ...record,
+    workflowId: workflow.id,
+    policy: record.policy ?? policyById.get(record.policyId)
+  }));
+  const workflowGraph = buildWorkflowGraph(records);
+
+  return {
+    workflow,
+    records,
+    workflowGraph,
+    layout: calculateWorkflowCanvasLayout({
+      workflowGraph,
+      editingPolicyIndex: editingPolicyIndexByWorkflowId.get(workflow.id) ?? null,
+      direction
+    })
+  };
+}
+
+function workflowTriggerLinks(
   config: ProjectAutomationConfig,
-  selectedWorkflowId: string,
   recordsByWorkflowId: ReadonlyMap<string, WorkflowStepRecord[]>,
   policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>
-) {
-  const reachable = new Set<string>();
+): WorkflowTriggerLink[] {
+  return config.workflows.flatMap((workflow) => {
+    const records = recordsByWorkflowId.get(workflow.id) ?? [];
+    return records.flatMap((record) =>
+      (record.outputTargets ?? [])
+        .filter((target): target is Extract<WorkflowOutputTarget, { type: "trigger" }> => target.type === "trigger")
+        .flatMap((target) => {
+          const targetWorkflow = resolveTriggerTargetWorkflow(config, target, policyById);
+          if (!targetWorkflow || targetWorkflow.id === workflow.id) return [];
+          return [{
+            sourceWorkflowId: workflow.id,
+            targetWorkflowId: targetWorkflow.id,
+            sourceStepIndex: record.index,
+            sourcePolicyId: record.policyId,
+            outputId: target.outputId,
+            eventType: target.eventType
+          } satisfies WorkflowTriggerLink];
+        })
+    );
+  });
+}
+
+function linkedWorkflowIds(
+  config: ProjectAutomationConfig,
+  links: WorkflowTriggerLink[],
+  selectedWorkflowId: string,
+  direction: "upstream" | "downstream"
+): string[] {
+  const visited = new Set<string>();
   const queue = [selectedWorkflowId];
 
   while (queue.length > 0) {
     const workflowId = queue.shift();
-    if (!workflowId || reachable.has(workflowId)) continue;
-    reachable.add(workflowId);
-
-    const records = recordsByWorkflowId.get(workflowId) ?? [];
-    records.forEach((record) => {
-      record.outputTargets?.forEach((target) => {
-        if (target.type !== "trigger") return;
-        const targetWorkflow = resolveTriggerTargetWorkflow(config, target, policyById);
-        if (targetWorkflow && !reachable.has(targetWorkflow.id)) queue.push(targetWorkflow.id);
-      });
+    if (!workflowId) continue;
+    const candidates = links.filter((link) =>
+      direction === "downstream"
+        ? link.sourceWorkflowId === workflowId
+        : link.targetWorkflowId === workflowId
+    );
+    candidates.forEach((link) => {
+      const linkedWorkflowId = direction === "downstream" ? link.targetWorkflowId : link.sourceWorkflowId;
+      if (linkedWorkflowId === selectedWorkflowId || visited.has(linkedWorkflowId)) return;
+      visited.add(linkedWorkflowId);
+      queue.push(linkedWorkflowId);
     });
   }
 
-  return reachable;
+  return config.workflows.map((workflow) => workflow.id).filter((workflowId) => visited.has(workflowId));
+}
+
+function compactWorkflowNodes({
+  config,
+  workflowIds,
+  y,
+  direction,
+  policyById
+}: {
+  config: ProjectAutomationConfig;
+  workflowIds: string[];
+  y: number;
+  direction: WorkflowLayoutDirection;
+  policyById: ReadonlyMap<string, ProjectAutomationConfig["policies"][number]>;
+}): WorkflowCanvasLayoutNode[] {
+  let nextX = workflowCanvasLayoutConfig.startX;
+
+  return workflowIds.flatMap((workflowId) => {
+    const workflow = config.workflows.find((candidate) => candidate.id === workflowId);
+    if (!workflow) return [];
+    const firstPolicy = policyById.get(workflow.steps[0] ?? "");
+    const label = compactWorkflowLabel(workflow, firstPolicy);
+    const width = workflowSummaryNodeWidth(workflow.id);
+    const node: WorkflowCanvasLayoutNode = {
+      key: compactWorkflowNodeKey(workflow.id),
+      workflowId: workflow.id,
+      kind: "workflow",
+      x: nextX,
+      y,
+      width,
+      height: workflowNodeSizes.workflow.height,
+      direction,
+      workflowSummary: {
+        workflowId: workflow.id,
+        label,
+        trigger: firstPolicy?.source === "trigger" ? firstPolicy.trigger : undefined,
+        action: firstPolicy?.action
+      }
+    };
+    nextX += width + compactWorkflowColumnGap();
+    return [node];
+  });
+}
+
+function compactWorkflowTriggerEdges({
+  links,
+  compactWorkflowIds,
+  selectedWorkflowId
+}: {
+  links: WorkflowTriggerLink[];
+  compactWorkflowIds: ReadonlySet<string>;
+  selectedWorkflowId: string;
+}): WorkflowCanvasEdge[] {
+  return links.flatMap((link) => {
+    const sourceIsCompact = compactWorkflowIds.has(link.sourceWorkflowId);
+    const targetIsCompact = compactWorkflowIds.has(link.targetWorkflowId);
+    const targetIsSelected = link.targetWorkflowId === selectedWorkflowId;
+    if (!sourceIsCompact || (!targetIsCompact && !targetIsSelected)) return [];
+
+    return [{
+      key: `workflow:${link.sourceWorkflowId}:output:${link.sourceStepIndex}:${link.outputId}:to:${link.targetWorkflowId}:workflow`,
+      sourceNodeKey: compactWorkflowNodeKey(link.sourceWorkflowId),
+      targetNodeKey: targetIsSelected ? namespaceWorkflowKey(selectedWorkflowId, "trigger") : compactWorkflowNodeKey(link.targetWorkflowId),
+      sourceHandleId: "right",
+      targetHandleId: "left",
+      eventType: link.eventType,
+      label: link.outputId,
+      tone: "cross-workflow",
+      route: {
+        sourceWorkflowId: link.sourceWorkflowId,
+        targetWorkflowId: link.targetWorkflowId,
+        sourceStepIndex: link.sourceStepIndex,
+        sourcePolicyId: link.sourcePolicyId,
+        eventType: link.eventType,
+        outputId: link.outputId
+      }
+    } satisfies WorkflowCanvasEdge];
+  });
+}
+
+function selectedToCompactWorkflowTriggerEdges({
+  selectedRow,
+  targetWorkflowIds,
+  links
+}: {
+  selectedRow: WorkflowLayoutRow;
+  targetWorkflowIds: ReadonlySet<string>;
+  links: WorkflowTriggerLink[];
+}): WorkflowCanvasEdge[] {
+  return links
+    .filter((link) => link.sourceWorkflowId === selectedRow.workflow.id && targetWorkflowIds.has(link.targetWorkflowId))
+    .flatMap((link) => {
+      const record = selectedRow.records.find((candidate) => candidate.index === link.sourceStepIndex);
+      if (!record) return [];
+      const canonicalRecord = workflowCanonicalRecord(selectedRow.workflowGraph, record);
+
+      return [{
+        key: `workflow:${selectedRow.workflow.id}:output:${link.sourceStepIndex}:${link.outputId}:to:${link.targetWorkflowId}:workflow`,
+        sourceNodeKey: namespaceWorkflowKey(selectedRow.workflow.id, `policy-${canonicalRecord.index}`),
+        targetNodeKey: compactWorkflowNodeKey(link.targetWorkflowId),
+        sourceHandleId: workflowOutputSourceHandleId({ outputId: link.outputId, eventType: link.eventType }),
+        targetHandleId: "left",
+        eventType: link.eventType,
+        label: link.outputId,
+        tone: "cross-workflow",
+        route: {
+          sourceWorkflowId: selectedRow.workflow.id,
+          targetWorkflowId: link.targetWorkflowId,
+          sourceStepIndex: link.sourceStepIndex,
+          sourcePolicyId: link.sourcePolicyId,
+          eventType: link.eventType,
+          outputId: link.outputId
+        }
+      } satisfies WorkflowCanvasEdge];
+    });
+}
+
+function compactWorkflowLabel(
+  workflow: ProjectWorkflow,
+  firstPolicy: ProjectAutomationConfig["policies"][number] | undefined
+) {
+  const source = firstPolicy?.action
+    ? firstPolicy.action.replace(/^create-/, "")
+    : workflow.id.replace(/\.loop$/, "");
+  const label = source
+    .split("-")
+    .filter(Boolean)
+    .join(" ");
+
+  return label ? `${label} workflow` : "workflow";
+}
+
+function compactWorkflowNodeKey(workflowId: string) {
+  return `workflow:${workflowId}:workflow`;
+}
+
+function compactWorkflowColumnGap() {
+  return workflowCanvasLayoutConfig.columnGap * 2;
 }
 
 function resolveTriggerTargetWorkflow(

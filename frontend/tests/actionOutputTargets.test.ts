@@ -24,7 +24,7 @@ describe("actionOutputTargetsByOutputId", () => {
   it("derives trigger targets for human gate approval outputs", () => {
     expect(actionOutputTargetsByOutputId(config(), "human-review", ["approved", "changes-requested"])).toEqual({
       approved: { type: "trigger", id: "human-review.approved", label: "human-review.approved" },
-      changes-requested: { type: "event", id: "human-review.changes-requested", label: "human-review.changes-requested" }
+      "changes-requested": { type: "event", id: "human-review.changes-requested", label: "human-review.changes-requested" }
     });
   });
 });

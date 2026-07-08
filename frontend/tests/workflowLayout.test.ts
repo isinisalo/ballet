@@ -43,25 +43,33 @@ const compositeConfig = (
   outputRoutes: ProjectAutomationConfig["outputRoutes"] = [],
   sourceStartTrigger = "source-trigger"
 ): ProjectAutomationConfig => {
+  const upstreamPolicy = policy("upstream-start", undefined, "upstream-gate");
+  upstreamPolicy.trigger = "upstream-trigger";
   const sourcePolicy = policy("source-start", undefined, "source-gate");
   sourcePolicy.trigger = sourceStartTrigger;
   const targetPolicy = policy("target-start", undefined, "target-gate");
   targetPolicy.trigger = "source-gate.ready";
+  const downstreamPolicy = policy("downstream-start", undefined, "final-gate");
+  downstreamPolicy.trigger = "target-gate.done";
   const policyByWorkflowId = new Map([
+    ["upstream", upstreamPolicy],
     ["source", sourcePolicy],
-    ["target", targetPolicy]
+    ["target", targetPolicy],
+    ["downstream", downstreamPolicy]
   ]);
 
   return {
     version: 1,
     actions: [
+      { id: "upstream-gate", description: "Upstream gate", outputIds: ["ready", "blocked"], agentIds: [], humanGate: true },
       { id: "source-gate", description: "Source gate", outputIds: ["ready", "blocked"], agentIds: [], humanGate: true },
-      { id: "target-gate", description: "Target gate", outputIds: ["done", "blocked"], agentIds: [], humanGate: true }
+      { id: "target-gate", description: "Target gate", outputIds: ["done", "blocked"], agentIds: [], humanGate: true },
+      { id: "final-gate", description: "Final gate", outputIds: ["done", "blocked"], agentIds: [], humanGate: true }
     ],
     outputs: [{ id: "ready" }, { id: "blocked" }, { id: "done" }],
     outputRoutes,
     humanGateResponses: [],
-    policies: [sourcePolicy, targetPolicy],
+    policies: [upstreamPolicy, sourcePolicy, targetPolicy, downstreamPolicy],
     workflows: workflowIds.map((workflowId) => {
       const workflowPolicy = policyByWorkflowId.get(workflowId);
       return {
@@ -1036,7 +1044,7 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
     expect(layout.nodes.some((node) => node.key.startsWith("workflow:observer:"))).toBe(false);
   });
 
-  it("renders a derived trigger target workflow below the selected workflow with namespaced keys", () => {
+  it("renders a derived trigger target workflow as a compact workflow node below the selected workflow", () => {
     const config = compositeConfig(["source", "target"]);
     const layout = calculateCompositeWorkflowCanvasLayout({
       config,
@@ -1044,23 +1052,41 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       recordsByWorkflowId: compositeRecords(config)
     });
     const sourceTrigger = layout.nodes.find((node) => node.key === "workflow:source:trigger");
-    const targetTrigger = layout.nodes.find((node) => node.key === "workflow:target:trigger");
-    const crossEdge = layout.edges.find((edge) => edge.key === "workflow:source:output:0:ready:to:target:trigger");
+    const targetWorkflow = layout.nodes.find((node) => node.key === "workflow:target:workflow");
+    const crossEdge = layout.edges.find((edge) => edge.key === "workflow:source:output:0:ready:to:target:workflow");
 
     expect(layout.nodes.every((node) => node.key.startsWith("workflow:"))).toBe(true);
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
     expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
       "workflow:source:trigger",
       "workflow:source:policy-0",
-      "workflow:target:trigger",
-      "workflow:target:policy-0"
+      "workflow:target:workflow"
     ]));
+    expect(layout.nodes.find((node) => node.key === "workflow:target:trigger")).toBeUndefined();
+    expect(layout.nodes.find((node) => node.key === "workflow:target:policy-0")).toBeUndefined();
     expect(layout.nodes.find((node) => node.key === "workflow:source:output-event-0-ready")).toBeUndefined();
-    expect(sourceTrigger?.x).toBe(targetTrigger?.x);
-    expect(targetTrigger?.y).toBeGreaterThan(sourceTrigger?.y ?? 0);
+    expect(targetWorkflow).toMatchObject({
+      kind: "workflow",
+      width: workflowNodeSizes.workflow.minWidth,
+      height: workflowNodeSizes.workflow.height,
+      workflowSummary: {
+        workflowId: "target",
+        label: "target gate workflow",
+        trigger: "source-gate.ready",
+        action: "target-gate"
+      }
+    });
+    expect(targetWorkflow?.y).toBeGreaterThan(sourceTrigger?.y ?? 0);
+    expect(targetWorkflow?.y).toBe(
+      Math.max(
+        ...layout.nodes
+          .filter((node) => node.workflowId === "source" && node.kind !== "workflow")
+          .map((node) => node.y + node.height)
+      ) + workflowCanvasLayoutConfig.selectedCompactWorkflowRowGap
+    );
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "workflow:source:policy-0",
-      targetNodeKey: "workflow:target:trigger",
+      targetNodeKey: "workflow:target:workflow",
       sourceHandleId: "right",
       targetHandleId: "left",
       eventType: "trigger.source-gate.ready",
@@ -1077,31 +1103,48 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       recordsByWorkflowId: compositeRecords(config)
     });
 
-    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:ready:to:target:trigger")).toMatchObject({
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:ready:to:target:workflow")).toMatchObject({
       sourceNodeKey: "workflow:source:policy-0",
+      targetNodeKey: "workflow:target:workflow",
       sourceHandleId: "right",
       targetHandleId: "left",
       label: "ready",
       tone: "cross-workflow"
     });
     expect(layout.nodes.find((node) => node.key === "workflow:source:output-event-0-blocked")).toBeDefined();
-    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toBeUndefined();
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:workflow")).toBeUndefined();
   });
 
-  it("renders a derived trigger target workflow above the selected workflow when config order is above", () => {
-    const config = compositeConfig(["target", "source"]);
+  it("renders upstream workflows as compact workflow nodes above the selected workflow", () => {
+    const config = compositeConfig(["upstream", "source"], [], "upstream-gate.ready");
     const layout = calculateCompositeWorkflowCanvasLayout({
       config,
       selectedWorkflowId: "source",
       recordsByWorkflowId: compositeRecords(config)
     });
     const sourceTrigger = layout.nodes.find((node) => node.key === "workflow:source:trigger");
-    const targetTrigger = layout.nodes.find((node) => node.key === "workflow:target:trigger");
+    const upstreamWorkflow = layout.nodes.find((node) => node.key === "workflow:upstream:workflow");
+    const crossEdge = layout.edges.find((edge) => edge.key === "workflow:upstream:output:0:ready:to:source:workflow");
 
     expect(sourceTrigger).toBeDefined();
-    expect(targetTrigger).toBeDefined();
-    expect(sourceTrigger?.x).toBe(targetTrigger?.x);
-    expect(targetTrigger?.y).toBeLessThan(sourceTrigger?.y ?? 0);
+    expect(upstreamWorkflow).toMatchObject({
+      kind: "workflow",
+      workflowSummary: {
+        workflowId: "upstream",
+        label: "upstream gate workflow"
+      }
+    });
+    expect(upstreamWorkflow?.y).toBeLessThan(sourceTrigger?.y ?? 0);
+    expect((sourceTrigger?.y ?? 0) - ((upstreamWorkflow?.y ?? 0) + workflowNodeSizes.workflow.height)).toBe(
+      workflowCanvasLayoutConfig.selectedCompactWorkflowRowGap
+    );
+    expect(layout.nodes.find((node) => node.key === "workflow:upstream:policy-0")).toBeUndefined();
+    expect(crossEdge).toMatchObject({
+      sourceNodeKey: "workflow:upstream:workflow",
+      targetNodeKey: "workflow:source:trigger",
+      label: "ready",
+      tone: "cross-workflow"
+    });
   });
 
   it("does not route rework outputs to target workflows automatically", () => {
@@ -1113,7 +1156,7 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
     });
 
     expect(layout.nodes.find((node) => node.key === "workflow:source:output-event-0-blocked")).toBeDefined();
-    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:trigger")).toBeUndefined();
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:blocked:to:target:workflow")).toBeUndefined();
   });
 
   it("protects circular derived trigger workflow references from recursive layout", () => {
@@ -1124,10 +1167,55 @@ describe("calculateCompositeWorkflowCanvasLayout", () => {
       recordsByWorkflowId: compositeRecords(config)
     });
 
-    expect(layout.nodes.filter((node) => node.kind === "trigger")).toHaveLength(2);
-    expect(layout.nodes.filter((node) => node.kind === "policy")).toHaveLength(2);
-    expect(layout.edges.filter((edge) => edge.targetNodeKey.endsWith(":trigger"))).toHaveLength(2);
+    expect(layout.nodes.filter((node) => node.kind === "trigger")).toHaveLength(1);
+    expect(layout.nodes.filter((node) => node.kind === "policy")).toHaveLength(1);
+    expect(layout.nodes.filter((node) => node.kind === "workflow")).toHaveLength(1);
+    expect(layout.edges.filter((edge) => edge.tone === "cross-workflow")).toHaveLength(2);
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
+  });
+
+  it("orders branching compact workflow successors by config order on the downstream row", () => {
+    const config = compositeConfig(["source", "target", "downstream"]);
+    config.actions.push({
+      id: "branch-gate",
+      description: "Branch gate",
+      outputIds: ["ready", "blocked"],
+      agentIds: [],
+      humanGate: true
+    });
+    config.policies.push({
+      id: "branch-source",
+      source: "event",
+      event: "source-gate.blocked",
+      action: "branch-gate",
+      enabled: true
+    });
+    const sourceWorkflow = config.workflows.find((workflow) => workflow.id === "source");
+    sourceWorkflow?.steps.push("branch-source");
+    const branchPolicy = policy("branch-start", undefined, "final-gate");
+    branchPolicy.trigger = "branch-gate.ready";
+    config.policies.push(branchPolicy);
+    config.workflows.push({ id: "branch", steps: [branchPolicy.id] });
+    const layout = calculateCompositeWorkflowCanvasLayout({
+      config,
+      selectedWorkflowId: "source",
+      recordsByWorkflowId: compositeRecords(config)
+    });
+    const targetWorkflow = layout.nodes.find((node) => node.key === "workflow:target:workflow");
+    const branchWorkflow = layout.nodes.find((node) => node.key === "workflow:branch:workflow");
+
+    expect(targetWorkflow).toBeDefined();
+    expect(branchWorkflow).toBeDefined();
+    expect(targetWorkflow?.y).toBe(branchWorkflow?.y);
+    expect(targetWorkflow ? branchWorkflow?.x : undefined).toBeGreaterThan(targetWorkflow?.x ?? 0);
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:0:ready:to:target:workflow")).toMatchObject({
+      label: "ready",
+      tone: "cross-workflow"
+    });
+    expect(layout.edges.find((edge) => edge.key === "workflow:source:output:1:ready:to:branch:workflow")).toMatchObject({
+      label: "ready",
+      tone: "cross-workflow"
+    });
   });
 });
 

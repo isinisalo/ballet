@@ -54,6 +54,10 @@ export function workflowTriggerNodeWidth() {
   return workflowOutputNodeWidth("", workflowNodeSizes.trigger.minWidth, workflowNodeSizes.trigger.maxWidth);
 }
 
+export function workflowSummaryNodeWidth(value: string) {
+  return workflowOutputNodeWidth(value, workflowNodeSizes.workflow.minWidth, workflowNodeSizes.workflow.maxWidth);
+}
+
 export function workflowHorizontalEdgeGap(edges: WorkflowDagreEdge[]) {
   const maxLabelWidth = Math.max(
     0,

@@ -1,4 +1,4 @@
-import { Route, Zap } from "lucide-react";
+import { Route, Workflow, Zap } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { workflowTriggerLabel } from "./workflowGraph";
@@ -43,11 +43,30 @@ function WorkflowNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds:
 }
 
 function renderNodeContent(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {
+  if (node.kind === "workflow") return renderWorkflowNode(node);
   if (node.kind === "trigger") return renderTriggerNode(node, context);
   if (node.kind === "first-policy-ghost") return renderFirstPolicyGhost(node, context);
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (!node.record) return null;
   return <WorkflowPolicyNode context={context} record={node.record} records={node.records ?? [node.record]} />;
+}
+
+function renderWorkflowNode(node: WorkflowCanvasLayoutNode) {
+  const summary = node.workflowSummary;
+  const label = summary?.workflowId ?? "Workflow";
+
+  return (
+    <div
+      data-workflow-node
+      data-workflow-summary={summary?.workflowId}
+      aria-label={`Workflow: ${label}`}
+      title={label}
+      className="flex h-[22px] w-full min-w-0 items-center gap-1 rounded-md border border-divider-strong bg-card px-1.5 text-left font-mono text-[0.66rem] leading-4 text-foreground"
+    >
+      <Workflow className="size-3 shrink-0 text-tertiary" aria-hidden="true" />
+      <span className="block min-w-0 truncate text-tertiary">{label}</span>
+    </div>
+  );
 }
 
 function renderTriggerNode(node: WorkflowCanvasLayoutNode, context: WorkflowNodeContext) {

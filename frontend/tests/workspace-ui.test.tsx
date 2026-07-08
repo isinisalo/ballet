@@ -750,6 +750,52 @@ describe("workspace entity UI flows", () => {
     });
   });
 
+  it("renders surrounding workflows as compact nodes around the selected workflow", async () => {
+    const workflowData = baseData();
+    workflowData.automation.actions[0] = {
+      id: "implementation",
+      description: "Review generated evidence.",
+      outputIds: ["approved", "changes-requested"],
+      agentIds: [],
+      humanGate: true
+    };
+    workflowData.automation.actions.push({
+      id: "next-step",
+      description: "Continue the next workflow.",
+      outputIds: ["complete", "failed"],
+      agentIds: ["agent-1"]
+    });
+    workflowData.automation.policies.push({
+      id: "on.trigger.manual-start.start.project-brief-gate",
+      source: "trigger",
+      trigger: "manual-start",
+      action: "project-brief-gate",
+      enabled: true
+    }, {
+      id: "on.trigger.implementation.approved.start.next-step",
+      source: "trigger",
+      trigger: "implementation.approved",
+      action: "next-step",
+      enabled: true
+    });
+    workflowData.automation.workflows.push({
+      id: "manual-start.loop",
+      steps: ["on.trigger.manual-start.start.project-brief-gate"]
+    }, {
+      id: "implementation.approved.loop",
+      steps: ["on.trigger.implementation.approved.start.next-step"]
+    });
+
+    await renderRoute("/automation/workflows?id=project-brief-gate.approved.loop", workflowData);
+
+    expect(screen.getByLabelText("Workflow: manual-start.loop")).toHaveTextContent("manual-start.loop");
+    expect(screen.getByLabelText("Workflow: implementation.approved.loop")).toHaveTextContent("implementation.approved.loop");
+    expect(screen.getByLabelText("Policy: on.implementation.failed.start.implementation")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Policy: on.trigger.manual-start.start.project-brief-gate")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Policy: on.trigger.implementation.approved.start.next-step")).not.toBeInTheDocument();
+    await waitFor(() => expect(workflowEdgeLabelTexts()).toContain("approved"));
+  });
+
   it("folds repeated workflow actions into one visible policy node", async () => {
     const workflowData = baseData();
     workflowData.automation.outputs = [
