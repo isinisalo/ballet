@@ -13,7 +13,9 @@ import type { ProjectRuntime } from "../../shared/domain/runtime.js";
 import {
   actionOutputIds,
   actionOutputSlotKind,
+  actionHasExecutableTarget,
   approvalOutputCandidates,
+  defaultActionOutputIds,
   reworkOutputCandidates,
   defaultPolicyOutputIds,
   defaultProjectOutputs,
@@ -122,10 +124,10 @@ const legacyGateActions = (value: unknown, availableOutputIds: string[]): Record
     __legacyGateId: normalizePolicyToken(stringValue(gate.id))
   }));
 
-const normalizeActionBase = (value: Record<string, unknown>, availableOutputIds: string[]) => ({
+const normalizeActionBase = (value: Record<string, unknown>) => ({
   id: normalizePolicyToken(stringValue(value.id)),
   description: stringValue(value.description),
-  outputIds: normalizeOutputIds(value.outputIds) ?? fallbackActionOutputIds(availableOutputIds),
+  outputIds: normalizeOutputIds(value.outputIds),
   humanGate: value.humanGate === true
 });
 
@@ -217,11 +219,9 @@ const createActions = (
     ? rawActions.map((action) => {
       const rawAgentIds = normalizeRawAgentIds(action.agentIds, agents);
       const rawOutputIds = normalizeRawOutputIds(action.outputIds);
-      const base = normalizeActionBase(action, availableOutputIds);
+      const base = normalizeActionBase(action);
       return {
-        base: rawAgentIds?.length === 0 && !base.humanGate
-          ? { ...base, outputIds: [] }
-          : base,
+        base,
         rawAgentIds,
         rawOutputIds,
         legacyGateId: typeof action.__legacyGateId === "string" ? action.__legacyGateId : undefined
@@ -254,16 +254,22 @@ const createActions = (
   };
 
   const actionFromBase = (
-    base: { description: string; outputIds: string[]; humanGate: boolean },
+    base: { description: string; outputIds?: string[]; humanGate: boolean },
     id: string,
     agentIds: string[]
-  ): ProjectAction => ({
-    id,
-    description: base.description,
-    outputIds: base.outputIds,
-    agentIds: base.humanGate ? [] : agentIds,
-    ...(base.humanGate ? { humanGate: true } : {})
-  });
+  ): ProjectAction => {
+    const normalizedAgentIds = base.humanGate ? [] : agentIds;
+    const outputSource = { humanGate: base.humanGate, agentIds: normalizedAgentIds };
+    return {
+      id,
+      description: base.description,
+      outputIds: actionHasExecutableTarget(outputSource)
+        ? base.outputIds ?? defaultActionOutputIds(outputSource)
+        : [],
+      agentIds: normalizedAgentIds,
+      ...(base.humanGate ? { humanGate: true } : {})
+    };
+  };
 
   const registerLegacyEventRewrites = (
     legacyActionId: string,

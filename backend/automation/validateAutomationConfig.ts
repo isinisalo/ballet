@@ -413,32 +413,34 @@ const validateHumanGateResponse = (
 const validateOutputRouteTarget = (
   target: unknown,
   base: string,
-  context: ValidationContext,
   issues: ProjectAutomationIssue[]
-) => {
+): boolean => {
   if (!isRecord(target)) {
     issues.push({ path: base, message: "Output route target must be an object." });
-    return;
+    return false;
   }
 
-  if (target.type !== "policy" && target.type !== "event" && target.type !== "trigger") {
+  if (target.type !== "policy" && target.type !== "event") {
     issues.push({ path: `${base}.type`, message: "Output route target type must be policy." });
-    return;
+    return false;
   }
 
   if (target.type === "policy") {
     addStringIssue(issues, `${base}.policyId`, target.policyId, "Output route target policy", automationFieldLimits.policyId);
-    return;
+    return typeof target.policyId === "string" && target.policyId.trim().length > 0;
   }
 
+  // Raw legacy configs may name an event target; ProjectOutputTarget itself is
+  // still the normalized policy reference projected from that event.
   if (target.type === "event") {
     if (target.eventType !== undefined) {
       addStringIssue(issues, `${base}.eventType`, target.eventType, "Output route event type", automationFieldLimits.eventType);
     }
-    return;
+    return true;
   }
 
   issues.push({ path: `${base}.type`, message: "Output route target type must be policy." });
+  return false;
 };
 
 const validateOutputRoute = (
@@ -456,11 +458,11 @@ const validateOutputRoute = (
 
   addStringIssue(issues, `${base}.sourcePolicyId`, route.sourcePolicyId, "Output route source policy", automationFieldLimits.policyId);
   addOutputIdIssue(issues, `${base}.outputId`, route.outputId);
-  validateOutputRouteTarget(route.target, `${base}.target`, context, issues);
+  const validTargetShape = validateOutputRouteTarget(route.target, `${base}.target`, issues);
 
   const sourcePolicyId = stringValue(route.sourcePolicyId);
   const rawOutputId = normalizePolicyToken(stringValue(route.outputId));
-  if (!sourcePolicyId || !rawOutputId) return;
+  if (!sourcePolicyId || !rawOutputId || !validTargetShape) return;
 
   const sourcePolicy = context.normalizedPolicies.find((policy) => policy.id === sourcePolicyId);
   if (!sourcePolicy) {

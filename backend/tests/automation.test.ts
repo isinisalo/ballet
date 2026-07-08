@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig, ProjectPolicy } from "../../shared/domain/automation.js";
 import { actionOutputIds, findProjectOutputRoute, generatedPolicyId, humanGateApprovalTriggerId, humanGateResponseId, policyOutputEventType, loopIdFromTrigger } from "../../shared/policy-actions.js";
+import { actionOutputEventType, aggregateActionOutputStatus } from "../automation/actionOutputAggregator.js";
 import {
     automationPoliciesToEventDefinitions,
     automationPoliciesToPolicies,
@@ -165,7 +166,8 @@ describe("project automation config", () => {
   });
 
   it("keeps the repository loop gates and outputs fully routed", async () => {
-    const config = JSON.parse(await readFile(path.join(process.cwd(), ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
+    const rawConfig = JSON.parse(await readFile(path.join(process.cwd(), ".ballet/project.json"), "utf8")) as unknown;
+    const config = normalizeProjectAutomationConfig(rawConfig);
     const humanGateIds = config.actions.filter((action) => action.humanGate).map((action) => action.id);
     const expectedGateIds = [
       "project-brief-gate",
@@ -229,6 +231,166 @@ describe("project automation config", () => {
     expect(saved.loops[0]?.id).toBe(startLoopId);
     expect(saved.loops[0]?.steps).toEqual([startPolicyId, startRejectedPolicyId]);
     expect(await readFile(instructionPath, "utf8")).toBe("# Code review\n");
+  });
+
+  it("derives default outputIds for persisted executable actions when outputIds is missing", () => {
+    const normalized = normalizeProjectAutomationConfig({
+      version: 1,
+      actions: [{ id: "implementation", description: "Implement.", agentIds: ["developer-agent"] }],
+      outputRoutes: [],
+      humanGateResponses: [],
+      policies: [],
+      loops: [],
+      runtimes: []
+    }, [agent]);
+
+    expect(normalized.actions[0]?.outputIds).toEqual(["approved", "rejected"]);
+    expect(validateProjectAutomationConfig(normalized, [agent])).toEqual([]);
+  });
+
+  it("derives default outputIds for persisted human gate actions when outputIds is missing", () => {
+    const normalized = normalizeProjectAutomationConfig({
+      version: 1,
+      actions: [{ id: "human-review", description: "Review.", agentIds: [], humanGate: true }],
+      outputRoutes: [],
+      humanGateResponses: [],
+      policies: [],
+      loops: [],
+      runtimes: []
+    }, [agent]);
+
+    expect(normalized.actions[0]?.outputIds).toEqual(["approved", "rejected"]);
+    expect(validateProjectAutomationConfig(normalized, [agent])).toEqual([]);
+  });
+
+  it("derives empty outputIds for persisted no-op actions when outputIds is missing", () => {
+    const normalized = normalizeProjectAutomationConfig({
+      version: 1,
+      actions: [{ id: "done", description: "Done.", agentIds: [] }],
+      outputRoutes: [],
+      humanGateResponses: [],
+      policies: [],
+      loops: [],
+      runtimes: []
+    }, [agent]);
+
+    expect(normalized.actions[0]?.outputIds).toEqual([]);
+    expect(validateProjectAutomationConfig(normalized, [agent])).toEqual([]);
+  });
+
+  it("preserves explicit approval-only outputIds and does not emit a rejected output event", () => {
+    const config = normalizeProjectAutomationConfig({
+      ...validConfig(),
+      actions: [{ ...validConfig().actions[0]!, outputIds: ["approved"] }, startGateAction()],
+      policies: [
+        startPolicy(),
+        {
+          id: "on.implementation.approved.start.implementation",
+          loopId: startLoopId,
+          source: "event",
+          event: "implementation.approved",
+          action: "implementation",
+          enabled: true
+        }
+      ],
+      loops: [{ id: startLoopId, steps: [startPolicyId, "on.implementation.approved.start.implementation"] }]
+    }, [agent]);
+
+    expect(config.actions[0]?.outputIds).toEqual(["approved"]);
+    expect(actionOutputIds(config.actions, "implementation")).toEqual(["approved"]);
+    expect(automationPoliciesToEventDefinitions(
+      config.policies,
+      config.actions,
+      config.outputs,
+      config.outputRoutes
+    ).map((event) => event.eventType)).not.toContain("implementation.rejected");
+  });
+
+  it("keeps existing explicit default outputIds normalized unchanged", () => {
+    const normalized = normalizeProjectAutomationConfig(validConfig(), [agent]);
+
+    expect(normalized.actions[0]?.outputIds).toEqual(["approved", "rejected"]);
+    expect(normalized.actions[1]?.outputIds).toEqual(["approved", "rejected"]);
+  });
+
+  it("saves compact JSON and loads it back into the same normalized config", async () => {
+    const root = await tempRoot();
+    const saved = await saveProjectAutomationConfig(root, validConfig(), [agent]);
+    const rawSaved = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as {
+      actions: Array<{ id: string; outputIds?: string[] }>;
+      outputs?: unknown;
+    };
+
+    expect(rawSaved.outputs).toBeUndefined();
+    expect(rawSaved.actions.find((action) => action.id === "implementation")).not.toHaveProperty("outputIds");
+    expect(rawSaved.actions.find((action) => action.id === "project-brief-gate")).not.toHaveProperty("outputIds");
+    await expect(loadProjectAutomationConfig(root, [agent])).resolves.toEqual(saved);
+  });
+
+  it("keeps approval-only outputIds when saving compact JSON", async () => {
+    const root = await tempRoot();
+    await saveProjectAutomationConfig(root, {
+      ...validConfig(),
+      actions: [{ ...validConfig().actions[0]!, outputIds: ["approved"] }, startGateAction()],
+      policies: [
+        startPolicy(),
+        {
+          id: "on.implementation.approved.start.implementation",
+          source: "event",
+          event: "implementation.approved",
+          action: "implementation",
+          enabled: true
+        }
+      ],
+      loops: [{ id: startLoopId, steps: [startPolicyId, "on.implementation.approved.start.implementation"] }]
+    }, [agent]);
+    const rawSaved = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as {
+      actions: Array<{ id: string; outputIds?: string[] }>;
+    };
+
+    expect(rawSaved.actions.find((action) => action.id === "implementation")?.outputIds).toEqual(["approved"]);
+    expect(rawSaved.actions.find((action) => action.id === "project-brief-gate")).not.toHaveProperty("outputIds");
+  });
+
+  it("maps runtime aggregation outcomes to approved and rejected output event types", () => {
+    const config = validConfig();
+    const policy = config.policies[0]!;
+
+    const approved = aggregateActionOutputStatus([{
+      runId: "run-approved",
+      triggerEventId: "event-approved",
+      policyId: policy.id,
+      policyVersion: 1,
+      agentRole: "developer-agent",
+      status: "completed",
+      attempt: 1,
+      createdAt: "2026-07-07T10:00:00.000Z",
+      updatedAt: "2026-07-07T10:01:00.000Z",
+      completedAt: "2026-07-07T10:01:00.000Z",
+      outcome: { outcome: "ready", summary: "Ready.", checks: [] }
+    }], policy, config.actions);
+    const rejected = aggregateActionOutputStatus([{
+      runId: "run-rejected",
+      triggerEventId: "event-rejected",
+      policyId: policy.id,
+      policyVersion: 1,
+      agentRole: "developer-agent",
+      status: "failed",
+      attempt: 1,
+      createdAt: "2026-07-07T10:00:00.000Z",
+      updatedAt: "2026-07-07T10:01:00.000Z",
+      completedAt: "2026-07-07T10:01:00.000Z",
+      outcome: { outcome: "failed", summary: "Failed.", checks: [] }
+    }], policy, config.actions);
+
+    expect(approved).toBe("approved");
+    expect(rejected).toBe("rejected");
+    expect(actionOutputEventType(policy, approved!, config.outputRoutes, config.actions, config.policies)).toBe(
+      policyOutputEventType(policy, "approved")
+    );
+    expect(actionOutputEventType(policy, rejected!, config.outputRoutes, config.actions, config.policies)).toBe(
+      policyOutputEventType(policy, "rejected")
+    );
   });
 
   it("normalizes legacy policy fields to event and action agents", async () => {
@@ -655,10 +817,12 @@ describe("project automation config", () => {
     };
 
     expect(validateProjectAutomationConfig(routeConfig, [agent])).toEqual([]);
-    expect(validateProjectAutomationConfig({
+    const triggerTargetIssues = validateProjectAutomationConfig({
       ...routeConfig,
       outputRoutes: [{ ...routeConfig.outputRoutes[0]!, target: { type: "trigger", trigger: "missing-trigger" } }]
-    }, [agent]).some((issue) => issue.message === "Output route target type must be policy.")).toBe(true);
+    }, [agent]);
+    expect(triggerTargetIssues.some((issue) => issue.message === "Output route target type must be policy.")).toBe(true);
+    expect(triggerTargetIssues.some((issue) => issue.message === "Output route target must reference an event policy.")).toBe(false);
     expect(validateProjectAutomationConfig({
       ...routeConfig,
       outputRoutes: [{ ...routeConfig.outputRoutes[0]!, target: { type: "policy", policyId: "missing-policy" } }]

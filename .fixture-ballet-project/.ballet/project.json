@@ -4,21 +4,9 @@
     {
       "id": "run",
       "description": "",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "reviewer"
       ]
-    }
-  ],
-  "outputs": [
-    {
-      "id": "approved"
-    },
-    {
-      "id": "rejected"
     }
   ],
   "outputRoutes": [],

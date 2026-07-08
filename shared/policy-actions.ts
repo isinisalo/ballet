@@ -13,6 +13,11 @@ export const defaultProjectOutputs = (): ProjectOutput[] => [
   { id: defaultPolicyOutputIds[1] }
 ];
 
+export type ActionOutputConfig = Pick<ProjectAction, "humanGate"> & {
+  agentIds?: readonly string[];
+  outputIds?: readonly string[];
+};
+
 export const normalizePolicyToken = (value: string): string =>
   value
     .trim()
@@ -143,20 +148,36 @@ export const normalizeActionOutputSlots = (outputIds: readonly string[] = defaul
     : [canonicalOutputIdForSlot("approval")];
 };
 
+export const actionHasExecutableTarget = (action: ActionOutputConfig | undefined): boolean =>
+  Boolean(action && (action.humanGate || action.agentIds === undefined || action.agentIds.length > 0));
+
+export const defaultActionOutputIds = (action: ActionOutputConfig | undefined): string[] =>
+  actionHasExecutableTarget(action) ? [...defaultPolicyOutputIds] : [];
+
+export const isDefaultActionOutputIds = (
+  outputIds: readonly string[] | undefined,
+  action?: ActionOutputConfig
+): boolean => {
+  if (outputIds === undefined) return true;
+  const expected = defaultActionOutputIds(action);
+  const normalized = outputIds.length > 0 ? normalizeActionOutputSlots(outputIds) : [];
+  return normalized.length === expected.length && normalized.every((outputId, index) => outputId === expected[index]);
+};
+
 const outputIdSet = (outputs: Array<Pick<ProjectOutput, "id">>): Set<string> =>
   new Set(outputs
     .map((output) => normalizePolicyToken(output.id))
     .filter(Boolean));
 
 export const actionOutputIds = (
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>,
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentIds?: string[]; outputIds?: readonly string[] }>,
   actionId: string
 ): string[] => {
   const normalizedActionId = normalizePolicyToken(actionId);
   const action = actions.find((candidate) => normalizePolicyToken(candidate.id) === normalizedActionId);
-  if (action && Array.isArray(action.agentIds) && action.agentIds.length === 0 && !action.humanGate) return [];
-  const outputIds = action?.outputIds ?? defaultPolicyOutputIds;
-  return normalizeActionOutputSlots(outputIds);
+  if (!action) return [...defaultPolicyOutputIds];
+  if (!actionHasExecutableTarget(action)) return [];
+  return action.outputIds === undefined ? defaultActionOutputIds(action) : normalizeActionOutputSlots(action.outputIds);
 };
 
 export const projectOutputRouteSlotKind = (

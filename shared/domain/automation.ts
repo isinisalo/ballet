@@ -41,6 +41,9 @@ export interface ProjectOutputRoute {
   target: ProjectOutputTarget;
 }
 
+// ProjectPolicy is the persisted loop handler/transition binding: it connects an
+// input source to a project action. Runtime policies are projected from this
+// shape plus the selected action agents.
 export interface ProjectPolicy {
   id: string;
   loopId?: string;

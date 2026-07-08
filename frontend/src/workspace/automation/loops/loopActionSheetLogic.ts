@@ -1,5 +1,5 @@
 import type { ProjectAutomationConfig, ProjectPolicy } from "@shared/api/workspace-contracts";
-import { generatedPolicyId } from "@shared/policy-actions";
+import { generatedPolicyId, projectOutputRouteCanTargetTrigger, projectOutputRouteKey } from "@shared/policy-actions";
 
 export const nextConfigWithLoopStepAction = (
   current: ProjectAutomationConfig,
@@ -30,17 +30,43 @@ export const nextConfigWithLoopHandlerAction = (
   };
   const nextPolicyId = generatedPolicyId(nextPolicy);
   const existingPolicy = current.policies.find((policy) => policy.id === nextPolicyId);
-  const policies = existingPolicy ? current.policies : [...current.policies, { ...nextPolicy, id: nextPolicyId }];
+  const nextLoops = current.loops.map((candidate) => candidate.id === loop.id
+    ? {
+      ...candidate,
+      steps: candidate.steps.map((step, index) => index === handlerStepIndex ? nextPolicyId : step)
+    }
+    : candidate);
+  const oldPolicyStillReferenced = nextLoops.some((candidate) => candidate.steps.includes(currentPolicy.id));
+  const policies = (existingPolicy ? current.policies : [...current.policies, { ...nextPolicy, id: nextPolicyId }])
+    .filter((policy) => policy.id !== currentPolicy.id || oldPolicyStillReferenced);
+  const policyIdMap = new Map([[currentPolicy.id, nextPolicyId]]);
+  const policyById = new Map(policies.map((policy) => [policy.id, policy]));
+  const outputRouteByKey = new Map(current.outputRoutes.flatMap((route) => {
+    const sourcePolicyId = policyIdMap.get(route.sourcePolicyId) ?? route.sourcePolicyId;
+    const targetPolicyId = policyIdMap.get(route.target.policyId) ?? route.target.policyId;
+    const sourcePolicy = policyById.get(sourcePolicyId);
+    if (!sourcePolicy || !policyById.has(targetPolicyId)) return [];
+    if (route.sourcePolicyId === currentPolicy.id) {
+      if (!targetAction.outputIds.includes(route.outputId)) return [];
+      if (projectOutputRouteCanTargetTrigger(sourcePolicy, route.outputId, current.actions)) return [];
+    }
+    const nextRoute = {
+      ...route,
+      sourcePolicyId,
+      target: {
+        ...route.target,
+        policyId: targetPolicyId
+      }
+    };
+    return [[projectOutputRouteKey(nextRoute.sourcePolicyId, nextRoute.outputId), nextRoute] as const];
+  }));
 
   return {
     ...current,
     policies,
-    loops: current.loops.map((candidate) => candidate.id === loop.id
-      ? {
-        ...candidate,
-        steps: candidate.steps.map((step, index) => index === handlerStepIndex ? nextPolicyId : step)
-      }
-      : candidate)
+    loops: nextLoops,
+    outputRoutes: [...outputRouteByKey.values()],
+    humanGateResponses: current.humanGateResponses.filter((response) => response.policyId !== currentPolicy.id)
   };
 };
 
