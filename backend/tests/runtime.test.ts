@@ -36,13 +36,6 @@ const agent: Agent = {
   updatedAt: "2026-06-24T08:00:00.000Z"
 };
 
-const architectureAgent: Agent = {
-  ...agent,
-  id: "architecture-reviewer",
-  name: "Architecture Reviewer",
-  description: "Reviews architecture."
-};
-
 const qaAgent: Agent = {
   ...agent,
   id: "qa-verification-reviewer",
@@ -65,7 +58,7 @@ const implementationAction = {
   id: "implementation",
   description: "Implement approved work.",
   outputIds: ["approved", "rejected"],
-  agentIds: ["developer-agent", "architecture-reviewer"]
+  agentIds: ["developer-agent"]
 };
 const qaAction = {
   id: "qa-review",
@@ -130,7 +123,7 @@ describe("runtime database", () => {
     db.close();
   });
 
-  it("fans one event out to every enabled agent on the matching action", async () => {
+  it("routes one event to the single agent on the matching action", async () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
 
@@ -140,20 +133,20 @@ describe("runtime database", () => {
       source: "test",
       subject: "work-1",
       payload: {}
-    }, automationConfig(), [agent, architectureAgent, qaAgent]);
+    }, automationConfig(), [agent, qaAgent]);
 
     expect(result.event.status).toBe("routed");
     expect(result.event.routing).toMatchObject({
-      matchedActions: 2,
-      routedRuns: 2,
+      matchedActions: 1,
+      routedRuns: 1,
       skippedActions: 0
     });
-    expect(result.runs.map((run) => run.agentRole).sort()).toEqual(["architecture-reviewer", "developer-agent"]);
-    expect(db.listRuns()).toHaveLength(2);
+    expect(result.runs.map((run) => run.agentRole)).toEqual(["developer-agent"]);
+    expect(db.listRuns()).toHaveLength(1);
     db.close();
   });
 
-  it("aggregates multi-agent action output after all sibling runs finish", async () => {
+  it("publishes action output when the single action run finishes", async () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     const config = automationConfig();
@@ -163,9 +156,9 @@ describe("runtime database", () => {
       source: "test",
       subject: "work-1",
       payload: {}
-    }, config, [agent, architectureAgent, qaAgent]);
+    }, config, [agent, qaAgent]);
 
-    expect(intake.runs.map((run) => run.agentRole).sort()).toEqual(["architecture-reviewer", "developer-agent"]);
+    expect(intake.runs.map((run) => run.agentRole)).toEqual(["developer-agent"]);
 
     const first = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
     const firstCompletion = db.completeRun({
@@ -178,27 +171,10 @@ describe("runtime database", () => {
       outputRoutes: config.outputRoutes,
       loops: config.loops,
       automation: config,
-      agents: [agent, architectureAgent, qaAgent]
+      agents: [agent, qaAgent]
     });
 
-    expect(firstCompletion.event).toBeUndefined();
-    expect(db.listRuntimeEvents()).toHaveLength(1);
-
-    const second = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
-    const secondCompletion = db.completeRun({
-      runId: second!.runId,
-      status: "completed",
-      outcome: readyOutcome,
-      projectAction: implementationAction,
-      actions: config.actions,
-      outputs: config.outputs,
-      outputRoutes: config.outputRoutes,
-      loops: config.loops,
-      automation: config,
-      agents: [agent, architectureAgent, qaAgent]
-    });
-
-    expect(secondCompletion.event).toMatchObject({
+    expect(firstCompletion.event).toMatchObject({
       type: "plan-approved.loop.implementation.approved",
       source: "agentd",
       correlationId: intake.event.correlationId,
@@ -209,12 +185,11 @@ describe("runtime database", () => {
         loop_id: loopId,
         status: "approved",
         agents: expect.arrayContaining([
-          expect.objectContaining({ agent: "developer-agent", status: "completed", outcome: "ready" }),
-          expect.objectContaining({ agent: "architecture-reviewer", status: "completed", outcome: "ready" })
+          expect.objectContaining({ agent: "developer-agent", status: "completed", outcome: "ready" })
         ])
       }
     });
-    expect(secondCompletion.runs?.map((run) => run.agentRole)).toEqual(["qa-verification-reviewer"]);
+    expect(firstCompletion.runs?.map((run) => run.agentRole)).toEqual(["qa-verification-reviewer"]);
     expect(db.listRuntimeEvents()).toHaveLength(2);
     db.close();
   });

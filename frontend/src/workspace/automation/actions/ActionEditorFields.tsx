@@ -8,8 +8,9 @@ import { automationFieldLimits, automationStringValidationMessage } from "@share
 import type { Agent, ProjectAction, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { defaultActionOutputIds, normalizeActionOutputSlots } from "@shared/policy-actions";
 import { Plus, ShieldCheck, X } from "lucide-react";
-import { useMemo } from "react";
 import { actionOutputTargetsByOutputId, type ActionOutputTarget } from "./actionOutputTargets";
+
+const noAgentSelectionValue = "__no-agent__";
 
 export function ActionEditorFields({
   agents,
@@ -23,28 +24,28 @@ export function ActionEditorFields({
   onChange: (patch: Partial<ProjectAction>) => void;
 }) {
   const selectedAgentIds = action.agentIds ?? [];
+  const selectedAgentId = selectedAgentIds[0] ?? "";
   const selectedOutputIds = action.outputIds ?? [];
   const humanGate = Boolean(action.humanGate);
-  const outputSlotIds = humanGate || selectedAgentIds.length > 0 ? normalizeActionOutputSlots(selectedOutputIds) : [];
+  const outputSlotIds = humanGate || selectedAgentId ? normalizeActionOutputSlots(selectedOutputIds) : [];
   const actionIdError = automationStringValidationMessage("Action ID", action.id, automationFieldLimits.policyId);
   const descriptionError = automationStringValidationMessage("Description", action.description, automationFieldLimits.description, { required: false });
-  const selectableAgents = useMemo(() => agents.filter((agent) => !selectedAgentIds.includes(agent.id)), [agents, selectedAgentIds]);
-  const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
   const fallbackOutputIds = () => {
     const availableOutputIds = config.outputs.map((output) => output.id);
     const defaultOutputIds = defaultActionOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
     return defaultOutputIds.length === defaultActionOutputIds.length ? defaultOutputIds : [...defaultActionOutputIds];
   };
-  const canAddAgent = selectedAgentIds.length < 5 && selectableAgents.length > 0;
-  const addAgent = (agentId: string) => {
-    if (humanGate || !agentId || selectedAgentIds.includes(agentId) || selectedAgentIds.length >= 5) return;
+  const updateAgent = (agentId: string) => {
+    if (humanGate) return;
+    if (agentId === noAgentSelectionValue) {
+      onChange({ agentIds: [], outputIds: [] });
+      return;
+    }
+    if (!agentId) return;
     onChange({
-      agentIds: [...selectedAgentIds, agentId],
+      agentIds: [agentId],
       outputIds: selectedOutputIds.length > 0 ? selectedOutputIds : fallbackOutputIds()
     });
-  };
-  const removeAgent = (agentId: string) => {
-    onChange({ agentIds: selectedAgentIds.filter((candidate) => candidate !== agentId) });
   };
   const updateHumanGate = (enabled: boolean) => {
     onChange(enabled
@@ -106,7 +107,7 @@ export function ActionEditorFields({
         <FieldDescription>Route this action to a human operator instead of an agent.</FieldDescription>
       </Field>
       <Field>
-        <FieldLabel>Agents</FieldLabel>
+        <FieldLabel>Agent</FieldLabel>
         {humanGate ? (
           <div className="flex min-h-7 flex-wrap items-center gap-2">
             <Badge variant="outline" className="border-tertiary/60 bg-tertiary/10 font-mono text-tertiary">
@@ -115,33 +116,18 @@ export function ActionEditorFields({
             </Badge>
           </div>
         ) : (
-          <div className="flex min-h-7 flex-wrap items-center gap-2">
-            {selectedAgentIds.map((agentId) => (
-              <Badge key={agentId} variant="outline" className="border-divider-strong bg-muted/50 font-mono">
-                {agentLabel(agentId)}
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant="ghost"
-                  aria-label={`Remove agent ${agentLabel(agentId)}`}
-                  title={`Remove agent ${agentLabel(agentId)}`}
-                  onClick={() => removeAgent(agentId)}
-                  className="-mr-1 size-4 rounded-full p-0"
-                >
-                  <X data-icon="inline-end" />
-                </Button>
-              </Badge>
-            ))}
-            <Select onValueChange={addAgent} disabled={!canAddAgent}>
+          <div className="flex min-h-7 items-center">
+            <Select value={selectedAgentId || noAgentSelectionValue} onValueChange={updateAgent}>
               <SelectTrigger
-                aria-label="Add agent"
-                className="h-5 w-auto gap-1 rounded-xl border-dashed border-divider-strong bg-transparent px-2 py-0.5 font-mono text-xs text-muted-foreground shadow-none hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Select agent"
+                className="w-full max-w-md font-mono"
               >
-                <SelectValue placeholder="+ Agent" />
+                <SelectValue placeholder="Select agent" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {selectableAgents.map((agent) => (
+                  <SelectItem value={noAgentSelectionValue}>No agent</SelectItem>
+                  {agents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.name ? `${agent.name} · ${agent.id}` : agent.id}
                     </SelectItem>
@@ -154,7 +140,7 @@ export function ActionEditorFields({
       </Field>
       <Field>
         <FieldLabel>Outputs</FieldLabel>
-        {!humanGate && selectedAgentIds.length === 0 ? (
+        {!humanGate && !selectedAgentId ? (
           <span className="text-sm text-muted-foreground">None</span>
         ) : (
           <div className="grid gap-3">

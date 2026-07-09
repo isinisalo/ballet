@@ -3,6 +3,7 @@ import type { ProjectAction, ProjectHumanGateResponse, ProjectLoop, ProjectOutpu
 
 export const actionOutputSlotCount = 2;
 export const actionOutputSlotMinCount = 1;
+export const actionAgentCount = 1;
 export const defaultActionOutputIds = ["approved", "rejected"] as const;
 export type ActionOutputId = string;
 export const actionOutputStatuses = defaultActionOutputIds;

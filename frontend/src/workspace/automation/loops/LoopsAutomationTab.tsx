@@ -23,7 +23,7 @@ import {
   nextConfigWithoutLoopStepIndexes
 } from "./loopActionSheetLogic";
 import type { LoopStepRecord } from "./loopGraph";
-import { loopEventParts, loopHandlerRoute, pendingLoopHandlerRoute, type PendingLoopHandlerOutput } from "./loopHandlerRoutes";
+import { loopHandlerRoute } from "./loopHandlerRoutes";
 import { calculateCompositeLoopCanvasLayout, type LoopCanvasEdge } from "./loopLayout";
 import { loopOutputTargetsForPolicy } from "./loopOutputTargets";
 import { useLoopCanvasInteraction } from "./useLoopCanvasInteraction";
@@ -33,7 +33,6 @@ const noSelection = "__none__";
 type LoopHandlerSelection = {
   source: LoopHandlerSelectionSource;
   stepIndexes: number[];
-  pendingOutput?: PendingLoopHandlerOutput;
 };
 
 export function LoopsAutomationTab({
@@ -119,12 +118,10 @@ export function LoopsAutomationTab({
     .map((stepIndex) => loopStepRecords.find((record) => record.index === stepIndex))
     .filter((record): record is LoopStepRecord => Boolean(record));
   const selectedHandlerRoutes = useMemo(
-    () => selectedHandlerSelection?.pendingOutput && selected
-      ? [pendingLoopHandlerRoute(selected.id, selectedHandlerSelection.stepIndexes[0] ?? selected.steps.length, selectedHandlerSelection.pendingOutput)]
-      : selectedHandlerRecords
+    () => selectedHandlerRecords
       .map(loopHandlerRoute)
       .filter((route): route is LoopHandlerRoute => Boolean(route)),
-    [selected, selectedHandlerRecords, selectedHandlerSelection]
+    [selectedHandlerRecords]
   );
 
   useEffect(() => {
@@ -137,7 +134,6 @@ export function LoopsAutomationTab({
 
   useEffect(() => {
     if (!selectedHandlerSelection) return;
-    if (selectedHandlerSelection.pendingOutput) return;
     if (selectedHandlerRecords.length !== selectedHandlerStepIndexes.length || selectedHandlerRoutes.length === 0) {
       setSelectedHandlerSelection(null);
     }
@@ -181,17 +177,10 @@ export function LoopsAutomationTab({
     if (!nextAction) return;
     const outputId = eventType ? normalizeActionToken(eventType.split(".").at(-1) ?? "") : "";
     if (eventType && sourceAction && outputId) {
-      const eventParts = loopEventParts(eventType);
-      setSelectedHandlerSelection({
-        source: "edge",
-        stepIndexes: [selected.steps.length],
-        pendingOutput: {
-          eventType,
-          sourceActionId: sourceAction.id,
-          sourceLabel: eventParts?.sourceLabel ?? eventType,
-          outputId
-        }
-      });
+      updateConfig((current) =>
+        nextConfigWithPendingLoopOutputHandlerAction(current, selected.id, selected.steps.length, nextAction.id, sourceAction.id, outputId)
+      );
+      setSelectedHandlerSelection({ source: "edge", stepIndexes: [selected.steps.length] });
       return;
     }
     const shouldAppendStep = !selected.steps.includes(nextAction.id);
@@ -239,14 +228,6 @@ export function LoopsAutomationTab({
   };
   const updateHandlerRouteAction = (loopId: string, stepIndex: number, actionId: string) => {
     if (!selected || loopId !== selected.id) return;
-    const pendingOutput = selectedHandlerSelection?.pendingOutput;
-    if (pendingOutput && selectedHandlerSelection.stepIndexes.includes(stepIndex)) {
-      updateConfig((current) =>
-        nextConfigWithPendingLoopOutputHandlerAction(current, selected.id, stepIndex, actionId, pendingOutput.sourceActionId, pendingOutput.outputId)
-      );
-      setSelectedHandlerSelection({ source: "edge", stepIndexes: [stepIndex] });
-      return;
-    }
     updateConfig((current) => nextConfigWithLoopHandlerAction(current, selected.id, stepIndex, actionId));
   };
   const updateOutputHandlerRoute = (

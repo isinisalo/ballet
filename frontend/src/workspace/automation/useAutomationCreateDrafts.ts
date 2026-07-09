@@ -156,12 +156,13 @@ const createDraftWithNewEntity = (
       automationStringValidationMessage("Description", drafts.action.description, automationFieldLimits.description, { required: false }) ||
       draft.actions.some((action) => action.id === id)
     ) return undefined;
-    const outputIds = drafts.action.agentIds.length > 0 || drafts.action.humanGate ? drafts.action.outputIds : [];
+    const agentIds = drafts.action.humanGate ? [] : drafts.action.agentIds.slice(0, 1);
+    const outputIds = agentIds.length > 0 || drafts.action.humanGate ? drafts.action.outputIds : [];
     const outputs = [...draft.outputs];
     outputIds.forEach((outputId) => {
       if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
     });
-    return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds, agentIds: drafts.action.humanGate ? [] : drafts.action.agentIds }] } };
+    return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds, agentIds }] } };
   }
   const eventAction = loopStartingAction(draft, drafts.loop);
   const id = normalizeAutomationLoopId(drafts.loop.id);

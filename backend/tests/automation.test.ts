@@ -212,10 +212,19 @@ describe("project automation config", () => {
   });
 
   it("validates actions, scoped routes, loops, and human gate responses", () => {
+    const reviewerAgent = { ...agent, id: "reviewer-agent", name: "Reviewer Agent" };
     expect(validateProjectAutomationConfig(validConfig(), [agent])).toEqual([]);
     expect(validateProjectAutomationConfig({ ...validConfig(), policies: [] }, [agent]).some((issue) =>
       issue.message === "Automation policies are no longer supported. Use action event handlers."
     )).toBe(true);
+    expect(normalizeProjectAutomationConfig({
+      ...validConfig(),
+      actions: [{ ...validConfig().actions[0]!, agentIds: ["developer-agent", "reviewer-agent"] }]
+    }, [agent, reviewerAgent]).actions[0]?.agentIds).toEqual(["developer-agent"]);
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      actions: [{ ...validConfig().actions[0]!, agentIds: ["developer-agent", "reviewer-agent"] }]
+    }, [agent, reviewerAgent]).some((issue) => issue.message === "Action can select at most 1 agent.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, agentIds: ["missing-agent"] }]

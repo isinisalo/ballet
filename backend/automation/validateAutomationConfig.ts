@@ -9,6 +9,7 @@ import {
 } from "../../shared/api/automationValidation.js";
 import {
   actionOutputIds,
+  actionAgentCount,
   actionOutputRouteKey,
   actionOutputSlotCount,
   actionOutputSlotKind,
@@ -137,6 +138,9 @@ const validateAction = (
   if (action.agentIds !== undefined && !Array.isArray(action.agentIds)) {
     issues.push({ path: `${base}.agentIds`, message: "Action agentIds must be an array." });
   }
+  if (Array.isArray(action.agentIds) && stringArray(action.agentIds).filter(Boolean).length > actionAgentCount) {
+    issues.push({ path: `${base}.agentIds`, message: "Action can select at most 1 agent." });
+  }
   if (!action.humanGate && normalizedAgentIds.length === 0 && outputIds.length > 0) {
     issues.push({ path: `${base}.outputIds`, message: "Action without agents cannot select outputs." });
   }
@@ -157,7 +161,6 @@ const validateAction = (
       issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Action references unknown output: ${outputId}.` });
     }
   });
-  if (normalizedAgentIds.length > 5) issues.push({ path: `${base}.agentIds`, message: "Action can select at most 5 agents." });
   if (action.humanGate === true && normalizedAgentIds.length > 0) {
     issues.push({ path: `${base}.agentIds`, message: "Human gate action cannot select agents." });
   }

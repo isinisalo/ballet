@@ -125,7 +125,7 @@ export function LoopHandlerSheet({
                           id={routeDescriptionFieldId}
                           description={action.description}
                         />
-                        {humanGate ? <HumanOperatorField /> : <ReadOnlyBadges label="Agents" values={agentIds.map(agentLabel)} />}
+                        {humanGate ? <HumanOperatorField /> : <ReadOnlyBadges label="Agent" values={agentIds.slice(0, 1).map(agentLabel)} />}
                         <LoopOutputHandlerControls
                           config={config}
                           route={route}
@@ -196,7 +196,6 @@ function LoopRouteActionSelect({
       <FieldLabel htmlFor={id}>Handler action</FieldLabel>
       <Select
         value={route.actionId || undefined}
-        items={config.actions.map((option) => ({ value: option.id, label: option.id }))}
         onValueChange={(actionId) => onRouteActionChange(route.loopId, route.stepIndex, actionId)}
       >
         <SelectTrigger
@@ -205,7 +204,7 @@ function LoopRouteActionSelect({
           className="h-5 min-h-5 w-full max-w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
           title={route.actionLabel || "Select handler action"}
         >
-          <SelectValue className={route.actionId ? loopActionTokenClassName() : "text-muted-foreground"} placeholder="" />
+          <SelectValue className={route.actionId ? loopActionTokenClassName() : "text-muted-foreground"} placeholder={route.actionId || "Action"} />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
@@ -240,7 +239,7 @@ function LoopRouteDescriptionField({ id, description }: { id: string; descriptio
 function HumanOperatorField() {
   return (
     <Field>
-      <FieldLabel>Agents</FieldLabel>
+      <FieldLabel>Agent</FieldLabel>
       <div className="flex min-h-7 flex-wrap items-center gap-2">
         <Badge variant="outline" className="border-tertiary/60 bg-tertiary/10 font-mono text-tertiary">
           <ShieldCheck data-icon="inline-start" />

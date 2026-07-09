@@ -58,32 +58,31 @@ export const routeAutomationEvent = (
       return;
     }
 
-    action.agentIds.forEach((targetAgentId) => {
-      const key = `${routeId}:${targetAgentId}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      const agent = agents.find((candidate) => candidate.id === targetAgentId);
-      if (!agent?.enabled) {
-        decisions.push({
-          actionId: normalizedActionId,
-          loopId,
-          routeId,
-          actionVersion: actionVersion(),
-          targetAgentId,
-          status: "skipped",
-          reason: `Action "${normalizedActionId}" matched, but target agent ${targetAgentId} is disabled or missing.`
-        });
-        return;
-      }
+    const targetAgentId = action.agentIds[0];
+    const key = `${routeId}:${targetAgentId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const agent = agents.find((candidate) => candidate.id === targetAgentId);
+    if (!agent?.enabled) {
       decisions.push({
         actionId: normalizedActionId,
         loopId,
         routeId,
         actionVersion: actionVersion(),
         targetAgentId,
-        status: "routed",
-        reason: `${reason} Routed action "${normalizedActionId}" to ${agent.name}.`
+        status: "skipped",
+        reason: `Action "${normalizedActionId}" matched, but target agent ${targetAgentId} is disabled or missing.`
       });
+      return;
+    }
+    decisions.push({
+      actionId: normalizedActionId,
+      loopId,
+      routeId,
+      actionVersion: actionVersion(),
+      targetAgentId,
+      status: "routed",
+      reason: `${reason} Routed action "${normalizedActionId}" to ${agent.name}.`
     });
   };
 

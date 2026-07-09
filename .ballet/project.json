@@ -704,8 +704,7 @@
       "id": "ci-or-validation-failed.loop",
       "steps": [
         "classify-failure",
-        "implement-task",
-        "done"
+        "implement-task"
       ]
     }
   ],

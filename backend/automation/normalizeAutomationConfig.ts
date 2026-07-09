@@ -11,6 +11,7 @@ import { defaultProjectAutomationConfig } from "../../shared/domain/automation.j
 import type { ProjectRuntime } from "../../shared/domain/runtime.js";
 import {
   actionHasExecutableTarget,
+  actionAgentCount,
   actionOutputRouteKey,
   actionOutputSlotKind,
   defaultActionOutputIds,
@@ -67,7 +68,7 @@ const normalizeAgentId = (value: string, agents: Agent[]): string => {
 };
 
 const normalizeRawAgentIds = (value: unknown, agents: Agent[]): string[] =>
-  [...new Set(stringArray(value).map((agentId) => normalizeAgentId(agentId, agents)).filter(Boolean))].slice(0, 5);
+  [...new Set(stringArray(value).map((agentId) => normalizeAgentId(agentId, agents)).filter(Boolean))].slice(0, actionAgentCount);
 
 const normalizeRawOutputIds = (value: unknown): string[] | undefined =>
   Array.isArray(value) ? normalizeActionOutputSlots(uniqueActionOutputIds(stringArray(value))) : undefined;

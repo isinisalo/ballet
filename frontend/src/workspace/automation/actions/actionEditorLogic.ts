@@ -15,7 +15,7 @@ export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
     ...action,
     id: editableActionId(action.id),
     outputIds: normalizeActionOutputSlots(action.outputIds),
-    agentIds: action.humanGate ? [] : [...new Set(action.agentIds)].slice(0, 5),
+    agentIds: action.humanGate ? [] : [...new Set(action.agentIds)].slice(0, 1),
   };
   if (normalized.agentIds.length === 0 && !normalized.humanGate) normalized.outputIds = [];
   return normalized;
