@@ -5,7 +5,7 @@ import { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import { buildLoopLayoutGraphDraft } from "./loopLayoutGraph";
 import { positionLoopNodes } from "./loopLayoutPositioning";
-import { loopOutputSourceHandleId, loopShortestVerticalHandles, loopSummaryNodeWidth } from "./loopLayoutSizing";
+import { loopOutputSourceHandleId, loopShortestVerticalHandles } from "./loopLayoutSizing";
 import type { LoopCanvasLayout, LoopCanvasLayoutNode, LoopLayoutDirection } from "./loopLayoutTypes";
 
 type LoopLayoutRow = {
@@ -214,11 +214,11 @@ function calculateSelectedLoopCanvasLayout({
     config,
     loopIds: upstreamLoopIds,
     y: loopCanvasLayoutConfig.startY,
-    direction,
-    actionById
+    direction
   });
+  const upstreamBounds = loopLayoutBounds(upstreamNodes);
   const selectedStartY = upstreamNodes.length > 0
-    ? loopCanvasLayoutConfig.startY + loopNodeSizes.loop.height + loopCanvasLayoutConfig.selectedCompactLoopRowGap
+    ? upstreamBounds.maxY + loopCanvasLayoutConfig.selectedCompactLoopRowGap
     : loopCanvasLayoutConfig.startY;
   const selectedBounds = loopLayoutBounds(selectedRow.layout.nodes);
   const selectedOffsetY = selectedStartY - selectedBounds.minY;
@@ -253,8 +253,7 @@ function calculateSelectedLoopCanvasLayout({
     config,
     loopIds: downstreamLoopIds,
     y: selectedVisibleBounds.maxY + loopCanvasLayoutConfig.selectedCompactLoopRowGap,
-    direction,
-    actionById
+    direction
   });
   nodes.push(...downstreamNodes);
 
@@ -370,39 +369,33 @@ function compactLoopNodes({
   config,
   loopIds,
   y,
-  direction,
-  actionById
+  direction
 }: {
   config: ProjectAutomationConfig;
   loopIds: string[];
   y: number;
   direction: LoopLayoutDirection;
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>;
 }): LoopCanvasLayoutNode[] {
-  let nextX = loopCanvasLayoutConfig.startX;
+  let nextY = y;
 
   return loopIds.flatMap((loopId) => {
     const loop = config.loops.find((candidate) => candidate.id === loopId);
     if (!loop) return [];
-    const firstAction = actionById.get(loop.steps[0] ?? "");
-    const label = compactLoopLabel(loop, firstAction);
-    const width = loopSummaryNodeWidth(loop.id);
+    const width = loopNodeSizes.loop.minWidth;
     const node: LoopCanvasLayoutNode = {
       key: compactLoopNodeKey(loop.id),
       loopId: loop.id,
       kind: "loop",
-      x: nextX,
-      y,
+      x: loopCanvasLayoutConfig.startX,
+      y: nextY,
       width,
       height: loopNodeSizes.loop.height,
       direction,
       loopSummary: {
-        loopId: loop.id,
-        label,
-        action: firstAction?.id
+        loopId: loop.id
       }
     };
-    nextX += width + compactLoopColumnGap();
+    nextY += loopNodeSizes.loop.height + loopCanvasLayoutConfig.compactLoopRowGap;
     return [node];
   });
 }
@@ -432,8 +425,8 @@ function compactLoopEventEdges({
       key: `loop:${link.sourceLoopId}:output:${link.sourceStepIndex}:${link.outputId}:to:${link.targetLoopId}:loop`,
       sourceNodeKey: compactLoopNodeKey(link.sourceLoopId),
       targetNodeKey,
-      sourceHandleId: "right",
-      targetHandleId: "left",
+      sourceHandleId: "bottom",
+      targetHandleId: targetIsSelected ? "left" : "top",
       eventType: link.eventType,
       label: link.outputId,
       tone: "cross-loop",
@@ -472,7 +465,7 @@ function selectedToCompactLoopEventEdges({
         sourceNodeKey: namespaceLoopKey(selectedRow.loop.id, `action-${canonicalRecord.index}`),
         targetNodeKey: compactLoopNodeKey(link.targetLoopId),
         sourceHandleId: loopOutputSourceHandleId({ outputId: link.outputId, eventType: link.eventType }),
-        targetHandleId: "left",
+        targetHandleId: "top",
         eventType: link.eventType,
         label: link.outputId,
         tone: "cross-loop",
@@ -488,27 +481,8 @@ function selectedToCompactLoopEventEdges({
     });
 }
 
-function compactLoopLabel(
-  loop: ProjectLoop,
-  firstAction: ProjectAutomationConfig["actions"][number] | undefined
-) {
-  const source = firstAction?.id
-    ? firstAction.id.replace(/^create-/, "")
-    : loop.id.replace(/\.loop$/, "");
-  const label = source
-    .split("-")
-    .filter(Boolean)
-    .join(" ");
-
-  return label ? `${label} loop` : "loop";
-}
-
 function compactLoopNodeKey(loopId: string) {
   return `loop:${loopId}:loop`;
-}
-
-function compactLoopColumnGap() {
-  return loopCanvasLayoutConfig.columnGap * 2;
 }
 
 function resolveEventTargetLoop(
@@ -656,17 +630,17 @@ function loopEdgesWithDynamicVerticalHandles(
 
   return edges.map((edge) => {
     const outputSlotKind = loopEdgeOutputSlotKind(edge);
+    const sourceNode = nodeByKey.get(edge.sourceNodeKey);
+    const targetNode = nodeByKey.get(edge.targetNodeKey);
     if (outputSlotKind === "approval") {
       return {
         ...edge,
-        sourceHandleId: "right",
-        targetHandleId: "left"
+        sourceHandleId: sourceNode?.kind === "loop" ? "bottom" : "right",
+        targetHandleId: targetNode?.kind === "loop" ? "top" : "left"
       };
     }
     const isDynamicVerticalEdge = edge.tone === "return" || outputSlotKind === "rework";
     if (!isDynamicVerticalEdge) return edge;
-    const sourceNode = nodeByKey.get(edge.sourceNodeKey);
-    const targetNode = nodeByKey.get(edge.targetNodeKey);
     if (!sourceNode || !targetNode) return edge;
     const isUpwardEdge = targetNode.y + targetNode.height / 2 < sourceNode.y + sourceNode.height / 2;
     if (outputSlotKind === "rework" && (edge.tone === "return" || isUpwardEdge)) {

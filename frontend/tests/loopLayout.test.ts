@@ -4,7 +4,7 @@ import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
 import { Position, type Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import { toLoopReactFlowEdges } from "../src/workspace/automation/loops/LoopCanvas";
-import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopRejectedEdgeLabelPlacement, loopReturnEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
+import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopRejectedEdgeLabelPlacement, loopReturnEdgePath, loopToLoopStraightEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
 import { loopCrossLoopSmoothStepPath } from "../src/workspace/automation/loops/loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor } from "../src/workspace/automation/loops/loopEdgeLabelGeometry";
 import { buildLoopGraph, type LoopStepRecord } from "../src/workspace/automation/loops/loopGraph";
@@ -1096,9 +1096,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       width: loopNodeSizes.loop.minWidth,
       height: loopNodeSizes.loop.height,
       loopSummary: {
-        loopId: "target",
-        label: "target start loop",
-        action: "target-start"
+        loopId: "target"
       }
     });
     expect(targetLoop?.y).toBeGreaterThan(sourceAction?.y ?? 0);
@@ -1113,7 +1111,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       sourceNodeKey: "loop:source:action-0",
       targetNodeKey: "loop:target:loop",
       sourceHandleId: "right",
-      targetHandleId: "left",
+      targetHandleId: "top",
       eventType: "source.source-start.approved",
       label: "approved",
       tone: "cross-loop"
@@ -1132,7 +1130,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       sourceNodeKey: "loop:source:action-0",
       targetNodeKey: "loop:target:loop",
       sourceHandleId: "right",
-      targetHandleId: "left",
+      targetHandleId: "top",
       label: "approved",
       tone: "cross-loop"
     });
@@ -1155,8 +1153,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(upstreamLoop).toMatchObject({
       kind: "loop",
       loopSummary: {
-        loopId: "upstream",
-        label: "upstream start loop"
+        loopId: "upstream"
       }
     });
     expect(upstreamLoop?.y).toBeLessThan(sourceAction?.y ?? 0);
@@ -1167,6 +1164,8 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "loop:upstream:loop",
       targetNodeKey: "loop:source:action-0",
+      sourceHandleId: "bottom",
+      targetHandleId: "left",
       label: "approved",
       tone: "cross-loop"
     });
@@ -1199,7 +1198,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
   });
 
-  it("orders branching compact loop successors by config order on the downstream row", () => {
+  it("stacks branching compact loop successors by config order", () => {
     const config = compositeConfig(["source", "target", "downstream"]);
     config.actions.push({
       id: "branch-gate",
@@ -1230,17 +1229,31 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       recordsByLoopId: compositeRecords(config)
     });
     const targetLoop = layout.nodes.find((node) => node.key === "loop:target:loop");
+    const downstreamLoop = layout.nodes.find((node) => node.key === "loop:downstream:loop");
     const branchLoop = layout.nodes.find((node) => node.key === "loop:branch:loop");
+    const compactLoopStep = loopNodeSizes.loop.height + loopCanvasLayoutConfig.compactLoopRowGap;
 
     expect(targetLoop).toBeDefined();
+    expect(downstreamLoop).toBeDefined();
     expect(branchLoop).toBeDefined();
-    expect(targetLoop?.y).toBe(branchLoop?.y);
-    expect(targetLoop ? branchLoop?.x : undefined).toBeGreaterThan(targetLoop?.x ?? 0);
+    expect(targetLoop?.x).toBe(branchLoop?.x);
+    expect(targetLoop?.x).toBe(downstreamLoop?.x);
+    expect(downstreamLoop?.y).toBe((targetLoop?.y ?? 0) + compactLoopStep);
+    expect(branchLoop?.y).toBe((downstreamLoop?.y ?? 0) + compactLoopStep);
+    expect(compactLoopStep).toBe(70);
     expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:loop")).toMatchObject({
       label: "approved",
       tone: "cross-loop"
     });
     expect(layout.edges.find((edge) => edge.key === "loop:source:output:1:approved:to:branch:loop")).toMatchObject({
+      label: "approved",
+      tone: "cross-loop"
+    });
+    expect(layout.edges.find((edge) => edge.key === "loop:target:output:0:approved:to:downstream:loop")).toMatchObject({
+      sourceNodeKey: "loop:target:loop",
+      targetNodeKey: "loop:downstream:loop",
+      sourceHandleId: "bottom",
+      targetHandleId: "top",
       label: "approved",
       tone: "cross-loop"
     });
@@ -1278,6 +1291,19 @@ describe("calculateAllLoopsCanvasLayout", () => {
 });
 
 describe("toLoopReactFlowEdges", () => {
+  it("renders compact loop-to-loop edges as one direct segment", () => {
+    expect(loopToLoopStraightEdgePath({
+      sourceX: 83,
+      sourceY: 86,
+      targetX: 83,
+      targetY: 134
+    })).toEqual({
+      path: "M 83,86 L 83,134",
+      labelX: 83,
+      labelY: 110
+    });
+  });
+
   it("uses action ids on forward edges and preserves output labels on rework edges", () => {
     const sourceNode = {
       key: "action-0",
@@ -1316,6 +1342,42 @@ describe("toLoopReactFlowEdges", () => {
       tone: "cross-loop",
       route: { outputId: "approved" }
     }, sourceNode)).toBeUndefined();
+
+    expect(loopEdgeDisplayLabel({
+      key: "loop-start",
+      sourceNodeKey: "loop:upstream:loop",
+      targetNodeKey: "loop:source:action-0",
+      label: "approved",
+      tone: "cross-loop",
+      route: { outputId: "approved" }
+    }, {
+      key: "loop:upstream:loop",
+      kind: "loop",
+      x: 72,
+      y: 64,
+      width: loopNodeSizes.loop.minWidth,
+      height: loopNodeSizes.loop.height,
+      direction: "horizontal",
+      loopSummary: { loopId: "upstream.approved.loop" }
+    })).toEqual({ value: "upstream.approved.loop", kind: "loop", placement: "start" });
+
+    expect(loopEdgeDisplayLabel({
+      key: "loop-end",
+      sourceNodeKey: "loop:source:action-0",
+      targetNodeKey: "loop:target:loop",
+      label: "approved",
+      tone: "cross-loop",
+      route: { outputId: "approved" }
+    }, sourceNode, {
+      key: "loop:target:loop",
+      kind: "loop",
+      x: 72,
+      y: 280,
+      width: loopNodeSizes.loop.minWidth,
+      height: loopNodeSizes.loop.height,
+      direction: "horizontal",
+      loopSummary: { loopId: "target.approved.loop" }
+    })).toEqual({ value: "target.approved.loop", kind: "loop", placement: "end" });
   });
 
   it("anchors stepped loop edge labels to the longest horizontal segment", () => {

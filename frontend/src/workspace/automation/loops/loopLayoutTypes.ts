@@ -17,8 +17,6 @@ export type LoopCanvasOutputEvent = {
 
 export type LoopCanvasLoopSummary = {
   loopId: string;
-  label: string;
-  action?: string;
 };
 
 export type LoopCanvasLayoutNode = {

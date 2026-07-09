@@ -44,10 +44,6 @@ export function loopOutputEventNodeWidth() {
   return loopNodeSizes.outputEvent.minWidth;
 }
 
-export function loopSummaryNodeWidth(value: string) {
-  return loopTextNodeWidth(value, loopNodeSizes.loop.minWidth, loopNodeSizes.loop.maxWidth);
-}
-
 export function loopHorizontalEdgeGap() {
   return loopCanvasLayoutConfig.horizontalEdgeGap;
 }
@@ -73,13 +69,4 @@ export function loopBranchStackHeight(node: Pick<LoopCanvasLayoutNode, "height" 
   return node.kind === "action"
     ? loopActionStackHeight()
     : node.height;
-}
-
-function loopTextNodeWidth(value: string, minWidth: number, maxWidth: number) {
-  const iconAndGapWidth = 20;
-  const estimatedCharacterWidth = 7;
-  return Math.min(
-    maxWidth,
-    Math.max(minWidth, iconAndGapWidth + value.length * estimatedCharacterWidth)
-  );
 }
