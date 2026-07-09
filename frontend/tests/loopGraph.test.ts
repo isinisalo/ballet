@@ -8,7 +8,7 @@ const action = (patch: Partial<ProjectAction>): ProjectAction => ({
   id: patch.id ?? "action",
   description: patch.description ?? "",
   outputIds: patch.outputIds ?? ["complete"],
-  agentIds: patch.agentIds ?? []
+  ...(patch.agentId ? { agentId: patch.agentId } : {})
 });
 
 describe("loop graph", () => {

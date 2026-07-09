@@ -7,27 +7,21 @@
       "outputIds": [
         "approved"
       ],
-      "agentIds": [
-        "brief-agent"
-      ]
+      "agentId": "brief-agent"
     },
     {
       "id": "challenge-project-brief",
       "description": "Challenge Project Brief against ADRs, GOALS, constraints, assumptions, and traceability.",
-      "agentIds": [
-        "loop-critic-agent"
-      ]
+      "agentId": "loop-critic-agent"
     },
     {
       "id": "project-brief-gate",
       "description": "Gate 1: Human approval of the agent-reviewed Project Brief before roadmap planning continues.",
-      "agentIds": [],
       "humanGate": true
     },
     {
       "id": "done",
-      "description": "No further loop action.",
-      "agentIds": []
+      "description": "No further loop action."
     },
     {
       "id": "create-roadmap",
@@ -35,168 +29,126 @@
       "outputIds": [
         "approved"
       ],
-      "agentIds": [
-        "roadmap-agent"
-      ]
+      "agentId": "roadmap-agent"
     },
     {
       "id": "challenge-roadmap",
       "description": "Challenge roadmap for value order, risk order, dependencies, and ADR/GOALS alignment.",
-      "agentIds": [
-        "loop-critic-agent"
-      ]
+      "agentId": "loop-critic-agent"
     },
     {
       "id": "roadmap-gate",
       "description": "Gate 2: Human approval of the reviewed Roadmap before UI design planning continues.",
-      "agentIds": [],
       "humanGate": true
     },
     {
       "id": "create-ui-design",
       "description": "Create UI/UX design plan from approved Roadmap.",
-      "agentIds": [
-        "ui-design-agent"
-      ]
+      "agentId": "ui-design-agent"
     },
     {
       "id": "challenge-ui-design",
       "description": "Challenge UI design for goal fit, states, accessibility, consistency, and implementation cost.",
-      "agentIds": [
-        "loop-critic-agent"
-      ]
+      "agentId": "loop-critic-agent"
     },
     {
       "id": "ui-design-gate",
       "description": "Gate 3: Human approval of the reviewed UI Design before technical planning continues.",
-      "agentIds": [],
       "humanGate": true
     },
     {
       "id": "create-technical-plan",
       "description": "Create implementation-ready Technical Plan from ADRs, Roadmap, and approved UI Design.",
-      "agentIds": [
-        "technical-plan-agent"
-      ]
+      "agentId": "technical-plan-agent"
     },
     {
       "id": "challenge-technical-plan",
       "description": "Challenge Technical Plan for architecture, data, APIs, security, testability, deployability, and rollback.",
-      "agentIds": [
-        "loop-critic-agent"
-      ]
+      "agentId": "loop-critic-agent"
     },
     {
       "id": "technical-plan-gate",
       "description": "Gate 4: Human approval of the reviewed Technical Plan before milestone planning continues.",
-      "agentIds": [],
       "humanGate": true
     },
     {
       "id": "create-milestones",
       "description": "Create validated milestones from approved Technical Plan and Roadmap.",
-      "agentIds": [
-        "milestone-task-agent"
-      ]
+      "agentId": "milestone-task-agent"
     },
     {
       "id": "challenge-milestones",
       "description": "Challenge milestones for scope, dependency order, validation method, and increment value.",
-      "agentIds": [
-        "loop-critic-agent"
-      ]
+      "agentId": "loop-critic-agent"
     },
     {
       "id": "milestones-gate",
       "description": "Gate 5: Human approval of the reviewed Milestones before task specification continues.",
-      "agentIds": [],
       "humanGate": true
     },
     {
       "id": "create-task-specs",
       "description": "Create atomic task specifications from approved milestones.",
-      "agentIds": [
-        "milestone-task-agent"
-      ]
+      "agentId": "milestone-task-agent"
     },
     {
       "id": "challenge-task-specs",
       "description": "Challenge task specs for atomicity, acceptance criteria, testability, dependencies, and traceability.",
-      "agentIds": [
-        "loop-critic-agent"
-      ]
+      "agentId": "loop-critic-agent"
     },
     {
       "id": "task-specs-gate",
       "description": "Gate 6: Human approval of the reviewed Task Specs before implementation starts.",
-      "agentIds": [],
       "humanGate": true
     },
     {
       "id": "implement-task",
       "description": "Implement only the approved task spec as the smallest safe code change.",
-      "agentIds": [
-        "implementation-agent"
-      ]
+      "agentId": "implementation-agent"
     },
     {
       "id": "run-tests",
       "description": "Run or assess required tests, build, lint, and acceptance evidence.",
-      "agentIds": [
-        "review-test-agent"
-      ]
+      "agentId": "review-test-agent"
     },
     {
       "id": "classify-failure",
       "description": "Classify failed implementation, review, test, deployment, or validation evidence and route safe corrections.",
-      "agentIds": [
-        "failure-router-agent"
-      ]
+      "agentId": "failure-router-agent"
     },
     {
       "id": "review-code",
       "description": "Review code against task spec, ADRs, GOALS, tests, security, and scope boundaries.",
-      "agentIds": [
-        "review-test-agent"
-      ]
+      "agentId": "review-test-agent"
     },
     {
       "id": "code-gate",
       "description": "Gate 7: Human approval of reviewed code before dev deployment starts.",
-      "agentIds": [],
       "humanGate": true
     },
     {
       "id": "prepare-dev-deployment",
       "description": "Check dev deployment readiness: artifact, config, migrations, rollback, and validation plan.",
-      "agentIds": [
-        "dev-deploy-agent"
-      ]
+      "agentId": "dev-deploy-agent"
     },
     {
       "id": "deploy-to-dev",
       "description": "Deploy the approved build to the dev environment.",
-      "agentIds": [
-        "dev-deploy-agent"
-      ]
+      "agentId": "dev-deploy-agent"
     },
     {
       "id": "validate-dev-deployment",
       "description": "Validate dev deployment with smoke tests, acceptance checks, logs, metrics, and traces.",
-      "agentIds": [
-        "dev-deploy-agent"
-      ]
+      "agentId": "dev-deploy-agent"
     },
     {
       "id": "dev-deployment-validation-gate",
       "description": "Gate 8: Human approval of validated dev deployment before the loop is done.",
-      "agentIds": [],
       "humanGate": true
     },
     {
       "id": "blocked",
-      "description": "Agent work is blocked.",
-      "agentIds": []
+      "description": "Agent work is blocked."
     }
   ],
   "outputRoutes": [

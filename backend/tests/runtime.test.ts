@@ -58,13 +58,13 @@ const implementationAction = {
   id: "implementation",
   description: "Implement approved work.",
   outputIds: ["approved", "rejected"],
-  agentIds: ["developer-agent"]
+  agentId: "developer-agent"
 };
 const qaAction = {
   id: "qa-review",
   description: "Review implementation.",
   outputIds: ["approved", "rejected"],
-  agentIds: ["qa-verification-reviewer"]
+  agentId: "qa-verification-reviewer"
 };
 const automationConfig = (patch: Partial<ProjectAutomationConfig> = {}): ProjectAutomationConfig => ({
   version: 1,
@@ -102,7 +102,7 @@ describe("runtime database", () => {
       tags: ["delivery"],
       payload: { work_item_id: "work-1" }
     }, automationConfig({
-      actions: [{ ...implementationAction, agentIds: ["developer-agent"] }],
+      actions: [{ ...implementationAction, agentId: "developer-agent" }],
       outputRoutes: [],
       loops: [{ id: loopId, steps: ["implementation"] }]
     }), [agent]);
@@ -207,7 +207,7 @@ describe("runtime database", () => {
     };
 
     const config = automationConfig({
-      actions: [{ ...implementationAction, agentIds: ["developer-agent"] }],
+      actions: [{ ...implementationAction, agentId: "developer-agent" }],
       outputRoutes: [],
       loops: [{ id: loopId, steps: ["implementation"] }]
     });
@@ -226,7 +226,7 @@ describe("runtime database", () => {
     const root = await tempRoot();
     const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     const config = automationConfig({
-      actions: [{ ...implementationAction, agentIds: ["developer-agent"] }],
+      actions: [{ ...implementationAction, agentId: "developer-agent" }],
       outputRoutes: [],
       loops: [{ id: loopId, steps: ["implementation"] }]
     });
@@ -271,10 +271,10 @@ describe("runtime output mapping", () => {
     expect(mapAgentOutputToEvent(implementationAction, { status: "complete", loopId }, [], [implementationAction]).id).toBe("plan-approved.loop.implementation.approved");
     expect(mapAgentOutputToEvent(implementationAction, { status: "failed", loopId }, [], [implementationAction]).id).toBe("plan-approved.loop.implementation.rejected");
     expect(mapAgentOutputToEvent(
-      { id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true },
+      { id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], humanGate: true },
       { status: "approved", loopId },
       [],
-      [{ id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], agentIds: [], humanGate: true }]
+      [{ id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], humanGate: true }]
     ).id).toBe("plan-approved.loop.human-review.approved");
   });
 

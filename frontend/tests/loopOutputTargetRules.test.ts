@@ -14,13 +14,12 @@ const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes"> => 
       id: "review",
       description: "Review.",
       outputIds: ["approved", "changes-requested"],
-      agentIds: ["reviewer-agent"]
+      agentId: "reviewer-agent"
     },
     {
       id: "human-review",
       description: "Human review.",
       outputIds: ["approved", "changes-requested"],
-      agentIds: [],
       humanGate: true
     }
   ],

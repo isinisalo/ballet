@@ -11,7 +11,6 @@ import { defaultProjectAutomationConfig } from "../../shared/domain/automation.j
 import type { ProjectRuntime } from "../../shared/domain/runtime.js";
 import {
   actionHasExecutableTarget,
-  actionAgentCount,
   actionOutputRouteKey,
   actionOutputSlotKind,
   defaultActionOutputIds,
@@ -67,8 +66,10 @@ const normalizeAgentId = (value: string, agents: Agent[]): string => {
   return agents.find((agent) => agent.id === trimmed)?.id ?? resolveActionAgent(agents, trimmed)?.id ?? trimmed;
 };
 
-const normalizeRawAgentIds = (value: unknown, agents: Agent[]): string[] =>
-  [...new Set(stringArray(value).map((agentId) => normalizeAgentId(agentId, agents)).filter(Boolean))].slice(0, actionAgentCount);
+const normalizeRawAgentId = (value: unknown, agents: Agent[]): string | undefined => {
+  const agentId = typeof value === "string" ? normalizeAgentId(value, agents) : "";
+  return agentId || undefined;
+};
 
 const normalizeRawOutputIds = (value: unknown): string[] | undefined =>
   Array.isArray(value) ? normalizeActionOutputSlots(uniqueActionOutputIds(stringArray(value))) : undefined;
@@ -113,7 +114,7 @@ const fallbackOutputIds = (availableOutputIds: string[]) => {
 
 const executableOutputIds = (
   outputIds: string[] | undefined,
-  executable: Pick<ProjectAction, "humanGate"> & { agentIds: string[] },
+  executable: Pick<ProjectAction, "humanGate" | "agentId">,
   availableOutputIds: string[]
 ): string[] => {
   const source = outputIds ?? fallbackOutputIds(availableOutputIds);
@@ -127,13 +128,13 @@ const readBaseAction = (value: RawRecord, agents: Agent[], availableOutputIds: s
   const id = rawActionToken(value);
   if (!id) return undefined;
   const humanGate = value.humanGate === true;
-  const agentIds = humanGate ? [] : normalizeRawAgentIds(value.agentIds, agents);
-  const executable = { humanGate, agentIds };
+  const agentId = humanGate ? undefined : normalizeRawAgentId(value.agentId, agents);
+  const executable = { humanGate, agentId };
   return {
     id,
     description: stringValue(value.description),
     outputIds: executableOutputIds(normalizeRawOutputIds(value.outputIds), executable, availableOutputIds),
-    agentIds,
+    ...(agentId ? { agentId } : {}),
     ...(humanGate ? { humanGate: true } : {})
   };
 };
@@ -200,13 +201,12 @@ const compactActions = (
     if (!actionId || actionById.has(actionId)) return;
     const run = isRecord(policy.run) ? policy.run : {};
     const inferredAgentId = normalizeAgentId(stringValue(policy.agent) || stringValue(run.agent), agents);
-    const agentIds = inferredAgentId ? [inferredAgentId] : [];
-    const executable = { humanGate: false, agentIds };
+    const executable = { humanGate: false, agentId: inferredAgentId || undefined };
     actionById.set(actionId, {
       id: actionId,
       description: "",
       outputIds: executableOutputIds(undefined, executable, availableOutputIds),
-      agentIds
+      ...(inferredAgentId ? { agentId: inferredAgentId } : {})
     });
   });
 

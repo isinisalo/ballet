@@ -19,19 +19,19 @@ const testAction = ({
   id,
   humanGate = false,
   outputIds = ["approved", "rejected"],
-  agentIds = ["agent-1"],
+  agentId = "agent-1",
   description
 }: {
   id?: string;
   humanGate?: boolean;
   outputIds?: string[];
-  agentIds?: string[];
+  agentId?: string;
   description?: string;
 }): ProjectAutomationConfig["actions"][number] => ({
   id: id ?? implementationActionId,
   description: description ?? `${id ?? implementationActionId} action`,
   outputIds,
-  agentIds: humanGate ? [] : agentIds,
+  ...(!humanGate && agentId ? { agentId } : {}),
   ...(humanGate ? { humanGate: true } : {})
 });
 
@@ -121,12 +121,11 @@ const baseData = (): AppData => ({
       id: implementationActionId,
       description: "Implement work",
       outputIds: ["approved", "rejected"],
-      agentIds: ["agent-1"]
+      agentId: "agent-1"
     }, {
       id: humanGateActionId,
       description: "Approve project brief",
       outputIds: ["approved", "rejected"],
-      agentIds: [],
       humanGate: true
     }],
     outputs: [
@@ -722,7 +721,6 @@ describe("workspace entity UI flows", () => {
       id: "human-review",
       description: "Review generated evidence.",
       outputIds: ["approved", "rejected"],
-      agentIds: [],
       humanGate: true
     })));
     const savedAction = data.automation.actions.find((action) => action.id === "human-review") as Record<string, unknown> | undefined;
@@ -744,7 +742,7 @@ describe("workspace entity UI flows", () => {
       id: reviewActionId,
       description: "Review implementation output.",
       outputIds: ["approved", "rejected"],
-      agentIds: ["agent-1"]
+      agentId: "agent-1"
     })];
     const { data, fetchMock } = await renderRoute(`/automation/loops?id=${loopId}`, loopData);
 
@@ -780,13 +778,13 @@ describe("workspace entity UI flows", () => {
         id: triageActionId,
         description: "Triage rejected output.",
         outputIds: ["approved", "rejected"],
-        agentIds: ["agent-1"]
+        agentId: "agent-1"
       }),
       testAction({
         id: reworkActionId,
         description: "Rework implementation.",
         outputIds: ["approved", "rejected"],
-        agentIds: ["agent-1"]
+        agentId: "agent-1"
       })
     ];
     loopData.automation.loops.push({ id: returnLoopId, steps: [triageActionId, reworkActionId] });

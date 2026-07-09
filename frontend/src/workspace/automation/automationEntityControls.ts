@@ -47,15 +47,15 @@ const addEntityConfig = (
             selectedOutputIds.forEach((outputId) => {
               if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
             });
-            const agentIds = agents?.[0]?.id ? [agents[0].id] : [];
+            const agentId = agents?.[0]?.id;
             return {
               ...current,
               outputs,
               actions: [...current.actions, {
                 id,
                 description: "New action",
-                outputIds: agentIds.length > 0 ? selectedOutputIds : [],
-                agentIds
+                outputIds: agentId ? selectedOutputIds : [],
+                ...(agentId ? { agentId } : {})
               }]
             };
           });

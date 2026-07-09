@@ -9,7 +9,6 @@ import {
 } from "../../shared/api/automationValidation.js";
 import {
   actionOutputIds,
-  actionAgentCount,
   actionOutputRouteKey,
   actionOutputSlotCount,
   actionOutputSlotKind,
@@ -129,22 +128,25 @@ const validateAction = (
   }
 
   const normalizedAction = normalized.actions[index];
-  const normalizedAgentIds = normalizedAction?.agentIds ?? [];
+  const normalizedAgentId = normalizedAction?.agentId;
   const rawOutputIds = normalizedActionOutputIds(action);
   const outputIds = rawOutputIds ?? normalizedAction?.outputIds ?? [];
   if (action.outputIds !== undefined && !Array.isArray(action.outputIds)) {
     issues.push({ path: `${base}.outputIds`, message: "Action outputIds must be an array." });
   }
-  if (action.agentIds !== undefined && !Array.isArray(action.agentIds)) {
-    issues.push({ path: `${base}.agentIds`, message: "Action agentIds must be an array." });
+  if (action.agentIds !== undefined) {
+    issues.push({ path: `${base}.agentIds`, message: "Action agentIds is no longer supported. Use agentId." });
   }
-  if (Array.isArray(action.agentIds) && stringArray(action.agentIds).filter(Boolean).length > actionAgentCount) {
-    issues.push({ path: `${base}.agentIds`, message: "Action can select at most 1 agent." });
+  if (action.agentId !== undefined && typeof action.agentId !== "string") {
+    issues.push({ path: `${base}.agentId`, message: "Action agentId must be a string." });
   }
-  if (!action.humanGate && normalizedAgentIds.length === 0 && outputIds.length > 0) {
+  if (typeof action.agentId === "string" && !action.agentId.trim()) {
+    issues.push({ path: `${base}.agentId`, message: "Action agentId cannot be empty." });
+  }
+  if (!action.humanGate && !normalizedAgentId && outputIds.length > 0) {
     issues.push({ path: `${base}.outputIds`, message: "Action without agents cannot select outputs." });
   }
-  if ((normalizedAgentIds.length > 0 || action.humanGate === true) &&
+  if ((normalizedAgentId || action.humanGate === true) &&
     rawOutputIds &&
     (rawOutputIds.length < actionOutputSlotMinCount || rawOutputIds.length > actionOutputSlotCount) &&
     !legacyCompatibleOutputIds(rawOutputIds)) {
@@ -161,17 +163,12 @@ const validateAction = (
       issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Action references unknown output: ${outputId}.` });
     }
   });
-  if (action.humanGate === true && normalizedAgentIds.length > 0) {
-    issues.push({ path: `${base}.agentIds`, message: "Human gate action cannot select agents." });
+  if (action.humanGate === true && (normalizedAgentId || typeof action.agentId === "string")) {
+    issues.push({ path: `${base}.agentId`, message: "Human gate action cannot select an agent." });
   }
-  const seenAgents = new Set<string>();
-  normalizedAgentIds.forEach((agentId, agentIndex) => {
-    if (seenAgents.has(agentId)) issues.push({ path: `${base}.agentIds[${agentIndex}]`, message: `Duplicate action agent id: ${agentId}.` });
-    seenAgents.add(agentId);
-    if (agentIdSet.size > 0 && !agentIdSet.has(agentId)) {
-      issues.push({ path: `${base}.agentIds[${agentIndex}]`, message: `Action references unknown agent: ${agentId}.` });
-    }
-  });
+  if (normalizedAgentId && agentIdSet.size > 0 && !agentIdSet.has(normalizedAgentId)) {
+    issues.push({ path: `${base}.agentId`, message: `Action references unknown agent: ${normalizedAgentId}.` });
+  }
 };
 
 const validateOutputRoute = (

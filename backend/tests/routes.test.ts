@@ -183,7 +183,7 @@ describe("API routes", () => {
         id: "implementation",
         description: "Implementation",
         outputIds: ["approved", "rejected"],
-        agentIds: ["developer-agent"]
+        agentId: "developer-agent"
       }],
       outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
@@ -197,7 +197,7 @@ describe("API routes", () => {
         id: "implementation",
         description: "Implementation",
         outputIds: ["approved", "rejected"],
-        agentIds: ["developer-agent"]
+        agentId: "developer-agent"
       }],
       outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
@@ -257,7 +257,7 @@ describe("API routes", () => {
         id: "implementation",
         description: "Implementation",
         outputIds: ["approved", "rejected"],
-        agentIds: ["developer-agent"]
+        agentId: "developer-agent"
       }],
       outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
@@ -315,7 +315,7 @@ describe("API routes", () => {
         id: loopStartActionId,
         description: "Implementation",
         outputIds: ["approved", "rejected"],
-        agentIds: ["developer-agent"]
+        agentId: "developer-agent"
       }],
       outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
@@ -334,7 +334,7 @@ describe("API routes", () => {
       const savedBody = await saved.json();
       expect(savedBody).toMatchObject({
         actions: [
-          expect.objectContaining({ id: loopStartActionId, agentIds: ["developer-agent"] })
+          expect.objectContaining({ id: loopStartActionId, agentId: "developer-agent" })
         ],
         outputs: [{ id: "approved" }, { id: "rejected" }],
         loops: [{ id: loopId, steps: [loopStartActionId] }]
@@ -355,7 +355,7 @@ describe("API routes", () => {
         config: {
           outputs: [{ id: "approved" }, { id: "rejected" }],
           actions: [
-            expect.objectContaining({ id: loopStartActionId, agentIds: ["developer-agent"] })
+            expect.objectContaining({ id: loopStartActionId, agentId: "developer-agent" })
           ]
         },
         issues: []

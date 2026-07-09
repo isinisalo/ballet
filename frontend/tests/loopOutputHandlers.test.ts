@@ -12,12 +12,12 @@ const returnLoopId = "return.loop";
 const config = (): ProjectAutomationConfig => ({
   version: 1,
   actions: [
-    { id: "start", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
-    { id: "review", description: "Review.", outputIds: ["approved", "changes-requested"], agentIds: ["agent-1"] },
-    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes-requested"], agentIds: [], humanGate: true },
-    { id: "return-start", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
-    { id: "rework", description: "Build.", outputIds: ["ready", "blocked"], agentIds: ["agent-1"] },
-    { id: "done", description: "Done.", outputIds: [], agentIds: [] }
+    { id: "start", description: "Build.", outputIds: ["ready", "blocked"], agentId: "agent-1" },
+    { id: "review", description: "Review.", outputIds: ["approved", "changes-requested"], agentId: "agent-1" },
+    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes-requested"], humanGate: true },
+    { id: "return-start", description: "Build.", outputIds: ["ready", "blocked"], agentId: "agent-1" },
+    { id: "rework", description: "Build.", outputIds: ["ready", "blocked"], agentId: "agent-1" },
+    { id: "done", description: "Done.", outputIds: [] }
   ],
   outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes-requested" }],
   outputRoutes: [{

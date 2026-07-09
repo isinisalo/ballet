@@ -90,7 +90,7 @@ export function LoopHandlerSheet({
             {routes.map((route) => {
               const action = config.actions.find((candidate) => candidate.id === route.actionId);
               const outputIds = action?.outputIds ?? [];
-              const agentIds = action?.agentIds ?? [];
+              const agentId = action?.agentId;
               const humanGate = Boolean(action?.humanGate);
               const response = humanGateResponseForRoute(config, route);
               const routeActionFieldId = `${actionFieldId}-${route.stepIndex}`;
@@ -125,7 +125,7 @@ export function LoopHandlerSheet({
                           id={routeDescriptionFieldId}
                           description={action.description}
                         />
-                        {humanGate ? <HumanOperatorField /> : <ReadOnlyBadges label="Agent" values={agentIds.slice(0, 1).map(agentLabel)} />}
+                        {humanGate ? <HumanOperatorField /> : <ReadOnlyBadges label="Agent" values={agentId ? [agentLabel(agentId)] : []} />}
                         <LoopOutputHandlerControls
                           config={config}
                           route={route}

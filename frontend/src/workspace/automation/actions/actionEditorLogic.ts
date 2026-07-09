@@ -15,9 +15,10 @@ export const normalizeActionDraft = (action: ProjectAction): ProjectAction => {
     ...action,
     id: editableActionId(action.id),
     outputIds: normalizeActionOutputSlots(action.outputIds),
-    agentIds: action.humanGate ? [] : [...new Set(action.agentIds)].slice(0, 1),
+    agentId: action.humanGate ? undefined : action.agentId,
   };
-  if (normalized.agentIds.length === 0 && !normalized.humanGate) normalized.outputIds = [];
+  if (!normalized.agentId && !normalized.humanGate) normalized.outputIds = [];
+  if (!normalized.agentId) delete normalized.agentId;
   return normalized;
 };
 
@@ -42,8 +43,7 @@ export const nextConfigWithActionPatch = (
       action: normalizeActionDraft({
         id: actionId,
         description: "",
-        outputIds: [],
-        agentIds: []
+        outputIds: []
       })
     };
   }

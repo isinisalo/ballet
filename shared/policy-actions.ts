@@ -15,7 +15,7 @@ export const defaultProjectOutputs = (): ProjectOutput[] => [
 ];
 
 export type ActionOutputConfig = Pick<ProjectAction, "humanGate"> & {
-  agentIds?: readonly string[];
+  agentId?: string;
   outputIds?: readonly string[];
 };
 
@@ -222,7 +222,7 @@ export const normalizeActionOutputSlots = (outputIds: readonly string[] = defaul
 };
 
 export const actionHasExecutableTarget = (action: ActionOutputConfig | undefined): boolean =>
-  Boolean(action && (action.humanGate || action.agentIds === undefined || action.agentIds.length > 0));
+  Boolean(action && (action.humanGate || action.agentId));
 
 export const defaultOutputIdsForAction = (action: ActionOutputConfig | undefined): string[] =>
   actionHasExecutableTarget(action) ? [...defaultActionOutputIds] : [];
@@ -243,7 +243,7 @@ const outputIdSet = (outputs: Array<Pick<ProjectOutput, "id">>): Set<string> =>
     .filter(Boolean));
 
 export const actionOutputIds = (
-  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentIds?: string[]; outputIds?: readonly string[] }>,
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string; outputIds?: readonly string[] }>,
   actionId: string
 ): string[] => {
   const normalizedActionId = normalizeActionToken(actionId);
@@ -256,7 +256,7 @@ export const actionOutputIds = (
 export const actionOutputRouteSlotKind = (
   action: Pick<ProjectAction, "id">,
   outputId: ActionOutputId,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }>
 ): ActionOutputSlotKind | undefined => {
   const normalizedOutputId = normalizeActionToken(outputId);
   const outputIndex = actionOutputIds(actions, action.id).indexOf(normalizedOutputId);
@@ -282,7 +282,7 @@ export const actionOutputRouteTargetAction = (
   action: Pick<ProjectAction, "id"> & { loopId?: string },
   outputId: ActionOutputId,
   outputRoutes: readonly ProjectOutputRoute[],
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = []
 ): Pick<ProjectAction, "id"> | undefined => {
   const route = findActionOutputRoute(outputRoutes, action.loopId ?? "", action.id, outputId);
   const legacyRoute = route as (ProjectOutputRoute & { target?: { policyId?: string; actionId?: string } }) | undefined;
@@ -296,7 +296,7 @@ export const actionOutputTargetEventType = (
   action: LegacyActionTokenInput,
   outputId: PolicyOutputId,
   _targetActionId?: string,
-  _actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
+  _actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = []
 ): string => {
   void _targetActionId;
   void _actions;
@@ -309,7 +309,7 @@ export const actionOutputRouteEventType = (
   action: Pick<ProjectAction, "id"> & { loopId?: string },
   outputId: PolicyOutputId,
   _outputRoutes: readonly ProjectOutputRoute[] = [],
-  _actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = []
+  _actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = []
 ): string => {
   void _outputRoutes;
   void _actions;
@@ -320,7 +320,7 @@ export const projectOutputRouteEventType = actionOutputRouteEventType;
 
 export const actionOutputEventTypes = (
   input: LegacyActionTokenInput,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }> = [],
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = [],
   outputs: Array<Pick<ProjectOutput, "id">> = []
 ): string[] => {
   const actionId = legacyActionToken(input);
@@ -375,7 +375,7 @@ export const uniqueAgentActionTokens = (agents: Agent[]): string[] => {
 };
 
 export const actionEventTypes = (
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }>,
   outputs: Array<Pick<ProjectOutput, "id">> = [],
   loops: Array<Pick<ProjectLoop, "id" | "steps">> = [],
   outputRoutes: readonly ProjectOutputRoute[] = []
@@ -399,7 +399,7 @@ export const policyEventTypesForActions = actionEventTypes;
 
 export const policyEventTypesForAgentsAndActions = (
   _agents: Agent[],
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentIds?: string[] }>,
+  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }>,
   outputs: Array<Pick<ProjectOutput, "id">> = [],
   loops: Array<Pick<ProjectLoop, "id" | "steps">> = [],
   outputRoutes: readonly ProjectOutputRoute[] = []

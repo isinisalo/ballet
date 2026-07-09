@@ -56,12 +56,11 @@ const validConfig = (): ProjectAutomationConfig => ({
     id: implementationActionId,
     description: "Implement approved work.",
     outputIds: ["approved", "rejected"],
-    agentIds: ["developer-agent"]
+    agentId: "developer-agent"
   }, {
     id: humanReviewActionId,
     description: "Review rejected implementation.",
     outputIds: ["approved", "rejected"],
-    agentIds: [],
     humanGate: true
   }],
   outputs: [{ id: "approved" }, { id: "rejected" }],
@@ -138,8 +137,8 @@ describe("project automation config", () => {
     const legacy = {
       version: 1,
       actions: [
-        { id: "implementation", description: "Implement.", outputIds: ["ok", "failed"], agentIds: ["developer-agent"] },
-        { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], agentIds: [], humanGate: true }
+        { id: "implementation", description: "Implement.", outputIds: ["ok", "failed"], agentId: "developer-agent" },
+        { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], humanGate: true }
       ],
       outputs: [{ id: "ok" }, { id: "failed" }],
       outputRoutes: [{
@@ -199,8 +198,8 @@ describe("project automation config", () => {
     const inflated = {
       version: 1,
       actions: [
-        { id: "on.plan-approved.start.plan-approved.loop.implementation", key: "implementation", loopId, event: startEvent, description: "Implement.", outputIds: ["approved", "rejected"], agentIds: ["developer-agent"], enabled: true },
-        { id: "on.plan-approved.loop.implementation.rejected.start.plan-approved.loop.implementation", key: "implementation", loopId, event: implementationRejectedEvent, description: "Implement.", outputIds: ["approved", "rejected"], agentIds: ["developer-agent"], enabled: true }
+        { id: "on.plan-approved.start.plan-approved.loop.implementation", key: "implementation", loopId, event: startEvent, description: "Implement.", outputIds: ["approved", "rejected"], agentId: "developer-agent", enabled: true },
+        { id: "on.plan-approved.loop.implementation.rejected.start.plan-approved.loop.implementation", key: "implementation", loopId, event: implementationRejectedEvent, description: "Implement.", outputIds: ["approved", "rejected"], agentId: "developer-agent", enabled: true }
       ],
       loops: [{ id: loopId, steps: ["on.plan-approved.start.plan-approved.loop.implementation", "on.plan-approved.loop.implementation.rejected.start.plan-approved.loop.implementation"] }]
     };
@@ -217,17 +216,13 @@ describe("project automation config", () => {
     expect(validateProjectAutomationConfig({ ...validConfig(), policies: [] }, [agent]).some((issue) =>
       issue.message === "Automation policies are no longer supported. Use action event handlers."
     )).toBe(true);
-    expect(normalizeProjectAutomationConfig({
-      ...validConfig(),
-      actions: [{ ...validConfig().actions[0]!, agentIds: ["developer-agent", "reviewer-agent"] }]
-    }, [agent, reviewerAgent]).actions[0]?.agentIds).toEqual(["developer-agent"]);
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, agentIds: ["developer-agent", "reviewer-agent"] }]
-    }, [agent, reviewerAgent]).some((issue) => issue.message === "Action can select at most 1 agent.")).toBe(true);
+    }, [agent, reviewerAgent]).some((issue) => issue.message === "Action agentIds is no longer supported. Use agentId.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...validConfig(),
-      actions: [{ ...validConfig().actions[0]!, agentIds: ["missing-agent"] }]
+      actions: [{ ...validConfig().actions[0]!, agentId: "missing-agent" }]
     }, [agent]).some((issue) => issue.message === "Action references unknown agent: missing-agent.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...validConfig(),

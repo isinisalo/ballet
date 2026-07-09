@@ -23,8 +23,7 @@ export function ActionEditorFields({
   action: ProjectAction;
   onChange: (patch: Partial<ProjectAction>) => void;
 }) {
-  const selectedAgentIds = action.agentIds ?? [];
-  const selectedAgentId = selectedAgentIds[0] ?? "";
+  const selectedAgentId = action.agentId ?? "";
   const selectedOutputIds = action.outputIds ?? [];
   const humanGate = Boolean(action.humanGate);
   const outputSlotIds = humanGate || selectedAgentId ? normalizeActionOutputSlots(selectedOutputIds) : [];
@@ -38,12 +37,12 @@ export function ActionEditorFields({
   const updateAgent = (agentId: string) => {
     if (humanGate) return;
     if (agentId === noAgentSelectionValue) {
-      onChange({ agentIds: [], outputIds: [] });
+      onChange({ agentId: undefined, outputIds: [] });
       return;
     }
     if (!agentId) return;
     onChange({
-      agentIds: [agentId],
+      agentId,
       outputIds: selectedOutputIds.length > 0 ? selectedOutputIds : fallbackOutputIds()
     });
   };
@@ -51,12 +50,12 @@ export function ActionEditorFields({
     onChange(enabled
       ? {
         humanGate: true,
-        agentIds: [],
+        agentId: undefined,
         outputIds: selectedOutputIds.length > 0 ? normalizeActionOutputSlots(selectedOutputIds) : fallbackOutputIds()
       }
       : {
         humanGate: false,
-        agentIds: agents[0]?.id ? [agents[0].id] : [],
+        agentId: agents[0]?.id,
         outputIds: agents[0]?.id ? (selectedOutputIds.length > 0 ? normalizeActionOutputSlots(selectedOutputIds) : fallbackOutputIds()) : []
       });
   };

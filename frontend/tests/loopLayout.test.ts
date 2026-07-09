@@ -20,7 +20,7 @@ const action = (id: string, event: string | undefined, action = "build"): Projec
   enabled: true,
   description: `${action} handler`,
   outputIds: ["approved", "rejected"],
-  agentIds: ["agent-1"]
+  agentId: "agent-1"
 });
 
 const graphFor = (records: LoopStepRecord[]) => {
@@ -90,19 +90,19 @@ const compositeConfig = (
 ): ProjectAutomationConfig => {
   const upstreamPolicy = action("upstream-start", undefined, "upstream-gate");
   upstreamPolicy.event = "upstream-event";
-  upstreamPolicy.agentIds = [];
+  delete upstreamPolicy.agentId;
   upstreamPolicy.humanGate = true;
   const sourcePolicy = action("source-start", undefined, "source-gate");
   sourcePolicy.event = sourceStartEvent;
-  sourcePolicy.agentIds = [];
+  delete sourcePolicy.agentId;
   sourcePolicy.humanGate = true;
   const targetPolicy = action("target-start", undefined, "target-gate");
   targetPolicy.event = "source-gate.approved";
-  targetPolicy.agentIds = [];
+  delete targetPolicy.agentId;
   targetPolicy.humanGate = true;
   const downstreamPolicy = action("downstream-start", undefined, "final-gate");
   downstreamPolicy.event = "target-gate.approved";
-  downstreamPolicy.agentIds = [];
+  delete downstreamPolicy.agentId;
   downstreamPolicy.humanGate = true;
   const policyByLoopId = new Map([
     ["upstream", upstreamPolicy],
@@ -317,7 +317,7 @@ describe("loop layout helper modules", () => {
 
 describe("calculateLoopCanvasLayout", () => {
   it("uses selected action outputs as action output events", () => {
-    expect(actionOutputEventTypes({ key: "build" }, [{ id: "build", key: "build", outputIds: ["complete", "failed"] }])).toEqual([
+    expect(actionOutputEventTypes({ key: "build" }, [{ id: "build", key: "build", outputIds: ["complete", "failed"], agentId: "agent-1" }])).toEqual([
       "build.approved",
       "build.rejected"
     ]);
@@ -367,7 +367,7 @@ describe("calculateLoopCanvasLayout", () => {
         actionId: start.id,
         index: 0,
         action: start,
-        outputEvents: actionOutputEventTypes(start, [{ id: "manual-gate", outputIds: ["complete"], agentIds: [] }])
+        outputEvents: actionOutputEventTypes(start, [{ id: "manual-gate", outputIds: ["complete"] }])
       }]),
       editingPolicyIndex: null
     });
@@ -502,7 +502,6 @@ describe("calculateLoopCanvasLayout", () => {
     const outputEvents = actionOutputEventTypes(start, [{
       id: "human-review",
       outputIds: ["approved", "changes-requested"],
-      agentIds: [],
       humanGate: true
     }]);
     const layout = calculateLoopCanvasLayout({
@@ -929,7 +928,7 @@ describe("calculateLoopCanvasLayout", () => {
       enabled: true,
       description: "Implement",
       outputIds: ["completed", "failed"],
-      agentIds: ["developer-agent"]
+      agentId: "developer-agent"
     });
     const review: ProjectAction = {
       id: "architect-review",
@@ -938,7 +937,7 @@ describe("calculateLoopCanvasLayout", () => {
       enabled: true,
       description: "Review",
       outputIds: ["accepted", "rejected"],
-      agentIds: ["architect"]
+      agentId: "architect"
     };
     const records: LoopStepRecord[] = [
       {
@@ -1217,14 +1216,13 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       enabled: true,
       description: "Branch gate",
       outputIds: ["approved", "rejected"],
-      agentIds: [],
       humanGate: true
     });
     const sourceLoop = config.loops.find((loop) => loop.id === "source");
     sourceLoop?.steps.push("branch-gate");
     const branchPolicy = action("branch-start", undefined, "final-gate");
     branchPolicy.event = "branch-gate.approved";
-    branchPolicy.agentIds = [];
+    delete branchPolicy.agentId;
     branchPolicy.humanGate = true;
     config.actions.push(branchPolicy);
     config.loops.push({ id: "branch", steps: [branchPolicy.id] });

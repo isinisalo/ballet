@@ -32,7 +32,6 @@ export function useAutomationCreateDrafts({
     id: "",
     description: "",
     outputIds: [],
-    agentIds: [],
     humanGate: false
   });
   const [newLoop, setNewLoop] = useState({ id: "", steps: [] as string[] });
@@ -51,7 +50,7 @@ export function useAutomationCreateDrafts({
   useEffect(() => {
     updateNewAction({
       outputIds: newAction.outputIds.length > 0 ? newAction.outputIds : defaultOutputIdsForDraft(draft),
-      agentIds: newAction.agentIds.length > 0 ? newAction.agentIds : agents.slice(0, 1).map((agent) => agent.id)
+      agentId: newAction.agentId ?? agents[0]?.id
     });
   }, [agents, draft.outputs]);
 
@@ -100,7 +99,7 @@ const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): A
     id: "",
     description: "",
     outputIds: defaultOutputIdsForDraft(draft),
-    agentIds: agents.slice(0, 1).map((agent) => agent.id),
+    agentId: agents[0]?.id,
     humanGate: false
   },
   loop: loopCreateDraftWithDefaultEvent(draft, { id: "", steps: [] })
@@ -156,13 +155,15 @@ const createDraftWithNewEntity = (
       automationStringValidationMessage("Description", drafts.action.description, automationFieldLimits.description, { required: false }) ||
       draft.actions.some((action) => action.id === id)
     ) return undefined;
-    const agentIds = drafts.action.humanGate ? [] : drafts.action.agentIds.slice(0, 1);
-    const outputIds = agentIds.length > 0 || drafts.action.humanGate ? drafts.action.outputIds : [];
+    const agentId = drafts.action.humanGate ? undefined : drafts.action.agentId;
+    const outputIds = agentId || drafts.action.humanGate ? drafts.action.outputIds : [];
     const outputs = [...draft.outputs];
     outputIds.forEach((outputId) => {
       if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
     });
-    return { id, config: { ...draft, outputs, actions: [...draft.actions, { ...drafts.action, id, outputIds, agentIds }] } };
+    const action = { ...drafts.action, id, outputIds, ...(agentId ? { agentId } : {}) };
+    if (!agentId) delete action.agentId;
+    return { id, config: { ...draft, outputs, actions: [...draft.actions, action] } };
   }
   const eventAction = loopStartingAction(draft, drafts.loop);
   const id = normalizeAutomationLoopId(drafts.loop.id);

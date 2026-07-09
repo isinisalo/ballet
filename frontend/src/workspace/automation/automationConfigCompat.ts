@@ -35,15 +35,15 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
       const id = normalizeActionToken(action.id);
       if (!id) return [];
       const humanGate = action.humanGate === true;
-      const agentIds = humanGate ? [] : Array.isArray(action.agentIds) ? [...new Set(action.agentIds.filter(Boolean))].slice(0, 1) : [];
+      const agentId = !humanGate && typeof action.agentId === "string" && action.agentId.trim() ? action.agentId.trim() : undefined;
       const selectedOutputIds = Array.isArray(action.outputIds)
         ? normalizeActionOutputSlots(action.outputIds)
         : fallback;
       return [{
         id,
         description: typeof action.description === "string" ? action.description : "",
-        outputIds: agentIds.length === 0 && !humanGate ? [] : selectedOutputIds,
-        agentIds,
+        outputIds: !agentId && !humanGate ? [] : selectedOutputIds,
+        ...(agentId ? { agentId } : {}),
         ...(humanGate ? { humanGate: true } : {})
       }];
     })

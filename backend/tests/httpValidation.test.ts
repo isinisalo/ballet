@@ -37,7 +37,7 @@ describe("HTTP Zod validation", () => {
         id: "implementation",
         description: "Implementation",
         outputIds: ["summary"],
-        agentIds: ["developer-agent"]
+        agentId: "developer-agent"
       }],
       outputs: [{ id: "summary" }],
       outputRoutes: [],
@@ -52,7 +52,6 @@ describe("HTTP Zod validation", () => {
         id: "human-review",
         description: "Human review",
         outputIds: ["summary"],
-        agentIds: [],
         humanGate: true
       }],
       humanGateResponses: [{
@@ -83,7 +82,7 @@ describe("HTTP Zod validation", () => {
       ...valid,
       outputRoutes: [{ sourceLoopId: "delivery.loop", sourceActionId: "implementation", outputId: "summary", targetLoopId: "delivery.loop", targetActionId: "" }]
     }), "outputRoutes.0.targetActionId");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"] }] }), "actions.0.agentIds");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"], agentIds: ["developer-agent"] }] }), "actions.0");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", description: "Summary" }] }), "outputs.0");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", type: "event" }] }), "outputs.0");
   });

@@ -8,9 +8,7 @@
         "approved",
         "rejected"
       ],
-      "agentIds": [
-        "reviewer"
-      ]
+      "agentId": "reviewer"
     }
   ],
   "outputs": [

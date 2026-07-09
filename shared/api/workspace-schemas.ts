@@ -130,7 +130,7 @@ const projectActionSchema = z.object({
   id: automationPolicyIdSchema,
   description: optionalAutomationDescriptionSchema,
   outputIds: z.array(automationOutputIdSchema),
-  agentIds: z.array(z.string().min(1)).max(1),
+  agentId: z.string().min(1).optional(),
   humanGate: z.boolean().optional()
 }).strict();
 

@@ -10,7 +10,7 @@ export interface ProjectAction {
   id: string;
   description: string;
   outputIds: string[];
-  agentIds: string[];
+  agentId?: string;
   humanGate?: boolean;
 }
 

@@ -17,8 +17,8 @@ const action = (patch: Partial<ProjectAction>): ProjectAction => ({
   id: patch.id ?? "build",
   description: patch.description ?? `${patch.id ?? "build"} action.`,
   outputIds: patch.outputIds ?? ["approved", "rejected"],
-  agentIds: patch.agentIds ?? ["agent-1"],
-  ...(patch.humanGate ? { humanGate: true, agentIds: [] } : {})
+  agentId: patch.agentId ?? "agent-1",
+  ...(patch.humanGate ? { humanGate: true } : {})
 });
 
 const config = (actions: ProjectAction[], steps = actions.map((item) => item.id)): ProjectAutomationConfig => ({
@@ -34,7 +34,7 @@ const config = (actions: ProjectAction[], steps = actions.map((item) => item.id)
 describe("nextConfigWithLoopStepAction", () => {
   it("changes the selected step to an existing action without creating action copies", () => {
     const build = action({ id: "build" });
-    const review = action({ id: "review", description: "Review.", agentIds: ["reviewer"] });
+    const review = action({ id: "review", description: "Review.", agentId: "reviewer" });
     const current = config([build, review], [build.id]);
     const next = nextConfigWithLoopStepAction(current, loopId, 0, review.id);
 
@@ -101,9 +101,9 @@ describe("nextConfigWithLoopStepAction", () => {
 
 describe("nextConfigWithLoopHandlerAction route cleanup", () => {
   it("rewrites scoped routes and removes stale human gate responses when a loop step action changes", () => {
-    const start = action({ id: "start-review", outputIds: ["rejected"], agentIds: ["reviewer"] });
+    const start = action({ id: "start-review", outputIds: ["rejected"], agentId: "reviewer" });
     const gate = action({ id: "gate-review", outputIds: ["rejected"], humanGate: true });
-    const done = action({ id: "done-review", outputIds: [], agentIds: [] });
+    const done = action({ id: "done-review", outputIds: [] });
     const gateResponseBase = {
       loopId,
       actionId: gate.id,

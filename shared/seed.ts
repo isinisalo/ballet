@@ -177,7 +177,7 @@ export const seedData: AppData = {
         id: "remediation",
         description: "Remediate failed infrastructure or deployment state.",
         outputIds: ["approved", "rejected"],
-        agentIds: ["agent-k8s"]
+        agentId: "agent-k8s"
       }
     ],
     outputs: [

@@ -41,7 +41,7 @@ export const routeAutomationEvent = (
       return;
     }
 
-    if (action.agentIds.length === 0) {
+    if (!action.agentId) {
       const key = `${routeId}:no-agent`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -58,7 +58,7 @@ export const routeAutomationEvent = (
       return;
     }
 
-    const targetAgentId = action.agentIds[0];
+    const targetAgentId = action.agentId;
     const key = `${routeId}:${targetAgentId}`;
     if (seen.has(key)) return;
     seen.add(key);
