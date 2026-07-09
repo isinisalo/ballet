@@ -724,7 +724,7 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => expect(data.automation.actions.some((action) => action.id === "human-review")).toBe(false));
   });
 
-  it("creates scoped output routes from the loop canvas without copying actions", async () => {
+  it("creates a scoped output route only after selecting the pending loop canvas handler action", async () => {
     const user = userEvent.setup();
     const loopData = baseData();
     loopData.automation.actions = [loopData.automation.actions[0]!, testAction({
@@ -735,8 +735,18 @@ describe("workspace entity UI flows", () => {
     const { data, fetchMock } = await renderRoute(`/automation/loops?id=${loopId}`, loopData);
 
     await user.click(screen.getByRole("button", { name: actionOutputStepName(actionOutputEvent(implementationActionId, "approved")) }));
-    expect(screen.getByRole("dialog", { name: "Output handler" })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Output handler" });
+    const actionSelect = within(dialog).getByLabelText("Handler action");
+    expect(actionSelect.querySelector("[data-placeholder]")).toBeEmptyDOMElement();
+    expect(within(dialog).queryByText("Description")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Agent")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Outputs")).not.toBeInTheDocument();
+
+    await selectOption(user, actionSelect, `${reviewActionId} · Review implementation output.`);
     expectActionSelectValue(reviewActionId);
+    expect(within(dialog).getByText("Description")).toBeInTheDocument();
+    expect(within(dialog).getByText("Agent")).toBeInTheDocument();
+    expect(within(dialog).getByText("Outputs")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save automation" }));
 
     await waitFor(() => expect(data.automation.actions.map((action) => action.id)).toEqual([implementationActionId, reviewActionId]));

@@ -205,7 +205,7 @@ function LoopRouteActionSelect({
           className="h-5 min-h-5 w-full max-w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
           title={route.actionLabel || "Select handler action"}
         >
-          <SelectValue className={route.actionId ? loopActionTokenClassName() : "text-muted-foreground"} placeholder={route.actionId || "Action"} />
+          <SelectValue className={route.actionId ? loopActionTokenClassName() : "text-muted-foreground"} placeholder="" />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
