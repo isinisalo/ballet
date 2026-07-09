@@ -4,6 +4,7 @@ import { humanGateResponseId } from "@shared/policy-actions";
 import {
   nextConfigWithLoopHandlerAction,
   nextConfigWithLoopOutputRouteTarget,
+  nextConfigWithPendingLoopOutputHandlerAction,
   nextConfigWithLoopStepAction,
   nextConfigWithLoopStepActions,
   nextConfigWithoutLoopOutputRouteTarget,
@@ -183,6 +184,33 @@ describe("nextConfigWithLoopOutputRouteTarget", () => {
 
     expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", emptyLoopId, review.id)).toBe(current);
     expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", loopId, review.id)).toBe(current);
+  });
+});
+
+describe("nextConfigWithPendingLoopOutputHandlerAction", () => {
+  it("appends the selected handler action and creates the scoped output route", () => {
+    const build = action({ id: "build", outputIds: ["approved", "rejected"] });
+    const review = action({ id: "review" });
+    const current = config([build, review], [build.id]);
+
+    const next = nextConfigWithPendingLoopOutputHandlerAction(current, loopId, 1, review.id, build.id, "approved");
+
+    expect(next.loops[0]?.steps).toEqual([build.id, review.id]);
+    expect(next.outputRoutes).toEqual([
+      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "approved", targetLoopId: loopId, targetActionId: review.id }
+    ]);
+  });
+
+  it("returns the current config for invalid pending handler input", () => {
+    const build = action({ id: "build" });
+    const review = action({ id: "review" });
+    const current = config([build, review], [build.id]);
+
+    expect(nextConfigWithPendingLoopOutputHandlerAction(current, "missing.loop", 1, review.id, build.id, "approved")).toBe(current);
+    expect(nextConfigWithPendingLoopOutputHandlerAction(current, loopId, -1, review.id, build.id, "approved")).toBe(current);
+    expect(nextConfigWithPendingLoopOutputHandlerAction(current, loopId, 2, review.id, build.id, "approved")).toBe(current);
+    expect(nextConfigWithPendingLoopOutputHandlerAction(current, loopId, 1, "missing-action", build.id, "approved")).toBe(current);
+    expect(nextConfigWithPendingLoopOutputHandlerAction(current, loopId, 1, review.id, build.id, "missing-output")).toBe(current);
   });
 });
 

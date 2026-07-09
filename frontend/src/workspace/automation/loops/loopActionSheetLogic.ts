@@ -106,6 +106,28 @@ export const nextConfigWithLoopOutputRouteTarget = (
   };
 };
 
+export const nextConfigWithPendingLoopOutputHandlerAction = (
+  current: ProjectAutomationConfig,
+  loopId: string,
+  handlerStepIndex: number,
+  actionId: string,
+  sourceActionId: string,
+  outputId: string
+): ProjectAutomationConfig => {
+  const loop = current.loops.find((candidate) => candidate.id === loopId);
+  const action = current.actions.find((candidate) => candidate.id === actionId);
+  const sourceAction = current.actions.find((candidate) => candidate.id === sourceActionId);
+  if (!loop || !action || !sourceAction || !sourceAction.outputIds.includes(outputId) || handlerStepIndex < 0 || handlerStepIndex > loop.steps.length) return current;
+
+  const nextSteps = [...loop.steps];
+  nextSteps[handlerStepIndex] = action.id;
+  const nextConfig = {
+    ...current,
+    loops: current.loops.map((candidate) => candidate.id === loop.id ? { ...candidate, steps: nextSteps } : candidate)
+  };
+  return nextConfigWithLoopOutputRouteTarget(nextConfig, loop.id, sourceActionId, outputId, loop.id, action.id);
+};
+
 export const nextConfigWithoutLoopOutputRouteTarget = (
   current: ProjectAutomationConfig,
   sourceLoopId: string,

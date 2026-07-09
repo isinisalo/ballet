@@ -119,32 +119,36 @@ export function LoopHandlerSheet({
                       config={config}
                       onRouteActionChange={onRouteActionChange}
                     />
-                    <LoopRouteDescriptionField
-                      id={routeDescriptionFieldId}
-                      description={action?.description ?? ""}
-                    />
-                    {humanGate ? <HumanOperatorField /> : <ReadOnlyBadges label="Agents" values={agentIds.map(agentLabel)} />}
-                    <LoopOutputHandlerControls
-                      config={config}
-                      route={route}
-                      outputIds={outputIds}
-                      label={humanGate ? "Output routing" : "Outputs"}
-                      onOutputHandlerRouteChange={onOutputHandlerRouteChange}
-                      onOutputHandlerRouteClear={onOutputHandlerRouteClear}
-                    />
-                    {humanGate ? (
-                      <HumanGateResponsePanel
-                        outputIds={outputIds}
-                        response={response}
-                        onSubmit={(outputId, prompt) => onHumanGateSubmit(route, outputId, prompt)}
-                      />
+                    {action ? (
+                      <>
+                        <LoopRouteDescriptionField
+                          id={routeDescriptionFieldId}
+                          description={action.description}
+                        />
+                        {humanGate ? <HumanOperatorField /> : <ReadOnlyBadges label="Agents" values={agentIds.map(agentLabel)} />}
+                        <LoopOutputHandlerControls
+                          config={config}
+                          route={route}
+                          outputIds={outputIds}
+                          label={humanGate ? "Output routing" : "Outputs"}
+                          onOutputHandlerRouteChange={onOutputHandlerRouteChange}
+                          onOutputHandlerRouteClear={onOutputHandlerRouteClear}
+                        />
+                        {humanGate ? (
+                          <HumanGateResponsePanel
+                            outputIds={outputIds}
+                            response={response}
+                            onSubmit={(outputId, prompt) => onHumanGateSubmit(route, outputId, prompt)}
+                          />
+                        ) : null}
+                      </>
                     ) : null}
                   </FieldGroup>
                 </div>
               );
             })}
           </div>
-          {routes.length === 1 && routes[0] ? (
+          {routes.length === 1 && routes[0] && config.actions.some((action) => action.id === routes[0]?.actionId) ? (
             <div className="mt-4 border-t border-divider-strong pt-4">
               <Button type="button" variant="destructive" size="sm" onClick={() => onRemoveRoute(routes[0].loopId, routes[0].stepIndex)}>
                 <Trash2 data-icon="inline-start" />
@@ -191,17 +195,17 @@ function LoopRouteActionSelect({
     <Field className="gap-1.5">
       <FieldLabel htmlFor={id}>Handler action</FieldLabel>
       <Select
-        value={route.actionId}
+        value={route.actionId || undefined}
         items={config.actions.map((option) => ({ value: option.id, label: option.id }))}
         onValueChange={(actionId) => onRouteActionChange(route.loopId, route.stepIndex, actionId)}
       >
         <SelectTrigger
           id={id}
           size="sm"
-          className="h-5 min-h-5 w-fit max-w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
-          title={route.actionLabel}
+          className="h-5 min-h-5 w-full max-w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
+          title={route.actionLabel || "Select handler action"}
         >
-          <SelectValue className={loopActionTokenClassName()} />
+          <SelectValue className={route.actionId ? loopActionTokenClassName() : "text-muted-foreground"} placeholder="" />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>

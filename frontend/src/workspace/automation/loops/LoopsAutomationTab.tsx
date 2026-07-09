@@ -8,7 +8,7 @@ import type {
   ProjectAction,
   ProjectLoop
 } from "@shared/api/workspace-contracts";
-import { actionOutputEventType, actionOutputIds, actionOutputRouteKey, eventTypeFromLoopId, humanGateResponseId, normalizeActionToken } from "@shared/policy-actions";
+import { actionOutputEventType, actionOutputIds, humanGateResponseId, normalizeActionToken } from "@shared/policy-actions";
 import { EmptyState, SelectField, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
@@ -18,10 +18,12 @@ import { LoopHandlerSheet, type LoopHandlerRoute, type LoopHandlerSelectionSourc
 import {
   nextConfigWithLoopHandlerAction,
   nextConfigWithLoopOutputRouteTarget,
+  nextConfigWithPendingLoopOutputHandlerAction,
   nextConfigWithoutLoopOutputRouteTarget,
   nextConfigWithoutLoopStepIndexes
 } from "./loopActionSheetLogic";
 import type { LoopStepRecord } from "./loopGraph";
+import { loopEventParts, loopHandlerRoute, pendingLoopHandlerRoute, type PendingLoopHandlerOutput } from "./loopHandlerRoutes";
 import { calculateCompositeLoopCanvasLayout, type LoopCanvasEdge } from "./loopLayout";
 import { loopOutputTargetsForPolicy } from "./loopOutputTargets";
 import { useLoopCanvasInteraction } from "./useLoopCanvasInteraction";
@@ -31,6 +33,7 @@ const noSelection = "__none__";
 type LoopHandlerSelection = {
   source: LoopHandlerSelectionSource;
   stepIndexes: number[];
+  pendingOutput?: PendingLoopHandlerOutput;
 };
 
 export function LoopsAutomationTab({
@@ -116,10 +119,12 @@ export function LoopsAutomationTab({
     .map((stepIndex) => loopStepRecords.find((record) => record.index === stepIndex))
     .filter((record): record is LoopStepRecord => Boolean(record));
   const selectedHandlerRoutes = useMemo(
-    () => selectedHandlerRecords
+    () => selectedHandlerSelection?.pendingOutput && selected
+      ? [pendingLoopHandlerRoute(selected.id, selectedHandlerSelection.stepIndexes[0] ?? selected.steps.length, selectedHandlerSelection.pendingOutput)]
+      : selectedHandlerRecords
       .map(loopHandlerRoute)
       .filter((route): route is LoopHandlerRoute => Boolean(route)),
-    [selectedHandlerRecords]
+    [selected, selectedHandlerRecords, selectedHandlerSelection]
   );
 
   useEffect(() => {
@@ -132,6 +137,7 @@ export function LoopsAutomationTab({
 
   useEffect(() => {
     if (!selectedHandlerSelection) return;
+    if (selectedHandlerSelection.pendingOutput) return;
     if (selectedHandlerRecords.length !== selectedHandlerStepIndexes.length || selectedHandlerRoutes.length === 0) {
       setSelectedHandlerSelection(null);
     }
@@ -171,36 +177,25 @@ export function LoopsAutomationTab({
   const addActionStep = (eventType?: string, sourceAction?: ProjectAction) => {
     if (!selected) return;
     const selectedActionIds = new Set(selected.steps);
-    const addedStepIndex = selected.steps.length;
-    const selectAddedOutputEventStep = () => {
-      if (eventType) setSelectedHandlerSelection({ source: "edge", stepIndexes: [addedStepIndex] });
-    };
     const nextAction = config.actions.find((action) => !selectedActionIds.has(action.id)) ?? config.actions[0];
     if (!nextAction) return;
     const outputId = eventType ? normalizeActionToken(eventType.split(".").at(-1) ?? "") : "";
-    const shouldAppendStep = !selected.steps.includes(nextAction.id);
     if (eventType && sourceAction && outputId) {
-      updateConfig((current) => ({
-        ...current,
-        loops: current.loops.map((loop) => loop.id === selected.id && shouldAppendStep ? { ...loop, steps: [...loop.steps, nextAction.id] } : loop),
-        outputRoutes: [
-          ...current.outputRoutes.filter((route) =>
-            actionOutputRouteKey(route.sourceLoopId, route.sourceActionId, route.outputId) !== actionOutputRouteKey(selected.id, sourceAction.id, outputId)
-          ),
-          {
-            sourceLoopId: selected.id,
-            sourceActionId: sourceAction.id,
-            outputId,
-            targetLoopId: selected.id,
-            targetActionId: nextAction.id
-          }
-        ]
-      }));
-      selectAddedOutputEventStep();
+      const eventParts = loopEventParts(eventType);
+      setSelectedHandlerSelection({
+        source: "edge",
+        stepIndexes: [selected.steps.length],
+        pendingOutput: {
+          eventType,
+          sourceActionId: sourceAction.id,
+          sourceLabel: eventParts?.sourceLabel ?? eventType,
+          outputId
+        }
+      });
       return;
     }
+    const shouldAppendStep = !selected.steps.includes(nextAction.id);
     if (shouldAppendStep) updateSelected({ steps: [...selected.steps, nextAction.id] });
-    selectAddedOutputEventStep();
   };
 
   const reorderStep = (loopId: string, fromIndex: number, toIndex: number) => {
@@ -244,6 +239,14 @@ export function LoopsAutomationTab({
   };
   const updateHandlerRouteAction = (loopId: string, stepIndex: number, actionId: string) => {
     if (!selected || loopId !== selected.id) return;
+    const pendingOutput = selectedHandlerSelection?.pendingOutput;
+    if (pendingOutput && selectedHandlerSelection.stepIndexes.includes(stepIndex)) {
+      updateConfig((current) =>
+        nextConfigWithPendingLoopOutputHandlerAction(current, selected.id, stepIndex, actionId, pendingOutput.sourceActionId, pendingOutput.outputId)
+      );
+      setSelectedHandlerSelection({ source: "edge", stepIndexes: [stepIndex] });
+      return;
+    }
     updateConfig((current) => nextConfigWithLoopHandlerAction(current, selected.id, stepIndex, actionId));
   };
   const updateOutputHandlerRoute = (
@@ -391,30 +394,4 @@ export function LoopsAutomationTab({
 function sameHumanGateResponseTarget(first: ProjectHumanGateResponse, second: ProjectHumanGateResponse) {
   return first.actionId === second.actionId &&
     (first.loopId ?? "") === (second.loopId ?? "");
-}
-
-function loopHandlerRoute(record: LoopStepRecord): LoopHandlerRoute | undefined {
-  if (!record.action) return undefined;
-  const eventParts = loopEventParts(record.outputEvents?.[0] ?? eventTypeFromLoopId(record.loopId ?? ""));
-
-  return {
-    id: `${record.loopId ?? "loop"}-${record.index}-${record.actionId}`,
-    loopId: record.loopId ?? "",
-    stepIndex: record.index,
-    actionId: record.actionId,
-    sourceLabel: eventParts?.sourceLabel ?? "Missing event",
-    outputId: eventParts?.outputId,
-    eventType: record.outputEvents?.[0],
-    actionLabel: record.action.id
-  };
-}
-
-function loopEventParts(eventType: string | undefined) {
-  if (!eventType) return undefined;
-  const separatorIndex = eventType.lastIndexOf(".");
-  if (separatorIndex < 0) return { sourceLabel: eventType };
-  return {
-    sourceLabel: eventType.slice(0, separatorIndex) || eventType,
-    outputId: eventType.slice(separatorIndex + 1) || undefined
-  };
 }
