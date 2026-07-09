@@ -1,8 +1,15 @@
-import { smartEdgePresets, type GetSmartEdgeOptions } from "@tisoap/react-flow-smart-edge";
+import { smartEdgePresets, svgDrawSmoothStepLinePath, type GetSmartEdgeOptions } from "@tisoap/react-flow-smart-edge";
 
 const loopCrossRowEdgeEpsilon = 0.5;
-const loopCrossRowSmartEdgeOptions = {
+export const loopSmartSmoothStepRadius = 16;
+export const loopSmartSmoothStepDrawEdge = svgDrawSmoothStepLinePath({ borderRadius: loopSmartSmoothStepRadius });
+const loopSmartSmoothStepOptions = {
   ...smartEdgePresets.smoothstep,
+  drawEdge: loopSmartSmoothStepDrawEdge
+} satisfies GetSmartEdgeOptions;
+
+const loopCrossRowSmartEdgeOptions = {
+  ...loopSmartSmoothStepOptions,
   gridRatio: 5,
   nodePadding: 6
 } satisfies GetSmartEdgeOptions;
@@ -14,6 +21,6 @@ export function loopSmartEdgeRoutingOptions({
   sourceY: number;
   targetY: number;
 }): GetSmartEdgeOptions {
-  if (Math.abs(sourceY - targetY) <= loopCrossRowEdgeEpsilon) return smartEdgePresets.smoothstep;
+  if (Math.abs(sourceY - targetY) <= loopCrossRowEdgeEpsilon) return loopSmartSmoothStepOptions;
   return loopCrossRowSmartEdgeOptions;
 }

@@ -11,7 +11,7 @@ import { buildLoopGraph, type LoopStepRecord } from "../src/workspace/automation
 import { calculateAllLoopsCanvasLayout, calculateCompositeLoopCanvasLayout, calculateLoopCanvasLayout, loopCanvasLayoutConfig, loopCanvasNodeAnchorY, loopNodeSizes, loopOutputSourceHandleId, loopActionOutputHandleY, loopActionStackHeight, type LoopLayoutDirection } from "../src/workspace/automation/loops/loopLayout";
 import { positionLoopNodes } from "../src/workspace/automation/loops/loopLayoutPositioning";
 import { loopOutputTargetsForPolicy } from "../src/workspace/automation/loops/loopOutputTargets";
-import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/loopSmartEdgeRouting";
+import { loopSmartEdgeRoutingOptions, loopSmartSmoothStepRadius } from "../src/workspace/automation/loops/loopSmartEdgeRouting";
 
 const action = (id: string, event: string | undefined, action = "build"): ProjectAction => ({
   id,
@@ -244,13 +244,20 @@ describe("loop layout helper modules", () => {
   });
 
   it("keeps default smooth smart edge routing for same-row edges and tightens cross-row routing", () => {
-    expect(loopSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 125.5 })).toBe(smartEdgePresets.smoothstep);
-    expect(loopSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 75.5 })).toMatchObject({
-      gridRatio: 5,
-      nodePadding: 6,
-      drawEdge: smartEdgePresets.smoothstep.drawEdge,
+    const sameRowOptions = loopSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 125.5 });
+    const crossRowOptions = loopSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 75.5 });
+
+    expect(sameRowOptions).toMatchObject({
+      fallback: smartEdgePresets.smoothstep.fallback,
       generatePath: smartEdgePresets.smoothstep.generatePath
     });
+    expect(sameRowOptions.drawEdge).toBe(crossRowOptions.drawEdge);
+    expect(crossRowOptions).toMatchObject({
+      gridRatio: 5,
+      nodePadding: 6,
+      generatePath: smartEdgePresets.smoothstep.generatePath
+    });
+    expect(sameRowOptions.drawEdge({ x: 0, y: 0 }, { x: 40, y: 40 }, [[40, 0]])).toContain(`L ${40 - loopSmartSmoothStepRadius},0Q 40,0 40,${loopSmartSmoothStepRadius}`);
   });
 
   it("routes dev deployment cross-row forward edges toward the target row first", () => {
@@ -1370,6 +1377,9 @@ describe("toLoopReactFlowEdges", () => {
         targetNode: topTargetNode
       }
     }).path.startsWith(`M ${sourceNode.x + sourceNode.width / 2},${sourceNode.y}`)).toBe(true);
+    expect(topReturnPath.path.match(/Q/g)).toHaveLength(2);
+    expect(topReturnPath.path).toContain(`Q ${sourceNode.x + sourceNode.width / 2},${topTargetNode.y - 28}`);
+    expect(topReturnPath.path).toContain(`Q ${topTargetNode.x + topTargetNode.width / 2},${topTargetNode.y - 28}`);
     expect(loopReturnEdgePath({
       ...baseProps,
       targetY: bottomTargetNode.y + bottomTargetNode.height,

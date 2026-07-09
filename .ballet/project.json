@@ -4,6 +4,9 @@
     {
       "id": "create-project-brief",
       "description": "Create Project Brief from accepted ADRs and approved GOALS.",
+      "outputIds": [
+        "approved"
+      ],
       "agentIds": [
         "brief-agent"
       ]
@@ -615,13 +618,6 @@
       "sourceActionId": "create-technical-plan",
       "outputId": "rejected",
       "targetLoopId": "ui-design-gate.approved.loop",
-      "targetActionId": "blocked"
-    },
-    {
-      "sourceLoopId": "adr-goals-changed.loop",
-      "sourceActionId": "create-project-brief",
-      "outputId": "rejected",
-      "targetLoopId": "adr-goals-changed.loop",
       "targetActionId": "blocked"
     }
   ],

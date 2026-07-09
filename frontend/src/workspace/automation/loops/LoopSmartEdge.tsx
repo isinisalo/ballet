@@ -4,7 +4,7 @@ import type { LoopReactFlowEdge } from "./LoopCanvasTypes";
 import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import { loopCrossLoopSmoothStepPath } from "./loopCrossLoopSmoothStepPath";
 import type { LoopEdgePoint } from "./loopEdgeLabelGeometry";
-import { loopSmartEdgeRoutingOptions } from "./loopSmartEdgeRouting";
+import { loopSmartEdgeRoutingOptions, loopSmartSmoothStepDrawEdge } from "./loopSmartEdgeRouting";
 
 const loopEdgeLabelCenterRatio = 0.5;
 const loopEdgeLabelVerticalOffset = 4;
@@ -135,12 +135,14 @@ export function loopReturnEdgePath({ data, sourceX, sourceY, targetX, targetY }:
     endLabelY,
     labelX,
     labelY,
-    path: [
-      `M ${resolvedSourceX},${resolvedSourceY}`,
-      `L ${resolvedSourceX},${sourceExitY}`,
-      `L ${resolvedSourceX},${targetEntryY}`,
-      `L ${resolvedTargetX},${targetEntryY}`,
-      `L ${resolvedTargetX},${resolvedTargetY}`
-    ].join(" ")
+    path: loopSmartSmoothStepDrawEdge(
+      { x: resolvedSourceX, y: resolvedSourceY },
+      { x: resolvedTargetX, y: resolvedTargetY },
+      [
+        [resolvedSourceX, sourceExitY],
+        [resolvedSourceX, targetEntryY],
+        [resolvedTargetX, targetEntryY]
+      ]
+    )
   };
 }
