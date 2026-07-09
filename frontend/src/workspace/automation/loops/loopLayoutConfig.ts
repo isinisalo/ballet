@@ -16,7 +16,7 @@ export const loopCanvasLayoutConfig = {
   edgePad: 18,
   actionAnchorY: 11,
   selectedCompactLoopRowGap: 112,
-  compactLoopRowGap: 48,
+  compactLoopRowGap: 24,
   outputEventsLaneGap: 24,
   outputEventLaneClearance: 24
 };

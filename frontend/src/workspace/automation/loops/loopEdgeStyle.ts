@@ -50,13 +50,26 @@ function loopEdgeStroke(edge: LoopCanvasEdge, targetNode: LoopCanvasLayoutNode |
 }
 
 function loopEdgeStrokeDasharray(edge: LoopCanvasEdge) {
+  if (loopEdgeIsRejectedOutput(edge)) return "6 5";
   if (edge.tone === "return") return undefined;
+  if (loopEdgeTouchesLoopSummary(edge)) return undefined;
   if (edge.tone === "cross-loop") return "1 5";
   return edge.dashed ? "6 5" : undefined;
 }
 
 function loopEdgeStrokeLinecap(edge: LoopCanvasEdge) {
+  if (loopEdgeIsRejectedOutput(edge)) return undefined;
+  if (loopEdgeTouchesLoopSummary(edge)) return undefined;
   return edge.tone === "cross-loop" ? "round" : undefined;
+}
+
+function loopEdgeTouchesLoopSummary(edge: LoopCanvasEdge) {
+  return edge.sourceNodeKey.endsWith(":loop") || edge.targetNodeKey.endsWith(":loop");
+}
+
+function loopEdgeIsRejectedOutput(edge: LoopCanvasEdge) {
+  return [edge.route?.outputId, edge.label, edge.eventType]
+    .some((value) => value === "rejected" || value?.endsWith(".rejected"));
 }
 
 function loopEdgeRenderedOpacity(

@@ -1240,7 +1240,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     expect(targetLoop?.x).toBe(downstreamLoop?.x);
     expect(downstreamLoop?.y).toBe((targetLoop?.y ?? 0) + compactLoopStep);
     expect(branchLoop?.y).toBe((downstreamLoop?.y ?? 0) + compactLoopStep);
-    expect(compactLoopStep).toBe(70);
+    expect(compactLoopStep).toBe(46);
     expect(layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:loop")).toMatchObject({
       label: "approved",
       tone: "cross-loop"
@@ -1359,7 +1359,7 @@ describe("toLoopReactFlowEdges", () => {
       height: loopNodeSizes.loop.height,
       direction: "horizontal",
       loopSummary: { loopId: "upstream.approved.loop" }
-    })).toEqual({ value: "upstream.approved.loop", kind: "loop", placement: "start" });
+    })).toBeUndefined();
 
     expect(loopEdgeDisplayLabel({
       key: "loop-end",
@@ -1368,16 +1368,29 @@ describe("toLoopReactFlowEdges", () => {
       label: "approved",
       tone: "cross-loop",
       route: { outputId: "approved" }
-    }, sourceNode, {
-      key: "loop:target:loop",
-      kind: "loop",
-      x: 72,
-      y: 280,
-      width: loopNodeSizes.loop.minWidth,
-      height: loopNodeSizes.loop.height,
-      direction: "horizontal",
-      loopSummary: { loopId: "target.approved.loop" }
-    })).toEqual({ value: "target.approved.loop", kind: "loop", placement: "end" });
+    }, sourceNode)).toBeUndefined();
+  });
+
+  it("keeps loop id labels outside compact loop node geometry", () => {
+    const config = compositeConfig(["source", "target", "downstream"]);
+    config.loops.find((loop) => loop.id === "downstream")!.id = "technical-plan-gate.approved.loop";
+    const downstreamAction = config.actions.find((candidate) => candidate.id === "downstream-start");
+    if (downstreamAction) downstreamAction.event = "target-gate.approved";
+    const route = config.outputRoutes.find((candidate) => candidate.targetLoopId === "downstream");
+    if (route) route.targetLoopId = "technical-plan-gate.approved.loop";
+    const layout = calculateCompositeLoopCanvasLayout({
+      config,
+      selectedLoopId: "source",
+      recordsByLoopId: compositeRecords(config)
+    });
+    const targetLoop = layout.nodes.find((node) => node.key === "loop:target:loop");
+    const longLoop = layout.nodes.find((node) => node.key === "loop:technical-plan-gate.approved.loop:loop");
+
+    expect(targetLoop).toBeDefined();
+    expect(longLoop).toBeDefined();
+    expect(longLoop!.width).toBe(loopNodeSizes.loop.minWidth);
+    expect(targetLoop!.width).toBe(loopNodeSizes.loop.minWidth);
+    expect(longLoop!.x).toBe(targetLoop!.x);
   });
 
   it("anchors stepped loop edge labels to the longest horizontal segment", () => {
@@ -1627,6 +1640,34 @@ describe("toLoopReactFlowEdges", () => {
     expect(edge.style?.strokeLinecap).toBeUndefined();
   });
 
+  it("maps rejected outputs from top and bottom anchors to dashed red-gray strokes", () => {
+    const edges = toLoopReactFlowEdges([{
+      key: "action-action-2-1-review.rejected",
+      sourceNodeKey: "action-2",
+      targetNodeKey: "action-1",
+      sourceHandleId: "top",
+      targetHandleId: "top",
+      tone: "return",
+      route: { outputId: "rejected" }
+    }, {
+      key: "action-action-0-1-review.rejected",
+      sourceNodeKey: "action-0",
+      targetNodeKey: "action-1",
+      sourceHandleId: "bottom",
+      targetHandleId: "top",
+      route: { outputId: "rejected" }
+    }]);
+
+    edges.forEach((edge) => {
+      expect(edge.style).toMatchObject({
+        stroke: "color-mix(in srgb, var(--destructive) 58%, var(--muted-foreground))",
+        strokeWidth: 2,
+        strokeDasharray: "6 5",
+        opacity: 0.75
+      });
+    });
+  });
+
   it("keeps dashed output-event edges on the muted ghost fallback even for rework outputs", () => {
     const [edge] = toLoopReactFlowEdges([{
       key: "action-output-event-0-blocked",
@@ -1703,6 +1744,58 @@ describe("toLoopReactFlowEdges", () => {
       strokeDasharray: "1 5",
       strokeLinecap: "round",
       opacity: 0.75
+    });
+  });
+
+  it("maps loop-to-loop approval edges to the solid green-gray output stroke", () => {
+    const [edge] = toLoopReactFlowEdges([{
+      key: "loop:source:output:0:approved:to:target:loop",
+      sourceNodeKey: "loop:source:loop",
+      targetNodeKey: "loop:target:loop",
+      sourceHandleId: "bottom",
+      targetHandleId: "top",
+      tone: "cross-loop",
+      route: {
+        outputId: "approved"
+      }
+    }]);
+
+    expect(edge.style).toMatchObject({
+      stroke: "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))",
+      strokeWidth: 2,
+      opacity: 0.75
+    });
+    expect(edge.style?.strokeDasharray).toBeUndefined();
+    expect(edge.style?.strokeLinecap).toBeUndefined();
+  });
+
+  it("maps opened-loop and loop-summary edges to solid output strokes", () => {
+    const edges = toLoopReactFlowEdges([{
+      key: "loop:upstream:output:0:approved:to:selected:action:start",
+      sourceNodeKey: "loop:upstream:loop",
+      targetNodeKey: "loop:selected:action-0",
+      sourceHandleId: "bottom",
+      targetHandleId: "left",
+      tone: "cross-loop",
+      route: { outputId: "approved" }
+    }, {
+      key: "loop:selected:output:0:approved:to:downstream:loop",
+      sourceNodeKey: "loop:selected:action-0",
+      targetNodeKey: "loop:downstream:loop",
+      sourceHandleId: "right",
+      targetHandleId: "top",
+      tone: "cross-loop",
+      route: { outputId: "approved" }
+    }]);
+
+    edges.forEach((edge) => {
+      expect(edge.style).toMatchObject({
+        stroke: "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))",
+        strokeWidth: 2,
+        opacity: 0.75
+      });
+      expect(edge.style?.strokeDasharray).toBeUndefined();
+      expect(edge.style?.strokeLinecap).toBeUndefined();
     });
   });
 

@@ -14,15 +14,14 @@ const loopEdgeLabelVerticalOffset = 4;
 const loopEdgeEndLabelGap = 8;
 
 type LoopEdgeDisplayLabel =
-  | { value: string; kind: "action" | "output" }
-  | { value: string; kind: "loop"; placement: "start" | "end" };
+  { value: string; kind: "action" | "output" };
 
 export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
   const nodes = useNodes();
   const loopEdge = props.data?.loopEdge;
   const outputSlotKind = loopEdgeOutputSlotKind(loopEdge);
   const edgePaths = loopEdgePaths(props, nodes, outputSlotKind);
-  const displayLabel = loopEdgeDisplayLabel(loopEdge, props.data?.sourceNode, props.data?.targetNode);
+  const displayLabel = loopEdgeDisplayLabel(loopEdge, props.data?.sourceNode);
   const labelPlacement = displayLabel ? loopEdgeLabelPlacement(props, edgePaths, displayLabel) : undefined;
 
   return (
@@ -60,25 +59,12 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
 
 export function loopEdgeDisplayLabel(
   edge: LoopCanvasEdge | undefined,
-  sourceNode: LoopCanvasLayoutNode | undefined,
-  targetNode?: LoopCanvasLayoutNode
+  sourceNode: LoopCanvasLayoutNode | undefined
 ): LoopEdgeDisplayLabel | undefined {
   if (!edge) return undefined;
-  const sourceLoopLabel = loopNodeDisplayLabel(sourceNode, "start");
-  if (sourceLoopLabel) return sourceLoopLabel;
-  const targetLoopLabel = loopNodeDisplayLabel(targetNode, "end");
-  if (targetLoopLabel) return targetLoopLabel;
+  if (sourceNode?.kind === "loop") return undefined;
   if (edge.tone === "cross-loop") return undefined;
   return actionOrOutputDisplayLabel(edge, sourceNode);
-}
-
-function loopNodeDisplayLabel(
-  node: LoopCanvasLayoutNode | undefined,
-  placement: "start" | "end"
-): LoopEdgeDisplayLabel | undefined {
-  if (node?.kind !== "loop") return undefined;
-  const loopId = node.loopSummary?.loopId;
-  return loopId ? { value: loopId, kind: "loop", placement } : undefined;
 }
 
 function actionOrOutputDisplayLabel(
@@ -103,14 +89,6 @@ function loopEdgeLabelPlacement(
   edgePaths: LoopEdgePaths,
   displayLabel: LoopEdgeDisplayLabel
 ) {
-  if (displayLabel.kind === "loop") {
-    const atStart = displayLabel.placement === "start";
-    return {
-      x: atStart ? sourceX + loopEdgeEndLabelGap : targetX - loopEdgeEndLabelGap,
-      y: atStart ? sourceY : targetY,
-      translate: atStart ? "translate(0, -50%)" : "translate(-100%, -50%)"
-    };
-  }
   if (displayLabel.kind === "action") {
     return {
       x: targetX - loopEdgeEndLabelGap,

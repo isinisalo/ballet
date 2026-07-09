@@ -376,19 +376,19 @@ function compactLoopNodes({
   y: number;
   direction: LoopLayoutDirection;
 }): LoopCanvasLayoutNode[] {
+  const loops = loopIds
+    .map((loopId) => config.loops.find((candidate) => candidate.id === loopId))
+    .filter((loop): loop is ProjectLoop => Boolean(loop));
   let nextY = y;
 
-  return loopIds.flatMap((loopId) => {
-    const loop = config.loops.find((candidate) => candidate.id === loopId);
-    if (!loop) return [];
-    const width = loopNodeSizes.loop.minWidth;
+  return loops.map((loop) => {
     const node: LoopCanvasLayoutNode = {
       key: compactLoopNodeKey(loop.id),
       loopId: loop.id,
       kind: "loop",
       x: loopCanvasLayoutConfig.startX,
       y: nextY,
-      width,
+      width: loopNodeSizes.loop.minWidth,
       height: loopNodeSizes.loop.height,
       direction,
       loopSummary: {
@@ -396,7 +396,7 @@ function compactLoopNodes({
       }
     };
     nextY += loopNodeSizes.loop.height + loopCanvasLayoutConfig.compactLoopRowGap;
-    return [node];
+    return node;
   });
 }
 

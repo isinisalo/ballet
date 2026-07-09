@@ -58,9 +58,12 @@ function renderLoopNode(node: LoopCanvasLayoutNode) {
       data-loop-summary={summary?.loopId}
       aria-label={`Loop: ${label}`}
       title={label}
-      className="flex size-[22px] items-center justify-center rounded border border-divider-strong bg-card"
+      className="relative flex size-[22px] items-center justify-center rounded border border-divider-strong bg-card text-tertiary"
     >
-      <Route className="size-3 text-tertiary" aria-hidden="true" />
+      <Route className="size-3" aria-hidden="true" />
+      <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-sm bg-background/95 px-1 font-mono text-[0.66rem] leading-4">
+        {label}
+      </span>
     </div>
   );
 }
