@@ -1,7 +1,5 @@
-import { Route, Zap } from "lucide-react";
+import { Route } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { cn } from "@/lib/utils";
-import { loopInputEventLabel } from "./loopGraph";
 import { loopAddActionGhostLabel, loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
 import { LoopActionNode } from "./LoopActionNode";
@@ -44,7 +42,6 @@ function LoopNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds: str
 
 function renderNodeContent(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   if (node.kind === "loop") return renderLoopNode(node);
-  if (node.kind === "input-event") return renderInputEventNode(node, context);
   if (node.kind === "first-action-ghost") return renderFirstPolicyGhost(node, context);
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (!node.record) return null;
@@ -65,24 +62,6 @@ function renderLoopNode(node: LoopCanvasLayoutNode) {
     >
       <Route className="size-3 shrink-0 text-tertiary" aria-hidden="true" />
       <span className="block min-w-0 truncate text-tertiary">{label}</span>
-    </div>
-  );
-}
-
-function renderInputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
-  const value = loopInputEventLabel(node.inputEventAction ?? context.firstAction);
-
-  return (
-    <div
-      data-loop-node
-      aria-label={`Input event: ${value}`}
-      title={value}
-      className={cn(
-        "flex h-[22px] w-full min-w-0 items-center justify-center rounded-md border border-divider-strong bg-card text-foreground",
-        !context.firstAction && "border-dashed border-muted-foreground/70 bg-background/80 text-muted-foreground"
-      )}
-    >
-      <Zap className="size-3.5 shrink-0 text-tertiary" aria-hidden="true" />
     </div>
   );
 }

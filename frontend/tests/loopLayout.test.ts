@@ -180,7 +180,6 @@ const firstRoutedPointMovingVertically = (points: number[][], sourceY: number) =
 
 describe("loop layout helper modules", () => {
   it("keeps exported node anchor and output handle calculations stable", () => {
-    expect(loopCanvasNodeAnchorY({ kind: "input-event", height: 99 })).toBe(loopCanvasLayoutConfig.inputEventAnchorY);
     expect(loopCanvasNodeAnchorY({ kind: "action", height: 99 })).toBe(loopCanvasLayoutConfig.actionAnchorY);
     expect(loopCanvasNodeAnchorY({ kind: "output-event", height: 46 })).toBe(23);
     expect(loopOutputSourceHandleId()).toBe("right");
@@ -191,66 +190,66 @@ describe("loop layout helper modules", () => {
   it("positions primary nodes through the extracted dagre layout helper", () => {
     const nodes = positionLoopNodes([
       {
-        key: "input-event",
-        kind: "input-event",
-        width: loopNodeSizes.inputEvent.minWidth,
-        height: loopNodeSizes.inputEvent.height,
+        key: "action-0",
+        kind: "action",
+        width: loopNodeSizes.action.minWidth,
+        height: loopNodeSizes.action.height,
         direction: "horizontal"
       },
+      {
+        key: "action-1",
+        kind: "action",
+        width: loopNodeSizes.action.minWidth,
+        height: loopNodeSizes.action.height,
+        direction: "horizontal"
+      }
+    ], [{ source: "action-0", target: "action-1", label: "updated" }], "horizontal");
+
+    const sourceNode = nodes.find((node) => node.key === "action-0");
+    const actionNode = nodes.find((node) => node.key === "action-1");
+
+    expect(sourceNode).toMatchObject({
+      x: loopCanvasLayoutConfig.startX,
+      y: loopCanvasLayoutConfig.startY
+    });
+    expect(actionNode?.x).toBeGreaterThan((sourceNode?.x ?? 0) + loopNodeSizes.action.minWidth);
+    expect(actionNode?.y).toBe(sourceNode?.y);
+  });
+
+  it("keeps horizontal spacing independent from edge label length", () => {
+    const nodeDrafts = [
       {
         key: "action-0",
         kind: "action",
         width: loopNodeSizes.action.minWidth,
         height: loopNodeSizes.action.height,
         direction: "horizontal"
-      }
-    ], [{ source: "input-event", target: "action-0", label: "updated" }], "horizontal");
-
-    const inputEventNode = nodes.find((node) => node.key === "input-event");
-    const actionNode = nodes.find((node) => node.key === "action-0");
-
-    expect(inputEventNode).toMatchObject({
-      x: loopCanvasLayoutConfig.startX,
-      y: loopCanvasLayoutConfig.startY
-    });
-    expect(actionNode?.x).toBeGreaterThan((inputEventNode?.x ?? 0) + loopNodeSizes.inputEvent.minWidth);
-    expect(actionNode?.y).toBe(inputEventNode?.y);
-  });
-
-  it("keeps horizontal spacing independent from edge label length", () => {
-    const nodeDrafts = [
-      {
-        key: "input-event",
-        kind: "input-event",
-        width: loopNodeSizes.inputEvent.minWidth,
-        height: loopNodeSizes.inputEvent.height,
-        direction: "horizontal"
       },
       {
-        key: "action-0",
+        key: "action-1",
         kind: "action",
         width: loopNodeSizes.action.minWidth,
         height: loopNodeSizes.action.height,
         direction: "horizontal"
       }
     ];
-    const shortLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "input-event", target: "action-0", label: "x" }], "horizontal");
-    const longLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "input-event", target: "action-0", label: "x".repeat(500) }], "horizontal");
+    const shortLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "action-0", target: "action-1", label: "x" }], "horizontal");
+    const longLabelNodes = positionLoopNodes(nodeDrafts, [{ source: "action-0", target: "action-1", label: "x".repeat(500) }], "horizontal");
 
-    const shortLabelActionNode = shortLabelNodes.find((node) => node.key === "action-0");
-    const longLabelActionNode = longLabelNodes.find((node) => node.key === "action-0");
+    const shortLabelActionNode = shortLabelNodes.find((node) => node.key === "action-1");
+    const longLabelActionNode = longLabelNodes.find((node) => node.key === "action-1");
 
     expect(longLabelActionNode?.x).toBe(shortLabelActionNode?.x);
-    expect(shortLabelActionNode?.x).toBe(loopCanvasLayoutConfig.startX + loopNodeSizes.inputEvent.minWidth + loopCanvasLayoutConfig.horizontalEdgeGap);
+    expect(shortLabelActionNode?.x).toBe(loopCanvasLayoutConfig.startX + loopNodeSizes.action.minWidth + loopCanvasLayoutConfig.horizontalEdgeGap);
   });
 
-  it("keeps default smart edge routing for same-row edges and tightens cross-row routing", () => {
-    expect(loopSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 125.5 })).toBe(smartEdgePresets.step);
+  it("keeps default smooth smart edge routing for same-row edges and tightens cross-row routing", () => {
+    expect(loopSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 125.5 })).toBe(smartEdgePresets.smoothstep);
     expect(loopSmartEdgeRoutingOptions({ sourceY: 125.5, targetY: 75.5 })).toMatchObject({
       gridRatio: 5,
       nodePadding: 6,
-      drawEdge: smartEdgePresets.step.drawEdge,
-      generatePath: smartEdgePresets.step.generatePath
+      drawEdge: smartEdgePresets.smoothstep.drawEdge,
+      generatePath: smartEdgePresets.smoothstep.generatePath
     });
   });
 
@@ -258,7 +257,7 @@ describe("loop layout helper modules", () => {
     const sourceY = 125.5;
     const targetY = 75.5;
     const nodes = [
-      loopRoutingTestNode({ id: "input-event", x: 32, y: 64, width: 28, height: 22 }),
+      loopRoutingTestNode({ id: "source-anchor", x: 32, y: 64, width: 28, height: 22 }),
       loopRoutingTestNode({ id: "action-0", x: 238, y: 64, width: 174, height: 22 }),
       loopRoutingTestNode({ id: "action-1", x: 597, y: 64, width: 112, height: 22 }),
       loopRoutingTestNode({ id: "action-3", x: 956, y: 64, width: 181, height: 22 }),
@@ -279,7 +278,7 @@ describe("loop layout helper modules", () => {
     };
     const defaultRoute = getSmartEdge({
       ...baseParams,
-      options: smartEdgePresets.step
+      options: smartEdgePresets.smoothstep
     });
     const directedRoute = getSmartEdge({
       ...baseParams,
@@ -317,25 +316,15 @@ describe("calculateLoopCanvasLayout", () => {
     ]);
   });
 
-  it("creates an input event and first-action ghost for an empty loop", () => {
+  it("creates only the first-action ghost for an empty loop", () => {
     const layout = layoutFor([], []);
-    const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
 
-    expect(layout.nodes.map((node) => node.kind)).toEqual(["input-event", "first-action-ghost"]);
-    expect(inputEventNode).toMatchObject({
-      width: loopNodeSizes.inputEvent.minWidth,
-      height: loopNodeSizes.inputEvent.height
+    expect(layout.nodes.map((node) => node.kind)).toEqual(["first-action-ghost"]);
+    expect(layout.nodes.find((node) => node.key === "first-action-ghost")).toMatchObject({
+      x: loopCanvasLayoutConfig.startX,
+      y: loopCanvasLayoutConfig.startY
     });
-    expect(layout.edges).toEqual([
-      expect.objectContaining({
-        key: "input-event-first-action",
-        sourceNodeKey: "input-event",
-        targetNodeKey: "first-action-ghost",
-        sourceHandleId: "right",
-        targetHandleId: "left",
-        dashed: true
-      })
-    ]);
+    expect(layout.edges).toEqual([]);
   });
 
   it("renders multiple unhandled outputs as separate output-event nodes", () => {
@@ -577,7 +566,6 @@ describe("calculateLoopCanvasLayout", () => {
     const childNode = layout.nodes.find((node) => node.key === "action-1");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.rejected");
     const outputEventEdge = layout.edges.find((edge) => edge.key === "action-output-event-0-build.rejected");
-    const inputEventPolicyEdge = layout.edges.find((edge) => edge.key === "input-event-action-0");
     const childPolicyEdge = layout.edges.find((edge) => edge.key === "action-action-0-1-build.approved");
 
     expect(layout.nodes.filter((node) => node.kind === "action").map((node) => node.record?.actionId)).toEqual(["first", "child"]);
@@ -591,7 +579,6 @@ describe("calculateLoopCanvasLayout", () => {
       targetHandleId: "left",
       eventType: "build.approved"
     }));
-    expect(inputEventPolicyEdge?.label).toBe("first");
     expect(childPolicyEdge?.label).toBe("approved");
     expect(outputEventNode).toMatchObject({
       kind: "output-event",
@@ -643,7 +630,7 @@ describe("calculateLoopCanvasLayout", () => {
     expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeLessThan(80);
   });
 
-  it("keeps the primary horizontal action path on the input event baseline and stacks branches compactly below it", () => {
+  it("keeps the primary horizontal action path on the root action baseline and stacks branches compactly below it", () => {
     const first = action("first", undefined, "build");
     const completeChild = action("complete-child", "build.complete", "deploy");
     const failedChild = action("failed-child", "build.failed", "debug");
@@ -670,13 +657,11 @@ describe("calculateLoopCanvasLayout", () => {
       ]),
       editingPolicyIndex: null
     });
-    const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
     const firstNode = layout.nodes.find((node) => node.key === "action-0");
     const completeChildNode = layout.nodes.find((node) => node.key === "action-1");
     const failedChildNode = layout.nodes.find((node) => node.key === "action-2");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.blocked");
 
-    expect(firstNode?.y).toBe(inputEventNode?.y);
     expect(completeChildNode?.y).toBe(firstNode?.y);
     expect(failedChildNode?.y).toBe(firstNode ? firstNode.y + loopActionStackHeight() + loopCanvasLayoutConfig.branchGap : undefined);
     expect(outputEventNode?.x).toBe(completeChildNode?.x);
@@ -913,22 +898,15 @@ describe("calculateLoopCanvasLayout", () => {
     const first = action("first", undefined, "build");
     const child = action("child", "build.approved", "deploy");
     const layout = layoutFor([first, child], [first.id, child.id], null, "vertical");
-    const inputEventNode = layout.nodes.find((node) => node.key === "input-event");
     const firstNode = layout.nodes.find((node) => node.key === "action-0");
     const childNode = layout.nodes.find((node) => node.key === "action-1");
     const outputEventNode = layout.nodes.find((node) => node.key === "output-event-0-build.rejected");
-    const inputEventPolicyEdge = layout.edges.find((edge) => edge.key === "input-event-action-0");
 
     expect(layout.direction).toBe("vertical");
-    expect(inputEventNode ? inputEventNode.x + inputEventNode.width / 2 : undefined).toBe(firstNode ? firstNode.x + firstNode.width / 2 : undefined);
+    expect(firstNode?.y).toBe(loopCanvasLayoutConfig.startY);
     expect(childNode?.y).toBeGreaterThan(firstNode?.y ?? 0);
     expect(outputEventNode?.x).toBe(childNode ? childNode.x + childNode.width + loopCanvasLayoutConfig.branchGap : undefined);
     expect(outputEventNode?.y).toBe(childNode?.y);
-    expect(inputEventPolicyEdge).toMatchObject({
-      sourceHandleId: "right",
-      targetHandleId: "left",
-      label: "first"
-    });
     expect(layout.edges).toContainEqual(expect.objectContaining({
       key: "action-action-0-1-build.approved",
       sourceHandleId: "right",
@@ -1086,7 +1064,6 @@ describe("calculateCompositeLoopCanvasLayout", () => {
     });
 
     expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
-      "loop:source:input-event",
       "loop:source:action-0",
       "loop:source:output-event-0-approved",
       "loop:source:output-event-0-rejected"
@@ -1101,18 +1078,16 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       selectedLoopId: "source",
       recordsByLoopId: compositeRecords(config)
     });
-    const sourceInputEvent = layout.nodes.find((node) => node.key === "loop:source:input-event");
+    const sourceAction = layout.nodes.find((node) => node.key === "loop:source:action-0");
     const targetLoop = layout.nodes.find((node) => node.key === "loop:target:loop");
     const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:loop");
 
     expect(layout.nodes.every((node) => node.key.startsWith("loop:"))).toBe(true);
     expect(new Set(layout.nodes.map((node) => node.key)).size).toBe(layout.nodes.length);
     expect(layout.nodes.map((node) => node.key)).toEqual(expect.arrayContaining([
-      "loop:source:input-event",
       "loop:source:action-0",
       "loop:target:loop"
     ]));
-    expect(layout.nodes.find((node) => node.key === "loop:target:input-event")).toBeUndefined();
     expect(layout.nodes.find((node) => node.key === "loop:target:action-0")).toBeUndefined();
     expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toMatchObject({
       kind: "output-event",
@@ -1125,11 +1100,10 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       loopSummary: {
         loopId: "target",
         label: "target start loop",
-        inputEvent: "target",
         action: "target-start"
       }
     });
-    expect(targetLoop?.y).toBeGreaterThan(sourceInputEvent?.y ?? 0);
+    expect(targetLoop?.y).toBeGreaterThan(sourceAction?.y ?? 0);
     expect(targetLoop?.y).toBe(
       Math.max(
         ...layout.nodes
@@ -1175,11 +1149,11 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       selectedLoopId: "source",
       recordsByLoopId: compositeRecords(config)
     });
-    const sourceInputEvent = layout.nodes.find((node) => node.key === "loop:source:input-event");
+    const sourceAction = layout.nodes.find((node) => node.key === "loop:source:action-0");
     const upstreamLoop = layout.nodes.find((node) => node.key === "loop:upstream:loop");
     const crossEdge = layout.edges.find((edge) => edge.key === "loop:upstream:output:0:approved:to:source:loop");
 
-    expect(sourceInputEvent).toBeDefined();
+    expect(sourceAction).toBeDefined();
     expect(upstreamLoop).toMatchObject({
       kind: "loop",
       loopSummary: {
@@ -1187,14 +1161,14 @@ describe("calculateCompositeLoopCanvasLayout", () => {
         label: "upstream start loop"
       }
     });
-    expect(upstreamLoop?.y).toBeLessThan(sourceInputEvent?.y ?? 0);
-    expect((sourceInputEvent?.y ?? 0) - ((upstreamLoop?.y ?? 0) + loopNodeSizes.loop.height)).toBe(
+    expect(upstreamLoop?.y).toBeLessThan(sourceAction?.y ?? 0);
+    expect((sourceAction?.y ?? 0) - ((upstreamLoop?.y ?? 0) + loopNodeSizes.loop.height)).toBe(
       loopCanvasLayoutConfig.selectedCompactLoopRowGap
     );
     expect(layout.nodes.find((node) => node.key === "loop:upstream:action-0")).toBeUndefined();
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "loop:upstream:loop",
-      targetNodeKey: "loop:source:input-event",
+      targetNodeKey: "loop:source:action-0",
       label: "approved",
       tone: "cross-loop"
     });
@@ -1220,7 +1194,7 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       recordsByLoopId: compositeRecords(config)
     });
 
-    expect(layout.nodes.filter((node) => node.kind === "input-event")).toHaveLength(1);
+    expect(layout.nodes.some((node) => node.key.includes("input-event"))).toBe(false);
     expect(layout.nodes.filter((node) => node.kind === "action")).toHaveLength(1);
     expect(layout.nodes.filter((node) => node.kind === "loop")).toHaveLength(1);
     expect(layout.edges.filter((edge) => edge.tone === "cross-loop")).toHaveLength(2);
@@ -1284,21 +1258,21 @@ describe("calculateAllLoopsCanvasLayout", () => {
       config,
       recordsByLoopId: compositeRecords(config)
     });
-    const sourceInputEvent = layout.nodes.find((node) => node.key === "loop:source:input-event");
-    const targetInputEvent = layout.nodes.find((node) => node.key === "loop:target:input-event");
-    const observerInputEvent = layout.nodes.find((node) => node.key === "loop:observer:input-event");
-    const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:input-event");
+    const sourceAction = layout.nodes.find((node) => node.key === "loop:source:action-0");
+    const targetAction = layout.nodes.find((node) => node.key === "loop:target:action-0");
+    const observerGhost = layout.nodes.find((node) => node.key === "loop:observer:first-action-ghost");
+    const crossEdge = layout.edges.find((edge) => edge.key === "loop:source:output:0:approved:to:target:action:target-start");
 
-    expect(sourceInputEvent).toBeDefined();
-    expect(targetInputEvent).toBeDefined();
-    expect(observerInputEvent).toBeDefined();
+    expect(sourceAction).toBeDefined();
+    expect(targetAction).toBeDefined();
+    expect(observerGhost).toMatchObject({ kind: "first-action-ghost" });
     expect(layout.nodes.find((node) => node.key === "loop:source:output-event-0-approved")).toMatchObject({
       kind: "output-event",
       outputEvent: { outputId: "approved", outputType: "action" }
     });
     expect(crossEdge).toMatchObject({
       sourceNodeKey: "loop:source:action-0",
-      targetNodeKey: "loop:target:input-event",
+      targetNodeKey: "loop:target:action-0",
       sourceHandleId: "right",
       targetHandleId: "left",
       label: "approved",
@@ -1459,7 +1433,7 @@ describe("toLoopReactFlowEdges", () => {
     expect(edge.markerEnd).toBeUndefined();
   });
 
-  it("maps every loop edge to SmartStepEdge", () => {
+  it("maps every loop edge to SmartSmoothStepEdge", () => {
     const edges = toLoopReactFlowEdges([
       {
         key: "action-action-0-1-build.complete",
@@ -1564,9 +1538,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("maps cross-loop approval edges to the green-gray dotted output stroke", () => {
     const [edge] = toLoopReactFlowEdges([{
-      key: "loop:source:output:0:ready:to:target:input-event",
+      key: "loop:source:output:0:ready:to:target:action:target-start",
       sourceNodeKey: "loop:source:action-0",
-      targetNodeKey: "loop:target:input-event",
+      targetNodeKey: "loop:target:action-0",
       sourceHandleId: "right",
       targetHandleId: "left",
       tone: "cross-loop",
@@ -1590,9 +1564,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("maps cross-loop rework edges to the red-gray dotted output stroke", () => {
     const [edge] = toLoopReactFlowEdges([{
-      key: "loop:source:output:0:changes-requested:to:target:input-event",
+      key: "loop:source:output:0:changes-requested:to:target:action:target-start",
       sourceNodeKey: "loop:source:action-0",
-      targetNodeKey: "loop:target:input-event",
+      targetNodeKey: "loop:target:action-0",
       sourceHandleId: "right",
       targetHandleId: "left",
       tone: "cross-loop",
@@ -1616,9 +1590,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("renders cross-loop edges as smoothstep paths", () => {
     const path = loopCrossLoopSmoothStepPath({
-      id: "loop:source:output:0:ready:to:target:input-event",
+      id: "loop:source:output:0:ready:to:target:action:target-start",
       source: "loop:source:action-0",
-      target: "loop:target:input-event",
+      target: "loop:target:action-0",
       selected: false,
       sourceX: 1000,
       sourceY: 76,
@@ -1628,9 +1602,9 @@ describe("toLoopReactFlowEdges", () => {
       targetPosition: Position.Left,
       data: {
         loopEdge: {
-          key: "loop:source:output:0:ready:to:target:input-event",
+          key: "loop:source:output:0:ready:to:target:action:target-start",
           sourceNodeKey: "loop:source:action-0",
-          targetNodeKey: "loop:target:input-event",
+          targetNodeKey: "loop:target:action-0",
           tone: "cross-loop"
         }
       }
@@ -1646,9 +1620,9 @@ describe("toLoopReactFlowEdges", () => {
 
   it("keeps cross-loop approval edges on the smoothstep loop-to-loop path", () => {
     const path = loopCrossLoopSmoothStepPath({
-      id: "loop:source:output:0:approved:to:target:input-event",
+      id: "loop:source:output:0:approved:to:target:action:target-start",
       source: "loop:source:action-0",
-      target: "loop:target:input-event",
+      target: "loop:target:action-0",
       selected: false,
       sourceX: 1000,
       sourceY: 76,
@@ -1658,9 +1632,9 @@ describe("toLoopReactFlowEdges", () => {
       targetPosition: Position.Left,
       data: {
         loopEdge: {
-          key: "loop:source:output:0:approved:to:target:input-event",
+          key: "loop:source:output:0:approved:to:target:action:target-start",
           sourceNodeKey: "loop:source:action-0",
-          targetNodeKey: "loop:target:input-event",
+          targetNodeKey: "loop:target:action-0",
           tone: "cross-loop",
           route: { outputId: "approved" }
         }

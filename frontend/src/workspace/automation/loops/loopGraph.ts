@@ -43,11 +43,6 @@ export type LoopGraph = {
   rootRecords: LoopStepRecord[];
 };
 
-export const loopInputEventLabel = (action?: ProjectAction) => {
-  if (!action) return "Next event";
-  return action.id || "Missing action";
-};
-
 export const loopOutputEvents = (recordOrAction: LoopStepRecord | ProjectAction | undefined, continuationEvent?: string) => {
   if (!recordOrAction) return ["Missing action"];
   const action = "actionId" in recordOrAction ? recordOrAction.action : recordOrAction;

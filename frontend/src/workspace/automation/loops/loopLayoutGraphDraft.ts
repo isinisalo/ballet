@@ -12,7 +12,6 @@ import {
 import { loopNodeSizes } from "./loopLayoutConfig";
 import {
   loopOutputEventNodeWidth,
-  loopInputEventNodeWidth,
   loopOutputSourceHandleId,
   loopOutputTargetHandleId,
   loopActionNodeWidth
@@ -110,16 +109,6 @@ export function addOutputEventNode(
   });
 }
 
-export function addInputEventNode(context: LoopLayoutGraphDraftContext) {
-  addNode(context, {
-    key: "input-event",
-    kind: "input-event",
-    width: loopInputEventNodeWidth(),
-    height: loopNodeSizes.inputEvent.height,
-    direction: context.direction
-  });
-}
-
 export function addFirstActionGhost(context: LoopLayoutGraphDraftContext) {
   addNode(context, {
     key: "first-action-ghost",
@@ -127,15 +116,6 @@ export function addFirstActionGhost(context: LoopLayoutGraphDraftContext) {
     width: loopNodeSizes.event.width,
     height: loopNodeSizes.event.height,
     direction: context.direction
-  });
-  addDagreEdge(context, { source: "input-event", target: "first-action-ghost" });
-  addCanvasEdge(context, {
-    key: "input-event-first-action",
-    sourceNodeKey: "input-event",
-    targetNodeKey: "first-action-ghost",
-    sourceHandleId: context.sourceHandleId,
-    targetHandleId: context.targetHandleId,
-    dashed: true
   });
 }
 

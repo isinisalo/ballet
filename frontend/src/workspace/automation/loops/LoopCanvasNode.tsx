@@ -2,10 +2,9 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type LoopNodeTone = "input-event" | "action" | "agent" | "event";
+type LoopNodeTone = "action" | "agent" | "event";
 
 const loopNodeToneClasses: Record<LoopNodeTone, string> = {
-  "input-event": "text-tertiary",
   action: "text-primary",
   agent: "text-secondary",
   event: "text-primary"

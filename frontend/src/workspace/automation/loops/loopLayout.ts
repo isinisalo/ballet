@@ -1,5 +1,4 @@
 import type { ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
-import { eventTypeFromLoopId } from "@shared/policy-actions";
 import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import { buildLoopGraph, loopCanonicalRecord, type LoopGraph, type LoopOutputTarget, type LoopStepRecord } from "./loopGraph";
 import { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
@@ -23,6 +22,7 @@ type LoopEventLink = {
   sourceActionId: string;
   outputId: string;
   eventType: string;
+  targetActionId: string;
 };
 
 // This module intentionally centralizes loop graph layout rules because
@@ -140,6 +140,7 @@ function calculateLoopCanvasLayoutRows({
       actionById
     }));
   const rowOffsetByLoopId = loopRowOffsets(rows);
+  const rowByLoopId = new Map(rows.map((row) => [row.loop.id, row]));
   const hiddenLocalNodeKeys = new Set<string>();
   const namespacedNodes: LoopCanvasLayoutNode[] = [];
   const namespacedEdges: LoopCanvasEdge[] = [];
@@ -156,8 +157,7 @@ function calculateLoopCanvasLayoutRows({
         loopId: row.loop.id,
         y: node.y + (rowOffsetByLoopId.get(row.loop.id) ?? 0),
         record: node.record ? { ...node.record, loopId: row.loop.id } : undefined,
-        records: node.records?.map((record) => ({ ...record, loopId: row.loop.id })),
-        inputEventAction: node.kind === "input-event" ? actionById.get(row.loop.steps[0] ?? "") : node.inputEventAction
+        records: node.records?.map((record) => ({ ...record, loopId: row.loop.id }))
       });
     });
   });
@@ -172,7 +172,7 @@ function calculateLoopCanvasLayoutRows({
   });
 
   rows.forEach((row) => {
-    crossLoopEventEdges(config, row, loopIds, actionById).forEach((edge) => namespacedEdges.push(edge));
+    crossLoopEventEdges(config, row, loopIds, actionById, rowByLoopId).forEach((edge) => namespacedEdges.push(edge));
   });
 
   return {
@@ -237,8 +237,7 @@ function calculateSelectedLoopCanvasLayout({
       loopId: selectedLoop.id,
       y: node.y + selectedOffsetY,
       record: node.record ? { ...node.record, loopId: selectedLoop.id } : undefined,
-      records: node.records?.map((record) => ({ ...record, loopId: selectedLoop.id })),
-      inputEventAction: node.kind === "input-event" ? actionById.get(selectedLoop.steps[0] ?? "") : node.inputEventAction
+      records: node.records?.map((record) => ({ ...record, loopId: selectedLoop.id }))
     });
   });
 
@@ -263,7 +262,8 @@ function calculateSelectedLoopCanvasLayout({
     ...compactLoopEventEdges({
       links,
       compactLoopIds: visibleCompactLoopIds,
-      selectedLoopId: selectedLoop.id
+      selectedLoopId: selectedLoop.id,
+      selectedRow
     }),
     ...selectedToCompactLoopEventEdges({
       selectedRow,
@@ -321,6 +321,7 @@ function loopEventLinks(
     return records.flatMap((record) =>
       (record.outputTargets ?? [])
         .flatMap((target) => {
+          if (target.type !== "action") return [];
           const targetLoop = resolveEventTargetLoop(config, target, actionById);
           if (!targetLoop || targetLoop.id === loop.id) return [];
           return [{
@@ -329,7 +330,8 @@ function loopEventLinks(
             sourceStepIndex: record.index,
             sourceActionId: record.actionId,
             outputId: target.outputId,
-            eventType: target.eventType
+            eventType: target.eventType,
+            targetActionId: target.targetActionId
           } satisfies LoopEventLink];
         })
     );
@@ -397,7 +399,6 @@ function compactLoopNodes({
       loopSummary: {
         loopId: loop.id,
         label,
-        inputEvent: eventTypeFromLoopId(loop.id),
         action: firstAction?.id
       }
     };
@@ -409,22 +410,28 @@ function compactLoopNodes({
 function compactLoopEventEdges({
   links,
   compactLoopIds,
-  selectedLoopId
+  selectedLoopId,
+  selectedRow
 }: {
   links: LoopEventLink[];
   compactLoopIds: ReadonlySet<string>;
   selectedLoopId: string;
+  selectedRow: LoopLayoutRow;
 }): LoopCanvasEdge[] {
   return links.flatMap((link) => {
     const sourceIsCompact = compactLoopIds.has(link.sourceLoopId);
     const targetIsCompact = compactLoopIds.has(link.targetLoopId);
     const targetIsSelected = link.targetLoopId === selectedLoopId;
     if (!sourceIsCompact || (!targetIsCompact && !targetIsSelected)) return [];
+    const targetNodeKey = targetIsSelected
+      ? selectedLoopTargetActionNodeKey(selectedRow, link)
+      : compactLoopNodeKey(link.targetLoopId);
+    if (!targetNodeKey) return [];
 
     return [{
       key: `loop:${link.sourceLoopId}:output:${link.sourceStepIndex}:${link.outputId}:to:${link.targetLoopId}:loop`,
       sourceNodeKey: compactLoopNodeKey(link.sourceLoopId),
-      targetNodeKey: targetIsSelected ? namespaceLoopKey(selectedLoopId, "input-event") : compactLoopNodeKey(link.targetLoopId),
+      targetNodeKey,
       sourceHandleId: "right",
       targetHandleId: "left",
       eventType: link.eventType,
@@ -435,6 +442,8 @@ function compactLoopEventEdges({
         targetLoopId: link.targetLoopId,
         sourceStepIndex: link.sourceStepIndex,
         sourceActionId: link.sourceActionId,
+        handlerActionId: targetIsSelected ? link.targetActionId : undefined,
+        handlerLoopId: targetIsSelected ? selectedLoopId : undefined,
         eventType: link.eventType,
         outputId: link.outputId
       }
@@ -530,7 +539,7 @@ function loopLayoutBounds(nodes: LoopCanvasLayoutNode[]) {
     return {
       minY: loopCanvasLayoutConfig.startY,
       maxY: loopCanvasLayoutConfig.startY,
-      height: loopNodeSizes.inputEvent.height
+      height: loopNodeSizes.action.height
     };
   }
   const minY = Math.min(...nodes.map((node) => node.y));
@@ -565,18 +574,21 @@ function crossLoopEventEdges(
     loopGraph: LoopGraph;
   },
   loopIds: ReadonlySet<string>,
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>
+  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>,
+  rowByLoopId: ReadonlyMap<string, LoopLayoutRow>
 ): LoopCanvasEdge[] {
   return row.records.flatMap((record) =>
     (record.outputTargets ?? [])
       .flatMap((target) => {
+        if (target.type !== "action") return [];
         const targetLoop = resolveEventTargetLoop(config, target, actionById);
         if (!targetLoop || !loopIds.has(targetLoop.id)) return [];
+        const targetNodeKey = targetLoopActionNodeKey(targetLoop.id, target.targetActionId, rowByLoopId);
+        if (!targetNodeKey) return [];
         const canonicalRecord = loopCanonicalRecord(row.loopGraph, record);
         const sourceNodeKey = namespaceLoopKey(row.loop.id, `action-${canonicalRecord.index}`);
-        const targetNodeKey = namespaceLoopKey(targetLoop.id, "input-event");
         return [{
-          key: `loop:${row.loop.id}:output:${record.index}:${target.outputId}:to:${targetLoop.id}:input-event`,
+          key: `loop:${row.loop.id}:output:${record.index}:${target.outputId}:to:${targetLoop.id}:action:${target.targetActionId}`,
           sourceNodeKey,
           targetNodeKey,
           sourceHandleId: loopOutputSourceHandleId(target),
@@ -589,12 +601,31 @@ function crossLoopEventEdges(
             targetLoopId: targetLoop.id,
             sourceStepIndex: record.index,
             sourceActionId: record.actionId,
+            handlerActionId: target.targetActionId,
+            handlerLoopId: targetLoop.id,
             eventType: target.eventType,
             outputId: target.outputId
           }
         } satisfies LoopCanvasEdge];
       })
   );
+}
+
+function selectedLoopTargetActionNodeKey(row: LoopLayoutRow, link: LoopEventLink) {
+  if (row.loop.id !== link.targetLoopId) return undefined;
+  return targetLoopActionNodeKey(row.loop.id, link.targetActionId, new Map([[row.loop.id, row]]));
+}
+
+function targetLoopActionNodeKey(
+  loopId: string,
+  actionId: string,
+  rowByLoopId: ReadonlyMap<string, LoopLayoutRow>
+) {
+  const row = rowByLoopId.get(loopId);
+  const targetRecord = row?.records.find((record) => record.actionId === actionId);
+  if (!row || !targetRecord) return undefined;
+  const canonicalTargetRecord = loopCanonicalRecord(row.loopGraph, targetRecord);
+  return namespaceLoopKey(loopId, `action-${canonicalTargetRecord.index}`);
 }
 
 function namespaceLoopEdge(loopId: string, edge: LoopCanvasEdge): LoopCanvasEdge {

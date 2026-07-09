@@ -136,7 +136,6 @@ function loopLayoutMetrics(
   })).values()].map(outputEventStackHeight);
   const maxOutputHeight = Math.max(loopNodeSizes.outputEvent.height, ...outputStackHeights);
   const policyStackHeight = loopActionStackHeight();
-  const inputEventWidth = primaryNodes.find((node) => node.kind === "input-event")?.width ?? loopNodeSizes.inputEvent.minWidth;
   const horizontalEdgeGap = loopHorizontalEdgeGap();
   const horizontalPolicyColumnWidth = Math.max(
     loopNodeSizes.action.minWidth,
@@ -144,10 +143,10 @@ function loopLayoutMetrics(
   );
 
   return {
-    horizontalRootPolicyX: loopCanvasLayoutConfig.startX + inputEventWidth + horizontalEdgeGap,
+    horizontalRootPolicyX: loopCanvasLayoutConfig.startX + horizontalPolicyColumnWidth + horizontalEdgeGap,
     horizontalPolicyColumnStep: horizontalPolicyColumnWidth + horizontalEdgeGap,
-    horizontalRowStep: Math.max(policyStackHeight, loopNodeSizes.inputEvent.height) + loopCanvasLayoutConfig.branchGap,
-    verticalRootPolicyY: loopCanvasLayoutConfig.startY + loopNodeSizes.inputEvent.height + loopCanvasLayoutConfig.branchGap,
+    horizontalRowStep: policyStackHeight + loopCanvasLayoutConfig.branchGap,
+    verticalRootPolicyY: loopCanvasLayoutConfig.startY + policyStackHeight + loopCanvasLayoutConfig.branchGap,
     verticalPolicyRankStep: policyStackHeight + maxOutputHeight + loopCanvasLayoutConfig.branchGap,
     verticalColumnStep: Math.max(loopNodeSizes.action.maxWidth, loopNodeSizes.outputEvent.maxWidth) + loopCanvasLayoutConfig.branchGap
   };

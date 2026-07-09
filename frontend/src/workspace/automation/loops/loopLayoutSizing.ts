@@ -4,7 +4,6 @@ import { loopAddActionGhostLabel, loopCanvasLayoutConfig, loopNodeSizes } from "
 import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
 export function loopCanvasNodeAnchorY(layoutNode: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
-  if (layoutNode.kind === "input-event") return loopCanvasLayoutConfig.inputEventAnchorY;
   if (layoutNode.kind === "action") return loopCanvasLayoutConfig.actionAnchorY;
   return layoutNode.height / 2;
 }
@@ -48,10 +47,6 @@ export function loopOutputEventNodeWidth() {
 
 export function loopActionNodeWidth(record: LoopStepRecord) {
   return loopOutputNodeWidth(record.action?.id || record.actionId || "No action", loopNodeSizes.action.minWidth, loopNodeSizes.action.maxWidth);
-}
-
-export function loopInputEventNodeWidth() {
-  return loopOutputNodeWidth("", loopNodeSizes.inputEvent.minWidth, loopNodeSizes.inputEvent.maxWidth);
 }
 
 export function loopSummaryNodeWidth(value: string) {

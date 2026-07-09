@@ -2,7 +2,7 @@ import { smartEdgePresets, type GetSmartEdgeOptions } from "@tisoap/react-flow-s
 
 const loopCrossRowEdgeEpsilon = 0.5;
 const loopCrossRowSmartEdgeOptions = {
-  ...smartEdgePresets.step,
+  ...smartEdgePresets.smoothstep,
   gridRatio: 5,
   nodePadding: 6
 } satisfies GetSmartEdgeOptions;
@@ -14,6 +14,6 @@ export function loopSmartEdgeRoutingOptions({
   sourceY: number;
   targetY: number;
 }): GetSmartEdgeOptions {
-  if (Math.abs(sourceY - targetY) <= loopCrossRowEdgeEpsilon) return smartEdgePresets.step;
+  if (Math.abs(sourceY - targetY) <= loopCrossRowEdgeEpsilon) return smartEdgePresets.smoothstep;
   return loopCrossRowSmartEdgeOptions;
 }

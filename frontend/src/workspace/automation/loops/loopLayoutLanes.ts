@@ -99,7 +99,7 @@ export function loopHorizontalLaneYOffsets(
   let nextOffset = 0;
   laneHeights.forEach((laneHeight, laneIndex) => {
     laneYOffsets.set(laneIndex, nextOffset);
-    nextOffset += Math.max(laneHeight, loopNodeSizes.inputEvent.height) + loopCanvasLayoutConfig.branchGap;
+    nextOffset += Math.max(laneHeight, loopNodeSizes.action.height) + loopCanvasLayoutConfig.branchGap;
   });
   return laneYOffsets;
 }
@@ -131,7 +131,6 @@ function loopHorizontalLaneIndexes(nodes: LoopCanvasLayoutNodeDraft[], edges: Lo
     });
   };
 
-  assignLane("input-event", 0);
   nodes.forEach((node) => {
     if (!laneIndexes.has(node.key)) assignLane(node.key, nextLaneIndex++);
   });
