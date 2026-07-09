@@ -78,15 +78,6 @@ export function LoopsAutomationTab({
   const [selectedHandlerSelection, setSelectedHandlerSelection] = useState<LoopHandlerSelection | null>(null);
   const selectedHandlerStepIndexes = selectedHandlerSelection?.stepIndexes ?? [];
   const actionById = useMemo(() => new Map(config.actions.map((action) => [action.id, action])), [config.actions]);
-  const stepActionOptions = [{ value: noSelection, label: "No action" }, ...config.actions.map((action) => ({ value: action.id, label: action.id }))];
-  const actionOptions = [
-    { value: noSelection, label: "No action" },
-    ...config.actions.map((action) => ({
-      value: action.id,
-      label: action.description ? `${action.id} · ${action.description}` : action.id,
-      description: action.description
-    }))
-  ];
   const startingActionOptions = config.actions.map((action) => ({
     value: action.id,
     label: action.description ? `${action.id} · ${action.description}` : action.id
@@ -172,11 +163,6 @@ export function LoopsAutomationTab({
       };
     });
     if (nextLoop.id !== selected.id) onSelect(nextLoop.id);
-  };
-
-  const updateStep = (loopId: string, index: number, actionId: string) => {
-    if (!selected || loopId !== selected.id) return;
-    updateSelected({ steps: selected.steps.map((step, stepIndex) => stepIndex === index ? actionId : step) });
   };
 
   const addActionStep = (eventType?: string, sourceAction?: ProjectAction) => {
@@ -360,10 +346,6 @@ export function LoopsAutomationTab({
         layout={loopLayout}
         selectedLoopId={selected.id}
         actionById={actionById}
-        firstAction={actionById.get(selected.steps[0] ?? "")}
-        noSelectionValue={noSelection}
-        stepActionOptions={stepActionOptions}
-        actionOptions={actionOptions}
         draggedStepIndex={canvasInteraction.draggedStepIndex}
         dragOverStepIndex={canvasInteraction.dragOverStepIndex}
         selectedActionStepIndexes={selectedHandlerStepIndexes}
@@ -378,7 +360,6 @@ export function LoopsAutomationTab({
         onStepPointerCancel={canvasInteraction.resetStepDrag}
         onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
         onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-        onActionChange={updateStep}
         onActionStepSelect={selectActionStep}
         onOutputHandlerSelect={selectOutputHandler}
         onAddActionStep={addActionStep}

@@ -95,10 +95,6 @@ function LoopNodeInternalsUpdater({ nodeIds }: { nodeIds: string[] }) {
 function useLoopNodeContext({
   actionById,
   selectedLoopId,
-  firstAction,
-  noSelectionValue,
-  stepActionOptions,
-  actionOptions,
   draggedStepIndex,
   dragOverStepIndex,
   selectedActionStepIndexes,
@@ -108,7 +104,6 @@ function useLoopNodeContext({
   onStepPointerMove,
   onStepPointerUp,
   onStepPointerCancel,
-  onActionChange,
   onActionStepSelect,
   onOutputHandlerSelect,
   onAddActionStep
@@ -116,10 +111,6 @@ function useLoopNodeContext({
   return useMemo<LoopNodeContext>(() => ({
     actionById,
     selectedLoopId,
-    firstAction,
-    noSelectionValue,
-    stepActionOptions,
-    actionOptions,
     draggedStepIndex,
     dragOverStepIndex,
     selectedActionStepIndexes,
@@ -129,30 +120,23 @@ function useLoopNodeContext({
     onStepPointerMove,
     onStepPointerUp,
     onStepPointerCancel,
-    onActionChange,
     onActionStepSelect,
     onOutputHandlerSelect,
     onAddActionStep
   }), [
-    actionOptions,
     actionById,
     canAddFirstAction,
     canAddActionForEvent,
     dragOverStepIndex,
     draggedStepIndex,
-    firstAction,
-    noSelectionValue,
     onAddActionStep,
     onActionStepSelect,
     onOutputHandlerSelect,
-    onActionChange,
     onStepPointerCancel,
     onStepPointerDown,
     onStepPointerMove,
     onStepPointerUp,
-    actionById,
     selectedLoopId,
-    stepActionOptions,
     selectedActionStepIndexes
   ]);
 }

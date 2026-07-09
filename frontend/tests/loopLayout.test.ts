@@ -4,7 +4,7 @@ import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
 import { Position, type Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import { toLoopReactFlowEdges } from "../src/workspace/automation/loops/LoopCanvas";
-import { loopApprovalEdgePath, loopReturnEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
+import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopReturnEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
 import { loopCrossLoopSmoothStepPath } from "../src/workspace/automation/loops/loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor } from "../src/workspace/automation/loops/loopEdgeLabelGeometry";
 import { buildLoopGraph, type LoopStepRecord } from "../src/workspace/automation/loops/loopGraph";
@@ -602,7 +602,7 @@ describe("calculateLoopCanvasLayout", () => {
     expect(layout.nodes.some((node) => node.kind === "output-event" && node.outputEvent?.eventType === "build.complete")).toBe(false);
   });
 
-  it("uses compact horizontal space between connected actions without visible edge labels", () => {
+  it("reserves compact horizontal space for action id end labels", () => {
     const first = action("first", undefined, "route-project");
     const child = action("child", "review-intent.changes-requested", "analyze-intent");
     const layout = calculateLoopCanvasLayout({
@@ -627,8 +627,7 @@ describe("calculateLoopCanvasLayout", () => {
 
     expect(firstNode).toBeDefined();
     expect(childNode).toBeDefined();
-    expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeGreaterThanOrEqual(loopCanvasLayoutConfig.horizontalEdgeGap);
-    expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBeLessThan(80);
+    expect(childNode!.x - (firstNode!.x + firstNode!.width)).toBe(loopCanvasLayoutConfig.horizontalEdgeGap);
   });
 
   it("keeps the primary horizontal action path on the root action baseline and stacks branches compactly below it", () => {
@@ -1279,6 +1278,46 @@ describe("calculateAllLoopsCanvasLayout", () => {
 });
 
 describe("toLoopReactFlowEdges", () => {
+  it("uses action ids on forward edges and preserves output labels on rework edges", () => {
+    const sourceNode = {
+      key: "action-0",
+      kind: "action" as const,
+      x: 72,
+      y: 64,
+      width: loopNodeSizes.action.minWidth,
+      height: loopNodeSizes.action.height,
+      direction: "horizontal" as const,
+      record: {
+        actionId: "create-project-brief",
+        index: 0,
+        action: action("create-project-brief", undefined)
+      }
+    };
+
+    expect(loopEdgeDisplayLabel({
+      key: "approved",
+      sourceNodeKey: "action-0",
+      targetNodeKey: "action-1",
+      label: "approved",
+      route: { outputId: "approved" }
+    }, sourceNode)).toEqual({ value: "create-project-brief", kind: "action" });
+    expect(loopEdgeDisplayLabel({
+      key: "rejected",
+      sourceNodeKey: "action-0",
+      targetNodeKey: "action-1",
+      label: "rejected",
+      route: { outputId: "rejected" }
+    }, sourceNode)).toEqual({ value: "rejected", kind: "output" });
+    expect(loopEdgeDisplayLabel({
+      key: "cross-loop",
+      sourceNodeKey: "action-0",
+      targetNodeKey: "action-1",
+      label: "approved",
+      tone: "cross-loop",
+      route: { outputId: "approved" }
+    }, sourceNode)).toBeUndefined();
+  });
+
   it("anchors stepped loop edge labels to the longest horizontal segment", () => {
     expect(loopRoutedEdgeLabelAnchor({
       source: { x: 412, y: 75.5 },

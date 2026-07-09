@@ -172,6 +172,7 @@ The shape language is **Soft-Industrial**. Keep controls precise and compact.
 - **Markdown & Frontmatter Previews:** Render metadata in compact, code-like blocks. Use Geist and preserve exact key names. Separate preview content from editable controls with a visible tonal boundary.
 - **Command & Filter Controls:** Use compact search, segmented filters, and command-bar patterns for fast routing across projects, agents, policies, and events.
 - **Node Cards:** Use for orchestration and policy flow. Include agent or policy identity, status, owner/source, and a collapsed parameters or payload section.
+- **Loop Canvas Nodes:** Render actions and terminal output targets as compact 22px rounded rectangles. Keep action identity out of the node; show the source action's exact `action.id` as a monospace label at the end of its forward edge. Preserve output labels such as `rejected` on rework/return edges, existing edge-handle routing rules, and semantic edge colors.
 
 ## Do's and Don'ts
 - Do use the token values in this file as the source of truth for UI color, spacing, radius, and typography decisions.

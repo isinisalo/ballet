@@ -4,16 +4,10 @@ import type { ProjectAction } from "@shared/api/workspace-contracts";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopCanvasEdge, LoopCanvasLayout, LoopCanvasLayoutNode } from "./loopLayout";
 
-export type LoopCanvasOption = { value: string; label: string; description?: string };
-
 export type LoopCanvasProps = {
   layout: LoopCanvasLayout;
   selectedLoopId: string;
   actionById: Map<string, ProjectAction>;
-  firstAction?: ProjectAction;
-  noSelectionValue: string;
-  stepActionOptions: LoopCanvasOption[];
-  actionOptions: LoopCanvasOption[];
   draggedStepIndex: number | null;
   dragOverStepIndex: number | null;
   selectedActionStepIndexes: number[];
@@ -28,7 +22,6 @@ export type LoopCanvasProps = {
   onStepPointerCancel: () => void;
   onCanvasMoveStart: () => void;
   onCanvasMoveEnd: () => void;
-  onActionChange: (loopId: string, index: number, actionId: string) => void;
   onActionStepSelect: (records: LoopStepRecord[]) => void;
   onOutputHandlerSelect: (edge: LoopCanvasEdge) => void;
   onAddActionStep: (eventType?: string, sourceAction?: ProjectAction) => void;

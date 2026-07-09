@@ -1,6 +1,6 @@
 import { Route } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { loopAddActionGhostLabel, loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
+import { loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
 import { LoopActionNode } from "./LoopActionNode";
 import type { LoopNodeContext, LoopReactFlowNode } from "./LoopCanvasTypes";
@@ -70,12 +70,10 @@ function renderFirstPolicyGhost(node: LoopCanvasLayoutNode, context: LoopNodeCon
   const editable = (node.loopId ?? context.selectedLoopId) === context.selectedLoopId;
   return (
     <LoopGhostNode
-      value="Add first action"
-      icon={Route}
       ariaLabel="Add first action"
       onClick={() => context.onAddActionStep()}
       disabled={!editable || !context.canAddFirstAction}
-      className="nodrag w-60"
+      className="nodrag"
     />
   );
 }
@@ -94,9 +92,7 @@ function renderOutputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeCont
       title={`Add action for ${eventType}`}
       disabled={!editable || !context.canAddActionForEvent(sourcePolicy)}
       onClick={() => context.onAddActionStep(eventType, sourcePolicy)}
-      className="nodrag nopan flex h-[22px] w-full min-w-0 items-center rounded-md border border-dashed border-muted-foreground/50 bg-background/60 px-1.5 text-left font-mono text-[0.66rem] leading-4 text-muted-foreground opacity-60 transition-colors hover:border-primary/65 hover:bg-card hover:text-foreground hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-muted-foreground/50 disabled:hover:bg-background/60"
-    >
-      <span className="block min-w-0 truncate">{loopAddActionGhostLabel}</span>
-    </button>
+      className="nodrag nopan block size-[22px] rounded border border-dashed border-muted-foreground/50 bg-background/60 opacity-60 transition-colors hover:border-primary/65 hover:bg-card hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-muted-foreground/50 disabled:hover:bg-background/60"
+    />
   );
 }

@@ -13,8 +13,7 @@ import { loopNodeSizes } from "./loopLayoutConfig";
 import {
   loopOutputEventNodeWidth,
   loopOutputSourceHandleId,
-  loopOutputTargetHandleId,
-  loopActionNodeWidth
+  loopOutputTargetHandleId
 } from "./loopLayoutSizing";
 import type { LoopCanvasLayoutNodeDraft, LoopDagreEdge, LoopLayoutDirection } from "./loopLayoutTypes";
 
@@ -38,11 +37,6 @@ export type LoopLayoutGraphDraftContext = {
   handledEventNodes: LoopHandledEventNode[];
 };
 
-export function loopActionInputEdgeLabel(record: LoopStepRecord) {
-  if (!record.action) return undefined;
-  return record.action.id ? loopEventOutputLabel(record.action.id) : "Missing action";
-}
-
 export function loopOutputEdgeLabel(output: LoopOutputTarget) {
   return output.outputId === output.eventType ? loopEventOutputLabel(output.eventType) : output.outputId;
 }
@@ -63,7 +57,7 @@ export function addActionNode(context: LoopLayoutGraphDraftContext, record: Loop
   addNode(context, {
     key: `action-${record.index}`,
     kind: "action",
-    width: loopActionNodeWidth(record),
+    width: loopNodeSizes.action.minWidth,
     height: loopNodeSizes.action.height,
     direction: context.direction,
     record,

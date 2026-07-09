@@ -27,7 +27,7 @@ type LoopEventLink = {
 
 // This module intentionally centralizes loop graph layout rules because
 // cross-loop routing depends on the same node, row, and edge geometry.
-export { loopAddActionGhostLabel, loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
+export { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
 export type { LoopCanvasEdge } from "./loopLayoutEdges";
 export {
   loopCanvasNodeAnchorY,

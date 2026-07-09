@@ -8,22 +8,9 @@ import { loopOutputTargetsForPolicy } from "./loopOutputTargets";
 import { useLoopCanvasInteraction } from "./useLoopCanvasInteraction";
 
 const allLoopsReadOnlyId = "__all_loops__";
-const noSelection = "__none__";
 
 export function AllLoopsCanvas({ config }: { config: ProjectAutomationConfig }) {
   const actionById = useMemo(() => new Map(config.actions.map((action) => [action.id, action])), [config.actions]);
-  const stepActionOptions = useMemo(() => [
-    { value: noSelection, label: "No action" },
-    ...config.actions.map((action) => ({ value: action.id, label: action.id }))
-  ], [config.actions]);
-  const actionOptions = useMemo(() => [
-    { value: noSelection, label: "No action" },
-    ...config.actions.map((action) => ({
-      value: action.id,
-      label: action.description ? `${action.id} · ${action.description}` : action.id,
-      description: action.description
-    }))
-  ], [config.actions]);
   const recordsByLoopId = useMemo(() => loopStepRecordsByLoopId(config, actionById), [config, actionById]);
   const layout = useMemo(() => calculateAllLoopsCanvasLayout({
     config,
@@ -42,9 +29,6 @@ export function AllLoopsCanvas({ config }: { config: ProjectAutomationConfig }) 
       layout={layout}
       selectedLoopId={allLoopsReadOnlyId}
       actionById={actionById}
-      noSelectionValue={noSelection}
-      stepActionOptions={stepActionOptions}
-      actionOptions={actionOptions}
       draggedStepIndex={canvasInteraction.draggedStepIndex}
       dragOverStepIndex={canvasInteraction.dragOverStepIndex}
       selectedActionStepIndexes={[]}
@@ -59,7 +43,6 @@ export function AllLoopsCanvas({ config }: { config: ProjectAutomationConfig }) 
       onStepPointerCancel={canvasInteraction.resetStepDrag}
       onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
       onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-      onActionChange={() => undefined}
       onActionStepSelect={() => undefined}
       onOutputHandlerSelect={() => undefined}
       onAddActionStep={() => undefined}

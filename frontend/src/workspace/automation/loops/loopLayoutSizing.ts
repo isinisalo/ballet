@@ -1,6 +1,5 @@
-import type { LoopStepRecord } from "./loopGraph";
 import { loopOutputSlotKindForValues } from "./loopEdgeOutputSlot";
-import { loopAddActionGhostLabel, loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
+import { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
 import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
 export function loopCanvasNodeAnchorY(layoutNode: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
@@ -42,15 +41,11 @@ export function loopActionStackHeight() {
 }
 
 export function loopOutputEventNodeWidth() {
-  return loopOutputNodeWidth(loopAddActionGhostLabel, loopNodeSizes.outputEvent.minWidth, loopNodeSizes.outputEvent.maxWidth);
-}
-
-export function loopActionNodeWidth(record: LoopStepRecord) {
-  return loopOutputNodeWidth(record.action?.id || record.actionId || "No action", loopNodeSizes.action.minWidth, loopNodeSizes.action.maxWidth);
+  return loopNodeSizes.outputEvent.minWidth;
 }
 
 export function loopSummaryNodeWidth(value: string) {
-  return loopOutputNodeWidth(value, loopNodeSizes.loop.minWidth, loopNodeSizes.loop.maxWidth);
+  return loopTextNodeWidth(value, loopNodeSizes.loop.minWidth, loopNodeSizes.loop.maxWidth);
 }
 
 export function loopHorizontalEdgeGap() {
@@ -80,7 +75,7 @@ export function loopBranchStackHeight(node: Pick<LoopCanvasLayoutNode, "height" 
     : node.height;
 }
 
-function loopOutputNodeWidth(value: string, minWidth: number, maxWidth: number) {
+function loopTextNodeWidth(value: string, minWidth: number, maxWidth: number) {
   const iconAndGapWidth = 20;
   const estimatedCharacterWidth = 7;
   return Math.min(

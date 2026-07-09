@@ -1,30 +1,111 @@
-import { BaseEdge, useNodes, type EdgeProps, type Node } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, useNodes, type EdgeProps, type Node } from "@xyflow/react";
+import { cn } from "@/lib/utils";
 import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
 import type { LoopReactFlowEdge } from "./LoopCanvasTypes";
 import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import { loopCrossLoopSmoothStepPath } from "./loopCrossLoopSmoothStepPath";
-import type { LoopEdgePoint } from "./loopEdgeLabelGeometry";
+import { loopRoutedEdgeLabelAnchor, type LoopEdgePoint } from "./loopEdgeLabelGeometry";
+import type { LoopCanvasEdge } from "./loopLayoutEdges";
+import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 import { loopSmartEdgeRoutingOptions, loopSmartSmoothStepDrawEdge } from "./loopSmartEdgeRouting";
 
 const loopEdgeLabelCenterRatio = 0.5;
 const loopEdgeLabelVerticalOffset = 4;
+const loopEdgeEndLabelGap = 8;
 
 export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
   const nodes = useNodes();
   const loopEdge = props.data?.loopEdge;
   const outputSlotKind = loopEdgeOutputSlotKind(loopEdge);
   const edgePaths = loopEdgePaths(props, nodes, outputSlotKind);
+  const displayLabel = loopEdgeDisplayLabel(loopEdge, props.data?.sourceNode);
+  const labelPlacement = displayLabel ? loopEdgeLabelPlacement(props, edgePaths, displayLabel.kind) : undefined;
 
   return (
-    <BaseEdge
-      id={props.id}
-      path={edgePaths.path}
-      style={props.style}
-      markerStart={props.markerStart}
-      markerEnd={props.markerEnd}
-      interactionWidth={props.interactionWidth}
-    />
+    <>
+      <BaseEdge
+        id={props.id}
+        path={edgePaths.path}
+        style={props.style}
+        markerStart={props.markerStart}
+        markerEnd={props.markerEnd}
+        interactionWidth={props.interactionWidth}
+      />
+      {displayLabel && labelPlacement ? (
+        <EdgeLabelRenderer>
+          <div
+            aria-hidden="true"
+            data-loop-edge-display-label={displayLabel.value}
+            data-loop-edge-label-kind={displayLabel.kind}
+            title={displayLabel.value}
+            className={cn(
+              "pointer-events-none absolute z-10 whitespace-nowrap rounded-sm bg-background/95 px-1 font-mono text-[0.66rem] leading-4",
+              displayLabel.kind === "action" ? "text-tertiary" : "text-muted-foreground"
+            )}
+            style={{
+              transform: `${labelPlacement.translate} translate(${labelPlacement.x}px, ${labelPlacement.y}px)`
+            }}
+          >
+            {displayLabel.value}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
+    </>
   );
+}
+
+export function loopEdgeDisplayLabel(
+  edge: LoopCanvasEdge | undefined,
+  sourceNode: LoopCanvasLayoutNode | undefined
+): { value: string; kind: "action" | "output" } | undefined {
+  if (!edge) return undefined;
+  if (edge.tone === "cross-loop") return undefined;
+  const outputSlotKind = loopEdgeOutputSlotKind(edge);
+  const sourceActionId = sourceNode?.record?.action?.id || sourceNode?.record?.actionId;
+  const usesActionLabel = sourceNode?.kind === "action" &&
+    edge.tone !== "return" &&
+    outputSlotKind !== "rework";
+
+  if (usesActionLabel && sourceActionId) return { value: sourceActionId, kind: "action" };
+  if (edge.label) return { value: edge.label, kind: "output" };
+  return undefined;
+}
+
+type LoopEdgePaths = ReturnType<typeof loopEdgePaths>;
+
+function loopEdgeLabelPlacement(
+  { sourceX, sourceY, targetX, targetY }: EdgeProps<LoopReactFlowEdge>,
+  edgePaths: LoopEdgePaths,
+  labelKind: "action" | "output"
+) {
+  if (labelKind === "action") {
+    return {
+      x: targetX - loopEdgeEndLabelGap,
+      y: targetY,
+      translate: "translate(-100%, -50%)"
+    };
+  }
+
+  const directLabelPath = edgePaths.returnEdgePath ?? edgePaths.crossLoopEdgePath ?? edgePaths.approvalEdgePath;
+  if (directLabelPath) {
+    return {
+      x: directLabelPath.labelX,
+      y: directLabelPath.labelY,
+      translate: "translate(-50%, -50%)"
+    };
+  }
+  if (!edgePaths.smartEdgePath) return undefined;
+  const anchor = loopRoutedEdgeLabelAnchor({
+    source: { x: sourceX, y: sourceY },
+    points: edgePaths.smartEdgePath.points,
+    target: { x: targetX, y: targetY },
+    fallback: edgePaths.smartEdgePath.fallbackLabelAnchor
+  });
+  return {
+    x: anchor.x,
+    y: anchor.y,
+    translate: "translate(-50%, -50%)"
+  };
 }
 
 function loopEdgePaths(

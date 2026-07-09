@@ -211,6 +211,10 @@ const loopEdgeLabelTexts = () => loopEdgeConnectors()
   .map((edge) => edge.dataset.loopEdgeLabelValue)
   .filter((value): value is string => Boolean(value));
 
+const loopEdgeDisplayLabelTexts = () => Array.from(document.querySelectorAll<HTMLElement>("[data-loop-edge-display-label]"))
+  .map((label) => label.dataset.loopEdgeDisplayLabel)
+  .filter((value): value is string => Boolean(value));
+
 const activateLoopNode = (element: HTMLElement) => {
   fireEvent.pointerDown(element, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
   fireEvent.pointerUp(element, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
@@ -650,7 +654,8 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete loop" })).toBeInTheDocument();
 
-    expect(screen.getByLabelText(`Action: ${implementationActionId}`)).toBeInTheDocument();
+    const implementationNode = screen.getByLabelText(`Action: ${implementationActionId}`);
+    expect(implementationNode).toBeEmptyDOMElement();
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy source")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy event")).not.toBeInTheDocument();
@@ -658,9 +663,11 @@ describe("workspace entity UI flows", () => {
 
     await waitFor(() => expect(loopEdgeLabelTexts()).toContain("approved"));
     expect(loopEdgeLabelTexts()).toContain("rejected");
+    await waitFor(() => expect(loopEdgeDisplayLabelTexts()).toContain(implementationActionId));
+    expect(loopEdgeDisplayLabelTexts()).toContain("rejected");
     expect(screen.getAllByRole("button", { name: /add action step for/i }).length).toBeGreaterThan(0);
 
-    activateLoopNode(screen.getByLabelText(`Action: ${implementationActionId}`));
+    activateLoopNode(implementationNode);
     const dialog = screen.getByRole("dialog", { name: "Loop handler" });
     expect(dialog).toBeInTheDocument();
     expectActionSelectValue(implementationActionId);
