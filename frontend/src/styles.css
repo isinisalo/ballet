@@ -319,14 +319,13 @@ body {
 }
 
 .loop-react-flow .loop-react-flow-handle {
-  width: 7px;
-  height: 7px;
-  min-width: 7px;
-  min-height: 7px;
-  border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
-  border-radius: 9999px;
-  background: var(--background);
-  opacity: 1;
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
   pointer-events: none;
   z-index: 20;
 }

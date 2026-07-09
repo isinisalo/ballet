@@ -1,3 +1,4 @@
+import { Bot, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopNodeContext } from "./LoopCanvasTypes";
@@ -42,7 +43,11 @@ export function LoopActionNode({
             event.stopPropagation();
             context.onActionStepSelect(records);
           }}
-        />
+        >
+          {record.action.humanGate
+            ? <Shield data-loop-human-gate-icon aria-hidden="true" className="size-3 text-tertiary" strokeWidth={1.8} />
+            : <Bot data-loop-agent-icon aria-hidden="true" className="size-3 text-primary/85" strokeWidth={1.8} />}
+        </button>
       ) : (
         <div
           data-loop-node
@@ -77,7 +82,7 @@ function loopStepDragClassName({
 
 function loopActionNodeClassName({ missing, humanGate, selected }: { missing: boolean; humanGate: boolean; selected: boolean }) {
   return cn(
-    "nodrag nopan block size-[22px] rounded border border-divider-strong bg-card transition-colors hover:border-primary/80",
+    "nodrag nopan inline-flex size-[22px] items-center justify-center rounded border border-divider-strong bg-card transition-colors hover:border-primary/80",
     missing && "border-dashed border-muted-foreground/50 bg-background/60",
     humanGate && "border-tertiary/60",
     selected && "border-primary/80 ring-2 ring-primary/20"

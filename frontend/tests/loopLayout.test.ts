@@ -4,7 +4,7 @@ import { getSmartEdge, smartEdgePresets } from "@tisoap/react-flow-smart-edge";
 import { Position, type Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 import { toLoopReactFlowEdges } from "../src/workspace/automation/loops/LoopCanvas";
-import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopReturnEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
+import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopRejectedEdgeLabelPlacement, loopReturnEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
 import { loopCrossLoopSmoothStepPath } from "../src/workspace/automation/loops/loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor } from "../src/workspace/automation/loops/loopEdgeLabelGeometry";
 import { buildLoopGraph, type LoopStepRecord } from "../src/workspace/automation/loops/loopGraph";
@@ -1344,6 +1344,19 @@ describe("toLoopReactFlowEdges", () => {
     })).toEqual({ x: 530, y: 75.5 });
   });
 
+  it("places rejected labels at the source end of vertical edges", () => {
+    expect(loopRejectedEdgeLabelPlacement({ sourceX: 240, sourceY: 80, sourcePosition: Position.Bottom })).toEqual({
+      x: 240,
+      y: 84,
+      translate: "translate(-50%, 0)"
+    });
+    expect(loopRejectedEdgeLabelPlacement({ sourceX: 240, sourceY: 80, sourcePosition: Position.Top })).toEqual({
+      x: 240,
+      y: 76,
+      translate: "translate(-50%, -100%)"
+    });
+  });
+
   it("falls back to the smart edge center when there is no horizontal label segment", () => {
     expect(loopRoutedEdgeLabelAnchor({
       source: { x: 0, y: 0 },
@@ -1388,6 +1401,7 @@ describe("toLoopReactFlowEdges", () => {
     expect(topReturnPath.labelY).toBe(topTargetNode.y - 28);
     expect(topReturnPath.startLabelX).toBe(sourceNode.x + sourceNode.width / 2);
     expect(topReturnPath.startLabelY).toBe(sourceNode.y - 4);
+    expect(topReturnPath.startLabelTranslate).toBe("translate(-50%, -100%)");
     expect(topReturnPath.endLabelX).toBe(topTargetNode.x + topTargetNode.width / 2);
     expect(topReturnPath.endLabelY).toBe(topTargetNode.y - 4);
     expect(loopReturnEdgePath({
@@ -1409,7 +1423,7 @@ describe("toLoopReactFlowEdges", () => {
     expect(topReturnPath.path.match(/Q/g)).toHaveLength(2);
     expect(topReturnPath.path).toContain(`Q ${sourceNode.x + sourceNode.width / 2},${topTargetNode.y - 28}`);
     expect(topReturnPath.path).toContain(`Q ${topTargetNode.x + topTargetNode.width / 2},${topTargetNode.y - 28}`);
-    expect(loopReturnEdgePath({
+    const bottomReturnPath = loopReturnEdgePath({
       ...baseProps,
       targetY: bottomTargetNode.y + bottomTargetNode.height,
       data: {
@@ -1424,7 +1438,10 @@ describe("toLoopReactFlowEdges", () => {
         sourceNode,
         targetNode: bottomTargetNode
       }
-    }).labelY).toBe(bottomTargetNode.y + bottomTargetNode.height + 28);
+    });
+
+    expect(bottomReturnPath.labelY).toBe(bottomTargetNode.y + bottomTargetNode.height + 28);
+    expect(bottomReturnPath.startLabelTranslate).toBe("translate(-50%, -100%)");
   });
 
   it("maps loop layout edges to smart ReactFlow edges", () => {

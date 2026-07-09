@@ -655,7 +655,7 @@ describe("workspace entity UI flows", () => {
     expect(screen.getByRole("button", { name: "Delete loop" })).toBeInTheDocument();
 
     const implementationNode = screen.getByLabelText(`Action: ${implementationActionId}`);
-    expect(implementationNode).toBeEmptyDOMElement();
+    expect(implementationNode.querySelector("[data-loop-agent-icon]")).toBeInTheDocument();
     expect(screen.queryByText("No policies.")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy source")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy event")).not.toBeInTheDocument();
@@ -826,6 +826,7 @@ describe("workspace entity UI flows", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(window.location.search).toBe(`?id=${manualStartLoopId}`));
+    expect(screen.getByLabelText(`Action: ${humanGateActionId}`).querySelector("[data-loop-human-gate-icon]")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save automation" }));
     await waitFor(() => expect(data.automation.loops.map((loop) => loop.id)).toEqual([manualStartLoopId]));
     expect(data.automation.outputRoutes).toEqual([]);

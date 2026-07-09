@@ -1,4 +1,4 @@
-import { BaseEdge, EdgeLabelRenderer, useNodes, type EdgeProps, type Node } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, Position, useNodes, type EdgeProps, type Node } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
 import type { LoopReactFlowEdge } from "./LoopCanvasTypes";
@@ -19,7 +19,7 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
   const outputSlotKind = loopEdgeOutputSlotKind(loopEdge);
   const edgePaths = loopEdgePaths(props, nodes, outputSlotKind);
   const displayLabel = loopEdgeDisplayLabel(loopEdge, props.data?.sourceNode);
-  const labelPlacement = displayLabel ? loopEdgeLabelPlacement(props, edgePaths, displayLabel.kind) : undefined;
+  const labelPlacement = displayLabel ? loopEdgeLabelPlacement(props, edgePaths, displayLabel) : undefined;
 
   return (
     <>
@@ -74,17 +74,19 @@ export function loopEdgeDisplayLabel(
 type LoopEdgePaths = ReturnType<typeof loopEdgePaths>;
 
 function loopEdgeLabelPlacement(
-  { sourceX, sourceY, targetX, targetY }: EdgeProps<LoopReactFlowEdge>,
+  { sourceX, sourceY, sourcePosition, targetX, targetY }: EdgeProps<LoopReactFlowEdge>,
   edgePaths: LoopEdgePaths,
-  labelKind: "action" | "output"
+  displayLabel: { value: string; kind: "action" | "output" }
 ) {
-  if (labelKind === "action") {
+  if (displayLabel.kind === "action") {
     return {
       x: targetX - loopEdgeEndLabelGap,
       y: targetY,
       translate: "translate(-100%, -50%)"
     };
   }
+
+  if (displayLabel.value === "rejected") return loopRejectedEdgeLabelPlacement({ sourceX, sourceY, sourcePosition }, edgePaths.returnEdgePath);
 
   const directLabelPath = edgePaths.returnEdgePath ?? edgePaths.crossLoopEdgePath ?? edgePaths.approvalEdgePath;
   if (directLabelPath) {
@@ -106,6 +108,24 @@ function loopEdgeLabelPlacement(
     y: anchor.y,
     translate: "translate(-50%, -50%)"
   };
+}
+
+export function loopRejectedEdgeLabelPlacement(
+  { sourceX, sourceY, sourcePosition }: Pick<EdgeProps<LoopReactFlowEdge>, "sourceX" | "sourceY" | "sourcePosition">,
+  returnEdgePath?: ReturnType<typeof loopReturnEdgePath>
+) {
+  if (returnEdgePath) {
+    return {
+      x: returnEdgePath.startLabelX,
+      y: returnEdgePath.startLabelY,
+      translate: returnEdgePath.startLabelTranslate
+    };
+  }
+
+  if (sourcePosition === Position.Bottom) return { x: sourceX, y: sourceY + loopEdgeLabelVerticalOffset, translate: "translate(-50%, 0)" };
+  if (sourcePosition === Position.Top) return { x: sourceX, y: sourceY - loopEdgeLabelVerticalOffset, translate: "translate(-50%, -100%)" };
+  if (sourcePosition === Position.Left) return { x: sourceX - loopEdgeLabelVerticalOffset, y: sourceY, translate: "translate(-100%, -50%)" };
+  return { x: sourceX + loopEdgeLabelVerticalOffset, y: sourceY, translate: "translate(0, -50%)" };
 }
 
 function loopEdgePaths(
@@ -206,12 +226,16 @@ export function loopReturnEdgePath({ data, sourceX, sourceY, targetX, targetY }:
   const startLabelY = sourceHandleId === "bottom"
     ? resolvedSourceY + loopEdgeLabelVerticalOffset + 20
     : resolvedSourceY - loopEdgeLabelVerticalOffset;
+  const startLabelTranslate = sourceHandleId === "bottom"
+    ? "translate(-50%, -50%)"
+    : "translate(-50%, -100%)";
   const endLabelX = resolvedTargetX;
   const endLabelY = resolvedTargetY - loopEdgeLabelVerticalOffset;
 
   return {
     startLabelX,
     startLabelY,
+    startLabelTranslate,
     endLabelX,
     endLabelY,
     labelX,
