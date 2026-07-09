@@ -18,6 +18,7 @@ import { LoopHandlerSheet, type LoopHandlerRoute, type LoopHandlerSelectionSourc
 import {
   nextConfigWithLoopHandlerAction,
   nextConfigWithLoopOutputRouteTarget,
+  nextConfigWithoutLoopOutputRouteTarget,
   nextConfigWithoutLoopStepIndexes
 } from "./loopActionSheetLogic";
 import type { LoopStepRecord } from "./loopGraph";
@@ -256,6 +257,11 @@ export function LoopsAutomationTab({
       nextConfigWithLoopOutputRouteTarget(current, sourceLoopId, sourceActionId, outputId, targetLoopId, targetActionId)
     );
   };
+  const clearOutputHandlerRoute = (sourceLoopId: string, sourceActionId: string, outputId: string) => {
+    updateConfig((current) =>
+      nextConfigWithoutLoopOutputRouteTarget(current, sourceLoopId, sourceActionId, outputId)
+    );
+  };
   const submitHumanGateResponse = async (route: LoopHandlerRoute, outputId: string, prompt: string) => {
     const action = config.actions.find((candidate) => candidate.id === route.actionId);
     if (!action?.humanGate || !action.outputIds.includes(outputId)) return;
@@ -375,6 +381,7 @@ export function LoopsAutomationTab({
         onRouteActionChange={updateHandlerRouteAction}
         onRemoveRoute={removeHandlerRoute}
         onOutputHandlerRouteChange={updateOutputHandlerRoute}
+        onOutputHandlerRouteClear={clearOutputHandlerRoute}
         onHumanGateSubmit={(route, outputId, prompt) => void submitHumanGateResponse(route, outputId, prompt)}
       />
     </>

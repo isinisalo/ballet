@@ -6,6 +6,7 @@ import {
   nextConfigWithLoopOutputRouteTarget,
   nextConfigWithLoopStepAction,
   nextConfigWithLoopStepActions,
+  nextConfigWithoutLoopOutputRouteTarget,
   nextConfigWithoutLoopStepIndexes
 } from "../src/workspace/automation/loops/loopActionSheetLogic";
 
@@ -182,5 +183,54 @@ describe("nextConfigWithLoopOutputRouteTarget", () => {
 
     expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", emptyLoopId, review.id)).toBe(current);
     expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", loopId, review.id)).toBe(current);
+  });
+});
+
+describe("nextConfigWithoutLoopOutputRouteTarget", () => {
+  it("removes only the selected scoped output route", () => {
+    const build = action({ id: "build" });
+    const review = action({ id: "review" });
+    const rework = action({ id: "rework" });
+    const responseBase = {
+      loopId,
+      actionId: review.id,
+      outputId: "approved",
+      prompt: "Ship it.",
+      submittedAt: "2026-07-07T10:00:00.000Z"
+    };
+    const current: ProjectAutomationConfig = {
+      ...config([build, review, rework], [build.id, review.id, rework.id]),
+      outputRoutes: [
+        { sourceLoopId: loopId, sourceActionId: build.id, outputId: "approved", targetLoopId: loopId, targetActionId: review.id },
+        { sourceLoopId: loopId, sourceActionId: build.id, outputId: "rejected", targetLoopId: loopId, targetActionId: rework.id }
+      ],
+      humanGateResponses: [{ ...responseBase, id: humanGateResponseId(responseBase) }]
+    };
+
+    const next = nextConfigWithoutLoopOutputRouteTarget(current, loopId, build.id, "approved");
+
+    expect(next).not.toBe(current);
+    expect(next.outputRoutes).toEqual([
+      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "rejected", targetLoopId: loopId, targetActionId: rework.id }
+    ]);
+    expect(next.loops).toBe(current.loops);
+    expect(next.actions).toBe(current.actions);
+    expect(next.humanGateResponses).toBe(current.humanGateResponses);
+  });
+
+  it("returns the current config for invalid route targets", () => {
+    const build = action({ id: "build" });
+    const review = action({ id: "review" });
+    const current: ProjectAutomationConfig = {
+      ...config([build, review], [build.id, review.id]),
+      outputRoutes: [
+        { sourceLoopId: loopId, sourceActionId: build.id, outputId: "approved", targetLoopId: loopId, targetActionId: review.id }
+      ]
+    };
+
+    expect(nextConfigWithoutLoopOutputRouteTarget(current, "missing.loop", build.id, "approved")).toBe(current);
+    expect(nextConfigWithoutLoopOutputRouteTarget(current, loopId, "missing-action", "approved")).toBe(current);
+    expect(nextConfigWithoutLoopOutputRouteTarget(current, loopId, build.id, "missing-output")).toBe(current);
+    expect(nextConfigWithoutLoopOutputRouteTarget(current, loopId, review.id, "approved")).toBe(current);
   });
 });

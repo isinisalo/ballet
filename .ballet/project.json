@@ -4,10 +4,6 @@
     {
       "id": "create-project-brief",
       "description": "Create Project Brief from accepted ADRs and approved GOALS.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "brief-agent"
       ]
@@ -15,10 +11,6 @@
     {
       "id": "challenge-project-brief",
       "description": "Challenge Project Brief against ADRs, GOALS, constraints, assumptions, and traceability.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "loop-critic-agent"
       ]
@@ -26,25 +18,19 @@
     {
       "id": "project-brief-gate",
       "description": "Gate 1: Human approval of the agent-reviewed Project Brief before roadmap planning continues.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [],
       "humanGate": true
     },
     {
       "id": "done",
       "description": "No further loop action.",
-      "outputIds": [],
       "agentIds": []
     },
     {
       "id": "create-roadmap",
       "description": "Create traceable delivery roadmap from approved Project Brief.",
       "outputIds": [
-        "approved",
-        "rejected"
+        "approved"
       ],
       "agentIds": [
         "roadmap-agent"
@@ -53,10 +39,6 @@
     {
       "id": "challenge-roadmap",
       "description": "Challenge roadmap for value order, risk order, dependencies, and ADR/GOALS alignment.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "loop-critic-agent"
       ]
@@ -64,20 +46,12 @@
     {
       "id": "roadmap-gate",
       "description": "Gate 2: Human approval of the reviewed Roadmap before UI design planning continues.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [],
       "humanGate": true
     },
     {
       "id": "create-ui-design",
       "description": "Create UI/UX design plan from approved Roadmap.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "ui-design-agent"
       ]
@@ -85,10 +59,6 @@
     {
       "id": "challenge-ui-design",
       "description": "Challenge UI design for goal fit, states, accessibility, consistency, and implementation cost.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "loop-critic-agent"
       ]
@@ -96,20 +66,12 @@
     {
       "id": "ui-design-gate",
       "description": "Gate 3: Human approval of the reviewed UI Design before technical planning continues.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [],
       "humanGate": true
     },
     {
       "id": "create-technical-plan",
       "description": "Create implementation-ready Technical Plan from ADRs, Roadmap, and approved UI Design.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "technical-plan-agent"
       ]
@@ -117,10 +79,6 @@
     {
       "id": "challenge-technical-plan",
       "description": "Challenge Technical Plan for architecture, data, APIs, security, testability, deployability, and rollback.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "loop-critic-agent"
       ]
@@ -128,20 +86,12 @@
     {
       "id": "technical-plan-gate",
       "description": "Gate 4: Human approval of the reviewed Technical Plan before milestone planning continues.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [],
       "humanGate": true
     },
     {
       "id": "create-milestones",
       "description": "Create validated milestones from approved Technical Plan and Roadmap.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "milestone-task-agent"
       ]
@@ -149,10 +99,6 @@
     {
       "id": "challenge-milestones",
       "description": "Challenge milestones for scope, dependency order, validation method, and increment value.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "loop-critic-agent"
       ]
@@ -160,20 +106,12 @@
     {
       "id": "milestones-gate",
       "description": "Gate 5: Human approval of the reviewed Milestones before task specification continues.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [],
       "humanGate": true
     },
     {
       "id": "create-task-specs",
       "description": "Create atomic task specifications from approved milestones.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "milestone-task-agent"
       ]
@@ -181,10 +119,6 @@
     {
       "id": "challenge-task-specs",
       "description": "Challenge task specs for atomicity, acceptance criteria, testability, dependencies, and traceability.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "loop-critic-agent"
       ]
@@ -192,20 +126,12 @@
     {
       "id": "task-specs-gate",
       "description": "Gate 6: Human approval of the reviewed Task Specs before implementation starts.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [],
       "humanGate": true
     },
     {
       "id": "implement-task",
       "description": "Implement only the approved task spec as the smallest safe code change.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "implementation-agent"
       ]
@@ -213,10 +139,6 @@
     {
       "id": "run-tests",
       "description": "Run or assess required tests, build, lint, and acceptance evidence.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "review-test-agent"
       ]
@@ -224,10 +146,6 @@
     {
       "id": "classify-failure",
       "description": "Classify failed implementation, review, test, deployment, or validation evidence and route safe corrections.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "failure-router-agent"
       ]
@@ -235,10 +153,6 @@
     {
       "id": "review-code",
       "description": "Review code against task spec, ADRs, GOALS, tests, security, and scope boundaries.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "review-test-agent"
       ]
@@ -246,20 +160,12 @@
     {
       "id": "code-gate",
       "description": "Gate 7: Human approval of reviewed code before dev deployment starts.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [],
       "humanGate": true
     },
     {
       "id": "prepare-dev-deployment",
       "description": "Check dev deployment readiness: artifact, config, migrations, rollback, and validation plan.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "dev-deploy-agent"
       ]
@@ -267,10 +173,6 @@
     {
       "id": "deploy-to-dev",
       "description": "Deploy the approved build to the dev environment.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "dev-deploy-agent"
       ]
@@ -278,10 +180,6 @@
     {
       "id": "validate-dev-deployment",
       "description": "Validate dev deployment with smoke tests, acceptance checks, logs, metrics, and traces.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [
         "dev-deploy-agent"
       ]
@@ -289,20 +187,13 @@
     {
       "id": "dev-deployment-validation-gate",
       "description": "Gate 8: Human approval of validated dev deployment before the loop is done.",
-      "outputIds": [
-        "approved",
-        "rejected"
-      ],
       "agentIds": [],
       "humanGate": true
-    }
-  ],
-  "outputs": [
-    {
-      "id": "approved"
     },
     {
-      "id": "rejected"
+      "id": "blocked",
+      "description": "Agent work is blocked.",
+      "agentIds": []
     }
   ],
   "outputRoutes": [
@@ -335,13 +226,6 @@
       "targetActionId": "create-project-brief"
     },
     {
-      "sourceLoopId": "adr-goals-changed.loop",
-      "sourceActionId": "create-project-brief",
-      "outputId": "rejected",
-      "targetLoopId": "adr-goals-changed.loop",
-      "targetActionId": "done"
-    },
-    {
       "sourceLoopId": "project-brief-gate.approved.loop",
       "sourceActionId": "create-roadmap",
       "outputId": "approved",
@@ -368,13 +252,6 @@
       "outputId": "rejected",
       "targetLoopId": "project-brief-gate.approved.loop",
       "targetActionId": "create-roadmap"
-    },
-    {
-      "sourceLoopId": "project-brief-gate.approved.loop",
-      "sourceActionId": "create-roadmap",
-      "outputId": "rejected",
-      "targetLoopId": "project-brief-gate.approved.loop",
-      "targetActionId": "done"
     },
     {
       "sourceLoopId": "roadmap-gate.approved.loop",
@@ -438,13 +315,6 @@
       "outputId": "rejected",
       "targetLoopId": "ui-design-gate.approved.loop",
       "targetActionId": "create-technical-plan"
-    },
-    {
-      "sourceLoopId": "ui-design-gate.approved.loop",
-      "sourceActionId": "create-technical-plan",
-      "outputId": "rejected",
-      "targetLoopId": "ui-design-gate.approved.loop",
-      "targetActionId": "done"
     },
     {
       "sourceLoopId": "technical-plan-gate.approved.loop",
@@ -739,6 +609,20 @@
       "outputId": "approved",
       "targetLoopId": "code-gate.approved.loop",
       "targetActionId": "prepare-dev-deployment"
+    },
+    {
+      "sourceLoopId": "ui-design-gate.approved.loop",
+      "sourceActionId": "create-technical-plan",
+      "outputId": "rejected",
+      "targetLoopId": "ui-design-gate.approved.loop",
+      "targetActionId": "blocked"
+    },
+    {
+      "sourceLoopId": "adr-goals-changed.loop",
+      "sourceActionId": "create-project-brief",
+      "outputId": "rejected",
+      "targetLoopId": "adr-goals-changed.loop",
+      "targetActionId": "blocked"
     }
   ],
   "humanGateResponses": [],
@@ -776,7 +660,7 @@
         "create-technical-plan",
         "challenge-technical-plan",
         "technical-plan-gate",
-        "done"
+        "blocked"
       ]
     },
     {

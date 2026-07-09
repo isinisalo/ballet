@@ -106,6 +106,24 @@ export const nextConfigWithLoopOutputRouteTarget = (
   };
 };
 
+export const nextConfigWithoutLoopOutputRouteTarget = (
+  current: ProjectAutomationConfig,
+  sourceLoopId: string,
+  sourceActionId: string,
+  outputId: string
+): ProjectAutomationConfig => {
+  const sourceLoop = current.loops.find((loop) => loop.id === sourceLoopId);
+  const sourceAction = current.actions.find((action) => action.id === sourceActionId);
+  if (!sourceLoop || !sourceAction || !sourceAction.outputIds.includes(outputId)) return current;
+
+  const routeKey = actionOutputRouteKey(sourceLoop.id, sourceAction.id, outputId);
+  const outputRoutes = current.outputRoutes.filter((route) =>
+    actionOutputRouteKey(route.sourceLoopId, route.sourceActionId, route.outputId) !== routeKey
+  );
+
+  return outputRoutes.length === current.outputRoutes.length ? current : { ...current, outputRoutes };
+};
+
 export const nextConfigWithoutLoopStepIndexes = (
   current: ProjectAutomationConfig,
   loopId: string,

@@ -38,6 +38,7 @@ export function LoopHandlerSheet({
   onRouteActionChange,
   onRemoveRoute,
   onOutputHandlerRouteChange,
+  onOutputHandlerRouteClear,
   onHumanGateSubmit
 }: {
   open: boolean;
@@ -55,6 +56,11 @@ export function LoopHandlerSheet({
     targetLoopId: string,
     targetActionId: string
   ) => void;
+  onOutputHandlerRouteClear: (
+    sourceLoopId: string,
+    sourceActionId: string,
+    outputId: string
+  ) => void;
   onHumanGateSubmit: (route: LoopHandlerRoute, outputId: string, prompt: string) => void;
 }) {
   const actionFieldId = useId();
@@ -71,7 +77,8 @@ export function LoopHandlerSheet({
       <SheetContent
         side="right"
         overlayClassName="pointer-events-none bg-black/5 supports-backdrop-filter:backdrop-blur-[1px]"
-        className="overflow-y-auto sm:max-w-md"
+        className="overflow-y-auto"
+        style={{ width: "min(98vw, 56rem)", maxWidth: "56rem" }}
         onPointerDown={(event) => event.stopPropagation()}
       >
         <SheetHeader>
@@ -123,6 +130,7 @@ export function LoopHandlerSheet({
                       outputIds={outputIds}
                       label={humanGate ? "Output routing" : "Outputs"}
                       onOutputHandlerRouteChange={onOutputHandlerRouteChange}
+                      onOutputHandlerRouteClear={onOutputHandlerRouteClear}
                     />
                     {humanGate ? (
                       <HumanGateResponsePanel

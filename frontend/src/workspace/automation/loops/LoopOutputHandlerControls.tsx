@@ -1,4 +1,6 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { findActionOutputRoute } from "@shared/policy-actions";
+import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { LoopHandlerRoute } from "./LoopHandlerSheet";
@@ -6,16 +8,19 @@ import {
   loopOutputHandlerSelection,
   loopOutputTargetActionOptions
 } from "./loopOutputHandlers";
-import { loopActionTokenClassName, loopOutputTokenClassName } from "./loopSheetTokenStyles";
+import { loopOutputTokenClassName } from "./loopSheetTokenStyles";
 
 const noTargetAction = "__no_target_action__";
+const outputRouteSelectTriggerClassName = "h-[22px] min-h-[22px] min-w-0 w-full rounded-md border-divider-strong bg-card px-1.5 py-0 font-mono text-[0.66rem] leading-4 text-foreground shadow-none";
+const outputRouteSelectValueClassName = "truncate font-mono text-[0.66rem] leading-4";
 
 export function LoopOutputHandlerControls({
   config,
   route,
   outputIds,
   label = "Outputs",
-  onOutputHandlerRouteChange
+  onOutputHandlerRouteChange,
+  onOutputHandlerRouteClear
 }: {
   config: ProjectAutomationConfig;
   route: LoopHandlerRoute;
@@ -28,6 +33,11 @@ export function LoopOutputHandlerControls({
     targetLoopId: string,
     targetActionId: string
   ) => void;
+  onOutputHandlerRouteClear: (
+    sourceLoopId: string,
+    sourceActionId: string,
+    outputId: string
+  ) => void;
 }) {
   return (
     <Field>
@@ -36,6 +46,7 @@ export function LoopOutputHandlerControls({
         <div className="flex flex-col gap-2">
           {outputIds.map((outputId) => {
             const selection = loopOutputHandlerSelection(config, route.loopId, route.actionId, outputId);
+            const selectedRoute = findActionOutputRoute(config.outputRoutes, route.loopId, route.actionId, outputId);
             const targetLoopLabel = selection.targetLoopId || "Loop";
             const targetActionLabel = selection.targetActionId || "Action";
             const selectTargetLoop = (targetLoopId: string) => {
@@ -48,8 +59,8 @@ export function LoopOutputHandlerControls({
             };
 
             return (
-              <div key={outputId} className="grid grid-cols-[minmax(0,6rem)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-2">
-                <span className={`min-w-0 truncate font-mono text-xs ${loopOutputTokenClassName(outputId)}`} title={outputId}>
+              <div key={outputId} className="grid grid-cols-[minmax(0,5rem)_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-1.5">
+                <span className={`min-w-0 truncate font-mono text-[0.66rem] leading-4 ${loopOutputTokenClassName(outputId)}`} title={outputId}>
                   {outputId}
                 </span>
                 <Select
@@ -60,10 +71,10 @@ export function LoopOutputHandlerControls({
                   <SelectTrigger
                     size="sm"
                     aria-label={`Target loop for ${outputId}`}
-                    className="h-5 min-h-5 min-w-0 w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
+                    className={outputRouteSelectTriggerClassName}
                     title={targetLoopLabel}
                   >
-                    <SelectValue className={loopActionTokenClassName()} />
+                    <SelectValue className={outputRouteSelectValueClassName} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -90,10 +101,10 @@ export function LoopOutputHandlerControls({
                   <SelectTrigger
                     size="sm"
                     aria-label={`Target action for ${outputId}`}
-                    className="h-5 min-h-5 min-w-0 w-full rounded-xl border-primary/60 bg-primary/10 px-2 py-0.5 font-mono text-xs text-primary shadow-none"
+                    className={outputRouteSelectTriggerClassName}
                     title={targetActionLabel}
                   >
-                    <SelectValue className={loopActionTokenClassName()} />
+                    <SelectValue className={outputRouteSelectValueClassName} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -105,11 +116,41 @@ export function LoopOutputHandlerControls({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+                <ClearOutputHandlerButton
+                  outputId={outputId}
+                  disabled={!selectedRoute}
+                  onClear={() => onOutputHandlerRouteClear(route.loopId, route.actionId, outputId)}
+                />
               </div>
             );
           })}
         </div>
       ) : <span className="text-sm text-muted-foreground">None</span>}
     </Field>
+  );
+}
+
+function ClearOutputHandlerButton({
+  outputId,
+  disabled,
+  onClear
+}: {
+  outputId: string;
+  disabled: boolean;
+  onClear: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant="ghost"
+      aria-label={`Clear output handler for ${outputId}`}
+      title={`Clear output handler for ${outputId}`}
+      disabled={disabled}
+      onClick={onClear}
+      className="h-[22px] rounded-md px-1.5 py-0 font-mono text-[0.66rem] leading-4 text-muted-foreground shadow-none"
+    >
+      Clear
+    </Button>
   );
 }
