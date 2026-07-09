@@ -14,14 +14,13 @@ const timestamp = "1970-01-01T00:00:00.000Z";
 
 export const automationActionsToEventDefinitions = (
   actions: ProjectAction[] = [],
-  outputs: Array<{ id: string }> = [],
   outputRoutes: ProjectOutputRoute[] = [],
   loops: ProjectLoop[] = []
 ): EventDefinition[] =>
   [...new Set([
-    ...actionEventTypes(actions, outputs, loops, outputRoutes),
+    ...actionEventTypes(actions, loops, outputRoutes),
     ...loops.flatMap((loop) => loop.steps.flatMap((actionId) =>
-      actionOutputEventTypes({ loopId: loop.id, actionId }, actions, outputs)
+      actionOutputEventTypes({ loopId: loop.id, actionId }, actions)
     ))
   ])]
     .map((eventType) => ({

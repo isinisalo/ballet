@@ -182,10 +182,8 @@ describe("API routes", () => {
       actions: [{
         id: "implementation",
         description: "Implementation",
-        outputIds: ["approved", "rejected"],
         agentId: "developer-agent"
       }],
-      outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
       humanGateResponses: [],
       loops: [{ id: "implementation.failed.loop", steps: ["implementation"] }],
@@ -196,10 +194,8 @@ describe("API routes", () => {
       actions: [{
         id: "implementation",
         description: "Implementation",
-        outputIds: ["approved", "rejected"],
         agentId: "developer-agent"
       }],
-      outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
       humanGateResponses: [],
       loops: [{ id: "implementation.failed.loop", steps: ["implementation"] }],
@@ -256,10 +252,8 @@ describe("API routes", () => {
       actions: [{
         id: "implementation",
         description: "Implementation",
-        outputIds: ["approved", "rejected"],
         agentId: "developer-agent"
       }],
-      outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
       humanGateResponses: [],
       loops: [{ id: "plan-approved.loop", steps: ["implementation"] }],
@@ -314,10 +308,8 @@ describe("API routes", () => {
       actions: [{
         id: loopStartActionId,
         description: "Implementation",
-        outputIds: ["approved", "rejected"],
         agentId: "developer-agent"
       }],
-      outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
       humanGateResponses: [],
       loops: [{ id: loopId, steps: [loopStartActionId] }],
@@ -336,7 +328,6 @@ describe("API routes", () => {
         actions: [
           expect.objectContaining({ id: loopStartActionId, agentId: "developer-agent" })
         ],
-        outputs: [{ id: "approved" }, { id: "rejected" }],
         loops: [{ id: loopId, steps: [loopStartActionId] }]
       });
       expect(savedBody).not.toHaveProperty("triggers");
@@ -353,7 +344,6 @@ describe("API routes", () => {
       expect(automationBody.config).not.toHaveProperty("gateDecisions");
       expect(automationBody).toMatchObject({
         config: {
-          outputs: [{ id: "approved" }, { id: "rejected" }],
           actions: [
             expect.objectContaining({ id: loopStartActionId, agentId: "developer-agent" })
           ]

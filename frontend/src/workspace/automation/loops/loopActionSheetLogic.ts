@@ -1,5 +1,5 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { actionOutputRouteKey, humanGateResponseId } from "@shared/policy-actions";
+import { actionOutputIds, actionOutputRouteKey, humanGateResponseId } from "@shared/policy-actions";
 
 export const nextConfigWithLoopStepAction = (
   current: ProjectAutomationConfig,
@@ -37,14 +37,14 @@ export const nextConfigWithLoopHandlerAction = (
     const targetActionId = route.targetLoopId === loop.id ? actionIdMap.get(route.targetActionId) ?? route.targetActionId : route.targetActionId;
     const sourceAction = actionById.get(sourceActionId);
     if (!sourceAction || !actionById.has(targetActionId)) return [];
-    if (route.sourceLoopId === loop.id && route.sourceActionId === currentAction.id && !sourceAction.outputIds.includes(route.outputId)) return [];
+    if (route.sourceLoopId === loop.id && route.sourceActionId === currentAction.id && !actionOutputIds(actions, sourceAction.id).includes(route.outputId)) return [];
     const nextRoute = { ...route, sourceActionId, targetActionId };
     return [[actionOutputRouteKey(nextRoute.sourceLoopId, nextRoute.sourceActionId, nextRoute.outputId), nextRoute] as const];
   }));
   const humanGateResponses = current.humanGateResponses.flatMap((response) => {
     if (response.loopId !== loop.id || response.actionId !== currentAction.id) return [response];
     const action = actionById.get(nextActionId);
-    if (!action?.humanGate || !action.outputIds.includes(response.outputId)) return [];
+    if (!action?.humanGate || !actionOutputIds(actions, action.id).includes(response.outputId)) return [];
     const nextResponse = { ...response, actionId: nextActionId };
     return [{ ...nextResponse, id: humanGateResponseId(nextResponse) }];
   });
@@ -86,7 +86,7 @@ export const nextConfigWithLoopOutputRouteTarget = (
   const targetAction = current.actions.find((action) => action.id === targetActionId);
 
   if (!sourceLoop || !targetLoop || !sourceAction || !targetAction) return current;
-  if (!sourceAction.outputIds.includes(outputId) || !targetLoop.steps.includes(targetAction.id)) return current;
+  if (!actionOutputIds(current.actions, sourceAction.id).includes(outputId) || !targetLoop.steps.includes(targetAction.id)) return current;
 
   const routeKey = actionOutputRouteKey(sourceLoop.id, sourceAction.id, outputId);
   return {
@@ -117,7 +117,7 @@ export const nextConfigWithPendingLoopOutputHandlerAction = (
   const loop = current.loops.find((candidate) => candidate.id === loopId);
   const action = current.actions.find((candidate) => candidate.id === actionId);
   const sourceAction = current.actions.find((candidate) => candidate.id === sourceActionId);
-  if (!loop || !action || !sourceAction || !sourceAction.outputIds.includes(outputId) || handlerStepIndex < 0 || handlerStepIndex > loop.steps.length) return current;
+  if (!loop || !action || !sourceAction || !actionOutputIds(current.actions, sourceAction.id).includes(outputId) || handlerStepIndex < 0 || handlerStepIndex > loop.steps.length) return current;
 
   const nextSteps = [...loop.steps];
   nextSteps[handlerStepIndex] = action.id;
@@ -136,7 +136,7 @@ export const nextConfigWithoutLoopOutputRouteTarget = (
 ): ProjectAutomationConfig => {
   const sourceLoop = current.loops.find((loop) => loop.id === sourceLoopId);
   const sourceAction = current.actions.find((action) => action.id === sourceActionId);
-  if (!sourceLoop || !sourceAction || !sourceAction.outputIds.includes(outputId)) return current;
+  if (!sourceLoop || !sourceAction || !actionOutputIds(current.actions, sourceAction.id).includes(outputId)) return current;
 
   const routeKey = actionOutputRouteKey(sourceLoop.id, sourceAction.id, outputId);
   const outputRoutes = current.outputRoutes.filter((route) =>

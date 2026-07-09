@@ -7,13 +7,12 @@ const loopId = "delivery.loop";
 const action = (patch: Partial<ProjectAction>): ProjectAction => ({
   id: patch.id ?? "action",
   description: patch.description ?? "",
-  outputIds: patch.outputIds ?? ["complete"],
   ...(patch.agentId ? { agentId: patch.agentId } : {})
 });
 
 describe("loop graph", () => {
   it("groups routed action targets under the latest parent output event", () => {
-    const parent = action({ id: "parent", outputIds: ["failed"] });
+    const parent = action({ id: "parent" });
     const child = action({ id: "child" });
     const graph = buildLoopGraph([
       {
@@ -22,22 +21,22 @@ describe("loop graph", () => {
         loopId,
         action: parent,
         outputTargets: [{
-          outputId: "failed",
-          eventType: "delivery.loop.parent.failed",
+          outputId: "rejected",
+          eventType: "delivery.loop.parent.rejected",
           type: "action",
           targetLoopId: loopId,
           targetActionId: child.id
         }]
       },
-      { actionId: child.id, index: 1, loopId, action: child, outputEvents: ["delivery.loop.child.complete"] }
+      { actionId: child.id, index: 1, loopId, action: child, outputEvents: ["delivery.loop.child.approved"] }
     ]);
 
     expect(graph.rootRecords.map((record) => record.actionId)).toEqual(["parent"]);
-    expect(graph.childRecordsByParentEvent.get("0:delivery.loop.parent.failed")?.map((record) => record.actionId)).toEqual(["child"]);
+    expect(graph.childRecordsByParentEvent.get("0:delivery.loop.parent.rejected")?.map((record) => record.actionId)).toEqual(["child"]);
   });
 
   it("indexes every existing routed action target by output event", () => {
-    const source = action({ id: "source", outputIds: ["done"] });
+    const source = action({ id: "source" });
     const first = action({ id: "first-handler" });
     const second = action({ id: "second-handler" });
     const graph = buildLoopGraph([
@@ -47,14 +46,14 @@ describe("loop graph", () => {
         loopId,
         action: source,
         outputTargets: [{
-          outputId: "done",
-          eventType: "delivery.loop.source.done",
+          outputId: "approved",
+          eventType: "delivery.loop.source.approved",
           type: "action",
           targetLoopId: loopId,
           targetActionId: first.id
         }, {
-          outputId: "done",
-          eventType: "delivery.loop.source.done",
+          outputId: "approved",
+          eventType: "delivery.loop.source.approved",
           type: "action",
           targetLoopId: loopId,
           targetActionId: second.id
@@ -64,7 +63,7 @@ describe("loop graph", () => {
       { actionId: second.id, index: 2, loopId, action: second }
     ]);
 
-    expect(graph.eventHandlerRecordsByEvent.get("delivery.loop.source.done")?.map((record) => record.actionId)).toEqual([
+    expect(graph.eventHandlerRecordsByEvent.get("delivery.loop.source.approved")?.map((record) => record.actionId)).toEqual([
       "first-handler",
       "second-handler"
     ]);
@@ -81,8 +80,8 @@ describe("loop graph", () => {
     const build = action({ id: "build" });
     const review = action({ id: "review" });
     const records = [
-      { actionId: build.id, index: 0, loopId, action: build, outputEvents: ["delivery.loop.build.ready"] },
-      { actionId: review.id, index: 1, loopId, action: review, outputEvents: ["delivery.loop.review.changes-requested"] },
+      { actionId: build.id, index: 0, loopId, action: build, outputEvents: ["delivery.loop.build.approved"] },
+      { actionId: review.id, index: 1, loopId, action: review, outputEvents: ["delivery.loop.review.rejected"] },
       { actionId: build.id, index: 2, loopId, action: build, outputEvents: ["delivery.loop.build.ready"] }
     ];
     const graph = buildLoopGraph(records);

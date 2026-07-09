@@ -36,9 +36,9 @@ export function actionOutputTargetsForOutput(
 export function actionOutputTargetsByOutputId(
   config: Pick<ProjectAutomationConfig, "actions" | "outputRoutes">,
   actionId: string,
-  outputIds: string[]
+  slotIds: string[]
 ): Record<string, ActionOutputTarget[]> {
-  return Object.fromEntries(outputIds.flatMap((outputId) => {
+  return Object.fromEntries(slotIds.flatMap((outputId) => {
     const targets = actionOutputTargetsForOutput(config, actionId, outputId);
     return targets.length > 0 ? [[outputId, targets]] : [];
   }));

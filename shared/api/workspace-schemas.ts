@@ -118,7 +118,6 @@ export const collectionUpsertSchema = (collection: MutableCollectionName): z.Zod
 const automationTokenSchema = z.string().min(automationFieldLimits.token.min).max(automationFieldLimits.token.max);
 const automationNameSchema = z.string().min(automationFieldLimits.name.min).max(automationFieldLimits.name.max);
 const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits.description.max);
-const automationOutputIdSchema = z.string().min(automationFieldLimits.outputId.min).max(automationFieldLimits.outputId.max);
 const automationLoopIdSchema = z.string().min(automationFieldLimits.loopId.min).max(automationFieldLimits.loopId.max);
 const automationPolicyIdSchema = z.string().min(automationFieldLimits.policyId.min).max(automationFieldLimits.policyId.max);
 const automationHumanGateResponseIdSchema = z.string().min(1).max(260);
@@ -129,19 +128,14 @@ const automationArgSchema = z.string().min(automationFieldLimits.arg.min).max(au
 const projectActionSchema = z.object({
   id: automationPolicyIdSchema,
   description: optionalAutomationDescriptionSchema,
-  outputIds: z.array(automationOutputIdSchema),
   agentId: z.string().min(1).optional(),
   humanGate: z.boolean().optional()
-}).strict();
-
-const projectOutputSchema = z.object({
-  id: automationOutputIdSchema
 }).strict();
 
 const projectOutputRouteSchema = z.object({
   sourceLoopId: automationLoopIdSchema,
   sourceActionId: automationPolicyIdSchema,
-  outputId: automationOutputIdSchema,
+  outputId: z.enum(["approved", "rejected"]),
   targetLoopId: automationLoopIdSchema,
   targetActionId: automationPolicyIdSchema
 }).strict();
@@ -155,7 +149,7 @@ const projectHumanGateResponseSchema = z.object({
   id: automationHumanGateResponseIdSchema,
   loopId: automationLoopIdSchema.optional(),
   actionId: automationPolicyIdSchema,
-  outputId: automationOutputIdSchema,
+  outputId: z.enum(["approved", "rejected"]),
   prompt: automationHumanGatePromptSchema,
   submittedAt: z.string()
 }).strict();
@@ -170,7 +164,6 @@ const projectRuntimeSchema = z.object({
 export const automationConfigSchema = z.object({
   version: z.literal(1),
   actions: z.array(projectActionSchema),
-  outputs: z.array(projectOutputSchema),
   outputRoutes: z.array(projectOutputRouteSchema),
   humanGateResponses: z.array(projectHumanGateResponseSchema),
   loops: z.array(projectLoopSchema),

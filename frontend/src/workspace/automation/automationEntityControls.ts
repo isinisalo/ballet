@@ -1,6 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { defaultActionOutputIds } from "@shared/policy-actions";
 import { automationSectionPath } from "../routing";
 import type { AutomationTab } from "../types";
 import { uniqueAutomationId } from "./automationUtils";
@@ -40,21 +39,12 @@ const addEntityConfig = (
         onAdd: () => {
           const id = uniqueAutomationId("new-action", draft.actions.map((action) => action.id));
           setDraft((current) => {
-            const availableOutputIds = current.outputs.map((output) => output.id);
-            const outputIds = defaultActionOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
-            const selectedOutputIds = outputIds.length === defaultActionOutputIds.length ? outputIds : [...defaultActionOutputIds];
-            const outputs = [...current.outputs];
-            selectedOutputIds.forEach((outputId) => {
-              if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
-            });
             const agentId = agents?.[0]?.id;
             return {
               ...current,
-              outputs,
               actions: [...current.actions, {
                 id,
                 description: "New action",
-                outputIds: agentId ? selectedOutputIds : [],
                 ...(agentId ? { agentId } : {})
               }]
             };

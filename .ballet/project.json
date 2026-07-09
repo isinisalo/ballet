@@ -4,9 +4,6 @@
     {
       "id": "create-project-brief",
       "description": "Create Project Brief from accepted ADRs and approved GOALS.",
-      "outputIds": [
-        "approved"
-      ],
       "agentId": "brief-agent"
     },
     {
@@ -26,9 +23,6 @@
     {
       "id": "create-roadmap",
       "description": "Create traceable delivery roadmap from approved Project Brief.",
-      "outputIds": [
-        "approved"
-      ],
       "agentId": "roadmap-agent"
     },
     {

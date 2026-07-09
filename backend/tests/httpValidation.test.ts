@@ -36,10 +36,8 @@ describe("HTTP Zod validation", () => {
       actions: [{
         id: "implementation",
         description: "Implementation",
-        outputIds: ["summary"],
         agentId: "developer-agent"
       }],
-      outputs: [{ id: "summary" }],
       outputRoutes: [],
       humanGateResponses: [],
       loops: [{ id: "delivery.loop", steps: ["implementation"] }],
@@ -51,14 +49,13 @@ describe("HTTP Zod validation", () => {
       actions: [...valid.actions, {
         id: "human-review",
         description: "Human review",
-        outputIds: ["summary"],
         humanGate: true
       }],
       humanGateResponses: [{
         id: "delivery.loop:human-review",
         loopId: "delivery.loop",
         actionId: "human-review",
-        outputId: "summary",
+        outputId: "approved",
         prompt: "Continue with the approved brief.",
         submittedAt: "2026-07-07T10:00:00.000Z"
       }]
@@ -74,17 +71,15 @@ describe("HTTP Zod validation", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, events: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, triggers: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: undefined }), "actions");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: undefined }), "outputs");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputRoutes: undefined }), "outputRoutes");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, humanGateResponses: undefined }), "humanGateResponses");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, gates: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
       ...valid,
       outputRoutes: [{ sourceLoopId: "delivery.loop", sourceActionId: "implementation", outputId: "summary", targetLoopId: "delivery.loop", targetActionId: "" }]
-    }), "outputRoutes.0.targetActionId");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"], agentIds: ["developer-agent"] }] }), "actions.0");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", description: "Summary" }] }), "outputs.0");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "summary", type: "event" }] }), "outputs.0");
+    }), "outputRoutes.0.outputId");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"], agentId: "developer-agent" }] }), "actions.0");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "approved" }] }), "$");
   });
 
   it("accepts valid event intake payloads and defaults payload to an object", () => {

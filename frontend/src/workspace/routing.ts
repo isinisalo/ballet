@@ -31,7 +31,6 @@ const legacyRouteAliases: Record<string, (url: URL) => RouteState> = {
   "/automation/policies": (url) => automationRoute("loops", url),
   "/policies": (url) => automationRoute("loops", url),
   "/actions": (url) => automationRoute("actions", url),
-  "/automation/outputs": (url) => automationRoute("actions", url),
   "/automation/runtimes": runtimeRoute,
   "/agent-runs": (url) => automationRoute("loops", url)
 };

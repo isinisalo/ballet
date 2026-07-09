@@ -1,22 +1,14 @@
 import type { Agent } from "./domain/agents.js";
-import type { ProjectAction, ProjectHumanGateResponse, ProjectLoop, ProjectOutput, ProjectOutputRoute } from "./domain/automation.js";
+import type { ProjectAction, ProjectHumanGateResponse, ProjectLoop, ProjectOutputRoute } from "./domain/automation.js";
 
-export const actionOutputSlotCount = 2;
-export const actionOutputSlotMinCount = 1;
 export const actionAgentCount = 1;
 export const defaultActionOutputIds = ["approved", "rejected"] as const;
 export type ActionOutputId = string;
 export const actionOutputStatuses = defaultActionOutputIds;
 export type ActionOutputStatus = typeof defaultActionOutputIds[number];
 
-export const defaultProjectOutputs = (): ProjectOutput[] => [
-  { id: defaultActionOutputIds[0] },
-  { id: defaultActionOutputIds[1] }
-];
-
 export type ActionOutputConfig = Pick<ProjectAction, "humanGate"> & {
   agentId?: string;
-  outputIds?: readonly string[];
 };
 
 type LegacyActionTokenInput = {
@@ -197,66 +189,26 @@ export const actionOutputSlotKind = (outputId: string): ActionOutputSlotKind | u
   return undefined;
 };
 
-export const uniqueActionOutputIds = (outputIds: readonly string[], max = Number.POSITIVE_INFINITY): string[] =>
-  [...new Set(outputIds.map(normalizeActionToken).filter(Boolean))].slice(0, max);
-
-const canonicalOutputIdForSlot = (slot: ActionOutputSlotKind): ActionOutputStatus =>
-  slot === "approval" ? defaultActionOutputIds[0] : defaultActionOutputIds[1];
-
-export const normalizeActionOutputSlots = (outputIds: readonly string[] = defaultActionOutputIds): string[] => {
-  const normalized = uniqueActionOutputIds(outputIds);
-  if (normalized.length === 0) return [...defaultActionOutputIds];
-
-  const slots = new Set<ActionOutputSlotKind>();
-  normalized.forEach((outputId, index) => {
-    const semanticSlot = actionOutputSlotKind(outputId);
-    const positionalSlot = index === 0 ? "approval" : index === 1 ? "rework" : undefined;
-    const slot = semanticSlot ?? positionalSlot;
-    if (slot) slots.add(slot);
-  });
-
-  if (!slots.has("approval")) slots.add("approval");
-  return slots.has("rework")
-    ? [canonicalOutputIdForSlot("approval"), canonicalOutputIdForSlot("rework")]
-    : [canonicalOutputIdForSlot("approval")];
-};
-
 export const actionHasExecutableTarget = (action: ActionOutputConfig | undefined): boolean =>
   Boolean(action && (action.humanGate || action.agentId));
 
 export const defaultOutputIdsForAction = (action: ActionOutputConfig | undefined): string[] =>
   actionHasExecutableTarget(action) ? [...defaultActionOutputIds] : [];
 
-export const isDefaultActionOutputIds = (
-  outputIds: readonly string[] | undefined,
-  action?: ActionOutputConfig
-): boolean => {
-  if (outputIds === undefined) return true;
-  const expected = defaultOutputIdsForAction(action);
-  const normalized = outputIds.length > 0 ? normalizeActionOutputSlots(outputIds) : [];
-  return normalized.length === expected.length && normalized.every((outputId, index) => outputId === expected[index]);
-};
-
-const outputIdSet = (outputs: Array<Pick<ProjectOutput, "id">>): Set<string> =>
-  new Set(outputs
-    .map((output) => normalizeActionToken(output.id))
-    .filter(Boolean));
-
 export const actionOutputIds = (
-  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string; outputIds?: readonly string[] }>,
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }>,
   actionId: string
 ): string[] => {
   const normalizedActionId = normalizeActionToken(actionId);
   const action = actions.find((candidate) => normalizeActionToken(candidate.id) === normalizedActionId);
   if (!action) return [...defaultActionOutputIds];
-  if (!actionHasExecutableTarget(action)) return [];
-  return action.outputIds === undefined ? defaultOutputIdsForAction(action) : normalizeActionOutputSlots(action.outputIds);
+  return defaultOutputIdsForAction(action);
 };
 
 export const actionOutputRouteSlotKind = (
   action: Pick<ProjectAction, "id">,
   outputId: ActionOutputId,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }>
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }>
 ): ActionOutputSlotKind | undefined => {
   const normalizedOutputId = normalizeActionToken(outputId);
   const outputIndex = actionOutputIds(actions, action.id).indexOf(normalizedOutputId);
@@ -282,7 +234,7 @@ export const actionOutputRouteTargetAction = (
   action: Pick<ProjectAction, "id"> & { loopId?: string },
   outputId: ActionOutputId,
   outputRoutes: readonly ProjectOutputRoute[],
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = []
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }> = []
 ): Pick<ProjectAction, "id"> | undefined => {
   const route = findActionOutputRoute(outputRoutes, action.loopId ?? "", action.id, outputId);
   const legacyRoute = route as (ProjectOutputRoute & { target?: { policyId?: string; actionId?: string } }) | undefined;
@@ -296,7 +248,7 @@ export const actionOutputTargetEventType = (
   action: LegacyActionTokenInput,
   outputId: PolicyOutputId,
   _targetActionId?: string,
-  _actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = []
+  _actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }> = []
 ): string => {
   void _targetActionId;
   void _actions;
@@ -309,7 +261,7 @@ export const actionOutputRouteEventType = (
   action: Pick<ProjectAction, "id"> & { loopId?: string },
   outputId: PolicyOutputId,
   _outputRoutes: readonly ProjectOutputRoute[] = [],
-  _actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = []
+  _actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }> = []
 ): string => {
   void _outputRoutes;
   void _actions;
@@ -320,15 +272,11 @@ export const projectOutputRouteEventType = actionOutputRouteEventType;
 
 export const actionOutputEventTypes = (
   input: LegacyActionTokenInput,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = [],
-  outputs: Array<Pick<ProjectOutput, "id">> = []
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }> = []
 ): string[] => {
   const actionId = legacyActionToken(input);
-  const outputIds = actionId && actions.length > 0 ? actionOutputIds(actions, actionId) : [...defaultActionOutputIds];
-  const availableOutputIds = outputs.length > 0 ? outputIdSet(outputs) : undefined;
-  return outputIds
-    .filter((outputId) => !availableOutputIds || availableOutputIds.has(outputId))
-    .map((outputId) => actionOutputEventType(input, outputId));
+  const outputSlots = actionId && actions.length > 0 ? actionOutputIds(actions, actionId) : [...defaultActionOutputIds];
+  return outputSlots.map((outputId) => actionOutputEventType(input, outputId));
 };
 
 export const policyOutputEventTypes = actionOutputEventTypes;
@@ -375,8 +323,7 @@ export const uniqueAgentActionTokens = (agents: Agent[]): string[] => {
 };
 
 export const actionEventTypes = (
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }>,
-  outputs: Array<Pick<ProjectOutput, "id">> = [],
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }>,
   loops: Array<Pick<ProjectLoop, "id" | "steps">> = [],
   outputRoutes: readonly ProjectOutputRoute[] = []
 ): string[] => {
@@ -385,7 +332,7 @@ export const actionEventTypes = (
     const startEvent = eventTypeFromLoopId(loop.id);
     if (startEvent) events.add(startEvent);
     loop.steps.forEach((actionId) => {
-      actionOutputEventTypes({ loopId: loop.id, actionId }, actions, outputs).forEach((eventType) => events.add(eventType));
+      actionOutputEventTypes({ loopId: loop.id, actionId }, actions).forEach((eventType) => events.add(eventType));
     });
   });
   outputRoutes.forEach((route) => {
@@ -399,11 +346,10 @@ export const policyEventTypesForActions = actionEventTypes;
 
 export const policyEventTypesForAgentsAndActions = (
   _agents: Agent[],
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }>,
-  outputs: Array<Pick<ProjectOutput, "id">> = [],
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }>,
   loops: Array<Pick<ProjectLoop, "id" | "steps">> = [],
   outputRoutes: readonly ProjectOutputRoute[] = []
-): string[] => actionEventTypes(actions, outputs, loops, outputRoutes);
+): string[] => actionEventTypes(actions, loops, outputRoutes);
 
 export const resolveActionAgent = (agents: Agent[], token: string): Agent | undefined => {
   const normalized = normalizeActionToken(token);
@@ -414,7 +360,6 @@ export const defaultPolicyOutputIds = defaultActionOutputIds;
 export type PolicyOutputId = ActionOutputId;
 export const policyOutputStatuses = actionOutputStatuses;
 export type PolicyOutputStatus = ActionOutputStatus;
-export const uniquePolicyOutputIds = uniqueActionOutputIds;
 export const normalizePolicyOutputEventType = normalizeActionOutputEventType;
 export const uniqueAgentPolicyTokens = uniqueAgentActionTokens;
 export const resolvePolicyAgent = resolveActionAgent;

@@ -101,10 +101,6 @@ describe("Markdown collection loading", () => {
     expect(data.automation).toEqual({
       version: 1,
       actions: [],
-      outputs: [
-        { id: "approved" },
-        { id: "rejected" }
-      ],
       outputRoutes: [],
       humanGateResponses: [],
       loops: [],

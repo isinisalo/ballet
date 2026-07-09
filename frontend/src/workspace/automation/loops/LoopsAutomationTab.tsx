@@ -248,7 +248,7 @@ export function LoopsAutomationTab({
   };
   const submitHumanGateResponse = async (route: LoopHandlerRoute, outputId: string, prompt: string) => {
     const action = config.actions.find((candidate) => candidate.id === route.actionId);
-    if (!action?.humanGate || !action.outputIds.includes(outputId)) return;
+    if (!action?.humanGate || !actionOutputIds(config.actions, action.id).includes(outputId)) return;
     const responseBase = {
       loopId: route.loopId,
       actionId: route.actionId,

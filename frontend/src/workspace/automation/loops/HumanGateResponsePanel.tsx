@@ -7,19 +7,19 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Textarea } from "@/components/ui/textarea";
 
 export function HumanGateResponsePanel({
-  outputIds,
+  slotIds,
   response,
   onSubmit
 }: {
-  outputIds: string[];
+  slotIds: string[];
   response?: ProjectHumanGateResponse;
   onSubmit: (outputId: string, prompt: string) => void;
 }) {
   const promptId = useId();
   const [prompt, setPrompt] = useState(response?.prompt ?? "");
   const [error, setError] = useState("");
-  const approvalOutputId = outputIds[0];
-  const reworkOutputId = outputIds[1];
+  const approvalOutputId = slotIds[0];
+  const reworkOutputId = slotIds[1];
 
   useEffect(() => {
     setPrompt(response?.prompt ?? "");

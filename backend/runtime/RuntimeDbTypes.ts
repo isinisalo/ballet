@@ -1,5 +1,5 @@
 import type { Agent } from "../../shared/domain/agents.js";
-import type { ProjectAction, ProjectAutomationConfig, ProjectLoop, ProjectOutput, ProjectOutputRoute } from "../../shared/domain/automation.js";
+import type { ProjectAction, ProjectAutomationConfig, ProjectLoop, ProjectOutputRoute } from "../../shared/domain/automation.js";
 import type { EventStatus } from "../../shared/domain/events.js";
 import type { AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus } from "../../shared/domain/runtime.js";
 
@@ -92,7 +92,6 @@ export interface CompleteRunInput {
   projectAction?: ProjectAction;
   projectActions?: ProjectAction[];
   actions?: ProjectAction[];
-  outputs?: ProjectOutput[];
   outputRoutes: ProjectOutputRoute[];
   loops?: ProjectLoop[];
   automation?: ProjectAutomationConfig;

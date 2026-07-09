@@ -20,7 +20,6 @@ export class WorkspaceDataService {
     data.automationIssues = automation.issues;
     data.eventDefinitions = automationActionsToEventDefinitions(
       automation.config.actions,
-      automation.config.outputs,
       automation.config.outputRoutes,
       automation.config.loops
     );

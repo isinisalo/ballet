@@ -16,15 +16,13 @@ const loopId = "delivery.loop";
 const action = (patch: Partial<ProjectAction>): ProjectAction => ({
   id: patch.id ?? "build",
   description: patch.description ?? `${patch.id ?? "build"} action.`,
-  outputIds: patch.outputIds ?? ["approved", "rejected"],
-  agentId: patch.agentId ?? "agent-1",
+  ...("agentId" in patch ? (patch.agentId ? { agentId: patch.agentId } : {}) : { agentId: "agent-1" }),
   ...(patch.humanGate ? { humanGate: true } : {})
 });
 
 const config = (actions: ProjectAction[], steps = actions.map((item) => item.id)): ProjectAutomationConfig => ({
   version: 1,
   actions,
-  outputs: [{ id: "approved" }, { id: "rejected" }],
   outputRoutes: [],
   humanGateResponses: [],
   loops: [{ id: loopId, steps }],
@@ -77,15 +75,15 @@ describe("nextConfigWithLoopStepAction", () => {
   });
 
   it("updates only scoped routes that reference the changed loop step", () => {
-    const build = action({ id: "build", outputIds: ["ready", "blocked"] });
-    const review = action({ id: "review", outputIds: ["approved", "changes-requested"] });
-    const rework = action({ id: "rework", outputIds: ["ready", "blocked"] });
-    const done = action({ id: "done", outputIds: [] });
+    const build = action({ id: "build" });
+    const review = action({ id: "review" });
+    const rework = action({ id: "rework" });
+    const done = action({ id: "done", agentId: undefined });
     const current: ProjectAutomationConfig = {
       ...config([build, review, rework, done], [build.id, review.id, rework.id]),
       outputRoutes: [
-        { sourceLoopId: loopId, sourceActionId: build.id, outputId: "ready", targetLoopId: loopId, targetActionId: review.id },
-        { sourceLoopId: loopId, sourceActionId: review.id, outputId: "changes-requested", targetLoopId: loopId, targetActionId: rework.id }
+        { sourceLoopId: loopId, sourceActionId: build.id, outputId: "approved", targetLoopId: loopId, targetActionId: review.id },
+        { sourceLoopId: loopId, sourceActionId: review.id, outputId: "rejected", targetLoopId: loopId, targetActionId: rework.id }
       ]
     };
     const next = nextConfigWithLoopHandlerAction(current, loopId, 2, done.id);
@@ -93,17 +91,17 @@ describe("nextConfigWithLoopStepAction", () => {
     expect(next.loops[0]?.steps).toEqual([build.id, review.id, done.id]);
     expect(next.actions).toBe(current.actions);
     expect(next.outputRoutes).toEqual([
-      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "ready", targetLoopId: loopId, targetActionId: review.id },
-      { sourceLoopId: loopId, sourceActionId: review.id, outputId: "changes-requested", targetLoopId: loopId, targetActionId: done.id }
+      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "approved", targetLoopId: loopId, targetActionId: review.id },
+      { sourceLoopId: loopId, sourceActionId: review.id, outputId: "rejected", targetLoopId: loopId, targetActionId: done.id }
     ]);
   });
 });
 
 describe("nextConfigWithLoopHandlerAction route cleanup", () => {
   it("rewrites scoped routes and removes stale human gate responses when a loop step action changes", () => {
-    const start = action({ id: "start-review", outputIds: ["rejected"], agentId: "reviewer" });
-    const gate = action({ id: "gate-review", outputIds: ["rejected"], humanGate: true });
-    const done = action({ id: "done-review", outputIds: [] });
+    const start = action({ id: "start-review", agentId: "reviewer" });
+    const gate = action({ id: "gate-review", humanGate: true });
+    const done = action({ id: "done-review", agentId: undefined });
     const gateResponseBase = {
       loopId,
       actionId: gate.id,
@@ -133,25 +131,25 @@ describe("nextConfigWithLoopHandlerAction route cleanup", () => {
 
 describe("nextConfigWithLoopOutputRouteTarget", () => {
   it("upserts scoped output routes by source loop, source action, and output", () => {
-    const build = action({ id: "build", outputIds: ["ready", "blocked"] });
+    const build = action({ id: "build" });
     const review = action({ id: "review" });
-    const done = action({ id: "done", outputIds: [] });
+    const done = action({ id: "done", agentId: undefined });
     const current: ProjectAutomationConfig = {
       ...config([build, review, done], [build.id, review.id, done.id]),
       outputRoutes: [
-        { sourceLoopId: loopId, sourceActionId: build.id, outputId: "ready", targetLoopId: loopId, targetActionId: review.id }
+        { sourceLoopId: loopId, sourceActionId: build.id, outputId: "approved", targetLoopId: loopId, targetActionId: review.id }
       ]
     };
 
-    const next = nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", loopId, done.id);
+    const next = nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "approved", loopId, done.id);
 
     expect(next.outputRoutes).toEqual([
-      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "ready", targetLoopId: loopId, targetActionId: done.id }
+      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "approved", targetLoopId: loopId, targetActionId: done.id }
     ]);
   });
 
   it("creates cross-loop output routes when the target action belongs to the target loop", () => {
-    const build = action({ id: "build", outputIds: ["ready", "blocked"] });
+    const build = action({ id: "build" });
     const review = action({ id: "review" });
     const rework = action({ id: "rework" });
     const returnLoopId = "return.loop";
@@ -163,15 +161,15 @@ describe("nextConfigWithLoopOutputRouteTarget", () => {
       ]
     };
 
-    const next = nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "blocked", returnLoopId, rework.id);
+    const next = nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "rejected", returnLoopId, rework.id);
 
     expect(next.outputRoutes).toEqual([
-      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "blocked", targetLoopId: returnLoopId, targetActionId: rework.id }
+      { sourceLoopId: loopId, sourceActionId: build.id, outputId: "rejected", targetLoopId: returnLoopId, targetActionId: rework.id }
     ]);
   });
 
   it("does not create invalid routes for empty target loops or actions outside the target loop", () => {
-    const build = action({ id: "build", outputIds: ["ready", "blocked"] });
+    const build = action({ id: "build" });
     const review = action({ id: "review" });
     const emptyLoopId = "empty.loop";
     const current: ProjectAutomationConfig = {
@@ -182,14 +180,14 @@ describe("nextConfigWithLoopOutputRouteTarget", () => {
       ]
     };
 
-    expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", emptyLoopId, review.id)).toBe(current);
-    expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "ready", loopId, review.id)).toBe(current);
+    expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "approved", emptyLoopId, review.id)).toBe(current);
+    expect(nextConfigWithLoopOutputRouteTarget(current, loopId, build.id, "approved", loopId, review.id)).toBe(current);
   });
 });
 
 describe("nextConfigWithPendingLoopOutputHandlerAction", () => {
   it("appends the selected handler action and creates the scoped output route", () => {
-    const build = action({ id: "build", outputIds: ["approved", "rejected"] });
+    const build = action({ id: "build" });
     const review = action({ id: "review" });
     const current = config([build, review], [build.id]);
 

@@ -53,7 +53,7 @@ export class RuntimeRunCompletion {
       if (!run) throw new Error("Agent run not found after update.");
       let event: RuntimeEvent | undefined;
       let runs: AgentRun[] = [];
-      const domainEvent = input.projectAction && input.actions && input.outputs
+      const domainEvent = input.projectAction && input.actions
         ? this.aggregateDomainEvent(run, input)
         : input.domainEvent;
       if (domainEvent) {
@@ -93,7 +93,6 @@ export class RuntimeRunCompletion {
           }, input.automation ?? {
             version: 1,
             actions: input.actions ?? [],
-            outputs: input.outputs ?? [],
             outputRoutes: input.outputRoutes,
             humanGateResponses: [],
             loops: input.loops ?? [],
@@ -117,7 +116,7 @@ export class RuntimeRunCompletion {
     input: CompleteRunInput
   ): CompleteRunInput["domainEvent"] | undefined {
     const action = input.projectAction;
-    if (!action || !input.actions || !input.outputs) return undefined;
+    if (!action || !input.actions) return undefined;
     const actionRuns = this.runStore.getRunsForActionInputEvent(run.inputEventId, run.routeId);
     if (!allActionRunsTerminal(actionRuns)) return undefined;
 

@@ -13,13 +13,11 @@ const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes"> => 
     {
       id: "review",
       description: "Review.",
-      outputIds: ["approved", "changes-requested"],
       agentId: "reviewer-agent"
     },
     {
       id: "human-review",
       description: "Human review.",
-      outputIds: ["approved", "changes-requested"],
       humanGate: true
     }
   ],
@@ -29,7 +27,7 @@ const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes"> => 
 describe("loop output target rules", () => {
   it("uses event select values until an explicit output route exists", () => {
     expect(loopOutputTargetSelectValue(config(), loopId, "human-review", "approved")).toBe("event");
-    expect(loopOutputTargetSelectValue(config(), loopId, "human-review", "changes-requested")).toBe("event");
+    expect(loopOutputTargetSelectValue(config(), loopId, "human-review", "rejected")).toBe("event");
   });
 
   it("formats selected output targets for event badges", () => {

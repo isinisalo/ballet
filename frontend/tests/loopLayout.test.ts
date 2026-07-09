@@ -19,7 +19,6 @@ const action = (id: string, event: string | undefined, action = "build"): Projec
   event: event ?? "project.updated",
   enabled: true,
   description: `${action} handler`,
-  outputIds: ["approved", "rejected"],
   agentId: "agent-1"
 });
 
@@ -114,7 +113,6 @@ const compositeConfig = (
   return {
     version: 1,
     actions: [upstreamPolicy, sourcePolicy, targetPolicy, downstreamPolicy],
-    outputs: [{ id: "approved" }, { id: "rejected" }],
     outputRoutes: [
       ...(loopIds.includes("source") && loopIds.includes("target")
         ? [{ sourceLoopId: "source", sourceActionId: "source-start", outputId: "approved", targetLoopId: "target", targetActionId: "target-start" }]
@@ -317,7 +315,7 @@ describe("loop layout helper modules", () => {
 
 describe("calculateLoopCanvasLayout", () => {
   it("uses selected action outputs as action output events", () => {
-    expect(actionOutputEventTypes({ key: "build" }, [{ id: "build", key: "build", outputIds: ["complete", "failed"], agentId: "agent-1" }])).toEqual([
+    expect(actionOutputEventTypes({ key: "build" }, [{ id: "build", key: "build", agentId: "agent-1" }])).toEqual([
       "build.approved",
       "build.rejected"
     ]);
@@ -341,23 +339,21 @@ describe("calculateLoopCanvasLayout", () => {
         actionId: start.id,
         index: 0,
         action: start,
-        outputEvents: ["build.complete", "build.failed", "build.blocked"]
+        outputEvents: ["build.approved", "build.rejected"]
       }]),
       editingPolicyIndex: null
     });
     const outputEventNodes = layout.nodes.filter((node) => node.kind === "output-event");
 
     expect(outputEventNodes.map((node) => node.outputEvent?.eventType)).toEqual([
-      "build.complete",
-      "build.failed",
-      "build.blocked"
+      "build.approved",
+      "build.rejected"
     ]);
     expect(outputEventNodes.map((node) => node.key)).toEqual([
-      "output-event-0-build.complete",
-      "output-event-0-build.failed",
-      "output-event-0-build.blocked"
+      "output-event-0-build.approved",
+      "output-event-0-build.rejected"
     ]);
-    expect(layout.edges.filter((edge) => edge.sourceNodeKey === "action-0" && edge.targetNodeKey.startsWith("output-event-"))).toHaveLength(3);
+    expect(layout.edges.filter((edge) => edge.sourceNodeKey === "action-0" && edge.targetNodeKey.startsWith("output-event-"))).toHaveLength(2);
   });
 
   it("does not render output nodes for an agentless action", () => {
@@ -367,7 +363,7 @@ describe("calculateLoopCanvasLayout", () => {
         actionId: start.id,
         index: 0,
         action: start,
-        outputEvents: actionOutputEventTypes(start, [{ id: "manual-gate", outputIds: ["complete"] }])
+        outputEvents: actionOutputEventTypes(start, [{ id: "manual-gate" }])
       }]),
       editingPolicyIndex: null
     });
@@ -501,7 +497,6 @@ describe("calculateLoopCanvasLayout", () => {
     const start = action("human-review", undefined, "human-review");
     const outputEvents = actionOutputEventTypes(start, [{
       id: "human-review",
-      outputIds: ["approved", "changes-requested"],
       humanGate: true
     }]);
     const layout = calculateLoopCanvasLayout({
@@ -927,7 +922,6 @@ describe("calculateLoopCanvasLayout", () => {
       key: "implement",
       enabled: true,
       description: "Implement",
-      outputIds: ["completed", "failed"],
       agentId: "developer-agent"
     });
     const review: ProjectAction = {
@@ -936,7 +930,6 @@ describe("calculateLoopCanvasLayout", () => {
       key: "review",
       enabled: true,
       description: "Review",
-      outputIds: ["accepted", "rejected"],
       agentId: "architect"
     };
     const records: LoopStepRecord[] = [
@@ -1215,7 +1208,6 @@ describe("calculateCompositeLoopCanvasLayout", () => {
       event: "source-gate.rejected",
       enabled: true,
       description: "Branch gate",
-      outputIds: ["approved", "rejected"],
       humanGate: true
     });
     const sourceLoop = config.loops.find((loop) => loop.id === "source");

@@ -16,7 +16,7 @@ export const allActionRunsTerminal = (runs: AgentRun[]): boolean =>
 export const outcomeToOutputEventStatus = (
   outcome: AgentOutcome,
   action: Pick<ProjectAction, "id">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }>
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }>
 ): AgentOutputEventStatus | undefined => {
   const allowedOutputIds = actionOutputIds(actions, action.id);
   switch (outcome.outcome) {
@@ -37,7 +37,7 @@ export const outcomeToOutputEventStatus = (
 export const aggregateActionOutputStatus = (
   runs: AgentRun[],
   action: Pick<ProjectAction, "id">,
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }>
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }>
 ): AgentOutputEventStatus | undefined => {
   const allowedOutputIds = actionOutputIds(actions, action.id);
   const outcomes = runs.map((run) => run.outcome?.outcome).filter(Boolean);
@@ -60,5 +60,5 @@ export const actionOutputEventType = (
   action: Pick<ProjectAction, "id"> & { loopId?: string },
   outputId: AgentOutputEventStatus,
   outputRoutes: ProjectOutputRoute[],
-  actions: Array<Pick<ProjectAction, "id" | "outputIds" | "humanGate"> & { agentId?: string }> = [],
+  actions: Array<Pick<ProjectAction, "id" | "humanGate"> & { agentId?: string }> = [],
 ): string => actionOutputRouteEventType(action, outputId, outputRoutes, actions);

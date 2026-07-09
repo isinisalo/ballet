@@ -7,6 +7,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { actionOutputIds } from "@shared/policy-actions";
 import { HumanGateResponsePanel } from "./HumanGateResponsePanel";
 import { LoopOutputHandlerControls } from "./LoopOutputHandlerControls";
 import { loopActionTokenClassName } from "./loopSheetTokenStyles";
@@ -89,7 +90,7 @@ export function LoopHandlerSheet({
           <div className="flex flex-col gap-3">
             {routes.map((route) => {
               const action = config.actions.find((candidate) => candidate.id === route.actionId);
-              const outputIds = action?.outputIds ?? [];
+              const slotIds = action ? actionOutputIds(config.actions, action.id) : [];
               const agentId = action?.agentId;
               const humanGate = Boolean(action?.humanGate);
               const response = humanGateResponseForRoute(config, route);
@@ -129,14 +130,14 @@ export function LoopHandlerSheet({
                         <LoopOutputHandlerControls
                           config={config}
                           route={route}
-                          outputIds={outputIds}
+                          slotIds={slotIds}
                           label={humanGate ? "Output routing" : "Outputs"}
                           onOutputHandlerRouteChange={onOutputHandlerRouteChange}
                           onOutputHandlerRouteClear={onOutputHandlerRouteClear}
                         />
                         {humanGate ? (
                           <HumanGateResponsePanel
-                            outputIds={outputIds}
+                            slotIds={slotIds}
                             response={response}
                             onSubmit={(outputId, prompt) => onHumanGateSubmit(route, outputId, prompt)}
                           />

@@ -55,15 +55,12 @@ const validConfig = (): ProjectAutomationConfig => ({
   actions: [{
     id: implementationActionId,
     description: "Implement approved work.",
-    outputIds: ["approved", "rejected"],
     agentId: "developer-agent"
   }, {
     id: humanReviewActionId,
     description: "Review rejected implementation.",
-    outputIds: ["approved", "rejected"],
     humanGate: true
   }],
-  outputs: [{ id: "approved" }, { id: "rejected" }],
   outputRoutes: [{
     sourceLoopId: loopId,
     sourceActionId: implementationActionId,
@@ -86,7 +83,6 @@ describe("project automation config", () => {
     await expect(loadProjectAutomationConfig(await tempRoot())).resolves.toEqual({
       version: 1,
       actions: [],
-      outputs: [{ id: "approved" }, { id: "rejected" }],
       outputRoutes: [],
       humanGateResponses: [],
       loops: [],
@@ -101,12 +97,13 @@ describe("project automation config", () => {
       expect(raw).not.toHaveProperty("triggers");
       expect(raw).not.toHaveProperty("gates");
       expect(raw).not.toHaveProperty("gateDecisions");
+      expect(raw).not.toHaveProperty("outputs");
       expect(Array.isArray(raw.actions)).toBe(true);
       expect(Array.isArray(raw.outputRoutes)).toBe(true);
       expect(Array.isArray(raw.humanGateResponses)).toBe(true);
       expect(validateProjectAutomationConfig(raw)).toEqual([]);
       expect((raw.actions as Array<Record<string, unknown>>).some((action) =>
-        "key" in action || "event" in action || "loopId" in action || "enabled" in action
+        "key" in action || "event" in action || "loopId" in action || "enabled" in action || "outputIds" in action
       )).toBe(false);
     }
   });
@@ -133,24 +130,23 @@ describe("project automation config", () => {
     await expect(loadProjectAutomationConfig(root, [agent])).resolves.toEqual(saved);
   });
 
-  it("loads legacy automation policies without inflating actions", () => {
+  it("normalizes legacy automation policies without preserving custom outputs", () => {
     const legacy = {
       version: 1,
       actions: [
-        { id: "implementation", description: "Implement.", outputIds: ["ok", "failed"], agentId: "developer-agent" },
-        { id: "human-review", description: "Human review.", outputIds: ["ok", "failed"], humanGate: true }
+        { id: "implementation", description: "Implement.", agentId: "developer-agent" },
+        { id: "human-review", description: "Human review.", humanGate: true }
       ],
-      outputs: [{ id: "ok" }, { id: "failed" }],
       outputRoutes: [{
         sourcePolicyId: "start-implementation",
-        outputId: "failed",
+        outputId: "rejected",
         target: { type: "policy", policyId: "human-review-handler" }
       }],
       humanGateResponses: [{
         id: "legacy-response",
         loopId,
         policyId: "human-review-handler",
-        outputId: "ok",
+        outputId: "approved",
         prompt: "Continue?",
         submittedAt: "2026-07-07T10:00:00.000Z"
       }],
@@ -163,7 +159,7 @@ describe("project automation config", () => {
       }, {
         id: "human-review-handler",
         source: "event",
-        event: `${loopId}.implementation.failed`,
+        event: `${loopId}.implementation.rejected`,
         action: "human-review",
         enabled: true
       }],
@@ -182,7 +178,7 @@ describe("project automation config", () => {
       targetLoopId: loopId,
       targetActionId: "human-review"
     }]);
-    expect(normalized.humanGateResponses).toEqual([{
+      expect(normalized.humanGateResponses).toEqual([{
       id: humanGateResponseId({ loopId, actionId: "human-review" }),
       loopId,
       actionId: "human-review",
@@ -198,8 +194,8 @@ describe("project automation config", () => {
     const inflated = {
       version: 1,
       actions: [
-        { id: "on.plan-approved.start.plan-approved.loop.implementation", key: "implementation", loopId, event: startEvent, description: "Implement.", outputIds: ["approved", "rejected"], agentId: "developer-agent", enabled: true },
-        { id: "on.plan-approved.loop.implementation.rejected.start.plan-approved.loop.implementation", key: "implementation", loopId, event: implementationRejectedEvent, description: "Implement.", outputIds: ["approved", "rejected"], agentId: "developer-agent", enabled: true }
+        { id: "on.plan-approved.start.plan-approved.loop.implementation", key: "implementation", loopId, event: startEvent, description: "Implement.", agentId: "developer-agent", enabled: true },
+        { id: "on.plan-approved.loop.implementation.rejected.start.plan-approved.loop.implementation", key: "implementation", loopId, event: implementationRejectedEvent, description: "Implement.", agentId: "developer-agent", enabled: true }
       ],
       loops: [{ id: loopId, steps: ["on.plan-approved.start.plan-approved.loop.implementation", "on.plan-approved.loop.implementation.rejected.start.plan-approved.loop.implementation"] }]
     };
@@ -222,13 +218,21 @@ describe("project automation config", () => {
     }, [agent, reviewerAgent]).some((issue) => issue.message === "Action agentIds is no longer supported. Use agentId.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...validConfig(),
+      outputs: [{ id: "approved" }]
+    }, [agent]).some((issue) => issue.message === "Automation outputs are fixed to approved/rejected and are no longer configurable.")).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
+      actions: [{ ...validConfig().actions[0]!, outputIds: ["approved"] }]
+    }, [agent]).some((issue) => issue.message === "Action outputIds is no longer supported. Outputs are fixed to approved/rejected.")).toBe(true);
+    expect(validateProjectAutomationConfig({
+      ...validConfig(),
       actions: [{ ...validConfig().actions[0]!, agentId: "missing-agent" }]
     }, [agent]).some((issue) => issue.message === "Action references unknown agent: missing-agent.")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...validConfig(),
       outputRoutes: [{ sourceLoopId: loopId, sourceActionId: implementationActionId, outputId: "summary", targetLoopId: loopId, targetActionId: humanReviewActionId }]
     }, [agent]).some((issue) =>
-      issue.message === `Output route references unavailable output summary for action ${implementationActionId}.`
+      issue.message === "Output route outputId must be approved or rejected."
     )).toBe(true);
     expect(validateProjectAutomationConfig({
       ...validConfig(),
@@ -261,7 +265,6 @@ describe("project automation config", () => {
     const config = validConfig();
     const eventTypes = automationActionsToEventDefinitions(
       config.actions,
-      config.outputs,
       config.outputRoutes,
       config.loops
     ).map((event) => event.eventType);

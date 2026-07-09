@@ -10,9 +10,7 @@ import {
 import {
   actionOutputIds,
   actionOutputRouteKey,
-  actionOutputSlotCount,
-  actionOutputSlotKind,
-  actionOutputSlotMinCount,
+  defaultActionOutputIds,
   humanGateResponseId,
   normalizeLoopId,
   normalizeActionToken
@@ -69,6 +67,9 @@ const addLoopIdIssue = (issues: ProjectAutomationIssue[], pathName: string, valu
   if (message) issues.push({ path: pathName, message });
 };
 
+const isCanonicalOutputId = (value: string): boolean =>
+  defaultActionOutputIds.some((outputId) => outputId === value);
+
 const addUniqueIssues = (issues: ProjectAutomationIssue[], ids: Array<{ id: string; path: string }>, label: string) => {
   const seen = new Map<string, string>();
   ids.forEach((item) => {
@@ -86,26 +87,13 @@ const requireAutomationArrays = (input: Record<string, unknown>, issues: Project
   if (input.triggers !== undefined) {
     issues.push({ path: "triggers", message: "Automation triggers are no longer supported. Use action events." });
   }
+  if (input.outputs !== undefined) {
+    issues.push({ path: "outputs", message: "Automation outputs are fixed to approved/rejected and are no longer configurable." });
+  }
   for (const key of ["actions", "outputs", "outputRoutes", "humanGateResponses", "loops", "runtimes"] as const) {
     if ((key === "actions" || key === "outputs" || key === "humanGateResponses") && input[key] === undefined) continue;
     if (!Array.isArray(input[key])) issues.push({ path: key, message: `${key} must be an array.` });
   }
-};
-
-const normalizedActionOutputIds = (action: Record<string, unknown>): string[] | undefined =>
-  Array.isArray(action.outputIds)
-    ? [...new Set(action.outputIds
-      .filter((outputId): outputId is string => typeof outputId === "string")
-      .map(normalizeActionToken)
-      .filter(Boolean))]
-    : undefined;
-
-const legacyCompatibleOutputIds = (outputIds: string[]): boolean => {
-  const slotKinds = new Set(outputIds.map(actionOutputSlotKind).filter(Boolean));
-  return outputIds.length > actionOutputSlotCount &&
-    outputIds.every((outputId) => Boolean(actionOutputSlotKind(outputId))) &&
-    slotKinds.has("approval") &&
-    slotKinds.has("rework");
 };
 
 const validateAction = (
@@ -113,7 +101,6 @@ const validateAction = (
   index: number,
   normalized: ReturnType<typeof normalizeProjectAutomationConfig>,
   agentIdSet: Set<string>,
-  outputIdSet: Set<string>,
   issues: ProjectAutomationIssue[]
 ) => {
   const base = `actions[${index}]`;
@@ -129,10 +116,8 @@ const validateAction = (
 
   const normalizedAction = normalized.actions[index];
   const normalizedAgentId = normalizedAction?.agentId;
-  const rawOutputIds = normalizedActionOutputIds(action);
-  const outputIds = rawOutputIds ?? normalizedAction?.outputIds ?? [];
-  if (action.outputIds !== undefined && !Array.isArray(action.outputIds)) {
-    issues.push({ path: `${base}.outputIds`, message: "Action outputIds must be an array." });
+  if (action.outputIds !== undefined) {
+    issues.push({ path: `${base}.outputIds`, message: "Action outputIds is no longer supported. Outputs are fixed to approved/rejected." });
   }
   if (action.agentIds !== undefined) {
     issues.push({ path: `${base}.agentIds`, message: "Action agentIds is no longer supported. Use agentId." });
@@ -143,26 +128,6 @@ const validateAction = (
   if (typeof action.agentId === "string" && !action.agentId.trim()) {
     issues.push({ path: `${base}.agentId`, message: "Action agentId cannot be empty." });
   }
-  if (!action.humanGate && !normalizedAgentId && outputIds.length > 0) {
-    issues.push({ path: `${base}.outputIds`, message: "Action without agents cannot select outputs." });
-  }
-  if ((normalizedAgentId || action.humanGate === true) &&
-    rawOutputIds &&
-    (rawOutputIds.length < actionOutputSlotMinCount || rawOutputIds.length > actionOutputSlotCount) &&
-    !legacyCompatibleOutputIds(rawOutputIds)) {
-    issues.push({ path: `${base}.outputIds`, message: "Action must define 1 or 2 outputs: approval and optional rework." });
-  }
-  if (action.humanGate === true && outputIds.length < actionOutputSlotMinCount) {
-    issues.push({ path: `${base}.outputIds`, message: "Human gate action must define an approval output." });
-  }
-  const seenOutputIds = new Set<string>();
-  outputIds.forEach((outputId, outputIndex) => {
-    if (seenOutputIds.has(outputId)) issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Duplicate action output id: ${outputId}.` });
-    seenOutputIds.add(outputId);
-    if (!outputIdSet.has(outputId) && !actionOutputSlotKind(outputId)) {
-      issues.push({ path: `${base}.outputIds[${outputIndex}]`, message: `Action references unknown output: ${outputId}.` });
-    }
-  });
   if (action.humanGate === true && (normalizedAgentId || typeof action.agentId === "string")) {
     issues.push({ path: `${base}.agentId`, message: "Human gate action cannot select an agent." });
   }
@@ -202,6 +167,10 @@ const validateOutputRoute = (
   const routeKey = actionOutputRouteKey(sourceLoopId, sourceAction.id, outputId);
   if (routeKeys.has(routeKey)) issues.push({ path: base, message: `Duplicate output route: ${routeKey}.` });
   routeKeys.add(routeKey);
+  if (!isCanonicalOutputId(outputId)) {
+    issues.push({ path: `${base}.outputId`, message: "Output route outputId must be approved or rejected." });
+    return;
+  }
   if (!actionOutputIds([...actionsById.values()], sourceAction.id).includes(outputId)) {
     issues.push({ path: `${base}.outputId`, message: `Output route references unavailable output ${outputId} for action ${sourceAction.id}.` });
   }
@@ -236,6 +205,10 @@ const validateHumanGateResponse = (
   }
   if (!action.humanGate) issues.push({ path: `${base}.actionId`, message: `Human gate response action is not a human gate: ${action.id}.` });
   const outputId = normalizeActionToken(stringValue(response.outputId));
+  if (!isCanonicalOutputId(outputId)) {
+    issues.push({ path: `${base}.outputId`, message: "Human gate response outputId must be approved or rejected." });
+    return;
+  }
   if (!actionOutputIds([...actionsById.values()], action.id).includes(outputId)) {
     issues.push({ path: `${base}.outputId`, message: `Human gate response references unavailable output ${outputId} for action ${action.id}.` });
   }
@@ -251,20 +224,14 @@ export const validateProjectAutomationConfig = (input: unknown, agents: Agent[] 
   requireAutomationArrays(input, issues);
   const normalized = normalizeProjectAutomationConfig(input, agents);
   const actionsById = new Map(normalized.actions.map((action) => [action.id, action]));
-  const outputIdSet = new Set(normalized.outputs.map((output) => output.id));
   const loopIdSet = new Set(normalized.loops.map((loop) => loop.id));
   const agentIdSet = new Set(agents.map((agent) => agent.id));
   addUniqueIssues(issues, normalized.actions.map((action, index) => ({ id: action.id, path: `actions[${index}].id` })), "action");
-  addUniqueIssues(issues, normalized.outputs.map((output, index) => ({ id: output.id, path: `outputs[${index}].id` })), "output");
   addUniqueIssues(issues, normalized.loops.map((loop, index) => ({ id: loop.id, path: `loops[${index}].id` })), "loop");
   addUniqueIssues(issues, normalized.humanGateResponses.map((response, index) => ({ id: response.id, path: `humanGateResponses[${index}].id` })), "human gate response");
 
   const rawActions = Array.isArray(input.actions) ? input.actions : [];
-  rawActions.forEach((action, index) => validateAction(action, index, normalized, agentIdSet, outputIdSet, issues));
-  (Array.isArray(input.outputs) ? input.outputs : []).forEach((output, index) => {
-    if (!isRecord(output)) issues.push({ path: `outputs[${index}]`, message: "Output must be an object." });
-    else addOutputIdIssue(issues, `outputs[${index}].id`, output.id);
-  });
+  rawActions.forEach((action, index) => validateAction(action, index, normalized, agentIdSet, issues));
   const routeKeys = new Set<string>();
   (Array.isArray(input.outputRoutes) ? input.outputRoutes : []).forEach((route, index) =>
     validateOutputRoute(route, index, actionsById, loopIdSet, routeKeys, issues)

@@ -12,24 +12,23 @@ const returnLoopId = "return.loop";
 const config = (): ProjectAutomationConfig => ({
   version: 1,
   actions: [
-    { id: "start", description: "Build.", outputIds: ["ready", "blocked"], agentId: "agent-1" },
-    { id: "review", description: "Review.", outputIds: ["approved", "changes-requested"], agentId: "agent-1" },
-    { id: "human-review", description: "Human review.", outputIds: ["approved", "changes-requested"], humanGate: true },
-    { id: "return-start", description: "Build.", outputIds: ["ready", "blocked"], agentId: "agent-1" },
-    { id: "rework", description: "Build.", outputIds: ["ready", "blocked"], agentId: "agent-1" },
-    { id: "done", description: "Done.", outputIds: [] }
+    { id: "start", description: "Build.", agentId: "agent-1" },
+    { id: "review", description: "Review.", agentId: "agent-1" },
+    { id: "human-review", description: "Human review.", humanGate: true },
+    { id: "return-start", description: "Build.", agentId: "agent-1" },
+    { id: "rework", description: "Build.", agentId: "agent-1" },
+    { id: "done", description: "Done." }
   ],
-  outputs: [{ id: "ready" }, { id: "blocked" }, { id: "approved" }, { id: "changes-requested" }],
   outputRoutes: [{
     sourceLoopId: loopId,
     sourceActionId: "start",
-    outputId: "ready",
+    outputId: "approved",
     targetLoopId: loopId,
     targetActionId: "review"
   }, {
     sourceLoopId: returnLoopId,
     sourceActionId: "review",
-    outputId: "changes-requested",
+    outputId: "rejected",
     targetLoopId: returnLoopId,
     targetActionId: "rework"
   }, {
@@ -52,10 +51,10 @@ const config = (): ProjectAutomationConfig => ({
 
 describe("loopOutputHandlerForOutput", () => {
   it("finds the next action handler for an output route", () => {
-    expect(loopOutputHandlerForOutput(config(), loopId, "start", "ready")).toEqual({
+    expect(loopOutputHandlerForOutput(config(), loopId, "start", "approved")).toEqual({
       type: "action",
-      outputId: "ready",
-      eventType: "delivery.loop.start.ready",
+      outputId: "approved",
+      eventType: "delivery.loop.start.approved",
       actionId: "review",
       loopId,
       stepIndex: 1,
@@ -64,10 +63,10 @@ describe("loopOutputHandlerForOutput", () => {
   });
 
   it("finds an earlier return handler action for a rework route", () => {
-    expect(loopOutputHandlerForOutput(config(), returnLoopId, "review", "changes-requested")).toEqual({
+    expect(loopOutputHandlerForOutput(config(), returnLoopId, "review", "rejected")).toEqual({
       type: "action",
-      outputId: "changes-requested",
-      eventType: "return.loop.review.changes-requested",
+      outputId: "rejected",
+      eventType: "return.loop.review.rejected",
       actionId: "rework",
       loopId: returnLoopId,
       stepIndex: 1,
@@ -92,13 +91,13 @@ describe("loopOutputHandlerForOutput", () => {
   });
 
   it("returns undefined when an output has no loop handler", () => {
-    expect(loopOutputHandlerForOutput(config(), loopId, "start", "blocked")).toBeUndefined();
+    expect(loopOutputHandlerForOutput(config(), loopId, "start", "rejected")).toBeUndefined();
   });
 });
 
 describe("loop output handler selection", () => {
   it("defaults the target loop to the edited action loop without selecting an action", () => {
-    expect(loopOutputHandlerSelection(config(), loopId, "start", "blocked")).toEqual({
+    expect(loopOutputHandlerSelection(config(), loopId, "start", "rejected")).toEqual({
       targetLoopId: loopId,
       targetActionId: "",
       actionOptions: [
@@ -123,13 +122,13 @@ describe("loop output handler selection", () => {
       outputRoutes: [{
         sourceLoopId: loopId,
         sourceActionId: "start",
-        outputId: "blocked",
+        outputId: "rejected",
         targetLoopId: returnLoopId,
         targetActionId: "rework"
       }]
     };
 
-    expect(loopOutputHandlerSelection(current, loopId, "start", "blocked")).toEqual({
+    expect(loopOutputHandlerSelection(current, loopId, "start", "rejected")).toEqual({
       targetLoopId: returnLoopId,
       targetActionId: "rework",
       actionOptions: [

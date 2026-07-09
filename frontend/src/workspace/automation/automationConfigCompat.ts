@@ -1,9 +1,7 @@
 import { defaultProjectAutomationConfig, type ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import {
   defaultActionOutputIds,
-  defaultProjectOutputs,
   humanGateResponseId,
-  normalizeActionOutputSlots,
   normalizeActionToken,
   normalizeLoopId
 } from "@shared/policy-actions";
@@ -15,49 +13,33 @@ export const ensureAutomationConfig = (config: ProjectAutomationConfig | undefin
     gates?: unknown;
     gateDecisions?: unknown;
     policies?: unknown;
+    outputs?: unknown;
   };
   delete configWithoutLegacy.triggers;
   delete configWithoutLegacy.gates;
   delete configWithoutLegacy.gateDecisions;
   delete configWithoutLegacy.policies;
+  delete configWithoutLegacy.outputs;
 
-  const baseOutputs = Array.isArray(config?.outputs) && config.outputs.length > 0
-    ? [...new Map(config.outputs
-      .map((output) => ({ id: normalizeActionToken(output.id) }))
-      .filter((output) => output.id)
-      .map((output) => [output.id, output])).values()]
-    : defaultProjectOutputs();
-  const outputIds = baseOutputs.map((output) => output.id);
-  const fallbackOutputIds = defaultActionOutputIds.filter((outputId) => outputIds.includes(outputId));
-  const fallback = fallbackOutputIds.length === defaultActionOutputIds.length ? fallbackOutputIds : [...defaultActionOutputIds];
   const actions = Array.isArray(config?.actions)
     ? config.actions.flatMap((action) => {
       const id = normalizeActionToken(action.id);
       if (!id) return [];
       const humanGate = action.humanGate === true;
       const agentId = !humanGate && typeof action.agentId === "string" && action.agentId.trim() ? action.agentId.trim() : undefined;
-      const selectedOutputIds = Array.isArray(action.outputIds)
-        ? normalizeActionOutputSlots(action.outputIds)
-        : fallback;
       return [{
         id,
         description: typeof action.description === "string" ? action.description : "",
-        outputIds: !agentId && !humanGate ? [] : selectedOutputIds,
         ...(agentId ? { agentId } : {}),
         ...(humanGate ? { humanGate: true } : {})
       }];
     })
     : defaults.actions;
-  const outputById = new Map(baseOutputs.map((output) => [output.id, output]));
-  actions.flatMap((action) => action.outputIds).forEach((id) => {
-    if (!outputById.has(id)) outputById.set(id, { id });
-  });
 
   return {
     ...defaults,
     ...configWithoutLegacy,
     actions,
-    outputs: [...outputById.values()],
     outputRoutes: normalizeOutputRoutes(config?.outputRoutes),
     humanGateResponses: normalizeHumanGateResponses(config?.humanGateResponses),
     loops: normalizeLoops(config?.loops),
@@ -88,7 +70,7 @@ const normalizeOutputRoutes = (rawRoutes: unknown): ProjectAutomationConfig["out
       const outputId = typeof record.outputId === "string" ? normalizeActionToken(record.outputId) : "";
       const targetLoopId = typeof record.targetLoopId === "string" ? normalizeLoopId(record.targetLoopId) : "";
       const targetActionId = typeof record.targetActionId === "string" ? normalizeActionToken(record.targetActionId) : "";
-      return sourceLoopId && sourceActionId && targetLoopId && targetActionId && outputId
+      return sourceLoopId && sourceActionId && targetLoopId && targetActionId && defaultActionOutputIds.some((id) => id === outputId)
         ? [{ sourceLoopId, sourceActionId, outputId, targetLoopId, targetActionId }]
         : [];
     })
@@ -102,7 +84,7 @@ const normalizeHumanGateResponses = (rawResponses: unknown): ProjectAutomationCo
       const loopId = typeof record.loopId === "string" ? normalizeLoopId(record.loopId) : "";
       const actionId = typeof record.actionId === "string" ? normalizeActionToken(record.actionId) : "";
       const outputId = typeof record.outputId === "string" ? normalizeActionToken(record.outputId) : "";
-      if (!loopId || !actionId || !outputId) return [];
+      if (!loopId || !actionId || !defaultActionOutputIds.some((id) => id === outputId)) return [];
       const base = {
         loopId,
         actionId,

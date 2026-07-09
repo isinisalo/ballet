@@ -18,19 +18,16 @@ const actionOutputEvent = (actionId: string, outputId: string, scopedLoopId = lo
 const testAction = ({
   id,
   humanGate = false,
-  outputIds = ["approved", "rejected"],
   agentId = "agent-1",
   description
 }: {
   id?: string;
   humanGate?: boolean;
-  outputIds?: string[];
   agentId?: string;
   description?: string;
 }): ProjectAutomationConfig["actions"][number] => ({
   id: id ?? implementationActionId,
   description: description ?? `${id ?? implementationActionId} action`,
-  outputIds,
   ...(!humanGate && agentId ? { agentId } : {}),
   ...(humanGate ? { humanGate: true } : {})
 });
@@ -120,19 +117,12 @@ const baseData = (): AppData => ({
     actions: [{
       id: implementationActionId,
       description: "Implement work",
-      outputIds: ["approved", "rejected"],
       agentId: "agent-1"
     }, {
       id: humanGateActionId,
       description: "Approve project brief",
-      outputIds: ["approved", "rejected"],
       humanGate: true
     }],
-    outputs: [
-      { id: "approved" },
-      { id: "rejected" },
-      { id: "summary" }
-    ],
     outputRoutes: [],
     humanGateResponses: [],
     loops: [{
@@ -342,7 +332,7 @@ function installApi(data: AppData, options: InstallApiOptions = {}) {
       data.automation = saved;
       data.eventDefinitions = [...new Set([
         ...saved.loops.map((loop) => eventTypeFromLoopId(loop.id)),
-        ...saved.actions.flatMap((action) => actionOutputEventTypes({ actionId: action.id }, [action], saved.outputs)),
+        ...saved.actions.flatMap((action) => actionOutputEventTypes({ actionId: action.id }, [action])),
         ...saved.outputRoutes.map((route) => actionOutputEventType({ loopId: route.sourceLoopId, actionId: route.sourceActionId }, route.outputId))
       ])].map((eventType) => ({
         id: eventType,
@@ -720,7 +710,6 @@ describe("workspace entity UI flows", () => {
     await waitFor(() => expect(data.automation.actions.find((action) => action.id === "human-review")).toEqual(expect.objectContaining({
       id: "human-review",
       description: "Review generated evidence.",
-      outputIds: ["approved", "rejected"],
       humanGate: true
     })));
     const savedAction = data.automation.actions.find((action) => action.id === "human-review") as Record<string, unknown> | undefined;
@@ -741,7 +730,6 @@ describe("workspace entity UI flows", () => {
     loopData.automation.actions = [loopData.automation.actions[0]!, testAction({
       id: reviewActionId,
       description: "Review implementation output.",
-      outputIds: ["approved", "rejected"],
       agentId: "agent-1"
     })];
     const { data, fetchMock } = await renderRoute(`/automation/loops?id=${loopId}`, loopData);
@@ -777,13 +765,11 @@ describe("workspace entity UI flows", () => {
       testAction({
         id: triageActionId,
         description: "Triage rejected output.",
-        outputIds: ["approved", "rejected"],
         agentId: "agent-1"
       }),
       testAction({
         id: reworkActionId,
         description: "Rework implementation.",
-        outputIds: ["approved", "rejected"],
         agentId: "agent-1"
       })
     ];

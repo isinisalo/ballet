@@ -1,5 +1,4 @@
 import type { ProjectRuntime } from "./runtime.js";
-import { defaultProjectOutputs } from "../policy-actions.js";
 
 export type PolicyPredicateOperator = "equals" | "in" | "exists";
 export type PolicyPredicateScalar = string | number | boolean | null;
@@ -9,16 +8,11 @@ export type JsonSchemaObject = Record<string, unknown>;
 export interface ProjectAction {
   id: string;
   description: string;
-  outputIds: string[];
   agentId?: string;
   humanGate?: boolean;
 }
 
-export type OutputId = string;
-
-export interface ProjectOutput {
-  id: OutputId;
-}
+export type OutputId = "approved" | "rejected";
 
 export interface ProjectHumanGateResponse {
   id: string;
@@ -45,7 +39,6 @@ export interface ProjectLoop {
 export interface ProjectAutomationConfig {
   version: 1;
   actions: ProjectAction[];
-  outputs: ProjectOutput[];
   outputRoutes: ProjectOutputRoute[];
   humanGateResponses: ProjectHumanGateResponse[];
   loops: ProjectLoop[];
@@ -55,7 +48,6 @@ export interface ProjectAutomationConfig {
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: 1,
   actions: [],
-  outputs: defaultProjectOutputs(),
   outputRoutes: [],
   humanGateResponses: [],
   loops: [],

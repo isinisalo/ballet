@@ -57,19 +57,16 @@ const loopId = "plan-approved.loop";
 const implementationAction = {
   id: "implementation",
   description: "Implement approved work.",
-  outputIds: ["approved", "rejected"],
   agentId: "developer-agent"
 };
 const qaAction = {
   id: "qa-review",
   description: "Review implementation.",
-  outputIds: ["approved", "rejected"],
   agentId: "qa-verification-reviewer"
 };
 const automationConfig = (patch: Partial<ProjectAutomationConfig> = {}): ProjectAutomationConfig => ({
   version: 1,
   actions: [implementationAction, qaAction],
-  outputs: [{ id: "approved" }, { id: "rejected" }],
   outputRoutes: [{
     sourceLoopId: loopId,
     sourceActionId: "implementation",
@@ -167,7 +164,6 @@ describe("runtime database", () => {
       outcome: readyOutcome,
       projectAction: implementationAction,
       actions: config.actions,
-      outputs: config.outputs,
       outputRoutes: config.outputRoutes,
       loops: config.loops,
       automation: config,
@@ -246,7 +242,6 @@ describe("runtime database", () => {
       outcome: readyOutcome,
       projectAction: implementationAction,
       actions: config.actions,
-      outputs: config.outputs,
       outputRoutes: config.outputRoutes,
       loops: config.loops,
       automation: config,
@@ -271,29 +266,29 @@ describe("runtime output mapping", () => {
     expect(mapAgentOutputToEvent(implementationAction, { status: "complete", loopId }, [], [implementationAction]).id).toBe("plan-approved.loop.implementation.approved");
     expect(mapAgentOutputToEvent(implementationAction, { status: "failed", loopId }, [], [implementationAction]).id).toBe("plan-approved.loop.implementation.rejected");
     expect(mapAgentOutputToEvent(
-      { id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], humanGate: true },
+      { id: "human-review", description: "Human review", humanGate: true },
       { status: "approved", loopId },
       [],
-      [{ id: "human-review", description: "Human review", outputIds: ["approved", "rejected"], humanGate: true }]
+      [{ id: "human-review", description: "Human review", humanGate: true }]
     ).id).toBe("plan-approved.loop.human-review.approved");
   });
 
-  it("maps structured outcomes to configured action outputs", () => {
+  it("maps structured outcomes to fixed action outputs", () => {
     expect(outcomeToOutputEventStatus(
       readyOutcome,
       implementationAction,
-      [{ ...implementationAction, outputIds: ["done", "needs-clarification"] }]
+      [implementationAction]
     )).toBe("approved");
     expect(outcomeToOutputEventStatus(
       { ...readyOutcome, outcome: "changes-requested" },
       { ...implementationAction, id: "review" },
-      [{ ...implementationAction, id: "review", outputIds: ["accepted", "reject"] }]
+      [{ ...implementationAction, id: "review" }]
     )).toBe("rejected");
     expect(outcomeToOutputEventStatus(
-      { ...readyOutcome, outcome: "changes-requested" },
+      { ...readyOutcome, outcome: "failed" },
       { ...implementationAction, id: "create-roadmap" },
-      [{ ...implementationAction, id: "create-roadmap", outputIds: ["roadmap_ready"] }]
-    )).toBeUndefined();
+      [{ ...implementationAction, id: "create-roadmap" }]
+    )).toBe("rejected");
   });
 
   it("does not require an event id in agent output", () => {

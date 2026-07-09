@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { Agent, ProjectAutomationConfig, ProjectAction, ProjectLoop } from "@shared/api/workspace-contracts";
 import { automationFieldLimits, automationLoopIdValidationMessage, automationStringValidationMessage, normalizeAutomationLoopId, normalizeAutomationToken } from "@shared/api/automationValidation";
-import { defaultActionOutputIds } from "@shared/policy-actions";
 import type { AutomationTab } from "../types";
 
 type SelectAutomationEntity = (tab: AutomationTab, id?: string) => void;
@@ -31,7 +30,6 @@ export function useAutomationCreateDrafts({
   const [newAction, setNewAction] = useState<ProjectAction>({
     id: "",
     description: "",
-    outputIds: [],
     humanGate: false
   });
   const [newLoop, setNewLoop] = useState({ id: "", steps: [] as string[] });
@@ -49,10 +47,9 @@ export function useAutomationCreateDrafts({
 
   useEffect(() => {
     updateNewAction({
-      outputIds: newAction.outputIds.length > 0 ? newAction.outputIds : defaultOutputIdsForDraft(draft),
       agentId: newAction.agentId ?? agents[0]?.id
     });
-  }, [agents, draft.outputs]);
+  }, [agents]);
 
   useEffect(() => {
     setNewLoop((current) => syncDraft(createDraftsRef, "loop", loopCreateDraftWithDefaultEvent(draft, current)));
@@ -98,7 +95,6 @@ const createInitialDrafts = (draft: ProjectAutomationConfig, agents: Agent[]): A
   action: {
     id: "",
     description: "",
-    outputIds: defaultOutputIdsForDraft(draft),
     agentId: agents[0]?.id,
     humanGate: false
   },
@@ -137,12 +133,6 @@ const loopCreateDraftWithDefaultEvent = (draft: ProjectAutomationConfig, loop: P
   });
 };
 
-const defaultOutputIdsForDraft = (draft: ProjectAutomationConfig): string[] => {
-  const availableOutputIds = draft.outputs.map((output) => output.id);
-  const defaultOutputIds = defaultActionOutputIds.filter((outputId) => availableOutputIds.includes(outputId));
-  return defaultOutputIds.length === defaultActionOutputIds.length ? defaultOutputIds : [...defaultActionOutputIds];
-};
-
 const createDraftWithNewEntity = (
   activeTab: AutomationTab,
   draft: ProjectAutomationConfig,
@@ -156,14 +146,9 @@ const createDraftWithNewEntity = (
       draft.actions.some((action) => action.id === id)
     ) return undefined;
     const agentId = drafts.action.humanGate ? undefined : drafts.action.agentId;
-    const outputIds = agentId || drafts.action.humanGate ? drafts.action.outputIds : [];
-    const outputs = [...draft.outputs];
-    outputIds.forEach((outputId) => {
-      if (!outputs.some((output) => output.id === outputId)) outputs.push({ id: outputId });
-    });
-    const action = { ...drafts.action, id, outputIds, ...(agentId ? { agentId } : {}) };
+    const action = { ...drafts.action, id, ...(agentId ? { agentId } : {}) };
     if (!agentId) delete action.agentId;
-    return { id, config: { ...draft, outputs, actions: [...draft.actions, action] } };
+    return { id, config: { ...draft, actions: [...draft.actions, action] } };
   }
   const eventAction = loopStartingAction(draft, drafts.loop);
   const id = normalizeAutomationLoopId(drafts.loop.id);

@@ -9,13 +9,11 @@ const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes"> => 
     {
       id: "review",
       description: "Review.",
-      outputIds: ["accepted"],
       agentId: "reviewer-agent"
     },
     {
       id: "human-review",
       description: "Human review.",
-      outputIds: ["approved", "changes-requested"],
       humanGate: true
     }
   ],
@@ -24,8 +22,8 @@ const config = (): Pick<ProjectAutomationConfig, "actions" | "outputRoutes"> => 
 
 describe("actionOutputTargetsByOutputId", () => {
   it("labels event outputs with the generated action output event type", () => {
-    expect(actionOutputTargetsByOutputId(config(), "review", ["accepted"])).toEqual({
-      accepted: [{ type: "event", id: "review.accepted", label: "review.accepted" }]
+    expect(actionOutputTargetsByOutputId(config(), "review", ["approved"])).toEqual({
+      approved: [{ type: "event", id: "review.approved", label: "review.approved" }]
     });
   });
 
@@ -35,21 +33,21 @@ describe("actionOutputTargetsByOutputId", () => {
       outputRoutes: [{
         sourceLoopId: loopId,
         sourceActionId: "review",
-        outputId: "accepted",
+        outputId: "approved",
         targetLoopId: loopId,
         targetActionId: "human-review"
       }]
     };
 
-    expect(actionOutputTargetsByOutputId(current, "review", ["accepted"])).toEqual({
-      accepted: [{ type: "action", id: "review.loop:human-review", label: "human-review" }]
+    expect(actionOutputTargetsByOutputId(current, "review", ["approved"])).toEqual({
+      approved: [{ type: "action", id: "review.loop:human-review", label: "human-review" }]
     });
   });
 
   it("derives event targets for human gate outputs", () => {
-    expect(actionOutputTargetsByOutputId(config(), "human-review", ["approved", "changes-requested"])).toEqual({
+    expect(actionOutputTargetsByOutputId(config(), "human-review", ["approved", "rejected"])).toEqual({
       approved: [{ type: "event", id: "human-review.approved", label: "human-review.approved" }],
-      "changes-requested": [{ type: "event", id: "human-review.changes-requested", label: "human-review.changes-requested" }]
+      rejected: [{ type: "event", id: "human-review.rejected", label: "human-review.rejected" }]
     });
   });
 });

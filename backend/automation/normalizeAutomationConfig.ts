@@ -4,7 +4,6 @@ import type {
   ProjectAutomationConfig,
   ProjectHumanGateResponse,
   ProjectLoop,
-  ProjectOutput,
   ProjectOutputRoute
 } from "../../shared/domain/automation.js";
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
@@ -14,17 +13,14 @@ import {
   actionOutputRouteKey,
   actionOutputSlotKind,
   defaultActionOutputIds,
-  defaultProjectOutputs,
   eventTypeFromLoopId,
   humanGateResponseId,
   loopIdFromEvent,
   normalizeActionOutputEventType,
-  normalizeActionOutputSlots,
   normalizeActionToken,
   normalizeEventTypeToken,
   normalizeLoopId,
-  resolveActionAgent,
-  uniqueActionOutputIds
+  resolveActionAgent
 } from "../../shared/policy-actions.js";
 
 type RawRecord = Record<string, unknown>;
@@ -71,9 +67,6 @@ const normalizeRawAgentId = (value: unknown, agents: Agent[]): string | undefine
   return agentId || undefined;
 };
 
-const normalizeRawOutputIds = (value: unknown): string[] | undefined =>
-  Array.isArray(value) ? normalizeActionOutputSlots(uniqueActionOutputIds(stringArray(value))) : undefined;
-
 const normalizeEvent = (value: string): string =>
   normalizeEventTypeToken(normalizeActionOutputEventType(value.startsWith("trigger.") ? value.slice("trigger.".length) : value));
 
@@ -88,52 +81,20 @@ const normalizeLegacyEvent = (value: string): string => {
 
 const normalizeRouteOutputId = (value: string): string => {
   const outputId = normalizeActionToken(value);
-  const slot = actionOutputSlotKind(outputId);
-  if (slot === "approval") return defaultActionOutputIds[0];
-  if (slot === "rework") return defaultActionOutputIds[1];
-  return outputId;
-};
-
-const normalizeOutput = (value: RawRecord): ProjectOutput => ({
-  id: normalizeActionToken(stringValue(value.id))
-});
-
-const canonicalOutputs = (rawOutputs: RawRecord[]): ProjectOutput[] => {
-  const outputById = new Map<string, ProjectOutput>();
-  const sourceOutputs = rawOutputs.length > 0 ? rawOutputs.map(normalizeOutput) : defaultProjectOutputs();
-  [...sourceOutputs, ...defaultProjectOutputs()].forEach((output) => {
-    if (output.id) outputById.set(output.id, output);
-  });
-  return [...outputById.values()];
-};
-
-const fallbackOutputIds = (availableOutputIds: string[]) => {
-  const defaults = defaultActionOutputIds.filter((id) => availableOutputIds.includes(id));
-  return defaults.length === defaultActionOutputIds.length ? defaults : [...defaultActionOutputIds];
-};
-
-const executableOutputIds = (
-  outputIds: string[] | undefined,
-  executable: Pick<ProjectAction, "humanGate" | "agentId">,
-  availableOutputIds: string[]
-): string[] => {
-  const source = outputIds ?? fallbackOutputIds(availableOutputIds);
-  return actionHasExecutableTarget(executable) ? normalizeActionOutputSlots(source) : [];
+  return defaultActionOutputIds.some((id) => id === outputId) ? outputId : "";
 };
 
 const rawActionToken = (value: RawRecord): string =>
   normalizeActionId(stringValue(value.key) || stringValue(value.action) || stringValue(value.id));
 
-const readBaseAction = (value: RawRecord, agents: Agent[], availableOutputIds: string[]): ProjectAction | undefined => {
+const readBaseAction = (value: RawRecord, agents: Agent[]): ProjectAction | undefined => {
   const id = rawActionToken(value);
   if (!id) return undefined;
   const humanGate = value.humanGate === true;
   const agentId = humanGate ? undefined : normalizeRawAgentId(value.agentId, agents);
-  const executable = { humanGate, agentId };
   return {
     id,
     description: stringValue(value.description),
-    outputIds: executableOutputIds(normalizeRawOutputIds(value.outputIds), executable, availableOutputIds),
     ...(agentId ? { agentId } : {}),
     ...(humanGate ? { humanGate: true } : {})
   };
@@ -184,15 +145,14 @@ const explicitLoopIdForHandler = (handler: RawRecord, rawLoops: RawRecord[], eve
 
 const compactActions = (
   input: RawRecord,
-  agents: Agent[],
-  availableOutputIds: string[]
+  agents: Agent[]
 ): { actions: ProjectAction[]; baseActions: Map<string, ProjectAction> } => {
   const rawActions = recordArray(input.actions);
   const rawPolicies = recordArray(input.policies);
   const actionById = new Map<string, ProjectAction>();
 
   rawActions.forEach((rawAction) => {
-    const action = readBaseAction(rawAction, agents, availableOutputIds);
+    const action = readBaseAction(rawAction, agents);
     if (action) actionById.set(action.id, action);
   });
 
@@ -202,10 +162,10 @@ const compactActions = (
     const run = isRecord(policy.run) ? policy.run : {};
     const inferredAgentId = normalizeAgentId(stringValue(policy.agent) || stringValue(run.agent), agents);
     const executable = { humanGate: false, agentId: inferredAgentId || undefined };
+    if (!actionHasExecutableTarget(executable)) return;
     actionById.set(actionId, {
       id: actionId,
       description: "",
-      outputIds: executableOutputIds(undefined, executable, availableOutputIds),
       ...(inferredAgentId ? { agentId: inferredAgentId } : {})
     });
   });
@@ -406,17 +366,13 @@ export const normalizeProjectAutomationConfig = (
   agents: Agent[] = []
 ): ProjectAutomationConfig => {
   if (!isRecord(value)) return defaultProjectAutomationConfig();
-  const rawOutputs = recordArray(value.outputs);
-  const outputs = canonicalOutputs(rawOutputs);
-  const availableOutputIds = outputs.map((output) => output.id);
-  const { actions } = compactActions(value, agents, availableOutputIds);
+  const { actions } = compactActions(value, agents);
   const bindings = handlerBindings(value);
   const rawIdToActionIds = rawIdActionMap(bindings, actions);
   const loops = recordArray(value.loops).map((loop) => normalizeLoop(loop, rawIdToActionIds));
   return {
     version: 1,
     actions,
-    outputs,
     outputRoutes: normalizeOutputRoutes(value, actions, loops, bindings),
     humanGateResponses: normalizeHumanGateResponses(value, rawIdToActionIds, bindings),
     loops,

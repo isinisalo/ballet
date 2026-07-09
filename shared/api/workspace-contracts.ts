@@ -4,7 +4,6 @@ import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectHumanGateResponse,
-  ProjectOutput,
   ProjectOutputRoute,
   ProjectLoop,
   Policy
@@ -85,7 +84,6 @@ export type {
   ProjectAutomationIssue,
   ProjectDocumentTreeNode,
   ProjectHumanGateResponse,
-  ProjectOutput,
   ProjectOutputRoute,
   ProjectRuntime,
   ProjectLoop,

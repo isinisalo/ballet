@@ -17,14 +17,14 @@ const outputRouteSelectValueClassName = "truncate font-mono text-[0.66rem] leadi
 export function LoopOutputHandlerControls({
   config,
   route,
-  outputIds,
+  slotIds,
   label = "Outputs",
   onOutputHandlerRouteChange,
   onOutputHandlerRouteClear
 }: {
   config: ProjectAutomationConfig;
   route: LoopHandlerRoute;
-  outputIds: string[];
+  slotIds: string[];
   label?: string;
   onOutputHandlerRouteChange: (
     sourceLoopId: string,
@@ -42,9 +42,9 @@ export function LoopOutputHandlerControls({
   return (
     <Field>
       <FieldLabel>{label}</FieldLabel>
-      {outputIds.length > 0 ? (
+      {slotIds.length > 0 ? (
         <div className="flex flex-col gap-2">
-          {outputIds.map((outputId) => {
+          {slotIds.map((outputId) => {
             const selection = loopOutputHandlerSelection(config, route.loopId, route.actionId, outputId);
             const selectedRoute = findActionOutputRoute(config.outputRoutes, route.loopId, route.actionId, outputId);
             const targetLoopLabel = selection.targetLoopId || "Loop";
