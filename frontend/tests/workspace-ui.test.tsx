@@ -652,7 +652,13 @@ describe("workspace entity UI flows", () => {
     expect(screen.queryByRole("tab", { name: /events/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /policies/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Loops" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete loop" })).toBeInTheDocument();
+    const workspace = screen.getByRole("region", { name: "Loop canvas workspace" });
+    const saveButton = screen.getByRole("button", { name: "Save automation" });
+    const deleteButton = screen.getByRole("button", { name: "Delete loop" });
+    expect(workspace).toContainElement(saveButton);
+    expect(workspace).toContainElement(deleteButton);
+    expect(saveButton.closest("[data-loop-canvas-actions]")).toBeInTheDocument();
+    expect(workspace.closest('[data-slot="card"]')?.querySelector('[data-slot="card-header"]')).toBeNull();
 
     const implementationNode = screen.getByLabelText(`Action: ${implementationActionId}`);
     expect(implementationNode.querySelector("[data-loop-agent-icon]")).toBeInTheDocument();
@@ -669,7 +675,11 @@ describe("workspace entity UI flows", () => {
 
     activateLoopNode(implementationNode);
     const dialog = screen.getByRole("dialog", { name: "Loop handler" });
+    const instructions = within(dialog).getByRole("complementary", { name: "Agent instructions" });
     expect(dialog).toBeInTheDocument();
+    expect(within(dialog).queryByText("Loop handler")).not.toBeInTheDocument();
+    expect(within(instructions).queryByRole("heading", { name: "Agent instructions" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Close" })).toHaveClass("absolute");
     expectActionSelectValue(implementationActionId);
     expect(within(dialog).queryByText("Input")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Loop policy action")).not.toBeInTheDocument();

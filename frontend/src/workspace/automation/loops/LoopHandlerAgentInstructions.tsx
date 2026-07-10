@@ -68,10 +68,7 @@ export function LoopHandlerAgentInstructions({
 
   return (
     <aside aria-label="Agent instructions" className="agent-instructions-preview min-w-0 overflow-y-auto border-b border-divider-strong bg-panel-section sm:border-r sm:border-b-0">
-      <header className="px-3 py-2.5">
-        <h2 className="text-xs font-medium text-foreground">Agent instructions</h2>
-      </header>
-      <div className="border-t border-divider-strong">
+      <div>
         {sections.map((section) => {
           const Icon = section.kind === "agent" ? Bot : section.kind === "human" ? ShieldCheck : TriangleAlert;
           return (

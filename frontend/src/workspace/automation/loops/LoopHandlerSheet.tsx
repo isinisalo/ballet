@@ -1,4 +1,4 @@
-import { useEffect, useId } from "react";
+import { useEffect } from "react";
 import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,10 +47,7 @@ export function LoopHandlerSheet({
   onOutputHandlerRouteClear: (sourceLoopId: string, sourceActionId: string, outputId: string) => void;
   onHumanGateSubmit: (route: LoopHandlerRoute, outputId: string, prompt: string) => void;
 }) {
-  const titleId = useId();
-  const descriptionId = useId();
   const title = selectionSource === "edge" && routes.length === 1 ? "Output handler" : "Loop handler";
-  const description = routes.length === 1 ? "Edit selected handler." : `${routes.length} selected handlers`;
 
   useLoopHandlerEscapeClose(open, onOpenChange);
   if (!open) return null;
@@ -61,20 +58,13 @@ export function LoopHandlerSheet({
       <aside
         role="dialog"
         aria-modal="false"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
+        aria-label={title}
         className="fixed inset-y-0 right-0 z-50 flex h-svh w-full min-w-0 flex-col overflow-hidden border-l border-divider-strong bg-popover text-sm text-popover-foreground shadow-lg md:static md:z-auto md:h-auto md:min-h-0 md:w-auto md:shadow-none"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <header className="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b border-divider-strong px-3 py-2">
-          <div className="min-w-0">
-            <h2 id={titleId} className="truncate text-sm font-medium text-foreground">{title}</h2>
-            <p id={descriptionId} className="truncate text-xs text-muted-foreground">{description}</p>
-          </div>
-          <Button type="button" variant="ghost" size="icon-xs" aria-label="Close" onClick={() => onOpenChange(false, { reason: "close-press" })}>
-            <X />
-          </Button>
-        </header>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label="Close" className="absolute top-1.5 right-1.5 z-20" onClick={() => onOpenChange(false, { reason: "close-press" })}>
+          <X />
+        </Button>
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto sm:grid-cols-[3fr_2fr] sm:overflow-hidden">
           <LoopHandlerAgentInstructions routes={routes} agents={agents} config={config} />
           <LoopHandlerEditor

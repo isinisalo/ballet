@@ -33,7 +33,7 @@ export function LoopHandlerEditor({
   const agentLabel = (agentId: string) => agents.find((agent) => agent.id === agentId)?.name ?? agentId;
 
   return (
-    <section aria-label="Loop handler editor" className="min-w-0 overflow-y-auto px-3 py-2.5 text-xs">
+    <section aria-label="Loop handler editor" className="min-w-0 overflow-y-auto px-3 pt-9 pb-2.5 text-xs">
       <div className="divide-y divide-divider-strong">
         {routes.map((route) => {
           const action = config.actions.find((candidate) => candidate.id === route.actionId);

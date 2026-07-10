@@ -52,6 +52,23 @@ export function AutomationView({
     selectAutomationEntity,
     isCreateMode
   });
+  const selectedLoopCanvas = activeTab === "loops" && !isCreateMode && !showAllLoops;
+  const automationActions = (
+    <div className="flex items-center justify-end gap-2">
+      <HeaderCrudActions
+        saveAction={(
+          <Button type="button" size="icon-sm" aria-label="Save automation" title="Save automation" onClick={() => void createDrafts.saveAutomationFromHeader()}>
+            <Save data-icon="inline-start" />
+          </Button>
+        )}
+        deleteLabel={deleteConfig.label}
+        deleteType={deleteConfig.type}
+        resourceName={deleteConfig.resourceName}
+        canDelete={deleteConfig.canDelete}
+        onDelete={deleteConfig.onDelete}
+      />
+    </div>
+  );
 
   return (
     <div className="grid gap-4">
@@ -63,22 +80,8 @@ export function AutomationView({
           </span>
         ) : null}
         icon={<Route data-icon="inline-start" />}
-        action={(
-          <div className="flex items-center justify-end gap-2">
-            <HeaderCrudActions
-              saveAction={(
-                <Button type="button" size="icon-sm" aria-label="Save automation" title="Save automation" onClick={() => void createDrafts.saveAutomationFromHeader()}>
-                  <Save data-icon="inline-start" />
-                </Button>
-              )}
-              deleteLabel={deleteConfig.label}
-              deleteType={deleteConfig.type}
-              resourceName={deleteConfig.resourceName}
-              canDelete={deleteConfig.canDelete}
-              onDelete={deleteConfig.onDelete}
-            />
-          </div>
-        )}
+        action={selectedLoopCanvas ? undefined : automationActions}
+        hideHeader={selectedLoopCanvas}
         contentClassName={activeTab === "loops" ? "p-0" : undefined}
       >
         {activeTab === "loops" ? (
@@ -88,7 +91,7 @@ export function AutomationView({
                 <AutomationIssues issues={data.automationIssues} />
               </div>
             ) : null}
-            <LoopsAutomationTab agents={data.agents} projectId={data.projects[0]?.id ?? "project"} config={draft} selectedId={selectedLoopId} createDraft={createDrafts.newLoop} showAll={showAllLoops} onCreateDraftChange={createDrafts.updateNewLoop} onSelect={(id) => selectAutomationEntity("loops", id)} updateConfig={updateConfig} saveDraft={saveDraft} createEvent={createEvent} />
+            <LoopsAutomationTab agents={data.agents} projectId={data.projects[0]?.id ?? "project"} config={draft} selectedId={selectedLoopId} createDraft={createDrafts.newLoop} showAll={showAllLoops} canvasActions={selectedLoopCanvas ? automationActions : undefined} onCreateDraftChange={createDrafts.updateNewLoop} onSelect={(id) => selectAutomationEntity("loops", id)} updateConfig={updateConfig} saveDraft={saveDraft} createEvent={createEvent} />
           </>
         ) : (
           <div className="grid gap-4">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   Agent,
   EventIntakeRequest,
@@ -48,6 +48,7 @@ export function LoopsAutomationTab({
   selectedId,
   createDraft,
   showAll = false,
+  canvasActions,
   onCreateDraftChange,
   onSelect,
   updateConfig,
@@ -60,6 +61,7 @@ export function LoopsAutomationTab({
   selectedId?: string;
   createDraft: ProjectLoop;
   showAll?: boolean;
+  canvasActions?: ReactNode;
   onCreateDraftChange: (patch: Partial<ProjectLoop>) => void;
   onSelect: (id: string) => void;
   updateConfig: AutomationConfigUpdater;
@@ -347,7 +349,7 @@ export function LoopsAutomationTab({
       className={selectedHandlerRoutes.length > 0 ? "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden md:grid-cols-[3fr_2fr]" : "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden"}
       style={{ height: canvasInteraction.canvasHeight ? `${canvasInteraction.canvasHeight}px` : undefined }}
     >
-      <div className="min-w-0">
+      <div className="relative min-w-0">
         <LoopCanvas
         layout={loopLayout}
         selectedLoopId={selected.id}
@@ -370,6 +372,7 @@ export function LoopsAutomationTab({
         onOutputHandlerSelect={selectOutputHandler}
         onAddActionStep={addActionStep}
         />
+        {canvasActions ? <div data-loop-canvas-actions className="absolute top-3 right-3 z-30">{canvasActions}</div> : null}
       </div>
       <LoopHandlerSheet
         open={selectedHandlerRoutes.length > 0}
