@@ -272,28 +272,28 @@ body {
 }
 
 .agent-instructions-preview .markdown-body {
-  font-size: 0.95rem;
-  line-height: 1.68;
+  font-size: 0.8125rem;
+  line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
 .agent-instructions-preview .markdown-body h1 {
-  font-size: 1.55rem;
+  font-size: 1.05rem;
 }
 
 .agent-instructions-preview .markdown-body h2 {
-  font-size: 1.18rem;
+  font-size: 0.95rem;
 }
 
 .agent-instructions-preview .markdown-body h3 {
-  font-size: 1.02rem;
+  font-size: 0.875rem;
 }
 
 .agent-instructions-preview .markdown-body h1,
 .agent-instructions-preview .markdown-body h2,
 .agent-instructions-preview .markdown-body h3,
 .agent-instructions-preview .markdown-body h4 {
-  margin-top: 1.35rem;
+  margin-top: 0.9rem;
 }
 
 .loop-react-flow {

@@ -341,8 +341,14 @@ export function LoopsAutomationTab({
   if (!loopLayout) return <EmptyState title="No loop selected." />;
 
   return (
-    <>
-      <LoopCanvas
+    <div
+      role="region"
+      aria-label="Loop canvas workspace"
+      className={selectedHandlerRoutes.length > 0 ? "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden md:grid-cols-[3fr_2fr]" : "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden"}
+      style={{ height: canvasInteraction.canvasHeight ? `${canvasInteraction.canvasHeight}px` : undefined }}
+    >
+      <div className="min-w-0">
+        <LoopCanvas
         layout={loopLayout}
         selectedLoopId={selected.id}
         actionById={actionById}
@@ -363,7 +369,8 @@ export function LoopsAutomationTab({
         onActionStepSelect={selectActionStep}
         onOutputHandlerSelect={selectOutputHandler}
         onAddActionStep={addActionStep}
-      />
+        />
+      </div>
       <LoopHandlerSheet
         open={selectedHandlerRoutes.length > 0}
         routes={selectedHandlerRoutes}
@@ -379,7 +386,7 @@ export function LoopsAutomationTab({
         onOutputHandlerRouteClear={clearOutputHandlerRoute}
         onHumanGateSubmit={(route, outputId, prompt) => void submitHumanGateResponse(route, outputId, prompt)}
       />
-    </>
+    </div>
   );
 }
 

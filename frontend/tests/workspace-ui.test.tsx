@@ -680,6 +680,44 @@ describe("workspace entity UI flows", () => {
     expect(data.automation.actions[0]).not.toHaveProperty("enabled");
   });
 
+  it("shows the selected handler agent instructions beside the editor and updates them with the action", async () => {
+    const user = userEvent.setup();
+    const loopData = baseData();
+    loopData.agents[0]!.instructions = "## Implementation workflow\n\n- Inspect the change\n- Implement it";
+    loopData.agents.push({
+      ...loopData.agents[0]!,
+      id: "agent-2",
+      name: "Review Agent",
+      instructions: "## Review workflow\n\nConfirm **acceptance criteria**."
+    });
+    loopData.automation.actions.push(testAction({
+      id: reviewActionId,
+      description: "Review implementation output.",
+      agentId: "agent-2"
+    }));
+    await renderRoute(`/automation/loops?id=${loopId}`, loopData);
+
+    activateLoopNode(screen.getByLabelText(`Action: ${implementationActionId}`));
+    const dialog = screen.getByRole("dialog", { name: "Loop handler" });
+    const workspace = screen.getByRole("region", { name: "Loop canvas workspace" });
+    const instructions = within(dialog).getByRole("complementary", { name: "Agent instructions" });
+    const editor = within(dialog).getByRole("region", { name: "Loop handler editor" });
+
+    expect(workspace).toHaveClass("md:grid-cols-[3fr_2fr]");
+    expect(dialog).toHaveClass("w-full", "md:w-auto");
+    expect(instructions.parentElement).toHaveClass("sm:grid-cols-[3fr_2fr]");
+    expect(instructions.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(instructions).getByRole("heading", { name: "Implementation workflow" })).toBeInTheDocument();
+    expect(within(instructions).getByText("Inspect the change")).toBeInTheDocument();
+
+    await selectOption(user, within(editor).getByLabelText("Handler action"), `${reviewActionId} · Review implementation output.`);
+
+    expect(within(instructions).getByRole("heading", { name: "Review Agent" })).toBeInTheDocument();
+    expect(within(instructions).getByRole("heading", { name: "Review workflow" })).toBeInTheDocument();
+    expect(within(instructions).getByText("acceptance criteria")).toBeInTheDocument();
+    expect(within(instructions).queryByRole("heading", { name: "Implementation workflow" })).not.toBeInTheDocument();
+  });
+
   it("selects compact automation entities from the sidebar and stores query ids", async () => {
     const user = userEvent.setup();
     await renderRoute("/automation");

@@ -38,7 +38,7 @@ export function HumanGateResponsePanel({
   };
 
   return (
-    <FieldGroup>
+    <FieldGroup className="gap-3">
       <Field>
         <FieldLabel>Human gate response</FieldLabel>
         <div className="flex min-h-7 flex-wrap items-center gap-2">
@@ -58,7 +58,7 @@ export function HumanGateResponsePanel({
         <Textarea
           id={promptId}
           value={prompt}
-          rows={5}
+          rows={3}
           aria-invalid={Boolean(error)}
           placeholder="Write clear next-step instructions for the agent."
           onChange={(event) => setPrompt(event.target.value)}

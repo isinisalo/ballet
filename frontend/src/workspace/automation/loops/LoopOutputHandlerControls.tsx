@@ -40,10 +40,10 @@ export function LoopOutputHandlerControls({
   ) => void;
 }) {
   return (
-    <Field>
-      <FieldLabel>{label}</FieldLabel>
+    <Field className="gap-1.5">
+      <FieldLabel className="text-xs font-normal text-muted-foreground">{label}</FieldLabel>
       {slotIds.length > 0 ? (
-        <div className="flex flex-col gap-2">
+        <div className="divide-y divide-divider-strong border-y border-divider-strong">
           {slotIds.map((outputId) => {
             const selection = loopOutputHandlerSelection(config, route.loopId, route.actionId, outputId);
             const selectedRoute = findActionOutputRoute(config.outputRoutes, route.loopId, route.actionId, outputId);
@@ -59,11 +59,19 @@ export function LoopOutputHandlerControls({
             };
 
             return (
-              <div key={outputId} className="grid grid-cols-[minmax(0,5rem)_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-1.5">
-                <span className={`min-w-0 truncate font-mono text-[0.66rem] leading-4 ${loopOutputTokenClassName(outputId)}`} title={outputId}>
-                  {outputId}
-                </span>
-                <Select
+              <div key={outputId} className="grid gap-1.5 py-2">
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <span className={`min-w-0 truncate font-mono text-[0.66rem] leading-4 ${loopOutputTokenClassName(outputId)}`} title={outputId}>
+                    {outputId}
+                  </span>
+                  <ClearOutputHandlerButton
+                    outputId={outputId}
+                    disabled={!selectedRoute}
+                    onClear={() => onOutputHandlerRouteClear(route.loopId, route.actionId, outputId)}
+                  />
+                </div>
+                <div className="grid min-w-0 grid-cols-2 gap-1.5">
+                  <Select
                   value={selection.targetLoopId}
                   items={config.loops.map((loop) => ({ value: loop.id, label: loop.id }))}
                   onValueChange={selectTargetLoop}
@@ -85,8 +93,8 @@ export function LoopOutputHandlerControls({
                       ))}
                     </SelectGroup>
                   </SelectContent>
-                </Select>
-                <Select
+                  </Select>
+                  <Select
                   value={selection.targetActionId || noTargetAction}
                   items={[
                     { value: noTargetAction, label: "Action" },
@@ -115,12 +123,8 @@ export function LoopOutputHandlerControls({
                       ))}
                     </SelectGroup>
                   </SelectContent>
-                </Select>
-                <ClearOutputHandlerButton
-                  outputId={outputId}
-                  disabled={!selectedRoute}
-                  onClear={() => onOutputHandlerRouteClear(route.loopId, route.actionId, outputId)}
-                />
+                  </Select>
+                </div>
               </div>
             );
           })}

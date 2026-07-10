@@ -1,10 +1,9 @@
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { CalendarDays, CheckCircle2, FileKey2, Hash, ShieldCheck, Tags, UserRound, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, ErrorPreview, statusVariant } from "@/components/shared/workspace-ui";
 import { cn } from "@/lib/utils";
-import { documentTitle, removeMatchingLeadingH1, type MarkdownEntity } from "./markdownDocument";
+import { MarkdownBody } from "./MarkdownBody";
+import { documentTitle, type MarkdownEntity } from "./markdownDocument";
 
 const isSimpleFrontmatterValue = (value: unknown) => value === null || ["string", "number", "boolean", "undefined"].includes(typeof value);
 const isSimpleFrontmatterArray = (value: unknown[]) => value.every(isSimpleFrontmatterValue);
@@ -91,17 +90,6 @@ function FrontmatterPanel({ document }: { document: MarkdownEntity }) {
         </dl>
       )}
     </aside>
-  );
-}
-
-function MarkdownBody({ source, title }: { source?: string; title?: string }) {
-  const body = removeMatchingLeadingH1(source?.trim() ?? "", title).trim();
-  if (!body) return <p className="text-muted-foreground">No Markdown body.</p>;
-
-  return (
-    <div className="markdown-body markdown-document-preview">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
-    </div>
   );
 }
 
