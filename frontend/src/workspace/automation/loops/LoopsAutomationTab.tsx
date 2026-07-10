@@ -346,7 +346,7 @@ export function LoopsAutomationTab({
     <div
       role="region"
       aria-label="Loop canvas workspace"
-      className={selectedHandlerRoutes.length > 0 ? "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden md:grid-cols-[3fr_2fr]" : "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden"}
+      className={selectedHandlerRoutes.length > 0 ? "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden md:grid-cols-2" : "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden"}
       style={{ height: canvasInteraction.canvasHeight ? `${canvasInteraction.canvasHeight}px` : undefined }}
     >
       <div className="relative min-w-0">

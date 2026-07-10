@@ -694,6 +694,8 @@ describe("workspace entity UI flows", () => {
     const user = userEvent.setup();
     const loopData = baseData();
     loopData.agents[0]!.instructions = "## Implementation workflow\n\n- Inspect the change\n- Implement it";
+    loopData.agents[0]!.model = "gpt-5.4";
+    loopData.agents[0]!.modelReasoningEffort = "high";
     loopData.agents.push({
       ...loopData.agents[0]!,
       id: "agent-2",
@@ -713,10 +715,15 @@ describe("workspace entity UI flows", () => {
     const instructions = within(dialog).getByRole("complementary", { name: "Agent instructions" });
     const editor = within(dialog).getByRole("region", { name: "Loop handler editor" });
 
-    expect(workspace).toHaveClass("md:grid-cols-[3fr_2fr]");
+    expect(workspace).toHaveClass("md:grid-cols-2");
     expect(dialog).toHaveClass("w-full", "md:w-auto");
     expect(instructions.parentElement).toHaveClass("sm:grid-cols-[3fr_2fr]");
     expect(instructions.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const runtimeMetadata = within(instructions).getByLabelText("Existing Agent runtime");
+    expect(within(runtimeMetadata).getByText("codex-cli")).toBeInTheDocument();
+    expect(within(runtimeMetadata).getByText("gpt-5.4")).toBeInTheDocument();
+    expect(within(runtimeMetadata).getByText("high")).toBeInTheDocument();
+    expect(runtimeMetadata.closest("header")).toHaveClass("border-b");
     expect(within(instructions).getByRole("heading", { name: "Implementation workflow" })).toBeInTheDocument();
     expect(within(instructions).getByText("Inspect the change")).toBeInTheDocument();
 

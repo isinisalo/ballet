@@ -9,8 +9,19 @@ type InstructionSection = {
   agentId?: string;
   instructions?: string;
   emptyText?: string;
+  runtime?: string;
+  model?: string;
+  effort?: string;
   kind: "agent" | "human" | "missing";
 };
+
+const frontmatterString = (agent: Agent, key: string) => typeof agent.frontmatter?.[key] === "string" ? agent.frontmatter[key] as string : "";
+
+function agentRuntime(agent: Agent, config: ProjectAutomationConfig) {
+  const runtimeReference = frontmatterString(agent, "runtime");
+  const runtime = config.runtimes.find((candidate) => candidate.id === runtimeReference || candidate.title === runtimeReference) ?? config.runtimes[0];
+  return runtime?.title || runtime?.id || runtimeReference || "None";
+}
 
 function instructionSections(
   routes: LoopHandlerRoute[],
@@ -48,6 +59,9 @@ function instructionSections(
       agentId: agent.id,
       instructions: agent.instructions,
       emptyText: "No instructions configured.",
+      runtime: agentRuntime(agent, config),
+      model: agent.model || frontmatterString(agent, "model") || "gpt-5.5",
+      effort: agent.modelReasoningEffort || frontmatterString(agent, "model_reasoning_effort") || "medium",
       kind: "agent"
     });
   });
@@ -73,12 +87,15 @@ export function LoopHandlerAgentInstructions({
           const Icon = section.kind === "agent" ? Bot : section.kind === "human" ? ShieldCheck : TriangleAlert;
           return (
             <article key={section.key} className="min-w-0 border-b border-divider-strong px-3 py-3 last:border-b-0">
-              <header className="mb-2 flex items-center gap-2">
-                <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <h3 className="truncate text-xs font-medium text-foreground">{section.title}</h3>
-                  {section.agentId ? <p className="truncate font-mono text-[0.65rem] text-muted-foreground">{section.agentId}</p> : null}
+              <header className="mb-2 flex items-start justify-between gap-3 border-b border-divider-strong pb-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <h3 className="break-words text-xs font-medium leading-4 text-foreground">{section.title}</h3>
+                    {section.agentId ? <p className="truncate font-mono text-[0.65rem] text-muted-foreground">{section.agentId}</p> : null}
+                  </div>
                 </div>
+                {section.kind === "agent" ? <AgentRuntimeMetadata section={section} /> : null}
               </header>
               <MarkdownBody source={section.instructions} title={section.title} emptyText={section.emptyText} />
             </article>
@@ -86,5 +103,22 @@ export function LoopHandlerAgentInstructions({
         })}
       </div>
     </aside>
+  );
+}
+
+function AgentRuntimeMetadata({ section }: { section: InstructionSection }) {
+  return (
+    <dl aria-label={`${section.title} runtime`} className="grid shrink-0 grid-cols-3 gap-x-1 text-right">
+      {[
+        ["Runtime", section.runtime],
+        ["Model", section.model],
+        ["Effort", section.effort]
+      ].map(([label, value]) => (
+        <div key={label} className="min-w-0">
+          <dt className="font-mono text-[0.5rem] font-medium uppercase tracking-[0.03em] text-muted-foreground">{label}</dt>
+          <dd className="max-w-16 truncate font-mono text-[0.58rem] text-foreground" title={value}>{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
