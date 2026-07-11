@@ -1,10 +1,10 @@
-import { BaseEdge, EdgeLabelRenderer, Position, useNodes, type EdgeProps, type Node } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
+import { BaseEdge, EdgeLabelRenderer, Position, useNodes, type EdgeProps, type Node } from "@xyflow/react";
 import type { LoopReactFlowEdge } from "./LoopCanvasTypes";
-import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import { loopCrossLoopSmoothStepPath } from "./loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor, type LoopEdgePoint } from "./loopEdgeLabelGeometry";
+import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 import { loopSmartEdgeRoutingOptions, loopSmartSmoothStepDrawEdge } from "./loopSmartEdgeRouting";
@@ -84,15 +84,15 @@ function stepOrOutputDisplayLabel(
 
 type LoopEdgePaths = ReturnType<typeof loopEdgePaths>;
 
-function loopEdgeLabelPlacement(
-  { sourceX, sourceY, sourcePosition, targetX, targetY }: EdgeProps<LoopReactFlowEdge>,
+export function loopEdgeLabelPlacement(
+  { sourceX, sourceY, sourcePosition, targetX, targetY, data }: EdgeProps<LoopReactFlowEdge>,
   edgePaths: LoopEdgePaths,
   displayLabel: LoopEdgeDisplayLabel
 ) {
   if (displayLabel.kind === "step") {
     return {
-      x: targetX - loopEdgeEndLabelGap,
-      y: targetY,
+      x: sourceX - (data?.sourceNode?.width ?? 0) - loopEdgeEndLabelGap,
+      y: sourceY,
       translate: "translate(-100%, -50%)"
     };
   }

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopReturnEdgePath, loopToLoopStraightEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
+import { describe, expect, it } from "vitest";
+import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopEdgeLabelPlacement, loopReturnEdgePath, loopToLoopStraightEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
 import { loopEdgeDomAttributes } from "../src/workspace/automation/loops/loopEdgeStyle";
 import { calculateCompositeLoopCanvasLayout, loopNodeSizes } from "../src/workspace/automation/loops/loopLayout";
 import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/loopSmartEdgeRouting";
@@ -95,6 +95,11 @@ describe("v3 compact loop canvas", () => {
     expect(stepNodes).toHaveLength(3);
     expect(approved.targetNodeKey).not.toBe(rejected.targetNodeKey);
     expect(loopEdgeDisplayLabel(approved, prepare)).toEqual({ value: "prepare", kind: "step" });
+    expect(loopEdgeLabelPlacement({ sourceX: 40, sourceY: 20, targetX: 160, targetY: 80, data: { sourceNode: { width: 24 } } } as never, undefined as never, { value: "prepare", kind: "step" })).toEqual({
+      x: 8,
+      y: 20,
+      translate: "translate(-100%, -50%)"
+    });
     expect(layout.edges.some((edge) => edge.tone === "return" && edge.route?.outputId === "rejected")).toBe(true);
     expect(layout.nodes.map((node) => node.outputEvent?.eventType)).toEqual(expect.arrayContaining(["completed", "failed"]));
     expect(loopEdgeDomAttributes(rejected, true)).toMatchObject({
