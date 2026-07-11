@@ -89,8 +89,14 @@ describe("HTTP Zod validation", () => {
       instructions: "Implement",
       skills: [],
       enabled: true,
+      nodeStyle: "luna",
       frontmatter: {}
-    })).toMatchObject({ name: "Developer", frontmatter: {} });
+    })).toMatchObject({ name: "Developer", nodeStyle: "luna", frontmatter: {} });
+
+    expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
+      name: "Developer",
+      nodeStyle: "mars"
+    }), "nodeStyle");
 
     expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
       name: "Developer",

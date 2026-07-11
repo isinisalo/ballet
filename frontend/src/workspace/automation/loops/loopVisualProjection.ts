@@ -1,4 +1,6 @@
 import type {
+  Agent,
+  AgentNodeStyle,
   LoopRunDetails,
   ProjectAutomationConfig,
   ProjectLoop,
@@ -14,6 +16,7 @@ export type LoopVisualStep = {
   description: string;
   agentId?: string;
   humanGate: boolean;
+  nodeStyle: AgentNodeStyle;
   step: ProjectStep;
   stepRun?: StepRun;
 };
@@ -40,16 +43,19 @@ export const visualStepKey = (loopId: string, stepId: string) => `${loopId}::${s
 export function buildLoopVisualProjection(
   config: ProjectAutomationConfig,
   displayedLoop: ProjectLoop,
-  run?: LoopRunDetails | null
+  run?: LoopRunDetails | null,
+  agents: Agent[] = []
 ): LoopVisualProjection {
   const loopDefinitions = config.loops.map((loop) => loop.id === displayedLoop.id ? displayedLoop : loop);
   const latestRunByStepId = latestStepRuns(run?.stepRuns ?? []);
+  const nodeStyleByAgentId = new Map(agents.map((agent) => [agent.id, agent.nodeStyle ?? "terra"]));
   const steps = loopDefinitions.flatMap((loop) => loop.steps.map((step) => ({
     id: visualStepKey(loop.id, step.id),
     displayId: step.id,
     description: step.description,
     agentId: step.type === "agent" ? step.agentId : undefined,
     humanGate: step.type === "human",
+    nodeStyle: step.type === "human" ? "luna" : nodeStyleByAgentId.get(step.agentId) ?? "terra",
     step,
     stepRun: loop.id === displayedLoop.id ? latestRunByStepId.get(step.id) : undefined
   })));

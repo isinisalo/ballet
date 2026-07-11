@@ -1,5 +1,6 @@
 import path from "node:path";
 import { unlink } from "node:fs/promises";
+import { normalizeAgentNodeStyle } from "../../shared/domain/agents.js";
 import { assertInsideRoot, safeSlug, writeMarkdownDocument, writeTomlDocument } from "../markdown.js";
 
 const now = () => new Date().toISOString();
@@ -64,6 +65,7 @@ const agentFrontmatter = (item: Record<string, unknown>): Record<string, unknown
     name: stringValue(item.name ?? base.name),
     description: stringValue(item.description ?? base.description),
     enabled: typeof item.enabled === "boolean" ? item.enabled : base.enabled !== false,
+    node_style: normalizeAgentNodeStyle(item.nodeStyle ?? base.node_style),
     developer_instructions: stringValue(item.developer_instructions ?? item.instructions ?? base.developer_instructions)
   };
 

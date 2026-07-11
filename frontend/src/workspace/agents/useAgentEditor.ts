@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from "react";
-import type { Agent } from "@shared/api/workspace-contracts";
+import { useEffect, useId, useRef, useState } from "react";
+import type { Agent, AgentNodeStyle } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
 import { agentTemplate } from "./agentOptions";
 
@@ -18,14 +18,23 @@ export function useAgentEditor({ agent, save, remove, onSaved, onNew, onDeleted 
   const instructionsId = useId();
   const [form, setForm] = useState<Partial<Agent>>(agent ?? agentTemplate());
   const [validationError, setValidationError] = useState("");
+  const [nodeStyleSaving, setNodeStyleSaving] = useState(false);
+  const [nodeStyleError, setNodeStyleError] = useState("");
+  const formRef = useRef(form);
 
   useEffect(() => {
-    setForm(agent ?? agentTemplate());
+    const nextForm = agent ?? agentTemplate();
+    formRef.current = nextForm;
+    setForm(nextForm);
     setValidationError("");
   }, [agent]);
 
-  const updateForm = (patch: Partial<Agent>) => setForm((current) => ({ ...current, ...patch }));
-  const newAgent = () => { setForm(agentTemplate()); setValidationError(""); onNew?.(); };
+  const replaceForm = (nextForm: Partial<Agent>) => {
+    formRef.current = nextForm;
+    setForm(nextForm);
+  };
+  const updateForm = (patch: Partial<Agent>) => replaceForm({ ...formRef.current, ...patch });
+  const newAgent = () => { replaceForm(agentTemplate()); setValidationError(""); onNew?.(); };
 
   const submit = async () => {
     setValidationError("");
@@ -40,12 +49,31 @@ export function useAgentEditor({ agent, save, remove, onSaved, onNew, onDeleted 
         skills: form.skills ?? [],
         enabled: form.enabled ?? true
       });
-      setForm(saved);
+      replaceForm(saved);
       onSaved?.(saved);
       return true;
     } catch (error) {
       setValidationError(toErrorMessage(error, "Unable to save agent."));
       return false;
+    }
+  };
+
+  const saveNodeStyle = async (nodeStyle: AgentNodeStyle) => {
+    const id = formRef.current.id ?? agent?.id;
+    if (!id) return false;
+    const pendingForm = { ...formRef.current, nodeStyle };
+    replaceForm(pendingForm);
+    setNodeStyleSaving(true);
+    setNodeStyleError("");
+    try {
+      const saved = await save("agents", { id, nodeStyle });
+      replaceForm({ ...pendingForm, nodeStyle: saved.nodeStyle });
+      return true;
+    } catch (error) {
+      setNodeStyleError(toErrorMessage(error, "Unable to save node style."));
+      return false;
+    } finally {
+      setNodeStyleSaving(false);
     }
   };
 
@@ -55,7 +83,7 @@ export function useAgentEditor({ agent, save, remove, onSaved, onNew, onDeleted 
     setValidationError("");
     try {
       await remove("agents", deletedId);
-      setForm(agentTemplate());
+      replaceForm(agentTemplate());
       onDeleted?.(deletedId);
     } catch (error) {
       setValidationError(toErrorMessage(error, "Unable to delete agent."));
@@ -64,9 +92,9 @@ export function useAgentEditor({ agent, save, remove, onSaved, onNew, onDeleted 
   };
 
   return {
-    form, formId, instructionsId, validationError,
+    form, formId, instructionsId, validationError, nodeStyleSaving, nodeStyleError,
     saveDisabled: !form.name?.trim(),
-    updateForm, newAgent, submit, deleteAgent
+    updateForm, saveNodeStyle, newAgent, submit, deleteAgent
   };
 }
 

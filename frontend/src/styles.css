@@ -45,6 +45,7 @@
   --panel-section: #1a1c1f;
   --section-heading: #c1c6d7;
   --divider-strong: #414755;
+  --loop-flow: #76d4ca;
   --chart-1: #adc6ff;
   --chart-2: #4edea3;
   --chart-3: #ffb95f;
@@ -90,9 +91,72 @@ body {
 }
 
 .loop-react-flow .loop-edge-animated .react-flow__edge-path {
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 70%, transparent));
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--loop-flow) 75%, transparent));
   stroke-dasharray: 8 6;
   animation: loop-edge-flow 0.85s linear infinite;
+}
+
+.loop-react-flow .loop-connection-point {
+  color: var(--loop-flow);
+  pointer-events: none;
+}
+
+.loop-celestial-node {
+  position: relative;
+  isolation: isolate;
+  padding: 0;
+  background: transparent;
+  outline: none;
+}
+
+.loop-celestial-node:hover .loop-celestial-surface,
+.loop-celestial-node:focus-visible .loop-celestial-surface {
+  filter: brightness(1.12);
+}
+
+.loop-celestial-node:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.loop-celestial-surface {
+  position: absolute;
+  inset: 2px;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: 9999px;
+  transition: filter 160ms ease;
+}
+
+.loop-celestial-surface::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 35% 28%, color-mix(in srgb, var(--foreground) 28%, transparent) 0 6%, transparent 32%);
+  content: "";
+}
+
+.loop-celestial-surface--luna {
+  background:
+    radial-gradient(circle at 65% 66%, color-mix(in srgb, var(--background) 65%, transparent) 0 7%, transparent 8%),
+    radial-gradient(circle at 35% 55%, color-mix(in srgb, var(--border) 50%, transparent) 0 9%, transparent 10%),
+    radial-gradient(circle at 38% 32%, var(--muted-foreground), var(--accent) 72%);
+  box-shadow: inset -4px -4px 8px color-mix(in srgb, var(--background) 62%, transparent), 0 0 8px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+.loop-celestial-surface--terra {
+  background:
+    radial-gradient(circle at 36% 28%, color-mix(in srgb, var(--foreground) 32%, var(--secondary)) 0, color-mix(in srgb, var(--muted-foreground) 48%, var(--secondary-container)) 42%, color-mix(in srgb, var(--accent) 72%, var(--secondary-container)) 76%);
+  box-shadow:
+    inset -7px -6px 12px color-mix(in srgb, var(--background) 72%, transparent),
+    inset 1px 1px 2px color-mix(in srgb, var(--primary) 42%, transparent),
+    0 0 9px color-mix(in srgb, var(--loop-flow) 30%, transparent);
+}
+
+.loop-celestial-surface--sol {
+  background:
+    radial-gradient(circle at 38% 30%, color-mix(in srgb, var(--tertiary) 72%, var(--foreground)), var(--tertiary) 42%, var(--tertiary-container) 76%);
+  box-shadow: inset -8px -7px 14px color-mix(in srgb, var(--tertiary-container) 58%, transparent), 0 0 10px var(--tertiary), 0 0 24px color-mix(in srgb, var(--tertiary) 58%, transparent);
 }
 
 .loop-react-flow .loop-react-flow-handle {

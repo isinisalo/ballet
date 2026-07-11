@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { Agent, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
 import { CirclePlus, Radio, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -17,11 +17,13 @@ type LoopRunController = ReturnType<typeof useLoopRun>;
 export function LoopRunView({
   config,
   loop,
+  agents,
   controller,
   startDisabledReason
 }: {
   config: ProjectAutomationConfig;
   loop: ProjectLoop;
+  agents: Agent[];
   controller: LoopRunController;
   startDisabledReason?: string;
 }) {
@@ -54,7 +56,7 @@ export function LoopRunView({
       </div>
       {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <div className={selectedStepRun && selectedStep && details ? "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden md:grid-cols-2" : "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden"}>
-        <LoopCanvas config={config} loop={canvasLoop} run={details} selectedStepId={selectedStepRun?.stepId} readOnly onStepSelect={(stepId) => setSelectedStepRunId([...((details?.stepRuns) ?? [])].reverse().find((stepRun) => stepRun.stepId === stepId)?.stepRunId)} />
+        <LoopCanvas config={config} loop={canvasLoop} agents={agents} run={details} selectedStepId={selectedStepRun?.stepId} readOnly onStepSelect={(stepId) => setSelectedStepRunId([...((details?.stepRuns) ?? [])].reverse().find((stepRun) => stepRun.stepId === stepId)?.stepRunId)} />
         <LoopHandlerSheet
           open={Boolean(selectedStepRun && selectedStep && details)}
           title="StepRun console"

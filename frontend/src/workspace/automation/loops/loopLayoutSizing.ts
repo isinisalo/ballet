@@ -3,7 +3,6 @@ import { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
 import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
 export function loopCanvasNodeAnchorY(layoutNode: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
-  if (layoutNode.kind === "step") return loopCanvasLayoutConfig.stepAnchorY;
   return layoutNode.height / 2;
 }
 
@@ -28,10 +27,10 @@ export function loopShortestVerticalHandles(sourceNode: LoopCanvasLayoutNode, ta
   return { sourceHandleId: handleId, targetHandleId: handleId };
 }
 
-export function loopStepOutputHandleY(outputIndex: number, outputHandleCount: number) {
-  if (outputHandleCount <= 1) return loopCanvasLayoutConfig.stepAnchorY;
-  const firstHandleY = loopCanvasLayoutConfig.stepAnchorY;
-  const lastHandleY = loopNodeSizes.step.height - loopCanvasLayoutConfig.edgePad / 2;
+export function loopStepOutputHandleY(outputIndex: number, outputHandleCount: number, nodeHeight = loopNodeSizes.step.height) {
+  if (outputHandleCount <= 1) return nodeHeight / 2;
+  const firstHandleY = loopCanvasLayoutConfig.edgePad / 2;
+  const lastHandleY = nodeHeight - loopCanvasLayoutConfig.edgePad / 2;
   const clampedIndex = Math.min(Math.max(outputIndex, 0), outputHandleCount - 1);
   return firstHandleY + (lastHandleY - firstHandleY) * (clampedIndex / (outputHandleCount - 1));
 }

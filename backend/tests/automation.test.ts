@@ -28,6 +28,7 @@ const agent: Agent = {
   instructions: "Implement.",
   skills: [],
   enabled: true,
+  nodeStyle: "terra",
   createdAt: "2026-07-10T00:00:00.000Z",
   updatedAt: "2026-07-10T00:00:00.000Z"
 };

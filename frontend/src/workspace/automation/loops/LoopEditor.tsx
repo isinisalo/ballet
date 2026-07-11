@@ -80,6 +80,7 @@ export function LoopEditor({
         <LoopCanvas
           config={config}
           loop={loop}
+          agents={agents}
           selectedStepId={selectedStep?.id}
           readOnly={false}
           canvasControls={canvasControls}

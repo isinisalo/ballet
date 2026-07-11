@@ -87,7 +87,15 @@ export function AgentProfilePanel({ agent, executionState, editor, executionEdit
         />
         <AgentLiveStatusBadge state={executionState} />
       </div>
-      <AgentExecutionSettingsForm compact agentId={agent.id} editor={executionEditor} />
+      <AgentExecutionSettingsForm
+        compact
+        agentId={agent.id}
+        editor={executionEditor}
+        nodeStyle={editor.form.nodeStyle ?? agent.nodeStyle ?? "terra"}
+        nodeStyleSaving={editor.nodeStyleSaving}
+        nodeStyleError={editor.nodeStyleError}
+        onNodeStyleChange={(style) => { void editor.saveNodeStyle(style); }}
+      />
       <ProfileSection title="Details">
         <ProfileRow label="Skills" value={String(agent.skills.length)} />
         <ProfileRow label="ID" value={agent.id} technical />

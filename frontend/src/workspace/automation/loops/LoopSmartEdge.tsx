@@ -5,24 +5,27 @@ import type { LoopReactFlowEdge } from "./LoopCanvasTypes";
 import { loopCrossLoopSmoothStepPath } from "./loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor, type LoopEdgePoint } from "./loopEdgeLabelGeometry";
 import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
+import { detachedLoopEdgeProps, loopConnectionPointRadius } from "./loopFloatingEdgeGeometry";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
-import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 import { loopSmartEdgeRoutingOptions, loopSmartSmoothStepDrawEdge } from "./loopSmartEdgeRouting";
+
+// This module intentionally keeps all selectable Loop edge path variants together;
+// label placement and return/cross-loop geometry must use the exact same path choice.
 
 const loopEdgeLabelCenterRatio = 0.5;
 const loopEdgeLabelVerticalOffset = 4;
-const loopEdgeEndLabelGap = 8;
-
 type LoopEdgeDisplayLabel =
-  { value: string; kind: "step" | "output" };
+  { value: string; kind: "output" };
 
 export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
   const nodes = useNodes();
+  const detachedProps = detachedLoopEdgeProps(props);
   const loopEdge = props.data?.loopEdge;
   const outputSlotKind = loopEdgeOutputSlotKind(loopEdge);
-  const edgePaths = loopEdgePaths(props, nodes, outputSlotKind);
-  const displayLabel = loopEdgeDisplayLabel(loopEdge, props.data?.sourceNode);
-  const labelPlacement = displayLabel ? loopEdgeLabelPlacement(props, edgePaths, displayLabel) : undefined;
+  const edgePaths = loopEdgePaths(detachedProps, nodes, outputSlotKind);
+  const displayLabel = loopEdgeDisplayLabel(loopEdge);
+  const labelPlacement = displayLabel ? loopEdgeLabelPlacement(detachedProps, edgePaths, displayLabel) : undefined;
+  const pointStyle = { fill: String(props.style?.stroke ?? "var(--loop-flow)"), filter: "drop-shadow(0 0 4px currentColor)" };
 
   return (
     <>
@@ -34,6 +37,8 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
         markerEnd={props.markerEnd}
         interactionWidth={props.interactionWidth}
       />
+      <circle aria-hidden="true" data-loop-connection-point="source" cx={detachedProps.sourceX} cy={detachedProps.sourceY} r={loopConnectionPointRadius} className="loop-connection-point" style={pointStyle} />
+      <circle aria-hidden="true" data-loop-connection-point="target" cx={detachedProps.targetX} cy={detachedProps.targetY} r={loopConnectionPointRadius} className="loop-connection-point" style={pointStyle} />
       {displayLabel && labelPlacement ? (
         <EdgeLabelRenderer>
           <div
@@ -43,7 +48,7 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
             title={displayLabel.value}
             className={cn(
               "pointer-events-none absolute z-10 whitespace-nowrap rounded-sm bg-background/95 px-1 font-mono text-[0.66rem] leading-4",
-              displayLabel.kind === "output" ? "text-muted-foreground" : "text-tertiary"
+              "text-muted-foreground"
             )}
             style={{
               transform: `${labelPlacement.translate} translate(${labelPlacement.x}px, ${labelPlacement.y}px)`
@@ -58,25 +63,9 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
 }
 
 export function loopEdgeDisplayLabel(
-  edge: LoopCanvasEdge | undefined,
-  sourceNode: LoopCanvasLayoutNode | undefined
+  edge: LoopCanvasEdge | undefined
 ): LoopEdgeDisplayLabel | undefined {
   if (!edge) return undefined;
-  if (sourceNode?.kind === "loop") return undefined;
-  return stepOrOutputDisplayLabel(edge, sourceNode);
-}
-
-function stepOrOutputDisplayLabel(
-  edge: LoopCanvasEdge,
-  sourceNode: LoopCanvasLayoutNode | undefined
-): LoopEdgeDisplayLabel | undefined {
-  const outputSlotKind = loopEdgeOutputSlotKind(edge);
-  const sourceStepId = sourceNode?.record?.step?.displayId || sourceNode?.record?.stepKey;
-  const usesStepLabel = sourceNode?.kind === "step" &&
-    edge.tone !== "return" &&
-    outputSlotKind !== "rework";
-
-  if (usesStepLabel && sourceStepId) return { value: sourceStepId, kind: "step" };
   if (edge.label && !["approved", "rejected"].includes(edge.label)) return { value: edge.label, kind: "output" };
   return undefined;
 }
@@ -84,18 +73,10 @@ function stepOrOutputDisplayLabel(
 type LoopEdgePaths = ReturnType<typeof loopEdgePaths>;
 
 export function loopEdgeLabelPlacement(
-  { sourceX, sourceY, sourcePosition, targetX, targetY, data }: EdgeProps<LoopReactFlowEdge>,
+  { sourceX, sourceY, sourcePosition, targetX, targetY }: EdgeProps<LoopReactFlowEdge>,
   edgePaths: LoopEdgePaths,
   displayLabel: LoopEdgeDisplayLabel
 ) {
-  if (displayLabel.kind === "step") {
-    return {
-      x: sourceX - (data?.sourceNode?.width ?? 0) - loopEdgeEndLabelGap,
-      y: sourceY,
-      translate: "translate(-100%, -50%)"
-    };
-  }
-
   if (displayLabel.value === "rejected") return loopRejectedEdgeLabelPlacement({ sourceX, sourceY, sourcePosition }, edgePaths.returnEdgePath);
 
   const directLabelPath = edgePaths.compactLoopEdgePath ?? edgePaths.returnEdgePath ?? edgePaths.crossLoopEdgePath ?? edgePaths.approvalEdgePath;

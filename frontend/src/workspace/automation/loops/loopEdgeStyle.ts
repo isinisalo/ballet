@@ -3,12 +3,12 @@ import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
-const loopSolidEdgeStroke = "color-mix(in srgb, var(--primary) 70%, transparent)";
+const loopSolidEdgeStroke = "var(--loop-flow)";
 const loopDashedEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 35%, transparent)";
-const loopReturnEdgeStroke = "color-mix(in srgb, var(--tertiary) 85%, transparent)";
-const loopCrossLoopApprovalEdgeStroke = "color-mix(in srgb, var(--secondary) 72%, transparent)";
-const loopApprovalOutputEdgeStroke = "color-mix(in srgb, var(--secondary) 58%, var(--muted-foreground))";
-const loopReworkOutputEdgeStroke = "color-mix(in srgb, var(--destructive) 58%, var(--muted-foreground))";
+const loopReturnEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 48%, transparent)";
+const loopCrossLoopApprovalEdgeStroke = "var(--loop-flow)";
+const loopApprovalOutputEdgeStroke = "var(--loop-flow)";
+const loopReworkOutputEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 48%, transparent)";
 const loopEdgeOpacity = 0.75;
 const loopGhostTargetEdgeOpacity = 0.6;
 const loopAnimatedEdgeOpacity = 1;
@@ -35,6 +35,7 @@ export function loopEdgeStyle(
     strokeWidth: 2,
     strokeDasharray: loopEdgeStrokeDasharray(edge),
     strokeLinecap: loopEdgeStrokeLinecap(edge),
+    filter: isAnimated || loopEdgeIsRejectedOutput(edge) ? undefined : "drop-shadow(0 0 3px color-mix(in srgb, var(--loop-flow) 45%, transparent))",
     opacity: loopEdgeRenderedOpacity(edge, targetNode, isAnimated)
   };
 }

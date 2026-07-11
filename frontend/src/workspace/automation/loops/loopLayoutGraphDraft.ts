@@ -9,7 +9,7 @@ import {
   type LoopCanvasEdge,
   type LoopHandledEventNode
 } from "./loopLayoutEdges";
-import { loopNodeSizes } from "./loopLayoutConfig";
+import { loopNodeSizes, loopPlanetNodeSizes } from "./loopLayoutConfig";
 import {
   loopOutputEventNodeWidth,
   loopOutputSourceHandleId,
@@ -54,11 +54,12 @@ export function addCanvasEdge(context: LoopLayoutGraphDraftContext, edge: LoopCa
 export function addStepNode(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, outputHandleCount: number) {
   const records = loopFoldedRecords(context.loopGraph, record);
   const isEditingStep = context.editingStepIndex === record.index;
+  const nodeSize = loopPlanetNodeSizes[record.step?.nodeStyle ?? "terra"];
   addNode(context, {
     key: `step-${record.index}`,
     kind: "step",
-    width: loopNodeSizes.step.minWidth,
-    height: loopNodeSizes.step.height,
+    width: nodeSize,
+    height: nodeSize,
     direction: context.direction,
     record,
     records,

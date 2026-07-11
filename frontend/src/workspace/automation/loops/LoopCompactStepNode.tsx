@@ -1,7 +1,16 @@
-import { Bot, Shield } from "lucide-react";
+import { Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopNodeContext } from "./LoopCanvasTypes";
+
+const stepRunStatusClass: Record<string, string> = {
+  queued: "border-tertiary/70 text-tertiary",
+  running: "border-secondary text-secondary ring-2 ring-secondary/20",
+  waiting_for_human: "border-tertiary text-tertiary ring-2 ring-tertiary/20",
+  completed: "border-secondary/75 text-secondary ring-2 ring-secondary/15",
+  failed: "border-destructive text-destructive ring-2 ring-destructive/20",
+  cancelled: "border-destructive text-destructive ring-2 ring-destructive/20"
+};
 
 export function LoopCompactStepNode({
   context,
@@ -18,9 +27,6 @@ export function LoopCompactStepNode({
   const draggable = !folded && editable;
   const selectedStepIndexSet = new Set(context.selectedStepIndexes);
   const selected = records.some((candidate) => selectedStepIndexSet.has(candidate.index));
-  const title = record.step?.displayId || record.stepKey || "Missing step";
-  const stepRun = record.step?.stepRun;
-  const ariaLabel = `${context.readOnly ? "View" : "Edit"} step ${title}`;
 
   return (
     <div
@@ -31,36 +37,56 @@ export function LoopCompactStepNode({
       onPointerUp={context.onStepPointerUp}
       onPointerCancel={context.onStepPointerCancel}
       className={cn(
-        "w-full select-none",
+        "h-full w-full select-none",
         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-default",
         draggable && context.draggedStepIndex === record.index && "opacity-60",
         draggable && context.dragOverStepIndex === record.index && context.draggedStepIndex !== record.index && "ring-2 ring-primary/20"
       )}
     >
-      <button
-        type="button"
-        data-loop-node
-        aria-label={ariaLabel}
-        title={title}
-        className={cn(
-          "nodrag nopan inline-flex size-[22px] items-center justify-center rounded border border-divider-strong bg-card transition-colors hover:border-primary/80",
-          record.step?.humanGate && "border-tertiary/60",
-          stepRun?.status === "queued" && "border-tertiary/70 text-tertiary",
-          stepRun?.status === "running" && "border-secondary text-secondary ring-2 ring-secondary/20",
-          stepRun?.status === "waiting_for_human" && "border-tertiary text-tertiary ring-2 ring-tertiary/20",
-          stepRun?.status === "completed" && "border-secondary/75 text-secondary ring-2 ring-secondary/15",
-          (stepRun?.status === "failed" || stepRun?.status === "cancelled") && "border-destructive text-destructive ring-2 ring-destructive/20",
-          selected && "border-primary/80 ring-2 ring-primary/20"
-        )}
-        onClick={(event) => {
-          event.stopPropagation();
-          context.onStepSelect(records);
-        }}
-      >
-        {record.step?.humanGate
-          ? <Shield aria-hidden="true" className="size-3 text-tertiary" strokeWidth={1.8} />
-          : <Bot aria-hidden="true" className="size-3 text-primary/85" strokeWidth={1.8} />}
-      </button>
+      <CelestialStepButton context={context} record={record} records={records} selected={selected} />
     </div>
+  );
+}
+
+function CelestialStepButton({ context, record, records, selected }: {
+  context: LoopNodeContext;
+  record: LoopStepRecord;
+  records: LoopStepRecord[];
+  selected: boolean;
+}) {
+  const title = record.step?.displayId || record.stepKey || "Missing step";
+  const humanGate = record.step?.humanGate ?? false;
+  const nodeStyle = humanGate ? "luna" : record.step?.nodeStyle ?? "terra";
+  const statusClass = record.step?.stepRun?.status ? stepRunStatusClass[record.step.stepRun.status] : undefined;
+
+  return (
+    <button
+      type="button"
+      data-loop-node
+      data-loop-node-kind={humanGate ? "human" : "agent"}
+      data-loop-node-style={nodeStyle}
+      aria-label={`${context.readOnly ? "View" : "Edit"} step ${title}`}
+      title={title}
+      className={cn(
+        "loop-celestial-node nodrag nopan inline-flex h-full w-full items-center justify-center rounded-full border border-transparent transition-[border-color,box-shadow,filter]",
+        humanGate && "border-tertiary/60",
+        statusClass,
+        selected && "border-primary/80 ring-2 ring-primary/20"
+      )}
+      onClick={(event) => {
+        event.stopPropagation();
+        context.onStepSelect(records);
+      }}
+    >
+      <span aria-hidden="true" className={`loop-celestial-surface loop-celestial-surface--${nodeStyle}`} />
+      {humanGate ? <Shield aria-hidden="true" className="relative z-10 size-3.5 text-tertiary" strokeWidth={1.8} /> : null}
+      <span
+        aria-hidden="true"
+        data-loop-node-label={title}
+        className="pointer-events-none absolute top-full left-1/2 mt-2 -translate-x-1/2 whitespace-nowrap rounded-sm bg-background/95 px-1 font-mono text-[0.66rem] leading-4 text-tertiary"
+      >
+        {title}
+      </span>
+    </button>
   );
 }

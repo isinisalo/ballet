@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Position, ReactFlow, type EdgeMouseHandler, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
-import type { LoopRunDetails, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { Agent, LoopRunDetails, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
 import { cn } from "@/lib/utils";
 import { LoopReactFlowNodeComponent } from "./LoopReactFlowNode";
 import { LoopSmartEdge } from "./LoopSmartEdge";
@@ -17,6 +17,7 @@ const loopEdgeTypes = { loopSmart: LoopSmartEdge } satisfies EdgeTypes;
 export function LoopCanvas({
   config,
   loop,
+  agents = [],
   run,
   selectedStepId,
   readOnly = false,
@@ -28,6 +29,7 @@ export function LoopCanvas({
 }: {
   config: ProjectAutomationConfig;
   loop: ProjectLoop;
+  agents?: Agent[];
   run?: LoopRunDetails | null;
   selectedStepId?: string;
   readOnly?: boolean;
@@ -37,7 +39,7 @@ export function LoopCanvas({
   onInsertStep?: (stepId: string, result: "approved" | "rejected") => void;
   onReorderStep?: (fromIndex: number, toIndex: number) => void;
 }) {
-  const projection = useMemo(() => buildLoopVisualProjection(config, loop, run), [config, loop, run]);
+  const projection = useMemo(() => buildLoopVisualProjection(config, loop, run, agents), [agents, config, loop, run]);
   const layout = useMemo(() => calculateCompositeLoopCanvasLayout({
     config: projection.config,
     selectedLoopId: loop.id,

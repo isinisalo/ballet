@@ -1,4 +1,4 @@
-import type { Agent, AgentExecutionState } from "../domain/agents.js";
+import type { Agent, AgentExecutionState, AgentNodeStyle } from "../domain/agents.js";
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
@@ -89,6 +89,7 @@ export { defaultProjectAutomationConfig } from "../domain/automation.js";
 
 export type {
   Agent,
+  AgentNodeStyle,
   AgentExecutionState,
   Adr,
   EventDefinition,

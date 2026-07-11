@@ -1,8 +1,15 @@
 import type { LoopLayoutDirection } from "./loopLayoutTypes";
+import type { AgentNodeStyle } from "@shared/api/workspace-contracts";
+
+export const loopPlanetNodeSizes: Record<AgentNodeStyle, number> = {
+  luna: 28,
+  terra: 44,
+  sol: 64
+};
 
 export const loopNodeSizes = {
   loop: { minWidth: 22, maxWidth: 22, height: 22 },
-  step: { minWidth: 22, maxWidth: 22, height: 22 },
+  step: { minWidth: 28, maxWidth: 64, height: 64 },
   event: { width: 22, height: 22 },
   outputEvent: { minWidth: 22, maxWidth: 22, height: 22, rowGap: 32 }
 };
@@ -14,7 +21,6 @@ export const loopCanvasLayoutConfig = {
   horizontalEdgeGap: 184,
   branchGap: 72,
   edgePad: 18,
-  stepAnchorY: 11,
   selectedCompactLoopRowGap: 112,
   compactLoopRowGap: 24,
   outputEventsLaneGap: 24,

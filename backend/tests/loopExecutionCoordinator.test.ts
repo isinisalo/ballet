@@ -122,6 +122,7 @@ const agent = (id: string): Agent => ({
   instructions: `Execute ${id} work.`,
   skills: [],
   enabled: true,
+  nodeStyle: "terra",
   createdAt: NOW,
   updatedAt: NOW
 });

@@ -83,6 +83,7 @@ describe("Markdown collection loading", () => {
     expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("modelReasoningEffort");
     expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("status");
     expect(data.agents.find((agent) => agent.id === "architect")?.nicknameCandidates).toEqual(["Arch", "Atlas"]);
+    expect(data.agents.find((agent) => agent.id === "architect")?.nodeStyle).toBe("terra");
     expect(data.agents.find((agent) => agent.id === "architect")?.instructions).toContain("Design architecture");
     expect(data.skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
     expect(data.skills[0]?.name).toBe("fixture-skill");
@@ -439,6 +440,7 @@ path = "../.agents/skills/missing-skill"
       model: "gpt-5.5",
       modelReasoningEffort: "high",
       nicknameCandidates: ["Atlas"],
+      nodeStyle: "sol",
       relativePath: ".codex/agents/reviewer.toml",
       frontmatter: {
         name: "Reviewer",
@@ -457,6 +459,7 @@ path = "../.agents/skills/missing-skill"
     expect(source).not.toContain('model_reasoning_effort =');
     expect(source).not.toContain('runtime =');
     expect(source).toContain('nickname_candidates = [ "Atlas" ]');
+    expect(source).toContain('node_style = "sol"');
     expect(source).toContain("[mcp_servers.docs]");
     expect(source).toContain('url = "https://example.test/mcp"');
     expect(source).toContain("[[skills.config]]");

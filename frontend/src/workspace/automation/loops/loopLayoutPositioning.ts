@@ -35,6 +35,9 @@ function positionPrimaryNodes(
   const horizontalLaneYOffsets = direction === "horizontal"
     ? loopHorizontalLaneYOffsets(nodes, outputNodes, edges, orderIndexes)
     : new Map<number, number>();
+  const horizontalLaneNodeHeights = direction === "horizontal"
+    ? loopHorizontalLaneNodeHeights(nodes, orderIndexes)
+    : new Map<number, number>();
   return nodes.map((node) => {
     const rank = ranks.get(node.key) ?? 0;
     const orderIndex = orderIndexes.get(node.key) ?? 0;
@@ -45,10 +48,24 @@ function positionPrimaryNodes(
         ? horizontalNodeX(rank, metrics)
         : verticalNodeX(node, orderIndex, metrics),
       y: direction === "horizontal"
-        ? loopCanvasLayoutConfig.startY + (horizontalLaneYOffsets.get(orderIndex) ?? orderIndex * metrics.horizontalRowStep)
+        ? loopCanvasLayoutConfig.startY +
+          (horizontalLaneYOffsets.get(orderIndex) ?? orderIndex * metrics.horizontalRowStep) +
+          ((horizontalLaneNodeHeights.get(orderIndex) ?? node.height) - node.height) / 2
         : verticalNodeY(rank, metrics)
     };
   });
+}
+
+function loopHorizontalLaneNodeHeights(
+  nodes: LoopCanvasLayoutNodeDraft[],
+  orderIndexes: ReadonlyMap<string, number>
+) {
+  const heights = new Map<number, number>();
+  nodes.forEach((node) => {
+    const orderIndex = orderIndexes.get(node.key) ?? 0;
+    heights.set(orderIndex, Math.max(heights.get(orderIndex) ?? 0, node.height));
+  });
+  return heights;
 }
 
 function positionOutputEventNodes(
@@ -118,7 +135,7 @@ function nextHorizontalOutputEventsY(
   const stackedY = outputStackTop + outputOrderIndex * outputEventStackStep();
 
   if (hasStepChild || !canAlignTerminalOutputEvents(sourceNode.outputHandleCount ?? 0)) return stackedY;
-  return sourceNode.y + loopStepOutputHandleY(node.outputIndex ?? outputOrderIndex, sourceNode.outputHandleCount ?? 0) - node.height / 2;
+  return sourceNode.y + loopStepOutputHandleY(node.outputIndex ?? outputOrderIndex, sourceNode.outputHandleCount ?? 0, sourceNode.height) - node.height / 2;
 }
 
 function nextVerticalOutputEventsX(childNodes: LoopCanvasLayoutNode[], sourceNode: LoopCanvasLayoutNode) {

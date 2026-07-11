@@ -10,6 +10,7 @@ const agents: Agent[] = [{
   role: "Implementation",
   description: "Builds the requested change.",
   enabled: true,
+  nodeStyle: "terra",
   skills: [],
   document: "# Builder"
 }];
@@ -60,5 +61,16 @@ describe("compact Loop editor UI", () => {
     expect(next.steps.find((step) => step.id === "review")?.on.approved).toBe("new-step");
     expect(next.steps.find((step) => step.id === "new-step")?.on.approved).toEqual({ end: "completed" });
     expect(screen.queryByText("Actions")).not.toBeInTheDocument();
+  });
+
+  it("renders agent and human Steps as celestial nodes with bright connection points", async () => {
+    const { container } = render(<LoopEditor config={config} loop={loop} loops={[loop]} agents={[{ ...agents[0]!, nodeStyle: "sol" }]} locked={false} onChange={() => undefined} />);
+
+    expect(await screen.findByRole("button", { name: "Edit step build" })).toHaveAttribute("data-loop-node-style", "sol");
+    expect(screen.getByRole("button", { name: "Edit step review" })).toHaveAttribute("data-loop-node-style", "luna");
+    expect(screen.getByRole("button", { name: "Edit step review" })).toHaveAttribute("data-loop-node-kind", "human");
+    expect(container.querySelector('[data-loop-node-label="build"]')).toHaveClass("left-1/2", "-translate-x-1/2", "top-full");
+    expect(container.querySelector('[data-loop-edge-display-label="build"]')).not.toBeInTheDocument();
+    expect(container.querySelectorAll("[data-loop-connection-point]").length).toBeGreaterThan(0);
   });
 });

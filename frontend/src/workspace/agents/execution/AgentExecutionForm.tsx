@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, Cpu } from "lucide-react";
 import { useId, useState } from "react";
 import { backendReadiness, providerLabel } from "../../runtimes/runtimeRegistry";
+import { AgentNodeStyleField, type AgentNodeStyleSettings } from "./AgentNodeStyleField";
 import { backendsForDevice, executionFormError, modelOptions, PROVIDER_DEFAULT, reasoningOptions, selectedExecutionBackend, selectedExecutionDevice } from "./executionOptions";
 import { useAgentExecutionBinding } from "./useAgentExecutionBinding";
 
@@ -19,13 +20,22 @@ export function AgentExecutionForm({ agentId, onSaved }: { agentId: string; onSa
   return <AgentExecutionSettingsForm agentId={agentId} editor={editor} onSaved={onSaved} />;
 }
 
-export function AgentExecutionSettingsForm({ agentId, editor, onSaved, compact = false }: { agentId: string; editor: AgentExecutionBindingEditor; onSaved?: () => void; compact?: boolean }) {
+export function AgentExecutionSettingsForm({ agentId, editor, onSaved, compact = false, nodeStyle, nodeStyleSaving = false, nodeStyleError, onNodeStyleChange }: {
+  agentId: string;
+  editor: AgentExecutionBindingEditor;
+  onSaved?: () => void;
+  compact?: boolean;
+  nodeStyle?: AgentNodeStyleSettings["nodeStyle"];
+  nodeStyleSaving?: boolean;
+  nodeStyleError?: string;
+  onNodeStyleChange?: AgentNodeStyleSettings["onNodeStyleChange"];
+}) {
   return compact
-    ? <CompactAgentExecutionSettings agentId={agentId} editor={editor} onSaved={onSaved} />
-    : <StandardAgentExecutionSettings agentId={agentId} editor={editor} onSaved={onSaved} />;
+    ? <CompactAgentExecutionSettings agentId={agentId} editor={editor} onSaved={onSaved} nodeStyle={nodeStyle} nodeStyleSaving={nodeStyleSaving} nodeStyleError={nodeStyleError} onNodeStyleChange={onNodeStyleChange} />
+    : <StandardAgentExecutionSettings agentId={agentId} editor={editor} onSaved={onSaved} nodeStyle={nodeStyle} nodeStyleSaving={nodeStyleSaving} nodeStyleError={nodeStyleError} onNodeStyleChange={onNodeStyleChange} />;
 }
 
-function CompactAgentExecutionSettings({ agentId, editor, onSaved }: { agentId: string; editor: AgentExecutionBindingEditor; onSaved?: () => void }) {
+function CompactAgentExecutionSettings({ agentId, editor, onSaved, ...nodeStyleSettings }: { agentId: string; editor: AgentExecutionBindingEditor; onSaved?: () => void } & AgentNodeStyleSettings) {
   const settings = useExecutionSettings(editor, onSaved);
 
   return (
@@ -36,6 +46,7 @@ function CompactAgentExecutionSettings({ agentId, editor, onSaved }: { agentId: 
       {editor.error ? <p role="alert" className="text-xs leading-4 text-destructive">{editor.error}</p> : null}
       {!editor.loading && editor.devices.length === 0 ? <p className="text-xs leading-4 text-muted-foreground">No runtime computers are connected.</p> : null}
       <ExecutionSelectionFields settings={settings} compact />
+      <AgentNodeStyleField compact {...nodeStyleSettings} />
       <NetworkAccessField compact checked={editor.form.policy.network} disabled={!settings.supportsNetwork} onChange={settings.setNetwork} />
       <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} onReadOnlyRootsChange={settings.setReadOnlyRoots} onReadOnlyRootsBlur={settings.saveReadOnlyRoots} compact />
       <p className="text-xs leading-4 text-muted-foreground">{editor.saving ? "Saving execution…" : settings.validationError ?? "Execution binding is explicit; Ballet never selects the first available runtime."}</p>
@@ -43,7 +54,7 @@ function CompactAgentExecutionSettings({ agentId, editor, onSaved }: { agentId: 
   );
 }
 
-function StandardAgentExecutionSettings({ agentId, editor, onSaved }: { agentId: string; editor: AgentExecutionBindingEditor; onSaved?: () => void }) {
+function StandardAgentExecutionSettings({ agentId, editor, onSaved, ...nodeStyleSettings }: { agentId: string; editor: AgentExecutionBindingEditor; onSaved?: () => void } & AgentNodeStyleSettings) {
   const settings = useExecutionSettings(editor, onSaved);
 
   return (
@@ -55,6 +66,7 @@ function StandardAgentExecutionSettings({ agentId, editor, onSaved }: { agentId:
       {editor.error ? <Alert variant="destructive"><AlertDescription>{editor.error}</AlertDescription></Alert> : null}
       {!editor.loading && editor.devices.length === 0 ? <Alert><AlertDescription>No runtime computers are connected. Connect one from Runtimes before configuring execution.</AlertDescription></Alert> : null}
       <ExecutionSelectionFields settings={settings} />
+      <AgentNodeStyleField {...nodeStyleSettings} />
       <div className="border border-divider-strong bg-background px-3 py-2 text-xs"><span className="font-medium text-foreground">Write scope:</span> <span className="text-muted-foreground">current project checkout only</span></div>
       <NetworkAccessField checked={editor.form.policy.network} disabled={!settings.supportsNetwork} onChange={settings.setNetwork} />
       <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} onReadOnlyRootsChange={settings.setReadOnlyRoots} onReadOnlyRootsBlur={settings.saveReadOnlyRoots} />

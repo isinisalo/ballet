@@ -12,6 +12,7 @@ const agent = (): Agent => ({
   instructions: "# Role\nDesign the system.",
   skills: [],
   enabled: true,
+  nodeStyle: "terra",
   createdAt: "2026-07-11T10:00:00.000Z",
   updatedAt: "2026-07-11T12:00:00.000Z",
   relativePath: ".codex/agents/brief-agent.toml"
@@ -150,5 +151,25 @@ describe("agent instructions workspace", () => {
       name: "Principal Architect",
       description: "Owns technical direction."
     })));
+  });
+});
+
+describe("agent node style", () => {
+  it("autosaves Node style without including unfinished agent fields", async () => {
+    const user = userEvent.setup();
+    const { save } = renderEditor();
+
+    await user.click(screen.getByRole("button", { name: "Edit agent description" }));
+    await user.clear(screen.getByLabelText("Agent description"));
+    await user.type(screen.getByLabelText("Agent description"), "Unsaved description");
+    await user.click(screen.getByLabelText("Node style"));
+    await user.click(await screen.findByRole("option", { name: "Sol" }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith("agents", {
+      id: "agent-architect",
+      nodeStyle: "sol"
+    }));
+    expect(screen.getByLabelText("Agent description")).toHaveValue("Unsaved description");
+    expect(screen.getByLabelText("Node style")).toHaveTextContent("Sol");
   });
 });

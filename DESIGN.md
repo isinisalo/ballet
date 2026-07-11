@@ -30,6 +30,7 @@ colors:
   on-tertiary: '#472a00'
   tertiary-container: '#ca8100'
   on-tertiary-container: '#3e2400'
+  loop-flow: '#76d4ca'
   error: '#ffb4ab'
   on-error: '#690005'
   error-container: '#93000a'
@@ -139,8 +140,9 @@ The palette is rooted in a deep, multi-layered dark mode.
 
 Theme support is currently dark-only. Do not expose light or system theme modes unless a complete light palette is added to this file and implemented as first-class design tokens.
 
-- **Primary (Electric Blue):** Use for primary commands, selected navigation, focused fields, graph flow paths, and the active Transition through a Loop.
+- **Primary (Electric Blue):** Use for primary commands, selected navigation, focused fields, and selected Loop nodes.
 - **Secondary (Emerald):** Use for running agents, successful Step outcomes, accepted goals, healthy runtimes, and go-forward states.
+- **Loop Flow (Mint):** Use for normal Loop connectors, their endpoint orbs, and the active Transition glow. Keep rejected and rework connectors muted and dashed.
 - **Tertiary (Amber):** Use for warnings, idle agents, queued Steps, human-wait states, and attention states that do not require destructive styling.
 - **Error:** Use only for failed or blocked Runs, invalid Loop state, destructive commands, and blocking validation errors.
 - **Background & Surfaces:** Use `#111316` for the application base. Use `#1a1c1f`, `#1e2023`, and `#282a2d` for functional containers, nested panels, and elevated work areas. Keep borders subtle but visible with `#414755` or lower-contrast variants.
@@ -161,7 +163,7 @@ The layout follows a fluid grid with sidebar-heavy navigation and dense operatio
 - **Desktop:** Use a 12-column grid. Keep primary navigation sidebars fixed near 280px when expanded. Let the main workspace remain fluid and scrollable.
 - **Data Density:** Keep density high but structured. Use the 4px spacing unit. Default vertical rhythm between related controls is 8px or 16px. Use 20px panel padding for primary work areas.
 - **Functional Zones:** Separate navigation, collection lists, entity detail panels, previews, Run history, and editor surfaces into clear zones with borders and tonal layers.
-- **Flow Visualization:** Use the compact composite Loop canvas for a selected Loop: 22px technical Step markers, fixed-scale panning, smart routed 2px paths, explicit Transition labels, and unobstructed return/cycle paths. Use Primary for normal flow, the semantic rejected treatment for rework, and Secondary animation for the Transition taken by the displayed Run. Present the All Loops overview as a dense responsive card grid rather than a second editable graph.
+- **Flow Visualization:** Use the compact composite Loop canvas for a selected Loop: Luna 28px, Terra 44px, and Sol 64px celestial Step nodes, fixed-scale panning, smart routed 2px paths, explicit Transition labels, and unobstructed return/cycle paths. Vertically center different-sized nodes that share a lane so their left/right connection points stay on one horizontal line and direct edges remain straight. Detach paths 8px from celestial nodes and terminate them in bright 5px endpoint orbs. Use Loop Flow mint for normal paths, the muted dashed treatment for rejected/rework, and a brighter Loop Flow animation for the Transition taken by the displayed Run. Present the All Loops overview as a dense responsive card grid rather than a second editable graph.
 - **Mobile:** Stack panels vertically. Convert sidebars to sheets or drawers. Keep key filters and commands reachable from a persistent top or bottom control.
 
 ## Elevation & Depth
@@ -187,6 +189,7 @@ The shape language is **Soft-Industrial**. Keep controls precise and compact.
 - **Buttons:** Primary buttons are solid Electric Blue. Secondary buttons are ghost or outline controls with subtle borders. Destructive buttons must use the error token family.
 - **Agent Chips:** Use a leading dot plus label. Emerald means running or healthy. Amber means idle, queued, pending, or needs attention. Gray means offline, disabled, unknown, or archived. Use pulse animation only for live-running state.
 - **Agent Editor Inspector:** Let the selected-agent editor use the full available workspace width. Keep its profile rail compact and dark at the base surface level: use `agent-inspector-title` with `on-surface` for the name, `agent-inspector-body` with `on-surface-variant` for description and row labels, `agent-inspector-value` with `on-surface` for technical values, and `agent-inspector-label` for uppercase section headings. Place an `Execution` section with a leading CPU icon directly in the profile rail; it owns compact Runtime, Provider, Model, Reasoning effort, and Network access controls plus the existing Advanced policy disclosure. Save a valid Execution configuration automatically whenever one of its settings changes; do not render a separate save control. Do not show an `Environment` tab or a second execution surface on the right. `Reasoning effort` is the portable persisted execution setting: each provider maps it to its own reasoning/effort API. Status chips use the existing semantic state colors and the 12px inspector body size.
+- **Agent Node Style:** Place the portable `Node style` selector in the Agent Editor Inspector's Execution section. Luna, Terra, and Sol affect only Loop Canvas rendering, save automatically and never change the provider model. Terra is the default.
 - **Cards & Panels:** Use cards for repeated entities and panels for workspace regions. Do not place cards inside cards. Prefer headers with metadata and a compact command area.
 - **Tables & Lists:** Use tight row heights, clear separators, and zebra-striping with a 2% lighter surface tint when rows are dense. Keep row controls icon-first where possible.
 - **Inputs:** Use dark surfaces, 1px borders, and Primary focus state. Validation messages must be explicit and adjacent to the field.
@@ -199,7 +202,7 @@ The shape language is **Soft-Industrial**. Keep controls precise and compact.
 - **Command & Filter Controls:** Use compact search, segmented filters, and command-bar patterns for fast navigation across projects, agents, Loops, Steps, and Runs.
 - **Step Cards:** Use for Loop definitions and Run snapshots. Include the Step type, agent identity when applicable, status, and a collapsed description or Run input section.
 - **Edit/Run Mode:** Place a compact segmented `Edit | Run` control next to the selected Loop identity and persist the mode in the URL. Edit shows the mutable saved definition; Run shows an immutable snapshot graph with live Step Run statuses. Lock Edit while the selected Loop has an active Run. In Run mode, keep manual input and Start visible when idle, the required response input with Approved and Rejected controls while waiting for a human, and Cancel while active.
-- **Loop Canvas Nodes:** Render selected-Loop Steps, related Loop summaries, and terminal targets as compact 22px rounded technical markers. Agent and human identity is conveyed by the marker icon and semantic border; the exact `step.id` appears as the compact monospace edge-end label used by the original Loop editor. Preserve explicit `approved` and `rejected` labels, smart-routed return paths, cycles, compact upstream/downstream Loop summaries, and the 24px grid. Edit mode makes Step nodes and Transitions selectable and opens the established 50/50 canvas/sheet workspace. Run mode keeps the snapshot immutable, changes only marker status/glow, and animates the taken Transition. In the All Loops card overview, show each Loop's ID, start Step, agent/human Step counts, and directly referenced next Loops.
+- **Loop Canvas Nodes:** Render agent Steps as circular celestial nodes: Luna is a cool cratered 28px moon, Terra a softly shaded pale-green 44px planet with a restrained cyan rim, and Sol an amber 64px sun with the strongest halo. Render human gates as neutral 28px Luna nodes with a Shield mark. CSS radial gradients are allowed only for these token-derived planetary surface textures; do not reuse them as general decoration. Keep related Loop summaries and terminal targets as compact 22px rounded technical markers. Place the exact `step.id` directly below its node, horizontally centered in compact monospace type. Preserve explicit `approved` and `rejected` labels, smart-routed return paths, cycles, compact upstream/downstream Loop summaries, and the 24px grid. Edit mode makes Step nodes and Transitions selectable and opens the established 50/50 canvas/sheet workspace. Run mode keeps the snapshot immutable, changes only the semantic status/glow ring, and animates the taken Transition. In the All Loops card overview, show each Loop's ID, start Step, agent/human Step counts, and directly referenced next Loops.
 
 ## Do's and Don'ts
 - Do use the token values in this file as the source of truth for UI color, spacing, radius, and typography decisions.

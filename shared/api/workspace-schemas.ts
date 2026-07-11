@@ -95,6 +95,7 @@ const agentUpsertSchema = z.object({
   instructions: z.string().optional(),
   skills: z.array(skillSchema).optional(),
   enabled: z.boolean().optional(),
+  nodeStyle: z.enum(["luna", "terra", "sol"]).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   nicknameCandidates: z.array(z.string()).optional(),

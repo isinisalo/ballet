@@ -86,7 +86,7 @@ export function AutomationView({ data, selectedId, loopView, mode, runtimeStream
       {loopView !== "all" && !displayedLoop ? <div className="p-4"><EmptyState title="Loop not found." /></div> : null}
       {loopView !== "all" && displayedLoop && mode === "edit" && creating ? <LoopCreationEditor loop={displayedLoop} loops={draft.loops} agents={data.agents} onChange={updateLoop} /> : null}
       {loopView !== "all" && displayedLoop && mode === "edit" && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
-      {loopView !== "all" && savedLoop && mode === "run" ? <LoopRunView config={data.automation} loop={savedLoop} controller={runController} startDisabledReason={isDirty ? "Save loop changes before starting a run." : data.automationIssues.length > 0 ? "Resolve automation validation issues before starting a run." : undefined} /> : null}
+      {loopView !== "all" && savedLoop && mode === "run" ? <LoopRunView config={data.automation} loop={savedLoop} agents={data.agents} controller={runController} startDisabledReason={isDirty ? "Save loop changes before starting a run." : data.automationIssues.length > 0 ? "Resolve automation validation issues before starting a run." : undefined} /> : null}
     </Panel>
   );
 }

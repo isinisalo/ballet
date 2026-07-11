@@ -1,8 +1,11 @@
-import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { Position } from "@xyflow/react";
+import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { describe, expect, it } from "vitest";
-import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopEdgeLabelPlacement, loopReturnEdgePath, loopToLoopStraightEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
+import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopReturnEdgePath, loopToLoopStraightEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
+import { detachedLoopEdgeProps, loopConnectionPointRadius, loopEdgeEndpointGap } from "../src/workspace/automation/loops/loopFloatingEdgeGeometry";
 import { loopEdgeDomAttributes } from "../src/workspace/automation/loops/loopEdgeStyle";
 import { calculateCompositeLoopCanvasLayout, loopNodeSizes } from "../src/workspace/automation/loops/loopLayout";
+import { loopPlanetNodeSizes } from "../src/workspace/automation/loops/loopLayoutConfig";
 import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/loopSmartEdgeRouting";
 import { buildLoopVisualProjection } from "../src/workspace/automation/loops/loopVisualProjection";
 
@@ -46,13 +49,12 @@ describe("v3 compact loop canvas", () => {
     });
     const stepNodes = layout.nodes.filter((node) => node.kind === "step");
     expect(stepNodes).toHaveLength(2);
-    expect(stepNodes.every((node) => node.width === loopNodeSizes.step.minWidth && node.height === 22)).toBe(true);
+    expect(stepNodes.map((node) => [node.width, node.height])).toEqual([[44, 44], [28, 28]]);
     expect(layout.nodes.some((node) => node.kind === "loop" && node.loopSummary?.loopId === "roadmap")).toBe(true);
     expect(layout.nodes.some((node) => node.kind === "output-event" && node.outputEvent?.eventType === "failed")).toBe(true);
     const crossLoopEdge = layout.edges.find((edge) => edge.tone === "cross-loop" && edge.route?.targetLoopId === "roadmap");
-    const crossLoopSource = layout.nodes.find((node) => node.key === crossLoopEdge?.sourceNodeKey);
     expect(crossLoopEdge).toBeDefined();
-    expect(loopEdgeDisplayLabel(crossLoopEdge, crossLoopSource)).toEqual({ value: "gate", kind: "step" });
+    expect(loopEdgeDisplayLabel(crossLoopEdge)).toBeUndefined();
     expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining(["approved", "rejected"]));
     expect(layout.edges.some((edge) => edge.route?.outputId === "rejected" && ["top", "bottom"].includes(edge.sourceHandleId ?? ""))).toBe(true);
   });
@@ -91,19 +93,13 @@ describe("v3 compact loop canvas", () => {
       recordsByLoopId: projection.recordsByLoopId
     });
     const stepNodes = layout.nodes.filter((node) => node.kind === "step");
-    const prepare = stepNodes.find((node) => node.record?.step?.displayId === "prepare")!;
     const approved = layout.edges.find((edge) => edge.route?.sourceStepIndex === 0 && edge.route.outputId === "approved")!;
     const rejected = layout.edges.find((edge) => edge.route?.sourceStepIndex === 0 && edge.route.outputId === "rejected")!;
 
     expect(stepNodes).toHaveLength(3);
     expect(approved.targetNodeKey).not.toBe(rejected.targetNodeKey);
-    expect(loopEdgeDisplayLabel(approved, prepare)).toEqual({ value: "prepare", kind: "step" });
-    expect(loopEdgeDisplayLabel(rejected, prepare)).toBeUndefined();
-    expect(loopEdgeLabelPlacement({ sourceX: 40, sourceY: 20, targetX: 160, targetY: 80, data: { sourceNode: { width: 24 } } } as never, undefined as never, { value: "prepare", kind: "step" })).toEqual({
-      x: 8,
-      y: 20,
-      translate: "translate(-100%, -50%)"
-    });
+    expect(loopEdgeDisplayLabel(approved)).toBeUndefined();
+    expect(loopEdgeDisplayLabel(rejected)).toBeUndefined();
     expect(layout.edges.some((edge) => edge.tone === "return" && edge.route?.outputId === "rejected")).toBe(true);
     expect(layout.nodes.map((node) => node.outputEvent?.eventType)).toEqual(expect.arrayContaining(["completed", "failed"]));
     expect(loopEdgeDomAttributes(rejected, true)).toMatchObject({
@@ -131,5 +127,47 @@ describe("v3 compact loop canvas", () => {
     } as never);
     expect(returnPath.path).toContain("M 90,60");
     expect(returnPath.path).toContain("L 10,20");
+  });
+
+});
+
+describe("celestial Loop Canvas geometry", () => {
+  it("projects Luna, Terra, Sol, and human gates into dynamic collision-safe sizes", () => {
+    const agents = (["luna", "terra", "sol"] as const).map((nodeStyle, index) => ({ id: `agent-${index}`, nodeStyle })) as Agent[];
+    const styledLoop = {
+      id: "styled",
+      start: "luna",
+      steps: [
+        { id: "luna", type: "agent", agentId: "agent-0", description: "", on: { approved: "terra", rejected: { end: "failed" } } },
+        { id: "terra", type: "agent", agentId: "agent-1", description: "", on: { approved: "sol", rejected: { end: "failed" } } },
+        { id: "sol", type: "agent", agentId: "agent-2", description: "", on: { approved: "human", rejected: { end: "failed" } } },
+        { id: "human", type: "human", description: "", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }
+      ]
+    } satisfies ProjectAutomationConfig["loops"][number];
+    const styledConfig = { version: 3, loops: [styledLoop] } satisfies ProjectAutomationConfig;
+    const projection = buildLoopVisualProjection(styledConfig, styledLoop, null, agents);
+    const layout = calculateCompositeLoopCanvasLayout({ config: projection.config, selectedLoopId: styledLoop.id, recordsByLoopId: projection.recordsByLoopId });
+    const steps = layout.nodes.filter((node) => node.kind === "step");
+
+    expect(projection.config.steps.map((step) => step.nodeStyle)).toEqual(["luna", "terra", "sol", "luna"]);
+    expect(steps.map((node) => node.width)).toEqual([loopPlanetNodeSizes.luna, loopPlanetNodeSizes.terra, loopPlanetNodeSizes.sol, loopPlanetNodeSizes.luna]);
+    expect(steps.every((node, index) => index === 0 || node.x > steps[index - 1]!.x + steps[index - 1]!.width)).toBe(true);
+    expect(new Set(steps.map((node) => node.y + node.height / 2))).toEqual(new Set([96]));
+    expect(loopNodeSizes.step.maxWidth).toBe(loopPlanetNodeSizes.sol);
+  });
+
+  it("detaches edge endpoints by eight pixels and uses five-pixel connection points", () => {
+    const detached = detachedLoopEdgeProps({
+      sourceX: 20,
+      sourceY: 30,
+      targetX: 120,
+      targetY: 80,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Top
+    } as never);
+
+    expect(detached).toMatchObject({ sourceX: 28, sourceY: 30, targetX: 120, targetY: 72 });
+    expect(loopEdgeEndpointGap).toBe(8);
+    expect(loopConnectionPointRadius * 2).toBe(5);
   });
 });
