@@ -8,7 +8,7 @@ export const loopNodeSizes = {
 };
 
 export const loopCanvasLayoutConfig = {
-  startX: 72,
+  startX: 120,
   startY: 64,
   columnGap: 72,
   horizontalEdgeGap: 184,

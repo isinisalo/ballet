@@ -2,38 +2,38 @@
 // transaction/event boundary over the focused control-plane stores and preflight service.
 import { EventEmitter } from "node:events";
 import { v4 as uuid } from "uuid";
-import type { ProjectLoop } from "../../shared/domain/automation.js";
-import type { AgentExecutionState, Agent } from "../../shared/domain/agents.js";
-import type {
-  AgentExecutionBinding,
-  AgentRun,
-  ExecutionAgentSnapshot,
-  ExecutionPolicy,
-  ExecutionSpec,
-  ExecutionTask,
-  RootFinalizationReport,
-  RootRunDisposition,
-  TaskDispositionResult
-} from "../../shared/domain/runtime.js";
 import type { z } from "zod";
 import type {
-  daemonCancelBodySchema,
-  daemonCompleteBodySchema,
-  daemonEventBatchBodySchema,
-  daemonFailBodySchema,
-  daemonTaskStateBodySchema
+    daemonCancelBodySchema,
+    daemonCompleteBodySchema,
+    daemonEventBatchBodySchema,
+    daemonFailBodySchema,
+    daemonTaskStateBodySchema
 } from "../../shared/api/runtime-schemas.js";
-import type { ControlPlaneDatabase } from "./ControlPlaneDatabase.js";
+import type { Agent, AgentExecutionState } from "../../shared/domain/agents.js";
+import type { ProjectLoop } from "../../shared/domain/automation.js";
+import type {
+    AgentExecutionBinding,
+    AgentRun,
+    ExecutionAgentSnapshot,
+    ExecutionPolicy,
+    ExecutionSpec,
+    ExecutionTask,
+    RootFinalizationReport,
+    RootRunDisposition,
+    TaskDispositionResult
+} from "../../shared/domain/runtime.js";
 import type { AdminAuthStore } from "./AdminAuthStore.js";
 import type { AgentExecutionStore } from "./AgentExecutionStore.js";
+import type { ControlPlaneDatabase } from "./ControlPlaneDatabase.js";
+import { ControlPlaneConflictError, ControlPlanePreflightError } from "./errors.js";
 import type { ExecutionEventStore } from "./ExecutionEventStore.js";
 import type { ExecutionTaskStore, FencedTaskInput, TaskClaim } from "./ExecutionTaskStore.js";
-import type { PairingStore, DaemonIdentity, DaemonPairingPoll } from "./PairingStore.js";
-import type { ProjectStore } from "./ProjectStore.js";
-import type { DaemonHeartbeat, RuntimeRegistryStore } from "./RuntimeRegistryStore.js";
-import { ControlPlaneConflictError, ControlPlanePreflightError } from "./errors.js";
-import type { LoopPreflightResult, RuntimePreflightService } from "./RuntimePreflightService.js";
+import type { DaemonIdentity, DaemonPairingPoll, PairingStore } from "./PairingStore.js";
+import type { ProjectStore, RegisteredProject } from "./ProjectStore.js";
 import type { RootFinalizationStore } from "./RootFinalizationStore.js";
+import type { LoopPreflightResult, RuntimePreflightService } from "./RuntimePreflightService.js";
+import type { DaemonHeartbeat, RuntimeRegistryStore } from "./RuntimeRegistryStore.js";
 
 type CompleteInput = z.infer<typeof daemonCompleteBodySchema>;
 type FailInput = z.infer<typeof daemonFailBodySchema>;
@@ -64,6 +64,7 @@ export interface ControlPlaneServiceOptions {
 }
 
 export class ControlPlaneService {
+  private project?: RegisteredProject;
   private readonly changes = new EventEmitter();
   private readonly checkoutRefreshes = new Map<string, {
     requestId: string;
@@ -77,7 +78,12 @@ export class ControlPlaneService {
     this.changes.setMaxListeners(200);
   }
 
-  registerProject(input: { id: string; repositoryUrl: string; checkoutPath: string }) { return this.options.projects.register(input); }
+  registerProject(input: { id: string; repositoryUrl: string; checkoutPath: string }) {
+    const project = this.options.projects.register(input);
+    this.project = project;
+    this.options.preflight.setProject(project);
+    return project;
+  }
   adminBootstrapped() { return this.options.admin.hasAdmin(); }
   bootstrapAdmin(password: string) { return this.options.admin.bootstrap(password); }
   loginAdmin(password: string) { return this.options.admin.createSession(password); }
@@ -466,7 +472,7 @@ export class ControlPlaneService {
     this.checkoutRefreshes.delete(deviceId);
     current.resolve();
   }
-  private requireActiveProject() { const project = this.options.projects.active(); if (!project) throw new ControlPlaneConflictError("No active project is registered."); return project; }
+  private requireActiveProject() { const project = this.project ?? this.options.projects.active(); if (!project) throw new ControlPlaneConflictError("No active project is registered."); return project; }
   private requireActiveDevice(id: string) {
     const device = this.options.registry.require(id);
     if (device.projectId !== this.requireActiveProject().id) throw new ControlPlaneConflictError("Runtime device is not in the active project.");

@@ -1,13 +1,13 @@
 import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type {
-  AgentExecutionBinding,
-  ExecutionProjectSnapshot,
-  ExecutionRuntimeSnapshot,
-  RuntimeBackend,
-  RuntimePreflightIssue
+    AgentExecutionBinding,
+    ExecutionProjectSnapshot,
+    ExecutionRuntimeSnapshot,
+    RuntimeBackend,
+    RuntimePreflightIssue
 } from "../../shared/domain/runtime.js";
-import { valueHash } from "./crypto.js";
 import type { AgentExecutionStore } from "./AgentExecutionStore.js";
+import { valueHash } from "./crypto.js";
 import type { ProjectStore, RegisteredProject } from "./ProjectStore.js";
 import type { RuntimeRegistryStore } from "./RuntimeRegistryStore.js";
 
@@ -27,14 +27,20 @@ export interface LoopPreflightResult {
 }
 
 export class RuntimePreflightService {
+  private project?: RegisteredProject;
+
   constructor(
     private readonly projects: ProjectStore,
     private readonly registry: RuntimeRegistryStore,
     private readonly agents: AgentExecutionStore
   ) {}
 
+  setProject(project: RegisteredProject): void {
+    this.project = project;
+  }
+
   agent(agentId: string, bindingOverride?: AgentExecutionBinding): AgentPreflightResult {
-    const project = this.projects.active();
+    const project = this.project ?? this.projects.active();
     if (!project) return failure(agentId, "offline", "No active project is registered.");
     const binding = bindingOverride ?? this.agents.getBinding(project.id, agentId);
     if (!binding) return failure(agentId, "unbound", "Agent has no execution runtime binding.");

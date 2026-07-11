@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import { v4 as uuid } from "uuid";
 import type { ProjectCheckout } from "../../shared/domain/runtime.js";
-import { ControlPlaneConflictError, ControlPlaneNotFoundError } from "./errors.js";
+import { ControlPlaneNotFoundError } from "./errors.js";
 
 export interface RegisteredProject {
   id: string;
@@ -43,19 +43,24 @@ export class ProjectStore {
     const transaction = this.connection().transaction(() => {
       const active = this.active();
       if (active && active.id !== input.id && this.hasActiveRuns(active.id)) {
-        throw new ControlPlaneConflictError(`Project ${active.id} cannot be deactivated while it has an active Run.`);
+        this.save(input, timestamp, false);
+        return this.require(input.id);
       }
       this.connection().prepare("UPDATE projects SET is_active = 0 WHERE is_active = 1").run();
-      this.connection().prepare(`
-        INSERT INTO projects (
-          project_id, repository_url, default_checkout_path, is_active, created_at, updated_at
-        ) VALUES (?, ?, ?, 1, ?, ?)
-        ON CONFLICT(project_id) DO UPDATE SET repository_url = excluded.repository_url,
-          default_checkout_path = excluded.default_checkout_path, is_active = 1, updated_at = excluded.updated_at
-      `).run(input.id, input.repositoryUrl, input.checkoutPath, timestamp, timestamp);
+      this.save(input, timestamp, true);
       return this.require(input.id);
     });
     return transaction() as RegisteredProject;
+  }
+
+  private save(input: { id: string; repositoryUrl: string; checkoutPath: string }, timestamp: string, active: boolean): void {
+      this.connection().prepare(`
+        INSERT INTO projects (
+          project_id, repository_url, default_checkout_path, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(project_id) DO UPDATE SET repository_url = excluded.repository_url,
+          default_checkout_path = excluded.default_checkout_path, is_active = excluded.is_active, updated_at = excluded.updated_at
+      `).run(input.id, input.repositoryUrl, input.checkoutPath, active ? 1 : 0, timestamp, timestamp);
   }
 
   private hasActiveRuns(projectId: string): boolean {

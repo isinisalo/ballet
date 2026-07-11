@@ -49,7 +49,10 @@ describe("v3 compact loop canvas", () => {
     expect(stepNodes.every((node) => node.width === loopNodeSizes.step.minWidth && node.height === 22)).toBe(true);
     expect(layout.nodes.some((node) => node.kind === "loop" && node.loopSummary?.loopId === "roadmap")).toBe(true);
     expect(layout.nodes.some((node) => node.kind === "output-event" && node.outputEvent?.eventType === "failed")).toBe(true);
-    expect(layout.edges.some((edge) => edge.tone === "cross-loop" && edge.route?.targetLoopId === "roadmap")).toBe(true);
+    const crossLoopEdge = layout.edges.find((edge) => edge.tone === "cross-loop" && edge.route?.targetLoopId === "roadmap");
+    const crossLoopSource = layout.nodes.find((node) => node.key === crossLoopEdge?.sourceNodeKey);
+    expect(crossLoopEdge).toBeDefined();
+    expect(loopEdgeDisplayLabel(crossLoopEdge, crossLoopSource)).toEqual({ value: "gate", kind: "step" });
     expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining(["approved", "rejected"]));
     expect(layout.edges.some((edge) => edge.route?.outputId === "rejected" && ["top", "bottom"].includes(edge.sourceHandleId ?? ""))).toBe(true);
   });
@@ -95,6 +98,7 @@ describe("v3 compact loop canvas", () => {
     expect(stepNodes).toHaveLength(3);
     expect(approved.targetNodeKey).not.toBe(rejected.targetNodeKey);
     expect(loopEdgeDisplayLabel(approved, prepare)).toEqual({ value: "prepare", kind: "step" });
+    expect(loopEdgeDisplayLabel(rejected, prepare)).toBeUndefined();
     expect(loopEdgeLabelPlacement({ sourceX: 40, sourceY: 20, targetX: 160, targetY: 80, data: { sourceNode: { width: 24 } } } as never, undefined as never, { value: "prepare", kind: "step" })).toEqual({
       x: 8,
       y: 20,

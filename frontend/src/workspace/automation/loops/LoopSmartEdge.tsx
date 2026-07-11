@@ -63,7 +63,6 @@ export function loopEdgeDisplayLabel(
 ): LoopEdgeDisplayLabel | undefined {
   if (!edge) return undefined;
   if (sourceNode?.kind === "loop") return undefined;
-  if (edge.tone === "cross-loop") return undefined;
   return stepOrOutputDisplayLabel(edge, sourceNode);
 }
 
@@ -78,7 +77,7 @@ function stepOrOutputDisplayLabel(
     outputSlotKind !== "rework";
 
   if (usesStepLabel && sourceStepId) return { value: sourceStepId, kind: "step" };
-  if (edge.label) return { value: edge.label, kind: "output" };
+  if (edge.label && !["approved", "rejected"].includes(edge.label)) return { value: edge.label, kind: "output" };
   return undefined;
 }
 
