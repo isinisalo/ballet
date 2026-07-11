@@ -22,17 +22,17 @@ describe("agent execution binding UI", () => {
 
     const save = await screen.findByRole("button", { name: "Save execution" });
     expect(save).toBeDisabled();
-    expect(screen.getByText("Select computer")).toBeInTheDocument();
-    const computer = screen.getByLabelText("Computer");
-    await waitFor(() => expect(computer).toBeEnabled());
-    await user.click(computer);
+    expect(screen.getByText("Select runtime")).toBeInTheDocument();
+    const runtime = screen.getByLabelText("Runtime");
+    await waitFor(() => expect(runtime).toBeEnabled());
+    await user.click(runtime);
     await user.click(await screen.findByRole("option", { name: /Iiro's MacBook Pro/ }));
     await user.click(screen.getByLabelText("Provider"));
     await user.click(await screen.findByRole("option", { name: "Codex CLI" }));
     expect(save).toBeDisabled();
     await user.click(screen.getByLabelText("Model"));
     await user.click(await screen.findByRole("option", { name: "GPT Test" }));
-    await user.click(screen.getByLabelText("Reasoning"));
+    await user.click(screen.getByLabelText("Reasoning effort"));
     await user.click(await screen.findByRole("option", { name: "high" }));
     expect(screen.getByText("current project checkout only")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Advanced policy/ }));
