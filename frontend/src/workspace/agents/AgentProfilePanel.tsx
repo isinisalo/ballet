@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
@@ -60,7 +59,6 @@ export function AgentProfilePanel({ agent, executionState, editor, executionEdit
   const [editingField, setEditingField] = useState<"name" | "description" | null>(null);
   const name = editor.form.name ?? agent.name;
   const description = editor.form.description ?? agent.description;
-  const enabled = editor.form.enabled ?? agent.enabled;
 
   return (
     <aside className="bg-background px-3 py-3">
@@ -91,7 +89,6 @@ export function AgentProfilePanel({ agent, executionState, editor, executionEdit
       </div>
       <AgentExecutionSettingsForm compact agentId={agent.id} editor={executionEditor} />
       <ProfileSection title="Details">
-        <EnabledProfileRow enabled={enabled} onChange={(nextEnabled) => editor.updateForm({ enabled: nextEnabled })} />
         <ProfileRow label="Skills" value={String(agent.skills.length)} />
         <ProfileRow label="ID" value={agent.id} technical />
         <ProfileRow label="Created" value={formatTimestamp(agent.createdAt)} />
@@ -172,8 +169,4 @@ function ProfileRow({ label, value, technical = false }: {
       <dd title={value} className={cn("min-w-0 truncate text-foreground", technical && "font-mono")}>{value}</dd>
     </div>
   );
-}
-
-function EnabledProfileRow({ enabled, onChange }: { enabled: boolean; onChange: (value: boolean) => void }) {
-  return <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 text-xs leading-4"><dt className="text-muted-foreground">Enabled</dt><dd><Switch checked={enabled} aria-label="Agent enabled" onCheckedChange={onChange} /></dd></div>;
 }

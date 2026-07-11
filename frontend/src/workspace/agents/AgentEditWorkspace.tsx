@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
-import { Activity, BookOpenText, ChevronRight, FileText, ListChecks, TerminalSquare } from "lucide-react";
+import { Activity, BookOpenText, ChevronRight, FileText } from "lucide-react";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
 import { AgentLiveStatusBadge, AgentProfilePanel } from "./AgentProfilePanel";
 import { useAgentExecutionBinding } from "./execution/useAgentExecutionBinding";
@@ -8,10 +8,8 @@ import type { AgentEditorState } from "./useAgentEditor";
 
 const workspaceTabs = [
   { label: "Activity", icon: Activity },
-  { label: "Tasks", icon: ListChecks },
   { label: "Instructions", icon: FileText },
-  { label: "Skills", icon: BookOpenText },
-  { label: "Custom Args", icon: TerminalSquare }
+  { label: "Skills", icon: BookOpenText }
 ];
 
 export function AgentEditWorkspace({ agent, executionState, editor }: {

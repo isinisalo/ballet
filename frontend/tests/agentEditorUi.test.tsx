@@ -37,6 +37,8 @@ describe("agent instructions workspace", () => {
 
     expect(screen.getByRole("tab", { name: "Instructions" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Activity" })).toBeDisabled();
+    expect(screen.queryByRole("tab", { name: "Tasks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Custom Args" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Running")).toHaveLength(2);
     expect(screen.getByLabelText("Runtime")).toBeInTheDocument();
 
@@ -60,6 +62,8 @@ describe("agent instructions workspace", () => {
     expect(screen.getByLabelText("Model")).toBeInTheDocument();
     expect(screen.getByLabelText("Reasoning effort")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Network access" })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Agent enabled" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save execution" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Environment" })).not.toBeInTheDocument();
   });
 
@@ -86,7 +90,7 @@ describe("agent instructions workspace", () => {
     }
   });
 
-  it("saves execution settings from the profile rail", async () => {
+  it("saves execution settings automatically from the profile rail", async () => {
     const user = userEvent.setup();
     const device = runtimeDevice();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -113,7 +117,6 @@ describe("agent instructions workspace", () => {
       await user.click(screen.getByLabelText("Reasoning effort"));
       await user.click(await screen.findByRole("option", { name: "high" }));
       await user.click(screen.getByRole("switch", { name: "Network access" }));
-      await user.click(screen.getByRole("button", { name: "Save execution" }));
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
         "/api/agents/agent-architect/execution-binding",

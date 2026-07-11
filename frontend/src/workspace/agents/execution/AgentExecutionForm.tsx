@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Cpu, Save } from "lucide-react";
+import { ChevronDown, Cpu } from "lucide-react";
 import { useId, useState } from "react";
 import { backendReadiness, providerLabel } from "../../runtimes/runtimeRegistry";
 import { backendsForDevice, executionFormError, modelOptions, PROVIDER_DEFAULT, reasoningOptions, selectedExecutionBackend, selectedExecutionDevice } from "./executionOptions";
@@ -30,16 +30,15 @@ function CompactAgentExecutionSettings({ agentId, editor, onSaved }: { agentId: 
 
   return (
     <section className="mt-5 grid gap-3 border-t border-divider-strong pt-4" aria-label="Agent execution settings">
-      <header className="flex items-center justify-between gap-3">
+      <header>
         <h3 className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase leading-4 tracking-[0.05em] text-muted-foreground"><Cpu className="size-3.5" /> Execution</h3>
-        <Button type="button" size="icon-sm" className="size-6" aria-label="Save execution" title="Save execution" disabled={settings.saveDisabled} onClick={settings.save}><Save className="size-3.5" /></Button>
       </header>
       {editor.error ? <p role="alert" className="text-xs leading-4 text-destructive">{editor.error}</p> : null}
       {!editor.loading && editor.devices.length === 0 ? <p className="text-xs leading-4 text-muted-foreground">No runtime computers are connected.</p> : null}
       <ExecutionSelectionFields settings={settings} compact />
       <NetworkAccessField compact checked={editor.form.policy.network} disabled={!settings.supportsNetwork} onChange={settings.setNetwork} />
-      <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} compact />
-      <p className="text-xs leading-4 text-muted-foreground">{settings.validationError ?? "Execution binding is explicit; Ballet never selects the first available runtime."}</p>
+      <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} onReadOnlyRootsChange={settings.setReadOnlyRoots} onReadOnlyRootsBlur={settings.saveReadOnlyRoots} compact />
+      <p className="text-xs leading-4 text-muted-foreground">{editor.saving ? "Saving execution…" : settings.validationError ?? "Execution binding is explicit; Ballet never selects the first available runtime."}</p>
     </section>
   );
 }
@@ -58,8 +57,8 @@ function StandardAgentExecutionSettings({ agentId, editor, onSaved }: { agentId:
       <ExecutionSelectionFields settings={settings} />
       <div className="border border-divider-strong bg-background px-3 py-2 text-xs"><span className="font-medium text-foreground">Write scope:</span> <span className="text-muted-foreground">current project checkout only</span></div>
       <NetworkAccessField checked={editor.form.policy.network} disabled={!settings.supportsNetwork} onChange={settings.setNetwork} />
-      <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} />
-      <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{settings.validationError ?? "Execution binding is explicit; Ballet never selects the first available runtime."}</p><Button type="button" size="sm" disabled={settings.saveDisabled} onClick={settings.save}><Save /> {editor.saving ? "Saving…" : "Save execution"}</Button></div>
+      <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} onReadOnlyRootsChange={settings.setReadOnlyRoots} onReadOnlyRootsBlur={settings.saveReadOnlyRoots} />
+      <p className="text-xs text-muted-foreground">{editor.saving ? "Saving execution…" : settings.validationError ?? "Execution binding is explicit; Ballet never selects the first available runtime."}</p>
     </section>
   );
 }
@@ -72,21 +71,25 @@ function useExecutionSettings(editor: AgentExecutionBindingEditor, onSaved?: () 
   const readiness = device && backend ? backendReadiness(device, backend) : undefined;
   const supportsNetwork = backend?.capabilities.policy.networkControl ?? false;
   const supportsRoots = backend?.capabilities.policy.readOnlyRoots ?? false;
-  const save = () => void editor.save().then((saved) => { if (saved) onSaved?.(); });
+  const persist = (pendingSave: Promise<boolean>) => void pendingSave.then((saved) => { if (saved) onSaved?.(); });
+  const selectDevice = (deviceId: string) => persist(editor.selectDevice(deviceId));
+  const selectBackend = (runtimeBackendId: string) => persist(editor.selectBackend(runtimeBackendId));
   const selectModel = (model: string) => {
     const options = reasoningOptions(backend, model);
-    editor.updateForm({ model, reasoning: options.length === 1 && options[0].value === PROVIDER_DEFAULT ? PROVIDER_DEFAULT : "" });
+    persist(editor.updateAndSave({ model, reasoning: options.length === 1 && options[0].value === PROVIDER_DEFAULT ? PROVIDER_DEFAULT : "" }));
   };
-  const setNetwork = (network: boolean) => editor.updateForm({ policy: { ...editor.form.policy, network } });
-  return { advancedOpen, backend, device, editor, readiness, save, saveDisabled: Boolean(validationError) || editor.saving || editor.loading, selectModel, setAdvancedOpen, setNetwork, supportsNetwork, supportsRoots, validationError };
+  const setNetwork = (network: boolean) => persist(editor.updateAndSave({ policy: { ...editor.form.policy, network } }));
+  const setReadOnlyRoots = (readOnlyRoots: string[]) => editor.updateForm({ policy: { ...editor.form.policy, readOnlyRoots } });
+  const saveReadOnlyRoots = () => persist(editor.saveIfValid());
+  return { advancedOpen, backend, device, editor, readiness, selectBackend, selectDevice, selectModel, saveReadOnlyRoots, setAdvancedOpen, setNetwork, setReadOnlyRoots, supportsNetwork, supportsRoots, validationError };
 }
 
 function ExecutionSelectionFields({ settings, compact = false }: { settings: ReturnType<typeof useExecutionSettings>; compact?: boolean }) {
   const { backend, device, editor } = settings;
   return (
     <div className={compact ? "grid gap-3" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-4"}>
-      <ExecutionSelect compact={compact} label="Runtime" value={editor.form.deviceId} placeholder="Select runtime" disabled={editor.loading} options={editor.devices.map((item) => ({ value: item.id, label: `${item.displayName} · ${item.status}` }))} onChange={editor.selectDevice} />
-      <ExecutionSelect compact={compact} label="Provider" value={editor.form.runtimeBackendId} placeholder="Select provider" disabled={!device} options={backendsForDevice(editor.devices, editor.form.deviceId).map((item) => ({ value: item.id, label: providerLabel(item.provider) }))} onChange={editor.selectBackend} />
+      <ExecutionSelect compact={compact} label="Runtime" value={editor.form.deviceId} placeholder="Select runtime" disabled={editor.loading} options={editor.devices.map((item) => ({ value: item.id, label: `${item.displayName} · ${item.status}` }))} onChange={settings.selectDevice} />
+      <ExecutionSelect compact={compact} label="Provider" value={editor.form.runtimeBackendId} placeholder="Select provider" disabled={!device} options={backendsForDevice(editor.devices, editor.form.deviceId).map((item) => ({ value: item.id, label: providerLabel(item.provider) }))} onChange={settings.selectBackend} />
       <ExecutionSelect compact={compact} label="Model" value={editor.form.model} placeholder="Select model" disabled={!backend} options={modelOptions(backend)} onChange={settings.selectModel} />
       <ExecutionSelect compact={compact} label="Reasoning effort" value={editor.form.reasoning} placeholder="Select effort" disabled={!backend || !editor.form.model} options={reasoningOptions(backend, editor.form.model)} onChange={(reasoning) => editor.updateForm({ reasoning })} />
     </div>
@@ -106,6 +109,6 @@ function NetworkAccessField({ checked, disabled, onChange, compact = false }: { 
   return <label className="flex items-center justify-between gap-4 text-xs"><span><strong className="block text-foreground">Network access</strong><span className="text-muted-foreground">Disabled by default. The provider must advertise network control.</span></span><Switch checked={checked} disabled={disabled} aria-label="Network access" onCheckedChange={onChange} /></label>;
 }
 
-function AdvancedPolicy({ agentId, editor, supportsRoots, open, onOpenChange, compact = false }: { agentId: string; editor: AgentExecutionBindingEditor; supportsRoots: boolean; open: boolean; onOpenChange: (open: boolean) => void; compact?: boolean }) {
-  return <Collapsible open={open} onOpenChange={onOpenChange}><CollapsibleTrigger render={<Button type="button" size="sm" variant="ghost" className={cn("px-0 text-muted-foreground", compact && "h-6 text-xs")}><ChevronDown className={cn("transition-transform", open && "rotate-180")} /> Advanced policy</Button>} /><CollapsibleContent className="grid gap-3 border-t border-divider-strong pt-3"><Field className="gap-1.5"><FieldLabel htmlFor={`read-only-roots-${agentId}`}>Additional read-only roots</FieldLabel><Textarea id={`read-only-roots-${agentId}`} className="min-h-20 font-mono text-xs" disabled={!supportsRoots} placeholder="One absolute path per line" value={editor.form.policy.readOnlyRoots.join("\n")} onChange={(event) => editor.updateForm({ policy: { ...editor.form.policy, readOnlyRoots: event.target.value.split("\n").map((value) => value.trim()).filter(Boolean) } })} /></Field></CollapsibleContent></Collapsible>;
+function AdvancedPolicy({ agentId, editor, supportsRoots, open, onOpenChange, onReadOnlyRootsChange, onReadOnlyRootsBlur, compact = false }: { agentId: string; editor: AgentExecutionBindingEditor; supportsRoots: boolean; open: boolean; onOpenChange: (open: boolean) => void; onReadOnlyRootsChange: (readOnlyRoots: string[]) => void; onReadOnlyRootsBlur: () => void; compact?: boolean }) {
+  return <Collapsible open={open} onOpenChange={onOpenChange}><CollapsibleTrigger render={<Button type="button" size="sm" variant="ghost" className={cn("px-0 text-muted-foreground", compact && "h-6 text-xs")}><ChevronDown className={cn("transition-transform", open && "rotate-180")} /> Advanced policy</Button>} /><CollapsibleContent className="grid gap-3 border-t border-divider-strong pt-3"><Field className="gap-1.5"><FieldLabel htmlFor={`read-only-roots-${agentId}`}>Additional read-only roots</FieldLabel><Textarea id={`read-only-roots-${agentId}`} className="min-h-20 font-mono text-xs" disabled={!supportsRoots} placeholder="One absolute path per line" value={editor.form.policy.readOnlyRoots.join("\n")} onBlur={onReadOnlyRootsBlur} onChange={(event) => onReadOnlyRootsChange(event.target.value.split("\n").map((value) => value.trim()).filter(Boolean))} /></Field></CollapsibleContent></Collapsible>;
 }
