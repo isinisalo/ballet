@@ -1,20 +1,20 @@
-import type { AppData } from "@shared/api/workspace-contracts";
 import { EmptyState } from "@/components/shared/workspace-ui";
+import type { AgentExecutionState, AppData } from "@shared/api/workspace-contracts";
+import type { RuntimeStreamStatus } from "../app/useRuntimeStream";
 import { AgentsView } from "./agents/AgentsView";
 import { AutomationView } from "./automation/AutomationView";
-import { RuntimeRegistryView } from "./runtimes";
-import {
-  AdrsPage,
-  GoalsPage,
-  InstructionsPage,
-  ProjectDocumentPage,
-  ProjectsOverview
-} from "./documents/ProjectDocumentPages";
-import { SkillsView } from "./skills/SkillsView";
-import type { WorkspaceSelection } from "./selection/useWorkspaceSelection";
-import type { RouteState } from "./types";
 import type { useWorkspaceMutations } from "./data/useWorkspaceMutations";
-import type { RuntimeStreamStatus } from "../app/useRuntimeStream";
+import {
+    AdrsPage,
+    GoalsPage,
+    InstructionsPage,
+    ProjectDocumentPage,
+    ProjectsOverview
+} from "./documents/ProjectDocumentPages";
+import { RuntimeRegistryView } from "./runtimes";
+import type { WorkspaceSelection } from "./selection/useWorkspaceSelection";
+import { SkillsView } from "./skills/SkillsView";
+import type { RouteState } from "./types";
 
 type WorkspaceMutationCallbacks = ReturnType<typeof useWorkspaceMutations>;
 
@@ -23,6 +23,7 @@ export function WorkspaceRouteOutlet({
   data,
   selection,
   mutations,
+  agentExecutionStates,
   runtimeStreamStatus,
   navigate
 }: {
@@ -30,6 +31,7 @@ export function WorkspaceRouteOutlet({
   data: AppData;
   selection: WorkspaceSelection;
   mutations: WorkspaceMutationCallbacks;
+  agentExecutionStates: AgentExecutionState[];
   runtimeStreamStatus: RuntimeStreamStatus;
   navigate: (path: string) => void;
 }) {
@@ -54,7 +56,7 @@ export function WorkspaceRouteOutlet({
     case "runtimes":
       return <RuntimeRegistryView selectedDeviceId={route.runtimeDeviceId} onSelectDevice={(deviceId) => navigate(deviceId ? `/runtimes?id=${encodeURIComponent(deviceId)}` : "/runtimes")} />;
     case "agents":
-      return <AgentsView agent={selection.selectedAgent} mode={route.agentMode ?? "edit"} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
+      return <AgentsView agent={selection.selectedAgent} agentExecutionStates={agentExecutionStates} mode={route.agentMode ?? "edit"} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
     case "skills":
       return <SkillsView skill={selection.selectedSkill} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
     default:

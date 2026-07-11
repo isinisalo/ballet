@@ -1,21 +1,21 @@
-import { Menu } from "lucide-react";
-import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
-import { AppSidebar } from "./layout/AppSidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger
+    SidebarInset,
+    SidebarProvider,
+    SidebarTrigger
 } from "@/components/ui/sidebar";
+import { Menu } from "lucide-react";
 import { useNotifications } from "../app/notifications";
 import { useRuntimeStream } from "../app/useRuntimeStream";
+import { useAgentExecutionStates } from "./data/useAgentExecutionStates";
+import { useRuntimeNotifications } from "./data/useRuntimeNotifications";
 import { useWorkspaceData } from "./data/useWorkspaceData";
 import { useWorkspaceMutations } from "./data/useWorkspaceMutations";
-import { useRuntimeNotifications } from "./data/useRuntimeNotifications";
-import { useAgentExecutionStates } from "./data/useAgentExecutionStates";
-import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
+import { AppSidebar } from "./layout/AppSidebar";
 import { useWorkspaceSelection } from "./selection/useWorkspaceSelection";
+import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
+import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
 
 export function WorkspaceShell() {
   const { notifications, notify } = useNotifications();
@@ -63,6 +63,7 @@ export function WorkspaceShell() {
                 data={data}
                 selection={selection}
                 mutations={mutations}
+                agentExecutionStates={agentExecutionStates}
                 runtimeStreamStatus={runtimeStreamStatus}
                 navigate={navigate}
               />

@@ -1,10 +1,11 @@
-import { Bot } from "lucide-react";
-import type { Agent } from "@shared/api/workspace-contracts";
 import { CrudActions, ErrorPreview, Panel, TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import { type RemoveAgent, type SaveAgent, type AgentEditorState, useAgentEditor } from "./useAgentEditor";
+import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
+import { Bot } from "lucide-react";
+import { AgentEditWorkspace } from "./AgentEditWorkspace";
+import { type AgentEditorState, type RemoveAgent, type SaveAgent, useAgentEditor } from "./useAgentEditor";
 
 function AgentEditorActions({ editor }: { editor: AgentEditorState }) {
   return <CrudActions formId={editor.formId} newLabel="New" saveLabel="Save agent" deleteLabel="Delete agent" id={editor.form.id} disabled={editor.saveDisabled} deleteType="agent" resourceName={editor.form.name} onNew={editor.newAgent} onDelete={editor.deleteAgent} showNew={false} />;
@@ -33,6 +34,7 @@ export function AgentEditorContent({ editor, showNameField = true }: { editor: A
 
 export function AgentEditor(props: {
   agent?: Agent;
+  executionState?: AgentExecutionState;
   save: SaveAgent;
   remove: RemoveAgent;
   onSaved?: (agent: Agent) => void;
@@ -40,5 +42,6 @@ export function AgentEditor(props: {
   onDeleted?: (id: string) => void;
 }) {
   const editor = useAgentEditor(props);
+  if (props.agent) return <AgentEditWorkspace agent={props.agent} executionState={props.executionState} editor={editor} />;
   return <Panel title={editor.form.id ? "Update agent" : "Create agent"} icon={<Bot data-icon="inline-start" />} action={<AgentEditorActions editor={editor} />}><AgentEditorContent editor={editor} /></Panel>;
 }

@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { AgentExecutionForm } from "./AgentExecutionForm";
 import { AgentExecutionModeSwitch } from "./AgentExecutionModeSwitch";
 import { AgentRunPane } from "./AgentRunPane";
 import type { AgentExecutionMode } from "./types";
@@ -14,7 +13,7 @@ export function AgentExecutionWorkspace({ agentId, mode, editContent, runDisable
   return (
     <div className="grid gap-3">
       <div className="flex justify-end"><AgentExecutionModeSwitch mode={mode} runDisabledReason={runDisabledReason} onChange={onModeChange} /></div>
-      {mode === "edit" ? <>{editContent}<AgentExecutionForm agentId={agentId} /></> : <AgentRunPane agentId={agentId} disabledReason={runDisabledReason} />}
+      {mode === "edit" ? editContent : <AgentRunPane agentId={agentId} disabledReason={runDisabledReason} />}
     </div>
   );
 }

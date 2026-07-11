@@ -82,6 +82,27 @@ typography:
     fontSize: 14px
     fontWeight: '400'
     lineHeight: 20px
+  agent-inspector-title:
+    fontFamily: Inter
+    fontSize: 16px
+    fontWeight: '600'
+    lineHeight: 20px
+  agent-inspector-body:
+    fontFamily: Inter
+    fontSize: 12px
+    fontWeight: '400'
+    lineHeight: 16px
+  agent-inspector-value:
+    fontFamily: Geist
+    fontSize: 12px
+    fontWeight: '400'
+    lineHeight: 16px
+  agent-inspector-label:
+    fontFamily: Geist
+    fontSize: 10px
+    fontWeight: '500'
+    lineHeight: 16px
+    letterSpacing: 0.05em
   label-caps:
     fontFamily: Geist
     fontSize: 11px
@@ -165,6 +186,7 @@ The shape language is **Soft-Industrial**. Keep controls precise and compact.
 - **Sidebar:** Treat the sidebar as an operational index, not a marketing navigation area. Use compact labels, icons, grouped sections, and clear selected state.
 - **Buttons:** Primary buttons are solid Electric Blue. Secondary buttons are ghost or outline controls with subtle borders. Destructive buttons must use the error token family.
 - **Agent Chips:** Use a leading dot plus label. Emerald means running or healthy. Amber means idle, queued, pending, or needs attention. Gray means offline, disabled, unknown, or archived. Use pulse animation only for live-running state.
+- **Agent Editor Inspector:** Let the selected-agent editor use the full available workspace width. Keep its profile rail compact and dark at the base surface level: use `agent-inspector-title` with `on-surface` for the name, `agent-inspector-body` with `on-surface-variant` for description and row labels, `agent-inspector-value` with `on-surface` for technical values, and `agent-inspector-label` for uppercase section headings. Status chips use the existing semantic state colors and the 12px inspector body size.
 - **Cards & Panels:** Use cards for repeated entities and panels for workspace regions. Do not place cards inside cards. Prefer headers with metadata and a compact command area.
 - **Tables & Lists:** Use tight row heights, clear separators, and zebra-striping with a 2% lighter surface tint when rows are dense. Keep row controls icon-first where possible.
 - **Inputs:** Use dark surfaces, 1px borders, and Primary focus state. Validation messages must be explicit and adjacent to the field.
