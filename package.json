@@ -9,6 +9,7 @@
     "daemon": "tsx backend/daemon/main.ts",
     "ballet": "tsx backend/cli/main.ts",
     "release:build": "sh scripts/build-release.sh",
+    "release:install": "sh scripts/install-local.sh",
     "build": "rm -rf dist dist-server && tsc -b --force && vite build",
     "test": "vitest run",
     "lint": "eslint .",
