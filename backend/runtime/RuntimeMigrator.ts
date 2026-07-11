@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 export class RuntimeMigrator {
   migrate(db: Database.Database): void {
@@ -56,12 +56,15 @@ export class RuntimeMigrator {
 
       CREATE TABLE IF NOT EXISTS loop_runs (
         run_id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
         loop_id TEXT NOT NULL,
         root_run_id TEXT NOT NULL,
         parent_run_id TEXT,
         parent_step_run_id TEXT,
         source TEXT NOT NULL,
         status TEXT NOT NULL,
+        runtime_device_id TEXT,
+        execution_plan_json TEXT,
         input TEXT,
         snapshot_json TEXT NOT NULL,
         transition_count INTEGER NOT NULL DEFAULT 0,
@@ -74,11 +77,14 @@ export class RuntimeMigrator {
 
       CREATE TABLE IF NOT EXISTS step_runs (
         step_run_id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
         run_id TEXT NOT NULL,
         loop_id TEXT NOT NULL,
         step_id TEXT NOT NULL,
         step_type TEXT NOT NULL,
         agent_id TEXT,
+        execution_task_id TEXT,
+        execution_snapshot_json TEXT,
         status TEXT NOT NULL,
         input TEXT,
         response_input TEXT,
@@ -86,48 +92,19 @@ export class RuntimeMigrator {
         outcome_json TEXT,
         error TEXT,
         attempt INTEGER NOT NULL DEFAULT 0,
-        lease_owner TEXT,
-        lease_until TEXT,
-        thread_id TEXT,
-        turn_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         completed_at TEXT,
         FOREIGN KEY(run_id) REFERENCES loop_runs(run_id) ON DELETE CASCADE
       );
 
-      CREATE TABLE IF NOT EXISTS step_run_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        step_run_id TEXT NOT NULL,
-        source TEXT NOT NULL,
-        kind TEXT NOT NULL,
-        level TEXT NOT NULL,
-        phase TEXT NOT NULL,
-        item_id TEXT,
-        message TEXT NOT NULL,
-        data_json TEXT,
-        content_bytes INTEGER NOT NULL,
-        terminal INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY(step_run_id) REFERENCES step_runs(step_run_id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS thread_bindings (
-        work_item_id TEXT NOT NULL,
-        agent_role TEXT NOT NULL,
-        thread_id TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY(work_item_id, agent_role)
-      );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedupe_key ON events(dedupe_key) WHERE dedupe_key IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedupe_key ON events(project_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS idx_loop_runs_one_active
-        ON loop_runs(loop_id) WHERE status IN ('running', 'waiting_for_human');
-      CREATE INDEX IF NOT EXISTS idx_loop_runs_latest ON loop_runs(loop_id, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_loop_runs_root ON loop_runs(root_run_id);
-      CREATE INDEX IF NOT EXISTS idx_step_runs_queue ON step_runs(status, lease_until, created_at);
-      CREATE INDEX IF NOT EXISTS idx_step_runs_run ON step_runs(run_id, created_at);
-      CREATE INDEX IF NOT EXISTS idx_step_run_logs_cursor ON step_run_logs(step_run_id, id);
+        ON loop_runs(project_id, loop_id) WHERE status IN ('running', 'waiting_for_human');
+      CREATE INDEX IF NOT EXISTS idx_loop_runs_latest ON loop_runs(project_id, loop_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_loop_runs_root ON loop_runs(project_id, root_run_id);
+      CREATE INDEX IF NOT EXISTS idx_step_runs_queue ON step_runs(project_id, status, created_at);
+      CREATE INDEX IF NOT EXISTS idx_step_runs_run ON step_runs(project_id, run_id, created_at);
     `);
   }
 }

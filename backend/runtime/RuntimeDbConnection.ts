@@ -23,7 +23,10 @@ export class RuntimeDbConnection {
   private db?: Database.Database;
   private readonly migrator = new RuntimeMigrator();
 
-  constructor(private readonly dbPath: string) {}
+  constructor(
+    private readonly dbPath: string,
+    private readonly projectId: string
+  ) {}
 
   close(): void {
     this.db?.close();
@@ -61,12 +64,15 @@ export class RuntimeDbConnection {
 
   health(): Record<string, unknown> {
     const db = this.connection();
-    const eventCount = db.prepare("SELECT COUNT(*) AS count FROM events").get() as { count: number };
-    const queuedSteps = db.prepare("SELECT COUNT(*) AS count FROM step_runs WHERE status = 'queued'").get() as { count: number };
-    const activeLoops = db.prepare("SELECT COUNT(*) AS count FROM loop_runs WHERE status IN ('running', 'waiting_for_human')").get() as { count: number };
+    const eventCount = db.prepare("SELECT COUNT(*) AS count FROM events WHERE project_id = ?").get(this.projectId) as { count: number };
+    const queuedSteps = db.prepare("SELECT COUNT(*) AS count FROM step_runs WHERE project_id = ? AND status = 'queued'")
+      .get(this.projectId) as { count: number };
+    const activeLoops = db.prepare("SELECT COUNT(*) AS count FROM loop_runs WHERE project_id = ? AND status IN ('running', 'waiting_for_human')")
+      .get(this.projectId) as { count: number };
     return {
       ok: true,
       dbPath: this.dbPath,
+      projectId: this.projectId,
       sqliteVersion: this.sqliteVersion(),
       events: eventCount.count,
       queuedSteps: queuedSteps.count,

@@ -1,9 +1,6 @@
 import type { AppData } from "../../shared/api/workspaceData.js";
 import { loadMarkdownAppData } from "../markdown-adapter.js";
-import {
-  automationRuntimesToRuntimes,
-  loadProjectAutomationConfigWithIssues
-} from "../automation.js";
+import { loadProjectAutomationConfigWithIssues } from "../automation.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
 
 export class WorkspaceDataService {
@@ -18,7 +15,6 @@ export class WorkspaceDataService {
     data.automation = automation.config;
     data.automationIssues = automation.issues;
     data.eventDefinitions = [];
-    data.runtimes = automationRuntimesToRuntimes(automation.config.runtimes);
     data.events = this.runtimeDatabaseProvider.runtimeDatabase().listEventRecords();
     data.loopRuns = this.runtimeDatabaseProvider.runtimeDatabase().listLoopRuns();
     return data;

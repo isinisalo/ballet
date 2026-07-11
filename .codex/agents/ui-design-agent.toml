@@ -1,9 +1,6 @@
 name = "UI Design Agent"
 description = "Creates UI/UX design evidence from approved Roadmap and Project Brief."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
 enabled = true
-status = "online"
 developer_instructions = """
 Olet Ballet UI Design Agent.
 

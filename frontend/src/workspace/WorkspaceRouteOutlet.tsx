@@ -2,7 +2,7 @@ import type { AppData } from "@shared/api/workspace-contracts";
 import { EmptyState } from "@/components/shared/workspace-ui";
 import { AgentsView } from "./agents/AgentsView";
 import { AutomationView } from "./automation/AutomationView";
-import { RuntimesView } from "./automation/runtimes/RuntimesView";
+import { RuntimeRegistryView } from "./runtimes";
 import {
   AdrsPage,
   GoalsPage,
@@ -52,9 +52,9 @@ export function WorkspaceRouteOutlet({
     case "automation":
       return <AutomationView data={data} selectedId={route.automationEntityId} loopView={route.automationLoopView} mode={route.automationLoopMode ?? "edit"} runtimeStreamStatus={runtimeStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
     case "runtimes":
-      return <RuntimesView data={data} selectedId={route.runtimeId} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
+      return <RuntimeRegistryView selectedDeviceId={route.runtimeDeviceId} onSelectDevice={(deviceId) => navigate(deviceId ? `/runtimes?id=${encodeURIComponent(deviceId)}` : "/runtimes")} />;
     case "agents":
-      return <AgentsView agent={selection.selectedAgent} runtimes={data.runtimes} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
+      return <AgentsView agent={selection.selectedAgent} mode={route.agentMode ?? "edit"} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
     case "skills":
       return <SkillsView skill={selection.selectedSkill} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
     default:

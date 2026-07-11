@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "loops": [
     {
       "id": "project-brief",
@@ -414,14 +414,6 @@
           }
         }
       ]
-    }
-  ],
-  "runtimes": [
-    {
-      "id": "codex-cli",
-      "title": "codex-cli",
-      "command": "codex",
-      "args": []
     }
   ]
 }

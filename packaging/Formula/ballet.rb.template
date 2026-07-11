@@ -1,0 +1,25 @@
+class Ballet < Formula
+  desc "Local-first command center for Codex and GitHub Copilot CLI agents"
+  homepage "https://github.com/isinisalo/ballet"
+  version "{{VERSION}}"
+
+  if Hardware::CPU.arm?
+    url "https://github.com/isinisalo/ballet/releases/download/v{{VERSION}}/ballet_{{VERSION}}_darwin_arm64.tar.gz"
+    sha256 "{{ARM64_SHA256}}"
+  else
+    url "https://github.com/isinisalo/ballet/releases/download/v{{VERSION}}/ballet_{{VERSION}}_darwin_x64.tar.gz"
+    sha256 "{{X64_SHA256}}"
+  end
+
+  depends_on macos: :ventura
+
+  def install
+    bin.install "ballet"
+    libexec.install "libexec/ballet"
+    share.install "share/ballet"
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/ballet version")
+  end
+end

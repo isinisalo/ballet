@@ -2,7 +2,7 @@ import type { AppData, CollectionName } from "../shared/api/workspaceData.js";
 import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { MarkdownDocument } from "../shared/domain/documents.js";
 import type { EventRecord } from "../shared/domain/events.js";
-import type { LoopRunSource, StepRunConsolePage, StepRunResult, StepRunLog } from "../shared/domain/runtime.js";
+import type { LoopRunSource, StepRunResult } from "../shared/domain/runtime.js";
 import { getProjectRoot } from "./markdown.js";
 import type { RuntimeDatabase } from "./runtime-db.js";
 import { AutomationValidationError } from "./automation.js";
@@ -12,6 +12,7 @@ import { MarkdownEntityService } from "./services/MarkdownEntityService.js";
 import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
 import { LoopRunService } from "./services/LoopRunService.js";
 import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
+import type { LoopExecutionGateway } from "./services/LoopExecutionGateway.js";
 
 export class MarkdownStore {
   private readonly runtimeDatabaseProvider = new RuntimeDatabaseProvider(() => this.root);
@@ -31,6 +32,10 @@ export class MarkdownStore {
 
   reset(): Promise<AppData> {
     return this.read();
+  }
+
+  setLoopExecutionGateway(gateway: LoopExecutionGateway): void {
+    this.loopRunService.setExecutionGateway(gateway);
   }
 
   list<T extends CollectionName>(collection: T): Promise<AppData[T]> {
@@ -97,17 +102,6 @@ export class MarkdownStore {
 
   listLoopRuns() {
     return this.loopRunService.list();
-  }
-
-  listStepRunLogs(stepRunId?: string): StepRunLog[] {
-    return this.loopRunService.database().listStepRunLogs(stepRunId);
-  }
-
-  getStepRunConsole(runId: string, stepRunId: string, afterId = 0, limit = 500): StepRunConsolePage | undefined {
-    const run = this.loopRunService.database().getLoopRun(runId);
-    const stepRun = this.loopRunService.database().getStepRun(stepRunId);
-    if (!run || !stepRun || stepRun.runId !== runId) return undefined;
-    return this.loopRunService.database().getStepRunConsole(stepRunId, afterId, limit);
   }
 
   runtimeHealth() {

@@ -7,7 +7,7 @@ import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/l
 import { buildLoopVisualProjection } from "../src/workspace/automation/loops/loopVisualProjection";
 
 const config: ProjectAutomationConfig = {
-  version: 2,
+  version: 3,
   loops: [{
     id: "brief",
     start: "create",
@@ -33,11 +33,10 @@ const config: ProjectAutomationConfig = {
       description: "Create roadmap",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
-  }],
-  runtimes: []
+  }]
 };
 
-describe("v2 compact loop canvas", () => {
+describe("v3 compact loop canvas", () => {
   it("projects Steps and Transitions into the original compact geometry", () => {
     const projection = buildLoopVisualProjection(config, config.loops[0]!);
     const layout = calculateCompositeLoopCanvasLayout({
@@ -57,7 +56,7 @@ describe("v2 compact loop canvas", () => {
 
   it("keeps direct branches, terminal ghosts, labels, and cycle return arcs", () => {
     const cyclic: ProjectAutomationConfig = {
-      version: 2,
+      version: 3,
       loops: [{
         id: "cycle",
         start: "prepare",
@@ -80,8 +79,7 @@ describe("v2 compact loop canvas", () => {
           description: "Repair",
           on: { approved: "review", rejected: { end: "failed" } }
         }]
-      }],
-      runtimes: []
+      }]
     };
     const projection = buildLoopVisualProjection(cyclic, cyclic.loops[0]!);
     const layout = calculateCompositeLoopCanvasLayout({

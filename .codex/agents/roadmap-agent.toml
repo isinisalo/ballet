@@ -1,9 +1,6 @@
 name = "Roadmap Agent"
 description = "Creates traceable roadmap evidence from approved Project Brief without starting UI, technical design, or implementation."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
 enabled = true
-status = "online"
 developer_instructions = """
 Olet Ballet Roadmap Agent.
 

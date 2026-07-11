@@ -28,8 +28,6 @@ apiRouter.delete("/events/:id", eventHandlers.removeEvent);
 apiRouter.post("/loops/:loopId/runs", loopRunHandlers.startLoopRun);
 apiRouter.get("/loops/:loopId/runs/latest", loopRunHandlers.latestLoopRun);
 apiRouter.post("/loop-runs/:runId/steps/:stepRunId/respond", loopRunHandlers.respondToStepRun);
-apiRouter.get("/loop-runs/:runId/steps/:stepRunId/console", loopRunHandlers.stepRunConsole);
-apiRouter.get("/loop-runs/:runId/steps/:stepRunId/console/stream", loopRunHandlers.stepRunConsoleStream);
 apiRouter.post("/loop-runs/:runId/cancel", loopRunHandlers.cancelLoopRun);
 
 apiRouter.get("/:collection", workspaceHandlers.listCollection);

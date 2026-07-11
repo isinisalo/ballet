@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "loops": [
     {
       "id": "adr-review",
@@ -15,16 +15,6 @@
             "rejected": { "end": "failed" }
           }
         }
-      ]
-    }
-  ],
-  "runtimes": [
-    {
-      "id": "test-runtime",
-      "title": "Test Runtime",
-      "command": "npm",
-      "args": [
-        "test"
       ]
     }
   ]

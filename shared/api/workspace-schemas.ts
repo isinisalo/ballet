@@ -6,7 +6,7 @@ import {
 } from "./automationValidation.js";
 
 export const mutableCollections = ["projects", "goals", "adrs", "agents", "skills"] as const;
-export const readableCollections = [...mutableCollections, "runtimes", "policies", "events"] as const;
+export const readableCollections = [...mutableCollections, "policies", "events"] as const;
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -95,11 +95,8 @@ const agentUpsertSchema = z.object({
   instructions: z.string().optional(),
   skills: z.array(skillSchema).optional(),
   enabled: z.boolean().optional(),
-  status: z.enum(["online", "offline"]).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
-  model: z.string().optional(),
-  modelReasoningEffort: z.string().optional(),
   nicknameCandidates: z.array(z.string()).optional(),
   ...markdownBackedFields
 }).strict();
@@ -118,17 +115,12 @@ export type CollectionUpsertPayload = Record<string, unknown> & { id?: string };
 export const collectionUpsertSchema = (collection: MutableCollectionName): z.ZodType<CollectionUpsertPayload> =>
   collectionUpsertSchemas[collection] as z.ZodType<CollectionUpsertPayload>;
 
-const automationTokenSchema = z.string().min(automationFieldLimits.token.min).max(automationFieldLimits.token.max);
-const automationNameSchema = z.string().min(automationFieldLimits.name.min).max(automationFieldLimits.name.max);
 const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits.description.max);
 const automationLoopIdSchema = z.string().min(automationFieldLimits.loopId.min).max(automationFieldLimits.loopId.max);
 const automationStepIdSchema = z.string()
   .min(automationFieldLimits.stepId.min)
   .max(automationFieldLimits.stepId.max)
   .regex(kebabCaseIdPattern, "Step id must be lowercase kebab-case.");
-const automationCommandSchema = z.string().min(automationFieldLimits.command.min).max(automationFieldLimits.command.max);
-const automationArgSchema = z.string().min(automationFieldLimits.arg.min).max(automationFieldLimits.arg.max);
-
 const kebabLoopIdSchema = automationLoopIdSchema.regex(kebabCaseIdPattern, "Loop id must be lowercase kebab-case.");
 const stepEndSchema = z.object({ end: z.enum(["completed", "blocked", "failed"]) }).strict();
 const stepLoopSchema = z.object({ loop: kebabLoopIdSchema }).strict();
@@ -153,17 +145,9 @@ const projectLoopSchema = z.object({
   steps: z.array(projectStepSchema).min(1)
 }).strict();
 
-const projectRuntimeSchema = z.object({
-  id: automationTokenSchema,
-  title: automationNameSchema,
-  command: automationCommandSchema,
-  args: z.array(automationArgSchema)
-}).strict();
-
 export const automationConfigSchema = z.object({
-  version: z.literal(2),
-  loops: z.array(projectLoopSchema),
-  runtimes: z.array(projectRuntimeSchema)
+  version: z.literal(3),
+  loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 
 export const eventIntakeSchema = z.object({

@@ -14,16 +14,18 @@ export type View =
 export type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
 export type AutomationLoopView = "all";
 export type AutomationLoopMode = "edit" | "run";
+export type AgentMode = "edit" | "run";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
   view: View;
   projectId?: string;
   documentPath?: string;
+  agentMode?: AgentMode;
   automationEntityId?: string;
   automationLoopView?: AutomationLoopView;
   automationLoopMode?: AutomationLoopMode;
-  runtimeId?: string;
+  runtimeDeviceId?: string;
 }
 
 export const emptyData: AppData = {
@@ -32,7 +34,6 @@ export const emptyData: AppData = {
   adrs: [],
   agents: [],
   skills: [],
-  runtimes: [],
   policies: [],
   eventDefinitions: [],
   events: [],

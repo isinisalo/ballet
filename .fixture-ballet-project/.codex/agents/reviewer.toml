@@ -1,7 +1,5 @@
 name = "Reviewer"
 description = "Reviews project changes"
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
 developer_instructions = """
 Review implementation changes and surface risks.
 """

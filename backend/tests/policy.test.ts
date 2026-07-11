@@ -35,7 +35,6 @@ const agent: Agent = {
   description: "Handles deployment failures.",
   instructions: "Triage and remediate rollout failures.",
   enabled: true,
-  status: "offline",
   skills: [],
   createdAt: "2026-06-23T08:00:00.000Z",
   updatedAt: "2026-06-23T08:00:00.000Z"
@@ -115,7 +114,7 @@ describe("policy interpreter", () => {
       match: {
         eventTypes: ["deployment.failed"],
         projectId: { operator: "equals", value: "project-1" },
-        source: { operator: "in", value: ["runtime-codex", "agentd"] },
+        source: { operator: "in", value: ["runtime-codex", "runtime-copilot"] },
         subject: { operator: "exists" },
         tags: { operator: "in", value: ["kubernetes"] },
         payload: {

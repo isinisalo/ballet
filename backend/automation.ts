@@ -7,4 +7,3 @@ export {
   loadProjectAutomationConfigWithIssues,
   saveProjectAutomationConfig
 } from "./automation/automationRepository.js";
-export { automationRuntimesToRuntimes } from "./automation/automationProjections.js";

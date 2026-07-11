@@ -11,7 +11,7 @@ import { parseAgentOutcomeText } from "../runtime-policy.js";
 
 const roots: string[] = [];
 const tempDbPath = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-runtime-v2-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-runtime-v3-"));
   roots.push(root);
   return path.join(root, "runtime.sqlite");
 };
@@ -32,7 +32,7 @@ const rejected: AgentOutcome = {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 2,
+  version: 3,
   loops: [{
     id: "delivery",
     start: "implement",
@@ -58,11 +58,10 @@ const config = (): ProjectAutomationConfig => ({
       description: "Publish.",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
-  }],
-  runtimes: []
+  }]
 });
 
-describe("runtime database v2", () => {
+describe("runtime database v3", () => {
   it("accepts patched SQLite versions and resets legacy runtime tables", async () => {
     expect(isPatchedSqliteVersion("3.51.3")).toBe(true);
     expect(isPatchedSqliteVersion("3.51.2")).toBe(false);
@@ -72,7 +71,8 @@ describe("runtime database v2", () => {
     legacy.close();
     const runtime = new RuntimeDatabase(dbPath);
     const tables = (runtime.connection().prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map((row) => row.name);
-    expect(tables).toEqual(expect.arrayContaining(["loop_runs", "step_runs", "step_run_logs"]));
+    expect(tables).toEqual(expect.arrayContaining(["loop_runs", "step_runs"]));
+    expect(tables).not.toContain("step_run_logs");
     expect(tables).not.toContain("loop_instances");
     runtime.close();
   });
@@ -85,15 +85,32 @@ describe("runtime database v2", () => {
     runtime.close();
   });
 
+  it("isolates loop and event rows by active project in the global database", async () => {
+    const dbPath = await tempDbPath();
+    const first = new RuntimeDatabase(dbPath, "project-a");
+    const second = new RuntimeDatabase(dbPath, "project-b");
+    first.startLoopRun(config(), "delivery");
+    second.startLoopRun(config(), "delivery");
+    first.intakeEvent({ projectId: "project-a", eventType: "first", payload: {} });
+    second.intakeEvent({ projectId: "project-b", eventType: "second", payload: {} });
+    expect(first.listLoopRuns()).toHaveLength(1);
+    expect(second.listLoopRuns()).toHaveLength(1);
+    expect(first.listEventRecords().map((event) => event.eventType)).toEqual(["first"]);
+    expect(second.listEventRecords().map((event) => event.eventType)).toEqual(["second"]);
+    expect(() => first.intakeEvent({ projectId: "project-b", eventType: "wrong", payload: {} })).toThrow("not the active project");
+    first.close();
+    second.close();
+  });
+
   it("runs agent and human steps, creates a distinct step run for a cycle, and keeps one active run per loop", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const started = runtime.startLoopRun(config(), "delivery", "Build release 1");
     expect(started).toMatchObject({ status: "running", input: "Build release 1", snapshot: { id: "delivery" } });
     expect(() => runtime.startLoopRun(config(), "delivery")).toThrow(LoopRunConflictError);
 
-    const first = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 });
-    expect(first).toMatchObject({ stepId: "implement", status: "running", attempt: 1 });
-    const waiting = runtime.completeAgentStep(config(), { stepRunId: first!.stepRunId, outcome: ready });
+    const first = started.stepRuns[0]!;
+    expect(first).toMatchObject({ stepId: "implement", status: "queued" });
+    const waiting = runtime.completeAgentStep(config(), { stepRunId: first.stepRunId, outcome: ready });
     expect(waiting.status).toBe("waiting_for_human");
     const gate = waiting.stepRuns.at(-1)!;
     const cycled = runtime.respondToStepRun(config(), waiting.runId, gate.stepRunId, "rejected", "Please revise tests");
@@ -108,7 +125,7 @@ describe("runtime database v2", () => {
   it("starts a linked child run from a human transition and forwards accumulated input", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const parent = runtime.startLoopRun(config(), "delivery", "Original request");
-    const agentStep = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 })!;
+    const agentStep = parent.stepRuns[0]!;
     const waiting = runtime.completeAgentStep(config(), { stepRunId: agentStep.stepRunId, outcome: ready });
     const gate = waiting.stepRuns.at(-1)!;
     const completedParent = runtime.respondToStepRun(config(), parent.runId, gate.stepRunId, "approved", "Ship it");
@@ -129,7 +146,7 @@ describe("runtime database v2", () => {
   it("leaves a human gate waiting if its child loop already has an active run", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const parent = runtime.startLoopRun(config(), "delivery");
-    const agentStep = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 })!;
+    const agentStep = parent.stepRuns[0]!;
     const waiting = runtime.completeAgentStep(config(), { stepRunId: agentStep.stepRunId, outcome: ready });
     const gate = waiting.stepRuns.at(-1)!;
     runtime.startLoopRun(config(), "release");
@@ -143,19 +160,18 @@ describe("runtime database v2", () => {
   it("cancels active work and logs but ignores a late agent completion", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const run = runtime.startLoopRun(config(), "delivery");
-    const step = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 })!;
+    const step = run.stepRuns[0]!;
     expect(runtime.cancelLoopRun(run.runId).status).toBe("cancelled");
     const afterLate = runtime.completeAgentStep(config(), { stepRunId: step.stepRunId, outcome: ready });
     expect(afterLate.status).toBe("cancelled");
     expect(afterLate.stepRuns).toHaveLength(1);
-    expect(runtime.listStepRunLogs(step.stepRunId).some((log) => log.message.includes("Late agent completion"))).toBe(true);
     runtime.close();
   });
 
   it("blocks a root run after the 20-transition safety limit", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const cyclic: ProjectAutomationConfig = {
-      version: 2,
+      version: 3,
       loops: [{
         id: "cycle",
         start: "again",
@@ -166,12 +182,11 @@ describe("runtime database v2", () => {
           description: "Again.",
           on: { approved: "again", rejected: { end: "failed" } }
         }]
-      }],
-      runtimes: []
+      }]
     };
     let details = runtime.startLoopRun(cyclic, "cycle");
     for (let index = 0; index < 21 && details.status === "running"; index += 1) {
-      const step = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 })!;
+      const step = details.stepRuns.at(-1)!;
       details = runtime.completeAgentStep(cyclic, { stepRunId: step.stepRunId, outcome: ready });
     }
     expect(details.status).toBe("blocked");
@@ -180,44 +195,6 @@ describe("runtime database v2", () => {
     runtime.close();
   });
 
-  it("streams console entries by cursor and truncates non-terminal output after 1 MB", async () => {
-    const runtime = new RuntimeDatabase(await tempDbPath());
-    const run = runtime.startLoopRun(config(), "delivery");
-    const stepRun = run.stepRuns[0]!;
-    runtime.appendStepRunConsole(stepRun.stepRunId, {
-      source: "codex",
-      kind: "output",
-      phase: "delta",
-      itemId: "command-1",
-      message: "a".repeat(600_000)
-    });
-    runtime.appendStepRunConsole(stepRun.stepRunId, {
-      source: "codex",
-      kind: "output",
-      phase: "delta",
-      itemId: "command-1",
-      message: "b".repeat(600_000)
-    });
-    runtime.appendStepRunConsole(stepRun.stepRunId, {
-      source: "codex",
-      kind: "error",
-      level: "error",
-      phase: "completed",
-      itemId: "turn-1",
-      message: "Turn failed after truncation.",
-      terminal: true
-    });
-
-    const firstPage = runtime.getStepRunConsole(stepRun.stepRunId, 0, 2);
-    const secondPage = runtime.getStepRunConsole(stepRun.stepRunId, firstPage.lastId, 20);
-    const entries = [...firstPage.entries, ...secondPage.entries];
-    expect(firstPage.hasMore).toBe(true);
-    expect(secondPage.truncated).toBe(true);
-    expect(entries.some((entry) => entry.message.includes("1 MB StepRun limit"))).toBe(true);
-    expect(entries.some((entry) => entry.message === "Turn failed after truncation." && entry.terminal)).toBe(true);
-    expect(entries.some((entry) => entry.message.startsWith("b"))).toBe(false);
-    runtime.close();
-  });
 });
 
 describe("agent outcome", () => {

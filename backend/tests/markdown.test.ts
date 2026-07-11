@@ -79,9 +79,9 @@ describe("Markdown collection loading", () => {
 
     expect(data.projectRoot).toBe(fixtureRoot);
     expect(data.agents.map((agent) => agent.id).sort()).toEqual(["architect", "reviewer"]);
-    expect(data.agents.find((agent) => agent.id === "architect")?.model).toBe("gpt-5.5");
-    expect(data.agents.find((agent) => agent.id === "architect")?.modelReasoningEffort).toBe("high");
-    expect(data.agents.find((agent) => agent.id === "architect")?.status).toBe("offline");
+    expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("model");
+    expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("modelReasoningEffort");
+    expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("status");
     expect(data.agents.find((agent) => agent.id === "architect")?.nicknameCandidates).toEqual(["Arch", "Atlas"]);
     expect(data.agents.find((agent) => agent.id === "architect")?.instructions).toContain("Design architecture");
     expect(data.skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
@@ -96,12 +96,10 @@ describe("Markdown collection loading", () => {
     expect(data.goals.some((goal) => goal.id === "test-goal")).toBe(true);
     expect(data.events).toEqual([]);
     expect(data.eventDefinitions).toEqual([]);
-    expect(data.runtimes).toEqual([]);
     expect(data.policies).toEqual([]);
     expect(data.automation).toEqual({
-      version: 2,
-      loops: [],
-      runtimes: []
+      version: 3,
+      loops: []
     });
   });
 
@@ -430,7 +428,7 @@ path = "../.agents/skills/missing-skill"
   it("writes TOML agents while preserving unknown nested config", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".codex/agents"), { recursive: true });
-    await writeFile(path.join(root, ".codex/agents/reviewer.toml"), "name = \"Reviewer\"\ndescription = \"Old\"\ndeveloper_instructions = \"Old instructions\"\n\n[mcp_servers.docs]\nurl = \"https://example.test/mcp\"\n", "utf8");
+    await writeFile(path.join(root, ".codex/agents/reviewer.toml"), "name = \"Reviewer\"\ndescription = \"Old\"\nstatus = \"online\"\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"\nruntime = \"codex\"\ndeveloper_instructions = \"Old instructions\"\n\n[mcp_servers.docs]\nurl = \"https://example.test/mcp\"\n", "utf8");
 
     await writeEntityMarkdown(root, "agents", {
       id: "reviewer",
@@ -454,9 +452,10 @@ path = "../.agents/skills/missing-skill"
     const source = await readFile(path.join(root, ".codex/agents/reviewer.toml"), "utf8");
 
     expect(source).toContain('description = "Updated"');
-    expect(source).toContain('status = "online"');
-    expect(source).toContain('model = "gpt-5.5"');
-    expect(source).toContain('model_reasoning_effort = "high"');
+    expect(source).not.toContain('status =');
+    expect(source).not.toContain('model =');
+    expect(source).not.toContain('model_reasoning_effort =');
+    expect(source).not.toContain('runtime =');
     expect(source).toContain('nickname_candidates = [ "Atlas" ]');
     expect(source).toContain("[mcp_servers.docs]");
     expect(source).toContain('url = "https://example.test/mcp"');

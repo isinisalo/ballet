@@ -2,15 +2,15 @@ import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { EventRecord, RuntimeEvent } from "../../shared/domain/events.js";
 import type {
   AgentOutcome,
+  ExecutionRuntimeSnapshot,
+  LoopExecutionPlan,
   LoopRun,
-  StepRun,
-  StepRunLog
+  StepRun
 } from "../../shared/domain/runtime.js";
 import { parseJsonArray, parseJsonObject } from "./RuntimeJson.js";
 import type {
   EventRow,
   LoopRunRow,
-  StepRunLogRow,
   StepRunRow
 } from "./RuntimeDbTypes.js";
 
@@ -63,6 +63,8 @@ export const toLoopRun = (row: LoopRunRow): LoopRun => ({
   parentStepRunId: row.parent_step_run_id ?? undefined,
   source: row.source,
   status: row.status,
+  runtimeDeviceId: row.runtime_device_id ?? undefined,
+  executionPlan: row.execution_plan_json ? JSON.parse(row.execution_plan_json) as LoopExecutionPlan : undefined,
   input: row.input ?? undefined,
   snapshot: JSON.parse(row.snapshot_json) as ProjectLoop,
   transitionCount: row.transition_count,
@@ -78,6 +80,8 @@ export const toStepRun = (row: StepRunRow): StepRun => ({
   stepId: row.step_id,
   type: row.step_type,
   agentId: row.agent_id ?? undefined,
+  executionTaskId: row.execution_task_id ?? undefined,
+  execution: row.execution_snapshot_json ? JSON.parse(row.execution_snapshot_json) as ExecutionRuntimeSnapshot : undefined,
   status: row.status,
   input: row.input ?? undefined,
   responseInput: row.response_input ?? undefined,
@@ -85,26 +89,7 @@ export const toStepRun = (row: StepRunRow): StepRun => ({
   outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
   error: row.error ?? undefined,
   attempt: row.attempt,
-  leaseOwner: row.lease_owner ?? undefined,
-  leaseUntil: row.lease_until ?? undefined,
-  threadId: row.thread_id ?? undefined,
-  turnId: row.turn_id ?? undefined,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   completedAt: row.completed_at ?? undefined
-});
-
-export const toStepRunLog = (row: StepRunLogRow): StepRunLog => ({
-  id: row.id,
-  stepRunId: row.step_run_id,
-  source: row.source,
-  kind: row.kind,
-  level: row.level,
-  phase: row.phase,
-  itemId: row.item_id ?? undefined,
-  message: row.message,
-  data: row.data_json ? parseJsonObject(row.data_json) : undefined,
-  contentBytes: row.content_bytes,
-  terminal: Boolean(row.terminal),
-  createdAt: row.created_at
 });

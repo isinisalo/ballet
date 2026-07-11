@@ -4,7 +4,7 @@ import {
 } from "../../shared/domain/automation.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 
-// Automation v2 is deliberately strict. This helper only narrows already
+// Automation v3 is deliberately strict. This helper only narrows already
 // canonical data; it never aliases, renames, or repairs legacy fields.
 export const normalizeProjectAutomationConfig = (
   value: unknown

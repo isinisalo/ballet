@@ -1,9 +1,6 @@
 name = "Implementation Agent"
 description = "Implements only approved task specs after Gate 6 has been approved."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
 enabled = true
-status = "online"
 developer_instructions = """
 Olet Ballet Implementation Agent.
 

@@ -4,3 +4,4 @@ export * from "./automation.js";
 export * from "./runtime.js";
 export * from "./events.js";
 export * from "../api/workspaceData.js";
+export * from "../api/runtime-schemas.js";

@@ -12,7 +12,7 @@ import {
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v2-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v3-"));
   roots.push(root);
   return root;
 };
@@ -28,13 +28,12 @@ const agent: Agent = {
   instructions: "Implement.",
   skills: [],
   enabled: true,
-  status: "offline",
   createdAt: "2026-07-10T00:00:00.000Z",
   updatedAt: "2026-07-10T00:00:00.000Z"
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 2,
+  version: 3,
   loops: [{
     id: "delivery",
     start: "implement",
@@ -50,18 +49,18 @@ const config = (): ProjectAutomationConfig => ({
       description: "Review the change.",
       on: { approved: { end: "completed" }, rejected: "implement" }
     }]
-  }],
-  runtimes: []
+  }]
 });
 
-describe("automation v2 config", () => {
-  it("round-trips only the canonical v2 shape", async () => {
+describe("automation v3 config", () => {
+  it("round-trips only the canonical v3 shape", async () => {
     const root = await tempRoot();
     const saved = await saveProjectAutomationConfig(root, config(), [agent]);
     expect(saved).toEqual(config());
     expect(await loadProjectAutomationConfig(root, [agent])).toEqual(config());
     const raw = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as Record<string, unknown>;
-    expect(raw.version).toBe(2);
+    expect(raw.version).toBe(3);
+    expect(raw).not.toHaveProperty("runtimes");
     expect(raw).not.toHaveProperty("actions");
     expect(raw).not.toHaveProperty("outputRoutes");
     expect(raw).not.toHaveProperty("humanGateResponses");

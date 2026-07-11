@@ -44,14 +44,29 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:4174"
+      "/api": "http://127.0.0.1:4317"
     }
   },
   test: {
-    environment: "node",
-    environmentMatchGlobs: [["frontend/tests/**/*.test.tsx", "jsdom"]],
     root: __dirname,
-    include: ["backend/tests/**/*.test.ts", "frontend/tests/**/*.test.{ts,tsx}"],
-    setupFiles: ["frontend/tests/setup.ts"]
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "backend",
+          environment: "node",
+          include: ["backend/**/*.test.ts"]
+        }
+      },
+      {
+        extends: true,
+        test: {
+          name: "frontend",
+          environment: "jsdom",
+          include: ["frontend/tests/**/*.test.{ts,tsx}"],
+          setupFiles: ["frontend/tests/setup.ts"]
+        }
+      }
+    ]
   }
 });

@@ -4,7 +4,7 @@ import { CirclePlus, Radio, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CodexRunConsole } from "./CodexRunConsole";
+import { CliRunConsole } from "../../components";
 import { LoopCanvas } from "./LoopCanvas";
 import { LoopHandlerSheet } from "./LoopHandlerSheet";
 import { LoopRunStartPanel } from "./LoopRunStartPanel";
@@ -25,7 +25,7 @@ export function LoopRunView({
   controller: LoopRunController;
   startDisabledReason?: string;
 }) {
-  const { details, pendingOperation, error, streamStatus, start, respond, cancel, acceptDetails } = controller;
+  const { details, preflight, preflightLoading, pendingOperation, error, streamStatus, start, respond, cancel, refresh } = controller;
   const [showNewRun, setShowNewRun] = useState(false);
   const [selectedStepRunId, setSelectedStepRunId] = useState<string | undefined>();
   const busy = pendingOperation !== null;
@@ -59,15 +59,23 @@ export function LoopRunView({
           open={Boolean(selectedStepRun && selectedStep && details)}
           title="StepRun console"
           onOpenChange={(open) => { if (!open) setSelectedStepRunId(undefined); }}
-          left={selectedStepRun && details ? <CodexRunConsole run={details} stepRun={selectedStepRun} onRun={acceptDetails} /> : null}
+          left={selectedStepRun && details ? (
+            <CliRunConsole
+              taskId={selectedStepRun.executionTaskId}
+              provider={selectedStepRun.execution?.provider}
+              active={["queued", "running"].includes(selectedStepRun.status)}
+              onTerminal={() => void refresh()}
+            />
+          ) : null}
           right={selectedStepRun && selectedStep ? <LoopRunStepPanel step={selectedStep} stepRun={selectedStepRun} pending={busy} onRespond={(stepRunId, result, input) => respond(stepRunId, { result, input })} /> : null}
         />
       </div>
       {details ? (
-        <div className="grid gap-2 border-t border-divider-strong bg-card px-4 py-3 font-mono text-[0.65rem] text-muted-foreground sm:grid-cols-3">
+        <div className="grid gap-2 border-t border-divider-strong bg-card px-4 py-3 font-mono text-[0.65rem] text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
           <span>source: {details.source}</span>
           <span>loop transitions: {details.transitionCount}/20</span>
           <span>updated: {new Date(details.updatedAt).toLocaleString()}</span>
+          {details.stepRuns.some((stepRun) => stepRun.executionTaskId) ? <span>branch: ballet/run/{details.rootRunId.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 12)}</span> : null}
         </div>
       ) : null}
       {details && !terminal ? (
@@ -82,7 +90,14 @@ export function LoopRunView({
           <Button type="button" variant="outline" disabled={busy} onClick={() => setShowNewRun(true)}><CirclePlus /> New run</Button>
         </div>
       ) : null}
-      {(!details || (terminal && showNewRun)) ? <LoopRunStartPanel disabledReason={startDisabledReason} pending={busy} onStart={start} /> : null}
+      {(!details || (terminal && showNewRun)) ? (
+        <LoopRunStartPanel
+          disabledReason={startDisabledReason ?? (preflightLoading ? "Checking runtime readiness…" : undefined)}
+          preflightIssues={preflight?.issues}
+          pending={busy || preflightLoading}
+          onStart={start}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { AutomationLoopMode, ProjectDocumentCreateKind, RouteState } from "./types";
+import type { AgentMode, AutomationLoopMode, ProjectDocumentCreateKind, RouteState } from "./types";
 
 const projectDocumentCollectionSegment: Record<ProjectDocumentCreateKind, string> = {
   adr: "adrs",
@@ -25,7 +25,7 @@ const automationRoute = (url: URL): RouteState => ({
 
 const runtimeRoute = (url: URL): RouteState => ({
   view: "runtimes",
-  runtimeId: url.searchParams.get("id") ?? undefined
+  runtimeDeviceId: url.searchParams.get("id") ?? undefined
 });
 
 export const routeFromPath = (path: string): RouteState => {
@@ -44,7 +44,11 @@ export const routeFromPath = (path: string): RouteState => {
     return documentPath ? { view: "project-document", documentPath } : { view: "projects" };
   }
 
-  if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
+  if (url.pathname === "/agents") return {
+    view: "agents",
+    documentPath: url.searchParams.get("path") ?? undefined,
+    agentMode: url.searchParams.get("mode") === "run" ? "run" : "edit"
+  };
   if (url.pathname === "/automation/loops" || url.pathname === "/automation") return automationRoute(url);
   if (url.pathname === "/runtimes") return runtimeRoute(url);
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
@@ -54,7 +58,8 @@ export const routeFromPath = (path: string): RouteState => {
 export const projectDocumentPath = (relativePath: string) => `/projects/document?path=${encodeURIComponent(relativePath)}`;
 export const projectCollectionDocumentPath = (projectId: string, kind: ProjectDocumentCreateKind, relativePath?: string) =>
   `/projects/${encodeURIComponent(projectId)}/${projectDocumentCollectionSegment[kind]}${relativePath ? `?path=${encodeURIComponent(relativePath)}` : ""}`;
-export const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
+export const agentDocumentPath = (relativePath: string, mode: AgentMode = "edit") =>
+  `/agents?path=${encodeURIComponent(relativePath)}${mode === "run" ? "&mode=run" : ""}`;
 export const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
 export const automationLoopPath = (id?: string, mode: AutomationLoopMode = "edit") => {
   if (!id) return "/automation/loops";

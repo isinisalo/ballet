@@ -32,7 +32,7 @@ describe("HTTP Zod validation", () => {
 
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
-      version: 2,
+      version: 3,
       loops: [{
         id: "delivery",
         start: "implementation",
@@ -43,8 +43,7 @@ describe("HTTP Zod validation", () => {
           agentId: "developer-agent",
           on: { approved: { end: "completed" }, rejected: { end: "failed" } }
         }]
-      }],
-      runtimes: [{ id: "codex", title: "Codex", command: "codex", args: [] }]
+      }]
     };
     expect(parseUnknown(automationConfigSchema, valid)).toEqual(valid);
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, events: [] }), "$");
@@ -90,9 +89,13 @@ describe("HTTP Zod validation", () => {
       instructions: "Implement",
       skills: [],
       enabled: true,
-      status: "offline",
-      frontmatter: { runtime: "codex" }
-    })).toMatchObject({ name: "Developer", frontmatter: { runtime: "codex" } });
+      frontmatter: {}
+    })).toMatchObject({ name: "Developer", frontmatter: {} });
+
+    expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
+      name: "Developer",
+      status: "online"
+    }), "$");
 
     expect(parseUnknown(collectionUpsertSchema("skills"), {
       name: "Kubernetes",

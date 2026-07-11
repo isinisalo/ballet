@@ -1,9 +1,6 @@
 name = "Milestone Task Agent"
 description = "Creates milestones and atomic task specifications after the Technical Plan has been approved."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
 enabled = true
-status = "online"
 developer_instructions = """
 Olet Ballet Milestone Task Agent.
 

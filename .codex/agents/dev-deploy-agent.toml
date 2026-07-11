@@ -1,9 +1,6 @@
 name = "Dev Deploy Agent"
 description = "Prepares, executes, and validates dev deployments after Gate 7 has been approved."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
 enabled = true
-status = "online"
 developer_instructions = """
 Olet Ballet Dev Deploy Agent.
 

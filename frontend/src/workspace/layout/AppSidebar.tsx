@@ -1,5 +1,5 @@
 import { Route } from "lucide-react";
-import type { Agent, ProjectAutomationConfig, ProjectDocumentTreeNode, Skill } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, ProjectAutomationConfig, ProjectDocumentTreeNode, Skill } from "@shared/api/workspace-contracts";
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -22,6 +22,7 @@ export function AppSidebar({
   projectDocumentTree,
   automation,
   agents,
+  agentExecutionStates,
   skills,
   navigate
 }: {
@@ -30,6 +31,7 @@ export function AppSidebar({
   projectDocumentTree: ProjectDocumentTreeNode[];
   automation: ProjectAutomationConfig;
   agents: Agent[];
+  agentExecutionStates: AgentExecutionState[];
   skills: Skill[];
   navigate: (path: string) => void;
 }) {
@@ -53,7 +55,7 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarAutomationMenu route={route} automation={automation} navigate={navigate} />
-              <SidebarEnvironmentMenu route={route} agents={agents} skills={skills} runtimes={automation.runtimes} navigate={navigate} />
+              <SidebarEnvironmentMenu route={route} agents={agents} agentExecutionStates={agentExecutionStates} skills={skills} navigate={navigate} />
               <SidebarProjectMenu route={route} projectId={projectId} projectDocumentTree={projectDocumentTree} navigate={navigate} />
             </SidebarMenu>
           </SidebarGroupContent>

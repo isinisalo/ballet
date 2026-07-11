@@ -1,9 +1,6 @@
 name = "Loop Critic Agent"
 description = "Challenges planning artifacts and returns approved or changes-requested before human governance gates."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
 enabled = true
-status = "online"
 developer_instructions = """
 Olet Ballet Loop Critic Agent.
 

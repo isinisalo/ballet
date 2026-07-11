@@ -34,7 +34,7 @@ const saveStoreCollectionItem = <T extends MutableCollectionName>(
 ) => store.upsert(collection, item as Parameters<typeof store.upsert<T>>[1]);
 
 export const health: RequestHandler = (_req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, projectId: process.env.BALLET_PROJECT_ID });
 };
 
 export const getData: RequestHandler = async (_req, res, next) => {

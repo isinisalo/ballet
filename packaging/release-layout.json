@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 3,
+  "platform": "darwin",
+  "architectures": ["arm64", "x64"],
+  "archiveName": "ballet_{version}_darwin_{arch}.tar.gz",
+  "archiveExecutable": "ballet",
+  "checksumManifest": "checksums.txt",
+  "attestation": {
+    "required": true,
+    "verification": "gh attestation verify <archive> --repo isinisalo/ballet"
+  },
+  "runtime": {
+    "kind": "bundled-node",
+    "minimumNodeMajor": 22,
+    "nativeBuildRequired": true
+  },
+  "entrypoints": {
+    "launcher": "ballet",
+    "cli": "libexec/ballet/dist-server/backend/cli/main.js",
+    "daemonArgument": "daemon-internal-run",
+    "serverArgument": "server-internal-run"
+  },
+  "archiveAssets": [
+    "ballet",
+    "libexec/ballet/node",
+    "libexec/ballet/NODE-LICENSE",
+    "libexec/ballet/package.json",
+    "libexec/ballet/dist-server/**",
+    "libexec/ballet/node_modules/**",
+    "share/ballet/dist/**"
+  ],
+  "directInstall": {
+    "versionsDirectory": "libexec/ballet/versions",
+    "bundleDirectory": "libexec/ballet/versions/{bundle-id}",
+    "bundleIdComponents": ["version", "checksum-derived-id", "unique-suffix"],
+    "bundleAssets": [
+      "ballet",
+      "libexec/ballet/**",
+      "share/ballet/**"
+    ],
+    "stableExecutable": "bin/ballet",
+    "stableExecutableTarget": "../libexec/ballet/versions/{bundle-id}/ballet",
+    "activation": {
+      "strategy": "atomic-symlink-rename",
+      "sameFilesystem": true,
+      "mutatesActiveBundle": false
+    }
+  }
+}

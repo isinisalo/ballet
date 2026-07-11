@@ -1,4 +1,4 @@
-import type { Agent } from "../domain/agents.js";
+import type { Agent, AgentExecutionState } from "../domain/agents.js";
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
@@ -17,15 +17,25 @@ import type {
 } from "../domain/documents.js";
 import type { EventDefinition, EventRecord } from "../domain/events.js";
 import type {
+  AgentExecutionBinding,
+  AgentRun,
+  ExecutionEvent,
+  ExecutionEventPage,
+  ExecutionSpec,
+  ExecutionTask,
   LoopRun,
   LoopRunDetails,
-  ProjectRuntime,
+  LoopExecutionPlan,
+  LoopRuntimePreflight,
+  PairingSession,
+  ProjectCheckout,
   RespondToStepRunRequest,
-  Runtime,
+  RuntimeBackend,
+  RuntimeDevice,
+  RuntimePreflightIssue,
   StartLoopRunRequest,
+  StartAgentRunRequest,
   StepRun,
-  StepRunConsoleEntry,
-  StepRunConsolePage
 } from "../domain/runtime.js";
 
 export type EventIntakeRequest = Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">;
@@ -38,7 +48,6 @@ export interface WorkspaceDataDto {
   adrs: Adr[];
   agents: Agent[];
   skills: Skill[];
-  runtimes: Runtime[];
   policies: Policy[];
   eventDefinitions: EventDefinition[];
   events: EventRecord[];
@@ -52,14 +61,13 @@ export interface WorkspaceDataDto {
     adr: MarkdownDocument[];
     agents: MarkdownDocument[];
     skills: MarkdownDocument[];
-    runtimes: MarkdownDocument[];
     events: MarkdownDocument[];
     policies: MarkdownDocument[];
   };
   projectRoot?: string;
 }
 
-export type WorkspaceCollectionName = "projects" | "goals" | "adrs" | "agents" | "skills" | "runtimes" | "policies" | "events";
+export type WorkspaceCollectionName = "projects" | "goals" | "adrs" | "agents" | "skills" | "policies" | "events";
 
 export type WorkspaceAutomationResponseDto = {
   config: ProjectAutomationConfig;
@@ -81,6 +89,7 @@ export { defaultProjectAutomationConfig } from "../domain/automation.js";
 
 export type {
   Agent,
+  AgentExecutionState,
   Adr,
   EventDefinition,
   EventRecord,
@@ -91,17 +100,27 @@ export type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectDocumentTreeNode,
-  ProjectRuntime,
   ProjectLoop,
   ProjectStep,
   StepTransitionTarget,
   LoopRun,
   LoopRunDetails,
+  LoopExecutionPlan,
+  LoopRuntimePreflight,
   StartLoopRunRequest,
+  StartAgentRunRequest,
   RespondToStepRunRequest,
   StepRun,
-  StepRunConsoleEntry,
-  StepRunConsolePage,
-  Runtime,
+  AgentExecutionBinding,
+  AgentRun,
+  ExecutionEvent,
+  ExecutionEventPage,
+  ExecutionSpec,
+  ExecutionTask,
+  PairingSession,
+  ProjectCheckout,
+  RuntimeBackend,
+  RuntimeDevice,
+  RuntimePreflightIssue,
   Skill
 };

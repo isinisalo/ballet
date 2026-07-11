@@ -1,9 +1,6 @@
 name = "Review Test Agent"
 description = "Runs tests and reviews code against task specs, ADRs, GOALS, and acceptance criteria."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
 enabled = true
-status = "online"
 developer_instructions = """
 Olet Ballet Review Test Agent.
 

@@ -13,6 +13,7 @@ import { useRuntimeStream } from "../app/useRuntimeStream";
 import { useWorkspaceData } from "./data/useWorkspaceData";
 import { useWorkspaceMutations } from "./data/useWorkspaceMutations";
 import { useRuntimeNotifications } from "./data/useRuntimeNotifications";
+import { useAgentExecutionStates } from "./data/useAgentExecutionStates";
 import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
 import { useWorkspaceSelection } from "./selection/useWorkspaceSelection";
 
@@ -21,6 +22,7 @@ export function WorkspaceShell() {
   const { route, navigate } = useWorkspaceNavigation();
   const { data, loading, refresh, selectedProjectId } = useWorkspaceData({ notify, routeProjectId: route.projectId });
   const selection = useWorkspaceSelection({ data, route, selectedProjectId });
+  const { states: agentExecutionStates } = useAgentExecutionStates();
 
   const runtimeStreamStatus = useRuntimeStream(refresh);
   useRuntimeNotifications({ notifications, notify, runtimeStreamStatus });
@@ -39,6 +41,7 @@ export function WorkspaceShell() {
           projectDocumentTree={selection.projectDocumentTree}
           automation={data.automation}
           agents={data.agents}
+          agentExecutionStates={agentExecutionStates}
           skills={data.skills}
           navigate={navigate}
         />

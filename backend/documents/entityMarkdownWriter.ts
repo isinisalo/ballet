@@ -1,6 +1,5 @@
 import path from "node:path";
 import { unlink } from "node:fs/promises";
-import type { AgentStatus } from "../../shared/domain/agents.js";
 import { assertInsideRoot, safeSlug, writeMarkdownDocument, writeTomlDocument } from "../markdown.js";
 
 const now = () => new Date().toISOString();
@@ -8,7 +7,6 @@ const now = () => new Date().toISOString();
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const stringValue = (value: unknown, fallback = ""): string => typeof value === "string" ? value : value === undefined || value === null ? fallback : String(value);
 const stringArray = (value: unknown): string[] => Array.isArray(value) ? value.map((item) => stringValue(item)).filter(Boolean) : typeof value === "string" ? value.split(",").map((item) => item.trim()).filter(Boolean) : [];
-const validAgentStatus = (value: unknown): AgentStatus => ["online", "offline"].includes(stringValue(value)) ? stringValue(value) as AgentStatus : "offline";
 
 const collectionFolder: Record<string, string> = {
   projects: ".ballet",
@@ -51,9 +49,10 @@ const projectFrontmatter = (item: Record<string, unknown>, id: string): Record<s
 
 const agentFrontmatter = (item: Record<string, unknown>): Record<string, unknown> => {
   const base = isRecord(item.frontmatter) ? { ...item.frontmatter } : {};
-  const model = stringValue(item.model ?? base.model);
-  const modelReasoningEffort = stringValue(item.model_reasoning_effort ?? item.modelReasoningEffort ?? base.model_reasoning_effort);
-  const status = validAgentStatus(item.status ?? base.status);
+  delete base.runtime;
+  delete base.status;
+  delete base.model;
+  delete base.model_reasoning_effort;
   const nicknameCandidates = Array.isArray(item.nickname_candidates)
     ? stringArray(item.nickname_candidates)
     : Array.isArray(item.nicknameCandidates)
@@ -63,15 +62,11 @@ const agentFrontmatter = (item: Record<string, unknown>): Record<string, unknown
   const next: Record<string, unknown> = {
     ...base,
     name: stringValue(item.name ?? base.name),
-    status,
     description: stringValue(item.description ?? base.description),
+    enabled: typeof item.enabled === "boolean" ? item.enabled : base.enabled !== false,
     developer_instructions: stringValue(item.developer_instructions ?? item.instructions ?? base.developer_instructions)
   };
 
-  if (model) next.model = model;
-  else delete next.model;
-  if (modelReasoningEffort) next.model_reasoning_effort = modelReasoningEffort;
-  else delete next.model_reasoning_effort;
   if (nicknameCandidates.length > 0) next.nickname_candidates = nicknameCandidates;
   else delete next.nickname_candidates;
 

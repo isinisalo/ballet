@@ -1,12 +1,4 @@
-import type {
-  AgentOutcome,
-  LoopRunSource,
-  LoopRunStatus,
-  StepRunConsoleKind,
-  StepRunConsolePhase,
-  StepRunResult,
-  StepRunStatus
-} from "../../shared/domain/runtime.js";
+import type { AgentOutcome, LoopRunSource, LoopRunStatus, StepRunResult, StepRunStatus } from "../../shared/domain/runtime.js";
 import type { EventStatus } from "../../shared/domain/events.js";
 
 export const MAX_ROOT_TRANSITIONS = 20;
@@ -32,12 +24,15 @@ export interface EventRow {
 
 export interface LoopRunRow {
   run_id: string;
+  project_id: string;
   loop_id: string;
   root_run_id: string;
   parent_run_id: string | null;
   parent_step_run_id: string | null;
   source: LoopRunSource;
   status: LoopRunStatus;
+  runtime_device_id: string | null;
+  execution_plan_json: string | null;
   input: string | null;
   snapshot_json: string;
   transition_count: number;
@@ -48,11 +43,14 @@ export interface LoopRunRow {
 
 export interface StepRunRow {
   step_run_id: string;
+  project_id: string;
   run_id: string;
   loop_id: string;
   step_id: string;
   step_type: "agent" | "human";
   agent_id: string | null;
+  execution_task_id: string | null;
+  execution_snapshot_json: string | null;
   status: StepRunStatus;
   input: string | null;
   response_input: string | null;
@@ -60,28 +58,9 @@ export interface StepRunRow {
   outcome_json: string | null;
   error: string | null;
   attempt: number;
-  lease_owner: string | null;
-  lease_until: string | null;
-  thread_id: string | null;
-  turn_id: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
-}
-
-export interface StepRunLogRow {
-  id: number;
-  step_run_id: string;
-  source: "ballet" | "codex";
-  kind: StepRunConsoleKind;
-  level: "info" | "warn" | "error";
-  phase: StepRunConsolePhase;
-  item_id: string | null;
-  message: string;
-  data_json: string | null;
-  content_bytes: number;
-  terminal: 0 | 1;
-  created_at: string;
 }
 
 export interface IntakeEventInput {
@@ -112,6 +91,4 @@ export interface CompleteStepRunInput {
   stepRunId: string;
   outcome?: AgentOutcome;
   error?: string;
-  threadId?: string;
-  turnId?: string;
 }

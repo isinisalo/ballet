@@ -25,14 +25,17 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
       <dl className="grid grid-cols-[5rem_minmax(0,1fr)] gap-x-2 gap-y-2 font-mono text-[0.65rem]">
         <dt className="text-muted-foreground">Type</dt><dd>{step.type}</dd>
         <dt className="text-muted-foreground">Agent</dt><dd className="break-words">{stepRun.agentId ?? "Human operator"}</dd>
+        {stepRun.execution ? <>
+          <dt className="text-muted-foreground">Runtime</dt><dd className="break-words">{stepRun.execution.deviceName} · {stepRun.execution.provider}</dd>
+          <dt className="text-muted-foreground">Model</dt><dd className="break-all">{stepRun.execution.model}</dd>
+          <dt className="text-muted-foreground">Reasoning</dt><dd>{stepRun.execution.reasoning}</dd>
+        </> : null}
         <dt className="text-muted-foreground">Attempt</dt><dd>{stepRun.attempt}</dd>
         <dt className="text-muted-foreground">Result</dt><dd>{stepRun.result ?? "—"}</dd>
         <dt className="text-muted-foreground">Transition</dt><dd>{stepRun.result ? formatTransition(step.on[stepRun.result]) : "—"}</dd>
         <dt className="text-muted-foreground">Created</dt><dd>{formatDate(stepRun.createdAt)}</dd>
         <dt className="text-muted-foreground">Updated</dt><dd>{formatDate(stepRun.updatedAt)}</dd>
         {stepRun.completedAt ? <><dt className="text-muted-foreground">Completed</dt><dd>{formatDate(stepRun.completedAt)}</dd></> : null}
-        {stepRun.threadId ? <><dt className="text-muted-foreground">Thread</dt><dd className="break-all">{stepRun.threadId}</dd></> : null}
-        {stepRun.turnId ? <><dt className="text-muted-foreground">Turn</dt><dd className="break-all">{stepRun.turnId}</dd></> : null}
       </dl>
       {stepRun.error ? <p className="mt-3 border-t border-divider-strong pt-3 font-mono text-[0.65rem] text-destructive">{stepRun.error}</p> : null}
       {stepRun.responseInput ? (

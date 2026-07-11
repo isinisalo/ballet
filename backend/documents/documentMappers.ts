@@ -1,4 +1,4 @@
-import type { Agent, AgentStatus } from "../../shared/domain/agents.js";
+import type { Agent } from "../../shared/domain/agents.js";
 import type { Adr, AdrStatus, EntityStatus, Goal, MarkdownDocument, Project, Skill } from "../../shared/domain/documents.js";
 import { agentSkillsFromFrontmatter } from "./skillLookup.js";
 
@@ -25,9 +25,6 @@ const validGoalStatus = (value: unknown): Goal["status"] =>
 
 const validAdrStatus = (value: unknown): AdrStatus =>
   ["proposed", "accepted", "superseded", "rejected"].includes(stringValue(value)) ? stringValue(value) as AdrStatus : "proposed";
-
-const validAgentStatus = (value: unknown): AgentStatus =>
-  ["online", "offline"].includes(stringValue(value)) ? stringValue(value) as AgentStatus : "offline";
 
 const dateValue = (value: unknown): string => stringValue(value, now());
 
@@ -93,11 +90,8 @@ export const agentFromDocument = (doc: MarkdownDocument, skillLookup: Map<string
     instructions: stringValue(fm.developer_instructions ?? fm.instructions, doc.body),
     skills: agentSkillsFromFrontmatter(fm, skillLookup),
     enabled: booleanValue(fm.enabled, true),
-    status: validAgentStatus(fm.status),
     createdAt: dateValue(fm.createdAt),
     updatedAt: dateValue(fm.updatedAt ?? fm.createdAt),
-    model: stringValue(fm.model) || undefined,
-    modelReasoningEffort: stringValue(fm.model_reasoning_effort) || undefined,
     nicknameCandidates: stringArray(fm.nickname_candidates)
   }, doc);
 };

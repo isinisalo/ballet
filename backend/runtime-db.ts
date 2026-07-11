@@ -3,23 +3,22 @@ import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { EventRecord, RuntimeEvent } from "../shared/domain/events.js";
 import type {
   AgentOutcome,
+  ExecutionRuntimeSnapshot,
+  LoopExecutionPlan,
   LoopRunDetails,
   LoopRunSource,
   StepRun,
-  StepRunConsoleEntry,
-  StepRunConsolePage,
-  StepRunLog,
   StepRunResult
 } from "../shared/domain/runtime.js";
 import { EventStore } from "./runtime/EventStore.js";
 import { LoopRunEngine } from "./runtime/LoopRunEngine.js";
-import { LoopRunStore, type AppendStepRunConsoleInput } from "./runtime/LoopRunStore.js";
+import { LoopRunStore } from "./runtime/LoopRunStore.js";
 import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
-import type { IntakeEventInput, LeaseOptions, PublishEventResult } from "./runtime/RuntimeDbTypes.js";
+import type { IntakeEventInput, PublishEventResult } from "./runtime/RuntimeDbTypes.js";
 import { resolveRuntimeDbPath } from "./runtime/runtimeDbPath.js";
 
 export { isPatchedSqliteVersion, resolveRuntimeDbPath };
-export type { IntakeEventInput, LeaseOptions, PublishEventResult };
+export type { IntakeEventInput, PublishEventResult };
 
 export class RuntimeDatabase {
   private readonly connectionManager: RuntimeDbConnection;
@@ -27,11 +26,11 @@ export class RuntimeDatabase {
   private readonly loopRunStore: LoopRunStore;
   private readonly loopRunEngine: LoopRunEngine;
 
-  constructor(dbPath: string) {
-    this.connectionManager = new RuntimeDbConnection(dbPath);
+  constructor(dbPath: string, readonly projectId = "project") {
+    this.connectionManager = new RuntimeDbConnection(dbPath, projectId);
     const connection = () => this.connection();
-    this.eventStore = new EventStore(connection);
-    this.loopRunStore = new LoopRunStore(connection);
+    this.eventStore = new EventStore(connection, projectId);
+    this.loopRunStore = new LoopRunStore(connection, projectId);
     this.loopRunEngine = new LoopRunEngine(connection, this.loopRunStore);
   }
 
@@ -75,9 +74,19 @@ export class RuntimeDatabase {
     config: ProjectAutomationConfig,
     loopId: string,
     input?: string,
-    source: LoopRunSource = "manual"
+    source: LoopRunSource = "manual",
+    runtimeDeviceId?: string,
+    executionPlan?: LoopExecutionPlan
   ): LoopRunDetails {
-    return this.loopRunEngine.start(config, loopId, { input, source });
+    return this.loopRunEngine.start(config, loopId, { input, source, runtimeDeviceId, executionPlan });
+  }
+
+  bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
+    return this.loopRunStore.bindStepExecution(stepRunId, taskId, snapshot);
+  }
+
+  markStepRunRunning(stepRunId: string): StepRun {
+    return this.loopRunStore.markStepRunning(stepRunId);
   }
 
   latestLoopRun(loopId: string): LoopRunDetails | undefined {
@@ -86,6 +95,10 @@ export class RuntimeDatabase {
 
   listLoopRuns(limit = 500): LoopRunDetails[] {
     return this.loopRunStore.list(limit);
+  }
+
+  listRootLoopRuns(rootRunId: string): LoopRunDetails[] {
+    return this.loopRunStore.listByRoot(rootRunId);
   }
 
   activeLoopIds(): string[] {
@@ -106,18 +119,12 @@ export class RuntimeDatabase {
     return this.loopRunEngine.cancel(runId);
   }
 
-  leaseNextStepRun(options: LeaseOptions): StepRun | undefined {
-    return this.loopRunStore.leaseNext(options);
-  }
-
   completeAgentStep(
     config: ProjectAutomationConfig,
     input: {
       stepRunId: string;
       outcome?: AgentOutcome;
       error?: string;
-      threadId?: string;
-      turnId?: string;
     }
   ): LoopRunDetails {
     return this.loopRunEngine.completeAgentStep(config, input);
@@ -127,36 +134,8 @@ export class RuntimeDatabase {
     return this.loopRunStore.details(runId);
   }
 
-  saveStepRunThread(stepRunId: string, threadId: string, turnId?: string): void {
-    this.loopRunStore.saveThread(stepRunId, threadId, turnId);
-  }
-
   getStepRun(stepRunId: string): StepRun | undefined {
     return this.loopRunStore.getStepRun(stepRunId);
   }
 
-  getThreadBinding(workItemId: string, agentRole: string): string | undefined {
-    return this.loopRunStore.getThreadBinding(workItemId, agentRole);
-  }
-
-  appendStepRunLog(
-    stepRunId: string,
-    level: StepRunLog["level"],
-    message: string,
-    data?: Record<string, unknown>
-  ): StepRunConsoleEntry | undefined {
-    return this.loopRunStore.appendLog(stepRunId, level, message, data);
-  }
-
-  appendStepRunConsole(stepRunId: string, input: AppendStepRunConsoleInput): StepRunConsoleEntry | undefined {
-    return this.loopRunStore.appendConsole(stepRunId, input);
-  }
-
-  getStepRunConsole(stepRunId: string, afterId = 0, limit = 500): StepRunConsolePage {
-    return this.loopRunStore.listConsole(stepRunId, afterId, limit);
-  }
-
-  listStepRunLogs(stepRunId?: string, limit = 500): StepRunLog[] {
-    return this.loopRunStore.listLogs(stepRunId, limit);
-  }
 }

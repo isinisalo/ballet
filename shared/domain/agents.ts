@@ -1,6 +1,5 @@
 import type { MarkdownBackedEntity, Skill } from "./documents.js";
-
-export type AgentStatus = "online" | "offline";
+import type { RuntimeProvider } from "./runtime.js";
 
 export interface Agent extends MarkdownBackedEntity {
   id: string;
@@ -9,10 +8,19 @@ export interface Agent extends MarkdownBackedEntity {
   instructions: string;
   skills: Skill[];
   enabled: boolean;
-  status: AgentStatus;
   createdAt: string;
   updatedAt: string;
-  model?: string;
-  modelReasoningEffort?: string;
   nicknameCandidates?: string[];
+}
+
+export type AgentLiveStatus = "running" | "idle" | "busy" | "attention" | "unbound" | "offline";
+
+export interface AgentExecutionState {
+  agentId: string;
+  status: AgentLiveStatus;
+  deviceId?: string;
+  runtimeBackendId?: string;
+  provider?: RuntimeProvider;
+  activeTaskId?: string;
+  reason?: string;
 }

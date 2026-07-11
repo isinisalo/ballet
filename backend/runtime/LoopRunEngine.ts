@@ -7,6 +7,7 @@ import type {
 } from "../../shared/domain/automation.js";
 import type {
   AgentOutcome,
+  LoopExecutionPlan,
   LoopRun,
   LoopRunDetails,
   LoopRunSource,
@@ -23,6 +24,8 @@ interface StartOptions {
   rootRunId?: string;
   parentRunId?: string;
   parentStepRunId?: string;
+  runtimeDeviceId?: string;
+  executionPlan?: LoopExecutionPlan;
 }
 
 const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } =>
@@ -88,15 +91,6 @@ export class LoopRunEngine {
       }
 
       this.store.completeStepRun(stepRun, result, { responseInput: input });
-      this.store.appendConsole(stepRun.stepRunId, {
-        source: "ballet",
-        kind: "system",
-        level: "info",
-        phase: "completed",
-        message: `Human step completed with ${result}.`,
-        data: { result, input },
-        terminal: true
-      });
       this.store.incrementTransitionCount(run.runId);
       const forwardedInput = this.forwardedInput(run.input, input);
       this.store.updateRunInput(run.runId, forwardedInput);
@@ -116,16 +110,9 @@ export class LoopRunEngine {
       const stepRun = this.store.getStepRun(input.stepRunId);
       if (!stepRun) throw new LoopRunNotFoundError(`Step run ${input.stepRunId} was not found.`);
       const run = this.requireRun(stepRun.runId);
-      if (run.status === "cancelled" || stepRun.status === "cancelled") {
-        this.store.appendLog(stepRun.stepRunId, "warn", "Late agent completion ignored because the loop run was cancelled.", {
-          outcome: input.outcome?.outcome,
-          error: input.error
-        });
-        return this.requireDetails(run.runId);
-      }
-      if (stepRun.type !== "agent") throw new LoopRunStateError("A human step cannot be completed by agentd.");
+      if (run.status === "cancelled" || stepRun.status === "cancelled") return this.requireDetails(run.runId);
+      if (stepRun.type !== "agent") throw new LoopRunStateError("A human step cannot be completed by a runtime daemon.");
       if (stepRun.status !== "running" && stepRun.status !== "queued") {
-        this.store.appendLog(stepRun.stepRunId, "warn", "Duplicate agent completion ignored.");
         return this.requireDetails(run.runId);
       }
 
@@ -134,19 +121,8 @@ export class LoopRunEngine {
       this.store.completeStepRun(stepRun, result, {
         outcome: input.outcome,
         error: input.error,
-        threadId: input.threadId,
-        turnId: input.turnId,
         failed: Boolean(input.error)
       });
-      if (input.threadId && stepRun.agentId) {
-        this.store.upsertThreadBinding(run.rootRunId, stepRun.agentId, input.threadId);
-      }
-      this.store.appendLog(
-        stepRun.stepRunId,
-        input.error ? "error" : "info",
-        input.error ?? `Agent step completed with ${result}.`,
-        input.outcome ? { outcome: input.outcome.outcome } : undefined
-      );
       if (this.wouldExceedTransitionLimit(run)) {
         this.blockForTransitionLimit(run, stepRun);
         return this.requireDetails(run.runId);
@@ -164,23 +140,12 @@ export class LoopRunEngine {
       if (!["running", "waiting_for_human"].includes(run.status)) {
         throw new LoopRunConflictError(`Loop run ${runId} is already ${run.status}.`);
       }
-      const activeStepRuns = this.store.details(runId)?.stepRuns.filter((stepRun) => ["queued", "running", "waiting_for_human"].includes(stepRun.status)) ?? [];
       const timestamp = now();
       this.connection().prepare(`
-        UPDATE step_runs SET status = 'cancelled', lease_owner = NULL, lease_until = NULL,
-          completed_at = @completedAt, updated_at = @updatedAt
+        UPDATE step_runs SET status = 'cancelled', completed_at = @completedAt, updated_at = @updatedAt
         WHERE run_id = @runId AND status IN ('queued', 'running', 'waiting_for_human')
       `).run({ runId, completedAt: timestamp, updatedAt: timestamp });
       this.store.finishRun(runId, "cancelled");
-      activeStepRuns.forEach((stepRun) => this.store.appendConsole(stepRun.stepRunId, {
-        source: "ballet",
-        kind: "system",
-        level: "warn",
-        phase: "completed",
-        message: "Loop run cancelled.",
-        data: { run_id: runId },
-        terminal: true
-      }));
       return this.requireDetails(runId);
     });
     return transaction() as LoopRunDetails;
@@ -195,13 +160,14 @@ export class LoopRunEngine {
       rootRunId: options.rootRunId,
       parentRunId: options.parentRunId,
       parentStepRunId: options.parentStepRunId,
+      runtimeDeviceId: options.runtimeDeviceId,
+      executionPlan: options.executionPlan,
       source: options.source ?? "manual",
       input: options.input
     });
     const firstStep = loop.steps.find((step) => step.id === loop.start);
     if (!firstStep) throw new LoopRunStateError(`Loop ${loop.id} start step ${loop.start} was not found.`);
-    const stepRun = this.store.createStepRun(run, firstStep, options.input);
-    this.store.appendLog(stepRun.stepRunId, "info", `Step ${firstStep.id} started.`, { source: run.source });
+    this.store.createStepRun(run, firstStep, options.input);
     return this.requireDetails(run.runId);
   }
 
@@ -216,24 +182,13 @@ export class LoopRunEngine {
       const nextStep = run.snapshot.steps.find((step) => step.id === target);
       if (!nextStep) {
         this.store.finishRun(run.runId, "blocked");
-        this.store.appendLog(sourceStepRun.stepRunId, "error", `Transition target step ${target} is missing from the run snapshot.`);
         return;
       }
-      const nextStepRun = this.store.createStepRun(this.requireRun(run.runId), nextStep, input);
-      this.store.appendLog(nextStepRun.stepRunId, "info", `Step ${target} started.`);
+      this.store.createStepRun(this.requireRun(run.runId), nextStep, input);
       return;
     }
     if (isEndTarget(target)) {
       this.store.finishRun(run.runId, target.end);
-      this.store.appendConsole(sourceStepRun.stepRunId, {
-        source: "ballet",
-        kind: "system",
-        level: target.end === "completed" ? "info" : "warn",
-        phase: "completed",
-        message: `Loop run ended as ${target.end}.`,
-        data: { status: target.end },
-        terminal: true
-      });
       return;
     }
     if (!isLoopTarget(target)) {
@@ -242,14 +197,15 @@ export class LoopRunEngine {
     }
     const targetLoop = this.requireLoop(config, target.loop);
     this.store.finishRun(run.runId, "completed");
-    const child = this.startInTransaction(targetLoop, {
+    this.startInTransaction(targetLoop, {
       source: "human",
       input,
       rootRunId: run.rootRunId,
       parentRunId: run.runId,
-      parentStepRunId: sourceStepRun.stepRunId
+      parentStepRunId: sourceStepRun.stepRunId,
+      runtimeDeviceId: run.runtimeDeviceId,
+      executionPlan: run.executionPlan
     });
-    this.store.appendLog(sourceStepRun.stepRunId, "info", `Started child loop ${target.loop}.`, { child_run_id: child.runId });
   }
 
   private wouldExceedTransitionLimit(run: LoopRun): boolean {
@@ -257,19 +213,8 @@ export class LoopRunEngine {
   }
 
   private blockForTransitionLimit(run: LoopRun, stepRun: StepRun): void {
+    void stepRun;
     this.store.finishRun(run.runId, "blocked");
-    this.store.appendConsole(stepRun.stepRunId, {
-      source: "ballet",
-      kind: "warn",
-      level: "warn",
-      phase: "completed",
-      message: "Run blocked because the root run reached the 20-transition safety limit.",
-      data: {
-        root_run_id: run.rootRunId,
-        max_transitions: MAX_ROOT_TRANSITIONS
-      },
-      terminal: true
-    });
   }
 
   private forwardedInput(runInput: string | undefined, responseInput: string): string {

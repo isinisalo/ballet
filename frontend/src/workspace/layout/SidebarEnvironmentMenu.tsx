@@ -1,5 +1,5 @@
 import { Bot, ChevronRight, Code2, FileKey2 } from "lucide-react";
-import type { Agent, ProjectRuntime, Skill } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, Skill } from "@shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   SidebarMenuButton,
@@ -12,19 +12,9 @@ import type { RouteState } from "../types";
 import { SidebarAgentList } from "./SidebarAgentList";
 import { SidebarCollapsibleLinkSection } from "./SidebarCollapsibleLinkSection";
 import { SidebarDocumentList } from "./SidebarDocumentList";
-import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
-function SidebarRuntimesSection({
-  route,
-  runtimes,
-  navigate
-}: {
-  route: RouteState;
-  runtimes: ProjectRuntime[];
-  navigate: (path: string) => void;
-}) {
+function SidebarRuntimesSection({ route, navigate }: { route: RouteState; navigate: (path: string) => void }) {
   const runtimesOpen = route.view === "runtimes";
-  const selectedId = runtimes.some((runtime) => runtime.id === route.runtimeId) ? route.runtimeId : undefined;
   const rootPath = runtimePath();
 
   return (
@@ -38,25 +28,7 @@ function SidebarRuntimesSection({
       chevronClassName="group-data-[state=open]/environment-section:rotate-90"
     >
       <SidebarMenuSub className="mx-2 gap-0.5 border-sidebar-border/60 px-2 py-1">
-        {runtimes.length === 0 ? (
-          <SidebarMenuSubItem>
-            <span className="block px-2 py-1.5 text-xs text-muted-foreground">No runtimes.</span>
-          </SidebarMenuSubItem>
-        ) : null}
-        {runtimes.map((runtime) => {
-          const path = runtimePath(runtime.id);
-          return (
-            <SidebarNavLinkItem
-              key={runtime.id}
-              path={path}
-              isActive={runtimesOpen && runtime.id === selectedId}
-              navigate={navigate}
-              className="h-6 min-w-0 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
-            >
-              <span className="truncate">{runtime.id}</span>
-            </SidebarNavLinkItem>
-          );
-        })}
+        <SidebarMenuSubItem><span className="block px-2 py-1.5 text-xs text-muted-foreground">Device registry</span></SidebarMenuSubItem>
       </SidebarMenuSub>
     </SidebarCollapsibleLinkSection>
   );
@@ -65,14 +37,14 @@ function SidebarRuntimesSection({
 export function SidebarEnvironmentMenu({
   route,
   agents,
+  agentExecutionStates,
   skills,
-  runtimes,
   navigate
 }: {
   route: RouteState;
   agents: Agent[];
+  agentExecutionStates: AgentExecutionState[];
   skills: Skill[];
-  runtimes: ProjectRuntime[];
   navigate: (path: string) => void;
 }) {
   const environmentOpen = route.view === "agents" || route.view === "skills" || route.view === "runtimes";
@@ -98,12 +70,12 @@ export function SidebarEnvironmentMenu({
         <CollapsibleContent>
           <SidebarMenuSub>
             <SidebarCollapsibleLinkSection label="Agents" icon={<Bot />} path="/agents" active={agentsOpen} navigate={navigate} groupClassName="group/environment-section" chevronClassName="group-data-[state=open]/environment-section:rotate-90">
-              <SidebarAgentList agents={agents} activePath={agentsOpen ? route.documentPath : undefined} navigate={navigate} />
+              <SidebarAgentList agents={agents} executionStates={agentExecutionStates} activePath={agentsOpen ? route.documentPath : undefined} navigate={navigate} />
             </SidebarCollapsibleLinkSection>
             <SidebarCollapsibleLinkSection label="Skills" icon={<FileKey2 />} path="/skills" active={skillsOpen} navigate={navigate} groupClassName="group/environment-section" chevronClassName="group-data-[state=open]/environment-section:rotate-90">
               <SidebarDocumentList documents={skills} activePath={skillsOpen ? route.documentPath : undefined} pathFor={skillDocumentPath} navigate={navigate} />
             </SidebarCollapsibleLinkSection>
-            <SidebarRuntimesSection route={route} runtimes={runtimes} navigate={navigate} />
+            <SidebarRuntimesSection route={route} navigate={navigate} />
           </SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>

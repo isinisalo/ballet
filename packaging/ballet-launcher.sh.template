@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+LAUNCHER=$0
+case "$LAUNCHER" in
+  */*) ;;
+  *) LAUNCHER=$(command -v "$LAUNCHER") ;;
+esac
+case "$LAUNCHER" in
+  /*) ;;
+  *) LAUNCHER=$(CDPATH= cd -- "$(dirname "$LAUNCHER")" && pwd -P)/$(basename "$LAUNCHER") ;;
+esac
+
+RESOLVED=$LAUNCHER
+while [ -L "$RESOLVED" ]; do
+  DIRECTORY=$(CDPATH= cd -- "$(dirname "$RESOLVED")" && pwd -P)
+  TARGET=$(readlink "$RESOLVED")
+  case "$TARGET" in
+    /*) RESOLVED=$TARGET ;;
+    *) RESOLVED=$DIRECTORY/$TARGET ;;
+  esac
+done
+DIRECTORY=$(CDPATH= cd -- "$(dirname "$RESOLVED")" && pwd -P)
+RESOLVED=$DIRECTORY/$(basename "$RESOLVED")
+if [ -x "$DIRECTORY/libexec/ballet/node" ]; then
+  PREFIX=$DIRECTORY
+else
+  PREFIX=$(CDPATH= cd -- "$DIRECTORY/.." && pwd -P)
+fi
+RUNTIME="$PREFIX/libexec/ballet"
+NODE="$RUNTIME/node"
+ENTRY="$RUNTIME/dist-server/backend/cli/main.js"
+
+[ -x "$NODE" ] || { printf 'ballet: packaged Node runtime is missing at %s\n' "$NODE" >&2; exit 1; }
+[ -f "$ENTRY" ] || { printf 'ballet: packaged CLI is missing at %s\n' "$ENTRY" >&2; exit 1; }
+
+export BALLET_VERSION="{{VERSION}}"
+export BALLET_PACKAGED_EXECUTABLE="$LAUNCHER"
+export BALLET_INSTALL_PATH="$LAUNCHER"
+export BALLET_WEB_DIST="$PREFIX/share/ballet/dist"
+
+exec "$NODE" "$ENTRY" "$@"

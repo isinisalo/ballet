@@ -21,8 +21,8 @@ const run = (status: LoopRunDetails["status"]): LoopRunDetails => ({
 });
 
 const data = (): AppData => ({
-  projects: [], goals: [], adrs: [], agents: [], skills: [], runtimes: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
-  automation: { version: 2, loops: [loop], runtimes: [] }, automationIssues: [], projectDocumentTree: []
+  projects: [], goals: [], adrs: [], agents: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
+  automation: { version: 3, loops: [loop] }, automationIssues: [], projectDocumentTree: []
 });
 
 function installApi(latest: LoopRunDetails | null) {
@@ -31,7 +31,13 @@ function installApi(latest: LoopRunDetails | null) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    if (url === "/api/admin/status") {
+      return Response.json({ bootstrapped: true, authenticated: true, csrfToken: "test-csrf-token" });
+    }
     if (url === "/api/data") return Response.json(workspace);
+    if (url === "/api/loops/delivery/preflight") {
+      return Response.json({ ok: true, issues: [], snapshots: [] });
+    }
     if (url.endsWith("/runs/latest")) return Response.json(current);
     if (url.endsWith("/runs") && method === "POST") {
       current = run("running");
@@ -66,7 +72,7 @@ async function renderRun(latest: LoopRunDetails | null) {
   return fetchMock;
 }
 
-describe("automation v2 UI", () => {
+describe("automation v3 UI", () => {
   it("persists Edit and Run mode in the URL and manually starts a saved loop", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(null);

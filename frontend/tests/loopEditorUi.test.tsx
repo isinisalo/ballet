@@ -31,7 +31,7 @@ const loop: ProjectLoop = {
   }]
 };
 
-const config: ProjectAutomationConfig = { version: 2, loops: [loop], runtimes: [] };
+const config: ProjectAutomationConfig = { version: 3, loops: [loop] };
 
 describe("compact Loop editor UI", () => {
   it("opens the restored 50/50 sheet with its 3/2 instructions and Step editor panes", async () => {

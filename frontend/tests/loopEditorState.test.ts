@@ -29,8 +29,7 @@ describe("loop editor state", () => {
     expect(withoutReview.steps[0].on.approved).toEqual({ end: "blocked" });
 
     const config: ProjectAutomationConfig = {
-      version: 2,
-      runtimes: [],
+      version: 3,
       loops: [loop(), {
         id: "next-loop",
         start: "gate",
@@ -46,7 +45,7 @@ describe("loop editor state", () => {
       start: "gate",
       steps: [{ id: "gate", type: "human", description: "", on: { approved: { loop: "first-loop" }, rejected: { end: "failed" } } }]
     };
-    const config: ProjectAutomationConfig = { version: 2, runtimes: [], loops: [loop(), second] };
+    const config: ProjectAutomationConfig = { version: 3, loops: [loop(), second] };
     const next = updateLoopAtIndex(config, 0, { ...config.loops[0], id: "renamed-loop" });
     expect(next.loops[1].steps[0].on.approved).toEqual({ loop: "renamed-loop" });
   });

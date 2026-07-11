@@ -1,9 +1,6 @@
 name = "Failure Router Agent"
 description = "Classifies failed evidence and routes only safe task-level corrections back to implementation."
-model = "gpt-5.5"
-model_reasoning_effort = "medium"
 enabled = true
-status = "online"
 developer_instructions = """
 Olet Ballet Failure Router Agent.
 

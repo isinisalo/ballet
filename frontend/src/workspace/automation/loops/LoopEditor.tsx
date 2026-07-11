@@ -100,7 +100,7 @@ export function LoopEditor({
           open={Boolean(selectedStep)}
           title={selection?.transition ? "Transition editor" : "Step editor"}
           onOpenChange={(open) => { if (!open) setSelection(null); }}
-          left={selectedStep ? <LoopHandlerAgentInstructions step={selectedStep} agents={agents} config={config} /> : null}
+          left={selectedStep ? <LoopHandlerAgentInstructions step={selectedStep} agents={agents} /> : null}
           right={selectedStep ? (
             <LoopStepSheetEditor
               step={selectedStep}

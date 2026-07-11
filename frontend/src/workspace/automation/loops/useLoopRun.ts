@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { LoopRunDetails, RespondToStepRunRequest } from "@shared/api/workspace-contracts";
+import type { LoopRunDetails, LoopRuntimePreflight, RespondToStepRunRequest } from "@shared/api/workspace-contracts";
 import { api } from "@/api";
 import { toErrorMessage } from "@/lib/errors";
 import type { RuntimeStreamStatus } from "@/app/useRuntimeStream";
@@ -8,6 +8,8 @@ export type LoopRunPendingOperation = "load" | "start" | "respond" | "cancel" | 
 
 export function useLoopRun(loopId: string | undefined, refreshSignal: string, streamStatus: RuntimeStreamStatus) {
   const [details, setDetails] = useState<LoopRunDetails | null>(null);
+  const [preflight, setPreflight] = useState<LoopRuntimePreflight>();
+  const [preflightLoopId, setPreflightLoopId] = useState<string>();
   const [pendingOperation, setPendingOperation] = useState<LoopRunPendingOperation>("load");
   const [error, setError] = useState("");
 
@@ -27,11 +29,31 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     }
   }, [loopId]);
 
+  const refreshPreflight = useCallback(async () => {
+    setPreflight(undefined);
+    setPreflightLoopId(undefined);
+    if (!loopId) return;
+    try {
+      setPreflight(await api.getLoopPreflight(loopId));
+    } catch (caught) {
+      setPreflight({ ok: false, issues: [{ agentId: "loop", code: "backend_unhealthy", message: toErrorMessage(caught, "Unable to run runtime preflight.") }], snapshots: [] });
+    } finally {
+      setPreflightLoopId(loopId);
+    }
+  }, [loopId]);
+
   useEffect(() => {
     setPendingOperation("load");
     setDetails(null);
     void refresh();
-  }, [refresh, refreshSignal]);
+    void refreshPreflight();
+  }, [refresh, refreshPreflight, refreshSignal]);
+
+  useEffect(() => {
+    if (!details || !["running", "waiting_for_human"].includes(details.status)) return;
+    const timer = window.setInterval(() => { void refresh(); }, 2000);
+    return () => window.clearInterval(timer);
+  }, [details, refresh]);
 
   const runMutation = useCallback(async (
     operation: Exclude<LoopRunPendingOperation, "load" | null>,
@@ -41,6 +63,7 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     setError("");
     try {
       setDetails(await request());
+      void refreshPreflight();
       return true;
     } catch (caught) {
       setError(toErrorMessage(caught, `Unable to ${operation} loop run.`));
@@ -49,12 +72,15 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     } finally {
       setPendingOperation(null);
     }
-  }, [refresh]);
+  }, [refresh, refreshPreflight]);
 
   const start = useCallback(async (input: string) => {
-    if (!loopId) return false;
+    if (!loopId || preflightLoopId !== loopId || !preflight?.ok) {
+      void refreshPreflight();
+      return false;
+    }
     return runMutation("start", () => api.startLoopRun(loopId, input.trim() ? { input } : {}));
-  }, [loopId, runMutation]);
+  }, [loopId, preflight, preflightLoopId, refreshPreflight, runMutation]);
 
   const respond = useCallback(async (stepRunId: string, request: RespondToStepRunRequest) => {
     if (!details) return false;
@@ -66,7 +92,17 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     return runMutation("cancel", () => api.cancelLoopRun(details.runId));
   }, [details, runMutation]);
 
-  const acceptDetails = useCallback((next: LoopRunDetails) => setDetails(next), []);
-
-  return { details, pendingOperation, error, streamStatus, refresh, start, respond, cancel, acceptDetails };
+  return {
+    details,
+    preflight: preflightLoopId === loopId ? preflight : undefined,
+    preflightLoading: Boolean(loopId) && preflightLoopId !== loopId,
+    pendingOperation,
+    error,
+    streamStatus,
+    refresh,
+    refreshPreflight,
+    start,
+    respond,
+    cancel
+  };
 }

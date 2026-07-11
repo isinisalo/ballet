@@ -53,7 +53,7 @@ describe("workspace routing", () => {
       automationLoopView: "all"
     });
     expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({ view: "projects" });
-    expect(routeFromPath("/runtimes?id=codex")).toEqual({ view: "runtimes", runtimeId: "codex" });
+    expect(routeFromPath("/runtimes?id=device-1")).toEqual({ view: "runtimes", runtimeDeviceId: "device-1" });
   });
 
   it("does not keep legacy automation route aliases", () => {

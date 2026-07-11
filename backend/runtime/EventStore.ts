@@ -6,10 +6,14 @@ import { runtimeEventToEventRecord, toEventRecord, toRuntimeEvent } from "./Runt
 import { now, type EventRow, type IntakeEventInput, type PublishEventResult } from "./RuntimeDbTypes.js";
 
 export class EventStore {
-  constructor(private readonly connection: () => Database.Database) {}
+  constructor(
+    private readonly connection: () => Database.Database,
+    private readonly projectId: string
+  ) {}
 
   listRuntimeEvents(limit = 500): RuntimeEvent[] {
-    const rows = this.connection().prepare("SELECT * FROM events ORDER BY seq DESC LIMIT ?").all(limit) as EventRow[];
+    const rows = this.connection().prepare("SELECT * FROM events WHERE project_id = ? ORDER BY seq DESC LIMIT ?")
+      .all(this.projectId, limit) as EventRow[];
     return rows.map(toRuntimeEvent);
   }
 
@@ -18,10 +22,11 @@ export class EventStore {
   }
 
   deleteEvent(eventId: string): void {
-    this.connection().prepare("DELETE FROM events WHERE event_id = ?").run(eventId);
+    this.connection().prepare("DELETE FROM events WHERE project_id = ? AND event_id = ?").run(this.projectId, eventId);
   }
 
   intake(input: IntakeEventInput): PublishEventResult {
+    if (input.projectId !== this.projectId) throw new Error(`Event project ${input.projectId} is not the active project ${this.projectId}.`);
     const transaction = this.connection().transaction(() => {
       if (input.dedupeKey) {
         const duplicate = this.getEventByDedupeKey(input.dedupeKey);
@@ -56,7 +61,7 @@ export class EventStore {
         occurredAt: createdAt,
         projectId: input.projectId,
         tagsJson: stringifyJson(input.tags ?? []),
-        handlingResult: input.body ?? "Event recorded. Automation v2 loop runs are started independently.",
+        handlingResult: input.body ?? "Event recorded. Automation v3 loop runs are started independently.",
         payloadJson: stringifyJson(payload)
       });
       const row = this.getEventById(eventId);
@@ -67,11 +72,13 @@ export class EventStore {
   }
 
   getEventById(eventId: string): EventRow | undefined {
-    return this.connection().prepare("SELECT * FROM events WHERE event_id = ?").get(eventId) as EventRow | undefined;
+    return this.connection().prepare("SELECT * FROM events WHERE project_id = ? AND event_id = ?")
+      .get(this.projectId, eventId) as EventRow | undefined;
   }
 
   getEventByDedupeKey(dedupeKey: string): EventRow | undefined {
-    return this.connection().prepare("SELECT * FROM events WHERE dedupe_key = ?").get(dedupeKey) as EventRow | undefined;
+    return this.connection().prepare("SELECT * FROM events WHERE project_id = ? AND dedupe_key = ?")
+      .get(this.projectId, dedupeKey) as EventRow | undefined;
   }
 
   toEventRecord(row: EventRow): EventRecord {

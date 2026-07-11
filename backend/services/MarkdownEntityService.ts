@@ -7,7 +7,7 @@ import {
   writeProjectMarkdownDocument
 } from "../markdown-adapter.js";
 
-type MutableMarkdownCollection = Exclude<CollectionName, "events" | "runtimes" | "policies">;
+type MutableMarkdownCollection = Exclude<CollectionName, "events" | "policies">;
 
 const markdownCollections = new Set<MutableMarkdownCollection>(["projects", "goals", "adrs", "agents", "skills"]);
 

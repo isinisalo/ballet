@@ -1,5 +1,3 @@
-import type { ProjectRuntime } from "./runtime.js";
-
 export type OutputId = "approved" | "rejected";
 export type StepEndStatus = "completed" | "blocked" | "failed";
 
@@ -38,15 +36,13 @@ export interface ProjectLoop {
 }
 
 export interface ProjectAutomationConfig {
-  version: 2;
+  version: 3;
   loops: ProjectLoop[];
-  runtimes: ProjectRuntime[];
 }
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
-  version: 2,
-  loops: [],
-  runtimes: []
+  version: 3,
+  loops: []
 });
 
 export interface ProjectAutomationIssue {
@@ -54,7 +50,7 @@ export interface ProjectAutomationIssue {
   message: string;
 }
 
-// Policies remain a Markdown document model. They are not part of automation v2
+// Policies remain a Markdown document model. They are not part of automation v3
 // execution or project.json routing.
 export type PolicyPredicateOperator = "equals" | "in" | "exists";
 export type PolicyPredicateScalar = string | number | boolean | null;
