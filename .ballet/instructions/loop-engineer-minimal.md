@@ -1,93 +1,68 @@
 ---
-title: Loop Engineer Minimal Loop
+title: Loop Engineer Minimal
 createdAt: 2026-07-06
+updatedAt: 2026-07-11
 tags:
   - ballet
-  - loop-engineer
+  - loop-engineering
   - governance
 ---
 
-# Loop Engineer Minimal Loop
+# Loop Engineer Minimal
 
-This project configuration implements nine focused delivery Loops:
+Ihminen kirjoittaa Goal- ja ADR-dokumentteihin WHAT- ja WHY-päätökset. Agentit päättävät HOW-toteutuksen näiden rajojen sisällä. Uutta WHAT/WHY- tai arkkitehtuuripäätöstä vaativa työ blokataan ja palautetaan ihmiselle; agentit eivät muuta Goal- tai ADR-dokumentteja.
 
-1. `project-brief`
-2. `roadmap`
-3. `ui-design`
-4. `technical-plan`
-5. `milestones`
-6. `task-specs`
-7. `implementation-review`
-8. `dev-deployment`
-9. `ci-validation-recovery`
+## Neljä Loopia
 
-Each Loop owns its Steps and starts at its declared `start` Step. Agent Steps may move only within that Loop or end its Run. Only a human Step may start another Loop as a linked Run. Every Loop also supports a direct manual start with optional free-form input.
+1. `delivery-planning`: `create-roadmap` → `create-work-breakdown` → human `planning-gate`. Agentin rejection blokkaa Runin. Human rejection palauttaa palautteen kanssa `create-roadmap`-Stepiin, ja approval päättää Runin.
+2. `ui-design`: taskikohtainen `design-task-ui`. Ready päättää Runin, muu outcome blokkaa sen. Käynnistä tämä Loop vain taskille, jonka `UI-tarve` edellyttää suunnittelua.
+3. `implementation`: `implement-task` → `verify-task` → human `code-gate`. Verifierin saman taskin `changes-requested` palautuu implementointiin. Verifierin `blocked`-palaute saa implementerin lopettamaan scopea laajentamatta. Human rejection palautuu implementointiin; approval valtuuttaa ja käynnistää `dev-deployment`-Loopin.
+4. `dev-deployment`: `deploy-and-validate-dev` tarkistaa valmiuden, deployaa vain deviin, validoi julkaisun ja rollbackaa epäonnistumisen. Approval päättää rootin onnistuneena, rejection epäonnistuneena.
 
-## Governance gates
+All-approved-happy path sisältää `delivery-planning`-Loopissa 3 transitionia, `ui-design`-Loopissa 1 transitionin ja `implementation` → `dev-deployment` -ketjussa 4 transitionia.
 
-The primary delivery chain waits at a human Step before another Loop starts:
+## Human gatet
 
-| Gate | Approved Transition | Meaning |
-|---|---|---|
-| Gate 1: `project-brief-gate` | `roadmap` | Project Brief accepted. |
-| Gate 2: `roadmap-gate` | `ui-design` | Roadmap accepted. |
-| Gate 3: `ui-design-gate` | `technical-plan` | UI Design accepted. |
-| Gate 4: `technical-plan-gate` | `milestones` | Technical Plan accepted. |
-| Gate 5: `milestones-gate` | `task-specs` | Milestones accepted. |
-| Gate 6: `task-specs-gate` | `implementation-review` | Task Specs accepted; implementation may start. |
-| Gate 7: `code-gate` | `dev-deployment` | Reviewed and tested code accepted; dev deployment may start. |
-| Gate 8: `dev-deployment-validation-gate` | `completed` | Dev deployment accepted and its Run completed. |
+- `planning-gate` hyväksyy ROADMAP-, MILESTONES- ja TASKS-artifactit toteutuksen lähtökohdaksi.
+- `code-gate` hyväksyy tarkastetun yhden taskin toteutuksen ja valtuuttaa ulkoiset dev-deployment-kirjoitukset.
 
-A human response requires both an `approved` or `rejected` result and non-empty input. Rejection follows the gate's Loop-local rework Transition. No planning agent Step can reach implementation directly; implementation begins from the human-approved `task-specs-gate` Transition or a manual `implementation-review` Run.
+Human-vastaus sisältää `approved`- tai `rejected`-tuloksen sekä palautetekstin. Agentti ei käynnistä seuraavaa Stepiä tai Loopia itse; Run-moottori soveltaa outcomea vastaavaan transitioniin.
 
-## Step and Transition contract
+## Run-input
 
-Every Step declares both `on.approved` and `on.rejected`. A target is one of:
+`ui-design`- ja `implementation`-Runin inputissa pitää olla täsmälleen yksi oma rivi seuraavassa muodossa:
 
-- another Step ID in the same Loop;
-- `{ "loop": "..." }` on a human Step only; or
-- `{ "end": "completed|blocked|failed" }`.
-
-Failures that can be corrected safely stay within the active Loop. Failures that require reopening an earlier specification or governance decision end the Run as `blocked` and state which earlier gate must be revisited.
-
-The `dev-deployment` and `ci-validation-recovery` Loops each contain their own classification, implementation, test, review, and human-gate Steps. Their remediation agents never jump to `implementation-review` or another Loop. An approved `ci-validation-remediation-gate` starts a linked `dev-deployment` Run so the corrected build is deployed and validated through the normal human-gated path.
-
-## Expected evidence artifacts
-
-Agents should write or update these Markdown artifacts under `.ballet/outputs/` unless the active repository already uses another approved location:
-
-- `.ballet/outputs/PROJECT_BRIEF.md`
-- `.ballet/outputs/ROADMAP.md`
-- `.ballet/outputs/UI_DESIGN_PLAN.md`
-- `.ballet/outputs/TECHNICAL_PLAN.md`
-- `.ballet/outputs/MILESTONES.md`
-- `.ballet/outputs/TASK_SPECS.md`
-- `.ballet/outputs/TRACEABILITY_MATRIX.md`
-- `.ballet/outputs/DEPLOYMENT_VALIDATION.md`
-
-## Agent outcome contract
-
-Each agent must return only JSON in this shape:
-
-```json
-{
-  "outcome": "ready | approved | changes-requested | blocked | failed",
-  "summary": "Short decision summary.",
-  "artifacts": {
-    "documents": [".ballet/outputs/..."]
-  },
-  "checks": [
-    { "name": "check name", "status": "passed | failed | skipped", "details": "evidence" }
-  ]
-}
+```text
+task_id: task-NNN
 ```
 
-The Run engine maps `ready` and `approved` to the Step's `approved` Transition. It maps `changes-requested`, `blocked`, and `failed` to the Step's `rejected` Transition.
+ID:n pitää olla deklaroitu `.ballet/outputs/TASKS.md`-tiedostossa täsmälleen kerran otsikolla `## task-NNN — <nimi>`; muualla esiintyvä task-ID on vain ristiviite. Puuttuva, moninkertainen, vääränmuotoinen tai tuntematon ID blokataan backendissä ennen agenttitaskin luontia. Yksi implementation-root toteuttaa vain tämän yhden taskin. `dev-deployment` ei ole itsenäisesti käynnistettävä root, vaan se syntyy vain hyväksytyn `code-gate`-transition kautta ja käyttää saman rootin taskia.
 
-## Run modes
+## Runtime-handoff
 
-- **Edit** changes and validates the saved Loop definition. Editing is locked while that Loop has an active Run.
-- **Run** starts a manual Run, shows the current or latest snapshot graph, accepts a human response, and cancels an active Run.
-- Each cycle through a Step creates a new Step Run, preserving the full rework history.
-- Only one active Run may exist for a Loop. A human cross-Loop Transition waits if the target Loop is already active.
-- A root Run chain stops as `blocked` after 20 Step transitions.
+Loop-agentin user-prompt on sisäinen JSON-envelope, jossa ovat nykyisen immutable snapshotin `loop_id`, `step_id` ja Step-kuvaus, kumulatiivinen Run-input sekä enintään kolme uusinta valmistunutta Stepiä koko rootista. Recent history välittää tiiviin human-palautteen, agent outcomen, olennaiset checkit, turvalliset artifact-viitteet ja errorin myös cross-loop-siirtymän yli.
+
+Run-input rajataan promptissa 20 000 merkkiin säilyttämällä alku ja loppu. Recent history rajataan 8 KiB:iin. Raakaa diffiä, pitkiä lokeja tai reasoning-sisältöä ei välitetä seuraavan agentin promptiin; lähdekoodi ja diff tarkastetaan yhteisestä worktreestä.
+
+## Artifact-sopimus
+
+- `.ballet/outputs/ROADMAP.md`: toimitusjärjestys, MVP, inkrementit, riskit, riippuvuudet, validointipisteet sekä Goal/ADR-viitteet.
+- `.ballet/outputs/MILESTONES.md`: milestonejen rajaus, lopputulos, järjestys ja validointitapa sekä Goal/ADR-jäljitettävyys.
+- `.ballet/outputs/TASKS.md`: pysyvät, yksikäsitteisinä `## task-NNN — <nimi>` -otsikkoina deklaroidut ID:t sekä jokaiselle taskille Goal/ADR-viitteet, scope, acceptance criteria, tarkistukset, UI-tarve ja deploy-vaikutus.
+- `.ballet/outputs/ui/<task-id>.md`: yhden UI-taskin käyttäjäpolut, näkymät, tilat, saavutettavuus, responsiivisuus ja UI acceptance criteriat.
+- `.ballet/outputs/deployments/<task-id>.md`: dev-julkaisun versio, ympäristö, komennot, checkit, tulos ja mahdollinen rollback.
+
+Erillisiä Project Brief-, Technical Plan- tai Traceability Matrix -artifacteja ei käytetä. Jäljitettävyys tallennetaan suoraan ROADMAP-, MILESTONES- ja TASKS-artifacteihin. Artifactit ja agenttien summaryt kirjoitetaan suomeksi; koodi ja tekniset tunnisteet säilytetään alkuperäisessä muodossa.
+
+## Outcomes ja rework
+
+Run-moottori tulkitsee `ready`- ja `approved`-outcomet Stepin approved-transitioniksi sekä `changes-requested`-, `blocked`- ja `failed`-outcomet rejected-transitioniksi. Korjattava verifier-palaute pysyy saman taskin implementation-Loopissa. Uutta task-scopea, Goal-päätöstä tai ADR-päätöstä vaativa puute blokataan.
+
+## Käyttöjärjestys
+
+1. Aja `delivery-planning` ja hyväksy `planning-gate`.
+2. Mergeä onnistuneen `ballet/run/*`-branchin artifactit lähdehaaraan.
+3. Aja tarvittaessa `ui-design` yhdelle taskille ja mergeä sen artifact ennen toteutusta.
+4. Aja `implementation` samalla task-ID:llä. Hyväksy `code-gate` vasta review- ja testievidenssin jälkeen; dev-deployment jatkuu linkitettynä samassa rootissa.
+
+Itsenäisten suunnittelu- ja UI-Runien brancheja ei mergetä automaattisesti. Käyttöönotossa irrota poistettujen `brief-agent`-, `loop-critic-agent`-, `technical-plan-agent`- ja `failure-router-agent`-ID:iden mahdolliset runtime attachmentit, jotta control planeen ei jää orphan-konfiguraatiota.

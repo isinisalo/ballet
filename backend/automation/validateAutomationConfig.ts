@@ -7,6 +7,7 @@ import type {
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
+import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 
 export class AutomationValidationError extends Error {
   constructor(
@@ -107,6 +108,58 @@ const validateLoop = (
   return issues;
 };
 
+const validateApprovedPaths = (
+  config: ProjectAutomationConfig
+): ProjectAutomationIssue[] => {
+  const loopsById = new Map(config.loops.map((loop) => [loop.id, loop]));
+  const issues: ProjectAutomationIssue[] = [];
+
+  config.loops.forEach((rootLoop, loopIndex) => {
+    let loop = rootLoop;
+    let stepId = rootLoop.start;
+    let transitionCount = 0;
+    const visited = new Set<string>();
+
+    while (true) {
+      const step = loop.steps.find((candidate) => candidate.id === stepId);
+      if (!step) return;
+
+      const state = `${loop.id}\0${step.id}`;
+      if (visited.has(state)) {
+        issues.push({
+          path: `loops.${loopIndex}.start`,
+          message: "The all-approved path cycles before reaching a terminal target."
+        });
+        return;
+      }
+      visited.add(state);
+
+      transitionCount += 1;
+      if (transitionCount > MAX_ROOT_TRANSITIONS) {
+        issues.push({
+          path: `loops.${loopIndex}.start`,
+          message: `The all-approved path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
+        });
+        return;
+      }
+
+      const target = step.on.approved;
+      if (typeof target === "string") {
+        stepId = target;
+        continue;
+      }
+      if (!isLoopTarget(target)) return;
+
+      const targetLoop = loopsById.get(target.loop);
+      if (!targetLoop) return;
+      loop = targetLoop;
+      stepId = targetLoop.start;
+    }
+  });
+
+  return issues;
+};
+
 export const validateProjectAutomationConfig = (
   input: unknown,
   agents: Agent[] = []
@@ -129,5 +182,6 @@ export const validateProjectAutomationConfig = (
   config.loops.forEach((loop, index) => {
     issues.push(...validateLoop(loop, index, loopIds, agentIds));
   });
+  issues.push(...validateApprovedPaths(config));
   return issues;
 };

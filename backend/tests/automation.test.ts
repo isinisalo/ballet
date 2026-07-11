@@ -3,12 +3,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
-import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import type { ProjectAutomationConfig, ProjectStep } from "../../shared/domain/automation.js";
 import {
   loadProjectAutomationConfig,
   saveProjectAutomationConfig,
   validateProjectAutomationConfig
 } from "../automation.js";
+import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 
 const roots: string[] = [];
 const tempRoot = async () => {
@@ -157,5 +158,108 @@ describe("automation v3 config", () => {
     expect(validateProjectAutomationConfig(humanSelfLoop, [agent]).some((issue) =>
       issue.message.includes("different loop")
     )).toBe(true);
+  });
+});
+
+describe("all-approved path liveness", () => {
+  it("rejects an all-approved cycle across loops", () => {
+    const cyclic: ProjectAutomationConfig = {
+      version: 3,
+      loops: [{
+        id: "planning",
+        start: "approve-plan",
+        steps: [{
+          id: "approve-plan",
+          type: "human",
+          description: "Approve the plan.",
+          on: { approved: { loop: "delivery" }, rejected: { end: "failed" } }
+        }]
+      }, {
+        id: "delivery",
+        start: "approve-delivery",
+        steps: [{
+          id: "approve-delivery",
+          type: "human",
+          description: "Approve delivery.",
+          on: { approved: { loop: "planning" }, rejected: { end: "failed" } }
+        }]
+      }]
+    };
+
+    const issues = validateProjectAutomationConfig(cyclic, [agent]);
+    expect(issues.filter((issue) => issue.message.includes("all-approved path cycles"))).toHaveLength(2);
+  });
+
+  it("rejects an all-approved cross-loop path longer than the runtime transition limit", () => {
+    const longSteps: ProjectStep[] = Array.from(
+      { length: MAX_ROOT_TRANSITIONS },
+      (_, index): ProjectStep => ({
+        id: `step-${index + 1}`,
+        type: "human",
+        description: `Complete step ${index + 1}.`,
+        on: {
+          approved: index === MAX_ROOT_TRANSITIONS - 1
+            ? { loop: "finish" }
+            : `step-${index + 2}`,
+          rejected: { end: "failed" }
+        }
+      })
+    );
+    const tooLong: ProjectAutomationConfig = {
+      version: 3,
+      loops: [{
+        id: "delivery",
+        start: "step-1",
+        steps: longSteps
+      }, {
+        id: "finish",
+        start: "complete",
+        steps: [{
+          id: "complete",
+          type: "human",
+          description: "Complete delivery.",
+          on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+        }]
+      }]
+    };
+
+    expect(validateProjectAutomationConfig(tooLong, [agent])).toContainEqual({
+      path: "loops.0.start",
+      message: `The all-approved path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
+    });
+  });
+
+  it("allows a short all-approved chain across loops", () => {
+    const short: ProjectAutomationConfig = {
+      version: 3,
+      loops: [{
+        id: "delivery",
+        start: "implement",
+        steps: [{
+          id: "implement",
+          type: "agent",
+          agentId: agent.id,
+          description: "Implement the task.",
+          on: { approved: "code-gate", rejected: { end: "blocked" } }
+        }, {
+          id: "code-gate",
+          type: "human",
+          description: "Approve the task.",
+          on: { approved: { loop: "dev-deployment" }, rejected: "implement" }
+        }]
+      }, {
+        id: "dev-deployment",
+        start: "deploy",
+        steps: [{
+          id: "deploy",
+          type: "agent",
+          agentId: agent.id,
+          description: "Deploy to dev.",
+          on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+        }]
+      }]
+    };
+
+    expect(validateProjectAutomationConfig(short, [agent])).toEqual([]);
   });
 });

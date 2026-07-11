@@ -5,6 +5,7 @@ import { notifyRuntimeChanged } from "../runtime-events.js";
 import type { RuntimeDatabase } from "../runtime-db.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
 import { loopContainsAgentWork, type LoopExecutionGateway } from "./LoopExecutionGateway.js";
+import { validateLoopRunStart } from "./LoopRunStartPolicy.js";
 
 export class LoopRunService {
   private executionGateway?: LoopExecutionGateway;
@@ -23,6 +24,7 @@ export class LoopRunService {
     if (data.automationIssues.length > 0) {
       throw new LoopRunStateError("Cannot start a loop while project.json is invalid.");
     }
+    await validateLoopRunStart(data, loopId, input);
     if (!this.executionGateway && loopContainsAgentWork(data, loopId)) {
       throw new LoopRunStateError("Cannot start an agent loop before the runtime control plane is configured.");
     }

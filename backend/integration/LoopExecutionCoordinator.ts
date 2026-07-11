@@ -14,6 +14,7 @@ import { agentSnapshotFromAgent } from "../control-plane/ControlPlaneService.js"
 import { ControlPlanePreflightError } from "../control-plane/errors.js";
 import type { RuntimeDatabase } from "../runtime-db.js";
 import type { LoopExecutionGateway } from "../services/LoopExecutionGateway.js";
+import { renderLoopStepPrompt } from "./LoopStepPrompt.js";
 
 export interface LoopExecutionCoordinatorOptions {
   controlPlane: ControlPlaneService;
@@ -98,7 +99,7 @@ export class LoopExecutionCoordinator implements LoopExecutionGateway {
       rootRunId,
       loopRunId: pending.run.runId,
       stepRunId: pending.stepRun.stepRunId,
-      input: pending.stepRun.input,
+      input: renderLoopStepPrompt(runs, pending.run, pending.stepRun),
       agent: snapshot.agent,
       runtime: snapshot.runtime,
       project: plan.project,

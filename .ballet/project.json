@@ -2,70 +2,35 @@
   "version": 3,
   "loops": [
     {
-      "id": "project-brief",
-      "start": "create-project-brief",
-      "steps": [
-        {
-          "id": "create-project-brief",
-          "type": "agent",
-          "agentId": "brief-agent",
-          "description": "Create Project Brief from accepted ADRs and approved GOALS.",
-          "on": {
-            "approved": "challenge-project-brief",
-            "rejected": { "end": "failed" }
-          }
-        },
-        {
-          "id": "challenge-project-brief",
-          "type": "agent",
-          "agentId": "loop-critic-agent",
-          "description": "Challenge Project Brief against ADRs, GOALS, constraints, assumptions, and traceability.",
-          "on": {
-            "approved": "project-brief-gate",
-            "rejected": "create-project-brief"
-          }
-        },
-        {
-          "id": "project-brief-gate",
-          "type": "human",
-          "description": "Gate 1: Approve the reviewed Project Brief before roadmap planning continues.",
-          "on": {
-            "approved": { "loop": "roadmap" },
-            "rejected": "create-project-brief"
-          }
-        }
-      ]
-    },
-    {
-      "id": "roadmap",
+      "id": "delivery-planning",
       "start": "create-roadmap",
       "steps": [
         {
           "id": "create-roadmap",
           "type": "agent",
           "agentId": "roadmap-agent",
-          "description": "Create traceable delivery roadmap from the approved Project Brief.",
+          "description": "Muodosta hyväksytyistä ADR- ja Goal-dokumenteista arvo-, riski- ja riippuvuusjärjestykseen asetettu roadmap tiedostoon .ballet/outputs/ROADMAP.md.",
           "on": {
-            "approved": "challenge-roadmap",
-            "rejected": { "end": "failed" }
+            "approved": "create-work-breakdown",
+            "rejected": { "end": "blocked" }
           }
         },
         {
-          "id": "challenge-roadmap",
+          "id": "create-work-breakdown",
           "type": "agent",
-          "agentId": "loop-critic-agent",
-          "description": "Challenge the roadmap for value order, risk order, dependencies, and ADR/GOALS alignment.",
+          "agentId": "milestone-task-agent",
+          "description": "Jaa roadmap milestoneiksi ja atomisiksi task-NNN-tehtäviksi tiedostoihin .ballet/outputs/MILESTONES.md ja .ballet/outputs/TASKS.md.",
           "on": {
-            "approved": "roadmap-gate",
-            "rejected": "create-roadmap"
+            "approved": "planning-gate",
+            "rejected": { "end": "blocked" }
           }
         },
         {
-          "id": "roadmap-gate",
+          "id": "planning-gate",
           "type": "human",
-          "description": "Gate 2: Approve the reviewed Roadmap before UI design planning continues.",
+          "description": "Hyväksy roadmap, milestonet ja taskit toteutuksen lähtökohdaksi. Rejection-palaute käynnistää suunnittelun uudelleen roadmapista.",
           "on": {
-            "approved": { "loop": "ui-design" },
+            "approved": { "end": "completed" },
             "rejected": "create-roadmap"
           }
         }
@@ -73,183 +38,39 @@
     },
     {
       "id": "ui-design",
-      "start": "create-ui-design",
+      "start": "design-task-ui",
       "steps": [
         {
-          "id": "create-ui-design",
+          "id": "design-task-ui",
           "type": "agent",
           "agentId": "ui-design-agent",
-          "description": "Create a UI/UX design plan from the approved Roadmap.",
+          "description": "Suunnittele yhden Run-inputissa nimetyn task-NNN-tehtävän UI tiedostoon .ballet/outputs/ui/<task-id>.md.",
           "on": {
-            "approved": "challenge-ui-design",
-            "rejected": { "end": "failed" }
-          }
-        },
-        {
-          "id": "challenge-ui-design",
-          "type": "agent",
-          "agentId": "loop-critic-agent",
-          "description": "Challenge the UI design for goal fit, states, accessibility, consistency, and implementation cost.",
-          "on": {
-            "approved": "ui-design-gate",
-            "rejected": "create-ui-design"
-          }
-        },
-        {
-          "id": "ui-design-gate",
-          "type": "human",
-          "description": "Gate 3: Approve the reviewed UI Design before technical planning continues.",
-          "on": {
-            "approved": { "loop": "technical-plan" },
-            "rejected": "create-ui-design"
-          }
-        }
-      ]
-    },
-    {
-      "id": "technical-plan",
-      "start": "create-technical-plan",
-      "steps": [
-        {
-          "id": "create-technical-plan",
-          "type": "agent",
-          "agentId": "technical-plan-agent",
-          "description": "Create an implementation-ready Technical Plan from ADRs, the Roadmap, and the approved UI Design.",
-          "on": {
-            "approved": "challenge-technical-plan",
+            "approved": { "end": "completed" },
             "rejected": { "end": "blocked" }
           }
-        },
-        {
-          "id": "challenge-technical-plan",
-          "type": "agent",
-          "agentId": "loop-critic-agent",
-          "description": "Challenge the Technical Plan for architecture, data, APIs, security, testability, deployability, and rollback.",
-          "on": {
-            "approved": "technical-plan-gate",
-            "rejected": "create-technical-plan"
-          }
-        },
-        {
-          "id": "technical-plan-gate",
-          "type": "human",
-          "description": "Gate 4: Approve the reviewed Technical Plan before milestone planning continues.",
-          "on": {
-            "approved": { "loop": "milestones" },
-            "rejected": "create-technical-plan"
-          }
         }
       ]
     },
     {
-      "id": "milestones",
-      "start": "create-milestones",
-      "steps": [
-        {
-          "id": "create-milestones",
-          "type": "agent",
-          "agentId": "milestone-task-agent",
-          "description": "Create validated milestones from the approved Technical Plan and Roadmap.",
-          "on": {
-            "approved": "challenge-milestones",
-            "rejected": { "end": "failed" }
-          }
-        },
-        {
-          "id": "challenge-milestones",
-          "type": "agent",
-          "agentId": "loop-critic-agent",
-          "description": "Challenge milestones for scope, dependency order, validation method, and increment value.",
-          "on": {
-            "approved": "milestones-gate",
-            "rejected": "create-milestones"
-          }
-        },
-        {
-          "id": "milestones-gate",
-          "type": "human",
-          "description": "Gate 5: Approve the reviewed Milestones before task specification continues.",
-          "on": {
-            "approved": { "loop": "task-specs" },
-            "rejected": "create-milestones"
-          }
-        }
-      ]
-    },
-    {
-      "id": "task-specs",
-      "start": "create-task-specs",
-      "steps": [
-        {
-          "id": "create-task-specs",
-          "type": "agent",
-          "agentId": "milestone-task-agent",
-          "description": "Create atomic task specifications from the approved milestones.",
-          "on": {
-            "approved": "challenge-task-specs",
-            "rejected": { "end": "failed" }
-          }
-        },
-        {
-          "id": "challenge-task-specs",
-          "type": "agent",
-          "agentId": "loop-critic-agent",
-          "description": "Challenge task specs for atomicity, acceptance criteria, testability, dependencies, and traceability.",
-          "on": {
-            "approved": "task-specs-gate",
-            "rejected": "create-task-specs"
-          }
-        },
-        {
-          "id": "task-specs-gate",
-          "type": "human",
-          "description": "Gate 6: Approve the reviewed Task Specs before implementation starts.",
-          "on": {
-            "approved": { "loop": "implementation-review" },
-            "rejected": "create-task-specs"
-          }
-        }
-      ]
-    },
-    {
-      "id": "implementation-review",
+      "id": "implementation",
       "start": "implement-task",
       "steps": [
         {
           "id": "implement-task",
           "type": "agent",
           "agentId": "implementation-agent",
-          "description": "Implement only the approved task spec as the smallest safe code change.",
+          "description": "Toteuta täsmälleen yksi Run-inputissa nimetty task-NNN-tehtävä ja sen hyväksymiskriteerit.",
           "on": {
-            "approved": "run-tests",
-            "rejected": "classify-failure"
-          }
-        },
-        {
-          "id": "run-tests",
-          "type": "agent",
-          "agentId": "review-test-agent",
-          "description": "Run or assess required tests, build, lint, and acceptance evidence.",
-          "on": {
-            "approved": "review-code",
-            "rejected": "classify-failure"
-          }
-        },
-        {
-          "id": "classify-failure",
-          "type": "agent",
-          "agentId": "failure-router-agent",
-          "description": "Classify failed implementation, review, or test evidence and route safe corrections.",
-          "on": {
-            "approved": "implement-task",
+            "approved": "verify-task",
             "rejected": { "end": "blocked" }
           }
         },
         {
-          "id": "review-code",
+          "id": "verify-task",
           "type": "agent",
           "agentId": "review-test-agent",
-          "description": "Review code against the task spec, ADRs, GOALS, tests, security, and scope boundaries.",
+          "description": "Tarkasta taskin scope, diff, testit ja hyväksymiskriteerit riippumattomasti; saman taskin korjaukset palautuvat implementointiin.",
           "on": {
             "approved": "code-gate",
             "rejected": "implement-task"
@@ -258,7 +79,7 @@
         {
           "id": "code-gate",
           "type": "human",
-          "description": "Gate 7: Approve the reviewed code before dev deployment starts.",
+          "description": "Hyväksy tarkastettu koodi ja valtuuta dev-deployment. Rejection-palaute palauttaa saman taskin implementointiin.",
           "on": {
             "approved": { "loop": "dev-deployment" },
             "rejected": "implement-task"
@@ -268,149 +89,16 @@
     },
     {
       "id": "dev-deployment",
-      "start": "prepare-dev-deployment",
+      "start": "deploy-and-validate-dev",
       "steps": [
         {
-          "id": "prepare-dev-deployment",
+          "id": "deploy-and-validate-dev",
           "type": "agent",
           "agentId": "dev-deploy-agent",
-          "description": "Check dev deployment readiness: artifact, config, migrations, rollback, and validation plan.",
-          "on": {
-            "approved": "deploy-to-dev",
-            "rejected": "classify-deployment-failure"
-          }
-        },
-        {
-          "id": "deploy-to-dev",
-          "type": "agent",
-          "agentId": "dev-deploy-agent",
-          "description": "Deploy the approved build to the dev environment.",
-          "on": {
-            "approved": "validate-dev-deployment",
-            "rejected": "classify-deployment-failure"
-          }
-        },
-        {
-          "id": "validate-dev-deployment",
-          "type": "agent",
-          "agentId": "dev-deploy-agent",
-          "description": "Validate the dev deployment with smoke tests, acceptance checks, logs, metrics, and traces.",
-          "on": {
-            "approved": "dev-deployment-validation-gate",
-            "rejected": "prepare-dev-deployment"
-          }
-        },
-        {
-          "id": "dev-deployment-validation-gate",
-          "type": "human",
-          "description": "Gate 8: Approve the validated dev deployment and complete the loop.",
+          "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
           "on": {
             "approved": { "end": "completed" },
-            "rejected": "prepare-dev-deployment"
-          }
-        },
-        {
-          "id": "classify-deployment-failure",
-          "type": "agent",
-          "agentId": "failure-router-agent",
-          "description": "Classify failed deployment evidence and route safe corrections.",
-          "on": {
-            "approved": "implement-deployment-remediation",
-            "rejected": { "end": "blocked" }
-          }
-        },
-        {
-          "id": "implement-deployment-remediation",
-          "type": "agent",
-          "agentId": "implementation-agent",
-          "description": "Implement the smallest safe correction for the classified deployment failure.",
-          "on": {
-            "approved": "test-deployment-remediation",
-            "rejected": "classify-deployment-failure"
-          }
-        },
-        {
-          "id": "test-deployment-remediation",
-          "type": "agent",
-          "agentId": "review-test-agent",
-          "description": "Run the tests, build, lint, and acceptance checks required for the deployment correction.",
-          "on": {
-            "approved": "review-deployment-remediation",
-            "rejected": "classify-deployment-failure"
-          }
-        },
-        {
-          "id": "review-deployment-remediation",
-          "type": "agent",
-          "agentId": "review-test-agent",
-          "description": "Review the deployment correction against the failure evidence, task spec, tests, and scope boundaries.",
-          "on": {
-            "approved": "deployment-remediation-gate",
-            "rejected": "implement-deployment-remediation"
-          }
-        },
-        {
-          "id": "deployment-remediation-gate",
-          "type": "human",
-          "description": "Approve the reviewed deployment correction before deployment readiness is checked again.",
-          "on": {
-            "approved": "prepare-dev-deployment",
-            "rejected": "implement-deployment-remediation"
-          }
-        }
-      ]
-    },
-    {
-      "id": "ci-validation-recovery",
-      "start": "classify-ci-validation-failure",
-      "steps": [
-        {
-          "id": "classify-ci-validation-failure",
-          "type": "agent",
-          "agentId": "failure-router-agent",
-          "description": "Classify failed CI or validation evidence and route safe corrections.",
-          "on": {
-            "approved": "implement-ci-validation-remediation",
-            "rejected": { "end": "blocked" }
-          }
-        },
-        {
-          "id": "implement-ci-validation-remediation",
-          "type": "agent",
-          "agentId": "implementation-agent",
-          "description": "Implement the smallest safe correction for the classified CI or validation failure.",
-          "on": {
-            "approved": "test-ci-validation-remediation",
-            "rejected": "classify-ci-validation-failure"
-          }
-        },
-        {
-          "id": "test-ci-validation-remediation",
-          "type": "agent",
-          "agentId": "review-test-agent",
-          "description": "Run the tests, build, lint, and acceptance checks required for the CI or validation correction.",
-          "on": {
-            "approved": "review-ci-validation-remediation",
-            "rejected": "classify-ci-validation-failure"
-          }
-        },
-        {
-          "id": "review-ci-validation-remediation",
-          "type": "agent",
-          "agentId": "review-test-agent",
-          "description": "Review the correction against the failure evidence, task spec, tests, and scope boundaries.",
-          "on": {
-            "approved": "ci-validation-remediation-gate",
-            "rejected": "implement-ci-validation-remediation"
-          }
-        },
-        {
-          "id": "ci-validation-remediation-gate",
-          "type": "human",
-          "description": "Approve the reviewed CI or validation correction before dev deployment starts.",
-          "on": {
-            "approved": { "loop": "dev-deployment" },
-            "rejected": "implement-ci-validation-remediation"
+            "rejected": { "end": "failed" }
           }
         }
       ]
