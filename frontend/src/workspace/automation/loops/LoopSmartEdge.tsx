@@ -25,7 +25,6 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
   const edgePaths = loopEdgePaths(detachedProps, nodes, outputSlotKind);
   const displayLabel = loopEdgeDisplayLabel(loopEdge);
   const labelPlacement = displayLabel ? loopEdgeLabelPlacement(detachedProps, edgePaths, displayLabel) : undefined;
-  const pointStyle = { fill: String(props.style?.stroke ?? "var(--loop-flow)"), filter: "drop-shadow(0 0 4px currentColor)" };
 
   return (
     <>
@@ -37,8 +36,8 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
         markerEnd={props.markerEnd}
         interactionWidth={props.interactionWidth}
       />
-      <circle aria-hidden="true" data-loop-connection-point="source" cx={detachedProps.sourceX} cy={detachedProps.sourceY} r={loopConnectionPointRadius} className="loop-connection-point" style={pointStyle} />
-      <circle aria-hidden="true" data-loop-connection-point="target" cx={detachedProps.targetX} cy={detachedProps.targetY} r={loopConnectionPointRadius} className="loop-connection-point" style={pointStyle} />
+      <circle aria-hidden="true" data-loop-connection-point="source" cx={detachedProps.sourceX} cy={detachedProps.sourceY} r={loopConnectionPointRadius} className="loop-connection-point" />
+      <circle aria-hidden="true" data-loop-connection-point="target" cx={detachedProps.targetX} cy={detachedProps.targetY} r={loopConnectionPointRadius} className="loop-connection-point" />
       {displayLabel && labelPlacement ? (
         <EdgeLabelRenderer>
           <div

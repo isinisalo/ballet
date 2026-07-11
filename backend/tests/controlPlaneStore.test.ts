@@ -385,7 +385,7 @@ describe("control-plane persistence and execution protocol", () => {
     expect(preflight.issues.filter((issue) => issue.code === "mixed_device")).toHaveLength(2);
     await expect(control.service.executionStates()).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({ agentId: "developer", status: "running" }),
-      expect.objectContaining({ agentId: "reviewer", status: "idle" })
+      expect.objectContaining({ agentId: "reviewer", status: "idle", reasoning: "high" })
     ]));
   });
 });

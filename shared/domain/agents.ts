@@ -31,6 +31,7 @@ export interface AgentExecutionState {
   deviceId?: string;
   runtimeBackendId?: string;
   provider?: RuntimeProvider;
+  reasoning?: string;
   activeTaskId?: string;
   reason?: string;
 }

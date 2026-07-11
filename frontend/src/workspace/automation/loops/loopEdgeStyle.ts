@@ -9,8 +9,8 @@ const loopReturnEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 48%, tr
 const loopCrossLoopApprovalEdgeStroke = "var(--loop-flow)";
 const loopApprovalOutputEdgeStroke = "var(--loop-flow)";
 const loopReworkOutputEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 48%, transparent)";
-const loopEdgeOpacity = 0.75;
-const loopGhostTargetEdgeOpacity = 0.6;
+const loopEdgeOpacity = 0.64;
+const loopGhostTargetEdgeOpacity = 0.5;
 const loopAnimatedEdgeOpacity = 1;
 
 export function loopEdgeDomAttributes(edge: LoopCanvasEdge, isAnimated = false): LoopReactFlowEdge["domAttributes"] {
@@ -32,10 +32,10 @@ export function loopEdgeStyle(
 ): LoopReactFlowEdge["style"] {
   return {
     stroke: loopEdgeStroke(edge, targetNode),
-    strokeWidth: 2,
+    strokeWidth: 1.5,
     strokeDasharray: loopEdgeStrokeDasharray(edge),
     strokeLinecap: loopEdgeStrokeLinecap(edge),
-    filter: isAnimated || loopEdgeIsRejectedOutput(edge) ? undefined : "drop-shadow(0 0 3px color-mix(in srgb, var(--loop-flow) 45%, transparent))",
+    filter: isAnimated || loopEdgeIsRejectedOutput(edge) ? undefined : "drop-shadow(0 0 2px color-mix(in srgb, var(--loop-flow) 38%, transparent))",
     opacity: loopEdgeRenderedOpacity(edge, targetNode, isAnimated)
   };
 }

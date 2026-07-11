@@ -90,10 +90,11 @@ function useExecutionSettings(editor: AgentExecutionBindingEditor, onSaved?: () 
     const options = reasoningOptions(backend, model);
     persist(editor.updateAndSave({ model, reasoning: options.length === 1 && options[0].value === PROVIDER_DEFAULT ? PROVIDER_DEFAULT : "" }));
   };
+  const selectReasoning = (reasoning: string) => persist(editor.updateAndSave({ reasoning }));
   const setNetwork = (network: boolean) => persist(editor.updateAndSave({ policy: { ...editor.form.policy, network } }));
   const setReadOnlyRoots = (readOnlyRoots: string[]) => editor.updateForm({ policy: { ...editor.form.policy, readOnlyRoots } });
   const saveReadOnlyRoots = () => persist(editor.saveIfValid());
-  return { advancedOpen, backend, device, editor, readiness, selectBackend, selectDevice, selectModel, saveReadOnlyRoots, setAdvancedOpen, setNetwork, setReadOnlyRoots, supportsNetwork, supportsRoots, validationError };
+  return { advancedOpen, backend, device, editor, readiness, selectBackend, selectDevice, selectModel, selectReasoning, saveReadOnlyRoots, setAdvancedOpen, setNetwork, setReadOnlyRoots, supportsNetwork, supportsRoots, validationError };
 }
 
 function ExecutionSelectionFields({ settings, compact = false }: { settings: ReturnType<typeof useExecutionSettings>; compact?: boolean }) {
@@ -103,7 +104,7 @@ function ExecutionSelectionFields({ settings, compact = false }: { settings: Ret
       <ExecutionSelect compact={compact} label="Runtime" value={editor.form.deviceId} placeholder="Select runtime" disabled={editor.loading} options={editor.devices.map((item) => ({ value: item.id, label: `${item.displayName} · ${item.status}` }))} onChange={settings.selectDevice} />
       <ExecutionSelect compact={compact} label="Provider" value={editor.form.runtimeBackendId} placeholder="Select provider" disabled={!device} options={backendsForDevice(editor.devices, editor.form.deviceId).map((item) => ({ value: item.id, label: providerLabel(item.provider) }))} onChange={settings.selectBackend} />
       <ExecutionSelect compact={compact} label="Model" value={editor.form.model} placeholder="Select model" disabled={!backend} options={modelOptions(backend)} onChange={settings.selectModel} />
-      <ExecutionSelect compact={compact} label="Reasoning effort" value={editor.form.reasoning} placeholder="Select effort" disabled={!backend || !editor.form.model} options={reasoningOptions(backend, editor.form.model)} onChange={(reasoning) => editor.updateForm({ reasoning })} />
+      <ExecutionSelect compact={compact} label="Reasoning effort" value={editor.form.reasoning} placeholder="Select effort" disabled={!backend || !editor.form.model} options={reasoningOptions(backend, editor.form.model)} onChange={settings.selectReasoning} />
     </div>
   );
 }

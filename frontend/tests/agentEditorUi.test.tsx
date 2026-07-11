@@ -98,9 +98,12 @@ describe("agent instructions workspace", () => {
       const url = String(input);
       if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
       if (url === "/api/agents/agent-architect/execution-binding" && !init?.method) return Response.json(null);
-      if (url === "/api/agents/agent-architect/execution-binding" && init?.method === "PUT") return Response.json({
-        id: "binding-1", projectId: "project-1", agentId: "agent-architect", runtimeBackendId: "backend-codex", deviceId: "device-1", provider: "codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: [] }, createdAt: now, updatedAt: now
-      });
+      if (url === "/api/agents/agent-architect/execution-binding" && init?.method === "PUT") {
+        const payload = JSON.parse(String(init.body)) as { runtimeBackendId: string; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
+        return Response.json({
+          id: "binding-1", projectId: "project-1", agentId: "agent-architect", deviceId: "device-1", provider: "codex", ...payload, createdAt: now, updatedAt: now
+        });
+      }
       return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${url}` }, { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);

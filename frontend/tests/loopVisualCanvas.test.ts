@@ -3,9 +3,10 @@ import type { Agent, ProjectAutomationConfig } from "@shared/api/workspace-contr
 import { describe, expect, it } from "vitest";
 import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopReturnEdgePath, loopToLoopStraightEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
 import { detachedLoopEdgeProps, loopConnectionPointRadius, loopEdgeEndpointGap } from "../src/workspace/automation/loops/loopFloatingEdgeGeometry";
-import { loopEdgeDomAttributes } from "../src/workspace/automation/loops/loopEdgeStyle";
+import { loopEdgeDomAttributes, loopEdgeStyle } from "../src/workspace/automation/loops/loopEdgeStyle";
 import { calculateCompositeLoopCanvasLayout, loopNodeSizes } from "../src/workspace/automation/loops/loopLayout";
 import { loopPlanetNodeSizes } from "../src/workspace/automation/loops/loopLayoutConfig";
+import { loopReasoningGlowLevel } from "../src/workspace/automation/loops/loopReasoningGlow";
 import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/loopSmartEdgeRouting";
 import { buildLoopVisualProjection } from "../src/workspace/automation/loops/loopVisualProjection";
 
@@ -145,15 +146,26 @@ describe("celestial Loop Canvas geometry", () => {
       ]
     } satisfies ProjectAutomationConfig["loops"][number];
     const styledConfig = { version: 3, loops: [styledLoop] } satisfies ProjectAutomationConfig;
-    const projection = buildLoopVisualProjection(styledConfig, styledLoop, null, agents);
+    const projection = buildLoopVisualProjection(styledConfig, styledLoop, null, agents, [
+      { agentId: "agent-0", status: "idle", reasoning: "low" },
+      { agentId: "agent-1", status: "idle", reasoning: "medium" },
+      { agentId: "agent-2", status: "idle", reasoning: "xhigh" }
+    ]);
     const layout = calculateCompositeLoopCanvasLayout({ config: projection.config, selectedLoopId: styledLoop.id, recordsByLoopId: projection.recordsByLoopId });
     const steps = layout.nodes.filter((node) => node.kind === "step");
 
     expect(projection.config.steps.map((step) => step.nodeStyle)).toEqual(["luna", "terra", "sol", "luna"]);
+    expect(projection.config.steps.map((step) => step.reasoningEffort)).toEqual(["low", "medium", "xhigh", undefined]);
     expect(steps.map((node) => node.width)).toEqual([loopPlanetNodeSizes.luna, loopPlanetNodeSizes.terra, loopPlanetNodeSizes.sol, loopPlanetNodeSizes.luna]);
     expect(steps.every((node, index) => index === 0 || node.x > steps[index - 1]!.x + steps[index - 1]!.width)).toBe(true);
+    expect(Math.min(...steps.slice(1).map((node, index) => node.x - (steps[index]!.x + steps[index]!.width)))).toBeGreaterThanOrEqual(208);
     expect(new Set(steps.map((node) => node.y + node.height / 2))).toEqual(new Set([96]));
     expect(loopNodeSizes.step.maxWidth).toBe(loopPlanetNodeSizes.sol);
+  });
+
+  it("maps increasing reasoning effort to progressively stronger glow levels", () => {
+    expect([undefined, "provider-default", "light", "low", "medium", "high", "xhigh", "max", "ultra"].map(loopReasoningGlowLevel)).toEqual([0, 0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(loopReasoningGlowLevel("custom-effort")).toBe(3);
   });
 
   it("detaches edge endpoints by eight pixels and uses five-pixel connection points", () => {
@@ -169,5 +181,9 @@ describe("celestial Loop Canvas geometry", () => {
     expect(detached).toMatchObject({ sourceX: 28, sourceY: 30, targetX: 120, targetY: 72 });
     expect(loopEdgeEndpointGap).toBe(8);
     expect(loopConnectionPointRadius * 2).toBe(5);
+    expect(loopEdgeStyle({ key: "flow", sourceNodeKey: "one", targetNodeKey: "two" }, undefined, false)).toMatchObject({
+      strokeWidth: 1.5,
+      opacity: 0.64
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Route, Save } from "lucide-react";
-import type { AppData, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { AgentExecutionState, AppData, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
 import { EmptyState, HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import type { AutomationLoopMode, AutomationLoopView } from "../types";
@@ -16,8 +16,9 @@ import { isActiveLoopRun } from "./loops/loopRunState";
 import { useLoopRun } from "./loops/useLoopRun";
 import type { RuntimeStreamStatus } from "@/app/useRuntimeStream";
 
-export function AutomationView({ data, selectedId, loopView, mode, runtimeStreamStatus, saveAutomation, navigate }: {
+export function AutomationView({ data, agentExecutionStates, selectedId, loopView, mode, runtimeStreamStatus, saveAutomation, navigate }: {
   data: AppData;
+  agentExecutionStates: AgentExecutionState[];
   selectedId?: string;
   loopView?: AutomationLoopView;
   mode: AutomationLoopMode;
@@ -85,8 +86,8 @@ export function AutomationView({ data, selectedId, loopView, mode, runtimeStream
       {loopView === "all" ? <AllLoopsCanvas config={draft} onSelect={(id) => navigate(automationLoopPath(id))} /> : null}
       {loopView !== "all" && !displayedLoop ? <div className="p-4"><EmptyState title="Loop not found." /></div> : null}
       {loopView !== "all" && displayedLoop && mode === "edit" && creating ? <LoopCreationEditor loop={displayedLoop} loops={draft.loops} agents={data.agents} onChange={updateLoop} /> : null}
-      {loopView !== "all" && displayedLoop && mode === "edit" && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
-      {loopView !== "all" && savedLoop && mode === "run" ? <LoopRunView config={data.automation} loop={savedLoop} agents={data.agents} controller={runController} startDisabledReason={isDirty ? "Save loop changes before starting a run." : data.automationIssues.length > 0 ? "Resolve automation validation issues before starting a run." : undefined} /> : null}
+      {loopView !== "all" && displayedLoop && mode === "edit" && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
+      {loopView !== "all" && savedLoop && mode === "run" ? <LoopRunView config={data.automation} loop={savedLoop} agents={data.agents} agentExecutionStates={agentExecutionStates} controller={runController} startDisabledReason={isDirty ? "Save loop changes before starting a run." : data.automationIssues.length > 0 ? "Resolve automation validation issues before starting a run." : undefined} /> : null}
     </Panel>
   );
 }

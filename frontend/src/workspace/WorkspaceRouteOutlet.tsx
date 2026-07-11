@@ -52,7 +52,7 @@ export function WorkspaceRouteOutlet({
     case "project-instructions":
       return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
     case "automation":
-      return <AutomationView data={data} selectedId={route.automationEntityId} loopView={route.automationLoopView} mode={route.automationLoopMode ?? "edit"} runtimeStreamStatus={runtimeStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
+      return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} mode={route.automationLoopMode ?? "edit"} runtimeStreamStatus={runtimeStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
     case "runtimes":
       return <RuntimeRegistryView selectedDeviceId={route.runtimeDeviceId} onSelectDevice={(deviceId) => navigate(deviceId ? `/runtimes?id=${encodeURIComponent(deviceId)}` : "/runtimes")} />;
     case "agents":

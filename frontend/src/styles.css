@@ -46,6 +46,7 @@
   --section-heading: #c1c6d7;
   --divider-strong: #414755;
   --loop-flow: #76d4ca;
+  --loop-connection-point: #e3fffb;
   --chart-1: #adc6ff;
   --chart-2: #4edea3;
   --chart-3: #ffb95f;
@@ -97,7 +98,8 @@ body {
 }
 
 .loop-react-flow .loop-connection-point {
-  color: var(--loop-flow);
+  fill: var(--loop-connection-point);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--loop-connection-point) 88%, transparent));
   pointer-events: none;
 }
 
@@ -107,6 +109,79 @@ body {
   padding: 0;
   background: transparent;
   outline: none;
+}
+
+.loop-celestial-node[data-loop-node-style="luna"] {
+  --loop-node-reasoning-accent: color-mix(in srgb, var(--foreground) 78%, var(--muted-foreground));
+}
+
+.loop-celestial-node[data-loop-node-style="terra"] {
+  --loop-node-reasoning-accent: color-mix(in srgb, var(--muted-foreground) 42%, var(--secondary));
+}
+
+.loop-celestial-node[data-loop-node-style="sol"] {
+  --loop-node-reasoning-accent: color-mix(in srgb, var(--muted-foreground) 36%, var(--tertiary));
+}
+
+.loop-celestial-reasoning-glow {
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: 9999px;
+  --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 88%, var(--loop-node-reasoning-accent));
+  background: radial-gradient(circle, var(--loop-node-reasoning-glow) 0, transparent 68%);
+  filter: blur(5px);
+  opacity: 0;
+  pointer-events: none;
+  transition: inset 180ms ease, filter 180ms ease, opacity 180ms ease;
+}
+
+.loop-celestial-node[data-loop-reasoning-glow="1"] .loop-celestial-reasoning-glow {
+  --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 88%, var(--loop-node-reasoning-accent));
+  inset: -6px;
+  opacity: 0.11;
+}
+
+.loop-celestial-node[data-loop-reasoning-glow="2"] .loop-celestial-reasoning-glow {
+  --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 76%, var(--loop-node-reasoning-accent));
+  inset: -8px;
+  filter: blur(6px);
+  opacity: 0.18;
+}
+
+.loop-celestial-node[data-loop-reasoning-glow="3"] .loop-celestial-reasoning-glow {
+  --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 62%, var(--loop-node-reasoning-accent));
+  inset: -10px;
+  filter: blur(7px);
+  opacity: 0.28;
+}
+
+.loop-celestial-node[data-loop-reasoning-glow="4"] .loop-celestial-reasoning-glow {
+  --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 46%, var(--loop-node-reasoning-accent));
+  inset: -13px;
+  filter: blur(9px);
+  opacity: 0.4;
+}
+
+.loop-celestial-node[data-loop-reasoning-glow="5"] .loop-celestial-reasoning-glow {
+  --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 30%, var(--loop-node-reasoning-accent));
+  inset: -16px;
+  filter: blur(11px);
+  opacity: 0.52;
+}
+
+.loop-celestial-node[data-loop-reasoning-glow="6"] .loop-celestial-reasoning-glow {
+  --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 14%, var(--loop-node-reasoning-accent));
+  inset: -20px;
+  filter: blur(14px);
+  opacity: 0.66;
+}
+
+.loop-celestial-node[data-loop-reasoning-glow="7"] .loop-celestial-reasoning-glow {
+  --loop-node-reasoning-glow: var(--loop-node-reasoning-accent);
+  inset: -25px;
+  filter: blur(17px);
+  opacity: 0.82;
 }
 
 .loop-celestial-node:hover .loop-celestial-surface,

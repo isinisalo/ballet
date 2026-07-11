@@ -2,6 +2,7 @@ import { Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopNodeContext } from "./LoopCanvasTypes";
+import { loopReasoningGlowLevel } from "./loopReasoningGlow";
 
 const stepRunStatusClass: Record<string, string> = {
   queued: "border-tertiary/70 text-tertiary",
@@ -57,6 +58,7 @@ function CelestialStepButton({ context, record, records, selected }: {
   const title = record.step?.displayId || record.stepKey || "Missing step";
   const humanGate = record.step?.humanGate ?? false;
   const nodeStyle = humanGate ? "luna" : record.step?.nodeStyle ?? "terra";
+  const reasoningGlow = humanGate ? 0 : loopReasoningGlowLevel(record.step?.reasoningEffort);
   const statusClass = record.step?.stepRun?.status ? stepRunStatusClass[record.step.stepRun.status] : undefined;
 
   return (
@@ -65,6 +67,8 @@ function CelestialStepButton({ context, record, records, selected }: {
       data-loop-node
       data-loop-node-kind={humanGate ? "human" : "agent"}
       data-loop-node-style={nodeStyle}
+      data-loop-reasoning-effort={record.step?.reasoningEffort}
+      data-loop-reasoning-glow={reasoningGlow}
       aria-label={`${context.readOnly ? "View" : "Edit"} step ${title}`}
       title={title}
       className={cn(
@@ -78,6 +82,7 @@ function CelestialStepButton({ context, record, records, selected }: {
         context.onStepSelect(records);
       }}
     >
+      <span aria-hidden="true" className="loop-celestial-reasoning-glow" />
       <span aria-hidden="true" className={`loop-celestial-surface loop-celestial-surface--${nodeStyle}`} />
       {humanGate ? <Shield aria-hidden="true" className="relative z-10 size-3.5 text-tertiary" strokeWidth={1.8} /> : null}
       <span

@@ -1,5 +1,6 @@
 import type {
   Agent,
+  AgentExecutionState,
   AgentNodeStyle,
   LoopRunDetails,
   ProjectAutomationConfig,
@@ -17,6 +18,7 @@ export type LoopVisualStep = {
   agentId?: string;
   humanGate: boolean;
   nodeStyle: AgentNodeStyle;
+  reasoningEffort?: string;
   step: ProjectStep;
   stepRun?: StepRun;
 };
@@ -44,11 +46,13 @@ export function buildLoopVisualProjection(
   config: ProjectAutomationConfig,
   displayedLoop: ProjectLoop,
   run?: LoopRunDetails | null,
-  agents: Agent[] = []
+  agents: Agent[] = [],
+  agentExecutionStates: AgentExecutionState[] = []
 ): LoopVisualProjection {
   const loopDefinitions = config.loops.map((loop) => loop.id === displayedLoop.id ? displayedLoop : loop);
   const latestRunByStepId = latestStepRuns(run?.stepRuns ?? []);
   const nodeStyleByAgentId = new Map(agents.map((agent) => [agent.id, agent.nodeStyle ?? "terra"]));
+  const reasoningByAgentId = new Map(agentExecutionStates.map((state) => [state.agentId, state.reasoning]));
   const steps = loopDefinitions.flatMap((loop) => loop.steps.map((step) => ({
     id: visualStepKey(loop.id, step.id),
     displayId: step.id,
@@ -56,6 +60,7 @@ export function buildLoopVisualProjection(
     agentId: step.type === "agent" ? step.agentId : undefined,
     humanGate: step.type === "human",
     nodeStyle: step.type === "human" ? "luna" : nodeStyleByAgentId.get(step.agentId) ?? "terra",
+    reasoningEffort: step.type === "agent" ? reasoningByAgentId.get(step.agentId) : undefined,
     step,
     stepRun: loop.id === displayedLoop.id ? latestRunByStepId.get(step.id) : undefined
   })));

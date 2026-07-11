@@ -170,7 +170,13 @@ export class AgentExecutionStore {
       health: string; auth_status: string; device_status: string;
       active_task_id: string | null; active_agent_id: string | null;
     } | undefined;
-    const base = { agentId, deviceId: binding.deviceId, runtimeBackendId: binding.runtimeBackendId, provider: binding.provider };
+    const base = {
+      agentId,
+      deviceId: binding.deviceId,
+      runtimeBackendId: binding.runtimeBackendId,
+      provider: binding.provider,
+      reasoning: binding.reasoning
+    };
     if (!backend || backend.device_status !== "online" || backend.health === "offline") return { ...base, status: "offline", reason: "Runtime device is offline." };
     if (backend.auth_status !== "ready" || backend.health !== "ready") return { ...base, status: "attention", reason: `Runtime backend is ${backend.health}.` };
     if (backend.active_task_id) {

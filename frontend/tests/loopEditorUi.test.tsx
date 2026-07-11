@@ -64,10 +64,13 @@ describe("compact Loop editor UI", () => {
   });
 
   it("renders agent and human Steps as celestial nodes with bright connection points", async () => {
-    const { container } = render(<LoopEditor config={config} loop={loop} loops={[loop]} agents={[{ ...agents[0]!, nodeStyle: "sol" }]} locked={false} onChange={() => undefined} />);
+    const { container } = render(<LoopEditor config={config} loop={loop} loops={[loop]} agents={[{ ...agents[0]!, nodeStyle: "sol" }]} agentExecutionStates={[{ agentId: "builder", status: "idle", reasoning: "high" }]} locked={false} onChange={() => undefined} />);
 
     expect(await screen.findByRole("button", { name: "Edit step build" })).toHaveAttribute("data-loop-node-style", "sol");
+    expect(screen.getByRole("button", { name: "Edit step build" })).toHaveAttribute("data-loop-reasoning-glow", "4");
+    expect(screen.getByRole("button", { name: "Edit step build" })).toHaveAttribute("data-loop-reasoning-effort", "high");
     expect(screen.getByRole("button", { name: "Edit step review" })).toHaveAttribute("data-loop-node-style", "luna");
+    expect(screen.getByRole("button", { name: "Edit step review" })).toHaveAttribute("data-loop-reasoning-glow", "0");
     expect(screen.getByRole("button", { name: "Edit step review" })).toHaveAttribute("data-loop-node-kind", "human");
     expect(container.querySelector('[data-loop-node-label="build"]')).toHaveClass("left-1/2", "-translate-x-1/2", "top-full");
     expect(container.querySelector('[data-loop-edge-display-label="build"]')).not.toBeInTheDocument();

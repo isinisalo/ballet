@@ -31,6 +31,7 @@ colors:
   tertiary-container: '#ca8100'
   on-tertiary-container: '#3e2400'
   loop-flow: '#76d4ca'
+  loop-connection-point: '#e3fffb'
   error: '#ffb4ab'
   on-error: '#690005'
   error-container: '#93000a'
@@ -142,7 +143,7 @@ Theme support is currently dark-only. Do not expose light or system theme modes 
 
 - **Primary (Electric Blue):** Use for primary commands, selected navigation, focused fields, and selected Loop nodes.
 - **Secondary (Emerald):** Use for running agents, successful Step outcomes, accepted goals, healthy runtimes, and go-forward states.
-- **Loop Flow (Mint):** Use for normal Loop connectors, their endpoint orbs, and the active Transition glow. Keep rejected and rework connectors muted and dashed.
+- **Loop Flow (Mint):** Use for thin, restrained normal Loop connectors and the active Transition glow. Use the brighter `loop-connection-point` token for endpoint orbs. Keep rejected and rework connectors muted and dashed.
 - **Tertiary (Amber):** Use for warnings, idle agents, queued Steps, human-wait states, and attention states that do not require destructive styling.
 - **Error:** Use only for failed or blocked Runs, invalid Loop state, destructive commands, and blocking validation errors.
 - **Background & Surfaces:** Use `#111316` for the application base. Use `#1a1c1f`, `#1e2023`, and `#282a2d` for functional containers, nested panels, and elevated work areas. Keep borders subtle but visible with `#414755` or lower-contrast variants.
@@ -163,7 +164,7 @@ The layout follows a fluid grid with sidebar-heavy navigation and dense operatio
 - **Desktop:** Use a 12-column grid. Keep primary navigation sidebars fixed near 280px when expanded. Let the main workspace remain fluid and scrollable.
 - **Data Density:** Keep density high but structured. Use the 4px spacing unit. Default vertical rhythm between related controls is 8px or 16px. Use 20px panel padding for primary work areas.
 - **Functional Zones:** Separate navigation, collection lists, entity detail panels, previews, Run history, and editor surfaces into clear zones with borders and tonal layers.
-- **Flow Visualization:** Use the compact composite Loop canvas for a selected Loop: Luna 28px, Terra 44px, and Sol 64px celestial Step nodes, fixed-scale panning, smart routed 2px paths, explicit Transition labels, and unobstructed return/cycle paths. Vertically center different-sized nodes that share a lane so their left/right connection points stay on one horizontal line and direct edges remain straight. Detach paths 8px from celestial nodes and terminate them in bright 5px endpoint orbs. Use Loop Flow mint for normal paths, the muted dashed treatment for rejected/rework, and a brighter Loop Flow animation for the Transition taken by the displayed Run. Present the All Loops overview as a dense responsive card grid rather than a second editable graph.
+- **Flow Visualization:** Use the compact composite Loop canvas for a selected Loop: Luna 28px, Terra 44px, and Sol 64px celestial Step nodes, fixed-scale panning, smart routed 1.5px paths, explicit Transition labels, and unobstructed return/cycle paths. Vertically center different-sized nodes that share a lane so their left/right connection points stay on one horizontal line and direct edges remain straight. Keep at least 208px of horizontal path clearance between full-size Step columns. Detach paths 8px from celestial nodes and terminate them in bright 5px endpoint orbs. Use Loop Flow mint for normal paths, the muted dashed treatment for rejected/rework, and a brighter Loop Flow animation for the Transition taken by the displayed Run. Present the All Loops overview as a dense responsive card grid rather than a second editable graph.
 - **Mobile:** Stack panels vertically. Convert sidebars to sheets or drawers. Keep key filters and commands reachable from a persistent top or bottom control.
 
 ## Elevation & Depth
@@ -190,6 +191,7 @@ The shape language is **Soft-Industrial**. Keep controls precise and compact.
 - **Agent Chips:** Use a leading dot plus label. Emerald means running or healthy. Amber means idle, queued, pending, or needs attention. Gray means offline, disabled, unknown, or archived. Use pulse animation only for live-running state.
 - **Agent Editor Inspector:** Let the selected-agent editor use the full available workspace width. Keep its profile rail compact and dark at the base surface level: use `agent-inspector-title` with `on-surface` for the name, `agent-inspector-body` with `on-surface-variant` for description and row labels, `agent-inspector-value` with `on-surface` for technical values, and `agent-inspector-label` for uppercase section headings. Place an `Execution` section with a leading CPU icon directly in the profile rail; it owns compact Runtime, Provider, Model, Reasoning effort, and Network access controls plus the existing Advanced policy disclosure. Save a valid Execution configuration automatically whenever one of its settings changes; do not render a separate save control. Do not show an `Environment` tab or a second execution surface on the right. `Reasoning effort` is the portable persisted execution setting: each provider maps it to its own reasoning/effort API. Status chips use the existing semantic state colors and the 12px inspector body size.
 - **Agent Node Style:** Place the portable `Node style` selector in the Agent Editor Inspector's Execution section. Luna, Terra, and Sol affect only Loop Canvas rendering, save automatically and never change the provider model. Terra is the default.
+- **Reasoning Glow:** Visualize a bound agent's explicit Reasoning effort as seven progressively wider, brighter, and more saturated background-glow levels in this order: `light`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`. Smaller efforts are grayer and dimmer; larger efforts approach the node-style accent. Keep the hue tied to the node style: pale gray for Luna, gray-green for Terra, and gray-orange for Sol. `Provider default` and unbound agents do not receive the additional reasoning glow; semantic Run status rings remain independent.
 - **Cards & Panels:** Use cards for repeated entities and panels for workspace regions. Do not place cards inside cards. Prefer headers with metadata and a compact command area.
 - **Tables & Lists:** Use tight row heights, clear separators, and zebra-striping with a 2% lighter surface tint when rows are dense. Keep row controls icon-first where possible.
 - **Inputs:** Use dark surfaces, 1px borders, and Primary focus state. Validation messages must be explicit and adjacent to the field.

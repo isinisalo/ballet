@@ -18,7 +18,7 @@ export const loopCanvasLayoutConfig = {
   startX: 120,
   startY: 64,
   columnGap: 72,
-  horizontalEdgeGap: 184,
+  horizontalEdgeGap: 208,
   branchGap: 72,
   edgePad: 18,
   selectedCompactLoopRowGap: 112,

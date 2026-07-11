@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { Agent, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
 import { LockKeyhole } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TextField } from "@/components/shared/workspace-ui";
@@ -41,6 +41,7 @@ export function LoopEditor({
   loop,
   loops,
   agents,
+  agentExecutionStates,
   locked,
   lockMessage,
   canvasControls,
@@ -50,6 +51,7 @@ export function LoopEditor({
   loop: ProjectLoop;
   loops: ProjectLoop[];
   agents: Agent[];
+  agentExecutionStates?: AgentExecutionState[];
   locked: boolean;
   lockMessage?: string;
   canvasControls?: ReactNode;
@@ -81,6 +83,7 @@ export function LoopEditor({
           config={config}
           loop={loop}
           agents={agents}
+          agentExecutionStates={agentExecutionStates}
           selectedStepId={selectedStep?.id}
           readOnly={false}
           canvasControls={canvasControls}
