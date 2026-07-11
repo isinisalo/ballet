@@ -3,7 +3,7 @@ import { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
 import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
 export function loopCanvasNodeAnchorY(layoutNode: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
-  if (layoutNode.kind === "action") return loopCanvasLayoutConfig.actionAnchorY;
+  if (layoutNode.kind === "step") return loopCanvasLayoutConfig.stepAnchorY;
   return layoutNode.height / 2;
 }
 
@@ -28,16 +28,16 @@ export function loopShortestVerticalHandles(sourceNode: LoopCanvasLayoutNode, ta
   return { sourceHandleId: handleId, targetHandleId: handleId };
 }
 
-export function loopActionOutputHandleY(outputIndex: number, outputHandleCount: number) {
-  if (outputHandleCount <= 1) return loopCanvasLayoutConfig.actionAnchorY;
-  const firstHandleY = loopCanvasLayoutConfig.actionAnchorY;
-  const lastHandleY = loopNodeSizes.action.height - loopCanvasLayoutConfig.edgePad / 2;
+export function loopStepOutputHandleY(outputIndex: number, outputHandleCount: number) {
+  if (outputHandleCount <= 1) return loopCanvasLayoutConfig.stepAnchorY;
+  const firstHandleY = loopCanvasLayoutConfig.stepAnchorY;
+  const lastHandleY = loopNodeSizes.step.height - loopCanvasLayoutConfig.edgePad / 2;
   const clampedIndex = Math.min(Math.max(outputIndex, 0), outputHandleCount - 1);
   return firstHandleY + (lastHandleY - firstHandleY) * (clampedIndex / (outputHandleCount - 1));
 }
 
-export function loopActionStackHeight() {
-  return loopNodeSizes.action.height;
+export function loopStepStackHeight() {
+  return loopNodeSizes.step.height;
 }
 
 export function loopOutputEventNodeWidth() {
@@ -59,14 +59,14 @@ export function outputEventStackHeight(count: number) {
 
 export function canAlignTerminalOutputEvents(outputHandleCount: number) {
   if (outputHandleCount <= 1) return true;
-  const firstHandleY = loopActionOutputHandleY(0, outputHandleCount);
-  const secondHandleY = loopActionOutputHandleY(1, outputHandleCount);
+  const firstHandleY = loopStepOutputHandleY(0, outputHandleCount);
+  const secondHandleY = loopStepOutputHandleY(1, outputHandleCount);
   const rowGap = secondHandleY - firstHandleY - loopNodeSizes.outputEvent.height;
   return rowGap >= loopNodeSizes.outputEvent.rowGap / 2;
 }
 
 export function loopBranchStackHeight(node: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
-  return node.kind === "action"
-    ? loopActionStackHeight()
+  return node.kind === "step"
+    ? loopStepStackHeight()
     : node.height;
 }

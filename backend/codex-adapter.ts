@@ -4,7 +4,7 @@ import { copyFile, mkdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Agent } from "../shared/domain/agents.js";
-import type { AgentOutcome } from "../shared/domain/runtime.js";
+import type { AgentOutcome, StepRunConsoleEntry, StepRunConsoleKind, StepRunConsolePhase } from "../shared/domain/runtime.js";
 import { agentOutcomeSchema, parseAgentOutcomeText } from "./runtime-policy.js";
 
 type JsonRpcId = string | number;
@@ -35,8 +35,21 @@ export interface CodexRunOptions {
   resumeThreadId?: string;
   timeoutMs?: number;
   codexCommand?: string;
+  signal?: AbortSignal;
   onLog?: (level: "info" | "warn" | "error", message: string, data?: Record<string, unknown>) => void;
+  onConsole?: (event: CodexConsoleEvent) => void;
   onThread?: (threadId: string, turnId?: string) => void;
+}
+
+export interface CodexConsoleEvent {
+  source: "codex";
+  kind: StepRunConsoleKind;
+  level: StepRunConsoleEntry["level"];
+  phase: StepRunConsolePhase;
+  itemId?: string;
+  message: string;
+  data?: Record<string, unknown>;
+  terminal?: boolean;
 }
 
 export interface CodexRunResult {
@@ -138,10 +151,12 @@ class JsonLineRpcClient {
       case "item/commandExecution/requestApproval":
       case "item/fileChange/requestApproval":
       case "item/permissions/requestApproval":
+        this.onLog("info", "Codex approval accepted automatically.", { method: message.method });
         this.send({ id: message.id, result: { decision: "accept" } });
         return;
       case "execCommandApproval":
       case "applyPatchApproval":
+        this.onLog("info", "Codex legacy approval accepted automatically.", { method: message.method });
         this.send({ id: message.id, result: { decision: "approved" } });
         return;
       case "mcpServer/elicitation/request":
@@ -228,6 +243,134 @@ const turnStatusFromNotification = (message: JsonRpcMessage): { id?: string; sta
   };
 };
 
+const stringValue = (value: unknown): string => typeof value === "string" ? value : "";
+
+class CodexConsoleNormalizer {
+  private readonly agentDeltaItems = new Set<string>();
+  private readonly commandDeltaItems = new Set<string>();
+
+  normalize(message: JsonRpcMessage): CodexConsoleEvent[] {
+    const params = asRecord(message.params);
+    const item = asRecord(params.item);
+    const itemId = stringValue(params.itemId) || stringValue(item.id) || undefined;
+    const delta = stringValue(params.delta);
+    switch (message.method) {
+      case "turn/started":
+        return [consoleEvent("system", "Codex turn started.", "started", itemId, { turn: params.turn })];
+      case "item/agentMessage/delta":
+        if (itemId) this.agentDeltaItems.add(itemId);
+        return delta ? [consoleEvent("agent", delta, "delta", itemId)] : [];
+      case "item/reasoning/summaryTextDelta":
+        return delta ? [consoleEvent("think", delta, "delta", itemId)] : [];
+      case "item/commandExecution/outputDelta":
+        if (itemId) this.commandDeltaItems.add(itemId);
+        return delta ? [consoleEvent("output", delta, "delta", itemId)] : [];
+      case "item/started":
+        return this.startedItem(item, itemId);
+      case "item/completed":
+        return this.completedItem(item, itemId);
+      case "turn/plan/updated":
+        return [consoleEvent("info", "Agent plan updated.", "completed", itemId, { plan: params.plan, explanation: params.explanation })];
+      case "turn/diff/updated":
+        return [consoleEvent("file", "Working tree diff updated.", "completed", itemId, { diff: params.diff })];
+      case "turn/completed": {
+        const turn = turnStatusFromNotification(message);
+        const level = turn.status === "completed" ? "info" : "error";
+        return [{
+          ...consoleEvent(level === "error" ? "error" : "system", `Codex turn ${turn.status ?? "completed"}.`, "completed", turn.id, turn.error ? { error: turn.error } : undefined),
+          level,
+          terminal: true
+        }];
+      }
+      case "error": {
+        const error = asRecord(params.error);
+        return [{
+          ...consoleEvent("error", stringValue(error.message) || "Codex app-server emitted an error.", "completed", itemId, error),
+          level: "error",
+          terminal: true
+        }];
+      }
+      default:
+        return [];
+    }
+  }
+
+  private startedItem(item: Record<string, unknown>, itemId?: string): CodexConsoleEvent[] {
+    const type = stringValue(item.type);
+    if (type === "commandExecution") {
+      return [consoleEvent("command", stringValue(item.command) || "Command started.", "started", itemId, {
+        cwd: item.cwd,
+        status: item.status
+      })];
+    }
+    if (type === "fileChange") return [consoleEvent("file", fileChangeMessage(item), "started", itemId, { changes: item.changes })];
+    if (isToolItem(type)) return [consoleEvent("tool", toolMessage(item, type), "started", itemId, item)];
+    if (type === "webSearch") return [consoleEvent("tool", `Web search: ${stringValue(item.query)}`, "started", itemId, item)];
+    return [];
+  }
+
+  private completedItem(item: Record<string, unknown>, itemId?: string): CodexConsoleEvent[] {
+    const type = stringValue(item.type);
+    if (type === "agentMessage") {
+      const text = stringValue(item.text);
+      if (!text || (itemId && this.agentDeltaItems.has(itemId))) return [];
+      return [consoleEvent("agent", text, "completed", itemId, { phase: item.phase })];
+    }
+    if (type === "commandExecution") {
+      const events: CodexConsoleEvent[] = [];
+      const output = stringValue(item.aggregatedOutput);
+      if (output && (!itemId || !this.commandDeltaItems.has(itemId))) events.push(consoleEvent("output", output, "delta", itemId));
+      const exitCode = typeof item.exitCode === "number" ? item.exitCode : undefined;
+      const failed = stringValue(item.status) === "failed" || (exitCode !== undefined && exitCode !== 0);
+      events.push({
+        ...consoleEvent(failed ? "error" : "command", `Command ${stringValue(item.status) || "completed"}${exitCode === undefined ? "" : ` with exit ${exitCode}`}.`, "completed", itemId, {
+          exitCode,
+          durationMs: item.durationMs,
+          status: item.status
+        }),
+        level: failed ? "error" : "info"
+      });
+      return events;
+    }
+    if (type === "fileChange") return [consoleEvent("file", fileChangeMessage(item), "completed", itemId, { changes: item.changes, status: item.status })];
+    if (isToolItem(type)) {
+      const failed = stringValue(item.status) === "failed" || Boolean(item.error);
+      return [{ ...consoleEvent(failed ? "error" : "tool", toolMessage(item, type), "completed", itemId, item), level: failed ? "error" : "info" }];
+    }
+    if (type === "webSearch") return [consoleEvent("tool", `Web search completed: ${stringValue(item.query)}`, "completed", itemId, item)];
+    return [];
+  }
+}
+
+function consoleEvent(
+  kind: StepRunConsoleKind,
+  message: string,
+  phase: StepRunConsolePhase,
+  itemId?: string,
+  data?: Record<string, unknown>
+): CodexConsoleEvent {
+  return {
+    source: "codex",
+    kind,
+    level: kind === "error" ? "error" : kind === "warn" ? "warn" : "info",
+    phase,
+    itemId,
+    message,
+    data
+  };
+}
+
+const isToolItem = (type: string) => ["mcpToolCall", "dynamicToolCall", "collabToolCall"].includes(type);
+const toolMessage = (item: Record<string, unknown>, type: string) => {
+  const name = stringValue(item.tool) || stringValue(item.server) || type;
+  return `${name}${item.status ? ` · ${String(item.status)}` : ""}`;
+};
+const fileChangeMessage = (item: Record<string, unknown>) => {
+  const changes = Array.isArray(item.changes) ? item.changes : [];
+  const paths = changes.map((change) => stringValue(asRecord(change).path)).filter(Boolean);
+  return paths.length > 0 ? `File changes: ${paths.join(", ")}` : "File changes updated.";
+};
+
 export const runCodexAgent = async (options: CodexRunOptions): Promise<CodexRunResult> => {
   const onLog = options.onLog ?? (() => undefined);
   const codexHome = await prepareCodexHome(options.projectRoot, options.workItemId, options.agentRole);
@@ -247,8 +390,12 @@ export const runCodexAgent = async (options: CodexRunOptions): Promise<CodexRunR
     turnCompleted = resolve;
     turnFailed = reject;
   });
+  void turnPromise.catch(() => undefined);
+
+  const consoleNormalizer = new CodexConsoleNormalizer();
 
   const client = new JsonLineRpcClient(proc, (message) => {
+    consoleNormalizer.normalize(message).forEach((event) => options.onConsole?.(event));
     if (message.method === "turn/started") {
       const params = asRecord(message.params);
       const turn = asRecord(params.turn);
@@ -285,6 +432,21 @@ export const runCodexAgent = async (options: CodexRunOptions): Promise<CodexRunR
       turnFailed?.(new Error(typeof error.message === "string" ? error.message : "Codex app-server emitted an error."));
     }
   }, onLog);
+
+  const abortTurn = () => {
+    options.onConsole?.({
+      source: "codex",
+      kind: "system",
+      level: "warn",
+      phase: "completed",
+      message: "Cancellation requested; interrupting the Codex turn.",
+      terminal: true
+    });
+    if (threadId && turnId) void client.request("turn/interrupt", { threadId, turnId }).catch(() => undefined);
+    turnFailed?.(new Error("Codex run cancelled."));
+    setTimeout(() => proc.kill("SIGTERM"), 1000).unref();
+  };
+  options.signal?.addEventListener("abort", abortTurn, { once: true });
 
   const timeoutMs = options.timeoutMs ?? 30 * 60 * 1000;
   const timeout = setTimeout(() => {
@@ -364,6 +526,7 @@ export const runCodexAgent = async (options: CodexRunOptions): Promise<CodexRunR
     };
   } finally {
     clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abortTurn);
     client.close();
   }
 };

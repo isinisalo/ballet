@@ -1,8 +1,6 @@
 import type { RequestHandler } from "express";
 import { onRuntimeChanged } from "../../runtime-events.js";
 import { store } from "../../store.js";
-import { agentRunParamsSchema } from "../validation/schemas.js";
-import { parseParams } from "../validation/httpValidation.js";
 
 export const runtimeHealth: RequestHandler = (_req, res, next) => {
   try {
@@ -34,30 +32,4 @@ export const runtimeStream: RequestHandler = (req, res) => {
     unsubscribe();
     res.end();
   });
-};
-
-export const listAgentRuns: RequestHandler = (_req, res, next) => {
-  try {
-    res.json(store.listAgentRuns());
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const listRunLogs: RequestHandler = (req, res, next) => {
-  try {
-    const { id } = parseParams(agentRunParamsSchema, req);
-    res.json(store.listRunLogs(id));
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const retryAgentRun: RequestHandler = (req, res, next) => {
-  try {
-    const { id } = parseParams(agentRunParamsSchema, req);
-    res.json(store.retryAgentRun(id));
-  } catch (error) {
-    next(error);
-  }
 };

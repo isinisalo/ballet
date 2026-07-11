@@ -1,5 +1,3 @@
-import { normalizeActionToken, normalizeLoopId } from "../policy-actions.js";
-
 export type AutomationFieldLimit = {
   min?: number;
   max: number;
@@ -7,41 +5,31 @@ export type AutomationFieldLimit = {
 
 export const automationFieldLimits = {
   token: { min: 2, max: 40 },
-  outputId: { min: 2, max: 32 },
-  name: { min: 1, max: 40 },
-  description: { min: 1, max: 240 },
+  name: { min: 1, max: 80 },
+  description: { min: 1, max: 2000 },
   command: { min: 1, max: 120 },
   arg: { min: 1, max: 120 },
-  eventType: { min: 1, max: 96 },
   loopId: { min: 2, max: 101 },
-  policyId: { min: 1, max: 160 }
+  stepId: { min: 1, max: 160 }
 } as const satisfies Record<string, AutomationFieldLimit>;
 
-export const normalizeAutomationToken = (value: string): string =>
-  normalizeActionToken(value);
-
-export const normalizeAutomationLoopId = (value: string): string =>
-  normalizeLoopId(value);
+export const kebabCaseIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const automationStringValidationMessage = (
   label: string,
   value: string,
   limit: AutomationFieldLimit,
-  { required = true, normalize }: { required?: boolean; normalize?: (value: string) => string } = {}
+  { required = true }: { required?: boolean } = {}
 ): string | undefined => {
-  const normalizedValue = normalize ? normalize(value) : value.trim();
-  if (required && !normalizedValue) return `${label} is required.`;
-  if (!normalizedValue) return undefined;
-  if (limit.min !== undefined && normalizedValue.length < limit.min) return `${label} must be at least ${limit.min} characters.`;
-  if (normalizedValue.length > limit.max) return `${label} must be ${limit.max} characters or fewer.`;
+  if (required && !value) return `${label} is required.`;
+  if (!value) return undefined;
+  if (limit.min !== undefined && value.length < limit.min) return `${label} must be at least ${limit.min} characters.`;
+  if (value.length > limit.max) return `${label} must be ${limit.max} characters or fewer.`;
   return undefined;
 };
 
-export const automationTokenValidationMessage = (label: string, value: string): string | undefined =>
-  automationStringValidationMessage(label, value, automationFieldLimits.token, { normalize: normalizeAutomationToken });
-
-export const automationLoopIdValidationMessage = (label: string, value: string): string | undefined =>
-  automationStringValidationMessage(label, value, automationFieldLimits.loopId, { normalize: normalizeAutomationLoopId });
-
-export const automationOutputIdValidationMessage = (value: string): string | undefined =>
-  automationStringValidationMessage("Output id", value, automationFieldLimits.outputId, { normalize: normalizeAutomationToken });
+export const automationIdValidationMessage = (label: string, value: string): string | undefined => {
+  if (!value) return `${label} is required.`;
+  if (!kebabCaseIdPattern.test(value)) return `${label} must be lowercase kebab-case.`;
+  return undefined;
+};

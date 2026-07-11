@@ -109,29 +109,29 @@ spacing:
 ---
 
 ## Brand & Style
-Ballet is an agent operations command center for managing projects, goals, ADRs, agents, skills, runtimes, policies, and routed event intake. The interface must feel like a high-stakes AI operations workspace: dense, structured, technical, and calm under pressure.
+Ballet is an agent operations command center for managing projects, goals, ADRs, agents, skills, runtimes, Loops, Steps, Transitions, and Runs. The interface must feel like a high-stakes AI operations workspace: dense, structured, technical, and calm under pressure.
 
-The visual system uses **Modern Minimalism** fused with **Technical Industrialism**. Dark tonal layers reduce eye strain during long monitoring sessions, while high-vibrancy signal colors mark active decisions, agent state, policy routing, and event urgency. The target users are DevOps engineers, AI architects, and operator agents who need fast scanning, reliable hierarchy, and low visual ambiguity.
+The visual system uses **Modern Minimalism** fused with **Technical Industrialism**. Dark tonal layers reduce eye strain during long monitoring sessions, while high-vibrancy signal colors mark active decisions, agent state, Transition state, and Run urgency. The target users are DevOps engineers, AI architects, and operator agents who need fast scanning, reliable hierarchy, and low visual ambiguity.
 
 ## Colors
 The palette is rooted in a deep, multi-layered dark mode.
 
 Theme support is currently dark-only. Do not expose light or system theme modes unless a complete light palette is added to this file and implemented as first-class design tokens.
 
-- **Primary (Electric Blue):** Use for primary actions, selected navigation, focused fields, graph flow paths, and the active route through an orchestration loop.
-- **Secondary (Emerald):** Use for running agents, successful policy outcomes, accepted goals, healthy runtimes, and go-forward states.
-- **Tertiary (Amber):** Use for warnings, idle agents, pending events, event stream highlights, and attention states that do not require destructive styling.
-- **Error:** Use only for failed runs, invalid policy state, destructive actions, and blocking validation errors.
+- **Primary (Electric Blue):** Use for primary commands, selected navigation, focused fields, graph flow paths, and the active Transition through a Loop.
+- **Secondary (Emerald):** Use for running agents, successful Step outcomes, accepted goals, healthy runtimes, and go-forward states.
+- **Tertiary (Amber):** Use for warnings, idle agents, queued Steps, human-wait states, and attention states that do not require destructive styling.
+- **Error:** Use only for failed or blocked Runs, invalid Loop state, destructive commands, and blocking validation errors.
 - **Background & Surfaces:** Use `#111316` for the application base. Use `#1a1c1f`, `#1e2023`, and `#282a2d` for functional containers, nested panels, and elevated work areas. Keep borders subtle but visible with `#414755` or lower-contrast variants.
 
 ## Typography
-Use **Inter** for the main interface. Use **Geist** for technical data, policy expressions, event payloads, CLI excerpts, file paths, identifiers, timestamps, and frontmatter previews.
+Use **Inter** for the main interface. Use **Geist** for technical data, Step Transitions, Run inputs, CLI excerpts, file paths, identifiers, timestamps, and frontmatter previews.
 
 - Use **headline-lg** for main workspace titles only.
-- Use **headline-md** and **headline-sm** for section-level hierarchy inside project, agent, policy, runtime, and event views.
+- Use **headline-md** and **headline-sm** for section-level hierarchy inside project, agent, Loop, Step, runtime, and Run views.
 - Use **body-md** as the default application text style.
 - Use **label-caps** for sidebar section labels, metadata labels, status group headings, and compact table headers.
-- Use **code-md** for TOML, YAML, Markdown frontmatter, JSON payloads, policy rules, terminal output, and route identifiers.
+- Use **code-md** for TOML, YAML, Markdown frontmatter, JSON input, Step definitions, terminal output, and Transition targets.
 - Keep technical labels concise. Prefer exact entity names, status values, and timestamps over descriptive prose.
 
 ## Layout & Spacing
@@ -139,9 +139,9 @@ The layout follows a fluid grid with sidebar-heavy navigation and dense operatio
 
 - **Desktop:** Use a 12-column grid. Keep primary navigation sidebars fixed near 280px when expanded. Let the main workspace remain fluid and scrollable.
 - **Data Density:** Keep density high but structured. Use the 4px spacing unit. Default vertical rhythm between related controls is 8px or 16px. Use 20px panel padding for primary work areas.
-- **Functional Zones:** Separate navigation, collection lists, entity detail panels, previews, audit/event streams, and editor surfaces into clear zones with borders and tonal layers.
-- **Flow Visualization:** Use node-based layout logic for agent orchestration and policy routing views. Connect nodes with 2px paths in Primary Electric Blue. Use Emerald for successful transitions and Amber for pending or attention states.
-- **Mobile:** Stack panels vertically. Convert sidebars to sheets or drawers. Keep key filters and command actions reachable from a persistent top or bottom control.
+- **Functional Zones:** Separate navigation, collection lists, entity detail panels, previews, Run history, and editor surfaces into clear zones with borders and tonal layers.
+- **Flow Visualization:** Use the compact composite Loop canvas for a selected Loop: 22px technical Step markers, fixed-scale panning, smart routed 2px paths, explicit Transition labels, and unobstructed return/cycle paths. Use Primary for normal flow, the semantic rejected treatment for rework, and Secondary animation for the Transition taken by the displayed Run. Present the All Loops overview as a dense responsive card grid rather than a second editable graph.
+- **Mobile:** Stack panels vertically. Convert sidebars to sheets or drawers. Keep key filters and commands reachable from a persistent top or bottom control.
 
 ## Elevation & Depth
 Depth is conveyed through tonal layering first and shadows second.
@@ -165,20 +165,22 @@ The shape language is **Soft-Industrial**. Keep controls precise and compact.
 - **Sidebar:** Treat the sidebar as an operational index, not a marketing navigation area. Use compact labels, icons, grouped sections, and clear selected state.
 - **Buttons:** Primary buttons are solid Electric Blue. Secondary buttons are ghost or outline controls with subtle borders. Destructive buttons must use the error token family.
 - **Agent Chips:** Use a leading dot plus label. Emerald means running or healthy. Amber means idle, queued, pending, or needs attention. Gray means offline, disabled, unknown, or archived. Use pulse animation only for live-running state.
-- **Cards & Panels:** Use cards for repeated entities and panels for workspace regions. Do not place cards inside cards. Prefer headers with metadata and a compact action area.
-- **Tables & Lists:** Use tight row heights, clear separators, and zebra-striping with a 2% lighter surface tint when rows are dense. Keep row actions icon-first where possible.
+- **Cards & Panels:** Use cards for repeated entities and panels for workspace regions. Do not place cards inside cards. Prefer headers with metadata and a compact command area.
+- **Tables & Lists:** Use tight row heights, clear separators, and zebra-striping with a 2% lighter surface tint when rows are dense. Keep row controls icon-first where possible.
 - **Inputs:** Use dark surfaces, 1px borders, and Primary focus state. Validation messages must be explicit and adjacent to the field.
-- **Event Stream:** Use monospaced entries. Start each row with a muted timestamp, then the event type, source, target, and outcome. Use Amber or Blue for event type emphasis.
+- **Run Timeline:** Use monospaced entries. Start each row with a muted timestamp, then the Step ID, agent or human source, result, and status. Use Emerald for approved results, Amber for waiting states, and Error for failed or blocked states.
+- **Codex Runtime Console:** Render the selected StepRun's persisted Codex event stream in a dense dark monospaced console. Each row starts with a muted receipt time and a fixed-width semantic type (`SYSTEM`, `THINK`, `AGENT`, `CMD`, `OUTPUT`, `FILE`, `TOOL`, `INFO`, `WARN`, or `ERROR`). Preserve command whitespace, allow horizontal scrolling, auto-follow only while the operator remains at the bottom, and expose connection and truncation state explicitly.
 - **Markdown & Frontmatter Previews:** Render metadata in compact, code-like blocks. Use Geist and preserve exact key names. Separate preview content from editable controls with a visible tonal boundary.
-- **Command & Filter Controls:** Use compact search, segmented filters, and command-bar patterns for fast routing across projects, agents, policies, and events.
-- **Node Cards:** Use for orchestration and policy flow. Include agent or policy identity, status, owner/source, and a collapsed parameters or payload section.
-- **Loop Canvas Nodes:** Render actions, loop summaries, and terminal output targets as compact 22px rounded rectangles. Keep action identity out of the node; show the source action's exact `action.id` as a monospace label at the end of its forward edge. Loop-summary nodes contain only the Route icon; render the exact `loop.id` as a horizontal monospace label 8px outside the node on its right, never as an edge label. Stack compact related-loop summaries vertically with a 24px gap on one shared vertical axis. Keep the separate spacing between a compact loop chain and the opened loop unchanged. Loop-summary nodes expose only top and bottom edge anchors; connect loop-to-loop relationships with one direct bottom-to-top edge. Every non-rejected edge that touches a loop-summary node uses a solid semantic stroke, while every `rejected` output edge uses a dashed semantic stroke regardless of its anchors. Loop-to-action relationships retain the action node's current anchor rule. Preserve output labels such as `rejected` on rework/return edges and semantic edge colors.
+- **Command & Filter Controls:** Use compact search, segmented filters, and command-bar patterns for fast navigation across projects, agents, Loops, Steps, and Runs.
+- **Step Cards:** Use for Loop definitions and Run snapshots. Include the Step type, agent identity when applicable, status, and a collapsed description or Run input section.
+- **Edit/Run Mode:** Place a compact segmented `Edit | Run` control next to the selected Loop identity and persist the mode in the URL. Edit shows the mutable saved definition; Run shows an immutable snapshot graph with live Step Run statuses. Lock Edit while the selected Loop has an active Run. In Run mode, keep manual input and Start visible when idle, the required response input with Approved and Rejected controls while waiting for a human, and Cancel while active.
+- **Loop Canvas Nodes:** Render selected-Loop Steps, related Loop summaries, and terminal targets as compact 22px rounded technical markers. Agent and human identity is conveyed by the marker icon and semantic border; the exact `step.id` appears as the compact monospace edge-end label used by the original Loop editor. Preserve explicit `approved` and `rejected` labels, smart-routed return paths, cycles, compact upstream/downstream Loop summaries, and the 24px grid. Edit mode makes Step nodes and Transitions selectable and opens the established 50/50 canvas/sheet workspace. Run mode keeps the snapshot immutable, changes only marker status/glow, and animates the taken Transition. In the All Loops card overview, show each Loop's ID, start Step, agent/human Step counts, and directly referenced next Loops.
 
 ## Do's and Don'ts
 - Do use the token values in this file as the source of truth for UI color, spacing, radius, and typography decisions.
 - Do prefer dense, scannable, work-focused screens over decorative landing-page composition.
 - Do use Electric Blue, Emerald, and Amber as operational signals with consistent meanings.
-- Do keep UI copy precise, short, and tied to concrete project, agent, policy, runtime, or event state.
+- Do keep UI copy precise, short, and tied to concrete project, agent, Loop, Step, Transition, runtime, or Run state.
 - Do keep visual hierarchy clear through typography scale, borders, and tonal layers.
 - Don't introduce one-off colors, gradients, ornamental backgrounds, or large decorative illustrations.
 - Don't use bright signal colors for passive decoration.

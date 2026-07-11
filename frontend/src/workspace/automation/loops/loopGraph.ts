@@ -1,5 +1,4 @@
-import type { ProjectAction } from "@shared/api/workspace-contracts";
-import { actionOutputEventTypes } from "@shared/policy-actions";
+import type { LoopVisualStep } from "./loopVisualProjection";
 
 export type LoopOutputTarget =
   {
@@ -9,59 +8,58 @@ export type LoopOutputTarget =
   } | {
     outputId: string;
     eventType: string;
-    type: "action";
+    type: "step";
     targetLoopId: string;
-    targetActionId: string;
+    targetStepKey: string;
   };
 
 export type LoopStepRecord = {
-  actionId: string;
+  stepKey: string;
   index: number;
   loopId?: string;
-  action?: ProjectAction;
+  step?: LoopVisualStep;
   outputEvents?: string[];
   outputTargets?: LoopOutputTarget[];
 };
 
-export type LoopActionFold = {
-  actionId: string;
+export type LoopStepFold = {
+  stepKey: string;
   canonicalRecord: LoopStepRecord;
   records: LoopStepRecord[];
 };
 
-export type LoopActionFoldModel = {
+export type LoopStepFoldModel = {
   canonicalIndexByRecordIndex: Map<number, number>;
   canonicalRecordByIndex: Map<number, LoopStepRecord>;
   recordsByCanonicalIndex: Map<number, LoopStepRecord[]>;
-  folds: LoopActionFold[];
+  folds: LoopStepFold[];
 };
 
 export type LoopGraph = {
-  actionFoldModel: LoopActionFoldModel;
+  stepFoldModel: LoopStepFoldModel;
   childRecordsByParentEvent: Map<string, LoopStepRecord[]>;
   eventHandlerRecordsByEvent: Map<string, LoopStepRecord[]>;
   rootRecords: LoopStepRecord[];
 };
 
-export const loopInputEventLabel = (action: Pick<ProjectAction, "id"> | undefined): string =>
-  action?.id ?? "Missing action";
+export const loopInputEventLabel = (step: Pick<LoopVisualStep, "displayId"> | undefined): string =>
+  step?.displayId ?? "Missing step";
 
-export const loopOutputEvents = (recordOrAction: LoopStepRecord | ProjectAction | undefined, continuationEvent?: string) => {
-  if (!recordOrAction) return ["Missing action"];
-  const action = "actionId" in recordOrAction ? recordOrAction.action : recordOrAction;
-  if (!action) return ["Missing action"];
-  const events = "actionId" in recordOrAction
-    ? recordOrAction.outputEvents ?? recordOrAction.outputTargets?.map((output) => output.eventType) ??
-      actionOutputEventTypes({ loopId: recordOrAction.loopId, actionId: recordOrAction.actionId }, [action])
-    : actionOutputEventTypes({ actionId: action.id }, [action]);
+export const loopOutputEvents = (recordOrStep: LoopStepRecord | LoopVisualStep | undefined, continuationEvent?: string) => {
+  if (!recordOrStep) return ["Missing step"];
+  const step = "stepKey" in recordOrStep ? recordOrStep.step : recordOrStep;
+  if (!step) return ["Missing step"];
+  const events = "stepKey" in recordOrStep
+    ? recordOrStep.outputEvents ?? recordOrStep.outputTargets?.map((output) => output.eventType) ?? []
+    : [];
   return continuationEvent && !events.includes(continuationEvent) ? [continuationEvent, ...events] : events;
 };
 
 export const loopCanonicalRecord = (loopGraph: LoopGraph, record: LoopStepRecord): LoopStepRecord =>
-  loopGraph.actionFoldModel.canonicalRecordByIndex.get(record.index) ?? record;
+  loopGraph.stepFoldModel.canonicalRecordByIndex.get(record.index) ?? record;
 
 export const loopFoldedRecords = (loopGraph: LoopGraph, record: LoopStepRecord): LoopStepRecord[] =>
-  loopGraph.actionFoldModel.recordsByCanonicalIndex.get(loopCanonicalRecord(loopGraph, record).index) ?? [record];
+  loopGraph.stepFoldModel.recordsByCanonicalIndex.get(loopCanonicalRecord(loopGraph, record).index) ?? [record];
 
 export const loopFoldedOutputTargets = (loopGraph: LoopGraph, record: LoopStepRecord): LoopOutputTarget[] => {
   const targetsByKey = new Map<string, LoopOutputTarget>();
@@ -82,15 +80,15 @@ export const loopFoldedOutputTargets = (loopGraph: LoopGraph, record: LoopStepRe
 };
 
 export const buildLoopGraph = (loopStepRecords: LoopStepRecord[]): LoopGraph => {
-  const actionFoldModel = buildLoopActionFoldModel(loopStepRecords);
+  const stepFoldModel = buildLoopStepFoldModel(loopStepRecords);
   const childRecordsByParentEvent = new Map<string, LoopStepRecord[]>();
   const eventHandlerRecordsByEvent = new Map<string, LoopStepRecord[]>();
   const childRecordIndexes = new Set<number>();
 
   loopStepRecords.forEach((record) => {
     record.outputTargets?.forEach((target) => {
-      if (target.type !== "action" || target.targetLoopId !== record.loopId) return;
-      const childRecord = loopStepRecords.find((candidate) => candidate.actionId === target.targetActionId);
+      if (target.type !== "step" || target.targetLoopId !== record.loopId) return;
+      const childRecord = loopStepRecords.find((candidate) => candidate.stepKey === target.targetStepKey);
       if (!childRecord) return;
       eventHandlerRecordsByEvent.set(target.eventType, [
         ...(eventHandlerRecordsByEvent.get(target.eventType) ?? []),
@@ -106,26 +104,26 @@ export const buildLoopGraph = (loopStepRecords: LoopStepRecord[]): LoopGraph => 
     ? [loopStepRecords[0]]
     : loopStepRecords.filter((record) => !childRecordIndexes.has(record.index));
   return {
-    actionFoldModel,
+    stepFoldModel,
     childRecordsByParentEvent,
     eventHandlerRecordsByEvent,
     rootRecords: rootRecords.length > 0 ? rootRecords : loopStepRecords.slice(0, 1)
   };
 };
 
-function buildLoopActionFoldModel(loopStepRecords: LoopStepRecord[]): LoopActionFoldModel {
-  const recordsByActionId = new Map<string, LoopStepRecord[]>();
+function buildLoopStepFoldModel(loopStepRecords: LoopStepRecord[]): LoopStepFoldModel {
+  const recordsByStepKey = new Map<string, LoopStepRecord[]>();
 
   loopStepRecords.forEach((record) => {
-    const actionId = record.actionId;
-    if (!actionId) return;
-    recordsByActionId.set(actionId, [...(recordsByActionId.get(actionId) ?? []), record]);
+    const stepKey = record.stepKey;
+    if (!stepKey) return;
+    recordsByStepKey.set(stepKey, [...(recordsByStepKey.get(stepKey) ?? []), record]);
   });
 
   const canonicalIndexByRecordIndex = new Map<number, number>();
   const canonicalRecordByIndex = new Map<number, LoopStepRecord>();
   const recordsByCanonicalIndex = new Map<number, LoopStepRecord[]>();
-  const folds: LoopActionFold[] = [];
+  const folds: LoopStepFold[] = [];
 
   loopStepRecords.forEach((record) => {
     canonicalIndexByRecordIndex.set(record.index, record.index);
@@ -133,10 +131,10 @@ function buildLoopActionFoldModel(loopStepRecords: LoopStepRecord[]): LoopAction
     recordsByCanonicalIndex.set(record.index, [record]);
   });
 
-  recordsByActionId.forEach((records, actionId) => {
+  recordsByStepKey.forEach((records, stepKey) => {
     const canonicalRecord = records[0];
     if (!canonicalRecord) return;
-    folds.push({ actionId, canonicalRecord, records });
+    folds.push({ stepKey, canonicalRecord, records });
     recordsByCanonicalIndex.set(canonicalRecord.index, records);
     records.forEach((record) => {
       canonicalIndexByRecordIndex.set(record.index, canonicalRecord.index);

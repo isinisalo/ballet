@@ -1,656 +1,418 @@
 {
-  "version": 1,
-  "actions": [
-    {
-      "id": "create-project-brief",
-      "description": "Create Project Brief from accepted ADRs and approved GOALS.",
-      "agentId": "brief-agent"
-    },
-    {
-      "id": "challenge-project-brief",
-      "description": "Challenge Project Brief against ADRs, GOALS, constraints, assumptions, and traceability.",
-      "agentId": "loop-critic-agent"
-    },
-    {
-      "id": "project-brief-gate",
-      "description": "Gate 1: Human approval of the agent-reviewed Project Brief before roadmap planning continues.",
-      "humanGate": true
-    },
-    {
-      "id": "done",
-      "description": "No further loop action."
-    },
-    {
-      "id": "create-roadmap",
-      "description": "Create traceable delivery roadmap from approved Project Brief.",
-      "agentId": "roadmap-agent"
-    },
-    {
-      "id": "challenge-roadmap",
-      "description": "Challenge roadmap for value order, risk order, dependencies, and ADR/GOALS alignment.",
-      "agentId": "loop-critic-agent"
-    },
-    {
-      "id": "roadmap-gate",
-      "description": "Gate 2: Human approval of the reviewed Roadmap before UI design planning continues.",
-      "humanGate": true
-    },
-    {
-      "id": "create-ui-design",
-      "description": "Create UI/UX design plan from approved Roadmap.",
-      "agentId": "ui-design-agent"
-    },
-    {
-      "id": "challenge-ui-design",
-      "description": "Challenge UI design for goal fit, states, accessibility, consistency, and implementation cost.",
-      "agentId": "loop-critic-agent"
-    },
-    {
-      "id": "ui-design-gate",
-      "description": "Gate 3: Human approval of the reviewed UI Design before technical planning continues.",
-      "humanGate": true
-    },
-    {
-      "id": "create-technical-plan",
-      "description": "Create implementation-ready Technical Plan from ADRs, Roadmap, and approved UI Design.",
-      "agentId": "technical-plan-agent"
-    },
-    {
-      "id": "challenge-technical-plan",
-      "description": "Challenge Technical Plan for architecture, data, APIs, security, testability, deployability, and rollback.",
-      "agentId": "loop-critic-agent"
-    },
-    {
-      "id": "technical-plan-gate",
-      "description": "Gate 4: Human approval of the reviewed Technical Plan before milestone planning continues.",
-      "humanGate": true
-    },
-    {
-      "id": "create-milestones",
-      "description": "Create validated milestones from approved Technical Plan and Roadmap.",
-      "agentId": "milestone-task-agent"
-    },
-    {
-      "id": "challenge-milestones",
-      "description": "Challenge milestones for scope, dependency order, validation method, and increment value.",
-      "agentId": "loop-critic-agent"
-    },
-    {
-      "id": "milestones-gate",
-      "description": "Gate 5: Human approval of the reviewed Milestones before task specification continues.",
-      "humanGate": true
-    },
-    {
-      "id": "create-task-specs",
-      "description": "Create atomic task specifications from approved milestones.",
-      "agentId": "milestone-task-agent"
-    },
-    {
-      "id": "challenge-task-specs",
-      "description": "Challenge task specs for atomicity, acceptance criteria, testability, dependencies, and traceability.",
-      "agentId": "loop-critic-agent"
-    },
-    {
-      "id": "task-specs-gate",
-      "description": "Gate 6: Human approval of the reviewed Task Specs before implementation starts.",
-      "humanGate": true
-    },
-    {
-      "id": "implement-task",
-      "description": "Implement only the approved task spec as the smallest safe code change.",
-      "agentId": "implementation-agent"
-    },
-    {
-      "id": "run-tests",
-      "description": "Run or assess required tests, build, lint, and acceptance evidence.",
-      "agentId": "review-test-agent"
-    },
-    {
-      "id": "classify-failure",
-      "description": "Classify failed implementation, review, test, deployment, or validation evidence and route safe corrections.",
-      "agentId": "failure-router-agent"
-    },
-    {
-      "id": "review-code",
-      "description": "Review code against task spec, ADRs, GOALS, tests, security, and scope boundaries.",
-      "agentId": "review-test-agent"
-    },
-    {
-      "id": "code-gate",
-      "description": "Gate 7: Human approval of reviewed code before dev deployment starts.",
-      "humanGate": true
-    },
-    {
-      "id": "prepare-dev-deployment",
-      "description": "Check dev deployment readiness: artifact, config, migrations, rollback, and validation plan.",
-      "agentId": "dev-deploy-agent"
-    },
-    {
-      "id": "deploy-to-dev",
-      "description": "Deploy the approved build to the dev environment.",
-      "agentId": "dev-deploy-agent"
-    },
-    {
-      "id": "validate-dev-deployment",
-      "description": "Validate dev deployment with smoke tests, acceptance checks, logs, metrics, and traces.",
-      "agentId": "dev-deploy-agent"
-    },
-    {
-      "id": "dev-deployment-validation-gate",
-      "description": "Gate 8: Human approval of validated dev deployment before the loop is done.",
-      "humanGate": true
-    },
-    {
-      "id": "blocked",
-      "description": "Agent work is blocked."
-    }
-  ],
-  "outputRoutes": [
-    {
-      "sourceLoopId": "adr-goals-changed.loop",
-      "sourceActionId": "create-project-brief",
-      "outputId": "approved",
-      "targetLoopId": "adr-goals-changed.loop",
-      "targetActionId": "challenge-project-brief"
-    },
-    {
-      "sourceLoopId": "adr-goals-changed.loop",
-      "sourceActionId": "challenge-project-brief",
-      "outputId": "approved",
-      "targetLoopId": "adr-goals-changed.loop",
-      "targetActionId": "project-brief-gate"
-    },
-    {
-      "sourceLoopId": "adr-goals-changed.loop",
-      "sourceActionId": "project-brief-gate",
-      "outputId": "rejected",
-      "targetLoopId": "adr-goals-changed.loop",
-      "targetActionId": "create-project-brief"
-    },
-    {
-      "sourceLoopId": "adr-goals-changed.loop",
-      "sourceActionId": "challenge-project-brief",
-      "outputId": "rejected",
-      "targetLoopId": "adr-goals-changed.loop",
-      "targetActionId": "create-project-brief"
-    },
-    {
-      "sourceLoopId": "project-brief-gate.approved.loop",
-      "sourceActionId": "create-roadmap",
-      "outputId": "approved",
-      "targetLoopId": "project-brief-gate.approved.loop",
-      "targetActionId": "challenge-roadmap"
-    },
-    {
-      "sourceLoopId": "project-brief-gate.approved.loop",
-      "sourceActionId": "challenge-roadmap",
-      "outputId": "approved",
-      "targetLoopId": "project-brief-gate.approved.loop",
-      "targetActionId": "roadmap-gate"
-    },
-    {
-      "sourceLoopId": "project-brief-gate.approved.loop",
-      "sourceActionId": "roadmap-gate",
-      "outputId": "rejected",
-      "targetLoopId": "project-brief-gate.approved.loop",
-      "targetActionId": "create-roadmap"
-    },
-    {
-      "sourceLoopId": "project-brief-gate.approved.loop",
-      "sourceActionId": "challenge-roadmap",
-      "outputId": "rejected",
-      "targetLoopId": "project-brief-gate.approved.loop",
-      "targetActionId": "create-roadmap"
-    },
-    {
-      "sourceLoopId": "roadmap-gate.approved.loop",
-      "sourceActionId": "create-ui-design",
-      "outputId": "approved",
-      "targetLoopId": "roadmap-gate.approved.loop",
-      "targetActionId": "challenge-ui-design"
-    },
-    {
-      "sourceLoopId": "roadmap-gate.approved.loop",
-      "sourceActionId": "challenge-ui-design",
-      "outputId": "approved",
-      "targetLoopId": "roadmap-gate.approved.loop",
-      "targetActionId": "ui-design-gate"
-    },
-    {
-      "sourceLoopId": "roadmap-gate.approved.loop",
-      "sourceActionId": "ui-design-gate",
-      "outputId": "rejected",
-      "targetLoopId": "roadmap-gate.approved.loop",
-      "targetActionId": "create-ui-design"
-    },
-    {
-      "sourceLoopId": "roadmap-gate.approved.loop",
-      "sourceActionId": "challenge-ui-design",
-      "outputId": "rejected",
-      "targetLoopId": "roadmap-gate.approved.loop",
-      "targetActionId": "create-ui-design"
-    },
-    {
-      "sourceLoopId": "roadmap-gate.approved.loop",
-      "sourceActionId": "create-ui-design",
-      "outputId": "rejected",
-      "targetLoopId": "roadmap-gate.approved.loop",
-      "targetActionId": "done"
-    },
-    {
-      "sourceLoopId": "ui-design-gate.approved.loop",
-      "sourceActionId": "create-technical-plan",
-      "outputId": "approved",
-      "targetLoopId": "ui-design-gate.approved.loop",
-      "targetActionId": "challenge-technical-plan"
-    },
-    {
-      "sourceLoopId": "ui-design-gate.approved.loop",
-      "sourceActionId": "challenge-technical-plan",
-      "outputId": "approved",
-      "targetLoopId": "ui-design-gate.approved.loop",
-      "targetActionId": "technical-plan-gate"
-    },
-    {
-      "sourceLoopId": "ui-design-gate.approved.loop",
-      "sourceActionId": "technical-plan-gate",
-      "outputId": "rejected",
-      "targetLoopId": "ui-design-gate.approved.loop",
-      "targetActionId": "create-technical-plan"
-    },
-    {
-      "sourceLoopId": "ui-design-gate.approved.loop",
-      "sourceActionId": "challenge-technical-plan",
-      "outputId": "rejected",
-      "targetLoopId": "ui-design-gate.approved.loop",
-      "targetActionId": "create-technical-plan"
-    },
-    {
-      "sourceLoopId": "technical-plan-gate.approved.loop",
-      "sourceActionId": "create-milestones",
-      "outputId": "approved",
-      "targetLoopId": "technical-plan-gate.approved.loop",
-      "targetActionId": "challenge-milestones"
-    },
-    {
-      "sourceLoopId": "technical-plan-gate.approved.loop",
-      "sourceActionId": "challenge-milestones",
-      "outputId": "approved",
-      "targetLoopId": "technical-plan-gate.approved.loop",
-      "targetActionId": "milestones-gate"
-    },
-    {
-      "sourceLoopId": "technical-plan-gate.approved.loop",
-      "sourceActionId": "milestones-gate",
-      "outputId": "rejected",
-      "targetLoopId": "technical-plan-gate.approved.loop",
-      "targetActionId": "create-milestones"
-    },
-    {
-      "sourceLoopId": "technical-plan-gate.approved.loop",
-      "sourceActionId": "challenge-milestones",
-      "outputId": "rejected",
-      "targetLoopId": "technical-plan-gate.approved.loop",
-      "targetActionId": "create-milestones"
-    },
-    {
-      "sourceLoopId": "technical-plan-gate.approved.loop",
-      "sourceActionId": "create-milestones",
-      "outputId": "rejected",
-      "targetLoopId": "technical-plan-gate.approved.loop",
-      "targetActionId": "done"
-    },
-    {
-      "sourceLoopId": "milestones-gate.approved.loop",
-      "sourceActionId": "create-task-specs",
-      "outputId": "approved",
-      "targetLoopId": "milestones-gate.approved.loop",
-      "targetActionId": "challenge-task-specs"
-    },
-    {
-      "sourceLoopId": "milestones-gate.approved.loop",
-      "sourceActionId": "challenge-task-specs",
-      "outputId": "approved",
-      "targetLoopId": "milestones-gate.approved.loop",
-      "targetActionId": "task-specs-gate"
-    },
-    {
-      "sourceLoopId": "milestones-gate.approved.loop",
-      "sourceActionId": "task-specs-gate",
-      "outputId": "rejected",
-      "targetLoopId": "milestones-gate.approved.loop",
-      "targetActionId": "create-task-specs"
-    },
-    {
-      "sourceLoopId": "milestones-gate.approved.loop",
-      "sourceActionId": "challenge-task-specs",
-      "outputId": "rejected",
-      "targetLoopId": "milestones-gate.approved.loop",
-      "targetActionId": "create-task-specs"
-    },
-    {
-      "sourceLoopId": "milestones-gate.approved.loop",
-      "sourceActionId": "create-task-specs",
-      "outputId": "rejected",
-      "targetLoopId": "milestones-gate.approved.loop",
-      "targetActionId": "done"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "implement-task",
-      "outputId": "approved",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "run-tests"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "implement-task",
-      "outputId": "rejected",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "classify-failure"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "run-tests",
-      "outputId": "approved",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "review-code"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "run-tests",
-      "outputId": "rejected",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "classify-failure"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "review-code",
-      "outputId": "rejected",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "implement-task"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "review-code",
-      "outputId": "approved",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "code-gate"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "code-gate",
-      "outputId": "rejected",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "implement-task"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "prepare-dev-deployment",
-      "outputId": "approved",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "deploy-to-dev"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "prepare-dev-deployment",
-      "outputId": "rejected",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "classify-failure"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "deploy-to-dev",
-      "outputId": "approved",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "validate-dev-deployment"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "deploy-to-dev",
-      "outputId": "rejected",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "classify-failure"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "validate-dev-deployment",
-      "outputId": "approved",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "dev-deployment-validation-gate"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "validate-dev-deployment",
-      "outputId": "rejected",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "prepare-dev-deployment"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "dev-deployment-validation-gate",
-      "outputId": "approved",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "done"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "dev-deployment-validation-gate",
-      "outputId": "rejected",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "prepare-dev-deployment"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "classify-failure",
-      "outputId": "approved",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "implement-task"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "classify-failure",
-      "outputId": "approved",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "implement-task"
-    },
-    {
-      "sourceLoopId": "ci-or-validation-failed.loop",
-      "sourceActionId": "classify-failure",
-      "outputId": "approved",
-      "targetLoopId": "ci-or-validation-failed.loop",
-      "targetActionId": "implement-task"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "classify-failure",
-      "outputId": "rejected",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "done"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "classify-failure",
-      "outputId": "rejected",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "done"
-    },
-    {
-      "sourceLoopId": "ci-or-validation-failed.loop",
-      "sourceActionId": "classify-failure",
-      "outputId": "rejected",
-      "targetLoopId": "ci-or-validation-failed.loop",
-      "targetActionId": "done"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "implement-task",
-      "outputId": "approved",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "run-tests"
-    },
-    {
-      "sourceLoopId": "code-gate.approved.loop",
-      "sourceActionId": "implement-task",
-      "outputId": "rejected",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "classify-failure"
-    },
-    {
-      "sourceLoopId": "ci-or-validation-failed.loop",
-      "sourceActionId": "implement-task",
-      "outputId": "approved",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "run-tests"
-    },
-    {
-      "sourceLoopId": "ci-or-validation-failed.loop",
-      "sourceActionId": "implement-task",
-      "outputId": "rejected",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "classify-failure"
-    },
-    {
-      "sourceLoopId": "adr-goals-changed.loop",
-      "sourceActionId": "project-brief-gate",
-      "outputId": "approved",
-      "targetLoopId": "project-brief-gate.approved.loop",
-      "targetActionId": "create-roadmap"
-    },
-    {
-      "sourceLoopId": "project-brief-gate.approved.loop",
-      "sourceActionId": "roadmap-gate",
-      "outputId": "approved",
-      "targetLoopId": "roadmap-gate.approved.loop",
-      "targetActionId": "create-ui-design"
-    },
-    {
-      "sourceLoopId": "roadmap-gate.approved.loop",
-      "sourceActionId": "ui-design-gate",
-      "outputId": "approved",
-      "targetLoopId": "ui-design-gate.approved.loop",
-      "targetActionId": "create-technical-plan"
-    },
-    {
-      "sourceLoopId": "ui-design-gate.approved.loop",
-      "sourceActionId": "technical-plan-gate",
-      "outputId": "approved",
-      "targetLoopId": "technical-plan-gate.approved.loop",
-      "targetActionId": "create-milestones"
-    },
-    {
-      "sourceLoopId": "technical-plan-gate.approved.loop",
-      "sourceActionId": "milestones-gate",
-      "outputId": "approved",
-      "targetLoopId": "milestones-gate.approved.loop",
-      "targetActionId": "create-task-specs"
-    },
-    {
-      "sourceLoopId": "milestones-gate.approved.loop",
-      "sourceActionId": "task-specs-gate",
-      "outputId": "approved",
-      "targetLoopId": "task-specs-gate.approved.loop",
-      "targetActionId": "implement-task"
-    },
-    {
-      "sourceLoopId": "task-specs-gate.approved.loop",
-      "sourceActionId": "code-gate",
-      "outputId": "approved",
-      "targetLoopId": "code-gate.approved.loop",
-      "targetActionId": "prepare-dev-deployment"
-    },
-    {
-      "sourceLoopId": "ui-design-gate.approved.loop",
-      "sourceActionId": "create-technical-plan",
-      "outputId": "rejected",
-      "targetLoopId": "ui-design-gate.approved.loop",
-      "targetActionId": "blocked"
-    }
-  ],
-  "humanGateResponses": [],
+  "version": 2,
   "loops": [
     {
-      "id": "adr-goals-changed.loop",
+      "id": "project-brief",
+      "start": "create-project-brief",
       "steps": [
-        "create-project-brief",
-        "challenge-project-brief",
-        "project-brief-gate",
-        "done"
+        {
+          "id": "create-project-brief",
+          "type": "agent",
+          "agentId": "brief-agent",
+          "description": "Create Project Brief from accepted ADRs and approved GOALS.",
+          "on": {
+            "approved": "challenge-project-brief",
+            "rejected": { "end": "failed" }
+          }
+        },
+        {
+          "id": "challenge-project-brief",
+          "type": "agent",
+          "agentId": "loop-critic-agent",
+          "description": "Challenge Project Brief against ADRs, GOALS, constraints, assumptions, and traceability.",
+          "on": {
+            "approved": "project-brief-gate",
+            "rejected": "create-project-brief"
+          }
+        },
+        {
+          "id": "project-brief-gate",
+          "type": "human",
+          "description": "Gate 1: Approve the reviewed Project Brief before roadmap planning continues.",
+          "on": {
+            "approved": { "loop": "roadmap" },
+            "rejected": "create-project-brief"
+          }
+        }
       ]
     },
     {
-      "id": "project-brief-gate.approved.loop",
+      "id": "roadmap",
+      "start": "create-roadmap",
       "steps": [
-        "create-roadmap",
-        "challenge-roadmap",
-        "roadmap-gate",
-        "done"
+        {
+          "id": "create-roadmap",
+          "type": "agent",
+          "agentId": "roadmap-agent",
+          "description": "Create traceable delivery roadmap from the approved Project Brief.",
+          "on": {
+            "approved": "challenge-roadmap",
+            "rejected": { "end": "failed" }
+          }
+        },
+        {
+          "id": "challenge-roadmap",
+          "type": "agent",
+          "agentId": "loop-critic-agent",
+          "description": "Challenge the roadmap for value order, risk order, dependencies, and ADR/GOALS alignment.",
+          "on": {
+            "approved": "roadmap-gate",
+            "rejected": "create-roadmap"
+          }
+        },
+        {
+          "id": "roadmap-gate",
+          "type": "human",
+          "description": "Gate 2: Approve the reviewed Roadmap before UI design planning continues.",
+          "on": {
+            "approved": { "loop": "ui-design" },
+            "rejected": "create-roadmap"
+          }
+        }
       ]
     },
     {
-      "id": "roadmap-gate.approved.loop",
+      "id": "ui-design",
+      "start": "create-ui-design",
       "steps": [
-        "create-ui-design",
-        "challenge-ui-design",
-        "ui-design-gate",
-        "done"
+        {
+          "id": "create-ui-design",
+          "type": "agent",
+          "agentId": "ui-design-agent",
+          "description": "Create a UI/UX design plan from the approved Roadmap.",
+          "on": {
+            "approved": "challenge-ui-design",
+            "rejected": { "end": "failed" }
+          }
+        },
+        {
+          "id": "challenge-ui-design",
+          "type": "agent",
+          "agentId": "loop-critic-agent",
+          "description": "Challenge the UI design for goal fit, states, accessibility, consistency, and implementation cost.",
+          "on": {
+            "approved": "ui-design-gate",
+            "rejected": "create-ui-design"
+          }
+        },
+        {
+          "id": "ui-design-gate",
+          "type": "human",
+          "description": "Gate 3: Approve the reviewed UI Design before technical planning continues.",
+          "on": {
+            "approved": { "loop": "technical-plan" },
+            "rejected": "create-ui-design"
+          }
+        }
       ]
     },
     {
-      "id": "ui-design-gate.approved.loop",
+      "id": "technical-plan",
+      "start": "create-technical-plan",
       "steps": [
-        "create-technical-plan",
-        "challenge-technical-plan",
-        "technical-plan-gate",
-        "blocked"
+        {
+          "id": "create-technical-plan",
+          "type": "agent",
+          "agentId": "technical-plan-agent",
+          "description": "Create an implementation-ready Technical Plan from ADRs, the Roadmap, and the approved UI Design.",
+          "on": {
+            "approved": "challenge-technical-plan",
+            "rejected": { "end": "blocked" }
+          }
+        },
+        {
+          "id": "challenge-technical-plan",
+          "type": "agent",
+          "agentId": "loop-critic-agent",
+          "description": "Challenge the Technical Plan for architecture, data, APIs, security, testability, deployability, and rollback.",
+          "on": {
+            "approved": "technical-plan-gate",
+            "rejected": "create-technical-plan"
+          }
+        },
+        {
+          "id": "technical-plan-gate",
+          "type": "human",
+          "description": "Gate 4: Approve the reviewed Technical Plan before milestone planning continues.",
+          "on": {
+            "approved": { "loop": "milestones" },
+            "rejected": "create-technical-plan"
+          }
+        }
       ]
     },
     {
-      "id": "technical-plan-gate.approved.loop",
+      "id": "milestones",
+      "start": "create-milestones",
       "steps": [
-        "create-milestones",
-        "challenge-milestones",
-        "milestones-gate",
-        "done"
+        {
+          "id": "create-milestones",
+          "type": "agent",
+          "agentId": "milestone-task-agent",
+          "description": "Create validated milestones from the approved Technical Plan and Roadmap.",
+          "on": {
+            "approved": "challenge-milestones",
+            "rejected": { "end": "failed" }
+          }
+        },
+        {
+          "id": "challenge-milestones",
+          "type": "agent",
+          "agentId": "loop-critic-agent",
+          "description": "Challenge milestones for scope, dependency order, validation method, and increment value.",
+          "on": {
+            "approved": "milestones-gate",
+            "rejected": "create-milestones"
+          }
+        },
+        {
+          "id": "milestones-gate",
+          "type": "human",
+          "description": "Gate 5: Approve the reviewed Milestones before task specification continues.",
+          "on": {
+            "approved": { "loop": "task-specs" },
+            "rejected": "create-milestones"
+          }
+        }
       ]
     },
     {
-      "id": "milestones-gate.approved.loop",
+      "id": "task-specs",
+      "start": "create-task-specs",
       "steps": [
-        "create-task-specs",
-        "challenge-task-specs",
-        "task-specs-gate",
-        "done"
+        {
+          "id": "create-task-specs",
+          "type": "agent",
+          "agentId": "milestone-task-agent",
+          "description": "Create atomic task specifications from the approved milestones.",
+          "on": {
+            "approved": "challenge-task-specs",
+            "rejected": { "end": "failed" }
+          }
+        },
+        {
+          "id": "challenge-task-specs",
+          "type": "agent",
+          "agentId": "loop-critic-agent",
+          "description": "Challenge task specs for atomicity, acceptance criteria, testability, dependencies, and traceability.",
+          "on": {
+            "approved": "task-specs-gate",
+            "rejected": "create-task-specs"
+          }
+        },
+        {
+          "id": "task-specs-gate",
+          "type": "human",
+          "description": "Gate 6: Approve the reviewed Task Specs before implementation starts.",
+          "on": {
+            "approved": { "loop": "implementation-review" },
+            "rejected": "create-task-specs"
+          }
+        }
       ]
     },
     {
-      "id": "task-specs-gate.approved.loop",
+      "id": "implementation-review",
+      "start": "implement-task",
       "steps": [
-        "implement-task",
-        "run-tests",
-        "classify-failure",
-        "review-code",
-        "code-gate",
-        "done"
+        {
+          "id": "implement-task",
+          "type": "agent",
+          "agentId": "implementation-agent",
+          "description": "Implement only the approved task spec as the smallest safe code change.",
+          "on": {
+            "approved": "run-tests",
+            "rejected": "classify-failure"
+          }
+        },
+        {
+          "id": "run-tests",
+          "type": "agent",
+          "agentId": "review-test-agent",
+          "description": "Run or assess required tests, build, lint, and acceptance evidence.",
+          "on": {
+            "approved": "review-code",
+            "rejected": "classify-failure"
+          }
+        },
+        {
+          "id": "classify-failure",
+          "type": "agent",
+          "agentId": "failure-router-agent",
+          "description": "Classify failed implementation, review, or test evidence and route safe corrections.",
+          "on": {
+            "approved": "implement-task",
+            "rejected": { "end": "blocked" }
+          }
+        },
+        {
+          "id": "review-code",
+          "type": "agent",
+          "agentId": "review-test-agent",
+          "description": "Review code against the task spec, ADRs, GOALS, tests, security, and scope boundaries.",
+          "on": {
+            "approved": "code-gate",
+            "rejected": "implement-task"
+          }
+        },
+        {
+          "id": "code-gate",
+          "type": "human",
+          "description": "Gate 7: Approve the reviewed code before dev deployment starts.",
+          "on": {
+            "approved": { "loop": "dev-deployment" },
+            "rejected": "implement-task"
+          }
+        }
       ]
     },
     {
-      "id": "code-gate.approved.loop",
+      "id": "dev-deployment",
+      "start": "prepare-dev-deployment",
       "steps": [
-        "prepare-dev-deployment",
-        "deploy-to-dev",
-        "classify-failure",
-        "validate-dev-deployment",
-        "dev-deployment-validation-gate",
-        "done",
-        "implement-task"
+        {
+          "id": "prepare-dev-deployment",
+          "type": "agent",
+          "agentId": "dev-deploy-agent",
+          "description": "Check dev deployment readiness: artifact, config, migrations, rollback, and validation plan.",
+          "on": {
+            "approved": "deploy-to-dev",
+            "rejected": "classify-deployment-failure"
+          }
+        },
+        {
+          "id": "deploy-to-dev",
+          "type": "agent",
+          "agentId": "dev-deploy-agent",
+          "description": "Deploy the approved build to the dev environment.",
+          "on": {
+            "approved": "validate-dev-deployment",
+            "rejected": "classify-deployment-failure"
+          }
+        },
+        {
+          "id": "validate-dev-deployment",
+          "type": "agent",
+          "agentId": "dev-deploy-agent",
+          "description": "Validate the dev deployment with smoke tests, acceptance checks, logs, metrics, and traces.",
+          "on": {
+            "approved": "dev-deployment-validation-gate",
+            "rejected": "prepare-dev-deployment"
+          }
+        },
+        {
+          "id": "dev-deployment-validation-gate",
+          "type": "human",
+          "description": "Gate 8: Approve the validated dev deployment and complete the loop.",
+          "on": {
+            "approved": { "end": "completed" },
+            "rejected": "prepare-dev-deployment"
+          }
+        },
+        {
+          "id": "classify-deployment-failure",
+          "type": "agent",
+          "agentId": "failure-router-agent",
+          "description": "Classify failed deployment evidence and route safe corrections.",
+          "on": {
+            "approved": "implement-deployment-remediation",
+            "rejected": { "end": "blocked" }
+          }
+        },
+        {
+          "id": "implement-deployment-remediation",
+          "type": "agent",
+          "agentId": "implementation-agent",
+          "description": "Implement the smallest safe correction for the classified deployment failure.",
+          "on": {
+            "approved": "test-deployment-remediation",
+            "rejected": "classify-deployment-failure"
+          }
+        },
+        {
+          "id": "test-deployment-remediation",
+          "type": "agent",
+          "agentId": "review-test-agent",
+          "description": "Run the tests, build, lint, and acceptance checks required for the deployment correction.",
+          "on": {
+            "approved": "review-deployment-remediation",
+            "rejected": "classify-deployment-failure"
+          }
+        },
+        {
+          "id": "review-deployment-remediation",
+          "type": "agent",
+          "agentId": "review-test-agent",
+          "description": "Review the deployment correction against the failure evidence, task spec, tests, and scope boundaries.",
+          "on": {
+            "approved": "deployment-remediation-gate",
+            "rejected": "implement-deployment-remediation"
+          }
+        },
+        {
+          "id": "deployment-remediation-gate",
+          "type": "human",
+          "description": "Approve the reviewed deployment correction before deployment readiness is checked again.",
+          "on": {
+            "approved": "prepare-dev-deployment",
+            "rejected": "implement-deployment-remediation"
+          }
+        }
       ]
     },
     {
-      "id": "ci-or-validation-failed.loop",
+      "id": "ci-validation-recovery",
+      "start": "classify-ci-validation-failure",
       "steps": [
-        "classify-failure",
-        "implement-task"
+        {
+          "id": "classify-ci-validation-failure",
+          "type": "agent",
+          "agentId": "failure-router-agent",
+          "description": "Classify failed CI or validation evidence and route safe corrections.",
+          "on": {
+            "approved": "implement-ci-validation-remediation",
+            "rejected": { "end": "blocked" }
+          }
+        },
+        {
+          "id": "implement-ci-validation-remediation",
+          "type": "agent",
+          "agentId": "implementation-agent",
+          "description": "Implement the smallest safe correction for the classified CI or validation failure.",
+          "on": {
+            "approved": "test-ci-validation-remediation",
+            "rejected": "classify-ci-validation-failure"
+          }
+        },
+        {
+          "id": "test-ci-validation-remediation",
+          "type": "agent",
+          "agentId": "review-test-agent",
+          "description": "Run the tests, build, lint, and acceptance checks required for the CI or validation correction.",
+          "on": {
+            "approved": "review-ci-validation-remediation",
+            "rejected": "classify-ci-validation-failure"
+          }
+        },
+        {
+          "id": "review-ci-validation-remediation",
+          "type": "agent",
+          "agentId": "review-test-agent",
+          "description": "Review the correction against the failure evidence, task spec, tests, and scope boundaries.",
+          "on": {
+            "approved": "ci-validation-remediation-gate",
+            "rejected": "implement-ci-validation-remediation"
+          }
+        },
+        {
+          "id": "ci-validation-remediation-gate",
+          "type": "human",
+          "description": "Approve the reviewed CI or validation correction before dev deployment starts.",
+          "on": {
+            "approved": { "loop": "dev-deployment" },
+            "rejected": "implement-ci-validation-remediation"
+          }
+        }
       ]
     }
   ],

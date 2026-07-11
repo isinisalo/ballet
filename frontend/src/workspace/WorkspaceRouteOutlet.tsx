@@ -14,6 +14,7 @@ import { SkillsView } from "./skills/SkillsView";
 import type { WorkspaceSelection } from "./selection/useWorkspaceSelection";
 import type { RouteState } from "./types";
 import type { useWorkspaceMutations } from "./data/useWorkspaceMutations";
+import type { RuntimeStreamStatus } from "../app/useRuntimeStream";
 
 type WorkspaceMutationCallbacks = ReturnType<typeof useWorkspaceMutations>;
 
@@ -22,12 +23,14 @@ export function WorkspaceRouteOutlet({
   data,
   selection,
   mutations,
+  runtimeStreamStatus,
   navigate
 }: {
   route: RouteState;
   data: AppData;
   selection: WorkspaceSelection;
   mutations: WorkspaceMutationCallbacks;
+  runtimeStreamStatus: RuntimeStreamStatus;
   navigate: (path: string) => void;
 }) {
   switch (route.view) {
@@ -47,7 +50,7 @@ export function WorkspaceRouteOutlet({
     case "project-instructions":
       return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
     case "automation":
-      return <AutomationView data={data} activeTab={route.automationTab ?? "loops"} selectedId={route.automationEntityId} loopView={route.automationLoopView} saveAutomation={mutations.saveAutomation} createEvent={mutations.createEvent} navigate={navigate} />;
+      return <AutomationView data={data} selectedId={route.automationEntityId} loopView={route.automationLoopView} mode={route.automationLoopMode ?? "edit"} runtimeStreamStatus={runtimeStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
     case "runtimes":
       return <RuntimesView data={data} selectedId={route.runtimeId} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
     case "agents":

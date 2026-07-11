@@ -7,8 +7,4 @@ export {
   loadProjectAutomationConfigWithIssues,
   saveProjectAutomationConfig
 } from "./automation/automationRepository.js";
-export {
-  automationActionsToEventDefinitions,
-  automationRuntimesToRuntimes
-} from "./automation/automationProjections.js";
-export { mapAgentOutputToEvent } from "./automation/agentOutputEventMapper.js";
+export { automationRuntimesToRuntimes } from "./automation/automationProjections.js";

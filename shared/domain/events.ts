@@ -1,34 +1,7 @@
 import type { MarkdownBackedEntity } from "./documents.js";
-import type { EventRoutingSummary } from "./automation.js";
-import type { AgentOutputEventStatus, AgentOutcomeStatus } from "./runtime.js";
+import type { AgentOutcomeStatus } from "./runtime.js";
 
 export type EventStatus = "received" | "routed" | "unassigned" | "handled";
-
-export interface RoutedEvent {
-  id: string;
-  source: string;
-  timestamp: string;
-  payload: {
-    agent?: string;
-    action: string;
-    status: AgentOutputEventStatus;
-    outcome?: AgentOutcomeStatus;
-    summary?: string;
-    agents?: Array<{
-      agent: string;
-      run_id: string;
-      status: string;
-      outcome?: AgentOutcomeStatus;
-      summary?: string;
-    }>;
-    run_id?: string;
-    input_event_id?: string;
-    action_id?: string;
-    loop_id?: string;
-    action_version?: number;
-    payload?: Record<string, unknown>;
-  };
-}
 
 export interface EventProducerRequirements {
   gitCommitExists?: boolean;
@@ -72,9 +45,6 @@ export interface EventRecord extends MarkdownBackedEntity {
   tags: string[];
   payload: Record<string, unknown>;
   status: EventStatus;
-  matchedPolicyId?: string;
-  assignedAgentId?: string;
-  routing?: EventRoutingSummary;
   handlingResult?: string;
   createdAt: string;
 }
@@ -94,8 +64,5 @@ export interface RuntimeEvent {
   tags: string[];
   payload: Record<string, unknown>;
   status: EventStatus;
-  matchedPolicyId?: string;
-  assignedAgentId?: string;
-  routing?: EventRoutingSummary;
   handlingResult?: string;
 }

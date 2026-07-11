@@ -7,8 +7,8 @@ import {
   loopBranchStackHeight,
   loopCanvasNodeAnchorY,
   loopHorizontalEdgeGap,
-  loopActionOutputHandleY,
-  loopActionStackHeight
+  loopStepOutputHandleY,
+  loopStepStackHeight
 } from "./loopLayoutSizing";
 import type { LoopCanvasLayoutNode, LoopCanvasLayoutNodeDraft, LoopDagreEdge, LoopLayoutDirection, LoopLayoutMetrics } from "./loopLayoutTypes";
 
@@ -61,12 +61,12 @@ function positionOutputEventNodes(
   const nodesBySourceKey = new Map<string, LoopCanvasLayoutNodeDraft[]>();
 
   nodes.forEach((node) => {
-    const sourceKey = node.record ? `action-${node.record.index}` : "";
+    const sourceKey = node.record ? `step-${node.record.index}` : "";
     nodesBySourceKey.set(sourceKey, [...(nodesBySourceKey.get(sourceKey) ?? []), node]);
   });
 
   return nodes.flatMap((node) => {
-    const sourceKey = node.record ? `action-${node.record.index}` : undefined;
+    const sourceKey = node.record ? `step-${node.record.index}` : undefined;
     const sourceNodes = sourceKey ? nodesBySourceKey.get(sourceKey) ?? [] : [];
     const outputOrderIndex = sourceNodes.findIndex((sourceNode) => sourceNode.key === node.key);
     return positionOutputEventNode(node, nodeByKey, edges, direction, metrics, Math.max(0, outputOrderIndex));
@@ -81,24 +81,24 @@ function positionOutputEventNode(
   metrics: LoopLayoutMetrics,
   outputOrderIndex: number
 ): LoopCanvasLayoutNode {
-  const sourceKey = node.record ? `action-${node.record.index}` : undefined;
+  const sourceKey = node.record ? `step-${node.record.index}` : undefined;
   const sourceNode = sourceKey ? nodeByKey.get(sourceKey) : undefined;
   if (!sourceNode) {
     return { ...node, x: loopCanvasLayoutConfig.startX, y: loopCanvasLayoutConfig.startY };
   }
   const childNodes = edges
-    .filter((edge) => edge.source === sourceKey && edge.target.startsWith("action-"))
+    .filter((edge) => edge.source === sourceKey && edge.target.startsWith("step-"))
     .map((edge) => nodeByKey.get(edge.target))
     .filter((childNode): childNode is LoopCanvasLayoutNode => Boolean(childNode));
 
   return {
     ...node,
     x: direction === "horizontal"
-      ? childNodes[0]?.x ?? sourceNode.x + metrics.horizontalPolicyColumnStep
+      ? childNodes[0]?.x ?? sourceNode.x + metrics.horizontalStepColumnGap
       : nextVerticalOutputEventsX(childNodes, sourceNode),
     y: direction === "horizontal"
       ? nextHorizontalOutputEventsY(childNodes, sourceNode, node, outputOrderIndex)
-      : (childNodes[0]?.y ?? sourceNode.y + metrics.verticalPolicyRankStep) + outputOrderIndex * outputEventStackStep()
+      : (childNodes[0]?.y ?? sourceNode.y + metrics.verticalStepRankGap) + outputOrderIndex * outputEventStackStep()
   };
 }
 
@@ -112,13 +112,13 @@ function nextHorizontalOutputEventsY(
     return sourceNode.y + loopCanvasNodeAnchorY(sourceNode) - node.height / 2 + outputOrderIndex * outputEventStackStep();
   }
 
-  const hasPolicyChild = childNodes.some((childNode) => childNode.kind === "action");
+  const hasStepChild = childNodes.some((childNode) => childNode.kind === "step");
   const childStackBottom = Math.max(...childNodes.map((childNode) => childNode.y + loopBranchStackHeight(childNode)));
   const outputStackTop = childStackBottom + loopNodeSizes.outputEvent.rowGap;
   const stackedY = outputStackTop + outputOrderIndex * outputEventStackStep();
 
-  if (hasPolicyChild || !canAlignTerminalOutputEvents(sourceNode.outputHandleCount ?? 0)) return stackedY;
-  return sourceNode.y + loopActionOutputHandleY(node.outputIndex ?? outputOrderIndex, sourceNode.outputHandleCount ?? 0) - node.height / 2;
+  if (hasStepChild || !canAlignTerminalOutputEvents(sourceNode.outputHandleCount ?? 0)) return stackedY;
+  return sourceNode.y + loopStepOutputHandleY(node.outputIndex ?? outputOrderIndex, sourceNode.outputHandleCount ?? 0) - node.height / 2;
 }
 
 function nextVerticalOutputEventsX(childNodes: LoopCanvasLayoutNode[], sourceNode: LoopCanvasLayoutNode) {
@@ -131,35 +131,35 @@ function loopLayoutMetrics(
   outputNodes: LoopCanvasLayoutNodeDraft[]
 ): LoopLayoutMetrics {
   const outputStackHeights = [...new Map(outputNodes.map((node) => {
-    const sourceKey = node.record ? `action-${node.record.index}` : node.key;
+    const sourceKey = node.record ? `step-${node.record.index}` : node.key;
     return [sourceKey, outputNodes.filter((candidate) => candidate.record?.index === node.record?.index).length];
   })).values()].map(outputEventStackHeight);
   const maxOutputHeight = Math.max(loopNodeSizes.outputEvent.height, ...outputStackHeights);
-  const policyStackHeight = loopActionStackHeight();
+  const stepStackHeight = loopStepStackHeight();
   const horizontalEdgeGap = loopHorizontalEdgeGap();
-  const horizontalPolicyColumnWidth = Math.max(
-    loopNodeSizes.action.minWidth,
-    ...primaryNodes.filter((node) => node.kind === "action").map((node) => node.width)
+  const horizontalStepColumnWidth = Math.max(
+    loopNodeSizes.step.minWidth,
+    ...primaryNodes.filter((node) => node.kind === "step").map((node) => node.width)
   );
 
   return {
-    horizontalRootPolicyX: loopCanvasLayoutConfig.startX + horizontalPolicyColumnWidth + horizontalEdgeGap,
-    horizontalPolicyColumnStep: horizontalPolicyColumnWidth + horizontalEdgeGap,
-    horizontalRowStep: policyStackHeight + loopCanvasLayoutConfig.branchGap,
-    verticalRootPolicyY: loopCanvasLayoutConfig.startY + policyStackHeight + loopCanvasLayoutConfig.branchGap,
-    verticalPolicyRankStep: policyStackHeight + maxOutputHeight + loopCanvasLayoutConfig.branchGap,
-    verticalColumnStep: Math.max(loopNodeSizes.action.maxWidth, loopNodeSizes.outputEvent.maxWidth) + loopCanvasLayoutConfig.branchGap
+    horizontalRootStepX: loopCanvasLayoutConfig.startX + horizontalStepColumnWidth + horizontalEdgeGap,
+    horizontalStepColumnGap: horizontalStepColumnWidth + horizontalEdgeGap,
+    horizontalRowStep: stepStackHeight + loopCanvasLayoutConfig.branchGap,
+    verticalRootStepY: loopCanvasLayoutConfig.startY + stepStackHeight + loopCanvasLayoutConfig.branchGap,
+    verticalStepRankGap: stepStackHeight + maxOutputHeight + loopCanvasLayoutConfig.branchGap,
+    verticalColumnStep: Math.max(loopNodeSizes.step.maxWidth, loopNodeSizes.outputEvent.maxWidth) + loopCanvasLayoutConfig.branchGap
   };
 }
 
 function horizontalNodeX(rank: number, metrics: LoopLayoutMetrics) {
   if (rank <= 0) return loopCanvasLayoutConfig.startX;
-  return metrics.horizontalRootPolicyX + (rank - 1) * metrics.horizontalPolicyColumnStep;
+  return metrics.horizontalRootStepX + (rank - 1) * metrics.horizontalStepColumnGap;
 }
 
 function verticalNodeY(rank: number, metrics: LoopLayoutMetrics) {
   if (rank <= 0) return loopCanvasLayoutConfig.startY;
-  return metrics.verticalRootPolicyY + (rank - 1) * metrics.verticalPolicyRankStep;
+  return metrics.verticalRootStepY + (rank - 1) * metrics.verticalStepRankGap;
 }
 
 function verticalNodeX(node: LoopCanvasLayoutNodeDraft, orderIndex: number, metrics: LoopLayoutMetrics) {

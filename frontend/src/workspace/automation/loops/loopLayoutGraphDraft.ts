@@ -25,7 +25,7 @@ export type LoopLayoutGraphDraft = {
 
 export type LoopLayoutGraphDraftContext = {
   loopGraph: LoopGraph;
-  editingActionIndex: number | null;
+  editingStepIndex: number | null;
   direction: LoopLayoutDirection;
   sourceHandleId: string;
   targetHandleId: string;
@@ -33,7 +33,7 @@ export type LoopLayoutGraphDraftContext = {
   dagreEdges: LoopDagreEdge[];
   canvasEdges: LoopCanvasEdge[];
   edgeKeys: Set<string>;
-  actionNodeIndexes: Set<number>;
+  stepNodeIndexes: Set<number>;
   handledEventNodes: LoopHandledEventNode[];
 };
 
@@ -51,21 +51,21 @@ export function addCanvasEdge(context: LoopLayoutGraphDraftContext, edge: LoopCa
   context.canvasEdges.push(edge);
 }
 
-export function addActionNode(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, outputHandleCount: number) {
+export function addStepNode(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, outputHandleCount: number) {
   const records = loopFoldedRecords(context.loopGraph, record);
-  const isEditingAction = context.editingActionIndex === record.index;
+  const isEditingStep = context.editingStepIndex === record.index;
   addNode(context, {
-    key: `action-${record.index}`,
-    kind: "action",
-    width: loopNodeSizes.action.minWidth,
-    height: loopNodeSizes.action.height,
+    key: `step-${record.index}`,
+    kind: "step",
+    width: loopNodeSizes.step.minWidth,
+    height: loopNodeSizes.step.height,
     direction: context.direction,
     record,
     records,
-    isEditingAction,
+    isEditingStep,
     outputHandleCount
   });
-  context.actionNodeIndexes.add(record.index);
+  context.stepNodeIndexes.add(record.index);
 }
 
 export function addOutputEventNode(
@@ -87,13 +87,13 @@ export function addOutputEventNode(
       eventType: output.eventType,
       outputType: output.type
     },
-    sourceActionId: record.actionId,
+    sourceStepId: record.stepKey,
     outputIndex
   });
-  addDagreEdge(context, { source: `action-${record.index}`, target: key });
+  addDagreEdge(context, { source: `step-${record.index}`, target: key });
   addCanvasEdge(context, {
-    key: `action-output-event-${record.index}-${output.outputId}`,
-    sourceNodeKey: `action-${record.index}`,
+    key: `step-output-event-${record.index}-${output.outputId}`,
+    sourceNodeKey: `step-${record.index}`,
     targetNodeKey: key,
     sourceHandleId: loopOutputSourceHandleId(output),
     targetHandleId: loopOutputTargetHandleId(output, context.targetHandleId),
@@ -103,10 +103,10 @@ export function addOutputEventNode(
   });
 }
 
-export function addFirstActionGhost(context: LoopLayoutGraphDraftContext) {
+export function addFirstStepGhost(context: LoopLayoutGraphDraftContext) {
   addNode(context, {
-    key: "first-action-ghost",
-    kind: "first-action-ghost",
+    key: "first-step-ghost",
+    kind: "first-step-ghost",
     width: loopNodeSizes.event.width,
     height: loopNodeSizes.event.height,
     direction: context.direction

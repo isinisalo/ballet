@@ -1,4 +1,11 @@
-import type { AppData, CollectionName, EventIntakeRequest, EventRecord } from "@shared/api/workspace-contracts";
+import type {
+  AppData,
+  CollectionName,
+  LoopRunDetails,
+  RespondToStepRunRequest,
+  StartLoopRunRequest,
+  StepRunConsolePage
+} from "@shared/api/workspace-contracts";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import type { MarkdownDocument } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
@@ -44,11 +51,22 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(config)
     }),
-  createEvent: (event: EventIntakeRequest) =>
-    request<EventRecord>("/api/events/intake", {
+  startLoopRun: (loopId: string, input: StartLoopRunRequest) =>
+    request<LoopRunDetails>(`/api/loops/${encodeURIComponent(loopId)}/runs`, {
       method: "POST",
-      body: JSON.stringify(event)
+      body: JSON.stringify(input)
     }),
+  getLatestLoopRun: (loopId: string) =>
+    request<LoopRunDetails | null>(`/api/loops/${encodeURIComponent(loopId)}/runs/latest`),
+  respondToStepRun: (runId: string, stepRunId: string, input: RespondToStepRunRequest) =>
+    request<LoopRunDetails>(`/api/loop-runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(stepRunId)}/respond`, {
+      method: "POST",
+      body: JSON.stringify(input)
+    }),
+  cancelLoopRun: (runId: string) =>
+    request<LoopRunDetails>(`/api/loop-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
+  getStepRunConsole: (runId: string, stepRunId: string, afterId = 0, limit = 500) =>
+    request<StepRunConsolePage>(`/api/loop-runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(stepRunId)}/console?afterId=${afterId}&limit=${limit}`),
   save: <T extends CollectionName>(collection: T, item: Partial<AppData[T][number]>) =>
     request<AppData[T][number]>(`/api/${collection}`, {
       method: "POST",

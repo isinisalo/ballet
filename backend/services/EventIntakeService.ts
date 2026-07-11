@@ -1,29 +1,13 @@
-import type { AppData } from "../../shared/api/workspaceData.js";
 import type { EventRecord } from "../../shared/domain/events.js";
 import { notifyRuntimeChanged } from "../runtime-events.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
 
-export class EventValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "EventValidationError";
-  }
-}
-
 export class EventIntakeService {
   constructor(
-    private readonly readData: () => Promise<AppData>,
     private readonly runtimeDatabaseProvider: RuntimeDatabaseProvider
   ) {}
 
   async createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {
-    const data = await this.readData();
-    const hasActiveDefinition = data.eventDefinitions.some((definition) =>
-      definition.active && definition.eventType === input.eventType
-    );
-    if (!hasActiveDefinition) {
-      throw new EventValidationError(`Unknown or inactive event type: ${input.eventType}`);
-    }
     const result = this.runtimeDatabaseProvider.runtimeDatabase().intakeEvent({
       projectId: input.projectId,
       eventType: input.eventType,
@@ -36,9 +20,8 @@ export class EventIntakeService {
       tags: input.tags,
       payload: input.payload,
       body: input.body
-    }, data.automation, data.agents);
+    });
     notifyRuntimeChanged("events");
-    if (result.runs.length > 0) notifyRuntimeChanged("agent-runs");
     return result.event;
   }
 

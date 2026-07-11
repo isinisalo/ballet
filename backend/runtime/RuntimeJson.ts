@@ -1,6 +1,4 @@
 import { createHash } from "node:crypto";
-import type { EventRoutingSummary } from "../../shared/domain/automation.js";
-
 export const stringifyJson = (value: unknown): string => JSON.stringify(value ?? {});
 
 const stableJson = (value: unknown): string => {
@@ -23,10 +21,4 @@ export const parseJsonObject = (value: string): Record<string, unknown> => {
 export const parseJsonArray = (value: string): string[] => {
   const parsed = JSON.parse(value) as unknown;
   return Array.isArray(parsed) ? parsed.map((item) => String(item)).filter(Boolean) : [];
-};
-
-export const parseRoutingSummary = (value: string | null): EventRoutingSummary | undefined => {
-  if (!value) return undefined;
-  const parsed = JSON.parse(value) as unknown;
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as EventRoutingSummary : undefined;
 };

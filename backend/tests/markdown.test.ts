@@ -99,10 +99,7 @@ describe("Markdown collection loading", () => {
     expect(data.runtimes).toEqual([]);
     expect(data.policies).toEqual([]);
     expect(data.automation).toEqual({
-      version: 1,
-      actions: [],
-      outputRoutes: [],
-      humanGateResponses: [],
+      version: 2,
       loops: [],
       runtimes: []
     });

@@ -2,7 +2,7 @@ import type { LoopLayoutDirection } from "./loopLayoutTypes";
 
 export const loopNodeSizes = {
   loop: { minWidth: 22, maxWidth: 22, height: 22 },
-  action: { minWidth: 22, maxWidth: 22, height: 22 },
+  step: { minWidth: 22, maxWidth: 22, height: 22 },
   event: { width: 22, height: 22 },
   outputEvent: { minWidth: 22, maxWidth: 22, height: 22, rowGap: 32 }
 };
@@ -14,7 +14,7 @@ export const loopCanvasLayoutConfig = {
   horizontalEdgeGap: 184,
   branchGap: 72,
   edgePad: 18,
-  actionAnchorY: 11,
+  stepAnchorY: 11,
   selectedCompactLoopRowGap: 112,
   compactLoopRowGap: 24,
   outputEventsLaneGap: 24,

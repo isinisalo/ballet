@@ -57,6 +57,17 @@ const send = (message) => {
 const completeTurn = () => {
   const failed = scenario === "turn-failed";
   const text = scenario === "malformed-output" ? "{not json" : JSON.stringify(outcome);
+  if (scenario === "console") {
+    send({ method: "turn/started", params: { threadId: currentThreadId, turn: { id: "turn-1", status: "inProgress" } } });
+    send({ method: "item/reasoning/summaryTextDelta", params: { threadId: currentThreadId, turnId: "turn-1", itemId: "reason-1", delta: "Inspecting the workspace." } });
+    send({ method: "item/reasoning/textDelta", params: { threadId: currentThreadId, turnId: "turn-1", itemId: "reason-1", delta: "private raw reasoning" } });
+    send({ method: "item/started", params: { threadId: currentThreadId, turnId: "turn-1", item: { type: "commandExecution", id: "cmd-1", command: "npm test", cwd: "/repo", status: "inProgress" } } });
+    send({ method: "item/commandExecution/outputDelta", params: { threadId: currentThreadId, turnId: "turn-1", itemId: "cmd-1", delta: "all tests passed\\n" } });
+    send({ method: "item/completed", params: { threadId: currentThreadId, turnId: "turn-1", item: { type: "commandExecution", id: "cmd-1", command: "npm test", status: "completed", aggregatedOutput: "all tests passed\\n", exitCode: 0 } } });
+    send({ method: "item/completed", params: { threadId: currentThreadId, turnId: "turn-1", item: { type: "fileChange", id: "file-1", status: "completed", changes: [{ path: "src/app.ts", kind: "update", diff: "+ok" }] } } });
+    send({ method: "item/completed", params: { threadId: currentThreadId, turnId: "turn-1", item: { type: "mcpToolCall", id: "tool-1", server: "docs", tool: "search", status: "completed", result: { ok: true } } } });
+    send({ method: "item/agentMessage/delta", params: { threadId: currentThreadId, turnId: "turn-1", itemId: "item-1", delta: text } });
+  }
   send({
     method: "item/completed",
     params: {
@@ -121,6 +132,7 @@ rl.on("line", (line) => {
   if (message.method === "turn/start") {
     currentThreadId = message.params.threadId;
     send({ id: message.id, result: { turn: { id: "turn-1", items: [], status: "running", error: null } } });
+    if (scenario === "cancel") return;
     if (scenario === "approval-request") {
       waitingForApproval = true;
       send({
@@ -132,6 +144,10 @@ rl.on("line", (line) => {
     }
     completeTurn();
   }
+  if (message.method === "turn/interrupt") {
+    send({ id: message.id, result: {} });
+    send({ method: "turn/completed", params: { threadId: currentThreadId, turn: { id: "turn-1", status: "interrupted" } } });
+  }
 });
 `;
 
@@ -142,12 +158,13 @@ const writeFixture = async (root: string) => {
   return fixture;
 };
 
-const runFixture = async (scenario: string, resumeThreadId?: string) => {
+const runFixture = async (scenario: string, resumeThreadId?: string, signal?: AbortSignal) => {
   previousScenario = process.env.BALLET_FIXTURE_SCENARIO;
   process.env.BALLET_FIXTURE_SCENARIO = scenario;
   const root = await tempRoot();
   const fixture = await writeFixture(root);
   const logs: string[] = [];
+  const consoleEvents: Array<{ kind: string; message: string }> = [];
   const threads: Array<{ threadId: string; turnId?: string }> = [];
 
   const result = await runCodexAgent({
@@ -160,11 +177,13 @@ const runFixture = async (scenario: string, resumeThreadId?: string) => {
     resumeThreadId,
     timeoutMs: 5000,
     codexCommand: fixture,
+    signal,
     onLog: (_level, message) => logs.push(message),
+    onConsole: (event) => consoleEvents.push({ kind: event.kind, message: event.message }),
     onThread: (threadId, turnId) => threads.push({ threadId, turnId })
   });
 
-  return { result, logs, threads };
+  return { result, logs, threads, consoleEvents };
 };
 
 describe("Codex app-server adapter", () => {
@@ -196,5 +215,20 @@ describe("Codex app-server adapter", () => {
 
   it("fails when final agent output is malformed", async () => {
     await expect(runFixture("malformed-output")).rejects.toThrow("not valid JSON");
+  });
+
+  it("normalizes the live Codex item stream without exposing raw reasoning or duplicating accumulated output", async () => {
+    const { consoleEvents } = await runFixture("console");
+    expect(consoleEvents.map((event) => event.kind)).toEqual(expect.arrayContaining(["system", "think", "command", "output", "file", "tool", "agent"]));
+    expect(consoleEvents.some((event) => event.message.includes("private raw reasoning"))).toBe(false);
+    expect(consoleEvents.filter((event) => event.message.includes("all tests passed"))).toHaveLength(1);
+    expect(consoleEvents.filter((event) => event.kind === "agent" && event.message.includes("Fixture completed"))).toHaveLength(1);
+  });
+
+  it("interrupts the active Codex turn when the run is cancelled", async () => {
+    const controller = new AbortController();
+    const promise = runFixture("cancel", undefined, controller.signal);
+    setTimeout(() => controller.abort(), 50);
+    await expect(promise).rejects.toThrow("Codex run cancelled");
   });
 });

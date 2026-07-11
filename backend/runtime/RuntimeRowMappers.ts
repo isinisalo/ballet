@@ -1,8 +1,18 @@
+import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { EventRecord, RuntimeEvent } from "../../shared/domain/events.js";
-import type { AgentOutcome, AgentRun, AgentRunLog } from "../../shared/domain/runtime.js";
-import { parseActionRouteId } from "../../shared/policy-actions.js";
-import { parseJsonArray, parseJsonObject, parseRoutingSummary } from "./RuntimeJson.js";
-import type { AgentRunLogRow, AgentRunRow, EventRow } from "./RuntimeDbTypes.js";
+import type {
+  AgentOutcome,
+  LoopRun,
+  StepRun,
+  StepRunLog
+} from "../../shared/domain/runtime.js";
+import { parseJsonArray, parseJsonObject } from "./RuntimeJson.js";
+import type {
+  EventRow,
+  LoopRunRow,
+  StepRunLogRow,
+  StepRunRow
+} from "./RuntimeDbTypes.js";
 
 export const toRuntimeEvent = (row: EventRow): RuntimeEvent => ({
   seq: row.seq,
@@ -17,16 +27,12 @@ export const toRuntimeEvent = (row: EventRow): RuntimeEvent => ({
   occurredAt: row.occurred_at,
   projectId: row.project_id,
   tags: parseJsonArray(row.tags_json),
-  payload: parseJsonObject(row.payload_json),
   status: row.status,
-  matchedPolicyId: row.matched_policy_id ?? undefined,
-  assignedAgentId: row.assigned_agent_id ?? undefined,
-  routing: parseRoutingSummary(row.routing_json),
-  handlingResult: row.handling_result ?? undefined
+  handlingResult: row.handling_result ?? undefined,
+  payload: parseJsonObject(row.payload_json)
 });
 
 export const runtimeEventToEventRecord = (event: RuntimeEvent): EventRecord => ({
-  seq: event.seq,
   id: event.eventId,
   eventId: event.eventId,
   projectId: event.projectId,
@@ -42,9 +48,6 @@ export const runtimeEventToEventRecord = (event: RuntimeEvent): EventRecord => (
   tags: event.tags,
   payload: event.payload,
   status: event.status,
-  matchedPolicyId: event.matchedPolicyId,
-  assignedAgentId: event.assignedAgentId,
-  routing: event.routing,
   handlingResult: event.handlingResult,
   createdAt: event.occurredAt
 });
@@ -52,36 +55,56 @@ export const runtimeEventToEventRecord = (event: RuntimeEvent): EventRecord => (
 export const toEventRecord = (row: EventRow): EventRecord =>
   runtimeEventToEventRecord(toRuntimeEvent(row));
 
-export const toAgentRun = (row: AgentRunRow): AgentRun => {
-  const parsedRoute = parseActionRouteId(row.policy_id);
-  return {
-    runId: row.run_id,
-    inputEventId: row.input_event_id,
-    inputEventSeq: row.input_event_seq ?? undefined,
-    actionId: parsedRoute.actionId || row.policy_id,
-    loopId: parsedRoute.loopId,
-    routeId: row.policy_id,
-    actionVersion: row.policy_version,
-    agentRole: row.agent_role,
-    status: row.status,
-    attempt: row.attempt,
-    leaseOwner: row.lease_owner ?? undefined,
-    leaseUntil: row.lease_until ?? undefined,
-    threadId: row.thread_id ?? undefined,
-    turnId: row.turn_id ?? undefined,
-    outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
-    error: row.error ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    completedAt: row.completed_at ?? undefined
-  };
-};
-
-export const toAgentRunLog = (row: AgentRunLogRow): AgentRunLog => ({
-  id: row.id,
+export const toLoopRun = (row: LoopRunRow): LoopRun => ({
   runId: row.run_id,
+  loopId: row.loop_id,
+  rootRunId: row.root_run_id,
+  parentRunId: row.parent_run_id ?? undefined,
+  parentStepRunId: row.parent_step_run_id ?? undefined,
+  source: row.source,
+  status: row.status,
+  input: row.input ?? undefined,
+  snapshot: JSON.parse(row.snapshot_json) as ProjectLoop,
+  transitionCount: row.transition_count,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  completedAt: row.completed_at ?? undefined
+});
+
+export const toStepRun = (row: StepRunRow): StepRun => ({
+  stepRunId: row.step_run_id,
+  runId: row.run_id,
+  loopId: row.loop_id,
+  stepId: row.step_id,
+  type: row.step_type,
+  agentId: row.agent_id ?? undefined,
+  status: row.status,
+  input: row.input ?? undefined,
+  responseInput: row.response_input ?? undefined,
+  result: row.result ?? undefined,
+  outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
+  error: row.error ?? undefined,
+  attempt: row.attempt,
+  leaseOwner: row.lease_owner ?? undefined,
+  leaseUntil: row.lease_until ?? undefined,
+  threadId: row.thread_id ?? undefined,
+  turnId: row.turn_id ?? undefined,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  completedAt: row.completed_at ?? undefined
+});
+
+export const toStepRunLog = (row: StepRunLogRow): StepRunLog => ({
+  id: row.id,
+  stepRunId: row.step_run_id,
+  source: row.source,
+  kind: row.kind,
   level: row.level,
+  phase: row.phase,
+  itemId: row.item_id ?? undefined,
   message: row.message,
   data: row.data_json ? parseJsonObject(row.data_json) : undefined,
+  contentBytes: row.content_bytes,
+  terminal: Boolean(row.terminal),
   createdAt: row.created_at
 });

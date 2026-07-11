@@ -1,11 +1,19 @@
 import type {
   Policy,
-  PolicyRouteDecision,
   PolicyPredicate,
   PolicyPredicateScalar
 } from "./domain/automation.js";
 import type { Agent } from "./domain/agents.js";
 import type { EventRecord } from "./domain/events.js";
+
+export interface PolicyRouteDecision {
+  policyId: string;
+  policyName: string;
+  policyVersion: number;
+  targetAgentId: string;
+  status: "routed" | "skipped";
+  reason: string;
+}
 
 const textMatches = (ruleValue: string, actualValue: string): boolean => {
   if (!ruleValue || ruleValue === "*") return true;

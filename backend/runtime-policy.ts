@@ -1,4 +1,4 @@
-import type { AgentOutcome, AgentRunStatus, RunCheck } from "../shared/domain/runtime.js";
+import type { AgentOutcome, RunCheck } from "../shared/domain/runtime.js";
 
 export const agentOutcomeSchema = {
   type: "object",
@@ -78,11 +78,4 @@ export const parseAgentOutcomeText = (text: string): AgentOutcome => {
     throw new Error("Agent outcome did not match the required schema.");
   }
   return parsed;
-};
-
-export const outcomeToRunStatus = (outcome: AgentOutcome): AgentRunStatus => {
-  if (outcome.outcome === "blocked") return "blocked";
-  if (outcome.outcome === "needs_input") return "needs_input";
-  if (outcome.outcome === "failed") return "failed";
-  return "completed";
 };

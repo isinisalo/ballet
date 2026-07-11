@@ -12,17 +12,17 @@ export type View =
   | "skills";
 
 export type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
-export type AutomationTab = "actions" | "loops";
 export type AutomationLoopView = "all";
+export type AutomationLoopMode = "edit" | "run";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
   view: View;
   projectId?: string;
   documentPath?: string;
-  automationTab?: AutomationTab;
   automationEntityId?: string;
   automationLoopView?: AutomationLoopView;
+  automationLoopMode?: AutomationLoopMode;
   runtimeId?: string;
 }
 
@@ -36,7 +36,7 @@ export const emptyData: AppData = {
   policies: [],
   eventDefinitions: [],
   events: [],
-  agentRuns: [],
+  loopRuns: [],
   automation: defaultProjectAutomationConfig(),
   automationIssues: [],
   projectDocumentTree: []

@@ -1,11 +1,10 @@
 import type { Agent } from "../domain/agents.js";
 import type {
-  ProjectAction,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
-  ProjectHumanGateResponse,
-  ProjectOutputRoute,
   ProjectLoop,
+  ProjectStep,
+  StepTransitionTarget,
   Policy
 } from "../domain/automation.js";
 import type {
@@ -17,7 +16,17 @@ import type {
   Skill
 } from "../domain/documents.js";
 import type { EventDefinition, EventRecord } from "../domain/events.js";
-import type { AgentRun, ProjectRuntime, Runtime } from "../domain/runtime.js";
+import type {
+  LoopRun,
+  LoopRunDetails,
+  ProjectRuntime,
+  RespondToStepRunRequest,
+  Runtime,
+  StartLoopRunRequest,
+  StepRun,
+  StepRunConsoleEntry,
+  StepRunConsolePage
+} from "../domain/runtime.js";
 
 export type EventIntakeRequest = Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">;
 export type ProjectDocumentCreateRequest = { directoryPath: string; title: string };
@@ -33,7 +42,7 @@ export interface WorkspaceDataDto {
   policies: Policy[];
   eventDefinitions: EventDefinition[];
   events: EventRecord[];
-  agentRuns: AgentRun[];
+  loopRuns: LoopRunDetails[];
   automation: ProjectAutomationConfig;
   automationIssues: ProjectAutomationIssue[];
   projectDocumentTree?: ProjectDocumentTreeNode[];
@@ -79,14 +88,20 @@ export type {
   MarkdownDocument,
   Policy,
   Project,
-  ProjectAction,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectDocumentTreeNode,
-  ProjectHumanGateResponse,
-  ProjectOutputRoute,
   ProjectRuntime,
   ProjectLoop,
+  ProjectStep,
+  StepTransitionTarget,
+  LoopRun,
+  LoopRunDetails,
+  StartLoopRunRequest,
+  RespondToStepRunRequest,
+  StepRun,
+  StepRunConsoleEntry,
+  StepRunConsolePage,
   Runtime,
   Skill
 };

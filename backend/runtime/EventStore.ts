@@ -1,7 +1,9 @@
 import type Database from "better-sqlite3";
+import { v4 as uuid } from "uuid";
 import type { EventRecord, RuntimeEvent } from "../../shared/domain/events.js";
+import { stringifyJson } from "./RuntimeJson.js";
 import { runtimeEventToEventRecord, toEventRecord, toRuntimeEvent } from "./RuntimeRowMappers.js";
-import type { EventRow } from "./RuntimeDbTypes.js";
+import { now, type EventRow, type IntakeEventInput, type PublishEventResult } from "./RuntimeDbTypes.js";
 
 export class EventStore {
   constructor(private readonly connection: () => Database.Database) {}
@@ -19,9 +21,49 @@ export class EventStore {
     this.connection().prepare("DELETE FROM events WHERE event_id = ?").run(eventId);
   }
 
-  getInputEvent(run: import("../../shared/domain/runtime.js").AgentRun): RuntimeEvent | undefined {
-    const row = this.getEventById(run.inputEventId);
-    return row ? toRuntimeEvent(row) : undefined;
+  intake(input: IntakeEventInput): PublishEventResult {
+    const transaction = this.connection().transaction(() => {
+      if (input.dedupeKey) {
+        const duplicate = this.getEventByDedupeKey(input.dedupeKey);
+        if (duplicate) return { event: toEventRecord(duplicate), duplicate: true };
+      }
+      const eventId = uuid();
+      const createdAt = now();
+      const payload = input.payload ?? {};
+      const subject = input.subject
+        ?? (typeof payload.work_item_id === "string" ? payload.work_item_id : undefined)
+        ?? (typeof payload.workItemId === "string" ? payload.workItemId : undefined)
+        ?? input.projectId;
+      this.connection().prepare(`
+        INSERT INTO events (
+          event_id, type, source, subject, correlation_id, causation_id, dedupe_key,
+          correlation_depth, occurred_at, project_id, tags_json, status,
+          handling_result, payload_json
+        ) VALUES (
+          @eventId, @type, @source, @subject, @correlationId, @causationId, @dedupeKey,
+          @correlationDepth, @occurredAt, @projectId, @tagsJson, 'unassigned',
+          @handlingResult, @payloadJson
+        )
+      `).run({
+        eventId,
+        type: input.eventType,
+        source: input.source ?? "unknown",
+        subject,
+        correlationId: input.correlationId ?? eventId,
+        causationId: input.causationId ?? null,
+        dedupeKey: input.dedupeKey ?? null,
+        correlationDepth: input.correlationDepth ?? 0,
+        occurredAt: createdAt,
+        projectId: input.projectId,
+        tagsJson: stringifyJson(input.tags ?? []),
+        handlingResult: input.body ?? "Event recorded. Automation v2 loop runs are started independently.",
+        payloadJson: stringifyJson(payload)
+      });
+      const row = this.getEventById(eventId);
+      if (!row) throw new Error("Failed to read the stored event.");
+      return { event: toEventRecord(row), duplicate: false };
+    });
+    return transaction() as PublishEventResult;
   }
 
   getEventById(eventId: string): EventRow | undefined {

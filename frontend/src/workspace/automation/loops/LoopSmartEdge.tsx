@@ -14,7 +14,7 @@ const loopEdgeLabelVerticalOffset = 4;
 const loopEdgeEndLabelGap = 8;
 
 type LoopEdgeDisplayLabel =
-  { value: string; kind: "action" | "output" };
+  { value: string; kind: "step" | "output" };
 
 export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
   const nodes = useNodes();
@@ -64,20 +64,20 @@ export function loopEdgeDisplayLabel(
   if (!edge) return undefined;
   if (sourceNode?.kind === "loop") return undefined;
   if (edge.tone === "cross-loop") return undefined;
-  return actionOrOutputDisplayLabel(edge, sourceNode);
+  return stepOrOutputDisplayLabel(edge, sourceNode);
 }
 
-function actionOrOutputDisplayLabel(
+function stepOrOutputDisplayLabel(
   edge: LoopCanvasEdge,
   sourceNode: LoopCanvasLayoutNode | undefined
 ): LoopEdgeDisplayLabel | undefined {
   const outputSlotKind = loopEdgeOutputSlotKind(edge);
-  const sourceActionId = sourceNode?.record?.action?.id || sourceNode?.record?.actionId;
-  const usesActionLabel = sourceNode?.kind === "action" &&
+  const sourceStepId = sourceNode?.record?.step?.displayId || sourceNode?.record?.stepKey;
+  const usesStepLabel = sourceNode?.kind === "step" &&
     edge.tone !== "return" &&
     outputSlotKind !== "rework";
 
-  if (usesActionLabel && sourceActionId) return { value: sourceActionId, kind: "action" };
+  if (usesStepLabel && sourceStepId) return { value: sourceStepId, kind: "step" };
   if (edge.label) return { value: edge.label, kind: "output" };
   return undefined;
 }
@@ -89,7 +89,7 @@ function loopEdgeLabelPlacement(
   edgePaths: LoopEdgePaths,
   displayLabel: LoopEdgeDisplayLabel
 ) {
-  if (displayLabel.kind === "action") {
+  if (displayLabel.kind === "step") {
     return {
       x: targetX - loopEdgeEndLabelGap,
       y: targetY,

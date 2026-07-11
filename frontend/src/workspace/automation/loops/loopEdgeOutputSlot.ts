@@ -1,14 +1,21 @@
-import { actionOutputSlotKind, type ActionOutputSlotKind } from "@shared/policy-actions";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 
-export function loopOutputSlotKindForValues(...values: Array<string | undefined>): ActionOutputSlotKind | undefined {
+export type StepOutputSlotKind = "approval" | "rework";
+
+const stepOutputSlotKind = (value: string): StepOutputSlotKind | undefined => {
+  if (value === "approved") return "approval";
+  if (value === "rejected") return "rework";
+  return undefined;
+};
+
+export function loopOutputSlotKindForValues(...values: Array<string | undefined>): StepOutputSlotKind | undefined {
   for (const value of values) {
     if (!value) continue;
-    const directKind = actionOutputSlotKind(value);
+    const directKind = stepOutputSlotKind(value);
     if (directKind) return directKind;
     const separatorIndex = value.lastIndexOf(".");
     const eventOutputId = separatorIndex >= 0 ? value.slice(separatorIndex + 1) : "";
-    const eventKind = actionOutputSlotKind(eventOutputId);
+    const eventKind = stepOutputSlotKind(eventOutputId);
     if (eventKind) return eventKind;
   }
   return undefined;
@@ -16,6 +23,6 @@ export function loopOutputSlotKindForValues(...values: Array<string | undefined>
 
 export function loopEdgeOutputSlotKind(
   edge: Pick<LoopCanvasEdge, "label" | "route"> | undefined
-): ActionOutputSlotKind | undefined {
+): StepOutputSlotKind | undefined {
   return loopOutputSlotKindForValues(edge?.route?.outputId, edge?.label);
 }

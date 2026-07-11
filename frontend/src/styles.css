@@ -73,6 +73,46 @@ body {
   color: var(--foreground);
 }
 
+.loop-react-flow {
+  background: transparent;
+}
+
+.loop-react-flow .react-flow__node,
+.loop-react-flow .react-flow__edge {
+  outline: none;
+}
+
+.loop-react-flow .react-flow__node:focus,
+.loop-react-flow .react-flow__node:focus-visible,
+.loop-react-flow .react-flow__edge:focus,
+.loop-react-flow .react-flow__edge:focus-visible {
+  outline: none;
+}
+
+.loop-react-flow .loop-edge-animated .react-flow__edge-path {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 70%, transparent));
+  stroke-dasharray: 8 6;
+  animation: loop-edge-flow 0.85s linear infinite;
+}
+
+.loop-react-flow .loop-react-flow-handle {
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@keyframes loop-edge-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
 .markdown-body {
   color: var(--foreground);
   font-size: 0.98rem;
@@ -294,46 +334,6 @@ body {
 .agent-instructions-preview .markdown-body h3,
 .agent-instructions-preview .markdown-body h4 {
   margin-top: 0.9rem;
-}
-
-.loop-react-flow {
-  background: transparent;
-}
-
-.loop-react-flow .react-flow__node,
-.loop-react-flow .react-flow__edge {
-  outline: none;
-}
-
-.loop-react-flow .react-flow__node:focus,
-.loop-react-flow .react-flow__node:focus-visible,
-.loop-react-flow .react-flow__edge:focus,
-.loop-react-flow .react-flow__edge:focus-visible {
-  outline: none;
-}
-
-.loop-react-flow .loop-edge-animated .react-flow__edge-path {
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 70%, transparent));
-  stroke-dasharray: 8 6;
-  animation: loop-edge-flow 0.85s linear infinite;
-}
-
-.loop-react-flow .loop-react-flow-handle {
-  width: 1px;
-  height: 1px;
-  min-width: 1px;
-  min-height: 1px;
-  border: 0;
-  background: transparent;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 20;
-}
-
-@keyframes loop-edge-flow {
-  to {
-    stroke-dashoffset: -28;
-  }
 }
 
 @theme inline {

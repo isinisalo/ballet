@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 
-type RuntimeSignal = "events" | "agent-runs" | "health";
+type RuntimeSignal = "events" | "loop-runs" | "automation" | "health";
 
 const emitter = new EventEmitter();
 emitter.setMaxListeners(200);

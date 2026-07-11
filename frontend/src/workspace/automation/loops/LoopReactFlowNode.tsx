@@ -2,7 +2,7 @@ import { Route } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
-import { LoopActionNode } from "./LoopActionNode";
+import { LoopCompactStepNode } from "./LoopCompactStepNode";
 import type { LoopNodeContext, LoopReactFlowNode } from "./LoopCanvasTypes";
 
 export function LoopReactFlowNodeComponent({ data }: NodeProps<LoopReactFlowNode>) {
@@ -42,10 +42,10 @@ function LoopNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds: str
 
 function renderNodeContent(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   if (node.kind === "loop") return renderLoopNode(node);
-  if (node.kind === "first-action-ghost") return renderFirstPolicyGhost(node, context);
+  if (node.kind === "first-step-ghost") return renderFirstStepGhost(node, context);
   if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (!node.record) return null;
-  return <LoopActionNode context={context} record={node.record} records={node.records ?? [node.record]} />;
+  return <LoopCompactStepNode context={context} record={node.record} records={node.records ?? [node.record]} />;
 }
 
 function renderLoopNode(node: LoopCanvasLayoutNode) {
@@ -68,13 +68,13 @@ function renderLoopNode(node: LoopCanvasLayoutNode) {
   );
 }
 
-function renderFirstPolicyGhost(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
+function renderFirstStepGhost(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   const editable = (node.loopId ?? context.selectedLoopId) === context.selectedLoopId;
   return (
     <LoopGhostNode
-      ariaLabel="Add first action"
-      onClick={() => context.onAddActionStep()}
-      disabled={!editable || !context.canAddFirstAction}
+      ariaLabel="Add first step"
+      onClick={() => context.onAddStep()}
+      disabled={!editable || !context.canAddFirstStep}
       className="nodrag"
     />
   );
@@ -82,18 +82,18 @@ function renderFirstPolicyGhost(node: LoopCanvasLayoutNode, context: LoopNodeCon
 
 function renderOutputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   const outputEvent = node.outputEvent;
-  const eventType = outputEvent?.eventType ?? "Output event";
-  const sourcePolicy = node.sourceActionId ? context.actionById.get(node.sourceActionId) : undefined;
+  const eventType = outputEvent?.eventType ?? "Terminal transition";
+  const sourceStep = node.sourceStepId ? context.stepByKey.get(node.sourceStepId) : undefined;
   const editable = (node.loopId ?? context.selectedLoopId) === context.selectedLoopId;
 
   return (
     <button
       type="button"
       data-loop-output-event={eventType}
-      aria-label={`Add action step for ${eventType}`}
-      title={`Add action for ${eventType}`}
-      disabled={!editable || !context.canAddActionForEvent(sourcePolicy)}
-      onClick={() => context.onAddActionStep(eventType, sourcePolicy)}
+      aria-label={`Add step for ${eventType}`}
+      title={`Add step for ${eventType}`}
+      disabled={!editable || !context.canAddStepForEvent(sourceStep)}
+      onClick={() => context.onAddStep(outputEvent?.outputId, sourceStep)}
       className="nodrag nopan block size-[22px] rounded border border-dashed border-muted-foreground/50 bg-background/60 opacity-60 transition-colors hover:border-primary/65 hover:bg-card hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-muted-foreground/50 disabled:hover:bg-background/60"
     />
   );

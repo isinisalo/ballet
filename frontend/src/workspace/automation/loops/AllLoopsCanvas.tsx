@@ -1,72 +1,45 @@
-import { useMemo } from "react";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { EmptyState } from "@/components/shared/workspace-ui";
-import { LoopCanvas } from "./LoopCanvas";
-import type { LoopStepRecord } from "./loopGraph";
-import { calculateAllLoopsCanvasLayout } from "./loopLayout";
-import { loopOutputTargetsForPolicy } from "./loopOutputTargets";
-import { useLoopCanvasInteraction } from "./useLoopCanvasInteraction";
+import { ArrowRight, Bot, Route, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-const allLoopsReadOnlyId = "__all_loops__";
-
-export function AllLoopsCanvas({ config }: { config: ProjectAutomationConfig }) {
-  const actionById = useMemo(() => new Map(config.actions.map((action) => [action.id, action])), [config.actions]);
-  const recordsByLoopId = useMemo(() => loopStepRecordsByLoopId(config, actionById), [config, actionById]);
-  const layout = useMemo(() => calculateAllLoopsCanvasLayout({
-    config,
-    recordsByLoopId,
-    direction: "horizontal"
-  }), [config, recordsByLoopId]);
-  const canvasInteraction = useLoopCanvasInteraction({
-    selectedId: allLoopsReadOnlyId,
-    reorderStep: () => undefined
-  });
-
-  if (config.loops.length === 0) return <EmptyState title="No loops configured." />;
+export function AllLoopsCanvas({
+  config,
+  onSelect
+}: {
+  config: ProjectAutomationConfig;
+  onSelect: (loopId: string) => void;
+}) {
+  if (config.loops.length === 0) {
+    return <p className="p-4 text-sm text-muted-foreground">No loops configured.</p>;
+  }
 
   return (
-    <LoopCanvas
-      layout={layout}
-      selectedLoopId={allLoopsReadOnlyId}
-      actionById={actionById}
-      draggedStepIndex={canvasInteraction.draggedStepIndex}
-      dragOverStepIndex={canvasInteraction.dragOverStepIndex}
-      selectedActionStepIndexes={[]}
-      canvasHeight={canvasInteraction.canvasHeight}
-      isCanvasPanning={canvasInteraction.isCanvasPanning}
-      loopCanvasRef={canvasInteraction.loopCanvasRef}
-      canAddFirstAction={false}
-      canAddActionForEvent={() => false}
-      onStepPointerDown={canvasInteraction.handleStepPointerDown}
-      onStepPointerMove={canvasInteraction.handleStepPointerMove}
-      onStepPointerUp={canvasInteraction.handleStepPointerUp}
-      onStepPointerCancel={canvasInteraction.resetStepDrag}
-      onCanvasMoveStart={canvasInteraction.handleCanvasMoveStart}
-      onCanvasMoveEnd={canvasInteraction.handleCanvasMoveEnd}
-      onActionStepSelect={() => undefined}
-      onOutputHandlerSelect={() => undefined}
-      onAddActionStep={() => undefined}
-    />
+    <div className="grid gap-px bg-divider-strong sm:grid-cols-2 xl:grid-cols-3" aria-label="All loops">
+      {config.loops.map((loop) => {
+        const humanSteps = loop.steps.filter((step) => step.type === "human").length;
+        const agentSteps = loop.steps.length - humanSteps;
+        const nextLoops = new Set(loop.steps.flatMap((step) => [step.on.approved, step.on.rejected])
+          .flatMap((target) => typeof target === "object" && "loop" in target ? [target.loop] : []));
+        return (
+          <Button
+            key={loop.id}
+            type="button"
+            variant="ghost"
+            className="h-auto min-h-28 justify-start rounded-none bg-card p-4 text-left hover:bg-muted"
+            onClick={() => onSelect(loop.id)}
+          >
+            <span className="grid w-full gap-3">
+              <span className="flex items-center gap-2 font-mono text-xs text-foreground"><Route className="text-primary" /> {loop.id}</span>
+              <span className="grid grid-cols-2 gap-2 font-mono text-[0.65rem] text-muted-foreground">
+                <span className="flex items-center gap-1"><Bot className="size-3" /> {agentSteps} agent</span>
+                <span className="flex items-center gap-1"><ShieldCheck className="size-3" /> {humanSteps} human</span>
+                <span className="col-span-2">start: {loop.start}</span>
+              </span>
+              {nextLoops.size > 0 ? <span className="flex items-center gap-1 truncate font-mono text-[0.65rem] text-secondary"><ArrowRight className="size-3" /> {[...nextLoops].join(", ")}</span> : null}
+            </span>
+          </Button>
+        );
+      })}
+    </div>
   );
-}
-
-function loopStepRecordsByLoopId(
-  config: ProjectAutomationConfig,
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>
-) {
-  return new Map(config.loops.map((loop) => {
-    const records: LoopStepRecord[] = loop.steps.map((actionId, index) => {
-      const action = actionById.get(actionId);
-      const outputTargets = action ? loopOutputTargetsForPolicy(config, action, loop.id) : undefined;
-      return {
-        actionId,
-        index,
-        loopId: loop.id,
-        action,
-        outputEvents: outputTargets?.map((output) => output.eventType),
-        outputTargets
-      };
-    });
-    return [loop.id, records] as const;
-  }));
 }

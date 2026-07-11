@@ -3,396 +3,227 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
-import { actionRouteId } from "../../shared/policy-actions.js";
-import { outcomeToOutputEventStatus } from "../agentd.js";
-import { mapAgentOutputToEvent } from "../automation.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
+import { LoopRunConflictError } from "../runtime/LoopRunErrors.js";
 import { parseAgentOutcomeText } from "../runtime-policy.js";
 
-const tempRoots: string[] = [];
-
-const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-runtime-"));
-  tempRoots.push(root);
-  return root;
+const roots: string[] = [];
+const tempDbPath = async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-runtime-v2-"));
+  roots.push(root);
+  return path.join(root, "runtime.sqlite");
 };
 
 afterEach(async () => {
-  await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-const agent: Agent = {
-  id: "developer-agent",
-  name: "Developer Agent",
-  description: "Implements changes.",
-  instructions: "Return structured outcome.",
-  skills: [],
-  enabled: true,
-  status: "offline",
-  createdAt: "2026-06-24T08:00:00.000Z",
-  updatedAt: "2026-06-24T08:00:00.000Z"
-};
-
-const qaAgent: Agent = {
-  ...agent,
-  id: "qa-verification-reviewer",
-  name: "QA Verification Reviewer",
-  description: "Reviews verification evidence."
-};
-
-const readyOutcome: AgentOutcome = {
+const ready: AgentOutcome = {
   outcome: "ready",
-  summary: "Change is implemented.",
-  artifacts: {
-    git_sha: "4f28dbd",
-    changed_files: ["backend/runtime-db.ts"]
-  },
-  checks: [{ name: "unit-tests", status: "passed" }]
+  summary: "Done.",
+  checks: [{ name: "test", status: "passed" }]
+};
+const rejected: AgentOutcome = {
+  outcome: "changes-requested",
+  summary: "Needs changes.",
+  checks: []
 };
 
-const loopId = "plan-approved.loop";
-const implementationAction = {
-  id: "implementation",
-  description: "Implement approved work.",
-  agentId: "developer-agent"
-};
-const qaAction = {
-  id: "qa-review",
-  description: "Review implementation.",
-  agentId: "qa-verification-reviewer"
-};
-const automationConfig = (patch: Partial<ProjectAutomationConfig> = {}): ProjectAutomationConfig => ({
-  version: 1,
-  actions: [implementationAction, qaAction],
-  outputRoutes: [{
-    sourceLoopId: loopId,
-    sourceActionId: "implementation",
-    outputId: "approved",
-    targetLoopId: loopId,
-    targetActionId: "qa-review"
+const config = (): ProjectAutomationConfig => ({
+  version: 2,
+  loops: [{
+    id: "delivery",
+    start: "implement",
+    steps: [{
+      id: "implement",
+      type: "agent",
+      agentId: "developer-agent",
+      description: "Implement.",
+      on: { approved: "gate", rejected: { end: "failed" } }
+    }, {
+      id: "gate",
+      type: "human",
+      description: "Approve.",
+      on: { approved: { loop: "release" }, rejected: "implement" }
+    }]
+  }, {
+    id: "release",
+    start: "publish",
+    steps: [{
+      id: "publish",
+      type: "agent",
+      agentId: "release-agent",
+      description: "Publish.",
+      on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+    }]
   }],
-  humanGateResponses: [],
-  loops: [{ id: loopId, steps: ["implementation", "qa-review"] }],
-  runtimes: [],
-  ...patch
+  runtimes: []
 });
 
-describe("runtime database", () => {
-  it("accepts SQLite versions with the WAL-reset fix", () => {
+describe("runtime database v2", () => {
+  it("accepts patched SQLite versions and resets legacy runtime tables", async () => {
     expect(isPatchedSqliteVersion("3.51.3")).toBe(true);
-    expect(isPatchedSqliteVersion("3.50.7")).toBe(true);
-    expect(isPatchedSqliteVersion("3.44.6")).toBe(true);
     expect(isPatchedSqliteVersion("3.51.2")).toBe(false);
+    const dbPath = await tempDbPath();
+    const legacy = new Database(dbPath);
+    legacy.exec("CREATE TABLE loop_instances (id TEXT PRIMARY KEY); INSERT INTO loop_instances VALUES ('old');");
+    legacy.close();
+    const runtime = new RuntimeDatabase(dbPath);
+    const tables = (runtime.connection().prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map((row) => row.name);
+    expect(tables).toEqual(expect.arrayContaining(["loop_runs", "step_runs", "step_run_logs"]));
+    expect(tables).not.toContain("loop_instances");
+    runtime.close();
   });
 
-  it("writes an intake event and queues deduplicated action runs", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
-
-    const result = db.intakeEvent({
-      projectId: "project",
-      eventType: "plan-approved",
-      source: "test",
-      tags: ["delivery"],
-      payload: { work_item_id: "work-1" }
-    }, automationConfig({
-      actions: [{ ...implementationAction, agentId: "developer-agent" }],
-      outputRoutes: [],
-      loops: [{ id: loopId, steps: ["implementation"] }]
-    }), [agent]);
-
-    expect(result.event.status).toBe("routed");
-    expect(result.event.subject).toBe("work-1");
-    expect(result.run).toMatchObject({
-      actionId: "implementation",
-      loopId,
-      routeId: actionRouteId(loopId, "implementation"),
-      actionVersion: 1,
-      agentRole: "developer-agent",
-      status: "queued"
-    });
-    expect(result.runs).toHaveLength(1);
-    expect(db.listRuntimeEvents()).toHaveLength(1);
-    expect(db.listRuns()).toHaveLength(1);
-    db.close();
+  it("records event intake without starting or advancing any loop", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const event = runtime.intakeEvent({ projectId: "project", eventType: "delivery.requested", payload: {} });
+    expect(event.event.status).toBe("unassigned");
+    expect(runtime.listLoopRuns()).toEqual([]);
+    runtime.close();
   });
 
-  it("routes one event to the single agent on the matching action", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
+  it("runs agent and human steps, creates a distinct step run for a cycle, and keeps one active run per loop", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const started = runtime.startLoopRun(config(), "delivery", "Build release 1");
+    expect(started).toMatchObject({ status: "running", input: "Build release 1", snapshot: { id: "delivery" } });
+    expect(() => runtime.startLoopRun(config(), "delivery")).toThrow(LoopRunConflictError);
 
-    const result = db.intakeEvent({
-      projectId: "project",
-      eventType: "plan-approved",
-      source: "test",
-      subject: "work-1",
-      payload: {}
-    }, automationConfig(), [agent, qaAgent]);
-
-    expect(result.event.status).toBe("routed");
-    expect(result.event.routing).toMatchObject({
-      matchedActions: 1,
-      routedRuns: 1,
-      skippedActions: 0
-    });
-    expect(result.runs.map((run) => run.agentRole)).toEqual(["developer-agent"]);
-    expect(db.listRuns()).toHaveLength(1);
-    db.close();
+    const first = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 });
+    expect(first).toMatchObject({ stepId: "implement", status: "running", attempt: 1 });
+    const waiting = runtime.completeAgentStep(config(), { stepRunId: first!.stepRunId, outcome: ready });
+    expect(waiting.status).toBe("waiting_for_human");
+    const gate = waiting.stepRuns.at(-1)!;
+    const cycled = runtime.respondToStepRun(config(), waiting.runId, gate.stepRunId, "rejected", "Please revise tests");
+    expect(cycled.status).toBe("running");
+    expect(cycled.input).toContain("Build release 1");
+    expect(cycled.input).toContain("Please revise tests");
+    expect(cycled.stepRuns.filter((step) => step.stepId === "implement")).toHaveLength(2);
+    expect(new Set(cycled.stepRuns.map((step) => step.stepRunId)).size).toBe(cycled.stepRuns.length);
+    runtime.close();
   });
 
-  it("publishes action output when the single action run finishes", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
-    const config = automationConfig();
-    const intake = db.intakeEvent({
-      projectId: "project",
-      eventType: "plan-approved",
-      source: "test",
-      subject: "work-1",
-      payload: {}
-    }, config, [agent, qaAgent]);
-
-    expect(intake.runs.map((run) => run.agentRole)).toEqual(["developer-agent"]);
-
-    const first = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
-    const firstCompletion = db.completeRun({
-      runId: first!.runId,
-      status: "completed",
-      outcome: readyOutcome,
-      projectAction: implementationAction,
-      actions: config.actions,
-      outputRoutes: config.outputRoutes,
-      loops: config.loops,
-      automation: config,
-      agents: [agent, qaAgent]
+  it("starts a linked child run from a human transition and forwards accumulated input", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const parent = runtime.startLoopRun(config(), "delivery", "Original request");
+    const agentStep = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 })!;
+    const waiting = runtime.completeAgentStep(config(), { stepRunId: agentStep.stepRunId, outcome: ready });
+    const gate = waiting.stepRuns.at(-1)!;
+    const completedParent = runtime.respondToStepRun(config(), parent.runId, gate.stepRunId, "approved", "Ship it");
+    expect(completedParent.status).toBe("completed");
+    const child = runtime.latestLoopRun("release")!;
+    expect(child).toMatchObject({
+      rootRunId: parent.runId,
+      parentRunId: parent.runId,
+      parentStepRunId: gate.stepRunId,
+      source: "human",
+      status: "running"
     });
-
-    expect(firstCompletion.event).toMatchObject({
-      type: "plan-approved.loop.implementation.approved",
-      source: "agentd",
-      correlationId: intake.event.correlationId,
-      causationId: intake.event.eventId,
-      status: "routed",
-      payload: {
-        action: "implementation",
-        loop_id: loopId,
-        status: "approved",
-        agents: expect.arrayContaining([
-          expect.objectContaining({ agent: "developer-agent", status: "completed", outcome: "ready" })
-        ])
-      }
-    });
-    expect(firstCompletion.runs?.map((run) => run.agentRole)).toEqual(["qa-verification-reviewer"]);
-    expect(db.listRuntimeEvents()).toHaveLength(2);
-    db.close();
+    expect(child.input).toContain("Original request");
+    expect(child.input).toContain("Ship it");
+    runtime.close();
   });
 
-  it("deduplicates event publication by dedupe key", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
-    const input = {
-      projectId: "project",
-      eventType: "plan-approved",
-      source: "test",
-      subject: "work-1",
-      dedupeKey: "external:work-1:plan-approved",
-      payload: {}
+  it("leaves a human gate waiting if its child loop already has an active run", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const parent = runtime.startLoopRun(config(), "delivery");
+    const agentStep = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 })!;
+    const waiting = runtime.completeAgentStep(config(), { stepRunId: agentStep.stepRunId, outcome: ready });
+    const gate = waiting.stepRuns.at(-1)!;
+    runtime.startLoopRun(config(), "release");
+    expect(() => runtime.respondToStepRun(config(), parent.runId, gate.stepRunId, "approved", "Continue"))
+      .toThrow(LoopRunConflictError);
+    expect(runtime.getLoopRun(parent.runId)).toMatchObject({ status: "waiting_for_human" });
+    expect(runtime.getLoopRun(parent.runId)!.stepRuns.at(-1)).toMatchObject({ status: "waiting_for_human" });
+    runtime.close();
+  });
+
+  it("cancels active work and logs but ignores a late agent completion", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const run = runtime.startLoopRun(config(), "delivery");
+    const step = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 })!;
+    expect(runtime.cancelLoopRun(run.runId).status).toBe("cancelled");
+    const afterLate = runtime.completeAgentStep(config(), { stepRunId: step.stepRunId, outcome: ready });
+    expect(afterLate.status).toBe("cancelled");
+    expect(afterLate.stepRuns).toHaveLength(1);
+    expect(runtime.listStepRunLogs(step.stepRunId).some((log) => log.message.includes("Late agent completion"))).toBe(true);
+    runtime.close();
+  });
+
+  it("blocks a root run after the 20-transition safety limit", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const cyclic: ProjectAutomationConfig = {
+      version: 2,
+      loops: [{
+        id: "cycle",
+        start: "again",
+        steps: [{
+          id: "again",
+          type: "agent",
+          agentId: "developer-agent",
+          description: "Again.",
+          on: { approved: "again", rejected: { end: "failed" } }
+        }]
+      }],
+      runtimes: []
     };
-
-    const config = automationConfig({
-      actions: [{ ...implementationAction, agentId: "developer-agent" }],
-      outputRoutes: [],
-      loops: [{ id: loopId, steps: ["implementation"] }]
-    });
-    const first = db.intakeEvent(input, config, [agent]);
-    const second = db.intakeEvent(input, config, [agent]);
-
-    expect(first.duplicate).toBe(false);
-    expect(second.duplicate).toBe(true);
-    expect(second.event.eventId).toBe(first.event.eventId);
-    expect(db.listRuntimeEvents()).toHaveLength(1);
-    expect(db.listRuns()).toHaveLength(1);
-    db.close();
+    let details = runtime.startLoopRun(cyclic, "cycle");
+    for (let index = 0; index < 21 && details.status === "running"; index += 1) {
+      const step = runtime.leaseNextStepRun({ owner: "test", leaseSeconds: 60 })!;
+      details = runtime.completeAgentStep(cyclic, { stepRunId: step.stepRunId, outcome: ready });
+    }
+    expect(details.status).toBe("blocked");
+    expect(details.transitionCount).toBe(20);
+    expect(details.stepRuns).toHaveLength(21);
+    runtime.close();
   });
 
-  it("stops chained publication when correlation depth exceeds the limit", async () => {
-    const root = await tempRoot();
-    const db = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
-    const config = automationConfig({
-      actions: [{ ...implementationAction, agentId: "developer-agent" }],
-      outputRoutes: [],
-      loops: [{ id: loopId, steps: ["implementation"] }]
+  it("streams console entries by cursor and truncates non-terminal output after 1 MB", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const run = runtime.startLoopRun(config(), "delivery");
+    const stepRun = run.stepRuns[0]!;
+    runtime.appendStepRunConsole(stepRun.stepRunId, {
+      source: "codex",
+      kind: "output",
+      phase: "delta",
+      itemId: "command-1",
+      message: "a".repeat(600_000)
     });
-    db.intakeEvent({
-      projectId: "project",
-      eventType: "plan-approved",
-      source: "test",
-      subject: "work-1",
-      correlationDepth: 20,
-      payload: {}
-    }, config, [agent]);
-
-    const leased = db.leaseNextRun({ owner: "test-worker", leaseSeconds: 60 });
-    const completed = db.completeRun({
-      runId: leased!.runId,
-      status: "completed",
-      outcome: readyOutcome,
-      projectAction: implementationAction,
-      actions: config.actions,
-      outputRoutes: config.outputRoutes,
-      loops: config.loops,
-      automation: config,
-      agents: [agent]
+    runtime.appendStepRunConsole(stepRun.stepRunId, {
+      source: "codex",
+      kind: "output",
+      phase: "delta",
+      itemId: "command-1",
+      message: "b".repeat(600_000)
+    });
+    runtime.appendStepRunConsole(stepRun.stepRunId, {
+      source: "codex",
+      kind: "error",
+      level: "error",
+      phase: "completed",
+      itemId: "turn-1",
+      message: "Turn failed after truncation.",
+      terminal: true
     });
 
-    expect(completed.event).toBeUndefined();
-    expect(completed.runs).toEqual([]);
-    expect(db.listRuntimeEvents()).toHaveLength(1);
-    expect(db.listRunLogs(leased!.runId).some((log) => log.level === "warn" && log.message.includes("correlation depth"))).toBe(true);
-    db.close();
+    const firstPage = runtime.getStepRunConsole(stepRun.stepRunId, 0, 2);
+    const secondPage = runtime.getStepRunConsole(stepRun.stepRunId, firstPage.lastId, 20);
+    const entries = [...firstPage.entries, ...secondPage.entries];
+    expect(firstPage.hasMore).toBe(true);
+    expect(secondPage.truncated).toBe(true);
+    expect(entries.some((entry) => entry.message.includes("1 MB StepRun limit"))).toBe(true);
+    expect(entries.some((entry) => entry.message === "Turn failed after truncation." && entry.terminal)).toBe(true);
+    expect(entries.some((entry) => entry.message.startsWith("b"))).toBe(false);
+    runtime.close();
   });
 });
 
-describe("runtime output mapping", () => {
-  it("validates structured agent outcome JSON", () => {
-    expect(parseAgentOutcomeText(JSON.stringify(readyOutcome))).toEqual(readyOutcome);
+describe("agent outcome", () => {
+  it("validates structured outcome JSON", () => {
+    expect(parseAgentOutcomeText(JSON.stringify(ready))).toEqual(ready);
+    expect(parseAgentOutcomeText(JSON.stringify(rejected))).toEqual(rejected);
     expect(() => parseAgentOutcomeText("{bad json")).toThrow("not valid JSON");
-  });
-
-  it("maps agent output statuses through action output events", () => {
-    expect(mapAgentOutputToEvent(implementationAction, { status: "complete", loopId }, [], [implementationAction]).id).toBe("plan-approved.loop.implementation.approved");
-    expect(mapAgentOutputToEvent(implementationAction, { status: "failed", loopId }, [], [implementationAction]).id).toBe("plan-approved.loop.implementation.rejected");
-    expect(mapAgentOutputToEvent(
-      { id: "human-review", description: "Human review", humanGate: true },
-      { status: "approved", loopId },
-      [],
-      [{ id: "human-review", description: "Human review", humanGate: true }]
-    ).id).toBe("plan-approved.loop.human-review.approved");
-  });
-
-  it("maps structured outcomes to fixed action outputs", () => {
-    expect(outcomeToOutputEventStatus(
-      readyOutcome,
-      implementationAction,
-      [implementationAction]
-    )).toBe("approved");
-    expect(outcomeToOutputEventStatus(
-      { ...readyOutcome, outcome: "changes-requested" },
-      { ...implementationAction, id: "review" },
-      [{ ...implementationAction, id: "review" }]
-    )).toBe("rejected");
-    expect(outcomeToOutputEventStatus(
-      { ...readyOutcome, outcome: "failed" },
-      { ...implementationAction, id: "create-roadmap" },
-      [{ ...implementationAction, id: "create-roadmap" }]
-    )).toBe("rejected");
-  });
-
-  it("does not require an event id in agent output", () => {
-    const routed = mapAgentOutputToEvent(implementationAction, {
-      runId: "run-1",
-      inputEventId: "event-1",
-      actionId: implementationAction.id,
-      loopId,
-      actionVersion: 123,
-      status: "complete",
-      outcome: "ready",
-      summary: "Done."
-    }, []);
-
-    expect(routed).toMatchObject({
-      id: "plan-approved.loop.implementation.approved",
-      source: "agentd",
-      payload: {
-        action: "implementation",
-        status: "approved",
-        outcome: "ready",
-        summary: "Done.",
-        run_id: "run-1",
-        input_event_id: "event-1",
-        action_id: implementationAction.id,
-        loop_id: loopId,
-        action_version: 123
-      }
-    });
-  });
-
-  it("migrates legacy trigger event run columns to input event columns", async () => {
-    const root = await tempRoot();
-    const dbPath = path.join(root, "runtime.sqlite");
-    const legacy = new Database(dbPath);
-    legacy.exec(`
-      CREATE TABLE events (
-        seq INTEGER PRIMARY KEY AUTOINCREMENT,
-        event_id TEXT NOT NULL UNIQUE,
-        type TEXT NOT NULL,
-        source TEXT NOT NULL,
-        subject TEXT NOT NULL,
-        correlation_id TEXT NOT NULL,
-        causation_id TEXT,
-        occurred_at TEXT NOT NULL,
-        project_id TEXT NOT NULL,
-        tags_json TEXT NOT NULL DEFAULT '[]',
-        status TEXT NOT NULL DEFAULT 'received',
-        matched_policy_id TEXT,
-        assigned_agent_id TEXT,
-        handling_result TEXT,
-        payload_json TEXT NOT NULL
-      );
-      CREATE TABLE agent_runs (
-        run_id TEXT PRIMARY KEY,
-        trigger_event_id TEXT NOT NULL,
-        trigger_event_seq INTEGER,
-        policy_id TEXT NOT NULL,
-        policy_version INTEGER NOT NULL,
-        agent_role TEXT NOT NULL,
-        status TEXT NOT NULL,
-        attempt INTEGER NOT NULL DEFAULT 0,
-        lease_owner TEXT,
-        lease_until TEXT,
-        thread_id TEXT,
-        turn_id TEXT,
-        outcome_json TEXT,
-        error TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        completed_at TEXT,
-        UNIQUE(trigger_event_id, policy_id, policy_version, agent_role),
-        FOREIGN KEY(trigger_event_seq) REFERENCES events(seq) ON DELETE SET NULL
-      );
-      CREATE INDEX idx_agent_runs_trigger ON agent_runs(trigger_event_id);
-      INSERT INTO events (
-        event_id, type, source, subject, correlation_id, occurred_at, project_id, tags_json, payload_json
-      ) VALUES (
-        'event-1', 'plan-approved', 'test', 'work-1', 'event-1', '2026-07-07T10:00:00.000Z', 'project', '[]', '{}'
-      );
-      INSERT INTO agent_runs (
-        run_id, trigger_event_id, trigger_event_seq, policy_id, policy_version, agent_role, status,
-        attempt, created_at, updated_at
-      ) VALUES (
-        'run-1', 'event-1', 1, 'plan-approved.loop:implementation', 1, 'developer-agent', 'queued',
-        0, '2026-07-07T10:00:00.000Z', '2026-07-07T10:00:00.000Z'
-      );
-    `);
-    legacy.close();
-
-    const runtime = new RuntimeDatabase(dbPath);
-    const columns = new Set((runtime.connection().prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>).map((column) => column.name));
-    expect(columns.has("input_event_id")).toBe(true);
-    expect(columns.has("input_event_seq")).toBe(true);
-    expect(columns.has("trigger_event_id")).toBe(false);
-    expect(columns.has("trigger_event_seq")).toBe(false);
-    expect(runtime.listRuns()[0]).toMatchObject({
-      runId: "run-1",
-      inputEventId: "event-1",
-      inputEventSeq: 1,
-      loopId,
-      actionId: "implementation"
-    });
-    expect(runtime.getInputEvent(runtime.listRuns()[0]!)).toMatchObject({ eventId: "event-1" });
-    runtime.close();
   });
 });

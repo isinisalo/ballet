@@ -5,9 +5,9 @@ export type LoopLayoutDirection = "horizontal" | "vertical";
 
 export type LoopCanvasNodeKind =
   | "loop"
-  | "action"
+  | "step"
   | "output-event"
-  | "first-action-ghost";
+  | "first-step-ghost";
 
 export type LoopCanvasOutputEvent = {
   outputId: string;
@@ -33,8 +33,8 @@ export type LoopCanvasLayoutNode = {
   eventType?: string;
   outputEvent?: LoopCanvasOutputEvent;
   loopSummary?: LoopCanvasLoopSummary;
-  sourceActionId?: string;
-  isEditingAction?: boolean;
+  sourceStepId?: string;
+  isEditingStep?: boolean;
   outputIndex?: number;
   outputHandleCount?: number;
 };
@@ -58,10 +58,10 @@ export type LoopActiveOutputTask =
   | { kind: "existing-handler"; output: LoopOutputTarget; hasBackwardHandler: boolean };
 
 export type LoopLayoutMetrics = {
-  horizontalRootPolicyX: number;
-  horizontalPolicyColumnStep: number;
+  horizontalRootStepX: number;
+  horizontalStepColumnGap: number;
   horizontalRowStep: number;
-  verticalRootPolicyY: number;
-  verticalPolicyRankStep: number;
+  verticalRootStepY: number;
+  verticalStepRankGap: number;
   verticalColumnStep: number;
 };

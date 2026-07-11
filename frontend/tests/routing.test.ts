@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   agentDocumentPath,
   automationAllLoopsPath,
-  automationSectionPath,
+  automationLoopPath,
   projectCollectionDocumentPath,
   projectDocumentPath,
   routeFromPath,
@@ -37,44 +37,32 @@ describe("workspace routing", () => {
   });
 
   it("parses canonical automation and runtime routes with selected entities", () => {
-    expect(routeFromPath("/automation/actions?id=build")).toEqual({
+    expect(routeFromPath("/automation/loops?id=build")).toEqual({
       view: "automation",
-      automationTab: "actions",
-      automationEntityId: "build"
+      automationEntityId: "build",
+      automationLoopMode: "edit"
+    });
+    expect(routeFromPath("/automation/loops?id=build&mode=run")).toEqual({
+      view: "automation",
+      automationEntityId: "build",
+      automationLoopMode: "run"
     });
     expect(routeFromPath("/automation/outputs?id=artifact")).toEqual({ view: "projects" });
     expect(routeFromPath("/automation/loops?view=all")).toEqual({
       view: "automation",
-      automationTab: "loops",
       automationLoopView: "all"
     });
     expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({ view: "projects" });
     expect(routeFromPath("/runtimes?id=codex")).toEqual({ view: "runtimes", runtimeId: "codex" });
   });
 
-  it("keeps legacy automation route aliases explicit", () => {
-    expect(routeFromPath("/automation/policies?id=policy-1")).toEqual({
-      view: "automation",
-      automationTab: "loops",
-      automationEntityId: "policy-1"
-    });
-    expect(routeFromPath("/policies?id=policy-1")).toEqual({
-      view: "automation",
-      automationTab: "loops",
-      automationEntityId: "policy-1"
-    });
-    expect(routeFromPath("/actions?id=build")).toEqual({
-      view: "automation",
-      automationTab: "actions",
-      automationEntityId: "build"
-    });
+  it("does not keep legacy automation route aliases", () => {
+    expect(routeFromPath("/automation/policies?id=policy-1")).toEqual({ view: "projects" });
+    expect(routeFromPath("/policies?id=policy-1")).toEqual({ view: "projects" });
+    expect(routeFromPath("/actions?id=build")).toEqual({ view: "projects" });
     expect(routeFromPath("/loop?id=delivery")).toEqual({ view: "projects" });
-    expect(routeFromPath("/automation/runtimes?id=codex")).toEqual({ view: "runtimes", runtimeId: "codex" });
-    expect(routeFromPath("/agent-runs?id=run-1")).toEqual({
-      view: "automation",
-      automationTab: "loops",
-      automationEntityId: "run-1"
-    });
+    expect(routeFromPath("/automation/runtimes?id=codex")).toEqual({ view: "projects" });
+    expect(routeFromPath("/agent-runs?id=run-1")).toEqual({ view: "projects" });
   });
 
   it("builds encoded paths", () => {
@@ -85,8 +73,8 @@ describe("workspace routing", () => {
     expect(agentDocumentPath(".codex/agents/a b.toml")).toBe("/agents?path=.codex%2Fagents%2Fa%20b.toml");
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(automationAllLoopsPath()).toBe("/automation/loops?view=all");
-    expect(automationSectionPath("loops", "wf 1")).toBe("/automation/loops?id=wf%201");
-    expect(automationSectionPath("actions", "action 1")).toBe("/automation/actions?id=action%201");
+    expect(automationLoopPath("wf 1")).toBe("/automation/loops?id=wf+1");
+    expect(automationLoopPath("wf 1", "run")).toBe("/automation/loops?id=wf+1&mode=run");
     expect(runtimePath("runtime 1")).toBe("/runtimes?id=runtime%201");
   });
 });

@@ -1,38 +1,38 @@
 import type Database from "better-sqlite3";
-import type { Agent } from "../shared/domain/agents.js";
 import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { EventRecord, RuntimeEvent } from "../shared/domain/events.js";
-import type { AgentRun, AgentRunLog } from "../shared/domain/runtime.js";
-import { AgentRunStore } from "./runtime/AgentRunStore.js";
-import { EventStore } from "./runtime/EventStore.js";
-import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
 import type {
-  CompleteRunInput,
-  IntakeEventInput,
-  LeaseOptions,
-  PublishEventResult
-} from "./runtime/RuntimeDbTypes.js";
-import { RuntimeProjector } from "./runtime/RuntimeProjector.js";
-import { RuntimeRunCompletion } from "./runtime/RuntimeRunCompletion.js";
+  AgentOutcome,
+  LoopRunDetails,
+  LoopRunSource,
+  StepRun,
+  StepRunConsoleEntry,
+  StepRunConsolePage,
+  StepRunLog,
+  StepRunResult
+} from "../shared/domain/runtime.js";
+import { EventStore } from "./runtime/EventStore.js";
+import { LoopRunEngine } from "./runtime/LoopRunEngine.js";
+import { LoopRunStore, type AppendStepRunConsoleInput } from "./runtime/LoopRunStore.js";
+import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
+import type { IntakeEventInput, LeaseOptions, PublishEventResult } from "./runtime/RuntimeDbTypes.js";
 import { resolveRuntimeDbPath } from "./runtime/runtimeDbPath.js";
 
 export { isPatchedSqliteVersion, resolveRuntimeDbPath };
-export type { CompleteRunInput, IntakeEventInput, LeaseOptions, PublishEventResult };
+export type { IntakeEventInput, LeaseOptions, PublishEventResult };
 
 export class RuntimeDatabase {
   private readonly connectionManager: RuntimeDbConnection;
   private readonly eventStore: EventStore;
-  private readonly runStore: AgentRunStore;
-  private readonly projector: RuntimeProjector;
-  private readonly runCompletion: RuntimeRunCompletion;
+  private readonly loopRunStore: LoopRunStore;
+  private readonly loopRunEngine: LoopRunEngine;
 
   constructor(dbPath: string) {
     this.connectionManager = new RuntimeDbConnection(dbPath);
     const connection = () => this.connection();
     this.eventStore = new EventStore(connection);
-    this.runStore = new AgentRunStore(connection);
-    this.projector = new RuntimeProjector(connection, this.eventStore, this.runStore);
-    this.runCompletion = new RuntimeRunCompletion(connection, this.eventStore, this.runStore, this.projector);
+    this.loopRunStore = new LoopRunStore(connection);
+    this.loopRunEngine = new LoopRunEngine(connection, this.loopRunStore);
   }
 
   close(): void {
@@ -55,12 +55,8 @@ export class RuntimeDatabase {
     return this.connectionManager.health();
   }
 
-  intakeEvent(input: IntakeEventInput, automation: ProjectAutomationConfig, agents: Agent[]): PublishEventResult {
-    return this.publishEventAndProjectActions(input, automation, agents);
-  }
-
-  publishEventAndProjectActions(input: IntakeEventInput, automation: ProjectAutomationConfig, agents: Agent[]): PublishEventResult {
-    return this.projector.publishEventAndProjectActions(input, automation, agents);
+  intakeEvent(input: IntakeEventInput): PublishEventResult {
+    return this.eventStore.intake(input);
   }
 
   listRuntimeEvents(limit = 500): RuntimeEvent[] {
@@ -75,47 +71,92 @@ export class RuntimeDatabase {
     this.eventStore.deleteEvent(eventId);
   }
 
-  listRuns(limit = 500): AgentRun[] {
-    return this.runStore.listRuns(limit);
+  startLoopRun(
+    config: ProjectAutomationConfig,
+    loopId: string,
+    input?: string,
+    source: LoopRunSource = "manual"
+  ): LoopRunDetails {
+    return this.loopRunEngine.start(config, loopId, { input, source });
   }
 
-  getRun(runId: string): AgentRun | undefined {
-    return this.runStore.getRun(runId);
+  latestLoopRun(loopId: string): LoopRunDetails | undefined {
+    return this.loopRunStore.latest(loopId);
   }
 
-  leaseNextRun(options: LeaseOptions): AgentRun | undefined {
-    return this.runStore.leaseNextRun(options);
+  listLoopRuns(limit = 500): LoopRunDetails[] {
+    return this.loopRunStore.list(limit);
   }
 
-  retryRun(runId: string): AgentRun {
-    return this.runStore.retryRun(runId);
+  activeLoopIds(): string[] {
+    return this.loopRunStore.activeLoopIds();
   }
 
-  completeRun(input: CompleteRunInput): { run: AgentRun; event?: RuntimeEvent; runs?: AgentRun[] } {
-    return this.runCompletion.completeRun(input);
+  respondToStepRun(
+    config: ProjectAutomationConfig,
+    runId: string,
+    stepRunId: string,
+    result: StepRunResult,
+    input: string
+  ): LoopRunDetails {
+    return this.loopRunEngine.respond(config, runId, stepRunId, result, input);
   }
 
-  saveRunThread(runId: string, threadId: string, turnId?: string): void {
-    this.runStore.saveRunThread(runId, threadId, turnId);
+  cancelLoopRun(runId: string): LoopRunDetails {
+    return this.loopRunEngine.cancel(runId);
+  }
+
+  leaseNextStepRun(options: LeaseOptions): StepRun | undefined {
+    return this.loopRunStore.leaseNext(options);
+  }
+
+  completeAgentStep(
+    config: ProjectAutomationConfig,
+    input: {
+      stepRunId: string;
+      outcome?: AgentOutcome;
+      error?: string;
+      threadId?: string;
+      turnId?: string;
+    }
+  ): LoopRunDetails {
+    return this.loopRunEngine.completeAgentStep(config, input);
+  }
+
+  getLoopRun(runId: string): LoopRunDetails | undefined {
+    return this.loopRunStore.details(runId);
+  }
+
+  saveStepRunThread(stepRunId: string, threadId: string, turnId?: string): void {
+    this.loopRunStore.saveThread(stepRunId, threadId, turnId);
+  }
+
+  getStepRun(stepRunId: string): StepRun | undefined {
+    return this.loopRunStore.getStepRun(stepRunId);
   }
 
   getThreadBinding(workItemId: string, agentRole: string): string | undefined {
-    return this.runStore.getThreadBinding(workItemId, agentRole);
+    return this.loopRunStore.getThreadBinding(workItemId, agentRole);
   }
 
-  upsertThreadBinding(workItemId: string, agentRole: string, threadId: string): void {
-    this.runStore.upsertThreadBinding(workItemId, agentRole, threadId);
+  appendStepRunLog(
+    stepRunId: string,
+    level: StepRunLog["level"],
+    message: string,
+    data?: Record<string, unknown>
+  ): StepRunConsoleEntry | undefined {
+    return this.loopRunStore.appendLog(stepRunId, level, message, data);
   }
 
-  appendRunLog(runId: string, level: AgentRunLog["level"], message: string, data?: Record<string, unknown>): void {
-    this.runStore.appendRunLog(runId, level, message, data);
+  appendStepRunConsole(stepRunId: string, input: AppendStepRunConsoleInput): StepRunConsoleEntry | undefined {
+    return this.loopRunStore.appendConsole(stepRunId, input);
   }
 
-  listRunLogs(runId?: string, limit = 500): AgentRunLog[] {
-    return this.runStore.listRunLogs(runId, limit);
+  getStepRunConsole(stepRunId: string, afterId = 0, limit = 500): StepRunConsolePage {
+    return this.loopRunStore.listConsole(stepRunId, afterId, limit);
   }
 
-  getInputEvent(run: AgentRun): RuntimeEvent | undefined {
-    return this.eventStore.getInputEvent(run);
+  listStepRunLogs(stepRunId?: string, limit = 500): StepRunLog[] {
+    return this.loopRunStore.listLogs(stepRunId, limit);
   }
 }

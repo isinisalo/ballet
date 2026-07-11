@@ -2,24 +2,24 @@ import type { AppData, CollectionName } from "../shared/api/workspaceData.js";
 import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { MarkdownDocument } from "../shared/domain/documents.js";
 import type { EventRecord } from "../shared/domain/events.js";
-import type { AgentRunLog } from "../shared/domain/runtime.js";
+import type { LoopRunSource, StepRunConsolePage, StepRunResult, StepRunLog } from "../shared/domain/runtime.js";
 import { getProjectRoot } from "./markdown.js";
 import type { RuntimeDatabase } from "./runtime-db.js";
 import { AutomationValidationError } from "./automation.js";
 import { AutomationService } from "./services/AutomationService.js";
-import { EventIntakeService, EventValidationError } from "./services/EventIntakeService.js";
+import { EventIntakeService } from "./services/EventIntakeService.js";
 import { MarkdownEntityService } from "./services/MarkdownEntityService.js";
 import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
-import { RuntimeRunService } from "./services/RuntimeRunService.js";
+import { LoopRunService } from "./services/LoopRunService.js";
 import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
 
 export class MarkdownStore {
   private readonly runtimeDatabaseProvider = new RuntimeDatabaseProvider(() => this.root);
   private readonly workspaceDataService = new WorkspaceDataService(() => this.root, this.runtimeDatabaseProvider);
   private readonly markdownEntityService = new MarkdownEntityService(() => this.root, () => this.read());
-  private readonly automationService = new AutomationService(() => this.root);
-  private readonly eventIntakeService = new EventIntakeService(() => this.read(), this.runtimeDatabaseProvider);
-  private readonly runtimeRunService = new RuntimeRunService(this.runtimeDatabaseProvider);
+  private readonly automationService = new AutomationService(() => this.root, this.runtimeDatabaseProvider);
+  private readonly eventIntakeService = new EventIntakeService(this.runtimeDatabaseProvider);
+  private readonly loopRunService = new LoopRunService(() => this.read(), this.runtimeDatabaseProvider);
 
   get root(): string {
     return getProjectRoot();
@@ -75,26 +75,49 @@ export class MarkdownStore {
     return this.eventIntakeService.createEvent(input);
   }
 
-  listAgentRuns() {
-    return this.runtimeRunService.listAgentRuns();
+  startLoopRun(loopId: string, input?: string, source: LoopRunSource = "manual") {
+    return this.loopRunService.start(loopId, input, source);
   }
 
-  retryAgentRun(runId: string) {
-    return this.runtimeRunService.retryAgentRun(runId);
+  latestLoopRun(loopId: string) {
+    return this.loopRunService.latest(loopId);
   }
 
-  listRunLogs(runId?: string): AgentRunLog[] {
-    return this.runtimeRunService.listRunLogs(runId);
+  getLoopRun(runId: string) {
+    return this.loopRunService.database().getLoopRun(runId);
+  }
+
+  respondToStepRun(runId: string, stepRunId: string, result: StepRunResult, input: string) {
+    return this.loopRunService.respond(runId, stepRunId, result, input);
+  }
+
+  cancelLoopRun(runId: string) {
+    return this.loopRunService.cancel(runId);
+  }
+
+  listLoopRuns() {
+    return this.loopRunService.list();
+  }
+
+  listStepRunLogs(stepRunId?: string): StepRunLog[] {
+    return this.loopRunService.database().listStepRunLogs(stepRunId);
+  }
+
+  getStepRunConsole(runId: string, stepRunId: string, afterId = 0, limit = 500): StepRunConsolePage | undefined {
+    const run = this.loopRunService.database().getLoopRun(runId);
+    const stepRun = this.loopRunService.database().getStepRun(stepRunId);
+    if (!run || !stepRun || stepRun.runId !== runId) return undefined;
+    return this.loopRunService.database().getStepRunConsole(stepRunId, afterId, limit);
   }
 
   runtimeHealth() {
-    return this.runtimeRunService.runtimeHealth();
+    return this.loopRunService.database().health();
   }
 
   runtimeDatabase(): RuntimeDatabase {
-    return this.runtimeRunService.runtimeDatabase();
+    return this.loopRunService.database();
   }
 }
 
 export const store = new MarkdownStore();
-export { AutomationValidationError, EventValidationError };
+export { AutomationValidationError };

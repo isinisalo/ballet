@@ -1,4 +1,4 @@
-import type { ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { LoopVisualConfig, LoopVisualLoop, LoopVisualStep } from "./loopVisualProjection";
 import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import { buildLoopGraph, loopCanonicalRecord, type LoopGraph, type LoopOutputTarget, type LoopStepRecord } from "./loopGraph";
 import { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
@@ -9,7 +9,7 @@ import { loopOutputSourceHandleId, loopShortestVerticalHandles } from "./loopLay
 import type { LoopCanvasLayout, LoopCanvasLayoutNode, LoopLayoutDirection } from "./loopLayoutTypes";
 
 type LoopLayoutRow = {
-  loop: ProjectLoop;
+  loop: LoopVisualLoop;
   records: LoopStepRecord[];
   loopGraph: LoopGraph;
   layout: LoopCanvasLayout;
@@ -19,10 +19,10 @@ type LoopEventLink = {
   sourceLoopId: string;
   targetLoopId: string;
   sourceStepIndex: number;
-  sourceActionId: string;
+  sourceStepId: string;
   outputId: string;
   eventType: string;
-  targetActionId: string;
+  targetStepId: string;
 };
 
 // This module intentionally centralizes loop graph layout rules because
@@ -32,8 +32,8 @@ export type { LoopCanvasEdge } from "./loopLayoutEdges";
 export {
   loopCanvasNodeAnchorY,
   loopOutputSourceHandleId,
-  loopActionOutputHandleY,
-  loopActionStackHeight
+  loopStepOutputHandleY,
+  loopStepStackHeight
 } from "./loopLayoutSizing";
 export type {
   LoopCanvasLayout,
@@ -45,16 +45,16 @@ export type {
 
 export function calculateLoopCanvasLayout({
   loopGraph,
-  editingActionIndex,
+  editingStepIndex,
   direction = "horizontal"
 }: {
   loopGraph: LoopGraph;
-  editingActionIndex: number | null;
+  editingStepIndex: number | null;
   direction?: LoopLayoutDirection;
 }): LoopCanvasLayout {
   const graphDraft = buildLoopLayoutGraphDraft({
     loopGraph,
-    editingActionIndex,
+    editingStepIndex,
     direction
   });
   const positionedNodes = positionLoopNodes(graphDraft.nodes, graphDraft.dagreEdges, direction);
@@ -70,48 +70,48 @@ export function calculateCompositeLoopCanvasLayout({
   config,
   selectedLoopId,
   recordsByLoopId,
-  editingActionIndexByLoopId = new Map(),
+  editingStepIndexByLoopId = new Map(),
   direction = "horizontal"
 }: {
-  config: ProjectAutomationConfig;
+  config: LoopVisualConfig;
   selectedLoopId: string;
   recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingActionIndexByLoopId?: ReadonlyMap<string, number | null>;
+  editingStepIndexByLoopId?: ReadonlyMap<string, number | null>;
   direction?: LoopLayoutDirection;
 }): LoopCanvasLayout {
   const selectedLoop = config.loops.find((loop) => loop.id === selectedLoopId);
   if (!selectedLoop) return { nodes: [], edges: [], direction };
 
-  const actionById = new Map(config.actions.map((action) => [action.id, action]));
+  const stepById = new Map(config.steps.map((step) => [step.id, step]));
   return calculateSelectedLoopCanvasLayout({
     config,
     selectedLoop,
     recordsByLoopId,
-    editingActionIndexByLoopId,
+    editingStepIndexByLoopId,
     direction,
-    actionById
+    stepById
   });
 }
 
 export function calculateAllLoopsCanvasLayout({
   config,
   recordsByLoopId,
-  editingActionIndexByLoopId = new Map(),
+  editingStepIndexByLoopId = new Map(),
   direction = "horizontal"
 }: {
-  config: ProjectAutomationConfig;
+  config: LoopVisualConfig;
   recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingActionIndexByLoopId?: ReadonlyMap<string, number | null>;
+  editingStepIndexByLoopId?: ReadonlyMap<string, number | null>;
   direction?: LoopLayoutDirection;
 }): LoopCanvasLayout {
-  const actionById = new Map(config.actions.map((action) => [action.id, action]));
+  const stepById = new Map(config.steps.map((step) => [step.id, step]));
   return calculateLoopCanvasLayoutRows({
     config,
     loopIds: new Set(config.loops.map((loop) => loop.id)),
     recordsByLoopId,
-    editingActionIndexByLoopId,
+    editingStepIndexByLoopId,
     direction,
-    actionById
+    stepById
   });
 }
 
@@ -119,25 +119,25 @@ function calculateLoopCanvasLayoutRows({
   config,
   loopIds,
   recordsByLoopId,
-  editingActionIndexByLoopId,
+  editingStepIndexByLoopId,
   direction,
-  actionById
+  stepById
 }: {
-  config: ProjectAutomationConfig;
+  config: LoopVisualConfig;
   loopIds: ReadonlySet<string>;
   recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingActionIndexByLoopId: ReadonlyMap<string, number | null>;
+  editingStepIndexByLoopId: ReadonlyMap<string, number | null>;
   direction: LoopLayoutDirection;
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>;
+  stepById: ReadonlyMap<string, LoopVisualStep>;
 }): LoopCanvasLayout {
   const rows = config.loops
     .filter((loop) => loopIds.has(loop.id))
     .map((loop) => loopLayoutRow({
       loop,
       recordsByLoopId,
-      editingActionIndexByLoopId,
+      editingStepIndexByLoopId,
       direction,
-      actionById
+      stepById
     }));
   const rowOffsetByLoopId = loopRowOffsets(rows);
   const rowByLoopId = new Map(rows.map((row) => [row.loop.id, row]));
@@ -147,7 +147,7 @@ function calculateLoopCanvasLayoutRows({
 
   rows.forEach((row) => {
     row.layout.nodes.forEach((node) => {
-      if (shouldHideLinkedOutputNode(config, node, loopIds, actionById)) {
+      if (shouldHideLinkedOutputNode(config, node, loopIds, stepById)) {
         hiddenLocalNodeKeys.add(namespaceLoopKey(row.loop.id, node.key));
         return;
       }
@@ -172,7 +172,7 @@ function calculateLoopCanvasLayoutRows({
   });
 
   rows.forEach((row) => {
-    crossLoopEventEdges(config, row, loopIds, actionById, rowByLoopId).forEach((edge) => namespacedEdges.push(edge));
+    crossLoopEventEdges(config, row, loopIds, stepById, rowByLoopId).forEach((edge) => namespacedEdges.push(edge));
   });
 
   return {
@@ -186,25 +186,25 @@ function calculateSelectedLoopCanvasLayout({
   config,
   selectedLoop,
   recordsByLoopId,
-  editingActionIndexByLoopId,
+  editingStepIndexByLoopId,
   direction,
-  actionById
+  stepById
 }: {
-  config: ProjectAutomationConfig;
-  selectedLoop: ProjectLoop;
+  config: LoopVisualConfig;
+  selectedLoop: LoopVisualLoop;
   recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingActionIndexByLoopId: ReadonlyMap<string, number | null>;
+  editingStepIndexByLoopId: ReadonlyMap<string, number | null>;
   direction: LoopLayoutDirection;
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>;
+  stepById: ReadonlyMap<string, LoopVisualStep>;
 }): LoopCanvasLayout {
   const selectedRow = loopLayoutRow({
     loop: selectedLoop,
     recordsByLoopId,
-    editingActionIndexByLoopId,
+    editingStepIndexByLoopId,
     direction,
-    actionById
+    stepById
   });
-  const links = loopEventLinks(config, recordsByLoopId, actionById);
+  const links = loopEventLinks(config, recordsByLoopId, stepById);
   const downstreamLoopIds = linkedLoopIds(config, links, selectedLoop.id, "downstream");
   const downstreamLoopIdSet = new Set(downstreamLoopIds);
   const upstreamLoopIds = linkedLoopIds(config, links, selectedLoop.id, "upstream")
@@ -227,7 +227,7 @@ function calculateSelectedLoopCanvasLayout({
   const edges: LoopCanvasEdge[] = [];
 
   selectedRow.layout.nodes.forEach((node) => {
-    if (shouldHideLinkedOutputNode(config, node, visibleCompactLoopIds, actionById)) {
+    if (shouldHideLinkedOutputNode(config, node, visibleCompactLoopIds, stepById)) {
       hiddenSelectedNodeKeys.add(namespaceLoopKey(selectedLoop.id, node.key));
       return;
     }
@@ -281,20 +281,20 @@ function calculateSelectedLoopCanvasLayout({
 function loopLayoutRow({
   loop,
   recordsByLoopId,
-  editingActionIndexByLoopId,
+  editingStepIndexByLoopId,
   direction,
-  actionById
+  stepById
 }: {
-  loop: ProjectLoop;
+  loop: LoopVisualLoop;
   recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingActionIndexByLoopId: ReadonlyMap<string, number | null>;
+  editingStepIndexByLoopId: ReadonlyMap<string, number | null>;
   direction: LoopLayoutDirection;
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>;
+  stepById: ReadonlyMap<string, LoopVisualStep>;
 }): LoopLayoutRow {
   const records = (recordsByLoopId.get(loop.id) ?? []).map((record) => ({
     ...record,
     loopId: loop.id,
-    action: record.action ?? actionById.get(record.actionId)
+    step: record.step ?? stepById.get(record.stepKey)
   }));
   const loopGraph = buildLoopGraph(records);
 
@@ -304,33 +304,33 @@ function loopLayoutRow({
     loopGraph,
     layout: calculateLoopCanvasLayout({
       loopGraph,
-      editingActionIndex: editingActionIndexByLoopId.get(loop.id) ?? null,
+      editingStepIndex: editingStepIndexByLoopId.get(loop.id) ?? null,
       direction
     })
   };
 }
 
 function loopEventLinks(
-  config: ProjectAutomationConfig,
+  config: LoopVisualConfig,
   recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>,
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>
+  stepById: ReadonlyMap<string, LoopVisualStep>
 ): LoopEventLink[] {
   return config.loops.flatMap((loop) => {
     const records = recordsByLoopId.get(loop.id) ?? [];
     return records.flatMap((record) =>
       (record.outputTargets ?? [])
         .flatMap((target) => {
-          if (target.type !== "action") return [];
-          const targetLoop = resolveEventTargetLoop(config, target, actionById);
+          if (target.type !== "step") return [];
+          const targetLoop = resolveEventTargetLoop(config, target, stepById);
           if (!targetLoop || targetLoop.id === loop.id) return [];
           return [{
             sourceLoopId: loop.id,
             targetLoopId: targetLoop.id,
             sourceStepIndex: record.index,
-            sourceActionId: record.actionId,
+            sourceStepId: record.stepKey,
             outputId: target.outputId,
             eventType: target.eventType,
-            targetActionId: target.targetActionId
+            targetStepId: target.targetStepKey
           } satisfies LoopEventLink];
         })
     );
@@ -338,7 +338,7 @@ function loopEventLinks(
 }
 
 function linkedLoopIds(
-  config: ProjectAutomationConfig,
+  config: LoopVisualConfig,
   links: LoopEventLink[],
   selectedLoopId: string,
   direction: "upstream" | "downstream"
@@ -371,14 +371,14 @@ function compactLoopNodes({
   y,
   direction
 }: {
-  config: ProjectAutomationConfig;
+  config: LoopVisualConfig;
   loopIds: string[];
   y: number;
   direction: LoopLayoutDirection;
 }): LoopCanvasLayoutNode[] {
   const loops = loopIds
     .map((loopId) => config.loops.find((candidate) => candidate.id === loopId))
-    .filter((loop): loop is ProjectLoop => Boolean(loop));
+    .filter((loop): loop is LoopVisualLoop => Boolean(loop));
   let nextY = y;
 
   return loops.map((loop) => {
@@ -417,7 +417,7 @@ function compactLoopEventEdges({
     const targetIsSelected = link.targetLoopId === selectedLoopId;
     if (!sourceIsCompact || (!targetIsCompact && !targetIsSelected)) return [];
     const targetNodeKey = targetIsSelected
-      ? selectedLoopTargetActionNodeKey(selectedRow, link)
+      ? selectedLoopTargetStepNodeKey(selectedRow, link)
       : compactLoopNodeKey(link.targetLoopId);
     if (!targetNodeKey) return [];
 
@@ -434,8 +434,8 @@ function compactLoopEventEdges({
         sourceLoopId: link.sourceLoopId,
         targetLoopId: link.targetLoopId,
         sourceStepIndex: link.sourceStepIndex,
-        sourceActionId: link.sourceActionId,
-        handlerActionId: targetIsSelected ? link.targetActionId : undefined,
+        sourceStepId: link.sourceStepId,
+        handlerStepId: targetIsSelected ? link.targetStepId : undefined,
         handlerLoopId: targetIsSelected ? selectedLoopId : undefined,
         eventType: link.eventType,
         outputId: link.outputId
@@ -462,7 +462,7 @@ function selectedToCompactLoopEventEdges({
 
       return [{
         key: `loop:${selectedRow.loop.id}:output:${link.sourceStepIndex}:${link.outputId}:to:${link.targetLoopId}:loop`,
-        sourceNodeKey: namespaceLoopKey(selectedRow.loop.id, `action-${canonicalRecord.index}`),
+        sourceNodeKey: namespaceLoopKey(selectedRow.loop.id, `step-${canonicalRecord.index}`),
         targetNodeKey: compactLoopNodeKey(link.targetLoopId),
         sourceHandleId: loopOutputSourceHandleId({ outputId: link.outputId, eventType: link.eventType }),
         targetHandleId: "top",
@@ -473,7 +473,7 @@ function selectedToCompactLoopEventEdges({
           sourceLoopId: selectedRow.loop.id,
           targetLoopId: link.targetLoopId,
           sourceStepIndex: link.sourceStepIndex,
-          sourceActionId: link.sourceActionId,
+          sourceStepId: link.sourceStepId,
           eventType: link.eventType,
           outputId: link.outputId
         }
@@ -486,16 +486,16 @@ function compactLoopNodeKey(loopId: string) {
 }
 
 function resolveEventTargetLoop(
-  config: ProjectAutomationConfig,
+  config: LoopVisualConfig,
   target: LoopOutputTarget,
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>
-): ProjectLoop | undefined {
-  void actionById;
-  if (target.type === "action") return config.loops.find((loop) => loop.id === target.targetLoopId);
+  stepById: ReadonlyMap<string, LoopVisualStep>
+): LoopVisualLoop | undefined {
+  void stepById;
+  if (target.type === "step") return config.loops.find((loop) => loop.id === target.targetLoopId);
   return undefined;
 }
 
-function loopRowOffsets(rows: Array<{ loop: ProjectLoop; layout: LoopCanvasLayout }>) {
+function loopRowOffsets(rows: Array<{ loop: LoopVisualLoop; layout: LoopCanvasLayout }>) {
   const offsets = new Map<string, number>();
   let nextRowY = loopCanvasLayoutConfig.startY;
 
@@ -513,7 +513,7 @@ function loopLayoutBounds(nodes: LoopCanvasLayoutNode[]) {
     return {
       minY: loopCanvasLayoutConfig.startY,
       maxY: loopCanvasLayoutConfig.startY,
-      height: loopNodeSizes.action.height
+      height: loopNodeSizes.step.height
     };
   }
   const minY = Math.min(...nodes.map((node) => node.y));
@@ -522,47 +522,47 @@ function loopLayoutBounds(nodes: LoopCanvasLayoutNode[]) {
 }
 
 function compositeLoopRowGap() {
-  return loopCanvasLayoutConfig.branchGap * 2 + loopNodeSizes.action.height;
+  return loopCanvasLayoutConfig.branchGap * 2 + loopNodeSizes.step.height;
 }
 
 function shouldHideLinkedOutputNode(
-  config: ProjectAutomationConfig,
+  config: LoopVisualConfig,
   node: LoopCanvasLayoutNode,
   loopIds: ReadonlySet<string>,
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>
+  stepById: ReadonlyMap<string, LoopVisualStep>
 ) {
   if (node.kind !== "output-event" || !node.outputEvent?.eventType) return false;
   const targetLoop = resolveEventTargetLoop(config, {
     outputId: node.outputEvent.outputId,
     eventType: node.outputEvent.eventType,
     type: "event"
-  }, actionById);
+  }, stepById);
   return Boolean(targetLoop && loopIds.has(targetLoop.id));
 }
 
 function crossLoopEventEdges(
-  config: ProjectAutomationConfig,
+  config: LoopVisualConfig,
   row: {
-    loop: ProjectLoop;
+    loop: LoopVisualLoop;
     records: LoopStepRecord[];
     loopGraph: LoopGraph;
   },
   loopIds: ReadonlySet<string>,
-  actionById: ReadonlyMap<string, ProjectAutomationConfig["actions"][number]>,
+  stepById: ReadonlyMap<string, LoopVisualStep>,
   rowByLoopId: ReadonlyMap<string, LoopLayoutRow>
 ): LoopCanvasEdge[] {
   return row.records.flatMap((record) =>
     (record.outputTargets ?? [])
       .flatMap((target) => {
-        if (target.type !== "action") return [];
-        const targetLoop = resolveEventTargetLoop(config, target, actionById);
+        if (target.type !== "step") return [];
+        const targetLoop = resolveEventTargetLoop(config, target, stepById);
         if (!targetLoop || !loopIds.has(targetLoop.id)) return [];
-        const targetNodeKey = targetLoopActionNodeKey(targetLoop.id, target.targetActionId, rowByLoopId);
+        const targetNodeKey = targetLoopStepNodeKey(targetLoop.id, target.targetStepKey, rowByLoopId);
         if (!targetNodeKey) return [];
         const canonicalRecord = loopCanonicalRecord(row.loopGraph, record);
-        const sourceNodeKey = namespaceLoopKey(row.loop.id, `action-${canonicalRecord.index}`);
+        const sourceNodeKey = namespaceLoopKey(row.loop.id, `step-${canonicalRecord.index}`);
         return [{
-          key: `loop:${row.loop.id}:output:${record.index}:${target.outputId}:to:${targetLoop.id}:action:${target.targetActionId}`,
+          key: `loop:${row.loop.id}:output:${record.index}:${target.outputId}:to:${targetLoop.id}:step:${target.targetStepKey}`,
           sourceNodeKey,
           targetNodeKey,
           sourceHandleId: loopOutputSourceHandleId(target),
@@ -574,8 +574,8 @@ function crossLoopEventEdges(
             sourceLoopId: row.loop.id,
             targetLoopId: targetLoop.id,
             sourceStepIndex: record.index,
-            sourceActionId: record.actionId,
-            handlerActionId: target.targetActionId,
+            sourceStepId: record.stepKey,
+            handlerStepId: target.targetStepKey,
             handlerLoopId: targetLoop.id,
             eventType: target.eventType,
             outputId: target.outputId
@@ -585,21 +585,21 @@ function crossLoopEventEdges(
   );
 }
 
-function selectedLoopTargetActionNodeKey(row: LoopLayoutRow, link: LoopEventLink) {
+function selectedLoopTargetStepNodeKey(row: LoopLayoutRow, link: LoopEventLink) {
   if (row.loop.id !== link.targetLoopId) return undefined;
-  return targetLoopActionNodeKey(row.loop.id, link.targetActionId, new Map([[row.loop.id, row]]));
+  return targetLoopStepNodeKey(row.loop.id, link.targetStepId, new Map([[row.loop.id, row]]));
 }
 
-function targetLoopActionNodeKey(
+function targetLoopStepNodeKey(
   loopId: string,
-  actionId: string,
+  stepId: string,
   rowByLoopId: ReadonlyMap<string, LoopLayoutRow>
 ) {
   const row = rowByLoopId.get(loopId);
-  const targetRecord = row?.records.find((record) => record.actionId === actionId);
+  const targetRecord = row?.records.find((record) => record.stepKey === stepId);
   if (!row || !targetRecord) return undefined;
   const canonicalTargetRecord = loopCanonicalRecord(row.loopGraph, targetRecord);
-  return namespaceLoopKey(loopId, `action-${canonicalTargetRecord.index}`);
+  return namespaceLoopKey(loopId, `step-${canonicalTargetRecord.index}`);
 }
 
 function namespaceLoopEdge(loopId: string, edge: LoopCanvasEdge): LoopCanvasEdge {

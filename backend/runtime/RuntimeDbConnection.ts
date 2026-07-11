@@ -62,15 +62,15 @@ export class RuntimeDbConnection {
   health(): Record<string, unknown> {
     const db = this.connection();
     const eventCount = db.prepare("SELECT COUNT(*) AS count FROM events").get() as { count: number };
-    const queuedRuns = db.prepare("SELECT COUNT(*) AS count FROM agent_runs WHERE status = 'queued'").get() as { count: number };
-    const runningRuns = db.prepare("SELECT COUNT(*) AS count FROM agent_runs WHERE status = 'running'").get() as { count: number };
+    const queuedSteps = db.prepare("SELECT COUNT(*) AS count FROM step_runs WHERE status = 'queued'").get() as { count: number };
+    const activeLoops = db.prepare("SELECT COUNT(*) AS count FROM loop_runs WHERE status IN ('running', 'waiting_for_human')").get() as { count: number };
     return {
       ok: true,
       dbPath: this.dbPath,
       sqliteVersion: this.sqliteVersion(),
       events: eventCount.count,
-      queuedRuns: queuedRuns.count,
-      runningRuns: runningRuns.count
+      queuedSteps: queuedSteps.count,
+      activeLoops: activeLoops.count
     };
   }
 }

@@ -1,11 +1,15 @@
-import type { Agent } from "../../shared/domain/agents.js";
-import type { ProjectAction, ProjectAutomationConfig, ProjectLoop, ProjectOutputRoute } from "../../shared/domain/automation.js";
+import type {
+  AgentOutcome,
+  LoopRunSource,
+  LoopRunStatus,
+  StepRunConsoleKind,
+  StepRunConsolePhase,
+  StepRunResult,
+  StepRunStatus
+} from "../../shared/domain/runtime.js";
 import type { EventStatus } from "../../shared/domain/events.js";
-import type { AgentOutcome, AgentRun, AgentRunLog, AgentRunStatus } from "../../shared/domain/runtime.js";
 
-export const PROJECTOR_CONSUMER = "policy-projector";
-export const MAX_CORRELATION_DEPTH = 20;
-
+export const MAX_ROOT_TRANSITIONS = 20;
 export const now = () => new Date().toISOString();
 
 export interface EventRow {
@@ -22,39 +26,61 @@ export interface EventRow {
   project_id: string;
   tags_json: string;
   status: EventStatus;
-  matched_policy_id: string | null;
-  assigned_agent_id: string | null;
-  routing_json: string | null;
   handling_result: string | null;
   payload_json: string;
 }
 
-export interface AgentRunRow {
+export interface LoopRunRow {
   run_id: string;
-  input_event_id: string;
-  input_event_seq: number | null;
-  policy_id: string;
-  policy_version: number;
-  agent_role: string;
-  status: AgentRunStatus;
-  attempt: number;
-  lease_owner: string | null;
-  lease_until: string | null;
-  thread_id: string | null;
-  turn_id: string | null;
-  outcome_json: string | null;
-  error: string | null;
+  loop_id: string;
+  root_run_id: string;
+  parent_run_id: string | null;
+  parent_step_run_id: string | null;
+  source: LoopRunSource;
+  status: LoopRunStatus;
+  input: string | null;
+  snapshot_json: string;
+  transition_count: number;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
 }
 
-export interface AgentRunLogRow {
-  id: number;
+export interface StepRunRow {
+  step_run_id: string;
   run_id: string;
+  loop_id: string;
+  step_id: string;
+  step_type: "agent" | "human";
+  agent_id: string | null;
+  status: StepRunStatus;
+  input: string | null;
+  response_input: string | null;
+  result: StepRunResult | null;
+  outcome_json: string | null;
+  error: string | null;
+  attempt: number;
+  lease_owner: string | null;
+  lease_until: string | null;
+  thread_id: string | null;
+  turn_id: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface StepRunLogRow {
+  id: number;
+  step_run_id: string;
+  source: "ballet" | "codex";
+  kind: StepRunConsoleKind;
   level: "info" | "warn" | "error";
+  phase: StepRunConsolePhase;
+  item_id: string | null;
   message: string;
   data_json: string | null;
+  content_bytes: number;
+  terminal: 0 | 1;
   created_at: string;
 }
 
@@ -72,37 +98,20 @@ export interface IntakeEventInput {
   body?: string;
 }
 
+export interface PublishEventResult {
+  event: import("../../shared/domain/events.js").EventRecord;
+  duplicate: boolean;
+}
+
 export interface LeaseOptions {
   owner: string;
   leaseSeconds: number;
 }
 
-export interface CompleteRunInput {
-  runId: string;
-  status: AgentRunStatus;
+export interface CompleteStepRunInput {
+  stepRunId: string;
   outcome?: AgentOutcome;
   error?: string;
   threadId?: string;
   turnId?: string;
-  domainEvent?: {
-    type: string;
-    source?: string;
-    payload: Record<string, unknown>;
-  };
-  projectAction?: ProjectAction;
-  projectActions?: ProjectAction[];
-  actions?: ProjectAction[];
-  outputRoutes: ProjectOutputRoute[];
-  loops?: ProjectLoop[];
-  automation?: ProjectAutomationConfig;
-  agents?: Agent[];
 }
-
-export interface PublishEventResult {
-  event: import("../../shared/domain/events.js").EventRecord;
-  run?: AgentRun;
-  runs: AgentRun[];
-  duplicate: boolean;
-}
-
-export type RunLogLevel = AgentRunLog["level"];

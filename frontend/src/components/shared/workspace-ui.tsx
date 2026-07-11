@@ -40,7 +40,8 @@ export function TextField({
   compact = false,
   minLength,
   maxLength,
-  error
+  error,
+  disabled = false
 }: {
   label: string;
   value: string | number;
@@ -52,6 +53,7 @@ export function TextField({
   minLength?: number;
   maxLength?: number;
   error?: string;
+  disabled?: boolean;
 }) {
   const fieldId = useId();
 
@@ -67,6 +69,7 @@ export function TextField({
         minLength={minLength}
         maxLength={maxLength}
         aria-invalid={Boolean(error)}
+        disabled={disabled}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -85,7 +88,8 @@ export function TextAreaField({
   compact = false,
   minLength,
   maxLength,
-  error
+  error,
+  disabled = false
 }: {
   label: string;
   value: string;
@@ -97,6 +101,7 @@ export function TextAreaField({
   minLength?: number;
   maxLength?: number;
   error?: string;
+  disabled?: boolean;
 }) {
   const fieldId = useId();
 
@@ -111,7 +116,8 @@ export function TextAreaField({
         required={required}
         minLength={minLength}
         maxLength={maxLength}
-        aria-invalid={Boolean(error)}
+      aria-invalid={Boolean(error)}
+      disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />
       {error ? <FieldError>{error}</FieldError> : null}
@@ -124,20 +130,22 @@ export function SelectField({
   value,
   options,
   onChange,
-  compact = false
+  compact = false,
+  disabled = false
 }: {
   label: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
   compact?: boolean;
+  disabled?: boolean;
 }) {
   const fieldId = useId();
 
   return (
     <Field className="gap-1.5">
       <FieldLabel htmlFor={fieldId} className={compact ? "text-muted-foreground" : undefined}>{label}</FieldLabel>
-      <Select value={value} onValueChange={onChange}>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger id={fieldId} className="min-w-0 w-full">
           <SelectValue />
         </SelectTrigger>

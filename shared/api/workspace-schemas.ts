@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { ProjectAutomationConfig } from "../domain/automation.js";
-import { automationFieldLimits } from "./automationValidation.js";
+import {
+  automationFieldLimits,
+  kebabCaseIdPattern
+} from "./automationValidation.js";
 
 export const mutableCollections = ["projects", "goals", "adrs", "agents", "skills"] as const;
 export const readableCollections = [...mutableCollections, "runtimes", "policies", "events"] as const;
@@ -119,39 +122,35 @@ const automationTokenSchema = z.string().min(automationFieldLimits.token.min).ma
 const automationNameSchema = z.string().min(automationFieldLimits.name.min).max(automationFieldLimits.name.max);
 const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits.description.max);
 const automationLoopIdSchema = z.string().min(automationFieldLimits.loopId.min).max(automationFieldLimits.loopId.max);
-const automationPolicyIdSchema = z.string().min(automationFieldLimits.policyId.min).max(automationFieldLimits.policyId.max);
-const automationHumanGateResponseIdSchema = z.string().min(1).max(260);
-const automationHumanGatePromptSchema = z.string().min(1).max(2000);
+const automationStepIdSchema = z.string()
+  .min(automationFieldLimits.stepId.min)
+  .max(automationFieldLimits.stepId.max)
+  .regex(kebabCaseIdPattern, "Step id must be lowercase kebab-case.");
 const automationCommandSchema = z.string().min(automationFieldLimits.command.min).max(automationFieldLimits.command.max);
 const automationArgSchema = z.string().min(automationFieldLimits.arg.min).max(automationFieldLimits.arg.max);
 
-const projectActionSchema = z.object({
-  id: automationPolicyIdSchema,
+const kebabLoopIdSchema = automationLoopIdSchema.regex(kebabCaseIdPattern, "Loop id must be lowercase kebab-case.");
+const stepEndSchema = z.object({ end: z.enum(["completed", "blocked", "failed"]) }).strict();
+const stepLoopSchema = z.object({ loop: kebabLoopIdSchema }).strict();
+const stepTransitionTargetSchema = z.union([automationStepIdSchema, stepLoopSchema, stepEndSchema]);
+const stepTransitionsSchema = z.object({
+  approved: stepTransitionTargetSchema,
+  rejected: stepTransitionTargetSchema
+}).strict();
+const stepBase = {
+  id: automationStepIdSchema,
   description: optionalAutomationDescriptionSchema,
-  agentId: z.string().min(1).optional(),
-  humanGate: z.boolean().optional()
-}).strict();
-
-const projectOutputRouteSchema = z.object({
-  sourceLoopId: automationLoopIdSchema,
-  sourceActionId: automationPolicyIdSchema,
-  outputId: z.enum(["approved", "rejected"]),
-  targetLoopId: automationLoopIdSchema,
-  targetActionId: automationPolicyIdSchema
-}).strict();
+  on: stepTransitionsSchema
+};
+const projectStepSchema = z.discriminatedUnion("type", [
+  z.object({ ...stepBase, type: z.literal("agent"), agentId: z.string().min(1) }).strict(),
+  z.object({ ...stepBase, type: z.literal("human") }).strict()
+]);
 
 const projectLoopSchema = z.object({
-  id: automationLoopIdSchema,
-  steps: z.array(automationPolicyIdSchema)
-}).strict();
-
-const projectHumanGateResponseSchema = z.object({
-  id: automationHumanGateResponseIdSchema,
-  loopId: automationLoopIdSchema.optional(),
-  actionId: automationPolicyIdSchema,
-  outputId: z.enum(["approved", "rejected"]),
-  prompt: automationHumanGatePromptSchema,
-  submittedAt: z.string()
+  id: kebabLoopIdSchema,
+  start: automationStepIdSchema,
+  steps: z.array(projectStepSchema).min(1)
 }).strict();
 
 const projectRuntimeSchema = z.object({
@@ -162,10 +161,7 @@ const projectRuntimeSchema = z.object({
 }).strict();
 
 export const automationConfigSchema = z.object({
-  version: z.literal(1),
-  actions: z.array(projectActionSchema),
-  outputRoutes: z.array(projectOutputRouteSchema),
-  humanGateResponses: z.array(projectHumanGateResponseSchema),
+  version: z.literal(2),
   loops: z.array(projectLoopSchema),
   runtimes: z.array(projectRuntimeSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
@@ -186,6 +182,28 @@ export const eventIntakeSchema = z.object({
 
 export const eventParamsSchema = z.object({
   id: z.string().min(1)
+}).strict();
+
+export const loopParamsSchema = z.object({
+  loopId: kebabLoopIdSchema
+}).strict();
+
+export const loopRunParamsSchema = z.object({
+  runId: z.string().uuid()
+}).strict();
+
+export const stepRunParamsSchema = z.object({
+  runId: z.string().uuid(),
+  stepRunId: z.string().uuid()
+}).strict();
+
+export const startLoopRunSchema = z.object({
+  input: z.string().max(20000).optional()
+}).strict();
+
+export const respondToStepRunSchema = z.object({
+  result: z.enum(["approved", "rejected"]),
+  input: z.string().trim().min(1).max(20000)
 }).strict();
 
 export const agentRunParamsSchema = z.object({

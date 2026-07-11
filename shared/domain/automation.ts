@@ -1,55 +1,50 @@
 import type { ProjectRuntime } from "./runtime.js";
 
-export type PolicyPredicateOperator = "equals" | "in" | "exists";
-export type PolicyPredicateScalar = string | number | boolean | null;
+export type OutputId = "approved" | "rejected";
+export type StepEndStatus = "completed" | "blocked" | "failed";
 
-export type JsonSchemaObject = Record<string, unknown>;
+export type StepTransitionTarget =
+  | string
+  | { loop: string }
+  | { end: StepEndStatus };
 
-export interface ProjectAction {
+export interface ProjectStepTransitions {
+  approved: StepTransitionTarget;
+  rejected: StepTransitionTarget;
+}
+
+interface ProjectStepBase {
   id: string;
   description: string;
-  agentId?: string;
-  humanGate?: boolean;
+  on: ProjectStepTransitions;
 }
 
-export type OutputId = "approved" | "rejected";
-
-export interface ProjectHumanGateResponse {
-  id: string;
-  loopId?: string;
-  actionId: string;
-  outputId: string;
-  prompt: string;
-  submittedAt: string;
+export interface ProjectAgentStep extends ProjectStepBase {
+  type: "agent";
+  agentId: string;
 }
 
-export interface ProjectOutputRoute {
-  sourceLoopId: string;
-  sourceActionId: string;
-  outputId: string;
-  targetLoopId: string;
-  targetActionId: string;
+export interface ProjectHumanStep extends ProjectStepBase {
+  type: "human";
+  agentId?: never;
 }
+
+export type ProjectStep = ProjectAgentStep | ProjectHumanStep;
 
 export interface ProjectLoop {
   id: string;
-  steps: string[];
+  start: string;
+  steps: ProjectStep[];
 }
 
 export interface ProjectAutomationConfig {
-  version: 1;
-  actions: ProjectAction[];
-  outputRoutes: ProjectOutputRoute[];
-  humanGateResponses: ProjectHumanGateResponse[];
+  version: 2;
   loops: ProjectLoop[];
   runtimes: ProjectRuntime[];
 }
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
-  version: 1,
-  actions: [],
-  outputRoutes: [],
-  humanGateResponses: [],
+  version: 2,
   loops: [],
   runtimes: []
 });
@@ -58,6 +53,11 @@ export interface ProjectAutomationIssue {
   path: string;
   message: string;
 }
+
+// Policies remain a Markdown document model. They are not part of automation v2
+// execution or project.json routing.
+export type PolicyPredicateOperator = "equals" | "in" | "exists";
+export type PolicyPredicateScalar = string | number | boolean | null;
 
 export interface PolicyPredicate {
   operator: PolicyPredicateOperator;
@@ -76,25 +76,6 @@ export interface PolicyMatch {
 export interface PolicyAction {
   type: "start_agent_run";
   targetAgentId: string;
-}
-
-export interface EventRoutingActionDecision {
-  actionId: string;
-  loopId: string;
-  routeId: string;
-  actionVersion: number;
-  targetAgentId: string;
-  status: "routed" | "skipped";
-  runId?: string;
-  reason: string;
-}
-
-export interface EventRoutingSummary {
-  matchedActions: number;
-  routedRuns: number;
-  skippedActions: number;
-  decisions: EventRoutingActionDecision[];
-  message: string;
 }
 
 export interface Policy {
@@ -116,25 +97,4 @@ export interface Policy {
   relativePath?: string;
   slug?: string;
   errors?: string[];
-}
-
-export interface RouteDecision {
-  actionId: string;
-  loopId: string;
-  routeId: string;
-  actionVersion: number;
-  targetAgentId: string;
-  status: "routed" | "skipped";
-  runId?: string;
-  reason: string;
-}
-
-export interface PolicyRouteDecision {
-  policyId: string;
-  policyName: string;
-  policyVersion: number;
-  targetAgentId: string;
-  status: "routed" | "skipped";
-  runId?: string;
-  reason: string;
 }

@@ -1,19 +1,20 @@
 {
-  "version": 1,
-  "actions": [
-    {
-      "id": "run",
-      "description": "",
-      "agentId": "reviewer"
-    }
-  ],
-  "outputRoutes": [],
-  "humanGateResponses": [],
+  "version": 2,
   "loops": [
     {
       "id": "adr-review",
+      "start": "run",
       "steps": [
-        "run"
+        {
+          "id": "run",
+          "type": "agent",
+          "agentId": "reviewer",
+          "description": "",
+          "on": {
+            "approved": { "end": "completed" },
+            "rejected": { "end": "failed" }
+          }
+        }
       ]
     }
   ],

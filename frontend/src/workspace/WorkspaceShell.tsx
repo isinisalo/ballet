@@ -1,7 +1,6 @@
 import { Menu } from "lucide-react";
 import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
 import { AppSidebar } from "./layout/AppSidebar";
-import { ensureAutomationConfig } from "./automation/automationConfigCompat";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -38,7 +37,7 @@ export function WorkspaceShell() {
           route={route}
           projectId={selection.project?.id}
           projectDocumentTree={selection.projectDocumentTree}
-          automation={ensureAutomationConfig(data.automation)}
+          automation={data.automation}
           agents={data.agents}
           skills={data.skills}
           navigate={navigate}
@@ -61,6 +60,7 @@ export function WorkspaceShell() {
                 data={data}
                 selection={selection}
                 mutations={mutations}
+                runtimeStreamStatus={runtimeStreamStatus}
                 navigate={navigate}
               />
             </main>

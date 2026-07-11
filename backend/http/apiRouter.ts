@@ -2,6 +2,7 @@ import express from "express";
 import { sendKnownHttpError } from "./errors.js";
 import * as automationHandlers from "./handlers/automationHandlers.js";
 import * as eventHandlers from "./handlers/eventHandlers.js";
+import * as loopRunHandlers from "./handlers/loopRunHandlers.js";
 import * as runtimeHandlers from "./handlers/runtimeHandlers.js";
 import * as workspaceHandlers from "./handlers/workspaceHandlers.js";
 
@@ -24,9 +25,12 @@ apiRouter.get("/events", eventHandlers.listEvents);
 apiRouter.post("/events/intake", eventHandlers.intakeEvent);
 apiRouter.delete("/events/:id", eventHandlers.removeEvent);
 
-apiRouter.get("/agent-runs", runtimeHandlers.listAgentRuns);
-apiRouter.get("/agent-runs/:id/logs", runtimeHandlers.listRunLogs);
-apiRouter.post("/agent-runs/:id/retry", runtimeHandlers.retryAgentRun);
+apiRouter.post("/loops/:loopId/runs", loopRunHandlers.startLoopRun);
+apiRouter.get("/loops/:loopId/runs/latest", loopRunHandlers.latestLoopRun);
+apiRouter.post("/loop-runs/:runId/steps/:stepRunId/respond", loopRunHandlers.respondToStepRun);
+apiRouter.get("/loop-runs/:runId/steps/:stepRunId/console", loopRunHandlers.stepRunConsole);
+apiRouter.get("/loop-runs/:runId/steps/:stepRunId/console/stream", loopRunHandlers.stepRunConsoleStream);
+apiRouter.post("/loop-runs/:runId/cancel", loopRunHandlers.cancelLoopRun);
 
 apiRouter.get("/:collection", workspaceHandlers.listCollection);
 apiRouter.post("/:collection", workspaceHandlers.saveCollectionItem);

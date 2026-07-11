@@ -1,8 +1,7 @@
 import type { ProjectAutomationConfig, ProjectRuntime } from "@shared/api/workspace-contracts";
-import { automationFieldLimits, automationStringValidationMessage, automationTokenValidationMessage } from "@shared/api/automationValidation";
+import { automationFieldLimits, automationIdValidationMessage, automationStringValidationMessage } from "@shared/api/automationValidation";
 import { TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { FieldGroup } from "@/components/ui/field";
-import { editablePolicyToken } from "../automationUtils";
 import type { AutomationConfigUpdater } from "../useAutomationDraft";
 
 export function RuntimesEditor({
@@ -24,23 +23,24 @@ export function RuntimesEditor({
   const selectedIndex = foundSelectedIndex;
   const selected = selectedIndex >= 0 ? config.runtimes[selectedIndex] : createDraft;
   const creating = foundSelectedIndex < 0;
-  const runtimeIdError = selected ? automationTokenValidationMessage("Runtime ID", selected.id) : undefined;
+  const runtimeIdError = selected
+    ? automationStringValidationMessage("Runtime ID", selected.id, automationFieldLimits.token) ?? automationIdValidationMessage("Runtime ID", selected.id)
+    : undefined;
   const titleError = selected ? automationStringValidationMessage("Title", selected.title, automationFieldLimits.name) : undefined;
   const commandError = selected ? automationStringValidationMessage("Command", selected.command, automationFieldLimits.command) : undefined;
   const argsError = selected?.args.find((arg) => automationStringValidationMessage("Arg", arg, automationFieldLimits.arg, { required: false }));
 
   const updateSelected = (patch: Partial<ProjectRuntime>) => {
     if (!selected) return;
-    const normalized = patch.id ? { ...patch, id: editablePolicyToken(patch.id) } : patch;
     if (creating) {
-      onCreateDraftChange(normalized);
+      onCreateDraftChange(patch);
       return;
     }
     updateConfig((current) => ({
       ...current,
-      runtimes: current.runtimes.map((runtime, index) => index === selectedIndex ? { ...runtime, ...normalized } : runtime)
+      runtimes: current.runtimes.map((runtime, index) => index === selectedIndex ? { ...runtime, ...patch } : runtime)
     }));
-    if (normalized.id) onSelect(normalized.id);
+    if (patch.id) onSelect(patch.id);
   };
 
   return (

@@ -32,54 +32,34 @@ describe("HTTP Zod validation", () => {
 
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
-      version: 1,
-      actions: [{
-        id: "implementation",
-        description: "Implementation",
-        agentId: "developer-agent"
+      version: 2,
+      loops: [{
+        id: "delivery",
+        start: "implementation",
+        steps: [{
+          id: "implementation",
+          type: "agent",
+          description: "Implementation",
+          agentId: "developer-agent",
+          on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+        }]
       }],
-      outputRoutes: [],
-      humanGateResponses: [],
-      loops: [{ id: "delivery.loop", steps: ["implementation"] }],
       runtimes: [{ id: "codex", title: "Codex", command: "codex", args: [] }]
     };
     expect(parseUnknown(automationConfigSchema, valid)).toEqual(valid);
-    const humanGateConfig = {
-      ...valid,
-      actions: [...valid.actions, {
-        id: "human-review",
-        description: "Human review",
-        humanGate: true
-      }],
-      humanGateResponses: [{
-        id: "delivery.loop:human-review",
-        loopId: "delivery.loop",
-        actionId: "human-review",
-        outputId: "approved",
-        prompt: "Continue with the approved brief.",
-        submittedAt: "2026-07-07T10:00:00.000Z"
-      }]
-    };
-    expect(parseUnknown(automationConfigSchema, humanGateConfig)).toMatchObject({
-      actions: expect.arrayContaining([expect.objectContaining({ id: "human-review", humanGate: true })]),
-      humanGateResponses: [expect.objectContaining({ actionId: "human-review", prompt: "Continue with the approved brief." })]
-    });
-    expectValidationError(() => parseUnknown(automationConfigSchema, {
-      ...humanGateConfig,
-      humanGateResponses: [{ ...humanGateConfig.humanGateResponses[0], prompt: "" }]
-    }), "humanGateResponses.0.prompt");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, events: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, triggers: [] }), "$");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: undefined }), "actions");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputRoutes: undefined }), "outputRoutes");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, humanGateResponses: undefined }), "humanGateResponses");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 1 }), "version");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, loops: undefined }), "loops");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, gates: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
       ...valid,
-      outputRoutes: [{ sourceLoopId: "delivery.loop", sourceActionId: "implementation", outputId: "summary", targetLoopId: "delivery.loop", targetActionId: "" }]
-    }), "outputRoutes.0.outputId");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, actions: [{ id: "implementation", description: "Implementation", outputIds: ["summary"], agentId: "developer-agent" }] }), "actions.0");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, outputs: [{ id: "approved" }] }), "$");
+      loops: [{ ...valid.loops[0], id: "Delivery" }]
+    }), "loops.0.id");
+    expectValidationError(() => parseUnknown(automationConfigSchema, {
+      ...valid,
+      loops: [{ ...valid.loops[0], steps: [{ ...valid.loops[0]!.steps[0], type: "human", agentId: "legacy" }] }]
+    }), "loops.0.steps.0");
   });
 
   it("accepts valid event intake payloads and defaults payload to an object", () => {

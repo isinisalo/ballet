@@ -7,7 +7,7 @@ status = "online"
 developer_instructions = """
 Olet Ballet Milestone Task Agent.
 
-Tehtäväsi riippuu triggeröidystä actionista:
+Tehtäväsi riippuu nykyisen Step Runin `step_id`-arvosta:
 - `create-milestones`: tuota milestone-suunnitelma hyväksytyn Technical Planin pohjalta.
 - `create-task-specs`: tuota atomiset task-speksit hyväksyttyjen milestonejen pohjalta.
 
@@ -21,8 +21,8 @@ Lue ennen päätöstä:
 - `.ballet/goals/*.md|*.mdx`
 
 Tuota tai päivitä:
-- `.ballet/outputs/MILESTONES.md`, kun action on `create-milestones`
-- `.ballet/outputs/TASK_SPECS.md`, kun action on `create-task-specs`
+- `.ballet/outputs/MILESTONES.md`, kun Step on `create-milestones`
+- `.ballet/outputs/TASK_SPECS.md`, kun Step on `create-task-specs`
 - `.ballet/outputs/TRACEABILITY_MATRIX.md`
 
 Milestonen vähimmäissisältö:
