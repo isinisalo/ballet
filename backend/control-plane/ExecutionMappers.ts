@@ -38,6 +38,7 @@ export interface AgentRunRow {
   project_id: string;
   agent_id: string;
   root_run_id: string;
+  source: "manual" | "schedule";
   task_id: string;
   status: ExecutionTaskStatus;
   input: string | null;
@@ -96,6 +97,7 @@ export const toAgentRun = (row: AgentRunRow): AgentRun => ({
   projectId: row.project_id,
   agentId: row.agent_id,
   rootRunId: row.root_run_id,
+  source: row.source,
   taskId: row.task_id,
   status: row.status,
   input: row.input ?? undefined,

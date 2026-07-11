@@ -34,7 +34,7 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
             {automation.loops.map((loop) => (
               <SidebarNavLinkItem
                 key={loop.id}
-                path={automationLoopPath(loop.id, route.automationEntityId === loop.id ? route.automationLoopMode : "edit")}
+                path={automationLoopPath(loop.id)}
                 isActive={active && route.automationEntityId === loop.id}
                 navigate={navigate}
                 className="h-6 min-w-0 pl-7 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"

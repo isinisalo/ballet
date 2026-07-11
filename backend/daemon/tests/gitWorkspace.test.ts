@@ -24,9 +24,9 @@ const fixture = async () => {
   await writeFile(path.join(source, ".ballet", "project.json"), "{\"version\":1}\n");
   await runGit(["add", "-A"], { cwd: source });
   await runGit(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "initial"], { cwd: source });
-  const manager = new GitWorkspaceManager({ root: home });
-  await manager.cloneProject("project-1", source);
-  const repository = path.join(home, "projects", "project-1", "repo");
+  await runGit(["remote", "add", "origin", source], { cwd: source });
+  const repository = source;
+  const manager = new GitWorkspaceManager({ root: home, repositoryPaths: { "project-1": repository } });
   await mkdir(path.join(repository, ".agents", "skills", "local"), { recursive: true });
   await writeFile(path.join(repository, ".agents", "skills", "local", "SKILL.md"), "local runtime skill\n");
   await writeFile(path.join(repository, ".ballet", "project.json"), "{\"version\":2}\n");

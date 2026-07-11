@@ -21,6 +21,7 @@ export class MarkdownStore {
   private readonly automationService = new AutomationService(() => this.root, this.runtimeDatabaseProvider);
   private readonly eventIntakeService = new EventIntakeService(this.runtimeDatabaseProvider);
   private readonly loopRunService = new LoopRunService(() => this.read(), this.runtimeDatabaseProvider);
+  private agentRemovalHook?: (agentId: string) => Promise<void> | void;
 
   get root(): string {
     return getProjectRoot();
@@ -36,6 +37,10 @@ export class MarkdownStore {
 
   setLoopExecutionGateway(gateway: LoopExecutionGateway): void {
     this.loopRunService.setExecutionGateway(gateway);
+  }
+
+  setAgentRemovalHook(hook: (agentId: string) => Promise<void> | void): void {
+    this.agentRemovalHook = hook;
   }
 
   list<T extends CollectionName>(collection: T): Promise<AppData[T]> {
@@ -54,6 +59,7 @@ export class MarkdownStore {
       this.eventIntakeService.removeEvent(id);
       return;
     }
+    if (collection === "agents") await this.agentRemovalHook?.(id);
     await this.markdownEntityService.remove(collection, id);
   }
 
@@ -102,6 +108,10 @@ export class MarkdownStore {
 
   listLoopRuns() {
     return this.loopRunService.list();
+  }
+
+  listActiveLoopRuns() {
+    return this.loopRunService.listActive();
   }
 
   runtimeHealth() {

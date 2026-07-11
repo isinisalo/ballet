@@ -1,15 +1,18 @@
 import type { Agent, ProjectStep } from "@shared/api/workspace-contracts";
+import type { ExecutionAgentSnapshot } from "@shared/api/workspace-contracts";
 import { Bot, ShieldCheck, TriangleAlert } from "lucide-react";
 import { MarkdownBody } from "../../documents/MarkdownBody";
 
-export function LoopHandlerAgentInstructions({ step, agents }: {
+export function LoopHandlerAgentInstructions({ step, agents, snapshot }: {
   step: ProjectStep;
   agents: Agent[];
+  snapshot?: ExecutionAgentSnapshot;
 }) {
   const agent = step.type === "agent" ? agents.find((candidate) => candidate.id === step.agentId) : undefined;
   const Icon = step.type === "human" ? ShieldCheck : agent ? Bot : TriangleAlert;
-  const title = step.type === "human" ? "Human operator" : agent?.name ?? step.agentId;
-  const emptyText = step.type === "human" ? "Human steps do not have agent instructions." : agent ? "No instructions configured." : "Agent not found.";
+  const title = step.type === "human" ? "Human operator" : snapshot?.name ?? agent?.name ?? step.agentId;
+  const instructions = snapshot?.instructions ?? agent?.instructions;
+  const emptyText = step.type === "human" ? "Human steps do not have agent instructions." : snapshot || agent ? "No instructions configured." : "Agent not found.";
 
   return (
     <aside aria-label="Agent instructions" className="agent-instructions-preview min-w-0 overflow-y-auto border-b border-divider-strong bg-panel-section sm:border-r sm:border-b-0">
@@ -22,9 +25,9 @@ export function LoopHandlerAgentInstructions({ step, agents }: {
               {step.type === "agent" ? <p className="truncate font-mono text-[0.65rem] text-muted-foreground">{step.agentId}</p> : null}
             </div>
           </div>
-          {agent ? <span className="font-mono text-[0.58rem] text-muted-foreground">Execution binding is environment-specific</span> : null}
+          {snapshot ? <span className="font-mono text-[0.58rem] text-secondary">Immutable Run snapshot</span> : agent ? <span className="font-mono text-[0.58rem] text-muted-foreground">Execution attachment is local</span> : null}
         </header>
-        <MarkdownBody source={agent?.instructions} title={title} emptyText={emptyText} />
+        <MarkdownBody source={instructions} title={title} emptyText={emptyText} />
       </article>
     </aside>
   );

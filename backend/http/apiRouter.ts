@@ -3,6 +3,7 @@ import { sendKnownHttpError } from "./errors.js";
 import * as automationHandlers from "./handlers/automationHandlers.js";
 import * as eventHandlers from "./handlers/eventHandlers.js";
 import * as loopRunHandlers from "./handlers/loopRunHandlers.js";
+import * as projectHandlers from "./handlers/projectHandlers.js";
 import * as runtimeHandlers from "./handlers/runtimeHandlers.js";
 import * as workspaceHandlers from "./handlers/workspaceHandlers.js";
 
@@ -17,6 +18,7 @@ apiRouter.put("/automation", automationHandlers.saveAutomation);
 
 apiRouter.post("/project-documents", workspaceHandlers.saveProjectDocument);
 apiRouter.post("/project-documents/create", workspaceHandlers.createProjectDocument);
+apiRouter.get("/project/config-status", projectHandlers.configStatus);
 
 apiRouter.get("/runtime/health", runtimeHandlers.runtimeHealth);
 apiRouter.get("/runtime/stream", runtimeHandlers.runtimeStream);

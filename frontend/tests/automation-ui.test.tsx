@@ -35,6 +35,23 @@ function installApi(latest: LoopRunDetails | null) {
       return Response.json({ bootstrapped: true, authenticated: true, csrfToken: "test-csrf-token" });
     }
     if (url === "/api/data") return Response.json(workspace);
+    if (url.startsWith("/api/runs?state=active")) return Response.json({ items: [] });
+    if (url.startsWith("/api/runs?state=recent")) return Response.json({ items: [] });
+    if (url === "/api/run-targets") return Response.json({ loops: [{ kind: "loop", id: "delivery", name: "delivery", ready: true, issues: [] }], agents: [] });
+    if (url === "/api/runs/run-1" && current) return Response.json({
+      rootRunId: current.rootRunId,
+      projectId: "project-1",
+      kind: "loop",
+      targetId: current.loopId,
+      source: current.source,
+      status: current.status,
+      current: current.stepRuns[0] ? { loopRunId: current.runId, loopId: current.loopId, stepRunId: current.stepRuns[0].stepRunId, stepId: current.stepRuns[0].stepId } : undefined,
+      createdAt: current.createdAt,
+      updatedAt: current.updatedAt,
+      completedAt: current.completedAt,
+      loopRuns: [current],
+      tasks: []
+    });
     if (url === "/api/loops/delivery/preflight") {
       return Response.json({ ok: true, issues: [], snapshots: [] });
     }
@@ -66,14 +83,14 @@ function installApi(latest: LoopRunDetails | null) {
 
 async function renderRun(latest: LoopRunDetails | null) {
   const fetchMock = installApi(latest);
-  window.history.pushState({}, "", "/automation/loops?id=delivery&mode=run");
+  window.history.pushState({}, "", "/run/loops/delivery");
   render(<WorkspaceApp />);
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/loops/delivery/runs/latest", expect.anything()));
   return fetchMock;
 }
 
 describe("automation v3 UI", () => {
-  it("persists Edit and Run mode in the URL and manually starts a saved loop", async () => {
+  it("starts a saved Loop from global Ballet Run without local mode controls", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(null);
     expect(screen.queryByText("Actions")).not.toBeInTheDocument();
@@ -82,18 +99,14 @@ describe("automation v3 UI", () => {
     await user.type(manualInput, "Ship release");
     await user.click(screen.getByRole("button", { name: "Start" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/loops/delivery/runs", expect.objectContaining({ method: "POST", body: JSON.stringify({ input: "Ship release" }) })));
-    await user.click(screen.getByRole("button", { name: "Edit" }));
-    expect(window.location.search).toBe("?id=delivery");
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/run/loops/delivery");
   });
 
-  it("requires human input, responds directly to a step run, and locks editing while active", async () => {
+  it("requires human input and responds directly to a StepRun", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(run("waiting_for_human"));
-    await user.click(screen.getByRole("button", { name: "Edit" }));
-    expect(await screen.findByText(/Editing is locked/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save loop" })).toBeDisabled();
-    expect(screen.getByLabelText("Edit loop canvas")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Run" }));
     const approved = await screen.findByRole("button", { name: "Approved" });
     expect(approved).toBeDisabled();
     await user.type(screen.getByLabelText("Response"), "Looks good");

@@ -192,7 +192,7 @@ export class RuntimeRegistryStore {
   private backendStatement(where: string): Database.Statement {
     return this.connection().prepare(`
       SELECT b.*,
-        (SELECT COUNT(*) FROM agent_execution_bindings x WHERE x.runtime_backend_id = b.backend_id) AS assigned_agents,
+        (SELECT COUNT(*) FROM agent_runtime_attachments x WHERE x.runtime_backend_id = b.backend_id) AS assigned_agents,
         (SELECT COUNT(*) FROM execution_tasks t WHERE t.runtime_backend_id = b.backend_id
           AND t.status IN ('claimed','preparing','running')) AS active_runs
       FROM runtime_backends b JOIN runtime_devices d ON d.device_id = b.device_id

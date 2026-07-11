@@ -11,6 +11,7 @@ import { createControlPlane } from "../control-plane/createControlPlane.js";
 import type { DaemonIdentity } from "../control-plane/PairingStore.js";
 import type { DaemonHeartbeat } from "../control-plane/RuntimeRegistryStore.js";
 import { LoopExecutionCoordinator } from "../integration/LoopExecutionCoordinator.js";
+import { LoopExecutionReconciler } from "../integration/LoopExecutionReconciler.js";
 import { RuntimeDatabase } from "../runtime-db.js";
 
 const PROJECT_ID = "project";
@@ -108,7 +109,7 @@ const pairDevice = (test: TestContext, name: string, definitions: Array<{ provid
 };
 
 const bind = (test: TestContext, agentId: string, runtimeBackendId: string, model: string) =>
-  test.control.service.putBinding(agentId, {
+  test.control.service.putAgentRuntime(agentId, {
     runtimeBackendId,
     model,
     reasoning: "high",
@@ -321,6 +322,82 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
   });
 });
 
+describe("LoopExecutionReconciler", () => {
+  it("reattaches an already-created task instead of enqueuing a duplicate after a startup gap", async () => {
+    const test = await context(appData(nestedAutomation(), ["developer", "publisher"]));
+    const device = pairDevice(test, "Shared Mac", [
+      { provider: "codex", model: "gpt-5" },
+      { provider: "copilot", model: "claude-sonnet" }
+    ]);
+    bind(test, "developer", device.backendIds.codex!, "gpt-5");
+    bind(test, "publisher", device.backendIds.copilot!, "claude-sonnet");
+    const started = await startRoot(test, "delivery");
+    const step = started.run.stepRuns[0]!;
+    const taskId = step.executionTaskId!;
+    test.runtime.connection().prepare(`
+      UPDATE step_runs SET execution_task_id = NULL, execution_snapshot_json = NULL WHERE step_run_id = ?
+    `).run(step.stepRunId);
+    insertCompletedLoopHistory(test.runtime, 500);
+    expect(test.runtime.listLoopRuns().some((run) => run.runId === started.run.runId)).toBe(false);
+
+    await reconciler(test).reconcile();
+
+    expect(taskCount(test, started.run.rootRunId)).toBe(1);
+    expect(test.runtime.getStepRun(step.stepRunId)?.executionTaskId).toBe(taskId);
+  });
+
+  it("completes a terminal task missed before shutdown and enqueues the next nested Loop task", async () => {
+    const test = await context(appData(nestedAutomation(), ["developer", "publisher"]));
+    const device = pairDevice(test, "Shared Mac", [
+      { provider: "codex", model: "gpt-5" },
+      { provider: "copilot", model: "claude-sonnet" }
+    ]);
+    bind(test, "developer", device.backendIds.codex!, "gpt-5");
+    bind(test, "publisher", device.backendIds.copilot!, "claude-sonnet");
+    const started = await startRoot(test, "delivery");
+    const taskId = started.run.stepRuns[0]!.executionTaskId!;
+    test.control.database.connection().prepare(`
+      UPDATE execution_tasks SET status = 'succeeded', outcome_json = ?, completed_at = ?, updated_at = ?
+      WHERE task_id = ?
+    `).run(JSON.stringify(READY), NOW, NOW, taskId);
+
+    await reconciler(test).reconcile();
+
+    const runs = test.runtime.listRootLoopRuns(started.run.rootRunId);
+    expect(runs.map((run) => [run.loopId, run.status])).toEqual([
+      ["delivery", "completed"],
+      ["release", "running"]
+    ]);
+    expect(taskCount(test, started.run.rootRunId)).toBe(2);
+  });
+
+  it("resumes cancellation for a terminal Loop whose task was left queued", async () => {
+    const test = await context(appData(nestedAutomation(), ["developer", "publisher"]));
+    const device = pairDevice(test, "Shared Mac", [
+      { provider: "codex", model: "gpt-5" },
+      { provider: "copilot", model: "claude-sonnet" }
+    ]);
+    bind(test, "developer", device.backendIds.codex!, "gpt-5");
+    bind(test, "publisher", device.backendIds.copilot!, "claude-sonnet");
+    const started = await startRoot(test, "delivery");
+    const taskId = started.run.stepRuns[0]!.executionTaskId!;
+    test.runtime.cancelLoopRun(started.run.runId);
+
+    await reconciler(test).reconcile();
+
+    expect(test.control.service.getTask(taskId).status).toBe("cancelled");
+    expect(finalization(test, started.run.rootRunId)).toMatchObject({ status: "pending", expected_success: 0 });
+  });
+});
+
+const reconciler = (test: TestContext) => new LoopExecutionReconciler({
+  controlPlaneDatabase: test.control.database,
+  runtimeDatabase: () => test.runtime,
+  coordinator: test.coordinator,
+  readData: async () => test.data,
+  projectId: PROJECT_ID
+});
+
 const taskCount = (test: TestContext, rootRunId?: string): number => {
   const row = rootRunId
     ? test.control.database.connection().prepare("SELECT COUNT(*) AS count FROM execution_tasks WHERE root_run_id = ?").get(rootRunId)
@@ -338,3 +415,24 @@ const finalization = (test: TestContext, rootRunId: string) => test.control.data
   status: string;
   expected_success: number;
 } | undefined;
+
+const insertCompletedLoopHistory = (runtime: RuntimeDatabase, count: number): void => {
+  const insert = runtime.connection().prepare(`
+    INSERT INTO loop_runs (
+      run_id, project_id, loop_id, root_run_id, source, status, snapshot_json,
+      transition_count, created_at, updated_at, completed_at
+    ) VALUES (?, ?, ?, ?, 'manual', 'completed', ?, 0, ?, ?, ?)
+  `);
+  runtime.connection().transaction(() => {
+    for (let index = 0; index < count; index += 1) {
+      const runId = `history-${index}`;
+      const loopId = `archived-${index}`;
+      const timestamp = new Date(Date.UTC(2999, 0, 1, 0, 0, index)).toISOString();
+      insert.run(runId, PROJECT_ID, loopId, runId, JSON.stringify({
+        id: loopId,
+        start: "done",
+        steps: []
+      }), timestamp, timestamp, timestamp);
+    }
+  })();
+};

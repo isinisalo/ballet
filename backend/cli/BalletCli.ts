@@ -1,17 +1,15 @@
 import { execFile, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
-import path from "node:path";
 import { promisify } from "node:util";
 import { v4 as uuid } from "uuid";
 import type { DaemonConfigStore, DaemonConfig } from "../daemon/config/DaemonConfigStore.js";
-import type { GitWorkspaceManager } from "../daemon/git/GitWorkspaceManager.js";
 import { parseCliOptions, resolveSetupPlan } from "./CliOptions.js";
 import { daemonKeychainAccount, type SecretStore } from "./Keychain.js";
-import { ensureConfiguredLocalServer, restartConfiguredLocalServer } from "./ConfiguredLocalServer.js";
+import { restartConfiguredLocalServer } from "./ConfiguredLocalServer.js";
 import type { LaunchdService, LaunchdStatus } from "./LaunchdService.js";
-import type { LocalServerService } from "./LocalServerService.js";
-import { safeProjectName } from "./ProjectIdentity.js";
+import type { LocalLifecycleStatus, LocalServerService } from "./LocalServerService.js";
+import { canonicalGitHubRepository, resolveLocalGitProject } from "./ProjectIdentity.js";
 import { type PairingClient, type PairingDeviceFacts } from "./PairingClient.js";
 import type { VerifiedReleaseUpdater } from "./VerifiedReleaseUpdater.js";
 
@@ -28,12 +26,14 @@ export interface BalletCliServices {
   pairing(serverUrl: string): PairingClient;
   launchd(): LaunchdService;
   localServer: LocalServerService;
-  git: GitWorkspaceManager;
   updater: VerifiedReleaseUpdater;
   output: CliOutput;
   openUrl(url: string): Promise<void>;
   version: string;
-  now?: () => Date;
+  cwd?: () => string;
+  localControlToken: string;
+  stopTimeoutMs?: number;
+  wait?: (milliseconds: number) => Promise<void>;
 }
 
 export const runBalletCli = async (argv: readonly string[], services: BalletCliServices): Promise<number> => {
@@ -43,17 +43,14 @@ export const runBalletCli = async (argv: readonly string[], services: BalletCliS
       case "setup":
         await setup(rest, services);
         return 0;
-      case "open":
-        await openApp(services);
+      case "stop":
+        await stopApp(services);
         return 0;
       case "update":
         services.output.stdout(await services.updater.update());
         await restartConfiguredLocalServer(services.config, services.localServer);
         await services.launchd().restart();
         services.output.stdout("Ballet daemon restarted on the updated executable.");
-        return 0;
-      case "project":
-        await project(rest, services);
         return 0;
       case "daemon":
         await daemon(rest, services);
@@ -66,8 +63,10 @@ export const runBalletCli = async (argv: readonly string[], services: BalletCliS
       case "help":
       case "--help":
       case "-h":
-      case undefined:
         services.output.stdout(helpText);
+        return 0;
+      case undefined:
+        await startApp(services);
         return 0;
       default:
         throw new Error(`Unknown command: ${command}`);
@@ -81,15 +80,21 @@ export const runBalletCli = async (argv: readonly string[], services: BalletCliS
 const setup = async (args: readonly string[], services: BalletCliServices): Promise<void> => {
   if (process.platform !== "darwin") throw new Error("Ballet local runtime currently supports macOS only.");
   const plan = resolveSetupPlan(args);
-  const { serverUrl, appUrl, displayName, repositoryUrl, projectId, deviceCode } = plan;
-  let checkout: Awaited<ReturnType<GitWorkspaceManager["cloneProject"]>> | undefined;
-  if (projectId && repositoryUrl) checkout = await services.git.cloneProject(projectId, repositoryUrl);
-  if (plan.managedLocalServer && projectId && repositoryUrl && checkout) {
+  const project = await resolveLocalGitProject(services.cwd?.() ?? process.cwd());
+  if (plan.repositoryUrl && canonicalGitHubRepository(plan.repositoryUrl) !== project.canonicalRepository) {
+    throw new Error(`The current checkout origin does not match --repo ${plan.repositoryUrl}.`);
+  }
+  if (plan.projectId && plan.projectId !== project.id) {
+    throw new Error(`The current checkout resolves to project ${project.id}, not ${plan.projectId}.`);
+  }
+  const { serverUrl, appUrl, displayName, deviceCode } = plan;
+  if (plan.managedLocalServer) {
     await services.localServer.ensureStarted({
       serverUrl,
-      projectId,
-      repositoryUrl,
-      repositoryPath: checkout.root
+      projectId: project.id,
+      repositoryUrl: project.repositoryUrl,
+      repositoryPath: project.root,
+      localControlToken: services.localControlToken
     });
   }
   const daemonId = uuid();
@@ -127,9 +132,9 @@ const setup = async (args: readonly string[], services: BalletCliServices): Prom
       { id: uuid(), provider: "codex", command: plan.codexCommand },
       { id: uuid(), provider: "copilot", command: plan.copilotCommand }
     ],
-    projectId,
-    repositoryUrl,
-    repositoryPath: checkout?.root
+    projectId: project.id,
+    repositoryUrl: project.repositoryUrl,
+    repositoryPath: project.root
   };
   const account = daemonKeychainAccount(serverUrl, claim.deviceId);
   await services.secrets.set(account, claim.daemonToken);
@@ -143,35 +148,69 @@ const setup = async (args: readonly string[], services: BalletCliServices): Prom
   services.output.stdout(`Ballet daemon paired as ${displayName} (${claim.deviceId}).`);
 };
 
-const openApp = async (services: BalletCliServices): Promise<void> => {
-  const config = await services.config.load();
-  await ensureConfiguredLocalServer(config, services.localServer);
-  await services.openUrl(config.appUrl);
+const startApp = async (services: BalletCliServices): Promise<void> => {
+  const project = await resolveLocalGitProject(services.cwd?.() ?? process.cwd());
+  const serverUrl = "http://127.0.0.1:4317";
+  const active = await services.localServer.activeProject(serverUrl);
+  if (active?.projectId && active.projectId !== project.id) {
+    throw new Error(`Ballet is already running for project ${active.projectId}. Run \`ballet stop\` before switching projects.`);
+  }
+  if (active?.projectId === project.id) {
+    await services.openUrl(serverUrl);
+    return;
+  }
+  const projectConfig = await services.config.activateProject(project.id, {
+    repositoryUrl: project.repositoryUrl,
+    repositoryPath: project.root
+  });
+  await services.localServer.ensureStarted({
+    serverUrl,
+    projectId: project.id,
+    repositoryUrl: project.repositoryUrl,
+    repositoryPath: project.root,
+    localControlToken: services.localControlToken
+  });
+  if (projectConfig) await services.launchd().installAndStart();
+  await services.openUrl(projectConfig?.appUrl ?? new URL("/runtimes?connect=1", serverUrl).toString());
 };
 
-const project = async (args: readonly string[], services: BalletCliServices): Promise<void> => {
-  const [subcommand, projectId, repositoryUrl] = args;
-  if (!projectId) throw new Error("Project id is required.");
-  if (subcommand === "clone") {
-    if (!repositoryUrl) throw new Error("Repository URL is required.");
-    const status = await services.git.cloneProject(projectId, repositoryUrl);
-    const config = await services.config.load();
-    config.projectId = projectId;
-    config.repositoryUrl = repositoryUrl;
-    config.repositoryPath = status.root;
-    await services.config.save(config);
-    services.output.stdout(JSON.stringify(status, null, 2));
-    return;
+const stopApp = async (services: BalletCliServices): Promise<void> => {
+  const serverUrl = "http://127.0.0.1:4317";
+  const timeoutMs = services.stopTimeoutMs ?? 90_000;
+  const deadline = Date.now() + timeoutMs;
+  const remaining = () => Math.max(1, deadline - Date.now());
+  let active: { projectId?: string } | undefined;
+  try {
+    active = await services.localServer.activeProject(serverUrl, Math.min(2_000, remaining()), true);
+  } catch (error) {
+    if (Date.now() >= deadline || isTimeoutError(error)) throw shutdownTimeout();
+    throw error;
   }
-  if (subcommand === "status") {
-    const config = await services.config.load();
-    const root = config.projectId === projectId && config.repositoryPath
-      ? config.repositoryPath
-      : path.join(services.config.home, "projects", safeProjectName(projectId), "repo");
-    services.output.stdout(JSON.stringify(await services.git.inspect(root), null, 2));
-    return;
+  if (Date.now() >= deadline) throw shutdownTimeout();
+  if (active) {
+    let status: LocalLifecycleStatus;
+    try {
+      status = await services.localServer.cancelAllRuns(serverUrl, services.localControlToken, remaining());
+    } catch (error) {
+      if (Date.now() >= deadline || isTimeoutError(error)) throw shutdownTimeout();
+      throw error;
+    }
+    if (Date.now() >= deadline && !status.idle) throw shutdownTimeout(status);
+    while (!status.idle && Date.now() < deadline) {
+      await (services.wait ?? delay)(500);
+      try {
+        status = await services.localServer.lifecycleStatus(serverUrl, services.localControlToken, Math.min(5_000, remaining()));
+      } catch (error) {
+        if (Date.now() >= deadline || isTimeoutError(error)) throw shutdownTimeout(status);
+        throw error;
+      }
+    }
+    if (!status.idle || Date.now() >= deadline) throw shutdownTimeout(status);
   }
-  throw new Error("Usage: ballet project clone <project-id> <repository-url> | ballet project status <project-id>");
+  if (Date.now() >= deadline) throw shutdownTimeout();
+  await services.launchd().stop();
+  await services.localServer.stop();
+  services.output.stdout("Ballet stopped.");
 };
 
 const daemon = async (args: readonly string[], services: BalletCliServices): Promise<void> => {
@@ -245,14 +284,22 @@ export const defaultOpenUrl = async (url: string): Promise<void> => {
   await execFileAsync("open", [url]);
 };
 
+const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const shutdownTimeout = (status?: { activeRuns: number; pendingFinalizations: number }) => new Error(status
+  ? `Ballet still has ${status.activeRuns} active runs and ${status.pendingFinalizations} pending finalizations; services were left running.`
+  : "Ballet shutdown timed out; services were left running.");
+
+const isTimeoutError = (error: unknown): boolean => error instanceof Error
+  && (error.name === "TimeoutError" || error.name === "AbortError");
+
 const helpText = `Ballet local runtime
 
 Usage:
-  ballet setup --repo <git-url> [--server <url>] [--app <url>] [--name <device-name>]
-  ballet setup --server <url> --device-code <code> [--repo <git-url>]
-  ballet open
+  ballet
+  ballet stop
+  ballet setup [--server <url>] [--app <url>] [--name <device-name>]
+  ballet setup --server <url> --device-code <code>
   ballet update
-  ballet project clone <project-id> <repository-url>
-  ballet project status <project-id>
   ballet daemon start|stop|restart|status|logs [--lines N]
   ballet version`;

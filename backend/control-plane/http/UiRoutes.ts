@@ -3,9 +3,9 @@ import { z } from "zod";
 import {
   adminBootstrapBodySchema,
   adminLoginBodySchema,
+  agentRuntimeConfigurationBodySchema,
   agentExecutionParamsSchema,
   agentRunParamsV1Schema,
-  executionBindingBodySchema,
   executionEventsQuerySchema,
   executionTaskParamsSchema,
   pairingApprovalBodySchema,
@@ -93,10 +93,15 @@ export const createUiRouter = (options: ControlPlaneRouterOptions): express.Rout
   });
 
   router.get("/agents/execution-states", read, asyncHandler(async (_req, res) => { res.json(await options.service.executionStates()); }));
-  router.get("/agents/:agentId/execution-binding", read, (req, res) => res.json(options.service.getBinding(parseParams(agentExecutionParamsSchema, req).agentId) ?? null));
-  router.put("/agents/:agentId/execution-binding", write, (req, res) => {
+  router.get("/agents/runtime/issues", read, asyncHandler(async (_req, res) => { res.json(await options.service.runtimeConfigurationIssues()); }));
+  router.get("/agents/:agentId/runtime", read, (req, res) => res.json(options.service.getAgentRuntime(parseParams(agentExecutionParamsSchema, req).agentId)));
+  router.put("/agents/:agentId/runtime", write, (req, res) => {
     const { agentId } = parseParams(agentExecutionParamsSchema, req);
-    res.json(options.service.putBinding(agentId, parseBody(executionBindingBodySchema, req)));
+    res.json(options.service.putAgentRuntime(agentId, parseBody(agentRuntimeConfigurationBodySchema, req)));
+  });
+  router.delete("/agents/:agentId/runtime", write, (req, res) => {
+    options.service.removeAgentRuntime(parseParams(agentExecutionParamsSchema, req).agentId);
+    res.status(204).end();
   });
   router.post("/agents/:agentId/runs", write, asyncHandler(async (req, res) => {
     const { agentId } = parseParams(agentExecutionParamsSchema, req);

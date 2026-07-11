@@ -69,12 +69,15 @@ function CelestialStepButton({ context, record, records, selected }: {
       data-loop-node-style={nodeStyle}
       data-loop-reasoning-effort={record.step?.reasoningEffort}
       data-loop-reasoning-glow={reasoningGlow}
+      data-loop-run-status={record.step?.stepRun?.status}
       aria-label={`${context.readOnly ? "View" : "Edit"} step ${title}`}
       title={title}
       className={cn(
         "loop-celestial-node nodrag nopan inline-flex h-full w-full items-center justify-center rounded-full border border-transparent transition-[border-color,box-shadow,filter]",
         humanGate && "border-tertiary/60",
         statusClass,
+        record.step?.stepRun?.status === "running" && "loop-run-node-pulse--running",
+        record.step?.stepRun?.status === "waiting_for_human" && "loop-run-node-pulse--waiting",
         selected && "border-primary/80 ring-2 ring-primary/20"
       )}
       onClick={(event) => {

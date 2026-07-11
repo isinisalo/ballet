@@ -137,13 +137,13 @@ describe("control-plane HTTP and websocket API", () => {
     const devices = await (await fetch(`${context.url}/api/runtimes/devices`, { headers: { Cookie: cookie } })).json() as Array<{ id: string; status: string }>;
     expect(devices).toContainEqual(expect.objectContaining({ id: paired.deviceId, status: "online" }));
 
-    const binding = await fetch(`${context.url}/api/agents/developer/execution-binding`, json({
+    const runtimeConfiguration = await fetch(`${context.url}/api/agents/developer/runtime`, json({
       runtimeBackendId: backendId,
       model: "gpt-5",
       reasoning: "high",
       policy: { network: false, readOnlyRoots: [] }
     }, { method: "PUT", headers: adminHeaders }));
-    expect(binding.status).toBe(200);
+    expect(runtimeConfiguration.status).toBe(200);
     const startedResponse = await fetch(`${context.url}/api/agents/developer/runs`, json({ input: "Ship it" }, { method: "POST", headers: adminHeaders }));
     expect(startedResponse.status).toBe(201);
     const run = await startedResponse.json() as { id: string; taskId: string };
@@ -211,7 +211,7 @@ describe("control-plane HTTP and websocket API", () => {
     const identity = context.control.service.authenticateDaemon(token);
     const backendId = uuid();
     context.control.service.heartbeat(identity, daemonHeartbeat(backendId));
-    context.control.service.putBinding("developer", {
+    context.control.service.putAgentRuntime("developer", {
       runtimeBackendId: backendId, model: "gpt-5", reasoning: "high", policy: { network: false, readOnlyRoots: [] }
     });
 

@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 export function LoopHandlerSheet({
   open,
   title,
+  header,
   left,
   right,
   onOpenChange
 }: {
   open: boolean;
   title: string;
+  header?: ReactNode;
   left: ReactNode;
   right: ReactNode;
   onOpenChange: (open: boolean) => void;
@@ -31,6 +33,7 @@ export function LoopHandlerSheet({
         <Button type="button" variant="ghost" size="icon-xs" aria-label="Close" className="absolute top-1.5 right-1.5 z-20" onClick={() => onOpenChange(false)}>
           <X />
         </Button>
+        {header ? <div className="shrink-0 border-b border-divider-strong bg-panel-section pr-10">{header}</div> : null}
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto sm:grid-cols-[3fr_2fr] sm:overflow-hidden">
           {left}
           {right}

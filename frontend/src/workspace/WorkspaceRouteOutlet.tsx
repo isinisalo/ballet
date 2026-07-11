@@ -14,6 +14,8 @@ import {
 import { RuntimeRegistryView } from "./runtimes";
 import type { WorkspaceSelection } from "./selection/useWorkspaceSelection";
 import { SkillsView } from "./skills/SkillsView";
+import { RunWorkspace } from "./runs/RunWorkspace";
+import type { RunDashboardState } from "./runs/useRunDashboard";
 import type { RouteState } from "./types";
 
 type WorkspaceMutationCallbacks = ReturnType<typeof useWorkspaceMutations>;
@@ -25,6 +27,7 @@ export function WorkspaceRouteOutlet({
   mutations,
   agentExecutionStates,
   runtimeStreamStatus,
+  runDashboard,
   navigate
 }: {
   route: RouteState;
@@ -33,6 +36,7 @@ export function WorkspaceRouteOutlet({
   mutations: WorkspaceMutationCallbacks;
   agentExecutionStates: AgentExecutionState[];
   runtimeStreamStatus: RuntimeStreamStatus;
+  runDashboard: RunDashboardState;
   navigate: (path: string) => void;
 }) {
   switch (route.view) {
@@ -52,13 +56,15 @@ export function WorkspaceRouteOutlet({
     case "project-instructions":
       return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
     case "automation":
-      return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} mode={route.automationLoopMode ?? "edit"} runtimeStreamStatus={runtimeStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
+      return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} runtimeStreamStatus={runtimeStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
     case "runtimes":
       return <RuntimeRegistryView selectedDeviceId={route.runtimeDeviceId} onSelectDevice={(deviceId) => navigate(deviceId ? `/runtimes?id=${encodeURIComponent(deviceId)}` : "/runtimes")} />;
     case "agents":
-      return <AgentsView agent={selection.selectedAgent} agentExecutionStates={agentExecutionStates} mode={route.agentMode ?? "edit"} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
+      return <AgentsView agent={selection.selectedAgent} agentExecutionStates={agentExecutionStates} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
     case "skills":
       return <SkillsView skill={selection.selectedSkill} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
+    case "run":
+      return <RunWorkspace route={route} data={data} agentExecutionStates={agentExecutionStates} runtimeStreamStatus={runtimeStreamStatus} dashboard={runDashboard} navigate={navigate} />;
     default:
       return (
         <EmptyState

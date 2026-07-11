@@ -9,7 +9,7 @@ Runtime v1 currently supports:
 - GitHub Copilot CLI `1.0.70` or newer through the Copilot SDK; and
 - direct agent runs plus agent Steps inside Ballet Loops.
 
-Each agent has one explicit execution binding: computer, provider backend, discovered model, reasoning setting, and execution policy. Ballet never falls back to another runtime implicitly. All reachable agent Steps in one root Loop Run must be bound to the same computer.
+Each agent has one portable runtime intent (provider, model, reasoning, and network policy) plus one machine-local runtime attachment. The attachment selects the compatible computer/backend and any absolute read-only roots. Ballet never falls back to another runtime implicitly. All reachable agent Steps in one root Loop Run must resolve to the same computer.
 
 ## Runtime & Daemon v1
 
@@ -21,7 +21,7 @@ The web application owns scheduling and durable state. The daemon owns local pro
 4. Provider events are normalized and uploaded under a leased, fenced task claim. The UI reads the durable event stream over SSE.
 5. A successful terminal root run is committed to its `ballet/run/<run-id>` branch and its worktree is removed. An unsuccessful terminal root retains its worktree for inspection.
 
-The Runtime registry shows paired computers, connection state, managed checkout, daemon diagnostics, and both provider backends. It combines heartbeat facts—configured executable, exact CLI version, authentication and health state, discovered models, and policy capabilities—with assignment and active-run counts from the control plane. The UI supports refresh, restart, logs, and disconnect; process stop remains a local CLI operation.
+The Runtime registry shows paired computers, connection state, source checkout, daemon diagnostics, and both provider backends. It combines heartbeat facts—configured executable, exact CLI version, authentication and health state, discovered models, and policy capabilities—with attachment and active-run counts from the control plane. The UI supports refresh, restart, logs, and disconnect; process stop remains a local CLI operation.
 
 ## Portable project configuration
 
@@ -60,9 +60,10 @@ The canonical automation file is [`.ballet/project.json`](.ballet/project.json).
 }
 ```
 
-Runtime devices, provider backends, local paths, agent bindings, credentials, runs, and logs do not belong in `project.json`. Commit the portable project sources instead:
+Runtime devices, provider commands, local paths, credentials, runs, and logs do not belong in `project.json`. Commit the portable project sources instead:
 
 - `.ballet/project.json` for automation v3;
+- `.ballet/runtime.json` for agent-specific provider, model, reasoning, and network intent;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` for project documents;
 - `.codex/agents/*.toml` for agents; and
 - `.agents/skills/**/SKILL.md` for repository skills.
@@ -71,15 +72,22 @@ Machine-local and mutable execution data lives outside the repository:
 
 | Path | Contents |
 | --- | --- |
-| `~/.ballet/control-plane.sqlite` | Admin/session hashes, projects, paired devices, backends, checkouts, execution bindings, task leases, agent/Loop Runs, and normalized events |
-| `~/.ballet/daemon/config.json` | Non-secret daemon, server, provider command, and managed-project configuration |
+| `~/.ballet/control-plane.sqlite` | Admin/session hashes, projects, paired devices, backends, runtime attachments, task leases, agent/Loop Runs, and normalized events |
+| `~/.ballet/daemon/config.json` | The active non-secret daemon, server, provider-command, and project configuration |
+| `~/.ballet/projects/<project-id>/daemon.json` | Reusable project-specific pairing and daemon registration |
 | `~/.ballet/daemon/status.json` | Last daemon status snapshot |
-| `~/.ballet/projects/<project-id>/` | Managed checkout, run worktrees, locks, and finalization state |
+| `~/.ballet/projects/<project-id>/` | Run worktrees, locks, snapshot cache, and finalization state; the Git clone remains in its original location |
 | `~/.ballet/cache/config-snapshots/` | Content-addressed snapshots of `.ballet`, `.codex/agents`, and `.agents/skills` |
 | `~/Library/Logs/Ballet/` | Daemon and managed local-server logs |
 | macOS Keychain | The daemon bearer token; it is not written to the daemon config or project |
 
 Set `BALLET_HOME` to relocate daemon-managed files, `BALLET_LOG_DIR` to relocate logs, or `BALLET_CONTROL_PLANE_DB_PATH` to override the SQLite path.
+
+## Ballet Configure and Ballet Run
+
+The upper-left Ballet dropdown switches the whole application between **Ballet Configure** and **Ballet Run**. Configure keeps the repository-backed editors and the existing Loop canvas. Run uses `/run`, `/run/loops/:loopId?run=<rootRunId>`, and `/run/agents/:agentId?run=<rootRunId>` for launching and monitoring persisted work. Its Overview combines active roots, launch readiness, and recent runs; the detail sheet shows immutable instructions beside the selected task's durable console or human response controls. A shared invalidation stream refreshes Run lists and details, while the console stream is opened only for the selected task.
+
+The Run read model accepts both `manual` and `schedule` sources. Scheduling configuration and a scheduler are intentionally not part of this version.
 
 ## Install on macOS
 
@@ -104,11 +112,12 @@ If `/usr/local/bin` is not writable, the installer uses `~/.local/bin`; add that
 
 ## Pair a computer
 
-For a self-hosted local project, the shortest setup clones the repository under `~/.ballet`, starts the local web server on port `4317`, opens the one-time approval flow, and installs the daemon as a `launchd` service:
+Run setup from the GitHub clone that Ballet should use. Setup resolves the Git root even when invoked from a subdirectory, starts the local web server on port `4317`, opens the one-time approval flow, and installs the daemon as a `launchd` service. It never clones or writes project configuration:
 
 ```bash
-ballet setup --repo git@github.com:YOUR-ORG/YOUR-REPO.git
-ballet open
+cd YOUR-REPO
+ballet setup
+ballet
 ```
 
 For an existing Ballet server, open **Runtimes → Connect computer** and run the generated one-time command. Its shape is:
@@ -122,7 +131,7 @@ ballet setup \
   --device-code ONE-TIME-DEVICE-CODE
 ```
 
-`--server` is the daemon API origin and must use HTTPS unless it is an HTTP loopback address. `--app` is the URL opened by `ballet open`. When `--project` is omitted, Ballet derives a stable project id from the repository URL. `--project` and `--repo` must be supplied together when either is explicit.
+`--server` is the daemon API origin and must use HTTPS unless it is an HTTP loopback address. `--app` is the URL opened by bare `ballet`. Ballet derives a stable project id from the current clone's GitHub origin and treats equivalent SSH and HTTPS origins as the same repository. Optional `--repo` and `--project` values verify the current checkout; they do not clone it.
 
 Setup configures both provider backends and starts the daemon unless `--no-start` is present. If a CLI is outside the service `PATH`, pass an absolute `--codex-command` or `--copilot-command`. The pairing session moves through `pending → approved → claimed`, expires after ten minutes, and can be claimed only once.
 
@@ -131,12 +140,11 @@ The first local browser session asks for a single Ballet administrator password 
 ## CLI reference
 
 ```text
-ballet setup --repo <git-url> [--server <url>] [--app <url>] [--name <device-name>]
+ballet
+ballet stop
+ballet setup [--repo <git-url>] [--server <url>] [--app <url>] [--name <device-name>]
 ballet setup --server <url> --device-code <code> [--repo <git-url>] [--project <id>]
-ballet open
 ballet update
-ballet project clone <project-id> <repository-url>
-ballet project status <project-id>
 ballet daemon start
 ballet daemon stop
 ballet daemon restart
@@ -150,10 +158,10 @@ Useful examples:
 ```bash
 ballet daemon status
 ballet daemon logs --lines 500 --follow
-ballet project status YOUR-PROJECT-ID
+ballet stop
 ```
 
-`ballet open` starts the configured managed local server when needed, then opens its app URL. `ballet project clone` creates or verifies the managed checkout and updates the daemon's project binding. `ballet update` accepts only a checksum- and attestation-verified release, atomically activates a new immutable bundle for direct installs (or delegates to Homebrew), then restarts the managed local server and daemon.
+Bare `ballet` binds the app to the current GitHub clone, starts the local server and an already-paired project daemon when needed, then opens the app URL. Re-running it for the same project only opens that project. Switching projects requires `ballet stop`, which cancels queued/running/waiting work, waits up to 90 seconds for terminal finalization, and only then stops the daemon and server. `ballet update` accepts only a checksum- and attestation-verified release, atomically activates a new immutable bundle for direct installs (or delegates to Homebrew), then restarts the managed local server and daemon.
 
 ## Local development
 
@@ -179,10 +187,11 @@ All HTTP paths are below `/api`.
 | Group | Main routes |
 | --- | --- |
 | Admin | `/admin/status`, `/admin/bootstrap`, `/admin/login`, `/admin/logout` |
-| Project and workspace | `/projects/active`, `/data`, `/automation`, `/project-documents`, collection routes, `/events` |
+| Project and workspace | `/projects/active`, `/data`, `/automation`, `/project/config-status`, `/project-documents`, collection routes, `/events` |
 | Runtime registry | `/runtimes/devices`, `/runtimes/devices/:deviceId/{refresh,restart,logs}` |
 | Pairing UI | `/pairing/sessions`, `/pairing/sessions/:pairingId`, `/pairing/sessions/:pairingId/approve` |
-| Agent execution | `/agents/execution-states`, `/agents/:agentId/execution-binding`, `/agents/:agentId/runs`, `/agent-runs/:runId` |
+| Agent execution | `/agents/execution-states`, `/agents/:agentId/runtime`, `/agents/runtime/issues`, `/agents/:agentId/runs`, `/agent-runs/:runId` |
+| Unified Run model | `/runs`, `/runs/:rootRunId`, `/run-targets`, `/runs/stream` |
 | Console | `/execution-tasks/:taskId/events`, `/execution-tasks/:taskId/console/stream` |
 | Loop execution | `/loops/:loopId/preflight`, `/loops/:loopId/runs`, `/loop-runs/:runId/...` |
 | Daemon | `/daemon/pairing/*`, `/daemon/heartbeat`, `/daemon/diagnostics`, `/daemon/tasks/*`, `/daemon/root-runs/*` |
@@ -196,9 +205,9 @@ Except for health, admin bootstrap/status, login, and the one-time daemon pairin
 - The server stores password and token digests, not daemon bearer tokens. Admin sessions use `HttpOnly`, `SameSite=Strict` cookies and CSRF validation; set `BALLET_SECURE_COOKIES=1` behind HTTPS.
 - Provider child processes do not inherit Ballet daemon, control, or pairing secrets.
 - Every run is bound to the exact device, backend, CLI version, model, reasoning setting, policy capability hash, Git HEAD, and project-config snapshot selected at start. Preflight fails closed when any required value is unavailable or changed.
-- The managed checkout must be free of code changes. Changes under `.ballet`, `.codex/agents`, and `.agents/skills` are captured into the immutable config snapshot instead of being treated as code dirt.
+- The source checkout must be free of code changes before a Run. Changes under `.ballet`, `.codex/agents`, and `.agents/skills` are captured into the immutable config snapshot instead of being treated as code dirt. Ballet reports these paths but never stages, commits, or pushes them.
 - Providers run in the root run's managed worktree with workspace-write scope and approval escalation disabled. Writes outside that worktree are denied. Additional read-only roots are supported only when the selected backend reports that capability; Runtime v1's Codex adapter does not.
-- Network access defaults to off and must be enabled explicitly in the agent binding. Ballet also rejects unsafe or out-of-workspace permission requests; the provider remains responsible for enforcing the advertised sandbox capability.
+- Network access defaults to off and must be enabled explicitly in the portable runtime intent. Ballet also rejects unsafe or out-of-workspace permission requests; the provider remains responsible for enforcing the advertised sandbox capability.
 - One root run reuses one locked worktree across its sequential agent Steps. Ballet never merges or pushes the result automatically. Successful roots are committed on their run branch and cleaned up; unsuccessful roots remain under `~/.ballet/projects/<project-id>/worktrees/`.
 - Durable console persistence is capped at 1 MiB of non-terminal content per task while terminal protocol events are retained. The UI keeps a bounded display window, resumes by event cursor, and displays semantic reasoning summaries rather than raw private reasoning.
 
@@ -226,7 +235,7 @@ Run `npx @google/design.md lint DESIGN.md` when `DESIGN.md` changes.
 ## Repository structure
 
 - `frontend/` contains the React and Vite UI.
-- `backend/control-plane/` contains registry, pairing, binding, task, event, and admin persistence.
+- `backend/control-plane/` contains registry, pairing, runtime-attachment, task, event, and admin persistence.
 - `backend/daemon/` contains the local service, provider adapters, worktree manager, and transport.
 - `backend/cli/` contains setup, update, pairing, `launchd`, project, and log commands.
 - `backend/runtime/` contains durable Loop and Step Run state.

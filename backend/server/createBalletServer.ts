@@ -7,10 +7,21 @@ import express from "express";
 import { createControlPlane, agentSnapshotFromAgent } from "../control-plane/index.js";
 import { adminAuth, controlPlaneErrorHandler } from "../control-plane/http/HttpSupport.js";
 import { LoopExecutionCoordinator, preflightLoopSnapshot } from "../integration/LoopExecutionCoordinator.js";
+import { LoopExecutionReconciler } from "../integration/LoopExecutionReconciler.js";
 import { resolveActiveProject } from "../project/activeProject.js";
 import { resolveRuntimeDbPath } from "../runtime-db.js";
+import { onRuntimeChanged } from "../runtime-events.js";
+import {
+  bridgeRunInvalidations,
+  createRunRouter,
+  RunInvalidationBroadcaster,
+  RunReadModelService,
+  RunReadModelStore,
+  RunTargetService
+} from "../runs/index.js";
 import { apiRouter } from "../routes.js";
 import { store } from "../store.js";
+import { createLocalLifecycleRouter } from "./LocalLifecycleRoutes.js";
 
 export const createBalletServer = async () => {
   const root = store.root;
@@ -51,6 +62,29 @@ export const createBalletServer = async () => {
   });
   execution.coordinator = coordinator;
   store.setLoopExecutionGateway(coordinator);
+  store.setAgentRemovalHook((agentId) => controlPlane.service.removeAgentRuntime(agentId));
+  await new LoopExecutionReconciler({
+    controlPlaneDatabase: controlPlane.database,
+    runtimeDatabase: () => store.runtimeDatabase(),
+    coordinator,
+    readData: () => store.read(),
+    projectId: project.id
+  }).reconcile();
+  const runReadModel = new RunReadModelService(new RunReadModelStore({
+    runtimeConnection: () => store.runtimeDatabase().connection(),
+    controlPlaneConnection: () => controlPlane.database.connection(),
+    projectId: project.id
+  }));
+  const runTargets = new RunTargetService({
+    readData: () => store.read(),
+    runs: runReadModel,
+    preflightAgent: (agentId) => controlPlane.service.preflightAgent(agentId)
+  });
+  const runInvalidations = new RunInvalidationBroadcaster();
+  const closeRunInvalidations = bridgeRunInvalidations(runInvalidations, {
+    subscribeRuntime: onRuntimeChanged,
+    subscribeControlPlane: (listener) => controlPlane.service.onChange(listener)
+  });
 
   const app = express();
   if (process.env.BALLET_TRUST_PROXY === "1") app.set("trust proxy", true);
@@ -60,7 +94,18 @@ export const createBalletServer = async () => {
   // server before an administrator session exists. Keep this single probe
   // public; every project-data route below remains session protected.
   app.get("/api/health", (_req, res) => res.json({ ok: true, projectId: project.id }));
+  const localControlToken = process.env.BALLET_LOCAL_CONTROL_TOKEN?.trim();
+  if (localControlToken) {
+    app.use("/api/local/lifecycle", createLocalLifecycleRouter({
+      token: localControlToken,
+      projectId: project.id,
+      controlPlane: controlPlane.service,
+      database: controlPlane.database,
+      store
+    }));
+  }
   app.use("/api", (req, res, next) => adminAuth(controlPlane.service, !["GET", "HEAD", "OPTIONS"].includes(req.method))(req, res, next));
+  app.use("/api", createRunRouter({ runs: runReadModel, targets: runTargets, invalidations: runInvalidations }));
   app.use("/api", apiRouter);
   app.use(controlPlaneErrorHandler);
 
@@ -80,7 +125,7 @@ export const createBalletServer = async () => {
 
   const server = createServer(app);
   controlPlane.attachWebSocket(server);
-  return { app, server, controlPlane, coordinator, project };
+  return { app, server, controlPlane, coordinator, project, closeRunInvalidations };
 };
 
 const shellQuote = (value: string): string => `'${value.replaceAll("'", `'"'"'`)}'`;

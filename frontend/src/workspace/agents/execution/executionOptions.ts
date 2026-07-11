@@ -1,5 +1,6 @@
 import type { RuntimeBackend, RuntimeDevice } from "../../runtimes/types";
-import type { AgentExecutionBinding, AgentExecutionFormValue } from "./types";
+import type { AgentRuntimeConfiguration } from "@shared/api/workspace-contracts";
+import type { AgentExecutionFormValue } from "./types";
 
 export const PROVIDER_DEFAULT = "provider-default";
 
@@ -11,14 +12,20 @@ export const emptyExecutionForm = (): AgentExecutionFormValue => ({
   policy: { network: false, readOnlyRoots: [] }
 });
 
-export const formFromBinding = (binding: AgentExecutionBinding | null): AgentExecutionFormValue =>
-  binding ? {
-    deviceId: binding.deviceId,
-    runtimeBackendId: binding.runtimeBackendId,
-    model: binding.model,
-    reasoning: binding.reasoning,
-    policy: { ...binding.policy, readOnlyRoots: [...binding.policy.readOnlyRoots] }
+export const formFromRuntimeConfiguration = (configuration: AgentRuntimeConfiguration | undefined, devices: RuntimeDevice[] = []): AgentExecutionFormValue => {
+  const backendId = configuration?.attachment?.runtimeBackendId ?? configuration?.resolved?.runtimeBackendId ?? "";
+  const backend = devices.flatMap((device) => device.backends).find((candidate) => candidate.id === backendId);
+  return configuration?.intent || configuration?.attachment || configuration?.resolved ? {
+    deviceId: configuration.resolved?.deviceId ?? backend?.deviceId ?? "",
+    runtimeBackendId: backendId,
+    model: configuration.intent?.model ?? configuration.resolved?.model ?? "",
+    reasoning: configuration.intent?.reasoning ?? configuration.resolved?.reasoning ?? "",
+    policy: {
+      network: configuration.intent?.policy.network ?? configuration.resolved?.policy.network ?? false,
+      readOnlyRoots: [...(configuration.attachment?.readOnlyRoots ?? configuration.resolved?.policy.readOnlyRoots ?? [])]
+    }
   } : emptyExecutionForm();
+};
 
 export const selectedExecutionDevice = (devices: RuntimeDevice[], deviceId: string) =>
   devices.find((device) => device.id === deviceId);

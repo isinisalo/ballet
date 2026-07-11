@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { backendReadiness, filterRuntimeDevices } from "../src/workspace/runtimes/runtimeRegistry";
-import { emptyExecutionForm, formFromBinding, modelOptions, PROVIDER_DEFAULT, reasoningOptions } from "../src/workspace/agents/execution/executionOptions";
+import { emptyExecutionForm, formFromRuntimeConfiguration, modelOptions, PROVIDER_DEFAULT, reasoningOptions } from "../src/workspace/agents/execution/executionOptions";
 import { runtimeBackend, runtimeDevice } from "./runtimeFixtures";
 
 describe("runtime registry logic", () => {
@@ -36,7 +36,7 @@ describe("runtime registry logic", () => {
 
   it("keeps an unbound agent empty, requires a real model and limits provider-default to reasoning", () => {
     expect(emptyExecutionForm()).toMatchObject({ deviceId: "", runtimeBackendId: "", model: "", reasoning: "" });
-    expect(formFromBinding(null)).toEqual(emptyExecutionForm());
+    expect(formFromRuntimeConfiguration(undefined)).toEqual(emptyExecutionForm());
     expect(modelOptions(runtimeBackend())).toEqual([{ value: "gpt-test", label: "GPT Test" }]);
     const backendWithoutReasoning = runtimeBackend({ capabilities: { ...runtimeBackend().capabilities, models: [{ id: "gpt-no-levels", label: "No levels", reasoningOptions: [] }] } });
     expect(reasoningOptions(backendWithoutReasoning, "gpt-no-levels")).toEqual([{ value: PROVIDER_DEFAULT, label: "Provider default" }]);

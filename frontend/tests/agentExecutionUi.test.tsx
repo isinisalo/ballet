@@ -2,21 +2,48 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AgentExecutionForm } from "../src/workspace/agents/execution/AgentExecutionForm";
-import { now, runtimeDevice } from "./runtimeFixtures";
+import { agentRuntimeConfiguration, runtimeDevice } from "./runtimeFixtures";
 
-describe("agent execution binding UI", () => {
+describe("agent runtime configuration UI", () => {
+  it("restores portable intent from a fresh clone and only requires attaching a compatible computer", async () => {
+    const user = userEvent.setup();
+    const device = runtimeDevice();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
+      if (url === "/api/agents/agent-1/runtime" && !init?.method) return Response.json({
+        intent: { provider: "codex", model: "gpt-test", reasoning: "high", policy: { network: true } },
+        issues: [{ code: "missing_attachment", path: "attachments.agent-1", agentId: "agent-1", message: "No compatible computer is attached on this machine." }]
+      });
+      if (url === "/api/agents/agent-1/runtime" && init?.method === "PUT") {
+        const payload = JSON.parse(String(init.body)) as { runtimeBackendId: string; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
+        return Response.json(agentRuntimeConfiguration({ backendId: payload.runtimeBackendId, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
+      }
+      return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${url}` }, { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentExecutionForm agentId="agent-1" />);
+
+    expect(await screen.findByText(/Portable intent: Codex CLI · gpt-test · high · network on/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Runtime"));
+    await user.click(await screen.findByRole("option", { name: /Iiro's MacBook Pro/ }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/agents/agent-1/runtime",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ runtimeBackendId: "backend-codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: [] } }) })
+    ));
+  });
+
   it("saves a valid device, provider, model and reasoning selection automatically", async () => {
     const user = userEvent.setup();
     const device = runtimeDevice();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
-      if (url === "/api/agents/agent-1/execution-binding" && !init?.method) return Response.json(null);
-      if (url === "/api/agents/agent-1/execution-binding" && init?.method === "PUT") {
+      if (url === "/api/agents/agent-1/runtime" && !init?.method) return Response.json({ issues: [] });
+      if (url === "/api/agents/agent-1/runtime" && init?.method === "PUT") {
         const payload = JSON.parse(String(init.body)) as { runtimeBackendId: string; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
-        return Response.json({
-          id: "binding-1", projectId: "project-1", agentId: "agent-1", runtimeBackendId: payload.runtimeBackendId, deviceId: "device-1", provider: "codex", model: payload.model, reasoning: payload.reasoning, policy: payload.policy, createdAt: now, updatedAt: now
-        });
+        return Response.json(agentRuntimeConfiguration({ backendId: payload.runtimeBackendId, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
       }
       return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${url}` }, { status: 404 });
     });
@@ -42,7 +69,7 @@ describe("agent execution binding UI", () => {
     await user.tab();
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "/api/agents/agent-1/execution-binding",
+      "/api/agents/agent-1/runtime",
       expect.objectContaining({ method: "PUT", body: JSON.stringify({ runtimeBackendId: "backend-codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: ["/shared/reference"] } }) })
     ));
   });

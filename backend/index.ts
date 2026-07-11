@@ -11,6 +11,7 @@ let shuttingDown = false;
 const shutdown = () => {
   if (shuttingDown) return;
   shuttingDown = true;
+  ballet.closeRunInvalidations();
   ballet.controlPlane.close();
   ballet.server.close(() => process.exit(0));
   // SSE requests are intentionally long-lived. Force them closed after the

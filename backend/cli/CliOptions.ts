@@ -21,7 +21,6 @@ export const resolveSetupPlan = (args: readonly string[]): SetupPlan => {
   const appUrl = options.get("app") ?? serverUrl;
   const repositoryUrl = options.get("repo") ?? options.get("repository");
   const projectId = options.get("project") ?? (repositoryUrl ? deriveProjectId(repositoryUrl) : undefined);
-  if (Boolean(projectId) !== Boolean(repositoryUrl)) throw new Error("--project and --repo must be provided together.");
   const deviceCode = options.get("device-code");
   if (options.has("device-code") && (!deviceCode || deviceCode === "true")) {
     throw new Error("--device-code requires the device code returned by an existing pairing session.");
@@ -30,7 +29,6 @@ export const resolveSetupPlan = (args: readonly string[]): SetupPlan => {
   if ((managedLocalServer || isLocalServerUrl(appUrl)) && new URL(serverUrl).origin !== new URL(appUrl).origin) {
     throw new Error("The managed local Ballet app and API must use the same loopback origin.");
   }
-  if (managedLocalServer && (!projectId || !repositoryUrl)) throw new Error("Local setup requires --repo <git-url>.");
   return {
     serverUrl,
     appUrl,

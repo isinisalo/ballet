@@ -3,30 +3,27 @@ import { Plus, Route, Save } from "lucide-react";
 import type { AgentExecutionState, AppData, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
 import { EmptyState, HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
-import type { AutomationLoopMode, AutomationLoopView } from "../types";
+import type { AutomationLoopView } from "../types";
 import { automationLoopPath } from "../routing";
 import { AutomationIssues } from "./AutomationIssues";
-import { AutomationModeSwitch } from "./AutomationModeSwitch";
 import { useAutomationDraft } from "./useAutomationDraft";
 import { AllLoopsCanvas } from "./loops/AllLoopsCanvas";
 import { LoopCreationEditor, LoopEditor } from "./loops/LoopEditor";
-import { LoopRunView } from "./loops/LoopRunView";
 import { createLoopDraft, removeLoopAtIndex, updateLoopAtIndex } from "./loops/loopEditorState";
 import { isActiveLoopRun } from "./loops/loopRunState";
 import { useLoopRun } from "./loops/useLoopRun";
 import type { RuntimeStreamStatus } from "@/app/useRuntimeStream";
 
-export function AutomationView({ data, agentExecutionStates, selectedId, loopView, mode, runtimeStreamStatus, saveAutomation, navigate }: {
+export function AutomationView({ data, agentExecutionStates, selectedId, loopView, runtimeStreamStatus, saveAutomation, navigate }: {
   data: AppData;
   agentExecutionStates: AgentExecutionState[];
   selectedId?: string;
   loopView?: AutomationLoopView;
-  mode: AutomationLoopMode;
   runtimeStreamStatus: RuntimeStreamStatus;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
   navigate: (path: string) => void;
 }) {
-  const { draft, setDraft, saveDraft, isDirty } = useAutomationDraft({ automation: data.automation, saveAutomation });
+  const { draft, setDraft, saveDraft } = useAutomationDraft({ automation: data.automation, saveAutomation });
   const [createDraft, setCreateDraft] = useState<ProjectLoop>(() => createLoopDraft(data.agents));
   const savedIndex = data.automation.loops.findIndex((loop) => loop.id === selectedId);
   const selectedIndex = savedIndex >= 0 ? savedIndex : -1;
@@ -57,7 +54,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
       return;
     }
     await saveDraft();
-    navigate(automationLoopPath(displayedLoop.id, mode));
+    navigate(automationLoopPath(displayedLoop.id));
   };
   const remove = async () => {
     if (selectedIndex < 0 || locked) return;
@@ -66,10 +63,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
     navigate(automationLoopPath(nextId));
   };
 
-  const modeSwitch = displayedLoop && !creating ? (
-    <AutomationModeSwitch mode={mode} onChange={(nextMode) => navigate(automationLoopPath(savedLoop?.id ?? displayedLoop.id, nextMode))} />
-  ) : null;
-  const editActions = mode === "edit" && loopView !== "all" ? (
+  const editActions = loopView !== "all" ? (
     <HeaderCrudActions
       saveAction={<Button type="button" size="icon-sm" disabled={locked} aria-label="Save loop" onClick={() => void save().catch(() => undefined)}><Save /></Button>}
       deleteLabel="Delete loop"
@@ -81,13 +75,12 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   ) : null;
 
   return (
-    <Panel title="Automation" titleExtra={displayedLoop?.id ? <span className="truncate text-muted-foreground">{displayedLoop.id}</span> : null} icon={<Route />} contentClassName="p-0" action={<div className="flex items-center gap-2">{modeSwitch}{creating ? editActions : null}{loopView === "all" ? <Button size="sm" onClick={() => navigate(automationLoopPath())}><Plus /> Add loop</Button> : null}</div>}>
+    <Panel title="Automation" titleExtra={displayedLoop?.id ? <span className="truncate text-muted-foreground">{displayedLoop.id}</span> : null} icon={<Route />} contentClassName="p-0" action={<div className="flex items-center gap-2">{creating ? editActions : null}{loopView === "all" ? <Button size="sm" onClick={() => navigate(automationLoopPath())}><Plus /> Add loop</Button> : null}</div>}>
       {data.automationIssues.length > 0 ? <div className="border-b border-divider-strong p-4"><AutomationIssues issues={data.automationIssues} /></div> : null}
       {loopView === "all" ? <AllLoopsCanvas config={draft} onSelect={(id) => navigate(automationLoopPath(id))} /> : null}
       {loopView !== "all" && !displayedLoop ? <div className="p-4"><EmptyState title="Loop not found." /></div> : null}
-      {loopView !== "all" && displayedLoop && mode === "edit" && creating ? <LoopCreationEditor loop={displayedLoop} loops={draft.loops} agents={data.agents} onChange={updateLoop} /> : null}
-      {loopView !== "all" && displayedLoop && mode === "edit" && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
-      {loopView !== "all" && savedLoop && mode === "run" ? <LoopRunView config={data.automation} loop={savedLoop} agents={data.agents} agentExecutionStates={agentExecutionStates} controller={runController} startDisabledReason={isDirty ? "Save loop changes before starting a run." : data.automationIssues.length > 0 ? "Resolve automation validation issues before starting a run." : undefined} /> : null}
+      {loopView !== "all" && displayedLoop && creating ? <LoopCreationEditor loop={displayedLoop} loops={draft.loops} agents={data.agents} onChange={updateLoop} /> : null}
+      {loopView !== "all" && displayedLoop && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
     </Panel>
   );
 }

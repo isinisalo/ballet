@@ -1,5 +1,6 @@
 import type { RuntimeBackend, RuntimeDevice } from "../src/workspace/runtimes/types";
 import type { AgentRun } from "../src/workspace/agents/execution/types";
+import type { AgentRuntimeConfiguration, RuntimeProvider } from "@shared/api/workspace-contracts";
 
 export const now = "2026-07-11T10:00:00.000Z";
 
@@ -67,6 +68,7 @@ export const agentRun = (patch: Partial<AgentRun> = {}): AgentRun => ({
   projectId: "project-1",
   agentId: "agent-1",
   rootRunId: "run-1",
+  source: "manual",
   taskId: "task-1",
   status: "running",
   runtime: {
@@ -90,4 +92,27 @@ export const agentRun = (patch: Partial<AgentRun> = {}): AgentRun => ({
   createdAt: now,
   updatedAt: now,
   ...patch
+});
+
+export const agentRuntimeConfiguration = ({
+  agentId = "agent-1",
+  backendId = "backend-codex",
+  provider = "codex",
+  model = "gpt-test",
+  reasoning = "high",
+  network = false,
+  readOnlyRoots = []
+}: {
+  agentId?: string;
+  backendId?: string;
+  provider?: RuntimeProvider;
+  model?: string;
+  reasoning?: string;
+  network?: boolean;
+  readOnlyRoots?: string[];
+} = {}): AgentRuntimeConfiguration => ({
+  intent: { provider, model, reasoning, policy: { network } },
+  attachment: { projectId: "project-1", agentId, runtimeBackendId: backendId, readOnlyRoots, createdAt: now, updatedAt: now },
+  resolved: { projectId: "project-1", agentId, runtimeBackendId: backendId, deviceId: "device-1", provider, model, reasoning, policy: { network, readOnlyRoots } },
+  issues: []
 });

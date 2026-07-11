@@ -10,6 +10,7 @@ import {
   ControlPlaneNotFoundError,
   ControlPlanePreflightError,
   ControlPlaneRateLimitError,
+  ControlPlaneRuntimeConfigurationError,
   ControlPlaneUnauthorizedError,
   ControlPlaneValidationError
 } from "../errors.js";
@@ -71,6 +72,7 @@ export const clearSessionCookies = (res: Response, secure: boolean): void => {
 export const controlPlaneErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (error instanceof HttpValidationError) { res.status(error.status).json({ error: error.message, issues: error.issues }); return; }
   if (error instanceof ControlPlanePreflightError) { res.status(409).json({ error: error.message, issues: error.issues }); return; }
+  if (error instanceof ControlPlaneRuntimeConfigurationError) { res.status(409).json({ error: error.message, issues: error.issues }); return; }
   if (error instanceof ControlPlaneValidationError) { res.status(400).json({ error: error.message }); return; }
   if (error instanceof ControlPlaneUnauthorizedError) { res.status(401).json({ error: error.message }); return; }
   if (error instanceof ControlPlaneForbiddenError) { res.status(403).json({ error: error.message }); return; }

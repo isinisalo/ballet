@@ -11,18 +11,18 @@ import { useId, useState } from "react";
 import { backendReadiness, providerLabel } from "../../runtimes/runtimeRegistry";
 import { AgentNodeStyleField, type AgentNodeStyleSettings } from "./AgentNodeStyleField";
 import { backendsForDevice, executionFormError, modelOptions, PROVIDER_DEFAULT, reasoningOptions, selectedExecutionBackend, selectedExecutionDevice } from "./executionOptions";
-import { useAgentExecutionBinding } from "./useAgentExecutionBinding";
+import { useAgentRuntimeConfiguration } from "./useAgentRuntimeConfiguration";
 
-export type AgentExecutionBindingEditor = ReturnType<typeof useAgentExecutionBinding>;
+export type AgentRuntimeConfigurationEditor = ReturnType<typeof useAgentRuntimeConfiguration>;
 
 export function AgentExecutionForm({ agentId, onSaved }: { agentId: string; onSaved?: () => void }) {
-  const editor = useAgentExecutionBinding(agentId);
+  const editor = useAgentRuntimeConfiguration(agentId);
   return <AgentExecutionSettingsForm agentId={agentId} editor={editor} onSaved={onSaved} />;
 }
 
 export function AgentExecutionSettingsForm({ agentId, editor, onSaved, compact = false, nodeStyle, nodeStyleSaving = false, nodeStyleError, onNodeStyleChange }: {
   agentId: string;
-  editor: AgentExecutionBindingEditor;
+  editor: AgentRuntimeConfigurationEditor;
   onSaved?: () => void;
   compact?: boolean;
   nodeStyle?: AgentNodeStyleSettings["nodeStyle"];
@@ -35,7 +35,7 @@ export function AgentExecutionSettingsForm({ agentId, editor, onSaved, compact =
     : <StandardAgentExecutionSettings agentId={agentId} editor={editor} onSaved={onSaved} nodeStyle={nodeStyle} nodeStyleSaving={nodeStyleSaving} nodeStyleError={nodeStyleError} onNodeStyleChange={onNodeStyleChange} />;
 }
 
-function CompactAgentExecutionSettings({ agentId, editor, onSaved, ...nodeStyleSettings }: { agentId: string; editor: AgentExecutionBindingEditor; onSaved?: () => void } & AgentNodeStyleSettings) {
+function CompactAgentExecutionSettings({ agentId, editor, onSaved, ...nodeStyleSettings }: { agentId: string; editor: AgentRuntimeConfigurationEditor; onSaved?: () => void } & AgentNodeStyleSettings) {
   const settings = useExecutionSettings(editor, onSaved);
 
   return (
@@ -44,38 +44,48 @@ function CompactAgentExecutionSettings({ agentId, editor, onSaved, ...nodeStyleS
         <h3 className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase leading-4 tracking-[0.05em] text-muted-foreground"><Cpu className="size-3.5" /> Execution</h3>
       </header>
       {editor.error ? <p role="alert" className="text-xs leading-4 text-destructive">{editor.error}</p> : null}
+      {editor.configuration?.issues.length ? <ul className="grid gap-1 font-mono text-[0.62rem] text-destructive">{editor.configuration.issues.map((issue) => <li key={`${issue.code}:${issue.path}`}>{issue.message}</li>)}</ul> : null}
+      {editor.configuration?.intent && !editor.configuration.resolved ? <PortableIntentSummary editor={editor} compact /> : null}
       {!editor.loading && editor.devices.length === 0 ? <p className="text-xs leading-4 text-muted-foreground">No runtime computers are connected.</p> : null}
       <ExecutionSelectionFields settings={settings} compact />
       <AgentNodeStyleField compact {...nodeStyleSettings} />
       <NetworkAccessField compact checked={editor.form.policy.network} disabled={!settings.supportsNetwork} onChange={settings.setNetwork} />
       <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} onReadOnlyRootsChange={settings.setReadOnlyRoots} onReadOnlyRootsBlur={settings.saveReadOnlyRoots} compact />
-      <p className="text-xs leading-4 text-muted-foreground">{editor.saving ? "Saving execution…" : settings.validationError ?? "Execution binding is explicit; Ballet never selects the first available runtime."}</p>
+      <p className="text-xs leading-4 text-muted-foreground">{editor.saving ? "Saving runtime configuration…" : settings.validationError ?? "Portable intent is stored in .ballet/runtime.json; the computer attachment stays local."}</p>
     </section>
   );
 }
 
-function StandardAgentExecutionSettings({ agentId, editor, onSaved, ...nodeStyleSettings }: { agentId: string; editor: AgentExecutionBindingEditor; onSaved?: () => void } & AgentNodeStyleSettings) {
+function StandardAgentExecutionSettings({ agentId, editor, onSaved, ...nodeStyleSettings }: { agentId: string; editor: AgentRuntimeConfigurationEditor; onSaved?: () => void } & AgentNodeStyleSettings) {
   const settings = useExecutionSettings(editor, onSaved);
 
   return (
     <section className="grid gap-3 border-t border-divider-strong bg-panel-section p-4" aria-label="Agent execution settings">
       <header className="flex items-start justify-between gap-3">
-        <div><h3 className="flex items-center gap-2 text-sm font-semibold"><Cpu className="size-4 text-muted-foreground" /> Execution</h3><p className="text-xs text-muted-foreground">Bind this agent to one explicit computer and CLI provider.</p></div>
+        <div><h3 className="flex items-center gap-2 text-sm font-semibold"><Cpu className="size-4 text-muted-foreground" /> Execution</h3><p className="text-xs text-muted-foreground">Configure portable intent and attach one local computer.</p></div>
         {settings.readiness ? <span className={cn("border px-2 py-1 font-mono text-[0.6rem] uppercase", settings.readiness.tone === "healthy" ? "border-secondary/30 text-secondary" : settings.readiness.tone === "error" ? "border-destructive/30 text-destructive" : "border-tertiary/30 text-tertiary")}>{settings.readiness.label}</span> : null}
       </header>
       {editor.error ? <Alert variant="destructive"><AlertDescription>{editor.error}</AlertDescription></Alert> : null}
+      {editor.configuration?.issues.length ? <Alert variant="destructive"><AlertDescription>{editor.configuration.issues.map((issue) => issue.message).join(" · ")}</AlertDescription></Alert> : null}
+      {editor.configuration?.intent && !editor.configuration.resolved ? <PortableIntentSummary editor={editor} /> : null}
       {!editor.loading && editor.devices.length === 0 ? <Alert><AlertDescription>No runtime computers are connected. Connect one from Runtimes before configuring execution.</AlertDescription></Alert> : null}
       <ExecutionSelectionFields settings={settings} />
       <AgentNodeStyleField {...nodeStyleSettings} />
       <div className="border border-divider-strong bg-background px-3 py-2 text-xs"><span className="font-medium text-foreground">Write scope:</span> <span className="text-muted-foreground">current project checkout only</span></div>
       <NetworkAccessField checked={editor.form.policy.network} disabled={!settings.supportsNetwork} onChange={settings.setNetwork} />
       <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} onReadOnlyRootsChange={settings.setReadOnlyRoots} onReadOnlyRootsBlur={settings.saveReadOnlyRoots} />
-      <p className="text-xs text-muted-foreground">{editor.saving ? "Saving execution…" : settings.validationError ?? "Execution binding is explicit; Ballet never selects the first available runtime."}</p>
+      <p className="text-xs text-muted-foreground">{editor.saving ? "Saving runtime configuration…" : settings.validationError ?? "Portable intent is stored in .ballet/runtime.json; the computer attachment stays local."}</p>
     </section>
   );
 }
 
-function useExecutionSettings(editor: AgentExecutionBindingEditor, onSaved?: () => void) {
+function PortableIntentSummary({ editor, compact = false }: { editor: AgentRuntimeConfigurationEditor; compact?: boolean }) {
+  const intent = editor.configuration?.intent;
+  if (!intent) return null;
+  return <p className={cn("border border-divider-strong bg-background font-mono text-muted-foreground", compact ? "px-2 py-1.5 text-[0.6rem] leading-4" : "px-3 py-2 text-[0.65rem]")}>Portable intent: {providerLabel(intent.provider)} · {intent.model} · {intent.reasoning} · network {intent.policy.network ? "on" : "off"}</p>;
+}
+
+function useExecutionSettings(editor: AgentRuntimeConfigurationEditor, onSaved?: () => void) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const device = selectedExecutionDevice(editor.devices, editor.form.deviceId);
   const backend = selectedExecutionBackend(editor.devices, editor.form.runtimeBackendId);
@@ -122,6 +132,6 @@ function NetworkAccessField({ checked, disabled, onChange, compact = false }: { 
   return <label className="flex items-center justify-between gap-4 text-xs"><span><strong className="block text-foreground">Network access</strong><span className="text-muted-foreground">Disabled by default. The provider must advertise network control.</span></span><Switch checked={checked} disabled={disabled} aria-label="Network access" onCheckedChange={onChange} /></label>;
 }
 
-function AdvancedPolicy({ agentId, editor, supportsRoots, open, onOpenChange, onReadOnlyRootsChange, onReadOnlyRootsBlur, compact = false }: { agentId: string; editor: AgentExecutionBindingEditor; supportsRoots: boolean; open: boolean; onOpenChange: (open: boolean) => void; onReadOnlyRootsChange: (readOnlyRoots: string[]) => void; onReadOnlyRootsBlur: () => void; compact?: boolean }) {
+function AdvancedPolicy({ agentId, editor, supportsRoots, open, onOpenChange, onReadOnlyRootsChange, onReadOnlyRootsBlur, compact = false }: { agentId: string; editor: AgentRuntimeConfigurationEditor; supportsRoots: boolean; open: boolean; onOpenChange: (open: boolean) => void; onReadOnlyRootsChange: (readOnlyRoots: string[]) => void; onReadOnlyRootsBlur: () => void; compact?: boolean }) {
   return <Collapsible open={open} onOpenChange={onOpenChange}><CollapsibleTrigger render={<Button type="button" size="sm" variant="ghost" className={cn("px-0 text-muted-foreground", compact && "h-6 text-xs")}><ChevronDown className={cn("transition-transform", open && "rotate-180")} /> Advanced policy</Button>} /><CollapsibleContent className="grid gap-3 border-t border-divider-strong pt-3"><Field className="gap-1.5"><FieldLabel htmlFor={`read-only-roots-${agentId}`}>Additional read-only roots</FieldLabel><Textarea id={`read-only-roots-${agentId}`} className="min-h-20 font-mono text-xs" disabled={!supportsRoots} placeholder="One absolute path per line" value={editor.form.policy.readOnlyRoots.join("\n")} onBlur={onReadOnlyRootsBlur} onChange={(event) => onReadOnlyRootsChange(event.target.value.split("\n").map((value) => value.trim()).filter(Boolean))} /></Field></CollapsibleContent></Collapsible>;
 }

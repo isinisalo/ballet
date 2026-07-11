@@ -23,7 +23,20 @@ describe("project registration", () => {
     });
     controls.push(control);
     const connection = control.database.connection();
-    connection.exec("CREATE TABLE loop_runs (project_id TEXT NOT NULL, status TEXT NOT NULL); INSERT INTO loop_runs VALUES ('release-smoke', 'running');");
+    connection.prepare(`
+      INSERT INTO loop_runs (
+        run_id, project_id, loop_id, root_run_id, source, status, snapshot_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run("run-1", "release-smoke", "delivery", "run-1", "manual", "running", JSON.stringify({
+      id: "delivery",
+      start: "gate",
+      steps: [{
+        id: "gate",
+        type: "human",
+        description: "Approve.",
+        on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
+      }]
+    }), "2026-07-11T00:00:00.000Z", "2026-07-11T00:00:00.000Z");
 
     expect(() => control.service.registerProject({
       id: "ballet",

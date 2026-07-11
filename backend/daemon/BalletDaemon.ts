@@ -240,7 +240,7 @@ export class BalletDaemon {
     if (!projectId || !repositoryUrl || !repositoryPath) return undefined;
     const inspected = await this.options.git.inspectManagedProject(projectId, this.controller.signal);
     if (inspected.root !== repositoryPath) {
-      throw new Error(`Configured repository path ${repositoryPath} does not match managed checkout ${inspected.root}.`);
+      throw new Error(`Configured repository path ${repositoryPath} does not match the source checkout ${inspected.root}.`);
     }
     return {
       repositoryUrl,

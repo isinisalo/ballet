@@ -40,12 +40,31 @@ export class DaemonConfigStore {
     return validateDaemonConfig(parsed);
   }
 
+  async loadProject(projectId: string): Promise<DaemonConfig | undefined> {
+    try {
+      const parsed = JSON.parse(await readFile(this.projectConfigPath(projectId), "utf8")) as unknown;
+      const config = validateDaemonConfig(parsed);
+      if (config.projectId !== projectId) throw new Error(`Stored daemon config belongs to ${config.projectId ?? "no project"}, not ${projectId}.`);
+      return config;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
+  }
+
   async save(config: DaemonConfig): Promise<void> {
     validateDaemonConfig(config);
-    await mkdir(path.dirname(this.path), { recursive: true });
-    const temporary = `${this.path}.${process.pid}.tmp`;
-    await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
+    const source = `${JSON.stringify(config, null, 2)}\n`;
+    await writeConfig(this.path, source);
+    if (config.projectId) await writeConfig(this.projectConfigPath(config.projectId), source);
+  }
+
+  async activateProject(projectId: string, repository: { repositoryUrl: string; repositoryPath: string }): Promise<DaemonConfig | undefined> {
+    const stored = await this.loadProject(projectId);
+    if (!stored) return undefined;
+    const active = { ...stored, repositoryUrl: repository.repositoryUrl, repositoryPath: path.resolve(repository.repositoryPath) };
+    await this.save(active);
+    return active;
   }
 
   statusPath(): string {
@@ -59,7 +78,21 @@ export class DaemonConfigStore {
   logPath(): string {
     return path.join(this.logDirectory(), "daemon.log");
   }
+
+  private projectConfigPath(projectId: string): string {
+    return path.join(this.home, "projects", safeProjectId(projectId), "daemon.json");
+  }
 }
+
+const writeConfig = async (target: string, source: string): Promise<void> => {
+  await mkdir(path.dirname(target), { recursive: true });
+  const temporary = `${target}.${process.pid}.tmp`;
+  await writeFile(temporary, source, { mode: 0o600 });
+  await rename(temporary, target);
+};
+
+const safeProjectId = (value: string): string =>
+  value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 200) || "project";
 
 const validateDaemonConfig = (value: unknown): DaemonConfig => {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Daemon config must be an object.");

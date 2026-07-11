@@ -60,7 +60,7 @@ const verifyModelDiscoveryFailure = async () => {
 describe("BalletDaemon", () => {
   it("reports model discovery failures as unhealthy and never wakes that backend", verifyModelDiscoveryFailure);
 
-  it("reports the inspected managed checkout and CAS config snapshot before accepting work", async () => {
+  it("reports the inspected source checkout and CAS config snapshot before accepting work", async () => {
     const transport = new FakeDaemonControlPlane();
     const codex = new FakeCliRuntimeAdapter("codex", "0.0.0", [], [{ id: "gpt-5.4", name: "GPT-5.4" }]);
     const copilot = new FakeCliRuntimeAdapter("copilot", "0.0.0", [], [{ id: "gpt-5", name: "GPT-5" }]);

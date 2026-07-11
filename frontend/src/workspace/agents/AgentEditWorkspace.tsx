@@ -3,7 +3,7 @@ import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts
 import { Activity, BookOpenText, ChevronRight, FileText } from "lucide-react";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
 import { AgentLiveStatusBadge, AgentProfilePanel } from "./AgentProfilePanel";
-import { useAgentExecutionBinding } from "./execution/useAgentExecutionBinding";
+import { useAgentRuntimeConfiguration } from "./execution/useAgentRuntimeConfiguration";
 import type { AgentEditorState } from "./useAgentEditor";
 
 const workspaceTabs = [
@@ -17,7 +17,7 @@ export function AgentEditWorkspace({ agent, executionState, editor }: {
   executionState?: AgentExecutionState;
   editor: AgentEditorState;
 }) {
-  const executionEditor = useAgentExecutionBinding(agent.id);
+  const executionEditor = useAgentRuntimeConfiguration(agent.id);
 
   return (
     <section className="w-full overflow-hidden border-y border-divider-strong bg-card">

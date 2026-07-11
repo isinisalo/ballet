@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AgentEditor } from "../src/workspace/agents/AgentEditor";
-import { now, runtimeBackend, runtimeDevice } from "./runtimeFixtures";
+import { agentRuntimeConfiguration, runtimeBackend, runtimeDevice } from "./runtimeFixtures";
 
 const agent = (): Agent => ({
   id: "agent-architect",
@@ -73,9 +73,7 @@ describe("agent instructions workspace", () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
-      if (url === "/api/agents/agent-architect/execution-binding") return Response.json({
-        id: "binding-1", projectId: "project-1", agentId: "agent-architect", runtimeBackendId: "backend-copilot", deviceId: "device-1", provider: "copilot", model: "gpt-test", reasoning: "high", policy: { network: false, readOnlyRoots: [] }, createdAt: now, updatedAt: now
-      });
+      if (url === "/api/agents/agent-architect/runtime") return Response.json(agentRuntimeConfiguration({ agentId: "agent-architect", backendId: "backend-copilot", provider: "copilot" }));
       return Response.json({ error: `Unhandled ${url}` }, { status: 404 });
     }));
 
@@ -97,12 +95,10 @@ describe("agent instructions workspace", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
-      if (url === "/api/agents/agent-architect/execution-binding" && !init?.method) return Response.json(null);
-      if (url === "/api/agents/agent-architect/execution-binding" && init?.method === "PUT") {
+      if (url === "/api/agents/agent-architect/runtime" && !init?.method) return Response.json({ issues: [] });
+      if (url === "/api/agents/agent-architect/runtime" && init?.method === "PUT") {
         const payload = JSON.parse(String(init.body)) as { runtimeBackendId: string; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
-        return Response.json({
-          id: "binding-1", projectId: "project-1", agentId: "agent-architect", deviceId: "device-1", provider: "codex", ...payload, createdAt: now, updatedAt: now
-        });
+        return Response.json(agentRuntimeConfiguration({ agentId: "agent-architect", backendId: payload.runtimeBackendId, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
       }
       return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${url}` }, { status: 404 });
     });
@@ -123,7 +119,7 @@ describe("agent instructions workspace", () => {
       await user.click(screen.getByRole("switch", { name: "Network access" }));
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-        "/api/agents/agent-architect/execution-binding",
+        "/api/agents/agent-architect/runtime",
         expect.objectContaining({ method: "PUT", body: JSON.stringify({ runtimeBackendId: "backend-codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: [] } }) })
       ));
     } finally {

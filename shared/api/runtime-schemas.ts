@@ -10,7 +10,22 @@ export const executionPolicySchema = z.object({
   readOnlyRoots: z.array(z.string().trim().min(1).max(4096).regex(/^\//, "Read-only roots must be absolute paths.")).max(32)
 }).strict();
 
-export const executionBindingBodySchema = z.object({
+export const portableAgentRuntimeIntentSchema = z.object({
+  provider: runtimeProviderSchema,
+  model: z.string().trim().min(1).max(200),
+  reasoning: z.string().trim().min(1).max(100),
+  policy: z.object({ network: z.boolean() }).strict()
+}).strict();
+
+export const projectRuntimeConfigSchema = z.object({
+  version: z.literal(1),
+  agents: z.record(
+    z.string().trim().min(1).max(200),
+    portableAgentRuntimeIntentSchema
+  )
+}).strict();
+
+export const agentRuntimeConfigurationBodySchema = z.object({
   runtimeBackendId: idSchema,
   model: z.string().trim().min(1).max(200),
   reasoning: z.string().trim().min(1).max(100),

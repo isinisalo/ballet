@@ -111,6 +111,29 @@ body {
   outline: none;
 }
 
+.loop-run-node-pulse--running::before,
+.loop-run-node-pulse--waiting::before {
+  position: absolute;
+  inset: -5px;
+  z-index: -1;
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  opacity: 0.25;
+  pointer-events: none;
+  content: "";
+  animation: loop-run-node-pulse 1.8s ease-in-out infinite;
+}
+
+.loop-run-node-pulse--running::before {
+  color: var(--secondary);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--secondary) 44%, transparent);
+}
+
+.loop-run-node-pulse--waiting::before {
+  color: var(--tertiary);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tertiary) 42%, transparent);
+}
+
 .loop-celestial-node[data-loop-node-style="luna"] {
   --loop-node-reasoning-accent: color-mix(in srgb, var(--foreground) 78%, var(--muted-foreground));
 }
@@ -249,6 +272,31 @@ body {
 @keyframes loop-edge-flow {
   to {
     stroke-dashoffset: -28;
+  }
+}
+
+@keyframes loop-run-node-pulse {
+  0%, 100% {
+    opacity: 0.18;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.68;
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loop-react-flow .loop-edge-animated .react-flow__edge-path,
+  .loop-run-node-pulse--running::before,
+  .loop-run-node-pulse--waiting::before {
+    animation: none;
+  }
+
+  .loop-run-node-pulse--running::before,
+  .loop-run-node-pulse--waiting::before {
+    opacity: 0.45;
+    transform: none;
   }
 }
 

@@ -62,6 +62,10 @@ export class LoopRunService {
     return this.database().listLoopRuns();
   }
 
+  listActive() {
+    return this.database().listActiveLoopRuns();
+  }
+
   database(): RuntimeDatabase {
     return this.runtimeDatabaseProvider.runtimeDatabase();
   }

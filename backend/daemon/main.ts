@@ -25,7 +25,10 @@ const adapters = [
   new CopilotSdkAdapter({ command: copilot.command })
 ];
 const transport = new HttpWsDaemonTransport({ baseUrl: config.serverUrl, daemonToken: token });
-const git = new GitWorkspaceManager({ root: configStore.home });
+const repositoryPaths = config.projectId && config.repositoryPath
+  ? { [config.projectId]: config.repositoryPath }
+  : {};
+const git = new GitWorkspaceManager({ root: configStore.home, repositoryPaths });
 const runner = new LeaseAwareJobRunner({ deviceId: config.deviceId, adapters, runtimeBackends: config.backends, transport, git });
 const logger = new RotatingDaemonLogger({ path: configStore.logPath() });
 const daemon = new BalletDaemon({

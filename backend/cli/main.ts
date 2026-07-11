@@ -3,16 +3,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runBalletCli, defaultOpenUrl } from "./BalletCli.js";
 import { DaemonConfigStore } from "../daemon/config/DaemonConfigStore.js";
-import { GitWorkspaceManager } from "../daemon/git/GitWorkspaceManager.js";
 import { MacOsKeychain } from "./Keychain.js";
 import { LaunchdService } from "./LaunchdService.js";
 import { LocalServerService } from "./LocalServerService.js";
+import { localControlToken } from "./LocalControlToken.js";
 import { superviseLaunchdProcess } from "./LaunchdLogSupervisor.js";
 import { PairingClient } from "./PairingClient.js";
 import { VerifiedReleaseUpdater } from "./VerifiedReleaseUpdater.js";
 
 const version = process.env.BALLET_VERSION ?? process.env.npm_package_version ?? "0.1.0";
 const config = new DaemonConfigStore();
+const controlToken = await localControlToken(config.home);
 const cliEntry = fileURLToPath(import.meta.url);
 const packagedExecutable = process.env.BALLET_PACKAGED_EXECUTABLE;
 if (packagedExecutable) process.env.BALLET_INSTALL_PATH ??= packagedExecutable;
@@ -55,14 +56,14 @@ if (argv[0] === "launchd-log-supervisor-internal-run") {
     programArguments: serverProgramArguments,
     webDistPath: packagedExecutable ? process.env.BALLET_WEB_DIST : undefined
   }),
-  git: new GitWorkspaceManager({ root: config.home }),
   updater: new VerifiedReleaseUpdater(),
   output: {
     stdout: (message) => process.stdout.write(`${message}\n`),
     stderr: (message) => process.stderr.write(`${message}\n`)
   },
   openUrl: defaultOpenUrl,
-  version
+  version,
+  localControlToken: controlToken
   });
 
   process.exitCode = exitCode;

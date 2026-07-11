@@ -57,6 +57,16 @@ export class ControlPlanePreflightError extends ControlPlaneConflictError {
   }
 }
 
+export class ControlPlaneRuntimeConfigurationError extends ControlPlaneConflictError {
+  constructor(
+    message: string,
+    readonly issues: import("../../shared/domain/runtime.js").RuntimeConfigurationIssue[]
+  ) {
+    super(message);
+    this.name = "ControlPlaneRuntimeConfigurationError";
+  }
+}
+
 export class ControlPlaneFencingError extends ControlPlaneConflictError {
   constructor(message = "The task lease is stale.") {
     super(message);

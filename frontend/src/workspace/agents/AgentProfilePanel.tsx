@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
 import { Check, Pencil, X } from "lucide-react";
 import { useState } from "react";
-import { AgentExecutionSettingsForm, type AgentExecutionBindingEditor } from "./execution/AgentExecutionForm";
+import { AgentExecutionSettingsForm, type AgentRuntimeConfigurationEditor } from "./execution/AgentExecutionForm";
 import type { AgentEditorState } from "./useAgentEditor";
 
 const statusLabel: Record<AgentExecutionState["status"], string> = {
@@ -54,7 +54,7 @@ export function AgentProfilePanel({ agent, executionState, editor, executionEdit
   agent: Agent;
   executionState?: AgentExecutionState;
   editor: AgentEditorState;
-  executionEditor: AgentExecutionBindingEditor;
+  executionEditor: AgentRuntimeConfigurationEditor;
 }) {
   const [editingField, setEditingField] = useState<"name" | "description" | null>(null);
   const name = editor.form.name ?? agent.name;

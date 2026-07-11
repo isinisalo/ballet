@@ -1,5 +1,5 @@
 import type { ProjectStep, StepRun } from "@shared/api/workspace-contracts";
-import { Bot, ShieldCheck } from "lucide-react";
+import { GitCompare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { HumanGateRunPanel } from "./HumanGateRunPanel";
 
@@ -9,19 +9,8 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
   pending: boolean;
   onRespond: (stepRunId: string, result: "approved" | "rejected", input: string) => Promise<boolean>;
 }) {
-  const Icon = step.type === "human" ? ShieldCheck : Bot;
   return (
-    <aside aria-label="StepRun details" className="min-w-0 overflow-y-auto px-3 pt-9 pb-2.5 text-xs">
-      <header className="mb-3 flex items-start justify-between gap-3 border-b border-divider-strong pb-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <h3 className="truncate font-mono text-xs font-medium">{step.id}</h3>
-            <p className="truncate font-mono text-[0.62rem] text-muted-foreground">{stepRun.stepRunId}</p>
-          </div>
-        </div>
-        <Badge variant={stepRun.status === "failed" ? "destructive" : stepRun.status === "completed" ? "secondary" : "outline"}>{stepRun.status}</Badge>
-      </header>
+    <div aria-label="StepRun details" className="min-w-0 px-3 py-3 text-xs">
       <dl className="grid grid-cols-[5rem_minmax(0,1fr)] gap-x-2 gap-y-2 font-mono text-[0.65rem]">
         <dt className="text-muted-foreground">Type</dt><dd>{step.type}</dd>
         <dt className="text-muted-foreground">Agent</dt><dd className="break-words">{stepRun.agentId ?? "Human operator"}</dd>
@@ -38,6 +27,14 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
         {stepRun.completedAt ? <><dt className="text-muted-foreground">Completed</dt><dd>{formatDate(stepRun.completedAt)}</dd></> : null}
       </dl>
       {stepRun.error ? <p className="mt-3 border-t border-divider-strong pt-3 font-mono text-[0.65rem] text-destructive">{stepRun.error}</p> : null}
+      {stepRun.outcome ? (
+        <section className="mt-3 grid gap-2 border-t border-divider-strong pt-3" aria-label="Structured outcome">
+          <div className="flex items-center gap-2"><h4 className="font-medium">Structured outcome</h4><Badge variant={stepRun.outcome.outcome === "failed" || stepRun.outcome.outcome === "blocked" ? "destructive" : "secondary"}>{stepRun.outcome.outcome}</Badge></div>
+          <p className="text-muted-foreground">{stepRun.outcome.summary}</p>
+          {stepRun.outcome.checks.length ? <ul className="grid gap-1 font-mono text-[0.65rem]">{stepRun.outcome.checks.map((check) => <li key={check.name} className="flex justify-between gap-3"><span>{check.name}</span><span>{check.status}</span></li>)}</ul> : null}
+          {stepRun.outcome.artifacts?.changed_files?.length ? <p className="flex items-start gap-1.5 break-words font-mono text-[0.62rem] text-muted-foreground"><GitCompare className="mt-0.5 size-3 shrink-0" />{stepRun.outcome.artifacts.changed_files.join(" · ")}</p> : null}
+        </section>
+      ) : null}
       {stepRun.responseInput ? (
         <div className="mt-3 border-t border-divider-strong pt-3">
           <p className="mb-1 text-muted-foreground">Human response</p>
@@ -47,7 +44,7 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
       {stepRun.type === "human" && stepRun.status === "waiting_for_human" ? (
         <div className="-mx-3 mt-3"><HumanGateRunPanel stepRun={stepRun} pending={pending} onRespond={onRespond} /></div>
       ) : null}
-    </aside>
+    </div>
   );
 }
 

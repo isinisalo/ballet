@@ -1,11 +1,17 @@
+import type { AgentExecutionState } from "../../shared/domain/agents.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type {
-    AgentExecutionBinding,
-    ExecutionProjectSnapshot,
-    ExecutionRuntimeSnapshot,
-    RuntimeBackend,
-    RuntimePreflightIssue
+  AgentRuntimeAttachment,
+  AgentRuntimeConfiguration,
+  ExecutionProjectSnapshot,
+  ExecutionRuntimeSnapshot,
+  PortableAgentRuntimeIntent,
+  ResolvedAgentExecution,
+  RuntimeBackend,
+  RuntimeConfigurationIssue,
+  RuntimePreflightIssue
 } from "../../shared/domain/runtime.js";
+import { RuntimeIntentRepository } from "../runtime-config/RuntimeIntentRepository.js";
 import type { AgentExecutionStore } from "./AgentExecutionStore.js";
 import { valueHash } from "./crypto.js";
 import type { ProjectStore, RegisteredProject } from "./ProjectStore.js";
@@ -32,24 +38,112 @@ export class RuntimePreflightService {
   constructor(
     private readonly projects: ProjectStore,
     private readonly registry: RuntimeRegistryStore,
-    private readonly agents: AgentExecutionStore
+    private readonly agents: AgentExecutionStore,
+    private readonly intents = new RuntimeIntentRepository()
   ) {}
 
   setProject(project: RegisteredProject): void {
     this.project = project;
   }
 
-  agent(agentId: string, bindingOverride?: AgentExecutionBinding): AgentPreflightResult {
-    const project = this.project ?? this.projects.active();
+  configuration(agentId: string): AgentRuntimeConfiguration {
+    const project = this.activeProject();
+    if (!project) return { issues: [missingAttachment(agentId, "No active project is registered.")] };
+    const loaded = this.intents.load(project.checkoutPath);
+    const attachment = this.agents.getAttachment(project.id, agentId);
+    if (!loaded.config) return { attachment, issues: loaded.issues };
+    const intent = loaded.config.agents[agentId];
+    const issues: RuntimeConfigurationIssue[] = [];
+    if (!intent) issues.push({
+      code: "missing_intent",
+      path: `agents.${agentId}`,
+      agentId,
+      message: "Agent has no portable runtime intent in .ballet/runtime.json."
+    });
+    if (!attachment) issues.push(missingAttachment(agentId, "No compatible computer is attached on this machine."));
+    const resolved = intent && attachment
+      ? this.resolve(project, agentId, intent, attachment, issues)
+      : undefined;
+    return { intent, attachment, resolved, issues };
+  }
+
+  configurationIssues(agentIds: readonly string[]): RuntimeConfigurationIssue[] {
+    const project = this.activeProject();
+    if (!project) return [missingAttachment("*", "No active project is registered.")];
+    const loaded = this.intents.load(project.checkoutPath);
+    if (!loaded.config) return loaded.issues;
+    const known = new Set(agentIds);
+    const issues = agentIds.flatMap((agentId) => this.configuration(agentId).issues);
+    for (const agentId of Object.keys(loaded.config.agents)) {
+      if (!known.has(agentId)) issues.push({
+        code: "orphan_intent",
+        path: `agents.${agentId}`,
+        agentId,
+        message: `Runtime intent ${agentId} has no matching agent and was left unchanged.`
+      });
+    }
+    for (const agentId of this.agents.attachedAgentIds(project.id)) {
+      if (!known.has(agentId)) issues.push({
+        code: "orphan_attachment",
+        path: `attachments.${agentId}`,
+        agentId,
+        message: `Local runtime attachment ${agentId} has no matching agent.`
+      });
+    }
+    return issues;
+  }
+
+  configuredAgentIds(): string[] {
+    const project = this.activeProject();
+    if (!project) return [];
+    const loaded = this.intents.load(project.checkoutPath);
+    return [...new Set([
+      ...Object.keys(loaded.config?.agents ?? {}),
+      ...this.agents.attachedAgentIds(project.id)
+    ])].sort();
+  }
+
+  putConfiguration(
+    agentId: string,
+    intent: PortableAgentRuntimeIntent,
+    attachment: Pick<AgentRuntimeAttachment, "runtimeBackendId" | "readOnlyRoots">
+  ): AgentRuntimeConfiguration {
+    const project = this.activeProject();
+    if (!project) return { issues: [missingAttachment(agentId, "No active project is registered.")] };
+    this.intents.put(project.checkoutPath, agentId, intent);
+    this.agents.putAttachment({ projectId: project.id, agentId, ...attachment });
+    return this.configuration(agentId);
+  }
+
+  removeConfiguration(agentId: string): void {
+    const project = this.activeProject();
+    if (!project) return;
+    this.intents.remove(project.checkoutPath, agentId);
+    this.agents.removeAttachment(project.id, agentId);
+  }
+
+  executionStates(agentIds: readonly string[]): AgentExecutionState[] {
+    return agentIds.map((agentId) => {
+      const configuration = this.configuration(agentId);
+      return this.agents.executionState(agentId, configuration.resolved, configuration.issues[0]?.message);
+    });
+  }
+
+  agent(agentId: string, executionOverride?: ResolvedAgentExecution): AgentPreflightResult {
+    const project = this.activeProject();
     if (!project) return failure(agentId, "offline", "No active project is registered.");
-    const binding = bindingOverride ?? this.agents.getBinding(project.id, agentId);
-    if (!binding) return failure(agentId, "unbound", "Agent has no execution runtime binding.");
-    const backend = this.registry.getBackend(binding.runtimeBackendId);
-    const issues = this.backendIssues(agentId, binding, backend);
+    const configuration = executionOverride ? undefined : this.configuration(agentId);
+    const execution = executionOverride ?? configuration?.resolved;
+    if (!execution) {
+      const issues = configuration?.issues.map((issue) => toPreflightIssue(issue, agentId)) ?? [];
+      return issues.length > 0 ? { ok: false, issues } : failure(agentId, "unbound", "Agent runtime is not configured.");
+    }
+    const backend = this.registry.getBackend(execution.runtimeBackendId);
+    const issues = this.backendIssues(agentId, execution, backend);
     const device = backend ? this.registry.get(backend.deviceId) : undefined;
     const projectSnapshot = device ? this.projectSnapshot(project, device.id, agentId, issues) : undefined;
-    const runtime = backend && device && issues.every((issue) => !["offline", "auth_required", "backend_unhealthy", "model_unavailable", "reasoning_unavailable", "policy_unsupported", "mixed_device"].includes(issue.code))
-      ? runtimeSnapshot(backend, device.displayName, binding)
+    const runtime = backend && device && issues.every((issue) => !blockingRuntimeCodes.has(issue.code))
+      ? runtimeSnapshot(backend, device.displayName, execution)
       : undefined;
     return { ok: issues.length === 0, deviceId: device?.id, issues, runtime, project: projectSnapshot };
   }
@@ -68,50 +162,74 @@ export class RuntimePreflightService {
       }
     }
     if (deviceIds.size > 1) {
-      for (const snapshot of snapshots) {
-        issues.push({
-          agentId: snapshot.agentId,
-          stepId: snapshot.stepId,
-          code: "mixed_device",
-          message: "Every agent step in a loop run must use a runtime on the same device."
-        });
-      }
+      for (const snapshot of snapshots) issues.push({
+        agentId: snapshot.agentId,
+        stepId: snapshot.stepId,
+        code: "mixed_device",
+        message: "Every agent step in a loop run must use a runtime on the same device."
+      });
+    }
+    return { ok: issues.length === 0, deviceId: deviceIds.size === 1 ? [...deviceIds][0] : undefined, issues, snapshots };
+  }
+
+  private resolve(
+    project: RegisteredProject,
+    agentId: string,
+    intent: PortableAgentRuntimeIntent,
+    attachment: AgentRuntimeAttachment,
+    issues: RuntimeConfigurationIssue[]
+  ): ResolvedAgentExecution | undefined {
+    const backend = this.registry.getBackend(attachment.runtimeBackendId);
+    if (!backend || backend.projectId !== project.id) {
+      issues.push({
+        code: "attachment_backend_missing",
+        path: `attachments.${agentId}.runtimeBackendId`,
+        agentId,
+        message: "Attached runtime backend is not available in the active project."
+      });
+      return undefined;
+    }
+    if (backend.provider !== intent.provider) {
+      issues.push({
+        code: "provider_mismatch",
+        path: `agents.${agentId}.provider`,
+        agentId,
+        message: `Portable provider ${intent.provider} does not match attached backend provider ${backend.provider}.`
+      });
+      return undefined;
     }
     return {
-      ok: issues.length === 0,
-      deviceId: deviceIds.size === 1 ? [...deviceIds][0] : undefined,
-      issues,
-      snapshots
+      projectId: project.id,
+      agentId,
+      runtimeBackendId: backend.id,
+      deviceId: backend.deviceId,
+      provider: intent.provider,
+      model: intent.model,
+      reasoning: intent.reasoning,
+      policy: { network: intent.policy.network, readOnlyRoots: attachment.readOnlyRoots }
     };
   }
 
-  private backendIssues(
-    agentId: string,
-    binding: AgentExecutionBinding,
-    backend: RuntimeBackend | undefined
-  ): RuntimePreflightIssue[] {
+  private backendIssues(agentId: string, execution: ResolvedAgentExecution, backend?: RuntimeBackend): RuntimePreflightIssue[] {
     const issues: RuntimePreflightIssue[] = [];
     const add = (code: RuntimePreflightIssue["code"], message: string) => issues.push({ agentId, code, message });
-    if (!backend) {
-      add("offline", "Bound runtime backend does not exist.");
-      return issues;
-    }
+    if (!backend) { add("offline", "Attached runtime backend does not exist."); return issues; }
     const device = this.registry.get(backend.deviceId);
-    if (!device || device.status !== "online") add("offline", "Bound runtime device is offline.");
+    if (!device || device.status !== "online") add("offline", "Attached runtime device is offline.");
     if (backend.authStatus !== "ready") add("auth_required", "Runtime CLI authentication is not ready.");
     if (backend.health !== "ready") add("backend_unhealthy", backend.healthMessage ?? `Runtime backend health is ${backend.health}.`);
     if (!backend.cliVersion) add("backend_unhealthy", "Runtime backend did not report an exact CLI version.");
-    const model = backend.capabilities.models.find((candidate) => candidate.id === binding.model);
-    if (!model) add("model_unavailable", `Model ${binding.model} is not available on the exact runtime backend.`);
+    const model = backend.capabilities.models.find((candidate) => candidate.id === execution.model);
+    if (!model) add("model_unavailable", `Model ${execution.model} is not available on the exact runtime backend.`);
     else {
-      const reasoningAvailable = model.reasoningOptions.length === 0
-        ? binding.reasoning === "provider-default"
-        : model.reasoningOptions.includes(binding.reasoning);
-      if (!reasoningAvailable) add("reasoning_unavailable", `Reasoning option ${binding.reasoning} is not available for ${binding.model}.`);
+      const available = model.reasoningOptions.length === 0
+        ? execution.reasoning === "provider-default"
+        : model.reasoningOptions.includes(execution.reasoning);
+      if (!available) add("reasoning_unavailable", `Reasoning option ${execution.reasoning} is not available for ${execution.model}.`);
     }
     if (!backend.capabilities.policy.workspaceWrite
-      || (binding.policy.network && !backend.capabilities.policy.networkControl)
-      || (binding.policy.readOnlyRoots.length > 0 && !backend.capabilities.policy.readOnlyRoots)) {
+      || (execution.policy.network && !backend.capabilities.policy.networkControl)
+      || (execution.policy.readOnlyRoots.length > 0 && !backend.capabilities.policy.readOnlyRoots)) {
       add("policy_unsupported", "Runtime backend cannot enforce the selected execution policy.");
     }
     return issues;
@@ -124,26 +242,52 @@ export class RuntimePreflightService {
       return undefined;
     }
     if (checkout.dirty) issues.push({ agentId, code: "dirty_checkout", message: "Runtime checkout has uncommitted changes." });
-    const base = {
+    return {
       checkoutId: checkout.id,
       repositoryUrl: checkout.repositoryUrl,
       headSha: checkout.headSha,
-      configHash: checkout.configHash
+      configHash: checkout.configHash,
+      snapshotHash: checkout.configHash
     };
-    return { ...base, snapshotHash: checkout.configHash };
+  }
+
+  private activeProject(): RegisteredProject | undefined {
+    return this.project ?? this.projects.active();
   }
 }
 
-const runtimeSnapshot = (backend: RuntimeBackend, deviceName: string, binding: AgentExecutionBinding): ExecutionRuntimeSnapshot => ({
+const blockingRuntimeCodes = new Set<RuntimePreflightIssue["code"]>([
+  "offline", "auth_required", "backend_unhealthy", "model_unavailable", "reasoning_unavailable",
+  "policy_unsupported", "provider_mismatch", "mixed_device", "invalid_runtime_config"
+]);
+
+const runtimeSnapshot = (backend: RuntimeBackend, deviceName: string, execution: ResolvedAgentExecution): ExecutionRuntimeSnapshot => ({
   deviceId: backend.deviceId,
   deviceName,
   runtimeBackendId: backend.id,
   provider: backend.provider,
   cliVersion: backend.cliVersion!,
-  model: binding.model,
-  reasoning: binding.reasoning,
-  policy: binding.policy,
+  model: execution.model,
+  reasoning: execution.reasoning,
+  policy: execution.policy,
   capabilityHash: valueHash(backend.capabilities)
+});
+
+const toPreflightIssue = (issue: RuntimeConfigurationIssue, fallbackAgentId: string): RuntimePreflightIssue => ({
+  agentId: issue.agentId ?? fallbackAgentId,
+  code: issue.code === "provider_mismatch"
+    ? "provider_mismatch"
+    : issue.code === "invalid_json" || issue.code === "invalid_schema"
+      ? "invalid_runtime_config"
+      : "unbound",
+  message: issue.message
+});
+
+const missingAttachment = (agentId: string, message: string): RuntimeConfigurationIssue => ({
+  code: "missing_attachment",
+  path: `attachments.${agentId}`,
+  agentId,
+  message
 });
 
 const failure = (agentId: string, code: RuntimePreflightIssue["code"], message: string): AgentPreflightResult => ({

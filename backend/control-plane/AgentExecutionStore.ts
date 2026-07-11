@@ -1,30 +1,23 @@
 import type Database from "better-sqlite3";
-import { v4 as uuid } from "uuid";
 import type { AgentExecutionState } from "../../shared/domain/agents.js";
 import type {
-  AgentExecutionBinding,
+  AgentRuntimeAttachment,
   AgentOutcome,
   AgentRun,
-  ExecutionPolicy,
   ExecutionProjectSnapshot,
   ExecutionRuntimeSnapshot,
   ExecutionTask,
+  ResolvedAgentExecution,
   RootFinalizationReport,
-  RuntimeBackend
 } from "../../shared/domain/runtime.js";
 import { ControlPlaneNotFoundError } from "./errors.js";
 import { toAgentRun, type AgentRunRow } from "./ExecutionMappers.js";
 
-interface BindingRow {
-  binding_id: string;
+interface AttachmentRow {
   project_id: string;
   agent_id: string;
   runtime_backend_id: string;
-  device_id: string;
-  provider: AgentExecutionBinding["provider"];
-  model: string;
-  reasoning: string;
-  policy_json: string;
+  read_only_roots_json: string;
   created_at: string;
   updated_at: string;
 }
@@ -32,35 +25,35 @@ interface BindingRow {
 export class AgentExecutionStore {
   constructor(private readonly connection: () => Database.Database, private readonly now: () => Date) {}
 
-  getBinding(projectId: string, agentId: string): AgentExecutionBinding | undefined {
+  getAttachment(projectId: string, agentId: string): AgentRuntimeAttachment | undefined {
     const row = this.connection().prepare(`
-      SELECT * FROM agent_execution_bindings WHERE project_id = ? AND agent_id = ?
-    `).get(projectId, agentId) as BindingRow | undefined;
-    return row ? toBinding(row) : undefined;
+      SELECT * FROM agent_runtime_attachments WHERE project_id = ? AND agent_id = ?
+    `).get(projectId, agentId) as AttachmentRow | undefined;
+    return row ? toAttachment(row) : undefined;
   }
 
-  putBinding(input: {
+  putAttachment(input: {
     projectId: string;
     agentId: string;
-    backend: RuntimeBackend;
-    model: string;
-    reasoning: string;
-    policy: ExecutionPolicy;
-  }): AgentExecutionBinding {
-    const existing = this.getBinding(input.projectId, input.agentId);
+    runtimeBackendId: string;
+    readOnlyRoots: string[];
+  }): AgentRuntimeAttachment {
+    const existing = this.getAttachment(input.projectId, input.agentId);
     const timestamp = this.now().toISOString();
     this.connection().prepare(`
-      INSERT INTO agent_execution_bindings (
-        binding_id, project_id, agent_id, runtime_backend_id, device_id, provider,
-        model, reasoning, policy_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO agent_runtime_attachments (
+        project_id, agent_id, runtime_backend_id, read_only_roots_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(project_id, agent_id) DO UPDATE SET runtime_backend_id = excluded.runtime_backend_id,
-        device_id = excluded.device_id, provider = excluded.provider, model = excluded.model,
-        reasoning = excluded.reasoning, policy_json = excluded.policy_json, updated_at = excluded.updated_at
-    `).run(existing?.id ?? uuid(), input.projectId, input.agentId, input.backend.id, input.backend.deviceId,
-      input.backend.provider, input.model, input.reasoning, JSON.stringify(input.policy),
+        read_only_roots_json = excluded.read_only_roots_json, updated_at = excluded.updated_at
+    `).run(input.projectId, input.agentId, input.runtimeBackendId, JSON.stringify(input.readOnlyRoots),
       existing?.createdAt ?? timestamp, timestamp);
-    return this.getBinding(input.projectId, input.agentId)!;
+    return this.getAttachment(input.projectId, input.agentId)!;
+  }
+
+  removeAttachment(projectId: string, agentId: string): void {
+    this.connection().prepare("DELETE FROM agent_runtime_attachments WHERE project_id = ? AND agent_id = ?")
+      .run(projectId, agentId);
   }
 
   createRun(input: {
@@ -68,6 +61,7 @@ export class AgentExecutionStore {
     projectId: string;
     agentId: string;
     rootRunId: string;
+    source?: "manual" | "schedule";
     taskId: string;
     runInput?: string;
     runtime: ExecutionRuntimeSnapshot;
@@ -76,10 +70,10 @@ export class AgentExecutionStore {
   }): AgentRun {
     this.connection().prepare(`
       INSERT INTO agent_runs (
-        run_id, project_id, agent_id, root_run_id, task_id, status, input,
+        run_id, project_id, agent_id, root_run_id, task_id, source, status, input,
         runtime_snapshot_json, project_snapshot_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)
-    `).run(input.id, input.projectId, input.agentId, input.rootRunId, input.taskId,
+      ) VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)
+    `).run(input.id, input.projectId, input.agentId, input.rootRunId, input.taskId, input.source ?? "manual",
       input.runInput ?? null, JSON.stringify(input.runtime), JSON.stringify(input.project), input.createdAt, input.createdAt);
     return this.requireRun(input.id);
   }
@@ -145,19 +139,14 @@ export class AgentExecutionStore {
       this.now().toISOString(), task.spec.agentRunId);
   }
 
-  executionStates(projectId: string, agentIds: string[]): AgentExecutionState[] {
-    return agentIds.map((agentId) => this.executionState(projectId, agentId));
-  }
-
-  boundAgentIds(projectId: string): string[] {
-    const rows = this.connection().prepare("SELECT agent_id FROM agent_execution_bindings WHERE project_id = ? ORDER BY agent_id")
+  attachedAgentIds(projectId: string): string[] {
+    const rows = this.connection().prepare("SELECT agent_id FROM agent_runtime_attachments WHERE project_id = ? ORDER BY agent_id")
       .all(projectId) as Array<{ agent_id: string }>;
     return rows.map((row) => row.agent_id);
   }
 
-  private executionState(projectId: string, agentId: string): AgentExecutionState {
-    const binding = this.getBinding(projectId, agentId);
-    if (!binding) return { agentId, status: "unbound", reason: "No execution runtime is attached." };
+  executionState(agentId: string, execution?: ResolvedAgentExecution, reason?: string): AgentExecutionState {
+    if (!execution) return { agentId, status: "unbound", reason: reason ?? "No execution runtime is configured." };
     const backend = this.connection().prepare(`
       SELECT b.health, b.auth_status, d.status AS device_status,
         (SELECT task_id FROM execution_tasks t WHERE t.runtime_backend_id = b.backend_id
@@ -166,16 +155,16 @@ export class AgentExecutionStore {
           AND t.status IN ('claimed','preparing','running') ORDER BY t.created_at LIMIT 1) AS active_agent_id
       FROM runtime_backends b JOIN runtime_devices d ON d.device_id = b.device_id
       WHERE b.backend_id = ? AND d.revoked_at IS NULL
-    `).get(binding.runtimeBackendId) as {
+    `).get(execution.runtimeBackendId) as {
       health: string; auth_status: string; device_status: string;
       active_task_id: string | null; active_agent_id: string | null;
     } | undefined;
     const base = {
       agentId,
-      deviceId: binding.deviceId,
-      runtimeBackendId: binding.runtimeBackendId,
-      provider: binding.provider,
-      reasoning: binding.reasoning
+      deviceId: execution.deviceId,
+      runtimeBackendId: execution.runtimeBackendId,
+      provider: execution.provider,
+      reasoning: execution.reasoning
     };
     if (!backend || backend.device_status !== "online" || backend.health === "offline") return { ...base, status: "offline", reason: "Runtime device is offline." };
     if (backend.auth_status !== "ready" || backend.health !== "ready") return { ...base, status: "attention", reason: `Runtime backend is ${backend.health}.` };
@@ -191,16 +180,11 @@ export class AgentExecutionStore {
 const isSuccessfulDirectOutcome = (outcome: AgentOutcome): boolean =>
   outcome.outcome === "ready" || outcome.outcome === "approved";
 
-const toBinding = (row: BindingRow): AgentExecutionBinding => ({
-  id: row.binding_id,
+const toAttachment = (row: AttachmentRow): AgentRuntimeAttachment => ({
   projectId: row.project_id,
   agentId: row.agent_id,
   runtimeBackendId: row.runtime_backend_id,
-  deviceId: row.device_id,
-  provider: row.provider,
-  model: row.model,
-  reasoning: row.reasoning,
-  policy: JSON.parse(row.policy_json) as ExecutionPolicy,
+  readOnlyRoots: JSON.parse(row.read_only_roots_json) as string[],
   createdAt: row.created_at,
   updatedAt: row.updated_at
 });

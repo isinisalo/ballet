@@ -76,6 +76,18 @@ export class LoopRunStore {
     });
   }
 
+  listActive(): LoopRunDetails[] {
+    const rows = this.connection().prepare(`
+      SELECT run_id FROM loop_runs
+      WHERE project_id = ? AND status IN ('running', 'waiting_for_human')
+      ORDER BY created_at ASC, rowid ASC
+    `).all(this.projectId) as Array<{ run_id: string }>;
+    return rows.flatMap((row) => {
+      const details = this.details(row.run_id);
+      return details ? [details] : [];
+    });
+  }
+
   listByRoot(rootRunId: string): LoopRunDetails[] {
     const rows = this.connection().prepare(`
       SELECT run_id FROM loop_runs WHERE project_id = ? AND root_run_id = ? ORDER BY created_at ASC, rowid ASC
@@ -198,6 +210,17 @@ export class LoopRunStore {
       UPDATE step_runs SET execution_task_id = ?, execution_snapshot_json = ?, updated_at = ?
       WHERE project_id = ? AND step_run_id = ? AND step_type = 'agent' AND execution_task_id IS NULL
     `).run(taskId, stringifyJson(snapshot), now(), this.projectId, stepRunId);
+    const stepRun = this.getStepRun(stepRunId);
+    if (!stepRun) throw new Error(`Step run ${stepRunId} was not found.`);
+    return stepRun;
+  }
+
+  clearStepExecution(stepRunId: string, expectedTaskId: string): StepRun {
+    this.connection().prepare(`
+      UPDATE step_runs SET execution_task_id = NULL, execution_snapshot_json = NULL, updated_at = ?
+      WHERE project_id = ? AND step_run_id = ? AND step_type = 'agent'
+        AND execution_task_id = ? AND status IN ('queued', 'running')
+    `).run(now(), this.projectId, stepRunId, expectedTaskId);
     const stepRun = this.getStepRun(stepRunId);
     if (!stepRun) throw new Error(`Step run ${stepRunId} was not found.`);
     return stepRun;

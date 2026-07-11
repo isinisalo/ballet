@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { v4 as uuid } from "uuid";
@@ -53,7 +53,7 @@ const fixture = async (options: { freshCheckoutBeforeRun?: boolean } = {}) => {
   const identity = control.service.authenticateDaemon(daemonToken);
   const backendId = uuid();
   control.service.heartbeat(identity, heartbeat(backendId));
-  control.service.putBinding("developer", {
+  control.service.putAgentRuntime("developer", {
     runtimeBackendId: backendId,
     model: "gpt-5",
     reasoning: "high",
@@ -221,6 +221,80 @@ const verifyModelDiscoveryReadiness = async () => {
 };
 
 describe("control-plane persistence and execution protocol", () => {
+  it("splits portable runtime intent from the machine-local attachment and derives the device", async () => {
+    const control = await fixture();
+    const filename = path.join(control.root, ".ballet", "runtime.json");
+    const configuration = control.service.getAgentRuntime("developer");
+
+    expect(configuration).toMatchObject({
+      intent: { provider: "codex", model: "gpt-5", reasoning: "high", policy: { network: false } },
+      attachment: { runtimeBackendId: control.backendId, readOnlyRoots: [] },
+      resolved: {
+        deviceId: control.identity.deviceId,
+        runtimeBackendId: control.backendId,
+        provider: "codex",
+        policy: { network: false, readOnlyRoots: [] }
+      },
+      issues: []
+    });
+    expect(JSON.parse(await readFile(filename, "utf8"))).toEqual({
+      version: 1,
+      agents: {
+        developer: { provider: "codex", model: "gpt-5", reasoning: "high", policy: { network: false } }
+      }
+    });
+    expect(control.database.connection().prepare(`
+      SELECT runtime_backend_id, read_only_roots_json FROM agent_runtime_attachments
+      WHERE project_id = 'project' AND agent_id = 'developer'
+    `).get()).toEqual({ runtime_backend_id: control.backendId, read_only_roots_json: "[]" });
+
+    control.service.removeAgentRuntime("developer");
+    expect(JSON.parse(await readFile(filename, "utf8"))).toEqual({ version: 1, agents: {} });
+    expect(control.database.connection().prepare("SELECT 1 FROM agent_runtime_attachments WHERE agent_id = 'developer'").get()).toBeUndefined();
+  });
+
+  it("surfaces invalid and orphan runtime config without silently rewriting it", async () => {
+    const control = await fixture();
+    const filename = path.join(control.root, ".ballet", "runtime.json");
+    const invalid = "{ invalid runtime config\n";
+    await writeFile(filename, invalid, "utf8");
+
+    expect(control.service.getAgentRuntime("developer").issues).toContainEqual(expect.objectContaining({ code: "invalid_json" }));
+    expect(control.service.preflightAgent("developer").issues).toContainEqual(expect.objectContaining({ code: "invalid_runtime_config" }));
+    expect(() => control.service.putAgentRuntime("developer", {
+      runtimeBackendId: control.backendId,
+      model: "gpt-5",
+      reasoning: "high",
+      policy: { network: false, readOnlyRoots: [] }
+    })).toThrow("left unchanged");
+    expect(await readFile(filename, "utf8")).toBe(invalid);
+
+    const mismatchSource = `${JSON.stringify({
+      version: 1,
+      agents: {
+        developer: { provider: "copilot", model: "gpt-5", reasoning: "high", policy: { network: false } }
+      }
+    }, null, 2)}\n`;
+    await writeFile(filename, mismatchSource, "utf8");
+    expect(control.service.getAgentRuntime("developer").issues).toContainEqual(expect.objectContaining({ code: "provider_mismatch" }));
+    expect(control.service.preflightAgent("developer").issues).toContainEqual(expect.objectContaining({ code: "provider_mismatch" }));
+    expect(await readFile(filename, "utf8")).toBe(mismatchSource);
+
+    const orphanSource = `${JSON.stringify({
+      version: 1,
+      agents: {
+        developer: { provider: "codex", model: "gpt-5", reasoning: "high", policy: { network: false } },
+        ghost: { provider: "codex", model: "gpt-5", reasoning: "high", policy: { network: false } }
+      }
+    }, null, 2)}\n`;
+    await writeFile(filename, orphanSource, "utf8");
+    await expect(control.service.runtimeConfigurationIssues()).resolves.toContainEqual(expect.objectContaining({
+      code: "orphan_intent",
+      agentId: "ghost"
+    }));
+    expect(await readFile(filename, "utf8")).toBe(orphanSource);
+  });
+
   it("bootstraps opaque admin sessions and pairs a daemon with only hashed long-lived credentials", async () => {
     const control = await fixture();
     expect(control.service.adminBootstrapped()).toBe(false);
@@ -369,7 +443,7 @@ describe("control-plane persistence and execution protocol", () => {
     const secondIdentity = control.service.authenticateDaemon(secondPair.daemonToken!);
     const secondBackendId = uuid();
     control.service.heartbeat(secondIdentity, heartbeat(secondBackendId));
-    control.service.putBinding("reviewer", {
+    control.service.putAgentRuntime("reviewer", {
       runtimeBackendId: secondBackendId,
       model: "gpt-5",
       reasoning: "high",

@@ -14,6 +14,7 @@ import type {
 
 export interface GitWorkspaceManagerOptions {
   root: string;
+  repositoryPaths?: Readonly<Record<string, string>>;
   commitName?: string;
   commitEmail?: string;
 }
@@ -22,6 +23,7 @@ export class GitWorkspaceManager {
   private readonly root: string;
   private readonly commitName: string;
   private readonly commitEmail: string;
+  private readonly repositoryPaths: Map<string, string>;
   private readonly snapshots: ConfigSnapshotStore;
   private readonly rootFinalizer: RootWorkspaceFinalizer;
 
@@ -29,6 +31,7 @@ export class GitWorkspaceManager {
     this.root = path.resolve(options.root);
     this.commitName = options.commitName ?? "Ballet Daemon";
     this.commitEmail = options.commitEmail ?? "daemon@ballet.local";
+    this.repositoryPaths = new Map(Object.entries(options.repositoryPaths ?? {}).map(([projectId, repositoryPath]) => [projectId, path.resolve(repositoryPath)]));
     this.snapshots = new ConfigSnapshotStore(path.join(this.root, "cache", "config-snapshots"));
     this.rootFinalizer = new RootWorkspaceFinalizer({
       projectPath: (projectId) => this.projectPath(projectId),
@@ -59,18 +62,6 @@ export class GitWorkspaceManager {
     return this.repositoryPath(projectId);
   }
 
-  async cloneProject(projectId: string, repositoryUrl: string, signal?: AbortSignal): Promise<GitCheckoutStatus> {
-    const target = this.repositoryPath(projectId);
-    if (await exists(target)) {
-      const origin = (await runGit(["remote", "get-url", "origin"], { cwd: target, signal })).stdout.trim();
-      if (origin !== repositoryUrl) throw new Error(`Managed checkout origin mismatch: expected ${repositoryUrl}, found ${origin}.`);
-      return this.inspect(target, signal);
-    }
-    await mkdir(path.dirname(target), { recursive: true });
-    await runGit(["clone", "--", repositoryUrl, target], { signal });
-    return this.inspect(target, signal);
-  }
-
   async prepare(request: PrepareGitWorkspaceRequest, signal?: AbortSignal): Promise<PreparedGitWorkspace> {
     validateRequest(request);
     const repositoryPath = this.repositoryPath(request.projectId);
@@ -79,7 +70,7 @@ export class GitWorkspaceManager {
     if (existing) return this.reopenExisting(request, existing, repositoryPath, signal);
 
     const origin = (await runGit(["remote", "get-url", "origin"], { cwd: repositoryPath, signal })).stdout.trim();
-    if (origin !== request.repositoryUrl) throw new Error(`Managed checkout origin mismatch: expected ${request.repositoryUrl}, found ${origin}.`);
+    if (origin !== request.repositoryUrl) throw new Error(`Source checkout origin mismatch: expected ${request.repositoryUrl}, found ${origin}.`);
     await runGit(["cat-file", "-e", `${request.headSha}^{commit}`], { cwd: repositoryPath, signal });
     const treeSha = (await runGit(["rev-parse", `${request.headSha}^{tree}`], { cwd: repositoryPath, signal })).stdout.trim();
     // Start already captured the immutable config into the local CAS and put
@@ -212,7 +203,9 @@ export class GitWorkspaceManager {
   }
 
   private repositoryPath(projectId: string): string {
-    return path.join(this.projectPath(projectId), "repo");
+    const configured = this.repositoryPaths.get(projectId);
+    if (!configured) throw new Error(`No source checkout is registered for Ballet project ${projectId}.`);
+    return configured;
   }
 
   private worktreePath(projectId: string, rootRunId: string): string {

@@ -26,7 +26,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
           <CardDescription>
             {bootstrapping
               ? "Create the single local administrator before connecting a computer."
-              : "Authenticate to manage runtimes, bindings, and runs."}
+              : "Authenticate to manage runtimes, attachments, and runs."}
           </CardDescription>
         </CardHeader>
         <CardContent>

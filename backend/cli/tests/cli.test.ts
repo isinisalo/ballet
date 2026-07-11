@@ -1,6 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { deriveProjectId, runBalletCli } from "../BalletCli.js";
 import type { SecretStore } from "../Keychain.js";
@@ -10,7 +12,9 @@ import { renderServerPlist, type LocalServerConfiguration, type LocalServerServi
 import { PairingClient, type PairingDeviceFacts, type PairingSession } from "../PairingClient.js";
 import type { VerifiedReleaseUpdater } from "../VerifiedReleaseUpdater.js";
 import { DaemonConfigStore } from "../../daemon/config/DaemonConfigStore.js";
-import { GitWorkspaceManager } from "../../daemon/git/GitWorkspaceManager.js";
+
+const execFileAsync = promisify(execFile);
+const controlToken = "local-control-token-that-is-long-enough";
 
 const roots: string[] = [];
 
@@ -25,11 +29,20 @@ class MemorySecrets implements SecretStore {
   async delete(account: string) { this.values.delete(account); }
 }
 
+const gitProject = async (repositoryUrl = "https://github.com/acme/studio.git") => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-project-"));
+  roots.push(root);
+  await execFileAsync("git", ["init", "-b", "main"], { cwd: root });
+  await execFileAsync("git", ["remote", "add", "origin", repositoryUrl], { cwd: root });
+  return root;
+};
+
 describe("Ballet CLI", () => {
   it("pairs once, stores the daemon token only in the secret store, and writes non-secret config", async () => {
     const home = await mkdtemp(path.join(os.tmpdir(), "ballet-cli-"));
     roots.push(home);
     const config = new DaemonConfigStore(home);
+    const projectRoot = await gitProject();
     const secrets = new MemorySecrets();
     const output: string[] = [];
     const opened: string[] = [];
@@ -55,11 +68,12 @@ describe("Ballet CLI", () => {
       pairing: () => pairing,
       launchd: () => ({ installAndStart: async () => { throw new Error("must not start"); } }) as unknown as LaunchdService,
       localServer: { ensureStarted: async () => { throw new Error("must not start a local server"); } } as unknown as LocalServerService,
-      git: new GitWorkspaceManager({ root: home }),
       updater: { update: async () => "updated" } as VerifiedReleaseUpdater,
       output: { stdout: (message) => output.push(message), stderr: (message) => output.push(message) },
       openUrl: async (url) => { opened.push(url); },
-      version: "1.2.3"
+      version: "1.2.3",
+      cwd: () => projectRoot,
+      localControlToken: controlToken
     });
 
     expect(code).toBe(0);
@@ -78,11 +92,11 @@ describe("Ballet CLI", () => {
     const config = new DaemonConfigStore(home);
     const secrets = new MemorySecrets();
     const repositoryUrl = "https://github.com/acme/studio.git";
+    const projectRoot = await gitProject(repositoryUrl);
     const deviceCode = "d".repeat(40);
     let pairingServer = "";
     let polledCode = "";
     let createCalled = false;
-    let cloned: { projectId: string; repositoryUrl: string } | undefined;
     let localServerConfig: LocalServerConfiguration | undefined;
     const pairing = {
       create: async () => { createCalled = true; throw new Error("must not create a pairing session"); },
@@ -91,20 +105,6 @@ describe("Ballet CLI", () => {
         return { deviceId: "10000000-0000-4000-8000-000000000011", daemonToken: "server-minted-daemon-token-that-is-long-enough" };
       }
     } as unknown as PairingClient;
-    const git = {
-      cloneProject: async (projectId: string, url: string) => {
-        cloned = { projectId, repositoryUrl: url };
-        return {
-          root: path.join(home, "projects", projectId, "repo"),
-          headSha: "a".repeat(40),
-          branch: "main",
-          dirtyPaths: [],
-          ignoredRuntimePaths: [],
-          codeDirty: false
-        };
-      }
-    } as unknown as GitWorkspaceManager;
-
     const code = await runBalletCli([
       "setup", "--repo", repositoryUrl, "--device-code", deviceCode, "--no-start"
     ], {
@@ -113,24 +113,26 @@ describe("Ballet CLI", () => {
       pairing: (serverUrl) => { pairingServer = serverUrl; return pairing; },
       launchd: () => ({ installAndStart: async () => undefined }) as unknown as LaunchdService,
       localServer: { ensureStarted: async (value: LocalServerConfiguration) => { localServerConfig = value; } } as LocalServerService,
-      git,
       updater: { update: async () => "updated" } as VerifiedReleaseUpdater,
       output: { stdout: () => undefined, stderr: () => undefined },
       openUrl: async () => { throw new Error("must not open a new pairing session"); },
-      version: "1.2.3"
+      version: "1.2.3",
+      cwd: () => projectRoot,
+      localControlToken: controlToken
     });
 
     const projectId = deriveProjectId(repositoryUrl);
+    const resolvedProjectRoot = await realpath(projectRoot);
     expect(code).toBe(0);
     expect(pairingServer).toBe("http://127.0.0.1:4317");
     expect(polledCode).toBe(deviceCode);
     expect(createCalled).toBe(false);
-    expect(cloned).toEqual({ projectId, repositoryUrl });
     expect(localServerConfig).toEqual({
       serverUrl: "http://127.0.0.1:4317",
       projectId,
       repositoryUrl,
-      repositoryPath: path.join(home, "projects", projectId, "repo")
+      repositoryPath: resolvedProjectRoot,
+      localControlToken: controlToken
     });
     expect(deriveProjectId(repositoryUrl)).toBe(deriveProjectId(repositoryUrl));
     expect(await config.load()).toMatchObject({
@@ -154,22 +156,23 @@ describe("Ballet CLI local lifecycle", () => {
       pairing: () => { throw new Error("pairing must not start"); },
       launchd: () => ({ installAndStart: async () => undefined }) as unknown as LaunchdService,
       localServer: { ensureStarted: async () => { throw new Error("must not start a local server"); } } as unknown as LocalServerService,
-      git: {} as GitWorkspaceManager,
       updater: { update: async () => "updated" } as VerifiedReleaseUpdater,
       output: { stdout: () => undefined, stderr: (message) => output.push(message) },
       openUrl: async () => undefined,
-      version: "1.2.3"
+      version: "1.2.3",
+      localControlToken: controlToken
     });
 
     expect(code).toBe(1);
     expect(output).toEqual(["--device-code requires the device code returned by an existing pairing session."]);
   });
 
-  it("ensures the configured project server before opening the local app", async () => {
+  it("starts the current GitHub project with the bare ballet command", async () => {
     const home = await mkdtemp(path.join(os.tmpdir(), "ballet-cli-open-"));
     roots.push(home);
     const config = new DaemonConfigStore(home);
-    const repositoryPath = path.join(home, "projects", "project-1", "repo");
+    const repositoryPath = await gitProject();
+    const projectId = deriveProjectId("https://github.com/acme/studio.git");
     await config.save({
       version: 1,
       serverUrl: "http://127.0.0.1:4317",
@@ -182,34 +185,173 @@ describe("Ballet CLI local lifecycle", () => {
         { id: "10000000-0000-4000-8000-000000000023", provider: "codex", command: "codex" },
         { id: "10000000-0000-4000-8000-000000000024", provider: "copilot", command: "copilot" }
       ],
-      projectId: "project-1",
+      projectId,
       repositoryUrl: "https://github.com/acme/studio.git",
       repositoryPath
     });
     let ensured: LocalServerConfiguration | undefined;
     let opened = "";
 
-    const code = await runBalletCli(["open"], {
+    const code = await runBalletCli([], {
       config,
       secrets: new MemorySecrets(),
       pairing: () => { throw new Error("pairing must not start"); },
-      launchd: () => ({} as LaunchdService),
-      localServer: { ensureStarted: async (value: LocalServerConfiguration) => { ensured = value; } } as unknown as LocalServerService,
-      git: {} as GitWorkspaceManager,
+      launchd: () => ({ installAndStart: async () => undefined }) as unknown as LaunchdService,
+      localServer: {
+        activeProject: async () => undefined,
+        ensureStarted: async (value: LocalServerConfiguration) => { ensured = value; }
+      } as unknown as LocalServerService,
       updater: {} as VerifiedReleaseUpdater,
       output: { stdout: () => undefined, stderr: () => undefined },
       openUrl: async (url) => { opened = url; },
-      version: "1.2.3"
+      version: "1.2.3",
+      cwd: () => repositoryPath,
+      localControlToken: controlToken
     });
 
     expect(code).toBe(0);
+    const resolvedRepositoryPath = await realpath(repositoryPath);
     expect(ensured).toEqual({
       serverUrl: "http://127.0.0.1:4317",
-      projectId: "project-1",
+      projectId,
       repositoryUrl: "https://github.com/acme/studio.git",
-      repositoryPath
+      repositoryPath: resolvedRepositoryPath,
+      localControlToken: controlToken
     });
     expect(opened).toBe("http://127.0.0.1:4317");
+  });
+
+  it("opens Runtimes for pairing when the current project has not been paired", async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), "ballet-cli-unpaired-"));
+    roots.push(home);
+    const repositoryPath = await gitProject();
+    let opened = "";
+    let ensured = false;
+
+    const code = await runBalletCli([], {
+      config: new DaemonConfigStore(home),
+      secrets: new MemorySecrets(),
+      pairing: () => { throw new Error("pairing must not start in the CLI"); },
+      launchd: () => ({ installAndStart: async () => { throw new Error("unpaired daemon must not start"); } }) as unknown as LaunchdService,
+      localServer: {
+        activeProject: async () => undefined,
+        ensureStarted: async () => { ensured = true; }
+      } as unknown as LocalServerService,
+      updater: {} as VerifiedReleaseUpdater,
+      output: { stdout: () => undefined, stderr: () => undefined },
+      openUrl: async (url) => { opened = url; },
+      version: "1.2.3",
+      cwd: () => repositoryPath,
+      localControlToken: controlToken
+    });
+
+    expect(code).toBe(0);
+    expect(ensured).toBe(true);
+    expect(opened).toBe("http://127.0.0.1:4317/runtimes?connect=1");
+  });
+
+  it("only opens the browser when the same project is already running", async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), "ballet-cli-running-same-"));
+    roots.push(home);
+    const repositoryPath = await gitProject();
+    const projectId = deriveProjectId("https://github.com/acme/studio.git");
+    let opened = "";
+
+    const code = await runBalletCli([], {
+      config: new DaemonConfigStore(home),
+      secrets: new MemorySecrets(),
+      pairing: () => { throw new Error("pairing must not start"); },
+      launchd: () => ({ installAndStart: async () => { throw new Error("daemon must not restart"); } }) as unknown as LaunchdService,
+      localServer: {
+        activeProject: async () => ({ projectId }),
+        ensureStarted: async () => { throw new Error("server must not restart"); }
+      } as unknown as LocalServerService,
+      updater: {} as VerifiedReleaseUpdater,
+      output: { stdout: () => undefined, stderr: () => undefined },
+      openUrl: async (url) => { opened = url; },
+      version: "1.2.3",
+      cwd: () => repositoryPath,
+      localControlToken: controlToken
+    });
+
+    expect(code).toBe(0);
+    expect(opened).toBe("http://127.0.0.1:4317");
+  });
+
+  it("requires ballet stop before switching the running project", async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), "ballet-cli-running-other-"));
+    roots.push(home);
+    const repositoryPath = await gitProject();
+    const errors: string[] = [];
+
+    const code = await runBalletCli([], {
+      config: new DaemonConfigStore(home),
+      secrets: new MemorySecrets(),
+      pairing: () => { throw new Error("pairing must not start"); },
+      launchd: () => ({ installAndStart: async () => { throw new Error("daemon must not restart"); } }) as unknown as LaunchdService,
+      localServer: {
+        activeProject: async () => ({ projectId: "another-project" }),
+        ensureStarted: async () => { throw new Error("server must not restart"); }
+      } as unknown as LocalServerService,
+      updater: {} as VerifiedReleaseUpdater,
+      output: { stdout: () => undefined, stderr: (message) => errors.push(message) },
+      openUrl: async () => { throw new Error("browser must not open"); },
+      version: "1.2.3",
+      cwd: () => repositoryPath,
+      localControlToken: controlToken
+    });
+
+    expect(code).toBe(1);
+    expect(errors).toEqual(["Ballet is already running for project another-project. Run `ballet stop` before switching projects."]);
+  });
+
+  it("cancels active work before stopping the daemon and local server", async () => {
+    const calls: string[] = [];
+    const code = await runBalletCli(["stop"], {
+      config: new DaemonConfigStore(await gitProject()),
+      secrets: new MemorySecrets(),
+      pairing: () => { throw new Error("pairing must not start"); },
+      launchd: () => ({ stop: async () => { calls.push("daemon-stop"); } }) as unknown as LaunchdService,
+      localServer: {
+        activeProject: async () => ({ projectId: "project-1" }),
+        cancelAllRuns: async () => { calls.push("cancel"); return { activeRuns: 0, pendingFinalizations: 0, idle: true }; },
+        stop: async () => { calls.push("server-stop"); }
+      } as unknown as LocalServerService,
+      updater: {} as VerifiedReleaseUpdater,
+      output: { stdout: (message) => calls.push(message), stderr: () => undefined },
+      openUrl: async () => undefined,
+      version: "1.2.3",
+      localControlToken: controlToken
+    });
+
+    expect(code).toBe(0);
+    expect(calls).toEqual(["cancel", "daemon-stop", "server-stop", "Ballet stopped."]);
+  });
+
+  it("leaves services running when cancellation does not settle before timeout", async () => {
+    const stopped: string[] = [];
+    const errors: string[] = [];
+    const code = await runBalletCli(["stop"], {
+      config: new DaemonConfigStore(await gitProject()),
+      secrets: new MemorySecrets(),
+      pairing: () => { throw new Error("pairing must not start"); },
+      launchd: () => ({ stop: async () => { stopped.push("daemon"); } }) as unknown as LaunchdService,
+      localServer: {
+        activeProject: async () => ({ projectId: "project-1" }),
+        cancelAllRuns: async () => ({ activeRuns: 1, pendingFinalizations: 0, idle: false }),
+        stop: async () => { stopped.push("server"); }
+      } as unknown as LocalServerService,
+      updater: {} as VerifiedReleaseUpdater,
+      output: { stdout: () => undefined, stderr: (message) => errors.push(message) },
+      openUrl: async () => undefined,
+      version: "1.2.3",
+      localControlToken: controlToken,
+      stopTimeoutMs: 0
+    });
+
+    expect(code).toBe(1);
+    expect(stopped).toEqual([]);
+    expect(errors[0]).toContain("services were left running");
   });
 });
 
@@ -274,12 +416,14 @@ describe("launchd logging", () => {
       serverUrl: "http://127.0.0.1:4317",
       projectId: "project-1",
       repositoryUrl: "https://github.com/acme/studio.git",
-      repositoryPath: "/Users/test/.ballet/projects/project-1/repo"
+      repositoryPath: "/Users/test/git/studio",
+      localControlToken: controlToken
     });
 
     expect(plist).toContain("<key>PORT</key><string>4317</string>");
     expect(plist).toContain("<key>BALLET_PROJECT_ID</key><string>project-1</string>");
-    expect(plist).toContain("<key>WorkingDirectory</key><string>/Users/test/.ballet/projects/project-1/repo</string>");
+    expect(plist).toContain("<key>WorkingDirectory</key><string>/Users/test/git/studio</string>");
+    expect(plist).toContain(`<key>BALLET_LOCAL_CONTROL_TOKEN</key><string>${controlToken}</string>`);
     expect(plist).toContain("<string>launchd-log-supervisor-internal-run</string>");
     expect(plist).toContain("<string>server</string>");
     expect(plist).toContain("<key>StandardOutPath</key><string>/dev/null</string>");

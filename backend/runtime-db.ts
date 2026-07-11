@@ -85,6 +85,10 @@ export class RuntimeDatabase {
     return this.loopRunStore.bindStepExecution(stepRunId, taskId, snapshot);
   }
 
+  clearStepExecution(stepRunId: string, expectedTaskId: string): StepRun {
+    return this.loopRunStore.clearStepExecution(stepRunId, expectedTaskId);
+  }
+
   markStepRunRunning(stepRunId: string): StepRun {
     return this.loopRunStore.markStepRunning(stepRunId);
   }
@@ -95,6 +99,10 @@ export class RuntimeDatabase {
 
   listLoopRuns(limit = 500): LoopRunDetails[] {
     return this.loopRunStore.list(limit);
+  }
+
+  listActiveLoopRuns(): LoopRunDetails[] {
+    return this.loopRunStore.listActive();
   }
 
   listRootLoopRuns(rootRunId: string): LoopRunDetails[] {

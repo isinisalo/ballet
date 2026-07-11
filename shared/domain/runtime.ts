@@ -97,8 +97,28 @@ export interface ExecutionPolicy {
   readOnlyRoots: string[];
 }
 
-export interface AgentExecutionBinding {
-  id: string;
+export interface PortableAgentRuntimeIntent {
+  provider: RuntimeProvider;
+  model: string;
+  reasoning: string;
+  policy: Pick<ExecutionPolicy, "network">;
+}
+
+export interface ProjectRuntimeConfig {
+  version: 1;
+  agents: Record<string, PortableAgentRuntimeIntent>;
+}
+
+export interface AgentRuntimeAttachment {
+  projectId: string;
+  agentId: string;
+  runtimeBackendId: string;
+  readOnlyRoots: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResolvedAgentExecution {
   projectId: string;
   agentId: string;
   runtimeBackendId: string;
@@ -107,8 +127,28 @@ export interface AgentExecutionBinding {
   model: string;
   reasoning: string;
   policy: ExecutionPolicy;
-  createdAt: string;
-  updatedAt: string;
+}
+
+export interface RuntimeConfigurationIssue {
+  code:
+    | "invalid_json"
+    | "invalid_schema"
+    | "missing_intent"
+    | "missing_attachment"
+    | "attachment_backend_missing"
+    | "provider_mismatch"
+    | "orphan_intent"
+    | "orphan_attachment";
+  path: string;
+  message: string;
+  agentId?: string;
+}
+
+export interface AgentRuntimeConfiguration {
+  intent?: PortableAgentRuntimeIntent;
+  attachment?: AgentRuntimeAttachment;
+  resolved?: ResolvedAgentExecution;
+  issues: RuntimeConfigurationIssue[];
 }
 
 export type ExecutionTaskStatus =
@@ -251,6 +291,7 @@ export interface AgentRun {
   projectId: string;
   agentId: string;
   rootRunId: string;
+  source: "manual" | "schedule";
   taskId: string;
   status: ExecutionTaskStatus;
   input?: string;
@@ -296,6 +337,8 @@ export interface RuntimePreflightIssue {
     | "model_unavailable"
     | "reasoning_unavailable"
     | "policy_unsupported"
+    | "invalid_runtime_config"
+    | "provider_mismatch"
     | "mixed_device"
     | "dirty_checkout";
   message: string;

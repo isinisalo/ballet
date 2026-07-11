@@ -6,6 +6,9 @@ import {
   projectCollectionDocumentPath,
   projectDocumentPath,
   routeFromPath,
+  runAgentPath,
+  runLoopPath,
+  runOverviewPath,
   runtimePath,
   skillDocumentPath
 } from "../src/workspace/routing";
@@ -37,16 +40,7 @@ describe("workspace routing", () => {
   });
 
   it("parses canonical automation and runtime routes with selected entities", () => {
-    expect(routeFromPath("/automation/loops?id=build")).toEqual({
-      view: "automation",
-      automationEntityId: "build",
-      automationLoopMode: "edit"
-    });
-    expect(routeFromPath("/automation/loops?id=build&mode=run")).toEqual({
-      view: "automation",
-      automationEntityId: "build",
-      automationLoopMode: "run"
-    });
+    expect(routeFromPath("/automation/loops?id=build")).toEqual({ view: "automation", automationEntityId: "build" });
     expect(routeFromPath("/automation/outputs?id=artifact")).toEqual({ view: "projects" });
     expect(routeFromPath("/automation/loops?view=all")).toEqual({
       view: "automation",
@@ -54,6 +48,12 @@ describe("workspace routing", () => {
     });
     expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({ view: "projects" });
     expect(routeFromPath("/runtimes?id=device-1")).toEqual({ view: "runtimes", runtimeDeviceId: "device-1" });
+  });
+
+  it("parses URL-backed Ballet Run routes", () => {
+    expect(routeFromPath("/run")).toEqual({ view: "run", rootRunId: undefined });
+    expect(routeFromPath("/run/loops/release%20train?run=root-1")).toEqual({ view: "run", runTargetKind: "loop", runTargetId: "release train", rootRunId: "root-1" });
+    expect(routeFromPath("/run/agents/reviewer?run=root-2")).toEqual({ view: "run", runTargetKind: "agent", runTargetId: "reviewer", rootRunId: "root-2" });
   });
 
   it("does not keep legacy automation route aliases", () => {
@@ -74,7 +74,9 @@ describe("workspace routing", () => {
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(automationAllLoopsPath()).toBe("/automation/loops?view=all");
     expect(automationLoopPath("wf 1")).toBe("/automation/loops?id=wf+1");
-    expect(automationLoopPath("wf 1", "run")).toBe("/automation/loops?id=wf+1&mode=run");
+    expect(runOverviewPath("root 1")).toBe("/run?run=root%201");
+    expect(runLoopPath("wf 1", "root 1")).toBe("/run/loops/wf%201?run=root%201");
+    expect(runAgentPath("agent 1", "root 1")).toBe("/run/agents/agent%201?run=root%201");
     expect(runtimePath("runtime 1")).toBe("/runtimes?id=runtime%201");
   });
 });

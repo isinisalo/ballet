@@ -13,6 +13,9 @@ import { useRuntimeNotifications } from "./data/useRuntimeNotifications";
 import { useWorkspaceData } from "./data/useWorkspaceData";
 import { useWorkspaceMutations } from "./data/useWorkspaceMutations";
 import { AppSidebar } from "./layout/AppSidebar";
+import { useConfigureGitStatus } from "./layout/useConfigureGitStatus";
+import { useRuntimeConfigurationIssues } from "./layout/useRuntimeConfigurationIssues";
+import { useRunDashboard } from "./runs/useRunDashboard";
 import { useWorkspaceSelection } from "./selection/useWorkspaceSelection";
 import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
 import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
@@ -23,6 +26,9 @@ export function WorkspaceShell() {
   const { data, loading, refresh, selectedProjectId } = useWorkspaceData({ notify, routeProjectId: route.projectId });
   const selection = useWorkspaceSelection({ data, route, selectedProjectId });
   const { states: agentExecutionStates } = useAgentExecutionStates();
+  const runDashboard = useRunDashboard({ enabled: route.view === "run", rootRunId: route.rootRunId });
+  const configureGitState = useConfigureGitStatus({ enabled: route.view !== "run", refreshSignal: data });
+  const runtimeConfigurationIssues = useRuntimeConfigurationIssues({ enabled: route.view !== "run", refreshSignal: data });
 
   const runtimeStreamStatus = useRuntimeStream(refresh);
   useRuntimeNotifications({ notifications, notify, runtimeStreamStatus });
@@ -43,6 +49,9 @@ export function WorkspaceShell() {
           agents={data.agents}
           agentExecutionStates={agentExecutionStates}
           skills={data.skills}
+          runDashboard={runDashboard}
+          configureGitState={configureGitState}
+          runtimeConfigurationIssues={runtimeConfigurationIssues}
           navigate={navigate}
         />
         <SidebarInset>
@@ -65,6 +74,7 @@ export function WorkspaceShell() {
                 mutations={mutations}
                 agentExecutionStates={agentExecutionStates}
                 runtimeStreamStatus={runtimeStreamStatus}
+                runDashboard={runDashboard}
                 navigate={navigate}
               />
             </main>

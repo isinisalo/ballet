@@ -12,11 +12,13 @@ import type {
 } from "../../shared/api/runtime-schemas.js";
 import type { Agent, AgentExecutionState } from "../../shared/domain/agents.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
+import { RuntimeIntentSourceError } from "../runtime-config/RuntimeIntentRepository.js";
 import type {
-    AgentExecutionBinding,
+    AgentRuntimeConfiguration,
     AgentRun,
     ExecutionAgentSnapshot,
     ExecutionPolicy,
+    ResolvedAgentExecution,
     ExecutionSpec,
     ExecutionTask,
     RootFinalizationReport,
@@ -26,7 +28,7 @@ import type {
 import type { AdminAuthStore } from "./AdminAuthStore.js";
 import type { AgentExecutionStore } from "./AgentExecutionStore.js";
 import type { ControlPlaneDatabase } from "./ControlPlaneDatabase.js";
-import { ControlPlaneConflictError, ControlPlanePreflightError } from "./errors.js";
+import { ControlPlaneConflictError, ControlPlanePreflightError, ControlPlaneRuntimeConfigurationError } from "./errors.js";
 import type { ExecutionEventStore } from "./ExecutionEventStore.js";
 import type { ExecutionTaskStore, FencedTaskInput, TaskClaim } from "./ExecutionTaskStore.js";
 import type { DaemonIdentity, DaemonPairingPoll, PairingStore } from "./PairingStore.js";
@@ -140,34 +142,75 @@ export class ControlPlaneService {
     };
   }
 
-  getBinding(agentId: string) { return this.options.agents.getBinding(this.requireActiveProject().id, agentId); }
-  putBinding(agentId: string, input: { runtimeBackendId: string; model: string; reasoning: string; policy: ExecutionPolicy }): AgentExecutionBinding {
+  getAgentRuntime(agentId: string): AgentRuntimeConfiguration {
+    this.requireActiveProject();
+    return this.options.preflight.configuration(agentId);
+  }
+  putAgentRuntime(agentId: string, input: {
+    runtimeBackendId: string;
+    model: string;
+    reasoning: string;
+    policy: ExecutionPolicy;
+  }): AgentRuntimeConfiguration {
     const project = this.requireActiveProject();
     const backend = this.options.registry.getBackend(input.runtimeBackendId);
     if (!backend || backend.projectId !== project.id) throw new ControlPlaneConflictError("Runtime backend is not available in the active project.");
-    const candidate: AgentExecutionBinding = {
-      id: uuid(), projectId: project.id, agentId, runtimeBackendId: backend.id, deviceId: backend.deviceId,
-      provider: backend.provider, model: input.model, reasoning: input.reasoning, policy: input.policy,
-      createdAt: this.options.now().toISOString(), updatedAt: this.options.now().toISOString()
+    const candidate: ResolvedAgentExecution = {
+      projectId: project.id, agentId, runtimeBackendId: backend.id, deviceId: backend.deviceId,
+      provider: backend.provider, model: input.model, reasoning: input.reasoning, policy: input.policy
     };
     const blocking = this.options.preflight.agent(agentId, candidate).issues
-      .filter((issue) => ["model_unavailable", "reasoning_unavailable", "policy_unsupported", "mixed_device"].includes(issue.code));
-    if (blocking.length > 0) throw new ControlPlanePreflightError("Execution binding is not supported.", blocking);
-    const saved = this.options.agents.putBinding({ projectId: project.id, agentId, backend, ...input });
+      .filter((issue) => ["model_unavailable", "reasoning_unavailable", "policy_unsupported", "provider_mismatch", "mixed_device"].includes(issue.code));
+    if (blocking.length > 0) throw new ControlPlanePreflightError("Agent runtime configuration is not supported.", blocking);
+    let saved: AgentRuntimeConfiguration;
+    try {
+      saved = this.options.preflight.putConfiguration(agentId, {
+        provider: backend.provider,
+        model: input.model,
+        reasoning: input.reasoning,
+        policy: { network: input.policy.network }
+      }, {
+        runtimeBackendId: backend.id,
+        readOnlyRoots: input.policy.readOnlyRoots
+      });
+    } catch (error) {
+      if (error instanceof RuntimeIntentSourceError) {
+        throw new ControlPlaneRuntimeConfigurationError(error.message, error.issues);
+      }
+      throw error;
+    }
     this.emit("runtime_changed", { agentId });
     return saved;
   }
 
+  removeAgentRuntime(agentId: string): void {
+    this.requireActiveProject();
+    try {
+      this.options.preflight.removeConfiguration(agentId);
+    } catch (error) {
+      if (error instanceof RuntimeIntentSourceError) {
+        throw new ControlPlaneRuntimeConfigurationError(error.message, error.issues);
+      }
+      throw error;
+    }
+    this.emit("runtime_changed", { agentId });
+  }
+
+  async runtimeConfigurationIssues() {
+    const ids = this.options.listAgentIds ? await this.options.listAgentIds() : this.options.preflight.configuredAgentIds();
+    return this.options.preflight.configurationIssues(ids);
+  }
+
   async executionStates(): Promise<AgentExecutionState[]> {
-    const project = this.requireActiveProject();
-    const ids = this.options.listAgentIds ? await this.options.listAgentIds() : this.options.agents.boundAgentIds(project.id);
-    return this.options.agents.executionStates(project.id, ids);
+    this.requireActiveProject();
+    const ids = this.options.listAgentIds ? await this.options.listAgentIds() : this.options.preflight.configuredAgentIds();
+    return this.options.preflight.executionStates(ids);
   }
 
   preflightLoop(loop: Pick<ProjectLoop, "steps">): LoopPreflightResult { return this.options.preflight.loop(loop); }
   preflightAgent(agentId: string) { return this.options.preflight.agent(agentId); }
 
-  async startAgentRun(agentId: string, input?: string): Promise<AgentRun> {
+  async startAgentRun(agentId: string, input?: string, source: "manual" | "schedule" = "manual"): Promise<AgentRun> {
     const activeProject = this.requireActiveProject();
     await this.refreshExecutionSnapshots([agentId]);
     const check = this.options.preflight.agent(agentId);
@@ -184,7 +227,7 @@ export class ControlPlaneService {
     };
     const transaction = this.options.database.connection().transaction(() => {
       this.options.tasks.create(spec);
-      return this.options.agents.createRun({ id: runId, projectId: spec.projectId, agentId, rootRunId: runId,
+      return this.options.agents.createRun({ id: runId, projectId: spec.projectId, agentId, rootRunId: runId, source,
         taskId, runInput: input, runtime: spec.runtime, project: spec.project, createdAt: timestamp });
     });
     const run = transaction() as AgentRun;

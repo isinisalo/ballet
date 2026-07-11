@@ -13,8 +13,10 @@ export function RuntimeRegistryView({ selectedDeviceId, onSelectDevice }: {
   onSelectDevice: (deviceId?: string) => void;
 }) {
   const registry = useRuntimeRegistry(selectedDeviceId);
-  const pairingId = new URLSearchParams(window.location.search).get("pairing") ?? undefined;
-  const [connectOpen, setConnectOpen] = useState(Boolean(pairingId));
+  const search = new URLSearchParams(window.location.search);
+  const pairingId = search.get("pairing") ?? undefined;
+  const connectRequested = search.get("connect") === "1";
+  const [connectOpen, setConnectOpen] = useState(Boolean(pairingId || connectRequested));
   const onlineCount = registry.devices.filter((device) => device.status === "online").length;
 
   return (
@@ -60,9 +62,10 @@ export function RuntimeRegistryView({ selectedDeviceId, onSelectDevice }: {
         initialPairingId={pairingId}
         onOpenChange={(nextOpen) => {
           setConnectOpen(nextOpen);
-          if (!nextOpen && pairingId) {
+          if (!nextOpen && (pairingId || connectRequested)) {
             const url = new URL(window.location.href);
             url.searchParams.delete("pairing");
+            url.searchParams.delete("connect");
             window.history.replaceState({}, "", `${url.pathname}${url.search}`);
           }
         }}

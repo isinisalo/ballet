@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import type { LoopRunDetails, LoopRuntimePreflight, RespondToStepRunRequest } from "@shared/api/workspace-contracts";
+import type { LoopRunDetails, LoopRuntimePreflight, RespondToStepRunRequest, RootRunDetail } from "@shared/api/workspace-contracts";
 import { api } from "@/api";
 import { toErrorMessage } from "@/lib/errors";
 import type { RuntimeStreamStatus } from "@/app/useRuntimeStream";
+import { runApi } from "../../runs/runApi";
 
 export type LoopRunPendingOperation = "load" | "start" | "respond" | "cancel" | null;
 
-export function useLoopRun(loopId: string | undefined, refreshSignal: string, streamStatus: RuntimeStreamStatus) {
+export function useLoopRun(loopId: string | undefined, refreshSignal: string, streamStatus: RuntimeStreamStatus, rootRunId?: string) {
   const [details, setDetails] = useState<LoopRunDetails | null>(null);
+  const [rootDetail, setRootDetail] = useState<RootRunDetail>();
   const [preflight, setPreflight] = useState<LoopRuntimePreflight>();
   const [preflightLoopId, setPreflightLoopId] = useState<string>();
   const [pendingOperation, setPendingOperation] = useState<LoopRunPendingOperation>("load");
@@ -20,14 +22,22 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
       return;
     }
     try {
-      setDetails(await api.getLatestLoopRun(loopId));
+      if (rootRunId) {
+        const root = await runApi.detail(rootRunId);
+        setRootDetail(root);
+        setDetails(root.loopRuns.find((run) => run.runId === root.current?.loopRunId) ?? root.loopRuns.at(-1) ?? null);
+      } else {
+        const latest = await api.getLatestLoopRun(loopId);
+        setDetails(latest);
+        setRootDetail(latest ? await runApi.detail(latest.rootRunId) : undefined);
+      }
       setError("");
     } catch (caught) {
       setError(toErrorMessage(caught, "Unable to load the latest loop run."));
     } finally {
       setPendingOperation((current) => current === "load" ? null : current);
     }
-  }, [loopId]);
+  }, [loopId, rootRunId]);
 
   const refreshPreflight = useCallback(async () => {
     setPreflight(undefined);
@@ -45,6 +55,7 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
   useEffect(() => {
     setPendingOperation("load");
     setDetails(null);
+    setRootDetail(undefined);
     void refresh();
     void refreshPreflight();
   }, [refresh, refreshPreflight, refreshSignal]);
@@ -62,13 +73,15 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     setPendingOperation(operation);
     setError("");
     try {
-      setDetails(await request());
+      const next = await request();
+      setDetails(next);
+      void runApi.detail(next.rootRunId).then(setRootDetail).catch(() => undefined);
       void refreshPreflight();
-      return true;
+      return next;
     } catch (caught) {
       setError(toErrorMessage(caught, `Unable to ${operation} loop run.`));
       void refresh();
-      return false;
+      return null;
     } finally {
       setPendingOperation(null);
     }
@@ -94,6 +107,7 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
 
   return {
     details,
+    rootDetail,
     preflight: preflightLoopId === loopId ? preflight : undefined,
     preflightLoading: Boolean(loopId) && preflightLoopId !== loopId,
     pendingOperation,
