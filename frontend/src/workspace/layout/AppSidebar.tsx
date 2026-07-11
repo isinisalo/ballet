@@ -1,4 +1,3 @@
-import { Route } from "lucide-react";
 import type { Agent, AgentExecutionState, ProjectAutomationConfig, ProjectDocumentTreeNode, RuntimeConfigurationIssue, Skill } from "@shared/api/workspace-contracts";
 import {
   Sidebar as ShadcnSidebar,
@@ -7,8 +6,6 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail
 } from "@/components/ui/sidebar";
 import type { RouteState } from "../types";
@@ -53,17 +50,6 @@ export function AppSidebar({
     <ShadcnSidebar collapsible="icon">
       <SidebarHeader>
         <BalletModeSelect mode={mode} onChange={(nextMode) => navigate(pathForBalletMode({ route, nextMode, agents }))} />
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip="Ballet">
-              <Route />
-              <span className="flex flex-col gap-0.5">
-                <span className="font-semibold">Ballet</span>
-                <span className="text-xs text-muted-foreground">Control plane</span>
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
