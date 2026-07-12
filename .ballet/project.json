@@ -1,12 +1,14 @@
 {
-  "version": 4,
+  "version": 5,
   "loops": [
     {
       "id": "delivery-planning",
+      "theme": "open-ai",
       "start": "create-roadmap",
       "steps": [
         {
           "id": "create-roadmap",
+          "nodeSize": "large",
           "description": "Muodosta hyväksytyistä ADR- ja Goal-dokumenteista arvo-, riski- ja riippuvuusjärjestykseen asetettu roadmap tiedostoon .ballet/outputs/ROADMAP.md.",
           "on": {
             "approved": "create-work-breakdown",
@@ -19,6 +21,7 @@
         },
         {
           "id": "create-work-breakdown",
+          "nodeSize": "small",
           "description": "Jaa roadmap milestoneiksi ja atomisiksi task-NNN-tehtäviksi tiedostoihin .ballet/outputs/MILESTONES.md ja .ballet/outputs/TASKS.md.",
           "on": {
             "approved": "planning-gate",
@@ -31,6 +34,7 @@
         },
         {
           "id": "planning-gate",
+          "nodeSize": "small",
           "description": "Hyväksy roadmap, milestonet ja taskit toteutuksen lähtökohdaksi. Rejection-palaute käynnistää suunnittelun uudelleen roadmapista.",
           "on": {
             "approved": {
@@ -44,10 +48,12 @@
     },
     {
       "id": "ui-design",
+      "theme": "open-ai",
       "start": "design-task-ui",
       "steps": [
         {
           "id": "design-task-ui",
+          "nodeSize": "large",
           "description": "Suunnittele yhden Run-inputissa nimetyn task-NNN-tehtävän UI tiedostoon .ballet/outputs/ui/<task-id>.md.",
           "on": {
             "approved": {
@@ -64,10 +70,12 @@
     },
     {
       "id": "implementation",
+      "theme": "open-ai",
       "start": "implement-task",
       "steps": [
         {
           "id": "implement-task",
+          "nodeSize": "medium",
           "description": "Toteuta täsmälleen yksi Run-inputissa nimetty task-NNN-tehtävä ja sen hyväksymiskriteerit.",
           "on": {
             "approved": "verify-task",
@@ -80,6 +88,7 @@
         },
         {
           "id": "verify-task",
+          "nodeSize": "medium",
           "description": "Tarkasta taskin scope, diff, testit ja hyväksymiskriteerit riippumattomasti; saman taskin korjaukset palautuvat implementointiin.",
           "on": {
             "approved": "code-gate",
@@ -90,6 +99,7 @@
         },
         {
           "id": "code-gate",
+          "nodeSize": "small",
           "description": "Hyväksy tarkastettu koodi ja valtuuta dev-deployment. Rejection-palaute palauttaa saman taskin implementointiin.",
           "on": {
             "approved": {
@@ -103,10 +113,12 @@
     },
     {
       "id": "dev-deployment",
+      "theme": "open-ai",
       "start": "deploy-and-validate-dev",
       "steps": [
         {
           "id": "deploy-and-validate-dev",
+          "nodeSize": "medium",
           "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
           "on": {
             "approved": {
@@ -123,10 +135,12 @@
     },
     {
       "id": "timed",
+      "theme": "open-ai",
       "start": "schedule-dev-deployment",
       "steps": [
         {
           "id": "schedule-dev-deployment",
+          "nodeSize": "small",
           "description": "Käynnistä kehitysympäristön deploymentin validointi arkipäivisin klo 09:00.",
           "type": "scheduled",
           "schedule": {
@@ -142,6 +156,7 @@
         },
         {
           "id": "deploy-and-validate-dev",
+          "nodeSize": "medium",
           "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
           "on": {
             "approved": {

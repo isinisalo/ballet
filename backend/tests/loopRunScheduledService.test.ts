@@ -176,14 +176,16 @@ const serviceContext = async (targetType: "agent" | "human", now: () => Date = (
 };
 
 const automationConfig = (targetType: "agent" | "human"): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "scheduled-work",
+    theme: "open-ai",
     start: "timer",
     steps: [{
       id: "timer",
       type: "scheduled",
       description: "Start work.",
+      nodeSize: "small",
       schedule: { kind: "once", date: "2026-07-12", time: "09:00", timeZone: "UTC" },
       on: { triggered: "work" }
     }, targetType === "agent" ? {
@@ -191,11 +193,13 @@ const automationConfig = (targetType: "agent" | "human"): ProjectAutomationConfi
       type: "agent",
       agentId: "worker",
       description: "Work.",
+      nodeSize: "medium",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     } : {
       id: "work",
       type: "human",
       description: "Approve.",
+      nodeSize: "small",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]

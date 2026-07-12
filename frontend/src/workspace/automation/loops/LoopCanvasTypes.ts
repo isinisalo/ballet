@@ -3,9 +3,11 @@ import type { Edge, Node } from "@xyflow/react";
 import type { LoopVisualStep } from "./loopVisualProjection";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopCanvasEdge, LoopCanvasLayout, LoopCanvasLayoutNode } from "./loopLayout";
+import type { LoopTheme } from "./loopTheme";
 
 export type LoopCanvasProps = {
   layout: LoopCanvasLayout;
+  theme: LoopTheme;
   selectedLoopId: string;
   stepByKey: Map<string, LoopVisualStep>;
   draggedStepIndex: number | null;

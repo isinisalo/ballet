@@ -1,10 +1,10 @@
 import type { LoopLayoutDirection } from "./loopLayoutTypes";
-import type { AgentNodeStyle } from "@shared/api/workspace-contracts";
+import type { LoopNodeSize } from "@shared/api/workspace-contracts";
 
-export const loopPlanetNodeSizes: Record<AgentNodeStyle, number> = {
-  luna: 28,
-  terra: 44,
-  sol: 64
+export const loopStepNodeSizes: Record<LoopNodeSize, number> = {
+  small: 28,
+  medium: 44,
+  large: 64
 };
 
 export const loopNodeSizes = {

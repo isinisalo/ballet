@@ -2,6 +2,7 @@ import type {
   AppData,
   AgentExecutionState,
   CollectionName,
+  WorkspaceSaveRequestByCollection,
   LoopRunDetails,
   LoopRuntimePreflight,
   RespondToStepRunRequest,
@@ -38,7 +39,7 @@ export const api = {
     request<LoopRunDetails>(`/api/loop-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
   getExecutionEvents: (taskId: string, after = 0, limit = 500) =>
     request<ExecutionEventPage>(`/api/execution-tasks/${encodeURIComponent(taskId)}/events?after=${after}&limit=${limit}`),
-  save: <T extends CollectionName>(collection: T, item: Partial<AppData[T][number]>) =>
+  save: <T extends CollectionName>(collection: T, item: WorkspaceSaveRequestByCollection[T]) =>
     request<AppData[T][number]>(`/api/${collection}`, {
       method: "POST",
       body: JSON.stringify(item)

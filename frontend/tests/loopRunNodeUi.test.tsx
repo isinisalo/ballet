@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { LoopNodeContext } from "../src/workspace/automation/loops/LoopCanvasTypes";
 import { LoopCompactStepNode } from "../src/workspace/automation/loops/LoopCompactStepNode";
 import type { LoopStepRecord } from "../src/workspace/automation/loops/loopGraph";
+import { loopThemes } from "../src/workspace/automation/loops/loopTheme";
 
 const context = (): LoopNodeContext => ({
   selectedLoopId: "delivery",
+  theme: loopThemes["open-ai"],
   stepByKey: new Map(),
   draggedStepIndex: null,
   dragOverStepIndex: null,
@@ -40,8 +42,8 @@ describe("Ballet Run node state", () => {
 const record = (kind: "agent" | "human", status: "running" | "waiting_for_human"): LoopStepRecord => {
   const id = kind === "agent" ? "implement" : "approve";
   const step = kind === "agent"
-    ? { id, type: "agent" as const, agentId: "developer", description: "Implement.", on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } } }
-    : { id, type: "human" as const, description: "Approve.", on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } } };
+    ? { id, type: "agent" as const, nodeSize: "medium" as const, agentId: "developer", description: "Implement.", on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } } }
+    : { id, type: "human" as const, nodeSize: "small" as const, description: "Approve.", on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } } };
   return {
     stepKey: `delivery::${id}`,
     loopId: "delivery",
@@ -52,7 +54,7 @@ const record = (kind: "agent" | "human", status: "running" | "waiting_for_human"
       description: step.description,
       agentId: kind === "agent" ? "developer" : undefined,
       humanGate: kind === "human",
-      nodeStyle: kind === "agent" ? "terra" : "luna",
+      nodeSize: kind === "agent" ? "medium" : "small",
       step,
       stepRun: {
         stepRunId: `step-${id}`,

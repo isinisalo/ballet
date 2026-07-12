@@ -1,4 +1,4 @@
-import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, AgentSaveRequest } from "@shared/api/workspace-contracts";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -12,7 +12,7 @@ const agent = (): Agent => ({
   instructions: "# Role\nDesign the system.",
   skills: [],
   enabled: true,
-  nodeStyle: "terra",
+  avatar: "compass",
   createdAt: "2026-07-11T10:00:00.000Z",
   updatedAt: "2026-07-11T12:00:00.000Z",
   relativePath: ".codex/agents/brief-agent.toml"
@@ -20,7 +20,7 @@ const agent = (): Agent => ({
 
 const renderEditor = (executionState?: AgentExecutionState) => {
   const selectedAgent = agent();
-  const save = vi.fn(async (_collection: "agents", item: Partial<Agent>) => ({ ...selectedAgent, ...item } as Agent));
+  const save = vi.fn(async (_collection: "agents", item: AgentSaveRequest) => ({ ...selectedAgent, ...item } as Agent));
   const remove = vi.fn(async () => undefined);
   render(<AgentEditor agent={selectedAgent} executionState={executionState} save={save} remove={remove} />);
   return { save, remove };
@@ -63,6 +63,7 @@ describe("agent instructions workspace", () => {
     expect(screen.getByLabelText("Model")).toBeInTheDocument();
     expect(screen.getByLabelText("Reasoning effort")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Network access" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Node style")).not.toBeInTheDocument();
     expect(screen.queryByRole("switch", { name: "Agent enabled" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save execution" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Environment" })).not.toBeInTheDocument();
@@ -153,22 +154,59 @@ describe("agent instructions workspace", () => {
   });
 });
 
-describe("agent node style", () => {
-  it("autosaves Node style without including unfinished agent fields", async () => {
+describe("agent avatar", () => {
+  it("previews an avatar change and persists it with Save agent", async () => {
     const user = userEvent.setup();
     const { save } = renderEditor();
 
+    expect(screen.getByRole("img", { name: "Compass avatar preview" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Edit agent description" }));
     await user.clear(screen.getByLabelText("Agent description"));
     await user.type(screen.getByLabelText("Agent description"), "Unsaved description");
-    await user.click(screen.getByLabelText("Node style"));
-    await user.click(await screen.findByRole("option", { name: "Sol" }));
+    await user.click(screen.getByLabelText("Avatar"));
+    await user.click(await screen.findByRole("option", { name: "Rocket" }));
 
-    await waitFor(() => expect(save).toHaveBeenCalledWith("agents", {
-      id: "agent-architect",
-      nodeStyle: "sol"
-    }));
+    expect(save).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Agent description")).toHaveValue("Unsaved description");
-    expect(screen.getByLabelText("Node style")).toHaveTextContent("Sol");
+    expect(screen.getByRole("img", { name: "Rocket avatar preview" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save agent" }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith("agents", expect.objectContaining({
+      id: "agent-architect",
+      avatar: "rocket",
+      description: "Unsaved description"
+    })));
+  });
+
+  it("clears an avatar with None", async () => {
+    const user = userEvent.setup();
+    const { save } = renderEditor();
+
+    await user.click(screen.getByLabelText("Avatar"));
+    await user.click(await screen.findByRole("option", { name: "None" }));
+
+    expect(screen.getByRole("img", { name: "No avatar selected" }).querySelector("svg")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Save agent" }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith("agents", expect.objectContaining({ avatar: null })));
+  });
+
+  it("supports choosing an avatar while creating an agent", async () => {
+    const user = userEvent.setup();
+    const save = vi.fn(async (_collection: "agents", item: AgentSaveRequest) => ({ ...agent(), ...item, id: "agent-new" } as Agent));
+    const remove = vi.fn(async () => undefined);
+    render(<AgentEditor save={save} remove={remove} />);
+
+    expect(screen.getByRole("img", { name: "No avatar selected" }).querySelector("svg")).toBeNull();
+    await user.type(screen.getByLabelText("Name"), "Builder");
+    await user.type(screen.getByLabelText("Instructions"), "Build the requested change.");
+    await user.click(screen.getByLabelText("Avatar"));
+    await user.click(await screen.findByRole("option", { name: "Brain circuit" }));
+    expect(screen.getByRole("img", { name: "Brain circuit avatar preview" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save agent" }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith("agents", expect.objectContaining({
+      name: "Builder",
+      avatar: "brain-circuit"
+    })));
   });
 });

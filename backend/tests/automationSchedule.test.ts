@@ -18,7 +18,7 @@ import {
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-schedule-v4-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-schedule-v5-"));
   roots.push(root);
   return root;
 };
@@ -34,20 +34,21 @@ const agent: Agent = {
   instructions: "Implement.",
   skills: [],
   enabled: true,
-  nodeStyle: "terra",
   createdAt: "2026-07-10T00:00:00.000Z",
   updatedAt: "2026-07-10T00:00:00.000Z"
 };
 
 const scheduledConfig = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "delivery",
+    theme: "open-ai",
     start: "scheduled-start",
     steps: [{
       id: "scheduled-start",
       type: "scheduled",
       description: "Start delivery on schedule.",
+      nodeSize: "small",
       schedule,
       on: { triggered: "implement" }
     }, {
@@ -55,6 +56,7 @@ const scheduledConfig = (schedule: ProjectStepSchedule): ProjectAutomationConfig
       type: "agent",
       agentId: agent.id,
       description: "Implement the change.",
+      nodeSize: "medium",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]

@@ -35,7 +35,6 @@ const agent: Agent = {
   description: "Handles deployment failures.",
   instructions: "Triage and remediate rollout failures.",
   enabled: true,
-  nodeStyle: "terra",
   skills: [],
   createdAt: "2026-06-23T08:00:00.000Z",
   updatedAt: "2026-06-23T08:00:00.000Z"

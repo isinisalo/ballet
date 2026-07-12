@@ -5,6 +5,5 @@ export const agentTemplate = (): Partial<Agent> => ({
   description: "",
   instructions: "",
   skills: [],
-  enabled: true,
-  nodeStyle: "terra"
+  enabled: true
 });

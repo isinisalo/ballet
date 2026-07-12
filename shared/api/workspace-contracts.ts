@@ -1,9 +1,11 @@
-import type { Agent, AgentExecutionState, AgentNodeStyle } from "../domain/agents.js";
+import type { Agent, AgentAvatar, AgentExecutionState } from "../domain/agents.js";
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectExecutableStep,
   ProjectLoop,
+  LoopNodeSize,
+  LoopThemeId,
   ProjectOnceStepSchedule,
   ProjectRecurringStepSchedule,
   ProjectScheduledStep,
@@ -106,13 +108,19 @@ export interface WorkspaceDataDto {
 
 export type WorkspaceCollectionName = "projects" | "goals" | "adrs" | "agents" | "skills" | "policies" | "events";
 
+export type AgentSaveRequest = Omit<Partial<Agent>, "avatar"> & {
+  avatar?: AgentAvatar | null;
+};
+
 export type WorkspaceAutomationResponseDto = {
   config: ProjectAutomationConfig;
   issues: ProjectAutomationIssue[];
 };
 
 export type WorkspaceSaveRequestByCollection = {
-  [K in WorkspaceCollectionName]: Partial<WorkspaceDataDto[K][number]>;
+  [K in WorkspaceCollectionName]: K extends "agents"
+    ? AgentSaveRequest
+    : Partial<WorkspaceDataDto[K][number]>;
 };
 
 export type WorkspaceSaveResponseByCollection = {
@@ -133,7 +141,7 @@ export {
 
 export type {
   Agent,
-  AgentNodeStyle,
+  AgentAvatar,
   AgentExecutionState,
   Adr,
   EventDefinition,
@@ -147,6 +155,8 @@ export type {
   ProjectDocumentTreeNode,
   ProjectExecutableStep,
   ProjectLoop,
+  LoopNodeSize,
+  LoopThemeId,
   ProjectOnceStepSchedule,
   ProjectRecurringStepSchedule,
   ProjectScheduledStep,

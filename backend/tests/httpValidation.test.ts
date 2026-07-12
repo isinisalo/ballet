@@ -32,14 +32,16 @@ describe("HTTP Zod validation", () => {
 
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
-      version: 4,
+      version: 5,
       loops: [{
         id: "delivery",
+        theme: "open-ai",
         start: "implementation",
         steps: [{
           id: "implementation",
           type: "agent",
           description: "Implementation",
+          nodeSize: "medium",
           agentId: "developer-agent",
           on: { approved: { end: "completed" }, rejected: { end: "failed" } }
         }]
@@ -50,6 +52,7 @@ describe("HTTP Zod validation", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, triggers: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 1 }), "version");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 3 }), "version");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 4 }), "version");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, loops: undefined }), "loops");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, gates: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
@@ -90,14 +93,24 @@ describe("HTTP Zod validation", () => {
       instructions: "Implement",
       skills: [],
       enabled: true,
-      nodeStyle: "luna",
+      avatar: "rocket",
       frontmatter: {}
-    })).toMatchObject({ name: "Developer", nodeStyle: "luna", frontmatter: {} });
+    })).toMatchObject({ name: "Developer", avatar: "rocket", frontmatter: {} });
+
+    expect(parseUnknown(collectionUpsertSchema("agents"), {
+      id: "developer",
+      avatar: null
+    })).toEqual({ id: "developer", avatar: null });
 
     expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
       name: "Developer",
-      nodeStyle: "mars"
-    }), "nodeStyle");
+      avatar: "mars"
+    }), "avatar");
+
+    expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
+      name: "Developer",
+      nodeStyle: "luna"
+    }), "$" );
 
     expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
       name: "Developer",

@@ -1,3 +1,4 @@
+// This integration suite intentionally shares one control-plane/runtime harness across coordinator scenarios.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -128,7 +129,7 @@ const agent = (id: string): Agent => ({
   instructions: `Execute ${id} work.`,
   skills: [],
   enabled: true,
-  nodeStyle: "terra",
+  avatar: "bot",
   createdAt: NOW,
   updatedAt: NOW
 });
@@ -139,111 +140,135 @@ const appData = (automation: ProjectAutomationConfig, agentIds: string[]): AppDa
 });
 
 const nestedAutomation = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "delivery",
+    theme: "open-ai",
     start: "implement",
     steps: [{
       id: "implement", type: "agent", agentId: "developer", description: "Implement.",
+      nodeSize: "medium",
       on: { approved: { loop: "release" }, rejected: { end: "failed" } }
     }]
   }, {
     id: "release",
+    theme: "open-ai",
     start: "publish",
     steps: [{
       id: "publish", type: "agent", agentId: "publisher", description: "Publish.",
+      nodeSize: "medium",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]
 });
 
 const humanTerminalAutomation = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "review",
+    theme: "open-ai",
     start: "analyze",
     steps: [{
       id: "analyze", type: "agent", agentId: "developer", description: "Analyze.",
+      nodeSize: "medium",
       on: { approved: "approve", rejected: { end: "failed" } }
     }, {
       id: "approve", type: "human", description: "Approve.",
+      nodeSize: "small",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]
 });
 
 const feedbackAutomation = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "implementation",
+    theme: "open-ai",
     start: "implement",
     steps: [{
       id: "implement", type: "agent", agentId: "developer", description: "Implement the task from its immutable snapshot.",
+      nodeSize: "medium",
       on: { approved: "verify", rejected: { end: "failed" } }
     }, {
       id: "verify", type: "agent", agentId: "reviewer", description: "Verify the implementation.",
+      nodeSize: "medium",
       on: { approved: { end: "completed" }, rejected: "implement" }
     }]
   }]
 });
 
 const humanFeedbackAutomation = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "implementation",
+    theme: "open-ai",
     start: "implement",
     steps: [{
       id: "implement", type: "agent", agentId: "developer", description: "Implement the task.",
+      nodeSize: "medium",
       on: { approved: "code-gate", rejected: { end: "failed" } }
     }, {
       id: "code-gate", type: "human", description: "Approve the implementation.",
+      nodeSize: "small",
       on: { approved: { end: "completed" }, rejected: "implement" }
     }]
   }]
 });
 
 const gatedDeploymentAutomation = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "implementation",
+    theme: "open-ai",
     start: "verify",
     steps: [{
       id: "verify", type: "agent", agentId: "reviewer", description: "Verify the implementation.",
+      nodeSize: "medium",
       on: { approved: "code-gate", rejected: { end: "failed" } }
     }, {
       id: "code-gate", type: "human", description: "Authorize the dev deployment.",
+      nodeSize: "small",
       on: { approved: { loop: "dev-deployment" }, rejected: { end: "failed" } }
     }]
   }, {
     id: "dev-deployment",
+    theme: "open-ai",
     start: "deploy",
     steps: [{
       id: "deploy", type: "agent", agentId: "deployer", description: "Deploy and validate dev.",
+      nodeSize: "medium",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]
 });
 
 const deliveryAutomation = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "implementation",
+    theme: "open-ai",
     start: "implement",
     steps: [{
       id: "implement", type: "agent", agentId: "developer", description: "Implement the task.",
+      nodeSize: "medium",
       on: { approved: "verify", rejected: { end: "blocked" } }
     }, {
       id: "verify", type: "agent", agentId: "reviewer", description: "Verify the implementation.",
+      nodeSize: "medium",
       on: { approved: "code-gate", rejected: "implement" }
     }, {
       id: "code-gate", type: "human", description: "Authorize the dev deployment.",
+      nodeSize: "small",
       on: { approved: { loop: "dev-deployment" }, rejected: "implement" }
     }]
   }, {
     id: "dev-deployment",
+    theme: "open-ai",
     start: "deploy",
     steps: [{
       id: "deploy", type: "agent", agentId: "deployer", description: "Deploy and validate dev.",
+      nodeSize: "medium",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]
@@ -709,6 +734,7 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
       ["delivery", "implement", "codex"],
       ["release", "publish", "copilot"]
     ]);
+    expect(plan.steps.map((step) => step.agent.avatar)).toEqual(["bot", "bot"]);
     const firstStep = test.runtime.getLoopRun(run.runId)!.stepRuns[0]!;
     const firstTask = test.control.service.getTask(firstStep.executionTaskId!);
     expect(firstTask.spec).toMatchObject({ rootRunId: run.rootRunId, project: plan.project, runtime: plan.steps[0]!.runtime });

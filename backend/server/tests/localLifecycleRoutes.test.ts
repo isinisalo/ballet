@@ -202,14 +202,16 @@ const heartbeat = (backendId: string) => ({
 });
 
 const humanAutomation: ProjectAutomationConfig = {
-  version: 4,
+  version: 5,
   loops: [{
     id: "approval",
+    theme: "open-ai",
     start: "approve",
     steps: [{
       id: "approve",
       type: "human",
       description: "Approve the release.",
+      nodeSize: "small",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]

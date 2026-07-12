@@ -1,8 +1,9 @@
 import type {
   Agent,
+  AgentAvatar,
   AgentExecutionState,
-  AgentNodeStyle,
   LoopRunDetails,
+  LoopNodeSize,
   ProjectAutomationConfig,
   ProjectLoop,
   ProjectStep,
@@ -21,7 +22,8 @@ export type LoopVisualStep = {
   humanGate: boolean;
   scheduled: boolean;
   scheduleLabel?: string;
-  nodeStyle: AgentNodeStyle;
+  nodeSize: LoopNodeSize;
+  avatar?: AgentAvatar;
   reasoningEffort?: string;
   step: ProjectStep;
   stepRun?: StepRun;
@@ -55,7 +57,11 @@ export function buildLoopVisualProjection(
 ): LoopVisualProjection {
   const loopDefinitions = config.loops.map((loop) => loop.id === displayedLoop.id ? displayedLoop : loop);
   const latestRunByStepId = latestStepRuns(run?.stepRuns ?? []);
-  const nodeStyleByAgentId = new Map(agents.map((agent) => [agent.id, agent.nodeStyle ?? "terra"]));
+  const avatarByAgentId = new Map(agents.map((agent) => [agent.id, agent.avatar]));
+  const snapshotAvatarByStepKey = new Map((run?.executionPlan?.steps ?? []).map((snapshot) => [
+    visualStepKey(snapshot.loopId, snapshot.stepId),
+    snapshot.agent.avatar
+  ]));
   const reasoningByAgentId = new Map(agentExecutionStates.map((state) => [state.agentId, state.reasoning]));
   const steps = loopDefinitions.flatMap((loop) => loop.steps.map((step) => ({
     id: visualStepKey(loop.id, step.id),
@@ -65,7 +71,10 @@ export function buildLoopVisualProjection(
     humanGate: step.type === "human",
     scheduled: step.type === "scheduled",
     scheduleLabel: step.type === "scheduled" ? scheduleSummary(step.schedule) : undefined,
-    nodeStyle: step.type === "agent" ? nodeStyleByAgentId.get(step.agentId) ?? "terra" : "luna",
+    nodeSize: step.nodeSize,
+    avatar: step.type === "agent"
+      ? run ? snapshotAvatarByStepKey.get(visualStepKey(loop.id, step.id)) : avatarByAgentId.get(step.agentId)
+      : undefined,
     reasoningEffort: step.type === "agent" ? reasoningByAgentId.get(step.agentId) : undefined,
     step,
     stepRun: loop.id === displayedLoop.id ? latestRunByStepId.get(step.id) : undefined

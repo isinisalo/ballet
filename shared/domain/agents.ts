@@ -1,14 +1,22 @@
 import type { MarkdownBackedEntity, Skill } from "./documents.js";
 import type { RuntimeProvider } from "./runtime.js";
 
-export const agentNodeStyles = ["luna", "terra", "sol"] as const;
-export type AgentNodeStyle = (typeof agentNodeStyles)[number];
-export const defaultAgentNodeStyle: AgentNodeStyle = "terra";
+export const agentAvatars = [
+  "bot",
+  "brain-circuit",
+  "code-2",
+  "compass",
+  "hammer",
+  "rocket",
+  "search",
+  "sparkles"
+] as const;
+export type AgentAvatar = (typeof agentAvatars)[number];
 
-export const normalizeAgentNodeStyle = (value: unknown): AgentNodeStyle =>
-  typeof value === "string" && agentNodeStyles.includes(value as AgentNodeStyle)
-    ? value as AgentNodeStyle
-    : defaultAgentNodeStyle;
+export const normalizeAgentAvatar = (value: unknown): AgentAvatar | undefined =>
+  typeof value === "string" && agentAvatars.includes(value as AgentAvatar)
+    ? value as AgentAvatar
+    : undefined;
 
 export interface Agent extends MarkdownBackedEntity {
   id: string;
@@ -17,7 +25,7 @@ export interface Agent extends MarkdownBackedEntity {
   instructions: string;
   skills: Skill[];
   enabled: boolean;
-  nodeStyle: AgentNodeStyle;
+  avatar?: AgentAvatar;
   createdAt: string;
   updatedAt: string;
   nicknameCandidates?: string[];

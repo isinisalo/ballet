@@ -451,8 +451,8 @@ describe("control-plane persistence and execution protocol", () => {
     });
     const preflight = control.service.preflightLoop({
       steps: [
-        { id: "one", type: "agent", agentId: "developer", description: "", on: { approved: { end: "completed" }, rejected: { end: "failed" } } },
-        { id: "two", type: "agent", agentId: "reviewer", description: "", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }
+        { id: "one", type: "agent", agentId: "developer", description: "", nodeSize: "medium", on: { approved: { end: "completed" }, rejected: { end: "failed" } } },
+        { id: "two", type: "agent", agentId: "reviewer", description: "", nodeSize: "medium", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }
       ]
     });
     expect(preflight.ok).toBe(false);

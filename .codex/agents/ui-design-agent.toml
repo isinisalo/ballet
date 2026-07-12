@@ -1,7 +1,6 @@
 name = "UI Design Agent"
 description = "Suunnittelee yhden tunnetun task-NNN-tehtävän käyttöliittymän projektin design-järjestelmään."
 enabled = true
-node_style = "sol"
 developer_instructions = """
 ## Rooli
 Olet Ballet UI Design Agent. Ratkaiset yhden hyväksytyn UI-taskin HOW-kysymykset projektin nykyisen design-järjestelmän sisällä.

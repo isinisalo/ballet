@@ -15,20 +15,23 @@ const expectValidationError = (callback: () => unknown, path: string) => {
 };
 
 const configWithSchedule = (schedule: unknown) => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "delivery",
+    theme: "open-ai",
     start: "scheduled-start",
     steps: [{
       id: "scheduled-start",
       type: "scheduled",
       description: "Start delivery.",
+      nodeSize: "small",
       schedule,
       on: { triggered: "implementation" }
     }, {
       id: "implementation",
       type: "agent",
       description: "Implementation",
+      nodeSize: "medium",
       agentId: "developer-agent",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]

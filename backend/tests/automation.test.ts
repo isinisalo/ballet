@@ -1,3 +1,4 @@
+// This validation suite intentionally keeps the canonical graph fixture and its cross-field invariants together.
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -13,7 +14,7 @@ import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v4-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v5-"));
   roots.push(root);
   return root;
 };
@@ -29,39 +30,41 @@ const agent: Agent = {
   instructions: "Implement.",
   skills: [],
   enabled: true,
-  nodeStyle: "terra",
   createdAt: "2026-07-10T00:00:00.000Z",
   updatedAt: "2026-07-10T00:00:00.000Z"
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "delivery",
+    theme: "open-ai",
     start: "implement",
     steps: [{
       id: "implement",
       type: "agent",
       agentId: agent.id,
       description: "Implement the change.",
+      nodeSize: "medium",
       on: { approved: "review", rejected: { end: "failed" } }
     }, {
       id: "review",
       type: "human",
       description: "Review the change.",
+      nodeSize: "small",
       on: { approved: { end: "completed" }, rejected: "implement" }
     }]
   }]
 });
 
-describe("automation v4 config", () => {
-  it("round-trips only the canonical v4 shape", async () => {
+describe("automation v5 config", () => {
+  it("round-trips only the canonical v5 shape", async () => {
     const root = await tempRoot();
     const saved = await saveProjectAutomationConfig(root, config(), [agent]);
     expect(saved).toEqual(config());
     expect(await loadProjectAutomationConfig(root, [agent])).toEqual(config());
     const raw = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as Record<string, unknown>;
-    expect(raw.version).toBe(4);
+    expect(raw.version).toBe(5);
     expect(raw).not.toHaveProperty("runtimes");
     expect(raw).not.toHaveProperty("actions");
     expect(raw).not.toHaveProperty("outputRoutes");
@@ -77,10 +80,26 @@ describe("automation v4 config", () => {
       loops: [],
       runtimes: []
     }, [agent]).length).toBeGreaterThan(0);
-    expect(validateProjectAutomationConfig({ version: 3, loops: [] }, [agent])).toContainEqual(
+    expect(validateProjectAutomationConfig({ version: 4, loops: [] }, [agent])).toContainEqual(
       expect.objectContaining({ path: "version" })
     );
     const base = config();
+    expect(validateProjectAutomationConfig({
+      ...base,
+      loops: [{ ...base.loops[0]!, theme: "space" }]
+    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.theme" }));
+    expect(validateProjectAutomationConfig({
+      ...base,
+      loops: [{ ...base.loops[0]!, theme: undefined }]
+    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.theme" }));
+    expect(validateProjectAutomationConfig({
+      ...base,
+      loops: [{ ...base.loops[0]!, steps: [{ ...base.loops[0]!.steps[0]!, nodeSize: "huge" }] }]
+    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.steps.0.nodeSize" }));
+    expect(validateProjectAutomationConfig({
+      ...base,
+      loops: [{ ...base.loops[0]!, steps: [{ ...base.loops[0]!.steps[0]!, nodeSize: undefined }] }]
+    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.steps.0.nodeSize" }));
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{ ...base.loops[0]!, id: "Delivery" }]
@@ -111,12 +130,14 @@ describe("automation v4 config", () => {
       ...base,
       loops: [{
         id: "cycle",
+        theme: "open-ai",
         start: "again",
         steps: [{
           id: "again",
           type: "agent",
           agentId: agent.id,
           description: "Cycle forever.",
+          nodeSize: "medium",
           on: { approved: "again", rejected: "again" }
         }]
       }]
@@ -126,11 +147,13 @@ describe("automation v4 config", () => {
   it("allows cross-loop transitions only from humans and never back to the same loop", () => {
     const target = {
       id: "release",
+      theme: "open-ai" as const,
       start: "finish",
       steps: [{
         id: "finish",
         type: "human" as const,
         description: "Finish.",
+        nodeSize: "small" as const,
         on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } }
       }]
     };
@@ -167,23 +190,27 @@ describe("automation v4 config", () => {
 describe("all-approved path liveness", () => {
   it("rejects an all-approved cycle across loops", () => {
     const cyclic: ProjectAutomationConfig = {
-      version: 4,
+      version: 5,
       loops: [{
         id: "planning",
+        theme: "open-ai",
         start: "approve-plan",
         steps: [{
           id: "approve-plan",
           type: "human",
           description: "Approve the plan.",
+          nodeSize: "small",
           on: { approved: { loop: "delivery" }, rejected: { end: "failed" } }
         }]
       }, {
         id: "delivery",
+        theme: "open-ai",
         start: "approve-delivery",
         steps: [{
           id: "approve-delivery",
           type: "human",
           description: "Approve delivery.",
+          nodeSize: "small",
           on: { approved: { loop: "planning" }, rejected: { end: "failed" } }
         }]
       }]
@@ -200,6 +227,7 @@ describe("all-approved path liveness", () => {
         id: `step-${index + 1}`,
         type: "human",
         description: `Complete step ${index + 1}.`,
+        nodeSize: "small",
         on: {
           approved: index === MAX_ROOT_TRANSITIONS - 1
             ? { loop: "finish" }
@@ -209,18 +237,21 @@ describe("all-approved path liveness", () => {
       })
     );
     const tooLong: ProjectAutomationConfig = {
-      version: 4,
+      version: 5,
       loops: [{
         id: "delivery",
+        theme: "open-ai",
         start: "step-1",
         steps: longSteps
       }, {
         id: "finish",
+        theme: "open-ai",
         start: "complete",
         steps: [{
           id: "complete",
           type: "human",
           description: "Complete delivery.",
+          nodeSize: "small",
           on: { approved: { end: "completed" }, rejected: { end: "failed" } }
         }]
       }]
@@ -234,30 +265,35 @@ describe("all-approved path liveness", () => {
 
   it("allows a short all-approved chain across loops", () => {
     const short: ProjectAutomationConfig = {
-      version: 4,
+      version: 5,
       loops: [{
         id: "delivery",
+        theme: "open-ai",
         start: "implement",
         steps: [{
           id: "implement",
           type: "agent",
           agentId: agent.id,
           description: "Implement the task.",
+          nodeSize: "medium",
           on: { approved: "code-gate", rejected: { end: "blocked" } }
         }, {
           id: "code-gate",
           type: "human",
           description: "Approve the task.",
+          nodeSize: "small",
           on: { approved: { loop: "dev-deployment" }, rejected: "implement" }
         }]
       }, {
         id: "dev-deployment",
+        theme: "open-ai",
         start: "deploy",
         steps: [{
           id: "deploy",
           type: "agent",
           agentId: agent.id,
           description: "Deploy to dev.",
+          nodeSize: "medium",
           on: { approved: { end: "completed" }, rejected: { end: "failed" } }
         }]
       }]

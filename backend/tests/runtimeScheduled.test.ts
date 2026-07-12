@@ -15,14 +15,16 @@ afterEach(async () => {
 });
 
 const config = (target: ProjectExecutableStep): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "scheduled-delivery",
+    theme: "open-ai",
     start: "timer",
     steps: [{
       id: "timer",
       type: "scheduled",
       description: "Start once.",
+      nodeSize: "small",
       schedule: {
         kind: "once",
         date: "2026-07-12",
@@ -39,6 +41,7 @@ const agent: ProjectExecutableStep = {
   type: "agent",
   agentId: "delivery-agent",
   description: "Deliver.",
+  nodeSize: "medium",
   on: { approved: { end: "completed" }, rejected: { end: "failed" } }
 };
 
@@ -46,6 +49,7 @@ const human: ProjectExecutableStep = {
   id: "human-gate",
   type: "human",
   description: "Approve delivery.",
+  nodeSize: "small",
   on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
 };
 

@@ -37,14 +37,16 @@ afterEach(async () => {
 });
 
 const automation = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "scheduled-delivery",
+    theme: "open-ai",
     start: "timer",
     steps: [{
       id: "timer",
       type: "scheduled",
       description: "Start on schedule.",
+      nodeSize: "small",
       schedule,
       on: { triggered: "work" }
     }, {
@@ -52,6 +54,7 @@ const automation = (schedule: ProjectStepSchedule): ProjectAutomationConfig => (
       type: "agent",
       agentId: "delivery-agent",
       description: "Deliver.",
+      nodeSize: "medium",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]
@@ -253,7 +256,7 @@ describe("Loop scheduler dispatch outcomes", () => {
       lastStatus: undefined
     })]);
 
-    data = workspace({ version: 4, loops: [] });
+    data = workspace({ version: 5, loops: [] });
     await scheduler.trigger();
     expect(database.listLoopScheduleStates()).toEqual([]);
   });

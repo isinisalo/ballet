@@ -1,0 +1,116 @@
+- generic [ref=e23]:
+  - generic [ref=e26]:
+    - generic [ref=e27]:
+      - combobox "Ballet mode" [ref=e28]:
+        - generic [ref=e29]: Ballet
+      - textbox [ref=e30]: configure
+    - list [ref=e34]:
+      - listitem [ref=e35]:
+        - button "7 config changes" [ref=e36]
+        - list [ref=e43]:
+          - listitem [ref=e44]:
+            - generic ".ballet/project.json" [ref=e45]
+          - listitem [ref=e46]:
+            - generic ".codex/agents/dev-deploy-agent.toml" [ref=e47]
+          - listitem [ref=e48]:
+            - generic ".codex/agents/implementation-agent.toml" [ref=e49]
+          - listitem [ref=e50]:
+            - generic ".codex/agents/milestone-task-agent.toml" [ref=e51]
+          - listitem [ref=e52]:
+            - generic ".codex/agents/review-test-agent.toml" [ref=e53]
+          - listitem [ref=e54]:
+            - generic ".codex/agents/roadmap-agent.toml" [ref=e55]
+          - listitem [ref=e56]:
+            - generic ".codex/agents/ui-design-agent.toml" [ref=e57]
+      - listitem [ref=e58]:
+        - button "6 runtime config issues" [ref=e59]
+        - list [ref=e63]:
+          - listitem [ref=e64]:
+            - 'generic "attachments.dev-deploy-agent: No compatible computer is attached on this machine." [ref=e65]'
+          - listitem [ref=e66]:
+            - 'generic "attachments.implementation-agent: No compatible computer is attached on this machine." [ref=e67]'
+          - listitem [ref=e68]:
+            - 'generic "attachments.milestone-task-agent: No compatible computer is attached on this machine." [ref=e69]'
+          - listitem [ref=e70]:
+            - 'generic "attachments.review-test-agent: No compatible computer is attached on this machine." [ref=e71]'
+          - listitem [ref=e72]:
+            - 'generic "attachments.roadmap-agent: No compatible computer is attached on this machine." [ref=e73]'
+          - listitem [ref=e74]:
+            - 'generic "attachments.ui-design-agent: No compatible computer is attached on this machine." [ref=e75]'
+      - listitem [ref=e77]:
+        - button "Automation" [expanded] [ref=e78]
+        - list [ref=e87]:
+          - listitem [ref=e88]:
+            - link "Loops" [ref=e89] [cursor=pointer]:
+              - /url: /automation/loops?view=all
+          - listitem [ref=e93]:
+            - link "delivery-planning" [ref=e94] [cursor=pointer]:
+              - /url: /automation/loops?id=delivery-planning
+          - listitem [ref=e96]:
+            - link "ui-design" [ref=e97] [cursor=pointer]:
+              - /url: /automation/loops?id=ui-design
+          - listitem [ref=e99]:
+            - link "implementation" [ref=e100] [cursor=pointer]:
+              - /url: /automation/loops?id=implementation
+          - listitem [ref=e102]:
+            - link "dev-deployment" [ref=e103] [cursor=pointer]:
+              - /url: /automation/loops?id=dev-deployment
+          - listitem [ref=e105]:
+            - link "timed" [ref=e106] [cursor=pointer]:
+              - /url: /automation/loops?id=timed
+      - listitem [ref=e109]:
+        - button "Environment" [ref=e110]
+      - listitem [ref=e119]:
+        - button "Project" [ref=e120]
+    - button "Toggle Sidebar" [ref=e127]
+  - main [ref=e128]:
+    - main [ref=e130]:
+      - generic [ref=e131]:
+        - generic [ref=e133]:
+          - generic [ref=e138]: Automation
+          - generic [ref=e139]: implementation
+        - region "Loop canvas workspace" [ref=e142]:
+          - generic [ref=e143]:
+            - generic "Edit loop canvas" [ref=e144]:
+              - application [ref=e145]:
+                - generic [ref=e147]:
+                  - generic:
+                    - generic:
+                      - img:
+                        - img "Edge from loop:implementation:step-1 to loop:implementation:step-2" [ref=e148]
+                      - img:
+                        - img "Edge from loop:implementation:step-0 to loop:implementation:step-1" [ref=e149]
+                      - img:
+                        - img "Edge from loop:implementation:step-0 to loop:implementation:output-event-0-rejected" [ref=e150]
+                      - img:
+                        - img "Edge from loop:implementation:step-2 to loop:implementation:step-1" [ref=e153]
+                      - img:
+                        - img "Edge from loop:implementation:step-2 to loop:implementation:step-0" [ref=e154]
+                      - img:
+                        - img "Edge from loop:implementation:step-1 to loop:implementation:step-0" [ref=e157]
+                      - img:
+                        - img "Edge from loop:implementation:step-2 to loop:dev-deployment:loop" [ref=e160]
+                    - generic:
+                      - button "Edit step implement-task" [ref=e166]:
+                        - generic: implement-task
+                      - button "Edit step verify-task" [ref=e171]:
+                        - generic: verify-task
+                      - button "Edit step code-gate" [ref=e176]:
+                        - generic: code-gate
+                      - button "Add step for blocked" [ref=e182]
+                      - 'generic "Loop: dev-deployment" [ref=e185]': dev-deployment
+            - generic [ref=e192]:
+              - generic [ref=e193]:
+                - generic [ref=e194]: Theme
+                - generic [ref=e195]:
+                  - combobox "Loop theme" [expanded] [ref=e196]:
+                    - generic [ref=e197]: OpenAI
+                    - img: ▼
+                  - listbox [ref=e205]:
+                    - group [ref=e206]:
+                      - option "Default" [ref=e207]
+                      - option "OpenAI" [active] [selected] [ref=e209]
+                  - textbox [ref=e198]: open-ai
+              - generic [ref=e199]:
+                - button "Save loop" [ref=e200]
+                - button "Delete loop" [ref=e201] [cursor=pointer]

@@ -1,3 +1,4 @@
+import type { AgentAvatar } from "./agents.js";
 import type { ProjectLoop } from "./automation.js";
 
 export type RuntimeProvider = "codex" | "copilot";
@@ -188,6 +189,7 @@ export interface ExecutionAgentSnapshot {
   description: string;
   instructions: string;
   skillIds: string[];
+  avatar?: AgentAvatar;
   configHash: string;
 }
 

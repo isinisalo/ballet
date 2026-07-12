@@ -4,6 +4,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
 import { Bot } from "lucide-react";
+import { AgentAvatarField } from "./AgentAvatarField";
 import { AgentEditWorkspace } from "./AgentEditWorkspace";
 import { type AgentEditorState, type RemoveAgent, type SaveAgent, useAgentEditor } from "./useAgentEditor";
 
@@ -20,6 +21,7 @@ export function AgentEditorContent({ editor, showNameField = true }: { editor: A
         <FieldGroup>
           {showNameField ? <TextField label="Name" required compact value={editor.form.name ?? ""} onChange={(name) => editor.updateForm({ name })} /> : null}
           <TextAreaField label="Description" rows={2} compact value={editor.form.description ?? ""} onChange={(description) => editor.updateForm({ description })} />
+          <AgentAvatarField avatar={editor.form.avatar} onChange={(avatar) => editor.updateForm({ avatar })} />
         </FieldGroup>
         <FieldGroup>
           <Field className="gap-1.5">

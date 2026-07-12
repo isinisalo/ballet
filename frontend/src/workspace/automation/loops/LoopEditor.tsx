@@ -8,6 +8,7 @@ import { LoopCanvas } from "./LoopCanvas";
 import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
 import { LoopHandlerSheet } from "./LoopHandlerSheet";
 import { LoopStepSheetEditor } from "./LoopStepSheetEditor";
+import { LoopThemeField, LoopThemeSelect } from "./LoopThemeField";
 
 type Selection = { stepId: string; transition?: ProjectStepTransitionId };
 
@@ -20,7 +21,10 @@ export function LoopCreationEditor({ loop, loops, agents, onChange }: {
   const step = loop.steps[0];
   return (
     <div className="grid min-w-0 gap-4 p-4 md:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)]">
-      <TextField label="Loop ID" required value={loop.id} onChange={(id) => onChange({ ...loop, id })} />
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_7.5rem] items-end gap-3">
+        <TextField label="Loop ID" required value={loop.id} onChange={(id) => onChange({ ...loop, id })} />
+        <LoopThemeField loop={loop} disabled={false} onChange={onChange} />
+      </div>
       {step ? (
         <LoopStepSheetEditor
           step={step}
@@ -61,6 +65,15 @@ export function LoopEditor({
 }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const selectedStep = loop.steps.find((step) => step.id === selection?.stepId);
+  const controls = (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 rounded-md border border-divider-strong bg-card px-1.5 py-1">
+        <span className="font-mono text-[0.66rem] text-muted-foreground">Theme</span>
+        <div className="w-24"><LoopThemeSelect loop={loop} disabled={locked} onChange={onChange} /></div>
+      </div>
+      {canvasControls}
+    </div>
+  );
 
   useEffect(() => setSelection(null), [loop.id]);
   useEffect(() => {
@@ -88,7 +101,7 @@ export function LoopEditor({
           agentExecutionStates={agentExecutionStates}
           selectedStepId={selectedStep?.id}
           readOnly={false}
-          canvasControls={canvasControls}
+          canvasControls={controls}
           onStepSelect={(stepId) => setSelection({ stepId })}
           onTransitionSelect={(stepId, transition) => setSelection({ stepId, transition })}
           onInsertStep={(stepId, result) => {

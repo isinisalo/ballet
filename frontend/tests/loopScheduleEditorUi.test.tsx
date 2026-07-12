@@ -5,24 +5,25 @@ import type { Agent, ProjectAutomationConfig, ProjectLoop, ProjectStepSchedule }
 import { AllLoopsCanvas } from "../src/workspace/automation/loops/AllLoopsCanvas";
 import { LoopEditor } from "../src/workspace/automation/loops/LoopEditor";
 
-const agents: Agent[] = [{ id: "builder", name: "Builder", role: "Implementation", description: "Builds.", enabled: true, nodeStyle: "terra", skills: [] }];
+const agents: Agent[] = [{ id: "builder", name: "Builder", role: "Implementation", description: "Builds.", enabled: true, skills: [] }];
 const executableSteps: ProjectLoop["steps"] = [{
-  id: "build", type: "agent", agentId: "builder", description: "Build", on: { approved: "review", rejected: { end: "failed" } }
+  id: "build", type: "agent", nodeSize: "medium", agentId: "builder", description: "Build", on: { approved: "review", rejected: { end: "failed" } }
 }, {
-  id: "review", type: "human", description: "Review", on: { approved: { end: "completed" }, rejected: "build" }
+  id: "review", type: "human", nodeSize: "small", description: "Review", on: { approved: { end: "completed" }, rejected: "build" }
 }];
-const ordinaryLoop: ProjectLoop = { id: "delivery", start: "build", steps: executableSteps };
+const ordinaryLoop: ProjectLoop = { id: "delivery", theme: "open-ai", start: "build", steps: executableSteps };
 
 function scheduledLoop(schedule: ProjectStepSchedule): ProjectLoop {
   return {
     id: "scheduled-delivery",
+    theme: "open-ai",
     start: "timer",
-    steps: [{ id: "timer", type: "scheduled", description: "Start delivery", schedule, on: { triggered: "build" } }, ...executableSteps]
+    steps: [{ id: "timer", type: "scheduled", nodeSize: "small", description: "Start delivery", schedule, on: { triggered: "build" } }, ...executableSteps]
   };
 }
 
 const weekdayLoop = scheduledLoop({ kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" });
-const config = (loop: ProjectLoop): ProjectAutomationConfig => ({ version: 4, loops: [loop] });
+const config = (loop: ProjectLoop): ProjectAutomationConfig => ({ version: 5, loops: [loop] });
 
 describe("scheduled Loop editor UI", () => {
   it("offers Scheduled only for an eligible start Step and preserves its approved local target", async () => {
@@ -48,7 +49,8 @@ describe("scheduled Loop editor UI", () => {
     const { container } = render(<LoopEditor config={config(weekdayLoop)} loop={weekdayLoop} loops={[weekdayLoop]} agents={agents} scheduleState={{ loopId: weekdayLoop.id, stepId: "timer", nextRunAt: "2026-07-13T06:00:00.000Z", lastScheduledAt: "2026-07-10T06:00:00.000Z", lastStatus: "started", lastRunId: "run-42" }} locked={false} onChange={() => undefined} />);
     const node = await screen.findByRole("button", { name: "Edit step timer" });
     expect(node).toHaveAttribute("data-loop-node-kind", "scheduled");
-    expect(node).toHaveAttribute("data-loop-node-style", "luna");
+    expect(node).toHaveAttribute("data-loop-node-size", "small");
+    expect(node).toHaveAttribute("data-loop-node-renderer", "luna");
     expect(container.querySelectorAll("[data-loop-node-schedule-label]")).toHaveLength(1);
     expect(container.querySelector("[data-loop-node-schedule-label]")).toHaveTextContent("Weekdays · 09:00 · Europe/Helsinki");
     await user.click(node);

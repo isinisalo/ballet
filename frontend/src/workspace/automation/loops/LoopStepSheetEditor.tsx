@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { Agent, LoopScheduleState, ProjectLoop, ProjectStep, ProjectStepTransitionId } from "@shared/api/workspace-contracts";
+import type { Agent, LoopNodeSize, LoopScheduleState, ProjectLoop, ProjectStep, ProjectStepTransitionId } from "@shared/api/workspace-contracts";
 import { isProjectExecutableStep } from "@shared/api/workspace-contracts";
 import { ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,20 @@ export function LoopStepSheetEditor({ step, loop, loops, agents, scheduleState, 
         <Field className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2">
           <FieldLabel className="text-xs font-normal text-muted-foreground">Type</FieldLabel>
           <LoopEditorSelect ariaLabel="Step type" value={step.type} disabled={disabled} options={typeOptions} onChange={(type) => onChange(changeStepType(step, type as ProjectStep["type"], { loop, firstAgentId: agents[0]?.id }))} />
+        </Field>
+        <Field className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2">
+          <FieldLabel className="text-xs font-normal text-muted-foreground">Node size</FieldLabel>
+          <LoopEditorSelect
+            ariaLabel="Node size"
+            value={step.nodeSize}
+            disabled={disabled}
+            options={[
+              { value: "small", label: "Small" },
+              { value: "medium", label: "Medium" },
+              { value: "large", label: "Large" }
+            ]}
+            onChange={(nodeSize) => onChange({ ...step, nodeSize: nodeSize as LoopNodeSize } as ProjectStep)}
+          />
         </Field>
         <Field className="gap-1">
           <FieldLabel htmlFor={`${id}-description`} className="text-xs font-normal text-muted-foreground">Description</FieldLabel>

@@ -1,4 +1,4 @@
-import type { AppData, CollectionName } from "../../shared/api/workspaceData.js";
+import type { AppData, CollectionName, WorkspaceSaveRequestByCollection } from "../../shared/api/workspaceData.js";
 import type { MarkdownDocument } from "../../shared/domain/documents.js";
 import {
   createProjectMarkdownDocument,
@@ -24,7 +24,7 @@ export class MarkdownEntityService {
 
   async upsert<T extends CollectionName>(
     collection: T,
-    item: Partial<AppData[T][number]> & { id?: string }
+    item: WorkspaceSaveRequestByCollection[T]
   ): Promise<AppData[T][number]> {
     if (!markdownCollections.has(collection as MutableMarkdownCollection)) {
       throw new Error(`Unsupported collection: ${collection}`);

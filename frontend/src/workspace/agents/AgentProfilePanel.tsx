@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
 import { Check, Pencil, X } from "lucide-react";
 import { useState } from "react";
+import { AgentAvatarField } from "./AgentAvatarField";
 import { AgentExecutionSettingsForm, type AgentRuntimeConfigurationEditor } from "./execution/AgentExecutionForm";
 import type { AgentEditorState } from "./useAgentEditor";
 
@@ -86,15 +87,12 @@ export function AgentProfilePanel({ agent, executionState, editor, executionEdit
           }}
         />
         <AgentLiveStatusBadge state={executionState} />
+        <AgentAvatarField compact avatar={editor.form.avatar} onChange={(avatar) => editor.updateForm({ avatar })} />
       </div>
       <AgentExecutionSettingsForm
         compact
         agentId={agent.id}
         editor={executionEditor}
-        nodeStyle={editor.form.nodeStyle ?? agent.nodeStyle ?? "terra"}
-        nodeStyleSaving={editor.nodeStyleSaving}
-        nodeStyleError={editor.nodeStyleError}
-        onNodeStyleChange={(style) => { void editor.saveNodeStyle(style); }}
       />
       <ProfileSection title="Details">
         <ProfileRow label="Skills" value={String(agent.skills.length)} />

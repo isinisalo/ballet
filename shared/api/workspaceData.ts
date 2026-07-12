@@ -7,6 +7,7 @@ export type {
   WorkspaceAutomationResponseDto,
   ProjectDocumentSaveRequest,
   ProjectDocumentCreateRequest,
+  AgentSaveRequest,
   EventIntakeRequest,
   WorkspaceSaveRequestByCollection,
   WorkspaceSaveResponseByCollection

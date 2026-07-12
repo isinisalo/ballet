@@ -1,5 +1,6 @@
 import type {
   Agent,
+  LoopNodeSize,
   ProjectAutomationConfig,
   ProjectExecutableStep,
   ProjectLoop,
@@ -18,7 +19,7 @@ export const createLoopDraft = (agents: Agent[]): ProjectLoop => {
   const step: ProjectStep = firstAgent
     ? agentStep("new-step", firstAgent.id)
     : humanStep("new-step");
-  return { id: "", start: step.id, steps: [step] };
+  return { id: "", theme: "open-ai", start: step.id, steps: [step] };
 };
 
 export const insertStepForTransition = (
@@ -105,12 +106,12 @@ export const changeStepType = (step: ProjectStep, type: ProjectStep["type"], opt
   const previousOn: ProjectStepTransitions = step.type === "scheduled"
     ? { approved: step.on.triggered, rejected: { end: "failed" } }
     : step.on;
-  if (type === "human") return humanStep(step.id, step.description, previousOn);
+  if (type === "human") return humanStep(step.id, step.description, previousOn, step.nodeSize);
   const on = {
     approved: isLoopTarget(previousOn.approved) ? { end: "blocked" as const } : previousOn.approved,
     rejected: isLoopTarget(previousOn.rejected) ? { end: "blocked" as const } : previousOn.rejected
   };
-  return agentStep(step.id, step.type === "agent" ? step.agentId : options.firstAgentId ?? "", step.description, on);
+  return agentStep(step.id, step.type === "agent" ? step.agentId : options.firstAgentId ?? "", step.description, on, step.nodeSize);
 };
 
 export const updateLoopAtIndex = (
@@ -179,14 +180,16 @@ const agentStep = (
   id: string,
   agentId: string,
   description = "",
-  on: ProjectStepTransitions = defaultOn()
-): ProjectExecutableStep => ({ id, type: "agent", agentId, description, on });
+  on: ProjectStepTransitions = defaultOn(),
+  nodeSize: LoopNodeSize = "medium"
+): ProjectExecutableStep => ({ id, type: "agent", agentId, description, nodeSize, on });
 
 const humanStep = (
   id: string,
   description = "",
-  on: ProjectStepTransitions = defaultOn()
-): ProjectExecutableStep => ({ id, type: "human", description, on });
+  on: ProjectStepTransitions = defaultOn(),
+  nodeSize: LoopNodeSize = "small"
+): ProjectExecutableStep => ({ id, type: "human", description, nodeSize, on });
 
 const scheduledStep = (step: ProjectStep, loop: ProjectLoop, now?: Date): ProjectScheduledStep => {
   const preferred = step.type !== "scheduled" && typeof step.on.approved === "string"
@@ -195,7 +198,7 @@ const scheduledStep = (step: ProjectStep, loop: ProjectLoop, now?: Date): Projec
   const target = step.type === "scheduled"
     ? step.on.triggered
     : preferred?.id ?? loop.steps.find((candidate) => candidate.id !== step.id && isProjectExecutableStep(candidate))?.id ?? "";
-  return { id: step.id, type: "scheduled", description: step.description, schedule: defaultOnceSchedule(now), on: { triggered: target } };
+  return { id: step.id, type: "scheduled", description: step.description, nodeSize: step.nodeSize, schedule: defaultOnceSchedule(now), on: { triggered: target } };
 };
 
 const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } =>

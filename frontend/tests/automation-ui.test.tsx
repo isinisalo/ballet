@@ -7,8 +7,9 @@ import { WorkspaceApp } from "../src/WorkspaceApp";
 const now = "2026-07-10T10:00:00.000Z";
 const loop: ProjectLoop = {
   id: "delivery",
+  theme: "open-ai",
   start: "approval",
-  steps: [{ id: "approval", type: "human", description: "Approve delivery", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }]
+  steps: [{ id: "approval", type: "human", nodeSize: "small", description: "Approve delivery", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }]
 };
 
 const run = (status: LoopRunDetails["status"]): LoopRunDetails => ({
@@ -22,7 +23,7 @@ const run = (status: LoopRunDetails["status"]): LoopRunDetails => ({
 
 const data = (): AppData => ({
   projects: [], goals: [], adrs: [], agents: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
-  automation: { version: 4, loops: [loop] }, automationIssues: [], scheduleStates: [], projectDocumentTree: []
+  automation: { version: 5, loops: [loop] }, automationIssues: [], scheduleStates: [], projectDocumentTree: []
 });
 
 function installApi(latest: LoopRunDetails | null) {
@@ -89,7 +90,7 @@ async function renderRun(latest: LoopRunDetails | null) {
   return fetchMock;
 }
 
-describe("automation v4 UI", () => {
+describe("automation v5 UI", () => {
   it("starts a saved Loop from global Ballet Run without local mode controls", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(null);

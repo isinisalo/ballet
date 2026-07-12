@@ -5,7 +5,7 @@ import type { LoopReactFlowEdge } from "./LoopCanvasTypes";
 import { loopCrossLoopSmoothStepPath } from "./loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor, type LoopEdgePoint } from "./loopEdgeLabelGeometry";
 import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
-import { detachedLoopEdgeProps, loopConnectionPointRadius } from "./loopFloatingEdgeGeometry";
+import { loopConnectionPointRadius, themedLoopEdgeProps } from "./loopFloatingEdgeGeometry";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import { loopSmartEdgeRoutingOptions, loopSmartSmoothStepDrawEdge } from "./loopSmartEdgeRouting";
 
@@ -19,7 +19,7 @@ type LoopEdgeDisplayLabel =
 
 export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
   const nodes = useNodes();
-  const detachedProps = detachedLoopEdgeProps(props);
+  const detachedProps = themedLoopEdgeProps(props, props.data?.context?.theme.connectionPoint.style ?? "near");
   const loopEdge = props.data?.loopEdge;
   const outputSlotKind = loopEdgeOutputSlotKind(loopEdge);
   const edgePaths = loopEdgePaths(detachedProps, nodes, outputSlotKind);
@@ -47,7 +47,7 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
             title={displayLabel.value}
             className={cn(
               "pointer-events-none absolute z-10 whitespace-nowrap rounded-sm bg-background/95 px-1 font-mono text-[0.66rem] leading-4",
-              "text-muted-foreground"
+              "text-[var(--loop-theme-edge-label)]"
             )}
             style={{
               transform: `${labelPlacement.translate} translate(${labelPlacement.x}px, ${labelPlacement.y}px)`

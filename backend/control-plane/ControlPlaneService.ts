@@ -528,5 +528,5 @@ export class ControlPlaneService {
 
 export const agentSnapshotFromAgent = (agent: Agent, configHash: string): ExecutionAgentSnapshot => ({
   id: agent.id, name: agent.name, description: agent.description, instructions: agent.instructions,
-  skillIds: agent.skills.map((skill) => skill.id), configHash
+  skillIds: agent.skills.map((skill) => skill.id), ...(agent.avatar ? { avatar: agent.avatar } : {}), configHash
 });

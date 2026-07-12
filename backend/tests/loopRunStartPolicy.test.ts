@@ -19,6 +19,7 @@ afterEach(async () => {
 
 const loop = (id: string): ProjectLoop => ({
   id,
+  theme: "open-ai",
   start: "work",
   steps: [{
     id: "work",
@@ -29,6 +30,7 @@ const loop = (id: string): ProjectLoop => ({
       "dev-deployment": "dev-deploy-agent"
     } as Record<string, string>)[id] ?? "worker",
     description: "Work.",
+    nodeSize: "medium",
     on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
   }]
 });
@@ -44,7 +46,7 @@ const data = (projectRoot: string, loopIds: string[]): AppData => ({
   events: [],
   loopRuns: [],
   scheduleStates: [],
-  automation: { version: 4, loops: loopIds.map(loop) },
+  automation: { version: 5, loops: loopIds.map(loop) },
   automationIssues: [],
   projectRoot
 });
@@ -172,6 +174,7 @@ describe("loop engineering root-start policy", () => {
       id: "timer",
       type: "scheduled",
       description: "Start implementation on schedule.",
+      nodeSize: "small",
       schedule: { kind: "once", date: "2026-07-12", time: "09:00", timeZone: "UTC" },
       on: { triggered: "work" }
     });

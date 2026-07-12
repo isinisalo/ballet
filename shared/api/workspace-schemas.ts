@@ -1,12 +1,16 @@
 import { z } from "zod";
-import type {
-  ProjectAutomationConfig,
-  ProjectStepSchedule
+import { agentAvatars } from "../domain/agents.js";
+import {
+  loopNodeSizes,
+  loopThemeIds,
+  type ProjectAutomationConfig,
+  type ProjectStepSchedule
 } from "../domain/automation.js";
 import {
   automationFieldLimits,
   kebabCaseIdPattern
 } from "./automationValidation.js";
+import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
 
 export const mutableCollections = ["projects", "goals", "adrs", "agents", "skills"] as const;
 export const readableCollections = [...mutableCollections, "policies", "events"] as const;
@@ -98,7 +102,9 @@ const agentUpsertSchema = z.object({
   instructions: z.string().optional(),
   skills: z.array(skillSchema).optional(),
   enabled: z.boolean().optional(),
-  nodeStyle: z.enum(["luna", "terra", "sol"]).optional(),
+  avatar: z.enum(agentAvatars)
+    .nullable()
+    .optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   nicknameCandidates: z.array(z.string()).optional(),
@@ -114,10 +120,11 @@ const collectionUpsertSchemas = {
 } as const;
 
 export type MutableCollectionName = keyof typeof collectionUpsertSchemas;
-export type CollectionUpsertPayload = Record<string, unknown> & { id?: string };
 
-export const collectionUpsertSchema = (collection: MutableCollectionName): z.ZodType<CollectionUpsertPayload> =>
-  collectionUpsertSchemas[collection] as z.ZodType<CollectionUpsertPayload>;
+export const collectionUpsertSchema = <T extends MutableCollectionName>(
+  collection: T
+): z.ZodType<WorkspaceSaveRequestByCollection[T]> =>
+  collectionUpsertSchemas[collection] as unknown as z.ZodType<WorkspaceSaveRequestByCollection[T]>;
 
 const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits.description.max);
 const automationLoopIdSchema = z.string().min(automationFieldLimits.loopId.min).max(automationFieldLimits.loopId.max);
@@ -136,6 +143,7 @@ const stepTransitionsSchema = z.object({
 const executableStepBase = {
   id: automationStepIdSchema,
   description: optionalAutomationDescriptionSchema,
+  nodeSize: z.enum(loopNodeSizes),
   on: stepTransitionsSchema
 };
 const calendarDatePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -197,6 +205,7 @@ const projectStepSchema = z.discriminatedUnion("type", [
   z.object({
     id: automationStepIdSchema,
     description: optionalAutomationDescriptionSchema,
+    nodeSize: z.enum(loopNodeSizes),
     type: z.literal("scheduled"),
     schedule: projectStepScheduleSchema,
     on: z.object({ triggered: automationStepIdSchema }).strict()
@@ -205,12 +214,13 @@ const projectStepSchema = z.discriminatedUnion("type", [
 
 const projectLoopSchema = z.object({
   id: kebabLoopIdSchema,
+  theme: z.enum(loopThemeIds),
   start: automationStepIdSchema,
   steps: z.array(projectStepSchema).min(1)
 }).strict();
 
 export const automationConfigSchema = z.object({
-  version: z.literal(4),
+  version: z.literal(5),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 

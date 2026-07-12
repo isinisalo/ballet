@@ -25,18 +25,20 @@ The Runtime registry shows paired computers, connection state, source checkout, 
 
 ## Portable project configuration
 
-The canonical automation file is [`.ballet/project.json`](.ballet/project.json). Version 4 is deliberately strict and portable: it contains Loops, their Steps, explicit Transitions, and optional scheduled start Steps.
+The canonical automation file is [`.ballet/project.json`](.ballet/project.json). Version 5 is deliberately strict and portable: it contains Loops, their visualization themes, Step node sizes, explicit Transitions, and optional scheduled start Steps.
 
 ```json
 {
-  "version": 4,
+  "version": 5,
   "loops": [
     {
       "id": "implementation",
+      "theme": "open-ai",
       "start": "implement",
       "steps": [
         {
           "id": "implement",
+          "nodeSize": "medium",
           "type": "agent",
           "agentId": "implementation-agent",
           "description": "Implement the approved task.",
@@ -47,6 +49,7 @@ The canonical automation file is [`.ballet/project.json`](.ballet/project.json).
         },
         {
           "id": "review",
+          "nodeSize": "small",
           "type": "human",
           "description": "Approve the result.",
           "on": {
@@ -65,10 +68,12 @@ A scheduled Loop replaces its configured start Step with a trigger and points `o
 ```json
 {
   "id": "weekday-planning",
+  "theme": "open-ai",
   "start": "weekday-start",
   "steps": [
     {
       "id": "weekday-start",
+      "nodeSize": "small",
       "type": "scheduled",
       "description": "Start planning every weekday morning.",
       "schedule": {
@@ -82,6 +87,7 @@ A scheduled Loop replaces its configured start Step with a trigger and points `o
     },
     {
       "id": "plan",
+      "nodeSize": "medium",
       "type": "agent",
       "agentId": "planning-agent",
       "description": "Create the daily plan.",
@@ -98,7 +104,7 @@ Scheduled runs do not add Run input; the triggered agent's saved instructions de
 
 Runtime devices, provider commands, local paths, credentials, runs, and logs do not belong in `project.json`. Commit the portable project sources instead:
 
-- `.ballet/project.json` for automation v4;
+- `.ballet/project.json` for automation v5, including Loop themes and Step node sizes;
 - `.ballet/runtime.json` for agent-specific provider, model, reasoning, and network intent;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` for project documents;
 - `.codex/agents/*.toml` for agents; and

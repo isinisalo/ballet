@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { projectRuntimeConfigSchema } from "../../shared/api/runtime-schemas.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
-import type { Agent, AgentNodeStyle } from "../../shared/domain/agents.js";
-import type { ProjectAutomationConfig, StepTransitionTarget } from "../../shared/domain/automation.js";
+import type { Agent } from "../../shared/domain/agents.js";
+import type { LoopNodeSize, ProjectAutomationConfig, StepTransitionTarget } from "../../shared/domain/automation.js";
 import { validateProjectAutomationConfig } from "../automation.js";
 import { parseTomlDocument } from "../markdown.js";
 
@@ -15,29 +15,28 @@ interface ExpectedAgentConfig {
   model: string;
   reasoning: "medium";
   network: boolean;
-  nodeStyle: AgentNodeStyle;
+  nodeSize: LoopNodeSize;
 }
 
 const expectedAgents: Record<string, ExpectedAgentConfig> = {
-  "dev-deploy-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
-  "implementation-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: false, nodeStyle: "terra" },
-  "milestone-task-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeStyle: "luna" },
-  "review-test-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
-  "roadmap-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" },
-  "ui-design-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" }
+  "dev-deploy-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeSize: "medium" },
+  "implementation-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: false, nodeSize: "medium" },
+  "milestone-task-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeSize: "small" },
+  "review-test-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeSize: "medium" },
+  "roadmap-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeSize: "large" },
+  "ui-design-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeSize: "large" }
 };
 
 const readJson = async (relativePath: string): Promise<unknown> =>
   JSON.parse(await readFile(path.join(repositoryRoot, relativePath), "utf8")) as unknown;
 
-const configuredAgents = (): Agent[] => Object.entries(expectedAgents).map(([id, config]) => ({
+const configuredAgents = (): Agent[] => Object.keys(expectedAgents).map((id) => ({
   id,
   name: id,
   description: id,
   instructions: id,
   skills: [],
   enabled: true,
-  nodeStyle: config.nodeStyle,
   createdAt: "2026-07-11T00:00:00.000Z",
   updatedAt: "2026-07-11T00:00:00.000Z"
 }));
@@ -110,7 +109,7 @@ describe("repository Loop engineering configuration", () => {
       const parsed = parseTomlDocument(await readFile(path.join(agentDirectory, `${agentId}.toml`), "utf8"));
       expect(parsed.errors).toBeUndefined();
       expect(parsed.frontmatter.enabled).toBe(true);
-      expect(parsed.frontmatter.node_style).toBe(expectedAgents[agentId]!.nodeStyle);
+      expect(parsed.frontmatter).not.toHaveProperty("node_style");
       expect(parsed.frontmatter.developer_instructions).toEqual(expect.stringContaining("## Tavoite"));
       expect(parsed.frontmatter.developer_instructions).toEqual(expect.stringContaining("## Pysäytyssäännöt"));
     }
@@ -119,6 +118,16 @@ describe("repository Loop engineering configuration", () => {
   it("keeps the four simple Loops, scheduled timed Loop, and their approved paths", async () => {
     const config = automationConfigSchema.parse(await readJson(".ballet/project.json"));
     expect(validateProjectAutomationConfig(config, configuredAgents())).toEqual([]);
+    expect(config.version).toBe(5);
+    expect(config.loops.every((loop) => loop.theme === "open-ai")).toBe(true);
+    for (const loop of config.loops) {
+      for (const step of loop.steps) {
+        const expectedSize = step.type === "agent"
+          ? expectedAgents[step.agentId]!.nodeSize
+          : "small";
+        expect(step.nodeSize).toBe(expectedSize);
+      }
+    }
     expect(routeShape(config)).toEqual({
       "delivery-planning": {
         start: "create-roadmap",

@@ -12,7 +12,7 @@ import {
 } from "../validation/schemas.js";
 import { HttpValidationError, parseBody, parseParams } from "../validation/httpValidation.js";
 import { store } from "../../store.js";
-import type { CollectionName } from "../../../shared/api/workspaceData.js";
+import type { CollectionName, WorkspaceSaveRequestByCollection } from "../../../shared/api/workspaceData.js";
 
 const assertReadableCollection = (collection: string): CollectionName => {
   if (!readableCollections.includes(collection as CollectionName)) {
@@ -30,8 +30,8 @@ const assertMutableCollection = (collection: string): MutableCollectionName => {
 
 const saveStoreCollectionItem = <T extends MutableCollectionName>(
   collection: T,
-  item: Record<string, unknown> & { id?: string }
-) => store.upsert(collection, item as Parameters<typeof store.upsert<T>>[1]);
+  item: WorkspaceSaveRequestByCollection[T]
+) => store.upsert(collection, item);
 
 export const health: RequestHandler = (_req, res) => {
   res.json({ ok: true, projectId: process.env.BALLET_PROJECT_ID });

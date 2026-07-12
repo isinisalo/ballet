@@ -1,3 +1,4 @@
+// This read-model suite intentionally shares one in-memory database harness across dashboard scenarios.
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../shared/api/workspaceData.js";
@@ -16,17 +17,21 @@ const READY: AgentOutcome = { outcome: "ready", summary: "Done.", checks: [] };
 const BLOCKED: AgentOutcome = { outcome: "blocked", summary: "Needs input.", checks: [] };
 const DELIVERY: ProjectLoop = {
   id: "delivery",
+  theme: "open-ai",
   start: "implement",
   steps: [{
     id: "implement", type: "agent", agentId: "developer", description: "Implement.",
+    nodeSize: "medium",
     on: { approved: { loop: "release" }, rejected: { end: "failed" } }
   }]
 };
 const RELEASE: ProjectLoop = {
   id: "release",
+  theme: "open-ai",
   start: "publish",
   steps: [{
     id: "publish", type: "agent", agentId: "publisher", description: "Publish.",
+    nodeSize: "medium",
     on: { approved: { end: "completed" }, rejected: { end: "failed" } }
   }]
 };
@@ -298,8 +303,8 @@ const appData = (): AppData => ({
   projects: [], goals: [], adrs: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [], scheduleStates: [],
   agents: ["developer", "publisher"].map((id) => ({
     id, name: id, description: `${id} agent`, instructions: `${id} instructions`, skills: [], enabled: true,
-    nodeStyle: "terra" as const, createdAt: "2026-07-11T08:00:00.000Z", updatedAt: "2026-07-11T08:00:00.000Z"
+    createdAt: "2026-07-11T08:00:00.000Z", updatedAt: "2026-07-11T08:00:00.000Z"
   })),
-  automation: { version: 4, loops: [DELIVERY, RELEASE] },
+  automation: { version: 5, loops: [DELIVERY, RELEASE] },
   automationIssues: []
 });

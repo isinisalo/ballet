@@ -1,3 +1,4 @@
+// This integration suite intentionally shares filesystem fixtures across Markdown and TOML round-trip scenarios.
 import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -83,7 +84,7 @@ describe("Markdown collection loading", () => {
     expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("modelReasoningEffort");
     expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("status");
     expect(data.agents.find((agent) => agent.id === "architect")?.nicknameCandidates).toEqual(["Arch", "Atlas"]);
-    expect(data.agents.find((agent) => agent.id === "architect")?.nodeStyle).toBe("terra");
+    expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("avatar");
     expect(data.agents.find((agent) => agent.id === "architect")?.instructions).toContain("Design architecture");
     expect(data.skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
     expect(data.skills[0]?.name).toBe("fixture-skill");
@@ -99,7 +100,7 @@ describe("Markdown collection loading", () => {
     expect(data.eventDefinitions).toEqual([]);
     expect(data.policies).toEqual([]);
     expect(data.automation).toEqual({
-      version: 4,
+      version: 5,
       loops: []
     });
   });
@@ -429,7 +430,7 @@ path = "../.agents/skills/missing-skill"
   it("writes TOML agents while preserving unknown nested config", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".codex/agents"), { recursive: true });
-    await writeFile(path.join(root, ".codex/agents/reviewer.toml"), "name = \"Reviewer\"\ndescription = \"Old\"\nstatus = \"online\"\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"\nruntime = \"codex\"\ndeveloper_instructions = \"Old instructions\"\n\n[mcp_servers.docs]\nurl = \"https://example.test/mcp\"\n", "utf8");
+    await writeFile(path.join(root, ".codex/agents/reviewer.toml"), "name = \"Reviewer\"\ndescription = \"Old\"\nstatus = \"online\"\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"\nruntime = \"codex\"\nnode_style = \"sol\"\ndeveloper_instructions = \"Old instructions\"\n\n[mcp_servers.docs]\nurl = \"https://example.test/mcp\"\n", "utf8");
 
     await writeEntityMarkdown(root, "agents", {
       id: "reviewer",
@@ -440,11 +441,12 @@ path = "../.agents/skills/missing-skill"
       model: "gpt-5.5",
       modelReasoningEffort: "high",
       nicknameCandidates: ["Atlas"],
-      nodeStyle: "sol",
+      avatar: "rocket",
       relativePath: ".codex/agents/reviewer.toml",
       frontmatter: {
         name: "Reviewer",
         description: "Old",
+        node_style: "sol",
         developer_instructions: "Old instructions",
         mcp_servers: { docs: { url: "https://example.test/mcp" } },
         skills: { config: [{ path: "../.agents/skills/docs-editor", enabled: true }] }
@@ -459,12 +461,35 @@ path = "../.agents/skills/missing-skill"
     expect(source).not.toContain('model_reasoning_effort =');
     expect(source).not.toContain('runtime =');
     expect(source).toContain('nickname_candidates = [ "Atlas" ]');
-    expect(source).toContain('node_style = "sol"');
+    expect(source).not.toContain("node_style");
+    expect(source).toContain('avatar = "rocket"');
     expect(source).toContain("[mcp_servers.docs]");
     expect(source).toContain('url = "https://example.test/mcp"');
     expect(source).toContain("[[skills.config]]");
     expect(source).toContain('path = "../.agents/skills/docs-editor"');
     expect(source).toContain("enabled = true");
+
+    await writeEntityMarkdown(root, "agents", {
+      id: "reviewer",
+      name: "Reviewer",
+      description: "Updated again",
+      instructions: "Updated instructions",
+      relativePath: ".codex/agents/reviewer.toml",
+      frontmatter: parseTomlDocument(source).frontmatter
+    });
+    const preservedAvatarSource = await readFile(path.join(root, ".codex/agents/reviewer.toml"), "utf8");
+    expect(preservedAvatarSource).toContain('avatar = "rocket"');
+
+    await writeEntityMarkdown(root, "agents", {
+      id: "reviewer",
+      name: "Reviewer",
+      description: "Updated",
+      instructions: "Updated instructions",
+      avatar: null,
+      relativePath: ".codex/agents/reviewer.toml",
+      frontmatter: parseTomlDocument(preservedAvatarSource).frontmatter
+    });
+    expect(await readFile(path.join(root, ".codex/agents/reviewer.toml"), "utf8")).not.toContain("avatar =");
   });
 
   it("writes skills while preserving unrelated frontmatter", async () => {

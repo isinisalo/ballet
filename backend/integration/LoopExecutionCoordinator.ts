@@ -175,7 +175,7 @@ export const preflightLoopSnapshot = (data: AppData, rootLoopId: string): Projec
   const root = data.automation.loops.find((loop) => loop.id === rootLoopId);
   if (!root) return undefined;
   const steps = reachableAgentSteps(data, rootLoopId).map(({ loopId, step }) => ({ ...step, id: `${loopId}:${step.id}` }));
-  return { id: root.id, start: steps[0]?.id ?? root.start, steps };
+  return { id: root.id, theme: root.theme, start: steps[0]?.id ?? root.start, steps };
 };
 
 const reachableLoops = (data: AppData, rootLoopId: string): ProjectLoop[] => {

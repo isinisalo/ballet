@@ -11,7 +11,7 @@ import { parseAgentOutcomeText } from "../runtime-policy.js";
 
 const roots: string[] = [];
 const tempDbPath = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-runtime-v4-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-runtime-v5-"));
   roots.push(root);
   return path.join(root, "runtime.sqlite");
 };
@@ -32,36 +32,41 @@ const rejected: AgentOutcome = {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: [{
     id: "delivery",
+    theme: "open-ai",
     start: "implement",
     steps: [{
       id: "implement",
       type: "agent",
       agentId: "developer-agent",
       description: "Implement.",
+      nodeSize: "medium",
       on: { approved: "gate", rejected: { end: "failed" } }
     }, {
       id: "gate",
       type: "human",
       description: "Approve.",
+      nodeSize: "small",
       on: { approved: { loop: "release" }, rejected: "implement" }
     }]
   }, {
     id: "release",
+    theme: "open-ai",
     start: "publish",
     steps: [{
       id: "publish",
       type: "agent",
       agentId: "release-agent",
       description: "Publish.",
+      nodeSize: "medium",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]
 });
 
-describe("runtime database v4", () => {
+describe("runtime database v5", () => {
   it("accepts patched SQLite versions and resets legacy runtime tables", async () => {
     expect(isPatchedSqliteVersion("3.51.3")).toBe(true);
     expect(isPatchedSqliteVersion("3.51.2")).toBe(false);
@@ -171,15 +176,17 @@ describe("runtime database v4", () => {
   it("blocks a root run after the 20-transition safety limit", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const cyclic: ProjectAutomationConfig = {
-      version: 4,
+      version: 5,
       loops: [{
         id: "cycle",
+        theme: "open-ai",
         start: "again",
         steps: [{
           id: "again",
           type: "agent",
           agentId: "developer-agent",
           description: "Again.",
+          nodeSize: "medium",
           on: { approved: "again", rejected: { end: "failed" } }
         }]
       }]

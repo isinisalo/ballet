@@ -1,4 +1,4 @@
-import { normalizeAgentNodeStyle, type Agent } from "../../shared/domain/agents.js";
+import { normalizeAgentAvatar, type Agent } from "../../shared/domain/agents.js";
 import type { Adr, AdrStatus, EntityStatus, Goal, MarkdownDocument, Project, Skill } from "../../shared/domain/documents.js";
 import { agentSkillsFromFrontmatter } from "./skillLookup.js";
 
@@ -83,6 +83,7 @@ export const adrFromDocument = (doc: MarkdownDocument, defaultProjectId: string)
 
 export const agentFromDocument = (doc: MarkdownDocument, skillLookup: Map<string, Skill>): Agent => {
   const fm = doc.frontmatter;
+  const avatar = normalizeAgentAvatar(fm.avatar);
   return attachDocument({
     id: doc.id,
     name: stringValue(fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
@@ -90,7 +91,7 @@ export const agentFromDocument = (doc: MarkdownDocument, skillLookup: Map<string
     instructions: stringValue(fm.developer_instructions ?? fm.instructions, doc.body),
     skills: agentSkillsFromFrontmatter(fm, skillLookup),
     enabled: booleanValue(fm.enabled, true),
-    nodeStyle: normalizeAgentNodeStyle(fm.node_style),
+    ...(avatar ? { avatar } : {}),
     createdAt: dateValue(fm.createdAt),
     updatedAt: dateValue(fm.updatedAt ?? fm.createdAt),
     nicknameCandidates: stringArray(fm.nickname_candidates)

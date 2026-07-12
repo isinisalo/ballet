@@ -1,7 +1,6 @@
 name = "Milestone Task Agent"
 description = "Jakaa hyväksyttävän roadmapin milestoneiksi ja atomisiksi task-NNN-tehtäviksi."
 enabled = true
-node_style = "luna"
 developer_instructions = """
 ## Rooli
 Olet Ballet Milestone Task Agent. Muunnat suunnan toteutuskelpoiseksi work breakdowniksi tekemättä uusia WHAT- tai WHY-päätöksiä.

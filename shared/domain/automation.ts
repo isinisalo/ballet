@@ -2,6 +2,12 @@ export type OutputId = "approved" | "rejected";
 export type ProjectStepTransitionId = OutputId | "triggered";
 export type StepEndStatus = "completed" | "blocked" | "failed";
 
+export const loopThemeIds = ["default", "open-ai"] as const;
+export type LoopThemeId = (typeof loopThemeIds)[number];
+
+export const loopNodeSizes = ["small", "medium", "large"] as const;
+export type LoopNodeSize = (typeof loopNodeSizes)[number];
+
 export type StepTransitionTarget =
   | string
   | { loop: string }
@@ -19,6 +25,7 @@ export interface ProjectScheduledStepTransitions {
 interface ProjectStepBase<TTransitions> {
   id: string;
   description: string;
+  nodeSize: LoopNodeSize;
   on: TTransitions;
 }
 
@@ -145,6 +152,7 @@ export const isProjectExecutableStep = (step: ProjectStep): step is ProjectExecu
 
 export interface ProjectLoop {
   id: string;
+  theme: LoopThemeId;
   start: string;
   steps: ProjectStep[];
 }
@@ -160,12 +168,12 @@ export const resolveEffectiveStartStep = (
 };
 
 export interface ProjectAutomationConfig {
-  version: 4;
+  version: 5;
   loops: ProjectLoop[];
 }
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
-  version: 4,
+  version: 5,
   loops: []
 });
 
@@ -174,7 +182,7 @@ export interface ProjectAutomationIssue {
   message: string;
 }
 
-// Policies remain a Markdown document model. They are not part of automation v4
+// Policies remain a Markdown document model. They are not part of automation v5
 // execution or project.json routing.
 export type PolicyPredicateOperator = "equals" | "in" | "exists";
 export type PolicyPredicateScalar = string | number | boolean | null;

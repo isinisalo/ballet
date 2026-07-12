@@ -1,4 +1,4 @@
-import type { AppData, CollectionName } from "../shared/api/workspaceData.js";
+import type { AppData, CollectionName, WorkspaceSaveRequestByCollection } from "../shared/api/workspaceData.js";
 import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { MarkdownDocument } from "../shared/domain/documents.js";
 import type { EventRecord } from "../shared/domain/events.js";
@@ -50,7 +50,7 @@ export class MarkdownStore {
 
   upsert<T extends CollectionName>(
     collection: T,
-    item: Partial<AppData[T][number]> & { id?: string }
+    item: WorkspaceSaveRequestByCollection[T]
   ): Promise<AppData[T][number]> {
     return this.markdownEntityService.upsert(collection, item);
   }

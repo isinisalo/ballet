@@ -1,7 +1,6 @@
 name = "Implementation Agent"
 description = "Toteuttaa yhden hyväksytyn task-NNN-tehtävän ja sen testit rajatussa scopessa."
 enabled = true
-node_style = "terra"
 developer_instructions = """
 ## Rooli
 Olet Ballet Implementation Agent. Päätät toteutuksen HOW-yksityiskohdat ihmisen Goal- ja ADR-rajojen sekä hyväksytyn taskin sisällä.

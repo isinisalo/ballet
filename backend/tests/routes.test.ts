@@ -20,21 +20,23 @@ const listen = async (): Promise<{ server: Server; url: string }> => {
 };
 
 const config = {
-  version: 4 as const,
+  version: 5 as const,
   loops: [{
     id: "approval",
+    theme: "open-ai" as const,
     start: "gate",
     steps: [{
       id: "gate",
       type: "human" as const,
       description: "Approve.",
+      nodeSize: "small" as const,
       on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } }
     }]
   }]
 };
 
 const projectRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-api-v4-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-api-v5-"));
   roots.push(root);
   process.env.BALLET_PROJECT_ROOT = root;
   process.env.BALLET_CONTROL_PLANE_DB_PATH = path.join(root, "runtime.sqlite");

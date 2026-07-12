@@ -1,0 +1,107 @@
+- generic [ref=f1e6]:
+  - generic [ref=f1e9]:
+    - generic [ref=f1e10]:
+      - combobox "Ballet mode" [active] [ref=f1e11]:
+        - generic [ref=f1e12]: Ballet
+      - textbox [ref=f1e13]: run
+    - list [ref=f1e17]:
+      - listitem [ref=f1e256]:
+        - button "Overview" [ref=f1e257]
+      - listitem [ref=f1e262]:
+        - generic [ref=f1e263]: Active runs
+        - list [ref=f1e267]:
+          - listitem [ref=f1e268]:
+            - generic [ref=f1e269]: No active runs.
+      - listitem [ref=f1e270]:
+        - generic [ref=f1e271]: Loops
+        - list [ref=f1e276]:
+          - listitem [ref=f1e277]:
+            - link "delivery-planning" [ref=f1e278] [cursor=pointer]:
+              - /url: /run/loops/delivery-planning
+          - listitem [ref=f1e281]:
+            - link "ui-design" [ref=f1e282] [cursor=pointer]:
+              - /url: /run/loops/ui-design
+          - listitem [ref=f1e285]:
+            - link "implementation" [ref=f1e286] [cursor=pointer]:
+              - /url: /run/loops/implementation
+          - listitem [ref=f1e289]:
+            - link "dev-deployment" [ref=f1e290] [cursor=pointer]:
+              - /url: /run/loops/dev-deployment
+          - listitem [ref=f1e293]:
+            - link "timed" [ref=f1e294] [cursor=pointer]:
+              - /url: /run/loops/timed
+      - listitem [ref=f1e297]:
+        - generic [ref=f1e298]: Agents
+        - list [ref=f1e302]:
+          - listitem [ref=f1e303]:
+            - link "Dev Deploy Agent" [ref=f1e304] [cursor=pointer]:
+              - /url: /run/agents/dev-deploy-agent
+          - listitem [ref=f1e307]:
+            - link "Implementation Agent" [ref=f1e308] [cursor=pointer]:
+              - /url: /run/agents/implementation-agent
+          - listitem [ref=f1e311]:
+            - link "Milestone Task Agent" [ref=f1e312] [cursor=pointer]:
+              - /url: /run/agents/milestone-task-agent
+          - listitem [ref=f1e315]:
+            - link "Review Test Agent" [ref=f1e316] [cursor=pointer]:
+              - /url: /run/agents/review-test-agent
+          - listitem [ref=f1e319]:
+            - link "Roadmap Agent" [ref=f1e320] [cursor=pointer]:
+              - /url: /run/agents/roadmap-agent
+          - listitem [ref=f1e323]:
+            - link "UI Design Agent" [ref=f1e324] [cursor=pointer]:
+              - /url: /run/agents/ui-design-agent
+    - button "Toggle Sidebar" [ref=f1e110]
+  - main [ref=f1e111]:
+    - main [ref=f1e113]:
+      - generic [ref=f1e327]:
+        - generic [ref=f1e328]:
+          - generic [ref=f1e329]:
+            - generic [ref=f1e334]: Ballet Run
+            - generic [ref=f1e335]: delivery-planning
+          - button "Overview" [ref=f1e337]
+        - generic [ref=f1e339]:
+          - generic [ref=f1e340]:
+            - generic [ref=f1e341]: No runs
+            - generic [ref=f1e349]: "stream: connected"
+          - generic "Run loop canvas" [ref=f1e352]:
+            - application [ref=f1e353]:
+              - generic [ref=f1e355]:
+                - generic:
+                  - generic:
+                    - img:
+                      - img "Edge from loop:delivery-planning:step-2 to loop:delivery-planning:output-event-2-approved" [ref=f1e356]
+                    - img:
+                      - img "Edge from loop:delivery-planning:step-1 to loop:delivery-planning:step-2" [ref=f1e357]
+                    - img:
+                      - img "Edge from loop:delivery-planning:step-1 to loop:delivery-planning:output-event-1-rejected" [ref=f1e358]
+                    - img:
+                      - img "Edge from loop:delivery-planning:step-0 to loop:delivery-planning:step-1" [ref=f1e361]
+                    - img:
+                      - img "Edge from loop:delivery-planning:step-0 to loop:delivery-planning:output-event-0-rejected" [ref=f1e362]
+                    - img:
+                      - img "Edge from loop:delivery-planning:step-2 to loop:delivery-planning:step-0" [ref=f1e365]
+                  - generic:
+                    - button "View step create-roadmap" [ref=f1e371]:
+                      - generic: create-roadmap
+                    - button "View step create-work-breakdown" [ref=f1e376]:
+                      - generic: create-work-breakdown
+                    - button "View step planning-gate" [ref=f1e381]:
+                      - generic: planning-gate
+                    - button "Add step for completed" [disabled] [ref=f1e387]
+                    - button "Add step for blocked" [disabled] [ref=f1e390]
+                    - button "Add step for blocked" [disabled] [ref=f1e393]
+          - region "Start loop run" [ref=f1e395]:
+            - alert [ref=f1e396]:
+              - paragraph [ref=f1e397]: Runtime preflight failed
+              - list [ref=f1e398]:
+                - listitem [ref=f1e399]: delivery-planning:create-roadmap · No compatible computer is attached on this machine.
+                - listitem [ref=f1e400]: delivery-planning:create-work-breakdown · No compatible computer is attached on this machine.
+              - link "Open Runtimes" [ref=f1e401] [cursor=pointer]:
+                - /url: /runtimes
+            - group [ref=f1e402]:
+              - generic [ref=f1e403]: Manual input (optional)
+              - textbox "Manual input (optional)" [disabled] [ref=f1e404]
+            - generic [ref=f1e405]:
+              - paragraph [ref=f1e406]: Resolve every runtime issue before starting.
+              - button "Start" [disabled]
