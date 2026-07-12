@@ -1,5 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
-import type { AppData } from "../../shared/api/workspaceData.js";
+import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { ProjectScheduledStep } from "../../shared/domain/automation.js";
 import type { DispatchLoopScheduleResult, RuntimeDatabase } from "../runtime-db.js";
 import {

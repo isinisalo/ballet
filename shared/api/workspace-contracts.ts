@@ -93,13 +93,16 @@ export interface WorkspaceDataDto {
 }
 
 export type WorkspaceCollectionName = "agents" | "skills";
-export type AgentSaveRequest = Omit<Partial<Agent>, "avatar"> & { avatar?: AgentAvatar | null };
+type ServerManagedEntityField = "relativePath" | "slug" | "errors";
+export type AgentSaveRequest = Omit<Partial<Agent>, ServerManagedEntityField | "createdAt" | "updatedAt" | "avatar">
+  & { avatar?: AgentAvatar | null };
+export type SkillSaveRequest = Omit<Partial<Skill>, ServerManagedEntityField>;
 export type WorkspaceAutomationResponseDto = { config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] };
 export interface CreateLoopThemeRequest { theme: LoopTheme; assignToLoopId: string }
 export interface CreateLoopThemeResponse { theme: LoopTheme; automation: ProjectAutomationConfig }
 
 export type WorkspaceSaveRequestByCollection = {
-  [K in WorkspaceCollectionName]: K extends "agents" ? AgentSaveRequest : Partial<WorkspaceDataDto[K][number]>;
+  [K in WorkspaceCollectionName]: K extends "agents" ? AgentSaveRequest : SkillSaveRequest;
 };
 export type WorkspaceSaveResponseByCollection = {
   [K in WorkspaceCollectionName]: WorkspaceDataDto[K][number];
@@ -109,9 +112,12 @@ export type AppData = WorkspaceDataDto;
 export type CollectionName = WorkspaceCollectionName;
 
 export {
+  clockTimePattern,
   defaultProjectAutomationConfig,
   getProjectStepTransitionEntries,
   getProjectStepTransitionTargets,
+  isCalendarDate,
+  isIanaTimeZone,
   isProjectExecutableStep,
   mapProjectStepTransitions,
   resolveEffectiveStartStep

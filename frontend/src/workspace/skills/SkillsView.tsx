@@ -7,6 +7,8 @@ import { toErrorMessage } from "@/lib/errors";
 import { frontmatterToYaml, parseFrontmatterYaml } from "../documents/frontmatter";
 import { MarkdownWorkbench } from "../documents/MarkdownWorkbench";
 import { skillDocumentPath } from "../routing";
+import { useRefreshSafeDraft } from "../useRefreshSafeDraft";
+import { useWorkspaceNavigationBlocker, type WorkspaceNavigation } from "../useWorkspaceNavigation";
 
 const skillTemplate = (): Partial<Skill> => ({
   name: "",
@@ -19,6 +21,21 @@ const skillTemplate = (): Partial<Skill> => ({
   body: ""
 });
 
+type SkillEditorDraft = {
+  form: Partial<Skill>;
+  frontmatterText: string;
+  bodyText: string;
+};
+
+const skillEditorDraft = (skill?: Skill): SkillEditorDraft => {
+  const form = skill ?? skillTemplate();
+  return {
+    form,
+    frontmatterText: frontmatterToYaml(form.frontmatter),
+    bodyText: form.body ?? ""
+  };
+};
+
 const stringFrontmatterValue = (frontmatter: Record<string, unknown>, key: string) => {
   const value = frontmatter[key];
   if (value === undefined || value === null) return "";
@@ -29,28 +46,26 @@ export function SkillsView({
   skill,
   save,
   remove,
-  navigate
+  navigate,
+  setNavigationBlocker
 }: {
   skill?: Skill;
   save: (collection: "skills", item: Partial<Skill>) => Promise<Skill>;
   remove: (collection: "skills", id: string) => Promise<void>;
-  navigate: (path: string) => void;
+  navigate: WorkspaceNavigation["navigate"];
+  setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 }) {
   const formId = useId();
-  const [form, setForm] = useState<Partial<Skill>>(skill ?? skillTemplate());
-  const [frontmatterText, setFrontmatterText] = useState(frontmatterToYaml((skill ?? skillTemplate()).frontmatter));
-  const [bodyText, setBodyText] = useState(skill?.body ?? "");
+  const { draft, setDraft, accept, dirty } = useRefreshSafeDraft(skillEditorDraft(skill), skill?.id ?? "new-skill");
+  const { form, frontmatterText, bodyText } = draft;
   const [validationError, setValidationError] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
-    const next = skill ?? skillTemplate();
-    setForm(next);
-    setFrontmatterText(frontmatterToYaml(next.frontmatter));
-    setBodyText(next.body ?? "");
     setValidationError("");
     setConfirmDeleteOpen(false);
-  }, [skill]);
+  }, [skill?.id]);
+  useWorkspaceNavigationBlocker(setNavigationBlocker, dirty, "Discard unsaved skill changes?");
 
   const previewDocument = useMemo(() => ({
     id: form.id ?? "new-skill",
@@ -74,8 +89,9 @@ export function SkillsView({
         frontmatter,
         body: bodyText
       });
+      accept(skillEditorDraft(saved));
       setValidationError("");
-      if (saved.relativePath) navigate(skillDocumentPath(saved.relativePath));
+      if (saved.relativePath) navigate(skillDocumentPath(saved.relativePath), { bypassBlocker: true });
     } catch (err) {
       setValidationError(toErrorMessage(err, "Invalid skill document."));
     }
@@ -84,7 +100,8 @@ export function SkillsView({
   const handleDelete = async () => {
     if (!form.id) return;
     await remove("skills", form.id);
-    navigate("/skills");
+    accept(skillEditorDraft());
+    navigate("/skills", { bypassBlocker: true });
   };
 
   return (
@@ -114,8 +131,8 @@ export function SkillsView({
           ) : null}
         </>
       )}
-      onFrontmatterChange={setFrontmatterText}
-      onBodyChange={setBodyText}
+      onFrontmatterChange={(frontmatterText) => setDraft((current) => ({ ...current, frontmatterText }))}
+      onBodyChange={(bodyText) => setDraft((current) => ({ ...current, bodyText }))}
       onSubmit={handleSave}
     />
   );

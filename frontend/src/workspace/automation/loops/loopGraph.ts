@@ -42,9 +42,6 @@ export type LoopGraph = {
   rootRecords: LoopStepRecord[];
 };
 
-export const loopInputEventLabel = (step: Pick<LoopVisualStep, "displayId"> | undefined): string =>
-  step?.displayId ?? "Missing step";
-
 export const loopOutputEvents = (recordOrStep: LoopStepRecord | LoopVisualStep | undefined, continuationEvent?: string) => {
   if (!recordOrStep) return ["Missing step"];
   const step = "stepKey" in recordOrStep ? recordOrStep.step : recordOrStep;

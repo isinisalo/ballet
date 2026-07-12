@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import type { CreateLoopThemeResponse, LoopTheme, AppData } from "@shared/api/workspace-contracts";
 import { ArrowLeft, CopyPlus, LoaderCircle, Palette, Save } from "lucide-react";
 import { EmptyState, Panel, TextField } from "@/components/shared/workspace-ui";
@@ -6,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { automationAllLoopsPath, automationNewThemePath, automationThemePath } from "../../routing";
-import type { WorkspaceNavigationBlocker } from "../../useWorkspaceNavigation";
+import { useWorkspaceNavigationBlocker, type WorkspaceNavigation } from "../../useWorkspaceNavigation";
 import {
   LoopThemeConnectionControls,
   LoopThemeEdgeControls,
@@ -31,8 +30,8 @@ export function LoopThemeEditorView({
   loopId?: string;
   updateTheme: (theme: LoopTheme) => Promise<LoopTheme>;
   createTheme: (theme: LoopTheme, loopId: string) => Promise<CreateLoopThemeResponse>;
-  navigate: (path: string) => void;
-  setNavigationBlocker: (blocker: WorkspaceNavigationBlocker | null) => void;
+  navigate: WorkspaceNavigation["navigate"];
+  setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 }) {
   const creating = !themeId && Boolean(sourceThemeId);
   const sourceId = themeId ?? sourceThemeId;
@@ -88,8 +87,8 @@ function LoopThemeEditorWorkspace({
   repairMissing: boolean;
   updateTheme: (theme: LoopTheme) => Promise<LoopTheme>;
   createTheme: (theme: LoopTheme, loopId: string) => Promise<CreateLoopThemeResponse>;
-  navigate: (path: string) => void;
-  setNavigationBlocker: (blocker: WorkspaceNavigationBlocker | null) => void;
+  navigate: WorkspaceNavigation["navigate"];
+  setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 }) {
   const editor = useLoopThemeEditor({
     source,
@@ -111,16 +110,12 @@ function LoopThemeEditorWorkspace({
     onColorChange: editor.setColor
   };
 
-  useEffect(() => {
-    setNavigationBlocker({ isDirty: editor.dirty, message: "Discard unsaved Loop theme changes?" });
-    return () => setNavigationBlocker(null);
-  }, [editor.dirty, setNavigationBlocker]);
+  useWorkspaceNavigationBlocker(setNavigationBlocker, editor.dirty, "Discard unsaved Loop theme changes?");
 
   const save = async () => {
     const saved = await editor.save();
     if (!saved) return;
-    setNavigationBlocker(null);
-    if (creating) navigate(automationThemePath(saved.id, loopId));
+    if (creating) navigate(automationThemePath(saved.id, loopId), { bypassBlocker: true });
   };
 
   return (

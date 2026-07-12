@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AppData } from "../../../shared/api/workspaceData.js";
+import type { AppData } from "../../../shared/api/workspace-contracts.js";
 import type { ProjectAutomationConfig, ProjectStepSchedule } from "../../../shared/domain/automation.js";
 import { builtInLoopThemes, resolveLoopTheme } from "../../../shared/domain/loopThemes.js";
 import { RuntimeDatabase, type DispatchLoopScheduleResult } from "../../runtime-db.js";

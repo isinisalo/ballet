@@ -6,19 +6,30 @@ import { frontmatterToYaml, parseFrontmatterYaml } from "./frontmatter";
 import { MarkdownWorkbench } from "./MarkdownWorkbench";
 import { type MarkdownEntity } from "./markdownDocument";
 import type { ProjectDocumentCreateKind } from "../types";
+import { useRefreshSafeDraft } from "../useRefreshSafeDraft";
+import { useWorkspaceNavigationBlocker, type WorkspaceNavigation } from "../useWorkspaceNavigation";
+
+type MarkdownEditorDraft = { frontmatterText: string; bodyText: string };
+
+const markdownEditorDraft = (document?: MarkdownEntity): MarkdownEditorDraft => ({
+  frontmatterText: frontmatterToYaml(document?.frontmatter),
+  bodyText: document?.body ?? ""
+});
 
 export function ProjectMarkdownEditorView({
   document,
   emptyTitle,
   saveProjectDocument,
   createProjectDocument,
-  createKind
+  createKind,
+  setNavigationBlocker
 }: {
   document?: MarkdownEntity;
   emptyTitle: string;
   saveProjectDocument: (document: Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">) => Promise<MarkdownDocument>;
   createProjectDocument?: (kind: ProjectDocumentCreateKind, title: string) => Promise<MarkdownDocument>;
   createKind?: ProjectDocumentCreateKind;
+  setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 }) {
   const formId = useId();
   const creating = !document && Boolean(createKind && createProjectDocument);
@@ -30,15 +41,17 @@ export function ProjectMarkdownEditorView({
     errors: []
   } : undefined, [createKind, creating]);
   const activeDocument = document ?? createDocument;
-  const [frontmatterText, setFrontmatterText] = useState(frontmatterToYaml(activeDocument?.frontmatter));
-  const [bodyText, setBodyText] = useState(document?.body ?? "");
+  const { draft, setDraft, accept, dirty } = useRefreshSafeDraft(
+    markdownEditorDraft(activeDocument),
+    activeDocument?.relativePath || activeDocument?.id || "empty-document"
+  );
+  const { frontmatterText, bodyText } = draft;
   const [validationError, setValidationError] = useState("");
 
   useEffect(() => {
-    setFrontmatterText(frontmatterToYaml(activeDocument?.frontmatter));
-    setBodyText(activeDocument?.body ?? "");
     setValidationError("");
-  }, [activeDocument]);
+  }, [activeDocument?.id, activeDocument?.relativePath]);
+  useWorkspaceNavigationBlocker(setNavigationBlocker, dirty, "Discard unsaved Markdown changes?");
 
   const handleSave = async () => {
     try {
@@ -48,21 +61,23 @@ export function ProjectMarkdownEditorView({
         const title = titleFromFrontmatter(frontmatter);
         if (!title) throw new Error("Document frontmatter title or name is required.");
         const created = await createProjectDocument(createKind, title);
-        await saveProjectDocument({
+        const saved = await saveProjectDocument({
           relativePath: created.relativePath,
           frontmatter,
           body: bodyText
         });
+        accept(markdownEditorDraft(saved));
         setValidationError("");
         return;
       }
       if (!document?.relativePath) return;
       setValidationError("");
-      await saveProjectDocument({
+      const saved = await saveProjectDocument({
         relativePath: document.relativePath,
         frontmatter,
         body: bodyText
       });
+      accept(markdownEditorDraft(saved));
     } catch (err) {
       setValidationError(toErrorMessage(err, "Invalid project document."));
     }
@@ -79,8 +94,8 @@ export function ProjectMarkdownEditorView({
       frontmatterText={frontmatterText}
       bodyText={bodyText}
       validationError={validationError}
-      onFrontmatterChange={setFrontmatterText}
-      onBodyChange={setBodyText}
+      onFrontmatterChange={(frontmatterText) => setDraft((current) => ({ ...current, frontmatterText }))}
+      onBodyChange={(bodyText) => setDraft((current) => ({ ...current, bodyText }))}
       onSubmit={handleSave}
     />
   );

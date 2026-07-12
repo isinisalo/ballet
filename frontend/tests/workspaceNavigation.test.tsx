@@ -24,6 +24,17 @@ describe("workspace navigation blocker", () => {
     expect(result.current.route).toEqual({ view: "agents", documentPath: undefined });
   });
 
+  it("allows navigation after a successful save without asking to discard it", () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { result } = renderHook(() => useWorkspaceNavigation());
+    act(() => result.current.setNavigationBlocker({ isDirty: true }));
+
+    act(() => result.current.navigate("/agents", { bypassBlocker: true }));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(result.current.route).toEqual({ view: "agents", documentPath: undefined });
+  });
+
   it("restores a cancelled history traversal without losing the back/forward stack", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { result } = renderHook(() => useWorkspaceNavigation());

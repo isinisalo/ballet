@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { AppData } from "../../shared/api/workspaceData.js";
+import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { builtInLoopThemes } from "../../shared/domain/loopThemes.js";
 import { loadAgents, loadBalletProject, loadBalletProjectTree, loadSkills } from "../markdown.js";

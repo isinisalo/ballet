@@ -1,7 +1,7 @@
 import type { Agent, ExecutionAgentSnapshot, ExecutionTask, ProjectStep, StepRun } from "@shared/api/workspace-contracts";
 import { Bot, CalendarClock, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { CliRunConsole } from "../../components";
+import { CliRunConsole } from "../../components/CliRunConsole";
 import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
 import { LoopRunStepPanel } from "./LoopRunStepPanel";
 

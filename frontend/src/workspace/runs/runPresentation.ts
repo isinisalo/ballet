@@ -1,7 +1,6 @@
 import type { DashboardRunStatus, RootRunSummary } from "@shared/api/workspace-contracts";
 import { runAgentPath, runLoopPath } from "../routing";
 
-export const activeRunStatuses = new Set<DashboardRunStatus>(["queued", "running", "waiting_for_human", "finalizing"]);
 export const cancellableRunStatuses = new Set<DashboardRunStatus>(["queued", "running", "waiting_for_human"]);
 
 export const runSummaryPath = (run: RootRunSummary) => run.kind === "loop"

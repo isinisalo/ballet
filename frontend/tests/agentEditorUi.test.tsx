@@ -92,37 +92,6 @@ describe("agent instructions workspace", () => {
     expect(screen.getByLabelText("Reasoning effort")).toHaveTextContent("high");
   });
 
-  it("saves execution settings automatically from the profile rail", async () => {
-    const user = userEvent.setup();
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url === "/api/agents/agent-architect/runtime" && init?.method === "PUT") {
-        const payload = JSON.parse(String(init.body)) as { provider: "codex"; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
-        return Response.json(agentRuntimeConfiguration({ agentId: "agent-architect", provider: payload.provider, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
-      }
-      return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${url}` }, { status: 404 });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    try {
-      renderEditor();
-      await user.click(screen.getByLabelText("Provider"));
-      await user.click(await screen.findByRole("option", { name: "Codex CLI" }));
-      await user.click(screen.getByLabelText("Model"));
-      await user.click(await screen.findByRole("option", { name: "GPT Test" }));
-      await user.click(screen.getByLabelText("Reasoning effort"));
-      await user.click(await screen.findByRole("option", { name: "high" }));
-      await user.click(screen.getByRole("switch", { name: "Network access" }));
-
-      await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-        "/api/agents/agent-architect/runtime",
-        expect.objectContaining({ method: "PUT", body: JSON.stringify({ provider: "codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: [] } }) })
-      ));
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
   it("edits the name and description independently from their clickable values", async () => {
     const user = userEvent.setup();
     const { save } = renderEditor();

@@ -1,3 +1,5 @@
+// The composite layout stays in one pure module because its lane, edge, and cross-Loop
+// passes share a single coordinate model; splitting them would duplicate that state.
 import type { LoopVisualConfig, LoopVisualLoop, LoopVisualStep } from "./loopVisualProjection";
 import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import { buildLoopGraph, loopCanonicalRecord, type LoopGraph, type LoopOutputTarget, type LoopStepRecord } from "./loopGraph";
@@ -93,95 +95,6 @@ export function calculateCompositeLoopCanvasLayout({
   });
 }
 
-export function calculateAllLoopsCanvasLayout({
-  config,
-  recordsByLoopId,
-  editingStepIndexByLoopId = new Map(),
-  direction = "horizontal"
-}: {
-  config: LoopVisualConfig;
-  recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingStepIndexByLoopId?: ReadonlyMap<string, number | null>;
-  direction?: LoopLayoutDirection;
-}): LoopCanvasLayout {
-  const stepById = new Map(config.steps.map((step) => [step.id, step]));
-  return calculateLoopCanvasLayoutRows({
-    config,
-    loopIds: new Set(config.loops.map((loop) => loop.id)),
-    recordsByLoopId,
-    editingStepIndexByLoopId,
-    direction,
-    stepById
-  });
-}
-
-function calculateLoopCanvasLayoutRows({
-  config,
-  loopIds,
-  recordsByLoopId,
-  editingStepIndexByLoopId,
-  direction,
-  stepById
-}: {
-  config: LoopVisualConfig;
-  loopIds: ReadonlySet<string>;
-  recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingStepIndexByLoopId: ReadonlyMap<string, number | null>;
-  direction: LoopLayoutDirection;
-  stepById: ReadonlyMap<string, LoopVisualStep>;
-}): LoopCanvasLayout {
-  const rows = config.loops
-    .filter((loop) => loopIds.has(loop.id))
-    .map((loop) => loopLayoutRow({
-      loop,
-      recordsByLoopId,
-      editingStepIndexByLoopId,
-      direction,
-      stepById
-    }));
-  const rowOffsetByLoopId = loopRowOffsets(rows);
-  const rowByLoopId = new Map(rows.map((row) => [row.loop.id, row]));
-  const hiddenLocalNodeKeys = new Set<string>();
-  const namespacedNodes: LoopCanvasLayoutNode[] = [];
-  const namespacedEdges: LoopCanvasEdge[] = [];
-
-  rows.forEach((row) => {
-    row.layout.nodes.forEach((node) => {
-      if (shouldHideLinkedOutputNode(config, node, loopIds, stepById)) {
-        hiddenLocalNodeKeys.add(namespaceLoopKey(row.loop.id, node.key));
-        return;
-      }
-      namespacedNodes.push({
-        ...node,
-        key: namespaceLoopKey(row.loop.id, node.key),
-        loopId: row.loop.id,
-        y: node.y + (rowOffsetByLoopId.get(row.loop.id) ?? 0),
-        record: node.record ? { ...node.record, loopId: row.loop.id } : undefined,
-        records: node.records?.map((record) => ({ ...record, loopId: row.loop.id }))
-      });
-    });
-  });
-
-  rows.forEach((row) => {
-    row.layout.edges.forEach((edge) => {
-      const sourceNodeKey = namespaceLoopKey(row.loop.id, edge.sourceNodeKey);
-      const targetNodeKey = namespaceLoopKey(row.loop.id, edge.targetNodeKey);
-      if (hiddenLocalNodeKeys.has(sourceNodeKey) || hiddenLocalNodeKeys.has(targetNodeKey)) return;
-      namespacedEdges.push(namespaceLoopEdge(row.loop.id, edge));
-    });
-  });
-
-  rows.forEach((row) => {
-    crossLoopEventEdges(config, row, loopIds, stepById, rowByLoopId).forEach((edge) => namespacedEdges.push(edge));
-  });
-
-  return {
-    nodes: namespacedNodes,
-    edges: loopEdgesWithDynamicVerticalHandles(namespacedEdges, namespacedNodes),
-    direction
-  };
-}
-
 function calculateSelectedLoopCanvasLayout({
   config,
   selectedLoop,
@@ -204,7 +117,7 @@ function calculateSelectedLoopCanvasLayout({
     direction,
     stepById
   });
-  const links = loopEventLinks(config, recordsByLoopId, stepById);
+  const links = loopEventLinks(config, recordsByLoopId);
   const downstreamLoopIds = linkedLoopIds(config, links, selectedLoop.id, "downstream");
   const downstreamLoopIdSet = new Set(downstreamLoopIds);
   const upstreamLoopIds = linkedLoopIds(config, links, selectedLoop.id, "upstream")
@@ -222,15 +135,10 @@ function calculateSelectedLoopCanvasLayout({
     : loopCanvasLayoutConfig.startY;
   const selectedBounds = loopLayoutBounds(selectedRow.layout.nodes);
   const selectedOffsetY = selectedStartY - selectedBounds.minY;
-  const hiddenSelectedNodeKeys = new Set<string>();
   const nodes: LoopCanvasLayoutNode[] = [...upstreamNodes];
   const edges: LoopCanvasEdge[] = [];
 
   selectedRow.layout.nodes.forEach((node) => {
-    if (shouldHideLinkedOutputNode(config, node, visibleCompactLoopIds, stepById)) {
-      hiddenSelectedNodeKeys.add(namespaceLoopKey(selectedLoop.id, node.key));
-      return;
-    }
     nodes.push({
       ...node,
       key: namespaceLoopKey(selectedLoop.id, node.key),
@@ -242,9 +150,6 @@ function calculateSelectedLoopCanvasLayout({
   });
 
   selectedRow.layout.edges.forEach((edge) => {
-    const sourceNodeKey = namespaceLoopKey(selectedLoop.id, edge.sourceNodeKey);
-    const targetNodeKey = namespaceLoopKey(selectedLoop.id, edge.targetNodeKey);
-    if (hiddenSelectedNodeKeys.has(sourceNodeKey) || hiddenSelectedNodeKeys.has(targetNodeKey)) return;
     edges.push(namespaceLoopEdge(selectedLoop.id, edge));
   });
 
@@ -312,8 +217,7 @@ function loopLayoutRow({
 
 function loopEventLinks(
   config: LoopVisualConfig,
-  recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>,
-  stepById: ReadonlyMap<string, LoopVisualStep>
+  recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>
 ): LoopEventLink[] {
   return config.loops.flatMap((loop) => {
     const records = recordsByLoopId.get(loop.id) ?? [];
@@ -321,7 +225,7 @@ function loopEventLinks(
       (record.outputTargets ?? [])
         .flatMap((target) => {
           if (target.type !== "step") return [];
-          const targetLoop = resolveEventTargetLoop(config, target, stepById);
+          const targetLoop = resolveEventTargetLoop(config, target);
           if (!targetLoop || targetLoop.id === loop.id) return [];
           return [{
             sourceLoopId: loop.id,
@@ -485,27 +389,9 @@ function compactLoopNodeKey(loopId: string) {
   return `loop:${loopId}:loop`;
 }
 
-function resolveEventTargetLoop(
-  config: LoopVisualConfig,
-  target: LoopOutputTarget,
-  stepById: ReadonlyMap<string, LoopVisualStep>
-): LoopVisualLoop | undefined {
-  void stepById;
+function resolveEventTargetLoop(config: LoopVisualConfig, target: LoopOutputTarget): LoopVisualLoop | undefined {
   if (target.type === "step") return config.loops.find((loop) => loop.id === target.targetLoopId);
   return undefined;
-}
-
-function loopRowOffsets(rows: Array<{ loop: LoopVisualLoop; layout: LoopCanvasLayout }>) {
-  const offsets = new Map<string, number>();
-  let nextRowY = loopCanvasLayoutConfig.startY;
-
-  rows.forEach(({ loop, layout }) => {
-    const bounds = loopLayoutBounds(layout.nodes);
-    offsets.set(loop.id, nextRowY - bounds.minY);
-    nextRowY += bounds.height + compositeLoopRowGap();
-  });
-
-  return offsets;
 }
 
 function loopLayoutBounds(nodes: LoopCanvasLayoutNode[]) {
@@ -519,70 +405,6 @@ function loopLayoutBounds(nodes: LoopCanvasLayoutNode[]) {
   const minY = Math.min(...nodes.map((node) => node.y));
   const maxY = Math.max(...nodes.map((node) => node.y + node.height));
   return { minY, maxY, height: maxY - minY };
-}
-
-function compositeLoopRowGap() {
-  return loopCanvasLayoutConfig.branchGap * 2 + loopNodeSizes.step.height;
-}
-
-function shouldHideLinkedOutputNode(
-  config: LoopVisualConfig,
-  node: LoopCanvasLayoutNode,
-  loopIds: ReadonlySet<string>,
-  stepById: ReadonlyMap<string, LoopVisualStep>
-) {
-  if (node.kind !== "output-event" || !node.outputEvent?.eventType) return false;
-  const targetLoop = resolveEventTargetLoop(config, {
-    outputId: node.outputEvent.outputId,
-    eventType: node.outputEvent.eventType,
-    type: "event"
-  }, stepById);
-  return Boolean(targetLoop && loopIds.has(targetLoop.id));
-}
-
-function crossLoopEventEdges(
-  config: LoopVisualConfig,
-  row: {
-    loop: LoopVisualLoop;
-    records: LoopStepRecord[];
-    loopGraph: LoopGraph;
-  },
-  loopIds: ReadonlySet<string>,
-  stepById: ReadonlyMap<string, LoopVisualStep>,
-  rowByLoopId: ReadonlyMap<string, LoopLayoutRow>
-): LoopCanvasEdge[] {
-  return row.records.flatMap((record) =>
-    (record.outputTargets ?? [])
-      .flatMap((target) => {
-        if (target.type !== "step") return [];
-        const targetLoop = resolveEventTargetLoop(config, target, stepById);
-        if (!targetLoop || !loopIds.has(targetLoop.id)) return [];
-        const targetNodeKey = targetLoopStepNodeKey(targetLoop.id, target.targetStepKey, rowByLoopId);
-        if (!targetNodeKey) return [];
-        const canonicalRecord = loopCanonicalRecord(row.loopGraph, record);
-        const sourceNodeKey = namespaceLoopKey(row.loop.id, `step-${canonicalRecord.index}`);
-        return [{
-          key: `loop:${row.loop.id}:output:${record.index}:${target.outputId}:to:${targetLoop.id}:step:${target.targetStepKey}`,
-          sourceNodeKey,
-          targetNodeKey,
-          sourceHandleId: loopOutputSourceHandleId(target),
-          targetHandleId: "left",
-          eventType: target.eventType,
-          label: target.outputId,
-          tone: "cross-loop",
-          route: {
-            sourceLoopId: row.loop.id,
-            targetLoopId: targetLoop.id,
-            sourceStepIndex: record.index,
-            sourceStepId: record.stepKey,
-            handlerStepId: target.targetStepKey,
-            handlerLoopId: targetLoop.id,
-            eventType: target.eventType,
-            outputId: target.outputId
-          }
-        } satisfies LoopCanvasEdge];
-      })
-  );
 }
 
 function selectedLoopTargetStepNodeKey(row: LoopLayoutRow, link: LoopEventLink) {

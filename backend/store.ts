@@ -1,10 +1,9 @@
 import path from "node:path";
-import type { AppData, CollectionName, WorkspaceSaveRequestByCollection } from "../shared/api/workspaceData.js";
+import type { AppData, CollectionName, WorkspaceSaveRequestByCollection } from "../shared/api/workspace-contracts.js";
 import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { MarkdownDocument } from "../shared/domain/documents.js";
 import { getProjectRoot } from "./markdown.js";
 import { RuntimeDatabase } from "./runtime-db.js";
-import { AutomationValidationError } from "./automation.js";
 import { AutomationService } from "./services/AutomationService.js";
 import { MarkdownEntityService } from "./services/MarkdownEntityService.js";
 import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
@@ -45,10 +44,6 @@ export class MarkdownStore {
     return this.workspaceDataService.read();
   }
 
-  reset(): Promise<AppData> {
-    return this.read();
-  }
-
   setWorkspaceEnricher(
     enrich: (data: WorkspaceContentData & Pick<AppData, "loopRuns" | "scheduleStates">) => Promise<AppData>
   ): void {
@@ -71,8 +66,15 @@ export class MarkdownStore {
   }
 
   async remove(collection: CollectionName, id: string): Promise<void> {
-    if (collection === "agents") await this.agentRemovalHook?.(id);
-    await this.markdownEntityService.remove(collection, id);
+    if (collection !== "agents") {
+      await this.markdownEntityService.remove(collection, id);
+      return;
+    }
+    await this.runProjectConfigMutation(async () => {
+      await this.automationService.assertAgentRemovable(id);
+      await this.markdownEntityService.remove(collection, id);
+      await this.agentRemovalHook?.(id);
+    });
   }
 
   saveAutomation(config: ProjectAutomationConfig): Promise<ProjectAutomationConfig> {
@@ -118,6 +120,3 @@ export class MarkdownStore {
     }
   }
 }
-
-export const store = new MarkdownStore();
-export { AutomationValidationError };

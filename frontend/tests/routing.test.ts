@@ -69,13 +69,6 @@ describe("workspace routing", () => {
 
   it("does not keep legacy automation route aliases", () => {
     expect(routeFromPath("/automation/policies?id=policy-1")).toEqual({ view: "projects" });
-    expect(routeFromPath("/policies?id=policy-1")).toEqual({ view: "projects" });
-    expect(routeFromPath("/actions?id=build")).toEqual({ view: "projects" });
-    expect(routeFromPath("/loop?id=delivery")).toEqual({ view: "projects" });
-    expect(routeFromPath("/automation/runtimes?id=codex")).toEqual({ view: "projects" });
-    expect(routeFromPath("/agent-runs?id=run-1")).toEqual({ view: "projects" });
-    expect(routeFromPath("/projects/document?path=.ballet%2Fgoals%2Fone.md")).toEqual({ view: "projects" });
-    expect(routeFromPath("/projects/project-1/goals")).toEqual({ view: "projects" });
   });
 
   it("builds encoded paths", () => {

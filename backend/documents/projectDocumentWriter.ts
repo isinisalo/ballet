@@ -2,6 +2,8 @@ import path from "node:path";
 import { mkdir, stat } from "node:fs/promises";
 import type { MarkdownDocument } from "../../shared/domain/documents.js";
 import { assertInsideRoot, readMarkdownDocument, safeSlug, writeMarkdownDocument } from "../markdown.js";
+import { resolveSafeProjectPath } from "./safeProjectPath.js";
+import { MarkdownEntityNotFoundError, MarkdownEntityValidationError } from "./MarkdownEntityErrors.js";
 
 const now = () => new Date().toISOString();
 
@@ -13,21 +15,24 @@ export const writeProjectMarkdownDocument = async (
     body: string;
   }
 ): Promise<MarkdownDocument> => {
-  const absolutePath = assertInsideRoot(root, input.relativePath);
+  const absolutePath = await resolveSafeProjectPath(root, input.relativePath);
   const balletRoot = assertInsideRoot(root, ".ballet");
   const relativeToBallet = path.relative(balletRoot, absolutePath);
 
   if (relativeToBallet.startsWith("..") || path.isAbsolute(relativeToBallet)) {
-    throw new Error("Project document must be inside .ballet.");
+    throw new MarkdownEntityValidationError("Project document must be inside .ballet.");
   }
 
   if (path.extname(absolutePath).toLowerCase() !== ".md") {
-    throw new Error("Project document must be a .md file.");
+    throw new MarkdownEntityValidationError("Project document must be a .md file.");
   }
 
-  const existing = await stat(absolutePath);
+  const existing = await stat(absolutePath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") throw new MarkdownEntityNotFoundError("Project document was not found.");
+    throw error;
+  });
   if (!existing.isFile()) {
-    throw new Error("Project document must be an existing file.");
+    throw new MarkdownEntityValidationError("Project document must be an existing file.");
   }
 
   await writeMarkdownDocument({
@@ -48,19 +53,19 @@ export const createProjectMarkdownDocument = async (
   }
 ): Promise<MarkdownDocument> => {
   const title = input.title.trim();
-  if (!title) throw new Error("title is required.");
+  if (!title) throw new MarkdownEntityValidationError("title is required.");
 
-  const absoluteDirectoryPath = assertInsideRoot(root, input.directoryPath);
+  const absoluteDirectoryPath = await resolveSafeProjectPath(root, input.directoryPath);
   const balletRoot = assertInsideRoot(root, ".ballet");
   const relativeToBallet = path.relative(balletRoot, absoluteDirectoryPath);
 
   if (relativeToBallet.startsWith("..") || path.isAbsolute(relativeToBallet)) {
-    throw new Error("Project document must be inside .ballet.");
+    throw new MarkdownEntityValidationError("Project document must be inside .ballet.");
   }
 
   const normalizedDirectoryPath = path.relative(path.resolve(root), absoluteDirectoryPath).split(path.sep).join("/");
   if (path.extname(normalizedDirectoryPath)) {
-    throw new Error("Project document directory must not include a file extension.");
+    throw new MarkdownEntityValidationError("Project document directory must not include a file extension.");
   }
 
   await mkdir(absoluteDirectoryPath, { recursive: true });

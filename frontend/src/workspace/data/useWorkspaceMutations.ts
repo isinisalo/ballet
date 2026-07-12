@@ -10,6 +10,7 @@ import { toErrorMessage } from "@/lib/errors";
 import { projectCollectionDocumentPath } from "../routing";
 import { projectDocumentCreateConfig } from "../documents/projectDocuments";
 import type { ProjectDocumentCreateKind, SaveCollection } from "../types";
+import type { WorkspaceNavigation } from "../useWorkspaceNavigation";
 
 type Notify = (input: { type: "info" | "error"; message: string }) => string;
 
@@ -20,7 +21,7 @@ export function useWorkspaceMutations({
 }: {
   notify: Notify;
   refresh: () => Promise<void>;
-  navigate: (path: string) => void;
+  navigate: WorkspaceNavigation["navigate"];
 }) {
   const runMutation = useCallback(async <T,>(action: () => Promise<T>, successMessage: string, fallbackError: string) => {
     try {
@@ -60,7 +61,7 @@ export function useWorkspaceMutations({
       "Created.",
       `Unable to create ${kind}.`
     );
-    navigate(projectCollectionDocumentPath(kind, saved.relativePath));
+    navigate(projectCollectionDocumentPath(kind, saved.relativePath), { bypassBlocker: true });
     return saved;
   }, [navigate, runMutation]);
 

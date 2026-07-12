@@ -1,32 +1,19 @@
+import { constants, type Dirent } from "node:fs";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 import { isMap, parseDocument, stringify } from "yaml";
 import type { MarkdownDocument, ProjectDocumentTreeNode } from "../shared/domain/documents.js";
+import { resolveSafeProjectPath } from "./documents/safeProjectPath.js";
 
-export interface ParsedMarkdownDocument {
-  frontmatter: Record<string, unknown>;
-  body: string;
-  errors?: string[];
-}
+export { assertInsideRoot } from "./documents/safeProjectPath.js";
 
-export interface ParsedTomlDocument {
-  frontmatter: Record<string, unknown>;
-  errors?: string[];
-}
-
-export interface ReadMarkdownCollectionOptions {
-  root: string;
-  collectionPath: string;
-  collection?: string;
-  extensions?: string[];
-}
-
-export interface ReadMarkdownDocumentOptions {
-  root: string;
-  relativePath: string;
-  collection?: string;
-}
+export type ParsedMarkdownDocument = { frontmatter: Record<string, unknown>; body: string; errors?: string[] };
+export type ParsedTomlDocument = { frontmatter: Record<string, unknown>; errors?: string[] };
+export type ReadMarkdownCollectionOptions = {
+  root: string; collectionPath: string; collection?: string; extensions?: string[];
+};
+export type ReadMarkdownDocumentOptions = { root: string; relativePath: string; collection?: string };
 
 export const getProjectRoot = (): string => path.resolve(process.cwd());
 
@@ -44,6 +31,20 @@ const slugify = (value: string): string =>
 
 const normalizeRelativePath = (relativePath: string): string => relativePath.split(path.sep).join("/");
 
+const readDirectory = async (absolutePath: string): Promise<Dirent[]> => {
+  try {
+    return await readdir(absolutePath, { withFileTypes: true });
+  } catch (error) {
+    if (isMissingDirectory(error)) return [];
+    throw error;
+  }
+};
+
+const isMissingDirectory = (error: unknown): boolean =>
+  error instanceof Error
+  && "code" in error
+  && ["ENOENT", "ENOTDIR"].includes(String((error as NodeJS.ErrnoException).code));
+
 const projectDocumentLabel = (document: MarkdownDocument): string =>
   document.title
   || (typeof document.frontmatter.title === "string" ? document.frontmatter.title : undefined)
@@ -56,16 +57,6 @@ const skillDocumentLabel = (document: MarkdownDocument): string =>
   || document.title
   || document.slug
   || document.id;
-
-export const assertInsideRoot = (root: string, target: string): string => {
-  const resolvedRoot = path.resolve(root);
-  const resolvedTarget = path.resolve(resolvedRoot, target);
-  const relative = path.relative(resolvedRoot, resolvedTarget);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error(`Path traversal blocked: ${target}`);
-  }
-  return resolvedTarget;
-};
 
 const toPlainFrontmatter = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -107,12 +98,12 @@ export const parseTomlDocument = (source: string): ParsedTomlDocument => {
 };
 
 export const readMarkdownDocument = async ({ root, relativePath, collection }: ReadMarkdownDocumentOptions): Promise<MarkdownDocument> => {
-  const absolutePath = assertInsideRoot(root, relativePath);
+  const absolutePath = await resolveSafeProjectPath(root, relativePath);
   if (!defaultExtensions.includes(path.extname(relativePath).toLowerCase())) {
     throw new Error(`Unsupported Markdown extension for ${relativePath}`);
   }
 
-  const source = await readFile(absolutePath, "utf8");
+  const source = await readFile(absolutePath, { encoding: "utf8", flag: constants.O_RDONLY | constants.O_NOFOLLOW });
   const parsed = parseMarkdownDocument(source);
   const normalizedRelativePath = normalizeRelativePath(path.relative(path.resolve(root), absolutePath));
   const slug = slugify(path.basename(normalizedRelativePath, path.extname(normalizedRelativePath)));
@@ -137,25 +128,33 @@ export const readMarkdownDocument = async ({ root, relativePath, collection }: R
 };
 
 export const readTomlDocument = async ({ root, relativePath, collection }: ReadMarkdownDocumentOptions): Promise<MarkdownDocument> => {
-  const absolutePath = assertInsideRoot(root, relativePath);
+  const absolutePath = await resolveSafeProjectPath(root, relativePath);
   if (!agentExtensions.includes(path.extname(relativePath).toLowerCase())) {
     throw new Error(`Unsupported TOML extension for ${relativePath}`);
   }
 
-  const source = await readFile(absolutePath, "utf8");
+  const [source, metadata] = await Promise.all([
+    readFile(absolutePath, { encoding: "utf8", flag: constants.O_RDONLY | constants.O_NOFOLLOW }),
+    stat(absolutePath)
+  ]);
   const parsed = parseTomlDocument(source);
+  const frontmatter: Record<string, unknown> = {
+    ...parsed.frontmatter,
+    createdAt: typeof parsed.frontmatter.createdAt === "string" ? parsed.frontmatter.createdAt : metadata.birthtime.toISOString(),
+    updatedAt: typeof parsed.frontmatter.updatedAt === "string" ? parsed.frontmatter.updatedAt : metadata.mtime.toISOString()
+  };
   const normalizedRelativePath = normalizeRelativePath(path.relative(path.resolve(root), absolutePath));
   const slug = slugify(path.basename(normalizedRelativePath, path.extname(normalizedRelativePath)));
-  const title = typeof parsed.frontmatter.name === "string" ? parsed.frontmatter.name : undefined;
-  const body = typeof parsed.frontmatter.developer_instructions === "string"
-    ? parsed.frontmatter.developer_instructions
+  const title = typeof frontmatter.name === "string" ? frontmatter.name : undefined;
+  const body = typeof frontmatter.developer_instructions === "string"
+    ? frontmatter.developer_instructions
     : "";
 
   return {
     id: slug,
     collection: collection ?? normalizedRelativePath.split("/").slice(0, -1).join("/"),
     title,
-    frontmatter: parsed.frontmatter,
+    frontmatter,
     body,
     absolutePath,
     relativePath: normalizedRelativePath,
@@ -170,16 +169,9 @@ export const readMarkdownCollection = async ({
   collection = collectionPath,
   extensions = defaultExtensions
 }: ReadMarkdownCollectionOptions): Promise<MarkdownDocument[]> => {
-  const absoluteCollectionPath = assertInsideRoot(root, collectionPath);
+  const absoluteCollectionPath = await resolveSafeProjectPath(root, collectionPath);
 
-  try {
-    const stats = await stat(absoluteCollectionPath);
-    if (!stats.isDirectory()) return [];
-  } catch {
-    return [];
-  }
-
-  const entries = await readdir(absoluteCollectionPath, { withFileTypes: true });
+  const entries = await readDirectory(absoluteCollectionPath);
   const extensionSet = new Set(extensions.map((extension) => extension.toLowerCase()));
   const files = entries
     .filter((entry) => entry.isFile() && extensionSet.has(path.extname(entry.name).toLowerCase()))
@@ -194,16 +186,9 @@ export const readMarkdownCollection = async ({
 };
 
 const readSkillDirectory = async (root: string, relativePath: string): Promise<string[]> => {
-  const absolutePath = assertInsideRoot(root, relativePath);
+  const absolutePath = await resolveSafeProjectPath(root, relativePath);
 
-  try {
-    const stats = await stat(absolutePath);
-    if (!stats.isDirectory()) return [];
-  } catch {
-    return [];
-  }
-
-  const entries = await readdir(absolutePath, { withFileTypes: true });
+  const entries = await readDirectory(absolutePath);
   const skillFile = entries.find((entry) => entry.isFile() && entry.name === "SKILL.md")
     ? [normalizeRelativePath(path.join(relativePath, "SKILL.md"))]
     : [];
@@ -221,7 +206,7 @@ const readSkillDocument = async (root: string, relativePath: string): Promise<Ma
 
   return {
     ...document,
-    id: typeof document.frontmatter.id === "string" ? document.frontmatter.id : stableId,
+    id: stableId,
     title: skillDocumentLabel(document),
     slug: stableId
   };
@@ -238,16 +223,9 @@ const readBalletProjectDirectory = async (
   relativePath: string,
   depth: number
 ): Promise<ProjectDocumentTreeNode[]> => {
-  const absolutePath = assertInsideRoot(root, relativePath);
+  const absolutePath = await resolveSafeProjectPath(root, relativePath);
 
-  try {
-    const stats = await stat(absolutePath);
-    if (!stats.isDirectory()) return [];
-  } catch {
-    return [];
-  }
-
-  const entries = await readdir(absolutePath, { withFileTypes: true });
+  const entries = await readDirectory(absolutePath);
   const files = entries
     .filter((entry) => entry.isFile() && projectTreeExtensions.includes(path.extname(entry.name).toLowerCase()))
     .map((entry) => normalizeRelativePath(path.join(relativePath, entry.name)))
@@ -282,16 +260,9 @@ const readBalletProjectDirectory = async (
 };
 
 export const loadAgents = async (root: string): Promise<MarkdownDocument[]> => {
-  const absoluteCollectionPath = assertInsideRoot(root, ".codex/agents");
+  const absoluteCollectionPath = await resolveSafeProjectPath(root, ".codex/agents");
 
-  try {
-    const stats = await stat(absoluteCollectionPath);
-    if (!stats.isDirectory()) return [];
-  } catch {
-    return [];
-  }
-
-  const entries = await readdir(absoluteCollectionPath, { withFileTypes: true });
+  const entries = await readDirectory(absoluteCollectionPath);
   const files = entries
     .filter((entry) => entry.isFile() && agentExtensions.includes(path.extname(entry.name).toLowerCase()))
     .map((entry) => normalizeRelativePath(path.join(".codex/agents", entry.name)))
@@ -312,14 +283,11 @@ export const loadBalletProject = async (root: string): Promise<MarkdownDocument[
     throw error;
   }
 };
-export const loadAdr = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/adr", collection: "adr" });
-export const loadGoals = (root: string) => readMarkdownCollection({ root, collectionPath: ".ballet/goals", collection: "goals" });
-
 export const safeSlug = slugify;
 
 export const markdownSource = (frontmatter: Record<string, unknown>, body: string): string => {
   const yaml = stringify(frontmatter).trimEnd();
-  return `---\n${yaml}\n---\n\n${body.trimStart()}`;
+  return `---\n${yaml}\n---\n${body}`;
 };
 
 export const tomlSource = (frontmatter: Record<string, unknown>): string => `${stringifyToml(frontmatter).trimEnd()}\n`;
@@ -328,34 +296,42 @@ export const writeMarkdownDocument = async ({
   root,
   relativePath,
   frontmatter,
-  body
+  body,
+  exclusive = false
 }: {
   root: string;
   relativePath: string;
   frontmatter: Record<string, unknown>;
   body: string;
+  exclusive?: boolean;
 }): Promise<void> => {
-  const absolutePath = assertInsideRoot(root, relativePath);
+  const absolutePath = await resolveSafeProjectPath(root, relativePath);
   if (!defaultExtensions.includes(path.extname(relativePath).toLowerCase())) {
     throw new Error(`Unsupported Markdown extension for ${relativePath}`);
   }
   await mkdir(path.dirname(absolutePath), { recursive: true });
-  await writeFile(absolutePath, markdownSource(frontmatter, body), "utf8");
+  const flag = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW
+    | (exclusive ? constants.O_EXCL : constants.O_TRUNC);
+  await writeFile(absolutePath, markdownSource(frontmatter, body), { encoding: "utf8", flag });
 };
 
 export const writeTomlDocument = async ({
   root,
   relativePath,
-  frontmatter
+  frontmatter,
+  exclusive = false
 }: {
   root: string;
   relativePath: string;
   frontmatter: Record<string, unknown>;
+  exclusive?: boolean;
 }): Promise<void> => {
-  const absolutePath = assertInsideRoot(root, relativePath);
+  const absolutePath = await resolveSafeProjectPath(root, relativePath);
   if (!agentExtensions.includes(path.extname(relativePath).toLowerCase())) {
     throw new Error(`Unsupported TOML extension for ${relativePath}`);
   }
   await mkdir(path.dirname(absolutePath), { recursive: true });
-  await writeFile(absolutePath, tomlSource(frontmatter), "utf8");
+  const flag = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW
+    | (exclusive ? constants.O_EXCL : constants.O_TRUNC);
+  await writeFile(absolutePath, tomlSource(frontmatter), { encoding: "utf8", flag });
 };

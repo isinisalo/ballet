@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { AppData } from "../../shared/api/workspaceData.js";
+import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { resolveEffectiveStartStep } from "../../shared/domain/automation.js";
 import { LoopRunStateError } from "../runtime/LoopRunErrors.js";
 

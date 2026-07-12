@@ -135,5 +135,6 @@ if (typeof window !== "undefined") {
 
 afterEach(() => {
   cleanup();
-  vi.clearAllMocks();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });

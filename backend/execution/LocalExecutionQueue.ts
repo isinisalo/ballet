@@ -1,6 +1,6 @@
 import type { AgentOutcome, ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
 import path from "node:path";
-import { agentOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import { agentOutcomeJsonSchema, agentOutcomeSchema } from "../../shared/api/runtime-schemas.js";
 import { WorkspacePermissionPolicy } from "./WorkspacePermissionPolicy.js";
 import type { ExecutionStore } from "./ExecutionStore.js";
 import type { LocalRuntimeService } from "./LocalRuntimeService.js";
@@ -61,10 +61,18 @@ export class LocalExecutionQueue {
   async shutdown(timeoutMs = 90_000): Promise<void> {
     this.stopping = true;
     for (const task of this.options.store.activeTasks()) await this.cancel(task.id);
-    await Promise.race([
-      Promise.allSettled([...this.active.values()]),
-      new Promise<void>((resolve) => setTimeout(resolve, timeoutMs))
-    ]);
+    let timeout: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        Promise.allSettled([...this.active.values()]),
+        new Promise<void>((resolve) => {
+          timeout = setTimeout(resolve, timeoutMs);
+          timeout.unref();
+        })
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   private async pump(provider: RuntimeProvider): Promise<void> {
@@ -98,7 +106,7 @@ export class LocalExecutionQueue {
         policy: expected.policy,
         signal: controller.signal,
         permissionPolicy: new WorkspacePermissionPolicy(this.rootWorktree(task), expected.policy),
-        outputSchema: outcomeJsonSchema
+        outputSchema: agentOutcomeJsonSchema
       })) {
         this.options.store.appendEvent(task.id, toExecutionEvent(event, sequence++, expected.provider));
         if (event.type === "execution.completed") {
@@ -142,15 +150,3 @@ export class LocalExecutionQueue {
     catch (error) { this.options.onOrchestrationError?.(error, task); }
   }
 }
-
-const outcomeJsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["outcome", "summary", "checks"],
-  properties: {
-    outcome: { enum: ["ready", "blocked", "needs_input", "approved", "changes-requested", "failed"] },
-    summary: { type: "string" },
-    artifacts: { type: "object" },
-    checks: { type: "array", items: { type: "object" } }
-  }
-};

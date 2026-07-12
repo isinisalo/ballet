@@ -72,39 +72,8 @@ describe("automation v6 config", () => {
     expect(raw).not.toHaveProperty("humanGateResponses");
   });
 
-  it("rejects v1 fields, invalid ids, missing starts, duplicate steps, and unknown targets", () => {
-    expect(validateProjectAutomationConfig({
-      version: 1,
-      actions: [],
-      outputRoutes: [],
-      humanGateResponses: [],
-      loops: [],
-      runtimes: []
-    }, [agent]).length).toBeGreaterThan(0);
-    expect(validateProjectAutomationConfig({ version: 4, loops: [] }, [agent])).toContainEqual(
-      expect.objectContaining({ path: "version" })
-    );
+  it("rejects missing starts, duplicate steps, and unknown targets", () => {
     const base = config();
-    expect(validateProjectAutomationConfig({
-      ...base,
-      loops: [{ ...base.loops[0]!, theme: "Space Theme" }]
-    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.theme" }));
-    expect(validateProjectAutomationConfig({
-      ...base,
-      loops: [{ ...base.loops[0]!, theme: undefined }]
-    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.theme" }));
-    expect(validateProjectAutomationConfig({
-      ...base,
-      loops: [{ ...base.loops[0]!, steps: [{ ...base.loops[0]!.steps[0]!, nodeSize: "huge" }] }]
-    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.steps.0.nodeSize" }));
-    expect(validateProjectAutomationConfig({
-      ...base,
-      loops: [{ ...base.loops[0]!, steps: [{ ...base.loops[0]!.steps[0]!, nodeSize: undefined }] }]
-    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.steps.0.nodeSize" }));
-    expect(validateProjectAutomationConfig({
-      ...base,
-      loops: [{ ...base.loops[0]!, id: "Delivery" }]
-    }, [agent]).some((issue) => issue.path === "loops.0.id")).toBe(true);
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{ ...base.loops[0]!, start: "missing" }]

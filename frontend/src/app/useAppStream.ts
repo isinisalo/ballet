@@ -39,12 +39,10 @@ export function useAppStream(callbacks: AppStreamCallbacks) {
       const source = new EventSource("/api/stream");
       sourceRef.current = source;
       source.onopen = () => {
+        const reconnected = retryRef.current > 0;
         retryRef.current = 0;
         setStatus("connected");
-        void Promise.all([
-          callbacksRef.current.onWorkspaceChanged(),
-          callbacksRef.current.onRunsChanged()
-        ]);
+        if (reconnected) void callbacksRef.current.onRunsChanged();
       };
       source.addEventListener("workspace-changed", () => {
         void callbacksRef.current.onWorkspaceChanged();

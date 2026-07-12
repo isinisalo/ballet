@@ -1,18 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
-import { HttpValidationError, parseUnknown } from "../http/validation/httpValidation.js";
-
-const expectValidationError = (callback: () => unknown, path: string) => {
-  expect(callback).toThrow(HttpValidationError);
-  try {
-    callback();
-  } catch (error) {
-    expect(error).toBeInstanceOf(HttpValidationError);
-    expect((error as HttpValidationError).issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path })
-    ]));
-  }
-};
+import { parseUnknown } from "../http/validation/httpValidation.js";
+import { expectValidationError } from "./expectValidationError.js";
 
 const configWithSchedule = (schedule: unknown) => ({
   version: 6,

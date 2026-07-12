@@ -62,3 +62,5 @@ export const agentOutcomeSchema = z.object({
   artifacts: z.record(z.string(), z.unknown()).optional(),
   checks: z.array(runCheckSchema).max(500)
 }).strict();
+
+export const agentOutcomeJsonSchema = z.toJSONSchema(agentOutcomeSchema) as Record<string, unknown>;

@@ -4,10 +4,14 @@ import { readFile } from "node:fs/promises";
 import express from "express";
 import { z } from "zod";
 import {
+  agentExecutionParamsSchema,
   agentRuntimeConfigurationBodySchema,
   emptyBodySchema,
+  executionTaskParamsSchema,
   executionEventsQuerySchema,
   respondToRunStepBodySchema,
+  rootRunParamsSchema,
+  stepRunParamsSchema,
   startRunBodySchema
 } from "../../shared/api/runtime-schemas.js";
 import {
@@ -23,7 +27,6 @@ import {
   type MutableCollectionName
 } from "../../shared/api/workspace-schemas.js";
 import type { RootRunListQuery } from "../../shared/domain/runs.js";
-import { validateProjectAutomationConfig } from "../automation/validateAutomationConfig.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
@@ -31,8 +34,6 @@ import { readProjectConfigStatus } from "../project/configGitStatus.js";
 import type { LocalRunService } from "../runs/LocalRunService.js";
 import type { WorkspaceInvalidationBroadcaster } from "../runs/WorkspaceInvalidationBroadcaster.js";
 import type { MarkdownStore } from "../store.js";
-import { AutomationValidationError } from "../store.js";
-import { sendKnownHttpError } from "./errors.js";
 import { HttpValidationError, parseBody, parseParams, parseUnknown } from "./validation/httpValidation.js";
 
 export interface ApiRouterOptions {
@@ -45,10 +46,6 @@ export interface ApiRouterOptions {
   logsPath: string;
 }
 
-const agentParams = z.object({ agentId: z.string().trim().min(1).max(200) }).strict();
-const rootParams = z.object({ rootRunId: z.string().uuid() }).strict();
-const rootStepParams = rootParams.extend({ stepRunId: z.string().uuid() }).strict();
-const taskParams = z.object({ taskId: z.string().uuid() }).strict();
 const runListQuery = z.object({
   state: z.enum(["active", "recent"]).optional(), kind: z.enum(["agent", "loop"]).optional(),
   cursor: z.string().max(1000).optional(), limit: z.coerce.number().int().min(1).max(200).optional()
@@ -59,8 +56,6 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
   router.get("/data", route(async (_req, res) => res.json(await options.store.read())));
   router.put("/automation", route(async (req, res) => {
     const config = parseBody(automationConfigSchema, req);
-    const issues = validateProjectAutomationConfig(config, (await options.store.read()).agents);
-    if (issues.length) throw new AutomationValidationError("Automation config is invalid.", issues);
     const saved = await options.store.saveAutomation(config);
     options.invalidations.publish("workspace-changed", { reason: "automation" });
     res.json(saved);
@@ -93,33 +88,33 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     content: (await readFile(options.logsPath, "utf8").catch(() => "")).slice(-256 * 1024)
   })));
   router.put("/agents/:agentId/runtime", route(async (req, res) => {
-    const { agentId } = parseParams(agentParams, req);
+    const { agentId } = parseParams(agentExecutionParamsSchema, req);
     res.json(await options.configurations.put(agentId, parseBody(agentRuntimeConfigurationBodySchema, req)));
     options.invalidations.publish("workspace-changed", { reason: "runtime-configuration" });
   }));
   router.delete("/agents/:agentId/runtime", route(async (req, res) => {
-    const { agentId } = parseParams(agentParams, req); await options.configurations.remove(agentId);
+    const { agentId } = parseParams(agentExecutionParamsSchema, req); await options.configurations.remove(agentId);
     options.invalidations.publish("workspace-changed", { reason: "runtime-configuration" }); res.status(204).end();
   }));
 
   router.post("/runs", route(async (req, res) => res.status(201).json(await options.runs.start(parseBody(startRunBodySchema, req)))));
   router.get("/runs", route(async (req, res) => res.json(options.runs.list(parseUnknown(runListQuery, req.query) as RootRunListQuery))));
   router.get("/runs/:rootRunId", route(async (req, res) => {
-    const { rootRunId } = parseParams(rootParams, req); const detail = options.runs.detail(rootRunId);
+    const { rootRunId } = parseParams(rootRunParamsSchema, req); const detail = options.runs.detail(rootRunId);
     if (!detail) throw new HttpValidationError(`Root Run ${rootRunId} was not found.`, [], 404); res.json(detail);
   }));
   router.post("/runs/:rootRunId/cancel", route(async (req, res) => {
-    const { rootRunId } = parseParams(rootParams, req);
+    const { rootRunId } = parseParams(rootRunParamsSchema, req);
     parseBody(emptyBodySchema, req);
     res.json(await options.runs.cancel(rootRunId));
   }));
   router.post("/runs/:rootRunId/steps/:stepRunId/respond", route(async (req, res) => {
-    const { rootRunId, stepRunId } = parseParams(rootStepParams, req);
+    const { rootRunId, stepRunId } = parseParams(stepRunParamsSchema, req);
     const input = parseBody(respondToRunStepBodySchema, req);
     res.json(await options.runs.respond(rootRunId, stepRunId, input.result, input.input));
   }));
   router.get("/execution-tasks/:taskId/events", route(async (req, res) => {
-    const { taskId } = parseParams(taskParams, req); const query = parseUnknown(executionEventsQuerySchema, req.query);
+    const { taskId } = parseParams(executionTaskParamsSchema, req); const query = parseUnknown(executionEventsQuerySchema, req.query);
     res.json(options.executions.events(taskId, query.after, query.limit));
   }));
   router.get("/execution-tasks/:taskId/console/stream", (req, res, next) => {
@@ -144,10 +139,6 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     await options.store.remove(collection, id); options.invalidations.publish("workspace-changed", { reason: collection }); res.status(204).end();
   }));
 
-  router.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (sendKnownHttpError(error, res)) return;
-    next(error);
-  });
   return router;
 };
 
@@ -159,8 +150,9 @@ const requireCollection = (value: string): MutableCollectionName => {
 };
 
 const streamConsole = (req: express.Request, res: express.Response, store: ExecutionStore): void => {
-  const { taskId } = parseParams(taskParams, req);
+  const { taskId } = parseParams(executionTaskParamsSchema, req);
   let cursor = Number(req.get("last-event-id") ?? req.query.after ?? 0) || 0;
+  let taskVersion = "";
   store.require(taskId);
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" });
   const flush = () => {
@@ -168,7 +160,12 @@ const streamConsole = (req: express.Request, res: express.Response, store: Execu
     for (const event of page.entries) {
       cursor = event.id; res.write(`id: ${event.id}\nevent: console\ndata: ${JSON.stringify(event)}\n\n`);
     }
-    res.write(`event: task\ndata: ${JSON.stringify(store.require(taskId))}\n\n`);
+    const task = store.require(taskId);
+    const nextTaskVersion = `${task.status}\0${task.updatedAt}`;
+    if (nextTaskVersion !== taskVersion) {
+      taskVersion = nextTaskVersion;
+      res.write(`event: task\ndata: ${JSON.stringify(task)}\n\n`);
+    }
   };
   flush();
   const timer = setInterval(flush, 500); timer.unref();

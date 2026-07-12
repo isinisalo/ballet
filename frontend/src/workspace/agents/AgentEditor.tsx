@@ -7,9 +7,12 @@ import { Bot } from "lucide-react";
 import { AgentAvatarField } from "./AgentAvatarField";
 import { AgentEditWorkspace } from "./AgentEditWorkspace";
 import { type AgentEditorState, type RemoveAgent, type SaveAgent, useAgentEditor } from "./useAgentEditor";
+import { useWorkspaceNavigationBlocker, type WorkspaceNavigation } from "../useWorkspaceNavigation";
+
+const ignoreNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"] = () => undefined;
 
 function AgentEditorActions({ editor }: { editor: AgentEditorState }) {
-  return <CrudActions formId={editor.formId} newLabel="New" saveLabel="Save agent" deleteLabel="Delete agent" id={editor.form.id} disabled={editor.saveDisabled} deleteType="agent" resourceName={editor.form.name} onNew={editor.newAgent} onDelete={editor.deleteAgent} showNew={false} />;
+  return <CrudActions formId={editor.formId} saveLabel="Save agent" deleteLabel="Delete agent" id={editor.form.id} disabled={editor.saveDisabled} deleteType="agent" resourceName={editor.form.name} onDelete={editor.deleteAgent} />;
 }
 
 export function AgentEditorContent({ editor, showNameField = true }: { editor: AgentEditorState; showNameField?: boolean }) {
@@ -44,8 +47,14 @@ export function AgentEditor(props: {
   onSaved?: (agent: Agent) => void;
   onNew?: () => void;
   onDeleted?: (id: string) => void;
+  setNavigationBlocker?: WorkspaceNavigation["setNavigationBlocker"];
 }) {
   const editor = useAgentEditor(props);
+  useWorkspaceNavigationBlocker(
+    props.setNavigationBlocker ?? ignoreNavigationBlocker,
+    editor.dirty,
+    "Discard unsaved agent changes?"
+  );
   if (props.agent) return <AgentEditWorkspace agent={props.agent} executionState={props.executionState} runtime={props.runtime} runtimeConfiguration={props.runtimeConfiguration} editor={editor} />;
   return <Panel title={editor.form.id ? "Update agent" : "Create agent"} icon={<Bot data-icon="inline-start" />} action={<AgentEditorActions editor={editor} />}><AgentEditorContent editor={editor} /></Panel>;
 }

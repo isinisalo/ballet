@@ -1,7 +1,8 @@
-import type { AppData } from "../../shared/api/workspaceData.js";
+import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { LoopExecutionPlan } from "../../shared/domain/runtime.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
+import { LoopRunConflictError, LoopRunNotFoundError, LoopRunStateError } from "../runtime/LoopRunErrors.js";
 import { agentSnapshot, reachableAgentSteps } from "./LoopExecutionSnapshot.js";
 
 export class LoopExecutionPlanner {
@@ -18,15 +19,20 @@ export class LoopExecutionPlanner {
     for (const entry of steps) {
       const agent = data.agents.find((candidate) =>
         candidate.id === entry.step.agentId && candidate.enabled);
-      if (!agent) throw new Error(`Agent ${entry.step.agentId} was not found or is disabled.`);
+      if (!agent) {
+        const exists = data.agents.some((candidate) => candidate.id === entry.step.agentId);
+        throw exists
+          ? new LoopRunStateError(`Agent ${entry.step.agentId} is disabled.`)
+          : new LoopRunNotFoundError(`Agent ${entry.step.agentId} was not found.`);
+      }
       const configuration = await this.configurations.get(agent.id);
       if (!configuration.resolved) {
-        throw new Error(configuration.issues[0]?.message ?? `Agent ${agent.id} is not configured.`);
+        throw new LoopRunStateError(configuration.issues[0]?.message ?? `Agent ${agent.id} is not configured.`);
       }
       const preflight = await this.runtime.preflight(configuration.resolved);
       if (project && (project.headSha !== preflight.project.headSha
         || project.configHash !== preflight.project.configHash)) {
-        throw new Error("Checkout changed during Loop preflight.");
+        throw new LoopRunConflictError("Checkout changed during Loop preflight.");
       }
       project ??= preflight.project;
       snapshots.push({

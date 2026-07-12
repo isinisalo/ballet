@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { appendConsoleEvents, mergeConsoleDeltas } from "../src/workspace/components/cliConsoleState";
-import type { CliConsoleEvent } from "../src/workspace/components/cliConsoleTypes";
+import type { ExecutionEvent } from "@shared/api/workspace-contracts";
 import { now } from "./runtimeFixtures";
 
-const event = (id: number, patch: Partial<CliConsoleEvent> = {}): CliConsoleEvent => ({
+const event = (id: number, patch: Partial<ExecutionEvent> = {}): ExecutionEvent => ({
   id,
   taskId: "task-1",
   sequence: id,

@@ -1,5 +1,7 @@
-import type { AppData, CollectionName, WorkspaceSaveRequestByCollection } from "../../shared/api/workspaceData.js";
+import type { AppData, CollectionName, WorkspaceSaveRequestByCollection } from "../../shared/api/workspace-contracts.js";
 import type { MarkdownDocument } from "../../shared/domain/documents.js";
+import { MarkdownEntityConflictError } from "../documents/MarkdownEntityErrors.js";
+import { safeSlug } from "../markdown.js";
 import {
   createProjectMarkdownDocument,
   removeEntityMarkdown,
@@ -31,9 +33,22 @@ export class MarkdownEntityService {
     }
 
     const data = await this.readData();
-    const existing = (data[collection] as unknown as Array<Record<string, unknown>>).find((candidate) => candidate.id === item.id);
+    const records = data[collection] as unknown as Array<Record<string, unknown>>;
+    const existing = records.find((candidate) => candidate.id === item.id);
+    if (item.id && !existing) {
+      throw new MarkdownEntityConflictError(`${collection === "agents" ? "Agent" : "Skill"} '${item.id}' no longer exists.`);
+    }
+    const candidateId = safeSlug(typeof item.name === "string" ? item.name : collection);
+    if (!existing && records.some((candidate) => candidate.id === candidateId)) {
+      throw new MarkdownEntityConflictError(`${collection === "agents" ? "Agent" : "Skill"} '${candidateId}' already exists.`);
+    }
     const nextInput = { ...existing, ...item } as Record<string, unknown>;
-    const saved = await writeEntityMarkdown(this.root(), collection as MutableMarkdownCollection, nextInput);
+    const saved = await writeEntityMarkdown(
+      this.root(),
+      collection as MutableMarkdownCollection,
+      nextInput,
+      { existing }
+    );
     const refreshed = await this.readData();
     return ((refreshed[collection] as unknown as Array<Record<string, unknown>>).find((candidate) => candidate.id === saved.id) ?? saved) as unknown as AppData[T][number];
   }
@@ -43,7 +58,7 @@ export class MarkdownEntityService {
     const target = (data[collection] as unknown as Array<Record<string, unknown>>).find((item) => item.id === id);
     const relativePath = typeof target?.relativePath === "string" ? target.relativePath : undefined;
     if (!relativePath) return;
-    await removeEntityMarkdown(this.root(), relativePath);
+    await removeEntityMarkdown(this.root(), collection as MutableMarkdownCollection, relativePath);
   }
 
   async saveProjectDocument(input: {

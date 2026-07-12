@@ -143,9 +143,6 @@ const requireCommand = async (run: CommandRunner, command: string, message: stri
   }
 };
 
-export const checksumFile = async (target: string): Promise<string> =>
-  createHash("sha256").update(await readFile(target)).digest("hex");
-
 const installDirectBundle = async (input: {
   root: string;
   installPath: string;

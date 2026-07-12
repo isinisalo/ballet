@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { emptyBodySchema } from "../../shared/api/runtime-schemas.js";
 import { createApiRouter } from "../http/apiRouter.js";
+import { sendKnownHttpError } from "../http/errors.js";
 import { parseBody } from "../http/validation/httpValidation.js";
 import { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
 import { ExecutionStore } from "../execution/ExecutionStore.js";
@@ -113,6 +114,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   app.get("*", (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     void _next;
+    if (sendKnownHttpError(error, res)) return;
     logger.error("HTTP request failed.", error instanceof Error ? { message: error.message, stack: error.stack } : error);
     res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error." });
   });
@@ -144,7 +146,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   return { app, server, context, store, runtime, configurations, executions, runs, queue, scheduler, shutdown, logger };
 };
 
-const loopbackSecurity = (port: number): express.RequestHandler => (req, res, next) => {
+export const loopbackSecurity = (port: number): express.RequestHandler => (req, res, next) => {
   const host = (req.get("host") ?? "").toLowerCase();
   const hostname = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
   if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(hostname)) {

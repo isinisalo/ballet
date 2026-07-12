@@ -1,8 +1,8 @@
-import type { CliConsoleEvent } from "./cliConsoleTypes";
+import type { ExecutionEvent } from "@shared/api/workspace-contracts";
 
 export const MAX_CLI_CONSOLE_BYTES = 1024 * 1024;
 
-export const visibleConsoleEvent = (event: CliConsoleEvent): CliConsoleEvent | null => {
+export const visibleConsoleEvent = (event: ExecutionEvent): ExecutionEvent | null => {
   if (event.kind !== "think") return event;
   if (event.data?.raw === true) return null;
   const summary = typeof event.data?.summary === "string" ? event.data.summary : event.message;
@@ -10,15 +10,15 @@ export const visibleConsoleEvent = (event: CliConsoleEvent): CliConsoleEvent | n
 };
 
 export const appendConsoleEvents = (
-  current: CliConsoleEvent[],
-  incoming: CliConsoleEvent[],
+  current: ExecutionEvent[],
+  incoming: ExecutionEvent[],
   maxBytes = MAX_CLI_CONSOLE_BYTES
 ) => {
   const seen = new Set(current.map((entry) => entry.id));
   const accepted = incoming
     .filter((entry) => !seen.has(entry.id))
     .map(visibleConsoleEvent)
-    .filter((entry): entry is CliConsoleEvent => Boolean(entry));
+    .filter((entry): entry is ExecutionEvent => Boolean(entry));
   const entries = [...current, ...accepted];
   let bytes = entries.reduce((total, entry) => total + entry.contentBytes, 0);
   let removed = 0;
@@ -30,8 +30,8 @@ export const appendConsoleEvents = (
   return { entries, truncated: removed > 0 };
 };
 
-export const mergeConsoleDeltas = (entries: CliConsoleEvent[]) =>
-  entries.reduce<CliConsoleEvent[]>((lines, entry) => {
+export const mergeConsoleDeltas = (entries: ExecutionEvent[]) =>
+  entries.reduce<ExecutionEvent[]>((lines, entry) => {
     const previous = lines.at(-1);
     if (
       entry.phase === "delta"

@@ -1,34 +1,29 @@
 import { useEffect, useRef } from "react";
-import type { NotificationItem } from "./notifications";
 import type { AppStreamStatus } from "./useAppStream";
 
 type Notify = (input: { type: "info" | "error"; message: string }) => string;
 
 export function useAppStreamNotifications({
-  notifications,
   notify,
   streamStatus
 }: {
-  notifications: NotificationItem[];
   notify: Notify;
   streamStatus: AppStreamStatus;
 }) {
-  const notificationRef = useRef<{ status: "reconnecting" | "disconnected"; id: string } | null>(null);
+  const notifiedStatusRef = useRef<"reconnecting" | "disconnected" | null>(null);
 
   useEffect(() => {
     if (streamStatus !== "reconnecting" && streamStatus !== "disconnected") {
-      notificationRef.current = null;
+      notifiedStatusRef.current = null;
       return;
     }
 
-    const current = notificationRef.current;
-    const visible = current ? notifications.some((notification) => notification.id === current.id) : false;
-    if (current?.status === streamStatus && visible) return;
+    if (notifiedStatusRef.current === streamStatus) return;
 
-    const id = notify({
+    notify({
       type: streamStatus === "disconnected" ? "error" : "info",
       message: `App stream ${streamStatus}. Live updates will resume automatically.`
     });
-    notificationRef.current = { status: streamStatus, id };
-  }, [notifications, notify, streamStatus]);
+    notifiedStatusRef.current = streamStatus;
+  }, [notify, streamStatus]);
 }

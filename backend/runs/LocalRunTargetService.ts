@@ -1,8 +1,8 @@
-import type { AppData } from "../../shared/api/workspaceData.js";
+import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { AgentRuntimeConfiguration } from "../../shared/domain/runtime.js";
-import { getProjectStepTransitionTargets } from "../../shared/domain/automation.js";
 import type { RunTarget, RunTargetsResponse } from "../../shared/domain/runs.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
+import { reachableAgentSteps, relevantLoopThemeIssues } from "./LoopExecutionSnapshot.js";
 import type { RootRunStore } from "./RootRunStore.js";
 
 export class LocalRunTargetService {
@@ -12,7 +12,7 @@ export class LocalRunTargetService {
   ) {}
 
   async list(
-    data: Pick<AppData, "agents" | "automation" | "automationIssues">,
+    data: Pick<AppData, "agents" | "automation" | "automationIssues" | "loopThemeIssues">,
     configurations: Record<string, AgentRuntimeConfiguration>
   ): Promise<RunTargetsResponse> {
     const agents: RunTarget[] = await Promise.all(data.agents.map(async (agent) => {
@@ -27,9 +27,14 @@ export class LocalRunTargetService {
       const issues: RunTarget["issues"] = data.automationIssues.map((issue) => ({
         code: "invalid_config", message: issue.message, path: issue.path
       }));
-      for (const agentId of reachableAgentIds(data, loop.id)) {
+      issues.push(...relevantLoopThemeIssues(data, loop.id).map((issue) => ({
+        code: "invalid_config" as const, message: issue.message, path: issue.path
+      })));
+      const agentIds = new Set(reachableAgentSteps(data, loop.id).map(({ step }) => step.agentId));
+      for (const agentId of agentIds) {
         const agent = data.agents.find((candidate) => candidate.id === agentId);
         if (!agent) issues.push({ code: "missing_agent", message: `Agent ${agentId} does not exist.`, agentId });
+        else if (!agent.enabled) issues.push({ code: "disabled", message: `Agent ${agentId} is disabled.`, agentId });
         else {
           const configuration = configurations[agentId] ?? await this.configurations.get(agentId);
           issues.push(...configuration.issues.map((issue) => ({
@@ -55,23 +60,3 @@ const target = (
   activeRootRunId: roots.active(kind, id)?.rootRunId,
   latestRootRunId: roots.latest(kind, id)?.rootRunId
 });
-
-const reachableAgentIds = (data: Pick<AppData, "automation">, rootLoopId: string): string[] => {
-  const pending = [rootLoopId];
-  const visited = new Set<string>();
-  const ids = new Set<string>();
-  while (pending.length) {
-    const loopId = pending.shift()!;
-    if (visited.has(loopId)) continue;
-    visited.add(loopId);
-    const loop = data.automation.loops.find((candidate) => candidate.id === loopId);
-    if (!loop) continue;
-    for (const step of loop.steps) {
-      if (step.type === "agent") ids.add(step.agentId);
-      for (const transition of getProjectStepTransitionTargets(step)) {
-        if (typeof transition === "object" && "loop" in transition) pending.push(transition.loop);
-      }
-    }
-  }
-  return [...ids];
-};

@@ -18,7 +18,7 @@ import { SkillsView } from "./skills/SkillsView";
 import { RunWorkspace } from "./runs/RunWorkspace";
 import type { RunDashboardState } from "./runs/useRunDashboard";
 import type { RouteState } from "./types";
-import type { WorkspaceNavigationBlocker } from "./useWorkspaceNavigation";
+import type { WorkspaceNavigation } from "./useWorkspaceNavigation";
 
 type WorkspaceMutationCallbacks = ReturnType<typeof useWorkspaceMutations>;
 
@@ -40,8 +40,8 @@ export function WorkspaceRouteOutlet({
   agentExecutionStates: AgentExecutionState[];
   appStreamStatus: AppStreamStatus;
   runDashboard: RunDashboardState;
-  navigate: (path: string) => void;
-  setNavigationBlocker: (blocker: WorkspaceNavigationBlocker | null) => void;
+  navigate: WorkspaceNavigation["navigate"];
+  setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 }) {
   switch (route.view) {
     case "projects":
@@ -49,26 +49,27 @@ export function WorkspaceRouteOutlet({
         <ProjectsOverview
           project={selection.project}
           saveProjectDocument={mutations.saveProjectDocument}
+          setNavigationBlocker={setNavigationBlocker}
         />
       );
     case "project-document":
-      return <ProjectDocumentPage document={selection.selectedProjectDocument} saveProjectDocument={mutations.saveProjectDocument} />;
+      return <ProjectDocumentPage document={selection.selectedProjectDocument} saveProjectDocument={mutations.saveProjectDocument} setNavigationBlocker={setNavigationBlocker} />;
     case "project-goals":
-      return <GoalsPage project={selection.project} selectedGoal={selection.selectedGoal} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
+      return <GoalsPage project={selection.project} selectedGoal={selection.selectedGoal} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} setNavigationBlocker={setNavigationBlocker} />;
     case "project-adrs":
-      return <AdrsPage project={selection.project} selectedAdr={selection.selectedAdr} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
+      return <AdrsPage project={selection.project} selectedAdr={selection.selectedAdr} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} setNavigationBlocker={setNavigationBlocker} />;
     case "project-instructions":
-      return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
+      return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} setNavigationBlocker={setNavigationBlocker} />;
     case "automation":
-      return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} appStreamStatus={appStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
+      return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} saveAutomation={mutations.saveAutomation} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "loop-theme":
       return <LoopThemeEditorView data={data} themeId={route.loopThemeId} sourceThemeId={route.loopThemeSourceId} loopId={route.loopThemeLoopId} updateTheme={mutations.updateLoopTheme} createTheme={mutations.createLoopTheme} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "runtimes":
       return <RuntimeRegistryView runtime={data.runtime} onRefreshed={mutations.refresh} />;
     case "agents":
-      return <AgentsView agent={selection.selectedAgent} agentExecutionStates={agentExecutionStates} runtime={data.runtime} runtimeConfiguration={selection.selectedAgent ? data.agentRuntimeConfigurations[selection.selectedAgent.id] : undefined} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
+      return <AgentsView agent={selection.selectedAgent} agentExecutionStates={agentExecutionStates} runtime={data.runtime} runtimeConfiguration={selection.selectedAgent ? data.agentRuntimeConfigurations[selection.selectedAgent.id] : undefined} save={mutations.save} remove={mutations.remove} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "skills":
-      return <SkillsView skill={selection.selectedSkill} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
+      return <SkillsView skill={selection.selectedSkill} save={mutations.save} remove={mutations.remove} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "run":
       return <RunWorkspace route={route} data={data} agentExecutionStates={agentExecutionStates} appStreamStatus={appStreamStatus} dashboard={runDashboard} navigate={navigate} />;
     default:

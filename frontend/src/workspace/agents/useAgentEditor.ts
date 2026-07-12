@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import type { Agent, AgentSaveRequest } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
+import { useRefreshSafeDraft } from "../useRefreshSafeDraft";
 import { agentTemplate } from "./agentOptions";
 
 export type SaveAgent = (collection: "agents", item: AgentSaveRequest) => Promise<Agent>;
@@ -16,17 +17,18 @@ export function useAgentEditor({ agent, save, remove, onSaved, onNew, onDeleted 
 }) {
   const formId = useId();
   const instructionsId = useId();
-  const [form, setForm] = useState<Partial<Agent>>(agent ?? agentTemplate());
+  const { draft: form, setDraft: setForm, accept, dirty } = useRefreshSafeDraft<Partial<Agent>>(
+    agent ?? agentTemplate(),
+    agent?.id ?? "new-agent"
+  );
   const [validationError, setValidationError] = useState("");
 
   useEffect(() => {
-    const nextForm = agent ?? agentTemplate();
-    setForm(nextForm);
     setValidationError("");
-  }, [agent]);
+  }, [agent?.id]);
 
   const updateForm = (patch: Partial<Agent>) => setForm((current) => ({ ...current, ...patch }));
-  const newAgent = () => { setForm(agentTemplate()); setValidationError(""); onNew?.(); };
+  const newAgent = () => { accept(agentTemplate()); setValidationError(""); onNew?.(); };
 
   const submit = async () => {
     setValidationError("");
@@ -42,7 +44,7 @@ export function useAgentEditor({ agent, save, remove, onSaved, onNew, onDeleted 
         enabled: form.enabled ?? true,
         avatar: form.avatar ?? null
       });
-      setForm(saved);
+      accept(saved);
       onSaved?.(saved);
       return true;
     } catch (error) {
@@ -57,7 +59,7 @@ export function useAgentEditor({ agent, save, remove, onSaved, onNew, onDeleted 
     setValidationError("");
     try {
       await remove("agents", deletedId);
-      setForm(agentTemplate());
+      accept(agentTemplate());
       onDeleted?.(deletedId);
     } catch (error) {
       setValidationError(toErrorMessage(error, "Unable to delete agent."));
@@ -66,7 +68,7 @@ export function useAgentEditor({ agent, save, remove, onSaved, onNew, onDeleted 
   };
 
   return {
-    form, formId, instructionsId, validationError,
+    form, formId, instructionsId, validationError, dirty,
     saveDisabled: !form.name?.trim(),
     updateForm, newAgent, submit, deleteAgent
   };

@@ -36,7 +36,7 @@ export function LoopRunView({
   onRootRunChange?: (rootRunId: string) => void;
   startDisabledReason?: string;
 }) {
-  const { details, preflight, preflightLoading, pendingOperation, error, streamStatus, start, respond, cancel, refresh } = controller;
+  const { details, preflight, pendingOperation, error, streamStatus, start, respond, cancel, refresh } = controller;
   const [showNewRun, setShowNewRun] = useState(false);
   const [selectedStepRunId, setSelectedStepRunId] = useState<string | undefined>();
   const busy = pendingOperation !== null;
@@ -111,9 +111,9 @@ export function LoopRunView({
       {(!details || (terminal && showNewRun)) ? (
         <LoopRunStartPanel
           bypassesSchedule={loop.steps.find((step) => step.id === loop.start)?.type === "scheduled"}
-          disabledReason={startDisabledReason ?? (preflightLoading ? "Checking runtime readiness…" : undefined)}
+          disabledReason={startDisabledReason}
           preflightIssues={preflight?.issues}
-          pending={busy || preflightLoading}
+          pending={busy}
           onStart={startRun}
         />
       ) : null}

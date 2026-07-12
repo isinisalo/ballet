@@ -2,23 +2,24 @@ import { useEffect, useRef, useState } from "react";
 import { toErrorMessage } from "@/lib/errors";
 import { appendConsoleEvents } from "./cliConsoleState";
 import { cliConsoleApi } from "./cliConsoleApi";
-import type { CliConsoleEvent, CliConsoleStatus } from "./cliConsoleTypes";
+import type { ExecutionEvent } from "@shared/api/workspace-contracts";
+
+type CliConsoleStatus = "connecting" | "connected" | "reconnecting" | "stored" | "disconnected";
 
 const reconnectDelays = [1000, 2000, 5000, 10000];
 
-export function useCliConsole({ taskId, active, onRunEvent, onTerminal }: {
+export function useCliConsole({ taskId, active, onTerminal }: {
   taskId?: string;
   active: boolean;
-  onRunEvent?: (payload: unknown) => void;
   onTerminal?: () => void;
 }) {
-  const [entries, setEntries] = useState<CliConsoleEvent[]>([]);
+  const [entries, setEntries] = useState<ExecutionEvent[]>([]);
   const [status, setStatus] = useState<CliConsoleStatus>(active ? "connecting" : "stored");
   const [error, setError] = useState("");
   const [truncated, setTruncated] = useState(false);
   const cursorRef = useRef(0);
-  const callbacksRef = useRef({ onRunEvent, onTerminal });
-  callbacksRef.current = { onRunEvent, onTerminal };
+  const onTerminalRef = useRef(onTerminal);
+  onTerminalRef.current = onTerminal;
 
   useEffect(() => {
     let disposed = false;
@@ -36,7 +37,7 @@ export function useCliConsole({ taskId, active, onRunEvent, onTerminal }: {
       return;
     }
 
-    const append = (event: CliConsoleEvent) => {
+    const append = (event: ExecutionEvent) => {
       if (event.id <= cursorRef.current) return;
       cursorRef.current = event.id;
       setEntries((current) => {
@@ -51,12 +52,11 @@ export function useCliConsole({ taskId, active, onRunEvent, onTerminal }: {
       setStatus(retry ? "reconnecting" : "connecting");
       source = new EventSource(cliConsoleApi.streamUrl(taskId, cursorRef.current));
       source.onopen = () => { retry = 0; setStatus("connected"); };
-      const onConsole = (raw: Event) => append(JSON.parse((raw as MessageEvent<string>).data) as CliConsoleEvent);
+      const onConsole = (raw: Event) => append(JSON.parse((raw as MessageEvent<string>).data) as ExecutionEvent);
       source.onmessage = onConsole;
       source.addEventListener("console", onConsole);
       const onStatus = (raw: Event) => {
         const payload = JSON.parse((raw as MessageEvent<string>).data) as unknown;
-        callbacksRef.current.onRunEvent?.(payload);
         const candidate = payload && typeof payload === "object" && "run" in payload
           ? (payload as { run?: unknown }).run
           : payload;
@@ -67,7 +67,7 @@ export function useCliConsole({ taskId, active, onRunEvent, onTerminal }: {
           terminalReceived = true;
           source?.close();
           setStatus("stored");
-          callbacksRef.current.onTerminal?.();
+          onTerminalRef.current?.();
         }
       };
       source.addEventListener("run", onStatus);

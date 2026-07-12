@@ -6,6 +6,7 @@ import {
 import type { LoopThemeRepository } from "../loop-themes/LoopThemeRepository.js";
 import { loadMarkdownAppData } from "../markdown-adapter.js";
 import {
+  AutomationConflictError,
   AutomationValidationError,
   loadProjectAutomationConfigWithIssues,
   saveProjectAutomationConfig
@@ -44,7 +45,22 @@ export class AutomationService {
         throw new LoopRunConflictError(`Loop ${loopId} cannot be edited while it has an active run.`);
       }
     }
-    const saved = await saveProjectAutomationConfig(this.root(), config, data.agents);
-    return saved;
+    return saveProjectAutomationConfig(this.root(), config, data.agents);
+  }
+
+  async assertAgentRemovable(agentId: string): Promise<void> {
+    const data = await loadMarkdownAppData(this.root());
+    const automation = await loadProjectAutomationConfigWithIssues(this.root(), data.agents);
+    if (automation.issues.length > 0) {
+      throw new AutomationValidationError("Automation config is invalid.", automation.issues);
+    }
+    const references = automation.config.loops.flatMap((loop) => loop.steps
+      .filter((step) => step.type === "agent" && step.agentId === agentId)
+      .map((step) => `${loop.id}:${step.id}`));
+    if (references.length > 0) {
+      throw new AutomationConflictError(
+        `Agent ${agentId} is referenced by automation steps: ${references.join(", ")}.`
+      );
+    }
   }
 }

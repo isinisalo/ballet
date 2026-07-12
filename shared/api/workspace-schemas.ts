@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { agentAvatars } from "../domain/agents.js";
 import {
+  clockTimePattern,
+  isCalendarDate,
+  isIanaTimeZone,
   loopNodeSizes,
   type ProjectAutomationConfig,
   type ProjectStepSchedule
@@ -13,24 +16,26 @@ import {
   loopNodeRenderers,
   type LoopTheme
 } from "../domain/loopThemes.js";
-import {
-  automationFieldLimits,
-  kebabCaseIdPattern
-} from "./automationValidation.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
-
-export const mutableCollections = ["agents", "skills"] as const;
-export const readableCollections = mutableCollections;
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 
-const markdownBackedFields = {
+const editableMarkdownFields = {
   frontmatter: unknownRecordSchema.optional(),
-  body: z.string().optional(),
-  relativePath: z.string().optional(),
-  slug: z.string().optional(),
-  errors: z.array(z.string()).optional()
+  body: z.string().optional()
+};
+
+const serverManagedFields = {
+  relativePath: z.unknown().optional(),
+  slug: z.unknown().optional(),
+  errors: z.unknown().optional()
+};
+
+const omitServerManagedFields = <T extends Record<string, unknown>>(value: T) => {
+  const result = { ...value };
+  for (const key of ["relativePath", "slug", "errors", "createdAt", "updatedAt"]) delete result[key];
+  return result;
 };
 
 const skillSchema = z.object({
@@ -39,8 +44,9 @@ const skillSchema = z.object({
   description: z.string().optional(),
   metadata: stringRecordSchema.optional(),
   enabled: z.boolean().optional(),
-  ...markdownBackedFields
-}).strict();
+  ...editableMarkdownFields,
+  ...serverManagedFields
+}).strict().transform(omitServerManagedFields);
 
 export const projectDocumentSaveSchema = z.object({
   relativePath: z.string().min(1),
@@ -54,10 +60,6 @@ export const projectDocumentCreateSchema = z.object({
 }).strict();
 
 export const collectionParamsSchema = z.object({
-  collection: z.string().min(1)
-}).strict();
-
-export const mutableCollectionParamsSchema = z.object({
   collection: z.string().min(1)
 }).strict();
 
@@ -76,11 +78,12 @@ const agentUpsertSchema = z.object({
   avatar: z.enum(agentAvatars)
     .nullable()
     .optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
+  createdAt: z.unknown().optional(),
+  updatedAt: z.unknown().optional(),
   nicknameCandidates: z.array(z.string()).optional(),
-  ...markdownBackedFields
-}).strict();
+  ...editableMarkdownFields,
+  ...serverManagedFields
+}).strict().transform(omitServerManagedFields);
 
 const collectionUpsertSchemas = {
   agents: agentUpsertSchema,
@@ -94,11 +97,12 @@ export const collectionUpsertSchema = <T extends MutableCollectionName>(
 ): z.ZodType<WorkspaceSaveRequestByCollection[T]> =>
   collectionUpsertSchemas[collection] as unknown as z.ZodType<WorkspaceSaveRequestByCollection[T]>;
 
-const optionalAutomationDescriptionSchema = z.string().max(automationFieldLimits.description.max);
-const automationLoopIdSchema = z.string().min(automationFieldLimits.loopId.min).max(automationFieldLimits.loopId.max);
+const kebabCaseIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const optionalAutomationDescriptionSchema = z.string().max(2000);
+const automationLoopIdSchema = z.string().min(2).max(101);
 const automationStepIdSchema = z.string()
-  .min(automationFieldLimits.stepId.min)
-  .max(automationFieldLimits.stepId.max)
+  .min(1)
+  .max(160)
   .regex(kebabCaseIdPattern, "Step id must be lowercase kebab-case.");
 const kebabLoopIdSchema = automationLoopIdSchema.regex(kebabCaseIdPattern, "Loop id must be lowercase kebab-case.");
 export const loopThemeIdSchema = z.string()
@@ -157,25 +161,9 @@ const executableStepBase = {
   nodeSize: z.enum(loopNodeSizes),
   on: stepTransitionsSchema
 };
-const calendarDatePattern = /^\d{4}-\d{2}-\d{2}$/;
-const clockTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-const isCalendarDate = (value: string): boolean => {
-  if (!calendarDatePattern.test(value)) return false;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-};
-const isTimeZone = (value: string): boolean => {
-  if (/^[+-]\d{2}:\d{2}$/.test(value)) return false;
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
-};
 const calendarDateSchema = z.string().refine(isCalendarDate, "Expected a valid date in YYYY-MM-DD format.");
 const clockTimeSchema = z.string().regex(clockTimePattern, "Expected a valid time in HH:mm format.");
-const timeZoneSchema = z.string().min(1).refine(isTimeZone, "Expected a valid IANA time zone.");
+const timeZoneSchema = z.string().min(1).refine(isIanaTimeZone, "Expected a valid IANA time zone.");
 const scheduleBase = {
   time: clockTimeSchema,
   timeZone: timeZoneSchema

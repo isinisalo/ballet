@@ -11,7 +11,6 @@ export interface ProjectContext {
   readonly settingsPath: string;
   readonly worktreesRoot: string;
   readonly logsPath: string;
-  readonly repositoryUrl: string;
   readonly headSha: string;
   readonly instanceId: string;
   readonly serviceLabel: string;
@@ -42,10 +41,6 @@ export const resolveProjectContext = async (options: ResolveProjectContextOption
   assertStateRoot(gitDir, stateRoot);
 
   const instanceId = await readOrCreateInstanceId(stateRoot);
-  const repositoryUrl = await runGit(["remote", "get-url", "origin"], {
-    cwd: gitRoot,
-    allowedExitCodes: [2, 128]
-  }).then((result) => result.exitCode === 0 && result.stdout.trim() ? result.stdout.trim() : `file://${gitRoot}`);
   const suffix = createHash("sha256").update(gitRoot).digest("hex").slice(0, 16);
   return Object.freeze({
     root: gitRoot,
@@ -55,7 +50,6 @@ export const resolveProjectContext = async (options: ResolveProjectContextOption
     settingsPath: path.join(stateRoot, "settings.json"),
     worktreesRoot: path.join(stateRoot, "worktrees"),
     logsPath: path.join(stateRoot, "logs", "ballet.log"),
-    repositoryUrl,
     headSha,
     instanceId,
     serviceLabel: `ai.ballet.${suffix}`

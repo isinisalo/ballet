@@ -5,12 +5,6 @@ type ErrorResponseBody = {
   issues?: Array<{ path?: string; message?: string }>;
 };
 
-let csrfToken = "";
-
-export const setCsrfToken = (value?: string) => {
-  csrfToken = value ?? "";
-};
-
 const parseJsonBody = async <T,>(response: Response): Promise<T | undefined> => {
   const text = await response.text();
   if (!text.trim()) return undefined;
@@ -24,10 +18,6 @@ const parseJsonBody = async <T,>(response: Response): Promise<T | undefined> => 
 export const request = async <T>(url: string, init: RequestInit = {}): Promise<T> => {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const method = (init.method ?? "GET").toUpperCase();
-  if (!["GET", "HEAD", "OPTIONS"].includes(method) && csrfToken) {
-    headers.set("X-CSRF-Token", csrfToken);
-  }
   const response = await fetch(url, { credentials: "same-origin", ...init, headers });
   if (!response.ok) {
     const body = (await parseJsonBody<ErrorResponseBody>(response)) ?? {};

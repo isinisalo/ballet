@@ -14,7 +14,7 @@ import { activeAgentRunStatuses, useAgentRun } from "./useAgentRun";
 const activeRootStatuses = new Set(["queued", "running", "waiting_for_human", "finalizing"]);
 
 export function AgentRunPane({ agentId, rootRunId, rootDetail, disabledReason, onRootRunChange }: { agentId: string; rootRunId?: string; rootDetail?: RootRunDetail; disabledReason?: string; onRootRunChange?: (rootRunId: string) => void }) {
-  const controller = useAgentRun(agentId, rootRunId);
+  const controller = useAgentRun(agentId, rootRunId ?? rootDetail?.rootRunId, rootDetail);
   const [input, setInput] = useState("");
   const [showNewRun, setShowNewRun] = useState(false);
   const detail = controller.detail ?? rootDetail;
@@ -50,7 +50,7 @@ function RunHeader({ detail, task }: { detail?: RootRunDetail; task?: ExecutionT
 function RunOutput({ agentId, detail, task, active, onTerminal }: { agentId: string; detail: RootRunDetail; task: ExecutionTask; active: boolean; onTerminal: () => void }) {
   const report = detail.finalization?.report;
   const refresh = () => { onTerminal(); window.setTimeout(onTerminal, 750); window.setTimeout(onTerminal, 2_000); };
-  return <div className="grid min-h-[32rem] md:grid-cols-2"><AgentRunInstructions task={task} agentId={agentId} /><div className="min-w-0 overflow-y-auto p-3"><CliRunConsole taskId={task.id} provider={task.spec.runtime.provider} active={active} onRunEvent={onTerminal} onTerminal={refresh} /><AgentRunDetails detail={detail} task={task} />{report ? <p className="border-t border-divider-strong bg-panel-section p-3 font-mono text-[0.65rem] text-muted-foreground">finalization: {report.commitSha ? `commit ${report.commitSha}` : report.retained ? `retained ${report.worktreePath}` : "reported"} · {changedFilesLabel(report.changedFiles)}</p> : null}{detail.errorMessage || task.errorMessage ? <p className="border-t border-divider-strong bg-destructive/5 p-3 font-mono text-[0.68rem] text-destructive">{detail.errorCode ?? task.errorCode ? `${detail.errorCode ?? task.errorCode}: ` : ""}{detail.errorMessage ?? task.errorMessage}</p> : null}</div></div>;
+  return <div className="grid min-h-[32rem] md:grid-cols-2"><AgentRunInstructions task={task} agentId={agentId} /><div className="min-w-0 overflow-y-auto p-3"><CliRunConsole taskId={task.id} provider={task.spec.runtime.provider} active={active} onTerminal={refresh} /><AgentRunDetails detail={detail} task={task} />{report ? <p className="border-t border-divider-strong bg-panel-section p-3 font-mono text-[0.65rem] text-muted-foreground">finalization: {report.commitSha ? `commit ${report.commitSha}` : report.retained ? `retained ${report.worktreePath}` : "reported"} · {changedFilesLabel(report.changedFiles)}</p> : null}{detail.errorMessage || task.errorMessage ? <p className="border-t border-divider-strong bg-destructive/5 p-3 font-mono text-[0.68rem] text-destructive">{detail.errorCode ?? task.errorCode ? `${detail.errorCode ?? task.errorCode}: ` : ""}{detail.errorMessage ?? task.errorMessage}</p> : null}</div></div>;
 }
 
 function RunControls({ active, terminal, showNewRun, busy, cancelling, onCancel, onNew }: { active: boolean; terminal: boolean; showNewRun: boolean; busy: boolean; cancelling: boolean; onCancel: () => void; onNew: () => void }) {

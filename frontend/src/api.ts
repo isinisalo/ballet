@@ -1,8 +1,7 @@
 import type {
   AppData,
   CollectionName,
-  WorkspaceSaveRequestByCollection,
-  ExecutionEventPage
+  WorkspaceSaveRequestByCollection
 } from "@shared/api/workspace-contracts";
 import type { CreateLoopThemeResponse, LoopTheme, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import type { MarkdownDocument } from "@shared/api/workspace-contracts";
@@ -25,8 +24,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ theme, assignToLoopId })
     }),
-  getExecutionEvents: (taskId: string, after = 0, limit = 500) =>
-    request<ExecutionEventPage>(`/api/execution-tasks/${encodeURIComponent(taskId)}/events?after=${after}&limit=${limit}`),
   save: <T extends CollectionName>(collection: T, item: WorkspaceSaveRequestByCollection[T]) =>
     request<AppData[T][number]>(`/api/${collection}`, {
       method: "POST",
@@ -43,5 +40,5 @@ export const api = {
       body: JSON.stringify(document)
     }),
   remove: (collection: CollectionName, id: string) =>
-    request<void>(`/api/${collection}/${id}`, { method: "DELETE" })
+    request<void>(`/api/${collection}/${encodeURIComponent(id)}`, { method: "DELETE" })
 };

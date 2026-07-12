@@ -3,17 +3,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { mergeConsoleDeltas } from "./cliConsoleState";
-import type { CliConsoleEvent, CliConsoleKind, CliConsoleProvider } from "./cliConsoleTypes";
+import type { ExecutionEvent, RuntimeProvider } from "@shared/api/workspace-contracts";
 import { useCliConsole } from "./useCliConsole";
 
-export function CliRunConsole({ taskId, provider, active, onRunEvent, onTerminal }: {
+type ExecutionEventKind = ExecutionEvent["kind"];
+
+export function CliRunConsole({ taskId, provider, active, onTerminal }: {
   taskId?: string;
-  provider?: CliConsoleProvider;
+  provider?: RuntimeProvider;
   active: boolean;
-  onRunEvent?: (payload: unknown) => void;
   onTerminal?: () => void;
 }) {
-  const console = useCliConsole({ taskId, active, onRunEvent, onTerminal });
+  const console = useCliConsole({ taskId, active, onTerminal });
   const lines = useMemo(() => mergeConsoleDeltas(console.entries), [console.entries]);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
@@ -64,7 +65,7 @@ export function CliRunConsole({ taskId, provider, active, onRunEvent, onTerminal
   );
 }
 
-function ConsoleLine({ entry }: { entry: CliConsoleEvent }) {
+function ConsoleLine({ entry }: { entry: ExecutionEvent }) {
   return (
     <div className="grid grid-cols-[5.25rem_3.75rem_3.5rem_minmax(0,1fr)] items-start gap-2">
       <time className="text-muted-foreground/70">[{consoleTime(entry.createdAt)}]</time>
@@ -83,5 +84,5 @@ const consoleTime = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
 };
-const kindLabel = (kind: CliConsoleKind) => ({ system: "SYSTEM", think: "THINK", agent: "AGENT", command: "CMD", output: "OUTPUT", file: "FILE", tool: "TOOL", info: "INFO", warn: "WARN", error: "ERROR" })[kind];
-const kindClassName = (kind: CliConsoleKind) => cn("font-semibold", ["system", "command", "tool"].includes(kind) && "text-primary", kind === "think" && "text-tertiary", ["agent", "file", "info"].includes(kind) && "text-secondary", kind === "output" && "text-muted-foreground", kind === "warn" && "text-tertiary", kind === "error" && "text-destructive");
+const kindLabel = (kind: ExecutionEventKind) => ({ system: "SYSTEM", think: "THINK", agent: "AGENT", command: "CMD", output: "OUTPUT", file: "FILE", tool: "TOOL", info: "INFO", warn: "WARN", error: "ERROR" })[kind];
+const kindClassName = (kind: ExecutionEventKind) => cn("font-semibold", ["system", "command", "tool"].includes(kind) && "text-primary", kind === "think" && "text-tertiary", ["agent", "file", "info"].includes(kind) && "text-secondary", kind === "output" && "text-muted-foreground", kind === "warn" && "text-tertiary", kind === "error" && "text-destructive");

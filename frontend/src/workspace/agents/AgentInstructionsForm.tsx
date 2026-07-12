@@ -46,7 +46,7 @@ export function AgentInstructionsForm({ editor }: { editor: AgentEditorState }) 
         </div>
       </div>
       <footer className="flex min-h-14 items-center justify-end border-t border-divider-strong bg-panel-section px-5 py-3 sm:px-6">
-        <CrudActions formId={editor.formId} newLabel="New" saveLabel="Save agent" deleteLabel="Delete agent" id={editor.form.id} disabled={editor.saveDisabled} deleteType="agent" resourceName={editor.form.name} onNew={editor.newAgent} onDelete={editor.deleteAgent} showNew={false} />
+        <CrudActions formId={editor.formId} saveLabel="Save agent" deleteLabel="Delete agent" id={editor.form.id} disabled={editor.saveDisabled} deleteType="agent" resourceName={editor.form.name} onDelete={editor.deleteAgent} />
       </footer>
     </form>
   );

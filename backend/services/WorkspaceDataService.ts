@@ -1,4 +1,4 @@
-import type { AppData } from "../../shared/api/workspaceData.js";
+import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { loadMarkdownAppData } from "../documents/markdownAppDataLoader.js";
 import type { WorkspaceContentData } from "../documents/markdownAppDataLoader.js";
 import { loadProjectAutomationConfigWithIssues } from "../automation.js";

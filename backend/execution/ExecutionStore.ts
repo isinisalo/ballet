@@ -8,6 +8,7 @@ import type {
   ExecutionTask,
   ExecutionTaskStatus
 } from "../../shared/domain/runtime.js";
+import { ExecutionTaskNotFoundError } from "./ExecutionErrors.js";
 
 const MAX_RETAINED_BYTES = 1024 * 1024;
 
@@ -49,7 +50,7 @@ export class ExecutionStore {
 
   require(taskId: string): ExecutionTask {
     const task = this.get(taskId);
-    if (!task) throw new Error(`Execution task ${taskId} was not found.`);
+    if (!task) throw new ExecutionTaskNotFoundError(`Execution task ${taskId} was not found.`);
     return task;
   }
 

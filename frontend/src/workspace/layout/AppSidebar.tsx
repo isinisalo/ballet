@@ -1,13 +1,5 @@
 import type { Agent, AgentExecutionState, ProjectAutomationConfig, ProjectDocumentTreeNode, RuntimeConfigurationIssue, Skill } from "@shared/api/workspace-contracts";
-import {
-  Sidebar as ShadcnSidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarRail
-} from "@/components/ui/sidebar";
+import { Sidebar as ShadcnSidebar } from "@/components/ui/sidebar";
 import type { RouteState } from "../types";
 import { balletModeFromRoute } from "../routing";
 import { pathForBalletMode } from "../balletModeNavigation";
@@ -45,14 +37,14 @@ export function AppSidebar({
 }) {
   const mode = balletModeFromRoute(route);
   return (
-    <ShadcnSidebar collapsible="icon">
-      <SidebarHeader>
+    <ShadcnSidebar>
+      <div data-slot="sidebar-header" data-sidebar="header" className="flex flex-col gap-2 p-2">
         <BalletModeSelect mode={mode} onChange={(nextMode) => navigate(pathForBalletMode({ route, nextMode, agents }))} />
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
+      </div>
+      <div data-slot="sidebar-content" data-sidebar="content" className="no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto group-data-[collapsible=icon]:overflow-hidden">
+        <div data-slot="sidebar-group" data-sidebar="group" className="relative flex w-full min-w-0 flex-col p-2">
+          <div data-slot="sidebar-group-content" data-sidebar="group-content" className="w-full text-sm">
+            <ul data-slot="sidebar-menu" data-sidebar="menu" className="flex w-full min-w-0 flex-col gap-0">
               {mode === "run" ? <RunSidebar route={route} dashboard={runDashboard} navigate={navigate} /> : (
                 <>
                   <ConfigureGitStatus state={configureGitState} />
@@ -62,11 +54,10 @@ export function AppSidebar({
                   <SidebarProjectMenu route={route} projectDocumentTree={projectDocumentTree} navigate={navigate} />
                 </>
               )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarRail />
+            </ul>
+          </div>
+        </div>
+      </div>
     </ShadcnSidebar>
   );
 }

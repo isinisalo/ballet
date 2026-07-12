@@ -40,7 +40,7 @@ export const inspectGitCheckout = async (root: string, signal?: AbortSignal): Pr
   };
 };
 
-const parsePorcelainPaths = (output: string): string[] => {
+export const parsePorcelainPaths = (output: string): string[] => {
   const fields = output.split("\0").filter(Boolean);
   const paths: string[] = [];
   for (let index = 0; index < fields.length; index += 1) {

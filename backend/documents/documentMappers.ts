@@ -1,26 +1,14 @@
 import { normalizeAgentAvatar, type Agent } from "../../shared/domain/agents.js";
 import type { EntityStatus, MarkdownDocument, Project, Skill } from "../../shared/domain/documents.js";
 import { agentSkillsFromFrontmatter } from "./skillLookup.js";
+import { booleanValue, stringArray, stringValue } from "./documentValues.js";
 
-const now = () => new Date().toISOString();
-
-const stringValue = (value: unknown, fallback = ""): string =>
-  typeof value === "string" ? value : value === undefined || value === null ? fallback : String(value);
-
-const booleanValue = (value: unknown, fallback = false): boolean =>
-  typeof value === "boolean" ? value : typeof value === "string" ? value.toLowerCase() === "true" : fallback;
-
-const stringArray = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.map((item) => stringValue(item)).filter(Boolean)
-    : typeof value === "string"
-      ? value.split(",").map((item) => item.trim()).filter(Boolean)
-      : [];
+const missingDate = new Date(0).toISOString();
 
 const validEntityStatus = (value: unknown): EntityStatus =>
   ["active", "paused", "archived"].includes(stringValue(value)) ? stringValue(value) as EntityStatus : "active";
 
-const dateValue = (value: unknown): string => stringValue(value, now());
+const dateValue = (value: unknown): string => stringValue(value, missingDate);
 
 const bodyPreview = (body: string): string => body.replace(/^#+\s+/gm, "").split(/\n{2,}/)[0]?.trim() ?? "";
 

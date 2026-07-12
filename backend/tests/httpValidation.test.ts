@@ -4,19 +4,8 @@ import {
     collectionUpsertSchema,
     projectDocumentSaveSchema
 } from "../../shared/api/workspace-schemas.js";
-import { HttpValidationError, parseUnknown } from "../http/validation/httpValidation.js";
-
-const expectValidationError = (callback: () => unknown, path: string) => {
-  expect(callback).toThrow(HttpValidationError);
-  try {
-    callback();
-  } catch (error) {
-    expect(error).toBeInstanceOf(HttpValidationError);
-    expect((error as HttpValidationError).issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path })
-    ]));
-  }
-};
+import { parseUnknown } from "../http/validation/httpValidation.js";
+import { expectValidationError } from "./expectValidationError.js";
 
 describe("HTTP Zod validation", () => {
   it("accepts valid project document saves and rejects unknown top-level fields", () => {
@@ -77,7 +66,12 @@ describe("HTTP Zod validation", () => {
 
     expect(parseUnknown(collectionUpsertSchema("agents"), {
       id: "developer",
-      avatar: null
+      avatar: null,
+      relativePath: "README.md",
+      slug: "forged",
+      errors: ["forged"],
+      createdAt: "forged",
+      updatedAt: "forged"
     })).toEqual({ id: "developer", avatar: null });
 
     expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {

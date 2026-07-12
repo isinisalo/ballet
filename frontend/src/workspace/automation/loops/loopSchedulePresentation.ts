@@ -1,4 +1,10 @@
-import type { ProjectScheduleWeekday, ProjectStepSchedule } from "@shared/api/workspace-contracts";
+import {
+  clockTimePattern,
+  isCalendarDate,
+  isIanaTimeZone,
+  type ProjectScheduleWeekday,
+  type ProjectStepSchedule
+} from "@shared/api/workspace-contracts";
 
 export type RecurringStepSchedule = Extract<ProjectStepSchedule, { kind: "recurring" }>;
 export type ScheduleField = "date" | "startsOn" | "time" | "timeZone" | "weekdays" | "dayOfMonth";
@@ -50,10 +56,10 @@ export function changeScheduleCadence(schedule: RecurringStepSchedule, cadence: 
 
 export function validateSchedule(schedule: ProjectStepSchedule): ScheduleErrors {
   const errors: ScheduleErrors = {};
-  if (schedule.kind === "once" && !validDate(schedule.date)) errors.date = "Enter a valid start date.";
-  if (schedule.kind === "recurring" && !validDate(schedule.startsOn)) errors.startsOn = "Enter a valid start date.";
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(schedule.time)) errors.time = "Use a 24-hour time (HH:mm).";
-  if (!validTimeZone(schedule.timeZone)) errors.timeZone = "Enter a valid IANA time zone.";
+  if (schedule.kind === "once" && !isCalendarDate(schedule.date)) errors.date = "Enter a valid start date.";
+  if (schedule.kind === "recurring" && !isCalendarDate(schedule.startsOn)) errors.startsOn = "Enter a valid start date.";
+  if (!clockTimePattern.test(schedule.time)) errors.time = "Use a 24-hour time (HH:mm).";
+  if (!isIanaTimeZone(schedule.timeZone)) errors.timeZone = "Enter a valid IANA time zone.";
   if (schedule.kind === "recurring" && schedule.cadence === "weekly" && schedule.weekdays.length === 0) {
     errors.weekdays = "Select at least one weekday.";
   }
@@ -78,26 +84,6 @@ export const scheduleWeekdayLabel = (weekday: ProjectScheduleWeekday) => weekday
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-}
-
-function validTimeZone(value: string) {
-  if (!value.trim() || /^[+-]\d{2}:\d{2}$/.test(value)) return false;
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function validDate(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 const localDate = (value: Date) => `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;

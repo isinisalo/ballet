@@ -14,18 +14,39 @@ export function useAgentRuntimeConfiguration(agentId: string, runtime: LocalRunt
   const revisionRef = useRef(0);
   const requestRef = useRef(0);
   const queueRef = useRef(Promise.resolve());
+  const generationRef = useRef(0);
+  const agentIdRef = useRef(agentId);
+  const initialRef = useRef(initial);
+  const receivedFormFingerprintRef = useRef(JSON.stringify(formFromRuntimeConfiguration(initial)));
+  initialRef.current = initial;
+  const initialFingerprint = JSON.stringify(initial);
 
   const applyConfiguration = useCallback((next?: AgentRuntimeConfiguration) => {
     const nextForm = formFromRuntimeConfiguration(next);
     setConfiguration(next);
     setForm(nextForm);
     formRef.current = nextForm;
+    receivedFormFingerprintRef.current = JSON.stringify(nextForm);
     revisionRef.current += 1;
   }, []);
 
   useEffect(() => {
-    applyConfiguration(initial);
-  }, [agentId, applyConfiguration, initial]);
+    const next = initialRef.current;
+    const nextFormFingerprint = JSON.stringify(formFromRuntimeConfiguration(next));
+    const previousFormFingerprint = receivedFormFingerprintRef.current;
+    const agentChanged = agentIdRef.current !== agentId;
+    receivedFormFingerprintRef.current = nextFormFingerprint;
+    setConfiguration(next);
+    if (agentChanged) {
+      agentIdRef.current = agentId;
+      generationRef.current += 1;
+      requestRef.current += 1;
+      queueRef.current = Promise.resolve();
+      setSaving(false);
+      setError("");
+    }
+    if (agentChanged || JSON.stringify(formRef.current) === previousFormFingerprint) applyConfiguration(next);
+  }, [agentId, applyConfiguration, initialFingerprint]);
 
   const replaceForm = (next: AgentExecutionFormValue) => {
     const revision = ++revisionRef.current;
@@ -36,20 +57,20 @@ export function useAgentRuntimeConfiguration(agentId: string, runtime: LocalRunt
   const updateForm = (patch: Partial<AgentExecutionFormValue>) => replaceForm({ ...formRef.current, ...patch });
   const save = (next = formRef.current, revision = revisionRef.current) => {
     const requestId = ++requestRef.current;
+    const generation = generationRef.current;
     setSaving(true);
     setError("");
     const task = async () => {
       try {
         if (!next.provider) return false;
         const saved = await agentExecutionApi.saveRuntime(agentId, { provider: next.provider, model: next.model, reasoning: next.reasoning, policy: next.policy });
-        setConfiguration(saved);
-        if (revision === revisionRef.current) applyConfiguration(saved);
+        if (generation === generationRef.current && revision === revisionRef.current) applyConfiguration(saved);
         return true;
       } catch (cause) {
-        if (revision === revisionRef.current) setError(toErrorMessage(cause, "Unable to save agent execution configuration."));
+        if (generation === generationRef.current && revision === revisionRef.current) setError(toErrorMessage(cause, "Unable to save agent execution configuration."));
         return false;
       } finally {
-        if (requestId === requestRef.current) setSaving(false);
+        if (generation === generationRef.current && requestId === requestRef.current) setSaving(false);
       }
     };
     const pending = queueRef.current.then(task, task);
@@ -70,5 +91,5 @@ export function useAgentRuntimeConfiguration(agentId: string, runtime: LocalRunt
       policy: preservesIntent ? formRef.current.policy : { network: false, readOnlyRoots: [] }
     });
   };
-  return { providers: runtime.providers, configuration, form, loading: false, saving, error, updateForm, updateAndSave, selectProvider, saveIfValid: () => executionFormError(formRef.current, runtime.providers) ? Promise.resolve(false) : save() };
+  return { providers: runtime.providers, configuration, form, saving, error, updateForm, updateAndSave, selectProvider, saveIfValid: () => executionFormError(formRef.current, runtime.providers) ? Promise.resolve(false) : save() };
 }

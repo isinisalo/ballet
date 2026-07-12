@@ -24,7 +24,7 @@ export function ExecutionSelectionFields({ compact, editor, provider, onProvider
   const reasoning = provider ? reasoningOptions(provider, editor.form.model) : editor.form.reasoning ? [{ value: editor.form.reasoning, label: editor.form.reasoning }] : [];
   return (
     <div className={compact ? "grid gap-3" : "grid gap-3 sm:grid-cols-3"}>
-      <ExecutionSelect compact={compact} label="Provider" value={editor.form.provider} placeholder="Select provider" disabled={editor.loading} options={editor.providers.map((item) => ({ value: item.provider, label: providerLabel(item.provider) }))} onChange={(value) => onProviderChange(value as RuntimeProvider)} />
+      <ExecutionSelect compact={compact} label="Provider" value={editor.form.provider} placeholder="Select provider" options={editor.providers.map((item) => ({ value: item.provider, label: providerLabel(item.provider) }))} onChange={(value) => onProviderChange(value as RuntimeProvider)} />
       <ExecutionSelect compact={compact} label="Model" value={editor.form.model} placeholder="Select model" disabled={!provider} options={models} onChange={onModelChange} />
       <ExecutionSelect compact={compact} label="Reasoning effort" value={editor.form.reasoning} placeholder="Select effort" disabled={!provider || !editor.form.model} options={reasoning} onChange={onReasoningChange} />
     </div>
@@ -54,7 +54,7 @@ export function ExecutionPolicyFields({ agentId, compact, editor, provider, adva
   );
 }
 
-function ExecutionSelect({ label, value, placeholder, disabled, options, onChange, compact }: { label: string; value: string; placeholder: string; disabled: boolean; options: Array<{ value: string; label: string }>; onChange: (value: string) => void; compact: boolean }) {
+function ExecutionSelect({ label, value, placeholder, disabled = false, options, onChange, compact }: { label: string; value: string; placeholder: string; disabled?: boolean; options: Array<{ value: string; label: string }>; onChange: (value: string) => void; compact: boolean }) {
   const id = useId();
   const select = <Select value={value} disabled={disabled} onValueChange={onChange}><SelectTrigger id={id} className={compact ? "h-8 w-full font-mono text-xs" : "w-full"}><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent align="start"><SelectGroup>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent></Select>;
   return compact ? <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 text-xs leading-4"><FieldLabel htmlFor={id} className="text-muted-foreground">{label}</FieldLabel>{select}</div> : <Field className="gap-1.5"><FieldLabel htmlFor={id}>{label}</FieldLabel>{select}</Field>;

@@ -1,5 +1,5 @@
 // This integration suite intentionally shares filesystem fixtures across Markdown and TOML round-trip scenarios.
-import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, readFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -15,7 +15,7 @@ import {
   tomlSource,
   writeMarkdownDocument
 } from "../markdown.js";
-import { createProjectMarkdownDocument, loadMarkdownAppData, writeEntityMarkdown, writeProjectMarkdownDocument } from "../markdown-adapter.js";
+import { createProjectMarkdownDocument, loadMarkdownAppData, removeEntityMarkdown, writeEntityMarkdown, writeProjectMarkdownDocument } from "../markdown-adapter.js";
 
 const fixtureRoot = path.resolve(process.cwd(), ".fixture-ballet-project");
 const tempRoots: string[] = [];
@@ -50,9 +50,11 @@ describe("Markdown parsing", () => {
   });
 
   it("serializes frontmatter before Markdown body", () => {
-    const source = markdownSource({ id: "doc-1", title: "Doc" }, "Body");
+    const body = "\n    const indented = true;\n\nTrailing.\n";
+    const source = markdownSource({ id: "doc-1", title: "Doc" }, body);
 
-    expect(source).toContain("---\nid: doc-1\ntitle: Doc\n---\n\nBody");
+    expect(source).toBe(`---\nid: doc-1\ntitle: Doc\n---\n${body}`);
+    expect(parseMarkdownDocument(source).body).toBe(body);
   });
 });
 
@@ -116,11 +118,26 @@ describe("Markdown collection loading", () => {
     expect(agent.body).toContain("Design architecture");
   });
 
-  it("loads repo skills from SKILL.md files with stable folder ids", async () => {
-    const skills = await loadSkills(fixtureRoot);
+  it("keeps agent timestamps stable when legacy TOML omits them", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".codex/agents"), { recursive: true });
+    await writeFile(path.join(root, ".codex/agents/reviewer.toml"), 'name = "Reviewer"\n', "utf8");
 
-    expect(skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
-    expect(skills[0]?.title).toBe("fixture-skill");
+    const first = (await loadMarkdownAppData(root)).agents[0];
+    const second = (await loadMarkdownAppData(root)).agents[0];
+
+    expect(first?.createdAt).toBe(second?.createdAt);
+    expect(first?.updatedAt).toBe(second?.updatedAt);
+  });
+
+  it("uses the skill folder as the canonical id", async () => {
+    const root = await tempRoot();
+    await mkdir(path.join(root, ".agents/skills/folder-id"), { recursive: true });
+    await writeFile(path.join(root, ".agents/skills/folder-id/SKILL.md"), "---\nid: forged-id\nname: Skill\n---\nBody", "utf8");
+    const skills = await loadSkills(root);
+
+    expect(skills[0]?.id).toBe("folder-id");
+    expect(skills[0]?.title).toBe("Skill");
   });
 
   it("loads agent TOML skills.config entries with resolved SKILL.md names and disabled state", async () => {
@@ -167,7 +184,9 @@ enabled = true
       relativePath: ".agents/skills/deprecated-review/SKILL.md"
     });
   });
+});
 
+describe("Markdown collection fallbacks and project tree", () => {
   it("falls back to the skills.config path basename when no SKILL.md matches", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".codex/agents"), { recursive: true });
@@ -257,7 +276,9 @@ path = "../.agents/skills/missing-skill"
     expect(invalid?.errors?.length).toBeGreaterThan(0);
     expect(invalid?.body).toContain("This body should still be available");
   });
+});
 
+describe("Markdown path safety and project document writes", () => {
   it("blocks path traversal outside the project root", async () => {
     await expect(readMarkdownDocument({ root: fixtureRoot, relativePath: "../package.json" })).rejects.toThrow("Path traversal blocked");
     await expect(readMarkdownDocument({ root: fixtureRoot, relativePath: "../outside.md" })).rejects.toThrow("Path traversal blocked");
@@ -265,6 +286,36 @@ path = "../.agents/skills/missing-skill"
     await expect(writeMarkdownDocument({ root: fixtureRoot, relativePath: "../outside.md", frontmatter: {}, body: "" })).rejects.toThrow("Path traversal blocked");
     await expect(writeEntityMarkdown(fixtureRoot, "agents", { relativePath: "../outside.toml", name: "Bad", description: "Bad", instructions: "Bad" })).rejects.toThrow("Path traversal blocked");
     await expect(writeEntityMarkdown(fixtureRoot, "skills", { relativePath: "../SKILL.md", name: "Bad", description: "Bad", body: "Bad" })).rejects.toThrow("Path traversal blocked");
+  });
+
+  it("blocks entity paths outside their collection and through symbolic links", async () => {
+    const root = await tempRoot();
+    const outside = await tempRoot();
+
+    await expect(writeEntityMarkdown(root, "skills", {
+      relativePath: "README.md", name: "Bad", description: "Bad", body: "Bad"
+    })).rejects.toThrow("Entity document must be inside .agents/skills.");
+
+    await symlink(outside, path.join(root, ".agents"));
+    await mkdir(path.join(outside, "skills/escaped"), { recursive: true });
+    await writeFile(path.join(outside, "skills/escaped/SKILL.md"), "outside", "utf8");
+    await expect(writeEntityMarkdown(root, "skills", {
+      name: "Escaped", description: "Bad", body: "Bad"
+    })).rejects.toThrow("Symbolic links are not allowed");
+    await expect(readMarkdownDocument({ root, relativePath: ".agents/skills/escaped/SKILL.md" }))
+      .rejects.toThrow("Symbolic links are not allowed");
+    await expect(removeEntityMarkdown(root, "skills", ".agents/skills/escaped/SKILL.md"))
+      .rejects.toThrow("Symbolic links are not allowed");
+    await expect(readFile(path.join(outside, "skills/escaped/SKILL.md"), "utf8")).resolves.toBe("outside");
+  });
+
+  it("rejects a new entity when its canonical slug already exists", async () => {
+    const root = await tempRoot();
+    const input = { name: "Release Review", description: "Review", instructions: "Review releases" };
+
+    await writeEntityMarkdown(root, "agents", input);
+
+    await expect(writeEntityMarkdown(root, "agents", input)).rejects.toThrow("Agent 'release-review' already exists.");
   });
 
   it("writes Markdown inside the active project root", async () => {
@@ -329,7 +380,9 @@ path = "../.agents/skills/missing-skill"
       title: "Invalid directory"
     })).rejects.toThrow("Project document directory must not include a file extension.");
   });
+});
 
+describe("Project Markdown updates", () => {
   it("saves the root Ballet project Markdown document in place", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".ballet"), { recursive: true });
@@ -395,7 +448,9 @@ path = "../.agents/skills/missing-skill"
       body: ""
     })).rejects.toThrow();
   });
+});
 
+describe("Markdown entity persistence", () => {
   it("writes TOML agents while preserving unknown nested config", async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, ".codex/agents"), { recursive: true });

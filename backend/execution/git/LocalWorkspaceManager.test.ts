@@ -58,6 +58,9 @@ describe("LocalWorkspaceManager", () => {
     const prepared = await fixture.manager.prepare("root-success");
     await writeFile(path.join(prepared.path, "step-one.txt"), "one\n");
     await writeFile(path.join(prepared.path, "step-two.txt"), "two\n");
+    await writeFile(path.join(prepared.path, " leading name.txt"), "space\n");
+    await writeFile(path.join(prepared.path, "line\nbreak.txt"), "newline\n");
+    await runGit(["mv", "README.md", "renamed file.md"], { cwd: prepared.path });
     const run = storedRun("root-success", prepared);
 
     const first = await fixture.manager.finalize(run, true);
@@ -69,7 +72,9 @@ describe("LocalWorkspaceManager", () => {
       branch: prepared.branch,
       worktreePath: prepared.path,
       commitSha: expect.stringMatching(/^[0-9a-f]{40}$/),
-      changedFiles: expect.arrayContaining(["step-one.txt", "step-two.txt"])
+      changedFiles: expect.arrayContaining([
+        "step-one.txt", "step-two.txt", " leading name.txt", "line\nbreak.txt", "README.md", "renamed file.md"
+      ])
     });
     expect(replayed.commitSha).toBe(first.commitSha);
     expect(await stat(prepared.path)).toBeTruthy();

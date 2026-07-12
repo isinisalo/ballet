@@ -35,6 +35,10 @@ export default defineConfig({
             return "vendor-icons";
           }
 
+          if (id.includes("@base-ui/react") || id.includes("class-variance-authority") || id.includes("tailwind-merge")) {
+            return "vendor-ui";
+          }
+
           if (id.includes("/node_modules/react/") || id.includes("/node_modules/react-dom/") || id.includes("/node_modules/scheduler/")) {
             return "vendor-react";
           }
@@ -44,7 +48,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:4317"
+      "/api": {
+        target: "http://127.0.0.1:4317",
+        configure(proxy) {
+          proxy.on("proxyReq", (request) => request.setHeader("origin", "http://127.0.0.1:4317"));
+        }
+      }
     }
   },
   test: {

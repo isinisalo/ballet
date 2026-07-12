@@ -49,33 +49,34 @@ const validate = (value: unknown): LocalSettings => {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Local Ballet settings must be a JSON object.");
   const source = value as Record<string, unknown>;
   if (source.version !== 1) throw new Error("Local Ballet settings version must be 1.");
-  const commands = ["codexCommand", "copilotCommand"] as const;
-  for (const key of commands) {
-    if (source[key] !== undefined && (typeof source[key] !== "string" || !source[key].trim())) {
-      throw new Error(`${key} must be a non-empty command.`);
-    }
-    if (typeof source[key] === "string" && source[key].includes("/") && !path.isAbsolute(source[key])) {
-      throw new Error(`${key} must be a command name or an absolute path.`);
-    }
-  }
+  const codexCommand = command(source.codexCommand, "codexCommand");
+  const copilotCommand = command(source.copilotCommand, "copilotCommand");
   const readOnlyRoots = roots(source.readOnlyRoots, "readOnlyRoots");
-  const agentReadOnlyRoots: Record<string, string[]> = {};
-  if (source.agentReadOnlyRoots !== undefined) {
-    if (!source.agentReadOnlyRoots || typeof source.agentReadOnlyRoots !== "object" || Array.isArray(source.agentReadOnlyRoots)) {
-      throw new Error("agentReadOnlyRoots must be an object.");
-    }
-    for (const [agentId, value] of Object.entries(source.agentReadOnlyRoots as Record<string, unknown>)) {
-      if (!agentId.trim()) throw new Error("agentReadOnlyRoots keys must be non-empty agent ids.");
-      agentReadOnlyRoots[agentId] = roots(value, `agentReadOnlyRoots.${agentId}`) ?? [];
-    }
-  }
+  const agentReadOnlyRoots = agentRoots(source.agentReadOnlyRoots);
   return {
     version: 1,
-    ...(typeof source.codexCommand === "string" ? { codexCommand: source.codexCommand } : {}),
-    ...(typeof source.copilotCommand === "string" ? { copilotCommand: source.copilotCommand } : {}),
+    ...(codexCommand ? { codexCommand } : {}),
+    ...(copilotCommand ? { copilotCommand } : {}),
     ...(readOnlyRoots ? { readOnlyRoots } : {}),
-    ...(Object.keys(agentReadOnlyRoots).length > 0 ? { agentReadOnlyRoots } : {})
+    ...(agentReadOnlyRoots ? { agentReadOnlyRoots } : {})
   };
+};
+
+const command = (value: unknown, label: string): string | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !value.trim()) throw new Error(`${label} must be a non-empty command.`);
+  if (value.includes("/") && !path.isAbsolute(value)) throw new Error(`${label} must be a command name or an absolute path.`);
+  return value;
+};
+
+const agentRoots = (value: unknown): Record<string, string[]> | undefined => {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agentReadOnlyRoots must be an object.");
+  const entries = Object.entries(value as Record<string, unknown>).map(([agentId, configuredRoots]) => {
+    if (!agentId.trim()) throw new Error("agentReadOnlyRoots keys must be non-empty agent ids.");
+    return [agentId, roots(configuredRoots, `agentReadOnlyRoots.${agentId}`) ?? []] as const;
+  });
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 };
 
 const roots = (value: unknown, label: string): string[] | undefined => {

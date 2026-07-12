@@ -58,29 +58,10 @@ export class LoopRunStore {
     return { ...run, transitionCount: rootCount.count, stepRuns: rows.map(toStepRun) };
   }
 
-  latest(loopId: string): LoopRunDetails | undefined {
-    const row = this.connection().prepare(`
-      SELECT run_id FROM loop_runs WHERE loop_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1
-    `).get(loopId) as { run_id: string } | undefined;
-    return row ? this.details(row.run_id) : undefined;
-  }
-
   list(limit = 500): LoopRunDetails[] {
     const rows = this.connection().prepare(`
       SELECT run_id FROM loop_runs ORDER BY created_at DESC, rowid DESC LIMIT ?
     `).all(limit) as Array<{ run_id: string }>;
-    return rows.flatMap((row) => {
-      const details = this.details(row.run_id);
-      return details ? [details] : [];
-    });
-  }
-
-  listActive(): LoopRunDetails[] {
-    const rows = this.connection().prepare(`
-      SELECT run_id FROM loop_runs
-      WHERE status IN ('running', 'waiting_for_human')
-      ORDER BY created_at ASC, rowid ASC
-    `).all() as Array<{ run_id: string }>;
     return rows.flatMap((row) => {
       const details = this.details(row.run_id);
       return details ? [details] : [];
@@ -208,17 +189,6 @@ export class LoopRunStore {
       UPDATE step_runs SET execution_task_id = ?, execution_snapshot_json = ?, updated_at = ?
       WHERE step_run_id = ? AND step_type = 'agent' AND execution_task_id IS NULL
     `).run(taskId, stringifyJson(snapshot), now(), stepRunId);
-    const stepRun = this.getStepRun(stepRunId);
-    if (!stepRun) throw new Error(`Step run ${stepRunId} was not found.`);
-    return stepRun;
-  }
-
-  clearStepExecution(stepRunId: string, expectedTaskId: string): StepRun {
-    this.connection().prepare(`
-      UPDATE step_runs SET execution_task_id = NULL, execution_snapshot_json = NULL, updated_at = ?
-      WHERE step_run_id = ? AND step_type = 'agent'
-        AND execution_task_id = ? AND status IN ('queued', 'running')
-    `).run(now(), stepRunId, expectedTaskId);
     const stepRun = this.getStepRun(stepRunId);
     if (!stepRun) throw new Error(`Step run ${stepRunId} was not found.`);
     return stepRun;

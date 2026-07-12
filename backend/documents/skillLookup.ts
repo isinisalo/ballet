@@ -1,10 +1,7 @@
 import path from "node:path";
 import type { Skill } from "../../shared/domain/documents.js";
 import { safeSlug } from "../markdown.js";
-
-const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-const stringValue = (value: unknown, fallback = ""): string => typeof value === "string" ? value : value === undefined || value === null ? fallback : String(value);
-const booleanValue = (value: unknown, fallback = false): boolean => typeof value === "boolean" ? value : typeof value === "string" ? value.toLowerCase() === "true" : fallback;
+import { booleanValue, isRecord, stringValue } from "./documentValues.js";
 
 const skillFromUnknown = (value: unknown, index: number): Skill => {
   if (isRecord(value)) {

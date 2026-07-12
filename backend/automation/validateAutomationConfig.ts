@@ -26,6 +26,13 @@ export class AutomationValidationError extends Error {
   }
 }
 
+export class AutomationConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AutomationConflictError";
+  }
+}
+
 const pathText = (path: PropertyKey[]): string =>
   path.length > 0 ? path.map(String).join(".") : "automation";
 
@@ -76,7 +83,7 @@ const validateLoop = (
   loop: ProjectLoop,
   loopIndex: number,
   loopIds: ReadonlySet<string>,
-  agentIds: ReadonlySet<string>
+  agentIds?: ReadonlySet<string>
 ): ProjectAutomationIssue[] => {
   const issues: ProjectAutomationIssue[] = [];
   const stepsById = new Map(loop.steps.map((step) => [step.id, step]));
@@ -116,7 +123,7 @@ const validateLoop = (
       }
       return;
     }
-    if (step.type === "agent" && agentIds.size > 0 && !agentIds.has(step.agentId)) {
+    if (step.type === "agent" && agentIds && !agentIds.has(step.agentId)) {
       issues.push({ path: `${base}.agentId`, message: `Step references unknown agent: ${step.agentId}.` });
     }
     for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
@@ -209,7 +216,7 @@ const validateApprovedPaths = (
 
 export const validateProjectAutomationConfig = (
   input: unknown,
-  agents: Agent[] = []
+  agents?: readonly Agent[]
 ): ProjectAutomationIssue[] => {
   const parsed = automationConfigSchema.safeParse(input);
   if (!parsed.success) {
@@ -221,7 +228,7 @@ export const validateProjectAutomationConfig = (
 
   const config: ProjectAutomationConfig = parsed.data;
   const loopIds = new Set(config.loops.map((loop) => loop.id));
-  const agentIds = new Set(agents.map((agent) => agent.id));
+  const agentIds = agents ? new Set(agents.map((agent) => agent.id)) : undefined;
   const issues = duplicateIssues(
     config.loops.map((loop, index) => ({ id: loop.id, path: `loops.${index}.id` })),
     "loop"

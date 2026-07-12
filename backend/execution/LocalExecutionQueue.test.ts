@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionSpec, ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
 import { LocalDatabase } from "../storage/LocalDatabase.js";
 import { ExecutionStore } from "./ExecutionStore.js";
@@ -127,12 +127,43 @@ describe("LocalExecutionQueue", () => {
     expect(fixture.store.events("invalid").entries.at(-1)).toMatchObject({ kind: "error", terminal: true });
     await fixture.close();
   });
+
+  it("derives the provider output schema from the outcome validator", async () => {
+    const fixture = await createFixture();
+    fixture.insertRoot("root");
+    fixture.store.create(specification("schema", "root"));
+
+    await fixture.queue.start();
+    await waitFor(() => fixture.store.require("schema").status === "succeeded");
+
+    expect(fixture.codex.outputSchemas[0]).toMatchObject({
+      additionalProperties: false,
+      properties: {
+        summary: { maxLength: 20_000 },
+        checks: { maxItems: 500 }
+      }
+    });
+    await fixture.close();
+  });
+
+  it("clears its shutdown timeout after workers stop", async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = await createFixture();
+      await fixture.queue.shutdown();
+      expect(vi.getTimerCount()).toBe(0);
+      await fixture.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 class ControlledAdapter implements CliRuntimeAdapter {
   readonly minimumVersion = "0.0.0";
   readonly started: string[] = [];
   readonly cancelled: string[] = [];
+  readonly outputSchemas: Array<Record<string, unknown> | undefined> = [];
   maximumActive = 0;
   private active = 0;
   private readonly gates = new Map<string, Deferred>();
@@ -166,6 +197,7 @@ class ControlledAdapter implements CliRuntimeAdapter {
 
   async *execute(request: RuntimeExecutionRequest): AsyncIterable<RuntimeEvent> {
     this.started.push(request.executionId);
+    this.outputSchemas.push(request.outputSchema);
     this.active += 1;
     this.maximumActive = Math.max(this.maximumActive, this.active);
     try {

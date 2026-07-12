@@ -11,6 +11,7 @@ import type {
   RootRunSource,
   RootRunSummary
 } from "../../shared/domain/runs.js";
+import { LoopRunNotFoundError } from "../runtime/LoopRunErrors.js";
 
 interface RootRunRow {
   root_run_id: string;
@@ -86,7 +87,7 @@ export class RootRunStore {
 
   require(rootRunId: string): StoredRootRun {
     const run = this.get(rootRunId);
-    if (!run) throw new Error(`Root Run ${rootRunId} was not found.`);
+    if (!run) throw new LoopRunNotFoundError(`Root Run ${rootRunId} was not found.`);
     return run;
   }
 

@@ -22,17 +22,6 @@ import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDb
 
 export { isPatchedSqliteVersion };
 
-export interface DispatchLoopScheduleInput {
-  loopId: string;
-  themeSnapshot: LoopTheme;
-  stepId: string;
-  definitionHash: string;
-  scheduledFor: string;
-  nextRunAt?: string;
-  executionPlan?: LoopExecutionPlan;
-  updatedAt: string;
-}
-
 export type DispatchLoopScheduleResult =
   | { status: "started"; run: LoopRunDetails }
   | { status: "skipped"; error: string }
@@ -57,20 +46,8 @@ export class RuntimeDatabase {
     this.connectionManager.close();
   }
 
-  get path(): string {
-    return this.connectionManager.path;
-  }
-
   connection(): Database.Database {
     return this.connectionManager.connection();
-  }
-
-  sqliteVersion(): string {
-    return this.connectionManager.sqliteVersion();
-  }
-
-  health(): Record<string, unknown> {
-    return this.connectionManager.health();
   }
 
   startLoopRun(
@@ -90,24 +67,12 @@ export class RuntimeDatabase {
     return this.loopRunStore.bindStepExecution(stepRunId, taskId, snapshot);
   }
 
-  clearStepExecution(stepRunId: string, expectedTaskId: string): StepRun {
-    return this.loopRunStore.clearStepExecution(stepRunId, expectedTaskId);
-  }
-
   markStepRunRunning(stepRunId: string): StepRun {
     return this.loopRunStore.markStepRunning(stepRunId);
   }
 
-  latestLoopRun(loopId: string): LoopRunDetails | undefined {
-    return this.loopRunStore.latest(loopId);
-  }
-
   listLoopRuns(limit = 500): LoopRunDetails[] {
     return this.loopRunStore.list(limit);
-  }
-
-  listActiveLoopRuns(): LoopRunDetails[] {
-    return this.loopRunStore.listActive();
   }
 
   listRootLoopRuns(rootRunId: string): LoopRunDetails[] {
@@ -201,10 +166,6 @@ export class RuntimeDatabase {
     }
   ): LoopRunDetails {
     return this.loopRunEngine.completeAgentStep(config, loopThemes, input);
-  }
-
-  getLoopRun(runId: string): LoopRunDetails | undefined {
-    return this.loopRunStore.details(runId);
   }
 
   getStepRun(stepRunId: string): StepRun | undefined {

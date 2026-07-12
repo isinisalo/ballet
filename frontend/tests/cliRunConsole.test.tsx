@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CliRunConsole } from "../src/workspace/components/CliRunConsole";
-import type { CliConsoleEvent } from "../src/workspace/components/cliConsoleTypes";
+import type { ExecutionEvent } from "@shared/api/workspace-contracts";
 import { now } from "./runtimeFixtures";
 
 const originalEventSource = globalThis.EventSource;
@@ -21,7 +21,7 @@ class ControlledEventSource extends EventTarget {
   }
 }
 
-const entry: CliConsoleEvent = {
+const entry: ExecutionEvent = {
   id: 7,
   taskId: "task-1",
   sequence: 7,
@@ -49,17 +49,14 @@ describe("CLI run console", () => {
     globalThis.EventSource = ControlledEventSource as unknown as typeof EventSource;
     window.EventSource = ControlledEventSource as unknown as typeof EventSource;
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ entries: [entry], lastId: 7, hasMore: false, truncated: false })));
-    const onRunEvent = vi.fn();
 
-    render(<CliRunConsole taskId="task-1" provider="copilot" active onRunEvent={onRunEvent} />);
+    render(<CliRunConsole taskId="task-1" provider="copilot" active />);
     expect(await screen.findByText("Stored response")).toBeInTheDocument();
     await waitFor(() => expect(ControlledEventSource.instances[0]?.url).toBe("/api/execution-tasks/task-1/console/stream?after=7"));
     expect(screen.getByLabelText("COPILOT CLI console")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Copy console" }));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Stored response"));
-    ControlledEventSource.instances[0].dispatchEvent(new MessageEvent("task", { data: JSON.stringify({ id: "task-1", status: "running" }) }));
-    expect(onRunEvent).toHaveBeenCalledWith({ id: "task-1", status: "running" });
     ControlledEventSource.instances[0].onerror?.();
     expect(await screen.findByText(/reconnecting/i)).toBeInTheDocument();
   });

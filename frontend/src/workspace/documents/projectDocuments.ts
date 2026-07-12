@@ -53,10 +53,3 @@ export const projectDocumentCreateConfig: Record<ProjectDocumentCreateKind, { di
   goal: { directoryPath: ".ballet/goals", title: "New goal", label: "New goal" },
   instruction: { directoryPath: ".ballet/instructions", title: "New instruction", label: "New instruction" }
 };
-
-export const createKindForProjectDocument = (relativePath?: string): ProjectDocumentCreateKind | undefined => {
-  if (relativePath?.startsWith(".ballet/adr/")) return "adr";
-  if (relativePath?.startsWith(".ballet/goals/")) return "goal";
-  if (relativePath?.startsWith(".ballet/instructions/")) return "instruction";
-  return undefined;
-};

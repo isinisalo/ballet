@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { AppData } from "../../shared/api/workspaceData.js";
+import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
 import { builtInLoopThemes } from "../../shared/domain/loopThemes.js";
 import { validateLoopRunStart } from "../services/LoopRunStartPolicy.js";

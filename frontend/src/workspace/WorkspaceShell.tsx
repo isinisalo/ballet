@@ -1,7 +1,6 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-    SidebarInset,
     SidebarProvider,
     SidebarTrigger
 } from "@/components/ui/sidebar";
@@ -19,7 +18,7 @@ import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
 import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
 
 export function WorkspaceShell() {
-  const { notifications, notify } = useNotifications();
+  const { notify } = useNotifications();
   const { route, navigate, setNavigationBlocker } = useWorkspaceNavigation();
   const { data, loading, refresh } = useWorkspaceData({ notify });
   const selection = useWorkspaceSelection({ data, route });
@@ -32,7 +31,7 @@ export function WorkspaceShell() {
       await Promise.all([refresh(), runDashboardData.refresh()]);
     }
   });
-  useAppStreamNotifications({ notifications, notify, streamStatus: appStreamStatus });
+  useAppStreamNotifications({ notify, streamStatus: appStreamStatus });
   const runDashboard = { ...runDashboardData, streamStatus: appStreamStatus };
   const mutations = useWorkspaceMutations({
     notify,
@@ -54,7 +53,7 @@ export function WorkspaceShell() {
           runtimeConfigurationIssues={runtimeConfigurationIssues}
           navigate={navigate}
         />
-        <SidebarInset>
+        <div data-slot="sidebar-inset" className="relative flex w-full flex-1 flex-col bg-background">
           <ScrollArea className="h-svh">
             <main className="flex min-h-svh flex-col bg-muted/30">
               <header className="flex flex-col gap-4 p-3 pb-0 md:hidden">
@@ -80,7 +79,7 @@ export function WorkspaceShell() {
               />
             </main>
           </ScrollArea>
-        </SidebarInset>
+        </div>
       </SidebarProvider>
   );
 }

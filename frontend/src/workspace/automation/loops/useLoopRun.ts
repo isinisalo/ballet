@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LoopRunDetails, RespondToStepRunRequest, RootRunDetail, RunTarget, RuntimePreflightIssue } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
 import type { AppStreamStatus } from "@/app/useAppStream";
@@ -6,11 +6,12 @@ import { runApi } from "../../runs/runApi";
 
 export type LoopRunPendingOperation = "load" | "start" | "respond" | "cancel" | null;
 
-export function useLoopRun(loopId: string | undefined, refreshSignal: string, streamStatus: AppStreamStatus, rootRunId?: string, target?: RunTarget) {
+export function useLoopRun(loopId: string | undefined, refreshSignal: string, streamStatus: AppStreamStatus, rootRunId?: string, target?: RunTarget, suppliedRootDetail?: RootRunDetail) {
   const [details, setDetails] = useState<LoopRunDetails | null>(null);
   const [rootDetail, setRootDetail] = useState<RootRunDetail>();
   const [pendingOperation, setPendingOperation] = useState<LoopRunPendingOperation>("load");
   const [error, setError] = useState("");
+  const generation = useRef(0);
   const selectedRootRunId = rootRunId ?? target?.activeRootRunId ?? target?.latestRootRunId;
   const preflight = useMemo(() => target ? {
     ok: target.ready,
@@ -30,11 +31,23 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
   }, []);
 
   const refresh = useCallback(async () => {
+    const current = ++generation.current;
     if (!loopId || !selectedRootRunId) { applyRoot(undefined); setPendingOperation(null); return; }
-    try { applyRoot(await runApi.detail(selectedRootRunId)); setError(""); }
-    catch (cause) { setError(toErrorMessage(cause, "Unable to load the Loop Run.")); }
-    finally { setPendingOperation((current) => current === "load" ? null : current); }
-  }, [applyRoot, loopId, selectedRootRunId]);
+    if (suppliedRootDetail?.rootRunId === selectedRootRunId) {
+      applyRoot(suppliedRootDetail);
+      setError("");
+      setPendingOperation((operation) => operation === "load" ? null : operation);
+      return;
+    }
+    try {
+      const next = await runApi.detail(selectedRootRunId);
+      if (generation.current === current) { applyRoot(next); setError(""); }
+    } catch (cause) {
+      if (generation.current === current) setError(toErrorMessage(cause, "Unable to load the Loop Run."));
+    } finally {
+      if (generation.current === current) setPendingOperation((operation) => operation === "load" ? null : operation);
+    }
+  }, [applyRoot, loopId, selectedRootRunId, suppliedRootDetail]);
 
   useEffect(() => { setPendingOperation("load"); applyRoot(undefined); void refresh(); }, [applyRoot, refresh, refreshSignal]);
   useEffect(() => {
@@ -44,12 +57,19 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
   }, [details, refresh]);
 
   const mutate = useCallback(async (operation: Exclude<LoopRunPendingOperation, "load" | null>, request: () => Promise<RootRunDetail>) => {
+    const current = ++generation.current;
     setPendingOperation(operation);
     setError("");
-    try { return applyRoot(await request()); }
-    catch (cause) { setError(toErrorMessage(cause, `Unable to ${operation} Loop Run.`)); void refresh(); return null; }
-    finally { setPendingOperation(null); }
-  }, [applyRoot, refresh]);
+    try {
+      const next = await request();
+      return generation.current === current ? applyRoot(next) : null;
+    } catch (cause) {
+      if (generation.current === current) setError(toErrorMessage(cause, `Unable to ${operation} Loop Run.`));
+      return null;
+    } finally {
+      if (generation.current === current) setPendingOperation(null);
+    }
+  }, [applyRoot]);
 
   const start = useCallback(async (input: string) => {
     if (!loopId || !preflight?.ok) return false;
@@ -64,7 +84,7 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     return mutate("cancel", () => runApi.cancel(rootDetail));
   }, [mutate, rootDetail]);
 
-  return { details, rootDetail, preflight, preflightLoading: false, pendingOperation, error, streamStatus, refresh, refreshPreflight: async () => undefined, start, respond, cancel };
+  return { details, rootDetail, preflight, pendingOperation, error, streamStatus, refresh, start, respond, cancel };
 }
 
 const selectedLoopRun = (root: RootRunDetail) => root.loopRuns.find((run) => run.runId === root.current?.loopRunId) ?? [...root.loopRuns].reverse()[0] ?? null;

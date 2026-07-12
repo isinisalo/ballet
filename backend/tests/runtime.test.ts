@@ -80,6 +80,11 @@ const config = (): ProjectAutomationConfig => ({
   }]
 });
 
+const runById = (runtime: RuntimeDatabase, runId: string) =>
+  runtime.listLoopRuns().find((run) => run.runId === runId);
+const latestRun = (runtime: RuntimeDatabase, loopId: string) =>
+  runtime.listLoopRuns().find((run) => run.loopId === loopId);
+
 describe("local runtime database", () => {
   it("recognizes patched SQLite versions", () => {
     expect(isPatchedSqliteVersion("3.51.3")).toBe(true);
@@ -119,7 +124,7 @@ describe("local runtime database", () => {
     const gate = waiting.stepRuns.at(-1)!;
     const completedParent = runtime.respondToStepRun(config(), builtInLoopThemes, parent.runId, gate.stepRunId, "approved", "Ship it");
     expect(completedParent.status).toBe("completed");
-    const child = runtime.latestLoopRun("release")!;
+    const child = latestRun(runtime, "release")!;
     expect(child).toMatchObject({
       rootRunId: parent.rootRunId,
       parentRunId: parent.runId,
@@ -171,7 +176,7 @@ describe("local runtime database", () => {
       "approved",
       "Ship it"
     );
-    const child = runtime.latestLoopRun("release")!;
+    const child = latestRun(runtime, "release")!;
     const completedChild = runtime.completeAgentStep(automation, [laterTheme], {
       stepRunId: child.stepRuns[0]!.stepRunId,
       outcome: ready
@@ -179,11 +184,13 @@ describe("local runtime database", () => {
 
     expect(completedParent).toMatchObject({ status: "completed", themeSnapshot: initialTheme });
     expect(completedChild).toMatchObject({ status: "completed", themeSnapshot: childTheme });
-    expect(runtime.getLoopRun(parent.runId)?.themeSnapshot).toEqual(initialTheme);
-    expect(runtime.getLoopRun(child.runId)?.themeSnapshot).toEqual(childTheme);
+    expect(runById(runtime, parent.runId)?.themeSnapshot).toEqual(initialTheme);
+    expect(runById(runtime, child.runId)?.themeSnapshot).toEqual(childTheme);
     runtime.close();
   });
+});
 
+describe("local runtime safeguards", () => {
   it("leaves a human gate waiting if its child loop already has an active run", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const parent = startLoop(runtime, config(), "delivery");
@@ -193,8 +200,8 @@ describe("local runtime database", () => {
     startLoop(runtime, config(), "release");
     expect(() => runtime.respondToStepRun(config(), builtInLoopThemes, parent.runId, gate.stepRunId, "approved", "Continue"))
       .toThrow(LoopRunConflictError);
-    expect(runtime.getLoopRun(parent.runId)).toMatchObject({ status: "waiting_for_human" });
-    expect(runtime.getLoopRun(parent.runId)!.stepRuns.at(-1)).toMatchObject({ status: "waiting_for_human" });
+    expect(runById(runtime, parent.runId)).toMatchObject({ status: "waiting_for_human" });
+    expect(runById(runtime, parent.runId)!.stepRuns.at(-1)).toMatchObject({ status: "waiting_for_human" });
     runtime.close();
   });
 
@@ -209,8 +216,8 @@ describe("local runtime database", () => {
 
     expect(() => runtime.respondToStepRun(config(), [], parent.runId, gate.stepRunId, "approved", "Continue"))
       .toThrow("Cannot start a loop while its theme is invalid.");
-    expect(runtime.getLoopRun(parent.runId)).toMatchObject({ status: "waiting_for_human" });
-    expect(runtime.latestLoopRun("release")).toBeUndefined();
+    expect(runById(runtime, parent.runId)).toMatchObject({ status: "waiting_for_human" });
+    expect(latestRun(runtime, "release")).toBeUndefined();
     runtime.close();
   });
 

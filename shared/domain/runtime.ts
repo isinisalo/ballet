@@ -210,11 +210,6 @@ export interface ExecutionEventPage {
   truncated: boolean;
 }
 
-export interface RootRunDisposition {
-  terminal: boolean;
-  success: boolean;
-}
-
 export interface RootFinalizationReport {
   success: boolean;
   retained: boolean;

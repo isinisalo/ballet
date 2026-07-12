@@ -20,16 +20,12 @@ export const isPatchedSqliteVersion = (version: string): boolean => {
 export class RuntimeDbConnection {
   private readonly database: LocalDatabase;
 
-  constructor(private readonly dbPath: string) {
+  constructor(dbPath: string) {
     this.database = new LocalDatabase(dbPath);
   }
 
   close(): void {
     this.database.close();
-  }
-
-  get path(): string {
-    return this.dbPath;
   }
 
   connection(): Database.Database {
@@ -42,24 +38,4 @@ export class RuntimeDbConnection {
     return db;
   }
 
-  sqliteVersion(): string {
-    const row = this.connection().prepare("SELECT sqlite_version() AS version").get() as { version: string };
-    return row.version;
-  }
-
-  health(): Record<string, unknown> {
-    const db = this.connection();
-    const eventCount = db.prepare("SELECT COUNT(*) AS count FROM execution_events").get() as { count: number };
-    const queuedSteps = db.prepare("SELECT COUNT(*) AS count FROM step_runs WHERE status = 'queued'").get() as { count: number };
-    const activeLoops = db.prepare("SELECT COUNT(*) AS count FROM loop_runs WHERE status IN ('running', 'waiting_for_human')")
-      .get() as { count: number };
-    return {
-      ok: true,
-      dbPath: this.dbPath,
-      sqliteVersion: this.sqliteVersion(),
-      events: eventCount.count,
-      queuedSteps: queuedSteps.count,
-      activeLoops: activeLoops.count
-    };
-  }
 }
