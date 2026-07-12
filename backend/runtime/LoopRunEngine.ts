@@ -6,6 +6,7 @@ import type {
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
 import { resolveEffectiveStartStep } from "../../shared/domain/automation.js";
+import { resolveLoopTheme, type LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
   LoopExecutionPlan,
@@ -52,10 +53,15 @@ export class LoopRunEngine {
     private readonly store: LoopRunStore
   ) {}
 
-  start(config: ProjectAutomationConfig, loopId: string, options: StartOptions = {}): LoopRunDetails {
+  start(
+    config: ProjectAutomationConfig,
+    loopId: string,
+    themeSnapshot: LoopTheme,
+    options: StartOptions = {}
+  ): LoopRunDetails {
     const transaction = this.connection().transaction(() => {
       const loop = this.requireLoop(config, loopId);
-      return this.startInTransaction(loop, options);
+      return this.startInTransaction(loop, themeSnapshot, options);
     });
     try {
       return transaction() as LoopRunDetails;
@@ -67,6 +73,7 @@ export class LoopRunEngine {
 
   respond(
     config: ProjectAutomationConfig,
+    loopThemes: readonly LoopTheme[],
     runId: string,
     stepRunId: string,
     result: StepRunResult,
@@ -96,7 +103,7 @@ export class LoopRunEngine {
       this.store.incrementTransitionCount(run.runId);
       const forwardedInput = this.forwardedInput(run.input, input);
       this.store.updateRunInput(run.runId, forwardedInput);
-      this.applyTransition(config, this.requireRun(run.runId), stepRun, target, forwardedInput);
+      this.applyTransition(config, loopThemes, this.requireRun(run.runId), stepRun, target, forwardedInput);
       return this.requireDetails(runId);
     });
     try {
@@ -107,7 +114,11 @@ export class LoopRunEngine {
     }
   }
 
-  completeAgentStep(config: ProjectAutomationConfig, input: CompleteStepRunInput): LoopRunDetails {
+  completeAgentStep(
+    config: ProjectAutomationConfig,
+    loopThemes: readonly LoopTheme[],
+    input: CompleteStepRunInput
+  ): LoopRunDetails {
     const transaction = this.connection().transaction(() => {
       const stepRun = this.store.getStepRun(input.stepRunId);
       if (!stepRun) throw new LoopRunNotFoundError(`Step run ${input.stepRunId} was not found.`);
@@ -131,7 +142,7 @@ export class LoopRunEngine {
         return this.requireDetails(run.runId);
       }
       this.store.incrementTransitionCount(run.runId);
-      this.applyTransition(config, run, stepRun, step.on[result], run.input);
+      this.applyTransition(config, loopThemes, run, stepRun, step.on[result], run.input);
       return this.requireDetails(run.runId);
     });
     return transaction() as LoopRunDetails;
@@ -154,12 +165,17 @@ export class LoopRunEngine {
     return transaction() as LoopRunDetails;
   }
 
-  private startInTransaction(loop: ProjectLoop, options: StartOptions): LoopRunDetails {
+  private startInTransaction(
+    loop: ProjectLoop,
+    themeSnapshot: LoopTheme,
+    options: StartOptions
+  ): LoopRunDetails {
     if (this.store.hasActiveLoop(loop.id)) {
       throw new LoopRunConflictError(`Loop ${loop.id} already has an active run.`);
     }
     const run = this.store.createLoopRun({
       loop,
+      themeSnapshot,
       rootRunId: options.rootRunId,
       parentRunId: options.parentRunId,
       parentStepRunId: options.parentStepRunId,
@@ -177,6 +193,7 @@ export class LoopRunEngine {
 
   private applyTransition(
     config: ProjectAutomationConfig,
+    loopThemes: readonly LoopTheme[],
     run: LoopRun,
     sourceStepRun: StepRun,
     target: StepTransitionTarget,
@@ -200,8 +217,11 @@ export class LoopRunEngine {
       return;
     }
     const targetLoop = this.requireLoop(config, target.loop);
+    if (!loopThemes.some((theme) => theme.id === targetLoop.theme)) {
+      throw new LoopRunStateError("Cannot start a loop while its theme is invalid.");
+    }
     this.store.finishRun(run.runId, "completed");
-    this.startInTransaction(targetLoop, {
+    this.startInTransaction(targetLoop, resolveLoopTheme(loopThemes, targetLoop.theme), {
       source: "human",
       input,
       rootRunId: run.rootRunId,

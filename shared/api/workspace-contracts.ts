@@ -5,7 +5,6 @@ import type {
   ProjectExecutableStep,
   ProjectLoop,
   LoopNodeSize,
-  LoopThemeId,
   ProjectOnceStepSchedule,
   ProjectRecurringStepSchedule,
   ProjectScheduledStep,
@@ -21,6 +20,14 @@ import type {
   StepTransitionTarget,
   Policy
 } from "../domain/automation.js";
+import type {
+  LoopConnectionPointStyle,
+  LoopEdgeLineStyle,
+  LoopNodeRenderer,
+  LoopTheme,
+  LoopThemeId,
+  LoopThemeIssue
+} from "../domain/loopThemes.js";
 import type {
   Adr,
   Goal,
@@ -93,6 +100,8 @@ export interface WorkspaceDataDto {
   scheduleStates: LoopScheduleState[];
   automation: ProjectAutomationConfig;
   automationIssues: ProjectAutomationIssue[];
+  loopThemes: LoopTheme[];
+  loopThemeIssues: LoopThemeIssue[];
   projectDocumentTree?: ProjectDocumentTreeNode[];
   documents?: {
     project: MarkdownDocument[];
@@ -117,6 +126,16 @@ export type WorkspaceAutomationResponseDto = {
   issues: ProjectAutomationIssue[];
 };
 
+export interface CreateLoopThemeRequest {
+  theme: LoopTheme;
+  assignToLoopId: string;
+}
+
+export interface CreateLoopThemeResponse {
+  theme: LoopTheme;
+  automation: ProjectAutomationConfig;
+}
+
 export type WorkspaceSaveRequestByCollection = {
   [K in WorkspaceCollectionName]: K extends "agents"
     ? AgentSaveRequest
@@ -138,6 +157,12 @@ export {
   mapProjectStepTransitions,
   resolveEffectiveStartStep
 } from "../domain/automation.js";
+export {
+  builtInLoopThemes,
+  defaultLoopTheme,
+  resolveLoopTheme,
+  validateAutomationThemeReferences
+} from "../domain/loopThemes.js";
 
 export type {
   Agent,
@@ -157,6 +182,11 @@ export type {
   ProjectLoop,
   LoopNodeSize,
   LoopThemeId,
+  LoopTheme,
+  LoopThemeIssue,
+  LoopNodeRenderer,
+  LoopEdgeLineStyle,
+  LoopConnectionPointStyle,
   ProjectOnceStepSchedule,
   ProjectRecurringStepSchedule,
   ProjectScheduledStep,

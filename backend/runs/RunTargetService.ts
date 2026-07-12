@@ -61,6 +61,11 @@ export class RunTargetService {
     if (data.automationIssues.length > 0) {
       return data.automationIssues.map((issue) => ({ code: "invalid_config", path: issue.path, message: issue.message }));
     }
+    const reachableLoopIds = reachableLoops(data, root.id);
+    const themeIssues = data.loopThemeIssues.filter((issue) => issue.loopId && reachableLoopIds.has(issue.loopId));
+    if (themeIssues.length > 0) {
+      return themeIssues.map((issue) => ({ code: "invalid_config", path: issue.path, message: issue.message }));
+    }
     const entries = reachableAgentSteps(data, root.id);
     const issues: RunTargetIssue[] = [];
     const deviceIds = new Set<string>();
@@ -92,20 +97,27 @@ export class RunTargetService {
 
 const reachableAgentSteps = (data: AppData, rootLoopId: string): Array<{ agentId: string; stepId: string }> => {
   const result: Array<{ agentId: string; stepId: string }> = [];
-  const pending = [rootLoopId];
-  const visited = new Set<string>();
-  while (pending.length > 0) {
-    const loopId = pending.shift();
-    if (!loopId || visited.has(loopId)) continue;
-    visited.add(loopId);
+  for (const loopId of reachableLoops(data, rootLoopId)) {
     const loop = data.automation.loops.find((candidate) => candidate.id === loopId);
     if (!loop) continue;
     for (const step of loop.steps) {
       if (step.type === "agent") result.push({ agentId: step.agentId, stepId: `${loop.id}:${step.id}` });
-      for (const target of getProjectStepTransitionTargets(step)) {
-        if (typeof target === "object" && "loop" in target) pending.push(target.loop);
-      }
     }
+  }
+  return result;
+};
+
+const reachableLoops = (data: AppData, rootLoopId: string): Set<string> => {
+  const result = new Set<string>();
+  const pending = [rootLoopId];
+  while (pending.length > 0) {
+    const loopId = pending.shift();
+    if (!loopId || result.has(loopId)) continue;
+    result.add(loopId);
+    const loop = data.automation.loops.find((candidate) => candidate.id === loopId);
+    loop?.steps.forEach((step) => getProjectStepTransitionTargets(step).forEach((target) => {
+      if (typeof target === "object" && "loop" in target) pending.push(target.loop);
+    }));
   }
   return result;
 };

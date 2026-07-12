@@ -1,4 +1,6 @@
 import type { AppData } from "../../shared/api/workspaceData.js";
+import { getProjectStepTransitionTargets } from "../../shared/domain/automation.js";
+import { resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { LoopExecutionPlan, LoopRunSource, StepRunResult } from "../../shared/domain/runtime.js";
 import { LoopRunNotFoundError, LoopRunStateError } from "../runtime/LoopRunErrors.js";
 import { notifyRuntimeChanged } from "../runtime-events.js";
@@ -27,18 +29,22 @@ export class LoopRunService {
     if (data.automationIssues.length > 0) {
       throw new LoopRunStateError("Cannot start a loop while project.json is invalid.");
     }
+    assertReachableLoopThemes(data, loopId);
     await validateLoopRunStart(data, loopId, input);
     if (!this.executionGateway && loopContainsAgentWork(data, loopId)) {
       throw new LoopRunStateError("Cannot start an agent loop before the runtime control plane is configured.");
     }
     const plan = await this.executionGateway?.prepare(data, loopId);
-    const run = this.database().startLoopRun(data.automation, loopId, input, source, plan?.deviceId, plan);
+    const loop = data.automation.loops.find((candidate) => candidate.id === loopId);
+    if (!loop) throw new LoopRunNotFoundError(`Loop ${loopId} was not found.`);
+    const themeSnapshot = resolveLoopTheme(data.loopThemes, loop.theme);
+    const run = this.database().startLoopRun(data.automation, loopId, themeSnapshot, input, source, plan?.deviceId, plan);
     if (this.executionGateway) await this.executionGateway.enqueuePending(data, run.rootRunId);
     notifyRuntimeChanged("loop-runs");
     return this.database().getLoopRun(run.runId) ?? run;
   }
 
-  async dispatchScheduled(input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan"> & {
+  async dispatchScheduled(input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan" | "themeSnapshot"> & {
     canDispatch?: () => boolean;
   }): Promise<DispatchLoopScheduleResult> {
     const { canDispatch, ...dispatchInput } = input;
@@ -49,6 +55,7 @@ export class LoopRunService {
       if (data.automationIssues.length > 0) {
         throw new LoopRunStateError("Cannot start a loop while project.json is invalid.");
       }
+      assertReachableLoopThemes(data, input.loopId);
       if (!matchesScheduleDefinition(data, input)) return { status: "stale" };
       if (this.database().activeLoopIds().includes(input.loopId)) {
         return this.skipScheduled(dispatchInput, `Loop ${input.loopId} already has an active run.`);
@@ -65,6 +72,7 @@ export class LoopRunService {
         || JSON.stringify(currentData.automation) !== automationSnapshot
         || !matchesScheduleDefinition(currentData, input)
       ) return { status: "stale" };
+      assertReachableLoopThemes(currentData, input.loopId);
       data = currentData;
     } catch (error) {
       return this.skipScheduled(dispatchInput, errorMessage(error));
@@ -78,8 +86,11 @@ export class LoopRunService {
 
     let result: DispatchLoopScheduleResult;
     try {
+      const loop = data.automation.loops.find((candidate) => candidate.id === input.loopId);
+      if (!loop) return { status: "stale" };
       result = this.database().dispatchLoopScheduleOccurrence(data.automation, {
         ...dispatchInput,
+        themeSnapshot: resolveLoopTheme(data.loopThemes, loop.theme),
         runtimeDeviceId: plan?.deviceId,
         executionPlan: plan,
         updatedAt: attemptedAt.toISOString()
@@ -105,7 +116,7 @@ export class LoopRunService {
 
   async respond(runId: string, stepRunId: string, result: StepRunResult, input: string) {
     const data = await this.readData();
-    const run = this.database().respondToStepRun(data.automation, runId, stepRunId, result, input);
+    const run = this.database().respondToStepRun(data.automation, data.loopThemes, runId, stepRunId, result, input);
     if (this.executionGateway) await this.executionGateway.enqueuePending(data, run.rootRunId);
     await this.executionGateway?.finalizeIfTerminal(run.rootRunId);
     notifyRuntimeChanged("loop-runs");
@@ -133,14 +144,14 @@ export class LoopRunService {
   }
 
   private skipScheduled(
-    input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan">,
+    input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan" | "themeSnapshot">,
     error: string
   ): DispatchLoopScheduleResult {
     return this.completeScheduled(input, "skipped", error);
   }
 
   private completeScheduled(
-    input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan">,
+    input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan" | "themeSnapshot">,
     status: "skipped" | "missed",
     error: string
   ): DispatchLoopScheduleResult {
@@ -179,4 +190,25 @@ const matchesScheduleDefinition = (
     && step?.type === "scheduled"
     && scheduleDefinitionHash(step.schedule, step.on.triggered) === input.definitionHash
   );
+};
+
+const assertReachableLoopThemes = (data: AppData, rootLoopId: string): void => {
+  const availableThemeIds = new Set(data.loopThemes.map((theme) => theme.id));
+  const visited = new Set<string>();
+  const pending = [rootLoopId];
+  while (pending.length > 0) {
+    const loopId = pending.shift();
+    if (!loopId || visited.has(loopId)) continue;
+    visited.add(loopId);
+    const loop = data.automation.loops.find((candidate) => candidate.id === loopId);
+    if (!loop) continue;
+    if (!availableThemeIds.has(loop.theme)) {
+      throw new LoopRunStateError("Cannot start a loop while its theme is invalid.");
+    }
+    for (const step of loop.steps) {
+      for (const target of getProjectStepTransitionTargets(step)) {
+        if (typeof target === "object" && "loop" in target) pending.push(target.loop);
+      }
+    }
+  }
 };

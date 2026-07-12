@@ -62,6 +62,38 @@ function StepNodeButton({ context, record, records, selected }: {
   selected: boolean;
 }) {
   const model = stepNodeModel(record, context);
+  const className = cn(
+    "loop-step-node nodrag nopan inline-flex h-full w-full items-center justify-center rounded-full border border-transparent transition-[border-color,box-shadow,filter]",
+    model.borderClass,
+    model.statusClass,
+    model.pulseClass,
+    selected && "border-primary/80 ring-2 ring-primary/20"
+  );
+  const content = (
+    <>
+      <span aria-hidden="true" className="loop-node-reasoning-glow" />
+      <span aria-hidden="true" className={`loop-node-surface loop-node-surface--${model.renderer}`} />
+      <StepNodeMark kind={model.kind} avatar={model.showAvatar ? model.avatar : undefined} />
+      <StepNodeLabel title={model.title} scheduleLabel={model.scheduleLabel} />
+    </>
+  );
+
+  if (context.staticPreview) {
+    return (
+      <div
+        role="img"
+        aria-label={`Preview step ${model.title}`}
+        data-loop-node
+        data-loop-node-kind={model.kind}
+        data-loop-node-size={model.nodeSize}
+        data-loop-node-renderer={model.renderer}
+        className={className}
+        style={{ "--loop-node-glow-color": model.glowColor } as CSSProperties}
+      >
+        {content}
+      </div>
+    );
+  }
 
   return (
     <button
@@ -75,23 +107,14 @@ function StepNodeButton({ context, record, records, selected }: {
       data-loop-run-status={model.status}
       aria-label={`${context.readOnly ? "View" : "Edit"} step ${model.title}`}
       title={model.tooltip}
-      className={cn(
-        "loop-step-node nodrag nopan inline-flex h-full w-full items-center justify-center rounded-full border border-transparent transition-[border-color,box-shadow,filter]",
-        model.borderClass,
-        model.statusClass,
-        model.pulseClass,
-        selected && "border-primary/80 ring-2 ring-primary/20"
-      )}
+      className={className}
       onClick={(event) => {
         event.stopPropagation();
         context.onStepSelect(records);
       }}
       style={{ "--loop-node-glow-color": model.glowColor } as CSSProperties}
     >
-      <span aria-hidden="true" className="loop-node-reasoning-glow" />
-      <span aria-hidden="true" className={`loop-node-surface loop-node-surface--${model.renderer}`} />
-      <StepNodeMark kind={model.kind} avatar={model.showAvatar ? model.avatar : undefined} />
-      <StepNodeLabel title={model.title} scheduleLabel={model.scheduleLabel} />
+      {content}
     </button>
   );
 }
@@ -103,8 +126,8 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
     title: record.stepKey || "Missing step",
     kind: "agent" as const,
     nodeSize: "medium" as const,
-    renderer: context.theme.node.sizes.medium.renderer,
-    glowColor: loopThemeNodeGlow(context.theme, "medium"),
+    renderer: context.theme.node.styles.medium,
+    glowColor: loopThemeNodeGlow(context.theme),
     tooltip: record.stepKey || "Missing step",
     reasoningGlow: 0
   };
@@ -117,8 +140,8 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
     title,
     kind,
     nodeSize,
-    renderer: context.theme.node.sizes[nodeSize].renderer,
-    glowColor: loopThemeNodeGlow(context.theme, nodeSize),
+    renderer: context.theme.node.styles[nodeSize],
+    glowColor: loopThemeNodeGlow(context.theme),
     avatar: step.avatar,
     showAvatar: kind === "agent" && context.theme.node.showAgentAvatarInNode && Boolean(step.avatar),
     scheduleLabel,

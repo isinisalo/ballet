@@ -22,7 +22,7 @@ import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
 
 export function WorkspaceShell() {
   const { notifications, notify } = useNotifications();
-  const { route, navigate } = useWorkspaceNavigation();
+  const { route, navigate, setNavigationBlocker } = useWorkspaceNavigation();
   const { data, loading, refresh, selectedProjectId } = useWorkspaceData({ notify, routeProjectId: route.projectId });
   const selection = useWorkspaceSelection({ data, route, selectedProjectId });
   const { states: agentExecutionStates } = useAgentExecutionStates();
@@ -76,6 +76,7 @@ export function WorkspaceShell() {
                 runtimeStreamStatus={runtimeStreamStatus}
                 runDashboard={runDashboard}
                 navigate={navigate}
+                setNavigationBlocker={setNavigationBlocker}
               />
             </main>
           </ScrollArea>

@@ -1,9 +1,8 @@
+import type { LoopThemeId } from "./loopThemes.js";
+
 export type OutputId = "approved" | "rejected";
 export type ProjectStepTransitionId = OutputId | "triggered";
 export type StepEndStatus = "completed" | "blocked" | "failed";
-
-export const loopThemeIds = ["default", "open-ai"] as const;
-export type LoopThemeId = (typeof loopThemeIds)[number];
 
 export const loopNodeSizes = ["small", "medium", "large"] as const;
 export type LoopNodeSize = (typeof loopNodeSizes)[number];

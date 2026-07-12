@@ -150,7 +150,7 @@ export class LoopExecutionCoordinator implements LoopExecutionGateway {
       return { terminal: true, success: task.status === "succeeded" };
     }
     const data = await this.options.readData();
-    this.options.database().completeAgentStep(data.automation, {
+    this.options.database().completeAgentStep(data.automation, data.loopThemes, {
       stepRunId: task.spec.stepRunId,
       outcome: task.outcome,
       error: task.status === "succeeded" ? undefined : task.errorMessage ?? task.errorCode ?? task.status

@@ -7,7 +7,6 @@ export type LoopCanvasEdge = {
   targetNodeKey: string;
   sourceHandleId?: string;
   targetHandleId?: string;
-  dashed?: boolean;
   tone?: "return" | "cross-loop";
   eventType?: string;
   label?: string;

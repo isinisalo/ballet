@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig, ProjectExecutableStep } from "../../shared/domain/automation.js";
+import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import { RuntimeDatabase } from "../runtime-db.js";
 import { scheduleDefinitionHash } from "../scheduling/ScheduleDefinition.js";
 
@@ -52,6 +53,7 @@ const human: ProjectExecutableStep = {
   nodeSize: "small",
   on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
 };
+const openAiTheme = resolveLoopTheme(builtInLoopThemes, "open-ai");
 
 describe("scheduled runtime starts", () => {
   it.each([
@@ -75,6 +77,7 @@ describe("scheduled runtime starts", () => {
 
     const result = database.dispatchLoopScheduleOccurrence(automation, {
       loopId: "scheduled-delivery",
+      themeSnapshot: openAiTheme,
       stepId: "timer",
       definitionHash,
       scheduledFor: "2026-07-12T09:00:00.000Z",
@@ -111,6 +114,7 @@ describe("scheduled runtime starts", () => {
     const run = database.startLoopRun(
       automation,
       "scheduled-delivery",
+      openAiTheme,
       "Manual context",
       "manual"
     );

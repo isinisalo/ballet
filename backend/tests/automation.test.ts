@@ -86,7 +86,7 @@ describe("automation v5 config", () => {
     const base = config();
     expect(validateProjectAutomationConfig({
       ...base,
-      loops: [{ ...base.loops[0]!, theme: "space" }]
+      loops: [{ ...base.loops[0]!, theme: "Space Theme" }]
     }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.theme" }));
     expect(validateProjectAutomationConfig({
       ...base,

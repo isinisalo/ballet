@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AppData } from "../../shared/api/workspaceData.js";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome, RuntimeProvider } from "../../shared/domain/runtime.js";
 import { createControlPlane } from "../control-plane/createControlPlane.js";
 import type { DaemonIdentity } from "../control-plane/PairingStore.js";
@@ -136,7 +137,8 @@ const agent = (id: string): Agent => ({
 
 const appData = (automation: ProjectAutomationConfig, agentIds: string[]): AppData => ({
   projects: [], goals: [], adrs: [], agents: agentIds.map(agent), skills: [], policies: [],
-  eventDefinitions: [], events: [], loopRuns: [], scheduleStates: [], automation, automationIssues: []
+  eventDefinitions: [], events: [], loopRuns: [], scheduleStates: [], automation, automationIssues: [],
+  loopThemes: [...builtInLoopThemes], loopThemeIssues: []
 });
 
 const nestedAutomation = (): ProjectAutomationConfig => ({
@@ -279,7 +281,17 @@ const READY: AgentOutcome = { outcome: "ready", summary: "Done.", checks: [] };
 const startRoot = async (test: TestContext, loopId: string) => {
   const plan = await test.coordinator.prepare(test.data, loopId);
   if (!plan) throw new Error("Expected an execution plan.");
-  const run = test.runtime.startLoopRun(test.data.automation, loopId, "Ship it", "manual", plan.deviceId, plan);
+  const loop = test.data.automation.loops.find((candidate) => candidate.id === loopId);
+  if (!loop) throw new Error(`Expected Loop ${loopId}.`);
+  const run = test.runtime.startLoopRun(
+    test.data.automation,
+    loopId,
+    resolveLoopTheme(test.data.loopThemes, loop.theme),
+    "Ship it",
+    "manual",
+    plan.deviceId,
+    plan
+  );
   await test.coordinator.enqueuePending(test.data, run.rootRunId);
   return { plan, run: test.runtime.getLoopRun(run.runId)! };
 };
@@ -427,7 +439,7 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
     const waiting = test.runtime.getLoopRun(started.run.runId)!;
     const gate = waiting.stepRuns.at(-1)!;
 
-    test.runtime.respondToStepRun(test.data.automation, waiting.runId, gate.stepRunId, "rejected", "Please address the empty state.");
+    test.runtime.respondToStepRun(test.data.automation, test.data.loopThemes, waiting.runId, gate.stepRunId, "rejected", "Please address the empty state.");
     await test.coordinator.enqueuePending(test.data, started.run.rootRunId);
     const retry = test.runtime.getLoopRun(started.run.runId)!.stepRuns.at(-1)!;
     const prompt = promptForStep(test, retry.stepRunId);
@@ -458,6 +470,7 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
 
     test.runtime.respondToStepRun(
       test.data.automation,
+      test.data.loopThemes,
       parent.runId,
       gate.stepRunId,
       "approved",
@@ -521,7 +534,7 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
 
     const parent = test.runtime.getLoopRun(started.run.runId)!;
     const gate = parent.stepRuns.at(-1)!;
-    test.runtime.respondToStepRun(test.data.automation, parent.runId, gate.stepRunId, "approved", "Deploy to dev.");
+    test.runtime.respondToStepRun(test.data.automation, test.data.loopThemes, parent.runId, gate.stepRunId, "approved", "Deploy to dev.");
     await test.coordinator.enqueuePending(test.data, started.run.rootRunId);
     const deploy = test.runtime.listRootLoopRuns(started.run.rootRunId)
       .find((run) => run.loopId === "dev-deployment")!.stepRuns[0]!;
@@ -614,6 +627,7 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
     const started = test.runtime.startLoopRun(
       test.data.automation,
       "implementation",
+      resolveLoopTheme(test.data.loopThemes, "open-ai"),
       initialInput,
       "manual",
       plan.deviceId,
@@ -623,7 +637,7 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
     await claimAndComplete(test, device.identity, device.backendIds.codex!);
     const waiting = test.runtime.getLoopRun(started.runId)!;
     const gate = waiting.stepRuns.at(-1)!;
-    test.runtime.respondToStepRun(test.data.automation, waiting.runId, gate.stepRunId, "rejected", humanFeedback);
+    test.runtime.respondToStepRun(test.data.automation, test.data.loopThemes, waiting.runId, gate.stepRunId, "rejected", humanFeedback);
     await test.coordinator.enqueuePending(test.data, started.rootRunId);
 
     const retry = test.runtime.getLoopRun(started.runId)!.stepRuns.at(-1)!;
@@ -645,6 +659,7 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
     const started = test.runtime.startLoopRun(
       test.data.automation,
       "implementation",
+      resolveLoopTheme(test.data.loopThemes, "open-ai"),
       longInput,
       "manual",
       plan.deviceId,
@@ -793,7 +808,7 @@ describe("LoopExecutionCoordinator control-plane integration", () => {
     const humanStep = waiting.stepRuns.at(-1)!;
     expect(waiting.status).toBe("waiting_for_human");
     expect(finalization(test, first.run.rootRunId)).toBeUndefined();
-    expect(test.runtime.respondToStepRun(test.data.automation, waiting.runId, humanStep.stepRunId, "approved", "Approved").status)
+    expect(test.runtime.respondToStepRun(test.data.automation, test.data.loopThemes, waiting.runId, humanStep.stepRunId, "approved", "Approved").status)
       .toBe("completed");
     await test.coordinator.finalizeIfTerminal(first.run.rootRunId);
 
@@ -929,9 +944,13 @@ const insertCompletedLoopHistory = (runtime: RuntimeDatabase, count: number): vo
       const loopId = `archived-${index}`;
       const timestamp = new Date(Date.UTC(2999, 0, 1, 0, 0, index)).toISOString();
       insert.run(runId, PROJECT_ID, loopId, runId, JSON.stringify({
-        id: loopId,
-        start: "done",
-        steps: []
+        loop: {
+          id: loopId,
+          theme: "open-ai",
+          start: "done",
+          steps: []
+        },
+        theme: resolveLoopTheme([], "open-ai")
       }), timestamp, timestamp, timestamp);
     }
   })();

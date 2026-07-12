@@ -227,7 +227,9 @@ body {
     radial-gradient(circle at 65% 66%, color-mix(in srgb, var(--background) 65%, transparent) 0 7%, transparent 8%),
     radial-gradient(circle at 35% 55%, color-mix(in srgb, var(--border) 50%, transparent) 0 9%, transparent 10%),
     radial-gradient(circle at 38% 32%, var(--muted-foreground), var(--accent) 72%);
-  box-shadow: inset -4px -4px 8px color-mix(in srgb, var(--background) 62%, transparent), 0 0 8px color-mix(in srgb, var(--primary) 24%, transparent);
+  box-shadow:
+    inset -4px -4px 8px color-mix(in srgb, var(--background) 62%, transparent),
+    0 0 12px color-mix(in srgb, var(--loop-node-glow-color) 48%, transparent);
 }
 
 .loop-node-surface--terra {
@@ -236,13 +238,15 @@ body {
   box-shadow:
     inset -7px -6px 12px color-mix(in srgb, var(--background) 72%, transparent),
     inset 1px 1px 2px color-mix(in srgb, var(--primary) 42%, transparent),
-    0 0 9px color-mix(in srgb, var(--loop-flow) 30%, transparent);
+    0 0 12px color-mix(in srgb, var(--loop-node-glow-color) 48%, transparent);
 }
 
 .loop-node-surface--sol {
   background:
     radial-gradient(circle at 38% 30%, color-mix(in srgb, var(--tertiary) 72%, var(--foreground)), var(--tertiary) 42%, var(--tertiary-container) 76%);
-  box-shadow: inset -8px -7px 14px color-mix(in srgb, var(--tertiary-container) 58%, transparent), 0 0 10px var(--tertiary), 0 0 24px color-mix(in srgb, var(--tertiary) 58%, transparent);
+  box-shadow:
+    inset -8px -7px 14px color-mix(in srgb, var(--tertiary-container) 58%, transparent),
+    0 0 16px color-mix(in srgb, var(--loop-node-glow-color) 62%, transparent);
 }
 
 .loop-node-surface--flat {

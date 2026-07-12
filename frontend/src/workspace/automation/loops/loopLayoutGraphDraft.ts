@@ -98,7 +98,6 @@ export function addOutputEventNode(
     targetNodeKey: key,
     sourceHandleId: loopOutputSourceHandleId(output),
     targetHandleId: loopOutputTargetHandleId(output, context.targetHandleId),
-    dashed: true,
     eventType: output.eventType,
     label: loopOutputEdgeLabel(output)
   });

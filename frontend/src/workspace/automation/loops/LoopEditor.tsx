@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { Agent, AgentExecutionState, LoopScheduleState, ProjectAutomationConfig, ProjectLoop, ProjectStepTransitionId } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, LoopScheduleState, LoopTheme, ProjectAutomationConfig, ProjectLoop, ProjectStepTransitionId } from "@shared/api/workspace-contracts";
 import { LockKeyhole } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TextField } from "@/components/shared/workspace-ui";
@@ -9,13 +9,15 @@ import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
 import { LoopHandlerSheet } from "./LoopHandlerSheet";
 import { LoopStepSheetEditor } from "./LoopStepSheetEditor";
 import { LoopThemeField, LoopThemeSelect } from "./LoopThemeField";
+import { loopTheme as resolveLoopTheme } from "./loopTheme";
 
 type Selection = { stepId: string; transition?: ProjectStepTransitionId };
 
-export function LoopCreationEditor({ loop, loops, agents, onChange }: {
+export function LoopCreationEditor({ loop, loops, agents, themes, onChange }: {
   loop: ProjectLoop;
   loops: ProjectLoop[];
   agents: Agent[];
+  themes: readonly LoopTheme[];
   onChange: (loop: ProjectLoop) => void;
 }) {
   const step = loop.steps[0];
@@ -23,7 +25,7 @@ export function LoopCreationEditor({ loop, loops, agents, onChange }: {
     <div className="grid min-w-0 gap-4 p-4 md:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)]">
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_7.5rem] items-end gap-3">
         <TextField label="Loop ID" required value={loop.id} onChange={(id) => onChange({ ...loop, id })} />
-        <LoopThemeField loop={loop} disabled={false} onChange={onChange} />
+        <LoopThemeField loop={loop} themes={themes} disabled={false} onChange={onChange} />
       </div>
       {step ? (
         <LoopStepSheetEditor
@@ -46,6 +48,7 @@ export function LoopEditor({
   loops,
   agents,
   agentExecutionStates,
+  themes,
   scheduleState,
   locked,
   lockMessage,
@@ -57,6 +60,7 @@ export function LoopEditor({
   loops: ProjectLoop[];
   agents: Agent[];
   agentExecutionStates?: AgentExecutionState[];
+  themes: readonly LoopTheme[];
   scheduleState?: LoopScheduleState;
   locked: boolean;
   lockMessage?: string;
@@ -69,7 +73,7 @@ export function LoopEditor({
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-1.5 rounded-md border border-divider-strong bg-card px-1.5 py-1">
         <span className="font-mono text-[0.66rem] text-muted-foreground">Theme</span>
-        <div className="w-24"><LoopThemeSelect loop={loop} disabled={locked} onChange={onChange} /></div>
+        <div className="w-24"><LoopThemeSelect loop={loop} themes={themes} disabled={locked} onChange={onChange} /></div>
       </div>
       {canvasControls}
     </div>
@@ -99,6 +103,7 @@ export function LoopEditor({
           loop={loop}
           agents={agents}
           agentExecutionStates={agentExecutionStates}
+          theme={resolveLoopTheme(loop.theme, themes)}
           selectedStepId={selectedStep?.id}
           readOnly={false}
           canvasControls={controls}

@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ReactFlow, type EdgeMouseHandler, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
-import type { Agent, AgentExecutionState, LoopRunDetails, ProjectAutomationConfig, ProjectLoop, ProjectStepTransitionId } from "@shared/api/workspace-contracts";
-import { cn } from "@/lib/utils";
-import { LoopReactFlowNodeComponent } from "./LoopReactFlowNode";
-import { LoopSmartEdge } from "./LoopSmartEdge";
-import type { LoopCanvasProps, LoopNodeContext, LoopReactFlowEdge, LoopReactFlowNode } from "./LoopCanvasTypes";
+import { useMemo, type ReactNode } from "react";
+import type {
+  Agent,
+  AgentExecutionState,
+  LoopRunDetails,
+  LoopTheme,
+  ProjectAutomationConfig,
+  ProjectLoop,
+  ProjectStepTransitionId
+} from "@shared/api/workspace-contracts";
+import { LoopCanvasSurface } from "./LoopCanvasSurface";
 import { calculateCompositeLoopCanvasLayout } from "./loopLayout";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import { buildLoopVisualProjection } from "./loopVisualProjection";
 import { useLoopCanvasInteraction } from "./useLoopCanvasInteraction";
-import { loopTheme as resolveLoopTheme, loopThemeCssProperties } from "./loopTheme";
-import { loopActiveHandleIdsByNodeKey, loopNodeHandles, toLoopReactFlowEdges } from "./loopReactFlowElements";
-
-const loopNodeTypes = { loop: LoopReactFlowNodeComponent } satisfies NodeTypes;
-const loopEdgeTypes = { loopSmart: LoopSmartEdge } satisfies EdgeTypes;
+import { loopTheme as resolveLoopTheme } from "./loopTheme";
 
 export function LoopCanvas({
   config,
@@ -22,6 +22,7 @@ export function LoopCanvas({
   agentExecutionStates = [],
   run,
   selectedStepId,
+  theme: themeOverride,
   readOnly = false,
   canvasControls,
   onStepSelect,
@@ -35,6 +36,7 @@ export function LoopCanvas({
   agentExecutionStates?: AgentExecutionState[];
   run?: LoopRunDetails | null;
   selectedStepId?: string;
+  theme?: LoopTheme;
   readOnly?: boolean;
   canvasControls?: ReactNode;
   onStepSelect?: (stepId: string) => void;
@@ -42,7 +44,7 @@ export function LoopCanvas({
   onInsertStep?: (stepId: string, result: "approved" | "rejected") => void;
   onReorderStep?: (fromIndex: number, toIndex: number) => void;
 }) {
-  const theme = resolveLoopTheme(loop.theme);
+  const theme = run?.themeSnapshot ?? themeOverride ?? resolveLoopTheme(loop.theme);
   const projection = useMemo(
     () => buildLoopVisualProjection(config, loop, run, agents, agentExecutionStates),
     [agentExecutionStates, agents, config, loop, run]
@@ -64,7 +66,9 @@ export function LoopCanvas({
     const index = edge.route?.sourceStepIndex;
     const result = edge.route?.outputId;
     const step = index === undefined ? undefined : loop.steps[index];
-    if (step && (result === "approved" || result === "rejected" || result === "triggered")) onTransitionSelect?.(step.id, result);
+    if (step && (result === "approved" || result === "rejected" || result === "triggered")) {
+      onTransitionSelect?.(step.id, result);
+    }
   };
 
   return (
@@ -78,6 +82,7 @@ export function LoopCanvas({
         dragOverStepIndex={interaction.dragOverStepIndex}
         selectedStepIndexes={selectedIndexes}
         readOnly={readOnly}
+        staticPreview={false}
         canvasHeight={interaction.canvasHeight}
         isCanvasPanning={interaction.isCanvasPanning}
         loopCanvasRef={interaction.loopCanvasRef}
@@ -109,115 +114,6 @@ function activeRunEdgeId(edges: LoopCanvasEdge[], loop: ProjectLoop, run?: LoopR
   const latestWithResult = [...(run?.stepRuns ?? [])].reverse().find((stepRun) => stepRun.result);
   if (!latestWithResult?.result) return null;
   const sourceStepIndex = loop.steps.findIndex((step) => step.id === latestWithResult.stepId);
-  return edges.find((edge) => edge.route?.sourceStepIndex === sourceStepIndex && edge.route?.outputId === latestWithResult.result)?.key ?? null;
-}
-
-function LoopCanvasSurface({
-  layout,
-  canvasHeight,
-  isCanvasPanning,
-  loopCanvasRef,
-  onCanvasMoveStart,
-  onCanvasMoveEnd,
-  activeEdgeId,
-  ...nodeContextProps
-}: LoopCanvasProps & { activeEdgeId?: string | null }) {
-  const nodeContext = useLoopNodeContext(nodeContextProps);
-  const nodes = useLoopNodes(layout.nodes, layout.edges, nodeContext);
-  const nodeIds = useMemo(() => layout.nodes.map((node) => node.key), [layout.nodes]);
-  const [animatedEdgeId, setAnimatedEdgeId] = useState<string | null>(activeEdgeId ?? null);
-  const edges = useLoopEdges(layout.edges, layout.nodes, nodeContext, animatedEdgeId);
-  const handleEdgeClick = useCallback<EdgeMouseHandler<LoopReactFlowEdge>>((event, edge) => {
-    event.stopPropagation();
-    if (edge.data?.loopEdge) nodeContext.onOutputHandlerSelect(edge.data.loopEdge);
-    if (!nodeContext.readOnly) setAnimatedEdgeId((current) => current === edge.id ? null : edge.id);
-  }, [nodeContext]);
-
-  useEffect(() => setAnimatedEdgeId(activeEdgeId ?? null), [activeEdgeId]);
-  useEffect(() => {
-    if (!animatedEdgeId || layout.edges.some((edge) => edge.key === animatedEdgeId)) return;
-    setAnimatedEdgeId(null);
-  }, [animatedEdgeId, layout.edges]);
-
-  return (
-    <div
-      ref={loopCanvasRef}
-      data-loop-canvas
-      data-loop-theme={nodeContext.theme.id}
-      aria-label={`${nodeContext.readOnly ? "Run" : "Edit"} loop canvas`}
-      className={cn("relative min-h-[28rem] overflow-hidden border border-divider-strong bg-background", isCanvasPanning ? "cursor-grabbing" : "cursor-grab")}
-      style={{
-        ...loopThemeCssProperties(nodeContext.theme),
-        height: canvasHeight ? `${canvasHeight}px` : undefined
-      }}
-    >
-      <div className="pointer-events-none absolute inset-0 z-0 opacity-50 bg-[image:linear-gradient(to_right,var(--divider-strong)_1px,transparent_1px),linear-gradient(to_bottom,var(--divider-strong)_1px,transparent_1px)] bg-[size:24px_24px]" />
-      <ReactFlow<LoopReactFlowNode, LoopReactFlowEdge>
-        className="loop-react-flow relative z-10 h-full w-full"
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={loopNodeTypes}
-        edgeTypes={loopEdgeTypes}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        minZoom={1}
-        maxZoom={1}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        edgesReconnectable={false}
-        elementsSelectable={false}
-        selectNodesOnDrag={false}
-        selectionOnDrag={false}
-        panOnDrag
-        panOnScroll={false}
-        zoomOnScroll={false}
-        zoomOnPinch={false}
-        zoomOnDoubleClick={false}
-        preventScrolling={false}
-        deleteKeyCode={null}
-        selectionKeyCode={null}
-        multiSelectionKeyCode={null}
-        proOptions={{ hideAttribution: true }}
-        onEdgeClick={handleEdgeClick}
-        onMoveStart={onCanvasMoveStart}
-        onMoveEnd={onCanvasMoveEnd}
-      >
-        <LoopNodeInternalsUpdater nodeIds={nodeIds} />
-      </ReactFlow>
-    </div>
-  );
-}
-
-function LoopNodeInternalsUpdater({ nodeIds }: { nodeIds: string[] }) {
-  const updateNodeInternals = useUpdateNodeInternals();
-  useEffect(() => updateNodeInternals(nodeIds), [nodeIds, updateNodeInternals]);
-  return null;
-}
-
-function useLoopNodeContext(props: LoopNodeContext) {
-  return useMemo(() => props, [props]);
-}
-
-function useLoopNodes(layoutNodes: LoopCanvasProps["layout"]["nodes"], layoutEdges: LoopCanvasProps["layout"]["edges"], nodeContext: LoopNodeContext) {
-  const activeHandleIdsByNodeKey = useMemo(() => loopActiveHandleIdsByNodeKey(layoutEdges), [layoutEdges]);
-  return useMemo<LoopReactFlowNode[]>(() => layoutNodes.map((layoutNode) => ({
-    id: layoutNode.key,
-    type: "loop",
-    position: { x: layoutNode.x, y: layoutNode.y },
-    data: { layoutNode, context: nodeContext, activeHandleIds: activeHandleIdsByNodeKey.get(layoutNode.key) ?? [] },
-    width: layoutNode.width,
-    height: layoutNode.height,
-    initialWidth: layoutNode.width,
-    initialHeight: layoutNode.height,
-    measured: { width: layoutNode.width, height: layoutNode.height },
-    handles: loopNodeHandles(layoutNode, activeHandleIdsByNodeKey.get(layoutNode.key) ?? []),
-    draggable: false,
-    selectable: false,
-    connectable: false,
-    focusable: false,
-    style: { width: layoutNode.width, height: layoutNode.height, pointerEvents: "all" }
-  })), [activeHandleIdsByNodeKey, layoutNodes, nodeContext]);
-}
-
-function useLoopEdges(layoutEdges: LoopCanvasProps["layout"]["edges"], layoutNodes: LoopCanvasProps["layout"]["nodes"], context: LoopNodeContext, animatedEdgeId: string | null) {
-  return useMemo(() => toLoopReactFlowEdges(layoutEdges, layoutNodes, context, animatedEdgeId), [animatedEdgeId, context, layoutEdges, layoutNodes]);
+  return edges.find((edge) => edge.route?.sourceStepIndex === sourceStepIndex
+    && edge.route?.outputId === latestWithResult.result)?.key ?? null;
 }

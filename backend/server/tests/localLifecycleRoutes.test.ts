@@ -6,6 +6,7 @@ import path from "node:path";
 import { v4 as uuid } from "uuid";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig } from "../../../shared/domain/automation.js";
+import { builtInLoopThemes, resolveLoopTheme } from "../../../shared/domain/loopThemes.js";
 import { createControlPlane } from "../../control-plane/createControlPlane.js";
 import { RuntimeDatabase } from "../../runtime-db.js";
 import {
@@ -21,6 +22,7 @@ const roots: string[] = [];
 const servers: Server[] = [];
 const controls: Array<ReturnType<typeof createControlPlane>> = [];
 const runtimes: RuntimeDatabase[] = [];
+const openAiTheme = resolveLoopTheme(builtInLoopThemes, "open-ai");
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
@@ -120,7 +122,7 @@ const listen = async () => {
   });
   const agentRun = await control.service.startAgentRun("developer", "Ship it");
 
-  const loop = runtime.startLoopRun(humanAutomation, "approval");
+  const loop = runtime.startLoopRun(humanAutomation, "approval", openAiTheme);
   insertCompletedHistory(runtime, 500);
 
   let schedulerPauseCount = 0;

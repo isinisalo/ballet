@@ -9,7 +9,7 @@ import type {
   StartLoopRunRequest,
   ExecutionEventPage
 } from "@shared/api/workspace-contracts";
-import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import type { CreateLoopThemeResponse, LoopTheme, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import type { MarkdownDocument } from "@shared/api/workspace-contracts";
 import { request } from "@/apiClient";
 
@@ -20,6 +20,16 @@ export const api = {
     request<ProjectAutomationConfig>("/api/automation", {
       method: "PUT",
       body: JSON.stringify(config)
+    }),
+  updateLoopTheme: (theme: LoopTheme) =>
+    request<LoopTheme>(`/api/loop-themes/${encodeURIComponent(theme.id)}`, {
+      method: "PUT",
+      body: JSON.stringify(theme)
+    }),
+  createLoopTheme: (theme: LoopTheme, assignToLoopId: string) =>
+    request<CreateLoopThemeResponse>("/api/loop-themes", {
+      method: "POST",
+      body: JSON.stringify({ theme, assignToLoopId })
     }),
   startLoopRun: (loopId: string, input: StartLoopRunRequest) =>
     request<LoopRunDetails>(`/api/loops/${encodeURIComponent(loopId)}/runs`, {

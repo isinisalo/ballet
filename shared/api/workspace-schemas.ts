@@ -2,10 +2,15 @@ import { z } from "zod";
 import { agentAvatars } from "../domain/agents.js";
 import {
   loopNodeSizes,
-  loopThemeIds,
   type ProjectAutomationConfig,
   type ProjectStepSchedule
 } from "../domain/automation.js";
+import {
+  loopConnectionPointStyles,
+  loopEdgeLineStyles,
+  loopNodeRenderers,
+  type LoopTheme
+} from "../domain/loopThemes.js";
 import {
   automationFieldLimits,
   kebabCaseIdPattern
@@ -133,6 +138,49 @@ const automationStepIdSchema = z.string()
   .max(automationFieldLimits.stepId.max)
   .regex(kebabCaseIdPattern, "Step id must be lowercase kebab-case.");
 const kebabLoopIdSchema = automationLoopIdSchema.regex(kebabCaseIdPattern, "Loop id must be lowercase kebab-case.");
+export const loopThemeIdSchema = z.string()
+  .min(1)
+  .max(64)
+  .regex(kebabCaseIdPattern, "Theme id must be lowercase kebab-case.");
+const loopThemeColorSchema = z.string()
+  .regex(/^#[0-9a-f]{6}$/, "Expected a six-digit lowercase hex color.");
+const loopThemeStylesSchema = z.object({
+  small: z.enum(loopNodeRenderers),
+  medium: z.enum(loopNodeRenderers),
+  large: z.enum(loopNodeRenderers)
+}).strict();
+
+export const loopThemeSchema = z.object({
+  version: z.literal(1),
+  id: loopThemeIdSchema,
+  label: z.string().trim().min(1),
+  node: z.object({
+    labelColor: loopThemeColorSchema,
+    glowColor: loopThemeColorSchema,
+    styles: loopThemeStylesSchema,
+    showAgentAvatarInNode: z.boolean()
+  }).strict(),
+  edge: z.object({
+    color: loopThemeColorSchema,
+    labelColor: loopThemeColorSchema,
+    style: z.enum(loopEdgeLineStyles),
+    rejectedStyle: z.enum(loopEdgeLineStyles),
+    crossLoopStyle: z.enum(loopEdgeLineStyles)
+  }).strict(),
+  connectionPoint: z.object({
+    style: z.enum(loopConnectionPointStyles),
+    color: loopThemeColorSchema
+  }).strict()
+}).strict() satisfies z.ZodType<LoopTheme>;
+
+export const loopThemeParamsSchema = z.object({
+  themeId: loopThemeIdSchema
+}).strict();
+
+export const createLoopThemeSchema = z.object({
+  theme: loopThemeSchema,
+  assignToLoopId: kebabLoopIdSchema
+}).strict();
 const stepEndSchema = z.object({ end: z.enum(["completed", "blocked", "failed"]) }).strict();
 const stepLoopSchema = z.object({ loop: kebabLoopIdSchema }).strict();
 const stepTransitionTargetSchema = z.union([automationStepIdSchema, stepLoopSchema, stepEndSchema]);
@@ -214,7 +262,7 @@ const projectStepSchema = z.discriminatedUnion("type", [
 
 const projectLoopSchema = z.object({
   id: kebabLoopIdSchema,
-  theme: z.enum(loopThemeIds),
+  theme: loopThemeIdSchema,
   start: automationStepIdSchema,
   steps: z.array(projectStepSchema).min(1)
 }).strict();

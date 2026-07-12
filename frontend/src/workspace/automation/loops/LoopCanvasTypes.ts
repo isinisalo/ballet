@@ -3,7 +3,7 @@ import type { Edge, Node } from "@xyflow/react";
 import type { LoopVisualStep } from "./loopVisualProjection";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopCanvasEdge, LoopCanvasLayout, LoopCanvasLayoutNode } from "./loopLayout";
-import type { LoopTheme } from "./loopTheme";
+import type { LoopTheme } from "@shared/api/workspace-contracts";
 
 export type LoopCanvasProps = {
   layout: LoopCanvasLayout;
@@ -14,6 +14,7 @@ export type LoopCanvasProps = {
   dragOverStepIndex: number | null;
   selectedStepIndexes: number[];
   readOnly: boolean;
+  staticPreview: boolean;
   canvasHeight: number | null;
   isCanvasPanning: boolean;
   loopCanvasRef: RefObject<HTMLDivElement>;

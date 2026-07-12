@@ -1,14 +1,16 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { getProjectStepTransitionTargets } from "@shared/api/workspace-contracts";
-import { ArrowRight, Bot, CalendarClock, Route, ShieldCheck } from "lucide-react";
+import { ArrowRight, Bot, CalendarClock, PanelTopOpen, Palette, Route, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AllLoopsCanvas({
   config,
-  onSelect
+  onOpenLoop,
+  onEditTheme
 }: {
   config: ProjectAutomationConfig;
-  onSelect: (loopId: string) => void;
+  onOpenLoop: (loopId: string) => void;
+  onEditTheme: (loopId: string, themeId: string) => void;
 }) {
   if (config.loops.length === 0) {
     return <p className="p-4 text-sm text-muted-foreground">No loops configured.</p>;
@@ -23,14 +25,11 @@ export function AllLoopsCanvas({
         const nextLoops = new Set(loop.steps.flatMap(getProjectStepTransitionTargets)
           .flatMap((target) => typeof target === "object" && "loop" in target ? [target.loop] : []));
         return (
-          <Button
+          <article
             key={loop.id}
-            type="button"
-            variant="ghost"
-            className="h-auto min-h-28 justify-start rounded-none bg-card p-4 text-left hover:bg-muted"
-            onClick={() => onSelect(loop.id)}
+            className="grid min-h-28 bg-card"
           >
-            <span className="grid w-full gap-3">
+            <div className="grid gap-3 p-4">
               <span className="flex items-center gap-2 font-mono text-xs text-foreground"><Route className="text-primary" /> {loop.id}</span>
               <span className="grid grid-cols-3 gap-2 font-mono text-[0.65rem] text-muted-foreground">
                 <span className="flex items-center gap-1"><Bot className="size-3" /> {agentSteps} agent</span>
@@ -39,8 +38,16 @@ export function AllLoopsCanvas({
                 <span className="col-span-3">start: {loop.start}</span>
               </span>
               {nextLoops.size > 0 ? <span className="flex items-center gap-1 truncate font-mono text-[0.65rem] text-secondary"><ArrowRight className="size-3" /> {[...nextLoops].join(", ")}</span> : null}
-            </span>
-          </Button>
+            </div>
+            <div className="flex items-center gap-2 border-t border-divider-strong p-2">
+              <Button type="button" size="sm" className="flex-1" aria-label={`Open loop ${loop.id}`} onClick={() => onOpenLoop(loop.id)}>
+                <PanelTopOpen /> Open loop
+              </Button>
+              <Button type="button" size="sm" variant="outline" className="flex-1" aria-label={`Edit theme for ${loop.id}`} onClick={() => onEditTheme(loop.id, loop.theme)}>
+                <Palette /> Edit theme
+              </Button>
+            </div>
+          </article>
         );
       })}
     </div>

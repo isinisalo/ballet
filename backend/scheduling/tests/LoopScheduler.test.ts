@@ -5,6 +5,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../../shared/api/workspaceData.js";
 import type { ProjectAutomationConfig, ProjectStepSchedule } from "../../../shared/domain/automation.js";
+import { builtInLoopThemes, resolveLoopTheme } from "../../../shared/domain/loopThemes.js";
 import { RuntimeDatabase } from "../../runtime-db.js";
 import { notifyRuntimeChanged } from "../../runtime-events.js";
 import { LoopScheduler, type LoopSchedulerOptions } from "../LoopScheduler.js";
@@ -13,6 +14,7 @@ import type { ScheduleClock } from "../ScheduleClock.js";
 const roots: string[] = [];
 const schedulers: LoopScheduler[] = [];
 const databases: RuntimeDatabase[] = [];
+const openAiTheme = resolveLoopTheme(builtInLoopThemes, "open-ai");
 
 class FakeScheduleClock implements ScheduleClock {
   private instant: Temporal.Instant;
@@ -72,7 +74,9 @@ const workspace = (config: ProjectAutomationConfig): AppData => ({
   loopRuns: [],
   scheduleStates: [],
   automation: config,
-  automationIssues: []
+  automationIssues: [],
+  loopThemes: [...builtInLoopThemes],
+  loopThemeIssues: []
 });
 
 const once = (time = "09:00"): ProjectStepSchedule => ({
@@ -106,7 +110,10 @@ const startScheduler = async (input: {
 }) => {
   const dispatch = input.dispatch ?? vi.fn<LoopSchedulerOptions["dispatch"]>(async ({ canDispatch, ...occurrence }) => {
     if (!canDispatch()) return { status: "stale" } as const;
-    return input.database.dispatchLoopScheduleOccurrence(input.data().automation, occurrence);
+    return input.database.dispatchLoopScheduleOccurrence(input.data().automation, {
+      ...occurrence,
+      themeSnapshot: openAiTheme
+    });
   });
   const scheduler = new LoopScheduler({
     readData: async () => input.data(),
@@ -128,7 +135,10 @@ describe("Loop scheduler", () => {
     const clock = new FakeScheduleClock("2026-07-12T09:00:30.000Z");
     const dispatch = vi.fn<LoopSchedulerOptions["dispatch"]>(async ({ canDispatch, ...occurrence }) => {
       if (!canDispatch()) return { status: "stale" };
-      return database.dispatchLoopScheduleOccurrence(data.automation, occurrence);
+      return database.dispatchLoopScheduleOccurrence(data.automation, {
+        ...occurrence,
+        themeSnapshot: openAiTheme
+      });
     });
     const { scheduler } = await startScheduler({ data: () => data, database, clock, dispatch });
 
@@ -229,7 +239,7 @@ describe("Loop scheduler dispatch outcomes", () => {
     const config = automation(once());
     const data = workspace(config);
     const database = await runtimeDatabase();
-    const active = database.startLoopRun(config, "scheduled-delivery");
+    const active = database.startLoopRun(config, "scheduled-delivery", openAiTheme);
     const clock = new FakeScheduleClock("2026-07-12T09:00:10.000Z");
     await startScheduler({ data: () => data, database, clock });
 

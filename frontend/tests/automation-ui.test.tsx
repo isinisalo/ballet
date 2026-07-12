@@ -1,7 +1,14 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { AppData, LoopRunDetails, ProjectLoop } from "@shared/api/workspace-contracts";
+import {
+  builtInLoopThemes,
+  resolveLoopTheme,
+  type AppData,
+  type LoopRunDetails,
+  type LoopTheme,
+  type ProjectLoop
+} from "@shared/api/workspace-contracts";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 
 const now = "2026-07-10T10:00:00.000Z";
@@ -12,8 +19,12 @@ const loop: ProjectLoop = {
   steps: [{ id: "approval", type: "human", nodeSize: "small", description: "Approve delivery", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }]
 };
 
-const run = (status: LoopRunDetails["status"]): LoopRunDetails => ({
+const run = (
+  status: LoopRunDetails["status"],
+  themeSnapshot: LoopTheme = resolveLoopTheme(builtInLoopThemes, loop.theme)
+): LoopRunDetails => ({
   runId: "run-1", loopId: loop.id, rootRunId: "run-1", source: "manual", status, snapshot: loop,
+  themeSnapshot,
   transitionCount: 0, createdAt: now, updatedAt: now,
   stepRuns: status === "waiting_for_human" ? [{
     stepRunId: "step-run-1", runId: "run-1", loopId: loop.id, stepId: "approval", type: "human",
@@ -23,7 +34,8 @@ const run = (status: LoopRunDetails["status"]): LoopRunDetails => ({
 
 const data = (): AppData => ({
   projects: [], goals: [], adrs: [], agents: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
-  automation: { version: 5, loops: [loop] }, automationIssues: [], scheduleStates: [], projectDocumentTree: []
+  automation: { version: 5, loops: [loop] }, automationIssues: [], scheduleStates: [],
+  loopThemes: [...builtInLoopThemes], loopThemeIssues: [], projectDocumentTree: []
 });
 
 function installApi(latest: LoopRunDetails | null) {
@@ -120,6 +132,16 @@ describe("automation v5 UI", () => {
     await renderRun(run("completed"));
     await user.click(await screen.findByRole("button", { name: "New run" }));
     expect(screen.getByLabelText("Manual input (optional)")).toBeEnabled();
+  });
+
+  it("renders an existing Run with its immutable theme snapshot", async () => {
+    const liveTheme = resolveLoopTheme(builtInLoopThemes, loop.theme);
+    const archivedTheme: LoopTheme = { ...liveTheme, id: "archived-theme", label: "Archived theme" };
+
+    await renderRun(run("completed", archivedTheme));
+
+    await waitFor(() => expect(document.querySelector("[data-loop-canvas]"))
+      .toHaveAttribute("data-loop-theme", "archived-theme"));
   });
 
   it("cancels the active loop run from Run mode", async () => {

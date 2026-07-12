@@ -3,6 +3,8 @@ import {
   agentDocumentPath,
   automationAllLoopsPath,
   automationLoopPath,
+  automationNewThemePath,
+  automationThemePath,
   projectCollectionDocumentPath,
   projectDocumentPath,
   routeFromPath,
@@ -47,6 +49,18 @@ describe("workspace routing", () => {
       automationLoopView: "all"
     });
     expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({ view: "projects" });
+    expect(routeFromPath("/automation/themes?id=open-ai&loop=release%20train")).toEqual({
+      view: "loop-theme",
+      loopThemeId: "open-ai",
+      loopThemeSourceId: undefined,
+      loopThemeLoopId: "release train"
+    });
+    expect(routeFromPath("/automation/themes?newFrom=open-ai&loop=release%20train")).toEqual({
+      view: "loop-theme",
+      loopThemeId: undefined,
+      loopThemeSourceId: "open-ai",
+      loopThemeLoopId: "release train"
+    });
     expect(routeFromPath("/runtimes?id=device-1")).toEqual({ view: "runtimes", runtimeDeviceId: "device-1" });
   });
 
@@ -74,6 +88,8 @@ describe("workspace routing", () => {
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(automationAllLoopsPath()).toBe("/automation/loops?view=all");
     expect(automationLoopPath("wf 1")).toBe("/automation/loops?id=wf+1");
+    expect(automationThemePath("theme 1", "wf 1")).toBe("/automation/themes?id=theme+1&loop=wf+1");
+    expect(automationNewThemePath("theme 1", "wf 1")).toBe("/automation/themes?newFrom=theme+1&loop=wf+1");
     expect(runOverviewPath("root 1")).toBe("/run?run=root%201");
     expect(runLoopPath("wf 1", "root 1")).toBe("/run/loops/wf%201?run=root%201");
     expect(runAgentPath("agent 1", "root 1")).toBe("/run/agents/agent%201?run=root%201");

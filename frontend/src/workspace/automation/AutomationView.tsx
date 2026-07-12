@@ -4,7 +4,7 @@ import type { AgentExecutionState, AppData, ProjectAutomationConfig, ProjectLoop
 import { EmptyState, HeaderCrudActions, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import type { AutomationLoopView } from "../types";
-import { automationLoopPath } from "../routing";
+import { automationLoopPath, automationThemePath } from "../routing";
 import { AutomationIssues } from "./AutomationIssues";
 import { useAutomationDraft } from "./useAutomationDraft";
 import { AllLoopsCanvas } from "./loops/AllLoopsCanvas";
@@ -77,11 +77,17 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
 
   return (
     <Panel title="Automation" titleExtra={displayedLoop?.id ? <span className="truncate text-muted-foreground">{displayedLoop.id}</span> : null} icon={<Route />} contentClassName="p-0" action={<div className="flex items-center gap-2">{creating ? editActions : null}{loopView === "all" ? <Button size="sm" onClick={() => navigate(automationLoopPath())}><Plus /> Add loop</Button> : null}</div>}>
-      {data.automationIssues.length > 0 ? <div className="border-b border-divider-strong p-4"><AutomationIssues issues={data.automationIssues} /></div> : null}
-      {loopView === "all" ? <AllLoopsCanvas config={draft} onSelect={(id) => navigate(automationLoopPath(id))} /> : null}
+      {[...data.automationIssues, ...data.loopThemeIssues].length > 0 ? <div className="border-b border-divider-strong p-4"><AutomationIssues issues={[...data.automationIssues, ...data.loopThemeIssues]} /></div> : null}
+      {loopView === "all" ? (
+        <AllLoopsCanvas
+          config={draft}
+          onOpenLoop={(id) => navigate(automationLoopPath(id))}
+          onEditTheme={(loopId, themeId) => navigate(automationThemePath(themeId, loopId))}
+        />
+      ) : null}
       {loopView !== "all" && !displayedLoop ? <div className="p-4"><EmptyState title="Loop not found." /></div> : null}
-      {loopView !== "all" && displayedLoop && creating ? <LoopCreationEditor loop={displayedLoop} loops={draft.loops} agents={data.agents} onChange={updateLoop} /> : null}
-      {loopView !== "all" && displayedLoop && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} scheduleState={scheduleState} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
+      {loopView !== "all" && displayedLoop && creating ? <LoopCreationEditor loop={displayedLoop} loops={draft.loops} agents={data.agents} themes={data.loopThemes} onChange={updateLoop} /> : null}
+      {loopView !== "all" && displayedLoop && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} themes={data.loopThemes} scheduleState={scheduleState} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
     </Panel>
   );
 }

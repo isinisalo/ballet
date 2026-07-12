@@ -233,6 +233,22 @@ describe("Loop theme rendering", () => {
     });
   });
 
+  it("applies theme styles to terminal normal and rejected edges", () => {
+    const themed = {
+      ...structuredClone(loopThemes.default),
+      edge: {
+        ...loopThemes.default.edge,
+        style: "dotted" as const,
+        rejectedStyle: "solid" as const
+      }
+    };
+    const completed = { key: "completed", sourceNodeKey: "one", targetNodeKey: "output-event-completed", eventType: "completed" };
+    const rejected = { key: "rejected", sourceNodeKey: "one", targetNodeKey: "output-event-rejected", eventType: "rejected" };
+
+    expect(loopEdgeLineStyle(completed, themed)).toBe("dotted");
+    expect(loopEdgeLineStyle(rejected, themed)).toBe("solid");
+  });
+
   it("keeps the built-in theme tokens and avatar visibility explicit", () => {
     expect(loopThemes["open-ai"]).toMatchObject({
       node: { labelColor: "#ffb95f", showAgentAvatarInNode: false },

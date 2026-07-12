@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import { createControlPlane } from "../control-plane/createControlPlane.js";
 
 const roots: string[] = [];
@@ -28,14 +29,19 @@ describe("project registration", () => {
         run_id, project_id, loop_id, root_run_id, source, status, snapshot_json, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run("run-1", "release-smoke", "delivery", "run-1", "manual", "running", JSON.stringify({
-      id: "delivery",
-      start: "gate",
-      steps: [{
-        id: "gate",
-        type: "human",
-        description: "Approve.",
-        on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-      }]
+      loop: {
+        id: "delivery",
+        theme: "open-ai",
+        start: "gate",
+        steps: [{
+          id: "gate",
+          type: "human",
+          description: "Approve.",
+          nodeSize: "small",
+          on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
+        }]
+      },
+      theme: resolveLoopTheme(builtInLoopThemes, "open-ai")
     }), "2026-07-11T00:00:00.000Z", "2026-07-11T00:00:00.000Z");
 
     expect(() => control.service.registerProject({

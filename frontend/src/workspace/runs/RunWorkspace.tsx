@@ -50,7 +50,7 @@ function RunLoopWorkspace({ loop, route, data, agentExecutionStates, runtimeStre
   const disabledReason = target?.ready ? undefined : target?.issues.map((issue) => issue.message).join(" · ");
   return (
     <Panel title="Ballet Run" titleExtra={<span className="truncate text-muted-foreground">{loop.id}</span>} icon={<Route />} contentClassName="p-0" action={<OverviewButton navigate={navigate} />}>
-      <LoopRunView config={data.automation} loop={loop} agents={data.agents} agentExecutionStates={agentExecutionStates} controller={controller} rootDetail={controller.rootDetail ?? (dashboard.detail?.rootRunId === route.rootRunId ? dashboard.detail : undefined)} startDisabledReason={disabledReason} onRootRunChange={(rootRunId) => navigate(runLoopPath(loop.id, rootRunId))} />
+      <LoopRunView config={data.automation} loop={loop} agents={data.agents} agentExecutionStates={agentExecutionStates} themes={data.loopThemes} controller={controller} rootDetail={controller.rootDetail ?? (dashboard.detail?.rootRunId === route.rootRunId ? dashboard.detail : undefined)} startDisabledReason={disabledReason} onRootRunChange={(rootRunId) => navigate(runLoopPath(loop.id, rootRunId))} />
     </Panel>
   );
 }

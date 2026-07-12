@@ -1,5 +1,6 @@
 import type { AgentAvatar } from "./agents.js";
 import type { ProjectLoop } from "./automation.js";
+import type { LoopTheme } from "./loopThemes.js";
 
 export type RuntimeProvider = "codex" | "copilot";
 export type RuntimeDeviceStatus = "online" | "offline";
@@ -406,6 +407,7 @@ export interface LoopRun {
   status: LoopRunStatus;
   input?: string;
   snapshot: ProjectLoop;
+  themeSnapshot: LoopTheme;
   runtimeDeviceId?: string;
   executionPlan?: LoopExecutionPlan;
   schedule?: LoopScheduleOccurrence;

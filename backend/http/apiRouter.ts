@@ -3,6 +3,7 @@ import { sendKnownHttpError } from "./errors.js";
 import * as automationHandlers from "./handlers/automationHandlers.js";
 import * as eventHandlers from "./handlers/eventHandlers.js";
 import * as loopRunHandlers from "./handlers/loopRunHandlers.js";
+import * as loopThemeHandlers from "./handlers/loopThemeHandlers.js";
 import * as projectHandlers from "./handlers/projectHandlers.js";
 import * as runtimeHandlers from "./handlers/runtimeHandlers.js";
 import * as workspaceHandlers from "./handlers/workspaceHandlers.js";
@@ -15,6 +16,9 @@ apiRouter.post("/reset", workspaceHandlers.resetData);
 
 apiRouter.get("/automation", automationHandlers.getAutomation);
 apiRouter.put("/automation", automationHandlers.saveAutomation);
+
+apiRouter.put("/loop-themes/:themeId", loopThemeHandlers.updateLoopTheme);
+apiRouter.post("/loop-themes", loopThemeHandlers.createLoopTheme);
 
 apiRouter.post("/project-documents", workspaceHandlers.saveProjectDocument);
 apiRouter.post("/project-documents/create", workspaceHandlers.createProjectDocument);

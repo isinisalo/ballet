@@ -72,6 +72,21 @@ describe("Runtime Registry UI", () => {
     expect(screen.getByRole("button", { name: "Create one-time code" })).toBeInTheDocument();
   });
 
+  it("preserves workspace history metadata when pairing query parameters are cleared", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({ __balletWorkspaceIndex: 7, retained: "value" }, "", "/runtimes?connect=1");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/runtimes/devices") return Response.json({ devices: [] });
+      return Response.json({ error: `Unhandled GET ${String(input)}` }, { status: 404 });
+    }));
+    render(<RuntimeRegistryView onSelectDevice={vi.fn()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Close" }));
+
+    expect(window.location.search).toBe("");
+    expect(window.history.state).toEqual({ __balletWorkspaceIndex: 7, retained: "value" });
+  });
+
   it("approves a claimed computer and exposes CLI readiness", async () => {
     const user = userEvent.setup();
     const readyDevice = runtimeDevice();

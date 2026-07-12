@@ -3,6 +3,7 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../shared/api/workspaceData.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
+import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome, ExecutionSpec, ExecutionTaskStatus, LoopRunStatus } from "../../shared/domain/runtime.js";
 import {
   bridgeRunInvalidations,
@@ -164,6 +165,34 @@ describe("root run read model", () => {
       expect.objectContaining({ code: "mixed_device", stepId: "release:publish" })
     ]));
   });
+
+  it("marks a root target unready when a reachable Loop has an invalid theme reference", async () => {
+    const data = appData();
+    data.loopThemeIssues = [{
+      path: "loops.1.theme",
+      loopId: "release",
+      themeId: "missing-theme",
+      message: "Loop release references unknown theme: missing-theme."
+    }];
+    const targets = await new RunTargetService({
+      readData: async () => data,
+      runs: service,
+      preflightAgent: () => ({ ok: true, deviceId: "device-a", issues: [] })
+    }).list();
+
+    expect(targets.loops).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "delivery",
+        ready: false,
+        issues: [expect.objectContaining({ code: "invalid_config", path: "loops.1.theme" })]
+      }),
+      expect.objectContaining({
+        id: "release",
+        ready: false,
+        issues: [expect.objectContaining({ code: "invalid_config", path: "loops.1.theme" })]
+      })
+    ]));
+  });
 });
 
 describe("run invalidation broadcaster", () => {
@@ -231,7 +260,10 @@ const insertLoop = (input: {
   INSERT INTO loop_runs (run_id, project_id, loop_id, root_run_id, parent_run_id, source, status, snapshot_json, created_at, updated_at, completed_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `).run(input.runId, PROJECT_ID, input.loop.id, input.rootRunId, input.parentRunId ?? null, input.source, input.status,
-  JSON.stringify(input.loop), input.createdAt, input.createdAt, input.status === "running" || input.status === "waiting_for_human" ? null : input.createdAt);
+  JSON.stringify({
+    loop: input.loop,
+    theme: resolveLoopTheme(builtInLoopThemes, input.loop.theme)
+  }), input.createdAt, input.createdAt, input.status === "running" || input.status === "waiting_for_human" ? null : input.createdAt);
 
 const insertStep = (input: {
   stepRunId: string; runId: string; loopId: string; stepId: string; agentId: string;
@@ -306,5 +338,7 @@ const appData = (): AppData => ({
     createdAt: "2026-07-11T08:00:00.000Z", updatedAt: "2026-07-11T08:00:00.000Z"
   })),
   automation: { version: 5, loops: [DELIVERY, RELEASE] },
-  automationIssues: []
+  automationIssues: [],
+  loopThemes: [...builtInLoopThemes],
+  loopThemeIssues: []
 });

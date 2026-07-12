@@ -1,5 +1,6 @@
 import type { AppData } from "../../shared/api/workspaceData.js";
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
+import { builtInLoopThemes } from "../../shared/domain/loopThemes.js";
 import { loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadGoals, loadSkills } from "../markdown.js";
 import { adrFromDocument, agentFromDocument, goalFromDocument, projectFromDocument, skillDocumentFromDocument } from "./documentMappers.js";
 import { buildSkillLookup } from "./skillLookup.js";
@@ -34,6 +35,8 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
     scheduleStates: [],
     automation: defaultProjectAutomationConfig(),
     automationIssues: [],
+    loopThemes: builtInLoopThemes.map((theme) => structuredClone(theme)),
+    loopThemeIssues: [],
     projectDocumentTree,
     documents: {
       project: projectDocs,

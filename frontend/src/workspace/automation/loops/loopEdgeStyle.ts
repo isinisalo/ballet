@@ -5,11 +5,11 @@ import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 import { loopEdgeDasharray, type LoopEdgeLineStyle, type LoopTheme } from "./loopTheme";
 
 const loopSolidEdgeStroke = "var(--loop-theme-edge-color)";
-const loopDashedEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 35%, transparent)";
-const loopReturnEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 48%, transparent)";
+const loopGhostEdgeStroke = "color-mix(in srgb, var(--loop-theme-edge-color) 35%, transparent)";
+const loopMutedThemeEdgeStroke = "color-mix(in srgb, var(--loop-theme-edge-color) 42%, var(--muted-foreground))";
 const loopCrossLoopApprovalEdgeStroke = "var(--loop-theme-edge-color)";
 const loopApprovalOutputEdgeStroke = "var(--loop-theme-edge-color)";
-const loopReworkOutputEdgeStroke = "color-mix(in srgb, var(--muted-foreground) 48%, transparent)";
+const loopReworkOutputEdgeStroke = loopMutedThemeEdgeStroke;
 const loopEdgeOpacity = 0.64;
 const loopGhostTargetEdgeOpacity = 0.5;
 const loopAnimatedEdgeOpacity = 1;
@@ -46,17 +46,16 @@ export function loopEdgeStyle(
 }
 
 function loopEdgeStroke(edge: LoopCanvasEdge, targetNode: LoopCanvasLayoutNode | undefined) {
-  if (loopEdgeTargetsGhostNode(edge, targetNode)) return loopDashedEdgeStroke;
+  if (loopEdgeTargetsGhostNode(edge, targetNode)) return loopGhostEdgeStroke;
   const outputSlotKind = loopEdgeOutputSlotKind(edge);
   if (outputSlotKind === "approval") return loopApprovalOutputEdgeStroke;
   if (outputSlotKind === "rework") return loopReworkOutputEdgeStroke;
-  if (edge.tone === "return") return loopReturnEdgeStroke;
+  if (edge.tone === "return") return loopMutedThemeEdgeStroke;
   if (edge.tone === "cross-loop") return loopCrossLoopApprovalEdgeStroke;
-  return edge.dashed ? loopDashedEdgeStroke : loopSolidEdgeStroke;
+  return loopSolidEdgeStroke;
 }
 
 export function loopEdgeLineStyle(edge: LoopCanvasEdge, theme: LoopTheme): LoopEdgeLineStyle {
-  if (edge.dashed) return "dashed";
   if (loopEdgeIsRejectedOutput(edge)) return theme.edge.rejectedStyle;
   if (edge.tone === "cross-loop") return theme.edge.crossLoopStyle;
   return theme.edge.style;

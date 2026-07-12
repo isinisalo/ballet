@@ -8,6 +8,8 @@ export type {
   ProjectDocumentSaveRequest,
   ProjectDocumentCreateRequest,
   AgentSaveRequest,
+  CreateLoopThemeRequest,
+  CreateLoopThemeResponse,
   EventIntakeRequest,
   WorkspaceSaveRequestByCollection,
   WorkspaceSaveResponseByCollection

@@ -13,13 +13,32 @@ import { MarkdownEntityService } from "./services/MarkdownEntityService.js";
 import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
 import { LoopRunService } from "./services/LoopRunService.js";
 import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
+import type { CreateLoopThemeRequest } from "../shared/api/workspace-contracts.js";
+import type { LoopTheme, LoopThemeId } from "../shared/domain/loopThemes.js";
+import { LoopThemeRepository } from "./loop-themes/LoopThemeRepository.js";
+import { LoopThemeService } from "./services/LoopThemeService.js";
 import type { LoopExecutionGateway } from "./services/LoopExecutionGateway.js";
 
 export class MarkdownStore {
+  private projectConfigMutationQueue: Promise<void> = Promise.resolve();
   private readonly runtimeDatabaseProvider = new RuntimeDatabaseProvider(() => this.root);
-  private readonly workspaceDataService = new WorkspaceDataService(() => this.root, this.runtimeDatabaseProvider);
+  private readonly loopThemeRepository = new LoopThemeRepository();
+  private readonly workspaceDataService = new WorkspaceDataService(
+    () => this.root,
+    this.runtimeDatabaseProvider,
+    this.loopThemeRepository
+  );
   private readonly markdownEntityService = new MarkdownEntityService(() => this.root, () => this.read());
-  private readonly automationService = new AutomationService(() => this.root, this.runtimeDatabaseProvider);
+  private readonly automationService = new AutomationService(
+    () => this.root,
+    this.runtimeDatabaseProvider,
+    this.loopThemeRepository
+  );
+  private readonly loopThemeService = new LoopThemeService(
+    () => this.root,
+    this.loopThemeRepository,
+    (config) => this.automationService.save(config)
+  );
   private readonly eventIntakeService = new EventIntakeService(this.runtimeDatabaseProvider);
   private readonly loopRunService = new LoopRunService(() => this.read(), this.runtimeDatabaseProvider);
   private agentRemovalHook?: (agentId: string) => Promise<void> | void;
@@ -65,7 +84,15 @@ export class MarkdownStore {
   }
 
   saveAutomation(config: ProjectAutomationConfig): Promise<ProjectAutomationConfig> {
-    return this.automationService.save(config);
+    return this.runProjectConfigMutation(() => this.automationService.save(config));
+  }
+
+  updateLoopTheme(themeId: LoopThemeId, theme: LoopTheme): Promise<LoopTheme> {
+    return this.loopThemeService.update(themeId, theme);
+  }
+
+  createLoopTheme(input: CreateLoopThemeRequest) {
+    return this.runProjectConfigMutation(() => this.loopThemeService.create(input));
   }
 
   saveProjectDocument(input: {
@@ -91,7 +118,7 @@ export class MarkdownStore {
     return this.loopRunService.start(loopId, input, source);
   }
 
-  dispatchScheduledLoop(input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan"> & {
+  dispatchScheduledLoop(input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan" | "themeSnapshot"> & {
     canDispatch?: () => boolean;
   }) {
     return this.loopRunService.dispatchScheduled(input);
@@ -127,6 +154,18 @@ export class MarkdownStore {
 
   runtimeDatabase(): RuntimeDatabase {
     return this.loopRunService.database();
+  }
+
+  private async runProjectConfigMutation<T>(mutation: () => Promise<T>): Promise<T> {
+    const predecessor = this.projectConfigMutationQueue;
+    let release!: () => void;
+    this.projectConfigMutationQueue = new Promise<void>((resolve) => { release = resolve; });
+    await predecessor;
+    try {
+      return await mutation();
+    } finally {
+      release();
+    }
   }
 }
 

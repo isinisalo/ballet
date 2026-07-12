@@ -85,6 +85,19 @@ function renderOutputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeCont
   const eventType = outputEvent?.eventType ?? "Terminal transition";
   const sourceStep = node.sourceStepId ? context.stepByKey.get(node.sourceStepId) : undefined;
   const editable = (node.loopId ?? context.selectedLoopId) === context.selectedLoopId;
+  const className = "nodrag nopan block size-[22px] rounded border border-dashed border-muted-foreground/50 bg-background/60 opacity-60 transition-colors";
+
+  if (context.staticPreview) {
+    return (
+      <div
+        role="img"
+        data-loop-output-event={eventType}
+        aria-label={`Terminal target: ${eventType}`}
+        title={eventType}
+        className={className}
+      />
+    );
+  }
 
   return (
     <button
@@ -94,7 +107,7 @@ function renderOutputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeCont
       title={`Add step for ${eventType}`}
       disabled={!editable || !context.canAddStepForEvent(sourceStep)}
       onClick={() => context.onAddStep(outputEvent?.outputId, sourceStep)}
-      className="nodrag nopan block size-[22px] rounded border border-dashed border-muted-foreground/50 bg-background/60 opacity-60 transition-colors hover:border-primary/65 hover:bg-card hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-muted-foreground/50 disabled:hover:bg-background/60"
+      className={`${className} hover:border-primary/65 hover:bg-card hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-muted-foreground/50 disabled:hover:bg-background/60`}
     />
   );
 }

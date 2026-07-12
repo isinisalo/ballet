@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { EventRecord, RuntimeEvent } from "../shared/domain/events.js";
+import type { LoopTheme } from "../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
   ExecutionRuntimeSnapshot,
@@ -28,6 +29,7 @@ export type { IntakeEventInput, PublishEventResult };
 
 export interface DispatchLoopScheduleInput {
   loopId: string;
+  themeSnapshot: LoopTheme;
   stepId: string;
   definitionHash: string;
   scheduledFor: string;
@@ -98,13 +100,14 @@ export class RuntimeDatabase {
   startLoopRun(
     config: ProjectAutomationConfig,
     loopId: string,
+    themeSnapshot: LoopTheme,
     input?: string,
     source: LoopRunSource = "manual",
     runtimeDeviceId?: string,
     executionPlan?: LoopExecutionPlan,
     schedule?: { stepId: string; scheduledFor: string }
   ): LoopRunDetails {
-    return this.loopRunEngine.start(config, loopId, { input, source, runtimeDeviceId, executionPlan, schedule });
+    return this.loopRunEngine.start(config, loopId, themeSnapshot, { input, source, runtimeDeviceId, executionPlan, schedule });
   }
 
   bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
@@ -177,7 +180,7 @@ export class RuntimeDatabase {
         });
         return { status: "skipped", error };
       }
-      const run = this.loopRunEngine.start(config, input.loopId, {
+      const run = this.loopRunEngine.start(config, input.loopId, input.themeSnapshot, {
         source: "schedule",
         runtimeDeviceId: input.runtimeDeviceId,
         executionPlan: input.executionPlan,
@@ -196,12 +199,13 @@ export class RuntimeDatabase {
 
   respondToStepRun(
     config: ProjectAutomationConfig,
+    loopThemes: readonly LoopTheme[],
     runId: string,
     stepRunId: string,
     result: StepRunResult,
     input: string
   ): LoopRunDetails {
-    return this.loopRunEngine.respond(config, runId, stepRunId, result, input);
+    return this.loopRunEngine.respond(config, loopThemes, runId, stepRunId, result, input);
   }
 
   cancelLoopRun(runId: string): LoopRunDetails {
@@ -210,13 +214,14 @@ export class RuntimeDatabase {
 
   completeAgentStep(
     config: ProjectAutomationConfig,
+    loopThemes: readonly LoopTheme[],
     input: {
       stepRunId: string;
       outcome?: AgentOutcome;
       error?: string;
     }
   ): LoopRunDetails {
-    return this.loopRunEngine.completeAgentStep(config, input);
+    return this.loopRunEngine.completeAgentStep(config, loopThemes, input);
   }
 
   getLoopRun(runId: string): LoopRunDetails | undefined {

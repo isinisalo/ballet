@@ -3,6 +3,7 @@ import type { AgentExecutionState, AppData } from "@shared/api/workspace-contrac
 import type { RuntimeStreamStatus } from "../app/useRuntimeStream";
 import { AgentsView } from "./agents/AgentsView";
 import { AutomationView } from "./automation/AutomationView";
+import { LoopThemeEditorView } from "./automation/themes/LoopThemeEditorView";
 import type { useWorkspaceMutations } from "./data/useWorkspaceMutations";
 import {
     AdrsPage,
@@ -17,6 +18,7 @@ import { SkillsView } from "./skills/SkillsView";
 import { RunWorkspace } from "./runs/RunWorkspace";
 import type { RunDashboardState } from "./runs/useRunDashboard";
 import type { RouteState } from "./types";
+import type { WorkspaceNavigationBlocker } from "./useWorkspaceNavigation";
 
 type WorkspaceMutationCallbacks = ReturnType<typeof useWorkspaceMutations>;
 
@@ -28,7 +30,8 @@ export function WorkspaceRouteOutlet({
   agentExecutionStates,
   runtimeStreamStatus,
   runDashboard,
-  navigate
+  navigate,
+  setNavigationBlocker
 }: {
   route: RouteState;
   data: AppData;
@@ -38,6 +41,7 @@ export function WorkspaceRouteOutlet({
   runtimeStreamStatus: RuntimeStreamStatus;
   runDashboard: RunDashboardState;
   navigate: (path: string) => void;
+  setNavigationBlocker: (blocker: WorkspaceNavigationBlocker | null) => void;
 }) {
   switch (route.view) {
     case "projects":
@@ -57,6 +61,8 @@ export function WorkspaceRouteOutlet({
       return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
     case "automation":
       return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} runtimeStreamStatus={runtimeStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
+    case "loop-theme":
+      return <LoopThemeEditorView data={data} themeId={route.loopThemeId} sourceThemeId={route.loopThemeSourceId} loopId={route.loopThemeLoopId} updateTheme={mutations.updateLoopTheme} createTheme={mutations.createLoopTheme} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "runtimes":
       return <RuntimeRegistryView selectedDeviceId={route.runtimeDeviceId} onSelectDevice={(deviceId) => navigate(deviceId ? `/runtimes?id=${encodeURIComponent(deviceId)}` : "/runtimes")} />;
     case "agents":

@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { v4 as uuid } from "uuid";
 import type { ProjectAgentStep, ProjectHumanStep, ProjectLoop } from "../../shared/domain/automation.js";
+import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
   ExecutionRuntimeSnapshot,
@@ -22,6 +23,7 @@ import { now } from "./RuntimeDbTypes.js";
 export interface CreateLoopRunInput {
   runId?: string;
   loop: ProjectLoop;
+  themeSnapshot: LoopTheme;
   rootRunId?: string;
   parentRunId?: string;
   parentStepRunId?: string;
@@ -138,7 +140,7 @@ export class LoopRunStore {
       scheduleStepId: input.schedule?.stepId ?? null,
       scheduledFor: input.schedule?.scheduledFor ?? null,
       input: input.input ?? null,
-      snapshotJson: stringifyJson(input.loop),
+      snapshotJson: stringifyJson({ loop: input.loop, theme: input.themeSnapshot }),
       createdAt: timestamp,
       updatedAt: timestamp
     });

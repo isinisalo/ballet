@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AppData } from "../../shared/api/workspaceData.js";
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import { ControlPlanePreflightError } from "../control-plane/errors.js";
 import { RuntimeDatabase } from "../runtime-db.js";
 import { scheduleDefinitionHash } from "../scheduling/index.js";
@@ -13,6 +14,7 @@ import type { RuntimeDatabaseProvider } from "../services/RuntimeDatabaseProvide
 
 const roots: string[] = [];
 const databases: RuntimeDatabase[] = [];
+const openAiTheme = resolveLoopTheme(builtInLoopThemes, "open-ai");
 
 afterEach(async () => {
   databases.splice(0).forEach((database) => database.close());
@@ -38,7 +40,7 @@ describe("scheduled LoopRun service", () => {
 
   it("skips an active loop before running preflight", async () => {
     const context = await serviceContext("human");
-    context.database.startLoopRun(context.data.automation, "scheduled-work");
+    context.database.startLoopRun(context.data.automation, "scheduled-work", openAiTheme);
     context.service.setExecutionGateway(gateway(async () => {
       throw new Error("Preflight should not run for an active loop.");
     }));
@@ -207,7 +209,8 @@ const automationConfig = (targetType: "agent" | "human"): ProjectAutomationConfi
 
 const workspace = (automation: ProjectAutomationConfig): AppData => ({
   projects: [], goals: [], adrs: [], agents: [], skills: [], policies: [], eventDefinitions: [],
-  events: [], loopRuns: [], scheduleStates: [], automation, automationIssues: []
+  events: [], loopRuns: [], scheduleStates: [], automation, automationIssues: [],
+  loopThemes: [...builtInLoopThemes], loopThemeIssues: []
 });
 
 const gateway = (prepare: LoopExecutionGateway["prepare"]): LoopExecutionGateway => ({

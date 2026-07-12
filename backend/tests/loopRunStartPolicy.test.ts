@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../shared/api/workspaceData.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
+import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { LoopRunDetails } from "../../shared/domain/runtime.js";
 import type { RuntimeDatabase } from "../runtime-db.js";
 import type { LoopExecutionGateway } from "../services/LoopExecutionGateway.js";
@@ -48,6 +49,8 @@ const data = (projectRoot: string, loopIds: string[]): AppData => ({
   scheduleStates: [],
   automation: { version: 5, loops: loopIds.map(loop) },
   automationIssues: [],
+  loopThemes: [...builtInLoopThemes],
+  loopThemeIssues: [],
   projectRoot
 });
 
@@ -68,6 +71,7 @@ const service = (workspace: AppData) => {
     source: "manual",
     status: "running",
     snapshot: workspace.automation.loops[0]!,
+    themeSnapshot: resolveLoopTheme(builtInLoopThemes, workspace.automation.loops[0]!.theme),
     transitionCount: 0,
     stepRuns: [],
     createdAt: "2026-07-11T08:00:00.000Z",
@@ -92,6 +96,21 @@ const service = (workspace: AppData) => {
 };
 
 describe("loop engineering root-start policy", () => {
+  it("blocks a Run when a reachable Loop references an unknown theme", async () => {
+    const root = await projectWithTasks();
+    const workspace = data(root, ["delivery", "release"]);
+    const rootStep = workspace.automation.loops[0]!.steps[0]!;
+    if (!("approved" in rootStep.on)) throw new Error("Expected executable root step.");
+    rootStep.on.approved = { loop: "release" };
+    workspace.automation.loops[1]!.theme = "missing-project-theme";
+    const test = service(workspace);
+
+    await expect(test.instance.start("delivery", "Ship it"))
+      .rejects.toThrow("Cannot start a loop while its theme is invalid.");
+    expect(test.gateway.prepare).not.toHaveBeenCalled();
+    expect(test.runtime.startLoopRun).not.toHaveBeenCalled();
+  });
+
   it.each(["ui-design", "implementation"])("accepts one known task for %s", async (loopId) => {
     const root = await projectWithTasks();
     const test = service(data(root, [loopId]));

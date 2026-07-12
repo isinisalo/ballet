@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const SCHEMA_VERSION = "6";
+const SCHEMA_VERSION = "7";
 
 export const resolveControlPlaneDbPath = (): string => {
   const configured = process.env.BALLET_CONTROL_PLANE_DB_PATH?.trim();

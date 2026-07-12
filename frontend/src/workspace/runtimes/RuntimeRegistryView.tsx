@@ -66,7 +66,7 @@ export function RuntimeRegistryView({ selectedDeviceId, onSelectDevice }: {
             const url = new URL(window.location.href);
             url.searchParams.delete("pairing");
             url.searchParams.delete("connect");
-            window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+            window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
           }
         }}
         onConnected={(deviceId) => {

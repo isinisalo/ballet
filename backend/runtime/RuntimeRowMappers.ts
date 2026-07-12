@@ -1,5 +1,6 @@
 import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { EventRecord, RuntimeEvent } from "../../shared/domain/events.js";
+import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
   ExecutionRuntimeSnapshot,
@@ -55,26 +56,35 @@ export const runtimeEventToEventRecord = (event: RuntimeEvent): EventRecord => (
 export const toEventRecord = (row: EventRow): EventRecord =>
   runtimeEventToEventRecord(toRuntimeEvent(row));
 
-export const toLoopRun = (row: LoopRunRow): LoopRun => ({
-  runId: row.run_id,
-  loopId: row.loop_id,
-  rootRunId: row.root_run_id,
-  parentRunId: row.parent_run_id ?? undefined,
-  parentStepRunId: row.parent_step_run_id ?? undefined,
-  source: row.source,
-  status: row.status,
-  runtimeDeviceId: row.runtime_device_id ?? undefined,
-  executionPlan: row.execution_plan_json ? JSON.parse(row.execution_plan_json) as LoopExecutionPlan : undefined,
-  schedule: row.schedule_step_id && row.scheduled_for
-    ? { stepId: row.schedule_step_id, scheduledFor: row.scheduled_for }
-    : undefined,
-  input: row.input ?? undefined,
-  snapshot: JSON.parse(row.snapshot_json) as ProjectLoop,
-  transitionCount: row.transition_count,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  completedAt: row.completed_at ?? undefined
-});
+interface StoredLoopRunSnapshot {
+  loop: ProjectLoop;
+  theme: LoopTheme;
+}
+
+export const toLoopRun = (row: LoopRunRow): LoopRun => {
+  const snapshot = JSON.parse(row.snapshot_json) as StoredLoopRunSnapshot;
+  return {
+    runId: row.run_id,
+    loopId: row.loop_id,
+    rootRunId: row.root_run_id,
+    parentRunId: row.parent_run_id ?? undefined,
+    parentStepRunId: row.parent_step_run_id ?? undefined,
+    source: row.source,
+    status: row.status,
+    runtimeDeviceId: row.runtime_device_id ?? undefined,
+    executionPlan: row.execution_plan_json ? JSON.parse(row.execution_plan_json) as LoopExecutionPlan : undefined,
+    schedule: row.schedule_step_id && row.scheduled_for
+      ? { stepId: row.schedule_step_id, scheduledFor: row.scheduled_for }
+      : undefined,
+    input: row.input ?? undefined,
+    snapshot: snapshot.loop,
+    themeSnapshot: snapshot.theme,
+    transitionCount: row.transition_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at ?? undefined
+  };
+};
 
 export const toStepRun = (row: StepRunRow): StepRun => ({
   stepRunId: row.step_run_id,
