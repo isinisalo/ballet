@@ -2,8 +2,20 @@ import type { Agent, AgentExecutionState, AgentNodeStyle } from "../domain/agent
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
+  ProjectExecutableStep,
   ProjectLoop,
+  ProjectOnceStepSchedule,
+  ProjectRecurringStepSchedule,
+  ProjectScheduledStep,
+  ProjectScheduledStepTransitions,
+  ProjectScheduleCadence,
+  ProjectScheduleWeekday,
   ProjectStep,
+  ProjectStepSchedule,
+  ProjectStepTransitionEntry,
+  ProjectStepTransitionId,
+  ProjectStepTransitionMappers,
+  ProjectStepTransitions,
   StepTransitionTarget,
   Policy
 } from "../domain/automation.js";
@@ -29,6 +41,7 @@ import type {
   LoopRun,
   LoopRunDetails,
   LoopExecutionPlan,
+  LoopScheduleState,
   LoopRuntimePreflight,
   PairingSession,
   PortableAgentRuntimeIntent,
@@ -75,6 +88,7 @@ export interface WorkspaceDataDto {
   eventDefinitions: EventDefinition[];
   events: EventRecord[];
   loopRuns: LoopRunDetails[];
+  scheduleStates: LoopScheduleState[];
   automation: ProjectAutomationConfig;
   automationIssues: ProjectAutomationIssue[];
   projectDocumentTree?: ProjectDocumentTreeNode[];
@@ -108,7 +122,14 @@ export type WorkspaceSaveResponseByCollection = {
 export type AppData = WorkspaceDataDto;
 export type CollectionName = WorkspaceCollectionName;
 
-export { defaultProjectAutomationConfig } from "../domain/automation.js";
+export {
+  defaultProjectAutomationConfig,
+  getProjectStepTransitionEntries,
+  getProjectStepTransitionTargets,
+  isProjectExecutableStep,
+  mapProjectStepTransitions,
+  resolveEffectiveStartStep
+} from "../domain/automation.js";
 
 export type {
   Agent,
@@ -124,12 +145,25 @@ export type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectDocumentTreeNode,
+  ProjectExecutableStep,
   ProjectLoop,
+  ProjectOnceStepSchedule,
+  ProjectRecurringStepSchedule,
+  ProjectScheduledStep,
+  ProjectScheduledStepTransitions,
+  ProjectScheduleCadence,
+  ProjectScheduleWeekday,
   ProjectStep,
+  ProjectStepSchedule,
+  ProjectStepTransitionEntry,
+  ProjectStepTransitionId,
+  ProjectStepTransitionMappers,
+  ProjectStepTransitions,
   StepTransitionTarget,
   LoopRun,
   LoopRunDetails,
   LoopExecutionPlan,
+  LoopScheduleState,
   LoopRuntimePreflight,
   StartLoopRunRequest,
   StartAgentRunRequest,

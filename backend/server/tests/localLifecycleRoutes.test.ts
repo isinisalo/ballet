@@ -38,11 +38,13 @@ describe("local lifecycle HTTP API", () => {
     expect((await fetch(context.url, { headers: { Authorization: "Bearer incorrect-token" } })).status).toBe(401);
 
     const before = await responseJson(context.url, authorized);
+    expect(context.pauseCount()).toBe(0);
     expect(before).toEqual({ activeRuns: 2, pendingFinalizations: 0, idle: false });
     expect(context.runtime.listLoopRuns().some((run) => run.runId === context.loopRunId)).toBe(false);
     expect(context.runtime.listActiveLoopRuns().map((run) => run.runId)).toContain(context.loopRunId);
 
     const cancelled = await responseJson(context.url, authorized, "POST");
+    expect(context.pauseCount()).toBe(1);
     expect(cancelled).toEqual({ activeRuns: 0, pendingFinalizations: 0, idle: true });
     expect(context.control.service.getRun(context.agentRunId).status).toBe("cancelled");
     expect(context.runtime.getLoopRun(context.loopRunId)?.status).toBe("cancelled");
@@ -121,9 +123,13 @@ const listen = async () => {
   const loop = runtime.startLoopRun(humanAutomation, "approval");
   insertCompletedHistory(runtime, 500);
 
+  let schedulerPauseCount = 0;
   const store: LocalLifecycleLoopStore = {
     listActiveLoopRuns: () => runtime.listActiveLoopRuns(),
-    cancelLoopRun: (runId) => runtime.cancelLoopRun(runId)
+    cancelLoopRun: (runId) => {
+      if (schedulerPauseCount === 0) throw new Error("Scheduler must pause before Loop cancellation.");
+      return runtime.cancelLoopRun(runId);
+    }
   };
   const app = express();
   app.use(express.json());
@@ -132,7 +138,8 @@ const listen = async () => {
     projectId: PROJECT_ID,
     controlPlane: control.service,
     database: control.database,
-    store
+    store,
+    scheduler: { pause: async () => { schedulerPauseCount += 1; } }
   }));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     void _next;
@@ -151,6 +158,7 @@ const listen = async () => {
     deviceId: paired.deviceId,
     agentRunId: agentRun.id,
     loopRunId: loop.runId,
+    pauseCount: () => schedulerPauseCount,
     url: `http://127.0.0.1:${address.port}/api/local/lifecycle`
   };
 };
@@ -194,7 +202,7 @@ const heartbeat = (backendId: string) => ({
 });
 
 const humanAutomation: ProjectAutomationConfig = {
-  version: 3,
+  version: 4,
   loops: [{
     id: "approval",
     start: "approve",

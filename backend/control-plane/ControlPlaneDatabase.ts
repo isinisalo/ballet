@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const SCHEMA_VERSION = "5";
+const SCHEMA_VERSION = "6";
 
 export const resolveControlPlaneDbPath = (): string => {
   const configured = process.env.BALLET_CONTROL_PLANE_DB_PATH?.trim();
@@ -81,6 +81,8 @@ export class ControlPlaneDatabase {
         status TEXT NOT NULL,
         runtime_device_id TEXT,
         execution_plan_json TEXT,
+        schedule_step_id TEXT,
+        scheduled_for TEXT,
         input TEXT,
         snapshot_json TEXT NOT NULL,
         transition_count INTEGER NOT NULL DEFAULT 0,
@@ -111,6 +113,20 @@ export class ControlPlaneDatabase {
         updated_at TEXT NOT NULL,
         completed_at TEXT,
         FOREIGN KEY(run_id) REFERENCES loop_runs(run_id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS loop_schedule_state (
+        project_id TEXT NOT NULL,
+        loop_id TEXT NOT NULL,
+        step_id TEXT NOT NULL,
+        definition_hash TEXT NOT NULL,
+        next_run_at TEXT,
+        last_scheduled_at TEXT,
+        last_status TEXT CHECK(last_status IN ('started','skipped','missed')),
+        last_run_id TEXT,
+        last_error TEXT,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(project_id, loop_id, step_id),
+        FOREIGN KEY(last_run_id) REFERENCES loop_runs(run_id) ON DELETE SET NULL
       );
 
       CREATE TABLE IF NOT EXISTS runtime_devices (
@@ -212,10 +228,14 @@ export class ControlPlaneDatabase {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedupe_key ON events(project_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS idx_loop_runs_one_active
         ON loop_runs(project_id, loop_id) WHERE status IN ('running', 'waiting_for_human');
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_loop_runs_schedule_occurrence
+        ON loop_runs(project_id, loop_id, schedule_step_id, scheduled_for)
+        WHERE source = 'schedule' AND schedule_step_id IS NOT NULL AND scheduled_for IS NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_loop_runs_latest ON loop_runs(project_id, loop_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_loop_runs_root ON loop_runs(project_id, root_run_id);
       CREATE INDEX IF NOT EXISTS idx_step_runs_queue ON step_runs(project_id, status, created_at);
       CREATE INDEX IF NOT EXISTS idx_step_runs_run ON step_runs(project_id, run_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_loop_schedule_due ON loop_schedule_state(project_id, next_run_at);
       CREATE TRIGGER IF NOT EXISTS execution_task_spec_is_immutable
       BEFORE UPDATE OF spec_json, spec_hash, project_id, runtime_backend_id, device_id, kind, root_run_id ON execution_tasks
       BEGIN SELECT RAISE(ABORT, 'execution task specification is immutable'); END;
@@ -270,6 +290,7 @@ export class ControlPlaneDatabase {
       DROP TABLE IF EXISTS runtime_devices;
       DROP TABLE IF EXISTS admin_sessions;
       DROP TABLE IF EXISTS admins;
+      DROP TABLE IF EXISTS loop_schedule_state;
       DROP TABLE IF EXISTS step_runs;
       DROP TABLE IF EXISTS loop_runs;
       DROP TABLE IF EXISTS events;

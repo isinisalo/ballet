@@ -15,6 +15,7 @@ export interface LocalLifecycleDependencies {
   controlPlane: ControlPlaneService;
   database: ControlPlaneDatabase;
   store: LocalLifecycleLoopStore;
+  scheduler?: { pause: () => Promise<void> };
 }
 
 export const createLocalLifecycleRouter = (dependencies: LocalLifecycleDependencies): express.Router => {
@@ -29,6 +30,7 @@ export const createLocalLifecycleRouter = (dependencies: LocalLifecycleDependenc
   router.get("/", (_req, res) => res.json(lifecycleStatus(dependencies)));
   router.post("/", async (req, res, next) => {
     try {
+      await dependencies.scheduler?.pause();
       await cancelAll(dependencies);
       res.json(lifecycleStatus(dependencies));
     } catch (error) {

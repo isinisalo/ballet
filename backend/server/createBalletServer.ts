@@ -11,6 +11,7 @@ import { LoopExecutionReconciler } from "../integration/LoopExecutionReconciler.
 import { resolveActiveProject } from "../project/activeProject.js";
 import { resolveRuntimeDbPath } from "../runtime-db.js";
 import { onRuntimeChanged } from "../runtime-events.js";
+import { LoopScheduler } from "../scheduling/LoopScheduler.js";
 import {
   bridgeRunInvalidations,
   createRunRouter,
@@ -70,6 +71,12 @@ export const createBalletServer = async () => {
     readData: () => store.read(),
     projectId: project.id
   }).reconcile();
+  const scheduler = new LoopScheduler({
+    readData: () => store.read(),
+    database: () => store.runtimeDatabase(),
+    dispatch: (input) => store.dispatchScheduledLoop(input)
+  });
+  scheduler.start();
   const runReadModel = new RunReadModelService(new RunReadModelStore({
     runtimeConnection: () => store.runtimeDatabase().connection(),
     controlPlaneConnection: () => controlPlane.database.connection(),
@@ -101,7 +108,8 @@ export const createBalletServer = async () => {
       projectId: project.id,
       controlPlane: controlPlane.service,
       database: controlPlane.database,
-      store
+      store,
+      scheduler
     }));
   }
   app.use("/api", (req, res, next) => adminAuth(controlPlane.service, !["GET", "HEAD", "OPTIONS"].includes(req.method))(req, res, next));
@@ -125,7 +133,7 @@ export const createBalletServer = async () => {
 
   const server = createServer(app);
   controlPlane.attachWebSocket(server);
-  return { app, server, controlPlane, coordinator, project, closeRunInvalidations };
+  return { app, server, controlPlane, coordinator, scheduler, project, closeRunInvalidations };
 };
 
 const shellQuote = (value: string): string => `'${value.replaceAll("'", `'"'"'`)}'`;

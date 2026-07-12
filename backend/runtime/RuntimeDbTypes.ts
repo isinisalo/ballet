@@ -33,12 +33,27 @@ export interface LoopRunRow {
   status: LoopRunStatus;
   runtime_device_id: string | null;
   execution_plan_json: string | null;
+  schedule_step_id: string | null;
+  scheduled_for: string | null;
   input: string | null;
   snapshot_json: string;
   transition_count: number;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+}
+
+export interface LoopScheduleStateRow {
+  project_id: string;
+  loop_id: string;
+  step_id: string;
+  definition_hash: string;
+  next_run_at: string | null;
+  last_scheduled_at: string | null;
+  last_status: "started" | "skipped" | "missed" | null;
+  last_run_id: string | null;
+  last_error: string | null;
+  updated_at: string;
 }
 
 export interface StepRunRow {

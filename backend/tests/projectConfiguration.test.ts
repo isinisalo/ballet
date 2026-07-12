@@ -69,6 +69,10 @@ const approvedTransitionCount = (config: ProjectAutomationConfig, initialLoopId:
     visited.add(state);
     const step = loop.steps.find((candidate) => candidate.id === stepId);
     if (!step) throw new Error(`Unknown step ${state}.`);
+    if (step.type === "scheduled") {
+      stepId = step.on.triggered;
+      continue;
+    }
     const target = step.on.approved;
     transitions += 1;
     if (typeof target === "string") {

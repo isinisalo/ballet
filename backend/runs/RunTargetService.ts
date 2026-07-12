@@ -1,6 +1,7 @@
 import type { AppData } from "../../shared/api/workspaceData.js";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
+import { getProjectStepTransitionTargets } from "../../shared/domain/automation.js";
 import type { RunTargetIssue, RunTargetsResponse } from "../../shared/domain/runs.js";
 import type { RuntimePreflightIssue } from "../../shared/domain/runtime.js";
 import type { RunReadModelService } from "./RunReadModelService.js";
@@ -101,7 +102,7 @@ const reachableAgentSteps = (data: AppData, rootLoopId: string): Array<{ agentId
     if (!loop) continue;
     for (const step of loop.steps) {
       if (step.type === "agent") result.push({ agentId: step.agentId, stepId: `${loop.id}:${step.id}` });
-      for (const target of [step.on.approved, step.on.rejected]) {
+      for (const target of getProjectStepTransitionTargets(step)) {
         if (typeof target === "object" && "loop" in target) pending.push(target.loop);
       }
     }

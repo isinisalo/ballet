@@ -1,5 +1,8 @@
 import { z } from "zod";
-import type { ProjectAutomationConfig } from "../domain/automation.js";
+import type {
+  ProjectAutomationConfig,
+  ProjectStepSchedule
+} from "../domain/automation.js";
 import {
   automationFieldLimits,
   kebabCaseIdPattern
@@ -130,14 +133,74 @@ const stepTransitionsSchema = z.object({
   approved: stepTransitionTargetSchema,
   rejected: stepTransitionTargetSchema
 }).strict();
-const stepBase = {
+const executableStepBase = {
   id: automationStepIdSchema,
   description: optionalAutomationDescriptionSchema,
   on: stepTransitionsSchema
 };
+const calendarDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+const clockTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const isCalendarDate = (value: string): boolean => {
+  if (!calendarDatePattern.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
+const isTimeZone = (value: string): boolean => {
+  if (/^[+-]\d{2}:\d{2}$/.test(value)) return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+};
+const calendarDateSchema = z.string().refine(isCalendarDate, "Expected a valid date in YYYY-MM-DD format.");
+const clockTimeSchema = z.string().regex(clockTimePattern, "Expected a valid time in HH:mm format.");
+const timeZoneSchema = z.string().min(1).refine(isTimeZone, "Expected a valid IANA time zone.");
+const scheduleBase = {
+  time: clockTimeSchema,
+  timeZone: timeZoneSchema
+};
+const recurringScheduleBase = {
+  ...scheduleBase,
+  kind: z.literal("recurring"),
+  startsOn: calendarDateSchema
+};
+const scheduleWeekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+const recurringScheduleSchema = z.discriminatedUnion("cadence", [
+  z.object({ ...recurringScheduleBase, cadence: z.literal("daily") }).strict(),
+  z.object({ ...recurringScheduleBase, cadence: z.literal("weekdays") }).strict(),
+  z.object({
+    ...recurringScheduleBase,
+    cadence: z.literal("weekly"),
+    weekdays: z.array(scheduleWeekdaySchema)
+      .min(1)
+      .refine((days) => new Set(days).size === days.length, "Weekdays must be unique.")
+  }).strict(),
+  z.object({
+    ...recurringScheduleBase,
+    cadence: z.literal("monthly"),
+    dayOfMonth: z.number().int().min(1).max(31)
+  }).strict()
+]);
+export const projectStepScheduleSchema = z.union([
+  z.object({
+    ...scheduleBase,
+    kind: z.literal("once"),
+    date: calendarDateSchema
+  }).strict(),
+  recurringScheduleSchema
+]) satisfies z.ZodType<ProjectStepSchedule>;
 const projectStepSchema = z.discriminatedUnion("type", [
-  z.object({ ...stepBase, type: z.literal("agent"), agentId: z.string().min(1) }).strict(),
-  z.object({ ...stepBase, type: z.literal("human") }).strict()
+  z.object({ ...executableStepBase, type: z.literal("agent"), agentId: z.string().min(1) }).strict(),
+  z.object({ ...executableStepBase, type: z.literal("human") }).strict(),
+  z.object({
+    id: automationStepIdSchema,
+    description: optionalAutomationDescriptionSchema,
+    type: z.literal("scheduled"),
+    schedule: projectStepScheduleSchema,
+    on: z.object({ triggered: automationStepIdSchema }).strict()
+  }).strict()
 ]);
 
 const projectLoopSchema = z.object({
@@ -147,7 +210,7 @@ const projectLoopSchema = z.object({
 }).strict();
 
 export const automationConfigSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 

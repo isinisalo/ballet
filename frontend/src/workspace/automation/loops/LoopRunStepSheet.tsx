@@ -1,12 +1,12 @@
 import type { Agent, ExecutionAgentSnapshot, ExecutionTask, ProjectStep, StepRun } from "@shared/api/workspace-contracts";
-import { Bot, ShieldCheck } from "lucide-react";
+import { Bot, CalendarClock, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CliRunConsole } from "../../components";
 import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
 import { LoopRunStepPanel } from "./LoopRunStepPanel";
 
 export function LoopRunStepHeader({ step, stepRun }: { step: ProjectStep; stepRun: StepRun }) {
-  const Icon = step.type === "human" ? ShieldCheck : Bot;
+  const Icon = step.type === "human" ? ShieldCheck : step.type === "scheduled" ? CalendarClock : Bot;
   return (
     <header className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-xs">
       <Icon className="size-3.5 text-muted-foreground" />

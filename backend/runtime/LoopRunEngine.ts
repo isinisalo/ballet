@@ -5,6 +5,7 @@ import type {
   ProjectStep,
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
+import { resolveEffectiveStartStep } from "../../shared/domain/automation.js";
 import type {
   AgentOutcome,
   LoopExecutionPlan,
@@ -26,6 +27,7 @@ interface StartOptions {
   parentStepRunId?: string;
   runtimeDeviceId?: string;
   executionPlan?: LoopExecutionPlan;
+  schedule?: { stepId: string; scheduledFor: string };
 }
 
 const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } =>
@@ -117,6 +119,7 @@ export class LoopRunEngine {
       }
 
       const step = this.requireSnapshotStep(run, stepRun.stepId);
+      if (step.type !== "agent") throw new LoopRunStateError("An agent StepRun must reference an agent step.");
       const result = input.outcome ? resultForOutcome(input.outcome) : "rejected";
       this.store.completeStepRun(stepRun, result, {
         outcome: input.outcome,
@@ -162,11 +165,12 @@ export class LoopRunEngine {
       parentStepRunId: options.parentStepRunId,
       runtimeDeviceId: options.runtimeDeviceId,
       executionPlan: options.executionPlan,
+      schedule: options.schedule,
       source: options.source ?? "manual",
       input: options.input
     });
-    const firstStep = loop.steps.find((step) => step.id === loop.start);
-    if (!firstStep) throw new LoopRunStateError(`Loop ${loop.id} start step ${loop.start} was not found.`);
+    const firstStep = resolveEffectiveStartStep(loop);
+    if (!firstStep) throw new LoopRunStateError(`Loop ${loop.id} does not have an executable start step.`);
     this.store.createStepRun(run, firstStep, options.input);
     return this.requireDetails(run.runId);
   }
@@ -180,7 +184,7 @@ export class LoopRunEngine {
   ): void {
     if (typeof target === "string") {
       const nextStep = run.snapshot.steps.find((step) => step.id === target);
-      if (!nextStep) {
+      if (!nextStep || nextStep.type === "scheduled") {
         this.store.finishRun(run.runId, "blocked");
         return;
       }

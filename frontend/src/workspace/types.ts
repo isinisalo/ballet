@@ -38,6 +38,7 @@ export const emptyData: AppData = {
   eventDefinitions: [],
   events: [],
   loopRuns: [],
+  scheduleStates: [],
   automation: defaultProjectAutomationConfig(),
   automationIssues: [],
   projectDocumentTree: []

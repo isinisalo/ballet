@@ -1,10 +1,17 @@
 import type { Agent } from "../../shared/domain/agents.js";
 import type {
+  ProjectExecutableStep,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectLoop,
   ProjectStep,
   StepTransitionTarget
+} from "../../shared/domain/automation.js";
+import {
+  getProjectStepTransitionEntries,
+  getProjectStepTransitionTargets,
+  isProjectExecutableStep,
+  resolveEffectiveStartStep
 } from "../../shared/domain/automation.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
@@ -41,7 +48,7 @@ const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } 
 const validateTarget = (
   target: StepTransitionTarget,
   path: string,
-  step: ProjectStep,
+  step: ProjectExecutableStep,
   sourceLoopId: string,
   stepsById: ReadonlyMap<string, ProjectStep>,
   loopIds: ReadonlySet<string>
@@ -80,13 +87,52 @@ const validateLoop = (
   if (!stepsById.has(loop.start)) {
     issues.push({ path: `loops.${loopIndex}.start`, message: `Loop start references unknown step: ${loop.start}.` });
   }
+  const scheduledSteps = loop.steps
+    .map((step, stepIndex) => ({ step, stepIndex }))
+    .filter(({ step }) => step.type === "scheduled");
+  if (scheduledSteps.length > 1) {
+    issues.push({
+      path: `loops.${loopIndex}.steps`,
+      message: "Loop may contain at most one scheduled step."
+    });
+  }
   loop.steps.forEach((step, stepIndex) => {
     const base = `loops.${loopIndex}.steps.${stepIndex}`;
+    if (step.type === "scheduled") {
+      if (step.id !== loop.start) {
+        issues.push({ path: `${base}.type`, message: "A scheduled step is allowed only as the loop start step." });
+      }
+      const target = stepsById.get(step.on.triggered);
+      if (!target) {
+        issues.push({
+          path: `${base}.on.triggered`,
+          message: `Transition references unknown step: ${step.on.triggered}.`
+        });
+      } else if (!isProjectExecutableStep(target) || target.id === step.id) {
+        issues.push({
+          path: `${base}.on.triggered`,
+          message: "A scheduled step must trigger another agent or human step in the same loop."
+        });
+      }
+      return;
+    }
     if (step.type === "agent" && agentIds.size > 0 && !agentIds.has(step.agentId)) {
       issues.push({ path: `${base}.agentId`, message: `Step references unknown agent: ${step.agentId}.` });
     }
-    issues.push(...validateTarget(step.on.approved, `${base}.on.approved`, step, loop.id, stepsById, loopIds));
-    issues.push(...validateTarget(step.on.rejected, `${base}.on.rejected`, step, loop.id, stepsById, loopIds));
+    for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
+      issues.push(...validateTarget(target, `${base}.on.${transitionId}`, step, loop.id, stepsById, loopIds));
+    }
+  });
+  const scheduledIds = new Set(scheduledSteps.map(({ step }) => step.id));
+  loop.steps.forEach((step, stepIndex) => {
+    for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
+      if (typeof target === "string" && scheduledIds.has(target)) {
+        issues.push({
+          path: `loops.${loopIndex}.steps.${stepIndex}.on.${transitionId}`,
+          message: "No transition may target a scheduled start step."
+        });
+      }
+    }
   });
   const reachable = new Set<string>();
   const pending = [loop.start];
@@ -97,7 +143,7 @@ const validateLoop = (
     reachable.add(stepId);
     const step = stepsById.get(stepId);
     if (!step) continue;
-    for (const target of [step.on.approved, step.on.rejected]) {
+    for (const target of getProjectStepTransitionTargets(step)) {
       if (typeof target === "string") pending.push(target);
       else hasReachableExit = true;
     }
@@ -116,12 +162,11 @@ const validateApprovedPaths = (
 
   config.loops.forEach((rootLoop, loopIndex) => {
     let loop = rootLoop;
-    let stepId = rootLoop.start;
+    let step = resolveEffectiveStartStep(rootLoop);
     let transitionCount = 0;
     const visited = new Set<string>();
 
     while (true) {
-      const step = loop.steps.find((candidate) => candidate.id === stepId);
       if (!step) return;
 
       const state = `${loop.id}\0${step.id}`;
@@ -145,7 +190,9 @@ const validateApprovedPaths = (
 
       const target = step.on.approved;
       if (typeof target === "string") {
-        stepId = target;
+        const nextStep = loop.steps.find((candidate) => candidate.id === target);
+        if (!nextStep || !isProjectExecutableStep(nextStep)) return;
+        step = nextStep;
         continue;
       }
       if (!isLoopTarget(target)) return;
@@ -153,7 +200,7 @@ const validateApprovedPaths = (
       const targetLoop = loopsById.get(target.loop);
       if (!targetLoop) return;
       loop = targetLoop;
-      stepId = targetLoop.start;
+      step = resolveEffectiveStartStep(targetLoop);
     }
   });
 

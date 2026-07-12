@@ -295,11 +295,11 @@ const executionSpec = (
 });
 
 const appData = (): AppData => ({
-  projects: [], goals: [], adrs: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
+  projects: [], goals: [], adrs: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [], scheduleStates: [],
   agents: ["developer", "publisher"].map((id) => ({
     id, name: id, description: `${id} agent`, instructions: `${id} instructions`, skills: [], enabled: true,
     nodeStyle: "terra" as const, createdAt: "2026-07-11T08:00:00.000Z", updatedAt: "2026-07-11T08:00:00.000Z"
   })),
-  automation: { version: 3, loops: [DELIVERY, RELEASE] },
+  automation: { version: 4, loops: [DELIVERY, RELEASE] },
   automationIssues: []
 });

@@ -7,12 +7,18 @@ import type {
   LoopExecutionPlan,
   LoopRunDetails,
   LoopRunSource,
+  LoopScheduleState,
   StepRun,
   StepRunResult
 } from "../shared/domain/runtime.js";
 import { EventStore } from "./runtime/EventStore.js";
 import { LoopRunEngine } from "./runtime/LoopRunEngine.js";
 import { LoopRunStore } from "./runtime/LoopRunStore.js";
+import {
+  LoopScheduleStateStore,
+  type CompleteScheduleOccurrenceInput,
+  type ScheduleDefinitionState
+} from "./runtime/LoopScheduleStateStore.js";
 import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
 import type { IntakeEventInput, PublishEventResult } from "./runtime/RuntimeDbTypes.js";
 import { resolveRuntimeDbPath } from "./runtime/runtimeDbPath.js";
@@ -20,11 +26,29 @@ import { resolveRuntimeDbPath } from "./runtime/runtimeDbPath.js";
 export { isPatchedSqliteVersion, resolveRuntimeDbPath };
 export type { IntakeEventInput, PublishEventResult };
 
+export interface DispatchLoopScheduleInput {
+  loopId: string;
+  stepId: string;
+  definitionHash: string;
+  scheduledFor: string;
+  nextRunAt?: string;
+  runtimeDeviceId?: string;
+  executionPlan?: LoopExecutionPlan;
+  updatedAt: string;
+}
+
+export type DispatchLoopScheduleResult =
+  | { status: "started"; run: LoopRunDetails }
+  | { status: "skipped"; error: string }
+  | { status: "missed"; error: string }
+  | { status: "stale" };
+
 export class RuntimeDatabase {
   private readonly connectionManager: RuntimeDbConnection;
   private readonly eventStore: EventStore;
   private readonly loopRunStore: LoopRunStore;
   private readonly loopRunEngine: LoopRunEngine;
+  private readonly loopScheduleStateStore: LoopScheduleStateStore;
 
   constructor(dbPath: string, readonly projectId = "project") {
     this.connectionManager = new RuntimeDbConnection(dbPath, projectId);
@@ -32,6 +56,7 @@ export class RuntimeDatabase {
     this.eventStore = new EventStore(connection, projectId);
     this.loopRunStore = new LoopRunStore(connection, projectId);
     this.loopRunEngine = new LoopRunEngine(connection, this.loopRunStore);
+    this.loopScheduleStateStore = new LoopScheduleStateStore(connection, projectId);
   }
 
   close(): void {
@@ -76,9 +101,10 @@ export class RuntimeDatabase {
     input?: string,
     source: LoopRunSource = "manual",
     runtimeDeviceId?: string,
-    executionPlan?: LoopExecutionPlan
+    executionPlan?: LoopExecutionPlan,
+    schedule?: { stepId: string; scheduledFor: string }
   ): LoopRunDetails {
-    return this.loopRunEngine.start(config, loopId, { input, source, runtimeDeviceId, executionPlan });
+    return this.loopRunEngine.start(config, loopId, { input, source, runtimeDeviceId, executionPlan, schedule });
   }
 
   bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
@@ -111,6 +137,61 @@ export class RuntimeDatabase {
 
   activeLoopIds(): string[] {
     return this.loopRunStore.activeLoopIds();
+  }
+
+  listLoopScheduleStates(): LoopScheduleState[] {
+    return this.loopScheduleStateStore.list();
+  }
+
+  syncLoopScheduleDefinitions(definitions: ScheduleDefinitionState[], updatedAt: string): boolean {
+    const validKeys = new Set(definitions.map((definition) => `${definition.loopId}\0${definition.stepId}`));
+    const transaction = this.connection().transaction(() => {
+      let changed = false;
+      definitions.forEach((definition) => {
+        changed = this.loopScheduleStateStore.replaceDefinition(definition, updatedAt) || changed;
+      });
+      return this.loopScheduleStateStore.prune(validKeys) || changed;
+    });
+    return transaction() as boolean;
+  }
+
+  completeLoopScheduleOccurrence(input: CompleteScheduleOccurrenceInput): boolean {
+    return this.loopScheduleStateStore.completeOccurrence(input);
+  }
+
+  dispatchLoopScheduleOccurrence(
+    config: ProjectAutomationConfig,
+    input: DispatchLoopScheduleInput
+  ): DispatchLoopScheduleResult {
+    const transaction = this.connection().transaction((): DispatchLoopScheduleResult => {
+      const state = this.loopScheduleStateStore.get(input.loopId, input.stepId);
+      if (state?.definition_hash !== input.definitionHash || state.next_run_at !== input.scheduledFor) {
+        return { status: "stale" };
+      }
+      if (this.loopRunStore.hasActiveLoop(input.loopId)) {
+        const error = `Loop ${input.loopId} already has an active run.`;
+        this.loopScheduleStateStore.completeOccurrence({
+          ...input,
+          status: "skipped",
+          error
+        });
+        return { status: "skipped", error };
+      }
+      const run = this.loopRunEngine.start(config, input.loopId, {
+        source: "schedule",
+        runtimeDeviceId: input.runtimeDeviceId,
+        executionPlan: input.executionPlan,
+        schedule: { stepId: input.stepId, scheduledFor: input.scheduledFor }
+      });
+      const completed = this.loopScheduleStateStore.completeOccurrence({
+        ...input,
+        status: "started",
+        runId: run.runId
+      });
+      if (!completed) throw new Error("Scheduled Loop state changed while dispatching its occurrence.");
+      return { status: "started", run };
+    });
+    return transaction() as DispatchLoopScheduleResult;
   }
 
   respondToStepRun(

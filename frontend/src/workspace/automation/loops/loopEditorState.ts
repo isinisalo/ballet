@@ -1,10 +1,15 @@
 import type {
   Agent,
   ProjectAutomationConfig,
+  ProjectExecutableStep,
   ProjectLoop,
+  ProjectScheduledStep,
   ProjectStep,
+  ProjectStepTransitions,
   StepTransitionTarget
 } from "@shared/api/workspace-contracts";
+import { isProjectExecutableStep, mapProjectStepTransitions } from "@shared/api/workspace-contracts";
+import { defaultOnceSchedule } from "./loopSchedulePresentation";
 
 export type TransitionTargetKind = "step" | "loop" | "end";
 
@@ -24,7 +29,7 @@ export const insertStepForTransition = (
 ): ProjectLoop => {
   const sourceIndex = loop.steps.findIndex((step) => step.id === sourceStepId);
   const source = loop.steps[sourceIndex];
-  if (!source) return loop;
+  if (!source || !isProjectExecutableStep(source)) return loop;
   const id = uniqueStepId(loop, "new-step");
   const inheritedTarget = source.on[result];
   const step = agents[0]
@@ -38,6 +43,8 @@ export const insertStepForTransition = (
 
 export const reorderLoopSteps = (loop: ProjectLoop, fromIndex: number, toIndex: number): ProjectLoop => {
   if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= loop.steps.length || toIndex >= loop.steps.length) return loop;
+  const scheduledStartIndex = loop.steps.findIndex((step) => step.type === "scheduled");
+  if (scheduledStartIndex >= 0 && (fromIndex === scheduledStartIndex || toIndex === scheduledStartIndex)) return loop;
   const steps = [...loop.steps];
   const [moved] = steps.splice(fromIndex, 1);
   if (!moved) return loop;
@@ -53,35 +60,57 @@ export const replaceStep = (loop: ProjectLoop, previousId: string, step: Project
     steps: loop.steps.map((candidate) => {
       const next = candidate.id === previousId ? step : candidate;
       if (!renamed) return next;
-      return {
-        ...next,
-        on: {
-          approved: next.on.approved === previousId ? step.id : next.on.approved,
-          rejected: next.on.rejected === previousId ? step.id : next.on.rejected
-        }
-      } as ProjectStep;
+      return mapProjectStepTransitions(next, {
+        approved: (target) => target === previousId ? step.id : target,
+        rejected: (target) => target === previousId ? step.id : target,
+        triggered: (target) => target === previousId ? step.id : target
+      });
     })
   };
 };
 
 export const removeStep = (loop: ProjectLoop, stepId: string): ProjectLoop => {
-  const steps = loop.steps.filter((step) => step.id !== stepId).map((step) => ({
-    ...step,
-    on: {
-      approved: step.on.approved === stepId ? { end: "blocked" as const } : step.on.approved,
-      rejected: step.on.rejected === stepId ? { end: "blocked" as const } : step.on.rejected
-    }
-  } as ProjectStep));
-  return { ...loop, steps, start: loop.start === stepId ? steps[0]?.id ?? "" : loop.start };
+  if (!canRemoveStep(loop, stepId)) return loop;
+  const removed = loop.steps.find((step) => step.id === stepId);
+  const remaining = loop.steps.filter((step) => step.id !== stepId);
+  const fallback = remaining.find(isProjectExecutableStep)?.id;
+  const steps = remaining.map((step) => mapProjectStepTransitions(step, {
+    approved: (target) => target === stepId ? { end: "blocked" as const } : target,
+    rejected: (target) => target === stepId ? { end: "blocked" as const } : target,
+    triggered: (target) => target === stepId ? fallback ?? target : target
+  }));
+  const scheduledTarget = removed?.type === "scheduled"
+    ? steps.find((step) => step.id === removed.on.triggered && isProjectExecutableStep(step))?.id
+    : undefined;
+  return { ...loop, steps, start: loop.start === stepId ? scheduledTarget ?? steps[0]?.id ?? "" : loop.start };
 };
 
-export const changeStepType = (step: ProjectStep, type: ProjectStep["type"], firstAgentId?: string): ProjectStep => {
-  if (type === "human") return humanStep(step.id, step.description, step.on);
+export const canRemoveStep = (loop: ProjectLoop, stepId: string) => {
+  if (loop.steps.length <= 1) return false;
+  const scheduled = loop.steps.find((step) => step.type === "scheduled");
+  if (!scheduled || scheduled.id === stepId) return true;
+  return loop.steps.some((step) => step.id !== stepId && isProjectExecutableStep(step));
+};
+
+export const canChangeStepToScheduled = (loop: ProjectLoop, stepId: string) =>
+  loop.start === stepId && loop.steps.some((step) => step.id !== stepId && isProjectExecutableStep(step));
+
+export const changeStepType = (step: ProjectStep, type: ProjectStep["type"], options: {
+  loop: ProjectLoop;
+  firstAgentId?: string;
+  now?: Date;
+}): ProjectStep => {
+  if (type === step.type) return step;
+  if (type === "scheduled") return scheduledStep(step, options.loop, options.now);
+  const previousOn: ProjectStepTransitions = step.type === "scheduled"
+    ? { approved: step.on.triggered, rejected: { end: "failed" } }
+    : step.on;
+  if (type === "human") return humanStep(step.id, step.description, previousOn);
   const on = {
-    approved: isLoopTarget(step.on.approved) ? { end: "blocked" as const } : step.on.approved,
-    rejected: isLoopTarget(step.on.rejected) ? { end: "blocked" as const } : step.on.rejected
+    approved: isLoopTarget(previousOn.approved) ? { end: "blocked" as const } : previousOn.approved,
+    rejected: isLoopTarget(previousOn.rejected) ? { end: "blocked" as const } : previousOn.rejected
   };
-  return agentStep(step.id, step.type === "agent" ? step.agentId : firstAgentId ?? "", step.description, on);
+  return agentStep(step.id, step.type === "agent" ? step.agentId : options.firstAgentId ?? "", step.description, on);
 };
 
 export const updateLoopAtIndex = (
@@ -99,13 +128,10 @@ export const updateLoopAtIndex = (
       if (!renamed) return next;
       return {
         ...next,
-        steps: next.steps.map((step) => ({
-          ...step,
-          on: {
-            approved: replaceLoopTarget(step.on.approved, previous.id, loop.id),
-            rejected: replaceLoopTarget(step.on.rejected, previous.id, loop.id)
-          }
-        } as ProjectStep))
+        steps: next.steps.map((step) => mapProjectStepTransitions(step, {
+          approved: (target) => replaceLoopTarget(target, previous.id, loop.id),
+          rejected: (target) => replaceLoopTarget(target, previous.id, loop.id)
+        }))
       };
     })
   };
@@ -118,13 +144,10 @@ export const removeLoopAtIndex = (config: ProjectAutomationConfig, index: number
     ...config,
     loops: config.loops.filter((_, candidateIndex) => candidateIndex !== index).map((loop) => ({
       ...loop,
-      steps: loop.steps.map((step) => ({
-        ...step,
-        on: {
-          approved: replaceLoopTarget(step.on.approved, removed.id, undefined),
-          rejected: replaceLoopTarget(step.on.rejected, removed.id, undefined)
-        }
-      } as ProjectStep))
+      steps: loop.steps.map((step) => mapProjectStepTransitions(step, {
+        approved: (target) => replaceLoopTarget(target, removed.id, undefined),
+        rejected: (target) => replaceLoopTarget(target, removed.id, undefined)
+      }))
     }))
   };
 };
@@ -156,14 +179,24 @@ const agentStep = (
   id: string,
   agentId: string,
   description = "",
-  on: ProjectStep["on"] = defaultOn()
-): ProjectStep => ({ id, type: "agent", agentId, description, on });
+  on: ProjectStepTransitions = defaultOn()
+): ProjectExecutableStep => ({ id, type: "agent", agentId, description, on });
 
 const humanStep = (
   id: string,
   description = "",
-  on: ProjectStep["on"] = defaultOn()
-): ProjectStep => ({ id, type: "human", description, on });
+  on: ProjectStepTransitions = defaultOn()
+): ProjectExecutableStep => ({ id, type: "human", description, on });
+
+const scheduledStep = (step: ProjectStep, loop: ProjectLoop, now?: Date): ProjectScheduledStep => {
+  const preferred = step.type !== "scheduled" && typeof step.on.approved === "string"
+    ? loop.steps.find((candidate) => candidate.id === step.on.approved && candidate.id !== step.id && isProjectExecutableStep(candidate))
+    : undefined;
+  const target = step.type === "scheduled"
+    ? step.on.triggered
+    : preferred?.id ?? loop.steps.find((candidate) => candidate.id !== step.id && isProjectExecutableStep(candidate))?.id ?? "";
+  return { id: step.id, type: "scheduled", description: step.description, schedule: defaultOnceSchedule(now), on: { triggered: target } };
+};
 
 const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } =>
   typeof target === "object" && "loop" in target;

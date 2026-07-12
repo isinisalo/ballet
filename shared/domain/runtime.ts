@@ -377,6 +377,23 @@ export type LoopRunStatus = "running" | "waiting_for_human" | "completed" | "blo
 export type StepRunStatus = "queued" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
 export type StepRunResult = "approved" | "rejected";
 
+export type LoopScheduleOccurrenceStatus = "started" | "skipped" | "missed";
+
+export interface LoopScheduleOccurrence {
+  stepId: string;
+  scheduledFor: string;
+}
+
+export interface LoopScheduleState {
+  loopId: string;
+  stepId: string;
+  nextRunAt?: string;
+  lastScheduledAt?: string;
+  lastStatus?: LoopScheduleOccurrenceStatus;
+  lastRunId?: string;
+  lastError?: string;
+}
+
 export interface LoopRun {
   runId: string;
   loopId: string;
@@ -389,6 +406,7 @@ export interface LoopRun {
   snapshot: ProjectLoop;
   runtimeDeviceId?: string;
   executionPlan?: LoopExecutionPlan;
+  schedule?: LoopScheduleOccurrence;
   transitionCount: number;
   createdAt: string;
   updatedAt: string;

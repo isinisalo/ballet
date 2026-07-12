@@ -22,7 +22,7 @@ const run = (status: LoopRunDetails["status"]): LoopRunDetails => ({
 
 const data = (): AppData => ({
   projects: [], goals: [], adrs: [], agents: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
-  automation: { version: 3, loops: [loop] }, automationIssues: [], projectDocumentTree: []
+  automation: { version: 4, loops: [loop] }, automationIssues: [], scheduleStates: [], projectDocumentTree: []
 });
 
 function installApi(latest: LoopRunDetails | null) {
@@ -89,7 +89,7 @@ async function renderRun(latest: LoopRunDetails | null) {
   return fetchMock;
 }
 
-describe("automation v3 UI", () => {
+describe("automation v4 UI", () => {
   it("starts a saved Loop from global Ballet Run without local mode controls", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(null);

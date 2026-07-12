@@ -43,7 +43,8 @@ const data = (projectRoot: string, loopIds: string[]): AppData => ({
   eventDefinitions: [],
   events: [],
   loopRuns: [],
-  automation: { version: 3, loops: loopIds.map(loop) },
+  scheduleStates: [],
+  automation: { version: 4, loops: loopIds.map(loop) },
   automationIssues: [],
   projectRoot
 });
@@ -160,5 +161,24 @@ describe("loop engineering root-start policy", () => {
     const start = workspace.automation.loops[0]!.steps[0]!;
     if (start.type === "agent") start.agentId = "custom-worker";
     await expect(validateLoopRunStart(workspace, "implementation")).resolves.toBeUndefined();
+  });
+
+  it("enforces task input behind a scheduled start", async () => {
+    const root = await projectWithTasks();
+    const workspace = data(root, ["implementation"]);
+    const implementation = workspace.automation.loops[0]!;
+    implementation.start = "timer";
+    implementation.steps.unshift({
+      id: "timer",
+      type: "scheduled",
+      description: "Start implementation on schedule.",
+      schedule: { kind: "once", date: "2026-07-12", time: "09:00", timeZone: "UTC" },
+      on: { triggered: "work" }
+    });
+
+    await expect(validateLoopRunStart(workspace, "implementation"))
+      .rejects.toThrow("implementation input must contain exactly one line in the form task_id: task-NNN.");
+    await expect(validateLoopRunStart(workspace, "implementation", "task_id: task-001"))
+      .resolves.toBeUndefined();
   });
 });

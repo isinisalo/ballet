@@ -7,11 +7,13 @@ import type { RuntimePreflightIssue } from "@shared/api/workspace-contracts";
 export function LoopRunStartPanel({
   disabledReason,
   preflightIssues = [],
+  bypassesSchedule = false,
   pending,
   onStart
 }: {
   disabledReason?: string;
   preflightIssues?: RuntimePreflightIssue[];
+  bypassesSchedule?: boolean;
   pending: boolean;
   onStart: (input: string) => Promise<boolean>;
 }) {
@@ -35,7 +37,7 @@ export function LoopRunStartPanel({
       ) : null}
       <TextAreaField label="Manual input (optional)" value={input} rows={3} disabled={pending || blocked} onChange={setInput} />
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{preflightIssues.length > 0 ? "Resolve every runtime issue before starting." : disabledReason ?? "Starts a new manual run from this loop's saved start step."}</p>
+        <p className="text-xs text-muted-foreground">{preflightIssues.length > 0 ? "Resolve every runtime issue before starting." : disabledReason ?? (bypassesSchedule ? "Starts from the first executable step and bypasses the saved schedule." : "Starts a new manual run from this loop's saved start step.")}</p>
         <Button type="button" disabled={pending || blocked} onClick={() => void start()}>
           <Play /> {pending ? "Starting…" : "Start"}
         </Button>

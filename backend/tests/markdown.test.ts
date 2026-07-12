@@ -99,7 +99,7 @@ describe("Markdown collection loading", () => {
     expect(data.eventDefinitions).toEqual([]);
     expect(data.policies).toEqual([]);
     expect(data.automation).toEqual({
-      version: 3,
+      version: 4,
       loops: []
     });
   });

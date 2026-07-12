@@ -135,11 +135,11 @@ const agent = (id: string): Agent => ({
 
 const appData = (automation: ProjectAutomationConfig, agentIds: string[]): AppData => ({
   projects: [], goals: [], adrs: [], agents: agentIds.map(agent), skills: [], policies: [],
-  eventDefinitions: [], events: [], loopRuns: [], automation, automationIssues: []
+  eventDefinitions: [], events: [], loopRuns: [], scheduleStates: [], automation, automationIssues: []
 });
 
 const nestedAutomation = (): ProjectAutomationConfig => ({
-  version: 3,
+  version: 4,
   loops: [{
     id: "delivery",
     start: "implement",
@@ -158,7 +158,7 @@ const nestedAutomation = (): ProjectAutomationConfig => ({
 });
 
 const humanTerminalAutomation = (): ProjectAutomationConfig => ({
-  version: 3,
+  version: 4,
   loops: [{
     id: "review",
     start: "analyze",
@@ -173,7 +173,7 @@ const humanTerminalAutomation = (): ProjectAutomationConfig => ({
 });
 
 const feedbackAutomation = (): ProjectAutomationConfig => ({
-  version: 3,
+  version: 4,
   loops: [{
     id: "implementation",
     start: "implement",
@@ -188,7 +188,7 @@ const feedbackAutomation = (): ProjectAutomationConfig => ({
 });
 
 const humanFeedbackAutomation = (): ProjectAutomationConfig => ({
-  version: 3,
+  version: 4,
   loops: [{
     id: "implementation",
     start: "implement",
@@ -203,7 +203,7 @@ const humanFeedbackAutomation = (): ProjectAutomationConfig => ({
 });
 
 const gatedDeploymentAutomation = (): ProjectAutomationConfig => ({
-  version: 3,
+  version: 4,
   loops: [{
     id: "implementation",
     start: "verify",
@@ -225,7 +225,7 @@ const gatedDeploymentAutomation = (): ProjectAutomationConfig => ({
 });
 
 const deliveryAutomation = (): ProjectAutomationConfig => ({
-  version: 3,
+  version: 4,
   loops: [{
     id: "implementation",
     start: "implement",

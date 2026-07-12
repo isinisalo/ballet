@@ -17,6 +17,7 @@ export class WorkspaceDataService {
     data.eventDefinitions = [];
     data.events = this.runtimeDatabaseProvider.runtimeDatabase().listEventRecords();
     data.loopRuns = this.runtimeDatabaseProvider.runtimeDatabase().listLoopRuns();
+    data.scheduleStates = this.runtimeDatabaseProvider.runtimeDatabase().listLoopScheduleStates();
     return data;
   }
 }

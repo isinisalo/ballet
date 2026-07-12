@@ -1,13 +1,28 @@
 import type { Agent, ProjectStep } from "@shared/api/workspace-contracts";
 import type { ExecutionAgentSnapshot } from "@shared/api/workspace-contracts";
-import { Bot, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Bot, CalendarClock, ShieldCheck, TriangleAlert } from "lucide-react";
 import { MarkdownBody } from "../../documents/MarkdownBody";
+import { scheduleSummary } from "./loopSchedulePresentation";
 
 export function LoopHandlerAgentInstructions({ step, agents, snapshot }: {
   step: ProjectStep;
   agents: Agent[];
   snapshot?: ExecutionAgentSnapshot;
 }) {
+  if (step.type === "scheduled") {
+    return (
+      <aside aria-label="Schedule summary" className="agent-instructions-preview min-w-0 overflow-y-auto border-b border-divider-strong bg-panel-section sm:border-r sm:border-b-0">
+        <article className="grid min-w-0 gap-3 px-3 py-3">
+          <header className="flex items-center gap-2 border-b border-divider-strong pb-2">
+            <CalendarClock className="size-3.5 text-muted-foreground" />
+            <h3 className="text-xs font-medium leading-4 text-foreground">Scheduled start</h3>
+          </header>
+          <p className="break-words font-mono text-[0.65rem] leading-4 text-muted-foreground">{scheduleSummary(step.schedule)}</p>
+          <p className="text-xs leading-4 text-muted-foreground">The schedule triggers its target Step without creating a StepRun for this start node.</p>
+        </article>
+      </aside>
+    );
+  }
   const agent = step.type === "agent" ? agents.find((candidate) => candidate.id === step.agentId) : undefined;
   const Icon = step.type === "human" ? ShieldCheck : agent ? Bot : TriangleAlert;
   const title = step.type === "human" ? "Human operator" : snapshot?.name ?? agent?.name ?? step.agentId;

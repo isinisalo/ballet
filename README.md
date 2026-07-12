@@ -25,11 +25,11 @@ The Runtime registry shows paired computers, connection state, source checkout, 
 
 ## Portable project configuration
 
-The canonical automation file is [`.ballet/project.json`](.ballet/project.json). Version 3 is deliberately strict and portable: it contains only Loops, their Steps, and explicit Transitions.
+The canonical automation file is [`.ballet/project.json`](.ballet/project.json). Version 4 is deliberately strict and portable: it contains Loops, their Steps, explicit Transitions, and optional scheduled start Steps.
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "loops": [
     {
       "id": "implementation",
@@ -60,9 +60,45 @@ The canonical automation file is [`.ballet/project.json`](.ballet/project.json).
 }
 ```
 
+A scheduled Loop replaces its configured start Step with a trigger and points `on.triggered` at the first executable Step. Recurring schedules keep their wall-clock time in the configured IANA time zone:
+
+```json
+{
+  "id": "weekday-planning",
+  "start": "weekday-start",
+  "steps": [
+    {
+      "id": "weekday-start",
+      "type": "scheduled",
+      "description": "Start planning every weekday morning.",
+      "schedule": {
+        "kind": "recurring",
+        "cadence": "weekdays",
+        "startsOn": "2026-07-13",
+        "time": "09:00",
+        "timeZone": "Europe/Helsinki"
+      },
+      "on": { "triggered": "plan" }
+    },
+    {
+      "id": "plan",
+      "type": "agent",
+      "agentId": "planning-agent",
+      "description": "Create the daily plan.",
+      "on": {
+        "approved": { "end": "completed" },
+        "rejected": { "end": "failed" }
+      }
+    }
+  ]
+}
+```
+
+Scheduled runs do not add Run input; the triggered agent's saved instructions define the work. An occurrence is attempted only during its scheduled minute. Occurrences missed while the project server is stopped, or blocked by an active Run or failed preflight, are recorded and not replayed.
+
 Runtime devices, provider commands, local paths, credentials, runs, and logs do not belong in `project.json`. Commit the portable project sources instead:
 
-- `.ballet/project.json` for automation v3;
+- `.ballet/project.json` for automation v4;
 - `.ballet/runtime.json` for agent-specific provider, model, reasoning, and network intent;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` for project documents;
 - `.codex/agents/*.toml` for agents; and
@@ -87,7 +123,7 @@ Set `BALLET_HOME` to relocate daemon-managed files, `BALLET_LOG_DIR` to relocate
 
 The upper-left Ballet dropdown switches the whole application between **Ballet Configure** and **Ballet Run**. Configure keeps the repository-backed editors and the existing Loop canvas. Run uses `/run`, `/run/loops/:loopId?run=<rootRunId>`, and `/run/agents/:agentId?run=<rootRunId>` for launching and monitoring persisted work. Its Overview combines active roots, launch readiness, and recent runs; the detail sheet shows immutable instructions beside the selected task's durable console or human response controls. A shared invalidation stream refreshes Run lists and details, while the console stream is opened only for the selected task.
 
-The Run read model accepts both `manual` and `schedule` sources. Scheduling configuration and a scheduler are intentionally not part of this version.
+The Run read model accepts both `manual` and `schedule` sources. A Loop may use one `scheduled` start Step for a one-time or recurring calendar launch; Ballet's project-bound web server owns dispatch while the runtime daemon continues to own provider execution.
 
 ## Install on macOS
 

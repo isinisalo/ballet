@@ -5,6 +5,7 @@ import type { EventRecord } from "../shared/domain/events.js";
 import type { LoopRunSource, StepRunResult } from "../shared/domain/runtime.js";
 import { getProjectRoot } from "./markdown.js";
 import type { RuntimeDatabase } from "./runtime-db.js";
+import type { DispatchLoopScheduleInput } from "./runtime-db.js";
 import { AutomationValidationError } from "./automation.js";
 import { AutomationService } from "./services/AutomationService.js";
 import { EventIntakeService } from "./services/EventIntakeService.js";
@@ -88,6 +89,12 @@ export class MarkdownStore {
 
   startLoopRun(loopId: string, input?: string, source: LoopRunSource = "manual") {
     return this.loopRunService.start(loopId, input, source);
+  }
+
+  dispatchScheduledLoop(input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan"> & {
+    canDispatch?: () => boolean;
+  }) {
+    return this.loopRunService.dispatchScheduled(input);
   }
 
   latestLoopRun(loopId: string) {

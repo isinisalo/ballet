@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "loops": [
     {
       "id": "delivery-planning",
@@ -7,32 +7,38 @@
       "steps": [
         {
           "id": "create-roadmap",
-          "type": "agent",
-          "agentId": "roadmap-agent",
           "description": "Muodosta hyväksytyistä ADR- ja Goal-dokumenteista arvo-, riski- ja riippuvuusjärjestykseen asetettu roadmap tiedostoon .ballet/outputs/ROADMAP.md.",
           "on": {
             "approved": "create-work-breakdown",
-            "rejected": { "end": "blocked" }
-          }
+            "rejected": {
+              "end": "blocked"
+            }
+          },
+          "type": "agent",
+          "agentId": "roadmap-agent"
         },
         {
           "id": "create-work-breakdown",
-          "type": "agent",
-          "agentId": "milestone-task-agent",
           "description": "Jaa roadmap milestoneiksi ja atomisiksi task-NNN-tehtäviksi tiedostoihin .ballet/outputs/MILESTONES.md ja .ballet/outputs/TASKS.md.",
           "on": {
             "approved": "planning-gate",
-            "rejected": { "end": "blocked" }
-          }
+            "rejected": {
+              "end": "blocked"
+            }
+          },
+          "type": "agent",
+          "agentId": "milestone-task-agent"
         },
         {
           "id": "planning-gate",
-          "type": "human",
           "description": "Hyväksy roadmap, milestonet ja taskit toteutuksen lähtökohdaksi. Rejection-palaute käynnistää suunnittelun uudelleen roadmapista.",
           "on": {
-            "approved": { "end": "completed" },
+            "approved": {
+              "end": "completed"
+            },
             "rejected": "create-roadmap"
-          }
+          },
+          "type": "human"
         }
       ]
     },
@@ -42,13 +48,17 @@
       "steps": [
         {
           "id": "design-task-ui",
-          "type": "agent",
-          "agentId": "ui-design-agent",
           "description": "Suunnittele yhden Run-inputissa nimetyn task-NNN-tehtävän UI tiedostoon .ballet/outputs/ui/<task-id>.md.",
           "on": {
-            "approved": { "end": "completed" },
-            "rejected": { "end": "blocked" }
-          }
+            "approved": {
+              "end": "completed"
+            },
+            "rejected": {
+              "end": "blocked"
+            }
+          },
+          "type": "agent",
+          "agentId": "ui-design-agent"
         }
       ]
     },
@@ -58,32 +68,36 @@
       "steps": [
         {
           "id": "implement-task",
-          "type": "agent",
-          "agentId": "implementation-agent",
           "description": "Toteuta täsmälleen yksi Run-inputissa nimetty task-NNN-tehtävä ja sen hyväksymiskriteerit.",
           "on": {
             "approved": "verify-task",
-            "rejected": { "end": "blocked" }
-          }
+            "rejected": {
+              "end": "blocked"
+            }
+          },
+          "type": "agent",
+          "agentId": "implementation-agent"
         },
         {
           "id": "verify-task",
-          "type": "agent",
-          "agentId": "review-test-agent",
           "description": "Tarkasta taskin scope, diff, testit ja hyväksymiskriteerit riippumattomasti; saman taskin korjaukset palautuvat implementointiin.",
           "on": {
             "approved": "code-gate",
             "rejected": "implement-task"
-          }
+          },
+          "type": "agent",
+          "agentId": "review-test-agent"
         },
         {
           "id": "code-gate",
-          "type": "human",
           "description": "Hyväksy tarkastettu koodi ja valtuuta dev-deployment. Rejection-palaute palauttaa saman taskin implementointiin.",
           "on": {
-            "approved": { "loop": "dev-deployment" },
+            "approved": {
+              "loop": "dev-deployment"
+            },
             "rejected": "implement-task"
-          }
+          },
+          "type": "human"
         }
       ]
     },
@@ -93,13 +107,37 @@
       "steps": [
         {
           "id": "deploy-and-validate-dev",
-          "type": "agent",
-          "agentId": "dev-deploy-agent",
           "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
           "on": {
-            "approved": { "end": "completed" },
-            "rejected": { "end": "failed" }
-          }
+            "approved": {
+              "end": "completed"
+            },
+            "rejected": {
+              "end": "failed"
+            }
+          },
+          "type": "agent",
+          "agentId": "dev-deploy-agent"
+        }
+      ]
+    },
+    {
+      "id": "timed",
+      "start": "new-step",
+      "steps": [
+        {
+          "id": "new-step",
+          "description": "",
+          "on": {
+            "approved": {
+              "end": "failed"
+            },
+            "rejected": {
+              "end": "failed"
+            }
+          },
+          "type": "agent",
+          "agentId": "dev-deploy-agent"
         }
       ]
     }

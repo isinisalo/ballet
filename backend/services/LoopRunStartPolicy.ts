@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { AppData } from "../../shared/api/workspaceData.js";
+import { resolveEffectiveStartStep } from "../../shared/domain/automation.js";
 import { LoopRunStateError } from "../runtime/LoopRunErrors.js";
 
 const LOOP_ENGINEERING_AGENTS = {
@@ -23,7 +24,7 @@ export const validateLoopRunStart = async (data: AppData, loopId: string, input?
   const loop = data.automation.loops.find((candidate) => candidate.id === loopId);
   if (!loop) return;
   const expectedAgent = LOOP_ENGINEERING_AGENTS[loopId as keyof typeof LOOP_ENGINEERING_AGENTS];
-  const start = loop.steps.find((step) => step.id === loop.start);
+  const start = resolveEffectiveStartStep(loop);
   if (!expectedAgent || start?.type !== "agent" || start.agentId !== expectedAgent) return;
   if (GATED_CHILD_LOOPS.has(loopId)) {
     throw new LoopRunStateError(`${loopId} can only start from its approved human-gate transition.`);

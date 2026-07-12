@@ -61,7 +61,7 @@ export class EventStore {
         occurredAt: createdAt,
         projectId: input.projectId,
         tagsJson: stringifyJson(input.tags ?? []),
-        handlingResult: input.body ?? "Event recorded. Automation v3 loop runs are started independently.",
+        handlingResult: input.body ?? "Event recorded. Automation v4 loop runs are started independently.",
         payloadJson: stringifyJson(payload)
       });
       const row = this.getEventById(eventId);

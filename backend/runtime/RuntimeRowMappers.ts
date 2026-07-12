@@ -65,6 +65,9 @@ export const toLoopRun = (row: LoopRunRow): LoopRun => ({
   status: row.status,
   runtimeDeviceId: row.runtime_device_id ?? undefined,
   executionPlan: row.execution_plan_json ? JSON.parse(row.execution_plan_json) as LoopExecutionPlan : undefined,
+  schedule: row.schedule_step_id && row.scheduled_for
+    ? { stepId: row.schedule_step_id, scheduledFor: row.scheduled_for }
+    : undefined,
   input: row.input ?? undefined,
   snapshot: JSON.parse(row.snapshot_json) as ProjectLoop,
   transitionCount: row.transition_count,

@@ -32,7 +32,7 @@ describe("HTTP Zod validation", () => {
 
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
-      version: 3,
+      version: 4,
       loops: [{
         id: "delivery",
         start: "implementation",
@@ -49,6 +49,7 @@ describe("HTTP Zod validation", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, events: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, triggers: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 1 }), "version");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 3 }), "version");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, loops: undefined }), "loops");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, gates: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, {

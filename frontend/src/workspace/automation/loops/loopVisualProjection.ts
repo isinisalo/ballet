@@ -9,7 +9,9 @@ import type {
   StepRun,
   StepTransitionTarget
 } from "@shared/api/workspace-contracts";
+import { getProjectStepTransitionEntries } from "@shared/api/workspace-contracts";
 import type { LoopOutputTarget, LoopStepRecord } from "./loopGraph";
+import { scheduleSummary } from "./loopSchedulePresentation";
 
 export type LoopVisualStep = {
   id: string;
@@ -17,6 +19,8 @@ export type LoopVisualStep = {
   description: string;
   agentId?: string;
   humanGate: boolean;
+  scheduled: boolean;
+  scheduleLabel?: string;
   nodeStyle: AgentNodeStyle;
   reasoningEffort?: string;
   step: ProjectStep;
@@ -59,7 +63,9 @@ export function buildLoopVisualProjection(
     description: step.description,
     agentId: step.type === "agent" ? step.agentId : undefined,
     humanGate: step.type === "human",
-    nodeStyle: step.type === "human" ? "luna" : nodeStyleByAgentId.get(step.agentId) ?? "terra",
+    scheduled: step.type === "scheduled",
+    scheduleLabel: step.type === "scheduled" ? scheduleSummary(step.schedule) : undefined,
+    nodeStyle: step.type === "agent" ? nodeStyleByAgentId.get(step.agentId) ?? "terra" : "luna",
     reasoningEffort: step.type === "agent" ? reasoningByAgentId.get(step.agentId) : undefined,
     step,
     stepRun: loop.id === displayedLoop.id ? latestRunByStepId.get(step.id) : undefined
@@ -74,8 +80,8 @@ export function buildLoopVisualProjection(
     const records = loop.steps.map((projectStep, index): LoopStepRecord => {
       const stepKey = visualStepKey(loop.id, projectStep.id);
       const visualStep = stepByKey.get(stepKey);
-      const outputTargets = (["approved", "rejected"] as const).map((result) =>
-        visualTarget(loop.id, result, projectStep.on[result], loopDefinitions)
+      const outputTargets = getProjectStepTransitionEntries(projectStep).map(([result, target]) =>
+        visualTarget(loop.id, result, target, loopDefinitions)
       );
       return {
         stepKey,
@@ -95,7 +101,7 @@ export function buildLoopVisualProjection(
 
 function visualTarget(
   sourceLoopId: string,
-  result: "approved" | "rejected",
+  result: string,
   target: StepTransitionTarget,
   loops: ProjectLoop[]
 ): LoopOutputTarget {

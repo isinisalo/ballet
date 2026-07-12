@@ -20,7 +20,7 @@ const listen = async (): Promise<{ server: Server; url: string }> => {
 };
 
 const config = {
-  version: 3 as const,
+  version: 4 as const,
   loops: [{
     id: "approval",
     start: "gate",
@@ -34,7 +34,7 @@ const config = {
 };
 
 const projectRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-api-v3-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-api-v4-"));
   roots.push(root);
   process.env.BALLET_PROJECT_ROOT = root;
   process.env.BALLET_CONTROL_PLANE_DB_PATH = path.join(root, "runtime.sqlite");

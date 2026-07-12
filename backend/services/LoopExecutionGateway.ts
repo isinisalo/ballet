@@ -1,4 +1,5 @@
 import type { AppData } from "../../shared/api/workspaceData.js";
+import { getProjectStepTransitionTargets } from "../../shared/domain/automation.js";
 import type { LoopExecutionPlan, LoopRunDetails } from "../../shared/domain/runtime.js";
 
 export interface LoopExecutionGateway {
@@ -19,7 +20,7 @@ export const loopContainsAgentWork = (data: AppData, loopId: string): boolean =>
     if (!loop) continue;
     if (loop.steps.some((step) => step.type === "agent")) return true;
     for (const step of loop.steps) {
-      for (const target of [step.on.approved, step.on.rejected]) {
+      for (const target of getProjectStepTransitionTargets(step)) {
         if (typeof target === "object" && "loop" in target) pending.push(target.loop);
       }
     }

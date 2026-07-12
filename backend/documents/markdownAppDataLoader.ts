@@ -31,6 +31,7 @@ export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
     eventDefinitions: [],
     events: [],
     loopRuns: [],
+    scheduleStates: [],
     automation: defaultProjectAutomationConfig(),
     automationIssues: [],
     projectDocumentTree,

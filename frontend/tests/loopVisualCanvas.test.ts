@@ -11,7 +11,7 @@ import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/l
 import { buildLoopVisualProjection } from "../src/workspace/automation/loops/loopVisualProjection";
 
 const config: ProjectAutomationConfig = {
-  version: 3,
+  version: 4,
   loops: [{
     id: "brief",
     start: "create",
@@ -40,7 +40,7 @@ const config: ProjectAutomationConfig = {
   }]
 };
 
-describe("v3 compact loop canvas", () => {
+describe("v4 compact loop canvas", () => {
   it("projects Steps and Transitions into the original compact geometry", () => {
     const projection = buildLoopVisualProjection(config, config.loops[0]!);
     const layout = calculateCompositeLoopCanvasLayout({
@@ -62,7 +62,7 @@ describe("v3 compact loop canvas", () => {
 
   it("keeps direct branches, terminal ghosts, labels, and cycle return arcs", () => {
     const cyclic: ProjectAutomationConfig = {
-      version: 3,
+      version: 4,
       loops: [{
         id: "cycle",
         start: "prepare",
@@ -133,6 +133,34 @@ describe("v3 compact loop canvas", () => {
 });
 
 describe("celestial Loop Canvas geometry", () => {
+  it("keeps a scheduled start in 28px Luna geometry with one triggered edge", () => {
+    const scheduledLoop = {
+      id: "scheduled",
+      start: "timer",
+      steps: [{
+        id: "timer",
+        type: "scheduled",
+        description: "",
+        schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
+        on: { triggered: "run" }
+      }, {
+        id: "run",
+        type: "agent",
+        agentId: "agent",
+        description: "",
+        on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+      }]
+    } satisfies ProjectAutomationConfig["loops"][number];
+    const scheduledConfig = { version: 4, loops: [scheduledLoop] } satisfies ProjectAutomationConfig;
+    const projection = buildLoopVisualProjection(scheduledConfig, scheduledLoop);
+    const layout = calculateCompositeLoopCanvasLayout({ config: projection.config, selectedLoopId: scheduledLoop.id, recordsByLoopId: projection.recordsByLoopId });
+    const scheduledNode = layout.nodes.find((node) => node.record?.step?.scheduled);
+
+    expect(scheduledNode).toMatchObject({ width: 28, height: 28 });
+    expect(scheduledNode?.record?.step?.scheduleLabel).toBe("Weekdays · 09:00 · Europe/Helsinki");
+    expect(layout.edges.some((edge) => edge.route?.outputId === "triggered")).toBe(true);
+  });
+
   it("projects Luna, Terra, Sol, and human gates into dynamic collision-safe sizes", () => {
     const agents = (["luna", "terra", "sol"] as const).map((nodeStyle, index) => ({ id: `agent-${index}`, nodeStyle })) as Agent[];
     const styledLoop = {
@@ -145,7 +173,7 @@ describe("celestial Loop Canvas geometry", () => {
         { id: "human", type: "human", description: "", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }
       ]
     } satisfies ProjectAutomationConfig["loops"][number];
-    const styledConfig = { version: 3, loops: [styledLoop] } satisfies ProjectAutomationConfig;
+    const styledConfig = { version: 4, loops: [styledLoop] } satisfies ProjectAutomationConfig;
     const projection = buildLoopVisualProjection(styledConfig, styledLoop, null, agents, [
       { agentId: "agent-0", status: "idle", reasoning: "low" },
       { agentId: "agent-1", status: "idle", reasoning: "medium" },

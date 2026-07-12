@@ -32,7 +32,7 @@ const loop: ProjectLoop = {
   }]
 };
 
-const config: ProjectAutomationConfig = { version: 3, loops: [loop] };
+const config: ProjectAutomationConfig = { version: 4, loops: [loop] };
 
 describe("compact Loop editor UI", () => {
   it("opens the restored 50/50 sheet with its 3/2 instructions and Step editor panes", async () => {
@@ -76,4 +76,5 @@ describe("compact Loop editor UI", () => {
     expect(container.querySelector('[data-loop-edge-display-label="build"]')).not.toBeInTheDocument();
     expect(container.querySelectorAll("[data-loop-connection-point]").length).toBeGreaterThan(0);
   });
+
 });

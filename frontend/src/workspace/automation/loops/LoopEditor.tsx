@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { Agent, AgentExecutionState, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, LoopScheduleState, ProjectAutomationConfig, ProjectLoop, ProjectStepTransitionId } from "@shared/api/workspace-contracts";
 import { LockKeyhole } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TextField } from "@/components/shared/workspace-ui";
@@ -9,7 +9,7 @@ import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
 import { LoopHandlerSheet } from "./LoopHandlerSheet";
 import { LoopStepSheetEditor } from "./LoopStepSheetEditor";
 
-type Selection = { stepId: string; transition?: "approved" | "rejected" };
+type Selection = { stepId: string; transition?: ProjectStepTransitionId };
 
 export function LoopCreationEditor({ loop, loops, agents, onChange }: {
   loop: ProjectLoop;
@@ -42,6 +42,7 @@ export function LoopEditor({
   loops,
   agents,
   agentExecutionStates,
+  scheduleState,
   locked,
   lockMessage,
   canvasControls,
@@ -52,6 +53,7 @@ export function LoopEditor({
   loops: ProjectLoop[];
   agents: Agent[];
   agentExecutionStates?: AgentExecutionState[];
+  scheduleState?: LoopScheduleState;
   locked: boolean;
   lockMessage?: string;
   canvasControls?: ReactNode;
@@ -111,6 +113,7 @@ export function LoopEditor({
               loop={loop}
               loops={loops}
               agents={agents}
+              scheduleState={selectedStep.type === "scheduled" ? scheduleState : undefined}
               disabled={locked}
               focusedTransition={selection?.transition}
               onChange={(step) => {

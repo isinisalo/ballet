@@ -13,7 +13,7 @@ import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v3-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v4-"));
   roots.push(root);
   return root;
 };
@@ -35,7 +35,7 @@ const agent: Agent = {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 3,
+  version: 4,
   loops: [{
     id: "delivery",
     start: "implement",
@@ -54,14 +54,14 @@ const config = (): ProjectAutomationConfig => ({
   }]
 });
 
-describe("automation v3 config", () => {
-  it("round-trips only the canonical v3 shape", async () => {
+describe("automation v4 config", () => {
+  it("round-trips only the canonical v4 shape", async () => {
     const root = await tempRoot();
     const saved = await saveProjectAutomationConfig(root, config(), [agent]);
     expect(saved).toEqual(config());
     expect(await loadProjectAutomationConfig(root, [agent])).toEqual(config());
     const raw = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as Record<string, unknown>;
-    expect(raw.version).toBe(3);
+    expect(raw.version).toBe(4);
     expect(raw).not.toHaveProperty("runtimes");
     expect(raw).not.toHaveProperty("actions");
     expect(raw).not.toHaveProperty("outputRoutes");
@@ -77,6 +77,9 @@ describe("automation v3 config", () => {
       loops: [],
       runtimes: []
     }, [agent]).length).toBeGreaterThan(0);
+    expect(validateProjectAutomationConfig({ version: 3, loops: [] }, [agent])).toContainEqual(
+      expect.objectContaining({ path: "version" })
+    );
     const base = config();
     expect(validateProjectAutomationConfig({
       ...base,
@@ -164,7 +167,7 @@ describe("automation v3 config", () => {
 describe("all-approved path liveness", () => {
   it("rejects an all-approved cycle across loops", () => {
     const cyclic: ProjectAutomationConfig = {
-      version: 3,
+      version: 4,
       loops: [{
         id: "planning",
         start: "approve-plan",
@@ -206,7 +209,7 @@ describe("all-approved path liveness", () => {
       })
     );
     const tooLong: ProjectAutomationConfig = {
-      version: 3,
+      version: 4,
       loops: [{
         id: "delivery",
         start: "step-1",
@@ -231,7 +234,7 @@ describe("all-approved path liveness", () => {
 
   it("allows a short all-approved chain across loops", () => {
     const short: ProjectAutomationConfig = {
-      version: 3,
+      version: 4,
       loops: [{
         id: "delivery",
         start: "implement",

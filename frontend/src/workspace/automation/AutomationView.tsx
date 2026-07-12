@@ -31,6 +31,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   const savedLoop = savedIndex >= 0 ? data.automation.loops[savedIndex] : undefined;
   const creating = !selectedId && loopView !== "all";
   const displayedLoop = creating ? createDraft : selectedLoop;
+  const scheduleState = data.scheduleStates.find((state) => state.loopId === displayedLoop?.id && state.stepId === displayedLoop.start);
   const loopRunRefreshSignal = JSON.stringify(data.loopRuns.find((run) => run.loopId === savedLoop?.id) ?? null);
   const runController = useLoopRun(savedLoop?.id, loopRunRefreshSignal, runtimeStreamStatus);
   const checkingRun = Boolean(savedLoop) && runController.pendingOperation === "load";
@@ -80,7 +81,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
       {loopView === "all" ? <AllLoopsCanvas config={draft} onSelect={(id) => navigate(automationLoopPath(id))} /> : null}
       {loopView !== "all" && !displayedLoop ? <div className="p-4"><EmptyState title="Loop not found." /></div> : null}
       {loopView !== "all" && displayedLoop && creating ? <LoopCreationEditor loop={displayedLoop} loops={draft.loops} agents={data.agents} onChange={updateLoop} /> : null}
-      {loopView !== "all" && displayedLoop && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
+      {loopView !== "all" && displayedLoop && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} scheduleState={scheduleState} locked={locked} lockMessage={checkingRun ? "Checking for an active run before enabling edits…" : undefined} canvasControls={editActions} onChange={updateLoop} /> : null}
     </Panel>
   );
 }

@@ -1,4 +1,4 @@
-import type { ProjectStep, StepRun } from "@shared/api/workspace-contracts";
+import type { ProjectStep, StepRun, StepTransitionTarget } from "@shared/api/workspace-contracts";
 import { GitCompare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { HumanGateRunPanel } from "./HumanGateRunPanel";
@@ -21,7 +21,7 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
         </> : null}
         <dt className="text-muted-foreground">Attempt</dt><dd>{stepRun.attempt}</dd>
         <dt className="text-muted-foreground">Result</dt><dd>{stepRun.result ?? "—"}</dd>
-        <dt className="text-muted-foreground">Transition</dt><dd>{stepRun.result ? formatTransition(step.on[stepRun.result]) : "—"}</dd>
+        <dt className="text-muted-foreground">Transition</dt><dd>{stepRun.result && step.type !== "scheduled" ? formatTransition(step.on[stepRun.result]) : "—"}</dd>
         <dt className="text-muted-foreground">Created</dt><dd>{formatDate(stepRun.createdAt)}</dd>
         <dt className="text-muted-foreground">Updated</dt><dd>{formatDate(stepRun.updatedAt)}</dd>
         {stepRun.completedAt ? <><dt className="text-muted-foreground">Completed</dt><dd>{formatDate(stepRun.completedAt)}</dd></> : null}
@@ -50,5 +50,5 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
 
 const formatDate = (value: string) => new Date(value).toLocaleString();
 
-const formatTransition = (target: ProjectStep["on"]["approved"]) =>
+const formatTransition = (target: StepTransitionTarget) =>
   typeof target === "string" ? `Step · ${target}` : "loop" in target ? `Loop · ${target.loop}` : `End · ${target.end}`;

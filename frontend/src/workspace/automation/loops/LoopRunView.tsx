@@ -108,6 +108,7 @@ export function LoopRunView({
       ) : null}
       {(!details || (terminal && showNewRun)) ? (
         <LoopRunStartPanel
+          bypassesSchedule={loop.steps.find((step) => step.id === loop.start)?.type === "scheduled"}
           disabledReason={startDisabledReason ?? (preflightLoading ? "Checking runtime readiness…" : undefined)}
           preflightIssues={preflight?.issues}
           pending={busy || preflightLoading}

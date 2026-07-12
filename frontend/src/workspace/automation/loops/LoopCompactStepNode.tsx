@@ -1,4 +1,4 @@
-import { Shield } from "lucide-react";
+import { CalendarClock, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LoopStepRecord } from "./loopGraph";
 import type { LoopNodeContext } from "./LoopCanvasTypes";
@@ -11,6 +11,10 @@ const stepRunStatusClass: Record<string, string> = {
   completed: "border-secondary/75 text-secondary ring-2 ring-secondary/15",
   failed: "border-destructive text-destructive ring-2 ring-destructive/20",
   cancelled: "border-destructive text-destructive ring-2 ring-destructive/20"
+};
+const stepRunPulseClass: Record<string, string> = {
+  running: "loop-run-node-pulse--running",
+  waiting_for_human: "loop-run-node-pulse--waiting"
 };
 
 export function LoopCompactStepNode({
@@ -25,7 +29,7 @@ export function LoopCompactStepNode({
   const folded = records.length > 1;
   const loopId = record.loopId ?? context.selectedLoopId;
   const editable = !context.readOnly && loopId === context.selectedLoopId;
-  const draggable = !folded && editable;
+  const draggable = !folded && editable && !record.step?.scheduled;
   const selectedStepIndexSet = new Set(context.selectedStepIndexes);
   const selected = records.some((candidate) => selectedStepIndexSet.has(candidate.index));
 
@@ -55,29 +59,24 @@ function CelestialStepButton({ context, record, records, selected }: {
   records: LoopStepRecord[];
   selected: boolean;
 }) {
-  const title = record.step?.displayId || record.stepKey || "Missing step";
-  const humanGate = record.step?.humanGate ?? false;
-  const nodeStyle = humanGate ? "luna" : record.step?.nodeStyle ?? "terra";
-  const reasoningGlow = humanGate ? 0 : loopReasoningGlowLevel(record.step?.reasoningEffort);
-  const statusClass = record.step?.stepRun?.status ? stepRunStatusClass[record.step.stepRun.status] : undefined;
+  const model = celestialNodeModel(record);
 
   return (
     <button
       type="button"
       data-loop-node
-      data-loop-node-kind={humanGate ? "human" : "agent"}
-      data-loop-node-style={nodeStyle}
-      data-loop-reasoning-effort={record.step?.reasoningEffort}
-      data-loop-reasoning-glow={reasoningGlow}
-      data-loop-run-status={record.step?.stepRun?.status}
-      aria-label={`${context.readOnly ? "View" : "Edit"} step ${title}`}
-      title={title}
+      data-loop-node-kind={model.kind}
+      data-loop-node-style={model.nodeStyle}
+      data-loop-reasoning-effort={model.reasoningEffort}
+      data-loop-reasoning-glow={model.reasoningGlow}
+      data-loop-run-status={model.status}
+      aria-label={`${context.readOnly ? "View" : "Edit"} step ${model.title}`}
+      title={model.tooltip}
       className={cn(
         "loop-celestial-node nodrag nopan inline-flex h-full w-full items-center justify-center rounded-full border border-transparent transition-[border-color,box-shadow,filter]",
-        humanGate && "border-tertiary/60",
-        statusClass,
-        record.step?.stepRun?.status === "running" && "loop-run-node-pulse--running",
-        record.step?.stepRun?.status === "waiting_for_human" && "loop-run-node-pulse--waiting",
+        model.borderClass,
+        model.statusClass,
+        model.pulseClass,
         selected && "border-primary/80 ring-2 ring-primary/20"
       )}
       onClick={(event) => {
@@ -86,15 +85,55 @@ function CelestialStepButton({ context, record, records, selected }: {
       }}
     >
       <span aria-hidden="true" className="loop-celestial-reasoning-glow" />
-      <span aria-hidden="true" className={`loop-celestial-surface loop-celestial-surface--${nodeStyle}`} />
-      {humanGate ? <Shield aria-hidden="true" className="relative z-10 size-3.5 text-tertiary" strokeWidth={1.8} /> : null}
-      <span
-        aria-hidden="true"
-        data-loop-node-label={title}
-        className="pointer-events-none absolute top-full left-1/2 mt-2 -translate-x-1/2 whitespace-nowrap rounded-sm bg-background/95 px-1 font-mono text-[0.66rem] leading-4 text-tertiary"
-      >
-        {title}
-      </span>
+      <span aria-hidden="true" className={`loop-celestial-surface loop-celestial-surface--${model.nodeStyle}`} />
+      <StepNodeMark kind={model.kind} />
+      <StepNodeLabel title={model.title} scheduleLabel={model.scheduleLabel} />
     </button>
+  );
+}
+
+type StepNodeKind = "agent" | "human" | "scheduled";
+
+function celestialNodeModel(record: LoopStepRecord) {
+  const step = record.step;
+  if (!step) return {
+    title: record.stepKey || "Missing step",
+    kind: "agent" as const,
+    nodeStyle: "terra" as const,
+    tooltip: record.stepKey || "Missing step",
+    reasoningGlow: 0
+  };
+  const title = step.displayId || record.stepKey || "Missing step";
+  const kind: StepNodeKind = step.scheduled ? "scheduled" : step.humanGate ? "human" : "agent";
+  const nodeStyle = kind === "agent" ? step.nodeStyle : "luna";
+  const status = step.stepRun?.status;
+  const scheduleLabel = step.scheduleLabel;
+  return {
+    title,
+    kind,
+    nodeStyle,
+    scheduleLabel,
+    tooltip: scheduleLabel ? `${title} · ${scheduleLabel}` : title,
+    reasoningEffort: step.reasoningEffort,
+    reasoningGlow: kind === "agent" ? loopReasoningGlowLevel(step.reasoningEffort) : 0,
+    borderClass: kind === "human" ? "border-tertiary/60" : kind === "scheduled" ? "border-muted-foreground/55" : undefined,
+    status,
+    statusClass: status ? stepRunStatusClass[status] : undefined,
+    pulseClass: status ? stepRunPulseClass[status] : undefined
+  };
+}
+
+function StepNodeMark({ kind }: { kind: StepNodeKind }) {
+  if (kind === "human") return <Shield aria-hidden="true" className="relative z-10 size-3.5 text-tertiary" strokeWidth={1.8} />;
+  if (kind === "scheduled") return <CalendarClock aria-hidden="true" className="relative z-10 size-3.5 text-muted-foreground" strokeWidth={1.8} />;
+  return null;
+}
+
+function StepNodeLabel({ title, scheduleLabel }: { title: string; scheduleLabel?: string }) {
+  return (
+    <span aria-hidden="true" data-loop-node-label={title} className="pointer-events-none absolute top-full left-1/2 mt-2 -translate-x-1/2 whitespace-nowrap rounded-sm bg-background/95 px-1 font-mono text-[0.66rem] leading-4 text-tertiary">
+      <span className="block">{title}</span>
+      {scheduleLabel ? <span data-loop-node-schedule-label={scheduleLabel} className="block max-w-64 overflow-hidden text-ellipsis text-muted-foreground">{scheduleLabel}</span> : null}
+    </span>
   );
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Position, ReactFlow, type EdgeMouseHandler, type EdgeTypes, type NodeTypes, useUpdateNodeInternals } from "@xyflow/react";
-import type { Agent, AgentExecutionState, LoopRunDetails, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, LoopRunDetails, ProjectAutomationConfig, ProjectLoop, ProjectStepTransitionId } from "@shared/api/workspace-contracts";
 import { cn } from "@/lib/utils";
 import { LoopReactFlowNodeComponent } from "./LoopReactFlowNode";
 import { LoopSmartEdge } from "./LoopSmartEdge";
@@ -37,7 +37,7 @@ export function LoopCanvas({
   readOnly?: boolean;
   canvasControls?: ReactNode;
   onStepSelect?: (stepId: string) => void;
-  onTransitionSelect?: (stepId: string, result: "approved" | "rejected") => void;
+  onTransitionSelect?: (stepId: string, result: ProjectStepTransitionId) => void;
   onInsertStep?: (stepId: string, result: "approved" | "rejected") => void;
   onReorderStep?: (fromIndex: number, toIndex: number) => void;
 }) {
@@ -62,7 +62,7 @@ export function LoopCanvas({
     const index = edge.route?.sourceStepIndex;
     const result = edge.route?.outputId;
     const step = index === undefined ? undefined : loop.steps[index];
-    if (step && (result === "approved" || result === "rejected")) onTransitionSelect?.(step.id, result);
+    if (step && (result === "approved" || result === "rejected" || result === "triggered")) onTransitionSelect?.(step.id, result);
   };
 
   return (
@@ -79,7 +79,7 @@ export function LoopCanvas({
         isCanvasPanning={interaction.isCanvasPanning}
         loopCanvasRef={interaction.loopCanvasRef}
         canAddFirstStep={false}
-        canAddStepForEvent={() => !readOnly && Boolean(onInsertStep)}
+        canAddStepForEvent={(sourceStep) => !readOnly && Boolean(onInsertStep) && sourceStep?.step.type !== "scheduled"}
         onStepPointerDown={interaction.handleStepPointerDown}
         onStepPointerMove={interaction.handleStepPointerMove}
         onStepPointerUp={interaction.handleStepPointerUp}

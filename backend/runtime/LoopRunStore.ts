@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { v4 as uuid } from "uuid";
-import type { ProjectLoop, ProjectStep } from "../../shared/domain/automation.js";
+import type { ProjectAgentStep, ProjectHumanStep, ProjectLoop } from "../../shared/domain/automation.js";
 import type {
   AgentOutcome,
   ExecutionRuntimeSnapshot,
@@ -29,6 +29,7 @@ export interface CreateLoopRunInput {
   input?: string;
   runtimeDeviceId?: string;
   executionPlan?: LoopExecutionPlan;
+  schedule?: { stepId: string; scheduledFor: string };
 }
 
 export class LoopRunStore {
@@ -117,10 +118,12 @@ export class LoopRunStore {
     this.connection().prepare(`
       INSERT INTO loop_runs (
         run_id, project_id, loop_id, root_run_id, parent_run_id, parent_step_run_id,
-        source, status, runtime_device_id, execution_plan_json, input, snapshot_json, transition_count, created_at, updated_at
+        source, status, runtime_device_id, execution_plan_json, schedule_step_id, scheduled_for,
+        input, snapshot_json, transition_count, created_at, updated_at
       ) VALUES (
         @runId, @projectId, @loopId, @rootRunId, @parentRunId, @parentStepRunId,
-        @source, 'running', @runtimeDeviceId, @executionPlanJson, @input, @snapshotJson, 0, @createdAt, @updatedAt
+        @source, 'running', @runtimeDeviceId, @executionPlanJson, @scheduleStepId, @scheduledFor,
+        @input, @snapshotJson, 0, @createdAt, @updatedAt
       )
     `).run({
       runId,
@@ -132,6 +135,8 @@ export class LoopRunStore {
       source: input.source,
       runtimeDeviceId: input.runtimeDeviceId ?? null,
       executionPlanJson: input.executionPlan ? stringifyJson(input.executionPlan) : null,
+      scheduleStepId: input.schedule?.stepId ?? null,
+      scheduledFor: input.schedule?.scheduledFor ?? null,
       input: input.input ?? null,
       snapshotJson: stringifyJson(input.loop),
       createdAt: timestamp,
@@ -142,7 +147,7 @@ export class LoopRunStore {
     return run;
   }
 
-  createStepRun(run: LoopRun, step: ProjectStep, input?: string): StepRun {
+  createStepRun(run: LoopRun, step: ProjectAgentStep | ProjectHumanStep, input?: string): StepRun {
     const stepRunId = uuid();
     const timestamp = now();
     const status = step.type === "human" ? "waiting_for_human" : "queued";

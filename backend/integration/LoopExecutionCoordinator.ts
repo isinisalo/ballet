@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { v4 as uuid } from "uuid";
 import type { AppData } from "../../shared/api/workspaceData.js";
 import type { ProjectLoop, ProjectStep } from "../../shared/domain/automation.js";
+import { getProjectStepTransitionTargets } from "../../shared/domain/automation.js";
 import type {
   ExecutionSpec,
   ExecutionTask,
@@ -189,7 +190,7 @@ const reachableLoops = (data: AppData, rootLoopId: string): ProjectLoop[] => {
     if (!loop) continue;
     result.push(loop);
     for (const step of loop.steps) {
-      for (const target of [step.on.approved, step.on.rejected]) {
+      for (const target of getProjectStepTransitionTargets(step)) {
         if (typeof target === "object" && "loop" in target) pending.push(target.loop);
       }
     }

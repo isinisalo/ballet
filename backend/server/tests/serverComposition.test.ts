@@ -35,6 +35,7 @@ describe("Ballet server composition", () => {
       });
       expect((await fetch(`${origin}/api/data`)).status).toBe(401);
     } finally {
+      await ballet.scheduler.stop();
       ballet.controlPlane.close();
       ballet.server.closeAllConnections();
       await new Promise<void>((resolve) => ballet.server.close(() => resolve()));
