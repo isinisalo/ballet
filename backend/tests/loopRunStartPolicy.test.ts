@@ -1,16 +1,11 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { AppData } from "../../shared/api/workspaceData.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
-import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
-import type { LoopRunDetails } from "../../shared/domain/runtime.js";
-import type { RuntimeDatabase } from "../runtime-db.js";
-import type { LoopExecutionGateway } from "../services/LoopExecutionGateway.js";
-import { LoopRunService } from "../services/LoopRunService.js";
+import { builtInLoopThemes } from "../../shared/domain/loopThemes.js";
 import { validateLoopRunStart } from "../services/LoopRunStartPolicy.js";
-import type { RuntimeDatabaseProvider } from "../services/RuntimeDatabaseProvider.js";
 
 const roots: string[] = [];
 
@@ -37,21 +32,28 @@ const loop = (id: string): ProjectLoop => ({
 });
 
 const data = (projectRoot: string, loopIds: string[]): AppData => ({
-  projects: [],
-  goals: [],
-  adrs: [],
+  project: {
+    id: "fixture", name: "Fixture", description: "Fixture checkout", status: "active",
+    createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
+  },
   agents: [],
   skills: [],
-  policies: [],
-  eventDefinitions: [],
-  events: [],
   loopRuns: [],
   scheduleStates: [],
   automation: { version: 6, loops: loopIds.map(loop) },
   automationIssues: [],
   loopThemes: [...builtInLoopThemes],
   loopThemeIssues: [],
-  projectRoot
+  runtime: {
+    instanceId: "fixture", hostname: "localhost", platform: "darwin", architecture: "arm64",
+    checkout: { path: projectRoot, headSha: "a".repeat(40), configHash: "config", dirty: false },
+    uptimeSeconds: 0, startedAt: "2026-01-01T00:00:00.000Z", providers: [], activeRunCount: 0,
+    logsPath: path.join(projectRoot, ".git", "ballet", "logs", "ballet.log")
+  },
+  agentRuntimeConfigurations: {},
+  executionStates: [],
+  runTargets: { loops: [], agents: [] },
+  projectDocumentTree: []
 });
 
 const projectWithTasks = async (content = "# Tasks\n\n## task-001\n") => {
@@ -63,60 +65,11 @@ const projectWithTasks = async (content = "# Tasks\n\n## task-001\n") => {
   return root;
 };
 
-const service = (workspace: AppData) => {
-  const run: LoopRunDetails = {
-    runId: "run-1",
-    loopId: workspace.automation.loops[0]!.id,
-    rootRunId: "run-1",
-    source: "manual",
-    status: "running",
-    snapshot: workspace.automation.loops[0]!,
-    themeSnapshot: resolveLoopTheme(builtInLoopThemes, workspace.automation.loops[0]!.theme),
-    transitionCount: 0,
-    stepRuns: [],
-    createdAt: "2026-07-11T08:00:00.000Z",
-    updatedAt: "2026-07-11T08:00:00.000Z"
-  };
-  const runtime = {
-    startLoopRun: vi.fn(() => run),
-    getLoopRun: vi.fn(() => run)
-  } as unknown as RuntimeDatabase;
-  const gateway: LoopExecutionGateway = {
-    prepare: vi.fn(async () => undefined),
-    enqueuePending: vi.fn(async () => undefined),
-    cancel: vi.fn(async () => undefined),
-    finalizeIfTerminal: vi.fn(async () => undefined)
-  };
-  const instance = new LoopRunService(
-    async () => workspace,
-    { runtimeDatabase: () => runtime } as RuntimeDatabaseProvider
-  );
-  instance.setExecutionGateway(gateway);
-  return { instance, runtime, gateway };
-};
-
 describe("loop engineering root-start policy", () => {
-  it("blocks a Run when a reachable Loop references an unknown theme", async () => {
-    const root = await projectWithTasks();
-    const workspace = data(root, ["delivery", "release"]);
-    const rootStep = workspace.automation.loops[0]!.steps[0]!;
-    if (!("approved" in rootStep.on)) throw new Error("Expected executable root step.");
-    rootStep.on.approved = { loop: "release" };
-    workspace.automation.loops[1]!.theme = "missing-project-theme";
-    const test = service(workspace);
-
-    await expect(test.instance.start("delivery", "Ship it"))
-      .rejects.toThrow("Cannot start a loop while its theme is invalid.");
-    expect(test.gateway.prepare).not.toHaveBeenCalled();
-    expect(test.runtime.startLoopRun).not.toHaveBeenCalled();
-  });
-
   it.each(["ui-design", "implementation"])("accepts one known task for %s", async (loopId) => {
     const root = await projectWithTasks();
-    const test = service(data(root, [loopId]));
-    await expect(test.instance.start(loopId, "context\ntask_id: task-001")).resolves.toMatchObject({ loopId });
-    expect(test.gateway.prepare).toHaveBeenCalledOnce();
-    expect(test.runtime.startLoopRun).toHaveBeenCalledOnce();
+    await expect(validateLoopRunStart(data(root, [loopId]), loopId, "context\ntask_id: task-001"))
+      .resolves.toBeUndefined();
   });
 
   it.each([
@@ -125,49 +78,39 @@ describe("loop engineering root-start policy", () => {
     ["multiple", "task_id: task-001\ntask_id: task-002"]
   ])("rejects a %s task declaration before execution", async (_case, input) => {
     const root = await projectWithTasks("# Tasks\n\ntask-001\ntask-002\n");
-    const test = service(data(root, ["implementation"]));
-    await expect(test.instance.start("implementation", input))
+    await expect(validateLoopRunStart(data(root, ["implementation"]), "implementation", input))
       .rejects.toThrow("exactly one line in the form task_id: task-NNN");
-    expect(test.gateway.prepare).not.toHaveBeenCalled();
-    expect(test.runtime.startLoopRun).not.toHaveBeenCalled();
   });
 
   it("rejects an unknown task before execution", async () => {
     const root = await projectWithTasks();
-    const test = service(data(root, ["implementation"]));
-    await expect(test.instance.start("implementation", "task_id: task-999"))
+    await expect(validateLoopRunStart(data(root, ["implementation"]), "implementation", "task_id: task-999"))
       .rejects.toThrow("task_id task-999 must have exactly one ## task-999 declaration");
-    expect(test.gateway.prepare).not.toHaveBeenCalled();
   });
 
   it("does not treat a task cross-reference as a declaration", async () => {
     const root = await projectWithTasks("# Tasks\n\n## task-001 — Active\n\nDepends on removed task-999.\n");
-    const test = service(data(root, ["implementation"]));
-    await expect(test.instance.start("implementation", "task_id: task-999"))
+    await expect(validateLoopRunStart(data(root, ["implementation"]), "implementation", "task_id: task-999"))
       .rejects.toThrow("exactly one ## task-999 declaration");
   });
 
   it("rejects duplicate task declarations", async () => {
     const root = await projectWithTasks("# Tasks\n\n## task-001 — First\n\n## task-001 — Duplicate\n");
-    const test = service(data(root, ["implementation"]));
-    await expect(test.instance.start("implementation", "task_id: task-001"))
+    await expect(validateLoopRunStart(data(root, ["implementation"]), "implementation", "task_id: task-001"))
       .rejects.toThrow("exactly one ## task-001 declaration");
   });
 
   it("rejects a task-scoped run when TASKS.md is unavailable", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "ballet-loop-policy-"));
     roots.push(root);
-    const test = service(data(root, ["ui-design"]));
-    await expect(test.instance.start("ui-design", "task_id: task-001"))
+    await expect(validateLoopRunStart(data(root, ["ui-design"]), "ui-design", "task_id: task-001"))
       .rejects.toThrow(".ballet/outputs/TASKS.md is unavailable");
   });
 
   it("blocks direct root starts of the gated deployment loop", async () => {
     const root = await projectWithTasks();
-    const test = service(data(root, ["dev-deployment"]));
-    await expect(test.instance.start("dev-deployment", "task_id: task-001"))
+    await expect(validateLoopRunStart(data(root, ["dev-deployment"]), "dev-deployment", "task_id: task-001"))
       .rejects.toThrow("can only start from its approved human-gate transition");
-    expect(test.gateway.prepare).not.toHaveBeenCalled();
   });
 
   it("does not impose the task contract on other loops", async () => {

@@ -16,12 +16,10 @@ import { ProjectDocumentTree } from "./ProjectDocumentTree";
 
 export function SidebarProjectMenu({
   route,
-  projectId,
   projectDocumentTree,
   navigate
 }: {
   route: RouteState;
-  projectId?: string;
   projectDocumentTree: ProjectDocumentTreeNode[];
   navigate: (path: string) => void;
 }) {
@@ -30,9 +28,9 @@ export function SidebarProjectMenu({
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
   const projectPathFor = (kind: ProjectDocumentCreateKind) => (relativePath: string) =>
-    projectId ? projectCollectionDocumentPath(projectId, kind, relativePath) : projectDocumentPath(relativePath);
+    projectCollectionDocumentPath(kind, relativePath);
   const projectCollectionPathFor = (kind: ProjectDocumentCreateKind) =>
-    projectId ? projectCollectionDocumentPath(projectId, kind) : "/";
+    projectCollectionDocumentPath(kind);
 
   return (
     <Collapsible defaultOpen={projectOpen} className="group/collapsible">

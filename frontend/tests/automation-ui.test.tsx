@@ -10,6 +10,7 @@ import {
   type ProjectLoop
 } from "@shared/api/workspace-contracts";
 import { WorkspaceApp } from "../src/WorkspaceApp";
+import { emptyData } from "../src/workspace/types";
 
 const now = "2026-07-10T10:00:00.000Z";
 const loop: ProjectLoop = {
@@ -32,28 +33,28 @@ const run = (
   }] : []
 });
 
-const data = (): AppData => ({
-  projects: [], goals: [], adrs: [], agents: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
+const data = (latest: LoopRunDetails | null): AppData => ({
+  ...emptyData,
+  loopRuns: latest ? [latest] : [],
   automation: { version: 6, loops: [loop] }, automationIssues: [], scheduleStates: [],
-  loopThemes: [...builtInLoopThemes], loopThemeIssues: [], projectDocumentTree: []
+  loopThemes: [...builtInLoopThemes], loopThemeIssues: [], projectDocumentTree: [],
+  runTargets: {
+    loops: [{ kind: "loop", id: "delivery", name: "delivery", ready: true, issues: [], ...latest ? { latestRootRunId: latest.rootRunId, ...["running", "waiting_for_human"].includes(latest.status) ? { activeRootRunId: latest.rootRunId } : {} } : {} }],
+    agents: []
+  }
 });
 
 function installApi(latest: LoopRunDetails | null) {
-  const workspace = data();
+  const workspace = data(latest);
   let current = latest;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
-    if (url === "/api/admin/status") {
-      return Response.json({ bootstrapped: true, authenticated: true, csrfToken: "test-csrf-token" });
-    }
     if (url === "/api/data") return Response.json(workspace);
     if (url.startsWith("/api/runs?state=active")) return Response.json({ items: [] });
     if (url.startsWith("/api/runs?state=recent")) return Response.json({ items: [] });
-    if (url === "/api/run-targets") return Response.json({ loops: [{ kind: "loop", id: "delivery", name: "delivery", ready: true, issues: [] }], agents: [] });
     if (url === "/api/runs/run-1" && current) return Response.json({
       rootRunId: current.rootRunId,
-      projectId: "project-1",
       kind: "loop",
       targetId: current.loopId,
       source: current.source,
@@ -65,21 +66,17 @@ function installApi(latest: LoopRunDetails | null) {
       loopRuns: [current],
       tasks: []
     });
-    if (url === "/api/loops/delivery/preflight") {
-      return Response.json({ ok: true, issues: [], snapshots: [] });
-    }
-    if (url.endsWith("/runs/latest")) return Response.json(current);
-    if (url.endsWith("/runs") && method === "POST") {
+    if (url === "/api/runs" && method === "POST") {
       current = run("running");
-      return Response.json(current);
+      return Response.json(rootDetail(current));
     }
-    if (url.endsWith("/respond") && method === "POST") {
+    if (url === "/api/runs/run-1/steps/step-run-1/respond" && method === "POST") {
       current = run("completed");
-      return Response.json(current);
+      return Response.json(rootDetail(current));
     }
-    if (url.endsWith("/cancel") && method === "POST") {
+    if (url === "/api/runs/run-1/cancel" && method === "POST") {
       current = run("cancelled");
-      return Response.json(current);
+      return Response.json(rootDetail(current));
     }
     if (url.includes("/console?")) {
       return Response.json({ entries: [], lastId: 0, hasMore: false, truncated: false });
@@ -98,7 +95,7 @@ async function renderRun(latest: LoopRunDetails | null) {
   const fetchMock = installApi(latest);
   window.history.pushState({}, "", "/run/loops/delivery");
   render(<WorkspaceApp />);
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/loops/delivery/runs/latest", expect.anything()));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/data", expect.anything()));
   return fetchMock;
 }
 
@@ -111,7 +108,7 @@ describe("automation v6 UI", () => {
     await waitFor(() => expect(manualInput).toBeEnabled());
     await user.type(manualInput, "Ship release");
     await user.click(screen.getByRole("button", { name: "Start" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/loops/delivery/runs", expect.objectContaining({ method: "POST", body: JSON.stringify({ input: "Ship release" }) })));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs", expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "loop", targetId: "delivery", input: "Ship release" }) })));
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
     expect(window.location.pathname).toBe("/run/loops/delivery");
@@ -124,7 +121,7 @@ describe("automation v6 UI", () => {
     expect(approved).toBeDisabled();
     await user.type(screen.getByLabelText("Response"), "Looks good");
     await user.click(approved);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/loop-runs/run-1/steps/step-run-1/respond", expect.objectContaining({ method: "POST" })));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1/steps/step-run-1/respond", expect.objectContaining({ method: "POST" })));
   });
 
   it("offers a new run after the latest run has finished", async () => {
@@ -149,8 +146,22 @@ describe("automation v6 UI", () => {
     const fetchMock = await renderRun(run("running"));
     await user.click(await screen.findByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "/api/loop-runs/run-1/cancel",
+      "/api/runs/run-1/cancel",
       expect.objectContaining({ method: "POST" })
     ));
   });
+});
+
+const rootDetail = (current: LoopRunDetails) => ({
+  rootRunId: current.rootRunId,
+  kind: "loop",
+  targetId: current.loopId,
+  source: current.source === "schedule" ? "schedule" : "manual",
+  status: current.status,
+  current: current.stepRuns[0] ? { loopRunId: current.runId, loopId: current.loopId, stepRunId: current.stepRuns[0].stepRunId, stepId: current.stepRuns[0].stepId } : undefined,
+  createdAt: current.createdAt,
+  updatedAt: current.updatedAt,
+  completedAt: current.completedAt,
+  loopRuns: [current],
+  tasks: []
 });

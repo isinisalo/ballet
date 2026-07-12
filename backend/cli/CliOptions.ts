@@ -1,58 +1,67 @@
-import os from "node:os";
-import { isLocalServerUrl } from "./LocalServerService.js";
-import { deriveProjectId } from "./ProjectIdentity.js";
-
-export interface SetupPlan {
-  serverUrl: string;
-  appUrl: string;
-  displayName: string;
-  repositoryUrl?: string;
-  projectId?: string;
-  deviceCode?: string;
-  codexCommand: string;
-  copilotCommand: string;
-  managedLocalServer: boolean;
-  startDaemon: boolean;
+export interface StartOptions {
+  codexCommand?: string;
+  copilotCommand?: string;
+  openBrowser: boolean;
 }
 
-export const resolveSetupPlan = (args: readonly string[]): SetupPlan => {
-  const options = parseCliOptions(args);
-  const serverUrl = options.get("server") ?? "http://127.0.0.1:4317";
-  const appUrl = options.get("app") ?? serverUrl;
-  const repositoryUrl = options.get("repo") ?? options.get("repository");
-  const projectId = options.get("project") ?? (repositoryUrl ? deriveProjectId(repositoryUrl) : undefined);
-  const deviceCode = options.get("device-code");
-  if (options.has("device-code") && (!deviceCode || deviceCode === "true")) {
-    throw new Error("--device-code requires the device code returned by an existing pairing session.");
-  }
-  const managedLocalServer = isLocalServerUrl(serverUrl);
-  if ((managedLocalServer || isLocalServerUrl(appUrl)) && new URL(serverUrl).origin !== new URL(appUrl).origin) {
-    throw new Error("The managed local Ballet app and API must use the same loopback origin.");
-  }
+export interface LogOptions {
+  lines: number;
+  follow: boolean;
+}
+
+export const parseStartOptions = (args: readonly string[]): StartOptions => {
+  const options = parseCliOptions(args, new Set(["codex-command", "copilot-command"]), new Set(["no-open"]));
   return {
-    serverUrl,
-    appUrl,
-    displayName: options.get("name") ?? os.hostname(),
-    repositoryUrl,
-    projectId,
-    deviceCode,
-    codexCommand: options.get("codex-command") ?? "codex",
-    copilotCommand: options.get("copilot-command") ?? "copilot",
-    managedLocalServer,
-    startDaemon: !options.has("no-start")
+    codexCommand: optionalValue(options, "codex-command"),
+    copilotCommand: optionalValue(options, "copilot-command"),
+    openBrowser: !options.has("no-open")
   };
 };
 
-export const parseCliOptions = (args: readonly string[]): Map<string, string> => {
+export const parseLogOptions = (args: readonly string[]): LogOptions => {
+  const normalized = args.flatMap((value) => value === "-f" ? ["--follow"] : value === "-n" ? ["--lines"] : [value]);
+  const options = parseCliOptions(normalized, new Set(["lines"]), new Set(["follow"]));
+  const rawLines = options.get("lines") ?? "200";
+  const lines = Number(rawLines);
+  if (!Number.isSafeInteger(lines) || lines < 1 || lines > 10_000) {
+    throw new Error("--lines must be an integer between 1 and 10000.");
+  }
+  return { lines, follow: options.has("follow") };
+};
+
+export const parseCliOptions = (
+  args: readonly string[],
+  valueOptions = new Set<string>(),
+  flagOptions = new Set<string>()
+): Map<string, string> => {
   const options = new Map<string, string>();
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index]!;
     if (!value.startsWith("--")) throw new Error(`Unexpected argument: ${value}`);
-    const [rawKey, inline] = value.slice(2).split("=", 2);
-    if (!rawKey) throw new Error("Invalid empty option.");
-    if (inline !== undefined) options.set(rawKey, inline);
-    else if (args[index + 1] && !args[index + 1]!.startsWith("--")) options.set(rawKey, args[++index]!);
-    else options.set(rawKey, "true");
+    const separator = value.indexOf("=");
+    const key = value.slice(2, separator < 0 ? undefined : separator);
+    const inline = separator < 0 ? undefined : value.slice(separator + 1);
+    if (!key || (!valueOptions.has(key) && !flagOptions.has(key))) throw new Error(`Unknown option: --${key || "<empty>"}`);
+    if (options.has(key)) throw new Error(`Option --${key} may be provided only once.`);
+
+    if (flagOptions.has(key)) {
+      if (inline !== undefined) throw new Error(`Option --${key} does not accept a value.`);
+      options.set(key, "true");
+      continue;
+    }
+
+    const optionValue = inline ?? args[++index];
+    if (!optionValue || optionValue.startsWith("--")) throw new Error(`--${key} requires a value.`);
+    options.set(key, optionValue);
   }
   return options;
+};
+
+const optionalValue = (options: Map<string, string>, key: string): string | undefined => {
+  const value = options.get(key)?.trim();
+  if (!value) return undefined;
+  if (value.includes("/") && !value.startsWith("/")) {
+    throw new Error(`--${key} must be a command name or an absolute path.`);
+  }
+  return value;
 };

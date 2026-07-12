@@ -1,21 +1,22 @@
+import { useState } from "react";
+import { Cpu } from "lucide-react";
+import type { AgentRuntimeConfiguration, LocalRuntime } from "@shared/api/workspace-contracts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Cpu } from "lucide-react";
-import { useId, useState } from "react";
-import { backendReadiness, providerLabel } from "../../runtimes/runtimeRegistry";
-import { backendsForDevice, executionFormError, modelOptions, PROVIDER_DEFAULT, reasoningOptions, selectedExecutionBackend, selectedExecutionDevice } from "./executionOptions";
+import { providerReadiness } from "../../runtimes/runtimeRegistry";
+import { ExecutionPolicyFields, ExecutionSelectionFields } from "./ExecutionFields";
+import { executionFormError, PROVIDER_DEFAULT, reasoningOptions, selectedExecutionProvider } from "./executionOptions";
 import { useAgentRuntimeConfiguration } from "./useAgentRuntimeConfiguration";
 
 export type AgentRuntimeConfigurationEditor = ReturnType<typeof useAgentRuntimeConfiguration>;
 
-export function AgentExecutionForm({ agentId, onSaved }: { agentId: string; onSaved?: () => void }) {
-  const editor = useAgentRuntimeConfiguration(agentId);
+export function AgentExecutionForm({ agentId, runtime, configuration, onSaved }: {
+  agentId: string;
+  runtime: LocalRuntime;
+  configuration?: AgentRuntimeConfiguration;
+  onSaved?: () => void;
+}) {
+  const editor = useAgentRuntimeConfiguration(agentId, runtime, configuration);
   return <AgentExecutionSettingsForm agentId={agentId} editor={editor} onSaved={onSaved} />;
 }
 
@@ -25,120 +26,48 @@ export function AgentExecutionSettingsForm({ agentId, editor, onSaved, compact =
   onSaved?: () => void;
   compact?: boolean;
 }) {
-  return compact
-    ? <CompactAgentExecutionSettings agentId={agentId} editor={editor} onSaved={onSaved} />
-    : <StandardAgentExecutionSettings agentId={agentId} editor={editor} onSaved={onSaved} />;
-}
-
-function CompactAgentExecutionSettings({ agentId, editor, onSaved }: { agentId: string; editor: AgentRuntimeConfigurationEditor; onSaved?: () => void }) {
-  const settings = useExecutionSettings(editor, onSaved);
-
-  return (
-    <section className="mt-5 grid gap-3 border-t border-divider-strong pt-4" aria-label="Agent execution settings">
-      <header>
-        <h3 className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase leading-4 tracking-[0.05em] text-muted-foreground"><Cpu className="size-3.5" /> Execution</h3>
-      </header>
-      {editor.error ? <p role="alert" className="text-xs leading-4 text-destructive">{editor.error}</p> : null}
-      {editor.configuration?.issues.length ? <RuntimeIssues issues={editor.configuration.issues.map((issue) => issue.message)} compact /> : null}
-      {editor.configuration?.intent && !editor.configuration.resolved ? <PortableIntentSummary editor={editor} compact /> : null}
-      {!editor.loading && editor.devices.length === 0 ? <p className="text-xs leading-4 text-muted-foreground">No runtime computers are connected.</p> : null}
-      <ExecutionSelectionFields settings={settings} compact />
-      <NetworkAccessField compact checked={editor.form.policy.network} disabled={!settings.supportsNetwork} onChange={settings.setNetwork} />
-      <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} onReadOnlyRootsChange={settings.setReadOnlyRoots} onReadOnlyRootsBlur={settings.saveReadOnlyRoots} compact />
-      <p className="text-xs leading-4 text-muted-foreground">{editor.saving ? "Saving runtime configuration…" : settings.validationError ?? "Portable intent is stored in .ballet/project.json; the computer attachment stays local."}</p>
-    </section>
-  );
-}
-
-function StandardAgentExecutionSettings({ agentId, editor, onSaved }: { agentId: string; editor: AgentRuntimeConfigurationEditor; onSaved?: () => void }) {
-  const settings = useExecutionSettings(editor, onSaved);
-
-  return (
-    <section className="grid gap-3 border-t border-divider-strong bg-panel-section p-4" aria-label="Agent execution settings">
-      <header className="flex items-start justify-between gap-3">
-        <div><h3 className="flex items-center gap-2 text-sm font-semibold"><Cpu className="size-4 text-muted-foreground" /> Execution</h3><p className="text-xs text-muted-foreground">Configure portable intent and attach one local computer.</p></div>
-        {settings.readiness ? <span className={cn("border px-2 py-1 font-mono text-[0.6rem] uppercase", settings.readiness.tone === "healthy" ? "border-secondary/30 text-secondary" : settings.readiness.tone === "error" ? "border-destructive/30 text-destructive" : "border-tertiary/30 text-tertiary")}>{settings.readiness.label}</span> : null}
-      </header>
-      {editor.error ? <Alert variant="destructive"><AlertDescription>{editor.error}</AlertDescription></Alert> : null}
-      {editor.configuration?.issues.length ? <RuntimeIssues issues={editor.configuration.issues.map((issue) => issue.message)} /> : null}
-      {editor.configuration?.intent && !editor.configuration.resolved ? <PortableIntentSummary editor={editor} /> : null}
-      {!editor.loading && editor.devices.length === 0 ? <Alert><AlertDescription>No runtime computers are connected. Connect one from Runtimes before configuring execution.</AlertDescription></Alert> : null}
-      <ExecutionSelectionFields settings={settings} />
-      <div className="border border-divider-strong bg-background px-3 py-2 text-xs"><span className="font-medium text-foreground">Write scope:</span> <span className="text-muted-foreground">current project checkout only</span></div>
-      <NetworkAccessField checked={editor.form.policy.network} disabled={!settings.supportsNetwork} onChange={settings.setNetwork} />
-      <AdvancedPolicy agentId={agentId} editor={editor} supportsRoots={settings.supportsRoots} open={settings.advancedOpen} onOpenChange={settings.setAdvancedOpen} onReadOnlyRootsChange={settings.setReadOnlyRoots} onReadOnlyRootsBlur={settings.saveReadOnlyRoots} />
-      <p className="text-xs text-muted-foreground">{editor.saving ? "Saving runtime configuration…" : settings.validationError ?? "Portable intent is stored in .ballet/project.json; the computer attachment stays local."}</p>
-    </section>
-  );
-}
-
-function PortableIntentSummary({ editor, compact = false }: { editor: AgentRuntimeConfigurationEditor; compact?: boolean }) {
-  const intent = editor.configuration?.intent;
-  if (!intent) return null;
-  return <p className={cn("border border-divider-strong bg-background font-mono text-muted-foreground", compact ? "px-2 py-1.5 text-[0.6rem] leading-4" : "px-3 py-2 text-[0.65rem]")}>Portable intent: {providerLabel(intent.provider)} · {intent.model} · {intent.reasoning} · network {intent.policy.network ? "on" : "off"}</p>;
-}
-
-function useExecutionSettings(editor: AgentRuntimeConfigurationEditor, onSaved?: () => void) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const device = selectedExecutionDevice(editor.devices, editor.form.deviceId);
-  const backend = selectedExecutionBackend(editor.devices, editor.form.runtimeBackendId);
-  const validationError = executionFormError(editor.form, editor.devices);
-  const readiness = device && backend ? backendReadiness(device, backend) : undefined;
-  const supportsNetwork = backend?.capabilities.policy.networkControl ?? false;
-  const supportsRoots = backend?.capabilities.policy.readOnlyRoots ?? false;
-  const persist = (pendingSave: Promise<boolean>) => void pendingSave.then((saved) => { if (saved) onSaved?.(); });
-  const selectDevice = (deviceId: string) => persist(editor.selectDevice(deviceId));
-  const selectBackend = (runtimeBackendId: string) => persist(editor.selectBackend(runtimeBackendId));
+  const provider = selectedExecutionProvider(editor.providers, editor.form.provider);
+  const readiness = provider ? providerReadiness(provider) : undefined;
+  const validationError = executionFormError(editor.form, editor.providers);
+  const persist = (pending: Promise<boolean>) => void pending.then((saved) => { if (saved) onSaved?.(); });
   const selectModel = (model: string) => {
-    const options = reasoningOptions(backend, model);
-    persist(editor.updateAndSave({ model, reasoning: options.length === 1 && options[0].value === PROVIDER_DEFAULT ? PROVIDER_DEFAULT : "" }));
+    const options = reasoningOptions(provider, model);
+    persist(editor.updateAndSave({ model, reasoning: options.length === 1 && options[0]?.value === PROVIDER_DEFAULT ? PROVIDER_DEFAULT : "" }));
   };
-  const selectReasoning = (reasoning: string) => persist(editor.updateAndSave({ reasoning }));
-  const setNetwork = (network: boolean) => persist(editor.updateAndSave({ policy: { ...editor.form.policy, network } }));
-  const setReadOnlyRoots = (readOnlyRoots: string[]) => editor.updateForm({ policy: { ...editor.form.policy, readOnlyRoots } });
-  const saveReadOnlyRoots = () => persist(editor.saveIfValid());
-  return { advancedOpen, backend, device, editor, readiness, selectBackend, selectDevice, selectModel, selectReasoning, saveReadOnlyRoots, setAdvancedOpen, setNetwork, setReadOnlyRoots, supportsNetwork, supportsRoots, validationError };
-}
 
-function ExecutionSelectionFields({ settings, compact = false }: { settings: ReturnType<typeof useExecutionSettings>; compact?: boolean }) {
-  const { backend, device, editor } = settings;
-  const intent = editor.configuration?.intent;
-  const providerValue = editor.form.runtimeBackendId || (intent ? `intent:${intent.provider}` : "");
-  const providerOptions = device
-    ? backendsForDevice(editor.devices, editor.form.deviceId).map((item) => ({ value: item.id, label: providerLabel(item.provider) }))
-    : intent ? [{ value: `intent:${intent.provider}`, label: providerLabel(intent.provider) }] : [];
-  const models = backend ? modelOptions(backend) : editor.form.model ? [{ value: editor.form.model, label: editor.form.model }] : [];
-  const reasoning = backend ? reasoningOptions(backend, editor.form.model) : editor.form.reasoning ? [{ value: editor.form.reasoning, label: editor.form.reasoning }] : [];
   return (
-    <div className={compact ? "grid gap-3" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-4"}>
-      <ExecutionSelect compact={compact} label="Runtime" value={editor.form.deviceId} placeholder="Select runtime" disabled={editor.loading} options={editor.devices.map((item) => ({ value: item.id, label: `${item.displayName} · ${item.status}` }))} onChange={settings.selectDevice} />
-      <ExecutionSelect compact={compact} label="Provider" value={providerValue} placeholder="Select provider" disabled={!device} options={providerOptions} onChange={settings.selectBackend} />
-      <ExecutionSelect compact={compact} label="Model" value={editor.form.model} placeholder="Select model" disabled={!backend} options={models} onChange={settings.selectModel} />
-      <ExecutionSelect compact={compact} label="Reasoning effort" value={editor.form.reasoning} placeholder="Select effort" disabled={!backend || !editor.form.model} options={reasoning} onChange={settings.selectReasoning} />
-    </div>
+    <section className={cn("grid gap-3 border-divider-strong", compact ? "mt-5 border-t pt-4" : "border-t bg-panel-section p-4")} aria-label="Agent execution settings">
+      <header className={cn(!compact && "flex items-start justify-between gap-3")}>
+        <div><h3 className={cn("flex items-center gap-2 font-medium", compact ? "font-mono text-[10px] uppercase leading-4 tracking-[0.05em] text-muted-foreground" : "text-sm font-semibold")}><Cpu className={compact ? "size-3.5" : "size-4 text-muted-foreground"} /> Execution</h3>{!compact ? <p className="text-xs text-muted-foreground">Configure the local CLI provider and portable execution intent.</p> : null}</div>
+        {readiness && !compact ? <span className={cn("border px-2 py-1 font-mono text-[0.6rem] uppercase", readiness.tone === "healthy" ? "border-secondary/30 text-secondary" : readiness.tone === "error" ? "border-destructive/30 text-destructive" : "border-tertiary/30 text-tertiary")}>{readiness.label}</span> : null}
+      </header>
+      {editor.error ? compact ? <p role="alert" className="text-xs leading-4 text-destructive">{editor.error}</p> : <Alert variant="destructive"><AlertDescription>{editor.error}</AlertDescription></Alert> : null}
+      {editor.configuration?.issues.length ? <RuntimeIssues issues={editor.configuration.issues.map((issue) => issue.message)} compact={compact} /> : null}
+      <ExecutionSelectionFields
+        compact={compact}
+        editor={editor}
+        provider={provider}
+        onProviderChange={(value) => persist(editor.selectProvider(value))}
+        onModelChange={selectModel}
+        onReasoningChange={(reasoning) => persist(editor.updateAndSave({ reasoning }))}
+      />
+      {!compact ? <div className="border border-divider-strong bg-background px-3 py-2 text-xs"><span className="font-medium text-foreground">Write scope:</span> <span className="text-muted-foreground">current project checkout only</span></div> : null}
+      <ExecutionPolicyFields
+        agentId={agentId}
+        compact={compact}
+        editor={editor}
+        provider={provider}
+        advancedOpen={advancedOpen}
+        onAdvancedOpenChange={setAdvancedOpen}
+        onPersist={persist}
+      />
+      <p className="text-xs leading-4 text-muted-foreground">{editor.saving ? "Saving execution configuration…" : validationError ?? "Intent is stored in .ballet/project.json; absolute roots stay in .git/ballet/settings.json."}</p>
+    </section>
   );
 }
 
-function RuntimeIssues({ issues, compact = false }: { issues: string[]; compact?: boolean }) {
+function RuntimeIssues({ issues, compact }: { issues: string[]; compact: boolean }) {
   const content = <><span>{issues.join(" · ")}</span>{" "}<a className="font-medium underline underline-offset-2" href="/runtimes">Open Runtimes</a></>;
-  return compact
-    ? <p role="alert" className="font-mono text-[0.62rem] leading-4 text-destructive">{content}</p>
-    : <Alert variant="destructive"><AlertDescription>{content}</AlertDescription></Alert>;
-}
-
-function ExecutionSelect({ label, value, placeholder, disabled, options, onChange, compact = false }: { label: string; value: string; placeholder: string; disabled: boolean; options: Array<{ value: string; label: string }>; onChange: (value: string) => void; compact?: boolean }) {
-  const id = useId();
-  if (compact) {
-    return <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 text-xs leading-4"><FieldLabel htmlFor={id} className="text-muted-foreground">{label}</FieldLabel><Select value={value} disabled={disabled} onValueChange={onChange}><SelectTrigger id={id} className="h-8 w-full font-mono text-xs"><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent align="start"><SelectGroup>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent></Select></div>;
-  }
-  return <Field className="gap-1.5"><FieldLabel htmlFor={id}>{label}</FieldLabel><Select value={value} disabled={disabled} onValueChange={onChange}><SelectTrigger id={id} className="w-full"><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent align="start"><SelectGroup>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>;
-}
-
-function NetworkAccessField({ checked, disabled, onChange, compact = false }: { checked: boolean; disabled: boolean; onChange: (value: boolean) => void; compact?: boolean }) {
-  if (compact) return <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 text-xs leading-4"><span className="text-muted-foreground">Network access</span><Switch checked={checked} disabled={disabled} aria-label="Network access" onCheckedChange={onChange} /></div>;
-  return <label className="flex items-center justify-between gap-4 text-xs"><span><strong className="block text-foreground">Network access</strong><span className="text-muted-foreground">Disabled by default. The provider must advertise network control.</span></span><Switch checked={checked} disabled={disabled} aria-label="Network access" onCheckedChange={onChange} /></label>;
-}
-
-function AdvancedPolicy({ agentId, editor, supportsRoots, open, onOpenChange, onReadOnlyRootsChange, onReadOnlyRootsBlur, compact = false }: { agentId: string; editor: AgentRuntimeConfigurationEditor; supportsRoots: boolean; open: boolean; onOpenChange: (open: boolean) => void; onReadOnlyRootsChange: (readOnlyRoots: string[]) => void; onReadOnlyRootsBlur: () => void; compact?: boolean }) {
-  return <Collapsible open={open} onOpenChange={onOpenChange}><CollapsibleTrigger render={<Button type="button" size="sm" variant="ghost" className={cn("px-0 text-muted-foreground", compact && "h-6 text-xs")}><ChevronDown className={cn("transition-transform", open && "rotate-180")} /> Advanced policy</Button>} /><CollapsibleContent className="grid gap-3 border-t border-divider-strong pt-3"><Field className="gap-1.5"><FieldLabel htmlFor={`read-only-roots-${agentId}`}>Additional read-only roots</FieldLabel><Textarea id={`read-only-roots-${agentId}`} className="min-h-20 font-mono text-xs" disabled={!supportsRoots} placeholder="One absolute path per line" value={editor.form.policy.readOnlyRoots.join("\n")} onBlur={onReadOnlyRootsBlur} onChange={(event) => onReadOnlyRootsChange(event.target.value.split("\n").map((value) => value.trim()).filter(Boolean))} /></Field></CollapsibleContent></Collapsible>;
+  return compact ? <p role="alert" className="font-mono text-[0.62rem] leading-4 text-destructive">{content}</p> : <Alert variant="destructive"><AlertDescription>{content}</AlertDescription></Alert>;
 }

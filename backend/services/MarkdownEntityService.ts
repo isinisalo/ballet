@@ -7,9 +7,9 @@ import {
   writeProjectMarkdownDocument
 } from "../markdown-adapter.js";
 
-type MutableMarkdownCollection = Exclude<CollectionName, "events" | "policies">;
+type MutableMarkdownCollection = CollectionName;
 
-const markdownCollections = new Set<MutableMarkdownCollection>(["projects", "goals", "adrs", "agents", "skills"]);
+const markdownCollections = new Set<MutableMarkdownCollection>(["agents", "skills"]);
 
 export class MarkdownEntityService {
   constructor(
@@ -39,7 +39,6 @@ export class MarkdownEntityService {
   }
 
   async remove(collection: CollectionName, id: string): Promise<void> {
-    if (collection === "events") return;
     const data = await this.readData();
     const target = (data[collection] as unknown as Array<Record<string, unknown>>).find((item) => item.id === id);
     const relativePath = typeof target?.relativePath === "string" ? target.relativePath : undefined;

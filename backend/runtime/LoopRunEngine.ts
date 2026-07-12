@@ -26,7 +26,6 @@ interface StartOptions {
   rootRunId?: string;
   parentRunId?: string;
   parentStepRunId?: string;
-  runtimeDeviceId?: string;
   executionPlan?: LoopExecutionPlan;
   schedule?: { stepId: string; scheduledFor: string };
 }
@@ -124,7 +123,7 @@ export class LoopRunEngine {
       if (!stepRun) throw new LoopRunNotFoundError(`Step run ${input.stepRunId} was not found.`);
       const run = this.requireRun(stepRun.runId);
       if (run.status === "cancelled" || stepRun.status === "cancelled") return this.requireDetails(run.runId);
-      if (stepRun.type !== "agent") throw new LoopRunStateError("A human step cannot be completed by a runtime daemon.");
+      if (stepRun.type !== "agent") throw new LoopRunStateError("A human step cannot be completed by the local runtime.");
       if (stepRun.status !== "running" && stepRun.status !== "queued") {
         return this.requireDetails(run.runId);
       }
@@ -179,7 +178,6 @@ export class LoopRunEngine {
       rootRunId: options.rootRunId,
       parentRunId: options.parentRunId,
       parentStepRunId: options.parentStepRunId,
-      runtimeDeviceId: options.runtimeDeviceId,
       executionPlan: options.executionPlan,
       schedule: options.schedule,
       source: options.source ?? "manual",
@@ -227,7 +225,6 @@ export class LoopRunEngine {
       rootRunId: run.rootRunId,
       parentRunId: run.runId,
       parentStepRunId: sourceStepRun.stepRunId,
-      runtimeDeviceId: run.runtimeDeviceId,
       executionPlan: run.executionPlan
     });
   }

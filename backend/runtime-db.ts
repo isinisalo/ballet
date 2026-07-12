@@ -1,6 +1,5 @@
 import type Database from "better-sqlite3";
 import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
-import type { EventRecord, RuntimeEvent } from "../shared/domain/events.js";
 import type { LoopTheme } from "../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
@@ -12,7 +11,6 @@ import type {
   StepRun,
   StepRunResult
 } from "../shared/domain/runtime.js";
-import { EventStore } from "./runtime/EventStore.js";
 import { LoopRunEngine } from "./runtime/LoopRunEngine.js";
 import { LoopRunStore } from "./runtime/LoopRunStore.js";
 import {
@@ -21,11 +19,8 @@ import {
   type ScheduleDefinitionState
 } from "./runtime/LoopScheduleStateStore.js";
 import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
-import type { IntakeEventInput, PublishEventResult } from "./runtime/RuntimeDbTypes.js";
-import { resolveRuntimeDbPath } from "./runtime/runtimeDbPath.js";
 
-export { isPatchedSqliteVersion, resolveRuntimeDbPath };
-export type { IntakeEventInput, PublishEventResult };
+export { isPatchedSqliteVersion };
 
 export interface DispatchLoopScheduleInput {
   loopId: string;
@@ -34,7 +29,6 @@ export interface DispatchLoopScheduleInput {
   definitionHash: string;
   scheduledFor: string;
   nextRunAt?: string;
-  runtimeDeviceId?: string;
   executionPlan?: LoopExecutionPlan;
   updatedAt: string;
 }
@@ -47,18 +41,16 @@ export type DispatchLoopScheduleResult =
 
 export class RuntimeDatabase {
   private readonly connectionManager: RuntimeDbConnection;
-  private readonly eventStore: EventStore;
   private readonly loopRunStore: LoopRunStore;
   private readonly loopRunEngine: LoopRunEngine;
   private readonly loopScheduleStateStore: LoopScheduleStateStore;
 
-  constructor(dbPath: string, readonly projectId = "project") {
-    this.connectionManager = new RuntimeDbConnection(dbPath, projectId);
+  constructor(dbPath: string) {
+    this.connectionManager = new RuntimeDbConnection(dbPath);
     const connection = () => this.connection();
-    this.eventStore = new EventStore(connection, projectId);
-    this.loopRunStore = new LoopRunStore(connection, projectId);
+    this.loopRunStore = new LoopRunStore(connection);
     this.loopRunEngine = new LoopRunEngine(connection, this.loopRunStore);
-    this.loopScheduleStateStore = new LoopScheduleStateStore(connection, projectId);
+    this.loopScheduleStateStore = new LoopScheduleStateStore(connection);
   }
 
   close(): void {
@@ -81,33 +73,17 @@ export class RuntimeDatabase {
     return this.connectionManager.health();
   }
 
-  intakeEvent(input: IntakeEventInput): PublishEventResult {
-    return this.eventStore.intake(input);
-  }
-
-  listRuntimeEvents(limit = 500): RuntimeEvent[] {
-    return this.eventStore.listRuntimeEvents(limit);
-  }
-
-  listEventRecords(limit = 500): EventRecord[] {
-    return this.eventStore.listEventRecords(limit);
-  }
-
-  deleteEvent(eventId: string): void {
-    this.eventStore.deleteEvent(eventId);
-  }
-
   startLoopRun(
     config: ProjectAutomationConfig,
     loopId: string,
     themeSnapshot: LoopTheme,
+    rootRunId: string,
     input?: string,
     source: LoopRunSource = "manual",
-    runtimeDeviceId?: string,
     executionPlan?: LoopExecutionPlan,
     schedule?: { stepId: string; scheduledFor: string }
   ): LoopRunDetails {
-    return this.loopRunEngine.start(config, loopId, themeSnapshot, { input, source, runtimeDeviceId, executionPlan, schedule });
+    return this.loopRunEngine.start(config, loopId, themeSnapshot, { input, source, executionPlan, schedule, rootRunId });
   }
 
   bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
@@ -162,39 +138,42 @@ export class RuntimeDatabase {
     return this.loopScheduleStateStore.completeOccurrence(input);
   }
 
-  dispatchLoopScheduleOccurrence(
-    config: ProjectAutomationConfig,
-    input: DispatchLoopScheduleInput
-  ): DispatchLoopScheduleResult {
-    const transaction = this.connection().transaction((): DispatchLoopScheduleResult => {
-      const state = this.loopScheduleStateStore.get(input.loopId, input.stepId);
-      if (state?.definition_hash !== input.definitionHash || state.next_run_at !== input.scheduledFor) {
-        return { status: "stale" };
+  finishReservedScheduleOccurrence(input: {
+    loopId: string;
+    stepId: string;
+    scheduledFor: string;
+    status: "started" | "skipped";
+    runId?: string;
+    error?: string;
+    updatedAt: string;
+  }): boolean {
+    const result = this.connection().prepare(`
+      UPDATE loop_schedule_state SET last_status = ?, last_run_id = ?, last_error = ?, updated_at = ?
+      WHERE loop_id = ? AND step_id = ? AND last_scheduled_at = ?
+    `).run(input.status, input.runId ?? null, input.error ?? null, input.updatedAt,
+      input.loopId, input.stepId, input.scheduledFor);
+    return result.changes === 1;
+  }
+
+  recoverReservedScheduleOccurrences(updatedAt = new Date().toISOString()): void {
+    const rows = this.connection().prepare(`
+      SELECT loop_id, step_id, last_scheduled_at FROM loop_schedule_state
+      WHERE last_status = 'started' AND last_run_id IS NULL AND last_scheduled_at IS NOT NULL
+    `).all() as Array<{ loop_id: string; step_id: string; last_scheduled_at: string }>;
+    const transaction = this.connection().transaction(() => {
+      for (const row of rows) {
+        const run = this.connection().prepare(`
+          SELECT run_id FROM loop_runs WHERE loop_id = ? AND schedule_step_id = ? AND scheduled_for = ? LIMIT 1
+        `).get(row.loop_id, row.step_id, row.last_scheduled_at) as { run_id: string } | undefined;
+        this.connection().prepare(`
+          UPDATE loop_schedule_state SET last_status = ?, last_run_id = ?, last_error = ?, updated_at = ?
+          WHERE loop_id = ? AND step_id = ? AND last_scheduled_at = ?
+        `).run(run ? "started" : "missed", run?.run_id ?? null,
+          run ? null : "Scheduled occurrence was interrupted before its Run was stored.", updatedAt,
+          row.loop_id, row.step_id, row.last_scheduled_at);
       }
-      if (this.loopRunStore.hasActiveLoop(input.loopId)) {
-        const error = `Loop ${input.loopId} already has an active run.`;
-        this.loopScheduleStateStore.completeOccurrence({
-          ...input,
-          status: "skipped",
-          error
-        });
-        return { status: "skipped", error };
-      }
-      const run = this.loopRunEngine.start(config, input.loopId, input.themeSnapshot, {
-        source: "schedule",
-        runtimeDeviceId: input.runtimeDeviceId,
-        executionPlan: input.executionPlan,
-        schedule: { stepId: input.stepId, scheduledFor: input.scheduledFor }
-      });
-      const completed = this.loopScheduleStateStore.completeOccurrence({
-        ...input,
-        status: "started",
-        runId: run.runId
-      });
-      if (!completed) throw new Error("Scheduled Loop state changed while dispatching its occurrence.");
-      return { status: "started", run };
     });
-    return transaction() as DispatchLoopScheduleResult;
+    transaction();
   }
 
   respondToStepRun(

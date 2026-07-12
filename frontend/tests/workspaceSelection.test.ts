@@ -39,26 +39,17 @@ describe("workspace selection", () => {
 
   const data = {
     ...emptyData,
-    projects: [
-      {
-        id: "project-a",
-        collection: "projects",
-        absolutePath: "/workspace/.ballet/project-a.md",
-        relativePath: ".ballet/project-a.md",
-        slug: "project-a",
-        frontmatter: { title: "Project A" },
-        body: "Project A"
-      },
-      {
-        id: "project-b",
-        collection: "projects",
-        absolutePath: "/workspace/.ballet/project-b.md",
-        relativePath: ".ballet/project-b.md",
-        slug: "project-b",
-        frontmatter: { title: "Project B" },
-        body: "Project B"
-      }
-    ],
+    project: {
+      id: "project-a",
+      name: "Project A",
+      description: "Local checkout",
+      status: "active" as const,
+      createdAt: "2026-07-11T10:00:00.000Z",
+      updatedAt: "2026-07-11T10:00:00.000Z",
+      relativePath: ".ballet/project.md",
+      frontmatter: { title: "Project A" },
+      body: "Project A"
+    },
     agents: [
       {
         id: "agent-a",
@@ -88,20 +79,18 @@ describe("workspace selection", () => {
     projectDocumentTree: tree
   };
 
-  it("preserves project and document fallback behavior", () => {
+  it("uses the single project and selects documents only from its tree", () => {
     const routed = getWorkspaceSelection({
       data,
-      route: { view: "project-goals", projectId: "project-b", documentPath: ".ballet/goals/second.md" },
-      selectedProjectId: "project-a"
+      route: { view: "project-goals", documentPath: ".ballet/goals/second.md" }
     });
 
-    expect(routed.project?.id).toBe("project-b");
+    expect(routed.project?.id).toBe("project-a");
     expect(routed.selectedGoal?.id).toBe("second-goal");
 
     const fallback = getWorkspaceSelection({
       data,
-      route: { view: "project-goals", projectId: "missing", documentPath: ".ballet/adr/decision.md" },
-      selectedProjectId: "project-a"
+      route: { view: "project-goals", documentPath: ".ballet/adr/decision.md" }
     });
 
     expect(fallback.project?.id).toBe("project-a");
@@ -111,20 +100,17 @@ describe("workspace selection", () => {
   it("preserves agent and skill selected-item behavior", () => {
     expect(getWorkspaceSelection({
       data,
-      route: { view: "agents" },
-      selectedProjectId: "project-a"
+      route: { view: "agents" }
     }).selectedAgent).toBeUndefined();
 
     expect(getWorkspaceSelection({
       data,
-      route: { view: "agents", documentPath: ".codex/agents/missing.toml" },
-      selectedProjectId: "project-a"
+      route: { view: "agents", documentPath: ".codex/agents/missing.toml" }
     }).selectedAgent?.id).toBe("agent-a");
 
     expect(getWorkspaceSelection({
       data,
-      route: { view: "skills", documentPath: ".agents/skills/a/SKILL.md" },
-      selectedProjectId: "project-a"
+      route: { view: "skills", documentPath: ".agents/skills/a/SKILL.md" }
     }).selectedSkill?.id).toBe("skill-a");
   });
 });

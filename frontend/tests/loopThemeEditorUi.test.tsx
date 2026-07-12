@@ -9,6 +9,7 @@ import {
   type ProjectLoop
 } from "@shared/api/workspace-contracts";
 import { WorkspaceApp } from "../src/WorkspaceApp";
+import { emptyData } from "../src/workspace/types";
 import { LoopThemeEditorView } from "../src/workspace/automation/themes/LoopThemeEditorView";
 import { LoopThemePreview } from "../src/workspace/automation/themes/LoopThemePreview";
 import { createLoopThemeDraft } from "../src/workspace/automation/themes/loopThemeEditorState";
@@ -31,7 +32,7 @@ const loop: ProjectLoop = {
 const themes = () => builtInLoopThemes.map((theme) => structuredClone(theme));
 const openAiTheme = () => themes().find((theme) => theme.id === "open-ai")!;
 const data = (): AppData => ({
-  projects: [], goals: [], adrs: [], agents: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
+  ...emptyData,
   automation: { version: 6, loops: [structuredClone(loop)] }, automationIssues: [], scheduleStates: [],
   loopThemes: themes(), loopThemeIssues: [], projectDocumentTree: []
 });

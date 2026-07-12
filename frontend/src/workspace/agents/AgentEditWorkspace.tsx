@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, AgentRuntimeConfiguration, LocalRuntime } from "@shared/api/workspace-contracts";
 import { Activity, BookOpenText, ChevronRight, FileText } from "lucide-react";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
 import { AgentLiveStatusBadge, AgentProfilePanel } from "./AgentProfilePanel";
@@ -12,12 +12,14 @@ const workspaceTabs = [
   { label: "Skills", icon: BookOpenText }
 ];
 
-export function AgentEditWorkspace({ agent, executionState, editor }: {
+export function AgentEditWorkspace({ agent, executionState, runtime, runtimeConfiguration, editor }: {
   agent: Agent;
   executionState?: AgentExecutionState;
+  runtime: LocalRuntime;
+  runtimeConfiguration?: AgentRuntimeConfiguration;
   editor: AgentEditorState;
 }) {
-  const executionEditor = useAgentRuntimeConfiguration(agent.id);
+  const executionEditor = useAgentRuntimeConfiguration(agent.id, runtime, runtimeConfiguration);
 
   return (
     <section className="w-full overflow-hidden border-y border-divider-strong bg-card">

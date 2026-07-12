@@ -25,7 +25,7 @@ if [ "$INSTALL_METHOD" = "homebrew" ]; then
   need brew "Homebrew was requested but is not installed"
   printf 'Installing Ballet with Homebrew...\n'
   brew install isinisalo/tap/ballet
-  printf '\nInstalled. Set up this computer with:\n  ballet setup --repo <git-url>\n'
+  printf '\nInstalled. Start Ballet from a committed Git checkout root:\n  cd <checkout> && ballet\n'
   exit 0
 fi
 
@@ -106,4 +106,4 @@ case ":$PATH:" in
 esac
 
 printf '\nInstalled verified Ballet %s to %s/ballet.\n' "$TAG" "$BIN_DIR"
-printf 'Set up this computer with:\n  ballet setup --repo <git-url>\n'
+printf 'Start Ballet from a committed Git checkout root:\n  cd <checkout> && ballet\n'

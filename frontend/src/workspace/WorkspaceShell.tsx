@@ -7,14 +7,12 @@ import {
 } from "@/components/ui/sidebar";
 import { Menu } from "lucide-react";
 import { useNotifications } from "../app/notifications";
-import { useRuntimeStream } from "../app/useRuntimeStream";
-import { useAgentExecutionStates } from "./data/useAgentExecutionStates";
-import { useRuntimeNotifications } from "./data/useRuntimeNotifications";
+import { useAppStream } from "../app/useAppStream";
+import { useAppStreamNotifications } from "../app/useAppStreamNotifications";
 import { useWorkspaceData } from "./data/useWorkspaceData";
 import { useWorkspaceMutations } from "./data/useWorkspaceMutations";
 import { AppSidebar } from "./layout/AppSidebar";
 import { useConfigureGitStatus } from "./layout/useConfigureGitStatus";
-import { useRuntimeConfigurationIssues } from "./layout/useRuntimeConfigurationIssues";
 import { useRunDashboard } from "./runs/useRunDashboard";
 import { useWorkspaceSelection } from "./selection/useWorkspaceSelection";
 import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
@@ -23,19 +21,22 @@ import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
 export function WorkspaceShell() {
   const { notifications, notify } = useNotifications();
   const { route, navigate, setNavigationBlocker } = useWorkspaceNavigation();
-  const { data, loading, refresh, selectedProjectId } = useWorkspaceData({ notify, routeProjectId: route.projectId });
-  const selection = useWorkspaceSelection({ data, route, selectedProjectId });
-  const { states: agentExecutionStates } = useAgentExecutionStates();
-  const runDashboard = useRunDashboard({ enabled: route.view === "run", rootRunId: route.rootRunId });
+  const { data, loading, refresh } = useWorkspaceData({ notify });
+  const selection = useWorkspaceSelection({ data, route });
+  const runDashboardData = useRunDashboard({ enabled: route.view === "run", rootRunId: route.rootRunId, targets: data.runTargets });
   const configureGitState = useConfigureGitStatus({ enabled: route.view !== "run", refreshSignal: data });
-  const runtimeConfigurationIssues = useRuntimeConfigurationIssues({ enabled: route.view !== "run", refreshSignal: data });
-
-  const runtimeStreamStatus = useRuntimeStream(refresh);
-  useRuntimeNotifications({ notifications, notify, runtimeStreamStatus });
+  const runtimeConfigurationIssues = Object.values(data.agentRuntimeConfigurations).flatMap((configuration) => configuration.issues);
+  const appStreamStatus = useAppStream({
+    onWorkspaceChanged: refresh,
+    onRunsChanged: async () => {
+      await Promise.all([refresh(), runDashboardData.refresh()]);
+    }
+  });
+  useAppStreamNotifications({ notifications, notify, streamStatus: appStreamStatus });
+  const runDashboard = { ...runDashboardData, streamStatus: appStreamStatus };
   const mutations = useWorkspaceMutations({
     notify,
     refresh,
-    project: selection.project,
     navigate
   });
 
@@ -43,11 +44,10 @@ export function WorkspaceShell() {
       <SidebarProvider>
         <AppSidebar
           route={route}
-          projectId={selection.project?.id}
           projectDocumentTree={selection.projectDocumentTree}
           automation={data.automation}
           agents={data.agents}
-          agentExecutionStates={agentExecutionStates}
+          agentExecutionStates={data.executionStates}
           skills={data.skills}
           runDashboard={runDashboard}
           configureGitState={configureGitState}
@@ -72,8 +72,8 @@ export function WorkspaceShell() {
                 data={data}
                 selection={selection}
                 mutations={mutations}
-                agentExecutionStates={agentExecutionStates}
-                runtimeStreamStatus={runtimeStreamStatus}
+                agentExecutionStates={data.executionStates}
+                appStreamStatus={appStreamStatus}
                 runDashboard={runDashboard}
                 navigate={navigate}
                 setNavigationBlocker={setNavigationBlocker}

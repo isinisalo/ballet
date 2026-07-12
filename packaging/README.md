@@ -1,6 +1,6 @@
 # Ballet CLI release contract
 
-Each macOS archive is built on a native runner for its target architecture. It contains a small `ballet` launcher plus a bundled Node runtime, compiled server JavaScript, production dependencies (including the native `better-sqlite3` addon), and the frontend:
+Each macOS archive is built on a native runner for its target architecture. It contains the `ballet` launcher, bundled Node runtime, compiled local server and CLI, production dependencies (including native `better-sqlite3`), and the frontend:
 
 ```text
 ballet
@@ -11,26 +11,21 @@ libexec/ballet/node_modules/**
 share/ballet/dist/**
 ```
 
-The launcher resolves its installation prefix, exports the packaged executable and web asset locations, then dispatches the CLI through `libexec/ballet/node`. The existing private `daemon-internal-run` and `server-internal-run` arguments therefore use the same bundled runtime and production dependency tree.
+The launcher resolves its installation prefix, exports the packaged executable and web asset locations, and dispatches the CLI through bundled Node. The private `server-internal-run` entrypoint uses the same runtime and dependency tree; there is no daemon entrypoint or second process.
 
-`scripts/build-release.sh` refuses cross-architecture builds. It creates the archive, extracts those final bytes into the direct-install layout, loads `better-sqlite3`, starts the packaged `server-internal-run`, verifies the project-aware health endpoint, and verifies that an unauthenticated daemon API request returns 401. The script emits the archive checksum only after those checks, making native module and server startup failures release-blocking.
+`scripts/build-release.sh` refuses cross-architecture builds. It builds the final archive, extracts those exact bytes into the direct-install layout, loads `better-sqlite3`, creates a committed fixture checkout, and starts the packaged server against that checkout. The smoke test verifies checkout-aware health, `.git/ballet/state.sqlite`, a clean Git status, and graceful SIGTERM shutdown before emitting the archive checksum.
 
-Each release publishes arm64 and x64 archives, `checksums.txt`, a generated Homebrew Formula, and GitHub Artifact Attestations. The curl installer and `ballet update` verify both SHA256 and the attestation before activating any downloaded bytes.
+Each release publishes arm64 and x64 archives, `checksums.txt`, a generated Homebrew Formula, and GitHub Artifact Attestations. The curl installer and `ballet update` verify SHA-256 and attestation before activation.
 
-A direct install expands the complete archive into one immutable, versioned bundle. The canonical executable is a stable symlink:
+A direct install expands the complete archive into one immutable versioned bundle. The canonical executable is a stable symlink:
 
 ```text
 <prefix>/bin/ballet
   -> ../libexec/ballet/versions/<bundle-id>/ballet
-
-<prefix>/libexec/ballet/versions/<bundle-id>/
-  ballet
-  libexec/ballet/**
-  share/ballet/**
 ```
 
-`<bundle-id>` is version- and checksum-derived and has a unique suffix, so an update never writes into the active bundle. After validating the staged bundle's launcher, runtime architecture, and CLI version, the installer or updater creates a replacement symlink beside `<prefix>/bin/ballet` and activates it with a same-filesystem atomic rename. The release build and in-place updater additionally load the packaged native dependency before activation. Existing processes can finish against their original bundle while new invocations resolve the new target. Previous bundles are left untouched by activation.
+After validating the staged launcher, runtime architecture, native dependency, and CLI version, the installer creates a replacement symlink beside `<prefix>/bin/ballet` and activates it with a same-filesystem atomic rename. Existing processes keep their original bundle while new launchd starts resolve the new target.
 
-Homebrew installs the archive contents into its own versioned Cellar layout with `brew install isinisalo/tap/ballet`; `ballet update` delegates activation to `brew upgrade ballet` after verifying the release archive and then confirms the installed version.
+Homebrew installs the same archive into its versioned Cellar layout. `ballet update` delegates to Homebrew when the active executable belongs to its Ballet prefix.
 
-Mutable state stays under `~/.ballet`. Daemon and server logs stay under `~/Library/Logs/Ballet` unless `BALLET_LOG_DIR` is explicitly configured.
+All mutable application state lives in the active checkout's `.git/ballet` directory. The uniquely named checkout plist under `~/Library/LaunchAgents` is the only project-specific Ballet artifact outside the Git directory.

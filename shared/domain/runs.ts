@@ -1,7 +1,12 @@
-import type { AgentRun, ExecutionTask, LoopRunDetails, RootFinalizationReport, RuntimePreflightIssue } from "./runtime.js";
+import type {
+  AgentOutcome,
+  ExecutionTask,
+  LoopRunDetails,
+  RootFinalizationReport,
+  RuntimePreflightIssue
+} from "./runtime.js";
 
 export type BalletMode = "configure" | "run";
-
 export type DashboardRunStatus =
   | "queued"
   | "running"
@@ -11,7 +16,6 @@ export type DashboardRunStatus =
   | "blocked"
   | "failed"
   | "cancelled";
-
 export type RootRunKind = "loop" | "agent";
 export type RootRunSource = "manual" | "schedule";
 export type RootRunListState = "active" | "recent";
@@ -27,20 +31,23 @@ export interface RootRunCurrentPosition {
 }
 
 export interface RootRunFinalization {
-  status: "pending" | "reported";
+  status: "finalizing" | "completed" | "failed";
   success: boolean;
   report?: RootFinalizationReport;
-  authorizedAt: string;
-  finalizedAt?: string;
+  startedAt: string;
+  completedAt?: string;
 }
 
 export interface RootRunSummary {
   rootRunId: string;
-  projectId: string;
   kind: RootRunKind;
   targetId: string;
   source: RootRunSource;
   status: DashboardRunStatus;
+  input?: string;
+  outcome?: AgentOutcome;
+  errorCode?: string;
+  errorMessage?: string;
   current?: RootRunCurrentPosition;
   finalization?: RootRunFinalization;
   createdAt: string;
@@ -51,7 +58,6 @@ export interface RootRunSummary {
 export interface RootRunDetail extends RootRunSummary {
   loopRuns: LoopRunDetails[];
   tasks: ExecutionTask[];
-  agentRun?: AgentRun;
 }
 
 export interface RootRunListQuery {
@@ -61,9 +67,12 @@ export interface RootRunListQuery {
   limit?: number;
 }
 
-export interface RootRunListResponse {
-  items: RootRunSummary[];
-  nextCursor?: string;
+export interface RootRunListResponse { items: RootRunSummary[]; nextCursor?: string }
+
+export interface StartRootRunRequest {
+  kind: RootRunKind;
+  targetId: string;
+  input?: string;
 }
 
 export interface RunTarget {
@@ -74,6 +83,7 @@ export interface RunTarget {
   ready: boolean;
   issues: RunTargetIssue[];
   activeRootRunId?: string;
+  latestRootRunId?: string;
 }
 
 export interface RunTargetIssue {
@@ -84,14 +94,11 @@ export interface RunTargetIssue {
   path?: string;
 }
 
-export interface RunTargetsResponse {
-  loops: RunTarget[];
-  agents: RunTarget[];
-}
+export interface RunTargetsResponse { loops: RunTarget[]; agents: RunTarget[] }
 
-export interface RunInvalidationEvent {
+export interface WorkspaceInvalidationEvent {
   id: number;
-  type: "runs-invalidated";
+  type: "workspace-changed" | "runs-changed";
   at: string;
   rootRunId?: string;
   reason?: string;

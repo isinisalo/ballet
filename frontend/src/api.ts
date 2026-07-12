@@ -1,12 +1,7 @@
 import type {
   AppData,
-  AgentExecutionState,
   CollectionName,
   WorkspaceSaveRequestByCollection,
-  LoopRunDetails,
-  LoopRuntimePreflight,
-  RespondToStepRunRequest,
-  StartLoopRunRequest,
   ExecutionEventPage
 } from "@shared/api/workspace-contracts";
 import type { CreateLoopThemeResponse, LoopTheme, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
@@ -15,7 +10,6 @@ import { request } from "@/apiClient";
 
 export const api = {
   getData: () => request<AppData>("/api/data"),
-  getAgentExecutionStates: () => request<AgentExecutionState[]>("/api/agents/execution-states"),
   saveAutomation: (config: ProjectAutomationConfig) =>
     request<ProjectAutomationConfig>("/api/automation", {
       method: "PUT",
@@ -31,22 +25,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ theme, assignToLoopId })
     }),
-  startLoopRun: (loopId: string, input: StartLoopRunRequest) =>
-    request<LoopRunDetails>(`/api/loops/${encodeURIComponent(loopId)}/runs`, {
-      method: "POST",
-      body: JSON.stringify(input)
-    }),
-  getLatestLoopRun: (loopId: string) =>
-    request<LoopRunDetails | null>(`/api/loops/${encodeURIComponent(loopId)}/runs/latest`),
-  getLoopPreflight: (loopId: string) =>
-    request<LoopRuntimePreflight>(`/api/loops/${encodeURIComponent(loopId)}/preflight`),
-  respondToStepRun: (runId: string, stepRunId: string, input: RespondToStepRunRequest) =>
-    request<LoopRunDetails>(`/api/loop-runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(stepRunId)}/respond`, {
-      method: "POST",
-      body: JSON.stringify(input)
-    }),
-  cancelLoopRun: (runId: string) =>
-    request<LoopRunDetails>(`/api/loop-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
   getExecutionEvents: (taskId: string, after = 0, limit = 500) =>
     request<ExecutionEventPage>(`/api/execution-tasks/${encodeURIComponent(taskId)}/events?after=${after}&limit=${limit}`),
   save: <T extends CollectionName>(collection: T, item: WorkspaceSaveRequestByCollection[T]) =>

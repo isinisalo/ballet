@@ -1,6 +1,6 @@
 import { EmptyState } from "@/components/shared/workspace-ui";
 import type { AgentExecutionState, AppData } from "@shared/api/workspace-contracts";
-import type { RuntimeStreamStatus } from "../app/useRuntimeStream";
+import type { AppStreamStatus } from "../app/useAppStream";
 import { AgentsView } from "./agents/AgentsView";
 import { AutomationView } from "./automation/AutomationView";
 import { LoopThemeEditorView } from "./automation/themes/LoopThemeEditorView";
@@ -28,7 +28,7 @@ export function WorkspaceRouteOutlet({
   selection,
   mutations,
   agentExecutionStates,
-  runtimeStreamStatus,
+  appStreamStatus,
   runDashboard,
   navigate,
   setNavigationBlocker
@@ -38,7 +38,7 @@ export function WorkspaceRouteOutlet({
   selection: WorkspaceSelection;
   mutations: WorkspaceMutationCallbacks;
   agentExecutionStates: AgentExecutionState[];
-  runtimeStreamStatus: RuntimeStreamStatus;
+  appStreamStatus: AppStreamStatus;
   runDashboard: RunDashboardState;
   navigate: (path: string) => void;
   setNavigationBlocker: (blocker: WorkspaceNavigationBlocker | null) => void;
@@ -60,17 +60,17 @@ export function WorkspaceRouteOutlet({
     case "project-instructions":
       return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} />;
     case "automation":
-      return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} runtimeStreamStatus={runtimeStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
+      return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} appStreamStatus={appStreamStatus} saveAutomation={mutations.saveAutomation} navigate={navigate} />;
     case "loop-theme":
       return <LoopThemeEditorView data={data} themeId={route.loopThemeId} sourceThemeId={route.loopThemeSourceId} loopId={route.loopThemeLoopId} updateTheme={mutations.updateLoopTheme} createTheme={mutations.createLoopTheme} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "runtimes":
-      return <RuntimeRegistryView selectedDeviceId={route.runtimeDeviceId} onSelectDevice={(deviceId) => navigate(deviceId ? `/runtimes?id=${encodeURIComponent(deviceId)}` : "/runtimes")} />;
+      return <RuntimeRegistryView runtime={data.runtime} onRefreshed={mutations.refresh} />;
     case "agents":
-      return <AgentsView agent={selection.selectedAgent} agentExecutionStates={agentExecutionStates} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
+      return <AgentsView agent={selection.selectedAgent} agentExecutionStates={agentExecutionStates} runtime={data.runtime} runtimeConfiguration={selection.selectedAgent ? data.agentRuntimeConfigurations[selection.selectedAgent.id] : undefined} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
     case "skills":
       return <SkillsView skill={selection.selectedSkill} save={mutations.save} remove={mutations.remove} navigate={navigate} />;
     case "run":
-      return <RunWorkspace route={route} data={data} agentExecutionStates={agentExecutionStates} runtimeStreamStatus={runtimeStreamStatus} dashboard={runDashboard} navigate={navigate} />;
+      return <RunWorkspace route={route} data={data} agentExecutionStates={agentExecutionStates} appStreamStatus={appStreamStatus} dashboard={runDashboard} navigate={navigate} />;
     default:
       return (
         <EmptyState

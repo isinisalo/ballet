@@ -2,7 +2,6 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { AppData } from "../../shared/api/workspaceData.js";
 import type { ProjectScheduledStep } from "../../shared/domain/automation.js";
 import type { DispatchLoopScheduleResult, RuntimeDatabase } from "../runtime-db.js";
-import { notifyRuntimeChanged, onRuntimeChanged } from "../runtime-events.js";
 import {
   latestScheduleOccurrenceBefore,
   nextScheduleOccurrence,
@@ -32,6 +31,8 @@ export interface LoopSchedulerOptions {
   }) => Promise<DispatchLoopScheduleResult>;
   clock?: ScheduleClock;
   intervalMs?: number;
+  subscribeChanges?: (listener: (reason?: string) => void) => () => void;
+  onChanged?: (reason: "schedules") => void;
 }
 
 export class LoopScheduler {
@@ -53,8 +54,8 @@ export class LoopScheduler {
     if (this.timer) return;
     this.paused = false;
     this.generation += 1;
-    this.unsubscribe = onRuntimeChanged((signal) => {
-      if (signal !== "automation") return;
+    this.unsubscribe = this.options.subscribeChanges?.((reason) => {
+      if (reason !== "automation") return;
       if (this.inFlight) {
         this.automationRefreshPending = true;
         return;
@@ -119,7 +120,7 @@ export class LoopScheduler {
       };
     });
     const changed = database.syncLoopScheduleDefinitions(definitionStates, nowIso);
-    if (changed) notifyRuntimeChanged("schedules");
+    if (changed) this.options.onChanged?.("schedules");
 
     const definitionsByKey = new Map(definitions.map((definition) => [
       `${definition.loopId}\0${definition.step.id}`,
@@ -147,7 +148,7 @@ export class LoopScheduler {
           error: "Scheduled occurrence was missed while Ballet was not dispatching runs.",
           updatedAt: nowIso
         });
-        if (completed) notifyRuntimeChanged("schedules");
+        if (completed) this.options.onChanged?.("schedules");
         if (!completed || !nextRunAt) continue;
         scheduledFor = nextRunAt;
         due = Temporal.Instant.from(scheduledFor);

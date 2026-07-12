@@ -1,15 +1,17 @@
-import type { AgentRun, ExecutionPolicy } from "@shared/api/workspace-contracts";
+import type { ExecutionPolicy, RuntimeProvider } from "@shared/api/workspace-contracts";
 
 export interface AgentRuntimeConfigurationInput {
-  runtimeBackendId: string;
+  provider: RuntimeProvider;
   model: string;
   reasoning: string;
   policy: ExecutionPolicy;
 }
 
-export interface AgentExecutionFormValue extends AgentRuntimeConfigurationInput {
-  deviceId: string;
+export interface AgentExecutionFormValue {
+  provider: RuntimeProvider | "";
+  model: string;
+  reasoning: string;
+  policy: ExecutionPolicy;
 }
 
-export type { AgentOutcome, AgentRun, ExecutionPolicy } from "@shared/api/workspace-contracts";
-export type AgentRunStatus = AgentRun["status"];
+export type { AgentOutcome, ExecutionPolicy } from "@shared/api/workspace-contracts";

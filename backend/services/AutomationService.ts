@@ -11,7 +11,6 @@ import {
   saveProjectAutomationConfig
 } from "../automation.js";
 import { LoopRunConflictError } from "../runtime/LoopRunErrors.js";
-import { notifyRuntimeChanged } from "../runtime-events.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
 
 export class AutomationService {
@@ -46,7 +45,6 @@ export class AutomationService {
       }
     }
     const saved = await saveProjectAutomationConfig(this.root(), config, data.agents);
-    notifyRuntimeChanged("automation");
     return saved;
   }
 }

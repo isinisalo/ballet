@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { ControlPlaneDatabase } from "../control-plane/ControlPlaneDatabase.js";
+import { LocalDatabase } from "../storage/LocalDatabase.js";
 
 const parseVersion = (version: string): [number, number, number] => {
   const [major = 0, minor = 0, patch = 0] = version.split(".").map((part) => Number.parseInt(part, 10));
@@ -18,13 +18,10 @@ export const isPatchedSqliteVersion = (version: string): boolean => {
 };
 
 export class RuntimeDbConnection {
-  private readonly database: ControlPlaneDatabase;
+  private readonly database: LocalDatabase;
 
-  constructor(
-    private readonly dbPath: string,
-    private readonly projectId: string
-  ) {
-    this.database = new ControlPlaneDatabase(dbPath);
+  constructor(private readonly dbPath: string) {
+    this.database = new LocalDatabase(dbPath);
   }
 
   close(): void {
@@ -52,15 +49,13 @@ export class RuntimeDbConnection {
 
   health(): Record<string, unknown> {
     const db = this.connection();
-    const eventCount = db.prepare("SELECT COUNT(*) AS count FROM events WHERE project_id = ?").get(this.projectId) as { count: number };
-    const queuedSteps = db.prepare("SELECT COUNT(*) AS count FROM step_runs WHERE project_id = ? AND status = 'queued'")
-      .get(this.projectId) as { count: number };
-    const activeLoops = db.prepare("SELECT COUNT(*) AS count FROM loop_runs WHERE project_id = ? AND status IN ('running', 'waiting_for_human')")
-      .get(this.projectId) as { count: number };
+    const eventCount = db.prepare("SELECT COUNT(*) AS count FROM execution_events").get() as { count: number };
+    const queuedSteps = db.prepare("SELECT COUNT(*) AS count FROM step_runs WHERE status = 'queued'").get() as { count: number };
+    const activeLoops = db.prepare("SELECT COUNT(*) AS count FROM loop_runs WHERE status IN ('running', 'waiting_for_human')")
+      .get() as { count: number };
     return {
       ok: true,
       dbPath: this.dbPath,
-      projectId: this.projectId,
       sqliteVersion: this.sqliteVersion(),
       events: eventCount.count,
       queuedSteps: queuedSteps.count,

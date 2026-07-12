@@ -13,39 +13,54 @@ export type View =
   | "skills"
   | "run";
 
-export type SaveCollection = "projects" | "goals" | "adrs" | "agents" | "skills";
+export type SaveCollection = "agents" | "skills";
 export type AutomationLoopView = "all";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
   view: View;
-  projectId?: string;
   documentPath?: string;
   automationEntityId?: string;
   automationLoopView?: AutomationLoopView;
   loopThemeId?: string;
   loopThemeSourceId?: string;
   loopThemeLoopId?: string;
-  runtimeDeviceId?: string;
   runTargetKind?: "loop" | "agent";
   runTargetId?: string;
   rootRunId?: string;
 }
 
 export const emptyData: AppData = {
-  projects: [],
-  goals: [],
-  adrs: [],
+  project: {
+    id: "",
+    name: "",
+    description: "",
+    status: "active",
+    createdAt: "",
+    updatedAt: ""
+  },
   agents: [],
   skills: [],
-  policies: [],
-  eventDefinitions: [],
-  events: [],
   loopRuns: [],
   scheduleStates: [],
   automation: defaultProjectAutomationConfig(),
   automationIssues: [],
   loopThemes: [...builtInLoopThemes],
   loopThemeIssues: [],
+  runtime: {
+    instanceId: "",
+    hostname: "",
+    platform: "darwin",
+    architecture: "arm64",
+    checkout: { path: "", headSha: "", configHash: "", dirty: false },
+    uptimeSeconds: 0,
+    startedAt: "",
+    providers: [],
+    activeRunCount: 0,
+    logsPath: ""
+  },
+  agentRuntimeConfigurations: {},
+  executionStates: [],
+  runTargets: { loops: [], agents: [] },
   projectDocumentTree: []
 };

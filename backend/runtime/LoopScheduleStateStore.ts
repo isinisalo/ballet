@@ -23,28 +23,25 @@ export interface CompleteScheduleOccurrenceInput {
 }
 
 export class LoopScheduleStateStore {
-  constructor(
-    private readonly connection: () => Database.Database,
-    private readonly projectId: string
-  ) {}
+  constructor(private readonly connection: () => Database.Database) {}
 
   list(): LoopScheduleState[] {
     const rows = this.connection().prepare(`
-      SELECT * FROM loop_schedule_state WHERE project_id = ? ORDER BY loop_id, step_id
-    `).all(this.projectId) as LoopScheduleStateRow[];
+      SELECT * FROM loop_schedule_state ORDER BY loop_id, step_id
+    `).all() as LoopScheduleStateRow[];
     return rows.map(toScheduleState);
   }
 
   rows(): LoopScheduleStateRow[] {
     return this.connection().prepare(`
-      SELECT * FROM loop_schedule_state WHERE project_id = ? ORDER BY loop_id, step_id
-    `).all(this.projectId) as LoopScheduleStateRow[];
+      SELECT * FROM loop_schedule_state ORDER BY loop_id, step_id
+    `).all() as LoopScheduleStateRow[];
   }
 
   get(loopId: string, stepId: string): LoopScheduleStateRow | undefined {
     return this.connection().prepare(`
-      SELECT * FROM loop_schedule_state WHERE project_id = ? AND loop_id = ? AND step_id = ?
-    `).get(this.projectId, loopId, stepId) as LoopScheduleStateRow | undefined;
+      SELECT * FROM loop_schedule_state WHERE loop_id = ? AND step_id = ?
+    `).get(loopId, stepId) as LoopScheduleStateRow | undefined;
   }
 
   replaceDefinition(definition: ScheduleDefinitionState, updatedAt: string): boolean {
@@ -52,13 +49,13 @@ export class LoopScheduleStateStore {
     if (existing?.definition_hash === definition.definitionHash) return false;
     this.connection().prepare(`
       INSERT INTO loop_schedule_state (
-        project_id, loop_id, step_id, definition_hash, next_run_at,
+        loop_id, step_id, definition_hash, next_run_at,
         last_scheduled_at, last_status, last_run_id, last_error, updated_at
       ) VALUES (
-        @projectId, @loopId, @stepId, @definitionHash, @nextRunAt,
+        @loopId, @stepId, @definitionHash, @nextRunAt,
         NULL, NULL, NULL, NULL, @updatedAt
       )
-      ON CONFLICT(project_id, loop_id, step_id) DO UPDATE SET
+      ON CONFLICT(loop_id, step_id) DO UPDATE SET
         definition_hash = excluded.definition_hash,
         next_run_at = excluded.next_run_at,
         last_scheduled_at = NULL,
@@ -67,7 +64,6 @@ export class LoopScheduleStateStore {
         last_error = NULL,
         updated_at = excluded.updated_at
     `).run({
-      projectId: this.projectId,
       loopId: definition.loopId,
       stepId: definition.stepId,
       definitionHash: definition.definitionHash,
@@ -82,8 +78,8 @@ export class LoopScheduleStateStore {
     for (const row of this.rows()) {
       if (validKeys.has(scheduleStateKey(row.loop_id, row.step_id))) continue;
       this.connection().prepare(`
-        DELETE FROM loop_schedule_state WHERE project_id = ? AND loop_id = ? AND step_id = ?
-      `).run(this.projectId, row.loop_id, row.step_id);
+        DELETE FROM loop_schedule_state WHERE loop_id = ? AND step_id = ?
+      `).run(row.loop_id, row.step_id);
       changed = true;
     }
     return changed;
@@ -98,13 +94,11 @@ export class LoopScheduleStateStore {
         last_run_id = @lastRunId,
         last_error = @lastError,
         updated_at = @updatedAt
-      WHERE project_id = @projectId
-        AND loop_id = @loopId
+      WHERE loop_id = @loopId
         AND step_id = @stepId
         AND definition_hash = @definitionHash
         AND next_run_at = @scheduledFor
     `).run({
-      projectId: this.projectId,
       loopId: input.loopId,
       stepId: input.stepId,
       definitionHash: input.definitionHash,

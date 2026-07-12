@@ -1,14 +1,13 @@
 import { mkdtemp, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
 import { LoopRunConflictError } from "../runtime/LoopRunErrors.js";
-import { parseAgentOutcomeText } from "../runtime-policy.js";
 
 const roots: string[] = [];
 const tempDbPath = async () => {
@@ -26,12 +25,25 @@ const ready: AgentOutcome = {
   summary: "Done.",
   checks: [{ name: "test", status: "passed" }]
 };
-const rejected: AgentOutcome = {
-  outcome: "changes-requested",
-  summary: "Needs changes.",
-  checks: []
-};
 const openAiTheme = resolveLoopTheme(builtInLoopThemes, "open-ai");
+
+const startLoop = (
+  runtime: RuntimeDatabase,
+  automation: ProjectAutomationConfig,
+  loopId: string,
+  theme = openAiTheme,
+  input?: string
+) => {
+  const rootRunId = randomUUID();
+  const timestamp = new Date().toISOString();
+  runtime.connection().prepare(`
+    INSERT INTO root_runs (
+      root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
+      config_hash, snapshot_hash, created_at, updated_at
+    ) VALUES (?, 'loop', ?, 'manual', 'queued', ?, ?, ?, 'config', 'snapshot', ?, ?)
+  `).run(rootRunId, loopId, `/tmp/${rootRunId}`, `ballet/run/${rootRunId}`, "a".repeat(40), timestamp, timestamp);
+  return runtime.startLoopRun(automation, loopId, theme, rootRunId, input);
+};
 
 const config = (): ProjectAutomationConfig => ({
   version: 6,
@@ -68,71 +80,22 @@ const config = (): ProjectAutomationConfig => ({
   }]
 });
 
-describe("runtime database v8", () => {
-  it("accepts patched SQLite versions and migrates v7 without deleting persisted rows", async () => {
+describe("local runtime database", () => {
+  it("recognizes patched SQLite versions", () => {
     expect(isPatchedSqliteVersion("3.51.3")).toBe(true);
     expect(isPatchedSqliteVersion("3.51.2")).toBe(false);
-    const dbPath = await tempDbPath();
-    const initial = new RuntimeDatabase(dbPath);
-    initial.connection().prepare("INSERT INTO projects (project_id, repository_url, default_checkout_path, is_active, created_at, updated_at) VALUES ('saved', 'https://example.test/saved.git', '/tmp/saved', 1, 'now', 'now')").run();
-    initial.connection().prepare("UPDATE control_plane_metadata SET value = '7' WHERE key = 'schema_version'").run();
-    initial.close();
-
-    const runtime = new RuntimeDatabase(dbPath);
-    expect(runtime.connection().prepare(
-      "SELECT value FROM control_plane_metadata WHERE key = 'schema_version'"
-    ).get()).toEqual({ value: "8" });
-    expect(runtime.connection().prepare("SELECT project_id FROM projects WHERE project_id = 'saved'").get()).toEqual({ project_id: "saved" });
-    runtime.close();
-  });
-
-  it("refuses an unknown schema version without deleting persisted rows", async () => {
-    const dbPath = await tempDbPath();
-    const initial = new RuntimeDatabase(dbPath);
-    initial.connection().prepare("INSERT INTO projects (project_id, repository_url, default_checkout_path, is_active, created_at, updated_at) VALUES ('saved', 'https://example.test/saved.git', '/tmp/saved', 1, 'now', 'now')").run();
-    initial.connection().prepare("UPDATE control_plane_metadata SET value = '6' WHERE key = 'schema_version'").run();
-    initial.close();
-    expect(() => new RuntimeDatabase(dbPath).connection()).toThrow("persisted state was left unchanged");
-    const raw = new Database(dbPath, { readonly: true });
-    expect(raw.prepare("SELECT project_id FROM projects WHERE project_id = 'saved'").get()).toEqual({ project_id: "saved" });
-    raw.close();
-  });
-
-  it("records event intake without starting or advancing any loop", async () => {
-    const runtime = new RuntimeDatabase(await tempDbPath());
-    const event = runtime.intakeEvent({ projectId: "project", eventType: "delivery.requested", payload: {} });
-    expect(event.event.status).toBe("unassigned");
-    expect(runtime.listLoopRuns()).toEqual([]);
-    runtime.close();
-  });
-
-  it("isolates loop and event rows by active project in the global database", async () => {
-    const dbPath = await tempDbPath();
-    const first = new RuntimeDatabase(dbPath, "project-a");
-    const second = new RuntimeDatabase(dbPath, "project-b");
-    first.startLoopRun(config(), "delivery", openAiTheme);
-    second.startLoopRun(config(), "delivery", openAiTheme);
-    first.intakeEvent({ projectId: "project-a", eventType: "first", payload: {} });
-    second.intakeEvent({ projectId: "project-b", eventType: "second", payload: {} });
-    expect(first.listLoopRuns()).toHaveLength(1);
-    expect(second.listLoopRuns()).toHaveLength(1);
-    expect(first.listEventRecords().map((event) => event.eventType)).toEqual(["first"]);
-    expect(second.listEventRecords().map((event) => event.eventType)).toEqual(["second"]);
-    expect(() => first.intakeEvent({ projectId: "project-b", eventType: "wrong", payload: {} })).toThrow("not the active project");
-    first.close();
-    second.close();
   });
 
   it("runs agent and human steps, creates a distinct step run for a cycle, and keeps one active run per loop", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
-    const started = runtime.startLoopRun(config(), "delivery", openAiTheme, "Build release 1");
+    const started = startLoop(runtime, config(), "delivery", openAiTheme, "Build release 1");
     expect(started).toMatchObject({
       status: "running",
       input: "Build release 1",
       snapshot: { id: "delivery" },
       themeSnapshot: openAiTheme
     });
-    expect(() => runtime.startLoopRun(config(), "delivery", openAiTheme)).toThrow(LoopRunConflictError);
+    expect(() => startLoop(runtime, config(), "delivery")).toThrow(LoopRunConflictError);
 
     const first = started.stepRuns[0]!;
     expect(first).toMatchObject({ stepId: "implement", status: "queued" });
@@ -150,7 +113,7 @@ describe("runtime database v8", () => {
 
   it("starts a linked child run from a human transition and forwards accumulated input", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
-    const parent = runtime.startLoopRun(config(), "delivery", openAiTheme, "Original request");
+    const parent = startLoop(runtime, config(), "delivery", openAiTheme, "Original request");
     const agentStep = parent.stepRuns[0]!;
     const waiting = runtime.completeAgentStep(config(), builtInLoopThemes, { stepRunId: agentStep.stepRunId, outcome: ready });
     const gate = waiting.stepRuns.at(-1)!;
@@ -158,7 +121,7 @@ describe("runtime database v8", () => {
     expect(completedParent.status).toBe("completed");
     const child = runtime.latestLoopRun("release")!;
     expect(child).toMatchObject({
-      rootRunId: parent.runId,
+      rootRunId: parent.rootRunId,
       parentRunId: parent.runId,
       parentStepRunId: gate.stepRunId,
       source: "human",
@@ -189,7 +152,7 @@ describe("runtime database v8", () => {
     };
     const automation = config();
 
-    const parent = runtime.startLoopRun(automation, "delivery", initialTheme, "Original request");
+    const parent = startLoop(runtime, automation, "delivery", initialTheme, "Original request");
     const storedSnapshot = JSON.parse((runtime.connection().prepare(
       "SELECT snapshot_json FROM loop_runs WHERE run_id = ?"
     ).get(parent.runId) as { snapshot_json: string }).snapshot_json) as Record<string, unknown>;
@@ -223,11 +186,11 @@ describe("runtime database v8", () => {
 
   it("leaves a human gate waiting if its child loop already has an active run", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
-    const parent = runtime.startLoopRun(config(), "delivery", openAiTheme);
+    const parent = startLoop(runtime, config(), "delivery");
     const agentStep = parent.stepRuns[0]!;
     const waiting = runtime.completeAgentStep(config(), builtInLoopThemes, { stepRunId: agentStep.stepRunId, outcome: ready });
     const gate = waiting.stepRuns.at(-1)!;
-    runtime.startLoopRun(config(), "release", openAiTheme);
+    startLoop(runtime, config(), "release");
     expect(() => runtime.respondToStepRun(config(), builtInLoopThemes, parent.runId, gate.stepRunId, "approved", "Continue"))
       .toThrow(LoopRunConflictError);
     expect(runtime.getLoopRun(parent.runId)).toMatchObject({ status: "waiting_for_human" });
@@ -237,7 +200,7 @@ describe("runtime database v8", () => {
 
   it("leaves a human gate waiting when its child Loop theme is unavailable", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
-    const parent = runtime.startLoopRun(config(), "delivery", openAiTheme);
+    const parent = startLoop(runtime, config(), "delivery");
     const waiting = runtime.completeAgentStep(config(), builtInLoopThemes, {
       stepRunId: parent.stepRuns[0]!.stepRunId,
       outcome: ready
@@ -253,7 +216,7 @@ describe("runtime database v8", () => {
 
   it("cancels active work and logs but ignores a late agent completion", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
-    const run = runtime.startLoopRun(config(), "delivery", openAiTheme);
+    const run = startLoop(runtime, config(), "delivery");
     const step = run.stepRuns[0]!;
     expect(runtime.cancelLoopRun(run.runId).status).toBe("cancelled");
     const afterLate = runtime.completeAgentStep(config(), builtInLoopThemes, { stepRunId: step.stepRunId, outcome: ready });
@@ -280,7 +243,7 @@ describe("runtime database v8", () => {
         }]
       }]
     };
-    let details = runtime.startLoopRun(cyclic, "cycle", openAiTheme);
+    let details = startLoop(runtime, cyclic, "cycle");
     for (let index = 0; index < 21 && details.status === "running"; index += 1) {
       const step = details.stepRuns.at(-1)!;
       details = runtime.completeAgentStep(cyclic, builtInLoopThemes, { stepRunId: step.stepRunId, outcome: ready });
@@ -291,12 +254,4 @@ describe("runtime database v8", () => {
     runtime.close();
   });
 
-});
-
-describe("agent outcome", () => {
-  it("validates structured outcome JSON", () => {
-    expect(parseAgentOutcomeText(JSON.stringify(ready))).toEqual(ready);
-    expect(parseAgentOutcomeText(JSON.stringify(rejected))).toEqual(rejected);
-    expect(() => parseAgentOutcomeText("{bad json")).toThrow("not valid JSON");
-  });
 });

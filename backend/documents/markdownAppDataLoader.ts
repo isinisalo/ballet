@@ -1,51 +1,38 @@
+import path from "node:path";
 import type { AppData } from "../../shared/api/workspaceData.js";
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { builtInLoopThemes } from "../../shared/domain/loopThemes.js";
-import { loadAdr, loadAgents, loadBalletProject, loadBalletProjectTree, loadGoals, loadSkills } from "../markdown.js";
-import { adrFromDocument, agentFromDocument, goalFromDocument, projectFromDocument, skillDocumentFromDocument } from "./documentMappers.js";
+import { loadAgents, loadBalletProject, loadBalletProjectTree, loadSkills } from "../markdown.js";
+import { agentFromDocument, projectFromDocument, skillDocumentFromDocument } from "./documentMappers.js";
 import { buildSkillLookup } from "./skillLookup.js";
 
-export const loadMarkdownAppData = async (root: string): Promise<AppData> => {
-  const [projectDocs, projectDocumentTree, agentDocs, skillDocs, adrDocs, goalDocs] = await Promise.all([
+export type WorkspaceContentData = Omit<AppData,
+  "runtime" | "agentRuntimeConfigurations" | "executionStates" | "runTargets" | "loopRuns" | "scheduleStates">;
+
+export const loadMarkdownAppData = async (root: string): Promise<WorkspaceContentData> => {
+  const [projectDocs, projectDocumentTree, agentDocs, skillDocs] = await Promise.all([
     loadBalletProject(root),
     loadBalletProjectTree(root),
     loadAgents(root),
-    loadSkills(root),
-    loadAdr(root),
-    loadGoals(root)
+    loadSkills(root)
   ]);
 
-  const projects = projectDocs.map(projectFromDocument);
-  const defaultProjectId = projects[0]?.id ?? "project";
+  const project = projectDocs[0] ? projectFromDocument(projectDocs[0]) : {
+    id: path.basename(root), name: path.basename(root), description: "Local Git checkout",
+    status: "active" as const, createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString()
+  };
   const skills = skillDocs.map(skillDocumentFromDocument);
   const skillLookup = buildSkillLookup(skills);
   const agents = agentDocs.map((doc) => agentFromDocument(doc, skillLookup));
 
   return {
-    projectRoot: root,
-    projects,
-    goals: goalDocs.map((doc) => goalFromDocument(doc, defaultProjectId)),
-    adrs: adrDocs.map((doc) => adrFromDocument(doc, defaultProjectId)),
+    project,
     agents,
     skills,
-    policies: [],
-    eventDefinitions: [],
-    events: [],
-    loopRuns: [],
-    scheduleStates: [],
     automation: defaultProjectAutomationConfig(),
     automationIssues: [],
     loopThemes: builtInLoopThemes.map((theme) => structuredClone(theme)),
     loopThemeIssues: [],
-    projectDocumentTree,
-    documents: {
-      project: projectDocs,
-      agents: agentDocs,
-      skills: skillDocs,
-      adr: adrDocs,
-      goals: goalDocs,
-      events: [],
-      policies: []
-    }
+    projectDocumentTree
   };
 };

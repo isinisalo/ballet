@@ -37,8 +37,7 @@ export const validateLoopRunStart = async (data: AppData, loopId: string, input?
     throw new LoopRunStateError(`${loopId} input must contain exactly one line in the form task_id: task-NNN.`);
   }
 
-  const projectRoot = data.projectRoot;
-  if (!projectRoot) throw new LoopRunStateError(`Cannot validate ${loopId} task_id because the project root is unavailable.`);
+  const projectRoot = data.runtime.checkout.path;
   let tasks: string;
   try {
     tasks = await readFile(path.join(projectRoot, ".ballet", "outputs", "TASKS.md"), "utf8");

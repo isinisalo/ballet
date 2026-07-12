@@ -17,26 +17,23 @@ import {
 
 describe("workspace routing", () => {
   it("parses project document and collection routes", () => {
-    expect(routeFromPath("/projects/document?path=.ballet%2Fgoals%2Fone.md")).toEqual({
+    expect(routeFromPath("/project/document?path=.ballet%2Fgoals%2Fone.md")).toEqual({
       view: "project-document",
       documentPath: ".ballet/goals/one.md"
     });
-    expect(routeFromPath("/projects/project%201/goals")).toEqual({ view: "project-goals", projectId: "project 1" });
-    expect(routeFromPath("/projects/project%201/goals?path=.ballet%2Fgoals%2Fone.md")).toEqual({
+    expect(routeFromPath("/project/goals")).toEqual({ view: "project-goals" });
+    expect(routeFromPath("/project/goals?path=.ballet%2Fgoals%2Fone.md")).toEqual({
       view: "project-goals",
-      projectId: "project 1",
       documentPath: ".ballet/goals/one.md"
     });
-    expect(routeFromPath("/projects/project-1/adrs")).toEqual({ view: "project-adrs", projectId: "project-1" });
-    expect(routeFromPath("/projects/project-1/adrs?path=.ballet%2Fadr%2Fdecision.md")).toEqual({
+    expect(routeFromPath("/project/adrs")).toEqual({ view: "project-adrs" });
+    expect(routeFromPath("/project/adrs?path=.ballet%2Fadr%2Fdecision.md")).toEqual({
       view: "project-adrs",
-      projectId: "project-1",
       documentPath: ".ballet/adr/decision.md"
     });
-    expect(routeFromPath("/projects/project-1/instructions")).toEqual({ view: "project-instructions", projectId: "project-1" });
-    expect(routeFromPath("/projects/project-1/instructions?path=.ballet%2Finstructions%2Freviewer.md")).toEqual({
+    expect(routeFromPath("/project/instructions")).toEqual({ view: "project-instructions" });
+    expect(routeFromPath("/project/instructions?path=.ballet%2Finstructions%2Freviewer.md")).toEqual({
       view: "project-instructions",
-      projectId: "project-1",
       documentPath: ".ballet/instructions/reviewer.md"
     });
   });
@@ -61,7 +58,7 @@ describe("workspace routing", () => {
       loopThemeSourceId: "open-ai",
       loopThemeLoopId: "release train"
     });
-    expect(routeFromPath("/runtimes?id=device-1")).toEqual({ view: "runtimes", runtimeDeviceId: "device-1" });
+    expect(routeFromPath("/runtimes?id=ignored-local-device")).toEqual({ view: "runtimes" });
   });
 
   it("parses URL-backed Ballet Run routes", () => {
@@ -77,13 +74,15 @@ describe("workspace routing", () => {
     expect(routeFromPath("/loop?id=delivery")).toEqual({ view: "projects" });
     expect(routeFromPath("/automation/runtimes?id=codex")).toEqual({ view: "projects" });
     expect(routeFromPath("/agent-runs?id=run-1")).toEqual({ view: "projects" });
+    expect(routeFromPath("/projects/document?path=.ballet%2Fgoals%2Fone.md")).toEqual({ view: "projects" });
+    expect(routeFromPath("/projects/project-1/goals")).toEqual({ view: "projects" });
   });
 
   it("builds encoded paths", () => {
-    expect(projectDocumentPath(".ballet/goals/a b.md")).toBe("/projects/document?path=.ballet%2Fgoals%2Fa%20b.md");
-    expect(projectCollectionDocumentPath("project 1", "goal", ".ballet/goals/a b.md")).toBe("/projects/project%201/goals?path=.ballet%2Fgoals%2Fa%20b.md");
-    expect(projectCollectionDocumentPath("project 1", "adr", ".ballet/adr/a b.md")).toBe("/projects/project%201/adrs?path=.ballet%2Fadr%2Fa%20b.md");
-    expect(projectCollectionDocumentPath("project 1", "instruction", ".ballet/instructions/a b.md")).toBe("/projects/project%201/instructions?path=.ballet%2Finstructions%2Fa%20b.md");
+    expect(projectDocumentPath(".ballet/goals/a b.md")).toBe("/project/document?path=.ballet%2Fgoals%2Fa%20b.md");
+    expect(projectCollectionDocumentPath("goal", ".ballet/goals/a b.md")).toBe("/project/goals?path=.ballet%2Fgoals%2Fa%20b.md");
+    expect(projectCollectionDocumentPath("adr", ".ballet/adr/a b.md")).toBe("/project/adrs?path=.ballet%2Fadr%2Fa%20b.md");
+    expect(projectCollectionDocumentPath("instruction", ".ballet/instructions/a b.md")).toBe("/project/instructions?path=.ballet%2Finstructions%2Fa%20b.md");
     expect(agentDocumentPath(".codex/agents/a b.toml")).toBe("/agents?path=.codex%2Fagents%2Fa%20b.toml");
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(automationAllLoopsPath()).toBe("/automation/loops?view=all");
@@ -93,6 +92,6 @@ describe("workspace routing", () => {
     expect(runOverviewPath("root 1")).toBe("/run?run=root%201");
     expect(runLoopPath("wf 1", "root 1")).toBe("/run/loops/wf%201?run=root%201");
     expect(runAgentPath("agent 1", "root 1")).toBe("/run/agents/agent%201?run=root%201");
-    expect(runtimePath("runtime 1")).toBe("/runtimes?id=runtime%201");
+    expect(runtimePath()).toBe("/runtimes");
   });
 });

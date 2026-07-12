@@ -7,7 +7,6 @@ import type { RunDashboardState } from "../src/workspace/runs/useRunDashboard";
 
 const activeRun: RootRunSummary = {
   rootRunId: "root-active",
-  projectId: "project-1",
   kind: "loop",
   targetId: "delivery",
   source: "manual",
@@ -19,16 +18,15 @@ const activeRun: RootRunSummary = {
 
 const recentRun: RootRunSummary = {
   rootRunId: "root-recent",
-  projectId: "project-1",
   kind: "agent",
   targetId: "reviewer",
   source: "schedule",
   status: "completed",
   finalization: {
-    status: "reported",
+    status: "completed",
     success: true,
-    authorizedAt: "2026-07-11T09:01:00.000Z",
-    finalizedAt: "2026-07-11T09:02:00.000Z",
+    startedAt: "2026-07-11T09:01:00.000Z",
+    completedAt: "2026-07-11T09:02:00.000Z",
     report: {
       success: true,
       retained: false,
@@ -55,7 +53,7 @@ describe("Run Overview", () => {
       recent: [recentRun],
       targets: {
         loops: [{ kind: "loop", id: "release", name: "Release", ready: true, issues: [] }],
-        agents: [{ kind: "agent", id: "publisher", name: "Publisher", ready: false, issues: [{ code: "unbound", message: "No runtime is attached.", agentId: "publisher" }] }]
+        agents: [{ kind: "agent", id: "publisher", name: "Publisher", ready: false, issues: [{ code: "unbound", message: "No local provider is configured.", agentId: "publisher" }] }]
       },
       loading: false,
       error: "",
@@ -64,7 +62,7 @@ describe("Run Overview", () => {
       cancel
     };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) === "/api/loops/release/runs" && init?.method === "POST") {
+      if (String(input) === "/api/runs" && init?.method === "POST") {
         return Response.json({ rootRunId: "root-new" }, { status: 201 });
       }
       return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${String(input)}` }, { status: 404 });
@@ -76,15 +74,15 @@ describe("Run Overview", () => {
     expect(screen.getByText(/delivery · implement · developer · root-active/)).toBeInTheDocument();
     expect(screen.getByText("schedule")).toBeInTheDocument();
     expect(screen.getByText(/src\/review\.ts/)).toBeInTheDocument();
-    expect(screen.getByText(/No runtime is attached/)).toBeInTheDocument();
+    expect(screen.getByText(/No local provider is configured/)).toBeInTheDocument();
     const startButtons = screen.getAllByRole("button", { name: "Start" });
     expect(startButtons[0]).toBeEnabled();
     expect(startButtons[1]).toBeDisabled();
 
     await user.click(startButtons[0]!);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "/api/loops/release/runs",
-      expect.objectContaining({ method: "POST", body: "{}" })
+      "/api/runs",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "loop", targetId: "release" }) })
     ));
     expect(refresh).toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith("/run/loops/release?run=root-new");

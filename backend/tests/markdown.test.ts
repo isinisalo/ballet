@@ -78,7 +78,6 @@ describe("Markdown collection loading", () => {
   it("loads fixture collections from project-local .codex and .ballet folders", async () => {
     const data = await loadMarkdownAppData(fixtureRoot);
 
-    expect(data.projectRoot).toBe(fixtureRoot);
     expect(data.agents.map((agent) => agent.id).sort()).toEqual(["architect", "reviewer"]);
     expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("model");
     expect(data.agents.find((agent) => agent.id === "architect")).not.toHaveProperty("modelReasoningEffort");
@@ -89,16 +88,11 @@ describe("Markdown collection loading", () => {
     expect(data.skills.map((skill) => skill.id)).toEqual(["fixture-skill"]);
     expect(data.skills[0]?.name).toBe("fixture-skill");
     expect(data.skills[0]?.relativePath).toBe(".agents/skills/fixture-skill/SKILL.md");
-    expect(data.projects[0]?.id).toBe("fixture-project");
-    expect(data.projects[0]).not.toHaveProperty("key");
-    expect(data.projects[0]?.name).toBe("Fixture Ballet Project");
-    expect(data.projects[0]?.description).toContain("Fixture project loaded from `.ballet/project.md`.");
-    expect(data.projects[0]?.relativePath).toBe(".ballet/project.md");
-    expect(data.adrs[0]?.id).toBe("0001-test-adr");
-    expect(data.goals.some((goal) => goal.id === "test-goal")).toBe(true);
-    expect(data.events).toEqual([]);
-    expect(data.eventDefinitions).toEqual([]);
-    expect(data.policies).toEqual([]);
+    expect(data.project.id).toBe("fixture-project");
+    expect(data.project).not.toHaveProperty("key");
+    expect(data.project.name).toBe("Fixture Ballet Project");
+    expect(data.project.description).toContain("Fixture project loaded from `.ballet/project.md`.");
+    expect(data.project.relativePath).toBe(".ballet/project.md");
     expect(data.automation).toEqual({
       version: 6,
       loops: []
@@ -107,9 +101,11 @@ describe("Markdown collection loading", () => {
 
   it("loads only .ballet/project.md for the project document", async () => {
     const data = await loadMarkdownAppData(fixtureRoot);
+    const rootDocuments = data.projectDocumentTree?.filter((node) => node.type === "file") ?? [];
 
-    expect(data.documents?.project).toHaveLength(1);
-    expect(data.documents?.project[0]?.relativePath).toBe(".ballet/project.md");
+    expect(rootDocuments).toHaveLength(1);
+    expect(rootDocuments[0]?.type === "file" ? rootDocuments[0].document.relativePath : undefined)
+      .toBe(".ballet/project.md");
   });
 
   it("loads custom agents from .toml files", async () => {
@@ -332,33 +328,6 @@ path = "../.agents/skills/missing-skill"
       directoryPath: ".ballet/instructions.txt",
       title: "Invalid directory"
     })).rejects.toThrow("Project document directory must not include a file extension.");
-  });
-
-  it("writes project description as Markdown body instead of frontmatter", async () => {
-    const root = await tempRoot();
-    await writeEntityMarkdown(root, "projects", {
-      id: "written-project",
-      name: "Written Project",
-      key: "OLD",
-      title: "Old title",
-      description: "Markdown project description.",
-      frontmatter: {
-        id: "written-project",
-        name: "Written Project",
-        key: "OLD",
-        title: "Old title",
-        description: "Old frontmatter description"
-      }
-    });
-
-    const source = await readFile(path.join(root, ".ballet/project.md"), "utf8");
-
-    expect(source).toContain("id: written-project");
-    expect(source).toContain("name: Written Project");
-    expect(source).not.toContain("key:");
-    expect(source).not.toContain("title:");
-    expect(source).not.toContain("description:");
-    expect(source).toContain("---\n\nMarkdown project description.");
   });
 
   it("saves the root Ballet project Markdown document in place", async () => {

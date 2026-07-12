@@ -12,14 +12,14 @@ import { LoopCreationEditor, LoopEditor } from "./loops/LoopEditor";
 import { createLoopDraft, removeLoopAtIndex, updateLoopAtIndex } from "./loops/loopEditorState";
 import { isActiveLoopRun } from "./loops/loopRunState";
 import { useLoopRun } from "./loops/useLoopRun";
-import type { RuntimeStreamStatus } from "@/app/useRuntimeStream";
+import type { AppStreamStatus } from "@/app/useAppStream";
 
-export function AutomationView({ data, agentExecutionStates, selectedId, loopView, runtimeStreamStatus, saveAutomation, navigate }: {
+export function AutomationView({ data, agentExecutionStates, selectedId, loopView, appStreamStatus, saveAutomation, navigate }: {
   data: AppData;
   agentExecutionStates: AgentExecutionState[];
   selectedId?: string;
   loopView?: AutomationLoopView;
-  runtimeStreamStatus: RuntimeStreamStatus;
+  appStreamStatus: AppStreamStatus;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
   navigate: (path: string) => void;
 }) {
@@ -33,7 +33,8 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   const displayedLoop = creating ? createDraft : selectedLoop;
   const scheduleState = data.scheduleStates.find((state) => state.loopId === displayedLoop?.id && state.stepId === displayedLoop.start);
   const loopRunRefreshSignal = JSON.stringify(data.loopRuns.find((run) => run.loopId === savedLoop?.id) ?? null);
-  const runController = useLoopRun(savedLoop?.id, loopRunRefreshSignal, runtimeStreamStatus);
+  const runTarget = data.runTargets.loops.find((target) => target.id === savedLoop?.id);
+  const runController = useLoopRun(savedLoop?.id, loopRunRefreshSignal, appStreamStatus, undefined, runTarget);
   const checkingRun = Boolean(savedLoop) && runController.pendingOperation === "load";
   const locked = checkingRun || isActiveLoopRun(runController.details);
 

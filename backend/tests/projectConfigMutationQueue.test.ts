@@ -7,6 +7,7 @@ import { defaultLoopTheme, type LoopTheme } from "../../shared/domain/loopThemes
 import { AutomationService } from "../services/AutomationService.js";
 import { LoopThemeService } from "../services/LoopThemeService.js";
 import { MarkdownStore } from "../store.js";
+import { RuntimeDatabase } from "../runtime-db.js";
 
 const roots: string[] = [];
 const stores: MarkdownStore[] = [];
@@ -14,15 +15,13 @@ const stores: MarkdownStore[] = [];
 afterEach(async () => {
   vi.restoreAllMocks();
   stores.splice(0).forEach((store) => store.runtimeDatabase().close());
-  delete process.env.BALLET_PROJECT_ROOT;
-  delete process.env.BALLET_CONTROL_PLANE_DB_PATH;
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe("MarkdownStore project config mutation queue", () => {
   it("finishes an earlier automation save before creating and assigning a theme", async () => {
     const root = await createProject();
-    const store = new MarkdownStore();
+    const store = new MarkdownStore(root, new RuntimeDatabase(path.join(root, "runtime.sqlite")));
     stores.push(store);
     const originalSave = AutomationService.prototype.save;
     let signalSaveStarted!: () => void;
@@ -71,8 +70,6 @@ describe("MarkdownStore project config mutation queue", () => {
 const createProject = async (): Promise<string> => {
   const root = await mkdtemp(path.join(os.tmpdir(), "ballet-project-mutation-"));
   roots.push(root);
-  process.env.BALLET_PROJECT_ROOT = root;
-  process.env.BALLET_CONTROL_PLANE_DB_PATH = path.join(root, "runtime.sqlite");
   await mkdir(path.join(root, ".ballet"), { recursive: true });
   await writeFile(path.join(root, ".ballet", "project.md"), "---\nid: mutation-queue\nname: Mutation queue\n---\n", "utf8");
   await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({ ...config(), agents: {} }, null, 2), "utf8");

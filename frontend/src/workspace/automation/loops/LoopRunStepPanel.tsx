@@ -15,7 +15,7 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
         <dt className="text-muted-foreground">Type</dt><dd>{step.type}</dd>
         <dt className="text-muted-foreground">Agent</dt><dd className="break-words">{stepRun.agentId ?? "Human operator"}</dd>
         {stepRun.execution ? <>
-          <dt className="text-muted-foreground">Runtime</dt><dd className="break-words">{stepRun.execution.deviceName} · {stepRun.execution.provider}</dd>
+          <dt className="text-muted-foreground">Runtime</dt><dd className="break-words">{stepRun.execution.hostname} · {stepRun.execution.provider}</dd>
           <dt className="text-muted-foreground">Model</dt><dd className="break-all">{stepRun.execution.model}</dd>
           <dt className="text-muted-foreground">Reasoning</dt><dd>{stepRun.execution.reasoning}</dd>
         </> : null}

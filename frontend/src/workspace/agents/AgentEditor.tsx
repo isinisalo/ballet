@@ -2,7 +2,7 @@ import { CrudActions, ErrorPreview, Panel, TextAreaField, TextField } from "@/co
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import type { Agent, AgentExecutionState } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, AgentRuntimeConfiguration, LocalRuntime } from "@shared/api/workspace-contracts";
 import { Bot } from "lucide-react";
 import { AgentAvatarField } from "./AgentAvatarField";
 import { AgentEditWorkspace } from "./AgentEditWorkspace";
@@ -37,6 +37,8 @@ export function AgentEditorContent({ editor, showNameField = true }: { editor: A
 export function AgentEditor(props: {
   agent?: Agent;
   executionState?: AgentExecutionState;
+  runtime: LocalRuntime;
+  runtimeConfiguration?: AgentRuntimeConfiguration;
   save: SaveAgent;
   remove: RemoveAgent;
   onSaved?: (agent: Agent) => void;
@@ -44,6 +46,6 @@ export function AgentEditor(props: {
   onDeleted?: (id: string) => void;
 }) {
   const editor = useAgentEditor(props);
-  if (props.agent) return <AgentEditWorkspace agent={props.agent} executionState={props.executionState} editor={editor} />;
+  if (props.agent) return <AgentEditWorkspace agent={props.agent} executionState={props.executionState} runtime={props.runtime} runtimeConfiguration={props.runtimeConfiguration} editor={editor} />;
   return <Panel title={editor.form.id ? "Update agent" : "Create agent"} icon={<Bot data-icon="inline-start" />} action={<AgentEditorActions editor={editor} />}><AgentEditorContent editor={editor} /></Panel>;
 }

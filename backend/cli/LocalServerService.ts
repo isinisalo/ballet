@@ -1,265 +1,210 @@
-import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { promisify } from "node:util";
-import { supervisedProgramArguments } from "./LaunchdLogSupervisor.js";
-import type { DaemonConfig } from "../daemon/config/DaemonConfigStore.js";
-import { pairingFactsFromConfig } from "./PairingClient.js";
+import {
+  findFreeLoopbackPort,
+  isLoopbackPortAvailable,
+  loadLocalSettings,
+  loadOrCreateServiceState,
+  loadServiceState,
+  saveServiceState,
+  updateProviderCommands,
+  type LocalSettings,
+  type ServiceState
+} from "./CheckoutState.js";
+import type { LaunchdService, LaunchdStatus } from "./LaunchdService.js";
+import type { ProjectContext } from "../project/ProjectContext.js";
 
-const execFileAsync = promisify(execFile);
-const LABEL = "ai.ballet.server";
-
-export interface LocalServerConfiguration {
-  serverUrl: string;
-  projectId: string;
-  repositoryUrl: string;
-  repositoryPath: string;
-  localControlToken?: string;
+export interface LocalHealth {
+  ok: true;
+  instanceId: string;
+  checkoutRoot: string;
+  port: number;
+  version: string;
+  startedAt: string;
 }
 
-export interface LocalLifecycleStatus {
-  activeRuns: number;
-  pendingFinalizations: number;
-  idle: boolean;
-}
-
-export interface LocalRuntimeStatus {
-  registered: boolean;
-  online: boolean;
-  backendsReady: boolean;
+export interface LocalServerStatus {
+  configured: boolean;
+  state?: ServiceState;
+  launchd: LaunchdStatus;
+  health?: LocalHealth;
 }
 
 export interface LocalServerServiceOptions {
-  balletHome: string;
-  logDirectory: string;
-  programArguments: string[];
-  webDistPath?: string;
-  executablePath?: string;
+  project: ProjectContext;
+  launchd: LaunchdService;
   fetch?: typeof fetch;
   startupTimeoutMs?: number;
 }
 
 export class LocalServerService {
-  private readonly plistPath = path.join(os.homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly options: LocalServerServiceOptions) {
     this.fetchImpl = options.fetch ?? fetch;
   }
 
-  async ensureStarted(config: LocalServerConfiguration): Promise<void> {
-    this.ensureMacOs();
-    const server = localServerUrl(config.serverUrl);
-    const health = await this.probe(server);
-    if (health?.projectId === config.projectId) return;
-    if (health) {
-      throw new Error(`Port ${server.port} is already serving Ballet project ${health.projectId ?? "unknown"}, not ${config.projectId}.`);
+  async ensureStarted(commands: { codexCommand?: string; copilotCommand?: string } = {}): Promise<ServiceState> {
+    let state = await loadOrCreateServiceState(this.options.project);
+    const { settings, commandOverridesChanged } = await this.prepareSettings(commands);
+    if (await this.reuseOrStopExisting(state, commandOverridesChanged)) return state;
+    state = await this.ensureAvailablePort(state);
+    return this.installWithConflictRecovery(state, settings);
+  }
+
+  private async prepareSettings(commands: {
+    codexCommand?: string;
+    copilotCommand?: string;
+  }): Promise<{ settings: LocalSettings; commandOverridesChanged: boolean }> {
+    const existing = await loadLocalSettings(this.options.project);
+    const changed = (commands.codexCommand !== undefined && commands.codexCommand !== existing.codexCommand)
+      || (commands.copilotCommand !== undefined && commands.copilotCommand !== existing.copilotCommand);
+    if (!changed) return { settings: existing, commandOverridesChanged: false };
+    return {
+      settings: await updateProviderCommands(this.options.project, commands),
+      commandOverridesChanged: true
+    };
+  }
+
+  private async reuseOrStopExisting(state: ServiceState, commandsChanged: boolean): Promise<boolean> {
+    let health = await this.probe(state);
+    if (health && this.matches(health, state)) {
+      if (!commandsChanged) return true;
+      await this.stopGracefully();
+      return false;
     }
-    await this.installAndStart(config, server);
+    const launchd = await this.options.launchd.status(state);
+    if (launchd.running) health = await this.waitUntilReady(state, 2_000).catch(() => undefined);
+    if (health && this.matches(health, state)) {
+      if (!commandsChanged) return true;
+      await this.stopGracefully();
+      return false;
+    }
+    if (launchd.loaded) await this.options.launchd.stop(state);
+    return false;
   }
 
-  async restart(config: LocalServerConfiguration): Promise<void> {
-    this.ensureMacOs();
-    await this.installAndStart(config, localServerUrl(config.serverUrl));
+  private async ensureAvailablePort(state: ServiceState): Promise<ServiceState> {
+    if (await isLoopbackPortAvailable(state.port)) return state;
+    const replacement = { ...state, port: await findDifferentLoopbackPort(state.port) };
+    await saveServiceState(this.options.project, replacement);
+    return replacement;
   }
 
-  async stop(): Promise<void> {
-    this.ensureMacOs();
-    await execFileAsync("launchctl", ["bootout", this.domain(), this.plistPath]).catch(() => undefined);
-  }
-
-  async activeProject(serverUrl: string, timeoutMs = 2_000, failClosed = false): Promise<{ projectId?: string } | undefined> {
-    return this.probe(localServerUrl(serverUrl), timeoutMs, failClosed);
-  }
-
-  async cancelAllRuns(serverUrl: string, controlToken: string, timeoutMs = 5_000): Promise<LocalLifecycleStatus> {
-    return this.lifecycleRequest(serverUrl, controlToken, "POST", timeoutMs);
-  }
-
-  async lifecycleStatus(serverUrl: string, controlToken: string, timeoutMs = 5_000): Promise<LocalLifecycleStatus> {
-    return this.lifecycleRequest(serverUrl, controlToken, "GET", timeoutMs);
-  }
-
-  async recoverRuntime(serverUrl: string, controlToken: string, config: DaemonConfig, daemonToken: string): Promise<void> {
-    const facts = pairingFactsFromConfig(config);
-    const response = await this.localRequest(serverUrl, controlToken, "/api/local/lifecycle/runtime/recover", {
-      method: "POST",
-      body: JSON.stringify({
-        projectId: config.projectId,
-        deviceId: config.deviceId,
-        daemonToken,
-        backends: config.backends.map(({ id, provider }) => ({ id, provider })),
-        ...facts
-      })
-    });
-    if (!response.ok) throw new Error(`Ballet runtime recovery failed with HTTP ${response.status}: ${(await response.text()).slice(0, 1000)}`);
-  }
-
-  async waitForRuntime(serverUrl: string, controlToken: string, deviceId: string, timeoutMs = 20_000): Promise<LocalRuntimeStatus> {
-    const deadline = Date.now() + timeoutMs;
-    let status: LocalRuntimeStatus = { registered: false, online: false, backendsReady: false };
-    while (Date.now() < deadline) {
-      const response = await this.localRequest(serverUrl, controlToken, `/api/local/lifecycle/runtime/${encodeURIComponent(deviceId)}`);
-      if (response.ok) {
-        status = await response.json() as LocalRuntimeStatus;
-        if (status.online && status.backendsReady) return status;
+  private async installWithConflictRecovery(state: ServiceState, settings: LocalSettings): Promise<ServiceState> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.options.launchd.installAndStart(state, settings);
+        await this.waitUntilReady(state, this.options.startupTimeoutMs ?? 20_000);
+        return state;
+      } catch (error) {
+        const portHealth = await this.probe(state);
+        const portWasClaimed = Boolean(portHealth && !this.matches(portHealth, state))
+          || !(await isLoopbackPortAvailable(state.port));
+        if (!portWasClaimed || attempt === 2) throw this.startupError(error);
+        await this.options.launchd.stop(state);
+        state = { ...state, port: await findDifferentLoopbackPort(state.port) };
+        await saveServiceState(this.options.project, state);
       }
-      await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    return status;
+    throw new Error("Ballet exhausted its local startup attempts.");
   }
 
-  private async installAndStart(config: LocalServerConfiguration, server: URL): Promise<void> {
-    await mkdir(path.dirname(this.plistPath), { recursive: true });
-    await mkdir(this.options.logDirectory, { recursive: true });
-    await writeFile(this.plistPath, renderServerPlist(this.options, config, server), { mode: 0o600 });
-    const domain = this.domain();
-    await execFileAsync("launchctl", ["bootout", domain, this.plistPath]).catch(() => undefined);
-    await execFileAsync("launchctl", ["bootstrap", domain, this.plistPath]);
-    await execFileAsync("launchctl", ["kickstart", "-k", `${domain}/${LABEL}`]);
-    await this.waitUntilReady(server, config.projectId);
+  async restart(commands: { codexCommand?: string; copilotCommand?: string } = {}, timeoutMs = 90_000): Promise<ServiceState> {
+    await this.stopGracefully(timeoutMs);
+    return this.ensureStarted(commands);
   }
 
-  private async waitUntilReady(server: URL, projectId: string): Promise<void> {
-    const deadline = Date.now() + (this.options.startupTimeoutMs ?? 20_000);
-    while (Date.now() < deadline) {
-      const health = await this.probe(server);
-      if (health?.projectId === projectId) return;
-      if (health) throw new Error(`Ballet server started with unexpected project ${health.projectId ?? "unknown"}.`);
-      await new Promise((resolve) => setTimeout(resolve, 250));
+  async stopGracefully(timeoutMs = 90_000): Promise<boolean> {
+    const state = await loadServiceState(this.options.project);
+    if (!state) return false;
+    const health = await this.probe(state);
+    if (health && this.matches(health, state)) {
+      const response = await this.fetchImpl(this.url(state, "/api/local/shutdown"), {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: "{}",
+        signal: AbortSignal.timeout(Math.max(1, Math.min(timeoutMs, 5_000)))
+      });
+      if (response.status !== 202) {
+        throw new Error(`Ballet shutdown request failed with HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`);
+      }
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (!await this.probe(state, Math.min(1_000, Math.max(1, deadline - Date.now())))) break;
+        await delay(200);
+      }
+      if (await this.probe(state, 500)) {
+        throw new Error("Ballet shutdown timed out; the checkout service was left loaded.");
+      }
     }
-    throw new Error(`Ballet server did not become ready at ${server.origin}. Check ${this.options.logDirectory}/server.err.log.`);
+    await this.options.launchd.stop(state);
+    return true;
   }
 
-  private async probe(server: URL, timeoutMs = 2_000, failClosed = false): Promise<{ projectId?: string } | undefined> {
+  async status(): Promise<LocalServerStatus> {
+    const state = await loadServiceState(this.options.project);
+    if (!state) return { configured: false, launchd: { loaded: false, running: false } };
+    return {
+      configured: true,
+      state,
+      launchd: await this.options.launchd.status(state),
+      health: await this.probe(state)
+    };
+  }
+
+  async probe(state: ServiceState, timeoutMs = 2_000): Promise<LocalHealth | undefined> {
     try {
-      const response = await this.fetchImpl(new URL("/api/health", server), {
+      const response = await this.fetchImpl(this.url(state, "/api/health"), {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(Math.max(1, timeoutMs))
       });
-      if (!response.ok) {
-        if (failClosed) throw new Error(`Ballet health check failed with HTTP ${response.status}.`);
-        return undefined;
-      }
-      const body = await response.json() as { ok?: unknown; projectId?: unknown };
-      if (body.ok === true) return { projectId: typeof body.projectId === "string" ? body.projectId : undefined };
-      if (failClosed) throw new Error("Ballet health check returned an invalid response.");
-      return undefined;
-    } catch (error) {
-      if (failClosed && !isConnectionRefused(error)) throw error;
+      if (!response.ok) return undefined;
+      const value = await response.json() as Partial<LocalHealth>;
+      if (value.ok !== true
+        || typeof value.instanceId !== "string"
+        || typeof value.checkoutRoot !== "string"
+        || typeof value.port !== "number"
+        || typeof value.version !== "string"
+        || typeof value.startedAt !== "string") return undefined;
+      return value as LocalHealth;
+    } catch {
       return undefined;
     }
   }
 
-  private async lifecycleRequest(serverUrl: string, controlToken: string, method: "GET" | "POST", timeoutMs: number): Promise<LocalLifecycleStatus> {
-    const response = await this.localRequest(serverUrl, controlToken, "/api/local/lifecycle", {
-      method,
-      ...(method === "POST" ? { body: "{}" } : {}),
-      signal: AbortSignal.timeout(Math.max(1, timeoutMs))
-    });
-    if (!response.ok) throw new Error(`Ballet lifecycle request failed with HTTP ${response.status}.`);
-    return response.json() as Promise<LocalLifecycleStatus>;
+  private async waitUntilReady(state: ServiceState, timeoutMs: number): Promise<LocalHealth> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const health = await this.probe(state, Math.min(1_000, Math.max(1, deadline - Date.now())));
+      if (health && this.matches(health, state)) return health;
+      if (health) throw new Error(`Port ${state.port} is serving a different Ballet checkout.`);
+      await delay(200);
+    }
+    throw new Error(`Ballet did not become ready at ${this.url(state).origin}.`);
   }
 
-  private localRequest(serverUrl: string, controlToken: string, pathname: string, init: RequestInit = {}): Promise<Response> {
-    const server = localServerUrl(serverUrl);
-    return this.fetchImpl(new URL(pathname, server), {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${controlToken}`,
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
-        ...init.headers
-      }
-    });
+  private startupError(error: unknown): Error {
+    const message = error instanceof Error ? error.message : String(error);
+    const logs = `${this.options.project.stateRoot}/logs`;
+    return new Error(`${message} Check ${logs}/ballet.log and ${logs}/launchd.err.log.`, { cause: error });
   }
 
-  private domain(): string {
-    return `gui/${process.getuid?.() ?? os.userInfo().uid}`;
+  private matches(health: LocalHealth, state: ServiceState): boolean {
+    return health.instanceId === state.instanceId
+      && health.checkoutRoot === state.checkoutRoot
+      && health.port === state.port;
   }
 
-  private ensureMacOs(): void {
-    if (process.platform !== "darwin") throw new Error("Ballet local server installation currently supports macOS launchd only.");
+  private url(state: ServiceState, pathname = "/"): URL {
+    return new URL(pathname, `http://127.0.0.1:${state.port}`);
   }
 }
 
-export const isLocalServerUrl = (value: string): boolean => {
-  const url = new URL(value);
-  return url.protocol === "http:" && ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname.toLowerCase());
-};
+const delay = (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-export const renderServerPlist = (
-  options: Pick<LocalServerServiceOptions, "balletHome" | "logDirectory" | "programArguments" | "webDistPath" | "executablePath">,
-  config: LocalServerConfiguration,
-  server = localServerUrl(config.serverUrl)
-): string => {
-  if (options.programArguments.length === 0) throw new Error("Server launchd ProgramArguments cannot be empty.");
-  const argumentsList = supervisedProgramArguments(options.programArguments, "server")
-    .map((argument) => `      <string>${escapeXml(argument)}</string>`)
-    .join("\n");
-  const environment = {
-    BALLET_HOME: options.balletHome,
-    BALLET_LOG_DIR: options.logDirectory,
-    BALLET_PROJECT_ROOT: config.repositoryPath,
-    BALLET_PROJECT_ID: config.projectId,
-    BALLET_REPOSITORY_URL: config.repositoryUrl,
-    ...(config.localControlToken ? { BALLET_LOCAL_CONTROL_TOKEN: config.localControlToken } : {}),
-    ...(options.webDistPath ? { BALLET_WEB_DIST: options.webDistPath } : {}),
-    PATH: options.executablePath ?? defaultExecutablePath(),
-    PORT: server.port || "80"
-  };
-  const variables = Object.entries(environment)
-    .map(([key, value]) => `      <key>${key}</key><string>${escapeXml(value)}</string>`)
-    .join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-  <dict>
-    <key>Label</key><string>${LABEL}</string>
-    <key>ProgramArguments</key>
-    <array>
-${argumentsList}
-    </array>
-    <key>WorkingDirectory</key><string>${escapeXml(config.repositoryPath)}</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-${variables}
-    </dict>
-    <key>RunAtLoad</key><true/>
-    <key>KeepAlive</key><true/>
-    <key>ProcessType</key><string>Background</string>
-    <key>ThrottleInterval</key><integer>10</integer>
-    <key>StandardOutPath</key><string>/dev/null</string>
-    <key>StandardErrorPath</key><string>/dev/null</string>
-  </dict>
-</plist>
-`;
-};
-
-const localServerUrl = (value: string): URL => {
-  const url = new URL(value);
-  if (!isLocalServerUrl(value) || (url.pathname !== "/" && url.pathname !== "")) {
-    throw new Error("The managed local Ballet server URL must be an HTTP loopback origin.");
+const findDifferentLoopbackPort = async (previousPort: number): Promise<number> => {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = await findFreeLoopbackPort();
+    if (candidate !== previousPort) return candidate;
   }
-  if (!url.port) url.port = "80";
-  return url;
-};
-
-const escapeXml = (value: string): string => value
-  .replaceAll("&", "&amp;")
-  .replaceAll("<", "&lt;")
-  .replaceAll(">", "&gt;")
-  .replaceAll('"', "&quot;")
-  .replaceAll("'", "&apos;");
-
-const defaultExecutablePath = (): string =>
-  process.env.PATH ?? "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
-
-const isConnectionRefused = (error: unknown): boolean => {
-  const cause = error && typeof error === "object" && "cause" in error
-    ? (error as { cause?: unknown }).cause
-    : undefined;
-  return Boolean(cause && typeof cause === "object" && "code" in cause
-    && (cause as { code?: unknown }).code === "ECONNREFUSED");
+  throw new Error(`Ballet could not allocate a replacement for loopback port ${previousPort}.`);
 };

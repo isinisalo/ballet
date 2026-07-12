@@ -91,15 +91,26 @@ find "$RUNTIME/node_modules/better-sqlite3" -name '*.node' -type f | grep . >/de
 [ -f "$BUNDLE/share/ballet/dist/index.html" ]
 
 cp -R .fixture-ballet-project "$SMOKE_ROOT/project"
+(
+  cd "$SMOKE_ROOT/project"
+  git init -b main >/dev/null
+  git config user.email ballet-release@example.test
+  git config user.name "Ballet release smoke"
+  git add .
+  git commit -m "Release smoke fixture" >/dev/null
+)
+mkdir -p "$SMOKE_ROOT/home"
 SMOKE_PORT=$(
   "$RUNTIME/node" -e 'const s=require("node:net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})'
 )
-BALLET_HOME="$SMOKE_ROOT/home" \
-BALLET_PROJECT_ROOT="$SMOKE_ROOT/project" \
-BALLET_PROJECT_ID="release-smoke" \
-BALLET_REPOSITORY_URL="file://$SMOKE_ROOT/project" \
-PORT="$SMOKE_PORT" \
-  "$SMOKE_INSTALL/bin/ballet" server-internal-run >"$SMOKE_ROOT/server.log" 2>"$SMOKE_ROOT/server.err.log" &
+(cd "$SMOKE_ROOT/project" && \
+  exec env HOME="$SMOKE_ROOT/home" "$SMOKE_INSTALL/bin/ballet" server-internal-run \
+    --root "$SMOKE_ROOT/project" \
+    --port "$SMOKE_PORT" \
+    --state-root "$SMOKE_ROOT/project/.git/ballet" \
+    --codex-command "$SMOKE_ROOT/providers/missing-codex" \
+    --copilot-command "$SMOKE_ROOT/providers/missing-copilot") \
+  >"$SMOKE_ROOT/server.log" 2>"$SMOKE_ROOT/server.err.log" &
 SERVER_PID=$!
 
 READY=false
@@ -111,7 +122,7 @@ while [ "$ATTEMPT" -lt 80 ]; do
     exit 1
   fi
   if curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/health" -o "$SMOKE_ROOT/health.json" 2>/dev/null \
-    && "$RUNTIME/node" -e 'const h=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));if(h.ok!==true||h.projectId!=="release-smoke")process.exit(1)' "$SMOKE_ROOT/health.json"; then
+    && "$RUNTIME/node" -e 'const fs=require("node:fs");const h=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(h.ok!==true||fs.realpathSync(h.checkoutRoot)!==fs.realpathSync(process.argv[2])||h.port!==Number(process.argv[3])||typeof h.instanceId!=="string")process.exit(1)' "$SMOKE_ROOT/health.json" "$SMOKE_ROOT/project" "$SMOKE_PORT"; then
     READY=true
     break
   fi
@@ -120,10 +131,19 @@ while [ "$ATTEMPT" -lt 80 ]; do
 done
 [ "$READY" = true ] || { cat "$SMOKE_ROOT/server.err.log" >&2; printf 'packaged Ballet server did not become healthy\n' >&2; exit 1; }
 
-UNAUTHORIZED=$(curl -sS -o /dev/null -w '%{http_code}' \
-  -X POST -H 'Content-Type: application/json' -d '{}' \
-  "http://127.0.0.1:${SMOKE_PORT}/api/daemon/heartbeat")
-[ "$UNAUTHORIZED" = 401 ] || { printf 'packaged daemon API smoke expected 401, got %s\n' "$UNAUTHORIZED" >&2; exit 1; }
+[ -f "$SMOKE_ROOT/project/.git/ballet/state.sqlite" ] || {
+  printf 'packaged Ballet server did not create checkout-local state.sqlite\n' >&2
+  exit 1
+}
+[ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || {
+  git -C "$SMOKE_ROOT/project" status --short >&2
+  printf 'packaged Ballet server dirtied the fixture checkout\n' >&2
+  exit 1
+}
+[ -z "$(find "$SMOKE_ROOT/home" -mindepth 1 -print -quit)" ] || {
+  printf 'packaged Ballet server wrote mutable state outside the checkout\n' >&2
+  exit 1
+}
 kill "$SERVER_PID"
 wait "$SERVER_PID"
 SERVER_PID=

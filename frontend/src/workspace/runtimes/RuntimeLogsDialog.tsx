@@ -4,52 +4,38 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { toErrorMessage } from "@/lib/errors";
 import { runtimeRegistryApi } from "./runtimeRegistryApi";
-import type { RuntimeLogEntry } from "./types";
 
-export function RuntimeLogsDialog({ deviceId, open, onOpenChange }: {
-  deviceId: string;
+export function RuntimeLogsDialog({ open, onOpenChange, fallbackPath }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  fallbackPath: string;
 }) {
-  const [entries, setEntries] = useState<RuntimeLogEntry[]>([]);
+  const [path, setPath] = useState(fallbackPath);
+  const [content, setContent] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
     let disposed = false;
-    setEntries([]);
+    setLoading(true);
     setError("");
-    runtimeRegistryApi.getDeviceLogs(deviceId).then((response) => {
-      if (!disposed) setEntries(response.entries);
-    }).catch((caught) => {
-      if (!disposed) setError(toErrorMessage(caught, "Unable to load daemon logs."));
-    });
+    runtimeRegistryApi.logs().then((response) => {
+      if (!disposed) { setPath(response.path); setContent(response.content); }
+    }).catch((cause) => {
+      if (!disposed) setError(toErrorMessage(cause, "Unable to load Ballet logs."));
+    }).finally(() => { if (!disposed) setLoading(false); });
     return () => { disposed = true; };
-  }, [deviceId, open]);
+  }, [open]);
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/55" />
         <DialogPrimitive.Popup className="fixed top-1/2 left-1/2 z-50 flex max-h-[80vh] w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-divider-strong bg-card shadow-lg">
-          <header className="flex items-center justify-between border-b border-divider-strong px-4 py-3">
-            <div>
-              <DialogPrimitive.Title className="text-sm font-semibold">Daemon logs</DialogPrimitive.Title>
-              <DialogPrimitive.Description className="font-mono text-[0.65rem] text-muted-foreground">{deviceId}</DialogPrimitive.Description>
-            </div>
-            <DialogPrimitive.Close render={<Button type="button" size="sm" variant="outline">Close</Button>} />
-          </header>
+          <header className="flex items-center justify-between border-b border-divider-strong px-4 py-3"><div><DialogPrimitive.Title className="text-sm font-semibold">Ballet logs</DialogPrimitive.Title><DialogPrimitive.Description className="font-mono text-[0.65rem] text-muted-foreground">{path || fallbackPath}</DialogPrimitive.Description></div><DialogPrimitive.Close render={<Button type="button" size="sm" variant="outline">Close</Button>} /></header>
           {error ? <Alert variant="destructive" className="m-3"><AlertDescription>{error}</AlertDescription></Alert> : null}
-          <div className="min-h-64 overflow-auto bg-background p-3 font-mono text-[0.68rem] leading-5">
-            {entries.length === 0 && !error ? <p className="text-muted-foreground">No daemon logs available.</p> : null}
-            {entries.map((entry) => (
-              <div key={entry.id} className="grid min-w-max grid-cols-[7rem_3rem_minmax(0,1fr)] gap-2">
-                <time className="text-muted-foreground">{new Date(entry.createdAt).toLocaleTimeString()}</time>
-                <span className={entry.level === "error" ? "text-destructive" : entry.level === "warn" ? "text-tertiary" : "text-secondary"}>{entry.level.toUpperCase()}</span>
-                <pre className="m-0 whitespace-pre">{entry.message}</pre>
-              </div>
-            ))}
-          </div>
+          <pre className="m-0 min-h-64 overflow-auto bg-background p-3 font-mono text-[0.68rem] leading-5 whitespace-pre">{loading ? "Loading logs…" : content || (error ? "" : "No Ballet logs available.")}</pre>
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

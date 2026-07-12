@@ -40,7 +40,7 @@ export function LoopHandlerAgentInstructions({ step, agents, snapshot }: {
               {step.type === "agent" ? <p className="truncate font-mono text-[0.65rem] text-muted-foreground">{step.agentId}</p> : null}
             </div>
           </div>
-          {snapshot ? <span className="font-mono text-[0.58rem] text-secondary">Immutable Run snapshot</span> : agent ? <span className="font-mono text-[0.58rem] text-muted-foreground">Execution attachment is local</span> : null}
+          {snapshot ? <span className="font-mono text-[0.58rem] text-secondary">Immutable Run snapshot</span> : agent ? <span className="font-mono text-[0.58rem] text-muted-foreground">Execution policy is local</span> : null}
         </header>
         <MarkdownBody source={instructions} title={title} emptyText={emptyText} />
       </article>

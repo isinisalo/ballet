@@ -18,7 +18,6 @@ import type { RouteState } from "../types";
 export type WorkspaceSelectionInput = {
   data: AppData;
   route: RouteState;
-  selectedProjectId: string;
 };
 
 export type WorkspaceSelection = {
@@ -37,13 +36,9 @@ export type WorkspaceSelection = {
 
 export function getWorkspaceSelection({
   data,
-  route,
-  selectedProjectId
+  route
 }: WorkspaceSelectionInput): WorkspaceSelection {
-  const project =
-    data.projects.find((item) => item.id === (route.projectId ?? selectedProjectId))
-    ?? data.projects.find((item) => item.id === selectedProjectId)
-    ?? data.projects[0];
+  const project = data.project;
   const projectDocumentTree = data.projectDocumentTree ?? [];
   const selectedProjectDocument = findProjectTreeDocument(projectDocumentTree, route.documentPath);
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
@@ -76,6 +71,6 @@ export function getWorkspaceSelection({
 export function useWorkspaceSelection(input: WorkspaceSelectionInput): WorkspaceSelection {
   return useMemo(
     () => getWorkspaceSelection(input),
-    [input.data, input.route, input.selectedProjectId]
+    [input.data, input.route]
   );
 }

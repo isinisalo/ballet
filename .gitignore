@@ -6,7 +6,7 @@ dist/
 dist-server/
 
 # Local runtime data
-data/
+/data/
 
 # Generated audit artifacts
 audit/

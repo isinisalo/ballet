@@ -77,26 +77,21 @@ describe("Loop Run sheet", () => {
 
 const taskSnapshot = () => ({
   id: "task-1",
-  projectId: "project-1",
-  runtimeBackendId: "backend-1",
-  deviceId: "device-1",
   kind: "loop_step",
   rootRunId: "root-1",
   status: "running",
-  fencing: 1,
   createdAt: "2026-07-11T10:00:00.000Z",
   updatedAt: "2026-07-11T10:00:00.000Z",
   spec: {
     version: 1,
-    projectId: "project-1",
     taskId: "task-1",
     kind: "loop_step",
     rootRunId: "root-1",
     loopRunId: "root-1",
     stepRunId: "step-agent",
     agent: { id: "developer", name: "Snapshotted developer", description: "Snapshot.", instructions: "# Immutable instructions", skillIds: [], configHash: "a".repeat(64) },
-    runtime: { deviceId: "device-1", deviceName: "Studio Mac", runtimeBackendId: "backend-1", provider: "codex", cliVersion: "1.0.0", model: "gpt-5", reasoning: "high", policy: { network: false, readOnlyRoots: [] }, capabilityHash: "b".repeat(64) },
-    project: { checkoutId: "checkout-1", repositoryUrl: "https://github.com/acme/ballet.git", headSha: "c".repeat(40), configHash: "d".repeat(64), snapshotHash: "d".repeat(64) },
+    runtime: { hostname: "Studio Mac", provider: "codex", cliVersion: "1.0.0", model: "gpt-5", reasoning: "high", policy: { network: false, readOnlyRoots: [] }, capabilityHash: "b".repeat(64) },
+    project: { checkoutRoot: "/workspace/ballet", headSha: "c".repeat(40), configHash: "d".repeat(64), snapshotHash: "d".repeat(64) },
     createdAt: "2026-07-11T10:00:00.000Z"
   }
 }) as ExecutionTask;

@@ -19,8 +19,8 @@ import {
 } from "./automationValidation.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
 
-export const mutableCollections = ["projects", "goals", "adrs", "agents", "skills"] as const;
-export const readableCollections = [...mutableCollections, "policies", "events"] as const;
+export const mutableCollections = ["agents", "skills"] as const;
+export const readableCollections = mutableCollections;
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -66,42 +66,6 @@ export const collectionItemParamsSchema = z.object({
   id: z.string().min(1)
 }).strict();
 
-const projectUpsertSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  status: z.enum(["active", "paused", "archived"]).optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-  ...markdownBackedFields
-}).strict();
-
-const goalUpsertSchema = z.object({
-  id: z.string().optional(),
-  projectId: z.string().optional(),
-  title: z.string().optional(),
-  description: z.string().optional(),
-  status: z.enum(["not-started", "in-progress", "at-risk", "done"]).optional(),
-  targetDate: z.string().optional(),
-  owner: z.string().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-  ...markdownBackedFields
-}).strict();
-
-const adrUpsertSchema = z.object({
-  id: z.string().optional(),
-  projectId: z.string().optional(),
-  title: z.string().optional(),
-  context: z.string().optional(),
-  decision: z.string().optional(),
-  consequences: z.string().optional(),
-  status: z.enum(["proposed", "accepted", "superseded", "rejected"]).optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-  ...markdownBackedFields
-}).strict();
-
 const agentUpsertSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
@@ -119,9 +83,6 @@ const agentUpsertSchema = z.object({
 }).strict();
 
 const collectionUpsertSchemas = {
-  projects: projectUpsertSchema,
-  goals: goalUpsertSchema,
-  adrs: adrUpsertSchema,
   agents: agentUpsertSchema,
   skills: skillSchema
 } as const;
@@ -279,47 +240,3 @@ export const projectConfigSchema = z.object({
   agents: z.record(z.string().trim().min(1).max(200), portableAgentRuntimeIntentSchema),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectConfiguration>;
-
-export const eventIntakeSchema = z.object({
-  projectId: z.string().min(1),
-  eventType: z.string().min(1),
-  source: z.string().optional(),
-  subject: z.string().optional(),
-  correlationId: z.string().optional(),
-  causationId: z.string().optional(),
-  dedupeKey: z.string().optional(),
-  correlationDepth: z.number().int().nonnegative().optional(),
-  tags: z.array(z.string()).optional(),
-  payload: z.record(z.string(), z.unknown()).default({}),
-  body: z.string().optional()
-}).strict();
-
-export const eventParamsSchema = z.object({
-  id: z.string().min(1)
-}).strict();
-
-export const loopParamsSchema = z.object({
-  loopId: kebabLoopIdSchema
-}).strict();
-
-export const loopRunParamsSchema = z.object({
-  runId: z.string().uuid()
-}).strict();
-
-export const stepRunParamsSchema = z.object({
-  runId: z.string().uuid(),
-  stepRunId: z.string().uuid()
-}).strict();
-
-export const startLoopRunSchema = z.object({
-  input: z.string().max(20000).optional()
-}).strict();
-
-export const respondToStepRunSchema = z.object({
-  result: z.enum(["approved", "rejected"]),
-  input: z.string().trim().min(1).max(20000)
-}).strict();
-
-export const agentRunParamsSchema = z.object({
-  id: z.string().min(1)
-}).strict();

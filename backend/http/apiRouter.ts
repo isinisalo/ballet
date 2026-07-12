@@ -1,46 +1,190 @@
+// The route factory is intentionally the one HTTP composition point; domain
+// decisions remain in injected services and every request body is Zod-validated.
+import { readFile } from "node:fs/promises";
 import express from "express";
+import { z } from "zod";
+import {
+  agentRuntimeConfigurationBodySchema,
+  emptyBodySchema,
+  executionEventsQuerySchema,
+  respondToRunStepBodySchema,
+  startRunBodySchema
+} from "../../shared/api/runtime-schemas.js";
+import {
+  automationConfigSchema,
+  collectionItemParamsSchema,
+  collectionParamsSchema,
+  collectionUpsertSchema,
+  createLoopThemeSchema,
+  loopThemeParamsSchema,
+  loopThemeSchema,
+  projectDocumentCreateSchema,
+  projectDocumentSaveSchema,
+  type MutableCollectionName
+} from "../../shared/api/workspace-schemas.js";
+import type { RootRunListQuery } from "../../shared/domain/runs.js";
+import { validateProjectAutomationConfig } from "../automation/validateAutomationConfig.js";
+import type { ExecutionStore } from "../execution/ExecutionStore.js";
+import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
+import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
+import { readProjectConfigStatus } from "../project/configGitStatus.js";
+import type { LocalRunService } from "../runs/LocalRunService.js";
+import type { WorkspaceInvalidationBroadcaster } from "../runs/WorkspaceInvalidationBroadcaster.js";
+import type { MarkdownStore } from "../store.js";
+import { AutomationValidationError } from "../store.js";
 import { sendKnownHttpError } from "./errors.js";
-import * as automationHandlers from "./handlers/automationHandlers.js";
-import * as eventHandlers from "./handlers/eventHandlers.js";
-import * as loopRunHandlers from "./handlers/loopRunHandlers.js";
-import * as loopThemeHandlers from "./handlers/loopThemeHandlers.js";
-import * as projectHandlers from "./handlers/projectHandlers.js";
-import * as runtimeHandlers from "./handlers/runtimeHandlers.js";
-import * as workspaceHandlers from "./handlers/workspaceHandlers.js";
+import { HttpValidationError, parseBody, parseParams, parseUnknown } from "./validation/httpValidation.js";
 
-export const apiRouter = express.Router();
+export interface ApiRouterOptions {
+  store: MarkdownStore;
+  runtime: LocalRuntimeService;
+  configurations: RuntimeConfigurationService;
+  executions: ExecutionStore;
+  runs: LocalRunService;
+  invalidations: WorkspaceInvalidationBroadcaster;
+  logsPath: string;
+}
 
-apiRouter.get("/health", workspaceHandlers.health);
-apiRouter.get("/data", workspaceHandlers.getData);
-apiRouter.post("/reset", workspaceHandlers.resetData);
+const agentParams = z.object({ agentId: z.string().trim().min(1).max(200) }).strict();
+const rootParams = z.object({ rootRunId: z.string().uuid() }).strict();
+const rootStepParams = rootParams.extend({ stepRunId: z.string().uuid() }).strict();
+const taskParams = z.object({ taskId: z.string().uuid() }).strict();
+const runListQuery = z.object({
+  state: z.enum(["active", "recent"]).optional(), kind: z.enum(["agent", "loop"]).optional(),
+  cursor: z.string().max(1000).optional(), limit: z.coerce.number().int().min(1).max(200).optional()
+}).strict();
 
-apiRouter.get("/automation", automationHandlers.getAutomation);
-apiRouter.put("/automation", automationHandlers.saveAutomation);
+export const createApiRouter = (options: ApiRouterOptions): express.Router => {
+  const router = express.Router();
+  router.get("/data", route(async (_req, res) => res.json(await options.store.read())));
+  router.put("/automation", route(async (req, res) => {
+    const config = parseBody(automationConfigSchema, req);
+    const issues = validateProjectAutomationConfig(config, (await options.store.read()).agents);
+    if (issues.length) throw new AutomationValidationError("Automation config is invalid.", issues);
+    const saved = await options.store.saveAutomation(config);
+    options.invalidations.publish("workspace-changed", { reason: "automation" });
+    res.json(saved);
+  }));
+  router.put("/loop-themes/:themeId", route(async (req, res) => {
+    const { themeId } = parseParams(loopThemeParamsSchema, req);
+    res.json(await options.store.updateLoopTheme(themeId, parseBody(loopThemeSchema, req)));
+    options.invalidations.publish("workspace-changed", { reason: "loop-theme" });
+  }));
+  router.post("/loop-themes", route(async (req, res) => {
+    res.status(201).json(await options.store.createLoopTheme(parseBody(createLoopThemeSchema, req)));
+    options.invalidations.publish("workspace-changed", { reason: "loop-theme" });
+  }));
+  router.post("/project-documents", route(async (req, res) => {
+    res.json(await options.store.saveProjectDocument(parseBody(projectDocumentSaveSchema, req)));
+    options.invalidations.publish("workspace-changed", { reason: "document" });
+  }));
+  router.post("/project-documents/create", route(async (req, res) => {
+    res.status(201).json(await options.store.createProjectDocument(parseBody(projectDocumentCreateSchema, req)));
+    options.invalidations.publish("workspace-changed", { reason: "document" });
+  }));
+  router.get("/project/config-status", route(async (_req, res) => res.json(await readProjectConfigStatus(options.store.root))));
 
-apiRouter.put("/loop-themes/:themeId", loopThemeHandlers.updateLoopTheme);
-apiRouter.post("/loop-themes", loopThemeHandlers.createLoopTheme);
+  router.post("/runtime/refresh", route(async (req, res) => {
+    parseBody(emptyBodySchema, req);
+    res.json(await options.runtime.refresh());
+  }));
+  router.get("/runtime/logs", route(async (_req, res) => res.json({
+    path: options.logsPath,
+    content: (await readFile(options.logsPath, "utf8").catch(() => "")).slice(-256 * 1024)
+  })));
+  router.put("/agents/:agentId/runtime", route(async (req, res) => {
+    const { agentId } = parseParams(agentParams, req);
+    res.json(await options.configurations.put(agentId, parseBody(agentRuntimeConfigurationBodySchema, req)));
+    options.invalidations.publish("workspace-changed", { reason: "runtime-configuration" });
+  }));
+  router.delete("/agents/:agentId/runtime", route(async (req, res) => {
+    const { agentId } = parseParams(agentParams, req); await options.configurations.remove(agentId);
+    options.invalidations.publish("workspace-changed", { reason: "runtime-configuration" }); res.status(204).end();
+  }));
 
-apiRouter.post("/project-documents", workspaceHandlers.saveProjectDocument);
-apiRouter.post("/project-documents/create", workspaceHandlers.createProjectDocument);
-apiRouter.get("/project/config-status", projectHandlers.configStatus);
+  router.post("/runs", route(async (req, res) => res.status(201).json(await options.runs.start(parseBody(startRunBodySchema, req)))));
+  router.get("/runs", route(async (req, res) => res.json(options.runs.list(parseUnknown(runListQuery, req.query) as RootRunListQuery))));
+  router.get("/runs/:rootRunId", route(async (req, res) => {
+    const { rootRunId } = parseParams(rootParams, req); const detail = options.runs.detail(rootRunId);
+    if (!detail) throw new HttpValidationError(`Root Run ${rootRunId} was not found.`, [], 404); res.json(detail);
+  }));
+  router.post("/runs/:rootRunId/cancel", route(async (req, res) => {
+    const { rootRunId } = parseParams(rootParams, req);
+    parseBody(emptyBodySchema, req);
+    res.json(await options.runs.cancel(rootRunId));
+  }));
+  router.post("/runs/:rootRunId/steps/:stepRunId/respond", route(async (req, res) => {
+    const { rootRunId, stepRunId } = parseParams(rootStepParams, req);
+    const input = parseBody(respondToRunStepBodySchema, req);
+    res.json(await options.runs.respond(rootRunId, stepRunId, input.result, input.input));
+  }));
+  router.get("/execution-tasks/:taskId/events", route(async (req, res) => {
+    const { taskId } = parseParams(taskParams, req); const query = parseUnknown(executionEventsQuerySchema, req.query);
+    res.json(options.executions.events(taskId, query.after, query.limit));
+  }));
+  router.get("/execution-tasks/:taskId/console/stream", (req, res, next) => {
+    try { streamConsole(req, res, options.executions); } catch (error) { next(error); }
+  });
+  router.get("/stream", (req, res) => streamInvalidations(req, res, options.invalidations));
 
-apiRouter.get("/runtime/health", runtimeHandlers.runtimeHealth);
-apiRouter.get("/runtime/stream", runtimeHandlers.runtimeStream);
+  router.get("/:collection", route(async (req, res) => {
+    const { collection: rawCollection } = parseParams(collectionParamsSchema, req);
+    const collection = requireCollection(rawCollection); res.json(await options.store.list(collection));
+  }));
+  router.post("/:collection", route(async (req, res) => {
+    const { collection: rawCollection } = parseParams(collectionParamsSchema, req);
+    const collection = requireCollection(rawCollection);
+    const body = parseBody(collectionUpsertSchema(collection), req);
+    res.status(body.id ? 200 : 201).json(await options.store.upsert(collection, body));
+    options.invalidations.publish("workspace-changed", { reason: collection });
+  }));
+  router.delete("/:collection/:id", route(async (req, res) => {
+    const { collection: rawCollection, id } = parseParams(collectionItemParamsSchema, req);
+    const collection = requireCollection(rawCollection);
+    await options.store.remove(collection, id); options.invalidations.publish("workspace-changed", { reason: collection }); res.status(204).end();
+  }));
 
-apiRouter.get("/events", eventHandlers.listEvents);
-apiRouter.post("/events/intake", eventHandlers.intakeEvent);
-apiRouter.delete("/events/:id", eventHandlers.removeEvent);
+  router.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (sendKnownHttpError(error, res)) return;
+    next(error);
+  });
+  return router;
+};
 
-apiRouter.post("/loops/:loopId/runs", loopRunHandlers.startLoopRun);
-apiRouter.get("/loops/:loopId/runs/latest", loopRunHandlers.latestLoopRun);
-apiRouter.post("/loop-runs/:runId/steps/:stepRunId/respond", loopRunHandlers.respondToStepRun);
-apiRouter.post("/loop-runs/:runId/cancel", loopRunHandlers.cancelLoopRun);
+const route = (handler: (req: express.Request, res: express.Response) => Promise<unknown>): express.RequestHandler =>
+  (req, res, next) => { void handler(req, res).catch(next); };
+const requireCollection = (value: string): MutableCollectionName => {
+  if (value !== "agents" && value !== "skills") throw new HttpValidationError("Unknown collection.", [], 404);
+  return value;
+};
 
-apiRouter.get("/:collection", workspaceHandlers.listCollection);
-apiRouter.post("/:collection", workspaceHandlers.saveCollectionItem);
-apiRouter.delete("/:collection/:id", workspaceHandlers.removeCollectionItem);
+const streamConsole = (req: express.Request, res: express.Response, store: ExecutionStore): void => {
+  const { taskId } = parseParams(taskParams, req);
+  let cursor = Number(req.get("last-event-id") ?? req.query.after ?? 0) || 0;
+  store.require(taskId);
+  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" });
+  const flush = () => {
+    const page = store.events(taskId, cursor, 500);
+    for (const event of page.entries) {
+      cursor = event.id; res.write(`id: ${event.id}\nevent: console\ndata: ${JSON.stringify(event)}\n\n`);
+    }
+    res.write(`event: task\ndata: ${JSON.stringify(store.require(taskId))}\n\n`);
+  };
+  flush();
+  const timer = setInterval(flush, 500); timer.unref();
+  req.once("close", () => clearInterval(timer));
+};
 
-apiRouter.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (sendKnownHttpError(error, res)) return;
-  next(error);
-});
+const streamInvalidations = (req: express.Request, res: express.Response, broadcaster: WorkspaceInvalidationBroadcaster): void => {
+  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" });
+  const last = Number(req.get("last-event-id") ?? 0) || 0;
+  const replay = broadcaster.replay(last);
+  const send = (event: { id: number; type: string }) => {
+    res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+  };
+  if (replay.reset) res.write(`event: workspace-changed\ndata: {"reason":"reconnected"}\n\n`);
+  else replay.events.forEach(send);
+  const unsubscribe = broadcaster.subscribe(send);
+  const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15_000); heartbeat.unref();
+  req.once("close", () => { clearInterval(heartbeat); unsubscribe(); });
+};

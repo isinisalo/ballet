@@ -1,18 +1,18 @@
+// The canonical runtime contract intentionally stays in one module so frontend and
+// backend cannot drift on persisted execution, provider, and Loop snapshot shapes.
 import type { AgentAvatar } from "./agents.js";
 import type { ProjectLoop } from "./automation.js";
 import type { LoopTheme } from "./loopThemes.js";
 
 export type RuntimeProvider = "codex" | "copilot";
-export type RuntimeDeviceStatus = "online" | "offline";
 export type RuntimeAuthStatus = "ready" | "required" | "expired" | "unknown";
-export type RuntimeBackendHealth =
+export type LocalProviderHealth =
   | "ready"
   | "probing"
   | "auth_required"
   | "unsupported_version"
   | "policy_unsupported"
-  | "error"
-  | "offline";
+  | "error";
 
 export interface RuntimeModelCapability {
   id: string;
@@ -29,69 +29,43 @@ export interface RuntimePolicyCapabilities {
 
 export interface RuntimeCapabilities {
   models: RuntimeModelCapability[];
-  supportsResume: boolean;
   supportsStructuredOutput: boolean;
   policy: RuntimePolicyCapabilities;
   refreshedAt: string;
 }
 
-export interface RuntimeBackend {
-  id: string;
-  projectId: string;
-  deviceId: string;
+export interface LocalProviderStatus {
   provider: RuntimeProvider;
+  command: string;
+  installed: boolean;
+  compatible: boolean;
   cliVersion?: string;
-  executablePath?: string;
   authStatus: RuntimeAuthStatus;
-  health: RuntimeBackendHealth;
+  health: LocalProviderHealth;
   healthMessage?: string;
   capabilities: RuntimeCapabilities;
-  assignedAgentCount: number;
-  activeRunCount: number;
   busy: boolean;
-  createdAt: string;
-  updatedAt: string;
+  activeRunCount: number;
 }
 
-export interface ProjectCheckout {
-  id: string;
-  projectId: string;
-  deviceId: string;
-  repositoryUrl: string;
+export interface LocalCheckoutStatus {
   path: string;
-  headSha?: string;
-  configHash?: string;
+  headSha: string;
+  configHash: string;
   dirty: boolean;
-  lastInspectedAt?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface RuntimeDeviceDiagnostics {
-  daemonId: string;
-  daemonVersion: string;
-  uptimeSeconds: number;
-  lastSeenAt: string;
-  connectedAt?: string;
-  restartRequestedAt?: string;
-  recentError?: string;
-}
-
-export interface RuntimeDevice {
-  id: string;
-  projectId: string;
+export interface LocalRuntime {
+  instanceId: string;
   hostname: string;
-  displayName: string;
   platform: "darwin";
   architecture: "arm64" | "x64";
-  status: RuntimeDeviceStatus;
-  diagnostics: RuntimeDeviceDiagnostics;
-  backends: RuntimeBackend[];
-  checkout?: ProjectCheckout;
+  checkout: LocalCheckoutStatus;
+  uptimeSeconds: number;
+  startedAt: string;
+  providers: LocalProviderStatus[];
   activeRunCount: number;
-  busyBackendCount: number;
-  createdAt: string;
-  updatedAt: string;
+  logsPath: string;
 }
 
 export interface ExecutionPolicy {
@@ -106,20 +80,8 @@ export interface PortableAgentRuntimeIntent {
   policy: Pick<ExecutionPolicy, "network">;
 }
 
-export interface AgentRuntimeAttachment {
-  projectId: string;
-  agentId: string;
-  runtimeBackendId: string;
-  readOnlyRoots: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface ResolvedAgentExecution {
-  projectId: string;
   agentId: string;
-  runtimeBackendId: string;
-  deviceId: string;
   provider: RuntimeProvider;
   model: string;
   reasoning: string;
@@ -127,15 +89,7 @@ export interface ResolvedAgentExecution {
 }
 
 export interface RuntimeConfigurationIssue {
-  code:
-    | "invalid_json"
-    | "invalid_schema"
-    | "missing_intent"
-    | "missing_attachment"
-    | "attachment_backend_missing"
-    | "provider_mismatch"
-    | "orphan_intent"
-    | "orphan_attachment";
+  code: "invalid_json" | "invalid_schema" | "missing_intent" | "orphan_intent" | "provider_unavailable";
   path: string;
   message: string;
   agentId?: string;
@@ -143,19 +97,12 @@ export interface RuntimeConfigurationIssue {
 
 export interface AgentRuntimeConfiguration {
   intent?: PortableAgentRuntimeIntent;
-  attachment?: AgentRuntimeAttachment;
+  localPolicy: Pick<ExecutionPolicy, "readOnlyRoots">;
   resolved?: ResolvedAgentExecution;
   issues: RuntimeConfigurationIssue[];
 }
 
-export type ExecutionTaskStatus =
-  | "queued"
-  | "claimed"
-  | "preparing"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "cancelled";
+export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 export type ExecutionTaskKind = "agent_run" | "loop_step";
 export type AgentOutcomeStatus = "ready" | "blocked" | "needs_input" | "approved" | "changes-requested" | "failed";
 export type RunCheckStatus = "passed" | "failed" | "skipped";
@@ -190,9 +137,7 @@ export interface ExecutionAgentSnapshot {
 }
 
 export interface ExecutionRuntimeSnapshot {
-  deviceId: string;
-  deviceName: string;
-  runtimeBackendId: string;
+  hostname: string;
   provider: RuntimeProvider;
   cliVersion: string;
   model: string;
@@ -202,8 +147,7 @@ export interface ExecutionRuntimeSnapshot {
 }
 
 export interface ExecutionProjectSnapshot {
-  checkoutId: string;
-  repositoryUrl: string;
+  checkoutRoot: string;
   headSha: string;
   configHash: string;
   snapshotHash: string;
@@ -211,11 +155,9 @@ export interface ExecutionProjectSnapshot {
 
 export interface ExecutionSpec {
   version: 1;
-  projectId: string;
   taskId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;
-  agentRunId?: string;
   loopRunId?: string;
   stepRunId?: string;
   input?: string;
@@ -227,16 +169,10 @@ export interface ExecutionSpec {
 
 export interface ExecutionTask {
   id: string;
-  projectId: string;
-  runtimeBackendId: string;
-  deviceId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;
   status: ExecutionTaskStatus;
   spec: ExecutionSpec;
-  fencing: number;
-  leaseUntil?: string;
-  claimedAt?: string;
   startedAt?: string;
   completedAt?: string;
   cancelRequestedAt?: string;
@@ -248,17 +184,7 @@ export interface ExecutionTask {
 }
 
 export type ExecutionEventSource = "ballet" | RuntimeProvider;
-export type ExecutionEventKind =
-  | "system"
-  | "think"
-  | "agent"
-  | "command"
-  | "output"
-  | "file"
-  | "tool"
-  | "info"
-  | "warn"
-  | "error";
+export type ExecutionEventKind = "system" | "think" | "agent" | "command" | "output" | "file" | "tool" | "info" | "warn" | "error";
 export type ExecutionEventPhase = "started" | "delta" | "completed";
 
 export interface ExecutionEvent {
@@ -284,34 +210,9 @@ export interface ExecutionEventPage {
   truncated: boolean;
 }
 
-export interface AgentRun {
-  id: string;
-  projectId: string;
-  agentId: string;
-  rootRunId: string;
-  source: "manual" | "schedule";
-  taskId: string;
-  status: ExecutionTaskStatus;
-  input?: string;
-  runtime: ExecutionRuntimeSnapshot;
-  project: ExecutionProjectSnapshot;
-  outcome?: AgentOutcome;
-  branch?: string;
-  worktreePath?: string;
-  errorCode?: string;
-  errorMessage?: string;
-  createdAt: string;
-  updatedAt: string;
-  completedAt?: string;
-}
-
 export interface RootRunDisposition {
   terminal: boolean;
   success: boolean;
-}
-
-export interface TaskDispositionResult {
-  rootDisposition?: RootRunDisposition;
 }
 
 export interface RootFinalizationReport {
@@ -329,28 +230,20 @@ export interface RuntimePreflightIssue {
   stepId?: string;
   code:
     | "unbound"
-    | "offline"
     | "auth_required"
     | "backend_unhealthy"
     | "model_unavailable"
     | "reasoning_unavailable"
     | "policy_unsupported"
     | "invalid_runtime_config"
-    | "provider_mismatch"
-    | "mixed_device"
     | "dirty_checkout";
   message: string;
 }
 
 export interface LoopRuntimePreflight {
   ok: boolean;
-  deviceId?: string;
   issues: RuntimePreflightIssue[];
-  snapshots: Array<{
-    stepId: string;
-    agentId: string;
-    runtime: ExecutionRuntimeSnapshot;
-  }>;
+  snapshots: Array<{ stepId: string; agentId: string; runtime: ExecutionRuntimeSnapshot }>;
 }
 
 export interface LoopExecutionStepSnapshot {
@@ -364,7 +257,6 @@ export interface LoopExecutionStepSnapshot {
 export interface LoopExecutionPlan {
   version: 1;
   rootLoopId: string;
-  deviceId: string;
   project: ExecutionProjectSnapshot;
   steps: LoopExecutionStepSnapshot[];
   createdAt: string;
@@ -374,13 +266,9 @@ export type LoopRunSource = "manual" | "human" | "schedule";
 export type LoopRunStatus = "running" | "waiting_for_human" | "completed" | "blocked" | "failed" | "cancelled";
 export type StepRunStatus = "queued" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
 export type StepRunResult = "approved" | "rejected";
-
 export type LoopScheduleOccurrenceStatus = "started" | "skipped" | "missed";
 
-export interface LoopScheduleOccurrence {
-  stepId: string;
-  scheduledFor: string;
-}
+export interface LoopScheduleOccurrence { stepId: string; scheduledFor: string }
 
 export interface LoopScheduleState {
   loopId: string;
@@ -403,7 +291,6 @@ export interface LoopRun {
   input?: string;
   snapshot: ProjectLoop;
   themeSnapshot: LoopTheme;
-  runtimeDeviceId?: string;
   executionPlan?: LoopExecutionPlan;
   schedule?: LoopScheduleOccurrence;
   transitionCount: number;
@@ -433,29 +320,5 @@ export interface StepRun {
   completedAt?: string;
 }
 
-export interface LoopRunDetails extends LoopRun {
-  stepRuns: StepRun[];
-}
-
-export interface StartLoopRunRequest {
-  input?: string;
-}
-
-export interface RespondToStepRunRequest {
-  result: StepRunResult;
-  input: string;
-}
-
-export interface StartAgentRunRequest {
-  input?: string;
-}
-
-export interface PairingSession {
-  id: string;
-  deviceCode: string;
-  userCode: string;
-  status: "pending" | "approved" | "claimed" | "expired" | "revoked";
-  expiresAt: string;
-  approvedAt?: string;
-  claimedAt?: string;
-}
+export interface LoopRunDetails extends LoopRun { stepRuns: StepRun[] }
+export interface RespondToStepRunRequest { result: StepRunResult; input: string }

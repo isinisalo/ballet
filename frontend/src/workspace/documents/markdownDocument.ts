@@ -1,6 +1,9 @@
-import type { Adr, Goal, MarkdownDocument, Project, Skill } from "@shared/api/workspace-contracts";
-
-export type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skill, "id" | "frontmatter" | "body" | "relativePath" | "errors"> & {
+export interface MarkdownEntity {
+  id: string;
+  frontmatter?: Record<string, unknown>;
+  body?: string;
+  relativePath?: string;
+  errors?: string[];
   createdAt?: string;
   updatedAt?: string;
   name?: string;
@@ -8,7 +11,7 @@ export type MarkdownEntity = Pick<Project | Goal | Adr | MarkdownDocument | Skil
   status?: string;
   targetDate?: string;
   owner?: string;
-};
+}
 
 export const documentTitle = (document: MarkdownEntity) =>
   document.title

@@ -1,5 +1,4 @@
 export type EntityStatus = "active" | "paused" | "archived";
-export type AdrStatus = "proposed" | "accepted" | "superseded" | "rejected";
 
 export interface MarkdownDocument {
   id: string;
@@ -39,30 +38,6 @@ export interface Project extends MarkdownBackedEntity {
   name: string;
   description: string;
   status: EntityStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Goal extends MarkdownBackedEntity {
-  id: string;
-  projectId: string;
-  title: string;
-  description: string;
-  status: "not-started" | "in-progress" | "at-risk" | "done";
-  targetDate: string;
-  owner: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Adr extends MarkdownBackedEntity {
-  id: string;
-  projectId: string;
-  title: string;
-  context: string;
-  decision: string;
-  consequences: string;
-  status: AdrStatus;
   createdAt: string;
   updatedAt: string;
 }

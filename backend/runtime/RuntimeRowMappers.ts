@@ -1,5 +1,4 @@
 import type { ProjectLoop } from "../../shared/domain/automation.js";
-import type { EventRecord, RuntimeEvent } from "../../shared/domain/events.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
@@ -8,53 +7,10 @@ import type {
   LoopRun,
   StepRun
 } from "../../shared/domain/runtime.js";
-import { parseJsonArray, parseJsonObject } from "./RuntimeJson.js";
 import type {
-  EventRow,
   LoopRunRow,
   StepRunRow
 } from "./RuntimeDbTypes.js";
-
-export const toRuntimeEvent = (row: EventRow): RuntimeEvent => ({
-  seq: row.seq,
-  eventId: row.event_id,
-  type: row.type,
-  source: row.source,
-  subject: row.subject,
-  correlationId: row.correlation_id,
-  causationId: row.causation_id ?? undefined,
-  dedupeKey: row.dedupe_key ?? undefined,
-  correlationDepth: row.correlation_depth,
-  occurredAt: row.occurred_at,
-  projectId: row.project_id,
-  tags: parseJsonArray(row.tags_json),
-  status: row.status,
-  handlingResult: row.handling_result ?? undefined,
-  payload: parseJsonObject(row.payload_json)
-});
-
-export const runtimeEventToEventRecord = (event: RuntimeEvent): EventRecord => ({
-  id: event.eventId,
-  eventId: event.eventId,
-  projectId: event.projectId,
-  source: event.source,
-  type: event.type,
-  eventType: event.type,
-  subject: event.subject,
-  correlationId: event.correlationId,
-  causationId: event.causationId,
-  dedupeKey: event.dedupeKey,
-  correlationDepth: event.correlationDepth,
-  occurredAt: event.occurredAt,
-  tags: event.tags,
-  payload: event.payload,
-  status: event.status,
-  handlingResult: event.handlingResult,
-  createdAt: event.occurredAt
-});
-
-export const toEventRecord = (row: EventRow): EventRecord =>
-  runtimeEventToEventRecord(toRuntimeEvent(row));
 
 interface StoredLoopRunSnapshot {
   loop: ProjectLoop;
@@ -71,7 +27,6 @@ export const toLoopRun = (row: LoopRunRow): LoopRun => {
     parentStepRunId: row.parent_step_run_id ?? undefined,
     source: row.source,
     status: row.status,
-    runtimeDeviceId: row.runtime_device_id ?? undefined,
     executionPlan: row.execution_plan_json ? JSON.parse(row.execution_plan_json) as LoopExecutionPlan : undefined,
     schedule: row.schedule_step_id && row.scheduled_for
       ? { stepId: row.schedule_step_id, scheduledFor: row.scheduled_for }

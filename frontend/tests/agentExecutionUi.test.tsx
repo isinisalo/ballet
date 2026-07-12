@@ -1,80 +1,51 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { AgentRuntimeConfiguration } from "@shared/api/workspace-contracts";
 import { AgentExecutionForm } from "../src/workspace/agents/execution/AgentExecutionForm";
-import { agentRuntimeConfiguration, runtimeDevice } from "./runtimeFixtures";
+import { agentRuntimeConfiguration, localRuntime } from "./runtimeFixtures";
 
-describe("agent runtime configuration UI", () => {
-  it("restores portable intent from a fresh clone and only requires attaching a compatible computer", async () => {
-    const user = userEvent.setup();
-    const device = runtimeDevice();
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
-      if (url === "/api/agents/agent-1/runtime" && !init?.method) return Response.json({
-        intent: { provider: "codex", model: "gpt-test", reasoning: "high", policy: { network: true } },
-        issues: [{ code: "missing_attachment", path: "attachments.agent-1", agentId: "agent-1", message: "No compatible computer is attached on this machine." }]
-      });
-      if (url === "/api/agents/agent-1/runtime" && init?.method === "PUT") {
-        const payload = JSON.parse(String(init.body)) as { runtimeBackendId: string; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
-        return Response.json(agentRuntimeConfiguration({ backendId: payload.runtimeBackendId, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
-      }
-      return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${url}` }, { status: 404 });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    render(<AgentExecutionForm agentId="agent-1" />);
+describe("agent execution configuration UI", () => {
+  it("restores portable intent and exposes the local provider without a computer selector", () => {
+    const configuration: AgentRuntimeConfiguration = {
+      ...agentRuntimeConfiguration({ network: true }),
+      resolved: undefined,
+      issues: [{ code: "provider_unavailable", path: "agents.agent-1", agentId: "agent-1", message: "Codex CLI needs attention on this machine." }]
+    };
+    render(<AgentExecutionForm agentId="agent-1" runtime={localRuntime()} configuration={configuration} />);
 
-    expect(await screen.findByText(/Portable intent: Codex CLI · gpt-test · high · network on/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Runtime")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Provider")).toHaveTextContent("Codex CLI");
-    expect(screen.getByLabelText("Model")).toHaveTextContent("gpt-test");
+    expect(screen.getByLabelText("Model")).toHaveTextContent("GPT Test");
     expect(screen.getByLabelText("Reasoning effort")).toHaveTextContent("high");
     expect(screen.getByRole("link", { name: "Open Runtimes" })).toHaveAttribute("href", "/runtimes");
-    await user.click(screen.getByLabelText("Runtime"));
-    await user.click(await screen.findByRole("option", { name: /Iiro's MacBook Pro/ }));
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "/api/agents/agent-1/runtime",
-      expect.objectContaining({ method: "PUT", body: JSON.stringify({ runtimeBackendId: "backend-codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: [] } }) })
-    ));
   });
 
-  it("saves a valid device, provider, model and reasoning selection automatically", async () => {
+  it("autosaves provider, model, reasoning, network and local roots", async () => {
     const user = userEvent.setup();
-    const device = runtimeDevice();
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
-      if (url === "/api/agents/agent-1/runtime" && !init?.method) return Response.json({ issues: [] });
-      if (url === "/api/agents/agent-1/runtime" && init?.method === "PUT") {
-        const payload = JSON.parse(String(init.body)) as { runtimeBackendId: string; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
-        return Response.json(agentRuntimeConfiguration({ backendId: payload.runtimeBackendId, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
-      }
-      return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${url}` }, { status: 404 });
+    const empty: AgentRuntimeConfiguration = { localPolicy: { readOnlyRoots: [] }, issues: [] };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body)) as { provider: "codex"; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
+      return Response.json(agentRuntimeConfiguration({ provider: payload.provider, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<AgentExecutionForm agentId="agent-1" />);
+    render(<AgentExecutionForm agentId="agent-1" runtime={localRuntime()} configuration={empty} />);
 
     expect(screen.queryByRole("button", { name: "Save execution" })).not.toBeInTheDocument();
-    expect(screen.getByText("Select runtime")).toBeInTheDocument();
-    const runtime = screen.getByLabelText("Runtime");
-    await waitFor(() => expect(runtime).toBeEnabled());
-    await user.click(runtime);
-    await user.click(await screen.findByRole("option", { name: /Iiro's MacBook Pro/ }));
     await user.click(screen.getByLabelText("Provider"));
     await user.click(await screen.findByRole("option", { name: "Codex CLI" }));
     await user.click(screen.getByLabelText("Model"));
     await user.click(await screen.findByRole("option", { name: "GPT Test" }));
     await user.click(screen.getByLabelText("Reasoning effort"));
     await user.click(await screen.findByRole("option", { name: "high" }));
-    expect(screen.getByText("current project checkout only")).toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "Network access" }));
     await user.click(screen.getByRole("button", { name: /Advanced policy/ }));
-    await user.click(screen.getByRole("switch", { name: /Network access/ }));
     await user.type(screen.getByLabelText("Additional read-only roots"), "/shared/reference");
     await user.tab();
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/agents/agent-1/runtime",
-      expect.objectContaining({ method: "PUT", body: JSON.stringify({ runtimeBackendId: "backend-codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: ["/shared/reference"] } }) })
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ provider: "codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: ["/shared/reference"] } }) })
     ));
   });
 });

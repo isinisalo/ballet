@@ -22,7 +22,6 @@ import { SidebarProjectMenu } from "./SidebarProjectMenu";
 
 export function AppSidebar({
   route,
-  projectId,
   projectDocumentTree,
   automation,
   agents,
@@ -34,7 +33,6 @@ export function AppSidebar({
   navigate
 }: {
   route: RouteState;
-  projectId?: string;
   projectDocumentTree: ProjectDocumentTreeNode[];
   automation: ProjectAutomationConfig;
   agents: Agent[];
@@ -61,7 +59,7 @@ export function AppSidebar({
                   <ConfigureRuntimeIssues issues={runtimeConfigurationIssues} />
                   <SidebarAutomationMenu route={route} automation={automation} navigate={navigate} />
                   <SidebarEnvironmentMenu route={route} agents={agents} agentExecutionStates={agentExecutionStates} skills={skills} navigate={navigate} />
-                  <SidebarProjectMenu route={route} projectId={projectId} projectDocumentTree={projectDocumentTree} navigate={navigate} />
+                  <SidebarProjectMenu route={route} projectDocumentTree={projectDocumentTree} navigate={navigate} />
                 </>
               )}
             </SidebarMenu>

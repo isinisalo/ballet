@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
     automationConfigSchema,
     collectionUpsertSchema,
-    eventIntakeSchema,
     projectDocumentSaveSchema
 } from "../../shared/api/workspace-schemas.js";
 import { HttpValidationError, parseUnknown } from "../http/validation/httpValidation.js";
@@ -63,27 +62,6 @@ describe("HTTP Zod validation", () => {
       ...valid,
       loops: [{ ...valid.loops[0], steps: [{ ...valid.loops[0]!.steps[0], type: "human", agentId: "legacy" }] }]
     }), "loops.0.steps.0");
-  });
-
-  it("accepts valid event intake payloads and defaults payload to an object", () => {
-    expect(parseUnknown(eventIntakeSchema, {
-      projectId: "project",
-      eventType: "manual-start",
-      tags: ["manual"],
-      correlationDepth: 0
-    })).toEqual({
-      projectId: "project",
-      eventType: "manual-start",
-      tags: ["manual"],
-      correlationDepth: 0,
-      payload: {}
-    });
-
-    expectValidationError(() => parseUnknown(eventIntakeSchema, {
-      projectId: "project",
-      eventType: "manual-start",
-      correlationDepth: -1
-    }), "correlationDepth");
   });
 
   it("uses collection-specific upsert schemas", () => {

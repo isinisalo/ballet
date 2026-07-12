@@ -1,9 +1,9 @@
-import type { Agent, AgentExecutionState, AgentSaveRequest } from "@shared/api/workspace-contracts";
+import type { Agent, AgentExecutionState, AgentRuntimeConfiguration, AgentSaveRequest, LocalRuntime } from "@shared/api/workspace-contracts";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AgentEditor } from "../src/workspace/agents/AgentEditor";
-import { agentRuntimeConfiguration, runtimeBackend, runtimeDevice } from "./runtimeFixtures";
+import { agentRuntimeConfiguration, localProvider, localRuntime } from "./runtimeFixtures";
 
 const agent = (): Agent => ({
   id: "agent-architect",
@@ -18,11 +18,17 @@ const agent = (): Agent => ({
   relativePath: ".codex/agents/brief-agent.toml"
 } as Agent);
 
-const renderEditor = (executionState?: AgentExecutionState) => {
+const emptyRuntimeConfiguration = (): AgentRuntimeConfiguration => ({ localPolicy: { readOnlyRoots: [] }, issues: [] });
+
+const renderEditor = (
+  executionState?: AgentExecutionState,
+  runtimeConfiguration: AgentRuntimeConfiguration = emptyRuntimeConfiguration(),
+  runtime: LocalRuntime = localRuntime()
+) => {
   const selectedAgent = agent();
   const save = vi.fn(async (_collection: "agents", item: AgentSaveRequest) => ({ ...selectedAgent, ...item } as Agent));
   const remove = vi.fn(async () => undefined);
-  render(<AgentEditor agent={selectedAgent} executionState={executionState} save={save} remove={remove} />);
+  render(<AgentEditor agent={selectedAgent} executionState={executionState} runtime={runtime} runtimeConfiguration={runtimeConfiguration} save={save} remove={remove} />);
   return { save, remove };
 };
 
@@ -32,8 +38,7 @@ describe("agent instructions workspace", () => {
     const { save } = renderEditor({
       agentId: "agent-architect",
       status: "running",
-      provider: "codex",
-      deviceId: "device-local"
+      provider: "codex"
     });
 
     expect(screen.getByRole("tab", { name: "Instructions" })).toHaveAttribute("aria-selected", "true");
@@ -41,7 +46,7 @@ describe("agent instructions workspace", () => {
     expect(screen.queryByRole("tab", { name: "Tasks" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Custom Args" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Running")).toHaveLength(2);
-    expect(screen.getByLabelText("Runtime")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Runtime")).not.toBeInTheDocument();
     expect(screen.getByText("Markdown Preview")).toBeInTheDocument();
     expect(screen.getByText("Edit")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Role" })).toBeInTheDocument();
@@ -62,7 +67,7 @@ describe("agent instructions workspace", () => {
 
     expect(screen.getAllByText("Unbound").length).toBeGreaterThan(0);
     expect(screen.getByText("Execution")).toBeInTheDocument();
-    expect(screen.getByLabelText("Runtime")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Runtime")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Provider")).toBeInTheDocument();
     expect(screen.getByLabelText("Model")).toBeInTheDocument();
     expect(screen.getByLabelText("Reasoning effort")).toBeInTheDocument();
@@ -74,36 +79,26 @@ describe("agent instructions workspace", () => {
   });
 
   it("renders the saved runtime configuration in the compact Execution section", async () => {
-    const device = runtimeDevice({ backends: [runtimeBackend({ id: "backend-copilot", provider: "copilot" })] });
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
-      if (url === "/api/agents/agent-architect/runtime") return Response.json(agentRuntimeConfiguration({ agentId: "agent-architect", backendId: "backend-copilot", provider: "copilot" }));
-      return Response.json({ error: `Unhandled ${url}` }, { status: 404 });
-    }));
+    const runtime = localRuntime({ providers: [localProvider({ provider: "copilot", command: "/opt/homebrew/bin/copilot" })] });
+    renderEditor(
+      { agentId: "agent-architect", status: "running", provider: "copilot" },
+      agentRuntimeConfiguration({ agentId: "agent-architect", provider: "copilot" }),
+      runtime
+    );
 
-    try {
-      renderEditor({ agentId: "agent-architect", status: "running", provider: "copilot", deviceId: "device-1" });
-
-      await waitFor(() => expect(screen.getByLabelText("Runtime")).toHaveTextContent("Iiro's MacBook Pro · online"));
-      expect(screen.getByLabelText("Provider")).toHaveTextContent("GitHub Copilot CLI");
-      expect(screen.getByLabelText("Model")).toHaveTextContent("GPT Test");
-      expect(screen.getByLabelText("Reasoning effort")).toHaveTextContent("high");
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    expect(screen.queryByLabelText("Runtime")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Provider")).toHaveTextContent("GitHub Copilot CLI");
+    expect(screen.getByLabelText("Model")).toHaveTextContent("GPT Test");
+    expect(screen.getByLabelText("Reasoning effort")).toHaveTextContent("high");
   });
 
   it("saves execution settings automatically from the profile rail", async () => {
     const user = userEvent.setup();
-    const device = runtimeDevice();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url === "/api/runtimes/devices") return Response.json({ devices: [device] });
-      if (url === "/api/agents/agent-architect/runtime" && !init?.method) return Response.json({ issues: [] });
       if (url === "/api/agents/agent-architect/runtime" && init?.method === "PUT") {
-        const payload = JSON.parse(String(init.body)) as { runtimeBackendId: string; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
-        return Response.json(agentRuntimeConfiguration({ agentId: "agent-architect", backendId: payload.runtimeBackendId, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
+        const payload = JSON.parse(String(init.body)) as { provider: "codex"; model: string; reasoning: string; policy: { network: boolean; readOnlyRoots: string[] } };
+        return Response.json(agentRuntimeConfiguration({ agentId: "agent-architect", provider: payload.provider, model: payload.model, reasoning: payload.reasoning, network: payload.policy.network, readOnlyRoots: payload.policy.readOnlyRoots }));
       }
       return Response.json({ error: `Unhandled ${init?.method ?? "GET"} ${url}` }, { status: 404 });
     });
@@ -111,10 +106,6 @@ describe("agent instructions workspace", () => {
 
     try {
       renderEditor();
-      const runtime = screen.getByLabelText("Runtime");
-      await waitFor(() => expect(runtime).toBeEnabled());
-      await user.click(runtime);
-      await user.click(await screen.findByRole("option", { name: /Iiro's MacBook Pro/ }));
       await user.click(screen.getByLabelText("Provider"));
       await user.click(await screen.findByRole("option", { name: "Codex CLI" }));
       await user.click(screen.getByLabelText("Model"));
@@ -125,7 +116,7 @@ describe("agent instructions workspace", () => {
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
         "/api/agents/agent-architect/runtime",
-        expect.objectContaining({ method: "PUT", body: JSON.stringify({ runtimeBackendId: "backend-codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: [] } }) })
+        expect.objectContaining({ method: "PUT", body: JSON.stringify({ provider: "codex", model: "gpt-test", reasoning: "high", policy: { network: true, readOnlyRoots: [] } }) })
       ));
     } finally {
       vi.unstubAllGlobals();
@@ -147,7 +138,7 @@ describe("agent instructions workspace", () => {
     await user.clear(screen.getByLabelText("Agent description"));
     await user.type(screen.getByLabelText("Agent description"), "Owns technical direction.");
     await user.click(screen.getByRole("button", { name: "Finish editing agent description" }));
-    expect(screen.getByLabelText("Runtime")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Runtime")).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Environment" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save agent" }));
 
@@ -198,7 +189,7 @@ describe("agent avatar", () => {
     const user = userEvent.setup();
     const save = vi.fn(async (_collection: "agents", item: AgentSaveRequest) => ({ ...agent(), ...item, id: "agent-new" } as Agent));
     const remove = vi.fn(async () => undefined);
-    render(<AgentEditor save={save} remove={remove} />);
+    render(<AgentEditor runtime={localRuntime()} save={save} remove={remove} />);
 
     expect(screen.getByRole("img", { name: "No avatar selected" }).querySelector("svg")).toBeNull();
     await user.type(screen.getByLabelText("Name"), "Builder");

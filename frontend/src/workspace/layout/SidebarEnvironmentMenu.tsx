@@ -28,7 +28,7 @@ function SidebarRuntimesSection({ route, navigate }: { route: RouteState; naviga
       chevronClassName="group-data-[state=open]/environment-section:rotate-90"
     >
       <SidebarMenuSub className="mx-2 gap-0.5 border-sidebar-border/60 px-2 py-1">
-        <SidebarMenuSubItem><span className="block px-2 py-1.5 text-xs text-muted-foreground">Device registry</span></SidebarMenuSubItem>
+        <SidebarMenuSubItem><span className="block px-2 py-1.5 text-xs text-muted-foreground">Local CLI</span></SidebarMenuSubItem>
       </SidebarMenuSub>
     </SidebarCollapsibleLinkSection>
   );

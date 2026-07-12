@@ -1,50 +1,44 @@
+import path from "node:path";
 import type { AppData, CollectionName, WorkspaceSaveRequestByCollection } from "../shared/api/workspaceData.js";
 import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
 import type { MarkdownDocument } from "../shared/domain/documents.js";
-import type { EventRecord } from "../shared/domain/events.js";
-import type { LoopRunSource, StepRunResult } from "../shared/domain/runtime.js";
 import { getProjectRoot } from "./markdown.js";
-import type { RuntimeDatabase } from "./runtime-db.js";
-import type { DispatchLoopScheduleInput } from "./runtime-db.js";
+import { RuntimeDatabase } from "./runtime-db.js";
 import { AutomationValidationError } from "./automation.js";
 import { AutomationService } from "./services/AutomationService.js";
-import { EventIntakeService } from "./services/EventIntakeService.js";
 import { MarkdownEntityService } from "./services/MarkdownEntityService.js";
 import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
-import { LoopRunService } from "./services/LoopRunService.js";
 import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
+import type { WorkspaceContentData } from "./documents/markdownAppDataLoader.js";
 import type { CreateLoopThemeRequest } from "../shared/api/workspace-contracts.js";
 import type { LoopTheme, LoopThemeId } from "../shared/domain/loopThemes.js";
 import { LoopThemeRepository } from "./loop-themes/LoopThemeRepository.js";
 import { LoopThemeService } from "./services/LoopThemeService.js";
-import type { LoopExecutionGateway } from "./services/LoopExecutionGateway.js";
 
 export class MarkdownStore {
+  private readonly projectRoot: string;
+  private readonly runtimeDatabaseProvider: RuntimeDatabaseProvider;
   private projectConfigMutationQueue: Promise<void> = Promise.resolve();
-  private readonly runtimeDatabaseProvider = new RuntimeDatabaseProvider(() => this.root);
   private readonly loopThemeRepository = new LoopThemeRepository();
-  private readonly workspaceDataService = new WorkspaceDataService(
-    () => this.root,
-    this.runtimeDatabaseProvider,
-    this.loopThemeRepository
-  );
-  private readonly markdownEntityService = new MarkdownEntityService(() => this.root, () => this.read());
-  private readonly automationService = new AutomationService(
-    () => this.root,
-    this.runtimeDatabaseProvider,
-    this.loopThemeRepository
-  );
-  private readonly loopThemeService = new LoopThemeService(
-    () => this.root,
-    this.loopThemeRepository,
-    (config) => this.automationService.save(config)
-  );
-  private readonly eventIntakeService = new EventIntakeService(this.runtimeDatabaseProvider);
-  private readonly loopRunService = new LoopRunService(() => this.read(), this.runtimeDatabaseProvider);
+  private readonly workspaceDataService: WorkspaceDataService;
+  private readonly markdownEntityService: MarkdownEntityService;
+  private readonly automationService: AutomationService;
+  private readonly loopThemeService: LoopThemeService;
   private agentRemovalHook?: (agentId: string) => Promise<void> | void;
 
+  constructor(root = getProjectRoot(), runtimeDatabase?: RuntimeDatabase) {
+    this.projectRoot = root;
+    this.runtimeDatabaseProvider = new RuntimeDatabaseProvider(
+      runtimeDatabase ?? new RuntimeDatabase(path.join(root, ".git", "ballet", "state.sqlite"))
+    );
+    this.workspaceDataService = new WorkspaceDataService(() => this.root, this.runtimeDatabaseProvider, this.loopThemeRepository);
+    this.markdownEntityService = new MarkdownEntityService(() => this.root, () => this.read());
+    this.automationService = new AutomationService(() => this.root, this.runtimeDatabaseProvider, this.loopThemeRepository);
+    this.loopThemeService = new LoopThemeService(() => this.root, this.loopThemeRepository, (config) => this.automationService.save(config));
+  }
+
   get root(): string {
-    return getProjectRoot();
+    return this.projectRoot;
   }
 
   read(): Promise<AppData> {
@@ -55,8 +49,10 @@ export class MarkdownStore {
     return this.read();
   }
 
-  setLoopExecutionGateway(gateway: LoopExecutionGateway): void {
-    this.loopRunService.setExecutionGateway(gateway);
+  setWorkspaceEnricher(
+    enrich: (data: WorkspaceContentData & Pick<AppData, "loopRuns" | "scheduleStates">) => Promise<AppData>
+  ): void {
+    this.workspaceDataService.setEnricher(enrich);
   }
 
   setAgentRemovalHook(hook: (agentId: string) => Promise<void> | void): void {
@@ -75,10 +71,6 @@ export class MarkdownStore {
   }
 
   async remove(collection: CollectionName, id: string): Promise<void> {
-    if (collection === "events") {
-      this.eventIntakeService.removeEvent(id);
-      return;
-    }
     if (collection === "agents") await this.agentRemovalHook?.(id);
     await this.markdownEntityService.remove(collection, id);
   }
@@ -110,50 +102,8 @@ export class MarkdownStore {
     return this.markdownEntityService.createProjectDocument(input);
   }
 
-  createEvent(input: Omit<Partial<EventRecord>, "id" | "createdAt" | "status"> & Pick<EventRecord, "projectId" | "eventType">) {
-    return this.eventIntakeService.createEvent(input);
-  }
-
-  startLoopRun(loopId: string, input?: string, source: LoopRunSource = "manual") {
-    return this.loopRunService.start(loopId, input, source);
-  }
-
-  dispatchScheduledLoop(input: Omit<DispatchLoopScheduleInput, "runtimeDeviceId" | "executionPlan" | "themeSnapshot"> & {
-    canDispatch?: () => boolean;
-  }) {
-    return this.loopRunService.dispatchScheduled(input);
-  }
-
-  latestLoopRun(loopId: string) {
-    return this.loopRunService.latest(loopId);
-  }
-
-  getLoopRun(runId: string) {
-    return this.loopRunService.database().getLoopRun(runId);
-  }
-
-  respondToStepRun(runId: string, stepRunId: string, result: StepRunResult, input: string) {
-    return this.loopRunService.respond(runId, stepRunId, result, input);
-  }
-
-  cancelLoopRun(runId: string) {
-    return this.loopRunService.cancel(runId);
-  }
-
-  listLoopRuns() {
-    return this.loopRunService.list();
-  }
-
-  listActiveLoopRuns() {
-    return this.loopRunService.listActive();
-  }
-
-  runtimeHealth() {
-    return this.loopRunService.database().health();
-  }
-
   runtimeDatabase(): RuntimeDatabase {
-    return this.loopRunService.database();
+    return this.runtimeDatabaseProvider.runtimeDatabase();
   }
 
   private async runProjectConfigMutation<T>(mutation: () => Promise<T>): Promise<T> {

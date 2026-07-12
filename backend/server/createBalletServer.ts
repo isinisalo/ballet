@@ -1,155 +1,174 @@
-import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { createControlPlane, agentSnapshotFromAgent } from "../control-plane/index.js";
-import { adminAuth, controlPlaneErrorHandler } from "../control-plane/http/HttpSupport.js";
-import { LoopExecutionCoordinator, preflightLoopSnapshot } from "../integration/LoopExecutionCoordinator.js";
-import { LoopExecutionReconciler } from "../integration/LoopExecutionReconciler.js";
-import { resolveActiveProject } from "../project/activeProject.js";
-import { resolveRuntimeDbPath } from "../runtime-db.js";
-import { onRuntimeChanged } from "../runtime-events.js";
+import { emptyBodySchema } from "../../shared/api/runtime-schemas.js";
+import { createApiRouter } from "../http/apiRouter.js";
+import { parseBody } from "../http/validation/httpValidation.js";
+import { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
+import { ExecutionStore } from "../execution/ExecutionStore.js";
+import { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
+import { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
+import { LocalSettingsRepository } from "../execution/LocalSettingsRepository.js";
+import { resolveProjectContext, type ProjectContext } from "../project/ProjectContext.js";
+import { RuntimeDatabase } from "../runtime-db.js";
+import { LocalRunService } from "../runs/LocalRunService.js";
+import { LocalRunTargetService } from "../runs/LocalRunTargetService.js";
+import { RootRunStore } from "../runs/RootRunStore.js";
+import { WorkspaceInvalidationBroadcaster } from "../runs/WorkspaceInvalidationBroadcaster.js";
 import { LoopScheduler } from "../scheduling/LoopScheduler.js";
-import {
-  bridgeRunInvalidations,
-  createRunRouter,
-  RunInvalidationBroadcaster,
-  RunReadModelService,
-  RunReadModelStore,
-  RunTargetService
-} from "../runs/index.js";
-import { apiRouter } from "../routes.js";
-import { store } from "../store.js";
-import { createLocalLifecycleRouter } from "./LocalLifecycleRoutes.js";
+import { MarkdownStore } from "../store.js";
+import { RotatingFileLogger } from "./RotatingFileLogger.js";
 
-export const createBalletServer = async () => {
-  const root = store.root;
-  const initialData = await store.read();
-  const project = await resolveActiveProject(root, initialData);
-  process.env.BALLET_PROJECT_ID = project.id;
-  store.runtimeDatabase();
+export interface CreateBalletServerOptions {
+  root: string;
+  port: number;
+  stateRoot?: string;
+  codexCommand?: string;
+  copilotCommand?: string;
+  webDist?: string;
+  onShutdown?(): void;
+}
 
-  const execution: { coordinator?: LoopExecutionCoordinator } = {};
-  const publicOrigin = resolvePublicOrigin();
-  const controlPlane = createControlPlane({
-    dbPath: resolveRuntimeDbPath(root),
-    project,
-    secureCookies: process.env.BALLET_SECURE_COOKIES === "1" || publicOrigin?.startsWith("https://"),
-    resolveAgentSnapshot: async (agentId) => {
-      const agent = (await store.read()).agents.find((candidate) => candidate.id === agentId);
-      if (!agent) throw new Error(`Agent ${agentId} was not found.`);
-      return agentSnapshotFromAgent(agent, createHash("sha256").update(JSON.stringify(agent)).digest("hex"));
-    },
-    listAgentIds: async () => (await store.read()).agents.map((agent) => agent.id),
-    resolveLoopSnapshot: async (loopId) => preflightLoopSnapshot(await store.read(), loopId),
-    freshCheckoutBeforeRun: true,
-    installCommand: ({ request, pairing }) => [
-      "ballet setup",
-      `--server ${shellQuote(requestOrigin(request, publicOrigin))}`,
-      `--repo ${shellQuote(project.repositoryUrl)}`,
-      `--project ${shellQuote(project.id)}`,
-      `--device-code ${shellQuote(pairing.deviceCode)}`
-    ].join(" "),
-    verificationUri: (request, pairing) => `${requestOrigin(request, publicOrigin)}/runtimes?pairing=${encodeURIComponent(pairing.id)}`,
-    onTaskState: (task) => execution.coordinator?.markTaskState(task),
-    onTaskTerminal: (task) => execution.coordinator?.handleTerminal(task)
+export const createBalletServer = async (options: CreateBalletServerOptions) => {
+  const context = await resolveProjectContext({ root: options.root, stateRoot: options.stateRoot });
+  const logger = new RotatingFileLogger(context.logsPath);
+  const database = new RuntimeDatabase(context.databasePath);
+  database.connection();
+  const roots = new RootRunStore(() => database.connection());
+  const executions = new ExecutionStore(() => database.connection());
+  const settings = new LocalSettingsRepository(context.settingsPath);
+  const savedSettings = await settings.load();
+  const runtime = new LocalRuntimeService({
+    context, executionStore: executions, settings,
+    codexCommand: options.codexCommand ?? savedSettings.codexCommand,
+    copilotCommand: options.copilotCommand ?? savedSettings.copilotCommand
   });
-  const coordinator = new LoopExecutionCoordinator({
-    controlPlane: controlPlane.service,
-    database: () => store.runtimeDatabase(),
-    readData: () => store.read()
+  await runtime.start();
+  const configurations = new RuntimeConfigurationService(context.root, settings, runtime, executions);
+  const invalidations = new WorkspaceInvalidationBroadcaster();
+  const store = new MarkdownStore(context.root, database);
+  const targets = new LocalRunTargetService(roots, configurations);
+  const runHolder: { service?: LocalRunService } = {};
+  const queue = new LocalExecutionQueue({
+    store: executions, runtime, worktreesRoot: context.worktreesRoot,
+    onTerminal: (task) => runHolder.service!.handleTerminal(task),
+    onStarted: (task) => runHolder.service!.handleStarted(task),
+    onOrchestrationError: (error, task) => logger.error("Task terminal reconciliation failed.", {
+      taskId: task.id, error: error instanceof Error ? error.message : String(error)
+    }),
+    onChanged: (rootRunId) => invalidations.publish("runs-changed", { rootRunId })
   });
-  execution.coordinator = coordinator;
-  store.setLoopExecutionGateway(coordinator);
-  store.setAgentRemovalHook((agentId) => controlPlane.service.removeAgentRuntime(agentId));
-  await new LoopExecutionReconciler({
-    controlPlaneDatabase: controlPlane.database,
-    runtimeDatabase: () => store.runtimeDatabase(),
-    coordinator,
-    readData: () => store.read(),
-    projectId: project.id
-  }).reconcile();
+  const runs = new LocalRunService({
+    context, connection: () => database.connection(), database, roots, executions, runtime,
+    configurations, queue, readData: () => store.read(),
+    onChanged: (rootRunId) => invalidations.publish("runs-changed", { rootRunId })
+  });
+  runHolder.service = runs;
+  store.setAgentRemovalHook((agentId) => configurations.remove(agentId));
+  store.setWorkspaceEnricher(async (content) => {
+    const agentIds = content.agents.map((agent) => agent.id);
+    const agentRuntimeConfigurations = await configurations.list(agentIds);
+    return {
+      ...content,
+      runtime: await runtime.snapshot(),
+      agentRuntimeConfigurations,
+      executionStates: await configurations.executionStates(agentIds, agentRuntimeConfigurations),
+      runTargets: await targets.list(content, agentRuntimeConfigurations)
+    };
+  });
+  await runs.reconcile();
+  await queue.start();
+  database.recoverReservedScheduleOccurrences();
   const scheduler = new LoopScheduler({
-    readData: () => store.read(),
-    database: () => store.runtimeDatabase(),
-    dispatch: (input) => store.dispatchScheduledLoop(input)
+    readData: () => store.read(), database: () => database,
+    dispatch: (input) => runs.dispatchScheduled(input),
+    subscribeChanges: (listener) => invalidations.subscribe((event) => {
+      if (event.type === "workspace-changed") listener(event.reason);
+    }),
+    onChanged: () => invalidations.publish("workspace-changed", { reason: "schedules" })
   });
   scheduler.start();
-  const runReadModel = new RunReadModelService(new RunReadModelStore({
-    runtimeConnection: () => store.runtimeDatabase().connection(),
-    controlPlaneConnection: () => controlPlane.database.connection(),
-    projectId: project.id
-  }));
-  const runTargets = new RunTargetService({
-    readData: () => store.read(),
-    runs: runReadModel,
-    preflightAgent: (agentId) => controlPlane.service.preflightAgent(agentId)
-  });
-  const runInvalidations = new RunInvalidationBroadcaster();
-  const closeRunInvalidations = bridgeRunInvalidations(runInvalidations, {
-    subscribeRuntime: onRuntimeChanged,
-    subscribeControlPlane: (listener) => controlPlane.service.onChange(listener)
-  });
 
   const app = express();
-  if (process.env.BALLET_TRUST_PROXY === "1") app.set("trust proxy", true);
+  app.disable("x-powered-by");
+  app.use(loopbackSecurity(options.port));
   app.use(express.json({ limit: "1mb" }));
-  app.use("/api", controlPlane.router);
-  // The launchd client must be able to identify the project bound to a local
-  // server before an administrator session exists. Keep this single probe
-  // public; every project-data route below remains session protected.
-  app.get("/api/health", (_req, res) => res.json({ ok: true, projectId: project.id }));
-  const localControlToken = process.env.BALLET_LOCAL_CONTROL_TOKEN?.trim();
-  if (localControlToken) {
-    app.use("/api/local/lifecycle", createLocalLifecycleRouter({
-      token: localControlToken,
-      projectId: project.id,
-      controlPlane: controlPlane.service,
-      database: controlPlane.database,
-      store,
-      scheduler
-    }));
-  }
-  app.use("/api", (req, res, next) => adminAuth(controlPlane.service, !["GET", "HEAD", "OPTIONS"].includes(req.method))(req, res, next));
-  app.use("/api", createRunRouter({ runs: runReadModel, targets: runTargets, invalidations: runInvalidations }));
-  app.use("/api", apiRouter);
-  app.use(controlPlaneErrorHandler);
+  app.get("/api/health", (_req, res) => res.json(health(context, options.port, runtime)));
+  let shuttingDown = false;
+  let resolveClosed!: () => void;
+  const closed = new Promise<void>((resolve) => { resolveClosed = resolve; });
+  app.post("/api/local/shutdown", (req, res, next) => {
+    try { parseBody(emptyBodySchema, req); } catch (error) { next(error); return; }
+    res.status(202).json({ accepted: true });
+    setTimeout(() => { void shutdown(); }, 25).unref();
+  });
+  app.use("/api", createApiRouter({
+    store, runtime, configurations, executions, runs, invalidations, logsPath: context.logsPath
+  }));
 
-  const clientDistCandidates = [
-    process.env.BALLET_WEB_DIST ? path.resolve(process.env.BALLET_WEB_DIST) : undefined,
-    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist"),
-    path.resolve(process.cwd(), "dist")
-  ].filter((candidate): candidate is string => Boolean(candidate));
-  const clientDist = clientDistCandidates.find((candidate) => existsSync(path.join(candidate, "index.html"))) ?? clientDistCandidates[0]!;
+  const clientDist = resolveClientDist(options.webDist);
   app.use(express.static(clientDist));
   app.get("*", (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
-  app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-    void next;
-    console.error(error);
-    res.status(500).json({ error: "Internal server error." });
+  app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    void _next;
+    logger.error("HTTP request failed.", error instanceof Error ? { message: error.message, stack: error.stack } : error);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error." });
   });
-
   const server = createServer(app);
-  controlPlane.attachWebSocket(server);
-  return { app, server, controlPlane, coordinator, scheduler, project, closeRunInvalidations };
+
+  const shutdown = async (): Promise<void> => {
+    if (shuttingDown) return closed;
+    shuttingDown = true;
+    logger.info("Ballet shutdown started.");
+    await scheduler.stop();
+    await Promise.race([
+      queue.shutdown(85_000).then(() => runs.reconcile()),
+      new Promise<void>((resolve) => {
+        const timeout = setTimeout(resolve, 90_000);
+        timeout.unref();
+      })
+    ]);
+    const serverClosed = new Promise<void>((resolve) => server.close(() => resolve()));
+    server.closeAllConnections();
+    await serverClosed;
+    database.close();
+    logger.info("Ballet shutdown completed.");
+    await logger.flush();
+    resolveClosed();
+    options.onShutdown?.();
+  };
+
+  logger.info("Ballet server initialized.", { root: context.root, instanceId: context.instanceId, port: options.port });
+  return { app, server, context, store, runtime, configurations, executions, runs, queue, scheduler, shutdown, logger };
 };
 
-const shellQuote = (value: string): string => `'${value.replaceAll("'", `'"'"'`)}'`;
-
-const resolvePublicOrigin = (): string | undefined => {
-  const configured = process.env.BALLET_PUBLIC_URL?.trim();
-  if (!configured) return undefined;
-  const url = new URL(configured);
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
-    throw new Error("BALLET_PUBLIC_URL must be an HTTP(S) origin without credentials, query, or fragment.");
+const loopbackSecurity = (port: number): express.RequestHandler => (req, res, next) => {
+  const host = (req.get("host") ?? "").toLowerCase();
+  const hostname = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
+  if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(hostname)) {
+    res.status(403).json({ error: "Ballet accepts loopback requests only." }); return;
   }
-  if (url.protocol !== "https:" && !["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname.toLowerCase())) {
-    throw new Error("Remote BALLET_PUBLIC_URL values must use HTTPS.");
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    const origin = req.get("origin");
+    const fetchSite = req.get("sec-fetch-site");
+    const allowed = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
+    if ((origin && !allowed.has(origin)) || (fetchSite && !["same-origin", "none"].includes(fetchSite))) {
+      res.status(403).json({ error: "Cross-origin mutation was blocked." }); return;
+    }
   }
-  return url.origin;
+  next();
 };
 
-const requestOrigin = (request: express.Request, publicOrigin?: string): string =>
-  publicOrigin ?? `${request.protocol}://${request.get("host") ?? "127.0.0.1:4317"}`;
+const health = (context: ProjectContext, port: number, runtime: LocalRuntimeService) => ({
+  ok: true, instanceId: context.instanceId, checkoutRoot: context.root, port,
+  version: process.env.BALLET_VERSION ?? "0.1.0",
+  startedAt: runtime.startedAtIso
+});
+
+const resolveClientDist = (configured?: string): string => {
+  const candidates = [configured, path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist"), path.resolve(process.cwd(), "dist")]
+    .filter((candidate): candidate is string => Boolean(candidate)).map((candidate) => path.resolve(candidate));
+  return candidates.find((candidate) => existsSync(path.join(candidate, "index.html"))) ?? candidates[0]!;
+};

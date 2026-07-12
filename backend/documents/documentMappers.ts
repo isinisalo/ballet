@@ -1,5 +1,5 @@
 import { normalizeAgentAvatar, type Agent } from "../../shared/domain/agents.js";
-import type { Adr, AdrStatus, EntityStatus, Goal, MarkdownDocument, Project, Skill } from "../../shared/domain/documents.js";
+import type { EntityStatus, MarkdownDocument, Project, Skill } from "../../shared/domain/documents.js";
 import { agentSkillsFromFrontmatter } from "./skillLookup.js";
 
 const now = () => new Date().toISOString();
@@ -19,12 +19,6 @@ const stringArray = (value: unknown): string[] =>
 
 const validEntityStatus = (value: unknown): EntityStatus =>
   ["active", "paused", "archived"].includes(stringValue(value)) ? stringValue(value) as EntityStatus : "active";
-
-const validGoalStatus = (value: unknown): Goal["status"] =>
-  ["not-started", "in-progress", "at-risk", "done"].includes(stringValue(value)) ? stringValue(value) as Goal["status"] : "not-started";
-
-const validAdrStatus = (value: unknown): AdrStatus =>
-  ["proposed", "accepted", "superseded", "rejected"].includes(stringValue(value)) ? stringValue(value) as AdrStatus : "proposed";
 
 const dateValue = (value: unknown): string => stringValue(value, now());
 
@@ -46,36 +40,6 @@ export const projectFromDocument = (doc: MarkdownDocument): Project => {
     name: stringValue(fm.name, stringValue(fm.title, doc.title ?? doc.slug)),
     description: doc.body.trim(),
     status: validEntityStatus(fm.status),
-    createdAt: dateValue(fm.createdAt),
-    updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
-  }, doc);
-};
-
-export const goalFromDocument = (doc: MarkdownDocument, defaultProjectId: string): Goal => {
-  const fm = doc.frontmatter;
-  return attachDocument({
-    id: doc.id,
-    projectId: stringValue(fm.projectId, defaultProjectId),
-    title: stringValue(fm.title, doc.title ?? doc.slug),
-    description: stringValue(fm.description, bodyPreview(doc.body)),
-    status: validGoalStatus(fm.status),
-    targetDate: stringValue(fm.targetDate ?? fm.dueDate),
-    owner: stringValue(fm.owner),
-    createdAt: dateValue(fm.createdAt),
-    updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
-  }, doc);
-};
-
-export const adrFromDocument = (doc: MarkdownDocument, defaultProjectId: string): Adr => {
-  const fm = doc.frontmatter;
-  return attachDocument({
-    id: doc.id,
-    projectId: stringValue(fm.projectId, defaultProjectId),
-    title: stringValue(fm.title, doc.title ?? doc.slug),
-    context: stringValue(fm.context, doc.body),
-    decision: stringValue(fm.decision),
-    consequences: stringValue(fm.consequences),
-    status: validAdrStatus(fm.status),
     createdAt: dateValue(fm.createdAt),
     updatedAt: dateValue(fm.updatedAt ?? fm.createdAt)
   }, doc);

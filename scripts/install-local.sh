@@ -56,4 +56,4 @@ case ":$PATH:" in
 esac
 
 printf '\nInstalled local Ballet %s to %s/ballet.\n' "$VERSION" "$BIN_DIR"
-printf 'Set up this computer with:\n  ballet setup --repo <git-url>\n'
+printf 'Start Ballet from a committed Git checkout root:\n  cd <checkout> && ballet\n'

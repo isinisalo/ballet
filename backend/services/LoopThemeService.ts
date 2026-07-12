@@ -13,7 +13,6 @@ import {
 import { loadProjectAutomationConfigWithIssues } from "../automation.js";
 import { validateProjectAutomationConfig, AutomationValidationError } from "../automation/validateAutomationConfig.js";
 import { loadMarkdownAppData } from "../markdown-adapter.js";
-import { notifyRuntimeChanged } from "../runtime-events.js";
 import { LoopThemeConflictError, LoopThemeNotFoundError, LoopThemeValidationError } from "../loop-themes/LoopThemeErrors.js";
 import type { LoopThemeRepository } from "../loop-themes/LoopThemeRepository.js";
 import { parseLoopTheme } from "../loop-themes/loopThemeValidation.js";
@@ -45,7 +44,6 @@ export class LoopThemeService {
       throw new LoopThemeNotFoundError(`Theme ${themeId} was not found.`);
     }
     const saved = await this.repository.update(this.root(), theme);
-    notifyRuntimeChanged("automation");
     return saved;
   }
 

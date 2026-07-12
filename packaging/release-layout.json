@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "platform": "darwin",
   "architectures": ["arm64", "x64"],
   "archiveName": "ballet_{version}_darwin_{arch}.tar.gz",
@@ -17,7 +17,6 @@
   "entrypoints": {
     "launcher": "ballet",
     "cli": "libexec/ballet/dist-server/backend/cli/main.js",
-    "daemonArgument": "daemon-internal-run",
     "serverArgument": "server-internal-run"
   },
   "archiveAssets": [

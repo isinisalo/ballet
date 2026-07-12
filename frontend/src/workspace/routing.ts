@@ -9,9 +9,9 @@ const projectDocumentCollectionSegment: Record<ProjectDocumentCreateKind, string
 
 const documentPathFromSearch = (url: URL) => url.searchParams.get("path") ?? undefined;
 
-const projectCollectionRoute = (view: "project-adrs" | "project-goals" | "project-instructions", projectId: string, url: URL): RouteState => {
+const projectCollectionRoute = (view: "project-adrs" | "project-goals" | "project-instructions", url: URL): RouteState => {
   const documentPath = documentPathFromSearch(url);
-  return documentPath ? { view, projectId, documentPath } : { view, projectId };
+  return documentPath ? { view, documentPath } : { view };
 };
 
 const automationRoute = (url: URL): RouteState => ({
@@ -33,16 +33,11 @@ const loopThemeRoute = (url: URL): RouteState => {
   };
 };
 
-const runtimeRoute = (url: URL): RouteState => ({
-  view: "runtimes",
-  runtimeDeviceId: url.searchParams.get("id") ?? undefined
-});
-
 const topLevelWorkspaceRoute = (url: URL): RouteState | undefined => {
   if (url.pathname === "/agents") return { view: "agents", documentPath: url.searchParams.get("path") ?? undefined };
   if (url.pathname === "/automation/themes") return loopThemeRoute(url);
   if (url.pathname === "/automation/loops" || url.pathname === "/automation") return automationRoute(url);
-  if (url.pathname === "/runtimes") return runtimeRoute(url);
+  if (url.pathname === "/runtimes") return { view: "runtimes" };
   if (url.pathname === "/skills") return { view: "skills", documentPath: url.searchParams.get("path") ?? undefined };
   return undefined;
 };
@@ -70,16 +65,11 @@ export const routeFromPath = (path: string): RouteState => {
     rootRunId: url.searchParams.get("run") ?? undefined
   };
 
-  const goalsMatch = url.pathname.match(/^\/projects\/([^/]+)\/goals\/?$/);
-  if (goalsMatch) return projectCollectionRoute("project-goals", decodeURIComponent(goalsMatch[1]), url);
+  if (url.pathname === "/project/goals") return projectCollectionRoute("project-goals", url);
+  if (url.pathname === "/project/adrs") return projectCollectionRoute("project-adrs", url);
+  if (url.pathname === "/project/instructions") return projectCollectionRoute("project-instructions", url);
 
-  const adrsMatch = url.pathname.match(/^\/projects\/([^/]+)\/adrs\/?$/);
-  if (adrsMatch) return projectCollectionRoute("project-adrs", decodeURIComponent(adrsMatch[1]), url);
-
-  const instructionsMatch = url.pathname.match(/^\/projects\/([^/]+)\/instructions\/?$/);
-  if (instructionsMatch) return projectCollectionRoute("project-instructions", decodeURIComponent(instructionsMatch[1]), url);
-
-  if (url.pathname === "/projects/document") {
+  if (url.pathname === "/project/document") {
     const documentPath = documentPathFromSearch(url);
     return documentPath ? { view: "project-document", documentPath } : { view: "projects" };
   }
@@ -87,9 +77,9 @@ export const routeFromPath = (path: string): RouteState => {
   return topLevelWorkspaceRoute(url) ?? { view: "projects" };
 };
 
-export const projectDocumentPath = (relativePath: string) => `/projects/document?path=${encodeURIComponent(relativePath)}`;
-export const projectCollectionDocumentPath = (projectId: string, kind: ProjectDocumentCreateKind, relativePath?: string) =>
-  `/projects/${encodeURIComponent(projectId)}/${projectDocumentCollectionSegment[kind]}${relativePath ? `?path=${encodeURIComponent(relativePath)}` : ""}`;
+export const projectDocumentPath = (relativePath: string) => `/project/document?path=${encodeURIComponent(relativePath)}`;
+export const projectCollectionDocumentPath = (kind: ProjectDocumentCreateKind, relativePath?: string) =>
+  `/project/${projectDocumentCollectionSegment[kind]}${relativePath ? `?path=${encodeURIComponent(relativePath)}` : ""}`;
 export const agentDocumentPath = (relativePath: string) => `/agents?path=${encodeURIComponent(relativePath)}`;
 export const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
 export const automationLoopPath = (id?: string) => {
@@ -106,7 +96,7 @@ export const automationNewThemePath = (sourceThemeId: string, loopId: string) =>
   const params = new URLSearchParams({ newFrom: sourceThemeId, loop: loopId });
   return `/automation/themes?${params.toString()}`;
 };
-export const runtimePath = (id?: string) => `/runtimes${id ? `?id=${encodeURIComponent(id)}` : ""}`;
+export const runtimePath = () => "/runtimes";
 export const runOverviewPath = (rootRunId?: string) => `/run${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
 export const runLoopPath = (loopId: string, rootRunId?: string) =>
   `/run/loops/${encodeURIComponent(loopId)}${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;

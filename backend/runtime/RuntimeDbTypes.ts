@@ -1,37 +1,16 @@
 import type { AgentOutcome, LoopRunSource, LoopRunStatus, StepRunResult, StepRunStatus } from "../../shared/domain/runtime.js";
-import type { EventStatus } from "../../shared/domain/events.js";
 
 export const MAX_ROOT_TRANSITIONS = 20;
 export const now = () => new Date().toISOString();
 
-export interface EventRow {
-  seq: number;
-  event_id: string;
-  type: string;
-  source: string;
-  subject: string;
-  correlation_id: string;
-  causation_id: string | null;
-  dedupe_key: string | null;
-  correlation_depth: number;
-  occurred_at: string;
-  project_id: string;
-  tags_json: string;
-  status: EventStatus;
-  handling_result: string | null;
-  payload_json: string;
-}
-
 export interface LoopRunRow {
   run_id: string;
-  project_id: string;
   loop_id: string;
   root_run_id: string;
   parent_run_id: string | null;
   parent_step_run_id: string | null;
   source: LoopRunSource;
   status: LoopRunStatus;
-  runtime_device_id: string | null;
   execution_plan_json: string | null;
   schedule_step_id: string | null;
   scheduled_for: string | null;
@@ -44,7 +23,6 @@ export interface LoopRunRow {
 }
 
 export interface LoopScheduleStateRow {
-  project_id: string;
   loop_id: string;
   step_id: string;
   definition_hash: string;
@@ -58,7 +36,6 @@ export interface LoopScheduleStateRow {
 
 export interface StepRunRow {
   step_run_id: string;
-  project_id: string;
   run_id: string;
   loop_id: string;
   step_id: string;
@@ -76,30 +53,6 @@ export interface StepRunRow {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
-}
-
-export interface IntakeEventInput {
-  projectId: string;
-  eventType: string;
-  source?: string;
-  subject?: string;
-  correlationId?: string;
-  causationId?: string;
-  dedupeKey?: string;
-  correlationDepth?: number;
-  tags?: string[];
-  payload?: Record<string, unknown>;
-  body?: string;
-}
-
-export interface PublishEventResult {
-  event: import("../../shared/domain/events.js").EventRecord;
-  duplicate: boolean;
-}
-
-export interface LeaseOptions {
-  owner: string;
-  leaseSeconds: number;
 }
 
 export interface CompleteStepRunInput {

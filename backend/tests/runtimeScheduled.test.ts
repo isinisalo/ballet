@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -75,32 +76,46 @@ describe("scheduled runtime starts", () => {
       nextRunAt: "2026-07-12T09:00:00.000Z"
     }], "2026-07-12T08:00:00.000Z");
 
-    const result = database.dispatchLoopScheduleOccurrence(automation, {
+    const scheduledFor = "2026-07-12T09:00:00.000Z";
+    const rootRunId = insertRoot(database, "scheduled-delivery", "schedule");
+    expect(database.completeLoopScheduleOccurrence({
       loopId: "scheduled-delivery",
-      themeSnapshot: openAiTheme,
       stepId: "timer",
       definitionHash,
-      scheduledFor: "2026-07-12T09:00:00.000Z",
+      scheduledFor,
+      status: "started",
       updatedAt: "2026-07-12T09:00:00.000Z"
-    });
+    })).toBe(true);
+    const run = database.startLoopRun(
+      automation,
+      "scheduled-delivery",
+      openAiTheme,
+      rootRunId,
+      undefined,
+      "schedule",
+      undefined,
+      { stepId: "timer", scheduledFor }
+    );
+    expect(database.finishReservedScheduleOccurrence({
+      loopId: "scheduled-delivery", stepId: "timer", scheduledFor,
+      status: "started", runId: run.runId, updatedAt: "2026-07-12T09:00:00.000Z"
+    })).toBe(true);
 
-    expect(result.status).toBe("started");
-    if (result.status !== "started") throw new Error("Expected scheduled run to start.");
-    expect(result.run).toMatchObject({
+    expect(run).toMatchObject({
       source: "schedule",
       status: runStatus,
       schedule: { stepId: "timer", scheduledFor: "2026-07-12T09:00:00.000Z" }
     });
-    expect(result.run.stepRuns).toHaveLength(1);
-    expect(result.run.stepRuns[0]).toMatchObject({
+    expect(run.stepRuns).toHaveLength(1);
+    expect(run.stepRuns[0]).toMatchObject({
       stepId: target.id,
       type: target.type,
       status: stepStatus
     });
-    expect(result.run.stepRuns.some((step) => step.stepId === "timer")).toBe(false);
+    expect(run.stepRuns.some((step) => step.stepId === "timer")).toBe(false);
     expect(database.listLoopScheduleStates()).toEqual([expect.objectContaining({
       lastStatus: "started",
-      lastRunId: result.run.runId
+      lastRunId: run.runId
     })]);
   });
 
@@ -110,11 +125,13 @@ describe("scheduled runtime starts", () => {
     const database = new RuntimeDatabase(path.join(root, "runtime.sqlite"));
     databases.push(database);
     const automation = config(agent);
+    const rootRunId = insertRoot(database, "scheduled-delivery", "manual");
 
     const run = database.startLoopRun(
       automation,
       "scheduled-delivery",
       openAiTheme,
+      rootRunId,
       "Manual context",
       "manual"
     );
@@ -129,3 +146,15 @@ describe("scheduled runtime starts", () => {
     expect(run.stepRuns.some((step) => step.stepId === "timer")).toBe(false);
   });
 });
+
+const insertRoot = (database: RuntimeDatabase, targetId: string, source: "manual" | "schedule"): string => {
+  const rootRunId = randomUUID();
+  const timestamp = new Date().toISOString();
+  database.connection().prepare(`
+    INSERT INTO root_runs (
+      root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
+      config_hash, snapshot_hash, created_at, updated_at
+    ) VALUES (?, 'loop', ?, ?, 'queued', ?, ?, ?, 'config', 'snapshot', ?, ?)
+  `).run(rootRunId, targetId, source, `/tmp/${rootRunId}`, `ballet/run/${rootRunId}`, "a".repeat(40), timestamp, timestamp);
+  return rootRunId;
+};
