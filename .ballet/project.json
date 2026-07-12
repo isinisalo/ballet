@@ -123,14 +123,29 @@
     },
     {
       "id": "timed",
-      "start": "new-step",
+      "start": "schedule-dev-deployment",
       "steps": [
         {
-          "id": "new-step",
-          "description": "",
+          "id": "schedule-dev-deployment",
+          "description": "Käynnistä kehitysympäristön deploymentin validointi arkipäivisin klo 09:00.",
+          "type": "scheduled",
+          "schedule": {
+            "time": "09:00",
+            "timeZone": "Europe/Helsinki",
+            "kind": "recurring",
+            "startsOn": "2026-07-13",
+            "cadence": "weekdays"
+          },
+          "on": {
+            "triggered": "deploy-and-validate-dev"
+          }
+        },
+        {
+          "id": "deploy-and-validate-dev",
+          "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
           "on": {
             "approved": {
-              "end": "failed"
+              "end": "completed"
             },
             "rejected": {
               "end": "failed"

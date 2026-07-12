@@ -1,9 +1,9 @@
 import { readdir, readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 import { projectRuntimeConfigSchema } from "../../shared/api/runtime-schemas.js";
+import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 import type { Agent, AgentNodeStyle } from "../../shared/domain/agents.js";
 import type { ProjectAutomationConfig, StepTransitionTarget } from "../../shared/domain/automation.js";
 import { validateProjectAutomationConfig } from "../automation.js";
@@ -116,7 +116,7 @@ describe("repository Loop engineering configuration", () => {
     }
   });
 
-  it("keeps the four simple Loops and their 3/1/4 approved paths", async () => {
+  it("keeps the four simple Loops, scheduled timed Loop, and their approved paths", async () => {
     const config = automationConfigSchema.parse(await readJson(".ballet/project.json"));
     expect(validateProjectAutomationConfig(config, configuredAgents())).toEqual([]);
     expect(routeShape(config)).toEqual({
@@ -143,12 +143,20 @@ describe("repository Loop engineering configuration", () => {
       "dev-deployment": {
         start: "deploy-and-validate-dev",
         steps: [["deploy-and-validate-dev", "agent", "dev-deploy-agent", { approved: { end: "completed" }, rejected: { end: "failed" } }]]
+      },
+      timed: {
+        start: "schedule-dev-deployment",
+        steps: [
+          ["schedule-dev-deployment", "scheduled", null, { triggered: "deploy-and-validate-dev" }],
+          ["deploy-and-validate-dev", "agent", "dev-deploy-agent", { approved: { end: "completed" }, rejected: { end: "failed" } }]
+        ]
       }
     });
     expect({
       deliveryPlanning: approvedTransitionCount(config, "delivery-planning"),
       uiDesign: approvedTransitionCount(config, "ui-design"),
-      implementationToDev: approvedTransitionCount(config, "implementation")
-    }).toEqual({ deliveryPlanning: 3, uiDesign: 1, implementationToDev: 4 });
+      implementationToDev: approvedTransitionCount(config, "implementation"),
+      timed: approvedTransitionCount(config, "timed")
+    }).toEqual({ deliveryPlanning: 3, uiDesign: 1, implementationToDev: 4, timed: 1 });
   });
 });
