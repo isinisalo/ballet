@@ -23,7 +23,7 @@ function scheduledLoop(schedule: ProjectStepSchedule): ProjectLoop {
 }
 
 const weekdayLoop = scheduledLoop({ kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" });
-const config = (loop: ProjectLoop): ProjectAutomationConfig => ({ version: 5, loops: [loop] });
+const config = (loop: ProjectLoop): ProjectAutomationConfig => ({ version: 6, loops: [loop] });
 
 describe("scheduled Loop editor UI", () => {
   it("offers Scheduled only for an eligible start Step and preserves its approved local target", async () => {

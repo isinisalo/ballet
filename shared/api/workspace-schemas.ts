@@ -5,6 +5,8 @@ import {
   type ProjectAutomationConfig,
   type ProjectStepSchedule
 } from "../domain/automation.js";
+import type { ProjectConfiguration } from "../domain/projectConfig.js";
+import { portableAgentRuntimeIntentSchema } from "./runtime-schemas.js";
 import {
   loopConnectionPointStyles,
   loopEdgeLineStyles,
@@ -268,9 +270,15 @@ const projectLoopSchema = z.object({
 }).strict();
 
 export const automationConfigSchema = z.object({
-  version: z.literal(5),
+  version: z.literal(6),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
+
+export const projectConfigSchema = z.object({
+  version: z.literal(6),
+  agents: z.record(z.string().trim().min(1).max(200), portableAgentRuntimeIntentSchema),
+  loops: z.array(projectLoopSchema)
+}).strict() satisfies z.ZodType<ProjectConfiguration>;
 
 export const eventIntakeSchema = z.object({
   projectId: z.string().min(1),

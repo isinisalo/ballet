@@ -25,6 +25,10 @@ describe("agent runtime configuration UI", () => {
     render(<AgentExecutionForm agentId="agent-1" />);
 
     expect(await screen.findByText(/Portable intent: Codex CLI · gpt-test · high · network on/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Provider")).toHaveTextContent("Codex CLI");
+    expect(screen.getByLabelText("Model")).toHaveTextContent("gpt-test");
+    expect(screen.getByLabelText("Reasoning effort")).toHaveTextContent("high");
+    expect(screen.getByRole("link", { name: "Open Runtimes" })).toHaveAttribute("href", "/runtimes");
     await user.click(screen.getByLabelText("Runtime"));
     await user.click(await screen.findByRole("option", { name: /Iiro's MacBook Pro/ }));
 

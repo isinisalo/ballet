@@ -29,7 +29,8 @@ The canonical automation file is [`.ballet/project.json`](.ballet/project.json).
 
 ```json
 {
-  "version": 5,
+  "version": 6,
+  "agents": {},
   "loops": [
     {
       "id": "implementation",
@@ -104,8 +105,7 @@ Scheduled runs do not add Run input; the triggered agent's saved instructions de
 
 Runtime devices, provider commands, local paths, credentials, runs, and logs do not belong in `project.json`. Commit the portable project sources instead:
 
-- `.ballet/project.json` for automation v5, including Loop themes and Step node sizes;
-- `.ballet/runtime.json` for agent-specific provider, model, reasoning, and network intent;
+- `.ballet/project.json` for project configuration v6, including agent-specific provider/model/reasoning/network intent, Loops, themes, and Step node sizes;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` for project documents;
 - `.codex/agents/*.toml` for agents; and
 - `.agents/skills/**/SKILL.md` for repository skills.
@@ -122,6 +122,8 @@ Machine-local and mutable execution data lives outside the repository:
 | `~/.ballet/cache/config-snapshots/` | Content-addressed snapshots of `.ballet`, `.codex/agents`, and `.agents/skills` |
 | `~/Library/Logs/Ballet/` | Daemon and managed local-server logs |
 | macOS Keychain | The daemon bearer token; it is not written to the daemon config or project |
+
+Running `ballet` from a configured checkout starts the project-bound server and daemon, restores a locally persisted pairing when the control-plane registry is missing, waits briefly for runtime readiness, and opens the Ballet UI. Recovery is restricted to the loopback server and requires both the local control token and the original Keychain credential.
 
 Set `BALLET_HOME` to relocate daemon-managed files, `BALLET_LOG_DIR` to relocate logs, or `BALLET_CONTROL_PLANE_DB_PATH` to override the SQLite path.
 

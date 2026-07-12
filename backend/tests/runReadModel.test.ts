@@ -337,7 +337,7 @@ const appData = (): AppData => ({
     id, name: id, description: `${id} agent`, instructions: `${id} instructions`, skills: [], enabled: true,
     createdAt: "2026-07-11T08:00:00.000Z", updatedAt: "2026-07-11T08:00:00.000Z"
   })),
-  automation: { version: 5, loops: [DELIVERY, RELEASE] },
+  automation: { version: 6, loops: [DELIVERY, RELEASE] },
   automationIssues: [],
   loopThemes: [...builtInLoopThemes],
   loopThemeIssues: []

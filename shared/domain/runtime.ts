@@ -106,11 +106,6 @@ export interface PortableAgentRuntimeIntent {
   policy: Pick<ExecutionPolicy, "network">;
 }
 
-export interface ProjectRuntimeConfig {
-  version: 1;
-  agents: Record<string, PortableAgentRuntimeIntent>;
-}
-
 export interface AgentRuntimeAttachment {
   projectId: string;
   agentId: string;

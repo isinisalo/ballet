@@ -35,7 +35,7 @@ const loop: ProjectLoop = {
   }]
 };
 
-const config: ProjectAutomationConfig = { version: 5, loops: [loop] };
+const config: ProjectAutomationConfig = { version: 6, loops: [loop] };
 
 describe("compact Loop editor UI", () => {
   it("opens the restored 50/50 sheet with its 3/2 instructions and Step editor panes", async () => {
@@ -93,7 +93,7 @@ describe("compact Loop editor UI", () => {
     expect(onChange).toHaveBeenCalledWith({ ...loop, theme: "default" });
 
     const defaultLoop = { ...loop, theme: "default" as const };
-    view.rerender(<LoopEditor config={{ version: 5, loops: [defaultLoop] }} loop={defaultLoop} loops={[defaultLoop]} agents={agents} themes={builtInLoopThemes} locked onChange={onChange} />);
+    view.rerender(<LoopEditor config={{ version: 6, loops: [defaultLoop] }} loop={defaultLoop} loops={[defaultLoop]} agents={agents} themes={builtInLoopThemes} locked onChange={onChange} />);
     expect(screen.getByRole("combobox", { name: "Loop theme" })).toBeDisabled();
     expect(document.querySelector("[data-loop-canvas]")).toHaveAttribute("data-loop-theme", "default");
     expect(await screen.findByRole("button", { name: "Edit step build" })).toHaveAttribute("data-loop-node-renderer", "flat");
@@ -115,7 +115,7 @@ describe("compact Loop editor UI", () => {
     expect(onChange).toHaveBeenCalledWith({ ...loop, theme: "project-aurora" });
 
     const customLoop = { ...loop, theme: customTheme.id };
-    view.rerender(<LoopEditor config={{ version: 5, loops: [customLoop] }} loop={customLoop} loops={[customLoop]} agents={agents} themes={[...builtInLoopThemes, customTheme]} locked={false} onChange={onChange} />);
+    view.rerender(<LoopEditor config={{ version: 6, loops: [customLoop] }} loop={customLoop} loops={[customLoop]} agents={agents} themes={[...builtInLoopThemes, customTheme]} locked={false} onChange={onChange} />);
     expect(document.querySelector("[data-loop-canvas]")).toHaveAttribute("data-loop-theme", "project-aurora");
     expect(await screen.findByRole("button", { name: "Edit step build" })).toHaveAttribute("data-loop-node-renderer", "flat");
   });

@@ -16,7 +16,7 @@ afterEach(async () => {
 });
 
 const config = (target: ProjectExecutableStep): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "scheduled-delivery",
     theme: "open-ai",

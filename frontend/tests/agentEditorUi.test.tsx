@@ -42,10 +42,14 @@ describe("agent instructions workspace", () => {
     expect(screen.queryByRole("tab", { name: "Custom Args" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Running")).toHaveLength(2);
     expect(screen.getByLabelText("Runtime")).toBeInTheDocument();
+    expect(screen.getByText("Markdown Preview")).toBeInTheDocument();
+    expect(screen.getByText("Edit")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Role" })).toBeInTheDocument();
 
     const instructions = screen.getByLabelText("Instructions");
     await user.clear(instructions);
     await user.type(instructions, "# Role\nPlan the technical direction.");
+    expect(screen.getByText("Plan the technical direction.", { selector: "p" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save agent" }));
 
     await waitFor(() => expect(save).toHaveBeenCalledWith("agents", expect.objectContaining({

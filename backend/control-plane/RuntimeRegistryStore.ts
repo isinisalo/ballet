@@ -85,6 +85,33 @@ export class RuntimeRegistryStore {
     return row ? toBackend(row) : undefined;
   }
 
+  restoreLocalBackends(projectId: string, deviceId: string, backends: Array<{ id: string; provider: RuntimeProvider }>): void {
+    const timestamp = this.now().toISOString();
+    const capabilities: RuntimeCapabilities = {
+      models: [], supportsResume: false, supportsStructuredOutput: false,
+      policy: { workspaceWrite: false, networkControl: false, readOnlyRoots: false },
+      refreshedAt: timestamp
+    };
+    const transaction = this.connection().transaction(() => {
+      for (const backend of backends) {
+        const existing = this.connection().prepare("SELECT project_id, device_id, provider FROM runtime_backends WHERE backend_id = ?")
+          .get(backend.id) as { project_id: string; device_id: string; provider: RuntimeProvider } | undefined;
+        if (existing && (existing.project_id !== projectId || existing.device_id !== deviceId || existing.provider !== backend.provider)) {
+          throw new ControlPlaneConflictError(`Runtime backend ${backend.id} conflicts with persisted state.`);
+        }
+        if (!existing) {
+          this.connection().prepare(`
+            INSERT INTO runtime_backends (
+              backend_id, project_id, device_id, provider, auth_status, health,
+              capabilities_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'unknown', 'offline', ?, ?, ?)
+          `).run(backend.id, projectId, deviceId, backend.provider, JSON.stringify(capabilities), timestamp, timestamp);
+        }
+      }
+    });
+    transaction();
+  }
+
   heartbeat(deviceId: string, input: DaemonHeartbeat): { device: RuntimeDevice; refreshRequested: boolean; restartRequested: boolean } {
     const transaction = this.connection().transaction(() => {
       const current = this.require(deviceId);

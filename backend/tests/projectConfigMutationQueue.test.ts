@@ -75,12 +75,12 @@ const createProject = async (): Promise<string> => {
   process.env.BALLET_CONTROL_PLANE_DB_PATH = path.join(root, "runtime.sqlite");
   await mkdir(path.join(root, ".ballet"), { recursive: true });
   await writeFile(path.join(root, ".ballet", "project.md"), "---\nid: mutation-queue\nname: Mutation queue\n---\n", "utf8");
-  await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify(config(), null, 2), "utf8");
+  await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({ ...config(), agents: {} }, null, 2), "utf8");
   return root;
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [automationLoop("first-loop"), automationLoop("second-loop")]
 });
 

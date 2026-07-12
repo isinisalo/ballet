@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { supervisedProgramArguments } from "./LaunchdLogSupervisor.js";
+import type { DaemonConfig } from "../daemon/config/DaemonConfigStore.js";
+import { pairingFactsFromConfig } from "./PairingClient.js";
 
 const execFileAsync = promisify(execFile);
 const LABEL = "ai.ballet.server";
@@ -20,6 +22,12 @@ export interface LocalLifecycleStatus {
   activeRuns: number;
   pendingFinalizations: number;
   idle: boolean;
+}
+
+export interface LocalRuntimeStatus {
+  registered: boolean;
+  online: boolean;
+  backendsReady: boolean;
 }
 
 export interface LocalServerServiceOptions {
@@ -73,6 +81,35 @@ export class LocalServerService {
     return this.lifecycleRequest(serverUrl, controlToken, "GET", timeoutMs);
   }
 
+  async recoverRuntime(serverUrl: string, controlToken: string, config: DaemonConfig, daemonToken: string): Promise<void> {
+    const facts = pairingFactsFromConfig(config);
+    const response = await this.localRequest(serverUrl, controlToken, "/api/local/lifecycle/runtime/recover", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: config.projectId,
+        deviceId: config.deviceId,
+        daemonToken,
+        backends: config.backends.map(({ id, provider }) => ({ id, provider })),
+        ...facts
+      })
+    });
+    if (!response.ok) throw new Error(`Ballet runtime recovery failed with HTTP ${response.status}: ${(await response.text()).slice(0, 1000)}`);
+  }
+
+  async waitForRuntime(serverUrl: string, controlToken: string, deviceId: string, timeoutMs = 20_000): Promise<LocalRuntimeStatus> {
+    const deadline = Date.now() + timeoutMs;
+    let status: LocalRuntimeStatus = { registered: false, online: false, backendsReady: false };
+    while (Date.now() < deadline) {
+      const response = await this.localRequest(serverUrl, controlToken, `/api/local/lifecycle/runtime/${encodeURIComponent(deviceId)}`);
+      if (response.ok) {
+        status = await response.json() as LocalRuntimeStatus;
+        if (status.online && status.backendsReady) return status;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    return status;
+  }
+
   private async installAndStart(config: LocalServerConfiguration, server: URL): Promise<void> {
     await mkdir(path.dirname(this.plistPath), { recursive: true });
     await mkdir(this.options.logDirectory, { recursive: true });
@@ -116,15 +153,26 @@ export class LocalServerService {
   }
 
   private async lifecycleRequest(serverUrl: string, controlToken: string, method: "GET" | "POST", timeoutMs: number): Promise<LocalLifecycleStatus> {
-    const server = localServerUrl(serverUrl);
-    const response = await this.fetchImpl(new URL("/api/local/lifecycle", server), {
+    const response = await this.localRequest(serverUrl, controlToken, "/api/local/lifecycle", {
       method,
-      headers: { Accept: "application/json", Authorization: `Bearer ${controlToken}` },
-      ...(method === "POST" ? { body: "{}", headers: { Accept: "application/json", Authorization: `Bearer ${controlToken}`, "Content-Type": "application/json" } } : {}),
+      ...(method === "POST" ? { body: "{}" } : {}),
       signal: AbortSignal.timeout(Math.max(1, timeoutMs))
     });
     if (!response.ok) throw new Error(`Ballet lifecycle request failed with HTTP ${response.status}.`);
     return response.json() as Promise<LocalLifecycleStatus>;
+  }
+
+  private localRequest(serverUrl: string, controlToken: string, pathname: string, init: RequestInit = {}): Promise<Response> {
+    const server = localServerUrl(serverUrl);
+    return this.fetchImpl(new URL(pathname, server), {
+      ...init,
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${controlToken}`,
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...init.headers
+      }
+    });
   }
 
   private domain(): string {

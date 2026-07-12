@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const SCHEMA_VERSION = "7";
+const SCHEMA_VERSION = 8;
 
 export const resolveControlPlaneDbPath = (): string => {
   const configured = process.env.BALLET_CONTROL_PLANE_DB_PATH?.trim();
@@ -23,7 +23,12 @@ export class ControlPlaneDatabase {
     db.pragma("synchronous = FULL");
     db.pragma("busy_timeout = 5000");
     db.pragma("foreign_keys = ON");
-    this.createSchema(db);
+    try {
+      this.createSchema(db);
+    } catch (error) {
+      db.close();
+      throw error;
+    }
     this.db = db;
     return db;
   }
@@ -39,8 +44,10 @@ export class ControlPlaneDatabase {
     `).all() as Array<{ name: string }>).map((row) => row.name));
     db.exec("CREATE TABLE IF NOT EXISTS control_plane_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);");
     const existingVersion = db.prepare("SELECT value FROM control_plane_metadata WHERE key = 'schema_version'").get() as { value: string } | undefined;
-    if ((existingVersion && existingVersion.value !== SCHEMA_VERSION)
-      || (!existingVersion && preexistingTables.size > 0)) this.resetSchema(db);
+    if (!existingVersion && preexistingTables.size > 0) {
+      throw new Error("Control-plane database has no schema version; refusing to delete persisted runtime state.");
+    }
+    if (existingVersion) this.migrate(db, existingVersion.value);
     db.exec(`
       CREATE TABLE IF NOT EXISTS control_plane_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS admins (
@@ -242,8 +249,8 @@ export class ControlPlaneDatabase {
     `);
     this.createExecutionEventRetentionSchema(db);
     const version = db.prepare("SELECT value FROM control_plane_metadata WHERE key = 'schema_version'").get() as { value: string } | undefined;
-    if (version && version.value !== SCHEMA_VERSION) throw new Error(`Unsupported control-plane schema version ${version.value}. Expected ${SCHEMA_VERSION}.`);
-    if (!version) db.prepare("INSERT INTO control_plane_metadata (key, value) VALUES ('schema_version', ?)").run(SCHEMA_VERSION);
+    if (version && Number(version.value) !== SCHEMA_VERSION) throw new Error(`Unsupported control-plane schema version ${version.value}. Expected ${SCHEMA_VERSION}.`);
+    if (!version) db.prepare("INSERT INTO control_plane_metadata (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
   }
 
   private createExecutionEventRetentionSchema(db: Database.Database): void {
@@ -263,40 +270,18 @@ export class ControlPlaneDatabase {
     `);
   }
 
-  private resetSchema(db: Database.Database): void {
-    db.exec(`
-      PRAGMA foreign_keys = OFF;
-      DROP TRIGGER IF EXISTS execution_task_spec_is_immutable;
-      DROP TABLE IF EXISTS execution_event_state;
-      DROP TABLE IF EXISTS execution_event_receipts;
-      DROP TABLE IF EXISTS root_run_finalizations;
-      DROP TABLE IF EXISTS execution_events;
-      DROP TABLE IF EXISTS device_logs;
-      DROP TABLE IF EXISTS execution_tasks;
-      DROP TABLE IF EXISTS agent_runs;
-      DROP TABLE IF EXISTS agent_runtime_attachments;
-      DROP TABLE IF EXISTS agent_execution_bindings;
-      DROP TABLE IF EXISTS agent_run_logs;
-      DROP TABLE IF EXISTS consumer_offsets;
-      DROP TABLE IF EXISTS step_run_logs;
-      DROP TABLE IF EXISTS loop_instances;
-      DROP TABLE IF EXISTS loop_instance_steps;
-      DROP TABLE IF EXISTS thread_bindings;
-      DROP TABLE IF EXISTS project_checkouts;
-      DROP TABLE IF EXISTS projects;
-      DROP TABLE IF EXISTS runtime_backends;
-      DROP TABLE IF EXISTS pairing_sessions;
-      DROP TABLE IF EXISTS daemon_tokens;
-      DROP TABLE IF EXISTS runtime_devices;
-      DROP TABLE IF EXISTS admin_sessions;
-      DROP TABLE IF EXISTS admins;
-      DROP TABLE IF EXISTS loop_schedule_state;
-      DROP TABLE IF EXISTS step_runs;
-      DROP TABLE IF EXISTS loop_runs;
-      DROP TABLE IF EXISTS events;
-      DROP TABLE IF EXISTS runtime_metadata;
-      DROP TABLE IF EXISTS control_plane_metadata;
-      PRAGMA foreign_keys = ON;
-    `);
+  private migrate(db: Database.Database, source: string): void {
+    const version = Number(source);
+    if (!Number.isInteger(version) || version < 7 || version > SCHEMA_VERSION) {
+      throw new Error(`Unsupported control-plane schema version ${source}. Expected version 7 or ${SCHEMA_VERSION}; persisted state was left unchanged.`);
+    }
+    if (version === SCHEMA_VERSION) return;
+    const migrate = db.transaction(() => {
+      // Version 8 establishes non-destructive migrations. Version 7 already has
+      // the latest table shape, so only its metadata changes.
+      db.prepare("UPDATE control_plane_metadata SET value = ? WHERE key = 'schema_version'")
+        .run(String(SCHEMA_VERSION));
+    });
+    migrate();
   }
 }

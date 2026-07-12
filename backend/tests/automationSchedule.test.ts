@@ -18,7 +18,7 @@ import {
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-schedule-v5-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-schedule-v6-"));
   roots.push(root);
   return root;
 };
@@ -39,7 +39,7 @@ const agent: Agent = {
 };
 
 const scheduledConfig = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "delivery",
     theme: "open-ai",

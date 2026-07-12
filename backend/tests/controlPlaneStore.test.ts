@@ -1,3 +1,5 @@
+// This protocol suite intentionally keeps the shared control-plane fixture and
+// end-to-end state-transition assertions together to avoid divergent fixtures.
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -223,7 +225,7 @@ const verifyModelDiscoveryReadiness = async () => {
 describe("control-plane persistence and execution protocol", () => {
   it("splits portable runtime intent from the machine-local attachment and derives the device", async () => {
     const control = await fixture();
-    const filename = path.join(control.root, ".ballet", "runtime.json");
+    const filename = path.join(control.root, ".ballet", "project.json");
     const configuration = control.service.getAgentRuntime("developer");
 
     expect(configuration).toMatchObject({
@@ -238,10 +240,11 @@ describe("control-plane persistence and execution protocol", () => {
       issues: []
     });
     expect(JSON.parse(await readFile(filename, "utf8"))).toEqual({
-      version: 1,
+      version: 6,
       agents: {
         developer: { provider: "codex", model: "gpt-5", reasoning: "high", policy: { network: false } }
-      }
+      },
+      loops: []
     });
     expect(control.database.connection().prepare(`
       SELECT runtime_backend_id, read_only_roots_json FROM agent_runtime_attachments
@@ -249,13 +252,13 @@ describe("control-plane persistence and execution protocol", () => {
     `).get()).toEqual({ runtime_backend_id: control.backendId, read_only_roots_json: "[]" });
 
     control.service.removeAgentRuntime("developer");
-    expect(JSON.parse(await readFile(filename, "utf8"))).toEqual({ version: 1, agents: {} });
+    expect(JSON.parse(await readFile(filename, "utf8"))).toEqual({ version: 6, agents: {}, loops: [] });
     expect(control.database.connection().prepare("SELECT 1 FROM agent_runtime_attachments WHERE agent_id = 'developer'").get()).toBeUndefined();
   });
 
   it("surfaces invalid and orphan runtime config without silently rewriting it", async () => {
     const control = await fixture();
-    const filename = path.join(control.root, ".ballet", "runtime.json");
+    const filename = path.join(control.root, ".ballet", "project.json");
     const invalid = "{ invalid runtime config\n";
     await writeFile(filename, invalid, "utf8");
 
@@ -270,10 +273,11 @@ describe("control-plane persistence and execution protocol", () => {
     expect(await readFile(filename, "utf8")).toBe(invalid);
 
     const mismatchSource = `${JSON.stringify({
-      version: 1,
+      version: 6,
       agents: {
         developer: { provider: "copilot", model: "gpt-5", reasoning: "high", policy: { network: false } }
-      }
+      },
+      loops: []
     }, null, 2)}\n`;
     await writeFile(filename, mismatchSource, "utf8");
     expect(control.service.getAgentRuntime("developer").issues).toContainEqual(expect.objectContaining({ code: "provider_mismatch" }));
@@ -281,11 +285,12 @@ describe("control-plane persistence and execution protocol", () => {
     expect(await readFile(filename, "utf8")).toBe(mismatchSource);
 
     const orphanSource = `${JSON.stringify({
-      version: 1,
+      version: 6,
       agents: {
         developer: { provider: "codex", model: "gpt-5", reasoning: "high", policy: { network: false } },
         ghost: { provider: "codex", model: "gpt-5", reasoning: "high", policy: { network: false } }
-      }
+      },
+      loops: []
     }, null, 2)}\n`;
     await writeFile(filename, orphanSource, "utf8");
     await expect(control.service.runtimeConfigurationIssues()).resolves.toContainEqual(expect.objectContaining({

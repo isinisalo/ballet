@@ -17,14 +17,6 @@ export const portableAgentRuntimeIntentSchema = z.object({
   policy: z.object({ network: z.boolean() }).strict()
 }).strict();
 
-export const projectRuntimeConfigSchema = z.object({
-  version: z.literal(1),
-  agents: z.record(
-    z.string().trim().min(1).max(200),
-    portableAgentRuntimeIntentSchema
-  )
-}).strict();
-
 export const agentRuntimeConfigurationBodySchema = z.object({
   runtimeBackendId: idSchema,
   model: z.string().trim().min(1).max(200),
@@ -75,6 +67,23 @@ export const daemonPairingPollBodySchema = z.object({
   daemonVersion: z.string().trim().min(1).max(100),
   daemonId: idSchema
 }).strict();
+
+export const localRuntimeRecoveryBodySchema = z.object({
+  projectId: projectIdSchema,
+  deviceId: idSchema,
+  daemonId: idSchema,
+  hostname: z.string().trim().min(1).max(255),
+  displayName: z.string().trim().min(1).max(200),
+  platform: z.literal("darwin"),
+  architecture: z.enum(["arm64", "x64"]),
+  daemonVersion: z.string().trim().min(1).max(100),
+  daemonToken: z.string().min(32).max(512),
+  backends: z.array(z.object({ id: idSchema, provider: runtimeProviderSchema }).strict()).length(2)
+}).strict().superRefine((value, context) => {
+  if (new Set(value.backends.map((backend) => backend.provider)).size !== value.backends.length) {
+    context.addIssue({ code: "custom", path: ["backends"], message: "Recovered runtime providers must be unique." });
+  }
+});
 
 export const runtimeModelCapabilitySchema = z.object({
   id: z.string().trim().min(1).max(200),

@@ -11,7 +11,7 @@ import type {
   RuntimeConfigurationIssue,
   RuntimePreflightIssue
 } from "../../shared/domain/runtime.js";
-import { RuntimeIntentRepository } from "../runtime-config/RuntimeIntentRepository.js";
+import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 import type { AgentExecutionStore } from "./AgentExecutionStore.js";
 import { valueHash } from "./crypto.js";
 import type { ProjectStore, RegisteredProject } from "./ProjectStore.js";
@@ -39,7 +39,7 @@ export class RuntimePreflightService {
     private readonly projects: ProjectStore,
     private readonly registry: RuntimeRegistryStore,
     private readonly agents: AgentExecutionStore,
-    private readonly intents = new RuntimeIntentRepository()
+    private readonly projectConfig = new ProjectConfigurationRepository()
   ) {}
 
   setProject(project: RegisteredProject): void {
@@ -49,7 +49,7 @@ export class RuntimePreflightService {
   configuration(agentId: string): AgentRuntimeConfiguration {
     const project = this.activeProject();
     if (!project) return { issues: [missingAttachment(agentId, "No active project is registered.")] };
-    const loaded = this.intents.load(project.checkoutPath);
+    const loaded = this.projectConfig.load(project.checkoutPath);
     const attachment = this.agents.getAttachment(project.id, agentId);
     if (!loaded.config) return { attachment, issues: loaded.issues };
     const intent = loaded.config.agents[agentId];
@@ -58,7 +58,7 @@ export class RuntimePreflightService {
       code: "missing_intent",
       path: `agents.${agentId}`,
       agentId,
-      message: "Agent has no portable runtime intent in .ballet/runtime.json."
+      message: "Agent has no portable runtime intent in .ballet/project.json."
     });
     if (!attachment) issues.push(missingAttachment(agentId, "No compatible computer is attached on this machine."));
     const resolved = intent && attachment
@@ -70,7 +70,7 @@ export class RuntimePreflightService {
   configurationIssues(agentIds: readonly string[]): RuntimeConfigurationIssue[] {
     const project = this.activeProject();
     if (!project) return [missingAttachment("*", "No active project is registered.")];
-    const loaded = this.intents.load(project.checkoutPath);
+    const loaded = this.projectConfig.load(project.checkoutPath);
     if (!loaded.config) return loaded.issues;
     const known = new Set(agentIds);
     const issues = agentIds.flatMap((agentId) => this.configuration(agentId).issues);
@@ -96,11 +96,32 @@ export class RuntimePreflightService {
   configuredAgentIds(): string[] {
     const project = this.activeProject();
     if (!project) return [];
-    const loaded = this.intents.load(project.checkoutPath);
+    const loaded = this.projectConfig.load(project.checkoutPath);
     return [...new Set([
       ...Object.keys(loaded.config?.agents ?? {}),
       ...this.agents.attachedAgentIds(project.id)
     ])].sort();
+  }
+
+  restoreMissingAttachments(backends: readonly RuntimeBackend[]): string[] {
+    const project = this.activeProject();
+    if (!project) return [];
+    const loaded = this.projectConfig.load(project.checkoutPath);
+    if (!loaded.config) return [];
+    const restored: string[] = [];
+    for (const [agentId, intent] of Object.entries(loaded.config.agents)) {
+      if (this.agents.getAttachment(project.id, agentId)) continue;
+      const compatible = backends.filter((backend) => backend.projectId === project.id && backend.provider === intent.provider);
+      if (compatible.length !== 1) continue;
+      this.agents.putAttachment({
+        projectId: project.id,
+        agentId,
+        runtimeBackendId: compatible[0]!.id,
+        readOnlyRoots: []
+      });
+      restored.push(agentId);
+    }
+    return restored;
   }
 
   putConfiguration(
@@ -110,7 +131,7 @@ export class RuntimePreflightService {
   ): AgentRuntimeConfiguration {
     const project = this.activeProject();
     if (!project) return { issues: [missingAttachment(agentId, "No active project is registered.")] };
-    this.intents.put(project.checkoutPath, agentId, intent);
+    this.projectConfig.putAgentIntent(project.checkoutPath, agentId, intent);
     this.agents.putAttachment({ projectId: project.id, agentId, ...attachment });
     return this.configuration(agentId);
   }
@@ -118,7 +139,7 @@ export class RuntimePreflightService {
   removeConfiguration(agentId: string): void {
     const project = this.activeProject();
     if (!project) return;
-    this.intents.remove(project.checkoutPath, agentId);
+    this.projectConfig.removeAgentIntent(project.checkoutPath, agentId);
     this.agents.removeAttachment(project.id, agentId);
   }
 

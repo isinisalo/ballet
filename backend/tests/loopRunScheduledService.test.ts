@@ -178,7 +178,7 @@ const serviceContext = async (targetType: "agent" | "human", now: () => Date = (
 };
 
 const automationConfig = (targetType: "agent" | "human"): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "scheduled-work",
     theme: "open-ai",

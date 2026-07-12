@@ -6,7 +6,7 @@ import { buildLoopVisualProjection } from "../loops/loopVisualProjection";
 
 const previewLoopId = "theme-preview";
 const previewConfig: ProjectAutomationConfig = {
-  version: 5,
+  version: 6,
   loops: [{
     id: previewLoopId,
     theme: "default",

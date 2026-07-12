@@ -142,7 +142,7 @@ const appData = (automation: ProjectAutomationConfig, agentIds: string[]): AppDa
 });
 
 const nestedAutomation = (): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "delivery",
     theme: "open-ai",
@@ -165,7 +165,7 @@ const nestedAutomation = (): ProjectAutomationConfig => ({
 });
 
 const humanTerminalAutomation = (): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "review",
     theme: "open-ai",
@@ -183,7 +183,7 @@ const humanTerminalAutomation = (): ProjectAutomationConfig => ({
 });
 
 const feedbackAutomation = (): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "implementation",
     theme: "open-ai",
@@ -201,7 +201,7 @@ const feedbackAutomation = (): ProjectAutomationConfig => ({
 });
 
 const humanFeedbackAutomation = (): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "implementation",
     theme: "open-ai",
@@ -219,7 +219,7 @@ const humanFeedbackAutomation = (): ProjectAutomationConfig => ({
 });
 
 const gatedDeploymentAutomation = (): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "implementation",
     theme: "open-ai",
@@ -246,7 +246,7 @@ const gatedDeploymentAutomation = (): ProjectAutomationConfig => ({
 });
 
 const deliveryAutomation = (): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "implementation",
     theme: "open-ai",

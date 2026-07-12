@@ -32,6 +32,34 @@ afterEach(async () => {
 });
 
 describe("local lifecycle HTTP API", () => {
+  it("restricts idempotent runtime recovery to the local control token", async () => {
+    const context = await listen();
+    const recoveryUrl = `${context.url}/runtime/recover`;
+    const body = JSON.stringify({
+      projectId: PROJECT_ID,
+      deviceId: context.deviceId,
+      daemonId: context.daemonId,
+      hostname: "mac.local",
+      displayName: "Local Mac",
+      platform: "darwin",
+      architecture: "arm64",
+      daemonVersion: "1.0.0",
+      daemonToken: context.daemonToken,
+      backends: [
+        { id: context.backendId, provider: "codex" },
+        { id: uuid(), provider: "copilot" }
+      ]
+    });
+    expect((await fetch(recoveryUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body })).status).toBe(401);
+    const response = await fetch(recoveryUrl, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+      body
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ device: { id: context.deviceId }, restoredAgentIds: [] });
+  });
+
   it("authenticates loopback requests, cancels every run beyond the history cap, and waits for finalization", async () => {
     const context = await listen();
     const authorized = { Authorization: `Bearer ${TOKEN}` };
@@ -101,6 +129,7 @@ const listen = async () => {
 
   const pairing = control.service.createPairing("Local Mac");
   control.service.approvePairing(pairing.id);
+  const daemonId = uuid();
   const paired = control.service.pollPairing({
     deviceCode: pairing.deviceCode,
     hostname: "mac.local",
@@ -108,7 +137,7 @@ const listen = async () => {
     platform: "darwin",
     architecture: "arm64",
     daemonVersion: "1.0.0",
-    daemonId: uuid()
+    daemonId
   });
   if (!paired.daemonToken || !paired.deviceId) throw new Error("Pairing did not return daemon credentials.");
   const identity = control.service.authenticateDaemon(paired.daemonToken);
@@ -157,6 +186,9 @@ const listen = async () => {
     runtime,
     control,
     identity,
+    daemonId,
+    daemonToken: paired.daemonToken,
+    backendId,
     deviceId: paired.deviceId,
     agentRunId: agentRun.id,
     loopRunId: loop.runId,
@@ -204,7 +236,7 @@ const heartbeat = (backendId: string) => ({
 });
 
 const humanAutomation: ProjectAutomationConfig = {
-  version: 5,
+  version: 6,
   loops: [{
     id: "approval",
     theme: "open-ai",

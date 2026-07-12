@@ -110,6 +110,38 @@ export class PairingStore {
     return { deviceId: row.device_id, tokenId: row.token_id };
   }
 
+  restoreLocalDevice(input: Omit<DaemonPairingPoll, "deviceCode"> & { projectId: string; deviceId: string; daemonToken: string }): void {
+    const transaction = this.connection().transaction(() => {
+      const existing = this.connection().prepare(`
+        SELECT device_id, project_id, daemon_id, revoked_at FROM runtime_devices
+        WHERE device_id = ? OR daemon_id = ? LIMIT 1
+      `).get(input.deviceId, input.daemonId) as {
+        device_id: string; project_id: string; daemon_id: string; revoked_at: string | null;
+      } | undefined;
+      if (existing?.revoked_at) throw new ControlPlaneConflictError("A revoked runtime device cannot be recovered automatically.");
+      if (existing && (existing.device_id !== input.deviceId || existing.daemon_id !== input.daemonId || existing.project_id !== input.projectId)) {
+        throw new ControlPlaneConflictError("Stored runtime identity conflicts with the active project.");
+      }
+      const timestamp = this.now().toISOString();
+      if (!existing) {
+        this.connection().prepare(`
+          INSERT INTO runtime_devices (
+            device_id, project_id, daemon_id, hostname, display_name, platform, architecture,
+            daemon_version, status, paired_at, last_seen_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'offline', ?, ?, ?)
+        `).run(input.deviceId, input.projectId, input.daemonId, input.hostname, input.displayName,
+          input.platform, input.architecture, input.daemonVersion, timestamp, timestamp, timestamp);
+      }
+      const activeToken = this.connection().prepare("SELECT token_id FROM daemon_tokens WHERE device_id = ? AND revoked_at IS NULL")
+        .get(input.deviceId) as { token_id: string } | undefined;
+      if (!activeToken) {
+        this.connection().prepare("INSERT INTO daemon_tokens (token_id, device_id, token_hash, created_at) VALUES (?, ?, ?, ?)")
+          .run(uuid(), input.deviceId, tokenHash(input.daemonToken), timestamp);
+      }
+    });
+    transaction();
+  }
+
   revokeDevice(deviceId: string): void {
     const timestamp = this.now().toISOString();
     const result = this.connection().prepare(`

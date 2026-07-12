@@ -47,7 +47,7 @@ const data = (projectRoot: string, loopIds: string[]): AppData => ({
   events: [],
   loopRuns: [],
   scheduleStates: [],
-  automation: { version: 5, loops: loopIds.map(loop) },
+  automation: { version: 6, loops: loopIds.map(loop) },
   automationIssues: [],
   loopThemes: [...builtInLoopThemes],
   loopThemeIssues: [],

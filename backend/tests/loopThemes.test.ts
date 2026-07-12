@@ -144,7 +144,7 @@ describe("LoopThemeService", () => {
   it("removes a newly created theme when assigning it to the loop fails", async () => {
     const root = await tempRoot();
     const config: ProjectAutomationConfig = {
-      version: 5,
+      version: 6,
       loops: [{
         id: "approval",
         theme: "default",
@@ -159,7 +159,7 @@ describe("LoopThemeService", () => {
       }]
     };
     await mkdir(path.join(root, ".ballet"), { recursive: true });
-    await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify(config), "utf8");
+    await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({ ...config, agents: {} }), "utf8");
     const repository = new LoopThemeRepository();
     const service = new LoopThemeService(
       () => root,
@@ -177,11 +177,11 @@ describe("LoopThemeService", () => {
   it("serializes concurrent create-and-assign transactions without losing loop assignments", async () => {
     const root = await tempRoot();
     const config: ProjectAutomationConfig = {
-      version: 5,
+      version: 6,
       loops: [automationLoop("first-loop"), automationLoop("second-loop")]
     };
     await mkdir(path.join(root, ".ballet"), { recursive: true });
-    await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify(config), "utf8");
+    await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({ ...config, agents: {} }), "utf8");
     let activeSaves = 0;
     let maximumActiveSaves = 0;
     const service = new LoopThemeService(

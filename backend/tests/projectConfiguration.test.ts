@@ -2,8 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { projectRuntimeConfigSchema } from "../../shared/api/runtime-schemas.js";
-import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
+import { projectConfigSchema } from "../../shared/api/workspace-schemas.js";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { LoopNodeSize, ProjectAutomationConfig, StepTransitionTarget } from "../../shared/domain/automation.js";
 import { validateProjectAutomationConfig } from "../automation.js";
@@ -88,7 +87,7 @@ const approvedTransitionCount = (config: ProjectAutomationConfig, initialLoopId:
 
 describe("repository Loop engineering configuration", () => {
   it("keeps exactly the six GPT-5.6 runtime and agent definitions", async () => {
-    const runtime = projectRuntimeConfigSchema.parse(await readJson(".ballet/runtime.json"));
+    const runtime = projectConfigSchema.parse(await readJson(".ballet/project.json"));
     const agentIds = Object.keys(expectedAgents).sort();
     expect(Object.keys(runtime.agents).sort()).toEqual(agentIds);
 
@@ -116,9 +115,10 @@ describe("repository Loop engineering configuration", () => {
   });
 
   it("keeps the four simple Loops, scheduled timed Loop, and their approved paths", async () => {
-    const config = automationConfigSchema.parse(await readJson(".ballet/project.json"));
+    const project = projectConfigSchema.parse(await readJson(".ballet/project.json"));
+    const config: ProjectAutomationConfig = { version: 6, loops: project.loops };
     expect(validateProjectAutomationConfig(config, configuredAgents())).toEqual([]);
-    expect(config.version).toBe(5);
+    expect(config.version).toBe(6);
     expect(config.loops.every((loop) => loop.theme === "open-ai")).toBe(true);
     for (const loop of config.loops) {
       for (const step of loop.steps) {

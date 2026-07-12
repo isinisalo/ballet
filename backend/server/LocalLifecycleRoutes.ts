@@ -3,6 +3,8 @@ import express from "express";
 import type { ControlPlaneService } from "../control-plane/ControlPlaneService.js";
 import type { ControlPlaneDatabase } from "../control-plane/ControlPlaneDatabase.js";
 import type { LoopRunDetails } from "../../shared/domain/runtime.js";
+import { localRuntimeRecoveryBodySchema } from "../../shared/api/runtime-schemas.js";
+import { parseBody } from "../control-plane/http/HttpSupport.js";
 
 export interface LocalLifecycleLoopStore {
   listActiveLoopRuns(): LoopRunDetails[];
@@ -28,6 +30,12 @@ export const createLocalLifecycleRouter = (dependencies: LocalLifecycleDependenc
     next();
   });
   router.get("/", (_req, res) => res.json(lifecycleStatus(dependencies)));
+  router.post("/runtime/recover", (req, res) => {
+    res.json(dependencies.controlPlane.recoverLocalRuntime(parseBody(localRuntimeRecoveryBodySchema, req)));
+  });
+  router.get("/runtime/:deviceId", (req, res) => {
+    res.json(dependencies.controlPlane.localRuntimeStatus(req.params.deviceId ?? ""));
+  });
   router.post("/", async (req, res, next) => {
     try {
       await dependencies.scheduler?.pause();

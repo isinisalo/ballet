@@ -12,7 +12,7 @@ import type {
 } from "../../shared/api/runtime-schemas.js";
 import type { Agent, AgentExecutionState } from "../../shared/domain/agents.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
-import { RuntimeIntentSourceError } from "../runtime-config/RuntimeIntentRepository.js";
+import { ProjectConfigurationSourceError } from "../project-config/ProjectConfigurationRepository.js";
 import type {
     AgentRuntimeConfiguration,
     AgentRun,
@@ -36,6 +36,7 @@ import type { ProjectStore, RegisteredProject } from "./ProjectStore.js";
 import type { RootFinalizationStore } from "./RootFinalizationStore.js";
 import type { LoopPreflightResult, RuntimePreflightService } from "./RuntimePreflightService.js";
 import type { DaemonHeartbeat, RuntimeRegistryStore } from "./RuntimeRegistryStore.js";
+import type { RuntimeProvider } from "../../shared/domain/runtime.js";
 
 type CompleteInput = z.infer<typeof daemonCompleteBodySchema>;
 type FailInput = z.infer<typeof daemonFailBodySchema>;
@@ -100,6 +101,33 @@ export class ControlPlaneService {
   approvePairing(id: string) { return this.options.pairing.approve(id); }
   pollPairing(input: DaemonPairingPoll) { return this.options.pairing.poll(input); }
   authenticateDaemon(token: string) { return this.options.pairing.authenticateDaemon(token); }
+
+  recoverLocalRuntime(input: Omit<DaemonPairingPoll, "deviceCode"> & {
+    projectId: string;
+    deviceId: string;
+    daemonToken: string;
+    backends: Array<{ id: string; provider: RuntimeProvider }>;
+  }) {
+    const project = this.requireActiveProject();
+    if (input.projectId !== project.id) throw new ControlPlaneConflictError("Recovered runtime belongs to another project.");
+    this.options.pairing.restoreLocalDevice(input);
+    this.options.registry.restoreLocalBackends(project.id, input.deviceId, input.backends);
+    const device = this.options.registry.require(input.deviceId);
+    const restoredAgentIds = this.options.preflight.restoreMissingAttachments(device.backends);
+    this.emit("runtime_changed", { deviceId: input.deviceId, restoredAgentIds });
+    return { device, restoredAgentIds };
+  }
+
+  localRuntimeStatus(deviceId: string) {
+    const project = this.requireActiveProject();
+    const device = this.options.registry.get(deviceId);
+    if (!device || device.projectId !== project.id) return { registered: false, online: false, backendsReady: false };
+    return {
+      registered: true,
+      online: device.status === "online",
+      backendsReady: device.backends.length > 0 && device.backends.every((backend) => backend.health !== "offline" && backend.health !== "probing")
+    };
+  }
 
   listDevices(search?: string, status?: "all" | "online" | "issues") { return this.options.registry.list(this.requireActiveProject().id, search, status); }
   getDevice(id: string) { return this.requireActiveDevice(id); }
@@ -174,7 +202,7 @@ export class ControlPlaneService {
         readOnlyRoots: input.policy.readOnlyRoots
       });
     } catch (error) {
-      if (error instanceof RuntimeIntentSourceError) {
+      if (error instanceof ProjectConfigurationSourceError) {
         throw new ControlPlaneRuntimeConfigurationError(error.message, error.issues);
       }
       throw error;
@@ -188,7 +216,7 @@ export class ControlPlaneService {
     try {
       this.options.preflight.removeConfiguration(agentId);
     } catch (error) {
-      if (error instanceof RuntimeIntentSourceError) {
+      if (error instanceof ProjectConfigurationSourceError) {
         throw new ControlPlaneRuntimeConfigurationError(error.message, error.issues);
       }
       throw error;

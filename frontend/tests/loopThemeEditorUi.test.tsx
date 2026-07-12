@@ -32,13 +32,13 @@ const themes = () => builtInLoopThemes.map((theme) => structuredClone(theme));
 const openAiTheme = () => themes().find((theme) => theme.id === "open-ai")!;
 const data = (): AppData => ({
   projects: [], goals: [], adrs: [], agents: [], skills: [], policies: [], eventDefinitions: [], events: [], loopRuns: [],
-  automation: { version: 5, loops: [structuredClone(loop)] }, automationIssues: [], scheduleStates: [],
+  automation: { version: 6, loops: [structuredClone(loop)] }, automationIssues: [], scheduleStates: [],
   loopThemes: themes(), loopThemeIssues: [], projectDocumentTree: []
 });
 
 const successfulCreate = async (theme: LoopTheme): Promise<CreateLoopThemeResponse> => ({
   theme,
-  automation: { version: 5, loops: [{ ...structuredClone(loop), theme: theme.id }] }
+  automation: { version: 6, loops: [{ ...structuredClone(loop), theme: theme.id }] }
 });
 
 function renderEditor(overrides: Partial<React.ComponentProps<typeof LoopThemeEditorView>> = {}) {

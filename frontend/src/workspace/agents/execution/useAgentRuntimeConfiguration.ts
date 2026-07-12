@@ -1,6 +1,7 @@
 import { toErrorMessage } from "@/lib/errors";
 import type { AgentRuntimeConfiguration } from "@shared/api/workspace-contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRuntimeStream } from "@/app/useRuntimeStream";
 import type { RuntimeDevice } from "../../runtimes/types";
 import { agentExecutionApi } from "./agentExecutionApi";
 import { emptyExecutionForm, executionFormError, formFromRuntimeConfiguration } from "./executionOptions";
@@ -30,6 +31,7 @@ export function useAgentRuntimeConfiguration(agentId: string) {
   }, [agentId]);
 
   useEffect(() => { void load(); }, [load]);
+  useRuntimeStream(load);
   const replaceForm = (next: AgentExecutionFormValue) => { const revision = ++revisionRef.current; formRef.current = next; setForm(next); return revision; };
   const updateForm = (patch: Partial<AgentExecutionFormValue>) => replaceForm({ ...formRef.current, ...patch });
   const save = (next = formRef.current, revision = revisionRef.current) => {

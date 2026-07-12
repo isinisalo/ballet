@@ -1,5 +1,43 @@
 {
-  "version": 5,
+  "version": 6,
+  "agents": {
+    "dev-deploy-agent": {
+      "provider": "codex",
+      "model": "gpt-5.6-terra",
+      "reasoning": "medium",
+      "policy": { "network": true }
+    },
+    "implementation-agent": {
+      "provider": "codex",
+      "model": "gpt-5.6-terra",
+      "reasoning": "medium",
+      "policy": { "network": false }
+    },
+    "milestone-task-agent": {
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "reasoning": "medium",
+      "policy": { "network": false }
+    },
+    "review-test-agent": {
+      "provider": "codex",
+      "model": "gpt-5.6-terra",
+      "reasoning": "medium",
+      "policy": { "network": true }
+    },
+    "roadmap-agent": {
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoning": "medium",
+      "policy": { "network": false }
+    },
+    "ui-design-agent": {
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoning": "medium",
+      "policy": { "network": false }
+    }
+  },
   "loops": [
     {
       "id": "delivery-planning",

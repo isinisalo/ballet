@@ -39,7 +39,7 @@ afterEach(async () => {
 });
 
 const automation = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "scheduled-delivery",
     theme: "open-ai",
@@ -266,7 +266,7 @@ describe("Loop scheduler dispatch outcomes", () => {
       lastStatus: undefined
     })]);
 
-    data = workspace({ version: 5, loops: [] });
+    data = workspace({ version: 6, loops: [] });
     await scheduler.trigger();
     expect(database.listLoopScheduleStates()).toEqual([]);
   });

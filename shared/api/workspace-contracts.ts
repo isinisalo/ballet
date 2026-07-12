@@ -55,7 +55,6 @@ import type {
   PairingSession,
   PortableAgentRuntimeIntent,
   ProjectCheckout,
-  ProjectRuntimeConfig,
   ResolvedAgentExecution,
   RespondToStepRunRequest,
   RuntimeBackend,
@@ -68,6 +67,7 @@ import type {
   StartAgentRunRequest,
   StepRun,
 } from "../domain/runtime.js";
+export type { ProjectConfiguration } from "../domain/projectConfig.js";
 import type {
   BalletMode,
   DashboardRunStatus,
@@ -215,7 +215,6 @@ export type {
   ExecutionAgentSnapshot,
   ExecutionPolicy,
   PortableAgentRuntimeIntent,
-  ProjectRuntimeConfig,
   ResolvedAgentExecution,
   AgentRun,
   ExecutionEvent,

@@ -20,7 +20,7 @@ const listen = async (): Promise<{ server: Server; url: string }> => {
 };
 
 const config = {
-  version: 5 as const,
+  version: 6 as const,
   loops: [{
     id: "approval",
     theme: "open-ai" as const,
@@ -36,13 +36,13 @@ const config = {
 };
 
 const projectRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-api-v5-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-api-v6-"));
   roots.push(root);
   process.env.BALLET_PROJECT_ROOT = root;
   process.env.BALLET_CONTROL_PLANE_DB_PATH = path.join(root, "runtime.sqlite");
   await mkdir(path.join(root, ".ballet"), { recursive: true });
   await writeFile(path.join(root, ".ballet/project.md"), "---\nid: project\nname: Project\n---\n", "utf8");
-  await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify(config, null, 2), "utf8");
+  await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({ ...config, agents: {} }, null, 2), "utf8");
   return root;
 };
 

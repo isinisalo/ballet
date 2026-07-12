@@ -12,7 +12,7 @@ import { parseAgentOutcomeText } from "../runtime-policy.js";
 
 const roots: string[] = [];
 const tempDbPath = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-runtime-v5-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-runtime-v8-"));
   roots.push(root);
   return path.join(root, "runtime.sqlite");
 };
@@ -34,7 +34,7 @@ const rejected: AgentOutcome = {
 const openAiTheme = resolveLoopTheme(builtInLoopThemes, "open-ai");
 
 const config = (): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [{
     id: "delivery",
     theme: "open-ai",
@@ -68,23 +68,34 @@ const config = (): ProjectAutomationConfig => ({
   }]
 });
 
-describe("runtime database v5", () => {
-  it("accepts patched SQLite versions and resets legacy runtime tables", async () => {
+describe("runtime database v8", () => {
+  it("accepts patched SQLite versions and migrates v7 without deleting persisted rows", async () => {
     expect(isPatchedSqliteVersion("3.51.3")).toBe(true);
     expect(isPatchedSqliteVersion("3.51.2")).toBe(false);
     const dbPath = await tempDbPath();
-    const legacy = new Database(dbPath);
-    legacy.exec("CREATE TABLE loop_instances (id TEXT PRIMARY KEY); INSERT INTO loop_instances VALUES ('old');");
-    legacy.close();
+    const initial = new RuntimeDatabase(dbPath);
+    initial.connection().prepare("INSERT INTO projects (project_id, repository_url, default_checkout_path, is_active, created_at, updated_at) VALUES ('saved', 'https://example.test/saved.git', '/tmp/saved', 1, 'now', 'now')").run();
+    initial.connection().prepare("UPDATE control_plane_metadata SET value = '7' WHERE key = 'schema_version'").run();
+    initial.close();
+
     const runtime = new RuntimeDatabase(dbPath);
-    const tables = (runtime.connection().prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map((row) => row.name);
-    expect(tables).toEqual(expect.arrayContaining(["loop_runs", "step_runs"]));
-    expect(tables).not.toContain("step_run_logs");
-    expect(tables).not.toContain("loop_instances");
     expect(runtime.connection().prepare(
       "SELECT value FROM control_plane_metadata WHERE key = 'schema_version'"
-    ).get()).toEqual({ value: "7" });
+    ).get()).toEqual({ value: "8" });
+    expect(runtime.connection().prepare("SELECT project_id FROM projects WHERE project_id = 'saved'").get()).toEqual({ project_id: "saved" });
     runtime.close();
+  });
+
+  it("refuses an unknown schema version without deleting persisted rows", async () => {
+    const dbPath = await tempDbPath();
+    const initial = new RuntimeDatabase(dbPath);
+    initial.connection().prepare("INSERT INTO projects (project_id, repository_url, default_checkout_path, is_active, created_at, updated_at) VALUES ('saved', 'https://example.test/saved.git', '/tmp/saved', 1, 'now', 'now')").run();
+    initial.connection().prepare("UPDATE control_plane_metadata SET value = '6' WHERE key = 'schema_version'").run();
+    initial.close();
+    expect(() => new RuntimeDatabase(dbPath).connection()).toThrow("persisted state was left unchanged");
+    const raw = new Database(dbPath, { readonly: true });
+    expect(raw.prepare("SELECT project_id FROM projects WHERE project_id = 'saved'").get()).toEqual({ project_id: "saved" });
+    raw.close();
   });
 
   it("records event intake without starting or advancing any loop", async () => {
@@ -254,7 +265,7 @@ describe("runtime database v5", () => {
   it("blocks a root run after the 20-transition safety limit", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const cyclic: ProjectAutomationConfig = {
-      version: 5,
+      version: 6,
       loops: [{
         id: "cycle",
         theme: "open-ai",

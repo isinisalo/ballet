@@ -13,7 +13,7 @@ import { buildLoopVisualProjection } from "../src/workspace/automation/loops/loo
 import { loopThemes } from "../src/workspace/automation/loops/loopTheme";
 
 const config: ProjectAutomationConfig = {
-  version: 5,
+  version: 6,
   loops: [{
     id: "brief",
     theme: "open-ai",
@@ -47,7 +47,7 @@ const config: ProjectAutomationConfig = {
   }]
 };
 
-describe("v5 compact loop canvas", () => {
+describe("v6 compact loop canvas", () => {
   it("projects Steps and Transitions into the original compact geometry", () => {
     const projection = buildLoopVisualProjection(config, config.loops[0]!);
     const layout = calculateCompositeLoopCanvasLayout({
@@ -69,7 +69,7 @@ describe("v5 compact loop canvas", () => {
 
   it("keeps direct branches, terminal ghosts, labels, and cycle return arcs", () => {
     const cyclic: ProjectAutomationConfig = {
-      version: 5,
+      version: 6,
       loops: [{
         id: "cycle",
         theme: "open-ai",
@@ -165,7 +165,7 @@ describe("celestial Loop Canvas geometry", () => {
         on: { approved: { end: "completed" }, rejected: { end: "failed" } }
       }]
     } satisfies ProjectAutomationConfig["loops"][number];
-    const scheduledConfig = { version: 5, loops: [scheduledLoop] } satisfies ProjectAutomationConfig;
+    const scheduledConfig = { version: 6, loops: [scheduledLoop] } satisfies ProjectAutomationConfig;
     const projection = buildLoopVisualProjection(scheduledConfig, scheduledLoop);
     const layout = calculateCompositeLoopCanvasLayout({ config: projection.config, selectedLoopId: scheduledLoop.id, recordsByLoopId: projection.recordsByLoopId });
     const scheduledNode = layout.nodes.find((node) => node.record?.step?.scheduled);
@@ -188,7 +188,7 @@ describe("celestial Loop Canvas geometry", () => {
         { id: "human", type: "human", nodeSize: "small", description: "", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }
       ]
     } satisfies ProjectAutomationConfig["loops"][number];
-    const styledConfig = { version: 5, loops: [styledLoop] } satisfies ProjectAutomationConfig;
+    const styledConfig = { version: 6, loops: [styledLoop] } satisfies ProjectAutomationConfig;
     const projection = buildLoopVisualProjection(styledConfig, styledLoop, null, agents, [
       { agentId: "agent-0", status: "idle", reasoning: "low" },
       { agentId: "agent-1", status: "idle", reasoning: "medium" },
@@ -276,7 +276,7 @@ describe("Loop theme rendering", () => {
         on: { approved: { end: "completed" }, rejected: { end: "failed" } }
       }]
     } satisfies ProjectAutomationConfig["loops"][number];
-    const avatarConfig = { version: 5, loops: [avatarLoop] } satisfies ProjectAutomationConfig;
+    const avatarConfig = { version: 6, loops: [avatarLoop] } satisfies ProjectAutomationConfig;
     const run = {
       executionPlan: {
         steps: [{ loopId: avatarLoop.id, stepId: "build", agentId: "builder", agent: { avatar: "rocket" } }]

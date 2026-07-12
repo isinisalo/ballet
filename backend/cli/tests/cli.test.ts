@@ -1,3 +1,5 @@
+// CLI lifecycle coverage intentionally shares one macOS/service test harness so
+// pairing, recovery, start, stop, update, and logging mocks stay consistent.
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import os from "node:os";
@@ -5,7 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { deriveProjectId, runBalletCli } from "../BalletCli.js";
-import type { SecretStore } from "../Keychain.js";
+import { daemonKeychainAccount, type SecretStore } from "../Keychain.js";
 import { renderPlist, type LaunchdService } from "../LaunchdService.js";
 import { RotatingTextLog, superviseLaunchdProcess } from "../LaunchdLogSupervisor.js";
 import { renderServerPlist, type LocalServerConfiguration, type LocalServerService } from "../LocalServerService.js";
@@ -189,17 +191,23 @@ describe("Ballet CLI local lifecycle", () => {
       repositoryUrl: "https://github.com/acme/studio.git",
       repositoryPath
     });
+    const secrets = new MemorySecrets();
+    await secrets.set(daemonKeychainAccount("http://127.0.0.1:4317", "10000000-0000-4000-8000-000000000021"), "saved-daemon-token-that-is-long-enough");
     let ensured: LocalServerConfiguration | undefined;
+    let recovered = false;
+    let daemonStarted = false;
     let opened = "";
 
     const code = await runBalletCli([], {
       config,
-      secrets: new MemorySecrets(),
+      secrets,
       pairing: () => { throw new Error("pairing must not start"); },
-      launchd: () => ({ installAndStart: async () => undefined }) as unknown as LaunchdService,
+      launchd: () => ({ status: async () => ({ loaded: false, running: false }), installAndStart: async () => { daemonStarted = true; } }) as unknown as LaunchdService,
       localServer: {
         activeProject: async () => undefined,
-        ensureStarted: async (value: LocalServerConfiguration) => { ensured = value; }
+        ensureStarted: async (value: LocalServerConfiguration) => { ensured = value; },
+        recoverRuntime: async () => { recovered = true; },
+        waitForRuntime: async () => ({ registered: true, online: true, backendsReady: true })
       } as unknown as LocalServerService,
       updater: {} as VerifiedReleaseUpdater,
       output: { stdout: () => undefined, stderr: () => undefined },
@@ -218,6 +226,8 @@ describe("Ballet CLI local lifecycle", () => {
       repositoryPath: resolvedRepositoryPath,
       localControlToken: controlToken
     });
+    expect(recovered).toBe(true);
+    expect(daemonStarted).toBe(true);
     expect(opened).toBe("http://127.0.0.1:4317");
   });
 
@@ -250,7 +260,7 @@ describe("Ballet CLI local lifecycle", () => {
     expect(opened).toBe("http://127.0.0.1:4317/runtimes?connect=1");
   });
 
-  it("only opens the browser when the same project is already running", async () => {
+  it("opens pairing when the same project server is running without saved runtime credentials", async () => {
     const home = await mkdtemp(path.join(os.tmpdir(), "ballet-cli-running-same-"));
     roots.push(home);
     const repositoryPath = await gitProject();
@@ -275,7 +285,7 @@ describe("Ballet CLI local lifecycle", () => {
     });
 
     expect(code).toBe(0);
-    expect(opened).toBe("http://127.0.0.1:4317");
+    expect(opened).toBe("http://127.0.0.1:4317/runtimes?connect=1");
   });
 
   it("requires ballet stop before switching the running project", async () => {

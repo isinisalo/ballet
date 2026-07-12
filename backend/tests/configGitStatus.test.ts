@@ -17,13 +17,13 @@ describe("project config Git status", () => {
   it("normalizes and sorts config changes without invoking Git mutations", () => {
     expect(parseConfigStatus([
       " M .ballet/project.json",
-      "?? .ballet/runtime.json",
+      "?? .ballet/themes/new.json",
       "R  .codex/agents/new.toml",
       ".codex/agents/old.toml",
       ""
     ].join("\0"))).toEqual([
       { path: ".ballet/project.json", status: "modified" },
-      { path: ".ballet/runtime.json", status: "untracked" },
+      { path: ".ballet/themes/new.json", status: "untracked" },
       { path: ".codex/agents/new.toml", status: "renamed" },
       { path: ".codex/agents/old.toml", status: "deleted" }
     ]);
@@ -48,7 +48,7 @@ describe("project config Git status", () => {
     const headBefore = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: root })).stdout.trim();
     const indexBefore = await readFile(path.join(root, ".git", "index"));
 
-    await writeFile(path.join(root, ".ballet", "runtime.json"), "{\"version\":1,\"agents\":{}}\n");
+    await writeFile(path.join(root, ".ballet", "project.json"), "{\"version\":6,\"agents\":{},\"loops\":[]}\n");
     await writeFile(path.join(root, ".codex", "agents", "review.toml"), "name = \"Strict review\"\n");
     await rm(path.join(root, ".agents", "skills", "review", "SKILL.md"));
     await writeFile(path.join(root, "src", "app.ts"), "export const changed = true;\n");
@@ -57,7 +57,7 @@ describe("project config Git status", () => {
       clean: false,
       changes: [
         { path: ".agents/skills/review/SKILL.md", status: "deleted" },
-        { path: ".ballet/runtime.json", status: "untracked" },
+        { path: ".ballet/project.json", status: "modified" },
         { path: ".codex/agents/review.toml", status: "modified" }
       ]
     });

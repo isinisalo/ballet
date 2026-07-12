@@ -32,7 +32,7 @@ describe("HTTP Zod validation", () => {
 
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
-      version: 5,
+      version: 6,
       loops: [{
         id: "delivery",
         theme: "open-ai",

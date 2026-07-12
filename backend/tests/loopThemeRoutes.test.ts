@@ -12,7 +12,7 @@ import { store } from "../store.js";
 const roots: string[] = [];
 
 const config = (theme = "default"): ProjectAutomationConfig => ({
-  version: 5,
+  version: 6,
   loops: [automationLoop("approval", theme)]
 });
 
@@ -42,7 +42,7 @@ const createProject = async (automation = config()): Promise<string> => {
   process.env.BALLET_CONTROL_PLANE_DB_PATH = path.join(root, "runtime.sqlite");
   await mkdir(path.join(root, ".ballet"), { recursive: true });
   await writeFile(path.join(root, ".ballet", "project.md"), "---\nid: theme-api\nname: Theme API\n---\n", "utf8");
-  await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify(automation, null, 2), "utf8");
+  await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({ ...automation, agents: {} }, null, 2), "utf8");
   return root;
 };
 
@@ -153,7 +153,7 @@ describe("loop theme API concurrency", () => {
 
   it("preserves both loop assignments across concurrent creates with different ids", async () => {
     const root = await createProject({
-      version: 5,
+      version: 6,
       loops: [automationLoop("first-loop"), automationLoop("second-loop")]
     });
     const { server, origin } = await listen();
@@ -185,7 +185,7 @@ describe("loop theme API concurrency", () => {
 describe("loop theme API reference validation", () => {
   it("repairs two missing theme references one create-and-assign at a time", async () => {
     const root = await createProject({
-      version: 5,
+      version: 6,
       loops: [
         automationLoop("first-loop", "missing-first"),
         automationLoop("second-loop", "missing-second")

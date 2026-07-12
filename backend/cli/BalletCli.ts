@@ -12,6 +12,7 @@ import type { LocalLifecycleStatus, LocalServerService } from "./LocalServerServ
 import { canonicalGitHubRepository, resolveLocalGitProject } from "./ProjectIdentity.js";
 import { type PairingClient, type PairingDeviceFacts } from "./PairingClient.js";
 import type { VerifiedReleaseUpdater } from "./VerifiedReleaseUpdater.js";
+import { startBalletApp } from "./StartApp.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -66,7 +67,7 @@ export const runBalletCli = async (argv: readonly string[], services: BalletCliS
         services.output.stdout(helpText);
         return 0;
       case undefined:
-        await startApp(services);
+        await startBalletApp(services);
         return 0;
       default:
         throw new Error(`Unknown command: ${command}`);
@@ -146,32 +147,6 @@ const setup = async (args: readonly string[], services: BalletCliServices): Prom
   }
   if (plan.startDaemon) await services.launchd().installAndStart();
   services.output.stdout(`Ballet daemon paired as ${displayName} (${claim.deviceId}).`);
-};
-
-const startApp = async (services: BalletCliServices): Promise<void> => {
-  const project = await resolveLocalGitProject(services.cwd?.() ?? process.cwd());
-  const serverUrl = "http://127.0.0.1:4317";
-  const active = await services.localServer.activeProject(serverUrl);
-  if (active?.projectId && active.projectId !== project.id) {
-    throw new Error(`Ballet is already running for project ${active.projectId}. Run \`ballet stop\` before switching projects.`);
-  }
-  if (active?.projectId === project.id) {
-    await services.openUrl(serverUrl);
-    return;
-  }
-  const projectConfig = await services.config.activateProject(project.id, {
-    repositoryUrl: project.repositoryUrl,
-    repositoryPath: project.root
-  });
-  await services.localServer.ensureStarted({
-    serverUrl,
-    projectId: project.id,
-    repositoryUrl: project.repositoryUrl,
-    repositoryPath: project.root,
-    localControlToken: services.localControlToken
-  });
-  if (projectConfig) await services.launchd().installAndStart();
-  await services.openUrl(projectConfig?.appUrl ?? new URL("/runtimes?connect=1", serverUrl).toString());
 };
 
 const stopApp = async (services: BalletCliServices): Promise<void> => {
