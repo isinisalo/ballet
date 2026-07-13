@@ -1,6 +1,6 @@
 import type { RootRunSummary } from "@shared/api/workspace-contracts";
 import { Activity, CalendarClock, GitCommitHorizontal, Square } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { OperationalStatus } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import { changedFilesLabel, currentRunLabel, cancellableRunStatuses, runStatusTone, runSummaryPath } from "./runPresentation";
 
@@ -17,7 +17,7 @@ export function RootRunCard({ run, pending, navigate, onCancel }: {
         <span className="flex min-w-0 flex-wrap items-center gap-2">
           <Activity className="size-3.5 text-muted-foreground" />
           <strong className="truncate font-mono text-xs">{run.targetId}</strong>
-          <Badge variant={runStatusTone(run.status)}>{run.status}</Badge>
+          <OperationalStatus compact label={run.status} tone={runStatusTone(run.status)} />
           <span className="flex items-center gap-1 font-mono text-[0.6rem] text-muted-foreground">
             {run.source === "schedule" ? <CalendarClock className="size-3" /> : null}{run.source}
           </span>

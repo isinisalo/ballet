@@ -1,21 +1,13 @@
-import { useId, useMemo, type ReactNode } from "react";
-import { Bold, Braces, Code2, Eye, FileKey2, Italic, Link2, List, Save } from "lucide-react";
+import { useId, useMemo, useRef, type FormEvent } from "react";
+import { Braces, Eye, FileKey2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import { EmptyState, Panel } from "@/components/shared/workspace-ui";
+import { EditorActions, EmptyState, Panel, WorkbenchLayout } from "@/components/shared/workspace-ui";
+import { countEditorWords, estimateEditorTokens, formatEditorMetric } from "./editorMetrics";
 import { parseFrontmatterYaml } from "./frontmatter";
 import { MarkdownDocumentView } from "./MarkdownDocumentView";
 import { documentTitle, markdownPreviewDocument, type MarkdownEntity } from "./markdownDocument";
-
-const countWords = (value: string) => value.trim().split(/\s+/).filter(Boolean).length;
-
-const tokenEstimate = (value: string) => {
-  const estimate = Math.max(0, Math.ceil(value.length / 4));
-  if (estimate >= 1000) return `${(estimate / 1000).toFixed(estimate >= 10000 ? 0 : 1)}k`;
-  return String(estimate);
-};
 
 function EditorMetric({ label, value }: { label: string; value: string | number }) {
   return (
@@ -25,31 +17,26 @@ function EditorMetric({ label, value }: { label: string; value: string | number 
   );
 }
 
-function EditorToolbar() {
-  const items = [
-    { label: "Bold", icon: Bold },
-    { label: "Italic", icon: Italic },
-    { label: "List", icon: List },
-    { label: "Code", icon: Code2 },
-    { label: "Link", icon: Link2 }
-  ];
-
-  return (
-    <div className="flex items-center gap-1 text-muted-foreground" aria-label="Markdown formatting tools">
-      {items.map(({ label, icon: Icon }) => (
-        <span key={label} className="grid size-7 place-items-center rounded border border-transparent text-muted-foreground" title={label} aria-label={label}>
-          <Icon className="size-3.5" />
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function WorkbenchTextArea({ label, value, onChange, rows }: { label: string; value: string; onChange: (value: string) => void; rows: number }) {
+function WorkbenchTextArea({
+  label,
+  value,
+  error,
+  disabled,
+  onChange,
+  rows
+}: {
+  label: string;
+  value: string;
+  error?: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+  rows: number;
+}) {
   const fieldId = useId();
+  const errorId = `${fieldId}-error`;
 
   return (
-    <Field className="gap-2">
+    <Field className="gap-2" data-invalid={Boolean(error)}>
       <div className="flex items-center gap-3 pt-1">
         <FieldLabel htmlFor={fieldId} className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
           {label}
@@ -62,38 +49,50 @@ function WorkbenchTextArea({ label, value, onChange, rows }: { label: string; va
         value={value}
         rows={rows}
         spellCheck={false}
-        className="resize-y border-border/80 bg-panel-section/80 font-mono text-xs leading-relaxed text-foreground shadow-inner focus-visible:border-primary focus-visible:ring-primary/25"
+        disabled={disabled}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : undefined}
+        className="resize-y border-border/80 bg-panel-section/80 font-mono text-base leading-relaxed text-foreground shadow-inner focus-visible:border-primary focus-visible:ring-primary/25 md:text-xs"
         onChange={(event) => onChange(event.target.value)}
       />
+      <FieldError id={errorId} className="font-mono text-xs">{error}</FieldError>
     </Field>
   );
 }
 
-export function MarkdownWorkbench({
-  document,
-  emptyTitle,
-  formId,
-  saveLabel,
-  frontmatterText,
-  bodyText,
-  validationError,
-  headerActions,
-  onFrontmatterChange,
-  onBodyChange,
-  onSubmit
-}: {
+export interface MarkdownWorkbenchFieldErrors {
+  frontmatter?: string;
+  body?: string;
+}
+
+export interface MarkdownWorkbenchProps {
   document?: MarkdownEntity;
   emptyTitle: string;
   formId: string;
   saveLabel: string;
   frontmatterText: string;
   bodyText: string;
-  validationError?: string;
-  headerActions?: ReactNode;
+  dirty: boolean;
+  valid: boolean;
+  pending: boolean;
+  fieldErrors?: MarkdownWorkbenchFieldErrors;
+  serverError?: string;
+  deleteLabel?: string;
+  deleteType?: string;
+  resourceName?: string;
+  onDelete?: () => unknown | Promise<unknown>;
   onFrontmatterChange: (value: string) => void;
   onBodyChange: (value: string) => void;
   onSubmit: () => void | Promise<void>;
-}) {
+}
+
+export function MarkdownWorkbench(props: MarkdownWorkbenchProps) {
+  const {
+    document, emptyTitle, formId, saveLabel, frontmatterText, bodyText, dirty, valid, pending,
+    fieldErrors, serverError, deleteLabel, deleteType, resourceName, onDelete,
+    onFrontmatterChange, onBodyChange, onSubmit
+  } = props;
+  const submittingRef = useRef(false);
   const previewDocument = useMemo(
     () => document ? markdownPreviewDocument(document, frontmatterText, bodyText, parseFrontmatterYaml) : undefined,
     [bodyText, document, frontmatterText]
@@ -101,38 +100,55 @@ export function MarkdownWorkbench({
 
   if (!document) return <EmptyState title={emptyTitle} />;
   const title = documentTitle(previewDocument ?? document);
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!dirty || !valid || pending || submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await onSubmit();
+    } finally {
+      submittingRef.current = false;
+    }
+  };
 
   return (
-    <div className="grid gap-0 xl:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)]">
-      <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
-        <MarkdownDocumentView document={previewDocument} emptyTitle={emptyTitle} compact embedded />
-      </Panel>
-      <div className="border-t border-divider-strong xl:border-l xl:border-t-0">
+    <WorkbenchLayout
+      preview={(
+        <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
+          <MarkdownDocumentView document={previewDocument} emptyTitle={emptyTitle} compact embedded />
+        </Panel>
+      )}
+      editor={(
         <Panel
           title="Markdown Workbench"
           icon={<FileKey2 data-icon="inline-start" />}
           compact
           contentClassName="p-0"
           action={(
-            <div className="flex items-center justify-end gap-2">
-              {headerActions}
-              <Button type="submit" size="icon-sm" form={formId} aria-label={saveLabel} title={saveLabel}>
-                <Save data-icon="inline-start" />
-              </Button>
-            </div>
+            <EditorActions
+              saveLabel={saveLabel}
+              formId={formId}
+              dirty={dirty}
+              valid={valid}
+              pending={pending}
+              canDelete={Boolean(onDelete)}
+              deleteLabel={deleteLabel}
+              deleteType={deleteType}
+              resourceName={resourceName}
+              onDelete={onDelete}
+            />
           )}
         >
-          <form id={formId} className="flex flex-col" onSubmit={(event) => { event.preventDefault(); void onSubmit(); }}>
-            {validationError ? (
+          <form id={formId} className="flex flex-col" onSubmit={(event) => { void handleSubmit(event); }}>
+            {serverError ? (
               <div className="px-4 py-3">
-                <Alert variant="destructive"><AlertDescription>{validationError}</AlertDescription></Alert>
+                <Alert variant="destructive"><AlertDescription>{serverError}</AlertDescription></Alert>
               </div>
             ) : null}
-            <div className="flex min-h-10 flex-wrap items-center justify-between gap-3 bg-panel-header px-4 py-2">
-              <EditorToolbar />
+            <div className="flex min-h-10 flex-wrap items-center justify-end gap-3 bg-panel-header px-4 py-2">
               <div className="flex items-center gap-3">
-                <EditorMetric label="Words" value={countWords(bodyText)} />
-                <EditorMetric label="Tokens" value={tokenEstimate(`${frontmatterText}\n${bodyText}`)} />
+                <EditorMetric label="Words" value={countEditorWords(bodyText)} />
+                <EditorMetric label="Tokens" value={formatEditorMetric(estimateEditorTokens(`${frontmatterText}\n${bodyText}`))} />
                 <span className="rounded bg-muted px-2 py-1 font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">
                   MARKDOWN_MODE
                 </span>
@@ -148,12 +164,12 @@ export function MarkdownWorkbench({
                   <p className="truncate text-sm font-medium text-foreground">{title}</p>
                 </div>
               </div>
-              <WorkbenchTextArea label="YAML Frontmatter" rows={9} value={frontmatterText} onChange={onFrontmatterChange} />
-              <WorkbenchTextArea label="Markdown Body" rows={18} value={bodyText} onChange={onBodyChange} />
+              <WorkbenchTextArea label="YAML Frontmatter" rows={9} value={frontmatterText} error={fieldErrors?.frontmatter} disabled={pending} onChange={onFrontmatterChange} />
+              <WorkbenchTextArea label="Markdown Body" rows={18} value={bodyText} error={fieldErrors?.body} disabled={pending} onChange={onBodyChange} />
             </div>
           </form>
         </Panel>
-      </div>
-    </div>
+      )}
+    />
   );
 }

@@ -11,7 +11,7 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
   automation: ProjectAutomationConfig;
   navigate: (path: string) => void;
 }) {
-  const active = route.view === "automation" || route.view === "loop-theme";
+  const active = route.view === "automation" || route.view === "loop-theme" || route.view === "loop-theme-library";
 
   return (
     <Collapsible defaultOpen={active} className="group/automation">

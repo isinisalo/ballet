@@ -26,4 +26,15 @@ describe("refresh-safe drafts", () => {
     expect(result.current.draft.name).toBe("Persisted");
     expect(result.current.dirty).toBe(false);
   });
+
+  it("keeps edits made after submission while advancing the saved baseline", () => {
+    const { result } = renderHook(() => useRefreshSafeDraft({ name: "Saved" }, "one"));
+    const submitted = { name: "Submitted" };
+    act(() => result.current.setDraft(submitted));
+    act(() => result.current.setDraft({ name: "Edited while saving" }));
+    act(() => result.current.accept({ name: "Persisted" }, submitted));
+
+    expect(result.current.draft.name).toBe("Edited while saving");
+    expect(result.current.dirty).toBe(true);
+  });
 });

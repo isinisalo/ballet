@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toErrorMessage } from "@/lib/errors";
+import { LoaderCircle } from "lucide-react";
 
 export function DeleteConfirmDialog({ open, onOpenChange, deleteType, resourceName, onConfirm }: {
   open: boolean;
@@ -13,12 +14,15 @@ export function DeleteConfirmDialog({ open, onOpenChange, deleteType, resourceNa
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const pendingRef = useRef(false);
 
   useEffect(() => {
-    if (!open) { setPending(false); setError(""); }
+    if (!open && !pendingRef.current) { setPending(false); setError(""); }
   }, [open]);
 
   const confirm = async () => {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setPending(true);
     setError("");
     try {
@@ -27,29 +31,29 @@ export function DeleteConfirmDialog({ open, onOpenChange, deleteType, resourceNa
     } catch (cause) {
       setError(toErrorMessage(cause, `Unable to delete ${deleteType}.`));
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   };
 
   const displayedName = resourceName?.trim() || `this ${deleteType}`;
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/50 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <DialogPrimitive.Popup className="fixed left-1/2 top-1/2 z-50 grid w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-divider-strong bg-card p-4 text-card-foreground shadow-lg outline-none transition duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0" onClick={(event) => event.stopPropagation()}>
-          <div className="grid gap-1.5">
-            <DialogPrimitive.Title className="text-sm font-semibold text-foreground">Delete {deleteType}?</DialogPrimitive.Title>
-            <DialogPrimitive.Description className="text-sm leading-relaxed text-muted-foreground">
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (nextOpen || !pendingRef.current) onOpenChange(nextOpen); }}>
+      <DialogContent showCloseButton={false} aria-busy={pending} onClick={(event) => event.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Delete {deleteType}?</DialogTitle>
+            <DialogDescription>
               Delete <span className="font-medium text-foreground">{displayedName}</span>? This action cannot be undone.
-            </DialogPrimitive.Description>
-          </div>
+            </DialogDescription>
+          </DialogHeader>
           {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-          <div className="flex items-center justify-end gap-2">
-            <DialogPrimitive.Close render={<Button type="button" variant="outline" className="cursor-pointer" disabled={pending}>Cancel</Button>} />
-            <Button type="button" variant="destructive" className="cursor-pointer" disabled={pending} onClick={(event) => { event.preventDefault(); event.stopPropagation(); void confirm(); }}>Delete</Button>
-          </div>
-        </DialogPrimitive.Popup>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" disabled={pending}>Cancel</Button>} />
+            <Button type="button" variant="destructive" className="cursor-pointer" disabled={pending} onClick={(event) => { event.preventDefault(); event.stopPropagation(); void confirm(); }}>
+              {pending ? <><LoaderCircle className="animate-spin motion-reduce:animate-none" /> Deleting…</> : "Delete"}
+            </Button>
+          </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

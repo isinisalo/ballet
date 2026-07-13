@@ -1,5 +1,5 @@
 import type { Agent, AgentExecutionState, AgentRuntimeConfiguration, AgentSaveRequest, LocalRuntime } from "@shared/api/workspace-contracts";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AgentEditor } from "../src/workspace/agents/AgentEditor";
@@ -33,7 +33,7 @@ const renderEditor = (
 };
 
 describe("agent instructions workspace", () => {
-  it("edits and saves instructions while keeping other tabs unavailable", async () => {
+  it("edits and saves instructions without duplicate workspace chrome", async () => {
     const user = userEvent.setup();
     const { save } = renderEditor({
       agentId: "agent-architect",
@@ -41,11 +41,10 @@ describe("agent instructions workspace", () => {
       provider: "codex"
     });
 
-    expect(screen.getByRole("tab", { name: "Instructions" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Activity" })).toBeDisabled();
-    expect(screen.queryByRole("tab", { name: "Tasks" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Custom Args" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Running")).toHaveLength(2);
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.queryByText("Preview and edit the Markdown injected into every task.")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Running")).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "Architect" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Runtime")).not.toBeInTheDocument();
     expect(screen.getByText("Markdown Preview")).toBeInTheDocument();
     expect(screen.getByText("Edit")).toBeInTheDocument();
@@ -65,7 +64,7 @@ describe("agent instructions workspace", () => {
   it("keeps execution configuration in the profile rail without an Environment tab", () => {
     renderEditor();
 
-    expect(screen.getAllByText("Unbound").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Unbound")).toHaveLength(1);
     expect(screen.getByText("Execution")).toBeInTheDocument();
     expect(screen.queryByLabelText("Runtime")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Provider")).toBeInTheDocument();
@@ -115,6 +114,70 @@ describe("agent instructions workspace", () => {
       name: "Principal Architect",
       description: "Owns technical direction."
     })));
+  });
+
+  it("shows adjacent creation errors in the same profile-preview-editor workspace", async () => {
+    const user = userEvent.setup();
+    const save = vi.fn(async (_collection: "agents", item: AgentSaveRequest) => ({ ...agent(), ...item, id: "agent-new" } as Agent));
+    render(<AgentEditor runtime={localRuntime()} save={save} remove={vi.fn(async () => undefined)} />);
+
+    expect(screen.getByRole("heading", { name: "New agent" })).toBeInTheDocument();
+    expect(screen.getByText("Markdown Preview")).toBeInTheDocument();
+    expect(screen.getByText("Edit")).toBeInTheDocument();
+    expect(screen.queryByText("Execution")).not.toBeInTheDocument();
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+
+    const name = screen.getByLabelText("Name");
+    const instructions = screen.getByLabelText("Instructions");
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    expect(instructions).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Agent name is required.")).toHaveAttribute("id", name.getAttribute("aria-describedby"));
+    expect(screen.getByText("Agent instructions are required.")).toHaveAttribute("id", instructions.getAttribute("aria-describedby"));
+    expect(screen.getByRole("button", { name: "Save agent" })).toBeDisabled();
+
+    await user.type(name, "Builder");
+    await user.type(instructions, "Build the requested change.");
+    expect(screen.getByRole("button", { name: "Save agent" })).toBeEnabled();
+  });
+});
+
+describe("agent save state", () => {
+  it("prevents duplicate saves while a request is pending", async () => {
+    let resolveSave: ((saved: Agent) => void) | undefined;
+    const save = vi.fn((_collection: "agents", item: AgentSaveRequest) => new Promise<Agent>((resolve) => {
+      resolveSave = resolve;
+      void item;
+    }));
+    render(<AgentEditor agent={agent()} runtime={localRuntime()} save={save} remove={vi.fn(async () => undefined)} />);
+
+    const instructions = screen.getByLabelText("Instructions");
+    fireEvent.change(instructions, { target: { value: "# Role\nUpdated instructions." } });
+    const form = instructions.closest("form");
+    if (!form) throw new Error("Expected instructions inside the agent form.");
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Save agent in progress" })).toBeDisabled();
+    resolveSave?.({ ...agent(), instructions: "# Role\nUpdated instructions." });
+    await waitFor(() => expect(screen.getByTitle("Save agent")).toBeDisabled());
+  });
+
+  it("keeps edits made while a save response is pending", async () => {
+    let resolveSave: ((saved: Agent) => void) | undefined;
+    const save = vi.fn(() => new Promise<Agent>((resolve) => { resolveSave = resolve; }));
+    render(<AgentEditor agent={agent()} runtime={localRuntime()} save={save} remove={vi.fn(async () => undefined)} />);
+
+    const instructions = screen.getByLabelText("Instructions");
+    fireEvent.change(instructions, { target: { value: "# Role\nSubmitted instructions." } });
+    const form = instructions.closest("form");
+    if (!form) throw new Error("Expected instructions inside the agent form.");
+    fireEvent.submit(form);
+    fireEvent.change(instructions, { target: { value: "# Role\nEdited while saving." } });
+    resolveSave?.({ ...agent(), instructions: "# Role\nSubmitted instructions." });
+
+    await waitFor(() => expect(instructions).toHaveValue("# Role\nEdited while saving."));
+    expect(screen.getByRole("button", { name: "Save agent" })).toBeEnabled();
   });
 });
 

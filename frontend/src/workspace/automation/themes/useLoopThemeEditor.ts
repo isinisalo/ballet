@@ -24,7 +24,7 @@ export function useLoopThemeEditor({
   source: LoopTheme;
   themes: readonly LoopTheme[];
   creating: boolean;
-  assignToLoopId: string;
+  assignToLoopId?: string;
   updateTheme: (theme: LoopTheme) => Promise<LoopTheme>;
   createTheme: (theme: LoopTheme, loopId: string) => Promise<CreateLoopThemeResponse>;
   repairMissing?: boolean;
@@ -35,8 +35,9 @@ export function useLoopThemeEditor({
   const [previewTheme, setPreviewTheme] = useState<LoopTheme>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const savingRef = useRef(false);
   const receivedFingerprintRef = useRef(themeFingerprint(initial()));
-  const editorKey = `${creating ? "create" : "edit"}:${source.id}:${assignToLoopId}`;
+  const editorKey = `${creating ? "create" : "edit"}:${source.id}:${assignToLoopId ?? ""}`;
   const editorKeyRef = useRef(editorKey);
   const sourceFingerprint = themeFingerprint(source);
   const themeIdsFingerprint = themes.map((theme) => theme.id).sort().join("\0");
@@ -84,22 +85,30 @@ export function useLoopThemeEditor({
     }
   };
   const save = async () => {
-    if (!valid || saving) return undefined;
+    if (!valid || savingRef.current) return undefined;
+    const submittedDraftFingerprint = themeFingerprint(draft);
+    const submittedPreviewFingerprint = themeFingerprint(previewTheme);
+    savingRef.current = true;
     setSaving(true);
     setError("");
     try {
       const normalized = normalizedLoopTheme(draft);
+      if ((creating || repairMissing) && !assignToLoopId) {
+        setError("A Loop is required when creating or repairing a theme.");
+        return undefined;
+      }
       const saved = creating || repairMissing
-        ? (await createTheme(normalized, assignToLoopId)).theme
+        ? (await createTheme(normalized, assignToLoopId!)).theme
         : await updateTheme(normalized);
       receivedFingerprintRef.current = themeFingerprint(saved);
-      setDraft(saved);
-      setPreviewTheme(saved);
+      setDraft((current) => themeFingerprint(current) === submittedDraftFingerprint ? saved : current);
+      setPreviewTheme((current) => themeFingerprint(current) === submittedPreviewFingerprint ? saved : current);
       return saved;
     } catch (cause) {
       setError(toErrorMessage(cause, "Unable to save Loop theme."));
       return undefined;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };

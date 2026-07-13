@@ -104,10 +104,10 @@ describe("automation v6 UI", () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(null);
     expect(screen.queryByText("Actions")).not.toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "Start loop run" })).toBeInTheDocument();
     const manualInput = screen.getByLabelText("Manual input (optional)");
     await waitFor(() => expect(manualInput).toBeEnabled());
-    await user.type(manualInput, "Ship release");
-    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.type(manualInput, "Ship release{Enter}");
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs", expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "loop", targetId: "delivery", input: "Ship release" }) })));
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
@@ -118,17 +118,34 @@ describe("automation v6 UI", () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(run("waiting_for_human"));
     const approved = await screen.findByRole("button", { name: "Approved" });
-    expect(approved).toBeDisabled();
-    await user.type(screen.getByLabelText("Response"), "Looks good");
+    expect(approved).toBeEnabled();
     await user.click(approved);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1/steps/step-run-1/respond", expect.objectContaining({ method: "POST" })));
+    expect(screen.getByText("Response is required.")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Response"), "Looks good");
+    expect(screen.queryByText("Response is required.")).not.toBeInTheDocument();
+    await user.click(approved);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1/steps/step-run-1/respond", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ result: "approved", input: "Looks good" })
+    })));
+  });
+
+  it("keeps the rejected Human Gate submit intent", async () => {
+    const user = userEvent.setup();
+    const fetchMock = await renderRun(run("waiting_for_human"));
+    await user.type(await screen.findByLabelText("Response"), "Needs another pass");
+    await user.click(screen.getByRole("button", { name: "Rejected" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1/steps/step-run-1/respond", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ result: "rejected", input: "Needs another pass" })
+    })));
   });
 
   it("offers a new run after the latest run has finished", async () => {
     const user = userEvent.setup();
     await renderRun(run("completed"));
     await user.click(await screen.findByRole("button", { name: "New run" }));
-    expect(screen.getByLabelText("Manual input (optional)")).toBeEnabled();
+    expect(await screen.findByLabelText("Manual input (optional)")).toBeEnabled();
   });
 
   it("renders an existing Run with its immutable theme snapshot", async () => {

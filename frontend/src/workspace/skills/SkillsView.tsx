@@ -1,8 +1,5 @@
-import { useEffect, useId, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Skill } from "@shared/api/workspace-contracts";
-import { Button } from "@/components/ui/button";
-import { DeleteConfirmDialog } from "@/components/shared/workspace-ui";
 import { toErrorMessage } from "@/lib/errors";
 import { frontmatterToYaml, parseFrontmatterYaml } from "../documents/frontmatter";
 import { MarkdownWorkbench } from "../documents/MarkdownWorkbench";
@@ -58,18 +55,20 @@ export function SkillsView({
   const formId = useId();
   const { draft, setDraft, accept, dirty } = useRefreshSafeDraft(skillEditorDraft(skill), skill?.id ?? "new-skill");
   const { form, frontmatterText, bodyText } = draft;
-  const [validationError, setValidationError] = useState("");
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+  const frontmatterError = useMemo(() => skillFrontmatterError(frontmatterText), [frontmatterText]);
+  const valid = !frontmatterError;
 
   useEffect(() => {
-    setValidationError("");
-    setConfirmDeleteOpen(false);
+    setServerError("");
   }, [skill?.id]);
   useWorkspaceNavigationBlocker(setNavigationBlocker, dirty, "Discard unsaved skill changes?");
 
   const previewDocument = useMemo(() => ({
     id: form.id ?? "new-skill",
-    name: form.name,
+    name: undefined,
     frontmatter: form.frontmatter,
     body: form.body,
     relativePath: form.relativePath,
@@ -77,10 +76,13 @@ export function SkillsView({
   }), [form]);
 
   const handleSave = async () => {
+    if (!valid || pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
+    setServerError("");
     try {
       const frontmatter = parseFrontmatterYaml(frontmatterText);
       const name = stringFrontmatterValue(frontmatter, "name").trim();
-      if (!name) throw new Error("Skill frontmatter name is required.");
 
       const saved = await save("skills", {
         ...form,
@@ -90,10 +92,12 @@ export function SkillsView({
         body: bodyText
       });
       accept(skillEditorDraft(saved));
-      setValidationError("");
       if (saved.relativePath) navigate(skillDocumentPath(saved.relativePath), { bypassBlocker: true });
     } catch (err) {
-      setValidationError(toErrorMessage(err, "Invalid skill document."));
+      setServerError(toErrorMessage(err, "Could not save skill document."));
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
     }
   };
 
@@ -112,28 +116,33 @@ export function SkillsView({
       saveLabel="Save skill"
       frontmatterText={frontmatterText}
       bodyText={bodyText}
-      validationError={validationError}
-      headerActions={(
-        <>
-          {form.id ? (
-            <>
-              <Button type="button" size="icon-sm" variant="destructive" aria-label="Delete skill" title="Delete skill" onClick={() => setConfirmDeleteOpen(true)}>
-                <Trash2 data-icon="inline-start" />
-              </Button>
-              <DeleteConfirmDialog
-                open={confirmDeleteOpen}
-                onOpenChange={setConfirmDeleteOpen}
-                deleteType="skill"
-                resourceName={form.name}
-                onConfirm={handleDelete}
-              />
-            </>
-          ) : null}
-        </>
-      )}
-      onFrontmatterChange={(frontmatterText) => setDraft((current) => ({ ...current, frontmatterText }))}
-      onBodyChange={(bodyText) => setDraft((current) => ({ ...current, bodyText }))}
+      dirty={dirty}
+      valid={valid}
+      pending={pending}
+      fieldErrors={{ frontmatter: frontmatterError }}
+      serverError={serverError}
+      deleteLabel="Delete skill"
+      deleteType="skill"
+      resourceName={form.name}
+      onDelete={form.id ? handleDelete : undefined}
+      onFrontmatterChange={(frontmatterText) => {
+        setServerError("");
+        setDraft((current) => ({ ...current, frontmatterText }));
+      }}
+      onBodyChange={(bodyText) => {
+        setServerError("");
+        setDraft((current) => ({ ...current, bodyText }));
+      }}
       onSubmit={handleSave}
     />
   );
 }
+
+const skillFrontmatterError = (value: string): string | undefined => {
+  try {
+    const name = stringFrontmatterValue(parseFrontmatterYaml(value), "name").trim();
+    return name ? undefined : "Skill frontmatter name is required.";
+  } catch (error) {
+    return toErrorMessage(error, "Invalid YAML frontmatter.");
+  }
+};

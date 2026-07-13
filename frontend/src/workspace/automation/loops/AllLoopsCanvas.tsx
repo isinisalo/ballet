@@ -1,23 +1,28 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { getProjectStepTransitionTargets } from "@shared/api/workspace-contracts";
-import { ArrowRight, Bot, CalendarClock, PanelTopOpen, Palette, Route, ShieldCheck } from "lucide-react";
+import { ArrowRight, Bot, CalendarClock, PanelTopOpen, Route, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AllLoopsCanvas({
   config,
-  onOpenLoop,
-  onEditTheme
+  onAddLoop,
+  onOpenLoop
 }: {
   config: ProjectAutomationConfig;
+  onAddLoop: () => void;
   onOpenLoop: (loopId: string) => void;
-  onEditTheme: (loopId: string, themeId: string) => void;
 }) {
-  if (config.loops.length === 0) {
-    return <p className="p-4 text-sm text-muted-foreground">No loops configured.</p>;
-  }
-
   return (
     <div className="grid gap-px bg-divider-strong sm:grid-cols-2 xl:grid-cols-3" aria-label="All loops">
+      <Button
+        type="button"
+        variant="ghost"
+        aria-label="+ Add loop"
+        className="grid min-h-28 place-items-center rounded-none border border-dashed border-muted-foreground/50 bg-background/60 font-mono text-xs text-muted-foreground opacity-60 transition-colors hover:border-primary/65 hover:bg-card hover:text-foreground hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+        onClick={onAddLoop}
+      >
+        + Add loop
+      </Button>
       {config.loops.map((loop) => {
         const humanSteps = loop.steps.filter((step) => step.type === "human").length;
         const agentSteps = loop.steps.filter((step) => step.type === "agent").length;
@@ -42,9 +47,6 @@ export function AllLoopsCanvas({
             <div className="flex items-center gap-2 border-t border-divider-strong p-2">
               <Button type="button" size="sm" className="flex-1" aria-label={`Open loop ${loop.id}`} onClick={() => onOpenLoop(loop.id)}>
                 <PanelTopOpen /> Open loop
-              </Button>
-              <Button type="button" size="sm" variant="outline" className="flex-1" aria-label={`Edit theme for ${loop.id}`} onClick={() => onEditTheme(loop.id, loop.theme)}>
-                <Palette /> Edit theme
               </Button>
             </div>
           </article>

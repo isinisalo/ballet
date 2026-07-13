@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { MarkdownDocument } from "@shared/api/workspace-contracts";
 import { EmptyState } from "@/components/shared/workspace-ui";
 import { toErrorMessage } from "@/lib/errors";
@@ -46,14 +46,22 @@ export function ProjectMarkdownEditorView({
     activeDocument?.relativePath || activeDocument?.id || "empty-document"
   );
   const { frontmatterText, bodyText } = draft;
-  const [validationError, setValidationError] = useState("");
+  const [serverError, setServerError] = useState("");
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+  const frontmatterError = useMemo(() => projectFrontmatterError(frontmatterText, creating), [creating, frontmatterText]);
+  const valid = !frontmatterError;
 
   useEffect(() => {
-    setValidationError("");
+    setServerError("");
   }, [activeDocument?.id, activeDocument?.relativePath]);
   useWorkspaceNavigationBlocker(setNavigationBlocker, dirty, "Discard unsaved Markdown changes?");
 
   const handleSave = async () => {
+    if (!valid || pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
+    setServerError("");
     try {
       const frontmatter = parseFrontmatterYaml(frontmatterText);
       if (creating) {
@@ -67,11 +75,9 @@ export function ProjectMarkdownEditorView({
           body: bodyText
         });
         accept(markdownEditorDraft(saved));
-        setValidationError("");
         return;
       }
       if (!document?.relativePath) return;
-      setValidationError("");
       const saved = await saveProjectDocument({
         relativePath: document.relativePath,
         frontmatter,
@@ -79,7 +85,10 @@ export function ProjectMarkdownEditorView({
       });
       accept(markdownEditorDraft(saved));
     } catch (err) {
-      setValidationError(toErrorMessage(err, "Invalid project document."));
+      setServerError(toErrorMessage(err, "Could not save project document."));
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
     }
   };
 
@@ -93,9 +102,19 @@ export function ProjectMarkdownEditorView({
       saveLabel="Save Markdown"
       frontmatterText={frontmatterText}
       bodyText={bodyText}
-      validationError={validationError}
-      onFrontmatterChange={(frontmatterText) => setDraft((current) => ({ ...current, frontmatterText }))}
-      onBodyChange={(bodyText) => setDraft((current) => ({ ...current, bodyText }))}
+      dirty={dirty}
+      valid={valid}
+      pending={pending}
+      fieldErrors={{ frontmatter: frontmatterError }}
+      serverError={serverError}
+      onFrontmatterChange={(frontmatterText) => {
+        setServerError("");
+        setDraft((current) => ({ ...current, frontmatterText }));
+      }}
+      onBodyChange={(bodyText) => {
+        setServerError("");
+        setDraft((current) => ({ ...current, bodyText }));
+      }}
       onSubmit={handleSave}
     />
   );
@@ -107,4 +126,14 @@ const titleFromFrontmatter = (frontmatter: Record<string, unknown>) => {
   const name = frontmatter.name;
   if (typeof name === "string" && name.trim()) return name.trim();
   return "";
+};
+
+const projectFrontmatterError = (value: string, titleRequired: boolean): string | undefined => {
+  try {
+    const frontmatter = parseFrontmatterYaml(value);
+    if (titleRequired && !titleFromFrontmatter(frontmatter)) return "Document frontmatter title or name is required.";
+    return undefined;
+  } catch (error) {
+    return toErrorMessage(error, "Invalid YAML frontmatter.");
+  }
 };

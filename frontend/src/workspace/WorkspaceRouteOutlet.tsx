@@ -4,6 +4,7 @@ import type { AppStreamStatus } from "../app/useAppStream";
 import { AgentsView } from "./agents/AgentsView";
 import { AutomationView } from "./automation/AutomationView";
 import { LoopThemeEditorView } from "./automation/themes/LoopThemeEditorView";
+import { LoopThemeLibrary } from "./automation/themes/LoopThemeLibrary";
 import type { useWorkspaceMutations } from "./data/useWorkspaceMutations";
 import {
     AdrsPage,
@@ -64,6 +65,8 @@ export function WorkspaceRouteOutlet({
       return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} saveAutomation={mutations.saveAutomation} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "loop-theme":
       return <LoopThemeEditorView data={data} themeId={route.loopThemeId} sourceThemeId={route.loopThemeSourceId} loopId={route.loopThemeLoopId} updateTheme={mutations.updateLoopTheme} createTheme={mutations.createLoopTheme} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
+    case "loop-theme-library":
+      return <LoopThemeLibrary data={data} navigate={navigate} />;
     case "runtimes":
       return <RuntimeRegistryView runtime={data.runtime} onRefreshed={mutations.refresh} />;
     case "agents":

@@ -1,12 +1,11 @@
 import { CirclePlus, Play, Square } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ExecutionTask, RootRunDetail } from "@shared/api/workspace-contracts";
+import { OperationalStatus, TextAreaField } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { CliRunConsole } from "../../components/CliRunConsole";
-import { changedFilesLabel } from "../../runs/runPresentation";
+import { changedFilesLabel, runStatusTone } from "../../runs/runPresentation";
 import { AgentRunDetails } from "./AgentRunDetails";
 import { AgentRunInstructions } from "./AgentRunInstructions";
 import { activeAgentRunStatuses, useAgentRun } from "./useAgentRun";
@@ -36,7 +35,7 @@ export function AgentRunPane({ agentId, rootRunId, rootDetail, disabledReason, o
       {controller.error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{controller.error}</AlertDescription></Alert> : null}
       {detail && task ? <RunOutput agentId={agentId} detail={detail} task={task} active={taskActive} onTerminal={() => void controller.refresh()} /> : null}
       <RunControls active={rootActive} terminal={terminal} showNewRun={showNewRun} busy={busy} cancelling={controller.operation === "cancel"} onCancel={() => void controller.cancel()} onNew={() => setShowNewRun(true)} />
-      {!detail || (terminal && showNewRun) ? <RunStart input={input} busy={busy} starting={controller.operation === "start"} disabledReason={disabledReason} onInput={setInput} onStart={() => void start()} /> : null}
+      {!detail || (terminal && showNewRun) ? <RunStart input={input} busy={busy} starting={controller.operation === "start"} disabledReason={disabledReason} onInput={setInput} onStart={start} /> : null}
     </section>
   );
 }
@@ -44,7 +43,7 @@ export function AgentRunPane({ agentId, rootRunId, rootDetail, disabledReason, o
 const selectedAgentTask = (detail?: RootRunDetail): ExecutionTask | undefined => detail?.tasks.find((task) => task.id === detail.current?.taskId) ?? [...(detail?.tasks ?? [])].reverse().find((task) => task.kind === "agent_run");
 
 function RunHeader({ detail, task }: { detail?: RootRunDetail; task?: ExecutionTask }) {
-  return <header className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-divider-strong bg-card px-4 py-2.5"><div className="flex min-w-0 items-center gap-2"><span className="font-mono text-xs">{detail?.rootRunId ?? "No runs"}</span>{detail ? <Badge variant={detail.status === "completed" ? "secondary" : ["failed", "blocked", "cancelled"].includes(detail.status) ? "destructive" : "outline"}>{detail.status}</Badge> : null}</div>{task ? <span className="font-mono text-[0.62rem] text-muted-foreground">{detail?.source ?? "manual"} · {task.spec.runtime.hostname} · {task.spec.runtime.provider} · {task.spec.runtime.model}</span> : null}</header>;
+  return <header className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-divider-strong bg-card px-4 py-2.5"><div className="flex min-w-0 items-center gap-2"><span className="font-mono text-xs">{detail?.rootRunId ?? "No runs"}</span>{detail ? <OperationalStatus compact label={detail.status} tone={runStatusTone(detail.status)} /> : null}</div>{task ? <span className="font-mono text-[0.62rem] text-muted-foreground">{detail?.source ?? "manual"} · {task.spec.runtime.hostname} · {task.spec.runtime.provider} · {task.spec.runtime.model}</span> : null}</header>;
 }
 
 function RunOutput({ agentId, detail, task, active, onTerminal }: { agentId: string; detail: RootRunDetail; task: ExecutionTask; active: boolean; onTerminal: () => void }) {
@@ -59,6 +58,44 @@ function RunControls({ active, terminal, showNewRun, busy, cancelling, onCancel,
   return null;
 }
 
-function RunStart({ input, busy, starting, disabledReason, onInput, onStart }: { input: string; busy: boolean; starting: boolean; disabledReason?: string; onInput: (value: string) => void; onStart: () => void }) {
-  return <div className="grid gap-3 border-t border-divider-strong bg-card p-4"><label className="grid gap-1.5 text-xs"><span className="font-medium">Run input (optional)</span><Textarea rows={4} disabled={busy || Boolean(disabledReason)} value={input} onChange={(event) => onInput(event.target.value)} /></label><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-xs text-muted-foreground"><p>{disabledReason ?? "Starts an isolated Run from the saved agent and local execution configuration."}</p>{disabledReason ? <a href="/runtimes" className="mt-1 inline-block text-primary underline-offset-4 hover:underline">Open Runtimes</a> : null}</div><Button type="button" disabled={busy || Boolean(disabledReason)} onClick={onStart}><Play /> {starting ? "Starting…" : "Start"}</Button></div></div>;
+function RunStart({ input, busy, starting, disabledReason, onInput, onStart }: { input: string; busy: boolean; starting: boolean; disabledReason?: string; onInput: (value: string) => void; onStart: () => Promise<void> }) {
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const blocked = Boolean(disabledReason);
+  const pending = busy || submitting;
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submittingRef.current || busy || blocked) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      await onStart();
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form
+      className="grid gap-3 border-t border-divider-strong bg-card p-4"
+      aria-label="Start agent run"
+      onSubmit={(event) => void submit(event)}
+      onKeyDown={(event) => {
+        if (event.target instanceof HTMLTextAreaElement && event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+          event.preventDefault();
+          event.currentTarget.requestSubmit();
+        }
+      }}
+    >
+      <TextAreaField label="Run input (optional)" density="compact" rows={4} disabled={pending || blocked} value={input} onChange={onInput} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs text-muted-foreground">
+          <p>{disabledReason ?? "Starts an isolated Run from the saved agent and local execution configuration."}</p>
+          {disabledReason ? <a href="/runtimes" className="mt-1 inline-block text-primary underline-offset-4 hover:underline">Open Runtimes</a> : null}
+        </div>
+        <Button type="submit" disabled={pending || blocked}><Play /> {starting || submitting ? "Starting…" : "Start"}</Button>
+      </div>
+    </form>
+  );
 }

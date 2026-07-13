@@ -37,7 +37,12 @@ export function AgentExecutionSettingsForm({ agentId, editor, onSaved, compact =
   };
 
   return (
-    <section className={cn("grid gap-3 border-divider-strong", compact ? "mt-5 border-t pt-4" : "border-t bg-panel-section p-4")} aria-label="Agent execution settings">
+    <section className={cn(
+      "grid gap-3 border-divider-strong",
+      compact
+        ? "border-t px-5 py-4"
+        : "border-t bg-panel-section p-4"
+    )} aria-label="Agent execution settings">
       <header className={cn(!compact && "flex items-start justify-between gap-3")}>
         <div><h3 className={cn("flex items-center gap-2 font-medium", compact ? "font-mono text-[10px] uppercase leading-4 tracking-[0.05em] text-muted-foreground" : "text-sm font-semibold")}><Cpu className={compact ? "size-3.5" : "size-4 text-muted-foreground"} /> Execution</h3>{!compact ? <p className="text-xs text-muted-foreground">Configure the local CLI provider and portable execution intent.</p> : null}</div>
         {readiness && !compact ? <span className={cn("border px-2 py-1 font-mono text-[0.6rem] uppercase", readiness.tone === "healthy" ? "border-secondary/30 text-secondary" : readiness.tone === "error" ? "border-destructive/30 text-destructive" : "border-tertiary/30 text-tertiary")}>{readiness.label}</span> : null}
@@ -62,7 +67,7 @@ export function AgentExecutionSettingsForm({ agentId, editor, onSaved, compact =
         onAdvancedOpenChange={setAdvancedOpen}
         onPersist={persist}
       />
-      <p className="text-xs leading-4 text-muted-foreground">{editor.saving ? "Saving execution configuration…" : validationError ?? "Intent is stored in .ballet/project.json; absolute roots stay in .git/ballet/settings.json."}</p>
+      <p className="text-xs leading-4 text-muted-foreground">{editor.saving ? "Autosave · Saving execution configuration…" : validationError ?? "Autosave · Intent is stored in .ballet/project.json; absolute roots stay in .git/ballet/settings.json."}</p>
     </section>
   );
 }

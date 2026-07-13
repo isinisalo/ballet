@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { toErrorMessage } from "@/lib/errors";
 
 export type AutomationConfigUpdater = (updater: (config: ProjectAutomationConfig) => ProjectAutomationConfig) => void;
 
@@ -11,6 +12,9 @@ export function useAutomationDraft({
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
 }) {
   const [draft, setDraft] = useState<ProjectAutomationConfig>(() => automation);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const savingRef = useRef(false);
   const receivedFingerprintRef = useRef(JSON.stringify(automation));
 
   useEffect(() => {
@@ -28,10 +32,23 @@ export function useAutomationDraft({
   };
 
   const saveDraft = async (nextDraft: ProjectAutomationConfig = draft) => {
-    const saved = await saveAutomation(nextDraft);
-    receivedFingerprintRef.current = JSON.stringify(saved);
-    setDraft(saved);
-    return true;
+    if (savingRef.current) return false;
+    const submittedFingerprint = JSON.stringify(nextDraft);
+    savingRef.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      const saved = await saveAutomation(nextDraft);
+      receivedFingerprintRef.current = JSON.stringify(saved);
+      setDraft((current) => JSON.stringify(current) === submittedFingerprint ? saved : current);
+      return true;
+    } catch (cause) {
+      setError(toErrorMessage(cause, "Unable to save Loop changes."));
+      return false;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   return {
@@ -39,6 +56,8 @@ export function useAutomationDraft({
     setDraft,
     updateConfig,
     saveDraft,
-    isDirty: JSON.stringify(draft) !== receivedFingerprintRef.current
+    isDirty: JSON.stringify(draft) !== receivedFingerprintRef.current,
+    saving,
+    error
   };
 }

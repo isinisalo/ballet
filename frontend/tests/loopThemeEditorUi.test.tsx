@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -11,9 +11,11 @@ import {
 import { WorkspaceApp } from "../src/WorkspaceApp";
 import { emptyData } from "../src/workspace/types";
 import { LoopThemeEditorView } from "../src/workspace/automation/themes/LoopThemeEditorView";
+import { LoopThemeLibrary } from "../src/workspace/automation/themes/LoopThemeLibrary";
 import { LoopThemePreview } from "../src/workspace/automation/themes/LoopThemePreview";
 import { createLoopThemeDraft } from "../src/workspace/automation/themes/loopThemeEditorState";
 import { useLoopThemeEditor } from "../src/workspace/automation/themes/useLoopThemeEditor";
+import { AutomationView } from "../src/workspace/automation/AutomationView";
 import { installThemeApi } from "./loopThemeEditorTestApi";
 
 const loop: ProjectLoop = {
@@ -64,6 +66,55 @@ function edgeColorInput() {
 }
 
 describe("Loop Theme editor controls", () => {
+  it("opens the shared theme library from the Automation header", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    render(<AutomationView data={data()} agentExecutionStates={[]} loopView="all" saveAutomation={vi.fn()} navigate={navigate} setNavigationBlocker={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit theme" }));
+    expect(navigate).toHaveBeenCalledWith("/automation/themes");
+  });
+
+  it("uses the first All Loops card to open a new Loop", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    render(<AutomationView data={data()} agentExecutionStates={[]} loopView="all" saveAutomation={vi.fn()} navigate={navigate} setNavigationBlocker={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Add loop", exact: true })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "+ Add loop" }));
+    expect(navigate).toHaveBeenCalledWith("/automation/loops");
+  });
+
+  it("gives the selected Loop canvas the full workspace without an Automation title bar", () => {
+    render(<AutomationView data={data()} selectedId="delivery" agentExecutionStates={[]} saveAutomation={vi.fn()} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
+
+    expect(screen.getByRole("region", { name: "Loop canvas workspace" })).toBeInTheDocument();
+    expect(screen.queryByText("Automation", { exact: true })).not.toBeInTheDocument();
+  });
+
+  it("lists shared themes with their Loop usage and opens the selected theme", async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    render(<LoopThemeLibrary data={data()} navigate={navigate} />);
+
+    expect(screen.getByText(openAiTheme().label)).toBeInTheDocument();
+    expect(screen.getByText("1 Loop")).toBeInTheDocument();
+    expect(screen.getByText("Used by: delivery")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: `Edit theme ${openAiTheme().label}` }));
+    expect(navigate).toHaveBeenCalledWith("/automation/themes?id=open-ai");
+  });
+
+  it("edits an existing shared theme without a Loop route context", async () => {
+    const user = userEvent.setup();
+    const props = renderEditor({ loopId: undefined });
+
+    expect(screen.getByText("Project-shared Loop visualization theme")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New theme" })).not.toBeInTheDocument();
+    await replaceValue(user, edgeColorInput(), "#123456");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(props.updateTheme).toHaveBeenCalledWith(expect.objectContaining({ id: "open-ai", edge: expect.objectContaining({ color: "#123456" }) })));
+  });
+
   it("suggests valid kebab-case copy ids when a long source id is truncated", () => {
     const source = { ...openAiTheme(), id: `${"a".repeat(58)}-${"b".repeat(5)}` };
     const draft = createLoopThemeDraft(source, [source]);
@@ -79,6 +130,7 @@ describe("Loop Theme editor controls", () => {
     const canvas = screen.getByLabelText("Theme preview loop canvas");
     const scheduledNode = screen.getByRole("img", { name: "Preview step scheduled-small" });
 
+    expect(screen.getByRole("form", { name: "Loop theme" })).toBeInTheDocument();
     expect(screen.getByLabelText("Theme ID")).toBeDisabled();
     expect(screen.getByText("1 Loop")).toBeInTheDocument();
     expect(scheduledNode).toHaveAttribute("data-loop-node-renderer", "luna");
@@ -93,7 +145,7 @@ describe("Loop Theme editor controls", () => {
     expect(canvas.style.getPropertyValue("--loop-theme-edge-color")).toBe("#123456");
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
 
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.submit(screen.getByRole("form", { name: "Loop theme" }));
     await waitFor(() => expect(props.updateTheme).toHaveBeenCalledWith(expect.objectContaining({
       id: "open-ai",
       node: expect.objectContaining({ styles: expect.objectContaining({ small: "flat" }) }),

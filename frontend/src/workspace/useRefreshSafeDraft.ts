@@ -18,9 +18,11 @@ export function useRefreshSafeDraft<T>(source: T, identity: string) {
     setDraft((current) => identityChanged || fingerprint(current) === previousFingerprint ? sourceRef.current : current);
   }, [identity, sourceFingerprint]);
 
-  const accept = useCallback((accepted: T) => {
+  const accept = useCallback((accepted: T, expectedCurrent?: T) => {
     receivedFingerprintRef.current = fingerprint(accepted);
-    setDraft(accepted);
+    setDraft((current) => expectedCurrent === undefined || fingerprint(current) === fingerprint(expectedCurrent)
+      ? accepted
+      : current);
   }, []);
 
   return {

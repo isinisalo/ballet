@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toErrorMessage } from "@/lib/errors";
 import { runtimeRegistryApi } from "./runtimeRegistryApi";
 
@@ -18,6 +18,8 @@ export function RuntimeLogsDialog({ open, onOpenChange, fallbackPath }: {
   useEffect(() => {
     if (!open) return;
     let disposed = false;
+    setPath(fallbackPath);
+    setContent("");
     setLoading(true);
     setError("");
     runtimeRegistryApi.logs().then((response) => {
@@ -26,18 +28,21 @@ export function RuntimeLogsDialog({ open, onOpenChange, fallbackPath }: {
       if (!disposed) setError(toErrorMessage(cause, "Unable to load Ballet logs."));
     }).finally(() => { if (!disposed) setLoading(false); });
     return () => { disposed = true; };
-  }, [open]);
+  }, [fallbackPath, open]);
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/55" />
-        <DialogPrimitive.Popup className="fixed top-1/2 left-1/2 z-50 flex max-h-[80vh] w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-divider-strong bg-card shadow-lg">
-          <header className="flex items-center justify-between border-b border-divider-strong px-4 py-3"><div><DialogPrimitive.Title className="text-sm font-semibold">Ballet logs</DialogPrimitive.Title><DialogPrimitive.Description className="font-mono text-[0.65rem] text-muted-foreground">{path || fallbackPath}</DialogPrimitive.Description></div><DialogPrimitive.Close render={<Button type="button" size="sm" variant="outline">Close</Button>} /></header>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent showCloseButton={false} className="flex max-h-[80vh] w-[min(56rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="flex-row items-center justify-between border-b border-divider-strong px-4 py-3">
+            <div className="min-w-0">
+              <DialogTitle>Ballet logs</DialogTitle>
+              <DialogDescription className="truncate font-mono text-[0.68rem]">{path || fallbackPath}</DialogDescription>
+            </div>
+            <DialogClose render={<Button type="button" size="sm" variant="outline">Close</Button>} />
+          </DialogHeader>
           {error ? <Alert variant="destructive" className="m-3"><AlertDescription>{error}</AlertDescription></Alert> : null}
           <pre className="m-0 min-h-64 overflow-auto bg-background p-3 font-mono text-[0.68rem] leading-5 whitespace-pre">{loading ? "Loading logs…" : content || (error ? "" : "No Ballet logs available.")}</pre>
-        </DialogPrimitive.Popup>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+        </DialogContent>
+    </Dialog>
   );
 }

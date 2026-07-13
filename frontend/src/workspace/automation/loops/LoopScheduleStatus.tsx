@@ -1,6 +1,6 @@
 import type { LoopScheduleState } from "@shared/api/workspace-contracts";
 import { CalendarClock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { OperationalStatus } from "@/components/shared/workspace-ui";
 
 export function LoopScheduleStatus({ state, timeZone }: { state?: LoopScheduleState; timeZone: string }) {
   return (
@@ -11,7 +11,7 @@ export function LoopScheduleStatus({ state, timeZone }: { state?: LoopScheduleSt
         <dd className="break-words">{formatTimestamp(state?.nextRunAt, timeZone) ?? "Not scheduled"}</dd>
         <dt className="text-muted-foreground">Last</dt>
         <dd className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {state?.lastStatus ? <Badge variant={state.lastStatus === "started" ? "secondary" : "outline"} className={state.lastStatus === "started" ? "" : "border-tertiary/45 text-tertiary"}>{state.lastStatus}</Badge> : "No occurrence yet"}
+          {state?.lastStatus ? <OperationalStatus compact label={state.lastStatus} tone={state.lastStatus === "started" ? "healthy" : "attention"} /> : "No occurrence yet"}
           {state?.lastScheduledAt ? <span>{formatTimestamp(state.lastScheduledAt, timeZone)}</span> : null}
         </dd>
         {state?.lastRunId ? <><dt className="text-muted-foreground">Run</dt><dd className="break-all">{state.lastRunId}</dd></> : null}

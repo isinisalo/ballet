@@ -1,16 +1,29 @@
-import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 import type { Agent, AgentExecutionState, AgentRuntimeConfiguration, LocalRuntime } from "@shared/api/workspace-contracts";
-import { Activity, BookOpenText, ChevronRight, FileText } from "lucide-react";
 import { AgentInstructionsForm } from "./AgentInstructionsForm";
-import { AgentLiveStatusBadge, AgentProfilePanel } from "./AgentProfilePanel";
+import { AgentProfilePanel, NewAgentProfilePanel } from "./AgentProfilePanel";
 import { useAgentRuntimeConfiguration } from "./execution/useAgentRuntimeConfiguration";
 import type { AgentEditorState } from "./useAgentEditor";
 
-const workspaceTabs = [
-  { label: "Activity", icon: Activity },
-  { label: "Instructions", icon: FileText },
-  { label: "Skills", icon: BookOpenText }
-];
+function AgentWorkspace({ editor, profile }: { editor: AgentEditorState; profile: ReactNode }) {
+  return (
+    <section className="@container/agent-workspace w-full overflow-hidden border-y border-divider-strong bg-card">
+      <form
+        id={editor.formId}
+        className="grid min-h-[42rem] @3xl/agent-workspace:grid-cols-[18rem_minmax(0,1fr)]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void editor.submit();
+        }}
+      >
+        <div className="border-b border-divider-strong @3xl/agent-workspace:border-b-0 @3xl/agent-workspace:border-r">
+          {profile}
+        </div>
+        <AgentInstructionsForm editor={editor} />
+      </form>
+    </section>
+  );
+}
 
 export function AgentEditWorkspace({ agent, executionState, runtime, runtimeConfiguration, editor }: {
   agent: Agent;
@@ -22,50 +35,20 @@ export function AgentEditWorkspace({ agent, executionState, runtime, runtimeConf
   const executionEditor = useAgentRuntimeConfiguration(agent.id, runtime, runtimeConfiguration);
 
   return (
-    <section className="w-full overflow-hidden border-y border-divider-strong bg-card">
-      <header className="flex min-h-12 flex-wrap items-center gap-x-2 gap-y-1 border-b border-divider-strong bg-panel-section px-4 py-2">
-        <span className="text-sm text-muted-foreground">Agents</span>
-        <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground/60" />
-        <h1 className="min-w-0 truncate text-sm font-medium text-foreground">{editor.form.name ?? agent.name}</h1>
-        <AgentLiveStatusBadge state={executionState} />
-      </header>
-      <div className="grid min-h-[42rem] lg:grid-cols-[20rem_minmax(0,1fr)]">
+    <AgentWorkspace
+      editor={editor}
+      profile={(
         <AgentProfilePanel
           agent={agent}
           executionState={executionState}
           editor={editor}
           executionEditor={executionEditor}
         />
-        <section className="min-w-0 border-t border-divider-strong lg:border-l lg:border-t-0">
-          <div className="overflow-x-auto border-b border-divider-strong bg-card">
-            <div className="flex min-w-max items-stretch px-2" role="tablist" aria-label="Agent workspace">
-              {workspaceTabs.map((tab) => {
-                const Icon = tab.icon;
-                const selected = tab.label === "Instructions";
-                return (
-                  <button
-                    key={tab.label}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    aria-disabled={!selected}
-                    disabled={!selected}
-                    title={selected ? tab.label : "Not available yet"}
-                    className={cn(
-                      "flex h-12 shrink-0 items-center gap-2 border-x border-transparent px-3 text-xs transition-colors",
-                      selected ? "border-divider-strong bg-background font-medium text-foreground" : "text-muted-foreground/65 disabled:cursor-not-allowed"
-                    )}
-                  >
-                    <Icon className="size-3.5" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <AgentInstructionsForm editor={editor} />
-        </section>
-      </div>
-    </section>
+      )}
+    />
   );
+}
+
+export function AgentCreateWorkspace({ editor }: { editor: AgentEditorState }) {
+  return <AgentWorkspace editor={editor} profile={<NewAgentProfilePanel editor={editor} />} />;
 }

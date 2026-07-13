@@ -8,6 +8,7 @@ export type View =
   | "project-instructions"
   | "automation"
   | "loop-theme"
+  | "loop-theme-library"
   | "runtimes"
   | "agents"
   | "skills"

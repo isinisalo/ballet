@@ -21,9 +21,9 @@ describe("direct agent Run UI", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<AgentRunPane agentId="agent-1" />);
 
+    expect(screen.getByRole("form", { name: "Start agent run" })).toBeInTheDocument();
     const runInput = screen.getByLabelText("Run input (optional)");
-    await user.type(runInput, "Review the change");
-    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.type(runInput, "Review the change{Enter}");
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs", expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "agent", targetId: "agent-1", input: "Review the change" }) })));
     expect(await screen.findByText("run-1")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancel" }));

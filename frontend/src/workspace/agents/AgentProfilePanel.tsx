@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { OperationalStatus, type OperationalStatusTone } from "@/components/shared/workspace-ui";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -18,22 +20,13 @@ const statusLabel: Record<AgentExecutionState["status"], string> = {
   offline: "Offline"
 };
 
-const statusClass: Record<AgentExecutionState["status"], string> = {
-  running: "border-secondary/30 bg-secondary/10 text-secondary",
-  idle: "border-tertiary/30 bg-tertiary/10 text-tertiary",
-  busy: "border-tertiary/30 bg-tertiary/10 text-tertiary",
-  attention: "border-tertiary/30 bg-tertiary/10 text-tertiary",
-  unbound: "border-muted-foreground/25 bg-muted text-muted-foreground",
-  offline: "border-muted-foreground/25 bg-muted text-muted-foreground"
-};
-
-const statusDotClass: Record<AgentExecutionState["status"], string> = {
-  running: "bg-secondary shadow-[0_0_0_3px] shadow-secondary/15",
-  idle: "bg-tertiary shadow-[0_0_0_3px] shadow-tertiary/10",
-  busy: "bg-tertiary shadow-[0_0_0_3px] shadow-tertiary/10",
-  attention: "bg-tertiary shadow-[0_0_0_3px] shadow-tertiary/10",
-  unbound: "bg-muted-foreground/50",
-  offline: "bg-muted-foreground/50"
+const statusTone: Record<AgentExecutionState["status"], OperationalStatusTone> = {
+  running: "active",
+  idle: "attention",
+  busy: "attention",
+  attention: "attention",
+  unbound: "neutral",
+  offline: "neutral"
 };
 
 const formatTimestamp = (value: string) => {
@@ -43,12 +36,7 @@ const formatTimestamp = (value: string) => {
 
 export function AgentLiveStatusBadge({ state }: { state?: AgentExecutionState }) {
   const status = state?.status ?? "unbound";
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-xl border px-2 py-0.5 text-xs leading-4", statusClass[status])}>
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", statusDotClass[status], status === "running" && "animate-pulse")} />
-      {statusLabel[status]}
-    </span>
-  );
+  return <OperationalStatus compact label={statusLabel[status]} tone={statusTone[status]} />;
 }
 
 export function AgentProfilePanel({ agent, executionState, editor, executionEditor }: {
@@ -62,10 +50,13 @@ export function AgentProfilePanel({ agent, executionState, editor, executionEdit
   const description = editor.form.description ?? agent.description;
 
   return (
-    <aside className="bg-background px-3 py-3">
-      <div className="grid gap-2">
+    <aside className="bg-background">
+      <div className="grid gap-3 px-5 py-5">
+        <AgentAvatarField profile compact avatar={editor.form.avatar} onChange={(avatar) => editor.updateForm({ avatar })} />
         <EditableAgentName
+          id={editor.nameId}
           name={name}
+          error={editor.nameError}
           editing={editingField === "name"}
           onChange={(nextName) => editor.updateForm({ name: nextName })}
           onEdit={() => setEditingField("name")}
@@ -87,13 +78,8 @@ export function AgentProfilePanel({ agent, executionState, editor, executionEdit
           }}
         />
         <AgentLiveStatusBadge state={executionState} />
-        <AgentAvatarField compact avatar={editor.form.avatar} onChange={(avatar) => editor.updateForm({ avatar })} />
       </div>
-      <AgentExecutionSettingsForm
-        compact
-        agentId={agent.id}
-        editor={executionEditor}
-      />
+      <AgentExecutionSettingsForm compact agentId={agent.id} editor={executionEditor} />
       <ProfileSection title="Details">
         <ProfileRow label="Skills" value={String(agent.skills.length)} />
         <ProfileRow label="ID" value={agent.id} technical />
@@ -104,31 +90,79 @@ export function AgentProfilePanel({ agent, executionState, editor, executionEdit
   );
 }
 
-function EditableAgentName({ name, editing, onChange, onEdit, onDone, onCancel }: {
+export function NewAgentProfilePanel({ editor }: { editor: AgentEditorState }) {
+  const nameErrorId = `${editor.nameId}-error`;
+
+  return (
+    <aside className="bg-background">
+      <div className="grid gap-3 px-5 py-5">
+        <AgentAvatarField profile compact avatar={editor.form.avatar} onChange={(avatar) => editor.updateForm({ avatar })} />
+        <h1 className="text-base font-semibold leading-5 text-foreground">New agent</h1>
+        <Field className="gap-1.5" data-invalid={Boolean(editor.nameError)}>
+          <FieldLabel htmlFor={editor.nameId} className="text-xs text-muted-foreground">Name</FieldLabel>
+          <Input
+            id={editor.nameId}
+            className="h-10 text-base md:h-8 md:text-xs"
+            value={editor.form.name ?? ""}
+            required
+            aria-invalid={Boolean(editor.nameError)}
+            aria-describedby={editor.nameError ? nameErrorId : undefined}
+            onChange={(event) => editor.updateForm({ name: event.target.value })}
+          />
+          {editor.nameError ? <FieldError id={nameErrorId} className="text-xs">{editor.nameError}</FieldError> : null}
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel htmlFor={editor.descriptionId} className="text-xs text-muted-foreground">Description</FieldLabel>
+          <Textarea
+            id={editor.descriptionId}
+            className="min-h-20 resize-y text-base leading-5 md:text-xs md:leading-4"
+            rows={3}
+            value={editor.form.description ?? ""}
+            onChange={(event) => editor.updateForm({ description: event.target.value })}
+          />
+        </Field>
+        <AgentLiveStatusBadge />
+      </div>
+    </aside>
+  );
+}
+
+function EditableAgentName({ id, name, error, editing, onChange, onEdit, onDone, onCancel }: {
+  id: string;
   name: string;
+  error: string;
   editing: boolean;
   onChange: (value: string) => void;
   onEdit: () => void;
   onDone: () => void;
   onCancel: () => void;
 }) {
+  const errorId = `${id}-error`;
   if (editing) {
     return (
-      <div className="flex items-center gap-1">
-        <Input autoFocus aria-label="Agent name" className="h-8 min-w-0 flex-1 text-xs" value={name} onChange={(event) => onChange(event.target.value)} />
-        <Button type="button" size="icon-sm" className="size-6" aria-label="Finish editing agent name" title="Finish editing agent name" onClick={onDone}><Check /></Button>
-        <Button type="button" size="icon-sm" variant="ghost" className="size-6" aria-label="Cancel editing agent name" title="Cancel editing agent name" onClick={onCancel}><X /></Button>
-      </div>
+      <Field className="gap-1" data-invalid={Boolean(error)}>
+        <h1 className="sr-only">{name || "Unnamed agent"}</h1>
+        <FieldLabel htmlFor={id} className="sr-only">Agent name</FieldLabel>
+        <div className="flex items-center gap-1">
+          <Input id={id} autoFocus aria-label="Agent name" aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} className="h-10 min-w-0 flex-1 text-base md:h-8 md:text-xs" value={name} onChange={(event) => onChange(event.target.value)} />
+          <Button type="button" size="icon-sm" aria-label="Finish editing agent name" title="Finish editing agent name" onClick={onDone}><Check /></Button>
+          <Button type="button" size="icon-sm" variant="ghost" aria-label="Cancel editing agent name" title="Cancel editing agent name" onClick={onCancel}><X /></Button>
+        </div>
+        {error ? <FieldError id={errorId} className="text-xs">{error}</FieldError> : null}
+      </Field>
     );
   }
 
   return (
-    <h2 className="min-w-0 text-base font-semibold leading-5 text-foreground">
-      <button type="button" className="group flex w-full items-center gap-1 text-left" aria-label="Edit agent name" title="Edit agent name" onClick={onEdit}>
-        <span className="min-w-0 flex-1 truncate">{name}</span>
-        <Pencil aria-hidden="true" className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
-      </button>
-    </h2>
+    <div className="grid gap-1">
+      <div className="group flex min-w-0 items-center gap-1">
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold leading-5 text-foreground">{name || "Unnamed agent"}</h1>
+        <button type="button" className="inline-flex size-10 shrink-0 items-center justify-center transition-opacity md:size-5 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100" aria-label="Edit agent name" title="Edit agent name" onClick={onEdit}>
+          <Pencil aria-hidden="true" className="size-3" />
+        </button>
+      </div>
+      {error ? <FieldError className="text-xs">{error}</FieldError> : null}
+    </div>
   );
 }
 
@@ -143,25 +177,27 @@ function EditableAgentDescription({ description, editing, onChange, onEdit, onDo
   if (editing) {
     return (
       <div className="flex items-start gap-1">
-        <Textarea autoFocus aria-label="Agent description" className="min-h-16 flex-1 resize-y text-xs leading-4" rows={2} value={description} onChange={(event) => onChange(event.target.value)} />
+        <Textarea autoFocus aria-label="Agent description" className="min-h-20 flex-1 resize-y text-base leading-5 md:min-h-16 md:text-xs md:leading-4" rows={2} value={description} onChange={(event) => onChange(event.target.value)} />
         <div className="grid gap-1">
-          <Button type="button" size="icon-sm" className="size-6" aria-label="Finish editing agent description" title="Finish editing agent description" onClick={onDone}><Check /></Button>
-          <Button type="button" size="icon-sm" variant="ghost" className="size-6" aria-label="Cancel editing agent description" title="Cancel editing agent description" onClick={onCancel}><X /></Button>
+          <Button type="button" size="icon-sm" aria-label="Finish editing agent description" title="Finish editing agent description" onClick={onDone}><Check /></Button>
+          <Button type="button" size="icon-sm" variant="ghost" aria-label="Cancel editing agent description" title="Cancel editing agent description" onClick={onCancel}><X /></Button>
         </div>
       </div>
     );
   }
 
   return (
-    <button type="button" className="group flex w-full items-start gap-1 text-left text-xs leading-4 text-muted-foreground" aria-label="Edit agent description" title="Edit agent description" onClick={onEdit}>
-      <span className="min-w-0 flex-1">{description.trim() || "<show description here>"}</span>
-      <Pencil aria-hidden="true" className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
-    </button>
+    <div className="group flex w-full items-start gap-1 text-xs leading-4 text-muted-foreground">
+      <p className="min-w-0 flex-1">{description.trim() || "No description"}</p>
+      <button type="button" className="inline-flex size-10 shrink-0 items-center justify-center transition-opacity md:size-5 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100" aria-label="Edit agent description" title="Edit agent description" onClick={onEdit}>
+        <Pencil aria-hidden="true" className="size-3" />
+      </button>
+    </div>
   );
 }
 
 function ProfileSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="mt-5 border-t border-divider-strong pt-4"><h3 className="mb-3 font-mono text-[10px] font-medium uppercase leading-4 tracking-[0.05em] text-muted-foreground">{title}</h3><dl className="grid gap-3">{children}</dl></section>;
+  return <section className="border-t border-divider-strong px-5 py-4"><h2 className="mb-3 font-mono text-[10px] font-medium uppercase leading-4 tracking-[0.05em] text-muted-foreground">{title}</h2><dl className="grid gap-3">{children}</dl></section>;
 }
 
 function ProfileRow({ label, value, technical = false }: {

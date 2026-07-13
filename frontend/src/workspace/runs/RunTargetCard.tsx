@@ -1,6 +1,6 @@
 import type { RunTarget } from "@shared/api/workspace-contracts";
 import { Bot, Play, Route } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { OperationalStatus } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 
 export function RunTargetCard({ target, pending, onOpen, onStart }: {
@@ -26,7 +26,11 @@ export function RunTargetCard({ target, pending, onOpen, onStart }: {
           <h3 className="truncate text-xs font-medium">{target.name}</h3>
           <p className="truncate font-mono text-[0.62rem] text-muted-foreground">{target.id}</p>
         </div>
-        <Badge variant={target.ready ? "secondary" : "outline"}>{target.activeRootRunId ? "active" : target.ready ? "ready" : "blocked"}</Badge>
+        <OperationalStatus
+          compact
+          label={target.activeRootRunId ? "active" : target.ready ? "ready" : "blocked"}
+          tone={target.activeRootRunId ? "active" : target.ready ? "healthy" : "danger"}
+        />
       </header>
       {target.description ? <p className="line-clamp-2 text-xs text-muted-foreground">{target.description}</p> : null}
       {reason ? <p className="line-clamp-2 font-mono text-[0.62rem] text-tertiary" title={fullReason}>{reason}</p> : <p className="font-mono text-[0.62rem] text-secondary">preflight ready</p>}

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { LoopTheme, LoopThemeId, ProjectLoop } from "@shared/api/workspace-contracts";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { LoopEditorSelect } from "./LoopEditorSelect";
@@ -9,15 +10,18 @@ export function LoopThemeField({ loop, themes, disabled, onChange }: {
   disabled: boolean;
   onChange: (loop: ProjectLoop) => void;
 }) {
+  const fieldId = useId();
   return (
     <Field className="gap-1">
-      <FieldLabel className="text-xs font-normal text-muted-foreground">Theme</FieldLabel>
-      <LoopThemeSelect loop={loop} themes={themes} disabled={disabled} onChange={onChange} />
+      <FieldLabel htmlFor={fieldId} className="text-xs font-normal text-muted-foreground">Theme</FieldLabel>
+      <LoopThemeSelect id={fieldId} density="form" loop={loop} themes={themes} disabled={disabled} onChange={onChange} />
     </Field>
   );
 }
 
-export function LoopThemeSelect({ loop, themes, disabled, onChange }: {
+export function LoopThemeSelect({ id, density = "canvas", loop, themes, disabled, onChange }: {
+  id?: string;
+  density?: "canvas" | "form";
   loop: ProjectLoop;
   themes: readonly LoopTheme[];
   disabled: boolean;
@@ -25,6 +29,8 @@ export function LoopThemeSelect({ loop, themes, disabled, onChange }: {
 }) {
   return (
     <LoopEditorSelect
+      id={id}
+      density={density}
       ariaLabel="Loop theme"
       value={loop.theme}
       options={loopThemeOptions(themes)}

@@ -1,4 +1,5 @@
 import { Bot, CircleDot, Gauge, Route } from "lucide-react";
+import { StatusDot } from "@/components/shared/workspace-ui";
 import {
   SidebarGroupLabel,
   SidebarMenuButton,
@@ -27,7 +28,7 @@ export function RunSidebar({ route, dashboard, navigate }: {
       <RunSection label="Active runs" icon={<CircleDot className="text-secondary" />} empty="No active runs.">
         {dashboard.active.map((run) => (
           <SidebarNavLinkItem key={run.rootRunId} path={runSummaryPath(run)} isActive={route.rootRunId === run.rootRunId} navigate={navigate} className="h-7 min-w-0 font-mono text-[0.65rem]">
-            <span aria-hidden className="size-1.5 shrink-0 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" />
+            <StatusDot tone="active" />
             <span className="truncate">{run.targetId}</span>
             <span className="ml-auto text-muted-foreground">{run.status}</span>
           </SidebarNavLinkItem>
@@ -64,5 +65,5 @@ function RunSection({ label, icon, empty, children }: { label: string; icon: Rea
 }
 
 function ReadinessDot({ ready, active }: { ready: boolean; active: boolean }) {
-  return <span aria-hidden className={active ? "size-2 shrink-0 animate-pulse rounded-full bg-secondary motion-reduce:animate-none" : ready ? "size-2 shrink-0 rounded-full bg-secondary/75" : "size-2 shrink-0 rounded-full bg-tertiary/75"} />;
+  return <StatusDot tone={active ? "active" : ready ? "healthy" : "attention"} className="size-2" />;
 }

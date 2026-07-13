@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "open-ai",
+  "label": "OpenAI",
+  "node": {
+    "labelColor": "#ffb95f",
+    "glowColor": "#8b90a0",
+    "styles": {
+      "small": "luna",
+      "medium": "terra",
+      "large": "sol"
+    },
+    "showAgentAvatarInNode": false
+  },
+  "edge": {
+    "color": "#76d4ca",
+    "labelColor": "#c1c6d7",
+    "style": "solid",
+    "rejectedStyle": "dotted",
+    "crossLoopStyle": "dashed"
+  },
+  "connectionPoint": {
+    "style": "near",
+    "color": "#e3fffb"
+  }
+}

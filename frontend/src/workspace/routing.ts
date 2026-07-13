@@ -25,10 +25,12 @@ const automationRoute = (url: URL): RouteState => ({
 
 const loopThemeRoute = (url: URL): RouteState => {
   const loopThemeId = url.searchParams.get("id") ?? undefined;
+  const loopThemeSourceId = loopThemeId ? undefined : url.searchParams.get("newFrom") ?? undefined;
+  if (!loopThemeId && !loopThemeSourceId) return { view: "loop-theme-library" };
   return {
     view: "loop-theme",
     loopThemeId,
-    loopThemeSourceId: loopThemeId ? undefined : url.searchParams.get("newFrom") ?? undefined,
+    loopThemeSourceId,
     loopThemeLoopId: url.searchParams.get("loop") ?? undefined
   };
 };
@@ -88,8 +90,10 @@ export const automationLoopPath = (id?: string) => {
   return `/automation/loops?${params.toString()}`;
 };
 export const automationAllLoopsPath = () => "/automation/loops?view=all";
-export const automationThemePath = (themeId: string, loopId: string) => {
-  const params = new URLSearchParams({ id: themeId, loop: loopId });
+export const automationThemeLibraryPath = () => "/automation/themes";
+export const automationThemePath = (themeId: string, loopId?: string) => {
+  const params = new URLSearchParams({ id: themeId });
+  if (loopId) params.set("loop", loopId);
   return `/automation/themes?${params.toString()}`;
 };
 export const automationNewThemePath = (sourceThemeId: string, loopId: string) => {

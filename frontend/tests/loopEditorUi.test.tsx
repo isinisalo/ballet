@@ -83,40 +83,27 @@ describe("compact Loop editor UI", () => {
     expect(container.querySelectorAll("[data-loop-connection-point]").length).toBeGreaterThan(0);
   });
 
-  it("previews a Loop theme change and locks the selector with an active Run", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const view = render(<LoopEditor config={config} loop={loop} loops={[loop]} agents={agents} themes={builtInLoopThemes} locked={false} onChange={onChange} />);
-
-    await user.click(screen.getByRole("combobox", { name: "Loop theme" }));
-    await user.click(await screen.findByRole("option", { name: "Default" }));
-    expect(onChange).toHaveBeenCalledWith({ ...loop, theme: "default" });
-
+  it("renders the persisted Loop theme without a canvas theme selector", async () => {
     const defaultLoop = { ...loop, theme: "default" as const };
-    view.rerender(<LoopEditor config={{ version: 6, loops: [defaultLoop] }} loop={defaultLoop} loops={[defaultLoop]} agents={agents} themes={builtInLoopThemes} locked onChange={onChange} />);
-    expect(screen.getByRole("combobox", { name: "Loop theme" })).toBeDisabled();
-    expect(document.querySelector("[data-loop-canvas]")).toHaveAttribute("data-loop-theme", "default");
+    const { container } = render(<LoopEditor config={{ version: 6, loops: [defaultLoop] }} loop={defaultLoop} loops={[defaultLoop]} agents={agents} themes={builtInLoopThemes} locked={false} onChange={() => undefined} />);
+
+    expect(screen.queryByRole("combobox", { name: "Loop theme" })).not.toBeInTheDocument();
+    expect(container.querySelector("[data-loop-canvas]")).toHaveAttribute("data-loop-theme", "default");
     expect(await screen.findByRole("button", { name: "Edit step build" })).toHaveAttribute("data-loop-node-renderer", "flat");
-    expect(document.querySelector(".loop-agent-avatar")).toBeInTheDocument();
+    expect(container.querySelector(".loop-agent-avatar")).toBeInTheDocument();
   });
 
-  it("offers project themes in the Loop theme selector", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
+  it("renders a project theme without adding a canvas selection control", async () => {
     const customTheme = {
       ...structuredClone(builtInLoopThemes[0]!),
       id: "project-aurora",
       label: "Project Aurora"
     } satisfies LoopTheme;
-    const view = render(<LoopEditor config={config} loop={loop} loops={[loop]} agents={agents} themes={[...builtInLoopThemes, customTheme]} locked={false} onChange={onChange} />);
-
-    await user.click(screen.getByRole("combobox", { name: "Loop theme" }));
-    await user.click(await screen.findByRole("option", { name: "Project Aurora" }));
-    expect(onChange).toHaveBeenCalledWith({ ...loop, theme: "project-aurora" });
-
     const customLoop = { ...loop, theme: customTheme.id };
-    view.rerender(<LoopEditor config={{ version: 6, loops: [customLoop] }} loop={customLoop} loops={[customLoop]} agents={agents} themes={[...builtInLoopThemes, customTheme]} locked={false} onChange={onChange} />);
-    expect(document.querySelector("[data-loop-canvas]")).toHaveAttribute("data-loop-theme", "project-aurora");
+    const { container } = render(<LoopEditor config={{ version: 6, loops: [customLoop] }} loop={customLoop} loops={[customLoop]} agents={agents} themes={[...builtInLoopThemes, customTheme]} locked={false} onChange={() => undefined} />);
+
+    expect(screen.queryByRole("combobox", { name: "Loop theme" })).not.toBeInTheDocument();
+    expect(container.querySelector("[data-loop-canvas]")).toHaveAttribute("data-loop-theme", "project-aurora");
     expect(await screen.findByRole("button", { name: "Edit step build" })).toHaveAttribute("data-loop-node-renderer", "flat");
   });
 

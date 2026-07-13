@@ -2,12 +2,17 @@ import type { BalletMode } from "@shared/api/workspace-contracts";
 import { Route } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const balletModes: Array<{ value: BalletMode; label: string }> = [
+  { value: "run", label: "Run" },
+  { value: "configure", label: "Configure" }
+];
+
 export function BalletModeSelect({ mode, onChange }: {
   mode: BalletMode;
   onChange: (mode: BalletMode) => void;
 }) {
   return (
-    <Select<BalletMode> value={mode} onValueChange={onChange}>
+    <Select<BalletMode> value={mode} items={balletModes} onValueChange={(next) => { if (next !== null) onChange(next); }}>
       <SelectTrigger
         aria-label="Ballet mode"
         title="Ballet"

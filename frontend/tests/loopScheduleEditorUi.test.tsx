@@ -87,24 +87,41 @@ describe("scheduled Loop editor UI", () => {
   });
 
   it("counts agent, human, and scheduled Steps independently in All Loops", () => {
-    render(<AllLoopsCanvas config={config(weekdayLoop)} onOpenLoop={() => undefined} onEditTheme={() => undefined} />);
+    render(<AllLoopsCanvas config={config(weekdayLoop)} onAddLoop={() => undefined} onOpenLoop={() => undefined} />);
     expect(screen.getByText("1 agent")).toBeInTheDocument();
     expect(screen.getByText("1 human")).toBeInTheDocument();
     expect(screen.getByText("1 scheduled")).toBeInTheDocument();
   });
 
-  it("offers separate Loop and theme actions in All Loops", async () => {
+  it("renders Add loop as the first keyboard-accessible ghost card", async () => {
+    const user = userEvent.setup();
+    const onAddLoop = vi.fn();
+    render(<AllLoopsCanvas config={config(weekdayLoop)} onAddLoop={onAddLoop} onOpenLoop={() => undefined} />);
+
+    const addLoopCard = screen.getByRole("button", { name: "+ Add loop" });
+    expect(addLoopCard).toHaveClass("border-dashed");
+    expect(addLoopCard.parentElement?.firstElementChild).toBe(addLoopCard);
+
+    await user.tab();
+    expect(document.activeElement).toBe(addLoopCard);
+    await user.keyboard("{Enter}");
+    expect(onAddLoop).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the Add loop card when no Loops are configured", () => {
+    render(<AllLoopsCanvas config={{ ...config(weekdayLoop), loops: [] }} onAddLoop={() => undefined} onOpenLoop={() => undefined} />);
+
+    expect(screen.getByRole("button", { name: "+ Add loop" })).toBeInTheDocument();
+    expect(screen.queryByText("No loops configured.")).not.toBeInTheDocument();
+  });
+
+  it("offers only the Loop action in All Loops cards", async () => {
     const user = userEvent.setup();
     const onOpenLoop = vi.fn();
-    const onEditTheme = vi.fn();
-    render(<AllLoopsCanvas config={config(weekdayLoop)} onOpenLoop={onOpenLoop} onEditTheme={onEditTheme} />);
+    render(<AllLoopsCanvas config={config(weekdayLoop)} onAddLoop={() => undefined} onOpenLoop={onOpenLoop} />);
 
     await user.click(screen.getByRole("button", { name: "Open loop scheduled-delivery" }));
     expect(onOpenLoop).toHaveBeenCalledWith("scheduled-delivery");
-    expect(onEditTheme).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole("button", { name: "Edit theme for scheduled-delivery" }));
-    expect(onEditTheme).toHaveBeenCalledWith("scheduled-delivery", "open-ai");
-    expect(onOpenLoop).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Edit theme for scheduled-delivery" })).not.toBeInTheDocument();
   });
 });

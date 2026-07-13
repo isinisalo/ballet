@@ -6,60 +6,7 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-type SelectProps<Value extends string = string> = Omit<
-  SelectPrimitive.Root.Props<Value, false>,
-  "defaultValue" | "onValueChange" | "value"
-> & {
-  defaultValue?: Value
-  onValueChange?: (value: Value) => void
-  value?: Value
-}
-
-function Select<Value extends string = string>({
-  children,
-  items,
-  onValueChange,
-  ...props
-}: SelectProps<Value>) {
-  const collectedItems = items ? [] : collectSelectItems<Value>(children)
-
-  return (
-    <SelectPrimitive.Root
-      data-slot="select"
-      items={items ?? (collectedItems.length > 0 ? collectedItems : undefined)}
-      onValueChange={(value) => {
-        if (value !== null) onValueChange?.(value)
-      }}
-      {...props}
-    >
-      {children}
-    </SelectPrimitive.Root>
-  )
-}
-
-function collectSelectItems<Value extends string>(
-  children: React.ReactNode
-): Array<{ label: React.ReactNode; value: Value }> {
-  const items: Array<{ label: React.ReactNode; value: Value }> = []
-
-  React.Children.forEach(children, (child) => {
-    if (!React.isValidElement(child)) return
-
-    const props = child.props as {
-      children?: React.ReactNode
-      value?: Value
-    }
-
-    if (child.type === SelectItem && props.value) {
-      items.push({ label: props.children, value: props.value })
-      return
-    }
-
-    items.push(...collectSelectItems<Value>(props.children))
-  })
-
-  return items
-}
+const Select = SelectPrimitive.Root
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (

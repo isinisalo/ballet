@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { frontmatterToYaml, parseFrontmatterYaml } from "../src/workspace/documents/frontmatter";
+import { countEditorWords, estimateEditorTokens, formatEditorMetric } from "../src/workspace/documents/editorMetrics";
 import { documentTitle, markdownPreviewDocument, removeMatchingLeadingH1 } from "../src/workspace/documents/markdownDocument";
 import { findProjectTreeDirectory, selectedProjectTreeDocument } from "../src/workspace/documents/projectDocuments";
 import type { ProjectDocumentTreeNode } from "@shared/api/workspace-contracts";
@@ -12,6 +13,22 @@ describe("frontmatter helpers", () => {
 
   it("rejects non-mapping frontmatter", () => {
     expect(() => parseFrontmatterYaml("- one\n- two")).toThrow("Frontmatter must be a YAML mapping/object.");
+  });
+});
+
+describe("editor metrics", () => {
+  it("counts words and estimates tokens without UI state", () => {
+    expect(countEditorWords("  one\n two   three ")).toBe(3);
+    expect(countEditorWords("  ")).toBe(0);
+    expect(estimateEditorTokens("12345")).toBe(2);
+    expect(estimateEditorTokens("")).toBe(0);
+  });
+
+  it("formats large metrics compactly", () => {
+    expect(formatEditorMetric(999)).toBe("999");
+    expect(formatEditorMetric(1000)).toBe("1.0k");
+    expect(formatEditorMetric(9999)).toBe("10.0k");
+    expect(formatEditorMetric(10000)).toBe("10k");
   });
 });
 

@@ -1,12 +1,20 @@
 import { CalendarDays, CheckCircle2, FileKey2, Hash, ShieldCheck, Tags, UserRound, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState, ErrorPreview, statusVariant } from "@/components/shared/workspace-ui";
+import { EmptyState, ErrorPreview, OperationalStatus, type OperationalStatusTone } from "@/components/shared/workspace-ui";
 import { cn } from "@/lib/utils";
 import { MarkdownBody } from "./MarkdownBody";
 import { documentTitle, type MarkdownEntity } from "./markdownDocument";
 
 const isSimpleFrontmatterValue = (value: unknown) => value === null || ["string", "number", "boolean", "undefined"].includes(typeof value);
 const isSimpleFrontmatterArray = (value: unknown[]) => value.every(isSimpleFrontmatterValue);
+
+const frontmatterStatusTone = (status: string): OperationalStatusTone => {
+  const normalized = status.toLowerCase();
+  if (["ready", "healthy", "done", "accepted", "handled", "routed", "success", "active"].includes(normalized)) return "healthy";
+  if (["running", "in-progress", "idle", "queued", "pending", "proposed", "received", "waiting", "at-risk"].includes(normalized)) return "attention";
+  if (["failed", "blocked", "rejected", "error", "unassigned"].includes(normalized)) return "danger";
+  return "neutral";
+};
 
 const frontmatterIcon = (fieldKey: string): LucideIcon => {
   if (fieldKey === "id") return Hash;
@@ -47,11 +55,7 @@ function FrontmatterValue({ fieldKey, value }: { fieldKey: string; value: unknow
 
   if (value === null || value === undefined || value === "") return <span className="text-muted-foreground">empty</span>;
   if (fieldKey === "status") {
-    return (
-      <Badge variant={statusVariant(String(value))} className="h-5 rounded-xl px-2 font-mono text-[0.65rem] uppercase">
-        {String(value)}
-      </Badge>
-    );
+    return <OperationalStatus compact label={String(value)} tone={frontmatterStatusTone(String(value))} className="uppercase" />;
   }
   return <span className="font-medium">{String(value)}</span>;
 }

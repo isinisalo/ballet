@@ -1,9 +1,13 @@
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const compactLoopControl = "h-[22px] min-h-[22px] w-full rounded-md border-divider-strong bg-card px-1.5 py-0 font-mono text-[0.66rem] leading-4 shadow-none";
+export const compactLoopFormControl = "h-10 min-h-10 w-full rounded border-divider-strong bg-card px-2 py-0 font-mono text-base leading-5 shadow-none md:h-7 md:min-h-7 md:text-xs md:leading-4";
 
-export function LoopEditorSelect({ ariaLabel, value, options, disabled, invalid, onChange }: {
+export function LoopEditorSelect({ id, ariaLabel, describedBy, density = "canvas", value, options, disabled, invalid, onChange }: {
+  id?: string;
   ariaLabel: string;
+  describedBy?: string;
+  density?: "canvas" | "form";
   value: string;
   options: Array<{ value: string; label: string }>;
   disabled: boolean;
@@ -11,8 +15,17 @@ export function LoopEditorSelect({ ariaLabel, value, options, disabled, invalid,
   onChange: (value: string) => void;
 }) {
   return (
-    <Select value={value || undefined} disabled={disabled} items={options} onValueChange={onChange}>
-      <SelectTrigger size="sm" aria-label={ariaLabel} aria-invalid={invalid} className={compactLoopControl}><SelectValue /></SelectTrigger>
+    <Select value={value || null} disabled={disabled} items={options} onValueChange={(next) => { if (next !== null) onChange(next); }}>
+      <SelectTrigger
+        id={id}
+        size="sm"
+        aria-label={ariaLabel}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
+        className={density === "form" ? compactLoopFormControl : compactLoopControl}
+      >
+        <SelectValue />
+      </SelectTrigger>
       <SelectContent><SelectGroup>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
     </Select>
   );

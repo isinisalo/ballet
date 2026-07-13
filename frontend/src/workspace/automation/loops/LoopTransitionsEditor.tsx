@@ -1,5 +1,6 @@
+import { useId } from "react";
 import type { ProjectExecutableStep, ProjectLoop, StepTransitionTarget } from "@shared/api/workspace-contracts";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { LoopEditorSelect } from "./LoopEditorSelect";
 import { transitionTarget, transitionTargetKind, transitionTargetValue, type TransitionTargetKind } from "./loopEditorState";
 
@@ -13,14 +14,14 @@ export function LoopTransitionsEditor({ step, loop, loops, disabled, focusedTran
 }) {
   const patch = (result: "approved" | "rejected", target: StepTransitionTarget) => onChange({ ...step, on: { ...step.on, [result]: target } });
   return (
-    <Field className="gap-1.5">
-      <FieldLabel className="text-xs font-normal text-muted-foreground">Transitions</FieldLabel>
+    <FieldSet className="gap-1.5">
+      <FieldLegend variant="label" className="mb-0 text-xs font-normal text-muted-foreground">Transitions</FieldLegend>
       <div className="divide-y divide-divider-strong border-y border-divider-strong">
         {(["approved", "rejected"] as const).map((result) => (
           <TransitionRow key={result} result={result} target={step.on[result]} step={step} loop={loop} loops={loops} disabled={disabled} focused={focusedTransition === result} onChange={(target) => patch(result, target)} />
         ))}
       </div>
-    </Field>
+    </FieldSet>
   );
 }
 
@@ -34,6 +35,8 @@ function TransitionRow({ result, target, step, loop, loops, disabled, focused, o
   focused: boolean;
   onChange: (target: StepTransitionTarget) => void;
 }) {
+  const kindId = useId();
+  const targetId = useId();
   const kind = transitionTargetKind(target);
   const loopOptions = loops.filter((candidate) => candidate.id !== loop.id).map((candidate) => ({ value: candidate.id, label: candidate.id }));
   const kindOptions = [
@@ -56,8 +59,14 @@ function TransitionRow({ result, target, step, loop, loops, disabled, focused, o
     <div className={`grid gap-1.5 py-2 ${focused ? "bg-primary/5" : ""}`}>
       <span className={`font-mono text-[0.66rem] leading-4 ${result === "approved" ? "text-secondary" : "text-destructive"}`}>{result}</span>
       <div className="grid min-w-0 grid-cols-2 gap-1.5">
-        <LoopEditorSelect ariaLabel={`${result} transition kind`} value={kind} disabled={disabled} options={kindOptions} onChange={changeKind} />
-        <LoopEditorSelect ariaLabel={`${result} transition target`} value={transitionTargetValue(target)} disabled={disabled} options={valueOptions} onChange={(value) => onChange(transitionTarget(kind, value))} />
+        <Field className="min-w-0 gap-1">
+          <FieldLabel htmlFor={kindId} className="sr-only">{result} transition kind</FieldLabel>
+          <LoopEditorSelect id={kindId} ariaLabel={`${result} transition kind`} density="form" value={kind} disabled={disabled} options={kindOptions} onChange={changeKind} />
+        </Field>
+        <Field className="min-w-0 gap-1">
+          <FieldLabel htmlFor={targetId} className="sr-only">{result} transition target</FieldLabel>
+          <LoopEditorSelect id={targetId} ariaLabel={`${result} transition target`} density="form" value={transitionTargetValue(target)} disabled={disabled} options={valueOptions} onChange={(value) => onChange(transitionTarget(kind, value))} />
+        </Field>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import type { DashboardRunStatus, RootRunSummary } from "@shared/api/workspace-contracts";
+import type { OperationalStatusTone } from "@/components/shared/workspace-ui";
 import { runAgentPath, runLoopPath } from "../routing";
 
 export const cancellableRunStatuses = new Set<DashboardRunStatus>(["queued", "running", "waiting_for_human"]);
@@ -18,8 +19,9 @@ export const changedFilesLabel = (paths: string[]) => {
   return paths.length > 5 ? `${visible} · +${paths.length - 5} more` : visible;
 };
 
-export const runStatusTone = (status: DashboardRunStatus) => {
-  if (status === "completed") return "secondary" as const;
-  if (["blocked", "failed", "cancelled"].includes(status)) return "destructive" as const;
-  return "outline" as const;
+export const runStatusTone = (status: DashboardRunStatus): OperationalStatusTone => {
+  if (status === "running") return "active";
+  if (status === "completed") return "healthy";
+  if (["blocked", "failed", "cancelled"].includes(status)) return "danger";
+  return "attention";
 };
