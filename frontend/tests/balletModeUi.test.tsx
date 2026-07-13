@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { SidebarMenuButton, SidebarMenuSubButton, SidebarProvider } from "../src/components/ui/sidebar";
 import { pathForBalletMode } from "../src/workspace/balletModeNavigation";
 import { BalletModeSelect } from "../src/workspace/layout/BalletModeSelect";
 
@@ -14,7 +15,7 @@ describe("global Ballet mode", () => {
 
     const trigger = screen.getByRole("combobox", { name: "Ballet mode" });
     expect(trigger).toHaveTextContent("Ballet");
-    expect(trigger).toHaveClass("bg-transparent", "hover:bg-sidebar-accent", "data-[popup-open]:bg-sidebar-accent");
+    expect(trigger).toHaveClass("bg-transparent", "hover:bg-sidebar-hover", "focus-visible:bg-sidebar-hover", "data-[popup-open]:bg-sidebar-accent");
 
     await user.click(trigger);
     expect(await screen.findByText("Run", { exact: true })).toBeVisible();
@@ -24,6 +25,18 @@ describe("global Ballet mode", () => {
 
     await user.click(screen.getByText("Run", { exact: true }));
     expect(onChange).toHaveBeenCalledWith("run");
+  });
+
+  it("keeps sidebar hover lighter than the selected menuitem", () => {
+    render(
+      <SidebarProvider>
+        <SidebarMenuButton isActive>Selected section</SidebarMenuButton>
+        <SidebarMenuSubButton href="#" isActive>Selected item</SidebarMenuSubButton>
+      </SidebarProvider>
+    );
+
+    expect(screen.getByRole("button", { name: "Selected section" })).toHaveClass("hover:bg-sidebar-hover", "data-active:bg-sidebar-accent", "data-active:hover:bg-sidebar-accent");
+    expect(screen.getByRole("link", { name: "Selected item" })).toHaveClass("hover:bg-sidebar-hover", "data-active:bg-sidebar-accent", "data-active:hover:bg-sidebar-accent");
   });
 
   it("preserves selected Loops and agents and sends Configure-only views to overview", () => {

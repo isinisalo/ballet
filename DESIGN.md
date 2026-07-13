@@ -48,7 +48,7 @@ colors:
   tertiary-fixed-dim: '#ffb95f'
   on-tertiary-fixed: '#2a1700'
   on-tertiary-fixed-variant: '#653e00'
-  background: '#111316'
+  background: '#0c0e11'
   on-background: '#e2e2e6'
   surface-variant: '#333538'
 typography:
@@ -154,7 +154,7 @@ Theme support is currently dark-only. Do not expose light or system theme modes 
 - **Loop Flow (Mint):** Use as the built-in `open-ai` baseline for thin normal Loop connectors and active Transition glow, with the brighter `loop-connection-point` token for endpoint orbs. A resolved project theme may replace these colors and choose each edge pattern inside its Loop canvas only. Keep rejected and rework connectors semantically muted with a shade derived from the selected edge color.
 - **Tertiary (Amber):** Use for warnings, idle agents, queued Steps, human-wait states, and attention states that do not require destructive styling.
 - **Error:** Use only for failed or blocked Runs, invalid Loop state, destructive commands, and blocking validation errors.
-- **Background & Surfaces:** Use `#111316` for the application base. Use `#1a1c1f`, `#1e2023`, and `#282a2d` for functional containers, nested panels, and elevated work areas. Keep borders subtle but visible with `#414755` or lower-contrast variants.
+- **Background & Surfaces:** Use `#0c0e11` for the application and workspace base. Use `#111316` for primary cards and panels, and `#1a1c1f` for the sidebar, compact headers, and nested sections. Reserve `#1e2023` and `#282a2d` for popovers, selected states, hover states, and other elevated interactive surfaces. Keep borders subtle but visible with `#414755` or lower-contrast variants.
 
 ## Typography
 Use **Inter** for the main interface. Use **Geist** for technical data, Step Transitions, Run inputs, CLI excerpts, file paths, identifiers, timestamps, and frontmatter previews.
@@ -179,8 +179,8 @@ The layout follows a fluid grid with sidebar-heavy navigation and dense operatio
 ## Elevation & Depth
 Depth is conveyed through tonal layering first and shadows second.
 
-- **Level 0 (Base):** Use `#111316` for the application background.
-- **Level 1 (Panels):** Use `#1a1c1f` or `#1e2023` with a 1px border. Do not add decorative shadows.
+- **Level 0 (Base):** Use `#0c0e11` for the application and workspace background.
+- **Level 1 (Panels):** Use `#111316` for primary panels and cards with a 1px border. Use `#1a1c1f` selectively for compact headers and nested sections. Do not add decorative shadows.
 - **Level 2 (Modals/Popovers):** Use `#1e2023` with a visible border, a subtle 10% white inner edge, and a restrained dark shadow.
 - **Active State:** Elements currently selected, edited, monitored, or focused may receive a 4px Primary glow at 20% opacity.
 - **Disabled State:** Lower opacity and reduce contrast. Do not change the shape language or introduce new colors.

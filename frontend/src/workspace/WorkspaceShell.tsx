@@ -55,7 +55,7 @@ export function WorkspaceShell() {
         />
         <div data-slot="sidebar-inset" className="relative flex w-full flex-1 flex-col bg-background">
           <ScrollArea className="h-svh">
-            <main className="flex min-h-svh flex-col bg-muted/30">
+            <main className="flex min-h-svh flex-col bg-background">
               <header className="flex flex-col gap-4 p-3 pb-0 md:hidden">
                 <div className="flex items-start gap-2">
                   <SidebarTrigger className="md:hidden">
