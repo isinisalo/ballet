@@ -33,6 +33,9 @@ export const findProjectTreeDocument = (nodes: ProjectDocumentTreeNode[], relati
   return undefined;
 };
 
+export const listProjectTreeDocuments = (nodes: ProjectDocumentTreeNode[]): MarkdownDocument[] =>
+  nodes.flatMap((node) => node.type === "file" ? [node.document] : listProjectTreeDocuments(node.children));
+
 export const firstProjectTreeDocument = (node?: ProjectTreeDirectory): MarkdownDocument | undefined => {
   for (const child of node?.children ?? []) {
     if (child.type === "file") return child.document;

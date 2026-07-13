@@ -10,6 +10,7 @@ import type {
 import {
   findProjectTreeDirectory,
   findProjectTreeDocument,
+  listProjectTreeDocuments,
   selectedProjectTreeDocument,
   type ProjectTreeDirectory
 } from "../documents/projectDocuments";
@@ -25,8 +26,11 @@ export type WorkspaceSelection = {
   projectDocumentTree: ProjectDocumentTreeNode[];
   selectedProjectDocument?: MarkdownDocument;
   adrDirectory?: ProjectTreeDirectory;
+  adrDocuments: MarkdownDocument[];
   goalsDirectory?: ProjectTreeDirectory;
+  goalDocuments: MarkdownDocument[];
   instructionsDirectory?: ProjectTreeDirectory;
+  instructionDocuments: MarkdownDocument[];
   selectedAdr?: MarkdownDocument;
   selectedGoal?: MarkdownDocument;
   selectedInstruction?: MarkdownDocument;
@@ -44,6 +48,9 @@ export function getWorkspaceSelection({
   const adrDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/adr");
   const goalsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/goals");
   const instructionsDirectory = findProjectTreeDirectory(projectDocumentTree, ".ballet/instructions");
+  const adrDocuments = listProjectTreeDocuments(adrDirectory?.children ?? []);
+  const goalDocuments = listProjectTreeDocuments(goalsDirectory?.children ?? []);
+  const instructionDocuments = listProjectTreeDocuments(instructionsDirectory?.children ?? []);
   const selectedAdr = route.documentPath ? selectedProjectTreeDocument(adrDirectory, route.documentPath) : undefined;
   const selectedGoal = route.documentPath ? selectedProjectTreeDocument(goalsDirectory, route.documentPath) : undefined;
   const selectedInstruction = route.documentPath ? selectedProjectTreeDocument(instructionsDirectory, route.documentPath) : undefined;
@@ -58,8 +65,11 @@ export function getWorkspaceSelection({
     projectDocumentTree,
     selectedProjectDocument,
     adrDirectory,
+    adrDocuments,
     goalsDirectory,
+    goalDocuments,
     instructionsDirectory,
+    instructionDocuments,
     selectedAdr,
     selectedGoal,
     selectedInstruction,

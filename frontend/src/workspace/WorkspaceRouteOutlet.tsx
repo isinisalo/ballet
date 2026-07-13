@@ -56,11 +56,11 @@ export function WorkspaceRouteOutlet({
     case "project-document":
       return <ProjectDocumentPage document={selection.selectedProjectDocument} saveProjectDocument={mutations.saveProjectDocument} setNavigationBlocker={setNavigationBlocker} />;
     case "project-goals":
-      return <GoalsPage project={selection.project} selectedGoal={selection.selectedGoal} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} setNavigationBlocker={setNavigationBlocker} />;
+      return <GoalsPage project={selection.project} documents={selection.goalDocuments} selectedGoal={selection.selectedGoal} creating={route.creating} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "project-adrs":
-      return <AdrsPage project={selection.project} selectedAdr={selection.selectedAdr} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} setNavigationBlocker={setNavigationBlocker} />;
+      return <AdrsPage project={selection.project} documents={selection.adrDocuments} selectedAdr={selection.selectedAdr} creating={route.creating} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "project-instructions":
-      return <InstructionsPage project={selection.project} selectedInstruction={selection.selectedInstruction} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} setNavigationBlocker={setNavigationBlocker} />;
+      return <InstructionsPage project={selection.project} documents={selection.instructionDocuments} selectedInstruction={selection.selectedInstruction} creating={route.creating} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "automation":
       return <AutomationView data={data} agentExecutionStates={agentExecutionStates} selectedId={route.automationEntityId} loopView={route.automationLoopView} saveAutomation={mutations.saveAutomation} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "loop-theme":
@@ -70,9 +70,9 @@ export function WorkspaceRouteOutlet({
     case "runtimes":
       return <RuntimeRegistryView runtime={data.runtime} onRefreshed={mutations.refresh} />;
     case "agents":
-      return <AgentsView agent={selection.selectedAgent} agentExecutionStates={agentExecutionStates} runtime={data.runtime} runtimeConfiguration={selection.selectedAgent ? data.agentRuntimeConfigurations[selection.selectedAgent.id] : undefined} save={mutations.save} remove={mutations.remove} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
+      return <AgentsView agents={data.agents} agent={selection.selectedAgent} creating={route.creating} agentExecutionStates={agentExecutionStates} runtime={data.runtime} runtimeConfiguration={selection.selectedAgent ? data.agentRuntimeConfigurations[selection.selectedAgent.id] : undefined} save={mutations.save} remove={mutations.remove} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "skills":
-      return <SkillsView skill={selection.selectedSkill} save={mutations.save} remove={mutations.remove} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
+      return <SkillsView skills={data.skills} skill={selection.selectedSkill} creating={route.creating} save={mutations.save} remove={mutations.remove} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "run":
       return <RunWorkspace route={route} data={data} agentExecutionStates={agentExecutionStates} appStreamStatus={appStreamStatus} dashboard={runDashboard} navigate={navigate} />;
     default:

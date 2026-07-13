@@ -3,9 +3,12 @@ import { agentDocumentPath } from "../routing";
 import type { SaveCollection } from "../types";
 import type { WorkspaceNavigation } from "../useWorkspaceNavigation";
 import { AgentEditor } from "./AgentEditor";
+import { AgentsOverview } from "./AgentsOverview";
 
-export function AgentsView({ agent, agentExecutionStates, runtime, runtimeConfiguration, save, remove, navigate, setNavigationBlocker }: {
+export function AgentsView({ agents, agent, creating = false, agentExecutionStates, runtime, runtimeConfiguration, save, remove, navigate, setNavigationBlocker }: {
+  agents: Agent[];
   agent?: Agent;
+  creating?: boolean;
   agentExecutionStates: AgentExecutionState[];
   runtime: LocalRuntime;
   runtimeConfiguration?: AgentRuntimeConfiguration;
@@ -14,6 +17,8 @@ export function AgentsView({ agent, agentExecutionStates, runtime, runtimeConfig
   navigate: WorkspaceNavigation["navigate"];
   setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 }) {
+  if (!agent && !creating) return <AgentsOverview agents={agents} executionStates={agentExecutionStates} navigate={navigate} />;
+
   const executionState = agent ? agentExecutionStates.find((state) => state.agentId === agent.id) : undefined;
   const editor = <AgentEditor
     agent={agent}

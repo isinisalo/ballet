@@ -20,6 +20,7 @@ export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
   view: View;
+  creating?: boolean;
   documentPath?: string;
   automationEntityId?: string;
   automationLoopView?: AutomationLoopView;

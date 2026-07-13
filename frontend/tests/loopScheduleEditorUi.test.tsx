@@ -100,7 +100,10 @@ describe("scheduled Loop editor UI", () => {
 
     const addLoopCard = screen.getByRole("button", { name: "+ Add loop" });
     expect(addLoopCard).toHaveClass("border-dashed");
+    expect(addLoopCard).toHaveClass("min-h-36", "rounded-lg", "bg-background/60");
+    expect(addLoopCard).not.toHaveClass("rounded-none");
     expect(addLoopCard.parentElement?.firstElementChild).toBe(addLoopCard);
+    expect(addLoopCard.parentElement).toHaveClass("gap-3", "p-4");
 
     await user.tab();
     expect(document.activeElement).toBe(addLoopCard);

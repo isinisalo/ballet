@@ -1,4 +1,5 @@
 export { DeleteConfirmDialog } from "./DeleteConfirmDialog";
+export { CollectionAddCard, CollectionCardGrid, CollectionEntityCard } from "./collection-overview";
 export { EditorActions } from "./editor-actions";
 export { EmptyState } from "./empty-state";
 export { SelectField, TextAreaField, TextField } from "./form-field";

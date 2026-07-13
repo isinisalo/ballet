@@ -1,6 +1,7 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { getProjectStepTransitionTargets } from "@shared/api/workspace-contracts";
 import { ArrowRight, Bot, CalendarClock, PanelTopOpen, Route, ShieldCheck } from "lucide-react";
+import { CollectionCardGrid } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 
 export function AllLoopsCanvas({
@@ -13,16 +14,7 @@ export function AllLoopsCanvas({
   onOpenLoop: (loopId: string) => void;
 }) {
   return (
-    <div className="grid gap-px bg-divider-strong sm:grid-cols-2 xl:grid-cols-3" aria-label="All loops">
-      <Button
-        type="button"
-        variant="ghost"
-        aria-label="+ Add loop"
-        className="grid min-h-28 place-items-center rounded-none border border-dashed border-muted-foreground/50 bg-background/60 font-mono text-xs text-muted-foreground opacity-60 transition-colors hover:border-primary/65 hover:bg-card hover:text-foreground hover:opacity-85 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-        onClick={onAddLoop}
-      >
-        + Add loop
-      </Button>
+    <CollectionCardGrid label="All loops" addLabel="Add loop" addAriaLabel="+ Add loop" onAdd={onAddLoop}>
       {config.loops.map((loop) => {
         const humanSteps = loop.steps.filter((step) => step.type === "human").length;
         const agentSteps = loop.steps.filter((step) => step.type === "agent").length;
@@ -32,7 +24,7 @@ export function AllLoopsCanvas({
         return (
           <article
             key={loop.id}
-            className="grid min-h-28 bg-card"
+            className="grid min-h-36 min-w-0 grid-rows-[1fr_auto] overflow-hidden rounded-lg border border-divider-strong bg-card"
           >
             <div className="grid gap-3 p-4">
               <span className="flex items-center gap-2 font-mono text-xs text-foreground"><Route className="text-primary" /> {loop.id}</span>
@@ -52,6 +44,6 @@ export function AllLoopsCanvas({
           </article>
         );
       })}
-    </div>
+    </CollectionCardGrid>
   );
 }
