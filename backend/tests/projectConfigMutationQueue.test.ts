@@ -77,6 +77,7 @@ const config = (): ProjectAutomationConfig => ({
 const automationLoop = (id: string): ProjectAutomationConfig["loops"][number] => ({
   id,
   start: "gate",
+  summaryStyle: "route",
   nodes: [{
     id: "gate",
     type: "human",

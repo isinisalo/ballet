@@ -8,6 +8,7 @@ import { LoopCanvas } from "./LoopCanvas";
 import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
 import { LoopHandlerSheet } from "./LoopHandlerSheet";
 import { LoopNodeSheetEditor } from "./LoopStepSheetEditor";
+import { LoopSummaryStyleField } from "./LoopSummaryStyleField";
 import { loopIdError } from "./loopFormValidation";
 
 type Selection = { stepId: string; transition?: ProjectStepTransitionId };
@@ -59,7 +60,16 @@ export function LoopEditor({
   const [selection, setSelection] = useState<Selection | null>(null);
   const selectedStep = loop.nodes.find((node) => node.id === selection?.stepId);
   const editingDisabled = locked || disabled;
-  const controls = canvasControls ? <div className="flex items-center gap-2">{canvasControls}</div> : undefined;
+  const controls = (
+    <div className="flex items-center gap-2">
+      <LoopSummaryStyleField
+        value={loop.summaryStyle ?? "route"}
+        disabled={editingDisabled}
+        onChange={(summaryStyle) => onChange({ ...loop, summaryStyle })}
+      />
+      {canvasControls}
+    </div>
+  );
   const selectionScope = creation ? "new-loop" : loop.id;
 
   useEffect(() => setSelection(null), [selectionScope]);

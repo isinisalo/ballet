@@ -16,6 +16,7 @@ afterEach(async () => {
 const loop = (id: string): ProjectLoop => ({
   id,
   start: "work",
+  summaryStyle: "route",
   nodes: [{
     id: "work",
     type: "agent",

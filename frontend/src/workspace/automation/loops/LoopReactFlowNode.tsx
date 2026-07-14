@@ -1,9 +1,9 @@
-import { Route } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
 import { LoopCompactStepNode } from "./LoopCompactStepNode";
 import type { LoopNodeContext, LoopReactFlowNode } from "./LoopCanvasTypes";
+import { LoopSummaryArtwork } from "./LoopSummaryArtwork";
 
 export function LoopReactFlowNodeComponent({ data }: NodeProps<LoopReactFlowNode>) {
   const { layoutNode, context, activeHandleIds } = data;
@@ -59,7 +59,7 @@ function renderLoopNode(node: LoopCanvasLayoutNode) {
       title={label}
       className="relative flex size-[22px] items-center justify-center rounded border border-divider-strong bg-card text-tertiary"
     >
-      <Route className="size-3" aria-hidden="true" />
+      <LoopSummaryArtwork summaryStyle={summary?.summaryStyle ?? "route"} size={22} />
       <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-sm bg-background/95 px-1 font-mono text-[0.66rem] leading-4">
         {label}
       </span>

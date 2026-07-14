@@ -1,5 +1,6 @@
 import type { LoopOutputTarget, LoopStepRecord } from "./loopGraph";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
+import type { LoopSummaryStyle } from "@shared/api/workspace-contracts";
 
 export type LoopLayoutDirection = "horizontal" | "vertical";
 
@@ -10,6 +11,7 @@ export type LoopCanvasNodeKind =
 
 export type LoopCanvasLoopSummary = {
   loopId: string;
+  summaryStyle: LoopSummaryStyle;
 };
 
 export type LoopCanvasLayoutNode = {

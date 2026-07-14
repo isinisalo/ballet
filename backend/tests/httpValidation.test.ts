@@ -25,6 +25,7 @@ describe("HTTP Zod validation", () => {
       loops: [{
         id: "delivery",
         start: "implementation",
+        summaryStyle: "route",
         nodes: [{
           id: "implementation",
           type: "agent",

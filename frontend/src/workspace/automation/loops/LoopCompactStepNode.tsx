@@ -6,7 +6,7 @@ import type { LoopNodeContext } from "./LoopCanvasTypes";
 import { loopReasoningGlowLevel } from "./loopReasoningGlow";
 import { loopThemeNodeGlow } from "./loopTheme";
 import { AgentAvatarIcon } from "../../agents/agentAvatars";
-import { defaultLoopNodeSize, defaultLoopNodeStyle } from "@shared/api/workspace-contracts";
+import { defaultLoopNodeSize, defaultLoopNodeStyle, loopNodeStyleCatalog } from "@shared/api/workspace-contracts";
 import { LoopNodeArtwork } from "./LoopNodeArtwork";
 const stepRunStatusClass: Record<string, string> = {
   queued: "border-tertiary/70 text-tertiary",
@@ -69,6 +69,7 @@ function StepNodeButton({ context, record, records, selected }: {
     model.borderClass,
     model.statusClass,
     model.pulseClass,
+    loopNodeStyleCatalog[model.nodeStyle].borderless && "loop-step-node--borderless",
     selected && "border-primary/80 ring-2 ring-primary/20"
   );
   const content = (

@@ -5,6 +5,13 @@ import { ShieldCheck } from "lucide-react";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { LoopEditorSelect } from "./LoopEditorSelect";
 
+const nodeStyleGroupLabels = {
+  classic: "Classic",
+  planet: "Planets",
+  ship: "Ships",
+  monster: "Monsters"
+} as const;
+
 export function NodeStyleField({ node, disabled, onChange }: {
   node: ProjectLoopNode;
   disabled: boolean;
@@ -18,7 +25,8 @@ export function NodeStyleField({ node, disabled, onChange }: {
       disabled={disabled}
       options={loopNodeStyles.map((style) => ({
         value: style,
-        label: loopNodeStyleCatalog[style].label
+        label: loopNodeStyleCatalog[style].label,
+        group: nodeStyleGroupLabels[loopNodeStyleCatalog[style].group]
       }))}
       onChange={(nodeStyle) => onChange({ ...node, nodeStyle: nodeStyle as LoopNodeStyle } as ProjectLoopNode)}
     />

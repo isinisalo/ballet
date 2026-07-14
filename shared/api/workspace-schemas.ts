@@ -2,10 +2,12 @@ import { z } from "zod";
 import { agentAvatars } from "../domain/agents.js";
 import {
   clockTimePattern,
+  defaultLoopSummaryStyle,
   isCalendarDate,
   isIanaTimeZone,
   loopNodeSizes,
   loopNodeStyles,
+  loopSummaryStyles,
   type ProjectAutomationConfig,
   type ProjectStepSchedule
 } from "../domain/automation.js";
@@ -220,6 +222,7 @@ const projectLoopNodeSchema = z.discriminatedUnion("type", [
 const projectLoopSchema = z.object({
   id: kebabLoopIdSchema,
   start: automationStepIdSchema,
+  summaryStyle: z.enum(loopSummaryStyles).default(defaultLoopSummaryStyle),
   nodes: z.array(projectLoopNodeSchema).min(4)
 }).strict().superRefine((loop, context) => {
   const seenNodeIds = new Set<string>();

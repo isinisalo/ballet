@@ -196,7 +196,7 @@ describe("v8 compact loop canvas", () => {
 });
 
 describe("Loop node style geometry", () => {
-  it("uses all 9 × 4 independent style and size combinations and keeps mixed-size lanes centered", () => {
+  it("uses all 27 × 4 independent style and size combinations and keeps mixed-size lanes centered", () => {
     const combinations = loopNodeStyles.flatMap((nodeStyle) => loopNodeSizes.map((nodeSize) => [nodeStyle, nodeSize] as const));
     const steps = combinations.map(([nodeStyle, nodeSize], index) => ({
       id: `${nodeStyle}-${nodeSize}`,

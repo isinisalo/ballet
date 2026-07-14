@@ -31,7 +31,7 @@ afterEach(async () => {
 
 const automation = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
   version: 8,
-  loops: [{ id: "scheduled-delivery", start: "timer", nodes: [
+  loops: [{ id: "scheduled-delivery", start: "timer", summaryStyle: "route", nodes: [
     { id: "timer", type: "scheduled", agentId: "delivery-agent", description: "Start on schedule.", nodeStyle: "luna", nodeSize: "tiny", schedule,
       on: { approved: "work", rejected: "failed" } },
     { id: "work", type: "agent", agentId: "delivery-agent", description: "Deliver.", nodeStyle: "terra", nodeSize: "medium",

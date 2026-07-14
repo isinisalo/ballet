@@ -50,6 +50,7 @@ const config = (): ProjectAutomationConfig => ({
   loops: [{
     id: "delivery",
     start: "implement",
+    summaryStyle: "spiral",
     nodes: [{
       id: "implement",
       type: "agent",
@@ -69,6 +70,7 @@ const config = (): ProjectAutomationConfig => ({
   }, {
     id: "release",
     start: "publish",
+    summaryStyle: "ring",
     nodes: [{
       id: "publish",
       type: "agent",
@@ -98,6 +100,7 @@ describe("terminal node runtime transitions", () => {
       loops: [{
         id: `terminal-${terminal}`,
         start: "work",
+        summaryStyle: "route",
         nodes: [{
           id: "work",
           type: "agent",
@@ -180,7 +183,7 @@ describe("local runtime database", () => {
     runtime.close();
   });
 
-  it("persists immutable theme snapshots for completed parent and cross-Loop child runs", async () => {
+  it("persists immutable theme and Loop summary snapshots across child runs", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const initialTheme = {
       ...openAiTheme,
@@ -195,18 +198,28 @@ describe("local runtime database", () => {
       node: { ...childTheme.node, glowColor: "#778899" }
     };
     const automation = config();
+    const loopSummaries = [
+      { loopId: "delivery", summaryStyle: "spiral" },
+      { loopId: "release", summaryStyle: "ring" }
+    ];
 
     const parent = startLoop(runtime, automation, "delivery", initialTheme, "Original request");
     const storedSnapshot = JSON.parse((runtime.connection().prepare(
       "SELECT snapshot_json FROM loop_runs WHERE run_id = ?"
     ).get(parent.runId) as { snapshot_json: string }).snapshot_json) as Record<string, unknown>;
-    expect(Object.keys(storedSnapshot).sort()).toEqual(["loop", "theme"]);
-    expect(storedSnapshot).toEqual({ loop: automation.loops[0], theme: initialTheme });
+    expect(Object.keys(storedSnapshot).sort()).toEqual(["loop", "loopSummaries", "theme"]);
+    expect(storedSnapshot).toEqual({
+      loop: automation.loops[0],
+      loopSummaries,
+      theme: initialTheme
+    });
+    expect(parent.loopSummarySnapshots).toEqual(loopSummaries);
 
     const waiting = runtime.completeAgentStep(automation, initialTheme, {
       stepRunId: parent.stepRuns[0]!.stepRunId,
       outcome: ready
     });
+    automation.loops[1]!.summaryStyle = "edge-on";
     const completedParent = runtime.respondToStepRun(
       automation,
       childTheme,
@@ -225,6 +238,30 @@ describe("local runtime database", () => {
     expect(completedChild).toMatchObject({ status: "completed", themeSnapshot: childTheme });
     expect(runById(runtime, parent.runId)?.themeSnapshot).toEqual(initialTheme);
     expect(runById(runtime, child.runId)?.themeSnapshot).toEqual(childTheme);
+    expect(runById(runtime, parent.runId)?.loopSummarySnapshots).toEqual(loopSummaries);
+    expect(runById(runtime, child.runId)?.loopSummarySnapshots).toEqual(loopSummaries);
+    expect(runById(runtime, child.runId)?.snapshot.summaryStyle).toBe("edge-on");
+    runtime.close();
+  });
+
+  it("normalizes legacy Loop snapshot rows without summary fields", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const run = startLoop(runtime, config(), "delivery");
+    const stored = JSON.parse((runtime.connection().prepare(
+      "SELECT snapshot_json FROM loop_runs WHERE run_id = ?"
+    ).get(run.runId) as { snapshot_json: string }).snapshot_json) as {
+      loop: Record<string, unknown>;
+      theme: unknown;
+      loopSummaries?: unknown;
+    };
+    delete stored.loop.summaryStyle;
+    delete stored.loopSummaries;
+    runtime.connection().prepare("UPDATE loop_runs SET snapshot_json = ? WHERE run_id = ?")
+      .run(JSON.stringify(stored), run.runId);
+
+    const legacy = runById(runtime, run.runId)!;
+    expect(legacy.snapshot.summaryStyle).toBe("route");
+    expect(legacy.loopSummarySnapshots).toBeUndefined();
     runtime.close();
   });
 });
@@ -262,6 +299,7 @@ describe("local runtime safeguards", () => {
       loops: [{
         id: "cycle",
         start: "again",
+        summaryStyle: "route",
         nodes: [{
           id: "again",
           type: "agent",

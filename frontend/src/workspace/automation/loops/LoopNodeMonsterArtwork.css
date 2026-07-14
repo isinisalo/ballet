@@ -1,0 +1,109 @@
+.loop-node-monster {
+  --loop-node-monster-body: color-mix(in srgb, var(--ballet-surface-highest) 68%, var(--ballet-primary));
+  --loop-node-monster-shadow: color-mix(in srgb, var(--ballet-surface-lowest) 74%, var(--ballet-outline-variant));
+  --loop-node-monster-line: color-mix(in srgb, var(--ballet-on-surface) 66%, var(--ballet-primary));
+  --loop-node-monster-accent: var(--ballet-secondary);
+  shape-rendering: geometricPrecision;
+}
+
+.loop-node-monster--star-jelly {
+  --loop-node-monster-body: color-mix(in srgb, var(--ballet-surface-highest) 70%, var(--ballet-tertiary));
+  --loop-node-monster-accent: var(--ballet-tertiary);
+}
+
+.loop-node-monster--void-manta {
+  --loop-node-monster-body: color-mix(in srgb, var(--ballet-surface-low) 72%, var(--ballet-primary));
+  --loop-node-monster-accent: var(--ballet-primary);
+}
+
+.loop-node-monster--cosmic-serpent {
+  --loop-node-monster-body: color-mix(in srgb, var(--ballet-surface-high) 62%, var(--ballet-secondary));
+  --loop-node-monster-accent: var(--ballet-secondary);
+}
+
+.loop-node-monster--moon-maw {
+  --loop-node-monster-body: color-mix(in srgb, var(--ballet-surface-highest) 72%, var(--ballet-mars-surface));
+  --loop-node-monster-accent: var(--ballet-tertiary);
+}
+
+.loop-node-monster--astral-kraken {
+  --loop-node-monster-body: color-mix(in srgb, var(--ballet-surface-highest) 66%, var(--ballet-primary));
+  --loop-node-monster-accent: color-mix(in srgb, var(--ballet-primary) 64%, var(--ballet-secondary));
+}
+
+.loop-node-monster-body {
+  fill: var(--loop-node-monster-body);
+  stroke: var(--loop-node-monster-line);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.9;
+}
+
+.loop-node-monster-limb,
+.loop-node-monster-serpent-body {
+  fill: none;
+  stroke: var(--loop-node-monster-body);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.loop-node-monster-limb {
+  paint-order: stroke;
+  stroke: var(--loop-node-monster-line);
+  stroke-width: 2.1;
+}
+
+.loop-node-monster-limb + .loop-node-monster-body {
+  paint-order: stroke;
+}
+
+.loop-node-monster-serpent-body {
+  stroke: var(--loop-node-monster-body);
+  stroke-width: 3.5;
+}
+
+.loop-node-monster-eye {
+  fill: color-mix(in srgb, var(--ballet-on-surface) 86%, var(--loop-node-monster-accent));
+  stroke: var(--loop-node-monster-shadow);
+  stroke-width: 0.7;
+}
+
+.loop-node-monster-pupil {
+  fill: var(--loop-node-monster-shadow);
+}
+
+.loop-node-monster-accent,
+.loop-node-monster-detail {
+  fill: none;
+  stroke: var(--loop-node-monster-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.85;
+}
+
+.loop-node-monster-detail {
+  stroke: color-mix(in srgb, var(--loop-node-monster-line) 62%, var(--loop-node-monster-shadow));
+}
+
+.loop-node-monster-manta-tail {
+  stroke-width: 1.45;
+}
+
+.loop-node-monster-serpent-head {
+  stroke-width: 0.95;
+}
+
+.loop-node-monster-serpent-tongue {
+  fill: none;
+  stroke: var(--loop-node-monster-accent);
+  stroke-linecap: round;
+  stroke-width: 0.8;
+}
+
+.loop-node-monster-tooth {
+  fill: color-mix(in srgb, var(--ballet-on-surface) 86%, var(--ballet-tertiary));
+  stroke: var(--loop-node-monster-shadow);
+  stroke-linejoin: round;
+  stroke-width: 0.55;
+}

@@ -1,13 +1,23 @@
 import { render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
-import { defaultLoopTheme, loopNodeStyles, type ProjectLoopNode, type ProjectStep, type StepRun } from "@shared/api/workspace-contracts";
+import {
+  defaultLoopTheme,
+  loopNodeStyleCatalog,
+  loopNodeStyles,
+  type LoopNodeStyle,
+  type ProjectLoopNode,
+  type ProjectStep,
+  type StepRun
+} from "@shared/api/workspace-contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { LoopNodeContext } from "../src/workspace/automation/loops/LoopCanvasTypes";
 import { LoopCompactStepNode } from "../src/workspace/automation/loops/LoopCompactStepNode";
 import { LoopNodeArtwork } from "../src/workspace/automation/loops/LoopNodeArtwork";
 import type { LoopStepRecord } from "../src/workspace/automation/loops/loopGraph";
 
-const nodeCss = readFileSync(`${process.cwd()}/frontend/src/styles.css`, "utf8");
+const artworkCss = readFileSync(`${process.cwd()}/frontend/src/workspace/automation/loops/LoopNodeArtwork.css`, "utf8");
+const cssSurfaceNodeStyles = new Set<LoopNodeStyle>(["flat", "luna", "mars", "terra", "sol"]);
+const borderlessNodeStyles = loopNodeStyles.filter((nodeStyle) => loopNodeStyleCatalog[nodeStyle].borderless);
 
 const context = (): LoopNodeContext => ({
   selectedLoopId: "delivery",
@@ -63,26 +73,61 @@ describe("Loop node artwork", () => {
     const { container } = render(<>{loopNodeStyles.map((nodeStyle) => <LoopNodeArtwork key={nodeStyle} nodeStyle={nodeStyle} />)}</>);
 
     loopNodeStyles.forEach((nodeStyle) => {
-      expect(container.querySelector(`[data-loop-node-artwork='${nodeStyle}']`)).toBeInTheDocument();
+      const surface = container.querySelector(`[data-loop-node-artwork='${nodeStyle}']`);
+      expect(surface).toHaveAttribute("aria-hidden", "true");
+      const svg = surface?.querySelector("svg.loop-node-artwork-svg");
+      if (cssSurfaceNodeStyles.has(nodeStyle)) {
+        expect(svg).not.toBeInTheDocument();
+      } else {
+        expect(svg).toHaveAttribute("aria-hidden", "true");
+        expect(svg).toHaveAttribute("focusable", "false");
+        expect(svg).toHaveAttribute("viewBox", "0 0 24 24");
+      }
     });
-    expect(container.querySelectorAll("svg.loop-node-artwork-svg")).toHaveLength(4);
+    expect(container.querySelectorAll("svg.loop-node-artwork-svg")).toHaveLength(22);
+    expect(container.querySelector("img, image")).not.toBeInTheDocument();
+    expect(container.innerHTML).not.toMatch(/\s(?:src|href|xlink:href)=/i);
   });
 
-  it.each(["black-hole", "satellite", "meteorite"] as const)("keeps %s borderless with glow, selection, and keyboard focus", (nodeStyle) => {
+  it("marks shared Tiny and Small detail levels without changing the SVG composition", () => {
+    const tinyRecord = record("agent", "running");
+    tinyRecord.step!.nodeStyle = "battle-station";
+    tinyRecord.step!.nodeSize = "tiny";
+    const view = render(<LoopCompactStepNode context={context()} record={tinyRecord} />);
+
+    let node = screen.getByRole("button", { name: "View step implement" });
+    expect(node).toHaveAttribute("data-loop-node-size", "tiny");
+    expect(node.querySelector(".loop-node-artwork-detail--small")).toBeInTheDocument();
+    expect(node.querySelector(".loop-node-artwork-detail--medium")).toBeInTheDocument();
+
+    const smallRecord = record("agent", "running");
+    smallRecord.step!.nodeStyle = "battle-station";
+    smallRecord.step!.nodeSize = "small";
+    view.rerender(<LoopCompactStepNode context={context()} record={smallRecord} />);
+    node = screen.getByRole("button", { name: "View step implement" });
+    expect(node).toHaveAttribute("data-loop-node-size", "small");
+    expect(node.querySelector(".loop-node-artwork-detail--small")).toBeInTheDocument();
+    expect(node.querySelector(".loop-node-artwork-detail--medium")).toBeInTheDocument();
+    expect(artworkCss).toContain(".loop-step-node[data-loop-node-size=\"tiny\"]");
+    expect(artworkCss).toContain(".loop-step-node[data-loop-node-size=\"small\"] .loop-node-artwork-detail--medium");
+    expect(artworkCss).toContain("display: none;");
+  });
+
+  it.each(borderlessNodeStyles)("keeps %s borderless with glow, selection, and keyboard focus", (nodeStyle) => {
     const selectedContext = context();
     selectedContext.selectedStepIndexes = [0];
     const selectedRecord = record("agent", "running");
     selectedRecord.step!.nodeStyle = nodeStyle;
-    selectedRecord.step!.reasoningEffort = "high";
+    selectedRecord.step!.reasoningEffort = "ultra";
     render(<LoopCompactStepNode context={selectedContext} record={selectedRecord} />);
 
     const node = screen.getByRole("button", { name: "View step implement" });
     node.focus();
     expect(node).toHaveFocus();
-    expect(nodeCss).toContain(`[data-loop-node-style="${nodeStyle}"]`);
-    expect(nodeCss).toContain("border-color: transparent !important;");
-    expect(node).toHaveClass("border-primary/80", "ring-2");
-    expect(node).toHaveAttribute("data-loop-reasoning-glow", "4");
+    expect(artworkCss).toContain(".loop-step-node--borderless");
+    expect(artworkCss).toContain("border-color: transparent !important;");
+    expect(node).toHaveClass("loop-step-node--borderless", "loop-run-node-pulse--running", "border-primary/80", "ring-2");
+    expect(node).toHaveAttribute("data-loop-reasoning-glow", "7");
     expect(node.querySelector(".loop-node-reasoning-glow")).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import type {
   Agent,
   AgentAvatar,
   AgentExecutionState,
+  LoopSummaryStyle,
   LoopRunDetails,
   LoopNodeStyle,
   LoopNodeSize,
@@ -11,7 +12,7 @@ import type {
   StepRun,
   StepTransitionTarget
 } from "@shared/api/workspace-contracts";
-import { getProjectStepTransitionEntries, isProjectTerminalNode } from "@shared/api/workspace-contracts";
+import { defaultLoopSummaryStyle, getProjectStepTransitionEntries, isProjectTerminalNode } from "@shared/api/workspace-contracts";
 import type { LoopOutputTarget, LoopStepRecord } from "./loopGraph";
 import { scheduleSummary } from "./loopSchedulePresentation";
 
@@ -36,6 +37,7 @@ export type LoopVisualLoop = {
   id: string;
   start: string;
   steps: string[];
+  summaryStyle: LoopSummaryStyle;
 };
 
 export type LoopVisualConfig = {
@@ -97,6 +99,7 @@ export function buildLoopVisualProjection(
   const loops = loopDefinitions.map((loop) => ({
     id: loop.id,
     start: visualStepKey(loop.id, loop.start),
+    summaryStyle: resolveLoopSummaryStyle(config, displayedLoop, loop.id, run),
     steps: loop.nodes
       .filter((node) => !isProjectTerminalNode(node) || visibleNodeIdsByLoopId.get(loop.id)?.has(node.id))
       .map((node) => visualStepKey(loop.id, node.id))
@@ -123,6 +126,20 @@ export function buildLoopVisualProjection(
   }));
 
   return { config: { steps, loops }, stepByKey, recordsByLoopId };
+}
+
+export function resolveLoopSummaryStyle(
+  config: ProjectAutomationConfig,
+  displayedLoop: ProjectLoop,
+  loopId: string,
+  run?: LoopRunDetails | null
+): LoopSummaryStyle {
+  const activeSnapshotStyle = run?.loopId === loopId ? run.snapshot.summaryStyle : undefined;
+  if (activeSnapshotStyle) return activeSnapshotStyle;
+  const runSnapshot = run?.loopSummarySnapshots?.find((snapshot) => snapshot.loopId === loopId);
+  if (runSnapshot) return runSnapshot.summaryStyle;
+  if (!run && displayedLoop.id === loopId) return displayedLoop.summaryStyle ?? defaultLoopSummaryStyle;
+  return config.loops.find((loop) => loop.id === loopId)?.summaryStyle ?? defaultLoopSummaryStyle;
 }
 
 function reachableNodeIds(loop: ProjectLoop): Set<string> {

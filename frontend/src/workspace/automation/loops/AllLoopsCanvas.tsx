@@ -1,8 +1,9 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { getProjectStepTransitionTargets } from "@shared/api/workspace-contracts";
-import { ArrowRight, Bot, CalendarClock, PanelTopOpen, Route, ShieldCheck } from "lucide-react";
+import { ArrowRight, Bot, CalendarClock, PanelTopOpen, ShieldCheck } from "lucide-react";
 import { CollectionCardGrid } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
+import { LoopSummaryArtwork } from "./LoopSummaryArtwork";
 
 export function AllLoopsCanvas({
   config,
@@ -27,7 +28,10 @@ export function AllLoopsCanvas({
             className="grid min-h-36 min-w-0 grid-rows-[1fr_auto] overflow-hidden rounded-lg border border-divider-strong bg-card"
           >
             <div className="grid gap-3 p-4">
-              <span className="flex items-center gap-2 font-mono text-xs text-foreground"><Route className="text-primary" /> {loop.id}</span>
+              <span className="flex items-center gap-2 font-mono text-xs text-foreground">
+                <LoopSummaryArtwork summaryStyle={loop.summaryStyle ?? "route"} size={24} className="text-primary" />
+                {loop.id}
+              </span>
               <span className="grid grid-cols-3 gap-2 font-mono text-[0.65rem] text-muted-foreground">
                 <span className="flex items-center gap-1"><Bot className="size-3" /> {agentSteps} agent</span>
                 <span className="flex items-center gap-1"><ShieldCheck className="size-3" /> {humanSteps} human</span>

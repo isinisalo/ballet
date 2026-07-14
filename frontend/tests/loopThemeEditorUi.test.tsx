@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   defaultLoopTheme,
   defaultTerminalNodes,
+  loopNodeStyles,
+  loopSummaryStyles,
   type AppData,
   type LoopTheme,
   type ProjectLoop
@@ -18,6 +20,7 @@ import { installThemeApi } from "./loopThemeEditorTestApi";
 const loop: ProjectLoop = {
   id: "delivery",
   start: "approval",
+  summaryStyle: "route",
   nodes: [{
     id: "approval",
     type: "human",
@@ -70,15 +73,24 @@ describe("singleton Loop theme editor", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
-  it("previews all node styles, every edge variant, and all terminal statuses", () => {
+  it("previews the complete grouped artwork catalog and a compact edge canvas", () => {
     render(<LoopThemePreview theme={theme()} />);
     const canvas = screen.getByLabelText("Theme preview loop canvas");
-    const styles = ["luna", "black-hole", "satellite", "meteorite", "spaceman", "mars", "flat", "terra", "sol"];
+    const gallery = screen.getByLabelText("Node artwork catalog");
 
     expect(canvas).toHaveAttribute("data-loop-canvas-preview", "true");
-    styles.forEach((style) => {
-      expect(canvas.querySelector(`[data-loop-node-style='${style}']`)).toBeInTheDocument();
+    loopNodeStyles.forEach((style) => {
+      const preview = gallery.querySelector(`[data-loop-artwork-preview='${style}']`);
+      expect(preview).toBeInTheDocument();
+      expect(preview?.querySelector(`[data-loop-node-style='${style}']`)).toBeInTheDocument();
     });
+    loopSummaryStyles.forEach((summaryStyle) => {
+      expect(gallery.querySelector(`[data-loop-summary-preview='${summaryStyle}']`)).toBeInTheDocument();
+      expect(gallery.querySelector(`[data-loop-summary-style='${summaryStyle}']`)).toBeInTheDocument();
+    });
+    expect(gallery.querySelectorAll("[data-loop-artwork-gallery-group]")).toHaveLength(5);
+    expect([...gallery.querySelectorAll<HTMLElement>("[data-loop-artwork-gallery-group='ship'] [data-loop-artwork-preview-size]")]
+      .map((preview) => preview.dataset.loopArtworkPreviewSize)).toEqual(["tiny", "small", "tiny", "small", "tiny", "small"]);
     expect(canvas.querySelector("[data-loop-edge-style='solid']")).toBeInTheDocument();
     expect(canvas.querySelector("[data-loop-edge-output-slot-kind='rework']")).toHaveAttribute("data-loop-edge-style", "dotted");
     expect(canvas.querySelector("[data-loop-edge-tone='cross-loop']")).toHaveAttribute("data-loop-edge-style", "dashed");
@@ -86,6 +98,8 @@ describe("singleton Loop theme editor", () => {
       expect(canvas.querySelector(`[data-loop-node-kind='terminal'] [data-loop-node-label='${status}']`)).toBeInTheDocument();
     });
     expect(within(canvas).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(gallery).queryByRole("button")).not.toBeInTheDocument();
+    expect(gallery.querySelector("img")).not.toBeInTheDocument();
     expect([...canvas.querySelectorAll<HTMLElement>(".react-flow__node")].every((node) => node.style.pointerEvents === "none")).toBe(true);
     expect(canvas.querySelector("[data-loop-edge-animated='true']")).not.toBeInTheDocument();
   });

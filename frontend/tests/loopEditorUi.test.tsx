@@ -25,6 +25,7 @@ const agents: Agent[] = [{
 const loop: ProjectLoop = {
   id: "delivery",
   start: "build",
+  summaryStyle: "route",
   nodes: [{
     id: "build",
     type: "agent",
@@ -82,16 +83,19 @@ describe("compact Loop editor UI", () => {
     expect(screen.queryByRole("button", { name: "Remove from loop" })).not.toBeInTheDocument();
   });
 
-  it("keeps Node size when Node style changes", async () => {
+  it("groups the complete Node style menu and keeps Node size when the style changes", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderEditor({ onChange });
     await user.click(await screen.findByRole("button", { name: "Edit step build" }));
     await user.click(screen.getByRole("combobox", { name: "Node style" }));
-    await user.click(await screen.findByRole("option", { name: "Luna" }, { timeout: 3_000 }));
+    for (const group of ["Classic", "Planets", "Ships", "Monsters"]) {
+      expect(await screen.findByText(group)).toBeInTheDocument();
+    }
+    await user.click(await screen.findByRole("option", { name: "Arrow scout" }, { timeout: 3_000 }));
 
     const next = onChange.mock.calls.at(-1)?.[0] as ProjectLoop;
-    expect(next.nodes.find((node) => node.id === "build")).toMatchObject({ nodeStyle: "luna", nodeSize: "large" });
+    expect(next.nodes.find((node) => node.id === "build")).toMatchObject({ nodeStyle: "ship-arrow", nodeSize: "large" });
   });
 
   it("renders Step-owned styles, sizes, reasoning, and connection points", async () => {

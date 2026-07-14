@@ -17,7 +17,7 @@ const agent = (enabled = true): Agent => ({
 const automation = {
   version: 8 as const,
   loops: [{
-    id: "delivery", start: "review",
+    id: "delivery", start: "review", summaryStyle: "route" as const,
     nodes: [{
       id: "review", type: "agent" as const, agentId: "reviewer", description: "Review.", nodeStyle: "luna" as const, nodeSize: "tiny" as const,
       on: { approved: "completed", rejected: "failed" }
