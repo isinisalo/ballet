@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Palette, Route } from "lucide-react";
 import type { AgentExecutionState, AppData, ProjectAutomationConfig, ProjectAutomationIssue, ProjectLoop } from "@shared/api/workspace-contracts";
-import { EditorActions, EmptyState, Panel } from "@/components/shared/workspace-ui";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import type { AutomationLoopView } from "../types";
-import { automationLoopPath, automationThemeLibraryPath } from "../routing";
-import { AutomationIssues } from "./AutomationIssues";
+import { automationLoopPath, automationThemePath } from "../routing";
+import { AutomationEditorWorkspace, AutomationIssueBanner } from "./AutomationEditorWorkspace";
 import { useAutomationDraft } from "./useAutomationDraft";
 import { AllLoopsCanvas } from "./loops/AllLoopsCanvas";
-import { LoopCreationEditor, LoopEditor } from "./loops/LoopEditor";
 import { createLoopDraft, removeLoopAtIndex, updateLoopAtIndex } from "./loops/loopEditorState";
 import { automationDraftIsValid } from "./loops/loopFormValidation";
 import { isActiveLoopRun } from "./loops/loopRunState";
@@ -25,7 +23,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 }) {
   const { draft, setDraft, saveDraft, isDirty, saving, error } = useAutomationDraft({ automation: data.automation, saveAutomation });
-  const [createDraft, setCreateDraft] = useState<ProjectLoop>(() => createLoopDraft(data.agents));
+  const [createDraft, setCreateDraft] = useState<ProjectLoop>(createLoopDraft);
   const operationRef = useRef(false);
   const savedIndex = data.automation.loops.findIndex((loop) => loop.id === selectedId);
   const selectedIndex = savedIndex >= 0 ? savedIndex : -1;
@@ -35,14 +33,13 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   const displayedLoop = creating ? createDraft : selectedLoop;
   const scheduleState = data.scheduleStates.find((state) => state.loopId === displayedLoop?.id && state.stepId === displayedLoop.start);
   const locked = isActiveLoopRun(data.loopRuns.find((run) => run.loopId === savedLoop?.id));
-  const createDirty = creating && JSON.stringify(createDraft) !== JSON.stringify(createLoopDraft(data.agents));
+  const createDirty = creating && JSON.stringify(createDraft) !== JSON.stringify(createLoopDraft());
   const candidateConfig = creating && displayedLoop ? { ...draft, loops: [...draft.loops, displayedLoop] } : draft;
   const valid = Boolean(displayedLoop) && automationDraftIsValid(candidateConfig);
   useWorkspaceNavigationBlocker(setNavigationBlocker, isDirty || createDirty, "Discard unsaved Loop changes?");
-
   useEffect(() => {
-    if (creating && !createDraft.id && createDraft.steps.length === 1) setCreateDraft(createLoopDraft(data.agents));
-  }, [creating, createDraft.id, createDraft.steps.length, data.agents]);
+    if (!creating) setCreateDraft(createLoopDraft());
+  }, [creating]);
 
   const issues = [...data.automationIssues, ...data.loopThemeIssues];
   if (loopView === "all") return <AutomationOverview draft={draft} issues={issues} navigate={navigate} />;
@@ -59,7 +56,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
       if (creating) {
         const next = { ...draft, loops: [...draft.loops, displayedLoop] };
         if (!await saveDraft(next)) return;
-        setCreateDraft(createLoopDraft(data.agents));
+        setCreateDraft(createLoopDraft());
         navigate(automationLoopPath(displayedLoop.id), { bypassBlocker: true });
         return;
       }
@@ -86,6 +83,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
       data={data}
       agentExecutionStates={agentExecutionStates}
       draft={draft}
+      candidateConfig={candidateConfig}
       displayedLoop={displayedLoop}
       selectedLoop={selectedLoop}
       scheduleState={scheduleState}
@@ -103,69 +101,13 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   );
 }
 
-function AutomationEditorWorkspace({ data, agentExecutionStates, draft, displayedLoop, selectedLoop, scheduleState, creating, locked, dirty, valid, saving, error, issues, onSave, onRemove, onChange }: {
-  data: AppData;
-  agentExecutionStates: AgentExecutionState[];
-  draft: ProjectAutomationConfig;
-  displayedLoop?: ProjectLoop;
-  selectedLoop?: ProjectLoop;
-  scheduleState: AppData["scheduleStates"][number] | undefined;
-  creating: boolean;
-  locked: boolean;
-  dirty: boolean;
-  valid: boolean;
-  saving: boolean;
-  error: string;
-  issues: ProjectAutomationIssue[];
-  onSave: () => Promise<void>;
-  onRemove: () => Promise<void>;
-  onChange: (loop: ProjectLoop) => void;
-}) {
-  const editActions = (
-    <EditorActions
-      saveLabel="Save loop"
-      onSave={onSave}
-      dirty={dirty}
-      valid={valid && !locked}
-      pending={saving}
-      deleteLabel="Delete loop"
-      deleteType="loop"
-      resourceName={selectedLoop?.id}
-      canDelete={Boolean(selectedLoop) && !locked}
-      onDelete={onRemove}
-    />
-  );
-
-  const content = (
-    <>
-      <AutomationIssueBanner issues={issues} />
-      {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
-      {!displayedLoop ? <div className="p-4"><EmptyState title="Loop not found." /></div> : null}
-      {displayedLoop && creating ? <LoopCreationEditor loop={displayedLoop} loops={draft.loops} agents={data.agents} themes={data.loopThemes} disabled={saving} onChange={onChange} /> : null}
-      {displayedLoop && !creating ? <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} themes={data.loopThemes} scheduleState={scheduleState} locked={locked} disabled={saving} canvasControls={editActions} onChange={onChange} /> : null}
-    </>
-  );
-
-  if (displayedLoop && !creating) return content;
-
-  return (
-    <Panel title="Automation" titleExtra={displayedLoop?.id ? <span className="truncate text-muted-foreground">{displayedLoop.id}</span> : null} icon={<Route />} contentClassName="p-0" action={<div className="flex items-center gap-2">{creating ? editActions : null}</div>}>
-      {content}
-    </Panel>
-  );
-}
-
 function AutomationOverview({ draft, issues, navigate }: { draft: ProjectAutomationConfig; issues: ProjectAutomationIssue[]; navigate: WorkspaceNavigation["navigate"] }) {
   return (
     <Panel title="Automation" icon={<Route />} contentClassName="p-0" action={<div className="flex items-center gap-2">
-      <Button size="sm" variant="outline" onClick={() => navigate(automationThemeLibraryPath())}><Palette /> Edit theme</Button>
+      <Button size="sm" variant="outline" onClick={() => navigate(automationThemePath())}><Palette /> Edit theme</Button>
     </div>}>
       <AutomationIssueBanner issues={issues} />
       <AllLoopsCanvas config={draft} onAddLoop={() => navigate(automationLoopPath())} onOpenLoop={(id) => navigate(automationLoopPath(id))} />
     </Panel>
   );
-}
-
-function AutomationIssueBanner({ issues }: { issues: ProjectAutomationIssue[] }) {
-  return issues.length ? <div className="border-b border-divider-strong p-4"><AutomationIssues issues={issues} /></div> : null;
 }

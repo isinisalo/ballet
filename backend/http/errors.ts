@@ -15,7 +15,6 @@ import {
 import { HttpValidationError } from "./validation/httpValidation.js";
 import {
   LoopThemeConflictError,
-  LoopThemeNotFoundError,
   LoopThemeValidationError
 } from "../loop-themes/LoopThemeErrors.js";
 
@@ -42,10 +41,6 @@ export const sendKnownHttpError = (error: unknown, res: express.Response): boole
   }
   if (error instanceof MarkdownEntityValidationError) {
     res.status(400).json({ error: error.message });
-    return true;
-  }
-  if (error instanceof LoopThemeNotFoundError) {
-    res.status(404).json({ error: error.message });
     return true;
   }
   if (error instanceof AutomationConflictError

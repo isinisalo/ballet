@@ -59,7 +59,7 @@ export function LoopRunStartPanel({
       ) : null}
       <TextAreaField label="Manual input (optional)" density="compact" value={input} rows={3} disabled={busy || blocked} onChange={setInput} />
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{preflightIssues.length > 0 ? "Resolve every runtime issue before starting." : disabledReason ?? (bypassesSchedule ? "Starts from the first executable step and bypasses the saved schedule." : "Starts a new manual run from this loop's saved start step.")}</p>
+        <p className="text-xs text-muted-foreground">{preflightIssues.length > 0 ? "Resolve every runtime issue before starting." : disabledReason ?? (bypassesSchedule ? "Runs the scheduled start agent now without changing its saved schedule." : "Starts a new manual run from this loop's saved start step.")}</p>
         <Button type="submit" disabled={busy || blocked}>
           <Play /> {busy ? "Starting…" : "Start"}
         </Button>

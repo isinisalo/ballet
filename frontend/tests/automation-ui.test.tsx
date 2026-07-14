@@ -2,8 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
-  builtInLoopThemes,
-  resolveLoopTheme,
+  defaultLoopTheme,
   type AppData,
   type LoopRunDetails,
   type LoopTheme,
@@ -15,14 +14,13 @@ import { emptyData } from "../src/workspace/types";
 const now = "2026-07-10T10:00:00.000Z";
 const loop: ProjectLoop = {
   id: "delivery",
-  theme: "open-ai",
   start: "approval",
-  steps: [{ id: "approval", type: "human", nodeSize: "small", description: "Approve delivery", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }]
+  steps: [{ id: "approval", type: "human", nodeStyle: "luna", description: "Approve delivery", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }]
 };
 
 const run = (
   status: LoopRunDetails["status"],
-  themeSnapshot: LoopTheme = resolveLoopTheme(builtInLoopThemes, loop.theme)
+  themeSnapshot: LoopTheme = structuredClone(defaultLoopTheme)
 ): LoopRunDetails => ({
   runId: "run-1", loopId: loop.id, rootRunId: "run-1", source: "manual", status, snapshot: loop,
   themeSnapshot,
@@ -36,8 +34,8 @@ const run = (
 const data = (latest: LoopRunDetails | null): AppData => ({
   ...emptyData,
   loopRuns: latest ? [latest] : [],
-  automation: { version: 6, loops: [loop] }, automationIssues: [], scheduleStates: [],
-  loopThemes: [...builtInLoopThemes], loopThemeIssues: [], projectDocumentTree: [],
+  automation: { version: 7, loops: [loop] }, automationIssues: [], scheduleStates: [],
+  loopTheme: structuredClone(defaultLoopTheme), loopThemeIssues: [], projectDocumentTree: [],
   runTargets: {
     loops: [{ kind: "loop", id: "delivery", name: "delivery", ready: true, issues: [], ...latest ? { latestRootRunId: latest.rootRunId, ...["running", "waiting_for_human"].includes(latest.status) ? { activeRootRunId: latest.rootRunId } : {} } : {} }],
     agents: []
@@ -99,7 +97,7 @@ async function renderRun(latest: LoopRunDetails | null) {
   return fetchMock;
 }
 
-describe("automation v6 UI", () => {
+describe("automation v7 UI", () => {
   it("starts a saved Loop from global Ballet Run without local mode controls", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(null);
@@ -149,23 +147,69 @@ describe("automation v6 UI", () => {
   });
 
   it("renders an existing Run with its immutable theme snapshot", async () => {
-    const liveTheme = resolveLoopTheme(builtInLoopThemes, loop.theme);
-    const archivedTheme: LoopTheme = { ...liveTheme, id: "archived-theme", label: "Archived theme" };
+    const archivedTheme: LoopTheme = {
+      ...structuredClone(defaultLoopTheme),
+      edge: { ...defaultLoopTheme.edge, color: "#abcdef" }
+    };
 
     await renderRun(run("completed", archivedTheme));
 
-    await waitFor(() => expect(document.querySelector("[data-loop-canvas]"))
-      .toHaveAttribute("data-loop-theme", "archived-theme"));
+    await waitFor(() => expect((document.querySelector("[data-loop-canvas]") as HTMLElement).style
+      .getPropertyValue("--loop-theme-edge-color")).toBe("#abcdef"));
+  });
+
+  it("creates a Loop only after ghost activation, a valid Loop ID, and explicit Save", async () => {
+    const user = userEvent.setup();
+    const fetchMock = installApi(null);
+    window.history.replaceState({}, "", "/automation/loops?view=all");
+    render(<WorkspaceApp />);
+
+    await user.click(await screen.findByRole("button", { name: "+ Add loop" }));
+    expect(await screen.findByRole("button", { name: "Add first step" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([input, init]) => String(input) === "/api/automation" && init?.method === "PUT")).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "Add first step" }));
+    const firstStep = await screen.findByRole("button", { name: "Edit step new-step" });
+    expect(firstStep).toHaveAttribute("data-loop-node-style", "flat");
+    expect(firstStep).toHaveAttribute("data-loop-node-size", "medium");
+    expect(screen.getByRole("region", { name: "Loop canvas workspace" })).toHaveClass("md:grid-cols-2");
+    expect(screen.getByRole("dialog", { name: "Loop definition" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save loop" })).toBeDisabled();
+    expect(fetchMock.mock.calls.filter(([input, init]) => String(input) === "/api/automation" && init?.method === "PUT")).toHaveLength(0);
+
+    await user.type(screen.getByLabelText("Loop ID"), "new-loop");
+    expect(screen.getByRole("button", { name: "Save loop" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Save loop" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/automation",
+      expect.objectContaining({ method: "PUT", body: expect.any(String) })
+    ));
+    const saveCall = fetchMock.mock.calls.find(([input, init]) => String(input) === "/api/automation" && init?.method === "PUT");
+    const saved = JSON.parse(String(saveCall?.[1]?.body));
+    expect(saved.version).toBe(7);
+    expect(saved.loops.find((candidate: ProjectLoop) => candidate.id === "new-loop")).toMatchObject({
+      id: "new-loop",
+      start: "new-step",
+      steps: [{
+        id: "new-step",
+        type: "human",
+        nodeStyle: "flat",
+        on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
+      }]
+    });
   });
 
   it("cancels the active loop run from Run mode", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(run("running"));
-    await user.click(await screen.findByRole("button", { name: "Cancel" }));
+    const cancel = await screen.findByRole("button", { name: "Cancel" });
+    await waitFor(() => expect(cancel).toBeEnabled());
+    await user.click(cancel);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/runs/run-1/cancel",
       expect.objectContaining({ method: "POST" })
-    ));
+    ), { timeout: 3_000 });
   });
 });
 

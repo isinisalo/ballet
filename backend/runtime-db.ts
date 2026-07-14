@@ -143,13 +143,13 @@ export class RuntimeDatabase {
 
   respondToStepRun(
     config: ProjectAutomationConfig,
-    loopThemes: readonly LoopTheme[],
+    loopTheme: LoopTheme,
     runId: string,
     stepRunId: string,
     result: StepRunResult,
     input: string
   ): LoopRunDetails {
-    return this.loopRunEngine.respond(config, loopThemes, runId, stepRunId, result, input);
+    return this.loopRunEngine.respond(config, loopTheme, runId, stepRunId, result, input);
   }
 
   cancelLoopRun(runId: string): LoopRunDetails {
@@ -158,14 +158,14 @@ export class RuntimeDatabase {
 
   completeAgentStep(
     config: ProjectAutomationConfig,
-    loopThemes: readonly LoopTheme[],
+    loopTheme: LoopTheme,
     input: {
       stepRunId: string;
       outcome?: AgentOutcome;
       error?: string;
     }
   ): LoopRunDetails {
-    return this.loopRunEngine.completeAgentStep(config, loopThemes, input);
+    return this.loopRunEngine.completeAgentStep(config, loopTheme, input);
   }
 
   getStepRun(stepRunId: string): StepRun | undefined {

@@ -25,7 +25,7 @@ export const validateLoopRunStart = async (data: AppData, loopId: string, input?
   if (!loop) return;
   const expectedAgent = LOOP_ENGINEERING_AGENTS[loopId as keyof typeof LOOP_ENGINEERING_AGENTS];
   const start = resolveEffectiveStartStep(loop);
-  if (!expectedAgent || start?.type !== "agent" || start.agentId !== expectedAgent) return;
+  if (!expectedAgent || !start || start.type === "human" || start.agentId !== expectedAgent) return;
   if (GATED_CHILD_LOOPS.has(loopId)) {
     throw new LoopRunStateError(`${loopId} can only start from its approved human-gate transition.`);
   }

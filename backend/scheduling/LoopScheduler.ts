@@ -176,7 +176,7 @@ export class LoopScheduler {
 const scheduledDefinitions = (data: AppData): ScheduledDefinition[] => data.automation.loops.flatMap((loop) => {
   const step = loop.steps.find((candidate): candidate is ProjectScheduledStep =>
     candidate.id === loop.start && candidate.type === "scheduled");
-  return step ? [{ loopId: loop.id, step, definitionHash: scheduleDefinitionHash(step.schedule, step.on.triggered) }] : [];
+  return step ? [{ loopId: loop.id, step, definitionHash: scheduleDefinitionHash(step.schedule, step.agentId) }] : [];
 });
 
 const initialCursor = (

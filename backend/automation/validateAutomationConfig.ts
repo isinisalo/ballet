@@ -10,7 +10,6 @@ import type {
 import {
   getProjectStepTransitionEntries,
   getProjectStepTransitionTargets,
-  isProjectExecutableStep,
   resolveEffectiveStartStep
 } from "../../shared/domain/automation.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
@@ -109,21 +108,8 @@ const validateLoop = (
       if (step.id !== loop.start) {
         issues.push({ path: `${base}.type`, message: "A scheduled step is allowed only as the loop start step." });
       }
-      const target = stepsById.get(step.on.triggered);
-      if (!target) {
-        issues.push({
-          path: `${base}.on.triggered`,
-          message: `Transition references unknown step: ${step.on.triggered}.`
-        });
-      } else if (!isProjectExecutableStep(target) || target.id === step.id) {
-        issues.push({
-          path: `${base}.on.triggered`,
-          message: "A scheduled step must trigger another agent or human step in the same loop."
-        });
-      }
-      return;
     }
-    if (step.type === "agent" && agentIds && !agentIds.has(step.agentId)) {
+    if (step.type !== "human" && agentIds && !agentIds.has(step.agentId)) {
       issues.push({ path: `${base}.agentId`, message: `Step references unknown agent: ${step.agentId}.` });
     }
     for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
@@ -198,7 +184,7 @@ const validateApprovedPaths = (
       const target = step.on.approved;
       if (typeof target === "string") {
         const nextStep = loop.steps.find((candidate) => candidate.id === target);
-        if (!nextStep || !isProjectExecutableStep(nextStep)) return;
+        if (!nextStep || nextStep.type === "scheduled") return;
         step = nextStep;
         continue;
       }

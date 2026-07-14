@@ -2,7 +2,7 @@ import { Position } from "@xyflow/react";
 import type { LoopCanvasProps, LoopNodeContext, LoopReactFlowEdge, LoopReactFlowNode } from "./LoopCanvasTypes";
 import { loopEdgeDomAttributes, loopEdgeStyle } from "./loopEdgeStyle";
 import { loopCanvasNodeAnchorY } from "./loopLayout";
-import { loopTheme as resolveLoopTheme } from "./loopTheme";
+import { defaultLoopTheme } from "@shared/api/workspace-contracts";
 
 export function loopActiveHandleIdsByNodeKey(layoutEdges: LoopCanvasProps["layout"]["edges"]) {
   const values = new Map<string, Set<string>>();
@@ -46,7 +46,7 @@ export function toLoopReactFlowEdges(
   animatedEdgeId?: string | null
 ): LoopReactFlowEdge[] {
   const nodeByKey = new Map(layoutNodes.map((node) => [node.key, node]));
-  const theme = context?.theme ?? resolveLoopTheme("open-ai");
+  const theme = context?.theme ?? defaultLoopTheme;
   return layoutEdges.map((loopEdge) => {
     const sourceNode = nodeByKey.get(loopEdge.sourceNodeKey);
     const targetNode = nodeByKey.get(loopEdge.targetNodeKey);

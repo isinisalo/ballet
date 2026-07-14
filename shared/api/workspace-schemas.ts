@@ -4,7 +4,7 @@ import {
   clockTimePattern,
   isCalendarDate,
   isIanaTimeZone,
-  loopNodeSizes,
+  loopNodeStyles,
   type ProjectAutomationConfig,
   type ProjectStepSchedule
 } from "../domain/automation.js";
@@ -13,7 +13,6 @@ import { portableAgentRuntimeIntentSchema } from "./runtime-schemas.js";
 import {
   loopConnectionPointStyles,
   loopEdgeLineStyles,
-  loopNodeRenderers,
   type LoopTheme
 } from "../domain/loopThemes.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
@@ -105,26 +104,14 @@ const automationStepIdSchema = z.string()
   .max(160)
   .regex(kebabCaseIdPattern, "Step id must be lowercase kebab-case.");
 const kebabLoopIdSchema = automationLoopIdSchema.regex(kebabCaseIdPattern, "Loop id must be lowercase kebab-case.");
-export const loopThemeIdSchema = z.string()
-  .min(1)
-  .max(64)
-  .regex(kebabCaseIdPattern, "Theme id must be lowercase kebab-case.");
 const loopThemeColorSchema = z.string()
   .regex(/^#[0-9a-f]{6}$/, "Expected a six-digit lowercase hex color.");
-const loopThemeStylesSchema = z.object({
-  small: z.enum(loopNodeRenderers),
-  medium: z.enum(loopNodeRenderers),
-  large: z.enum(loopNodeRenderers)
-}).strict();
 
 export const loopThemeSchema = z.object({
-  version: z.literal(1),
-  id: loopThemeIdSchema,
-  label: z.string().trim().min(1),
+  version: z.literal(2),
   node: z.object({
     labelColor: loopThemeColorSchema,
     glowColor: loopThemeColorSchema,
-    styles: loopThemeStylesSchema,
     showAgentAvatarInNode: z.boolean()
   }).strict(),
   edge: z.object({
@@ -139,15 +126,6 @@ export const loopThemeSchema = z.object({
     color: loopThemeColorSchema
   }).strict()
 }).strict() satisfies z.ZodType<LoopTheme>;
-
-export const loopThemeParamsSchema = z.object({
-  themeId: loopThemeIdSchema
-}).strict();
-
-export const createLoopThemeSchema = z.object({
-  theme: loopThemeSchema,
-  assignToLoopId: kebabLoopIdSchema
-}).strict();
 const stepEndSchema = z.object({ end: z.enum(["completed", "blocked", "failed"]) }).strict();
 const stepLoopSchema = z.object({ loop: kebabLoopIdSchema }).strict();
 const stepTransitionTargetSchema = z.union([automationStepIdSchema, stepLoopSchema, stepEndSchema]);
@@ -158,7 +136,7 @@ const stepTransitionsSchema = z.object({
 const executableStepBase = {
   id: automationStepIdSchema,
   description: optionalAutomationDescriptionSchema,
-  nodeSize: z.enum(loopNodeSizes),
+  nodeStyle: z.enum(loopNodeStyles),
   on: stepTransitionsSchema
 };
 const calendarDateSchema = z.string().refine(isCalendarDate, "Expected a valid date in YYYY-MM-DD format.");
@@ -202,29 +180,26 @@ const projectStepSchema = z.discriminatedUnion("type", [
   z.object({ ...executableStepBase, type: z.literal("agent"), agentId: z.string().min(1) }).strict(),
   z.object({ ...executableStepBase, type: z.literal("human") }).strict(),
   z.object({
-    id: automationStepIdSchema,
-    description: optionalAutomationDescriptionSchema,
-    nodeSize: z.enum(loopNodeSizes),
+    ...executableStepBase,
     type: z.literal("scheduled"),
+    agentId: z.string().min(1),
     schedule: projectStepScheduleSchema,
-    on: z.object({ triggered: automationStepIdSchema }).strict()
   }).strict()
 ]);
 
 const projectLoopSchema = z.object({
   id: kebabLoopIdSchema,
-  theme: loopThemeIdSchema,
   start: automationStepIdSchema,
   steps: z.array(projectStepSchema).min(1)
 }).strict();
 
 export const automationConfigSchema = z.object({
-  version: z.literal(6),
+  version: z.literal(7),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(6),
+  version: z.literal(7),
   agents: z.record(z.string().trim().min(1).max(200), portableAgentRuntimeIntentSchema),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectConfiguration>;

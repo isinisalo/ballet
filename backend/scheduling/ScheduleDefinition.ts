@@ -20,9 +20,7 @@ const canonicalJson = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
-export const scheduleDefinitionHash = (schedule: ProjectStepSchedule, triggeredTarget?: string): string =>
+export const scheduleDefinitionHash = (schedule: ProjectStepSchedule, agentId: string): string =>
   createHash("sha256")
-    .update(canonicalJson(triggeredTarget === undefined
-      ? normalizedDefinition(schedule)
-      : { schedule: normalizedDefinition(schedule), triggeredTarget }))
+    .update(canonicalJson({ schedule: normalizedDefinition(schedule), agentId }))
     .digest("hex");

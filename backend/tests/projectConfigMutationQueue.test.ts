@@ -3,11 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
-import { defaultLoopTheme, type LoopTheme } from "../../shared/domain/loopThemes.js";
-import { AutomationService } from "../services/AutomationService.js";
-import { LoopThemeService } from "../services/LoopThemeService.js";
-import { MarkdownStore } from "../store.js";
 import { RuntimeDatabase } from "../runtime-db.js";
+import { AutomationService } from "../services/AutomationService.js";
+import { MarkdownStore } from "../store.js";
 
 const roots: string[] = [];
 const stores: MarkdownStore[] = [];
@@ -19,7 +17,7 @@ afterEach(async () => {
 });
 
 describe("MarkdownStore project config mutation queue", () => {
-  it("finishes an earlier automation save before creating and assigning a theme", async () => {
+  it("serializes automation writes without legacy theme assignment transactions", async () => {
     const root = await createProject();
     const store = new MarkdownStore(root, new RuntimeDatabase(path.join(root, "runtime.sqlite")));
     stores.push(store);
@@ -29,7 +27,7 @@ describe("MarkdownStore project config mutation queue", () => {
     let releaseSave!: () => void;
     const saveCanFinish = new Promise<void>((resolve) => { releaseSave = resolve; });
     let pauseNextSave = true;
-    vi.spyOn(AutomationService.prototype, "save").mockImplementation(async function (
+    const saveSpy = vi.spyOn(AutomationService.prototype, "save").mockImplementation(async function (
       this: AutomationService,
       value
     ) {
@@ -40,30 +38,25 @@ describe("MarkdownStore project config mutation queue", () => {
       }
       return originalSave.call(this, value);
     });
-    const createSpy = vi.spyOn(LoopThemeService.prototype, "create");
-    const changed = config();
-    changed.loops[0]!.steps[0]!.description = "Keep this queued automation change.";
 
-    const save = store.saveAutomation(changed);
+    const first = config();
+    first.loops[0]!.steps[0]!.description = "First queued change.";
+    const second = structuredClone(first);
+    second.loops[1]!.steps[0]!.description = "Second queued change.";
+
+    const firstSave = store.saveAutomation(first);
     await saveStarted;
-    const create = store.createLoopTheme({
-      theme: theme("second-theme"),
-      assignToLoopId: "second-loop"
-    });
+    const secondSave = store.saveAutomation(second);
     await Promise.resolve();
-    expect(createSpy).not.toHaveBeenCalled();
+    expect(saveSpy).toHaveBeenCalledTimes(1);
 
     releaseSave();
-    await Promise.all([save, create]);
+    await Promise.all([firstSave, secondSave]);
+    expect(saveSpy).toHaveBeenCalledTimes(2);
 
     const persisted = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
-    expect(persisted.loops).toEqual([
-      expect.objectContaining({
-        id: "first-loop",
-        steps: [expect.objectContaining({ description: "Keep this queued automation change." })]
-      }),
-      expect.objectContaining({ id: "second-loop", theme: "second-theme" })
-    ]);
+    expect(persisted.loops[0]!.steps[0]!.description).toBe("First queued change.");
+    expect(persisted.loops[1]!.steps[0]!.description).toBe("Second queued change.");
   });
 });
 
@@ -77,25 +70,18 @@ const createProject = async (): Promise<string> => {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 6,
+  version: 7,
   loops: [automationLoop("first-loop"), automationLoop("second-loop")]
 });
 
 const automationLoop = (id: string): ProjectAutomationConfig["loops"][number] => ({
   id,
-  theme: "default",
   start: "gate",
   steps: [{
     id: "gate",
     type: "human",
     description: "Approve.",
-    nodeSize: "small",
+    nodeStyle: "luna",
     on: { approved: { end: "completed" }, rejected: { end: "failed" } }
   }]
-});
-
-const theme = (id: string): LoopTheme => ({
-  ...structuredClone(defaultLoopTheme),
-  id,
-  label: id
 });

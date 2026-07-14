@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "agents": {
     "dev-deploy-agent": {
       "provider": "codex",
@@ -53,13 +53,12 @@
   "loops": [
     {
       "id": "delivery-planning",
-      "theme": "open-ai",
       "start": "create-roadmap",
       "steps": [
         {
           "id": "create-roadmap",
           "description": "Muodosta hyväksytyistä ADR- ja Goal-dokumenteista arvo-, riski- ja riippuvuusjärjestykseen asetettu roadmap tiedostoon .ballet/outputs/ROADMAP.md.",
-          "nodeSize": "large",
+          "nodeStyle": "sol",
           "on": {
             "approved": "create-work-breakdown",
             "rejected": {
@@ -72,7 +71,7 @@
         {
           "id": "create-work-breakdown",
           "description": "Jaa roadmap milestoneiksi ja atomisiksi task-NNN-tehtäviksi tiedostoihin .ballet/outputs/MILESTONES.md ja .ballet/outputs/TASKS.md.",
-          "nodeSize": "small",
+          "nodeStyle": "luna",
           "on": {
             "approved": "planning-gate",
             "rejected": {
@@ -85,7 +84,7 @@
         {
           "id": "planning-gate",
           "description": "Hyväksy roadmap, milestonet ja taskit toteutuksen lähtökohdaksi. Rejection-palaute käynnistää suunnittelun uudelleen roadmapista.",
-          "nodeSize": "small",
+          "nodeStyle": "luna",
           "on": {
             "approved": {
               "end": "completed"
@@ -98,13 +97,12 @@
     },
     {
       "id": "ui-design",
-      "theme": "open-ai",
       "start": "design-task-ui",
       "steps": [
         {
           "id": "design-task-ui",
           "description": "Suunnittele yhden Run-inputissa nimetyn task-NNN-tehtävän UI tiedostoon .ballet/outputs/ui/<task-id>.md.",
-          "nodeSize": "large",
+          "nodeStyle": "sol",
           "on": {
             "approved": {
               "end": "completed"
@@ -120,13 +118,12 @@
     },
     {
       "id": "implementation",
-      "theme": "open-ai",
       "start": "implement-task",
       "steps": [
         {
           "id": "implement-task",
           "description": "Toteuta täsmälleen yksi Run-inputissa nimetty task-NNN-tehtävä ja sen hyväksymiskriteerit.",
-          "nodeSize": "medium",
+          "nodeStyle": "terra",
           "on": {
             "approved": "verify-task",
             "rejected": {
@@ -139,7 +136,7 @@
         {
           "id": "verify-task",
           "description": "Tarkasta taskin scope, diff, testit ja hyväksymiskriteerit riippumattomasti; saman taskin korjaukset palautuvat implementointiin.",
-          "nodeSize": "medium",
+          "nodeStyle": "terra",
           "on": {
             "approved": "code-gate",
             "rejected": "implement-task"
@@ -150,7 +147,7 @@
         {
           "id": "code-gate",
           "description": "Hyväksy tarkastettu koodi ja valtuuta dev-deployment. Rejection-palaute palauttaa saman taskin implementointiin.",
-          "nodeSize": "small",
+          "nodeStyle": "luna",
           "on": {
             "approved": {
               "loop": "dev-deployment"
@@ -163,13 +160,12 @@
     },
     {
       "id": "dev-deployment",
-      "theme": "open-ai",
       "start": "deploy-and-validate-dev",
       "steps": [
         {
           "id": "deploy-and-validate-dev",
           "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
-          "nodeSize": "medium",
+          "nodeStyle": "terra",
           "on": {
             "approved": {
               "end": "completed"
@@ -185,39 +181,29 @@
     },
     {
       "id": "timed",
-      "theme": "open-ai",
       "start": "schedule-dev-deployment",
       "steps": [
         {
           "id": "schedule-dev-deployment",
-          "description": "Käynnistä kehitysympäristön deploymentin validointi arkipäivisin klo 09:00.",
-          "nodeSize": "small",
+          "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
+          "nodeStyle": "luna",
           "type": "scheduled",
+          "agentId": "dev-deploy-agent",
           "schedule": {
             "time": "09:00",
             "timeZone": "Europe/Helsinki",
             "kind": "recurring",
             "startsOn": "2026-07-13",
-            "cadence": "weekdays"
+            "cadence": "daily"
           },
-          "on": {
-            "triggered": "deploy-and-validate-dev"
-          }
-        },
-        {
-          "id": "deploy-and-validate-dev",
-          "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
-          "nodeSize": "medium",
           "on": {
             "approved": {
               "end": "completed"
             },
             "rejected": {
-              "end": "failed"
+              "end": "blocked"
             }
-          },
-          "type": "agent",
-          "agentId": "dev-deploy-agent"
+          }
         }
       ]
     }

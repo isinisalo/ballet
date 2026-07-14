@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import type { ProjectAgentStep, ProjectHumanStep, ProjectLoop } from "../../shared/domain/automation.js";
+import type { ProjectExecutableStep, ProjectLoop } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
@@ -124,7 +124,7 @@ export class LoopRunStore {
     return run;
   }
 
-  createStepRun(run: LoopRun, step: ProjectAgentStep | ProjectHumanStep, input?: string): StepRun {
+  createStepRun(run: LoopRun, step: ProjectExecutableStep, input?: string): StepRun {
     const stepRunId = randomUUID();
     const timestamp = now();
     const status = step.type === "human" ? "waiting_for_human" : "queued";
@@ -141,8 +141,8 @@ export class LoopRunStore {
       runId: run.runId,
       loopId: run.loopId,
       stepId: step.id,
-      stepType: step.type,
-      agentId: step.type === "agent" ? step.agentId : null,
+      stepType: step.type === "human" ? "human" : "agent",
+      agentId: step.type === "human" ? null : step.agentId,
       status,
       input: input ?? null,
       createdAt: timestamp,

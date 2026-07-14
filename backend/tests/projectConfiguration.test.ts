@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { projectConfigSchema } from "../../shared/api/workspace-schemas.js";
 import type { Agent } from "../../shared/domain/agents.js";
-import type { LoopNodeSize, ProjectAutomationConfig, StepTransitionTarget } from "../../shared/domain/automation.js";
+import type { LoopNodeStyle, ProjectAutomationConfig, StepTransitionTarget } from "../../shared/domain/automation.js";
 import { validateProjectAutomationConfig } from "../automation.js";
 import { parseTomlDocument } from "../markdown.js";
 
@@ -14,16 +14,16 @@ interface ExpectedAgentConfig {
   model: string;
   reasoning: "medium";
   network: boolean;
-  nodeSize: LoopNodeSize;
+  nodeStyle: LoopNodeStyle;
 }
 
 const expectedAgents: Record<string, ExpectedAgentConfig> = {
-  "dev-deploy-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeSize: "medium" },
-  "implementation-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: false, nodeSize: "medium" },
-  "milestone-task-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeSize: "small" },
-  "review-test-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeSize: "medium" },
-  "roadmap-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeSize: "large" },
-  "ui-design-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeSize: "large" }
+  "dev-deploy-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
+  "implementation-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: false, nodeStyle: "terra" },
+  "milestone-task-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeStyle: "luna" },
+  "review-test-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
+  "roadmap-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" },
+  "ui-design-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" }
 };
 
 const readJson = async (relativePath: string): Promise<unknown> =>
@@ -46,7 +46,7 @@ const routeShape = (config: ProjectAutomationConfig): Record<string, unknown> =>
     steps: loop.steps.map((step) => [
       step.id,
       step.type,
-      step.type === "agent" ? step.agentId : null,
+      step.type === "human" ? null : step.agentId,
       step.on
     ])
   }]));
@@ -67,10 +67,6 @@ const approvedTransitionCount = (config: ProjectAutomationConfig, initialLoopId:
     visited.add(state);
     const step = loop.steps.find((candidate) => candidate.id === stepId);
     if (!step) throw new Error(`Unknown step ${state}.`);
-    if (step.type === "scheduled") {
-      stepId = step.on.triggered;
-      continue;
-    }
     const target = step.on.approved;
     transitions += 1;
     if (typeof target === "string") {
@@ -116,16 +112,15 @@ describe("repository Loop engineering configuration", () => {
 
   it("keeps the four simple Loops, scheduled timed Loop, and their approved paths", async () => {
     const project = projectConfigSchema.parse(await readJson(".ballet/project.json"));
-    const config: ProjectAutomationConfig = { version: 6, loops: project.loops };
+    const config: ProjectAutomationConfig = { version: 7, loops: project.loops };
     expect(validateProjectAutomationConfig(config, configuredAgents())).toEqual([]);
-    expect(config.version).toBe(6);
-    expect(config.loops.every((loop) => loop.theme === "open-ai")).toBe(true);
+    expect(config.version).toBe(7);
     for (const loop of config.loops) {
       for (const step of loop.steps) {
-        const expectedSize = step.type === "agent"
-          ? expectedAgents[step.agentId]!.nodeSize
-          : "small";
-        expect(step.nodeSize).toBe(expectedSize);
+        const expectedStyle = step.type !== "agent"
+          ? "luna"
+          : expectedAgents[step.agentId]!.nodeStyle;
+        expect(step.nodeStyle).toBe(expectedStyle);
       }
     }
     expect(routeShape(config)).toEqual({
@@ -156,8 +151,7 @@ describe("repository Loop engineering configuration", () => {
       timed: {
         start: "schedule-dev-deployment",
         steps: [
-          ["schedule-dev-deployment", "scheduled", null, { triggered: "deploy-and-validate-dev" }],
-          ["deploy-and-validate-dev", "agent", "dev-deploy-agent", { approved: { end: "completed" }, rejected: { end: "failed" } }]
+          ["schedule-dev-deployment", "scheduled", "dev-deploy-agent", { approved: { end: "completed" }, rejected: { end: "blocked" } }]
         ]
       }
     });

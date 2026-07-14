@@ -9,8 +9,7 @@ import { MarkdownEntityService } from "./services/MarkdownEntityService.js";
 import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
 import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
 import type { WorkspaceContentData } from "./documents/markdownAppDataLoader.js";
-import type { CreateLoopThemeRequest } from "../shared/api/workspace-contracts.js";
-import type { LoopTheme, LoopThemeId } from "../shared/domain/loopThemes.js";
+import type { LoopTheme } from "../shared/domain/loopThemes.js";
 import { LoopThemeRepository } from "./loop-themes/LoopThemeRepository.js";
 import { LoopThemeService } from "./services/LoopThemeService.js";
 
@@ -32,8 +31,8 @@ export class MarkdownStore {
     );
     this.workspaceDataService = new WorkspaceDataService(() => this.root, this.runtimeDatabaseProvider, this.loopThemeRepository);
     this.markdownEntityService = new MarkdownEntityService(() => this.root, () => this.read());
-    this.automationService = new AutomationService(() => this.root, this.runtimeDatabaseProvider, this.loopThemeRepository);
-    this.loopThemeService = new LoopThemeService(() => this.root, this.loopThemeRepository, (config) => this.automationService.save(config));
+    this.automationService = new AutomationService(() => this.root, this.runtimeDatabaseProvider);
+    this.loopThemeService = new LoopThemeService(() => this.root, this.loopThemeRepository);
   }
 
   get root(): string {
@@ -81,12 +80,8 @@ export class MarkdownStore {
     return this.runProjectConfigMutation(() => this.automationService.save(config));
   }
 
-  updateLoopTheme(themeId: LoopThemeId, theme: LoopTheme): Promise<LoopTheme> {
-    return this.loopThemeService.update(themeId, theme);
-  }
-
-  createLoopTheme(input: CreateLoopThemeRequest) {
-    return this.runProjectConfigMutation(() => this.loopThemeService.create(input));
+  updateLoopTheme(theme: LoopTheme): Promise<LoopTheme> {
+    return this.loopThemeService.update(theme);
   }
 
   saveProjectDocument(input: {

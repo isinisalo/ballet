@@ -89,14 +89,6 @@ export function useWorkspaceMutations({
     );
   }, [runMutation]);
 
-  const createLoopTheme = useCallback(async (theme: LoopTheme, assignToLoopId: string) => {
-    return runMutation(
-      () => api.createLoopTheme(theme, assignToLoopId),
-      "Theme created and assigned.",
-      "Unable to create Loop theme."
-    );
-  }, [runMutation]);
-
   return {
     save,
     saveProjectDocument,
@@ -104,7 +96,6 @@ export function useWorkspaceMutations({
     remove,
     saveAutomation,
     updateLoopTheme,
-    createLoopTheme,
     refresh
   };
 }

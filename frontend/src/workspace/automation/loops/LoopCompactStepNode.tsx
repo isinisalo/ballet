@@ -6,6 +6,8 @@ import type { LoopNodeContext } from "./LoopCanvasTypes";
 import { loopReasoningGlowLevel } from "./loopReasoningGlow";
 import { loopThemeNodeGlow } from "./loopTheme";
 import { AgentAvatarIcon } from "../../agents/agentAvatars";
+import { defaultLoopNodeStyle, loopNodeStyleCatalog } from "@shared/api/workspace-contracts";
+import { LoopNodeArtwork } from "./LoopNodeArtwork";
 const stepRunStatusClass: Record<string, string> = {
   queued: "border-tertiary/70 text-tertiary",
   running: "border-secondary text-secondary ring-2 ring-secondary/20",
@@ -72,7 +74,7 @@ function StepNodeButton({ context, record, records, selected }: {
   const content = (
     <>
       <span aria-hidden="true" className="loop-node-reasoning-glow" />
-      <span aria-hidden="true" className={`loop-node-surface loop-node-surface--${model.renderer}`} />
+      <LoopNodeArtwork nodeStyle={model.nodeStyle} />
       <StepNodeMark kind={model.kind} avatar={model.showAvatar ? model.avatar : undefined} />
       <StepNodeLabel title={model.title} scheduleLabel={model.scheduleLabel} />
     </>
@@ -86,7 +88,7 @@ function StepNodeButton({ context, record, records, selected }: {
         data-loop-node
         data-loop-node-kind={model.kind}
         data-loop-node-size={model.nodeSize}
-        data-loop-node-renderer={model.renderer}
+        data-loop-node-style={model.nodeStyle}
         className={className}
         style={{ "--loop-node-glow-color": model.glowColor } as CSSProperties}
       >
@@ -101,7 +103,7 @@ function StepNodeButton({ context, record, records, selected }: {
       data-loop-node
       data-loop-node-kind={model.kind}
       data-loop-node-size={model.nodeSize}
-      data-loop-node-renderer={model.renderer}
+      data-loop-node-style={model.nodeStyle}
       data-loop-reasoning-effort={model.reasoningEffort}
       data-loop-reasoning-glow={model.reasoningGlow}
       data-loop-run-status={model.status}
@@ -125,29 +127,30 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
   if (!step) return {
     title: record.stepKey || "Missing step",
     kind: "agent" as const,
-    nodeSize: "medium" as const,
-    renderer: context.theme.node.styles.medium,
+    nodeSize: loopNodeStyleCatalog[defaultLoopNodeStyle].size,
+    nodeStyle: defaultLoopNodeStyle,
     glowColor: loopThemeNodeGlow(context.theme),
     tooltip: record.stepKey || "Missing step",
     reasoningGlow: 0
   };
   const title = step.displayId || record.stepKey || "Missing step";
   const kind: StepNodeKind = step.scheduled ? "scheduled" : step.humanGate ? "human" : "agent";
-  const nodeSize = step.nodeSize;
+  const nodeStyle = step.nodeStyle;
+  const nodeSize = loopNodeStyleCatalog[nodeStyle].size;
   const status = step.stepRun?.status;
   const scheduleLabel = step.scheduleLabel;
   return {
     title,
     kind,
     nodeSize,
-    renderer: context.theme.node.styles[nodeSize],
+    nodeStyle,
     glowColor: loopThemeNodeGlow(context.theme),
     avatar: step.avatar,
     showAvatar: kind === "agent" && context.theme.node.showAgentAvatarInNode && Boolean(step.avatar),
     scheduleLabel,
     tooltip: scheduleLabel ? `${title} · ${scheduleLabel}` : title,
     reasoningEffort: step.reasoningEffort,
-    reasoningGlow: kind === "agent" ? loopReasoningGlowLevel(step.reasoningEffort) : 0,
+    reasoningGlow: kind === "human" ? 0 : loopReasoningGlowLevel(step.reasoningEffort),
     borderClass: kind === "human" ? "border-tertiary/60" : kind === "scheduled" ? "border-muted-foreground/55" : undefined,
     status,
     statusClass: status ? stepRunStatusClass[status] : undefined,

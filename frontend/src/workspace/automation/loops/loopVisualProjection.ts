@@ -3,7 +3,7 @@ import type {
   AgentAvatar,
   AgentExecutionState,
   LoopRunDetails,
-  LoopNodeSize,
+  LoopNodeStyle,
   ProjectAutomationConfig,
   ProjectLoop,
   ProjectStep,
@@ -22,7 +22,7 @@ export type LoopVisualStep = {
   humanGate: boolean;
   scheduled: boolean;
   scheduleLabel?: string;
-  nodeSize: LoopNodeSize;
+  nodeStyle: LoopNodeStyle;
   avatar?: AgentAvatar;
   reasoningEffort?: string;
   step: ProjectStep;
@@ -62,20 +62,28 @@ export function buildLoopVisualProjection(
     visualStepKey(snapshot.loopId, snapshot.stepId),
     snapshot.agent.avatar
   ]));
+  const snapshotReasoningByStepKey = new Map((run?.executionPlan?.steps ?? []).map((snapshot) => [
+    visualStepKey(snapshot.loopId, snapshot.stepId),
+    snapshot.runtime.reasoning
+  ]));
   const reasoningByAgentId = new Map(agentExecutionStates.map((state) => [state.agentId, state.reasoning]));
   const steps = loopDefinitions.flatMap((loop) => loop.steps.map((step) => ({
     id: visualStepKey(loop.id, step.id),
     displayId: step.id,
     description: step.description,
-    agentId: step.type === "agent" ? step.agentId : undefined,
+    agentId: step.type === "human" ? undefined : step.agentId,
     humanGate: step.type === "human",
     scheduled: step.type === "scheduled",
     scheduleLabel: step.type === "scheduled" ? scheduleSummary(step.schedule) : undefined,
-    nodeSize: step.nodeSize,
+    nodeStyle: step.nodeStyle,
     avatar: step.type === "agent"
       ? run ? snapshotAvatarByStepKey.get(visualStepKey(loop.id, step.id)) : avatarByAgentId.get(step.agentId)
       : undefined,
-    reasoningEffort: step.type === "agent" ? reasoningByAgentId.get(step.agentId) : undefined,
+    reasoningEffort: step.type === "human"
+      ? undefined
+      : run
+        ? snapshotReasoningByStepKey.get(visualStepKey(loop.id, step.id))
+        : reasoningByAgentId.get(step.agentId),
     step,
     stepRun: loop.id === displayedLoop.id ? latestRunByStepId.get(step.id) : undefined
   })));

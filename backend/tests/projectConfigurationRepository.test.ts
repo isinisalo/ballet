@@ -17,7 +17,7 @@ describe("project configuration repository", () => {
   it("does not create repository state while reading a fresh checkout", async () => {
     const projectRoot = await root();
     const repository = new ProjectConfigurationRepository();
-    expect(repository.load(projectRoot)).toMatchObject({ exists: false, config: { version: 6, agents: {}, loops: [] }, issues: [] });
+    expect(repository.load(projectRoot)).toMatchObject({ exists: false, config: { version: 7, agents: {}, loops: [] }, issues: [] });
     await expect(readFile(repository.path(projectRoot), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
@@ -33,7 +33,7 @@ describe("project configuration repository", () => {
     });
     repository.putAutomation(projectRoot, []);
     expect(JSON.parse(await readFile(repository.path(projectRoot), "utf8"))).toEqual({
-      version: 6,
+      version: 7,
       agents: {
         developer: { provider: "codex", model: "gpt-5", reasoning: "medium", policy: { network: false } },
         reviewer: { provider: "copilot", model: "claude-sonnet", reasoning: "high", policy: { network: true } }

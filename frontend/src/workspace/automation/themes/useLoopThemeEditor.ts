@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CreateLoopThemeResponse, LoopTheme } from "@shared/api/workspace-contracts";
+import type { LoopTheme } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
 import {
-  createLoopThemeDraft,
   normalizedLoopTheme,
   themeColorPattern,
   themeFingerprint,
@@ -13,52 +12,34 @@ import {
 
 export function useLoopThemeEditor({
   source,
-  themes,
-  creating,
-  assignToLoopId,
   updateTheme,
-  createTheme,
-  repairMissing = false,
   forceDirty = false
 }: {
   source: LoopTheme;
-  themes: readonly LoopTheme[];
-  creating: boolean;
-  assignToLoopId?: string;
   updateTheme: (theme: LoopTheme) => Promise<LoopTheme>;
-  createTheme: (theme: LoopTheme, loopId: string) => Promise<CreateLoopThemeResponse>;
-  repairMissing?: boolean;
   forceDirty?: boolean;
 }) {
-  const initial = () => creating ? createLoopThemeDraft(source, themes) : structuredClone(source);
+  const initial = () => structuredClone(source);
   const [draft, setDraft] = useState<LoopTheme>(initial);
   const [previewTheme, setPreviewTheme] = useState<LoopTheme>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const savingRef = useRef(false);
   const receivedFingerprintRef = useRef(themeFingerprint(initial()));
-  const editorKey = `${creating ? "create" : "edit"}:${source.id}:${assignToLoopId ?? ""}`;
-  const editorKeyRef = useRef(editorKey);
   const sourceFingerprint = themeFingerprint(source);
-  const themeIdsFingerprint = themes.map((theme) => theme.id).sort().join("\0");
 
   useEffect(() => {
-    const next = creating ? createLoopThemeDraft(source, themes) : structuredClone(source);
+    const next = structuredClone(source);
     const nextFingerprint = themeFingerprint(next);
     const previousFingerprint = receivedFingerprintRef.current;
-    const editorChanged = editorKeyRef.current !== editorKey;
-    editorKeyRef.current = editorKey;
     receivedFingerprintRef.current = nextFingerprint;
-    setDraft((current) => editorChanged || themeFingerprint(current) === previousFingerprint ? next : current);
-    setPreviewTheme((current) => editorChanged || themeFingerprint(current) === previousFingerprint ? next : current);
+    setDraft((current) => themeFingerprint(current) === previousFingerprint ? next : current);
+    setPreviewTheme((current) => themeFingerprint(current) === previousFingerprint ? next : current);
     setError("");
-  }, [creating, editorKey, sourceFingerprint, themeIdsFingerprint]);
+  }, [sourceFingerprint]);
 
-  const errors = useMemo(
-    () => validateLoopThemeDraft(draft, themes, creating),
-    [creating, draft, themes]
-  );
-  const dirty = creating || forceDirty || themeFingerprint(draft) !== receivedFingerprintRef.current;
+  const errors = useMemo(() => validateLoopThemeDraft(draft), [draft]);
+  const dirty = forceDirty || themeFingerprint(draft) !== receivedFingerprintRef.current;
   const valid = Object.keys(errors).length === 0;
 
   const changeTheme = (next: LoopTheme) => {
@@ -92,14 +73,7 @@ export function useLoopThemeEditor({
     setSaving(true);
     setError("");
     try {
-      const normalized = normalizedLoopTheme(draft);
-      if ((creating || repairMissing) && !assignToLoopId) {
-        setError("A Loop is required when creating or repairing a theme.");
-        return undefined;
-      }
-      const saved = creating || repairMissing
-        ? (await createTheme(normalized, assignToLoopId!)).theme
-        : await updateTheme(normalized);
+      const saved = await updateTheme(normalizedLoopTheme(draft));
       receivedFingerprintRef.current = themeFingerprint(saved);
       setDraft((current) => themeFingerprint(current) === submittedDraftFingerprint ? saved : current);
       setPreviewTheme((current) => themeFingerprint(current) === submittedPreviewFingerprint ? saved : current);

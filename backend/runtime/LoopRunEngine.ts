@@ -6,7 +6,7 @@ import type {
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
 import { resolveEffectiveStartStep } from "../../shared/domain/automation.js";
-import { resolveLoopTheme, type LoopTheme } from "../../shared/domain/loopThemes.js";
+import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
   LoopExecutionPlan,
@@ -72,7 +72,7 @@ export class LoopRunEngine {
 
   respond(
     config: ProjectAutomationConfig,
-    loopThemes: readonly LoopTheme[],
+    loopTheme: LoopTheme,
     runId: string,
     stepRunId: string,
     result: StepRunResult,
@@ -102,7 +102,7 @@ export class LoopRunEngine {
       this.store.incrementTransitionCount(run.runId);
       const forwardedInput = this.forwardedInput(run.input, input);
       this.store.updateRunInput(run.runId, forwardedInput);
-      this.applyTransition(config, loopThemes, this.requireRun(run.runId), stepRun, target, forwardedInput);
+      this.applyTransition(config, loopTheme, this.requireRun(run.runId), stepRun, target, forwardedInput);
       return this.requireDetails(runId);
     });
     try {
@@ -115,7 +115,7 @@ export class LoopRunEngine {
 
   completeAgentStep(
     config: ProjectAutomationConfig,
-    loopThemes: readonly LoopTheme[],
+    loopTheme: LoopTheme,
     input: CompleteStepRunInput
   ): LoopRunDetails {
     const transaction = this.connection().transaction(() => {
@@ -129,7 +129,7 @@ export class LoopRunEngine {
       }
 
       const step = this.requireSnapshotStep(run, stepRun.stepId);
-      if (step.type !== "agent") throw new LoopRunStateError("An agent StepRun must reference an agent step.");
+      if (step.type === "human") throw new LoopRunStateError("An agent StepRun must reference an agent-backed step.");
       const result = input.outcome ? resultForOutcome(input.outcome) : "rejected";
       this.store.completeStepRun(stepRun, result, {
         outcome: input.outcome,
@@ -141,7 +141,7 @@ export class LoopRunEngine {
         return this.requireDetails(run.runId);
       }
       this.store.incrementTransitionCount(run.runId);
-      this.applyTransition(config, loopThemes, run, stepRun, step.on[result], run.input);
+      this.applyTransition(config, loopTheme, run, stepRun, step.on[result], run.input);
       return this.requireDetails(run.runId);
     });
     return transaction() as LoopRunDetails;
@@ -191,7 +191,7 @@ export class LoopRunEngine {
 
   private applyTransition(
     config: ProjectAutomationConfig,
-    loopThemes: readonly LoopTheme[],
+    loopTheme: LoopTheme,
     run: LoopRun,
     sourceStepRun: StepRun,
     target: StepTransitionTarget,
@@ -215,11 +215,8 @@ export class LoopRunEngine {
       return;
     }
     const targetLoop = this.requireLoop(config, target.loop);
-    if (!loopThemes.some((theme) => theme.id === targetLoop.theme)) {
-      throw new LoopRunStateError("Cannot start a loop while its theme is invalid.");
-    }
     this.store.finishRun(run.runId, "completed");
-    this.startInTransaction(targetLoop, resolveLoopTheme(loopThemes, targetLoop.theme), {
+    this.startInTransaction(targetLoop, loopTheme, {
       source: "human",
       input,
       rootRunId: run.rootRunId,

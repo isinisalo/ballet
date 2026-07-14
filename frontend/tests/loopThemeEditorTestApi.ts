@@ -6,16 +6,9 @@ export function installThemeApi(workspace: AppData) {
     const url = String(input);
     if (url === "/api/data") return Response.json(workspace);
     if (url === "/api/project/config-status") return Response.json({ clean: true, changes: [] });
-    if (url === "/api/loop-themes" && init?.method === "POST") {
-      const request = JSON.parse(String(init.body)) as { theme: LoopTheme; assignToLoopId: string };
-      workspace.loopThemes.push(request.theme);
-      workspace.automation = {
-        ...workspace.automation,
-        loops: workspace.automation.loops.map((candidate) => candidate.id === request.assignToLoopId
-          ? { ...candidate, theme: request.theme.id }
-          : candidate)
-      };
-      return Response.json({ theme: request.theme, automation: workspace.automation });
+    if (url === "/api/loop-theme" && init?.method === "PUT") {
+      workspace.loopTheme = JSON.parse(String(init.body)) as LoopTheme;
+      return Response.json(workspace.loopTheme);
     }
     return Response.json({ error: `Unhandled request: ${url}` }, { status: 404 });
   });

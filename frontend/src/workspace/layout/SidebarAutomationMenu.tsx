@@ -11,7 +11,7 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
   automation: ProjectAutomationConfig;
   navigate: (path: string) => void;
 }) {
-  const active = route.view === "automation" || route.view === "loop-theme" || route.view === "loop-theme-library";
+  const active = route.view === "automation" || route.view === "loop-theme";
 
   return (
     <Collapsible defaultOpen={active} className="group/automation">
@@ -35,7 +35,7 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
               <SidebarNavLinkItem
                 key={loop.id}
                 path={automationLoopPath(loop.id)}
-                isActive={(route.view === "automation" && route.automationEntityId === loop.id) || (route.view === "loop-theme" && route.loopThemeLoopId === loop.id)}
+                isActive={route.view === "automation" && route.automationEntityId === loop.id}
                 navigate={navigate}
                 className="h-6 min-w-0 pl-7 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
               >

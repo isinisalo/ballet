@@ -4,13 +4,15 @@ import type { Agent, AgentAvatar, AgentExecutionState } from "../domain/agents.j
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
+  ProjectAgentBackedStep,
   ProjectExecutableStep,
   ProjectLoop,
   LoopNodeSize,
+  LoopNodeStyle,
+  LoopNodeStyleDefinition,
   ProjectOnceStepSchedule,
   ProjectRecurringStepSchedule,
   ProjectScheduledStep,
-  ProjectScheduledStepTransitions,
   ProjectScheduleCadence,
   ProjectScheduleWeekday,
   ProjectStep,
@@ -19,14 +21,13 @@ import type {
   ProjectStepTransitionId,
   ProjectStepTransitionMappers,
   ProjectStepTransitions,
+  StepEndStatus,
   StepTransitionTarget
 } from "../domain/automation.js";
 import type {
   LoopConnectionPointStyle,
   LoopEdgeLineStyle,
-  LoopNodeRenderer,
   LoopTheme,
-  LoopThemeId,
   LoopThemeIssue
 } from "../domain/loopThemes.js";
 import type { MarkdownDocument, Project, ProjectDocumentTreeNode, Skill } from "../domain/documents.js";
@@ -83,7 +84,7 @@ export interface WorkspaceDataDto {
   scheduleStates: LoopScheduleState[];
   automation: ProjectAutomationConfig;
   automationIssues: ProjectAutomationIssue[];
-  loopThemes: LoopTheme[];
+  loopTheme: LoopTheme;
   loopThemeIssues: LoopThemeIssue[];
   runtime: LocalRuntime;
   agentRuntimeConfigurations: Record<string, AgentRuntimeConfiguration>;
@@ -98,8 +99,6 @@ export type AgentSaveRequest = Omit<Partial<Agent>, ServerManagedEntityField | "
   & { avatar?: AgentAvatar | null };
 export type SkillSaveRequest = Omit<Partial<Skill>, ServerManagedEntityField>;
 export type WorkspaceAutomationResponseDto = { config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] };
-export interface CreateLoopThemeRequest { theme: LoopTheme; assignToLoopId: string }
-export interface CreateLoopThemeResponse { theme: LoopTheme; automation: ProjectAutomationConfig }
 
 export type WorkspaceSaveRequestByCollection = {
   [K in WorkspaceCollectionName]: K extends "agents" ? AgentSaveRequest : SkillSaveRequest;
@@ -113,25 +112,30 @@ export type CollectionName = WorkspaceCollectionName;
 
 export {
   clockTimePattern,
+  defaultLoopNodeStyle,
+  defaultTransitionFor,
   defaultProjectAutomationConfig,
   getProjectStepTransitionEntries,
   getProjectStepTransitionTargets,
   isCalendarDate,
   isIanaTimeZone,
-  isProjectExecutableStep,
+  isProjectAgentBackedStep,
+  loopNodeSizes,
+  loopNodeStyleCatalog,
+  loopNodeStyles,
   mapProjectStepTransitions,
   resolveEffectiveStartStep
 } from "../domain/automation.js";
-export { builtInLoopThemes, defaultLoopTheme, resolveLoopTheme, validateAutomationThemeReferences } from "../domain/loopThemes.js";
+export { defaultLoopTheme } from "../domain/loopThemes.js";
 
 export type {
   Agent, AgentAvatar, AgentExecutionState, MarkdownDocument, Project,
-  ProjectAutomationConfig, ProjectAutomationIssue, ProjectDocumentTreeNode, ProjectExecutableStep,
-  ProjectLoop, LoopNodeSize, LoopThemeId, LoopTheme, LoopThemeIssue, LoopNodeRenderer,
+  ProjectAutomationConfig, ProjectAutomationIssue, ProjectAgentBackedStep, ProjectDocumentTreeNode, ProjectExecutableStep,
+  ProjectLoop, LoopNodeSize, LoopNodeStyle, LoopNodeStyleDefinition, LoopTheme, LoopThemeIssue,
   LoopEdgeLineStyle, LoopConnectionPointStyle, ProjectOnceStepSchedule, ProjectRecurringStepSchedule,
-  ProjectScheduledStep, ProjectScheduledStepTransitions, ProjectScheduleCadence, ProjectScheduleWeekday,
+  ProjectScheduledStep, ProjectScheduleCadence, ProjectScheduleWeekday,
   ProjectStep, ProjectStepSchedule, ProjectStepTransitionEntry, ProjectStepTransitionId,
-  ProjectStepTransitionMappers, ProjectStepTransitions, StepTransitionTarget, LoopRun, LoopRunDetails,
+  ProjectStepTransitionMappers, ProjectStepTransitions, StepEndStatus, StepTransitionTarget, LoopRun, LoopRunDetails,
   LoopExecutionPlan, LoopScheduleState, LoopRuntimePreflight,
   RespondToStepRunRequest, StepRun, AgentRuntimeConfiguration, AgentOutcome, ExecutionAgentSnapshot,
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot, PortableAgentRuntimeIntent,

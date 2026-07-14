@@ -5,8 +5,8 @@ const kebabCaseIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function loopIdError(loop: ProjectLoop, loops: readonly ProjectLoop[]): string | undefined {
   if (!loop.id) return "Loop ID is required.";
-  if (loop.id.length > 160 || !kebabCaseIdPattern.test(loop.id)) {
-    return "Use 1–160 lowercase kebab-case characters.";
+  if (loop.id.length < 2 || loop.id.length > 101 || !kebabCaseIdPattern.test(loop.id)) {
+    return "Use 2–101 lowercase kebab-case characters.";
   }
   if (loops.some((candidate) => candidate !== loop && candidate.id === loop.id)) {
     return `Loop ${loop.id} already exists.`;

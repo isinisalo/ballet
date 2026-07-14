@@ -1,15 +1,8 @@
 {
-  "version": 1,
-  "id": "open-ai",
-  "label": "OpenAI",
+  "version": 2,
   "node": {
     "labelColor": "#ffb95f",
     "glowColor": "#8b90a0",
-    "styles": {
-      "small": "luna",
-      "medium": "terra",
-      "large": "sol"
-    },
     "showAgentAvatarInNode": false
   },
   "edge": {

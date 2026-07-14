@@ -20,7 +20,7 @@ export function LoopRunView({
   loop,
   agents,
   agentExecutionStates,
-  themes,
+  theme,
   controller,
   rootDetail,
   onRootRunChange,
@@ -30,7 +30,7 @@ export function LoopRunView({
   loop: ProjectLoop;
   agents: Agent[];
   agentExecutionStates: AgentExecutionState[];
-  themes: readonly LoopTheme[];
+  theme: LoopTheme;
   controller: LoopRunController;
   rootDetail?: RootRunDetail;
   onRootRunChange?: (rootRunId: string) => void;
@@ -77,7 +77,7 @@ export function LoopRunView({
       </div>
       {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <div className={selectedStepRun && selectedStep && details ? "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden md:grid-cols-2" : "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden"}>
-        <LoopCanvas config={config} loop={canvasLoop} agents={agents} agentExecutionStates={agentExecutionStates} theme={themes.find((theme) => theme.id === canvasLoop.theme)} run={details} selectedStepId={selectedStepRun?.stepId} readOnly onStepSelect={(stepId) => setSelectedStepRunId([...((details?.stepRuns) ?? [])].reverse().find((stepRun) => stepRun.stepId === stepId)?.stepRunId)} />
+        <LoopCanvas config={config} loop={canvasLoop} agents={agents} agentExecutionStates={agentExecutionStates} theme={theme} run={details} selectedStepId={selectedStepRun?.stepId} readOnly onStepSelect={(stepId) => setSelectedStepRunId([...((details?.stepRuns) ?? [])].reverse().find((stepRun) => stepRun.stepId === stepId)?.stepRunId)} />
         <LoopHandlerSheet
           open={Boolean(selectedStepRun && selectedStep && details)}
           title="StepRun console"

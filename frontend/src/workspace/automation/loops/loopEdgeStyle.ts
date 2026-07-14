@@ -79,9 +79,7 @@ function loopEdgeTargetsGhostNode(
   edge: LoopCanvasEdge,
   targetNode: LoopCanvasLayoutNode | undefined
 ) {
-  if (targetNode?.kind === "output-event" || targetNode?.kind === "first-step-ghost") return true;
+  if (targetNode?.kind === "first-step-ghost") return true;
   return edge.targetNodeKey === "first-step-ghost" ||
-    edge.targetNodeKey.endsWith(":first-step-ghost") ||
-    edge.targetNodeKey.startsWith("output-event-") ||
-    edge.targetNodeKey.includes(":output-event-");
+    edge.targetNodeKey.endsWith(":first-step-ghost");
 }

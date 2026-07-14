@@ -1,5 +1,5 @@
 import type { Agent, BalletMode } from "@shared/api/workspace-contracts";
-import { agentDocumentPath, automationAllLoopsPath, automationLoopPath, automationNewThemePath, automationThemePath, runAgentPath, runLoopPath, runOverviewPath } from "./routing";
+import { agentDocumentPath, automationAllLoopsPath, automationLoopPath, runAgentPath, runLoopPath, runOverviewPath } from "./routing";
 import type { RouteState } from "./types";
 
 export function pathForBalletMode({
@@ -14,7 +14,6 @@ export function pathForBalletMode({
   if (nextMode === "run") {
     if (route.view === "run") return runRoutePath(route);
     if (route.view === "automation" && route.automationEntityId) return runLoopPath(route.automationEntityId);
-    if (route.view === "loop-theme" && route.loopThemeLoopId) return runLoopPath(route.loopThemeLoopId);
     if (route.view === "agents") {
       const agent = agents.find((candidate) => candidate.relativePath === route.documentPath);
       if (agent) return runAgentPath(agent.id);
@@ -39,10 +38,6 @@ const runRoutePath = (route: RouteState) => {
 
 const configureRoutePath = (route: RouteState) => {
   if (route.view === "automation") return route.automationLoopView === "all" ? automationAllLoopsPath() : automationLoopPath(route.automationEntityId);
-  if (route.view === "loop-theme" && route.loopThemeLoopId) {
-    if (route.loopThemeId) return automationThemePath(route.loopThemeId, route.loopThemeLoopId);
-    if (route.loopThemeSourceId) return automationNewThemePath(route.loopThemeSourceId, route.loopThemeLoopId);
-  }
   if (route.view === "agents" && route.documentPath) return agentDocumentPath(route.documentPath);
   return windowPath();
 };

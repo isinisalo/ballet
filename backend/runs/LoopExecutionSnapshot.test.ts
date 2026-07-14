@@ -14,11 +14,11 @@ const agent = (enabled = true): Agent => ({
 });
 
 const automation = {
-  version: 6 as const,
+  version: 7 as const,
   loops: [{
-    id: "delivery", theme: "default", start: "review",
+    id: "delivery", start: "review",
     steps: [{
-      id: "review", type: "agent" as const, agentId: "reviewer", description: "Review.", nodeSize: "small" as const,
+      id: "review", type: "agent" as const, agentId: "reviewer", description: "Review.", nodeStyle: "luna" as const,
       on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } }
     }]
   }]
@@ -44,14 +44,14 @@ describe("Loop execution snapshots and targets", () => {
 
     const result = await service.list({
       agents: [agent(false)], automation, automationIssues: [],
-      loopThemeIssues: [{ path: ".ballet/themes/default.json", message: "Invalid theme.", themeId: "default" }]
+      loopThemeIssues: [{ path: ".ballet/theme.json", message: "Invalid theme." }]
     }, { reviewer: configuration });
 
     expect(result.loops[0]).toMatchObject({ ready: false });
     expect(result.loops[0]?.issues.map(({ code }) => code)).toEqual(expect.arrayContaining(["disabled", "invalid_config"]));
   });
 
-  it("ignores invalid theme files that no reachable loop uses", async () => {
+  it("marks every loop unavailable when the global theme is invalid", async () => {
     const configuration: AgentRuntimeConfiguration = {
       localPolicy: { readOnlyRoots: [] },
       resolved: { agentId: "reviewer", provider: "codex", model: "model", reasoning: "medium", policy: { network: false, readOnlyRoots: [] } },
@@ -64,9 +64,9 @@ describe("Loop execution snapshots and targets", () => {
 
     const result = await service.list({
       agents: [agent()], automation, automationIssues: [],
-      loopThemeIssues: [{ path: ".ballet/themes/unused.json", message: "Invalid theme.", themeId: "unused" }]
+      loopThemeIssues: [{ path: ".ballet/theme.json", message: "Invalid theme." }]
     }, { reviewer: configuration });
 
-    expect(result.loops[0]).toMatchObject({ ready: true, issues: [] });
+    expect(result.loops[0]).toMatchObject({ ready: false });
   });
 });

@@ -49,6 +49,9 @@ describe("agent removal", () => {
     expect(validateProjectAutomationConfig(config, [])).toContainEqual(expect.objectContaining({
       path: "loops.0.steps.0.agentId"
     }));
+    expect(validateProjectAutomationConfig(config, [])).toContainEqual(expect.objectContaining({
+      path: "loops.1.steps.0.agentId"
+    }));
     expect(loaded.config.loops).toEqual(config.loops);
     expect(loaded.issues).toContainEqual(expect.objectContaining({ path: "loops.0.steps.0.agentId" }));
   });
@@ -60,12 +63,24 @@ const agent: Agent = {
 };
 
 const automation = (): ProjectAutomationConfig => ({
-  version: 6,
+  version: 7,
   loops: [{
-    id: "delivery", theme: "default", start: "review",
+    id: "delivery", start: "review",
     steps: [{
-      id: "review", type: "agent", agentId: "reviewer", description: "Review.", nodeSize: "small",
+      id: "review", type: "agent", agentId: "reviewer", description: "Review.", nodeStyle: "luna",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+    }]
+  }, {
+    id: "scheduled-delivery",
+    start: "scheduled-review",
+    steps: [{
+      id: "scheduled-review",
+      type: "scheduled",
+      agentId: "reviewer",
+      description: "Review on schedule.",
+      nodeStyle: "luna",
+      schedule: { kind: "once", date: "2026-07-15", time: "09:00", timeZone: "UTC" },
+      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
     }]
   }]
 });

@@ -6,7 +6,7 @@ import { LoopRunStepInstructions, LoopRunStepOutput } from "../src/workspace/aut
 const agentStep: ProjectStep = {
   id: "implement",
   type: "agent",
-  nodeSize: "medium",
+  nodeStyle: "terra",
   agentId: "developer",
   description: "Implement.",
   on: { approved: { end: "completed" }, rejected: { end: "failed" } }
@@ -52,7 +52,7 @@ describe("Loop Run sheet", () => {
     const humanStep: ProjectStep = {
       id: "approve",
       type: "human",
-      nodeSize: "small",
+      nodeStyle: "luna",
       description: "Approve.",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     };

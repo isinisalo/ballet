@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
-import { builtInLoopThemes } from "../../shared/domain/loopThemes.js";
+import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { loadAgents, loadBalletProject, loadBalletProjectTree, loadSkills } from "../markdown.js";
 import { agentFromDocument, projectFromDocument, skillDocumentFromDocument } from "./documentMappers.js";
 import { buildSkillLookup } from "./skillLookup.js";
@@ -31,7 +31,7 @@ export const loadMarkdownAppData = async (root: string): Promise<WorkspaceConten
     skills,
     automation: defaultProjectAutomationConfig(),
     automationIssues: [],
-    loopThemes: builtInLoopThemes.map((theme) => structuredClone(theme)),
+    loopTheme: structuredClone(defaultLoopTheme),
     loopThemeIssues: [],
     projectDocumentTree
   };

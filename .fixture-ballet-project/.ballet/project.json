@@ -1,15 +1,14 @@
 {
-  "version": 6,
+  "version": 7,
   "agents": {},
   "loops": [
     {
       "id": "adr-review",
-      "theme": "open-ai",
       "start": "run",
       "steps": [
         {
           "id": "run",
-          "nodeSize": "medium",
+          "nodeStyle": "terra",
           "type": "agent",
           "agentId": "reviewer",
           "description": "",

@@ -3,72 +3,55 @@ import type { Agent, AgentExecutionState, LoopScheduleState, LoopTheme, ProjectA
 import { LockKeyhole } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TextField } from "@/components/shared/workspace-ui";
-import { insertStepForTransition, removeStep, reorderLoopSteps, replaceStep } from "./loopEditorState";
+import { addFirstStep, insertStepForTransition, removeStep, reorderLoopSteps, replaceStep } from "./loopEditorState";
 import { LoopCanvas } from "./LoopCanvas";
 import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
 import { LoopHandlerSheet } from "./LoopHandlerSheet";
 import { LoopStepSheetEditor } from "./LoopStepSheetEditor";
-import { LoopThemeField } from "./LoopThemeField";
 import { loopIdError } from "./loopFormValidation";
-import { loopTheme as resolveLoopTheme } from "./loopTheme";
 
 type Selection = { stepId: string; transition?: ProjectStepTransitionId };
 
-export function LoopCreationEditor({ loop, loops, agents, themes, disabled = false, onChange }: {
+export function LoopCreationEditor({ config, loop, loops, agents, theme, disabled = false, canvasControls, onChange }: {
+  config: ProjectAutomationConfig;
   loop: ProjectLoop;
   loops: ProjectLoop[];
   agents: Agent[];
-  themes: readonly LoopTheme[];
+  theme: LoopTheme;
   disabled?: boolean;
+  canvasControls?: ReactNode;
   onChange: (loop: ProjectLoop) => void;
 }) {
-  const step = loop.steps[0];
-  const idError = loopIdError(loop, loops);
   return (
-    <div className="grid min-w-0 gap-4 p-4 md:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)]">
-      <div className="grid min-w-0 grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_7.5rem]">
-        <TextField label="Loop ID" required value={loop.id} error={idError} disabled={disabled} onChange={(id) => onChange({ ...loop, id })} />
-        <LoopThemeField loop={loop} themes={themes} disabled={disabled} onChange={onChange} />
-      </div>
-      {step ? (
-        <LoopStepSheetEditor
-          step={step}
-          loop={loop}
-          loops={loops}
-          agents={agents}
-          disabled={disabled}
-          surface="embedded"
-          onChange={(nextStep) => onChange(replaceStep(loop, step.id, nextStep))}
-          onRemove={() => undefined}
-        />
-      ) : null}
-    </div>
+    <LoopEditor
+      config={config}
+      loop={loop}
+      loops={loops}
+      agents={agents}
+      theme={theme}
+      locked={false}
+      disabled={disabled}
+      creation
+      canvasControls={canvasControls}
+      onChange={onChange}
+    />
   );
 }
 
 export function LoopEditor({
-  config,
-  loop,
-  loops,
-  agents,
-  agentExecutionStates,
-  themes,
-  scheduleState,
-  locked,
-  disabled = false,
-  lockMessage,
-  canvasControls,
-  onChange
+  config, loop, loops, agents, agentExecutionStates, theme, scheduleState, locked,
+  disabled = false, creation = false, lockMessage, canvasControls, onChange
 }: {
   config: ProjectAutomationConfig;
   loop: ProjectLoop;
   loops: ProjectLoop[];
   agents: Agent[];
   agentExecutionStates?: AgentExecutionState[];
-  themes: readonly LoopTheme[];
+  theme: LoopTheme;
   scheduleState?: LoopScheduleState;
   locked: boolean;
   disabled?: boolean;
+  creation?: boolean;
   lockMessage?: string;
   canvasControls?: ReactNode;
   onChange: (loop: ProjectLoop) => void;
@@ -77,21 +60,25 @@ export function LoopEditor({
   const selectedStep = loop.steps.find((step) => step.id === selection?.stepId);
   const editingDisabled = locked || disabled;
   const controls = canvasControls ? <div className="flex items-center gap-2">{canvasControls}</div> : undefined;
+  const selectionScope = creation ? "new-loop" : loop.id;
 
-  useEffect(() => setSelection(null), [loop.id]);
+  useEffect(() => setSelection(null), [selectionScope]);
   useEffect(() => {
     if (!selection || selectedStep) return;
     setSelection(null);
   }, [selectedStep, selection]);
 
+  const insertFirstStep = () => {
+    if (editingDisabled) return;
+    const next = addFirstStep(loop, agents);
+    const step = next.steps[0];
+    onChange(next);
+    if (step) setSelection({ stepId: step.id });
+  };
+
   return (
     <div className="grid min-w-0 gap-0">
-      {locked ? (
-        <Alert className="m-4 mb-0 rounded-lg border-tertiary/40 text-tertiary">
-          <LockKeyhole />
-          <AlertDescription>{lockMessage ?? "This loop has an active run. Editing is locked until it finishes or is cancelled."}</AlertDescription>
-        </Alert>
-      ) : null}
+      {locked ? <LoopLockedAlert message={lockMessage} /> : null}
       <div
         role="region"
         aria-label="Loop canvas workspace"
@@ -102,10 +89,11 @@ export function LoopEditor({
           loop={loop}
           agents={agents}
           agentExecutionStates={agentExecutionStates}
-          theme={resolveLoopTheme(loop.theme, themes)}
+          theme={theme}
           selectedStepId={selectedStep?.id}
           readOnly={false}
           canvasControls={controls}
+          onAddFirstStep={insertFirstStep}
           onStepSelect={(stepId) => setSelection({ stepId })}
           onTransitionSelect={(stepId, transition) => setSelection({ stepId, transition })}
           onInsertStep={(stepId, result) => {
@@ -121,7 +109,8 @@ export function LoopEditor({
         />
         <LoopHandlerSheet
           open={Boolean(selectedStep)}
-          title={selection?.transition ? "Transition editor" : "Step editor"}
+          title={selection?.transition ? "Transition editor" : creation ? "Loop definition" : "Step editor"}
+          header={creation ? <LoopIdentityHeader loop={loop} loops={loops} disabled={editingDisabled} onChange={onChange} /> : undefined}
           onOpenChange={(open) => { if (!open) setSelection(null); }}
           left={selectedStep ? <LoopHandlerAgentInstructions step={selectedStep} agents={agents} /> : null}
           right={selectedStep ? (
@@ -147,5 +136,27 @@ export function LoopEditor({
         />
       </div>
     </div>
+  );
+}
+
+function LoopIdentityHeader({ loop, loops, disabled, onChange }: {
+  loop: ProjectLoop;
+  loops: ProjectLoop[];
+  disabled: boolean;
+  onChange: (loop: ProjectLoop) => void;
+}) {
+  return (
+    <div className="p-3">
+      <TextField label="Loop ID" density="compact" required value={loop.id} error={loopIdError(loop, loops)} disabled={disabled} onChange={(id) => onChange({ ...loop, id })} />
+    </div>
+  );
+}
+
+function LoopLockedAlert({ message }: { message?: string }) {
+  return (
+    <Alert className="m-4 mb-0 rounded-lg border-tertiary/40 text-tertiary">
+      <LockKeyhole />
+      <AlertDescription>{message ?? "This loop has an active run. Editing is locked until it finishes or is cancelled."}</AlertDescription>
+    </Alert>
   );
 }

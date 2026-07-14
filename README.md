@@ -19,7 +19,8 @@ Queued work survives a Ballet restart. Work that was running when the process ex
 
 Portable, version-controlled automation remains in the checkout:
 
-- `.ballet/project.json` — strict project configuration v6, including Loops and agent provider/model/reasoning/network intent;
+- `.ballet/project.json` — strict project configuration v7, including Loops, per-Step node styles, schedules, outputs, and agent provider/model/reasoning/network intent;
+- `.ballet/theme.json` — the single project-wide Loop visualization theme;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` — project documents;
 - `.codex/agents/*.toml` — agent definitions and instructions; and
 - `.agents/skills/**/SKILL.md` — repository skills.
@@ -112,7 +113,7 @@ Different clones may run at the same time. Each has a path-derived service label
 
 The upper-left Ballet dropdown switches the application between **Configure** and **Run**.
 
-- Configure edits repository-backed project documents, agents, skills, themes, Loops, Steps, Transitions, and schedules.
+- Configure edits repository-backed project documents, agents, skills, the single project Loop theme, Loops, Steps, Transitions, and schedules.
 - Run opens the overview or a Loop/agent target, checks local provider readiness, starts persisted work, and shows immutable instructions beside the durable console or human response controls.
 
 Agent execution keeps provider, model, reasoning effort, and network intent in `.ballet/project.json`. Provider commands and absolute read-only roots are local settings. There is no computer or runtime attachment selection because the current checkout's host is always the runtime.
@@ -124,6 +125,7 @@ The process binds only to `127.0.0.1`. The UI uses these primary API groups:
 | Purpose | Routes |
 | --- | --- |
 | Workspace snapshot | `GET /api/data` |
+| Automation and theme | `PUT /api/automation`, `PUT /api/loop-theme` |
 | Unified Runs | `POST/GET /api/runs`, `GET /api/runs/:rootRunId`, `POST /api/runs/:rootRunId/cancel` |
 | Human gate | `POST /api/runs/:rootRunId/steps/:stepRunId/respond` |
 | Invalidations | `GET /api/stream` |

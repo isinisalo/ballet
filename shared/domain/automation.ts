@@ -1,11 +1,43 @@
-import type { LoopThemeId } from "./loopThemes.js";
-
 export type OutputId = "approved" | "rejected";
-export type ProjectStepTransitionId = OutputId | "triggered";
+export type ProjectStepTransitionId = OutputId;
 export type StepEndStatus = "completed" | "blocked" | "failed";
 
-export const loopNodeSizes = ["small", "medium", "large"] as const;
+export const loopNodeSizes = ["tiny", "small", "medium", "large"] as const;
 export type LoopNodeSize = (typeof loopNodeSizes)[number];
+
+export const loopNodeStyles = [
+  "flat",
+  "luna",
+  "black-hole",
+  "satellite",
+  "meteorite",
+  "spaceman",
+  "mars",
+  "terra",
+  "sol"
+] as const;
+export type LoopNodeStyle = (typeof loopNodeStyles)[number];
+export type LoopNodePixels = 24 | 36 | 48 | 64;
+
+export interface LoopNodeStyleDefinition {
+  label: string;
+  size: LoopNodeSize;
+  pixels: LoopNodePixels;
+}
+
+export const loopNodeStyleCatalog: Readonly<Record<LoopNodeStyle, LoopNodeStyleDefinition>> = {
+  flat: { label: "Flat", size: "medium", pixels: 48 },
+  luna: { label: "Luna", size: "tiny", pixels: 24 },
+  "black-hole": { label: "Black hole", size: "tiny", pixels: 24 },
+  satellite: { label: "Satellite", size: "tiny", pixels: 24 },
+  meteorite: { label: "Meteorite", size: "tiny", pixels: 24 },
+  spaceman: { label: "Spaceman", size: "tiny", pixels: 24 },
+  mars: { label: "Mars", size: "small", pixels: 36 },
+  terra: { label: "Terra", size: "medium", pixels: 48 },
+  sol: { label: "Sol", size: "large", pixels: 64 }
+};
+
+export const defaultLoopNodeStyle: LoopNodeStyle = "flat";
 
 export type StepTransitionTarget =
   | string
@@ -17,23 +49,19 @@ export interface ProjectStepTransitions {
   rejected: StepTransitionTarget;
 }
 
-export interface ProjectScheduledStepTransitions {
-  triggered: string;
-}
-
-interface ProjectStepBase<TTransitions> {
+interface ProjectStepBase {
   id: string;
   description: string;
-  nodeSize: LoopNodeSize;
-  on: TTransitions;
+  nodeStyle: LoopNodeStyle;
+  on: ProjectStepTransitions;
 }
 
-export interface ProjectAgentStep extends ProjectStepBase<ProjectStepTransitions> {
+export interface ProjectAgentStep extends ProjectStepBase {
   type: "agent";
   agentId: string;
 }
 
-export interface ProjectHumanStep extends ProjectStepBase<ProjectStepTransitions> {
+export interface ProjectHumanStep extends ProjectStepBase {
   type: "human";
   agentId?: never;
 }
@@ -82,35 +110,22 @@ export type ProjectRecurringStepSchedule =
 
 export type ProjectStepSchedule = ProjectOnceStepSchedule | ProjectRecurringStepSchedule;
 
-export interface ProjectScheduledStep extends ProjectStepBase<ProjectScheduledStepTransitions> {
+export interface ProjectScheduledStep extends ProjectStepBase {
   type: "scheduled";
   schedule: ProjectStepSchedule;
-  agentId?: never;
+  agentId: string;
 }
 
-export type ProjectExecutableStep = ProjectAgentStep | ProjectHumanStep;
-export type ProjectStep = ProjectExecutableStep | ProjectScheduledStep;
+export type ProjectAgentBackedStep = ProjectAgentStep | ProjectScheduledStep;
+export type ProjectExecutableStep = ProjectAgentBackedStep | ProjectHumanStep;
+export type ProjectStep = ProjectExecutableStep;
 
-export type ProjectStepTransitionEntry =
-  | readonly [OutputId, StepTransitionTarget]
-  | readonly ["triggered", string];
+export type ProjectStepTransitionEntry = readonly [OutputId, StepTransitionTarget];
 
-export function getProjectStepTransitionEntries(
-  step: ProjectScheduledStep
-): Array<readonly ["triggered", string]>;
-export function getProjectStepTransitionEntries(
-  step: ProjectExecutableStep
-): Array<readonly [OutputId, StepTransitionTarget]>;
-export function getProjectStepTransitionEntries(step: ProjectStep): ProjectStepTransitionEntry[];
 export function getProjectStepTransitionEntries(step: ProjectStep): ProjectStepTransitionEntry[] {
-  return step.type === "scheduled"
-    ? [["triggered", step.on.triggered]]
-    : [["approved", step.on.approved], ["rejected", step.on.rejected]];
+  return [["approved", step.on.approved], ["rejected", step.on.rejected]];
 }
 
-export function getProjectStepTransitionTargets(step: ProjectScheduledStep): string[];
-export function getProjectStepTransitionTargets(step: ProjectExecutableStep): StepTransitionTarget[];
-export function getProjectStepTransitionTargets(step: ProjectStep): StepTransitionTarget[];
 export function getProjectStepTransitionTargets(step: ProjectStep): StepTransitionTarget[] {
   return getProjectStepTransitionEntries(step).map(([, target]) => target);
 }
@@ -118,61 +133,40 @@ export function getProjectStepTransitionTargets(step: ProjectStep): StepTransiti
 export interface ProjectStepTransitionMappers {
   approved?: (target: StepTransitionTarget) => StepTransitionTarget;
   rejected?: (target: StepTransitionTarget) => StepTransitionTarget;
-  triggered?: (target: string) => string;
 }
 
-export function mapProjectStepTransitions(
-  step: ProjectScheduledStep,
+export function mapProjectStepTransitions<T extends ProjectStep>(
+  step: T,
   mappers: ProjectStepTransitionMappers
-): ProjectScheduledStep;
-export function mapProjectStepTransitions(
-  step: ProjectExecutableStep,
-  mappers: ProjectStepTransitionMappers
-): ProjectExecutableStep;
-export function mapProjectStepTransitions(
-  step: ProjectStep,
-  mappers: ProjectStepTransitionMappers
-): ProjectStep;
-export function mapProjectStepTransitions(
-  step: ProjectStep,
-  mappers: ProjectStepTransitionMappers
-): ProjectStep {
-  if (step.type === "scheduled") {
-    const triggered = mappers.triggered?.(step.on.triggered) ?? step.on.triggered;
-    return { ...step, on: { triggered } };
-  }
+): T {
   const approved = mappers.approved?.(step.on.approved) ?? step.on.approved;
   const rejected = mappers.rejected?.(step.on.rejected) ?? step.on.rejected;
   return { ...step, on: { approved, rejected } };
 }
 
-export const isProjectExecutableStep = (step: ProjectStep): step is ProjectExecutableStep =>
-  step.type === "agent" || step.type === "human";
+export const defaultTransitionFor = (output: OutputId): StepTransitionTarget =>
+  output === "approved" ? { end: "completed" } : { end: "blocked" };
+
+export const isProjectAgentBackedStep = (step: ProjectStep): step is ProjectAgentBackedStep =>
+  step.type === "agent" || step.type === "scheduled";
 
 export interface ProjectLoop {
   id: string;
-  theme: LoopThemeId;
   start: string;
   steps: ProjectStep[];
 }
 
 export const resolveEffectiveStartStep = (
   loop: ProjectLoop
-): ProjectExecutableStep | undefined => {
-  const configuredStart = loop.steps.find((step) => step.id === loop.start);
-  if (!configuredStart) return undefined;
-  if (isProjectExecutableStep(configuredStart)) return configuredStart;
-  const target = loop.steps.find((step) => step.id === configuredStart.on.triggered);
-  return target && isProjectExecutableStep(target) ? target : undefined;
-};
+): ProjectExecutableStep | undefined => loop.steps.find((step) => step.id === loop.start);
 
 export interface ProjectAutomationConfig {
-  version: 6;
+  version: 7;
   loops: ProjectLoop[];
 }
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
-  version: 6,
+  version: 7,
   loops: []
 });
 

@@ -22,15 +22,15 @@ describe("LocalRunService failure boundaries", () => {
     const service = createService({
       roots,
       readData: async () => ({
-        automation: { version: 6, loops: [{
-          id: "delivery", theme: "broken", start: "gate",
+        automation: { version: 7, loops: [{
+          id: "delivery", start: "gate",
           steps: [{
-            id: "gate", type: "human", description: "Approve.", nodeSize: "small",
+            id: "gate", type: "human", description: "Approve.", nodeStyle: "luna",
             on: { approved: { end: "completed" }, rejected: { end: "failed" } }
           }]
         }] },
         automationIssues: [],
-        loopThemeIssues: [{ path: ".ballet/themes/broken.json", message: "Invalid theme.", themeId: "broken" }]
+        loopThemeIssues: [{ path: ".ballet/theme.json", message: "Invalid theme." }]
       } as unknown as AppData)
     });
 

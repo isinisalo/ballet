@@ -1,7 +1,6 @@
 import type {
   LoopConnectionPointStyle,
   LoopEdgeLineStyle,
-  LoopNodeRenderer,
   LoopTheme
 } from "@shared/api/workspace-contracts";
 import type { ReactNode } from "react";
@@ -20,10 +19,6 @@ type ControlsProps = {
   onColorChange: (key: LoopThemeColorKey, value: string) => void;
 };
 
-const rendererOptions = ["flat", "luna", "terra", "sol"].map((value) => ({
-  value,
-  label: value[0]!.toUpperCase() + value.slice(1)
-}));
 const lineStyleOptions = ["solid", "dashed", "dotted"].map((value) => ({ value, label: value }));
 const connectionStyleOptions = [
   { value: "near", label: "Near · detached" },
@@ -32,21 +27,12 @@ const connectionStyleOptions = [
 
 export function LoopThemeNodeControls(props: ControlsProps) {
   const { theme, previewTheme, errors, disabled = false, onChange, onColorChange } = props;
-  const setRenderer = (size: "small" | "medium" | "large", renderer: string) => onChange({
-    ...theme,
-    node: { ...theme.node, styles: { ...theme.node.styles, [size]: renderer as LoopNodeRenderer } }
-  });
 
   return (
     <ThemeControlSection title="Node">
       <div className="grid gap-3 sm:grid-cols-2">
         <ThemeColorField label="Label font color" value={theme.node.labelColor} previewValue={previewTheme.node.labelColor} error={errors["node.labelColor"]} disabled={disabled} onChange={(value) => onColorChange("node.labelColor", value)} />
         <ThemeColorField label="Glow color" value={theme.node.glowColor} previewValue={previewTheme.node.glowColor} error={errors["node.glowColor"]} disabled={disabled} onChange={(value) => onColorChange("node.glowColor", value)} />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {(["small", "medium", "large"] as const).map((size) => (
-          <SelectField key={size} label={`${size[0]!.toUpperCase()}${size.slice(1)} style`} density="compact" value={theme.node.styles[size]} options={rendererOptions} disabled={disabled} onChange={(value) => setRenderer(size, value)} />
-        ))}
       </div>
       <Field orientation="horizontal" className="min-h-7 justify-between rounded border border-divider-strong bg-panel-section px-3 py-1.5">
         <FieldLabel htmlFor="theme-agent-avatars">Show agent avatars</FieldLabel>

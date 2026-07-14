@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
-import { builtInLoopThemes } from "../../shared/domain/loopThemes.js";
+import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { validateLoopRunStart } from "../services/LoopRunStartPolicy.js";
 
 const roots: string[] = [];
@@ -15,7 +15,6 @@ afterEach(async () => {
 
 const loop = (id: string): ProjectLoop => ({
   id,
-  theme: "open-ai",
   start: "work",
   steps: [{
     id: "work",
@@ -26,7 +25,7 @@ const loop = (id: string): ProjectLoop => ({
       "dev-deployment": "dev-deploy-agent"
     } as Record<string, string>)[id] ?? "worker",
     description: "Work.",
-    nodeSize: "medium",
+    nodeStyle: "terra",
     on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
   }]
 });
@@ -40,9 +39,9 @@ const data = (projectRoot: string, loopIds: string[]): AppData => ({
   skills: [],
   loopRuns: [],
   scheduleStates: [],
-  automation: { version: 6, loops: loopIds.map(loop) },
+  automation: { version: 7, loops: loopIds.map(loop) },
   automationIssues: [],
-  loopThemes: [...builtInLoopThemes],
+  loopTheme: structuredClone(defaultLoopTheme),
   loopThemeIssues: [],
   runtime: {
     instanceId: "fixture", hostname: "localhost", platform: "darwin", architecture: "arm64",
@@ -135,10 +134,11 @@ describe("loop engineering root-start policy", () => {
     implementation.steps.unshift({
       id: "timer",
       type: "scheduled",
+      agentId: "implementation-agent",
       description: "Start implementation on schedule.",
-      nodeSize: "small",
+      nodeStyle: "luna",
       schedule: { kind: "once", date: "2026-07-12", time: "09:00", timeZone: "UTC" },
-      on: { triggered: "work" }
+      on: { approved: "work", rejected: { end: "blocked" } }
     });
 
     await expect(validateLoopRunStart(workspace, "implementation"))

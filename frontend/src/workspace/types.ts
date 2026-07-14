@@ -1,4 +1,4 @@
-import { builtInLoopThemes, defaultProjectAutomationConfig, type AppData } from "@shared/api/workspace-contracts";
+import { defaultLoopTheme, defaultProjectAutomationConfig, type AppData } from "@shared/api/workspace-contracts";
 
 export type View =
   | "projects"
@@ -8,7 +8,6 @@ export type View =
   | "project-instructions"
   | "automation"
   | "loop-theme"
-  | "loop-theme-library"
   | "runtimes"
   | "agents"
   | "skills"
@@ -24,9 +23,6 @@ export interface RouteState {
   documentPath?: string;
   automationEntityId?: string;
   automationLoopView?: AutomationLoopView;
-  loopThemeId?: string;
-  loopThemeSourceId?: string;
-  loopThemeLoopId?: string;
   runTargetKind?: "loop" | "agent";
   runTargetId?: string;
   rootRunId?: string;
@@ -47,7 +43,7 @@ export const emptyData: AppData = {
   scheduleStates: [],
   automation: defaultProjectAutomationConfig(),
   automationIssues: [],
-  loopThemes: [...builtInLoopThemes],
+  loopTheme: structuredClone(defaultLoopTheme),
   loopThemeIssues: [],
   runtime: {
     instanceId: "",

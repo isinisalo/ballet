@@ -20,16 +20,15 @@ describe("HTTP Zod validation", () => {
 
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
-      version: 6,
+      version: 7,
       loops: [{
         id: "delivery",
-        theme: "open-ai",
         start: "implementation",
         steps: [{
           id: "implementation",
           type: "agent",
           description: "Implementation",
-          nodeSize: "medium",
+          nodeStyle: "terra",
           agentId: "developer-agent",
           on: { approved: { end: "completed" }, rejected: { end: "failed" } }
         }]

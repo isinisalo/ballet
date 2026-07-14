@@ -15,7 +15,7 @@ export const loadProjectAutomationConfigWithIssues = async (
     config: defaultProjectAutomationConfig(),
     issues: loaded.issues.map((issue) => ({ path: issue.path, message: issue.message }))
   };
-  const value = { version: 6 as const, loops: loaded.config.loops };
+  const value = { version: 7 as const, loops: loaded.config.loops };
   const issues = validateProjectAutomationConfig(value, agents);
   return { config: value, issues };
 };

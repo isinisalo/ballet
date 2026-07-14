@@ -1,19 +1,19 @@
 import { useMemo, type ReactNode } from "react";
-import type {
-  Agent,
-  AgentExecutionState,
-  LoopRunDetails,
-  LoopTheme,
-  ProjectAutomationConfig,
-  ProjectLoop,
-  ProjectStepTransitionId
+import {
+  defaultLoopTheme,
+  type Agent,
+  type AgentExecutionState,
+  type LoopRunDetails,
+  type LoopTheme,
+  type ProjectAutomationConfig,
+  type ProjectLoop,
+  type ProjectStepTransitionId
 } from "@shared/api/workspace-contracts";
 import { LoopCanvasSurface } from "./LoopCanvasSurface";
 import { calculateCompositeLoopCanvasLayout } from "./loopLayout";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import { buildLoopVisualProjection } from "./loopVisualProjection";
 import { useLoopCanvasInteraction } from "./useLoopCanvasInteraction";
-import { loopTheme as resolveLoopTheme } from "./loopTheme";
 
 export function LoopCanvas({
   config,
@@ -25,6 +25,7 @@ export function LoopCanvas({
   theme: themeOverride,
   readOnly = false,
   canvasControls,
+  onAddFirstStep,
   onStepSelect,
   onTransitionSelect,
   onInsertStep,
@@ -39,12 +40,13 @@ export function LoopCanvas({
   theme?: LoopTheme;
   readOnly?: boolean;
   canvasControls?: ReactNode;
+  onAddFirstStep?: () => void;
   onStepSelect?: (stepId: string) => void;
   onTransitionSelect?: (stepId: string, result: ProjectStepTransitionId) => void;
   onInsertStep?: (stepId: string, result: "approved" | "rejected") => void;
   onReorderStep?: (fromIndex: number, toIndex: number) => void;
 }) {
-  const theme = run?.themeSnapshot ?? themeOverride ?? resolveLoopTheme(loop.theme);
+  const theme = run?.themeSnapshot ?? themeOverride ?? defaultLoopTheme;
   const projection = useMemo(
     () => buildLoopVisualProjection(config, loop, run, agents, agentExecutionStates),
     [agentExecutionStates, agents, config, loop, run]
@@ -66,7 +68,7 @@ export function LoopCanvas({
     const index = edge.route?.sourceStepIndex;
     const result = edge.route?.outputId;
     const step = index === undefined ? undefined : loop.steps[index];
-    if (step && (result === "approved" || result === "rejected" || result === "triggered")) {
+    if (step && (result === "approved" || result === "rejected")) {
       onTransitionSelect?.(step.id, result);
     }
   };
@@ -86,8 +88,8 @@ export function LoopCanvas({
         canvasHeight={interaction.canvasHeight}
         isCanvasPanning={interaction.isCanvasPanning}
         loopCanvasRef={interaction.loopCanvasRef}
-        canAddFirstStep={false}
-        canAddStepForEvent={(sourceStep) => !readOnly && Boolean(onInsertStep) && sourceStep?.step.type !== "scheduled"}
+        canAddFirstStep={!readOnly && loop.steps.length === 0 && Boolean(onAddFirstStep)}
+        canAddStepForEvent={(sourceStep) => !readOnly && Boolean(onInsertStep) && Boolean(sourceStep)}
         onStepPointerDown={interaction.handleStepPointerDown}
         onStepPointerMove={interaction.handleStepPointerMove}
         onStepPointerUp={interaction.handleStepPointerUp}
@@ -100,7 +102,11 @@ export function LoopCanvas({
         }}
         onOutputHandlerSelect={selectTransition}
         onAddStep={(outputId, sourceStep) => {
-          if (!sourceStep || (outputId !== "approved" && outputId !== "rejected")) return;
+          if (!sourceStep) {
+            onAddFirstStep?.();
+            return;
+          }
+          if (outputId !== "approved" && outputId !== "rejected") return;
           onInsertStep?.(sourceStep.displayId, outputId);
         }}
         activeEdgeId={activeEdgeId}

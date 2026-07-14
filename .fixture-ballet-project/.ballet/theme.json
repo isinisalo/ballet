@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "node": {
+    "labelColor": "#ffb95f",
+    "glowColor": "#8b90a0",
+    "showAgentAvatarInNode": false
+  },
+  "edge": {
+    "color": "#76d4ca",
+    "labelColor": "#c1c6d7",
+    "style": "solid",
+    "rejectedStyle": "dotted",
+    "crossLoopStyle": "dashed"
+  },
+  "connectionPoint": {
+    "style": "near",
+    "color": "#e3fffb"
+  }
+}

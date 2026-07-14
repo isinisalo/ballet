@@ -9,7 +9,8 @@ import {
   type LoopCanvasEdge,
   type LoopHandledEventNode
 } from "./loopLayoutEdges";
-import { loopNodeSizes, loopStepNodeSizes } from "./loopLayoutConfig";
+import { defaultLoopNodeStyle, loopNodeStyleCatalog } from "@shared/api/workspace-contracts";
+import { loopNodeSizes } from "./loopLayoutConfig";
 import {
   loopOutputEventNodeWidth,
   loopOutputSourceHandleId,
@@ -54,7 +55,7 @@ export function addCanvasEdge(context: LoopLayoutGraphDraftContext, edge: LoopCa
 export function addStepNode(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, outputHandleCount: number) {
   const records = loopFoldedRecords(context.loopGraph, record);
   const isEditingStep = context.editingStepIndex === record.index;
-  const nodeSize = loopStepNodeSizes[record.step?.nodeSize ?? "medium"];
+  const nodeSize = loopNodeStyleCatalog[record.step?.nodeStyle ?? defaultLoopNodeStyle].pixels;
   addNode(context, {
     key: `step-${record.index}`,
     kind: "step",
@@ -99,7 +100,13 @@ export function addOutputEventNode(
     sourceHandleId: loopOutputSourceHandleId(output),
     targetHandleId: loopOutputTargetHandleId(output, context.targetHandleId),
     eventType: output.eventType,
-    label: loopOutputEdgeLabel(output)
+    label: loopOutputEdgeLabel(output),
+    route: {
+      sourceStepIndex: record.index,
+      sourceStepId: record.stepKey,
+      eventType: output.eventType,
+      outputId: output.outputId
+    }
   });
 }
 

@@ -3,7 +3,6 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
-import { resolveLoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   ExecutionSpec,
   ExecutionTask,
@@ -202,7 +201,7 @@ export class LocalRunService {
       await this.failRoot(root, error);
       throw error;
     }
-    this.options.database.respondToStepRun(snapshot.automation, snapshot.loopThemes, step.runId, stepRunId, result, input);
+    this.options.database.respondToStepRun(snapshot.automation, snapshot.loopTheme, step.runId, stepRunId, result, input);
     await this.enqueuePending(rootRunId);
     await this.syncLoopRoot(rootRunId);
     this.changed(rootRunId);
@@ -255,7 +254,7 @@ export class LocalRunService {
     }
     try {
       const snapshot = await this.runConfiguration(root);
-      this.options.database.completeAgentStep(snapshot.automation, snapshot.loopThemes, {
+      this.options.database.completeAgentStep(snapshot.automation, snapshot.loopTheme, {
         stepRunId: task.spec.stepRunId,
         outcome: task.outcome,
         error: task.status === "succeeded" ? undefined : task.errorMessage ?? task.status
@@ -323,7 +322,7 @@ export class LocalRunService {
           worktreePath: workspace.path, branch: workspace.branch, headSha: workspace.headSha,
           configHash: workspace.configHash, snapshotHash: workspace.snapshotHash, createdAt: timestamp
         });
-        this.options.database.startLoopRun(data.automation, loopId, resolveLoopTheme(data.loopThemes, loop.theme),
+        this.options.database.startLoopRun(data.automation, loopId, data.loopTheme,
           rootRunId, input, source, plan, schedule);
       })();
     } catch (error) {
@@ -391,12 +390,12 @@ export class LocalRunService {
   private async runConfiguration(root: StoredRootRun) {
     const configuration = this.projectConfigurations.load(root.worktreePath);
     if (!configuration.config) throw new LoopRunStateError("Run configuration snapshot is invalid.");
-    const themes = await this.loopThemeRepository.load(root.worktreePath);
+    const themeLoad = await this.loopThemeRepository.load(root.worktreePath);
     if (relevantLoopThemeIssues({
       automation: configuration.config,
-      loopThemeIssues: themes.issues
+      loopThemeIssues: themeLoad.issues
     }, root.targetId).length > 0) throw new LoopRunStateError("Run Loop theme snapshot is invalid.");
-    return { automation: configuration.config, loopThemes: themes.themes };
+    return { automation: configuration.config, loopTheme: themeLoad.theme };
   }
 
   private async failRoot(

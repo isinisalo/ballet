@@ -18,7 +18,7 @@ import {
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-schedule-v6-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-schedule-v7-"));
   roots.push(root);
   return root;
 };
@@ -39,60 +39,34 @@ const agent: Agent = {
 };
 
 const scheduledConfig = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 6,
+  version: 7,
   loops: [{
     id: "delivery",
-    theme: "open-ai",
     start: "scheduled-start",
     steps: [{
       id: "scheduled-start",
       type: "scheduled",
-      description: "Start delivery on schedule.",
-      nodeSize: "small",
-      schedule,
-      on: { triggered: "implement" }
-    }, {
-      id: "implement",
-      type: "agent",
       agentId: agent.id,
-      description: "Implement the change.",
-      nodeSize: "medium",
-      on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+      description: "Deliver on schedule.",
+      nodeStyle: "luna",
+      schedule,
+      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
     }]
   }]
 });
 
 const schedules: ProjectStepSchedule[] = [{
-  kind: "once",
-  date: "2026-07-13",
-  time: "09:15",
-  timeZone: "Europe/Helsinki"
+  kind: "once", date: "2026-07-13", time: "09:15", timeZone: "Europe/Helsinki"
 }, {
-  kind: "recurring",
-  startsOn: "2026-07-13",
-  time: "09:15",
-  timeZone: "Europe/Helsinki",
-  cadence: "daily"
+  kind: "recurring", startsOn: "2026-07-13", time: "09:15", timeZone: "Europe/Helsinki", cadence: "daily"
 }, {
-  kind: "recurring",
-  startsOn: "2026-07-13",
-  time: "09:15",
-  timeZone: "Europe/Helsinki",
-  cadence: "weekdays"
+  kind: "recurring", startsOn: "2026-07-13", time: "09:15", timeZone: "Europe/Helsinki", cadence: "weekdays"
 }, {
-  kind: "recurring",
-  startsOn: "2026-07-13",
-  time: "09:15",
-  timeZone: "Europe/Helsinki",
-  cadence: "weekly",
-  weekdays: ["mon", "wed", "fri"]
+  kind: "recurring", startsOn: "2026-07-13", time: "09:15", timeZone: "Europe/Helsinki",
+  cadence: "weekly", weekdays: ["mon", "wed", "fri"]
 }, {
-  kind: "recurring",
-  startsOn: "2026-07-13",
-  time: "09:15",
-  timeZone: "Europe/Helsinki",
-  cadence: "monthly",
-  dayOfMonth: 31
+  kind: "recurring", startsOn: "2026-07-13", time: "09:15", timeZone: "Europe/Helsinki",
+  cadence: "monthly", dayOfMonth: 31
 }];
 
 describe("scheduled automation persistence", () => {
@@ -108,50 +82,46 @@ describe("scheduled automation persistence", () => {
 });
 
 describe("scheduled automation graph validation", () => {
-  it("requires the scheduled step to be the loop start", () => {
+  it("allows an agent-backed scheduled step to be the only step", () => {
+    expect(validateProjectAutomationConfig(scheduledConfig(schedules[0]!), [agent])).toEqual([]);
+  });
+
+  it("requires scheduled steps to be the start and rejects incoming transitions", () => {
     const valid = scheduledConfig(schedules[0]!);
-    const loop = valid.loops[0]!;
-    expect(validateProjectAutomationConfig({
+    const scheduled = valid.loops[0]!.steps[0]!;
+    const human = {
+      id: "gate",
+      type: "human" as const,
+      description: "Gate.",
+      nodeStyle: "flat" as const,
+      on: { approved: scheduled.id, rejected: { end: "blocked" as const } }
+    };
+    const candidate = {
       ...valid,
-      loops: [{ ...loop, start: "implement" }]
-    }, [agent])).toContainEqual(expect.objectContaining({
+      loops: [{ ...valid.loops[0]!, start: human.id, steps: [scheduled, human] }]
+    };
+    const issues = validateProjectAutomationConfig(candidate, [agent]);
+    expect(issues).toContainEqual(expect.objectContaining({
       path: "loops.0.steps.0.type",
       message: expect.stringContaining("only as the loop start")
     }));
-  });
-
-  it("rejects incoming, missing, self, and second scheduled targets", () => {
-    const valid = scheduledConfig(schedules[0]!);
-    const loop = valid.loops[0]!;
-    const scheduled = loop.steps[0]!;
-    const implement = loop.steps[1]!;
-    const issuesFor = (steps: unknown[]) => validateProjectAutomationConfig({
-      ...valid,
-      loops: [{ ...loop, steps }]
-    }, [agent]);
-
-    expect(issuesFor([scheduled, {
-      ...implement,
-      on: { approved: scheduled.id, rejected: { end: "failed" } }
-    }])).toContainEqual(expect.objectContaining({
+    expect(issues).toContainEqual(expect.objectContaining({
       path: "loops.0.steps.1.on.approved",
       message: "No transition may target a scheduled start step."
     }));
-    expect(issuesFor([{ ...scheduled, on: { triggered: "missing" } }, implement]))
-      .toContainEqual(expect.objectContaining({
-        path: "loops.0.steps.0.on.triggered",
-        message: expect.stringContaining("unknown step")
-      }));
-    expect(issuesFor([{ ...scheduled, on: { triggered: scheduled.id } }, implement]))
-      .toContainEqual(expect.objectContaining({
-        path: "loops.0.steps.0.on.triggered",
-        message: expect.stringContaining("another agent or human")
-      }));
-    expect(issuesFor([scheduled, {
-      ...scheduled,
-      id: "second-schedule",
-      on: { triggered: implement.id }
-    }, implement])).toContainEqual(expect.objectContaining({
+  });
+
+  it("requires an existing scheduled agent and at most one scheduled step", () => {
+    const valid = scheduledConfig(schedules[0]!);
+    const scheduled = valid.loops[0]!.steps[0]!;
+    expect(validateProjectAutomationConfig({
+      ...valid,
+      loops: [{ ...valid.loops[0]!, steps: [{ ...scheduled, agentId: "missing-agent" }] }]
+    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.steps.0.agentId" }));
+    expect(validateProjectAutomationConfig({
+      ...valid,
+      loops: [{ ...valid.loops[0]!, steps: [scheduled, { ...scheduled, id: "second-schedule" }] }]
+    }, [agent])).toContainEqual(expect.objectContaining({
       path: "loops.0.steps",
       message: "Loop may contain at most one scheduled step."
     }));
@@ -159,19 +129,16 @@ describe("scheduled automation graph validation", () => {
 });
 
 describe("scheduled automation domain helpers", () => {
-  it("resolves effective start and enumerates each step's own transitions", () => {
-    const loop = scheduledConfig(schedules[0]!).loops[0]!;
-    expect(resolveEffectiveStartStep(loop)?.id).toBe("implement");
-    expect(getProjectStepTransitionEntries(loop.steps[0]!)).toEqual([["triggered", "implement"]]);
-    expect(getProjectStepTransitionEntries(loop.steps[1]!)).toEqual([
+  it("treats scheduled as the effective executable start and maps both outputs", () => {
+    const step = scheduledConfig(schedules[0]!).loops[0]!.steps[0]!;
+    expect(resolveEffectiveStartStep(scheduledConfig(schedules[0]!).loops[0]!)?.id).toBe(step.id);
+    expect(getProjectStepTransitionEntries(step)).toEqual([
       ["approved", { end: "completed" }],
-      ["rejected", { end: "failed" }]
+      ["rejected", { end: "blocked" }]
     ]);
-    expect(mapProjectStepTransitions(loop.steps[0]!, {
-      triggered: () => "renamed-target"
-    }).on).toEqual({ triggered: "renamed-target" });
-    expect(mapProjectStepTransitions(loop.steps[1]!, {
-      approved: () => "renamed-target"
-    }).on).toEqual({ approved: "renamed-target", rejected: { end: "failed" } });
+    expect(mapProjectStepTransitions(step, { approved: () => "next-step" }).on).toEqual({
+      approved: "next-step",
+      rejected: { end: "blocked" }
+    });
   });
 });

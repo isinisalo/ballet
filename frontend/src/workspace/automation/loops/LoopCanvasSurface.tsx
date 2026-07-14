@@ -65,7 +65,7 @@ export function LoopCanvasSurface({
     <div
       ref={loopCanvasRef}
       data-loop-canvas
-      data-loop-theme={nodeContext.theme.id}
+      data-loop-theme="project"
       data-loop-canvas-preview={nodeContext.staticPreview ? "true" : undefined}
       aria-label={label}
       className={cn(

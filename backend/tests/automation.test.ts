@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
-import type { ProjectAutomationConfig, ProjectStep } from "../../shared/domain/automation.js";
+import {
+  type ProjectAutomationConfig,
+  type ProjectStep
+} from "../../shared/domain/automation.js";
 import {
   loadProjectAutomationConfig,
   saveProjectAutomationConfig,
@@ -14,7 +17,7 @@ import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v6-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v7-"));
   roots.push(root);
   return root;
 };
@@ -35,36 +38,35 @@ const agent: Agent = {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 6,
+  version: 7,
   loops: [{
     id: "delivery",
-    theme: "open-ai",
     start: "implement",
     steps: [{
       id: "implement",
       type: "agent",
       agentId: agent.id,
       description: "Implement the change.",
-      nodeSize: "medium",
+      nodeStyle: "terra",
       on: { approved: "review", rejected: { end: "failed" } }
     }, {
       id: "review",
       type: "human",
       description: "Review the change.",
-      nodeSize: "small",
+      nodeStyle: "luna",
       on: { approved: { end: "completed" }, rejected: "implement" }
     }]
   }]
 });
 
-describe("automation v6 config", () => {
-  it("round-trips only the canonical v6 shape", async () => {
+describe("automation v7 config", () => {
+  it("round-trips only the canonical v7 shape", async () => {
     const root = await tempRoot();
     const saved = await saveProjectAutomationConfig(root, config(), [agent]);
     expect(saved).toEqual(config());
     expect(await loadProjectAutomationConfig(root, [agent])).toEqual(config());
     const raw = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as Record<string, unknown>;
-    expect(raw.version).toBe(6);
+    expect(raw.version).toBe(7);
     expect(raw.agents).toEqual({});
     expect(raw).not.toHaveProperty("runtimes");
     expect(raw).not.toHaveProperty("actions");
@@ -100,14 +102,13 @@ describe("automation v6 config", () => {
       ...base,
       loops: [{
         id: "cycle",
-        theme: "open-ai",
         start: "again",
         steps: [{
           id: "again",
           type: "agent",
           agentId: agent.id,
           description: "Cycle forever.",
-          nodeSize: "medium",
+          nodeStyle: "terra",
           on: { approved: "again", rejected: "again" }
         }]
       }]
@@ -117,13 +118,12 @@ describe("automation v6 config", () => {
   it("allows cross-loop transitions only from humans and never back to the same loop", () => {
     const target = {
       id: "release",
-      theme: "open-ai" as const,
       start: "finish",
       steps: [{
         id: "finish",
         type: "human" as const,
         description: "Finish.",
-        nodeSize: "small" as const,
+        nodeStyle: "luna" as const,
         on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } }
       }]
     };
@@ -160,27 +160,25 @@ describe("automation v6 config", () => {
 describe("all-approved path liveness", () => {
   it("rejects an all-approved cycle across loops", () => {
     const cyclic: ProjectAutomationConfig = {
-      version: 6,
+      version: 7,
       loops: [{
         id: "planning",
-        theme: "open-ai",
         start: "approve-plan",
         steps: [{
           id: "approve-plan",
           type: "human",
           description: "Approve the plan.",
-          nodeSize: "small",
+          nodeStyle: "luna",
           on: { approved: { loop: "delivery" }, rejected: { end: "failed" } }
         }]
       }, {
         id: "delivery",
-        theme: "open-ai",
         start: "approve-delivery",
         steps: [{
           id: "approve-delivery",
           type: "human",
           description: "Approve delivery.",
-          nodeSize: "small",
+          nodeStyle: "luna",
           on: { approved: { loop: "planning" }, rejected: { end: "failed" } }
         }]
       }]
@@ -197,7 +195,7 @@ describe("all-approved path liveness", () => {
         id: `step-${index + 1}`,
         type: "human",
         description: `Complete step ${index + 1}.`,
-        nodeSize: "small",
+        nodeStyle: "luna",
         on: {
           approved: index === MAX_ROOT_TRANSITIONS - 1
             ? { loop: "finish" }
@@ -207,21 +205,19 @@ describe("all-approved path liveness", () => {
       })
     );
     const tooLong: ProjectAutomationConfig = {
-      version: 6,
+      version: 7,
       loops: [{
         id: "delivery",
-        theme: "open-ai",
         start: "step-1",
         steps: longSteps
       }, {
         id: "finish",
-        theme: "open-ai",
         start: "complete",
         steps: [{
           id: "complete",
           type: "human",
           description: "Complete delivery.",
-          nodeSize: "small",
+          nodeStyle: "luna",
           on: { approved: { end: "completed" }, rejected: { end: "failed" } }
         }]
       }]
@@ -235,35 +231,33 @@ describe("all-approved path liveness", () => {
 
   it("allows a short all-approved chain across loops", () => {
     const short: ProjectAutomationConfig = {
-      version: 6,
+      version: 7,
       loops: [{
         id: "delivery",
-        theme: "open-ai",
         start: "implement",
         steps: [{
           id: "implement",
           type: "agent",
           agentId: agent.id,
           description: "Implement the task.",
-          nodeSize: "medium",
+          nodeStyle: "terra",
           on: { approved: "code-gate", rejected: { end: "blocked" } }
         }, {
           id: "code-gate",
           type: "human",
           description: "Approve the task.",
-          nodeSize: "small",
+          nodeStyle: "luna",
           on: { approved: { loop: "dev-deployment" }, rejected: "implement" }
         }]
       }, {
         id: "dev-deployment",
-        theme: "open-ai",
         start: "deploy",
         steps: [{
           id: "deploy",
           type: "agent",
           agentId: agent.id,
           description: "Deploy to dev.",
-          nodeSize: "medium",
+          nodeStyle: "terra",
           on: { approved: { end: "completed" }, rejected: { end: "failed" } }
         }]
       }]

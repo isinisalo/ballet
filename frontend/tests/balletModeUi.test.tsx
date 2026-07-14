@@ -41,7 +41,7 @@ describe("global Ballet mode", () => {
 
   it("preserves selected Loops and agents and sends Configure-only views to overview", () => {
     expect(pathForBalletMode({ route: { view: "automation", automationEntityId: "release" }, nextMode: "run", agents })).toBe("/run/loops/release");
-    expect(pathForBalletMode({ route: { view: "loop-theme", loopThemeId: "open-ai", loopThemeLoopId: "release" }, nextMode: "run", agents })).toBe("/run/loops/release");
+    expect(pathForBalletMode({ route: { view: "loop-theme" }, nextMode: "run", agents })).toBe("/run");
     expect(pathForBalletMode({ route: { view: "run", runTargetKind: "loop", runTargetId: "release", rootRunId: "root-1" }, nextMode: "configure", agents })).toBe("/automation/loops?id=release");
     expect(pathForBalletMode({ route: { view: "agents", documentPath: ".codex/agents/reviewer.toml" }, nextMode: "run", agents })).toBe("/run/agents/reviewer");
     expect(pathForBalletMode({ route: { view: "run", runTargetKind: "agent", runTargetId: "reviewer" }, nextMode: "configure", agents })).toBe("/agents?path=.codex%2Fagents%2Freviewer.toml");

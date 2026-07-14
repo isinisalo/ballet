@@ -1,21 +1,16 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { builtInLoopThemes, type LoopTheme } from "@shared/api/workspace-contracts";
+import { defaultLoopTheme, type LoopTheme } from "@shared/api/workspace-contracts";
 import { useLoopThemeEditor } from "../src/workspace/automation/themes/useLoopThemeEditor";
 
 describe("Loop theme saving", () => {
   it("coalesces concurrent save attempts into one request", async () => {
-    const themes = builtInLoopThemes.map((theme) => structuredClone(theme));
-    const source = themes.find((theme) => theme.id === "open-ai")!;
+    const source = structuredClone(defaultLoopTheme);
     let finishSave!: () => void;
     const updateTheme = vi.fn((theme: LoopTheme) => new Promise<LoopTheme>((resolve) => { finishSave = () => resolve(theme); }));
     const { result } = renderHook(() => useLoopThemeEditor({
       source,
-      themes,
-      creating: false,
-      assignToLoopId: "delivery",
-      updateTheme,
-      createTheme: vi.fn()
+      updateTheme
     }));
 
     act(() => result.current.setColor("edge.color", "#abcdef"));
@@ -33,17 +28,12 @@ describe("Loop theme saving", () => {
   });
 
   it("preserves a newer theme edit when an older save completes", async () => {
-    const themes = builtInLoopThemes.map((theme) => structuredClone(theme));
-    const source = themes.find((theme) => theme.id === "open-ai")!;
+    const source = structuredClone(defaultLoopTheme);
     let finishSave!: () => void;
     const updateTheme = vi.fn((theme: LoopTheme) => new Promise<LoopTheme>((resolve) => { finishSave = () => resolve(theme); }));
     const { result } = renderHook(() => useLoopThemeEditor({
       source,
-      themes,
-      creating: false,
-      assignToLoopId: "delivery",
-      updateTheme,
-      createTheme: vi.fn()
+      updateTheme
     }));
 
     act(() => result.current.setColor("edge.color", "#abcdef"));

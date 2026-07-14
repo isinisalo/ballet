@@ -2,16 +2,17 @@ import type { LoopLayoutDirection } from "./loopLayoutTypes";
 import type { LoopNodeSize } from "@shared/api/workspace-contracts";
 
 export const loopStepNodeSizes: Record<LoopNodeSize, number> = {
-  small: 28,
-  medium: 44,
+  tiny: 24,
+  small: 36,
+  medium: 48,
   large: 64
 };
 
 export const loopNodeSizes = {
   loop: { minWidth: 22, maxWidth: 22, height: 22 },
-  step: { minWidth: 28, maxWidth: 64, height: 64 },
+  step: { minWidth: 24, maxWidth: 64, height: 64 },
   event: { width: 22, height: 22 },
-  outputEvent: { minWidth: 22, maxWidth: 22, height: 22, rowGap: 32 }
+  outputEvent: { minWidth: 24, maxWidth: 24, height: 24, rowGap: 32 }
 };
 
 export const loopCanvasLayoutConfig = {

@@ -4,12 +4,17 @@ import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { useAutomationDraft } from "../src/workspace/automation/useAutomationDraft";
 
 const config = (id?: string): ProjectAutomationConfig => ({
-  version: 6,
+  version: 7,
   loops: id ? [{
     id,
-    theme: "default",
     start: "first",
-    steps: [{ id: "first", type: "human", nodeSize: "small", description: "Review", on: {} }]
+    steps: [{
+      id: "first",
+      type: "human",
+      nodeStyle: "flat",
+      description: "Review",
+      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
+    }]
   }] : []
 });
 

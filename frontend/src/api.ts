@@ -1,9 +1,10 @@
 import type {
   AppData,
   CollectionName,
+  LoopTheme,
+  ProjectAutomationConfig,
   WorkspaceSaveRequestByCollection
 } from "@shared/api/workspace-contracts";
-import type { CreateLoopThemeResponse, LoopTheme, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import type { MarkdownDocument } from "@shared/api/workspace-contracts";
 import { request } from "@/apiClient";
 
@@ -15,14 +16,9 @@ export const api = {
       body: JSON.stringify(config)
     }),
   updateLoopTheme: (theme: LoopTheme) =>
-    request<LoopTheme>(`/api/loop-themes/${encodeURIComponent(theme.id)}`, {
+    request<LoopTheme>("/api/loop-theme", {
       method: "PUT",
       body: JSON.stringify(theme)
-    }),
-  createLoopTheme: (theme: LoopTheme, assignToLoopId: string) =>
-    request<CreateLoopThemeResponse>("/api/loop-themes", {
-      method: "POST",
-      body: JSON.stringify({ theme, assignToLoopId })
     }),
   save: <T extends CollectionName>(collection: T, item: WorkspaceSaveRequestByCollection[T]) =>
     request<AppData[T][number]>(`/api/${collection}`, {

@@ -51,7 +51,7 @@ function TransitionRow({ result, target, step, loop, loops, disabled, focused, o
     const nextKind = value as TransitionTargetKind;
     const nextValue = nextKind === "step"
       ? loop.steps[0]?.id ?? step.id
-      : nextKind === "loop" ? loopOptions[0]?.value ?? "" : result === "approved" ? "completed" : "failed";
+      : nextKind === "loop" ? loopOptions[0]?.value ?? "" : result === "approved" ? "completed" : "blocked";
     onChange(transitionTarget(nextKind, nextValue));
   };
 

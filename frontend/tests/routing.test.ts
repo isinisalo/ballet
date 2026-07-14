@@ -4,8 +4,6 @@ import {
   agentDocumentPath,
   automationAllLoopsPath,
   automationLoopPath,
-  automationNewThemePath,
-  automationThemeLibraryPath,
   automationThemePath,
   projectCollectionCreatePath,
   projectCollectionDocumentPath,
@@ -62,19 +60,7 @@ describe("workspace routing", () => {
       automationLoopView: "all"
     });
     expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({ view: "projects" });
-    expect(routeFromPath("/automation/themes")).toEqual({ view: "loop-theme-library" });
-    expect(routeFromPath("/automation/themes?id=open-ai&loop=release%20train")).toEqual({
-      view: "loop-theme",
-      loopThemeId: "open-ai",
-      loopThemeSourceId: undefined,
-      loopThemeLoopId: "release train"
-    });
-    expect(routeFromPath("/automation/themes?newFrom=open-ai&loop=release%20train")).toEqual({
-      view: "loop-theme",
-      loopThemeId: undefined,
-      loopThemeSourceId: "open-ai",
-      loopThemeLoopId: "release train"
-    });
+    expect(routeFromPath("/automation/theme")).toEqual({ view: "loop-theme" });
     expect(routeFromPath("/runtimes?id=ignored-local-device")).toEqual({ view: "runtimes" });
   });
 
@@ -86,6 +72,7 @@ describe("workspace routing", () => {
 
   it("does not keep legacy automation route aliases", () => {
     expect(routeFromPath("/automation/policies?id=policy-1")).toEqual({ view: "projects" });
+    expect(routeFromPath("/automation/themes?id=open-ai")).toEqual({ view: "projects" });
   });
 
   it("builds encoded paths", () => {
@@ -102,10 +89,7 @@ describe("workspace routing", () => {
     expect(skillCreatePath()).toBe("/skills?new=1");
     expect(automationAllLoopsPath()).toBe("/automation/loops?view=all");
     expect(automationLoopPath("wf 1")).toBe("/automation/loops?id=wf+1");
-    expect(automationThemeLibraryPath()).toBe("/automation/themes");
-    expect(automationThemePath("theme 1")).toBe("/automation/themes?id=theme+1");
-    expect(automationThemePath("theme 1", "wf 1")).toBe("/automation/themes?id=theme+1&loop=wf+1");
-    expect(automationNewThemePath("theme 1", "wf 1")).toBe("/automation/themes?newFrom=theme+1&loop=wf+1");
+    expect(automationThemePath()).toBe("/automation/theme");
     expect(runOverviewPath("root 1")).toBe("/run?run=root%201");
     expect(runLoopPath("wf 1", "root 1")).toBe("/run/loops/wf%201?run=root%201");
     expect(runAgentPath("agent 1", "root 1")).toBe("/run/agents/agent%201?run=root%201");

@@ -10,13 +10,6 @@ export class LoopThemeValidationError extends Error {
   }
 }
 
-export class LoopThemeNotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LoopThemeNotFoundError";
-  }
-}
-
 export class LoopThemeConflictError extends Error {
   constructor(message: string) {
     super(message);

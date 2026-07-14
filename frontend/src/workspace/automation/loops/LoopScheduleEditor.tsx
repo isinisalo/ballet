@@ -7,9 +7,8 @@ import { LoopScheduleStatus } from "./LoopScheduleStatus";
 import { LoopScheduleWeekdays } from "./LoopScheduleWeekdays";
 import { changeScheduleCadence, changeScheduleKind, validateSchedule } from "./loopSchedulePresentation";
 
-export function LoopScheduleEditor({ step, targets, state, disabled, onChange }: {
+export function LoopScheduleEditor({ step, state, disabled, onChange }: {
   step: ProjectScheduledStep;
-  targets: Array<{ value: string; label: string }>;
   state?: LoopScheduleState;
   disabled: boolean;
   onChange: (step: ProjectScheduledStep) => void;
@@ -57,16 +56,6 @@ export function LoopScheduleEditor({ step, targets, state, disabled, onChange }:
         </>
       ) : null}
 
-      <ScheduleSelectField
-        label="Trigger"
-        ariaLabel="Triggered transition target"
-        value={step.on.triggered}
-        disabled={disabled || targets.length === 0}
-        invalid={targets.length === 0}
-        error={targets.length === 0 ? "Add an executable Step before scheduling this Loop." : undefined}
-        options={targets}
-        onChange={(triggered) => onChange({ ...step, on: { triggered } })}
-      />
       <LoopScheduleStatus state={state} timeZone={schedule.timeZone} />
     </div>
   );

@@ -36,7 +36,7 @@ export function LoopRunStepOutput({ step, stepRun, task, pending, onTerminal, on
   const active = ["queued", "running"].includes(stepRun.status);
   return (
     <aside aria-label="StepRun output" className="min-w-0 overflow-y-auto bg-card">
-      {step.type === "agent" ? <div className="p-3"><CliRunConsole taskId={stepRun.executionTaskId} provider={task?.spec.runtime.provider ?? stepRun.execution?.provider} active={active} onTerminal={onTerminal} /></div> : null}
+      {step.type !== "human" ? <div className="p-3"><CliRunConsole taskId={stepRun.executionTaskId} provider={task?.spec.runtime.provider ?? stepRun.execution?.provider} active={active} onTerminal={onTerminal} /></div> : null}
       <LoopRunStepPanel step={step} stepRun={stepRun} pending={pending} onRespond={onRespond} />
     </aside>
   );

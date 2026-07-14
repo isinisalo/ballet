@@ -31,21 +31,9 @@ const automationRoute = (url: URL): RouteState => ({
       })
 });
 
-const loopThemeRoute = (url: URL): RouteState => {
-  const loopThemeId = url.searchParams.get("id") ?? undefined;
-  const loopThemeSourceId = loopThemeId ? undefined : url.searchParams.get("newFrom") ?? undefined;
-  if (!loopThemeId && !loopThemeSourceId) return { view: "loop-theme-library" };
-  return {
-    view: "loop-theme",
-    loopThemeId,
-    loopThemeSourceId,
-    loopThemeLoopId: url.searchParams.get("loop") ?? undefined
-  };
-};
-
 const topLevelWorkspaceRoute = (url: URL): RouteState | undefined => {
   if (url.pathname === "/agents") return documentCollectionRoute("agents", url);
-  if (url.pathname === "/automation/themes") return loopThemeRoute(url);
+  if (url.pathname === "/automation/theme") return { view: "loop-theme" };
   if (url.pathname === "/automation/loops" || url.pathname === "/automation") return automationRoute(url);
   if (url.pathname === "/runtimes") return { view: "runtimes" };
   if (url.pathname === "/skills") return documentCollectionRoute("skills", url);
@@ -101,16 +89,7 @@ export const automationLoopPath = (id?: string) => {
   return `/automation/loops?${params.toString()}`;
 };
 export const automationAllLoopsPath = () => "/automation/loops?view=all";
-export const automationThemeLibraryPath = () => "/automation/themes";
-export const automationThemePath = (themeId: string, loopId?: string) => {
-  const params = new URLSearchParams({ id: themeId });
-  if (loopId) params.set("loop", loopId);
-  return `/automation/themes?${params.toString()}`;
-};
-export const automationNewThemePath = (sourceThemeId: string, loopId: string) => {
-  const params = new URLSearchParams({ newFrom: sourceThemeId, loop: loopId });
-  return `/automation/themes?${params.toString()}`;
-};
+export const automationThemePath = () => "/automation/theme";
 export const runtimePath = () => "/runtimes";
 export const runOverviewPath = (rootRunId?: string) => `/run${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
 export const runLoopPath = (loopId: string, rootRunId?: string) =>

@@ -1,9 +1,4 @@
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
-import {
-  introducedLoopThemeReferenceIssues,
-  validateAutomationThemeReferences
-} from "../../shared/domain/loopThemes.js";
-import type { LoopThemeRepository } from "../loop-themes/LoopThemeRepository.js";
 import { loadMarkdownAppData } from "../markdown-adapter.js";
 import {
   AutomationConflictError,
@@ -17,26 +12,12 @@ import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
 export class AutomationService {
   constructor(
     private readonly root: () => string,
-    private readonly runtimeDatabaseProvider: RuntimeDatabaseProvider,
-    private readonly loopThemeRepository: LoopThemeRepository
+    private readonly runtimeDatabaseProvider: RuntimeDatabaseProvider
   ) {}
 
   async save(config: ProjectAutomationConfig): Promise<ProjectAutomationConfig> {
     const data = await loadMarkdownAppData(this.root());
-    const themes = await this.loopThemeRepository.load(this.root());
     const current = await loadProjectAutomationConfigWithIssues(this.root(), data.agents);
-    const currentReferenceIssues = validateAutomationThemeReferences(current.config, themes.themes);
-    const candidateReferenceIssues = validateAutomationThemeReferences(config, themes.themes);
-    const introducedReferenceIssues = introducedLoopThemeReferenceIssues(
-      currentReferenceIssues,
-      candidateReferenceIssues
-    );
-    if (introducedReferenceIssues.length > 0) {
-      throw new AutomationValidationError(
-        "Automation config references an unknown loop theme.",
-        introducedReferenceIssues
-      );
-    }
     const activeLoopIds = this.runtimeDatabaseProvider.runtimeDatabase().activeLoopIds();
     for (const loopId of activeLoopIds) {
       const before = current.config.loops.find((loop) => loop.id === loopId);
@@ -55,7 +36,7 @@ export class AutomationService {
       throw new AutomationValidationError("Automation config is invalid.", automation.issues);
     }
     const references = automation.config.loops.flatMap((loop) => loop.steps
-      .filter((step) => step.type === "agent" && step.agentId === agentId)
+      .filter((step) => step.type !== "human" && step.agentId === agentId)
       .map((step) => `${loop.id}:${step.id}`));
     if (references.length > 0) {
       throw new AutomationConflictError(

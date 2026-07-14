@@ -21,7 +21,7 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
         </> : null}
         <dt className="text-muted-foreground">Attempt</dt><dd>{stepRun.attempt}</dd>
         <dt className="text-muted-foreground">Result</dt><dd>{stepRun.result ?? "—"}</dd>
-        <dt className="text-muted-foreground">Transition</dt><dd>{stepRun.result && step.type !== "scheduled" ? formatTransition(step.on[stepRun.result]) : "—"}</dd>
+        <dt className="text-muted-foreground">Transition</dt><dd>{stepRun.result ? formatTransition(step.on[stepRun.result]) : "—"}</dd>
         <dt className="text-muted-foreground">Created</dt><dd>{formatDate(stepRun.createdAt)}</dd>
         <dt className="text-muted-foreground">Updated</dt><dd>{formatDate(stepRun.updatedAt)}</dd>
         {stepRun.completedAt ? <><dt className="text-muted-foreground">Completed</dt><dd>{formatDate(stepRun.completedAt)}</dd></> : null}

@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { Agent } from "../../shared/domain/agents.js";
-import { getProjectStepTransitionTargets, type ProjectLoop, type ProjectStep } from "../../shared/domain/automation.js";
+import {
+  getProjectStepTransitionTargets,
+  type ProjectAgentBackedStep,
+  type ProjectLoop
+} from "../../shared/domain/automation.js";
 import type { ExecutionAgentSnapshot } from "../../shared/domain/runtime.js";
 
 export const agentSnapshot = (agent: Agent): ExecutionAgentSnapshot => ({
@@ -20,9 +24,9 @@ export const agentSnapshot = (agent: Agent): ExecutionAgentSnapshot => ({
 export const reachableAgentSteps = (
   data: Pick<AppData, "automation">,
   rootLoopId: string
-): Array<{ loopId: string; step: Extract<ProjectStep, { type: "agent" }> }> =>
+): Array<{ loopId: string; step: ProjectAgentBackedStep }> =>
   reachableLoops(data, rootLoopId).flatMap((loop) => loop.steps.flatMap((step) =>
-    step.type === "agent" ? [{ loopId: loop.id, step }] : []));
+    step.type !== "human" ? [{ loopId: loop.id, step }] : []));
 
 export const reachableLoops = (
   data: Pick<AppData, "automation">,
@@ -52,9 +56,6 @@ export const relevantLoopThemeIssues = (
   data: Pick<AppData, "automation" | "loopThemeIssues">,
   rootLoopId: string
 ) => {
-  const loops = reachableLoops(data, rootLoopId);
-  const loopIds = new Set(loops.map((loop) => loop.id));
-  const themeIds = new Set(loops.map((loop) => loop.theme));
-  return data.loopThemeIssues.filter((issue) =>
-    (issue.loopId && loopIds.has(issue.loopId)) || (issue.themeId && themeIds.has(issue.themeId)));
+  void rootLoopId;
+  return data.loopThemeIssues;
 };

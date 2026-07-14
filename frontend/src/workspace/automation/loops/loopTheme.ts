@@ -1,30 +1,14 @@
 import type { CSSProperties } from "react";
 import {
-  builtInLoopThemes,
-  resolveLoopTheme,
   type LoopEdgeLineStyle,
-  type LoopTheme,
-  type LoopThemeId
+  type LoopTheme
 } from "@shared/api/workspace-contracts";
 
 export type {
   LoopConnectionPointStyle,
   LoopEdgeLineStyle,
-  LoopNodeRenderer,
   LoopTheme
 } from "@shared/api/workspace-contracts";
-
-export const loopThemes = Object.fromEntries(
-  builtInLoopThemes.map((theme) => [theme.id, theme])
-) as Record<"default" | "open-ai", LoopTheme>;
-
-export function loopTheme(themeId: LoopThemeId, themes: readonly LoopTheme[] = builtInLoopThemes): LoopTheme {
-  return resolveLoopTheme(themes, themeId);
-}
-
-export function loopThemeOptions(themes: readonly LoopTheme[]) {
-  return themes.map(({ id, label }) => ({ value: id, label }));
-}
 
 export function loopThemeNodeGlow(theme: LoopTheme) {
   return theme.node.glowColor;

@@ -21,8 +21,8 @@ describe("schedule definition hash", () => {
       kind: "recurring"
     };
 
-    expect(scheduleDefinitionHash(left)).toBe(scheduleDefinitionHash(right));
-    expect(scheduleDefinitionHash(left)).toMatch(/^[a-f0-9]{64}$/);
+    expect(scheduleDefinitionHash(left, "agent-a")).toBe(scheduleDefinitionHash(right, "agent-a"));
+    expect(scheduleDefinitionHash(left, "agent-a")).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("changes when an occurrence-defining field changes", () => {
@@ -33,11 +33,11 @@ describe("schedule definition hash", () => {
       timeZone: "Europe/Helsinki"
     };
 
-    expect(scheduleDefinitionHash(schedule)).not.toBe(scheduleDefinitionHash({
+    expect(scheduleDefinitionHash(schedule, "agent-a")).not.toBe(scheduleDefinitionHash({
       ...schedule,
       time: "10:00"
-    }));
-    expect(scheduleDefinitionHash(schedule, "first-step"))
-      .not.toBe(scheduleDefinitionHash(schedule, "other-step"));
+    }, "agent-a"));
+    expect(scheduleDefinitionHash(schedule, "agent-a"))
+      .not.toBe(scheduleDefinitionHash(schedule, "agent-b"));
   });
 });

@@ -6,7 +6,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../../shared/api/workspace-contracts.js";
 import type { ProjectAutomationConfig, ProjectStepSchedule } from "../../../shared/domain/automation.js";
-import { builtInLoopThemes, resolveLoopTheme } from "../../../shared/domain/loopThemes.js";
+import { defaultLoopTheme } from "../../../shared/domain/loopThemes.js";
 import { RuntimeDatabase, type DispatchLoopScheduleResult } from "../../runtime-db.js";
 import { LoopScheduler, type LoopSchedulerOptions } from "../LoopScheduler.js";
 import type { ScheduleClock } from "../ScheduleClock.js";
@@ -14,7 +14,7 @@ import type { ScheduleClock } from "../ScheduleClock.js";
 const roots: string[] = [];
 const schedulers: LoopScheduler[] = [];
 const databases: RuntimeDatabase[] = [];
-const openAiTheme = resolveLoopTheme(builtInLoopThemes, "open-ai");
+const openAiTheme = defaultLoopTheme;
 
 class FakeScheduleClock implements ScheduleClock {
   private instant: Temporal.Instant;
@@ -30,11 +30,11 @@ afterEach(async () => {
 });
 
 const automation = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 6,
-  loops: [{ id: "scheduled-delivery", theme: "open-ai", start: "timer", steps: [
-    { id: "timer", type: "scheduled", description: "Start on schedule.", nodeSize: "small", schedule,
-      on: { triggered: "work" } },
-    { id: "work", type: "agent", agentId: "delivery-agent", description: "Deliver.", nodeSize: "medium",
+  version: 7,
+  loops: [{ id: "scheduled-delivery", start: "timer", steps: [
+    { id: "timer", type: "scheduled", agentId: "delivery-agent", description: "Start on schedule.", nodeStyle: "luna", schedule,
+      on: { approved: "work", rejected: { end: "failed" } } },
+    { id: "work", type: "agent", agentId: "delivery-agent", description: "Deliver.", nodeStyle: "terra",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } } }
   ] }]
 });
@@ -45,7 +45,7 @@ const workspace = (config: ProjectAutomationConfig): AppData => ({
     createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
   },
   agents: [], skills: [], loopRuns: [], scheduleStates: [], automation: config, automationIssues: [],
-  loopThemes: [...builtInLoopThemes], loopThemeIssues: [],
+  loopTheme: structuredClone(defaultLoopTheme), loopThemeIssues: [],
   runtime: {
     instanceId: "fixture", hostname: "localhost", platform: "darwin", architecture: "arm64",
     checkout: { path: "/fixture", headSha: "a".repeat(40), configHash: "config", dirty: false },
@@ -265,7 +265,7 @@ describe("Loop scheduler dispatch outcomes", () => {
       lastStatus: undefined
     })]);
 
-    data = workspace({ version: 6, loops: [] });
+    data = workspace({ version: 7, loops: [] });
     await scheduler.trigger();
     expect(database.listLoopScheduleStates()).toEqual([]);
   });

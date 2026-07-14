@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
-import { builtInLoopThemes, resolveLoopTheme } from "../../shared/domain/loopThemes.js";
+import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
 import { LoopRunConflictError } from "../runtime/LoopRunErrors.js";
@@ -25,7 +25,7 @@ const ready: AgentOutcome = {
   summary: "Done.",
   checks: [{ name: "test", status: "passed" }]
 };
-const openAiTheme = resolveLoopTheme(builtInLoopThemes, "open-ai");
+const openAiTheme = defaultLoopTheme;
 
 const startLoop = (
   runtime: RuntimeDatabase,
@@ -46,35 +46,33 @@ const startLoop = (
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 6,
+  version: 7,
   loops: [{
     id: "delivery",
-    theme: "open-ai",
     start: "implement",
     steps: [{
       id: "implement",
       type: "agent",
       agentId: "developer-agent",
       description: "Implement.",
-      nodeSize: "medium",
+      nodeStyle: "terra",
       on: { approved: "gate", rejected: { end: "failed" } }
     }, {
       id: "gate",
       type: "human",
       description: "Approve.",
-      nodeSize: "small",
+      nodeStyle: "luna",
       on: { approved: { loop: "release" }, rejected: "implement" }
     }]
   }, {
     id: "release",
-    theme: "open-ai",
     start: "publish",
     steps: [{
       id: "publish",
       type: "agent",
       agentId: "release-agent",
       description: "Publish.",
-      nodeSize: "medium",
+      nodeStyle: "terra",
       on: { approved: { end: "completed" }, rejected: { end: "failed" } }
     }]
   }]
@@ -104,10 +102,10 @@ describe("local runtime database", () => {
 
     const first = started.stepRuns[0]!;
     expect(first).toMatchObject({ stepId: "implement", status: "queued" });
-    const waiting = runtime.completeAgentStep(config(), builtInLoopThemes, { stepRunId: first.stepRunId, outcome: ready });
+    const waiting = runtime.completeAgentStep(config(), openAiTheme, { stepRunId: first.stepRunId, outcome: ready });
     expect(waiting.status).toBe("waiting_for_human");
     const gate = waiting.stepRuns.at(-1)!;
-    const cycled = runtime.respondToStepRun(config(), builtInLoopThemes, waiting.runId, gate.stepRunId, "rejected", "Please revise tests");
+    const cycled = runtime.respondToStepRun(config(), openAiTheme, waiting.runId, gate.stepRunId, "rejected", "Please revise tests");
     expect(cycled.status).toBe("running");
     expect(cycled.input).toContain("Build release 1");
     expect(cycled.input).toContain("Please revise tests");
@@ -120,9 +118,9 @@ describe("local runtime database", () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const parent = startLoop(runtime, config(), "delivery", openAiTheme, "Original request");
     const agentStep = parent.stepRuns[0]!;
-    const waiting = runtime.completeAgentStep(config(), builtInLoopThemes, { stepRunId: agentStep.stepRunId, outcome: ready });
+    const waiting = runtime.completeAgentStep(config(), openAiTheme, { stepRunId: agentStep.stepRunId, outcome: ready });
     const gate = waiting.stepRuns.at(-1)!;
-    const completedParent = runtime.respondToStepRun(config(), builtInLoopThemes, parent.runId, gate.stepRunId, "approved", "Ship it");
+    const completedParent = runtime.respondToStepRun(config(), openAiTheme, parent.runId, gate.stepRunId, "approved", "Ship it");
     expect(completedParent.status).toBe("completed");
     const child = latestRun(runtime, "release")!;
     expect(child).toMatchObject({
@@ -142,17 +140,14 @@ describe("local runtime database", () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const initialTheme = {
       ...openAiTheme,
-      label: "Initial project theme",
       node: { ...openAiTheme.node, glowColor: "#112233" }
     };
     const childTheme = {
       ...initialTheme,
-      label: "Child project theme",
       node: { ...initialTheme.node, glowColor: "#445566" }
     };
     const laterTheme = {
       ...childTheme,
-      label: "Later project theme",
       node: { ...childTheme.node, glowColor: "#778899" }
     };
     const automation = config();
@@ -164,20 +159,20 @@ describe("local runtime database", () => {
     expect(Object.keys(storedSnapshot).sort()).toEqual(["loop", "theme"]);
     expect(storedSnapshot).toEqual({ loop: automation.loops[0], theme: initialTheme });
 
-    const waiting = runtime.completeAgentStep(automation, [initialTheme], {
+    const waiting = runtime.completeAgentStep(automation, initialTheme, {
       stepRunId: parent.stepRuns[0]!.stepRunId,
       outcome: ready
     });
     const completedParent = runtime.respondToStepRun(
       automation,
-      [childTheme],
+      childTheme,
       parent.runId,
       waiting.stepRuns.at(-1)!.stepRunId,
       "approved",
       "Ship it"
     );
     const child = latestRun(runtime, "release")!;
-    const completedChild = runtime.completeAgentStep(automation, [laterTheme], {
+    const completedChild = runtime.completeAgentStep(automation, laterTheme, {
       stepRunId: child.stepRuns[0]!.stepRunId,
       outcome: ready
     });
@@ -195,29 +190,13 @@ describe("local runtime safeguards", () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const parent = startLoop(runtime, config(), "delivery");
     const agentStep = parent.stepRuns[0]!;
-    const waiting = runtime.completeAgentStep(config(), builtInLoopThemes, { stepRunId: agentStep.stepRunId, outcome: ready });
+    const waiting = runtime.completeAgentStep(config(), openAiTheme, { stepRunId: agentStep.stepRunId, outcome: ready });
     const gate = waiting.stepRuns.at(-1)!;
     startLoop(runtime, config(), "release");
-    expect(() => runtime.respondToStepRun(config(), builtInLoopThemes, parent.runId, gate.stepRunId, "approved", "Continue"))
+    expect(() => runtime.respondToStepRun(config(), openAiTheme, parent.runId, gate.stepRunId, "approved", "Continue"))
       .toThrow(LoopRunConflictError);
     expect(runById(runtime, parent.runId)).toMatchObject({ status: "waiting_for_human" });
     expect(runById(runtime, parent.runId)!.stepRuns.at(-1)).toMatchObject({ status: "waiting_for_human" });
-    runtime.close();
-  });
-
-  it("leaves a human gate waiting when its child Loop theme is unavailable", async () => {
-    const runtime = new RuntimeDatabase(await tempDbPath());
-    const parent = startLoop(runtime, config(), "delivery");
-    const waiting = runtime.completeAgentStep(config(), builtInLoopThemes, {
-      stepRunId: parent.stepRuns[0]!.stepRunId,
-      outcome: ready
-    });
-    const gate = waiting.stepRuns.at(-1)!;
-
-    expect(() => runtime.respondToStepRun(config(), [], parent.runId, gate.stepRunId, "approved", "Continue"))
-      .toThrow("Cannot start a loop while its theme is invalid.");
-    expect(runById(runtime, parent.runId)).toMatchObject({ status: "waiting_for_human" });
-    expect(latestRun(runtime, "release")).toBeUndefined();
     runtime.close();
   });
 
@@ -226,7 +205,7 @@ describe("local runtime safeguards", () => {
     const run = startLoop(runtime, config(), "delivery");
     const step = run.stepRuns[0]!;
     expect(runtime.cancelLoopRun(run.runId).status).toBe("cancelled");
-    const afterLate = runtime.completeAgentStep(config(), builtInLoopThemes, { stepRunId: step.stepRunId, outcome: ready });
+    const afterLate = runtime.completeAgentStep(config(), openAiTheme, { stepRunId: step.stepRunId, outcome: ready });
     expect(afterLate.status).toBe("cancelled");
     expect(afterLate.stepRuns).toHaveLength(1);
     runtime.close();
@@ -235,17 +214,16 @@ describe("local runtime safeguards", () => {
   it("blocks a root run after the 20-transition safety limit", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const cyclic: ProjectAutomationConfig = {
-      version: 6,
+      version: 7,
       loops: [{
         id: "cycle",
-        theme: "open-ai",
         start: "again",
         steps: [{
           id: "again",
           type: "agent",
           agentId: "developer-agent",
           description: "Again.",
-          nodeSize: "medium",
+          nodeStyle: "terra",
           on: { approved: "again", rejected: { end: "failed" } }
         }]
       }]
@@ -253,7 +231,7 @@ describe("local runtime safeguards", () => {
     let details = startLoop(runtime, cyclic, "cycle");
     for (let index = 0; index < 21 && details.status === "running"; index += 1) {
       const step = details.stepRuns.at(-1)!;
-      details = runtime.completeAgentStep(cyclic, builtInLoopThemes, { stepRunId: step.stepRunId, outcome: ready });
+      details = runtime.completeAgentStep(cyclic, openAiTheme, { stepRunId: step.stepRunId, outcome: ready });
     }
     expect(details.status).toBe("blocked");
     expect(details.transitionCount).toBe(20);

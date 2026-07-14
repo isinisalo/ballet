@@ -19,8 +19,6 @@ import {
   collectionItemParamsSchema,
   collectionParamsSchema,
   collectionUpsertSchema,
-  createLoopThemeSchema,
-  loopThemeParamsSchema,
   loopThemeSchema,
   projectDocumentCreateSchema,
   projectDocumentSaveSchema,
@@ -60,13 +58,8 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     options.invalidations.publish("workspace-changed", { reason: "automation" });
     res.json(saved);
   }));
-  router.put("/loop-themes/:themeId", route(async (req, res) => {
-    const { themeId } = parseParams(loopThemeParamsSchema, req);
-    res.json(await options.store.updateLoopTheme(themeId, parseBody(loopThemeSchema, req)));
-    options.invalidations.publish("workspace-changed", { reason: "loop-theme" });
-  }));
-  router.post("/loop-themes", route(async (req, res) => {
-    res.status(201).json(await options.store.createLoopTheme(parseBody(createLoopThemeSchema, req)));
+  router.put("/loop-theme", route(async (req, res) => {
+    res.json(await options.store.updateLoopTheme(parseBody(loopThemeSchema, req)));
     options.invalidations.publish("workspace-changed", { reason: "loop-theme" });
   }));
   router.post("/project-documents", route(async (req, res) => {

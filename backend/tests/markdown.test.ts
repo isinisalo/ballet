@@ -96,7 +96,7 @@ describe("Markdown collection loading", () => {
     expect(data.project.description).toContain("Fixture project loaded from `.ballet/project.md`.");
     expect(data.project.relativePath).toBe(".ballet/project.md");
     expect(data.automation).toEqual({
-      version: 6,
+      version: 7,
       loops: []
     });
   });

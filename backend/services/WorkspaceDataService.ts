@@ -4,7 +4,6 @@ import type { WorkspaceContentData } from "../documents/markdownAppDataLoader.js
 import { loadProjectAutomationConfigWithIssues } from "../automation.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
 import type { LoopThemeRepository } from "../loop-themes/LoopThemeRepository.js";
-import { validateAutomationThemeReferences } from "../../shared/domain/loopThemes.js";
 
 export class WorkspaceDataService {
   private enrich?: (data: WorkspaceContentData & Pick<AppData, "loopRuns" | "scheduleStates">) => Promise<AppData>;
@@ -21,17 +20,14 @@ export class WorkspaceDataService {
 
   async read(): Promise<AppData> {
     const data = await loadMarkdownAppData(this.root());
-    const [automation, themes] = await Promise.all([
+    const [automation, themeLoad] = await Promise.all([
       loadProjectAutomationConfigWithIssues(this.root(), data.agents),
       this.loopThemeRepository.load(this.root())
     ]);
     data.automation = automation.config;
     data.automationIssues = automation.issues;
-    data.loopThemes = themes.themes;
-    data.loopThemeIssues = [
-      ...themes.issues,
-      ...validateAutomationThemeReferences(automation.config, themes.themes)
-    ];
+    data.loopTheme = themeLoad.theme;
+    data.loopThemeIssues = themeLoad.issues;
     const content = {
       ...data,
       loopRuns: this.runtimeDatabaseProvider.runtimeDatabase().listLoopRuns(),
