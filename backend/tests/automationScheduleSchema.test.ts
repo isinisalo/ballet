@@ -1,22 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
+import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import { parseUnknown } from "../http/validation/httpValidation.js";
 import { expectValidationError } from "./expectValidationError.js";
 
 const configWithSchedule = (schedule: unknown) => ({
-  version: 7,
+  version: 8,
   loops: [{
     id: "delivery",
     start: "scheduled-start",
-    steps: [{
+    nodes: [{
       id: "scheduled-start",
       type: "scheduled",
       agentId: "developer-agent",
       description: "Deliver.",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       schedule,
-      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-    }]
+      on: { approved: "completed", rejected: "blocked" }
+    }, ...defaultTerminalNodes()]
   }]
 });
 
@@ -37,40 +39,40 @@ describe("scheduled automation schema", () => {
     }
   });
 
-  it("rejects missing agent, legacy triggered output, and legacy node size", () => {
+  it("rejects missing agent, legacy triggered output, and invalid node size", () => {
     const valid = configWithSchedule(once);
-    const step = valid.loops[0]!.steps[0]!;
+    const step = valid.loops[0]!.nodes[0]!;
     const withoutAgent: Record<string, unknown> = { ...step };
     delete withoutAgent.agentId;
     expectValidationError(() => parseUnknown(automationConfigSchema, {
-      ...valid, loops: [{ ...valid.loops[0], steps: [withoutAgent] }]
-    }), "loops.0.steps.0.agentId");
+      ...valid, loops: [{ ...valid.loops[0], nodes: [withoutAgent, ...defaultTerminalNodes()] }]
+    }), "loops.0.nodes.0.agentId");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
-      ...valid, loops: [{ ...valid.loops[0], steps: [{ ...step, on: { triggered: "work" } }] }]
-    }), "loops.0.steps.0.on");
+      ...valid, loops: [{ ...valid.loops[0], nodes: [{ ...step, on: { triggered: "work" } }, ...defaultTerminalNodes()] }]
+    }), "loops.0.nodes.0.on");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
-      ...valid, loops: [{ ...valid.loops[0], steps: [{ ...step, nodeSize: "small" }] }]
-    }), "loops.0.steps.0");
+      ...valid, loops: [{ ...valid.loops[0], nodes: [{ ...step, nodeSize: "enormous" }, ...defaultTerminalNodes()] }]
+    }), "loops.0.nodes.0.nodeSize");
   });
 
   it("rejects malformed calendar values", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, configWithSchedule({
       ...once, date: "2026-02-30"
-    })), "loops.0.steps.0.schedule.date");
+    })), "loops.0.nodes.0.schedule.date");
     expectValidationError(() => parseUnknown(automationConfigSchema, configWithSchedule({
       ...once, time: "24:00"
-    })), "loops.0.steps.0.schedule.time");
+    })), "loops.0.nodes.0.schedule.time");
     expectValidationError(() => parseUnknown(automationConfigSchema, configWithSchedule({
       ...once, timeZone: "+02:00"
-    })), "loops.0.steps.0.schedule.timeZone");
+    })), "loops.0.nodes.0.schedule.timeZone");
   });
 
   it("rejects invalid recurring fields", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, configWithSchedule({
       ...weekly, weekdays: []
-    })), "loops.0.steps.0.schedule.weekdays");
+    })), "loops.0.nodes.0.schedule.weekdays");
     expectValidationError(() => parseUnknown(automationConfigSchema, configWithSchedule({
       ...monthly, dayOfMonth: 32
-    })), "loops.0.steps.0.schedule.dayOfMonth");
+    })), "loops.0.nodes.0.schedule.dayOfMonth");
   });
 });

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
-import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import { defaultTerminalNodes, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import {
   AutomationConflictError,
   loadProjectAutomationConfigWithIssues,
@@ -47,13 +47,13 @@ describe("agent removal", () => {
     const loaded = await loadProjectAutomationConfigWithIssues(root, []);
 
     expect(validateProjectAutomationConfig(config, [])).toContainEqual(expect.objectContaining({
-      path: "loops.0.steps.0.agentId"
+      path: "loops.0.nodes.0.agentId"
     }));
     expect(validateProjectAutomationConfig(config, [])).toContainEqual(expect.objectContaining({
-      path: "loops.1.steps.0.agentId"
+      path: "loops.1.nodes.0.agentId"
     }));
     expect(loaded.config.loops).toEqual(config.loops);
-    expect(loaded.issues).toContainEqual(expect.objectContaining({ path: "loops.0.steps.0.agentId" }));
+    expect(loaded.issues).toContainEqual(expect.objectContaining({ path: "loops.0.nodes.0.agentId" }));
   });
 });
 
@@ -63,24 +63,25 @@ const agent: Agent = {
 };
 
 const automation = (): ProjectAutomationConfig => ({
-  version: 7,
+  version: 8,
   loops: [{
     id: "delivery", start: "review",
-    steps: [{
-      id: "review", type: "agent", agentId: "reviewer", description: "Review.", nodeStyle: "luna",
-      on: { approved: { end: "completed" }, rejected: { end: "failed" } }
-    }]
+    nodes: [{
+      id: "review", type: "agent", agentId: "reviewer", description: "Review.", nodeStyle: "luna", nodeSize: "tiny",
+      on: { approved: "completed", rejected: "failed" }
+    }, ...defaultTerminalNodes()]
   }, {
     id: "scheduled-delivery",
     start: "scheduled-review",
-    steps: [{
+    nodes: [{
       id: "scheduled-review",
       type: "scheduled",
       agentId: "reviewer",
       description: "Review on schedule.",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       schedule: { kind: "once", date: "2026-07-15", time: "09:00", timeZone: "UTC" },
-      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-    }]
+      on: { approved: "completed", rejected: "blocked" }
+    }, ...defaultTerminalNodes()]
   }]
 });

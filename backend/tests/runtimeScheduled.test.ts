@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import { defaultTerminalNodes, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase } from "../runtime-db.js";
@@ -18,19 +18,20 @@ afterEach(async () => {
 });
 
 const automation: ProjectAutomationConfig = {
-  version: 7,
+  version: 8,
   loops: [{
     id: "scheduled-delivery",
     start: "timer",
-    steps: [{
+    nodes: [{
       id: "timer",
       type: "scheduled",
       agentId: "delivery-agent",
       description: "Deliver once.",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       schedule: { kind: "once", date: "2026-07-12", time: "09:00", timeZone: "UTC" },
-      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-    }]
+      on: { approved: "completed", rejected: "blocked" }
+    }, ...defaultTerminalNodes()]
   }]
 };
 
@@ -49,7 +50,7 @@ const blocked: AgentOutcome = {
 describe("scheduled runtime starts", () => {
   it("runs the scheduled node itself as an agent StepRun", async () => {
     const database = await runtimeDatabase();
-    const scheduled = automation.loops[0]!.steps[0]!;
+    const scheduled = automation.loops[0]!.nodes[0]!;
     if (scheduled.type !== "scheduled") throw new Error("Expected scheduled fixture step.");
     const definitionHash = scheduleDefinitionHash(scheduled.schedule, scheduled.agentId);
     database.syncLoopScheduleDefinitions([{

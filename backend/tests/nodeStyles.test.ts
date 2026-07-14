@@ -2,70 +2,128 @@ import { describe, expect, it } from "vitest";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 import {
   defaultTransitionFor,
+  defaultTerminalNodes,
+  loopNodeSizeCatalog,
+  loopNodeSizes,
   loopNodeStyleCatalog,
   loopNodeStyles,
   type ProjectAutomationConfig
 } from "../../shared/domain/automation.js";
 
 const config = (): ProjectAutomationConfig => ({
-  version: 7,
+  version: 8,
   loops: [{
     id: "delivery",
     start: "gate",
-    steps: [{
+    nodes: [{
       id: "gate",
       type: "human",
       description: "Approve.",
       nodeStyle: "flat",
-      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-    }]
+      nodeSize: "medium",
+      on: { approved: "completed", rejected: "blocked" }
+    }, ...defaultTerminalNodes()]
   }]
 });
 
-describe("v7 node style catalog", () => {
-  it("defines all nine intrinsic styles and their fixed sizes", () => {
+describe("v8 node style and size catalogs", () => {
+  it("defines nine independent styles and four explicit sizes", () => {
     expect(loopNodeStyles).toEqual([
       "flat", "luna", "black-hole", "satellite", "meteorite", "spaceman", "mars", "terra", "sol"
     ]);
     expect(Object.fromEntries(loopNodeStyles.map((style) => [style, loopNodeStyleCatalog[style]]))).toEqual({
-      flat: { label: "Flat", size: "medium", pixels: 48 },
-      luna: { label: "Luna", size: "tiny", pixels: 24 },
-      "black-hole": { label: "Black hole", size: "tiny", pixels: 24 },
-      satellite: { label: "Satellite", size: "tiny", pixels: 24 },
-      meteorite: { label: "Meteorite", size: "tiny", pixels: 24 },
-      spaceman: { label: "Spaceman", size: "tiny", pixels: 24 },
-      mars: { label: "Mars", size: "small", pixels: 36 },
-      terra: { label: "Terra", size: "medium", pixels: 48 },
-      sol: { label: "Sol", size: "large", pixels: 64 }
+      flat: { label: "Flat" },
+      luna: { label: "Luna" },
+      "black-hole": { label: "Black hole" },
+      satellite: { label: "Satellite" },
+      meteorite: { label: "Meteorite" },
+      spaceman: { label: "Spaceman" },
+      mars: { label: "Mars" },
+      terra: { label: "Terra" },
+      sol: { label: "Sol" }
+    });
+    expect(loopNodeSizeCatalog).toEqual({
+      tiny: { label: "Tiny", pixels: 24 },
+      small: { label: "Small", pixels: 36 },
+      medium: { label: "Medium", pixels: 48 },
+      large: { label: "Large", pixels: 64 }
     });
   });
 
-  it("accepts every style and rejects legacy size and loop theme fields", () => {
+  it("accepts every one of the 9 × 4 style and size combinations", () => {
     const base = config();
     for (const nodeStyle of loopNodeStyles) {
-      expect(automationConfigSchema.safeParse({
-        ...base,
-        loops: [{
-          ...base.loops[0],
-          steps: base.loops[0]!.steps.map((step) => ({ ...step, nodeStyle }))
-        }]
-      }).success).toBe(true);
+      for (const nodeSize of loopNodeSizes) {
+        expect(automationConfigSchema.safeParse({
+          ...base,
+          loops: [{
+            ...base.loops[0],
+            nodes: base.loops[0]!.nodes.map((node) => ({ ...node, nodeStyle, nodeSize }))
+          }]
+        }).success, `${nodeStyle}/${nodeSize}`).toBe(true);
+      }
     }
+  });
+
+  it("requires nodeSize and rejects legacy loop theme fields", () => {
+    const base = config();
     expect(automationConfigSchema.safeParse({
       ...base,
       loops: [{ ...base.loops[0], theme: "legacy" }]
     }).success).toBe(false);
+    const withoutNodeSize: Record<string, unknown> = { ...base.loops[0]!.nodes[0]! };
+    delete withoutNodeSize.nodeSize;
     expect(automationConfigSchema.safeParse({
       ...base,
       loops: [{
         ...base.loops[0],
-        steps: base.loops[0]!.steps.map((step) => ({ ...step, nodeSize: "medium" }))
+        nodes: [withoutNodeSize, ...base.loops[0]!.nodes.slice(1)]
       }]
     }).success).toBe(false);
   });
 
+  it("requires exactly one fixed-id terminal node of every status", () => {
+    const base = config();
+    const nodes = base.loops[0]!.nodes;
+    expect(automationConfigSchema.safeParse({
+      ...base,
+      loops: [{ ...base.loops[0], nodes: nodes.filter((node) => node.id !== "failed") }]
+    }).success).toBe(false);
+    expect(automationConfigSchema.safeParse({
+      ...base,
+      loops: [{ ...base.loops[0], nodes: [...nodes, { ...nodes.find((node) => node.id === "completed")! }] }]
+    }).success).toBe(false);
+    expect(automationConfigSchema.safeParse({
+      ...base,
+      loops: [{ ...base.loops[0], nodes: nodes.map((node) => node.id === "completed" ? { ...node, id: "blocked" } : node) }]
+    }).success).toBe(false);
+  });
+
+  it("reserves terminal ids and forbids agent, schedule, and output fields on terminals", () => {
+    const base = config();
+    const executable = base.loops[0]!.nodes[0]!;
+    const terminals = defaultTerminalNodes();
+    expect(automationConfigSchema.safeParse({
+      ...base,
+      loops: [{ ...base.loops[0], start: "completed", nodes: [{ ...executable, id: "completed" }, ...terminals] }]
+    }).success).toBe(false);
+    for (const forbidden of [
+      { agentId: "agent" },
+      { schedule: { kind: "once", date: "2026-07-14", time: "09:00", timeZone: "UTC" } },
+      { on: { approved: "completed", rejected: "blocked" } }
+    ]) {
+      expect(automationConfigSchema.safeParse({
+        ...base,
+        loops: [{
+          ...base.loops[0],
+          nodes: base.loops[0]!.nodes.map((node) => node.id === "completed" ? { ...node, ...forbidden } : node)
+        }]
+      }).success).toBe(false);
+    }
+  });
+
   it("provides completed and blocked defaults for required outputs", () => {
-    expect(defaultTransitionFor("approved")).toEqual({ end: "completed" });
-    expect(defaultTransitionFor("rejected")).toEqual({ end: "blocked" });
+    expect(defaultTransitionFor("approved")).toBe("completed");
+    expect(defaultTransitionFor("rejected")).toBe("blocked");
   });
 });

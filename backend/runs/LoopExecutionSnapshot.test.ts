@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import type { AgentRuntimeConfiguration } from "../../shared/domain/runtime.js";
+import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
 import type { RootRunStore } from "./RootRunStore.js";
 import { LocalRunTargetService } from "./LocalRunTargetService.js";
@@ -14,13 +15,13 @@ const agent = (enabled = true): Agent => ({
 });
 
 const automation = {
-  version: 7 as const,
+  version: 8 as const,
   loops: [{
     id: "delivery", start: "review",
-    steps: [{
-      id: "review", type: "agent" as const, agentId: "reviewer", description: "Review.", nodeStyle: "luna" as const,
-      on: { approved: { end: "completed" as const }, rejected: { end: "failed" as const } }
-    }]
+    nodes: [{
+      id: "review", type: "agent" as const, agentId: "reviewer", description: "Review.", nodeStyle: "luna" as const, nodeSize: "tiny" as const,
+      on: { approved: "completed", rejected: "failed" }
+    }, ...defaultTerminalNodes()]
   }]
 };
 

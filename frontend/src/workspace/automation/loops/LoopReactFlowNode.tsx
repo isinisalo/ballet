@@ -4,8 +4,6 @@ import { loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
 import { LoopCompactStepNode } from "./LoopCompactStepNode";
 import type { LoopNodeContext, LoopReactFlowNode } from "./LoopCanvasTypes";
-import { LoopTerminalNode } from "./LoopTerminalNode";
-import type { StepEndStatus } from "@shared/api/workspace-contracts";
 
 export function LoopReactFlowNodeComponent({ data }: NodeProps<LoopReactFlowNode>) {
   const { layoutNode, context, activeHandleIds } = data;
@@ -45,7 +43,6 @@ function LoopNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds: str
 function renderNodeContent(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   if (node.kind === "loop") return renderLoopNode(node);
   if (node.kind === "first-step-ghost") return renderFirstStepGhost(node, context);
-  if (node.kind === "output-event") return renderOutputEventNode(node, context);
   if (!node.record) return null;
   return <LoopCompactStepNode context={context} record={node.record} records={node.records ?? [node.record]} />;
 }
@@ -75,26 +72,9 @@ function renderFirstStepGhost(node: LoopCanvasLayoutNode, context: LoopNodeConte
   return (
     <LoopGhostNode
       ariaLabel="Add first step"
-      onClick={() => context.onAddStep()}
+      onClick={context.onAddFirstStep}
       disabled={!editable || !context.canAddFirstStep}
       className="nodrag"
     />
   );
-}
-
-function renderOutputEventNode(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
-  const outputEvent = node.outputEvent;
-  const status = terminalStatus(outputEvent?.eventType);
-  const sourceStep = node.sourceStepId ? context.stepByKey.get(node.sourceStepId) : undefined;
-  const editable = (node.loopId ?? context.selectedLoopId) === context.selectedLoopId;
-  return <LoopTerminalNode
-    status={status}
-    interactive={!context.staticPreview && !context.readOnly && editable && context.canAddStepForEvent(sourceStep)}
-    onClick={() => context.onAddStep(outputEvent?.outputId, sourceStep)}
-  />;
-}
-
-function terminalStatus(eventType?: string): StepEndStatus {
-  if (eventType === "completed" || eventType === "blocked" || eventType === "failed") return eventType;
-  return "failed";
 }

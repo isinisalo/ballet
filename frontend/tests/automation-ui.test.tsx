@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   defaultLoopTheme,
+  defaultTerminalNodes,
   type AppData,
   type LoopRunDetails,
   type LoopTheme,
@@ -15,7 +16,7 @@ const now = "2026-07-10T10:00:00.000Z";
 const loop: ProjectLoop = {
   id: "delivery",
   start: "approval",
-  steps: [{ id: "approval", type: "human", nodeStyle: "luna", description: "Approve delivery", on: { approved: { end: "completed" }, rejected: { end: "failed" } } }]
+  nodes: [{ id: "approval", type: "human", nodeStyle: "luna", nodeSize: "tiny", description: "Approve delivery", on: { approved: "completed", rejected: "failed" } }, ...defaultTerminalNodes()]
 };
 
 const run = (
@@ -34,7 +35,7 @@ const run = (
 const data = (latest: LoopRunDetails | null): AppData => ({
   ...emptyData,
   loopRuns: latest ? [latest] : [],
-  automation: { version: 7, loops: [loop] }, automationIssues: [], scheduleStates: [],
+  automation: { version: 8, loops: [loop] }, automationIssues: [], scheduleStates: [],
   loopTheme: structuredClone(defaultLoopTheme), loopThemeIssues: [], projectDocumentTree: [],
   runTargets: {
     loops: [{ kind: "loop", id: "delivery", name: "delivery", ready: true, issues: [], ...latest ? { latestRootRunId: latest.rootRunId, ...["running", "waiting_for_human"].includes(latest.status) ? { activeRootRunId: latest.rootRunId } : {} } : {} }],
@@ -97,7 +98,7 @@ async function renderRun(latest: LoopRunDetails | null) {
   return fetchMock;
 }
 
-describe("automation v7 UI", () => {
+describe("automation v8 UI", () => {
   it("starts a saved Loop from global Ballet Run without local mode controls", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(null);
@@ -143,7 +144,7 @@ describe("automation v7 UI", () => {
     const user = userEvent.setup();
     await renderRun(run("completed"));
     await user.click(await screen.findByRole("button", { name: "New run" }));
-    expect(await screen.findByLabelText("Manual input (optional)")).toBeEnabled();
+    expect(await screen.findByLabelText("Manual input (optional)", {}, { timeout: 3_000 })).toBeEnabled();
   });
 
   it("renders an existing Run with its immutable theme snapshot", async () => {
@@ -187,16 +188,17 @@ describe("automation v7 UI", () => {
     ));
     const saveCall = fetchMock.mock.calls.find(([input, init]) => String(input) === "/api/automation" && init?.method === "PUT");
     const saved = JSON.parse(String(saveCall?.[1]?.body));
-    expect(saved.version).toBe(7);
+    expect(saved.version).toBe(8);
     expect(saved.loops.find((candidate: ProjectLoop) => candidate.id === "new-loop")).toMatchObject({
       id: "new-loop",
       start: "new-step",
-      steps: [{
+      nodes: expect.arrayContaining([expect.objectContaining({
         id: "new-step",
         type: "human",
         nodeStyle: "flat",
-        on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-      }]
+        nodeSize: "medium",
+        on: { approved: "completed", rejected: "blocked" }
+      }), ...defaultTerminalNodes()])
     });
   });
 

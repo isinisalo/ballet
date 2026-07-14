@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import { defaultTerminalNodes, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { RuntimeDatabase } from "../runtime-db.js";
 import { AutomationService } from "../services/AutomationService.js";
 import { MarkdownStore } from "../store.js";
@@ -40,9 +40,9 @@ describe("MarkdownStore project config mutation queue", () => {
     });
 
     const first = config();
-    first.loops[0]!.steps[0]!.description = "First queued change.";
+    first.loops[0]!.nodes[0]!.description = "First queued change.";
     const second = structuredClone(first);
-    second.loops[1]!.steps[0]!.description = "Second queued change.";
+    second.loops[1]!.nodes[0]!.description = "Second queued change.";
 
     const firstSave = store.saveAutomation(first);
     await saveStarted;
@@ -55,8 +55,8 @@ describe("MarkdownStore project config mutation queue", () => {
     expect(saveSpy).toHaveBeenCalledTimes(2);
 
     const persisted = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
-    expect(persisted.loops[0]!.steps[0]!.description).toBe("First queued change.");
-    expect(persisted.loops[1]!.steps[0]!.description).toBe("Second queued change.");
+    expect(persisted.loops[0]!.nodes[0]!.description).toBe("First queued change.");
+    expect(persisted.loops[1]!.nodes[0]!.description).toBe("Second queued change.");
   });
 });
 
@@ -70,18 +70,19 @@ const createProject = async (): Promise<string> => {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 7,
+  version: 8,
   loops: [automationLoop("first-loop"), automationLoop("second-loop")]
 });
 
 const automationLoop = (id: string): ProjectAutomationConfig["loops"][number] => ({
   id,
   start: "gate",
-  steps: [{
+  nodes: [{
     id: "gate",
     type: "human",
     description: "Approve.",
     nodeStyle: "luna",
-    on: { approved: { end: "completed" }, rejected: { end: "failed" } }
-  }]
+    nodeSize: "tiny",
+    on: { approved: "completed", rejected: "failed" }
+  }, ...defaultTerminalNodes()]
 });

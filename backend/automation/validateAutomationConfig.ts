@@ -4,12 +4,13 @@ import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectLoop,
-  ProjectStep,
+  ProjectLoopNode,
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
 import {
   getProjectStepTransitionEntries,
   getProjectStepTransitionTargets,
+  isProjectTerminalNode,
   resolveEffectiveStartStep
 } from "../../shared/domain/automation.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
@@ -56,13 +57,13 @@ const validateTarget = (
   path: string,
   step: ProjectExecutableStep,
   sourceLoopId: string,
-  stepsById: ReadonlyMap<string, ProjectStep>,
+  nodesById: ReadonlyMap<string, ProjectLoopNode>,
   loopIds: ReadonlySet<string>
 ): ProjectAutomationIssue[] => {
   if (typeof target === "string") {
-    return stepsById.has(target)
+    return nodesById.has(target)
       ? []
-      : [{ path, message: `Transition references unknown step: ${target}.` }];
+      : [{ path, message: `Transition references unknown node: ${target}.` }];
   }
   if (!isLoopTarget(target)) return [];
   const issues: ProjectAutomationIssue[] = [];
@@ -85,25 +86,26 @@ const validateLoop = (
   agentIds?: ReadonlySet<string>
 ): ProjectAutomationIssue[] => {
   const issues: ProjectAutomationIssue[] = [];
-  const stepsById = new Map(loop.steps.map((step) => [step.id, step]));
+  const nodesById = new Map(loop.nodes.map((node) => [node.id, node]));
   issues.push(...duplicateIssues(
-    loop.steps.map((step, stepIndex) => ({ id: step.id, path: `loops.${loopIndex}.steps.${stepIndex}.id` })),
-    `step in loop ${loop.id}`
+    loop.nodes.map((node, nodeIndex) => ({ id: node.id, path: `loops.${loopIndex}.nodes.${nodeIndex}.id` })),
+    `node in loop ${loop.id}`
   ));
-  if (!stepsById.has(loop.start)) {
-    issues.push({ path: `loops.${loopIndex}.start`, message: `Loop start references unknown step: ${loop.start}.` });
+  if (!resolveEffectiveStartStep(loop)) {
+    issues.push({ path: `loops.${loopIndex}.start`, message: `Loop start must reference an executable node: ${loop.start}.` });
   }
-  const scheduledSteps = loop.steps
-    .map((step, stepIndex) => ({ step, stepIndex }))
-    .filter(({ step }) => step.type === "scheduled");
+  const scheduledSteps = loop.nodes
+    .flatMap((node, nodeIndex) => !isProjectTerminalNode(node) && node.type === "scheduled" ? [{ step: node, nodeIndex }] : []);
   if (scheduledSteps.length > 1) {
     issues.push({
-      path: `loops.${loopIndex}.steps`,
+      path: `loops.${loopIndex}.nodes`,
       message: "Loop may contain at most one scheduled step."
     });
   }
-  loop.steps.forEach((step, stepIndex) => {
-    const base = `loops.${loopIndex}.steps.${stepIndex}`;
+  loop.nodes.forEach((node, nodeIndex) => {
+    if (isProjectTerminalNode(node)) return;
+    const step = node;
+    const base = `loops.${loopIndex}.nodes.${nodeIndex}`;
     if (step.type === "scheduled") {
       if (step.id !== loop.start) {
         issues.push({ path: `${base}.type`, message: "A scheduled step is allowed only as the loop start step." });
@@ -113,15 +115,17 @@ const validateLoop = (
       issues.push({ path: `${base}.agentId`, message: `Step references unknown agent: ${step.agentId}.` });
     }
     for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
-      issues.push(...validateTarget(target, `${base}.on.${transitionId}`, step, loop.id, stepsById, loopIds));
+      issues.push(...validateTarget(target, `${base}.on.${transitionId}`, step, loop.id, nodesById, loopIds));
     }
   });
   const scheduledIds = new Set(scheduledSteps.map(({ step }) => step.id));
-  loop.steps.forEach((step, stepIndex) => {
+  loop.nodes.forEach((node, nodeIndex) => {
+    if (isProjectTerminalNode(node)) return;
+    const step = node;
     for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
       if (typeof target === "string" && scheduledIds.has(target)) {
         issues.push({
-          path: `loops.${loopIndex}.steps.${stepIndex}.on.${transitionId}`,
+          path: `loops.${loopIndex}.nodes.${nodeIndex}.on.${transitionId}`,
           message: "No transition may target a scheduled start step."
         });
       }
@@ -134,15 +138,24 @@ const validateLoop = (
     const stepId = pending.shift();
     if (!stepId || reachable.has(stepId)) continue;
     reachable.add(stepId);
-    const step = stepsById.get(stepId);
-    if (!step) continue;
+    const node = nodesById.get(stepId);
+    if (!node) continue;
+    if (isProjectTerminalNode(node)) {
+      hasReachableExit = true;
+      continue;
+    }
+    const step = node;
     for (const target of getProjectStepTransitionTargets(step)) {
-      if (typeof target === "string") pending.push(target);
+      if (typeof target === "string") {
+        const targetNode = nodesById.get(target);
+        if (targetNode && isProjectTerminalNode(targetNode)) hasReachableExit = true;
+        else pending.push(target);
+      }
       else hasReachableExit = true;
     }
   }
   if (!hasReachableExit) {
-    issues.push({ path: `loops.${loopIndex}.steps`, message: "Loop must have an end or cross-loop transition reachable from its start step." });
+    issues.push({ path: `loops.${loopIndex}.nodes`, message: "Loop must have a terminal or cross-loop transition reachable from its start node." });
   }
   return issues;
 };
@@ -183,9 +196,9 @@ const validateApprovedPaths = (
 
       const target = step.on.approved;
       if (typeof target === "string") {
-        const nextStep = loop.steps.find((candidate) => candidate.id === target);
-        if (!nextStep || nextStep.type === "scheduled") return;
-        step = nextStep;
+        const nextNode = loop.nodes.find((candidate) => candidate.id === target);
+        if (!nextNode || isProjectTerminalNode(nextNode) || nextNode.type === "scheduled") return;
+        step = nextNode;
         continue;
       }
       if (!isLoopTarget(target)) return;

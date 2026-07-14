@@ -7,9 +7,10 @@ const agentStep: ProjectStep = {
   id: "implement",
   type: "agent",
   nodeStyle: "terra",
+  nodeSize: "medium",
   agentId: "developer",
   description: "Implement.",
-  on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+  on: { approved: "completed", rejected: "failed" }
 };
 
 describe("Loop Run sheet", () => {
@@ -53,8 +54,9 @@ describe("Loop Run sheet", () => {
       id: "approve",
       type: "human",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       description: "Approve.",
-      on: { approved: { end: "completed" }, rejected: { end: "failed" } }
+      on: { approved: "completed", rejected: "failed" }
     };
     const humanRun: StepRun = {
       stepRunId: "step-human",

@@ -4,10 +4,6 @@ export type LoopOutputTarget =
   {
     outputId: string;
     eventType: string;
-    type: "event";
-  } | {
-    outputId: string;
-    eventType: string;
     type: "step";
     targetLoopId: string;
     targetStepKey: string;
@@ -18,7 +14,6 @@ export type LoopStepRecord = {
   index: number;
   loopId?: string;
   step?: LoopVisualStep;
-  outputEvents?: string[];
   outputTargets?: LoopOutputTarget[];
 };
 
@@ -42,16 +37,6 @@ export type LoopGraph = {
   rootRecords: LoopStepRecord[];
 };
 
-export const loopOutputEvents = (recordOrStep: LoopStepRecord | LoopVisualStep | undefined, continuationEvent?: string) => {
-  if (!recordOrStep) return ["Missing step"];
-  const step = "stepKey" in recordOrStep ? recordOrStep.step : recordOrStep;
-  if (!step) return ["Missing step"];
-  const events = "stepKey" in recordOrStep
-    ? recordOrStep.outputEvents ?? recordOrStep.outputTargets?.map((output) => output.eventType) ?? []
-    : [];
-  return continuationEvent && !events.includes(continuationEvent) ? [continuationEvent, ...events] : events;
-};
-
 export const loopCanonicalRecord = (loopGraph: LoopGraph, record: LoopStepRecord): LoopStepRecord =>
   loopGraph.stepFoldModel.canonicalRecordByIndex.get(record.index) ?? record;
 
@@ -61,11 +46,7 @@ export const loopFoldedRecords = (loopGraph: LoopGraph, record: LoopStepRecord):
 export const loopFoldedOutputTargets = (loopGraph: LoopGraph, record: LoopStepRecord): LoopOutputTarget[] => {
   const targetsByKey = new Map<string, LoopOutputTarget>();
   loopFoldedRecords(loopGraph, record).forEach((foldedRecord) => {
-    const outputTargets = foldedRecord.outputTargets ?? loopOutputEvents(foldedRecord).map((eventType) => ({
-      outputId: eventType,
-      eventType,
-      type: "event" as const
-    }));
+    const outputTargets = foldedRecord.outputTargets ?? [];
 
     outputTargets.forEach((output) => {
       const key = `${output.outputId}:${output.eventType}:${output.type}`;

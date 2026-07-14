@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
-import type { ProjectLoop } from "../../shared/domain/automation.js";
+import { defaultTerminalNodes, type ProjectLoop } from "../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { validateLoopRunStart } from "../services/LoopRunStartPolicy.js";
 
@@ -16,7 +16,7 @@ afterEach(async () => {
 const loop = (id: string): ProjectLoop => ({
   id,
   start: "work",
-  steps: [{
+  nodes: [{
     id: "work",
     type: "agent",
     agentId: ({
@@ -26,8 +26,9 @@ const loop = (id: string): ProjectLoop => ({
     } as Record<string, string>)[id] ?? "worker",
     description: "Work.",
     nodeStyle: "terra",
-    on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-  }]
+    nodeSize: "medium",
+    on: { approved: "completed", rejected: "blocked" }
+  }, ...defaultTerminalNodes()]
 });
 
 const data = (projectRoot: string, loopIds: string[]): AppData => ({
@@ -39,7 +40,7 @@ const data = (projectRoot: string, loopIds: string[]): AppData => ({
   skills: [],
   loopRuns: [],
   scheduleStates: [],
-  automation: { version: 7, loops: loopIds.map(loop) },
+  automation: { version: 8, loops: loopIds.map(loop) },
   automationIssues: [],
   loopTheme: structuredClone(defaultLoopTheme),
   loopThemeIssues: [],
@@ -121,7 +122,7 @@ describe("loop engineering root-start policy", () => {
   it("does not apply the convention to a same-named loop with another start agent", async () => {
     const root = await projectWithTasks();
     const workspace = data(root, ["implementation"]);
-    const start = workspace.automation.loops[0]!.steps[0]!;
+    const start = workspace.automation.loops[0]!.nodes[0]!;
     if (start.type === "agent") start.agentId = "custom-worker";
     await expect(validateLoopRunStart(workspace, "implementation")).resolves.toBeUndefined();
   });
@@ -131,14 +132,15 @@ describe("loop engineering root-start policy", () => {
     const workspace = data(root, ["implementation"]);
     const implementation = workspace.automation.loops[0]!;
     implementation.start = "timer";
-    implementation.steps.unshift({
+    implementation.nodes.unshift({
       id: "timer",
       type: "scheduled",
       agentId: "implementation-agent",
       description: "Start implementation on schedule.",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       schedule: { kind: "once", date: "2026-07-12", time: "09:00", timeZone: "UTC" },
-      on: { approved: "work", rejected: { end: "blocked" } }
+      on: { approved: "work", rejected: "blocked" }
     });
 
     await expect(validateLoopRunStart(workspace, "implementation"))

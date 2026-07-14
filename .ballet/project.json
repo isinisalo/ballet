@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "agents": {
     "dev-deploy-agent": {
       "provider": "codex",
@@ -54,89 +54,125 @@
     {
       "id": "delivery-planning",
       "start": "create-roadmap",
-      "steps": [
+      "nodes": [
         {
-          "id": "create-roadmap",
           "description": "Muodosta hyväksytyistä ADR- ja Goal-dokumenteista arvo-, riski- ja riippuvuusjärjestykseen asetettu roadmap tiedostoon .ballet/outputs/ROADMAP.md.",
           "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "create-roadmap",
           "on": {
             "approved": "create-work-breakdown",
-            "rejected": {
-              "end": "blocked"
-            }
+            "rejected": "blocked"
           },
           "type": "agent",
           "agentId": "roadmap-agent"
         },
         {
-          "id": "create-work-breakdown",
           "description": "Jaa roadmap milestoneiksi ja atomisiksi task-NNN-tehtäviksi tiedostoihin .ballet/outputs/MILESTONES.md ja .ballet/outputs/TASKS.md.",
           "nodeStyle": "luna",
+          "nodeSize": "tiny",
+          "id": "create-work-breakdown",
           "on": {
             "approved": "planning-gate",
-            "rejected": {
-              "end": "blocked"
-            }
+            "rejected": "blocked"
           },
           "type": "agent",
           "agentId": "milestone-task-agent"
         },
         {
-          "id": "planning-gate",
           "description": "Hyväksy roadmap, milestonet ja taskit toteutuksen lähtökohdaksi. Rejection-palaute käynnistää suunnittelun uudelleen roadmapista.",
           "nodeStyle": "luna",
+          "nodeSize": "tiny",
+          "id": "planning-gate",
           "on": {
-            "approved": {
-              "end": "completed"
-            },
+            "approved": "completed",
             "rejected": "create-roadmap"
           },
           "type": "human"
+        },
+        {
+          "description": "",
+          "nodeStyle": "terra",
+          "nodeSize": "tiny",
+          "id": "completed",
+          "type": "completed"
+        },
+        {
+          "description": "",
+          "nodeStyle": "mars",
+          "nodeSize": "tiny",
+          "id": "blocked",
+          "type": "blocked"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "failed",
+          "type": "failed"
         }
       ]
     },
     {
       "id": "ui-design",
       "start": "design-task-ui",
-      "steps": [
+      "nodes": [
         {
-          "id": "design-task-ui",
           "description": "Suunnittele yhden Run-inputissa nimetyn task-NNN-tehtävän UI tiedostoon .ballet/outputs/ui/<task-id>.md.",
           "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "design-task-ui",
           "on": {
-            "approved": {
-              "end": "completed"
-            },
-            "rejected": {
-              "end": "blocked"
-            }
+            "approved": "completed",
+            "rejected": "blocked"
           },
           "type": "agent",
           "agentId": "ui-design-agent"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "completed",
+          "type": "completed"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "blocked",
+          "type": "blocked"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "failed",
+          "type": "failed"
         }
       ]
     },
     {
       "id": "implementation",
       "start": "implement-task",
-      "steps": [
+      "nodes": [
         {
-          "id": "implement-task",
           "description": "Toteuta täsmälleen yksi Run-inputissa nimetty task-NNN-tehtävä ja sen hyväksymiskriteerit.",
           "nodeStyle": "terra",
+          "nodeSize": "medium",
+          "id": "implement-task",
           "on": {
             "approved": "verify-task",
-            "rejected": {
-              "end": "blocked"
-            }
+            "rejected": "blocked"
           },
           "type": "agent",
           "agentId": "implementation-agent"
         },
         {
-          "id": "verify-task",
           "description": "Tarkasta taskin scope, diff, testit ja hyväksymiskriteerit riippumattomasti; saman taskin korjaukset palautuvat implementointiin.",
           "nodeStyle": "terra",
+          "nodeSize": "medium",
+          "id": "verify-task",
           "on": {
             "approved": "code-gate",
             "rejected": "implement-task"
@@ -145,9 +181,10 @@
           "agentId": "review-test-agent"
         },
         {
-          "id": "code-gate",
           "description": "Hyväksy tarkastettu koodi ja valtuuta dev-deployment. Rejection-palaute palauttaa saman taskin implementointiin.",
           "nodeStyle": "luna",
+          "nodeSize": "tiny",
+          "id": "code-gate",
           "on": {
             "approved": {
               "loop": "dev-deployment"
@@ -155,38 +192,82 @@
             "rejected": "implement-task"
           },
           "type": "human"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "completed",
+          "type": "completed"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "blocked",
+          "type": "blocked"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "failed",
+          "type": "failed"
         }
       ]
     },
     {
       "id": "dev-deployment",
       "start": "deploy-and-validate-dev",
-      "steps": [
+      "nodes": [
         {
-          "id": "deploy-and-validate-dev",
           "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
           "nodeStyle": "terra",
+          "nodeSize": "medium",
+          "id": "deploy-and-validate-dev",
           "on": {
-            "approved": {
-              "end": "completed"
-            },
-            "rejected": {
-              "end": "failed"
-            }
+            "approved": "completed",
+            "rejected": "failed"
           },
           "type": "agent",
           "agentId": "dev-deploy-agent"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "completed",
+          "type": "completed"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "blocked",
+          "type": "blocked"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "failed",
+          "type": "failed"
         }
       ]
     },
     {
       "id": "timed",
       "start": "schedule-dev-deployment",
-      "steps": [
+      "nodes": [
         {
-          "id": "schedule-dev-deployment",
           "description": "Tarkista valmius, deployaa vain dev-ympäristöön, validoi smoke-, acceptance- ja observability-checkit sekä rollbackaa epäonnistunut julkaisu.",
           "nodeStyle": "luna",
+          "nodeSize": "tiny",
+          "id": "schedule-dev-deployment",
+          "on": {
+            "approved": "completed",
+            "rejected": "blocked"
+          },
           "type": "scheduled",
           "agentId": "dev-deploy-agent",
           "schedule": {
@@ -195,15 +276,28 @@
             "kind": "recurring",
             "startsOn": "2026-07-13",
             "cadence": "daily"
-          },
-          "on": {
-            "approved": {
-              "end": "completed"
-            },
-            "rejected": {
-              "end": "blocked"
-            }
           }
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "completed",
+          "type": "completed"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "blocked",
+          "type": "blocked"
+        },
+        {
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny",
+          "id": "failed",
+          "type": "failed"
         }
       ]
     }

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
+import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import type { ExecutionRuntimeSnapshot } from "../../shared/domain/runtime.js";
 import type { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
@@ -22,12 +23,12 @@ describe("LocalRunService failure boundaries", () => {
     const service = createService({
       roots,
       readData: async () => ({
-        automation: { version: 7, loops: [{
+        automation: { version: 8, loops: [{
           id: "delivery", start: "gate",
-          steps: [{
-            id: "gate", type: "human", description: "Approve.", nodeStyle: "luna",
-            on: { approved: { end: "completed" }, rejected: { end: "failed" } }
-          }]
+          nodes: [{
+            id: "gate", type: "human", description: "Approve.", nodeStyle: "luna", nodeSize: "tiny",
+            on: { approved: "completed", rejected: "failed" }
+          }, ...defaultTerminalNodes()]
         }] },
         automationIssues: [],
         loopThemeIssues: [{ path: ".ballet/theme.json", message: "Invalid theme." }]

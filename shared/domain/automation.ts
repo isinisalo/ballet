@@ -4,6 +4,19 @@ export type StepEndStatus = "completed" | "blocked" | "failed";
 
 export const loopNodeSizes = ["tiny", "small", "medium", "large"] as const;
 export type LoopNodeSize = (typeof loopNodeSizes)[number];
+export type LoopNodePixels = 24 | 36 | 48 | 64;
+
+export interface LoopNodeSizeDefinition {
+  label: string;
+  pixels: LoopNodePixels;
+}
+
+export const loopNodeSizeCatalog: Readonly<Record<LoopNodeSize, LoopNodeSizeDefinition>> = {
+  tiny: { label: "Tiny", pixels: 24 },
+  small: { label: "Small", pixels: 36 },
+  medium: { label: "Medium", pixels: 48 },
+  large: { label: "Large", pixels: 64 }
+};
 
 export const loopNodeStyles = [
   "flat",
@@ -17,42 +30,44 @@ export const loopNodeStyles = [
   "sol"
 ] as const;
 export type LoopNodeStyle = (typeof loopNodeStyles)[number];
-export type LoopNodePixels = 24 | 36 | 48 | 64;
 
 export interface LoopNodeStyleDefinition {
   label: string;
-  size: LoopNodeSize;
-  pixels: LoopNodePixels;
 }
 
 export const loopNodeStyleCatalog: Readonly<Record<LoopNodeStyle, LoopNodeStyleDefinition>> = {
-  flat: { label: "Flat", size: "medium", pixels: 48 },
-  luna: { label: "Luna", size: "tiny", pixels: 24 },
-  "black-hole": { label: "Black hole", size: "tiny", pixels: 24 },
-  satellite: { label: "Satellite", size: "tiny", pixels: 24 },
-  meteorite: { label: "Meteorite", size: "tiny", pixels: 24 },
-  spaceman: { label: "Spaceman", size: "tiny", pixels: 24 },
-  mars: { label: "Mars", size: "small", pixels: 36 },
-  terra: { label: "Terra", size: "medium", pixels: 48 },
-  sol: { label: "Sol", size: "large", pixels: 64 }
+  flat: { label: "Flat" },
+  luna: { label: "Luna" },
+  "black-hole": { label: "Black hole" },
+  satellite: { label: "Satellite" },
+  meteorite: { label: "Meteorite" },
+  spaceman: { label: "Spaceman" },
+  mars: { label: "Mars" },
+  terra: { label: "Terra" },
+  sol: { label: "Sol" }
 };
 
 export const defaultLoopNodeStyle: LoopNodeStyle = "flat";
+export const defaultLoopNodeSize: LoopNodeSize = "medium";
+export const defaultTerminalNodeSize: LoopNodeSize = "tiny";
 
 export type StepTransitionTarget =
   | string
-  | { loop: string }
-  | { end: StepEndStatus };
+  | { loop: string };
 
 export interface ProjectStepTransitions {
   approved: StepTransitionTarget;
   rejected: StepTransitionTarget;
 }
 
-interface ProjectStepBase {
-  id: string;
+interface ProjectLoopNodeVisual {
   description: string;
   nodeStyle: LoopNodeStyle;
+  nodeSize: LoopNodeSize;
+}
+
+interface ProjectStepBase extends ProjectLoopNodeVisual {
+  id: string;
   on: ProjectStepTransitions;
 }
 
@@ -119,6 +134,10 @@ export interface ProjectScheduledStep extends ProjectStepBase {
 export type ProjectAgentBackedStep = ProjectAgentStep | ProjectScheduledStep;
 export type ProjectExecutableStep = ProjectAgentBackedStep | ProjectHumanStep;
 export type ProjectStep = ProjectExecutableStep;
+export type ProjectTerminalNode = {
+  [Status in StepEndStatus]: ProjectLoopNodeVisual & { id: Status; type: Status }
+}[StepEndStatus];
+export type ProjectLoopNode = ProjectStep | ProjectTerminalNode;
 
 export type ProjectStepTransitionEntry = readonly [OutputId, StepTransitionTarget];
 
@@ -145,28 +164,40 @@ export function mapProjectStepTransitions<T extends ProjectStep>(
 }
 
 export const defaultTransitionFor = (output: OutputId): StepTransitionTarget =>
-  output === "approved" ? { end: "completed" } : { end: "blocked" };
+  output === "approved" ? "completed" : "blocked";
 
 export const isProjectAgentBackedStep = (step: ProjectStep): step is ProjectAgentBackedStep =>
   step.type === "agent" || step.type === "scheduled";
 
+export const isProjectTerminalNode = (node: ProjectLoopNode): node is ProjectTerminalNode =>
+  node.type === "completed" || node.type === "blocked" || node.type === "failed";
+
+export const defaultTerminalNodes = (): ProjectTerminalNode[] => ([
+  { id: "completed", type: "completed", description: "", nodeStyle: "flat", nodeSize: defaultTerminalNodeSize },
+  { id: "blocked", type: "blocked", description: "", nodeStyle: "flat", nodeSize: defaultTerminalNodeSize },
+  { id: "failed", type: "failed", description: "", nodeStyle: "flat", nodeSize: defaultTerminalNodeSize }
+]);
+
 export interface ProjectLoop {
   id: string;
   start: string;
-  steps: ProjectStep[];
+  nodes: ProjectLoopNode[];
 }
 
 export const resolveEffectiveStartStep = (
   loop: ProjectLoop
-): ProjectExecutableStep | undefined => loop.steps.find((step) => step.id === loop.start);
+): ProjectExecutableStep | undefined => {
+  const node = loop.nodes.find((candidate) => candidate.id === loop.start);
+  return node && !isProjectTerminalNode(node) ? node : undefined;
+};
 
 export interface ProjectAutomationConfig {
-  version: 7;
+  version: 8;
   loops: ProjectLoop[];
 }
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
-  version: 7,
+  version: 8,
   loops: []
 });
 

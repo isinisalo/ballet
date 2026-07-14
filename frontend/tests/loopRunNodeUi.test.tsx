@@ -1,12 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { defaultLoopTheme, loopNodeStyles, type ProjectStep, type StepRun } from "@shared/api/workspace-contracts";
+import { readFileSync } from "node:fs";
+import { defaultLoopTheme, loopNodeStyles, type ProjectLoopNode, type ProjectStep, type StepRun } from "@shared/api/workspace-contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { LoopNodeContext } from "../src/workspace/automation/loops/LoopCanvasTypes";
 import { LoopCompactStepNode } from "../src/workspace/automation/loops/LoopCompactStepNode";
 import { LoopNodeArtwork } from "../src/workspace/automation/loops/LoopNodeArtwork";
-import { LoopTerminalNode } from "../src/workspace/automation/loops/LoopTerminalNode";
 import type { LoopStepRecord } from "../src/workspace/automation/loops/loopGraph";
+
+const nodeCss = readFileSync(`${process.cwd()}/frontend/src/styles.css`, "utf8");
 
 const context = (): LoopNodeContext => ({
   selectedLoopId: "delivery",
@@ -18,14 +19,13 @@ const context = (): LoopNodeContext => ({
   readOnly: true,
   staticPreview: false,
   canAddFirstStep: false,
-  canAddStepForEvent: () => false,
   onStepPointerDown: vi.fn(),
   onStepPointerMove: vi.fn(),
   onStepPointerUp: vi.fn(() => false),
   onStepPointerCancel: vi.fn(),
   onStepSelect: vi.fn(),
   onOutputHandlerSelect: vi.fn(),
-  onAddStep: vi.fn()
+  onAddFirstStep: vi.fn()
 });
 
 describe("Ballet Run node state", () => {
@@ -67,27 +67,39 @@ describe("Loop node artwork", () => {
     });
     expect(container.querySelectorAll("svg.loop-node-artwork-svg")).toHaveLength(4);
   });
+
+  it.each(["black-hole", "satellite", "meteorite"] as const)("keeps %s borderless with glow, selection, and keyboard focus", (nodeStyle) => {
+    const selectedContext = context();
+    selectedContext.selectedStepIndexes = [0];
+    const selectedRecord = record("agent", "running");
+    selectedRecord.step!.nodeStyle = nodeStyle;
+    selectedRecord.step!.reasoningEffort = "high";
+    render(<LoopCompactStepNode context={selectedContext} record={selectedRecord} />);
+
+    const node = screen.getByRole("button", { name: "View step implement" });
+    node.focus();
+    expect(node).toHaveFocus();
+    expect(nodeCss).toContain(`[data-loop-node-style="${nodeStyle}"]`);
+    expect(nodeCss).toContain("border-color: transparent !important;");
+    expect(node).toHaveClass("border-primary/80", "ring-2");
+    expect(node).toHaveAttribute("data-loop-reasoning-glow", "4");
+    expect(node.querySelector(".loop-node-reasoning-glow")).toBeInTheDocument();
+  });
 });
 
-describe("semantic terminal nodes", () => {
-  it("renders completed, blocked, and failed as exact accessible statuses", () => {
+describe("terminal Loop nodes", () => {
+  it("renders completed, blocked, and failed with configured artwork and no status icon", () => {
     render(<>
-      <LoopTerminalNode status="completed" />
-      <LoopTerminalNode status="blocked" />
-      <LoopTerminalNode status="failed" />
+      <LoopCompactStepNode context={context()} record={terminalRecord("completed", "sol", "medium")} />
+      <LoopCompactStepNode context={context()} record={terminalRecord("blocked", "luna", "small")} />
+      <LoopCompactStepNode context={context()} record={terminalRecord("failed", "meteorite", "tiny")} />
     </>);
 
-    expect(screen.getByRole("img", { name: "Terminal target: completed" })).toHaveAttribute("data-loop-terminal-status", "completed");
-    expect(screen.getByRole("img", { name: "Terminal target: blocked" })).toHaveClass("text-tertiary");
-    expect(screen.getByRole("img", { name: "Terminal target: failed" })).toHaveClass("text-destructive");
-  });
-
-  it("keeps a configured terminal clickable as an insertion point", async () => {
-    const onClick = vi.fn();
-    render(<LoopTerminalNode status="blocked" interactive onClick={onClick} />);
-
-    await userEvent.click(screen.getByRole("button", { name: "Add step before blocked" }));
-    expect(onClick).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "View node completed" })).toHaveAttribute("data-loop-node-size", "medium");
+    expect(screen.getByRole("button", { name: "View node completed" })).toHaveAttribute("data-loop-node-style", "sol");
+    expect(screen.getByRole("button", { name: "View node blocked" })).toHaveAttribute("data-loop-node-size", "small");
+    expect(screen.getByRole("button", { name: "View node failed" }).querySelector(".loop-node-artwork-svg")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-circle-check-big, .lucide-circle-slash, .lucide-circle-x")).not.toBeInTheDocument();
   });
 });
 
@@ -96,15 +108,16 @@ const record = (
   status: "running" | "waiting_for_human"
 ): LoopStepRecord => {
   const id = kind === "agent" ? "implement" : kind === "human" ? "approve" : "deploy";
-  const on = { approved: { end: "completed" as const }, rejected: { end: "blocked" as const } };
+  const on = { approved: "completed", rejected: "blocked" };
   const step: ProjectStep = kind === "agent"
-    ? { id, type: "agent", nodeStyle: "flat", agentId: "developer", description: "Implement.", on }
+    ? { id, type: "agent", nodeStyle: "flat", nodeSize: "medium", agentId: "developer", description: "Implement.", on }
     : kind === "human"
-      ? { id, type: "human", nodeStyle: "mars", description: "Approve.", on }
+      ? { id, type: "human", nodeStyle: "mars", nodeSize: "small", description: "Approve.", on }
       : {
           id,
           type: "scheduled",
           nodeStyle: "luna",
+          nodeSize: "tiny",
           agentId: "developer",
           description: "Deploy.",
           schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
@@ -134,11 +147,38 @@ const record = (
       agentId: kind === "human" ? undefined : "developer",
       humanGate: kind === "human",
       scheduled: kind === "scheduled",
+      terminal: false,
       scheduleLabel: kind === "scheduled" ? "Weekdays · 09:00 · Europe/Helsinki" : undefined,
       nodeStyle: step.nodeStyle,
+      nodeSize: step.nodeSize,
       reasoningEffort: kind === "scheduled" ? "high" : undefined,
       step,
       stepRun
+    }
+  };
+};
+
+const terminalRecord = (
+  status: "completed" | "blocked" | "failed",
+  nodeStyle: ProjectLoopNode["nodeStyle"],
+  nodeSize: ProjectLoopNode["nodeSize"]
+): LoopStepRecord => {
+  const step: ProjectLoopNode = { id: status, type: status, description: "", nodeStyle, nodeSize };
+  return {
+    stepKey: `delivery::${status}`,
+    loopId: "delivery",
+    index: status === "completed" ? 1 : status === "blocked" ? 2 : 3,
+    outputTargets: [],
+    step: {
+      id: `delivery::${status}`,
+      displayId: status,
+      description: "",
+      humanGate: false,
+      scheduled: false,
+      terminal: true,
+      nodeStyle,
+      nodeSize,
+      step
     }
   };
 };

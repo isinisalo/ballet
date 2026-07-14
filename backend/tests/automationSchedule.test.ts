@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import {
+  defaultTerminalNodes,
   getProjectStepTransitionEntries,
   mapProjectStepTransitions,
   resolveEffectiveStartStep,
@@ -18,7 +19,7 @@ import {
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-schedule-v7-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-schedule-v8-"));
   roots.push(root);
   return root;
 };
@@ -39,19 +40,20 @@ const agent: Agent = {
 };
 
 const scheduledConfig = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 7,
+  version: 8,
   loops: [{
     id: "delivery",
     start: "scheduled-start",
-    steps: [{
+    nodes: [{
       id: "scheduled-start",
       type: "scheduled",
       agentId: agent.id,
       description: "Deliver on schedule.",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       schedule,
-      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-    }]
+      on: { approved: "completed", rejected: "blocked" }
+    }, ...defaultTerminalNodes()]
   }]
 });
 
@@ -82,47 +84,48 @@ describe("scheduled automation persistence", () => {
 });
 
 describe("scheduled automation graph validation", () => {
-  it("allows an agent-backed scheduled step to be the only step", () => {
+  it("allows an agent-backed scheduled node to be the only executable node", () => {
     expect(validateProjectAutomationConfig(scheduledConfig(schedules[0]!), [agent])).toEqual([]);
   });
 
   it("requires scheduled steps to be the start and rejects incoming transitions", () => {
     const valid = scheduledConfig(schedules[0]!);
-    const scheduled = valid.loops[0]!.steps[0]!;
+    const scheduled = valid.loops[0]!.nodes[0]!;
     const human = {
       id: "gate",
       type: "human" as const,
       description: "Gate.",
       nodeStyle: "flat" as const,
-      on: { approved: scheduled.id, rejected: { end: "blocked" as const } }
+      nodeSize: "medium" as const,
+      on: { approved: scheduled.id, rejected: "blocked" }
     };
     const candidate = {
       ...valid,
-      loops: [{ ...valid.loops[0]!, start: human.id, steps: [scheduled, human] }]
+      loops: [{ ...valid.loops[0]!, start: human.id, nodes: [scheduled, human, ...defaultTerminalNodes()] }]
     };
     const issues = validateProjectAutomationConfig(candidate, [agent]);
     expect(issues).toContainEqual(expect.objectContaining({
-      path: "loops.0.steps.0.type",
+      path: "loops.0.nodes.0.type",
       message: expect.stringContaining("only as the loop start")
     }));
     expect(issues).toContainEqual(expect.objectContaining({
-      path: "loops.0.steps.1.on.approved",
+      path: "loops.0.nodes.1.on.approved",
       message: "No transition may target a scheduled start step."
     }));
   });
 
   it("requires an existing scheduled agent and at most one scheduled step", () => {
     const valid = scheduledConfig(schedules[0]!);
-    const scheduled = valid.loops[0]!.steps[0]!;
+    const scheduled = valid.loops[0]!.nodes[0]!;
     expect(validateProjectAutomationConfig({
       ...valid,
-      loops: [{ ...valid.loops[0]!, steps: [{ ...scheduled, agentId: "missing-agent" }] }]
-    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.steps.0.agentId" }));
+      loops: [{ ...valid.loops[0]!, nodes: [{ ...scheduled, agentId: "missing-agent" }, ...defaultTerminalNodes()] }]
+    }, [agent])).toContainEqual(expect.objectContaining({ path: "loops.0.nodes.0.agentId" }));
     expect(validateProjectAutomationConfig({
       ...valid,
-      loops: [{ ...valid.loops[0]!, steps: [scheduled, { ...scheduled, id: "second-schedule" }] }]
+      loops: [{ ...valid.loops[0]!, nodes: [scheduled, { ...scheduled, id: "second-schedule" }, ...defaultTerminalNodes()] }]
     }, [agent])).toContainEqual(expect.objectContaining({
-      path: "loops.0.steps",
+      path: "loops.0.nodes",
       message: "Loop may contain at most one scheduled step."
     }));
   });
@@ -130,15 +133,16 @@ describe("scheduled automation graph validation", () => {
 
 describe("scheduled automation domain helpers", () => {
   it("treats scheduled as the effective executable start and maps both outputs", () => {
-    const step = scheduledConfig(schedules[0]!).loops[0]!.steps[0]!;
+    const step = scheduledConfig(schedules[0]!).loops[0]!.nodes[0]!;
+    if (step.type !== "scheduled") throw new Error("Expected scheduled fixture node.");
     expect(resolveEffectiveStartStep(scheduledConfig(schedules[0]!).loops[0]!)?.id).toBe(step.id);
     expect(getProjectStepTransitionEntries(step)).toEqual([
-      ["approved", { end: "completed" }],
-      ["rejected", { end: "blocked" }]
+      ["approved", "completed"],
+      ["rejected", "blocked"]
     ]);
     expect(mapProjectStepTransitions(step, { approved: () => "next-step" }).on).toEqual({
       approved: "next-step",
-      rejected: { end: "blocked" }
+      rejected: "blocked"
     });
   });
 });

@@ -4,6 +4,7 @@ import {
   clockTimePattern,
   isCalendarDate,
   isIanaTimeZone,
+  loopNodeSizes,
   loopNodeStyles,
   type ProjectAutomationConfig,
   type ProjectStepSchedule
@@ -126,17 +127,25 @@ export const loopThemeSchema = z.object({
     color: loopThemeColorSchema
   }).strict()
 }).strict() satisfies z.ZodType<LoopTheme>;
-const stepEndSchema = z.object({ end: z.enum(["completed", "blocked", "failed"]) }).strict();
 const stepLoopSchema = z.object({ loop: kebabLoopIdSchema }).strict();
-const stepTransitionTargetSchema = z.union([automationStepIdSchema, stepLoopSchema, stepEndSchema]);
+const stepTransitionTargetSchema = z.union([automationStepIdSchema, stepLoopSchema]);
 const stepTransitionsSchema = z.object({
   approved: stepTransitionTargetSchema,
   rejected: stepTransitionTargetSchema
 }).strict();
-const executableStepBase = {
-  id: automationStepIdSchema,
+const terminalStatuses = ["completed", "blocked", "failed"] as const;
+const executableNodeIdSchema = automationStepIdSchema.refine(
+  (value) => !terminalStatuses.includes(value as (typeof terminalStatuses)[number]),
+  "Executable node id is reserved for a terminal node."
+);
+const nodeVisualBase = {
   description: optionalAutomationDescriptionSchema,
   nodeStyle: z.enum(loopNodeStyles),
+  nodeSize: z.enum(loopNodeSizes)
+};
+const executableStepBase = {
+  ...nodeVisualBase,
+  id: executableNodeIdSchema,
   on: stepTransitionsSchema
 };
 const calendarDateSchema = z.string().refine(isCalendarDate, "Expected a valid date in YYYY-MM-DD format.");
@@ -186,20 +195,65 @@ const projectStepSchema = z.discriminatedUnion("type", [
     schedule: projectStepScheduleSchema,
   }).strict()
 ]);
+const completedTerminalNodeSchema = z.object({
+  ...nodeVisualBase,
+  id: z.literal("completed"),
+  type: z.literal("completed")
+}).strict();
+const blockedTerminalNodeSchema = z.object({
+  ...nodeVisualBase,
+  id: z.literal("blocked"),
+  type: z.literal("blocked")
+}).strict();
+const failedTerminalNodeSchema = z.object({
+  ...nodeVisualBase,
+  id: z.literal("failed"),
+  type: z.literal("failed")
+}).strict();
+const projectLoopNodeSchema = z.discriminatedUnion("type", [
+  ...projectStepSchema.options,
+  completedTerminalNodeSchema,
+  blockedTerminalNodeSchema,
+  failedTerminalNodeSchema
+]);
 
 const projectLoopSchema = z.object({
   id: kebabLoopIdSchema,
   start: automationStepIdSchema,
-  steps: z.array(projectStepSchema).min(1)
-}).strict();
+  nodes: z.array(projectLoopNodeSchema).min(4)
+}).strict().superRefine((loop, context) => {
+  const seenNodeIds = new Set<string>();
+  loop.nodes.forEach((node, nodeIndex) => {
+    if (seenNodeIds.has(node.id)) context.addIssue({
+      code: "custom",
+      path: ["nodes", nodeIndex, "id"],
+      message: `Duplicate node id: ${node.id}.`
+    });
+    seenNodeIds.add(node.id);
+  });
+  terminalStatuses.forEach((status) => {
+    const count = loop.nodes.filter((node) => node.type === status).length;
+    if (count !== 1) context.addIssue({
+      code: "custom",
+      path: ["nodes"],
+      message: `Loop must contain exactly one ${status} terminal node.`
+    });
+  });
+  const startNode = loop.nodes.find((node) => node.id === loop.start);
+  if (!startNode || terminalStatuses.includes(startNode.type as (typeof terminalStatuses)[number])) context.addIssue({
+    code: "custom",
+    path: ["start"],
+    message: "Loop start must reference an executable node."
+  });
+});
 
 export const automationConfigSchema = z.object({
-  version: z.literal(7),
+  version: z.literal(8),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(7),
+  version: z.literal(8),
   agents: z.record(z.string().trim().min(1).max(200), portableAgentRuntimeIntentSchema),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectConfiguration>;

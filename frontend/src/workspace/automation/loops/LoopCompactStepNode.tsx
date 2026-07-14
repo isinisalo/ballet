@@ -6,7 +6,7 @@ import type { LoopNodeContext } from "./LoopCanvasTypes";
 import { loopReasoningGlowLevel } from "./loopReasoningGlow";
 import { loopThemeNodeGlow } from "./loopTheme";
 import { AgentAvatarIcon } from "../../agents/agentAvatars";
-import { defaultLoopNodeStyle, loopNodeStyleCatalog } from "@shared/api/workspace-contracts";
+import { defaultLoopNodeSize, defaultLoopNodeStyle } from "@shared/api/workspace-contracts";
 import { LoopNodeArtwork } from "./LoopNodeArtwork";
 const stepRunStatusClass: Record<string, string> = {
   queued: "border-tertiary/70 text-tertiary",
@@ -33,7 +33,7 @@ export function LoopCompactStepNode({
   const folded = records.length > 1;
   const loopId = record.loopId ?? context.selectedLoopId;
   const editable = !context.readOnly && loopId === context.selectedLoopId;
-  const draggable = !folded && editable && !record.step?.scheduled;
+  const draggable = !folded && editable && !record.step?.scheduled && !record.step?.terminal;
   const selectedStepIndexSet = new Set(context.selectedStepIndexes);
   const selected = records.some((candidate) => selectedStepIndexSet.has(candidate.index));
 
@@ -107,7 +107,7 @@ function StepNodeButton({ context, record, records, selected }: {
       data-loop-reasoning-effort={model.reasoningEffort}
       data-loop-reasoning-glow={model.reasoningGlow}
       data-loop-run-status={model.status}
-      aria-label={`${context.readOnly ? "View" : "Edit"} step ${model.title}`}
+      aria-label={`${context.readOnly ? "View" : "Edit"} ${model.kind === "terminal" ? "node" : "step"} ${model.title}`}
       title={model.tooltip}
       className={className}
       onClick={(event) => {
@@ -121,22 +121,22 @@ function StepNodeButton({ context, record, records, selected }: {
   );
 }
 
-type StepNodeKind = "agent" | "human" | "scheduled";
+type StepNodeKind = "agent" | "human" | "scheduled" | "terminal";
 function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
   const step = record.step;
   if (!step) return {
     title: record.stepKey || "Missing step",
     kind: "agent" as const,
-    nodeSize: loopNodeStyleCatalog[defaultLoopNodeStyle].size,
+    nodeSize: defaultLoopNodeSize,
     nodeStyle: defaultLoopNodeStyle,
     glowColor: loopThemeNodeGlow(context.theme),
     tooltip: record.stepKey || "Missing step",
     reasoningGlow: 0
   };
   const title = step.displayId || record.stepKey || "Missing step";
-  const kind: StepNodeKind = step.scheduled ? "scheduled" : step.humanGate ? "human" : "agent";
+  const kind: StepNodeKind = step.terminal ? "terminal" : step.scheduled ? "scheduled" : step.humanGate ? "human" : "agent";
   const nodeStyle = step.nodeStyle;
-  const nodeSize = loopNodeStyleCatalog[nodeStyle].size;
+  const nodeSize = step.nodeSize;
   const status = step.stepRun?.status;
   const scheduleLabel = step.scheduleLabel;
   return {
@@ -150,7 +150,7 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
     scheduleLabel,
     tooltip: scheduleLabel ? `${title} · ${scheduleLabel}` : title,
     reasoningEffort: step.reasoningEffort,
-    reasoningGlow: kind === "human" ? 0 : loopReasoningGlowLevel(step.reasoningEffort),
+    reasoningGlow: kind === "agent" || kind === "scheduled" ? loopReasoningGlowLevel(step.reasoningEffort) : 0,
     borderClass: kind === "human" ? "border-tertiary/60" : kind === "scheduled" ? "border-muted-foreground/55" : undefined,
     status,
     statusClass: status ? stepRunStatusClass[status] : undefined,

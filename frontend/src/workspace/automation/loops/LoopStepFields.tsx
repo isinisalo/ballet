@@ -1,26 +1,43 @@
 import { useId, type ReactNode } from "react";
-import type { Agent, LoopNodeStyle, ProjectStep } from "@shared/api/workspace-contracts";
-import { loopNodeStyleCatalog, loopNodeStyles } from "@shared/api/workspace-contracts";
+import type { Agent, LoopNodeSize, LoopNodeStyle, ProjectLoopNode, ProjectStep } from "@shared/api/workspace-contracts";
+import { loopNodeSizeCatalog, loopNodeSizes, loopNodeStyleCatalog, loopNodeStyles } from "@shared/api/workspace-contracts";
 import { ShieldCheck } from "lucide-react";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { LoopEditorSelect } from "./LoopEditorSelect";
 
-export function NodeStyleField({ step, disabled, onChange }: {
-  step: ProjectStep;
+export function NodeStyleField({ node, disabled, onChange }: {
+  node: ProjectLoopNode;
   disabled: boolean;
-  onChange: (step: ProjectStep) => void;
+  onChange: (node: ProjectLoopNode) => void;
 }) {
   return (
     <CompactSelectField
       label="Node style"
       ariaLabel="Node style"
-      value={step.nodeStyle}
+      value={node.nodeStyle}
       disabled={disabled}
       options={loopNodeStyles.map((style) => ({
         value: style,
-        label: `${loopNodeStyleCatalog[style].label} · ${sizeLabel(loopNodeStyleCatalog[style].size)}`
+        label: loopNodeStyleCatalog[style].label
       }))}
-      onChange={(nodeStyle) => onChange({ ...step, nodeStyle: nodeStyle as LoopNodeStyle } as ProjectStep)}
+      onChange={(nodeStyle) => onChange({ ...node, nodeStyle: nodeStyle as LoopNodeStyle } as ProjectLoopNode)}
+    />
+  );
+}
+
+export function NodeSizeField({ node, disabled, onChange }: {
+  node: ProjectLoopNode;
+  disabled: boolean;
+  onChange: (node: ProjectLoopNode) => void;
+}) {
+  return (
+    <CompactSelectField
+      label="Node size"
+      ariaLabel="Node size"
+      value={node.nodeSize}
+      disabled={disabled}
+      options={loopNodeSizes.map((size) => ({ value: size, label: loopNodeSizeCatalog[size].label }))}
+      onChange={(nodeSize) => onChange({ ...node, nodeSize: nodeSize as LoopNodeSize } as ProjectLoopNode)}
     />
   );
 }
@@ -75,5 +92,3 @@ export function CompactSelectField({ label, ariaLabel, value, options, disabled,
     </Field>
   );
 }
-
-const sizeLabel = (value: string) => `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;

@@ -63,7 +63,7 @@ export class ProjectConfigurationRepository {
   putAutomation(root: string, loops: ProjectConfiguration["loops"]): ProjectConfiguration {
     const loaded = this.load(root);
     assertWritable(loaded);
-    const config = normalize({ ...loaded.config!, version: 7, loops });
+    const config = normalize({ ...loaded.config!, version: 8, loops });
     this.write(root, config);
     return config;
   }
@@ -73,7 +73,7 @@ export class ProjectConfigurationRepository {
     assertWritable(loaded);
     const config = normalize({
       ...loaded.config!,
-      version: 7,
+      version: 8,
       agents: { ...loaded.config!.agents, [agentId]: intent }
     });
     this.write(root, config);
@@ -86,7 +86,7 @@ export class ProjectConfigurationRepository {
     if (!Object.hasOwn(loaded.config!.agents, agentId)) return loaded.config!;
     const agents = { ...loaded.config!.agents };
     delete agents[agentId];
-    const config = normalize({ ...loaded.config!, version: 7, agents });
+    const config = normalize({ ...loaded.config!, version: 8, agents });
     this.write(root, config);
     return config;
   }
@@ -115,7 +115,7 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 7,
+  version: 8,
   agents: Object.fromEntries(Object.entries(config.agents)
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([agentId, intent]) => [agentId, {

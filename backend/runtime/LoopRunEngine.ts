@@ -5,7 +5,7 @@ import type {
   ProjectStep,
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
-import { resolveEffectiveStartStep } from "../../shared/domain/automation.js";
+import { isProjectTerminalNode, resolveEffectiveStartStep } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
@@ -32,9 +32,6 @@ interface StartOptions {
 
 const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } =>
   typeof target === "object" && "loop" in target;
-
-const isEndTarget = (target: StepTransitionTarget): target is { end: "completed" | "blocked" | "failed" } =>
-  typeof target === "object" && "end" in target;
 
 const resultForOutcome = (outcome: AgentOutcome): StepRunResult =>
   outcome.outcome === "ready" || outcome.outcome === "approved" ? "approved" : "rejected";
@@ -198,16 +195,20 @@ export class LoopRunEngine {
     input?: string
   ): void {
     if (typeof target === "string") {
-      const nextStep = run.snapshot.steps.find((step) => step.id === target);
-      if (!nextStep || nextStep.type === "scheduled") {
+      const nextNode = run.snapshot.nodes.find((node) => node.id === target);
+      if (!nextNode) {
         this.store.finishRun(run.runId, "blocked");
         return;
       }
-      this.store.createStepRun(this.requireRun(run.runId), nextStep, input);
-      return;
-    }
-    if (isEndTarget(target)) {
-      this.store.finishRun(run.runId, target.end);
+      if (isProjectTerminalNode(nextNode)) {
+        this.store.finishRun(run.runId, nextNode.type);
+        return;
+      }
+      if (nextNode.type === "scheduled") {
+        this.store.finishRun(run.runId, "blocked");
+        return;
+      }
+      this.store.createStepRun(this.requireRun(run.runId), nextNode, input);
       return;
     }
     if (!isLoopTarget(target)) {
@@ -261,8 +262,8 @@ export class LoopRunEngine {
   }
 
   private requireSnapshotStep(run: LoopRun, stepId: string): ProjectStep {
-    const step = run.snapshot.steps.find((candidate) => candidate.id === stepId);
-    if (!step) throw new LoopRunStateError(`Step ${stepId} was not found in the run snapshot.`);
+    const step = run.snapshot.nodes.find((candidate) => candidate.id === stepId);
+    if (!step || isProjectTerminalNode(step)) throw new LoopRunStateError(`Step ${stepId} was not found in the run snapshot.`);
     return step;
   }
 

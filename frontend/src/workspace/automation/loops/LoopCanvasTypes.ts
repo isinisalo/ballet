@@ -19,7 +19,6 @@ export type LoopCanvasProps = {
   isCanvasPanning: boolean;
   loopCanvasRef: RefObject<HTMLDivElement>;
   canAddFirstStep: boolean;
-  canAddStepForEvent: (step?: LoopVisualStep) => boolean;
   onStepPointerDown: (event: PointerEvent<HTMLDivElement>, loopId: string, index: number) => void;
   onStepPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onStepPointerUp: (event: PointerEvent<HTMLDivElement>) => boolean;
@@ -28,7 +27,7 @@ export type LoopCanvasProps = {
   onCanvasMoveEnd: () => void;
   onStepSelect: (records: LoopStepRecord[]) => void;
   onOutputHandlerSelect: (edge: LoopCanvasEdge) => void;
-  onAddStep: (outputId?: string, sourceStep?: LoopVisualStep) => void;
+  onAddFirstStep: () => void;
 };
 
 export type LoopNodeContext = Omit<LoopCanvasProps, "layout" | "canvasHeight" | "isCanvasPanning" | "loopCanvasRef" | "onCanvasMoveStart" | "onCanvasMoveEnd">;

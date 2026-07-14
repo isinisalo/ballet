@@ -6,14 +6,7 @@ export type LoopLayoutDirection = "horizontal" | "vertical";
 export type LoopCanvasNodeKind =
   | "loop"
   | "step"
-  | "output-event"
   | "first-step-ghost";
-
-export type LoopCanvasOutputEvent = {
-  outputId: string;
-  eventType: string;
-  outputType: LoopOutputTarget["type"];
-};
 
 export type LoopCanvasLoopSummary = {
   loopId: string;
@@ -30,12 +23,8 @@ export type LoopCanvasLayoutNode = {
   direction: LoopLayoutDirection;
   record?: LoopStepRecord;
   records?: LoopStepRecord[];
-  eventType?: string;
-  outputEvent?: LoopCanvasOutputEvent;
   loopSummary?: LoopCanvasLoopSummary;
-  sourceStepId?: string;
   isEditingStep?: boolean;
-  outputIndex?: number;
   outputHandleCount?: number;
 };
 

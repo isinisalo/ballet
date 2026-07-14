@@ -5,7 +5,7 @@ import path from "node:path";
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../../shared/api/workspace-contracts.js";
-import type { ProjectAutomationConfig, ProjectStepSchedule } from "../../../shared/domain/automation.js";
+import { defaultTerminalNodes, type ProjectAutomationConfig, type ProjectStepSchedule } from "../../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../../shared/domain/loopThemes.js";
 import { RuntimeDatabase, type DispatchLoopScheduleResult } from "../../runtime-db.js";
 import { LoopScheduler, type LoopSchedulerOptions } from "../LoopScheduler.js";
@@ -30,12 +30,13 @@ afterEach(async () => {
 });
 
 const automation = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 7,
-  loops: [{ id: "scheduled-delivery", start: "timer", steps: [
-    { id: "timer", type: "scheduled", agentId: "delivery-agent", description: "Start on schedule.", nodeStyle: "luna", schedule,
-      on: { approved: "work", rejected: { end: "failed" } } },
-    { id: "work", type: "agent", agentId: "delivery-agent", description: "Deliver.", nodeStyle: "terra",
-      on: { approved: { end: "completed" }, rejected: { end: "failed" } } }
+  version: 8,
+  loops: [{ id: "scheduled-delivery", start: "timer", nodes: [
+    { id: "timer", type: "scheduled", agentId: "delivery-agent", description: "Start on schedule.", nodeStyle: "luna", nodeSize: "tiny", schedule,
+      on: { approved: "work", rejected: "failed" } },
+    { id: "work", type: "agent", agentId: "delivery-agent", description: "Deliver.", nodeStyle: "terra", nodeSize: "medium",
+      on: { approved: "completed", rejected: "failed" } },
+    ...defaultTerminalNodes()
   ] }]
 });
 
@@ -265,7 +266,7 @@ describe("Loop scheduler dispatch outcomes", () => {
       lastStatus: undefined
     })]);
 
-    data = workspace({ version: 7, loops: [] });
+    data = workspace({ version: 8, loops: [] });
     await scheduler.trigger();
     expect(database.listLoopScheduleStates()).toEqual([]);
   });

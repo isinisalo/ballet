@@ -35,9 +35,9 @@ export class AutomationService {
     if (automation.issues.length > 0) {
       throw new AutomationValidationError("Automation config is invalid.", automation.issues);
     }
-    const references = automation.config.loops.flatMap((loop) => loop.steps
-      .filter((step) => step.type !== "human" && step.agentId === agentId)
-      .map((step) => `${loop.id}:${step.id}`));
+    const references = automation.config.loops.flatMap((loop) => loop.nodes
+      .filter((node) => (node.type === "agent" || node.type === "scheduled") && node.agentId === agentId)
+      .map((node) => `${loop.id}:${node.id}`));
     if (references.length > 0) {
       throw new AutomationConflictError(
         `Agent ${agentId} is referenced by automation steps: ${references.join(", ")}.`

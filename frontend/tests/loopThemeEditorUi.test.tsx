@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   defaultLoopTheme,
+  defaultTerminalNodes,
   type AppData,
   type LoopTheme,
   type ProjectLoop
@@ -17,19 +18,20 @@ import { installThemeApi } from "./loopThemeEditorTestApi";
 const loop: ProjectLoop = {
   id: "delivery",
   start: "approval",
-  steps: [{
+  nodes: [{
     id: "approval",
     type: "human",
     nodeStyle: "sol",
+    nodeSize: "large",
     description: "Approve delivery",
-    on: { approved: { end: "completed" }, rejected: { end: "failed" } }
-  }]
+    on: { approved: "completed", rejected: "failed" }
+  }, ...defaultTerminalNodes()]
 };
 
 const theme = () => structuredClone(defaultLoopTheme);
 const data = (): AppData => ({
   ...emptyData,
-  automation: { version: 7, loops: [structuredClone(loop)] },
+  automation: { version: 8, loops: [structuredClone(loop)] },
   automationIssues: [],
   scheduleStates: [],
   loopTheme: theme(),
@@ -81,7 +83,7 @@ describe("singleton Loop theme editor", () => {
     expect(canvas.querySelector("[data-loop-edge-output-slot-kind='rework']")).toHaveAttribute("data-loop-edge-style", "dotted");
     expect(canvas.querySelector("[data-loop-edge-tone='cross-loop']")).toHaveAttribute("data-loop-edge-style", "dashed");
     ["completed", "blocked", "failed"].forEach((status) => {
-      expect(within(canvas).getAllByRole("img", { name: `Terminal target: ${status}` }).length).toBeGreaterThan(0);
+      expect(canvas.querySelector(`[data-loop-node-kind='terminal'] [data-loop-node-label='${status}']`)).toBeInTheDocument();
     });
     expect(within(canvas).queryByRole("button")).not.toBeInTheDocument();
     expect([...canvas.querySelectorAll<HTMLElement>(".react-flow__node")].every((node) => node.style.pointerEvents === "none")).toBe(true);

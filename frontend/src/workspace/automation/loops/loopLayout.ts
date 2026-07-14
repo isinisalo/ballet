@@ -41,7 +41,6 @@ export type {
   LoopCanvasLayout,
   LoopCanvasLayoutNode,
   LoopCanvasNodeKind,
-  LoopCanvasOutputEvent,
   LoopLayoutDirection
 } from "./loopLayoutTypes";
 

@@ -12,7 +12,6 @@ import {
   addCanvasEdge,
   addDagreEdge,
   addFirstStepGhost,
-  addOutputEventNode,
   addStepNode,
   loopOutputEdgeLabel,
   type LoopLayoutGraphDraft,
@@ -79,12 +78,10 @@ function layoutStepBranch(context: LoopLayoutGraphDraftContext, record: LoopStep
   if (visitedStepIds.has(record.stepKey)) return;
   const nextVisitedStepIds = new Set(visitedStepIds);
   const activeOutputTasks: LoopActiveOutputTask[] = [];
-  const inactiveOutputTargets: LoopOutputTarget[] = [];
   nextVisitedStepIds.add(record.stepKey);
 
-  collectOutputTasks(context, record, nextVisitedStepIds, activeOutputTasks, inactiveOutputTargets);
-  const visibleInactiveOutputTargets = inactiveOutputTargets;
-  addStepNode(context, record, activeOutputTasks.length + visibleInactiveOutputTargets.length);
+  collectOutputTasks(context, record, nextVisitedStepIds, activeOutputTasks);
+  addStepNode(context, record, activeOutputTasks.length);
 
   activeOutputTasks.forEach((task) => {
     if (task.kind === "existing-handler") {
@@ -93,23 +90,19 @@ function layoutStepBranch(context: LoopLayoutGraphDraftContext, record: LoopStep
     }
     task.childRecords.forEach((childRecord) => addChildStepEdge(context, record, task.output, childRecord, nextVisitedStepIds));
   });
-
-  visibleInactiveOutputTargets.forEach((output, inactiveIndex) => {
-    addOutputEventNode(context, record, output, activeOutputTasks.length + inactiveIndex);
-  });
 }
 
 function collectOutputTasks(
   context: LoopLayoutGraphDraftContext,
   record: LoopStepRecord,
   nextVisitedStepIds: ReadonlySet<string>,
-  activeOutputTasks: LoopActiveOutputTask[],
-  inactiveOutputTargets: LoopOutputTarget[]
+  activeOutputTasks: LoopActiveOutputTask[]
 ) {
   const recordOutputTargets = loopFoldedOutputTargets(context.loopGraph, record);
   const foldedRecords = loopFoldedRecords(context.loopGraph, record);
 
   recordOutputTargets.forEach((output) => {
+    if (output.type === "step" && output.targetLoopId !== record.loopId) return;
     const { eventType } = output;
     const childRecords = foldedRecords.flatMap((sourceRecord) =>
       context.loopGraph.childRecordsByParentEvent.get(`${sourceRecord.index}:${eventType}`) ?? []
@@ -131,8 +124,6 @@ function collectOutputTasks(
       });
       return;
     }
-
-    inactiveOutputTargets.push(output);
   });
 }
 

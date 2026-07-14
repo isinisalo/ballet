@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Agent, AgentExecutionState, LoopTheme, ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
+import { isProjectTerminalNode, type Agent, type AgentExecutionState, type LoopTheme, type ProjectAutomationConfig, type ProjectLoop, type ProjectStep } from "@shared/api/workspace-contracts";
 import type { RootRunDetail } from "@shared/api/workspace-contracts";
 import { CirclePlus, Radio, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -44,7 +44,8 @@ export function LoopRunView({
   const terminal = details && (rootDetail ? !rootActive : !["running", "waiting_for_human"].includes(details.status));
   const canvasLoop = details?.snapshot ?? loop;
   const selectedStepRun = useMemo(() => details?.stepRuns.find((stepRun) => stepRun.stepRunId === selectedStepRunId), [details?.stepRuns, selectedStepRunId]);
-  const selectedStep = canvasLoop.steps.find((step) => step.id === selectedStepRun?.stepId);
+  const selectedStep = canvasLoop.nodes.find((step): step is ProjectStep =>
+    step.id === selectedStepRun?.stepId && !isProjectTerminalNode(step));
   const selectedTask = rootDetail?.tasks.find((task) => task.id === selectedStepRun?.executionTaskId);
   const selectedAgentSnapshot = selectedTask?.spec.agent ?? details?.executionPlan?.steps.find((snapshot) =>
     snapshot.loopId === selectedStepRun?.loopId
@@ -110,7 +111,7 @@ export function LoopRunView({
       ) : null}
       {(!details || (terminal && showNewRun)) ? (
         <LoopRunStartPanel
-          bypassesSchedule={loop.steps.find((step) => step.id === loop.start)?.type === "scheduled"}
+          bypassesSchedule={loop.nodes.find((step) => step.id === loop.start)?.type === "scheduled"}
           disabledReason={startDisabledReason}
           preflightIssues={preflight?.issues}
           pending={busy}

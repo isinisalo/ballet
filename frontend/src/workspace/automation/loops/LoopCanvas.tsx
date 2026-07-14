@@ -28,7 +28,6 @@ export function LoopCanvas({
   onAddFirstStep,
   onStepSelect,
   onTransitionSelect,
-  onInsertStep,
   onReorderStep
 }: {
   config: ProjectAutomationConfig;
@@ -43,7 +42,6 @@ export function LoopCanvas({
   onAddFirstStep?: () => void;
   onStepSelect?: (stepId: string) => void;
   onTransitionSelect?: (stepId: string, result: ProjectStepTransitionId) => void;
-  onInsertStep?: (stepId: string, result: "approved" | "rejected") => void;
   onReorderStep?: (fromIndex: number, toIndex: number) => void;
 }) {
   const theme = run?.themeSnapshot ?? themeOverride ?? defaultLoopTheme;
@@ -61,15 +59,15 @@ export function LoopCanvas({
     selectedId: loop.id,
     reorderStep: (_loopId, fromIndex, toIndex) => onReorderStep?.(fromIndex, toIndex)
   });
-  const selectedIndexes = loop.steps.flatMap((step, index) => step.id === selectedStepId ? [index] : []);
+  const selectedIndexes = loop.nodes.flatMap((node, index) => node.id === selectedStepId ? [index] : []);
   const activeEdgeId = useMemo(() => activeRunEdgeId(layout.edges, loop, run), [layout.edges, loop, run]);
 
   const selectTransition = (edge: LoopCanvasEdge) => {
     const index = edge.route?.sourceStepIndex;
     const result = edge.route?.outputId;
-    const step = index === undefined ? undefined : loop.steps[index];
-    if (step && (result === "approved" || result === "rejected")) {
-      onTransitionSelect?.(step.id, result);
+    const node = index === undefined ? undefined : loop.nodes[index];
+    if (node && (node.type === "agent" || node.type === "human" || node.type === "scheduled") && (result === "approved" || result === "rejected")) {
+      onTransitionSelect?.(node.id, result);
     }
   };
 
@@ -88,8 +86,7 @@ export function LoopCanvas({
         canvasHeight={interaction.canvasHeight}
         isCanvasPanning={interaction.isCanvasPanning}
         loopCanvasRef={interaction.loopCanvasRef}
-        canAddFirstStep={!readOnly && loop.steps.length === 0 && Boolean(onAddFirstStep)}
-        canAddStepForEvent={(sourceStep) => !readOnly && Boolean(onInsertStep) && Boolean(sourceStep)}
+        canAddFirstStep={!readOnly && !loop.nodes.some((node) => node.type === "agent" || node.type === "human" || node.type === "scheduled") && Boolean(onAddFirstStep)}
         onStepPointerDown={interaction.handleStepPointerDown}
         onStepPointerMove={interaction.handleStepPointerMove}
         onStepPointerUp={interaction.handleStepPointerUp}
@@ -101,14 +98,7 @@ export function LoopCanvas({
           if (stepId) onStepSelect?.(stepId);
         }}
         onOutputHandlerSelect={selectTransition}
-        onAddStep={(outputId, sourceStep) => {
-          if (!sourceStep) {
-            onAddFirstStep?.();
-            return;
-          }
-          if (outputId !== "approved" && outputId !== "rejected") return;
-          onInsertStep?.(sourceStep.displayId, outputId);
-        }}
+        onAddFirstStep={() => onAddFirstStep?.()}
         activeEdgeId={activeEdgeId}
       />
       {canvasControls ? <div data-loop-canvas-controls className="absolute top-3 right-3 z-30">{canvasControls}</div> : null}
@@ -119,7 +109,7 @@ export function LoopCanvas({
 function activeRunEdgeId(edges: LoopCanvasEdge[], loop: ProjectLoop, run?: LoopRunDetails | null) {
   const latestWithResult = [...(run?.stepRuns ?? [])].reverse().find((stepRun) => stepRun.result);
   if (!latestWithResult?.result) return null;
-  const sourceStepIndex = loop.steps.findIndex((step) => step.id === latestWithResult.stepId);
+  const sourceStepIndex = loop.nodes.findIndex((node) => node.id === latestWithResult.stepId);
   return edges.find((edge) => edge.route?.sourceStepIndex === sourceStepIndex
     && edge.route?.outputId === latestWithResult.result)?.key ?? null;
 }

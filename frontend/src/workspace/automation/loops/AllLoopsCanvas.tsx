@@ -16,10 +16,10 @@ export function AllLoopsCanvas({
   return (
     <CollectionCardGrid label="All loops" addLabel="Add loop" addAriaLabel="+ Add loop" onAdd={onAddLoop}>
       {config.loops.map((loop) => {
-        const humanSteps = loop.steps.filter((step) => step.type === "human").length;
-        const agentSteps = loop.steps.filter((step) => step.type === "agent").length;
-        const scheduledSteps = loop.steps.filter((step) => step.type === "scheduled").length;
-        const nextLoops = new Set(loop.steps.flatMap(getProjectStepTransitionTargets)
+        const humanSteps = loop.nodes.filter((step) => step.type === "human").length;
+        const agentSteps = loop.nodes.filter((step) => step.type === "agent").length;
+        const scheduledSteps = loop.nodes.filter((step) => step.type === "scheduled").length;
+        const nextLoops = new Set(loop.nodes.flatMap((node) => node.type === "agent" || node.type === "human" || node.type === "scheduled" ? getProjectStepTransitionTargets(node) : [])
           .flatMap((target) => typeof target === "object" && "loop" in target ? [target.loop] : []));
         return (
           <article

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import { defaultTerminalNodes, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
@@ -46,35 +46,38 @@ const startLoop = (
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 7,
+  version: 8,
   loops: [{
     id: "delivery",
     start: "implement",
-    steps: [{
+    nodes: [{
       id: "implement",
       type: "agent",
       agentId: "developer-agent",
       description: "Implement.",
       nodeStyle: "terra",
-      on: { approved: "gate", rejected: { end: "failed" } }
+      nodeSize: "medium",
+      on: { approved: "gate", rejected: "failed" }
     }, {
       id: "gate",
       type: "human",
       description: "Approve.",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       on: { approved: { loop: "release" }, rejected: "implement" }
-    }]
+    }, ...defaultTerminalNodes()]
   }, {
     id: "release",
     start: "publish",
-    steps: [{
+    nodes: [{
       id: "publish",
       type: "agent",
       agentId: "release-agent",
       description: "Publish.",
       nodeStyle: "terra",
-      on: { approved: { end: "completed" }, rejected: { end: "failed" } }
-    }]
+      nodeSize: "medium",
+      on: { approved: "completed", rejected: "failed" }
+    }, ...defaultTerminalNodes()]
   }]
 });
 
@@ -82,6 +85,47 @@ const runById = (runtime: RuntimeDatabase, runId: string) =>
   runtime.listLoopRuns().find((run) => run.runId === runId);
 const latestRun = (runtime: RuntimeDatabase, loopId: string) =>
   runtime.listLoopRuns().find((run) => run.loopId === loopId);
+
+describe("terminal node runtime transitions", () => {
+  it.each([
+    ["completed", "approved"],
+    ["blocked", "rejected"],
+    ["failed", "rejected"]
+  ] as const)("resolves a node-id transition to the %s terminal", async (terminal, result) => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const automation: ProjectAutomationConfig = {
+      version: 8,
+      loops: [{
+        id: `terminal-${terminal}`,
+        start: "work",
+        nodes: [{
+          id: "work",
+          type: "agent",
+          agentId: "developer-agent",
+          description: "Work.",
+          nodeStyle: "flat",
+          nodeSize: "medium",
+          on: { approved: terminal, rejected: terminal }
+        }, ...defaultTerminalNodes()]
+      }]
+    };
+    const started = startLoop(runtime, automation, `terminal-${terminal}`);
+    const outcome: AgentOutcome = {
+      outcome: terminal === "completed" ? "ready" : terminal,
+      summary: `${terminal}.`,
+      checks: []
+    };
+    const completed = runtime.completeAgentStep(automation, openAiTheme, {
+      stepRunId: started.stepRuns[0]!.stepRunId,
+      outcome
+    });
+
+    expect(completed.status).toBe(terminal);
+    expect(completed.stepRuns).toHaveLength(1);
+    expect(completed.stepRuns[0]).toMatchObject({ result, status: "completed" });
+    runtime.close();
+  });
+});
 
 describe("local runtime database", () => {
   it("recognizes patched SQLite versions", () => {
@@ -214,18 +258,19 @@ describe("local runtime safeguards", () => {
   it("blocks a root run after the 20-transition safety limit", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const cyclic: ProjectAutomationConfig = {
-      version: 7,
+      version: 8,
       loops: [{
         id: "cycle",
         start: "again",
-        steps: [{
+        nodes: [{
           id: "again",
           type: "agent",
           agentId: "developer-agent",
           description: "Again.",
           nodeStyle: "terra",
-          on: { approved: "again", rejected: { end: "failed" } }
-        }]
+          nodeSize: "medium",
+          on: { approved: "again", rejected: "failed" }
+        }, ...defaultTerminalNodes()]
       }]
     };
     let details = startLoop(runtime, cyclic, "cycle");

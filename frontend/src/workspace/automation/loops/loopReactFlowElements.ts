@@ -25,15 +25,16 @@ export function loopNodeHandles(
 ): LoopReactFlowNode["handles"] {
   const anchorTop = loopCanvasNodeAnchorY(layoutNode);
   const ids = new Set(activeHandleIds);
+  const terminal = Boolean(layoutNode.record?.step?.terminal);
   const handles: NonNullable<LoopReactFlowNode["handles"]> = [];
   if (ids.has("left")) handles.push({ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 });
-  if (ids.has("right")) handles.push({ id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 });
+  if (ids.has("right") && !terminal) handles.push({ id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 });
   if (ids.has("top")) {
-    handles.push({ id: "top", type: "source", position: Position.Top, x: layoutNode.width / 2, y: 0, width: 1, height: 1 });
+    if (!terminal) handles.push({ id: "top", type: "source", position: Position.Top, x: layoutNode.width / 2, y: 0, width: 1, height: 1 });
     handles.push({ id: "top", type: "target", position: Position.Top, x: layoutNode.width / 2, y: 0, width: 1, height: 1 });
   }
   if (ids.has("bottom")) {
-    handles.push({ id: "bottom", type: "source", position: Position.Bottom, x: layoutNode.width / 2, y: layoutNode.height, width: 1, height: 1 });
+    if (!terminal) handles.push({ id: "bottom", type: "source", position: Position.Bottom, x: layoutNode.width / 2, y: layoutNode.height, width: 1, height: 1 });
     handles.push({ id: "bottom", type: "target", position: Position.Bottom, x: layoutNode.width / 2, y: layoutNode.height, width: 1, height: 1 });
   }
   return handles;

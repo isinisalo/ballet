@@ -51,4 +51,4 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
 const formatDate = (value: string) => new Date(value).toLocaleString();
 
 const formatTransition = (target: StepTransitionTarget) =>
-  typeof target === "string" ? `Step · ${target}` : "loop" in target ? `Loop · ${target.loop}` : `End · ${target.end}`;
+  typeof target === "string" ? `Node · ${target}` : `Loop · ${target.loop}`;

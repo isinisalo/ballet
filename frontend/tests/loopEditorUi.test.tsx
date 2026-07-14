@@ -1,8 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   defaultLoopTheme,
+  defaultTerminalNodes,
   type Agent,
   type LoopTheme,
   type ProjectAutomationConfig,
@@ -24,23 +25,25 @@ const agents: Agent[] = [{
 const loop: ProjectLoop = {
   id: "delivery",
   start: "build",
-  steps: [{
+  nodes: [{
     id: "build",
     type: "agent",
     nodeStyle: "sol",
+    nodeSize: "large",
     agentId: "builder",
     description: "Build release",
-    on: { approved: "review", rejected: { end: "failed" } }
+    on: { approved: "review", rejected: "failed" }
   }, {
     id: "review",
     type: "human",
     nodeStyle: "luna",
+    nodeSize: "tiny",
     description: "Review release",
-    on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-  }]
+    on: { approved: "completed", rejected: "blocked" }
+  }, ...defaultTerminalNodes()]
 };
 
-const config: ProjectAutomationConfig = { version: 7, loops: [loop] };
+const config: ProjectAutomationConfig = { version: 8, loops: [loop] };
 
 describe("compact Loop editor UI", () => {
   it("opens the 50/50 sheet with instructions and Step editor panes", async () => {
@@ -48,31 +51,47 @@ describe("compact Loop editor UI", () => {
     renderEditor();
 
     await user.click(await screen.findByRole("button", { name: "Edit step build" }));
-    const dialog = screen.getByRole("dialog", { name: "Step editor" });
+    const dialog = screen.getByRole("dialog", { name: "Node editor" });
     const workspace = screen.getByRole("region", { name: "Loop canvas workspace" });
     const paneGrid = [...dialog.children].find((child) => child.className.includes("grid-cols-[3fr_2fr]"));
 
     expect(workspace).toHaveClass("md:grid-cols-2");
     expect(paneGrid).toBeDefined();
-    expect(screen.getByLabelText("Step ID")).toHaveValue("build");
-    expect(screen.getByRole("combobox", { name: "Node style" })).toHaveTextContent("Sol · Large");
+    expect(screen.getByLabelText("Node ID")).toHaveValue("build");
+    expect(screen.getByRole("combobox", { name: "Node style" })).toHaveTextContent("Sol");
+    expect(screen.getByRole("combobox", { name: "Node size" })).toHaveTextContent("Large");
     expect(screen.getByText("Transitions")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove from loop" })).toBeEnabled();
   });
 
-  it("adds a Flat Step before a terminal node and preserves the terminal", async () => {
+  it("shows locked empty agent and output fields for a terminal node", async () => {
     const onChange = vi.fn();
     renderEditor({ onChange });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Add step before completed" }));
-    expect(onChange).toHaveBeenCalledTimes(1);
-    const next = onChange.mock.calls[0]![0] as ProjectLoop;
-    expect(next.steps.find((step) => step.id === "review")?.on.approved).toBe("new-step");
-    expect(next.steps.find((step) => step.id === "new-step")).toMatchObject({
-      nodeStyle: "flat",
-      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-    });
-    expect(screen.queryByText("Actions")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit node completed" }));
+
+    expect(screen.getByLabelText("Node ID")).toHaveValue("completed");
+    expect(screen.getByLabelText("Node ID")).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Node type" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Agent" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Agent" }).parentElement?.querySelector("input[aria-hidden='true']")).toHaveValue("");
+    for (const output of ["approved", "rejected"]) {
+      expect(screen.getByRole("combobox", { name: `${output} transition kind` })).toBeDisabled();
+      expect(screen.getByRole("combobox", { name: `${output} transition target` })).toBeDisabled();
+    }
+    expect(screen.queryByRole("button", { name: "Remove from loop" })).not.toBeInTheDocument();
+  });
+
+  it("keeps Node size when Node style changes", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderEditor({ onChange });
+    await user.click(await screen.findByRole("button", { name: "Edit step build" }));
+    await user.click(screen.getByRole("combobox", { name: "Node style" }));
+    await user.click(await screen.findByRole("option", { name: "Luna" }, { timeout: 3_000 }));
+
+    const next = onChange.mock.calls.at(-1)?.[0] as ProjectLoop;
+    expect(next.nodes.find((node) => node.id === "build")).toMatchObject({ nodeStyle: "luna", nodeSize: "large" });
   });
 
   it("renders Step-owned styles, sizes, reasoning, and connection points", async () => {

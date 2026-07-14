@@ -4,6 +4,7 @@ import {
     collectionUpsertSchema,
     projectDocumentSaveSchema
 } from "../../shared/api/workspace-schemas.js";
+import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import { parseUnknown } from "../http/validation/httpValidation.js";
 import { expectValidationError } from "./expectValidationError.js";
 
@@ -20,18 +21,19 @@ describe("HTTP Zod validation", () => {
 
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
-      version: 7,
+      version: 8,
       loops: [{
         id: "delivery",
         start: "implementation",
-        steps: [{
+        nodes: [{
           id: "implementation",
           type: "agent",
           description: "Implementation",
           nodeStyle: "terra",
+          nodeSize: "medium",
           agentId: "developer-agent",
-          on: { approved: { end: "completed" }, rejected: { end: "failed" } }
-        }]
+          on: { approved: "completed", rejected: "failed" }
+        }, ...defaultTerminalNodes()]
       }]
     };
     expect(parseUnknown(automationConfigSchema, valid)).toEqual(valid);
@@ -40,6 +42,7 @@ describe("HTTP Zod validation", () => {
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 1 }), "version");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 3 }), "version");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 4 }), "version");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 7 }), "version");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, loops: undefined }), "loops");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, gates: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
@@ -48,8 +51,8 @@ describe("HTTP Zod validation", () => {
     }), "loops.0.id");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
       ...valid,
-      loops: [{ ...valid.loops[0], steps: [{ ...valid.loops[0]!.steps[0], type: "human", agentId: "legacy" }] }]
-    }), "loops.0.steps.0");
+      loops: [{ ...valid.loops[0], nodes: [{ ...valid.loops[0]!.nodes[0], type: "human", agentId: "legacy" }, ...defaultTerminalNodes()] }]
+    }), "loops.0.nodes.0");
   });
 
   it("uses collection-specific upsert schemas", () => {

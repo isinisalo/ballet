@@ -11,8 +11,7 @@ export const loopStepNodeSizes: Record<LoopNodeSize, number> = {
 export const loopNodeSizes = {
   loop: { minWidth: 22, maxWidth: 22, height: 22 },
   step: { minWidth: 24, maxWidth: 64, height: 64 },
-  event: { width: 22, height: 22 },
-  outputEvent: { minWidth: 24, maxWidth: 24, height: 24, rowGap: 32 }
+  event: { width: 22, height: 22 }
 };
 
 export const loopCanvasLayoutConfig = {
@@ -23,9 +22,7 @@ export const loopCanvasLayoutConfig = {
   branchGap: 72,
   edgePad: 18,
   selectedCompactLoopRowGap: 112,
-  compactLoopRowGap: 24,
-  outputEventsLaneGap: 24,
-  outputEventLaneClearance: 24
+  compactLoopRowGap: 24
 };
 
 export const loopDirectionHandles: Record<LoopLayoutDirection, { rankdir: "LR" | "TB"; sourceHandleId: string; targetHandleId: string }> = {

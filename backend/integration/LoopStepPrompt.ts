@@ -50,7 +50,7 @@ export const renderLoopStepPrompt = (
   currentRun: LoopRunDetails,
   currentStep: StepRun
 ): string => {
-  const snapshotStep = currentRun.snapshot.steps.find((step) => step.id === currentStep.stepId);
+  const snapshotStep = currentRun.snapshot.nodes.find((step) => step.id === currentStep.stepId);
   if (!snapshotStep) {
     throw new Error(`Loop step snapshot is missing ${currentRun.loopId}:${currentStep.stepId}.`);
   }

@@ -19,7 +19,7 @@ Queued work survives a Ballet restart. Work that was running when the process ex
 
 Portable, version-controlled automation remains in the checkout:
 
-- `.ballet/project.json` — strict project configuration v7, including Loops, per-Step node styles, schedules, outputs, and agent provider/model/reasoning/network intent;
+- `.ballet/project.json` — strict project configuration v8, including `loops[].nodes`, independent per-node artwork and size, fixed terminal nodes, schedules, transitions, and agent provider/model/reasoning/network intent;
 - `.ballet/theme.json` — the single project-wide Loop visualization theme;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` — project documents;
 - `.codex/agents/*.toml` — agent definitions and instructions; and
@@ -115,6 +115,8 @@ The upper-left Ballet dropdown switches the application between **Configure** an
 
 - Configure edits repository-backed project documents, agents, skills, the single project Loop theme, Loops, Steps, Transitions, and schedules.
 - Run opens the overview or a Loop/agent target, checks local provider readiness, starts persisted work, and shows immutable instructions beside the durable console or human response controls.
+
+Loop configuration v8 stores executable and terminal nodes together in `loops[].nodes`. Every node selects one of nine artwork styles and one independent size: Tiny 24 px, Small 36 px, Medium 48 px, or Large 64 px. Each Loop has exactly one fixed-ID `completed`, `blocked`, and `failed` terminal. Local transitions use a node ID; cross-Loop transitions retain `{ "loop": "target-loop" }`. Terminal nodes have no agent or outputs, and selecting one edits only its description, artwork, and size. The editor creates only the first executable node for a new Loop and offers no terminal insertion action; existing multi-node Loops remain editable.
 
 Agent execution keeps provider, model, reasoning effort, and network intent in `.ballet/project.json`. Provider commands and absolute read-only roots are local settings. There is no computer or runtime attachment selection because the current checkout's host is always the runtime.
 

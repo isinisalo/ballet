@@ -1,21 +1,43 @@
 {
-  "version": 7,
+  "version": 8,
   "agents": {},
   "loops": [
     {
       "id": "adr-review",
       "start": "run",
-      "steps": [
+      "nodes": [
         {
           "id": "run",
           "nodeStyle": "terra",
+          "nodeSize": "medium",
           "type": "agent",
           "agentId": "reviewer",
           "description": "",
           "on": {
-            "approved": { "end": "completed" },
-            "rejected": { "end": "failed" }
+            "approved": "completed",
+            "rejected": "failed"
           }
+        },
+        {
+          "id": "completed",
+          "type": "completed",
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny"
+        },
+        {
+          "id": "blocked",
+          "type": "blocked",
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny"
+        },
+        {
+          "id": "failed",
+          "type": "failed",
+          "description": "",
+          "nodeStyle": "flat",
+          "nodeSize": "tiny"
         }
       ]
     }

@@ -3,11 +3,11 @@ import type { Agent, AgentExecutionState, LoopScheduleState, LoopTheme, ProjectA
 import { LockKeyhole } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TextField } from "@/components/shared/workspace-ui";
-import { addFirstStep, insertStepForTransition, removeStep, reorderLoopSteps, replaceStep } from "./loopEditorState";
+import { addFirstStep, removeStep, reorderLoopSteps, replaceNode } from "./loopEditorState";
 import { LoopCanvas } from "./LoopCanvas";
 import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
 import { LoopHandlerSheet } from "./LoopHandlerSheet";
-import { LoopStepSheetEditor } from "./LoopStepSheetEditor";
+import { LoopNodeSheetEditor } from "./LoopStepSheetEditor";
 import { loopIdError } from "./loopFormValidation";
 
 type Selection = { stepId: string; transition?: ProjectStepTransitionId };
@@ -57,7 +57,7 @@ export function LoopEditor({
   onChange: (loop: ProjectLoop) => void;
 }) {
   const [selection, setSelection] = useState<Selection | null>(null);
-  const selectedStep = loop.steps.find((step) => step.id === selection?.stepId);
+  const selectedStep = loop.nodes.find((node) => node.id === selection?.stepId);
   const editingDisabled = locked || disabled;
   const controls = canvasControls ? <div className="flex items-center gap-2">{canvasControls}</div> : undefined;
   const selectionScope = creation ? "new-loop" : loop.id;
@@ -71,7 +71,7 @@ export function LoopEditor({
   const insertFirstStep = () => {
     if (editingDisabled) return;
     const next = addFirstStep(loop, agents);
-    const step = next.steps[0];
+    const step = next.nodes.find((node) => node.type === "agent" || node.type === "human" || node.type === "scheduled");
     onChange(next);
     if (step) setSelection({ stepId: step.id });
   };
@@ -96,25 +96,18 @@ export function LoopEditor({
           onAddFirstStep={insertFirstStep}
           onStepSelect={(stepId) => setSelection({ stepId })}
           onTransitionSelect={(stepId, transition) => setSelection({ stepId, transition })}
-          onInsertStep={(stepId, result) => {
-            if (editingDisabled) return;
-            const next = insertStepForTransition(loop, stepId, result, agents);
-            onChange(next);
-            const inserted = next.steps.find((step) => !loop.steps.some((candidate) => candidate.id === step.id));
-            if (inserted) setSelection({ stepId: inserted.id });
-          }}
           onReorderStep={(fromIndex, toIndex) => {
             if (!editingDisabled) onChange(reorderLoopSteps(loop, fromIndex, toIndex));
           }}
         />
         <LoopHandlerSheet
           open={Boolean(selectedStep)}
-          title={selection?.transition ? "Transition editor" : creation ? "Loop definition" : "Step editor"}
+          title={selection?.transition ? "Transition editor" : creation ? "Loop definition" : "Node editor"}
           header={creation ? <LoopIdentityHeader loop={loop} loops={loops} disabled={editingDisabled} onChange={onChange} /> : undefined}
           onOpenChange={(open) => { if (!open) setSelection(null); }}
           left={selectedStep ? <LoopHandlerAgentInstructions step={selectedStep} agents={agents} /> : null}
           right={selectedStep ? (
-            <LoopStepSheetEditor
+            <LoopNodeSheetEditor
               step={selectedStep}
               loop={loop}
               loops={loops}
@@ -124,7 +117,7 @@ export function LoopEditor({
               focusedTransition={selection?.transition}
               onChange={(step) => {
                 const previousId = selectedStep.id;
-                onChange(replaceStep(loop, previousId, step));
+                onChange(replaceNode(loop, previousId, step));
                 if (step.id !== previousId) setSelection((current) => current ? { ...current, stepId: step.id } : current);
               }}
               onRemove={() => {

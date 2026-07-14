@@ -226,6 +226,14 @@ body {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
+.loop-step-node:is(
+  [data-loop-node-style="black-hole"],
+  [data-loop-node-style="satellite"],
+  [data-loop-node-style="meteorite"]
+) {
+  border-color: transparent !important;
+}
+
 .loop-node-surface {
   position: absolute;
   inset: 1px;
@@ -286,6 +294,16 @@ body {
 .loop-node-surface--meteorite,
 .loop-node-surface--spaceman {
   overflow: visible;
+}
+
+.loop-node-surface--satellite,
+.loop-node-surface--meteorite {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--loop-node-glow-color) 30%, transparent));
+}
+
+.loop-step-node:hover .loop-node-surface:is(.loop-node-surface--satellite, .loop-node-surface--meteorite),
+.loop-step-node:focus-visible .loop-node-surface:is(.loop-node-surface--satellite, .loop-node-surface--meteorite) {
+  filter: brightness(1.12) drop-shadow(0 0 5px color-mix(in srgb, var(--loop-node-glow-color) 30%, transparent));
 }
 
 .loop-node-artwork-svg {

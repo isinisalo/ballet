@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { Agent } from "../../shared/domain/agents.js";
+import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
 import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
@@ -54,19 +55,20 @@ describe("LoopExecutionPlanner scheduled agents", () => {
     const data = {
       agents: [agent],
       automation: {
-        version: 7,
+        version: 8,
         loops: [{
           id: "scheduled-loop",
           start: "scheduled-start",
-          steps: [{
+          nodes: [{
             id: "scheduled-start",
             type: "scheduled",
             agentId: agent.id,
             description: "Run scheduled work.",
             nodeStyle: "luna",
+            nodeSize: "tiny",
             schedule: { kind: "once", date: "2026-07-14", time: "21:00", timeZone: "UTC" },
-            on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-          }]
+            on: { approved: "completed", rejected: "blocked" }
+          }, ...defaultTerminalNodes()]
         }]
       }
     } as unknown as AppData;

@@ -3,6 +3,7 @@ import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { Agent } from "../../shared/domain/agents.js";
 import {
   getProjectStepTransitionTargets,
+  isProjectTerminalNode,
   type ProjectAgentBackedStep,
   type ProjectLoop
 } from "../../shared/domain/automation.js";
@@ -25,8 +26,8 @@ export const reachableAgentSteps = (
   data: Pick<AppData, "automation">,
   rootLoopId: string
 ): Array<{ loopId: string; step: ProjectAgentBackedStep }> =>
-  reachableLoops(data, rootLoopId).flatMap((loop) => loop.steps.flatMap((step) =>
-    step.type !== "human" ? [{ loopId: loop.id, step }] : []));
+  reachableLoops(data, rootLoopId).flatMap((loop) => loop.nodes.flatMap((node) =>
+    !isProjectTerminalNode(node) && node.type !== "human" ? [{ loopId: loop.id, step: node }] : []));
 
 export const reachableLoops = (
   data: Pick<AppData, "automation">,
@@ -43,7 +44,8 @@ export const reachableLoops = (
     const loop = loops.get(loopId);
     if (!loop) continue;
     result.push(loop);
-    for (const step of loop.steps) {
+    for (const step of loop.nodes) {
+      if (isProjectTerminalNode(step)) continue;
       for (const target of getProjectStepTransitionTargets(step)) {
         if (typeof target === "object" && "loop" in target) pending.push(target.loop);
       }

@@ -39,29 +39,8 @@ export function loopStepStackHeight() {
   return loopNodeSizes.step.height;
 }
 
-export function loopOutputEventNodeWidth() {
-  return loopNodeSizes.outputEvent.minWidth;
-}
-
 export function loopHorizontalEdgeGap() {
   return loopCanvasLayoutConfig.horizontalEdgeGap;
-}
-
-export function outputEventStackStep() {
-  return loopNodeSizes.outputEvent.height + loopNodeSizes.outputEvent.rowGap;
-}
-
-export function outputEventStackHeight(count: number) {
-  if (count <= 0) return loopNodeSizes.outputEvent.height;
-  return count * loopNodeSizes.outputEvent.height + Math.max(0, count - 1) * loopNodeSizes.outputEvent.rowGap;
-}
-
-export function canAlignTerminalOutputEvents(outputHandleCount: number) {
-  if (outputHandleCount <= 1) return true;
-  const firstHandleY = loopStepOutputHandleY(0, outputHandleCount);
-  const secondHandleY = loopStepOutputHandleY(1, outputHandleCount);
-  const rowGap = secondHandleY - firstHandleY - loopNodeSizes.outputEvent.height;
-  return rowGap >= loopNodeSizes.outputEvent.rowGap / 2;
 }
 
 export function loopBranchStackHeight(node: Pick<LoopCanvasLayoutNode, "height" | "kind">) {

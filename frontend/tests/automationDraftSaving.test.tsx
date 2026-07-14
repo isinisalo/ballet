@@ -1,20 +1,21 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { defaultTerminalNodes, type ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { useAutomationDraft } from "../src/workspace/automation/useAutomationDraft";
 
 const config = (id?: string): ProjectAutomationConfig => ({
-  version: 7,
+  version: 8,
   loops: id ? [{
     id,
     start: "first",
-    steps: [{
+    nodes: [{
       id: "first",
       type: "human",
       nodeStyle: "flat",
+      nodeSize: "medium",
       description: "Review",
-      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
-    }]
+      on: { approved: "completed", rejected: "blocked" }
+    }, ...defaultTerminalNodes()]
   }] : []
 });
 

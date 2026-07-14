@@ -6,80 +6,126 @@ import { buildLoopVisualProjection } from "../loops/loopVisualProjection";
 
 const previewLoopId = "theme-preview";
 const previewConfig: ProjectAutomationConfig = {
-  version: 7,
+  version: 8,
   loops: [{
     id: previewLoopId,
     start: "luna",
-    steps: [{
+    nodes: [{
       id: "luna",
       type: "scheduled",
       agentId: "preview-agent",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       description: "Tiny Luna schedule",
       schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
-      on: { approved: "black-hole", rejected: { end: "blocked" } }
+      on: { approved: "black-hole", rejected: "blocked" }
     }, {
       id: "black-hole",
       type: "agent",
       agentId: "preview-agent",
       nodeStyle: "black-hole",
+      nodeSize: "tiny",
       description: "Tiny Black hole",
-      on: { approved: "satellite", rejected: { end: "failed" } }
+      on: { approved: "satellite", rejected: "failed" }
     }, {
       id: "satellite",
       type: "human",
       nodeStyle: "satellite",
+      nodeSize: "tiny",
       description: "Tiny Satellite",
-      on: { approved: "meteorite", rejected: { end: "completed" } }
+      on: { approved: "meteorite", rejected: "completed" }
     }, {
       id: "meteorite",
       type: "agent",
       agentId: "preview-agent",
       nodeStyle: "meteorite",
+      nodeSize: "tiny",
       description: "Tiny Meteorite",
-      on: { approved: "spaceman", rejected: { end: "blocked" } }
+      on: { approved: "spaceman", rejected: "blocked" }
     }, {
       id: "spaceman",
       type: "human",
       nodeStyle: "spaceman",
+      nodeSize: "tiny",
       description: "Tiny Spaceman",
-      on: { approved: "mars", rejected: { end: "failed" } }
+      on: { approved: "mars", rejected: "failed" }
     }, {
       id: "mars",
       type: "agent",
       agentId: "preview-agent",
       nodeStyle: "mars",
+      nodeSize: "small",
       description: "Small Mars",
-      on: { approved: "flat", rejected: { end: "blocked" } }
+      on: { approved: "flat", rejected: "blocked" }
     }, {
       id: "flat",
       type: "human",
       nodeStyle: "flat",
+      nodeSize: "medium",
       description: "Medium Flat",
-      on: { approved: "terra", rejected: { end: "failed" } }
+      on: { approved: "terra", rejected: "failed" }
     }, {
       id: "terra",
       type: "agent",
       agentId: "preview-agent",
       nodeStyle: "terra",
+      nodeSize: "medium",
       description: "Medium Terra",
-      on: { approved: "sol", rejected: { end: "blocked" } }
+      on: { approved: "sol", rejected: "blocked" }
     }, {
       id: "sol",
       type: "human",
       nodeStyle: "sol",
+      nodeSize: "large",
       description: "Large Sol",
-      on: { approved: { loop: "downstream-loop" }, rejected: { end: "failed" } }
+      on: { approved: { loop: "downstream-loop" }, rejected: "failed" }
+    }, {
+      id: "completed",
+      type: "completed",
+      nodeStyle: "flat",
+      nodeSize: "tiny",
+      description: "Completed terminal"
+    }, {
+      id: "blocked",
+      type: "blocked",
+      nodeStyle: "luna",
+      nodeSize: "tiny",
+      description: "Blocked terminal"
+    }, {
+      id: "failed",
+      type: "failed",
+      nodeStyle: "meteorite",
+      nodeSize: "tiny",
+      description: "Failed terminal"
     }]
   }, {
     id: "downstream-loop",
     start: "downstream-step",
-    steps: [{
+    nodes: [{
       id: "downstream-step",
       type: "human",
       nodeStyle: "flat",
+      nodeSize: "medium",
       description: "Cross-Loop destination",
-      on: { approved: { end: "completed" }, rejected: { end: "blocked" } }
+      on: { approved: "completed", rejected: "blocked" }
+    }, {
+      id: "completed",
+      type: "completed",
+      nodeStyle: "flat",
+      nodeSize: "tiny",
+      description: ""
+    }, {
+      id: "blocked",
+      type: "blocked",
+      nodeStyle: "flat",
+      nodeSize: "tiny",
+      description: ""
+    }, {
+      id: "failed",
+      type: "failed",
+      nodeStyle: "flat",
+      nodeSize: "tiny",
+      description: ""
     }]
   }]
 };
@@ -123,7 +169,6 @@ export function LoopThemePreview({ theme }: { theme: LoopTheme }) {
       isCanvasPanning={false}
       loopCanvasRef={canvasRef}
       canAddFirstStep={false}
-      canAddStepForEvent={() => false}
       onStepPointerDown={() => undefined}
       onStepPointerMove={() => undefined}
       onStepPointerUp={() => false}
@@ -132,7 +177,7 @@ export function LoopThemePreview({ theme }: { theme: LoopTheme }) {
       onCanvasMoveEnd={() => undefined}
       onStepSelect={() => undefined}
       onOutputHandlerSelect={() => undefined}
-      onAddStep={() => undefined}
+      onAddFirstStep={() => undefined}
     />
   );
 }

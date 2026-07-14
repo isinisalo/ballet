@@ -1,6 +1,6 @@
 import dagre from "@dagrejs/dagre";
 import { loopCanvasLayoutConfig, loopDirectionHandles, loopNodeSizes } from "./loopLayoutConfig";
-import { outputEventStackHeight, loopBranchStackHeight } from "./loopLayoutSizing";
+import { loopBranchStackHeight } from "./loopLayoutSizing";
 import type { LoopCanvasLayoutNodeDraft, LoopDagreEdge, LoopLayoutDirection } from "./loopLayoutTypes";
 
 export function loopNodeRanks(nodes: LoopCanvasLayoutNodeDraft[], edges: LoopDagreEdge[]) {
@@ -47,11 +47,8 @@ export function loopNodeOrderIndexes(nodes: LoopCanvasLayoutNodeDraft[], edges: 
 
 export function loopHorizontalLaneYOffsets(
   nodes: LoopCanvasLayoutNodeDraft[],
-  outputNodes: LoopCanvasLayoutNodeDraft[],
-  edges: LoopDagreEdge[],
   laneIndexes: ReadonlyMap<string, number>
 ) {
-  const primaryNodeByKey = new Map(nodes.map((node) => [node.key, node]));
   const laneCount = Math.max(0, ...[...laneIndexes.values()]) + 1;
   const laneHeights = Array.from({ length: laneCount }, () => 0);
 
@@ -59,40 +56,6 @@ export function loopHorizontalLaneYOffsets(
     const laneIndex = laneIndexes.get(node.key);
     if (laneIndex === undefined) return;
     laneHeights[laneIndex] = Math.max(laneHeights[laneIndex], loopBranchStackHeight(node));
-  });
-
-  outputNodesBySourceKey(outputNodes).forEach((sourceOutputNodes, sourceKey) => {
-    const sourceNode = primaryNodeByKey.get(sourceKey);
-    const sourceLaneIndex = laneIndexes.get(sourceKey);
-    if (!sourceNode || sourceLaneIndex === undefined) return;
-    const outputStackHeightValue = outputEventStackHeight(sourceOutputNodes.length);
-    const childNodes = edges
-      .filter((edge) => edge.source === sourceKey && edge.target.startsWith("step-"))
-      .map((edge) => primaryNodeByKey.get(edge.target))
-      .filter((childNode): childNode is LoopCanvasLayoutNodeDraft => Boolean(childNode));
-
-    if (childNodes.length === 0) {
-      laneHeights[sourceLaneIndex] = Math.max(
-        laneHeights[sourceLaneIndex],
-        outputStackHeightValue
-      );
-      return;
-    }
-
-    const lastChildNode = childNodes.reduce((currentLastChildNode, childNode) => {
-      const currentLaneIndex = laneIndexes.get(currentLastChildNode.key) ?? 0;
-      const childLaneIndex = laneIndexes.get(childNode.key) ?? 0;
-      return childLaneIndex > currentLaneIndex ? childNode : currentLastChildNode;
-    }, childNodes[0]);
-    const childLaneIndex = laneIndexes.get(lastChildNode.key);
-    if (childLaneIndex === undefined) return;
-    laneHeights[childLaneIndex] = Math.max(
-      laneHeights[childLaneIndex],
-      loopBranchStackHeight(lastChildNode) +
-        loopNodeSizes.outputEvent.rowGap +
-        outputStackHeightValue +
-        loopCanvasLayoutConfig.outputEventLaneClearance
-    );
   });
 
   const laneYOffsets = new Map<number, number>();
@@ -149,18 +112,6 @@ function compactLoopLaneIndexes(laneIndexes: ReadonlyMap<string, number>) {
     nodeKey,
     compactIndexByLaneIndex.get(laneIndex) ?? laneIndex
   ]));
-}
-
-function outputNodesBySourceKey(outputNodes: LoopCanvasLayoutNodeDraft[]) {
-  const nodesBySourceKey = new Map<string, LoopCanvasLayoutNodeDraft[]>();
-
-  outputNodes.forEach((node) => {
-    const sourceKey = node.record ? `step-${node.record.index}` : "";
-    if (!sourceKey) return;
-    nodesBySourceKey.set(sourceKey, [...(nodesBySourceKey.get(sourceKey) ?? []), node]);
-  });
-
-  return nodesBySourceKey;
 }
 
 function loopDagrePositions(nodes: LoopCanvasLayoutNodeDraft[], edges: LoopDagreEdge[], direction: LoopLayoutDirection) {

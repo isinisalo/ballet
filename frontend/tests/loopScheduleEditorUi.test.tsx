@@ -3,49 +3,54 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   defaultLoopTheme,
+  defaultTerminalNodes,
   type Agent,
   type ProjectAutomationConfig,
   type ProjectLoop,
+  type ProjectStep,
   type ProjectStepSchedule
 } from "@shared/api/workspace-contracts";
 import { AllLoopsCanvas } from "../src/workspace/automation/loops/AllLoopsCanvas";
 import { LoopEditor } from "../src/workspace/automation/loops/LoopEditor";
 
 const agents: Agent[] = [{ id: "builder", name: "Builder", role: "Implementation", description: "Builds.", enabled: true, skills: [] }];
-const executableSteps: ProjectLoop["steps"] = [{
+const executableSteps: ProjectStep[] = [{
   id: "build",
   type: "agent",
   nodeStyle: "terra",
+  nodeSize: "medium",
   agentId: "builder",
   description: "Build",
-  on: { approved: "review", rejected: { end: "failed" } }
+  on: { approved: "review", rejected: "failed" }
 }, {
   id: "review",
   type: "human",
   nodeStyle: "luna",
+  nodeSize: "tiny",
   description: "Review",
-  on: { approved: { end: "completed" }, rejected: "build" }
+  on: { approved: "completed", rejected: "build" }
 }];
-const ordinaryLoop: ProjectLoop = { id: "delivery", start: "build", steps: executableSteps };
+const ordinaryLoop: ProjectLoop = { id: "delivery", start: "build", nodes: [...executableSteps, ...defaultTerminalNodes()] };
 
 function scheduledLoop(schedule: ProjectStepSchedule): ProjectLoop {
   return {
     id: "scheduled-delivery",
     start: "timer",
-    steps: [{
+    nodes: [{
       id: "timer",
       type: "scheduled",
       nodeStyle: "luna",
+      nodeSize: "tiny",
       agentId: "builder",
       description: "Start delivery",
       schedule,
-      on: { approved: "build", rejected: { end: "blocked" } }
-    }, ...executableSteps]
+      on: { approved: "build", rejected: "blocked" }
+    }, ...executableSteps, ...defaultTerminalNodes()]
   };
 }
 
 const weekdayLoop = scheduledLoop({ kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" });
-const config = (loop: ProjectLoop): ProjectAutomationConfig => ({ version: 7, loops: [loop] });
+const config = (loop: ProjectLoop): ProjectAutomationConfig => ({ version: 8, loops: [loop] });
 
 describe("scheduled Loop editor UI", () => {
   it("offers Scheduled only for an eligible start Step and preserves its agent and outputs", async () => {
@@ -53,20 +58,20 @@ describe("scheduled Loop editor UI", () => {
     const onChange = vi.fn();
     const eligibleLoop: ProjectLoop = {
       ...ordinaryLoop,
-      steps: ordinaryLoop.steps.map((step) => step.id === "review"
-        ? { ...step, on: { ...step.on, rejected: { end: "blocked" } } }
-        : step)
+      nodes: ordinaryLoop.nodes.map((node) => node.id === "review" && node.type === "human"
+        ? { ...node, on: { ...node.on, rejected: "blocked" } }
+        : node)
     };
     renderEditor(eligibleLoop, { onChange });
 
     await user.click(await screen.findByRole("button", { name: "Edit step build" }));
-    await user.click(screen.getByRole("combobox", { name: "Step type" }));
+    await user.click(screen.getByRole("combobox", { name: "Node type" }));
     await user.click(await screen.findByRole("option", { name: "Scheduled" }));
 
-    expect((onChange.mock.calls.at(-1)?.[0] as ProjectLoop).steps[0]).toMatchObject({
+    expect((onChange.mock.calls.at(-1)?.[0] as ProjectLoop).nodes[0]).toMatchObject({
       type: "scheduled",
       agentId: "builder",
-      on: { approved: "review", rejected: { end: "failed" } }
+      on: { approved: "review", rejected: "failed" }
     });
   });
 
@@ -74,7 +79,7 @@ describe("scheduled Loop editor UI", () => {
     const user = userEvent.setup();
     renderEditor(ordinaryLoop);
     await user.click(await screen.findByRole("button", { name: "Edit step review" }));
-    await user.click(screen.getByRole("combobox", { name: "Step type" }));
+    await user.click(screen.getByRole("combobox", { name: "Node type" }));
     expect(screen.queryByRole("option", { name: "Scheduled" })).not.toBeInTheDocument();
   });
 
@@ -154,7 +159,7 @@ describe("scheduled Loop editor UI", () => {
   });
 
   it("keeps the Add loop card when no Loops are configured", () => {
-    render(<AllLoopsCanvas config={{ version: 7, loops: [] }} onAddLoop={() => undefined} onOpenLoop={() => undefined} />);
+    render(<AllLoopsCanvas config={{ version: 8, loops: [] }} onAddLoop={() => undefined} onOpenLoop={() => undefined} />);
     expect(screen.getByRole("button", { name: "+ Add loop" })).toBeInTheDocument();
     expect(screen.queryByText("No loops configured.")).not.toBeInTheDocument();
   });
