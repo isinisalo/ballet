@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -20,11 +20,7 @@ const loop = (id: string): ProjectLoop => ({
   nodes: [{
     id: "work",
     type: "agent",
-    agentId: ({
-      "ui-design": "ui-design-agent",
-      implementation: "implementation-agent",
-      "dev-deployment": "dev-deploy-agent"
-    } as Record<string, string>)[id] ?? "worker",
+    agentId: "worker",
     description: "Work.",
     nodeStyle: "terra",
     nodeSize: "medium",
@@ -57,96 +53,36 @@ const data = (projectRoot: string, loopIds: string[]): AppData => ({
   projectDocumentTree: []
 });
 
-const projectWithTasks = async (content = "# Tasks\n\n## task-001\n") => {
+const fixtureRoot = async (): Promise<string> => {
   const root = await mkdtemp(path.join(tmpdir(), "ballet-loop-policy-"));
   roots.push(root);
-  const outputs = path.join(root, ".ballet", "outputs");
-  await mkdir(outputs, { recursive: true });
-  await writeFile(path.join(outputs, "TASKS.md"), content, "utf8");
   return root;
 };
 
 describe("loop engineering root-start policy", () => {
-  it.each(["ui-design", "implementation"])("accepts one known task for %s", async (loopId) => {
-    const root = await projectWithTasks();
-    await expect(validateLoopRunStart(data(root, [loopId]), loopId, "context\ntask_id: task-001"))
+  it("allows the blueprint Loop as the only manual root", async () => {
+    const root = await fixtureRoot();
+    await expect(validateLoopRunStart(data(root, ["blueprint-design"]), "blueprint-design", "Start the project."))
       .resolves.toBeUndefined();
   });
 
-  it.each([
-    ["missing", "Ship it"],
-    ["malformed", "task_id: task-1"],
-    ["multiple", "task_id: task-001\ntask_id: task-002"]
-  ])("rejects a %s task declaration before execution", async (_case, input) => {
-    const root = await projectWithTasks("# Tasks\n\ntask-001\ntask-002\n");
-    await expect(validateLoopRunStart(data(root, ["implementation"]), "implementation", input))
-      .rejects.toThrow("exactly one line in the form task_id: task-NNN");
+  it.each(["milestone-planning", "milestone-delivery", "release-validation"])(
+    "blocks a direct root start of %s",
+    async (loopId) => {
+      const root = await fixtureRoot();
+      await expect(validateLoopRunStart(data(root, [loopId]), loopId, "milestone_id: milestone-001"))
+        .rejects.toThrow("can only start from its approved human-gate transition");
+    }
+  );
+
+  it("blocks another configured Loop from becoming a manual root", async () => {
+    const root = await fixtureRoot();
+    await expect(validateLoopRunStart(data(root, ["custom-loop"]), "custom-loop"))
+      .rejects.toThrow("is not a manual root in the engineering Loop chain");
   });
 
-  it("rejects an unknown task before execution", async () => {
-    const root = await projectWithTasks();
-    await expect(validateLoopRunStart(data(root, ["implementation"]), "implementation", "task_id: task-999"))
-      .rejects.toThrow("task_id task-999 must have exactly one ## task-999 declaration");
-  });
-
-  it("does not treat a task cross-reference as a declaration", async () => {
-    const root = await projectWithTasks("# Tasks\n\n## task-001 — Active\n\nDepends on removed task-999.\n");
-    await expect(validateLoopRunStart(data(root, ["implementation"]), "implementation", "task_id: task-999"))
-      .rejects.toThrow("exactly one ## task-999 declaration");
-  });
-
-  it("rejects duplicate task declarations", async () => {
-    const root = await projectWithTasks("# Tasks\n\n## task-001 — First\n\n## task-001 — Duplicate\n");
-    await expect(validateLoopRunStart(data(root, ["implementation"]), "implementation", "task_id: task-001"))
-      .rejects.toThrow("exactly one ## task-001 declaration");
-  });
-
-  it("rejects a task-scoped run when TASKS.md is unavailable", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "ballet-loop-policy-"));
-    roots.push(root);
-    await expect(validateLoopRunStart(data(root, ["ui-design"]), "ui-design", "task_id: task-001"))
-      .rejects.toThrow(".ballet/outputs/TASKS.md is unavailable");
-  });
-
-  it("blocks direct root starts of the gated deployment loop", async () => {
-    const root = await projectWithTasks();
-    await expect(validateLoopRunStart(data(root, ["dev-deployment"]), "dev-deployment", "task_id: task-001"))
-      .rejects.toThrow("can only start from its approved human-gate transition");
-  });
-
-  it("does not impose the task contract on other loops", async () => {
-    const root = await projectWithTasks();
-    await expect(validateLoopRunStart(data(root, ["delivery-planning"]), "delivery-planning"))
-      .resolves.toBeUndefined();
-  });
-
-  it("does not apply the convention to a same-named loop with another start agent", async () => {
-    const root = await projectWithTasks();
-    const workspace = data(root, ["implementation"]);
-    const start = workspace.automation.loops[0]!.nodes[0]!;
-    if (start.type === "agent") start.agentId = "custom-worker";
-    await expect(validateLoopRunStart(workspace, "implementation")).resolves.toBeUndefined();
-  });
-
-  it("enforces task input behind a scheduled start", async () => {
-    const root = await projectWithTasks();
-    const workspace = data(root, ["implementation"]);
-    const implementation = workspace.automation.loops[0]!;
-    implementation.start = "timer";
-    implementation.nodes.unshift({
-      id: "timer",
-      type: "scheduled",
-      agentId: "implementation-agent",
-      description: "Start implementation on schedule.",
-      nodeStyle: "luna",
-      nodeSize: "tiny",
-      schedule: { kind: "once", date: "2026-07-12", time: "09:00", timeZone: "UTC" },
-      on: { approved: "work", rejected: "blocked" }
-    });
-
-    await expect(validateLoopRunStart(workspace, "implementation"))
-      .rejects.toThrow("implementation input must contain exactly one line in the form task_id: task-NNN.");
-    await expect(validateLoopRunStart(workspace, "implementation", "task_id: task-001"))
-      .resolves.toBeUndefined();
+  it("ignores a missing Loop because the caller reports unknown targets separately", async () => {
+    const root = await fixtureRoot();
+    await expect(validateLoopRunStart(data(root, []), "missing-loop")).resolves.toBeUndefined();
   });
 });

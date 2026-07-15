@@ -83,6 +83,59 @@ const config = (): ProjectAutomationConfig => ({
   }]
 });
 
+const engineeringChainConfig = (): ProjectAutomationConfig => {
+  const terminals = () => defaultTerminalNodes();
+  return {
+    version: 8,
+    loops: [{
+      id: "blueprint-design",
+      start: "roadmap",
+      summaryStyle: "barred-spiral",
+      nodes: [
+        { id: "roadmap", type: "agent", agentId: "roadmap-agent", description: "Roadmap.", nodeStyle: "sol", nodeSize: "large", on: { approved: "data-model", rejected: "blocked" } },
+        { id: "data-model", type: "agent", agentId: "architecture-agent", description: "Data model.", nodeStyle: "sol", nodeSize: "large", on: { approved: "ui-design", rejected: "blocked" } },
+        { id: "ui-design", type: "agent", agentId: "ui-design-agent", description: "UI design.", nodeStyle: "sol", nodeSize: "large", on: { approved: "ui-mocks", rejected: "blocked" } },
+        { id: "ui-mocks", type: "agent", agentId: "ui-design-agent", description: "UI mocks.", nodeStyle: "sol", nodeSize: "large", on: { approved: "c4-models", rejected: "blocked" } },
+        { id: "c4-models", type: "agent", agentId: "architecture-agent", description: "C4.", nodeStyle: "sol", nodeSize: "large", on: { approved: "blueprint-gate", rejected: "blocked" } },
+        { id: "blueprint-gate", type: "human", description: "Approve blueprint.", nodeStyle: "luna", nodeSize: "tiny", on: { approved: { loop: "milestone-planning" }, rejected: "roadmap" } },
+        ...terminals()
+      ]
+    }, {
+      id: "milestone-planning",
+      start: "plan-milestone-issues",
+      summaryStyle: "ring",
+      nodes: [
+        { id: "plan-milestone-issues", type: "agent", agentId: "milestone-issues-agent", description: "Plan milestone.", nodeStyle: "luna", nodeSize: "medium", on: { approved: "implementation-plan", rejected: "blocked" } },
+        { id: "implementation-plan", type: "agent", agentId: "implementation-plan-agent", description: "Implementation plan.", nodeStyle: "luna", nodeSize: "medium", on: { approved: "test-plan", rejected: "blocked" } },
+        { id: "test-plan", type: "agent", agentId: "test-plan-agent", description: "Test plan.", nodeStyle: "luna", nodeSize: "medium", on: { approved: "milestone-gate", rejected: "blocked" } },
+        { id: "milestone-gate", type: "human", description: "Approve milestone.", nodeStyle: "luna", nodeSize: "tiny", on: { approved: { loop: "milestone-delivery" }, rejected: "plan-milestone-issues" } },
+        ...terminals()
+      ]
+    }, {
+      id: "milestone-delivery",
+      start: "implement-milestone",
+      summaryStyle: "twin-core",
+      nodes: [
+        { id: "implement-milestone", type: "agent", agentId: "implementation-agent", description: "Implement milestone.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "run-acceptance-tests", rejected: "blocked" } },
+        { id: "run-acceptance-tests", type: "agent", agentId: "acceptance-test-agent", description: "Run acceptance.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "implementation-gate", rejected: "implement-milestone" } },
+        { id: "implementation-gate", type: "human", description: "Approve implementation.", nodeStyle: "luna", nodeSize: "tiny", on: { approved: { loop: "release-validation" }, rejected: "implement-milestone" } },
+        ...terminals()
+      ]
+    }, {
+      id: "release-validation",
+      start: "make-git-release",
+      summaryStyle: "route",
+      nodes: [
+        { id: "make-git-release", type: "agent", agentId: "release-agent", description: "Make release.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "deploy-release", rejected: "failed" } },
+        { id: "deploy-release", type: "agent", agentId: "release-agent", description: "Deploy release.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "verify-release", rejected: "failed" } },
+        { id: "verify-release", type: "agent", agentId: "release-agent", description: "Verify release.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "release-gate", rejected: "failed" } },
+        { id: "release-gate", type: "human", description: "Approve release.", nodeStyle: "luna", nodeSize: "tiny", on: { approved: "completed", rejected: "verify-release" } },
+        ...terminals()
+      ]
+    }]
+  };
+};
+
 const runById = (runtime: RuntimeDatabase, runId: string) =>
   runtime.listLoopRuns().find((run) => run.runId === runId);
 const latestRun = (runtime: RuntimeDatabase, loopId: string) =>
@@ -278,6 +331,97 @@ describe("local runtime safeguards", () => {
       .toThrow(LoopRunConflictError);
     expect(runById(runtime, parent.runId)).toMatchObject({ status: "waiting_for_human" });
     expect(runById(runtime, parent.runId)!.stepRuns.at(-1)).toMatchObject({ status: "waiting_for_human" });
+    runtime.close();
+  });
+
+  it("runs the complete four-Loop chain under one root and keeps release-gate rejection in verification", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const automation = engineeringChainConfig();
+    const handoff = [
+      "milestone_id: milestone-001",
+      "github_issue: isinisalo/ballet#123",
+      "github_issue: isinisalo/ballet#124"
+    ].join("\n");
+    let blueprint = startLoop(runtime, automation, "blueprint-design", openAiTheme, "Build the next increment.");
+
+    for (let index = 0; index < 5; index += 1) {
+      blueprint = runtime.completeAgentStep(automation, openAiTheme, {
+        stepRunId: blueprint.stepRuns.at(-1)!.stepRunId,
+        outcome: ready
+      });
+    }
+    const blueprintGate = blueprint.stepRuns.at(-1)!;
+    expect(blueprintGate.stepId).toBe("blueprint-gate");
+    runtime.respondToStepRun(automation, openAiTheme, blueprint.runId, blueprintGate.stepRunId, "approved", handoff);
+
+    let milestone = latestRun(runtime, "milestone-planning")!;
+    for (let index = 0; index < 3; index += 1) {
+      milestone = runtime.completeAgentStep(automation, openAiTheme, {
+        stepRunId: milestone.stepRuns.at(-1)!.stepRunId,
+        outcome: ready
+      });
+    }
+    runtime.respondToStepRun(automation, openAiTheme, milestone.runId, milestone.stepRuns.at(-1)!.stepRunId, "approved", "Milestone scope approved.");
+
+    let delivery = latestRun(runtime, "milestone-delivery")!;
+    for (let index = 0; index < 2; index += 1) {
+      delivery = runtime.completeAgentStep(automation, openAiTheme, {
+        stepRunId: delivery.stepRuns.at(-1)!.stepRunId,
+        outcome: ready
+      });
+    }
+    runtime.respondToStepRun(automation, openAiTheme, delivery.runId, delivery.stepRuns.at(-1)!.stepRunId, "approved", "Implementation approved.");
+
+    let release = latestRun(runtime, "release-validation")!;
+    for (let index = 0; index < 3; index += 1) {
+      release = runtime.completeAgentStep(automation, openAiTheme, {
+        stepRunId: release.stepRuns.at(-1)!.stepRunId,
+        outcome: ready
+      });
+    }
+    expect(release.stepRuns.at(-1)).toMatchObject({ stepId: "release-gate", status: "waiting_for_human" });
+    release = runtime.respondToStepRun(automation, openAiTheme, release.runId, release.stepRuns.at(-1)!.stepRunId, "rejected", "Collect stronger production evidence.");
+    expect(release.stepRuns.at(-1)).toMatchObject({ stepId: "verify-release", status: "queued" });
+    release = runtime.completeAgentStep(automation, openAiTheme, {
+      stepRunId: release.stepRuns.at(-1)!.stepRunId,
+      outcome: ready
+    });
+    release = runtime.respondToStepRun(automation, openAiTheme, release.runId, release.stepRuns.at(-1)!.stepRunId, "approved", "Release evidence accepted.");
+
+    expect(release.status).toBe("completed");
+    expect(release.stepRuns.filter((step) => step.stepId === "make-git-release")).toHaveLength(1);
+    expect(new Set(runtime.listRootLoopRuns(blueprint.rootRunId).map((run) => run.rootRunId))).toEqual(new Set([blueprint.rootRunId]));
+    expect(runtime.listRootLoopRuns(blueprint.rootRunId).map((run) => run.loopId)).toEqual([
+      "blueprint-design",
+      "milestone-planning",
+      "milestone-delivery",
+      "release-validation"
+    ]);
+    expect(runtime.listRootLoopRuns(blueprint.rootRunId).every((run) => run.status === "completed")).toBe(true);
+    runtime.close();
+  });
+
+  it("rejects a gated cross-Loop transition without a milestone handoff", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const automation = engineeringChainConfig();
+    let blueprint = startLoop(runtime, automation, "blueprint-design");
+    for (let index = 0; index < 5; index += 1) {
+      blueprint = runtime.completeAgentStep(automation, openAiTheme, {
+        stepRunId: blueprint.stepRuns.at(-1)!.stepRunId,
+        outcome: ready
+      });
+    }
+
+    expect(() => runtime.respondToStepRun(
+      automation,
+      openAiTheme,
+      blueprint.runId,
+      blueprint.stepRuns.at(-1)!.stepRunId,
+      "approved",
+      "Continue without selecting a milestone."
+    )).toThrow("milestone_id");
+    expect(runById(runtime, blueprint.runId)).toMatchObject({ status: "waiting_for_human" });
+    expect(latestRun(runtime, "milestone-planning")).toBeUndefined();
     runtime.close();
   });
 

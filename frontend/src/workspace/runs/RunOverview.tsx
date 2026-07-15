@@ -37,7 +37,7 @@ export function RunOverview({ dashboard, navigate }: { dashboard: RunDashboardSt
     <Panel title="Run Overview" icon={<Play />} contentClassName="grid gap-0 p-0" action={<span className="font-mono text-[0.62rem] text-muted-foreground">stream: {dashboard.streamStatus}</span>}>
       {dashboard.error || actionError ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{actionError || dashboard.error}</AlertDescription></Alert> : null}
       <RunListSection title="Active root runs" icon={<Activity />} empty={dashboard.loading ? "Loading active runs…" : "No active runs."} runs={dashboard.active} pending={pending} navigate={navigate} onCancel={cancel} />
-      <TargetSection title="Launchable Loops" targets={dashboard.targets.loops} pending={pending} onOpen={openTarget} onStart={start} />
+      <TargetSection title="Configured Loops" targets={dashboard.targets.loops} pending={pending} onOpen={openTarget} onStart={start} />
       <TargetSection title="Launchable agents" targets={dashboard.targets.agents} pending={pending} onOpen={openTarget} onStart={start} />
       <RunListSection title="Recent runs" icon={<History />} empty={dashboard.loading ? "Loading recent runs…" : "No recent runs."} runs={dashboard.recent} pending={pending} navigate={navigate} />
     </Panel>

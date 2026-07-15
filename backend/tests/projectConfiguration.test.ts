@@ -18,11 +18,14 @@ interface ExpectedAgentConfig {
 }
 
 const expectedAgents: Record<string, ExpectedAgentConfig> = {
-  "dev-deploy-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
+  "acceptance-test-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
+  "architecture-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" },
   "implementation-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: false, nodeStyle: "terra" },
-  "milestone-task-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeStyle: "luna" },
-  "review-test-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
+  "implementation-plan-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeStyle: "luna" },
+  "milestone-issues-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: true, nodeStyle: "luna" },
+  "release-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
   "roadmap-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" },
+  "test-plan-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeStyle: "luna" },
   "ui-design-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" }
 };
 
@@ -36,8 +39,8 @@ const configuredAgents = (): Agent[] => Object.keys(expectedAgents).map((id) => 
   instructions: id,
   skills: [],
   enabled: true,
-  createdAt: "2026-07-11T00:00:00.000Z",
-  updatedAt: "2026-07-11T00:00:00.000Z"
+  createdAt: "2026-07-15T00:00:00.000Z",
+  updatedAt: "2026-07-15T00:00:00.000Z"
 }));
 
 const routeShape = (config: ProjectAutomationConfig): Record<string, unknown> =>
@@ -81,7 +84,7 @@ const approvedTransitionCount = (config: ProjectAutomationConfig, initialLoopId:
 };
 
 describe("repository Loop engineering configuration", () => {
-  it("keeps exactly the six GPT-5.6 runtime and agent definitions", async () => {
+  it("keeps the nine GPT-5.6 runtime and agent definitions", async () => {
     const runtime = projectConfigSchema.parse(await readJson(".ballet/project.json"));
     const agentIds = Object.keys(expectedAgents).sort();
     expect(Object.keys(runtime.agents).sort()).toEqual(agentIds);
@@ -109,58 +112,72 @@ describe("repository Loop engineering configuration", () => {
     }
   });
 
-  it("keeps the four simple Loops, scheduled timed Loop, and their approved paths", async () => {
+  it("keeps the four connected Loops and their approved/rejected paths", async () => {
     const project = projectConfigSchema.parse(await readJson(".ballet/project.json"));
     const config: ProjectAutomationConfig = { version: 8, loops: project.loops };
     expect(validateProjectAutomationConfig(config, configuredAgents())).toEqual([]);
     expect(config.version).toBe(8);
+    expect(config.loops.map((loop) => loop.id)).toEqual([
+      "blueprint-design",
+      "milestone-planning",
+      "milestone-delivery",
+      "release-validation"
+    ]);
+
     for (const loop of config.loops) {
       expect(loop.nodes.filter(isProjectTerminalNode).map((node) => node.id).sort()).toEqual(["blocked", "completed", "failed"]);
+      expect(loop.nodes.filter((node) => node.type === "human")).toHaveLength(1);
       for (const step of loop.nodes.filter((node) => !isProjectTerminalNode(node))) {
-        const expectedStyle = step.type !== "agent"
-          ? "luna"
-          : expectedAgents[step.agentId]!.nodeStyle;
+        const expectedStyle = step.type === "human" ? "luna" : expectedAgents[step.agentId]!.nodeStyle;
         expect(step.nodeStyle).toBe(expectedStyle);
-        expect(step.nodeSize).toBe(expectedStyle === "sol" ? "large" : expectedStyle === "terra" ? "medium" : "tiny");
+        expect(step.nodeSize).toBe(step.type === "human" ? "tiny" : expectedStyle === "sol" ? "large" : "medium");
       }
     }
+
     expect(routeShape(config)).toEqual({
-      "delivery-planning": {
-        start: "create-roadmap",
+      "blueprint-design": {
+        start: "roadmap",
         nodes: [
-          ["create-roadmap", "agent", "roadmap-agent", { approved: "create-work-breakdown", rejected: "blocked" }],
-          ["create-work-breakdown", "agent", "milestone-task-agent", { approved: "planning-gate", rejected: "blocked" }],
-          ["planning-gate", "human", null, { approved: "completed", rejected: "create-roadmap" }]
+          ["roadmap", "agent", "roadmap-agent", { approved: "data-model", rejected: "blocked" }],
+          ["data-model", "agent", "architecture-agent", { approved: "ui-design", rejected: "blocked" }],
+          ["ui-design", "agent", "ui-design-agent", { approved: "ui-mocks", rejected: "blocked" }],
+          ["ui-mocks", "agent", "ui-design-agent", { approved: "c4-models", rejected: "blocked" }],
+          ["c4-models", "agent", "architecture-agent", { approved: "blueprint-gate", rejected: "blocked" }],
+          ["blueprint-gate", "human", null, { approved: { loop: "milestone-planning" }, rejected: "roadmap" }]
         ]
       },
-      "ui-design": {
-        start: "design-task-ui",
-        nodes: [["design-task-ui", "agent", "ui-design-agent", { approved: "completed", rejected: "blocked" }]]
-      },
-      implementation: {
-        start: "implement-task",
+      "milestone-planning": {
+        start: "plan-milestone-issues",
         nodes: [
-          ["implement-task", "agent", "implementation-agent", { approved: "verify-task", rejected: "blocked" }],
-          ["verify-task", "agent", "review-test-agent", { approved: "code-gate", rejected: "implement-task" }],
-          ["code-gate", "human", null, { approved: { loop: "dev-deployment" }, rejected: "implement-task" }]
+          ["plan-milestone-issues", "agent", "milestone-issues-agent", { approved: "implementation-plan", rejected: "blocked" }],
+          ["implementation-plan", "agent", "implementation-plan-agent", { approved: "test-plan", rejected: "blocked" }],
+          ["test-plan", "agent", "test-plan-agent", { approved: "milestone-gate", rejected: "blocked" }],
+          ["milestone-gate", "human", null, { approved: { loop: "milestone-delivery" }, rejected: "plan-milestone-issues" }]
         ]
       },
-      "dev-deployment": {
-        start: "deploy-and-validate-dev",
-        nodes: [["deploy-and-validate-dev", "agent", "dev-deploy-agent", { approved: "completed", rejected: "failed" }]]
-      },
-      timed: {
-        start: "schedule-dev-deployment",
+      "milestone-delivery": {
+        start: "implement-milestone",
         nodes: [
-          ["schedule-dev-deployment", "scheduled", "dev-deploy-agent", { approved: "completed", rejected: "blocked" }]
+          ["implement-milestone", "agent", "implementation-agent", { approved: "run-acceptance-tests", rejected: "blocked" }],
+          ["run-acceptance-tests", "agent", "acceptance-test-agent", { approved: "implementation-gate", rejected: "implement-milestone" }],
+          ["implementation-gate", "human", null, { approved: { loop: "release-validation" }, rejected: "implement-milestone" }]
+        ]
+      },
+      "release-validation": {
+        start: "make-git-release",
+        nodes: [
+          ["make-git-release", "agent", "release-agent", { approved: "deploy-release", rejected: "failed" }],
+          ["deploy-release", "agent", "release-agent", { approved: "verify-release", rejected: "failed" }],
+          ["verify-release", "agent", "release-agent", { approved: "release-gate", rejected: "failed" }],
+          ["release-gate", "human", null, { approved: "completed", rejected: "verify-release" }]
         ]
       }
     });
     expect({
-      deliveryPlanning: approvedTransitionCount(config, "delivery-planning"),
-      uiDesign: approvedTransitionCount(config, "ui-design"),
-      implementationToDev: approvedTransitionCount(config, "implementation"),
-      timed: approvedTransitionCount(config, "timed")
-    }).toEqual({ deliveryPlanning: 3, uiDesign: 1, implementationToDev: 4, timed: 1 });
+      blueprint: approvedTransitionCount(config, "blueprint-design"),
+      milestone: approvedTransitionCount(config, "milestone-planning"),
+      delivery: approvedTransitionCount(config, "milestone-delivery"),
+      release: approvedTransitionCount(config, "release-validation")
+    }).toEqual({ blueprint: 17, milestone: 11, delivery: 7, release: 4 });
   });
 });

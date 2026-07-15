@@ -10,6 +10,7 @@ import {
   isProjectTerminalNode,
   resolveEffectiveStartStep
 } from "../../shared/domain/automation.js";
+import { LoopHandoffValidationError, validateLoopTransitionHandoff } from "../../shared/domain/loopHandoff.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
@@ -101,13 +102,21 @@ export class LoopRunEngine {
         this.blockForTransitionLimit(run, stepRun);
         return this.requireDetails(runId);
       }
+      const forwardedInput = this.forwardedInput(run.input, input);
+      if (isLoopTarget(target)) {
+        try {
+          validateLoopTransitionHandoff(target.loop, forwardedInput);
+        } catch (error) {
+          if (error instanceof LoopHandoffValidationError) throw new LoopRunStateError(error.message);
+          throw error;
+        }
+      }
       if (isLoopTarget(target) && this.store.hasActiveLoop(target.loop)) {
         throw new LoopRunConflictError(`Loop ${target.loop} already has an active run.`);
       }
 
       this.store.completeStepRun(stepRun, result, { responseInput: input });
       this.store.incrementTransitionCount(run.runId);
-      const forwardedInput = this.forwardedInput(run.input, input);
       this.store.updateRunInput(run.runId, forwardedInput);
       this.applyTransition(config, loopTheme, this.requireRun(run.runId), stepRun, target, forwardedInput);
       return this.requireDetails(runId);
