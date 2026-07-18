@@ -11,7 +11,7 @@ const loop = (): ProjectLoop => ({
     nodeStyle: "luna",
     nodeSize: "tiny",
     description: "Review delivery",
-    on: { approved: "completed", rejected: "failed" }
+    on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "failed", input: "append-signal" } }
   }, ...defaultTerminalNodes()]
 });
 

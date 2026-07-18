@@ -40,7 +40,7 @@ const loop: ProjectLoop = {
     nodeStyle: "luna",
     nodeSize: "tiny",
     description: "Review release",
-    on: { approved: "completed", rejected: "blocked" }
+    on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "blocked", input: "append-signal" } }
   }, ...defaultTerminalNodes()]
 };
 
@@ -62,15 +62,42 @@ describe("compact Loop editor UI", () => {
     expect(screen.getByRole("combobox", { name: "Node style" })).toHaveTextContent("Sol");
     expect(screen.getByRole("combobox", { name: "Node size" })).toHaveTextContent("Large");
     expect(screen.getByText("Transitions")).toBeInTheDocument();
-    for (const outcome of ["ready", "approved", "changes-requested"]) {
-      expect(screen.getByRole("combobox", { name: `${outcome} transition kind` })).toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: `${outcome} transition target` })).toBeInTheDocument();
+    for (const outcome of ["ready", "approved", "changes-requested", "needs_input", "blocked", "failed"]) {
+      expect(screen.getByRole("combobox", { name: `${outcome} action` })).toBeEnabled();
     }
-    for (const outcome of ["needs_input", "blocked", "failed"]) {
-      expect(screen.getByRole("combobox", { name: `${outcome} transition target` })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole("combobox", { name: "rejected transition target" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "ready target" })).toBeEnabled();
+    expect(screen.getByLabelText("failed retry max attempts")).toBeEnabled();
+    expect(screen.queryByRole("combobox", { name: "rejected action" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove from loop" })).toBeEnabled();
+  });
+
+  it("edits a blocked signal to a cross-Loop action from an agent node", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const current = structuredClone(loop);
+    const build = current.nodes.find((node) => node.id === "build");
+    if (!build || build.type === "human" || build.type === "completed" || build.type === "blocked" || build.type === "failed") {
+      throw new Error("Expected agent fixture.");
+    }
+    build.on.blocked = { action: "goto", target: "review" };
+    const handoff = { ...structuredClone(loop), id: "handoff" };
+    renderEditor({
+      config: { version: 8, loops: [current, handoff] },
+      loop: current,
+      loops: [current, handoff],
+      onChange
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Edit step build" }));
+    await user.click(screen.getByRole("combobox", { name: "blocked target kind" }));
+    await user.click(await screen.findByRole("option", { name: "Loop" }));
+
+    const next = onChange.mock.calls.at(-1)?.[0] as ProjectLoop;
+    const changed = next.nodes.find((node) => node.id === "build");
+    expect(changed).toMatchObject({
+      type: "agent",
+      on: { blocked: { action: "goto", target: { loop: "handoff" } } }
+    });
   });
 
   it("shows locked agent fields and no decision transitions for a terminal node", async () => {
@@ -85,8 +112,8 @@ describe("compact Loop editor UI", () => {
     expect(screen.getByRole("combobox", { name: "Agent" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Agent" }).parentElement?.querySelector("input[aria-hidden='true']")).toHaveValue("");
     expect(screen.getByText("Terminal nodes have no transitions.")).toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "approved transition target" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "rejected transition target" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "approved action" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "rejected action" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove from loop" })).not.toBeInTheDocument();
   });
 

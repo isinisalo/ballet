@@ -93,12 +93,40 @@
           "nodeSize": "large",
           "id": "source-inventory",
           "on": {
-            "ready": "source-validation",
-            "approved": "source-validation",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "source-validation"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "source-validation"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "roadmap-agent"
@@ -109,12 +137,40 @@
           "nodeSize": "large",
           "id": "source-validation",
           "on": {
-            "ready": "gap-and-conflict-audit",
-            "approved": "gap-and-conflict-audit",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "gap-and-conflict-audit"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "gap-and-conflict-audit"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "roadmap-agent"
@@ -125,12 +181,40 @@
           "nodeSize": "large",
           "id": "gap-and-conflict-audit",
           "on": {
-            "ready": "roadmap",
-            "approved": "roadmap",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "roadmap"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "roadmap"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "roadmap-agent"
@@ -141,8 +225,16 @@
           "nodeSize": "tiny",
           "id": "source-decision-gate",
           "on": {
-            "approved": "source-inventory",
-            "rejected": "blocked"
+            "approved": {
+              "action": "goto",
+              "target": "source-inventory",
+              "input": "append-signal"
+            },
+            "rejected": {
+              "action": "goto",
+              "target": "blocked",
+              "input": "append-signal"
+            }
           },
           "type": "human"
         },
@@ -152,12 +244,40 @@
           "nodeSize": "large",
           "id": "roadmap",
           "on": {
-            "ready": "domain-map",
-            "approved": "domain-map",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "domain-map"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "domain-map"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "roadmap-agent"
@@ -168,12 +288,40 @@
           "nodeSize": "large",
           "id": "domain-map",
           "on": {
-            "ready": "c4-context-container",
-            "approved": "c4-context-container",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "c4-context-container"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "c4-context-container"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "architecture-agent"
@@ -184,12 +332,40 @@
           "nodeSize": "large",
           "id": "c4-context-container",
           "on": {
-            "ready": "quality-scenarios",
-            "approved": "quality-scenarios",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "quality-scenarios"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "quality-scenarios"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "architecture-agent"
@@ -200,12 +376,40 @@
           "nodeSize": "large",
           "id": "quality-scenarios",
           "on": {
-            "ready": "threat-model",
-            "approved": "threat-model",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "threat-model"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "threat-model"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "architecture-agent"
@@ -216,12 +420,40 @@
           "nodeSize": "large",
           "id": "threat-model",
           "on": {
-            "ready": "ux-information-architecture",
-            "approved": "ux-information-architecture",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "ux-information-architecture"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "ux-information-architecture"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "architecture-agent"
@@ -232,12 +464,40 @@
           "nodeSize": "large",
           "id": "ux-information-architecture",
           "on": {
-            "ready": "test-strategy",
-            "approved": "test-strategy",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "test-strategy"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "test-strategy"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "ui-design-agent"
@@ -248,12 +508,40 @@
           "nodeSize": "large",
           "id": "test-strategy",
           "on": {
-            "ready": "traceability",
-            "approved": "traceability",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "traceability"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "traceability"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "architecture-agent"
@@ -264,12 +552,40 @@
           "nodeSize": "large",
           "id": "traceability",
           "on": {
-            "ready": "independent-blueprint-verifier",
-            "approved": "independent-blueprint-verifier",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "independent-blueprint-verifier"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "independent-blueprint-verifier"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "roadmap-agent"
@@ -280,12 +596,48 @@
           "nodeSize": "large",
           "id": "independent-blueprint-verifier",
           "on": {
-            "ready": "blueprint-gate",
-            "approved": "blueprint-gate",
-            "changes-requested": { "repair": "source-inventory" },
-            "needs_input": { "human": "source-decision-gate" },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "blueprint-gate"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "blueprint-gate"
+            },
+            "changes-requested": {
+              "action": "retry",
+              "target": "source-inventory",
+              "policy": {
+                "maxAttempts": 3,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "blocked"
+                },
+                "stallDetection": "same-evidence"
+              }
+            },
+            "needs_input": {
+              "action": "goto",
+              "target": "source-decision-gate",
+              "input": "signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "blueprint-verifier-agent"
@@ -297,9 +649,24 @@
           "id": "blueprint-gate",
           "on": {
             "approved": {
-              "loop": "milestone-planning"
+              "action": "goto",
+              "target": {
+                "loop": "milestone-planning"
+              },
+              "input": "append-signal"
             },
-            "rejected": "source-inventory"
+            "rejected": {
+              "action": "retry",
+              "target": "source-inventory",
+              "input": "append-signal",
+              "policy": {
+                "maxAttempts": 3,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "blocked"
+                }
+              }
+            }
           },
           "type": "human"
         },
@@ -336,12 +703,40 @@
           "nodeSize": "medium",
           "id": "plan-milestone-issues",
           "on": {
-            "ready": "implementation-plan",
-            "approved": "implementation-plan",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "wait": true },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "implementation-plan"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "implementation-plan"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "wait",
+              "resume": "same-step",
+              "input": "append-signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "milestone-issues-agent"
@@ -352,12 +747,40 @@
           "nodeSize": "medium",
           "id": "implementation-plan",
           "on": {
-            "ready": "test-plan",
-            "approved": "test-plan",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "wait": true },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "test-plan"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "test-plan"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "wait",
+              "resume": "same-step",
+              "input": "append-signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "implementation-plan-agent"
@@ -368,12 +791,40 @@
           "nodeSize": "medium",
           "id": "test-plan",
           "on": {
-            "ready": "milestone-gate",
-            "approved": "milestone-gate",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "wait": true },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "milestone-gate"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "milestone-gate"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "wait",
+              "resume": "same-step",
+              "input": "append-signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "test-plan-agent"
@@ -385,9 +836,24 @@
           "id": "milestone-gate",
           "on": {
             "approved": {
-              "loop": "milestone-delivery"
+              "action": "goto",
+              "target": {
+                "loop": "milestone-delivery"
+              },
+              "input": "append-signal"
             },
-            "rejected": "plan-milestone-issues"
+            "rejected": {
+              "action": "retry",
+              "target": "plan-milestone-issues",
+              "input": "append-signal",
+              "policy": {
+                "maxAttempts": 3,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "blocked"
+                }
+              }
+            }
           },
           "type": "human"
         },
@@ -424,12 +890,40 @@
           "nodeSize": "medium",
           "id": "implement-milestone",
           "on": {
-            "ready": "run-acceptance-tests",
-            "approved": "run-acceptance-tests",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "wait": true },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "run-acceptance-tests"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "run-acceptance-tests"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "wait",
+              "resume": "same-step",
+              "input": "append-signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "implementation-agent"
@@ -440,12 +934,48 @@
           "nodeSize": "medium",
           "id": "run-acceptance-tests",
           "on": {
-            "ready": "implementation-gate",
-            "approved": "implementation-gate",
-            "changes-requested": { "repair": "implement-milestone" },
-            "needs_input": { "wait": true },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "implementation-gate"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "implementation-gate"
+            },
+            "changes-requested": {
+              "action": "retry",
+              "target": "implement-milestone",
+              "policy": {
+                "maxAttempts": 3,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "blocked"
+                },
+                "stallDetection": "same-evidence"
+              }
+            },
+            "needs_input": {
+              "action": "wait",
+              "resume": "same-step",
+              "input": "append-signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "acceptance-test-agent"
@@ -457,9 +987,24 @@
           "id": "implementation-gate",
           "on": {
             "approved": {
-              "loop": "release-validation"
+              "action": "goto",
+              "target": {
+                "loop": "release-validation"
+              },
+              "input": "append-signal"
             },
-            "rejected": "implement-milestone"
+            "rejected": {
+              "action": "retry",
+              "target": "implement-milestone",
+              "input": "append-signal",
+              "policy": {
+                "maxAttempts": 3,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "blocked"
+                }
+              }
+            }
           },
           "type": "human"
         },
@@ -496,12 +1041,40 @@
           "nodeSize": "medium",
           "id": "make-git-release",
           "on": {
-            "ready": "deploy-release",
-            "approved": "deploy-release",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "wait": true },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "deploy-release"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "deploy-release"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "wait",
+              "resume": "same-step",
+              "input": "append-signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "release-agent"
@@ -512,12 +1085,40 @@
           "nodeSize": "medium",
           "id": "deploy-release",
           "on": {
-            "ready": "verify-release",
-            "approved": "verify-release",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "wait": true },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "verify-release"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "verify-release"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "wait",
+              "resume": "same-step",
+              "input": "append-signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "release-agent"
@@ -528,12 +1129,40 @@
           "nodeSize": "medium",
           "id": "verify-release",
           "on": {
-            "ready": "release-gate",
-            "approved": "release-gate",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "wait": true },
-            "blocked": { "terminal": "blocked" },
-            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+            "ready": {
+              "action": "goto",
+              "target": "release-gate"
+            },
+            "approved": {
+              "action": "goto",
+              "target": "release-gate"
+            },
+            "changes-requested": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "needs_input": {
+              "action": "wait",
+              "resume": "same-step",
+              "input": "append-signal"
+            },
+            "blocked": {
+              "action": "terminate",
+              "status": "blocked"
+            },
+            "failed": {
+              "action": "retry",
+              "policy": {
+                "maxAttempts": 1,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "failed"
+                },
+                "when": {
+                  "failureClassification": "transient"
+                }
+              }
+            }
           },
           "type": "agent",
           "agentId": "release-agent"
@@ -544,8 +1173,23 @@
           "nodeSize": "tiny",
           "id": "release-gate",
           "on": {
-            "approved": "completed",
-            "rejected": "verify-release"
+            "approved": {
+              "action": "goto",
+              "target": "completed",
+              "input": "append-signal"
+            },
+            "rejected": {
+              "action": "retry",
+              "target": "verify-release",
+              "input": "append-signal",
+              "policy": {
+                "maxAttempts": 3,
+                "onExhausted": {
+                  "action": "terminate",
+                  "status": "blocked"
+                }
+              }
+            }
           },
           "type": "human"
         },

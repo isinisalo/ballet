@@ -1,12 +1,13 @@
-// This transaction coordinator intentionally keeps all Loop state mutations in
-// one module so a Step result, its persisted routing record, and the next Run
-// state commit atomically. Outcome policy and evidence hashing live separately.
+// All Loop mutations remain in this transaction coordinator so a signal, its
+// interpreted action, and the resulting Run state commit atomically.
 import type Database from "better-sqlite3";
 import type {
   ProjectAutomationConfig,
   ProjectLoop,
   ProjectStep,
-  StepTransitionTarget
+  StepTransitionTarget,
+  TransitionAction,
+  TransitionInputMode
 } from "../../shared/domain/automation.js";
 import { isProjectAgentBackedStep, isProjectTerminalNode, resolveEffectiveStartStep } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
@@ -24,7 +25,7 @@ import type {
 } from "../../shared/domain/runtime.js";
 import { LoopRunConflictError, LoopRunNotFoundError, LoopRunStateError } from "./LoopRunErrors.js";
 import { LoopRunStore } from "./LoopRunStore.js";
-import { MAX_REPAIR_ATTEMPTS, decideAgentTransition, fingerprintRepairEvidence } from "./LoopTransitionPolicy.js";
+import { interpretTransitionAction, type TransitionDecision } from "./LoopTransitionPolicy.js";
 import { MAX_ROOT_TRANSITIONS, now, type CompleteStepRunInput } from "./RuntimeDbTypes.js";
 
 interface StartOptions {
@@ -76,31 +77,15 @@ export class LoopRunEngine {
       const run = this.requireRun(runId);
       const stepRun = this.requireStepRun(runId, stepRunId);
       const step = this.requireSnapshotStep(run, stepRun.stepId);
-      if (step.type !== "human" || stepRun.type !== "human") throw new LoopRunStateError("Only a human step can receive a response.");
+      if (step.type !== "human" || stepRun.type !== "human") {
+        throw new LoopRunStateError("Only a human step can receive a human decision.");
+      }
       if (run.status !== "waiting_for_human" || stepRun.status !== "waiting_for_human") {
         throw new LoopRunConflictError("The human step is no longer waiting for a response.");
       }
       const signal = { kind: "human", decision } as const satisfies StepRunResult;
-      if (!Object.hasOwn(step.on, decision)) return this.finishMissingTransition(run, stepRun, signal, input);
-      const target = step.on[decision];
-      const forwardedInput = this.forwardedInput(run.input, input);
-      if (isLoopTarget(target) && this.store.hasActiveLoop(target.loop)) {
-        throw new LoopRunConflictError(`Loop ${target.loop} already has an active run.`);
-      }
-
-      const targetFailure = this.invalidTarget(config, run, stepRun, target, signal);
-      const transition = targetFailure
-        ? this.terminalTransition(signal, targetFailure)
-        : this.humanTransition(run, stepRun, signal, target, input);
-      const guarded = targetFailure ?? this.guardTransition(run, stepRun, signal, transition);
-      this.store.completeStepRun(stepRun, signal, {
-        responseInput: input,
-        transition: guarded ? this.terminalTransition(signal, guarded) : transition
-      });
-      this.store.updateRunInput(run.runId, forwardedInput);
-      if (guarded) this.store.finishRun(run.runId, guarded);
-      else this.followTarget(config, theme, run, stepRun, signal, target, forwardedInput);
-      return this.requireDetails(runId);
+      const action = step.on[decision];
+      return this.applySignal(config, theme, run, stepRun, signal, action, { responseInput: input });
     });
     try { return transaction() as LoopRunDetails; }
     catch (error) {
@@ -122,88 +107,67 @@ export class LoopRunEngine {
 
       const outcome = input.outcome ?? executionFailure(input.error ?? "The execution returned no structured outcome.");
       const signal = { kind: "agent", outcome: outcome.outcome } as const satisfies StepRunResult;
-      const history = this.store.listByRoot(run.rootRunId).flatMap((candidate) => candidate.stepRuns);
-      const missing = !Object.hasOwn(step.on, outcome.outcome)
-        ? this.termination(run, stepRun, signal, "blocked", "missing_transition", `Step ${step.id} has no ${outcome.outcome} transition.`)
-        : undefined;
-      const decision = missing ? undefined : decideAgentTransition({ step, stepRun, outcome, history });
-      const target = decision && "target" in decision ? decision.target : undefined;
-      const targetFailure = target ? this.invalidTarget(config, run, stepRun, target, signal, decision!.transition) : undefined;
-      const guarded = missing ?? targetFailure ?? (decision && "target" in decision
-        ? this.guardTransition(run, stepRun, signal, decision.transition)
-        : undefined);
-      const transition = guarded ? this.terminalTransition(signal, guarded) : decision!.transition;
-      const waitingForInput = !guarded && "wait" in decision!;
-      this.store.completeStepRun(stepRun, signal, {
-        outcome,
-        error: input.error,
-        transition,
-        status: waitingForInput ? "waiting_for_human"
-          : outcome.outcome === "blocked" ? "blocked"
-            : outcome.outcome === "failed" ? "failed" : "completed"
-      });
-
-      if (guarded) this.store.finishRun(run.runId, guarded);
-      else if ("termination" in decision!) this.store.finishRun(run.runId, decision.termination);
-      else if ("wait" in decision!) this.store.waitForHuman(run.runId);
-      else if ("retry" in decision!) this.store.createStepRun(run, step, stepRun.input ?? run.input, { retryOf: stepRun });
-      else this.followTarget(
-        config,
-        theme,
-        run,
-        stepRun,
-        signal,
-        decision!.target,
-        decision!.transition.action === "human" ? outcome.summary : run.input
-      );
-      return this.requireDetails(run.runId);
+      const action = step.on[outcome.outcome];
+      return this.applySignal(config, theme, run, stepRun, signal, action, { outcome, error: input.error });
     });
     return transaction() as LoopRunDetails;
   }
 
-  resumeAgentInput(
+  resumeWait(
+    config: ProjectAutomationConfig,
+    theme: LoopTheme,
     runId: string,
     stepRunId: string,
     input: string
   ): LoopRunDetails {
-    if (!input.trim()) throw new LoopRunStateError("Agent response input is required.");
+    if (!input.trim()) throw new LoopRunStateError("Resume input is required.");
     const transaction = this.connection().transaction(() => {
       const run = this.requireRun(runId);
       const stepRun = this.requireStepRun(runId, stepRunId);
       const step = this.requireSnapshotStep(run, stepRun.stepId);
-      if (!isProjectAgentBackedStep(step) || stepRun.type !== "agent") {
-        throw new LoopRunStateError("Only an agent step waiting for input can be resumed with agent input.");
-      }
       if (run.status !== "waiting_for_human" || stepRun.status !== "waiting_for_human") {
-        throw new LoopRunConflictError("The agent step is no longer waiting for input.");
+        throw new LoopRunConflictError("The step is no longer waiting for resume input.");
       }
-      if (stepRun.outcome?.outcome !== "needs_input" || stepRun.transition?.action !== "wait") {
-        throw new LoopRunStateError("The agent step does not have a resumable needs_input outcome.");
+      if (!stepRun.result || stepRun.transition?.action !== "wait" || stepRun.transition.resumed) {
+        throw new LoopRunStateError("The step does not have a resumable wait action.");
       }
-      const signal = { kind: "agent", outcome: "needs_input" } as const satisfies StepRunResult;
-      const transition = { signal, action: "resume", target: step.id } as const satisfies StepRunTransition;
-      const guarded = this.guardTransition(run, stepRun, signal, transition);
-      const forwardedInput = this.forwardedInput(run.input, input);
-      this.store.completeStepRun(stepRun, signal, {
-        responseInput: input,
-        outcome: stepRun.outcome,
-        transition: guarded ? this.terminalTransition(signal, guarded) : transition
+
+      const target = stepRun.transition.resume === "same-step"
+        ? step.id
+        : stepRun.transition.resume.target;
+      const failure = this.invalidTarget(config, run, stepRun, target, stepRun.result, {
+        allowScheduledSource: stepRun.transition.resume === "same-step"
       });
-      this.store.updateRunInput(run.runId, forwardedInput);
+      if (!failure) this.ensureTargetAvailable(target);
+      const guarded = failure ?? this.guardTransition(run, stepRun, stepRun.result, target);
+      const transition: StepRunTransition = guarded
+        ? this.terminalTransition(stepRun.result, guarded)
+        : { ...stepRun.transition, resumed: { target, at: now() } };
+      const nextInput = this.transitionInput(run.input, input, stepRun.transition.input ?? "current");
+      this.store.completeStepRun(stepRun, stepRun.result, {
+        responseInput: stepRun.responseInput ? this.forwardedInput(stepRun.responseInput, input) : input,
+        outcome: stepRun.outcome,
+        transition,
+        status: guarded ? guarded.status : "completed"
+      });
+      this.store.updateRunInput(run.runId, this.forwardedInput(run.input, input));
       if (guarded) this.store.finishRun(run.runId, guarded);
-      else {
-        this.store.incrementTransitionCount(run.runId);
-        this.store.createStepRun(this.requireRun(run.runId), step, forwardedInput);
-      }
+      else this.followTarget(config, theme, run, stepRun, stepRun.result, target, nextInput);
       return this.requireDetails(runId);
     });
-    return transaction() as LoopRunDetails;
+    try { return transaction() as LoopRunDetails; }
+    catch (error) {
+      if (isActiveLoopConstraint(error)) throw new LoopRunConflictError("The target loop already has an active run.");
+      throw error;
+    }
   }
 
   cancel(runId: string): LoopRunDetails {
     const transaction = this.connection().transaction(() => {
       const run = this.requireRun(runId);
-      if (!["running", "waiting_for_human"].includes(run.status)) throw new LoopRunConflictError(`Loop run ${runId} is already ${run.status}.`);
+      if (!["running", "waiting_for_human"].includes(run.status)) {
+        throw new LoopRunConflictError(`Loop run ${runId} is already ${run.status}.`);
+      }
       const timestamp = now();
       this.connection().prepare(`
         UPDATE step_runs SET status = 'cancelled', completed_at = @completedAt, updated_at = @updatedAt
@@ -213,6 +177,89 @@ export class LoopRunEngine {
       return this.requireDetails(runId);
     });
     return transaction() as LoopRunDetails;
+  }
+
+  private applySignal(
+    config: ProjectAutomationConfig,
+    theme: LoopTheme,
+    run: LoopRun,
+    stepRun: StepRun,
+    signal: StepRunResult,
+    action: TransitionAction | undefined,
+    detail: { outcome?: AgentOutcome; responseInput?: string; error?: string }
+  ): LoopRunDetails {
+    if (!action) return this.finishMissingTransition(run, stepRun, signal, detail);
+    const history = this.store.listByRoot(run.rootRunId).flatMap((candidate) => candidate.stepRuns);
+    const interpreted = interpretTransitionAction({
+      action,
+      signal,
+      stepRun,
+      history,
+      outcome: detail.outcome,
+      responseInput: detail.responseInput
+    });
+    const target = interpreted.kind === "goto" || interpreted.kind === "retry"
+      ? interpreted.target
+      : undefined;
+    const implicitRetry = interpreted.kind === "retry" && action.action === "retry" && action.target === undefined;
+    const failure = target
+      ? this.invalidTarget(config, run, stepRun, target, signal, {
+          allowScheduledSource: implicitRetry,
+          requireExecutable: interpreted.kind === "retry"
+        })
+      : undefined;
+    if (target && !failure) this.ensureTargetAvailable(target);
+    const guarded = failure ?? (target && !implicitRetry
+      ? this.guardTransition(run, stepRun, signal, target)
+      : undefined);
+    const transition = guarded ? this.terminalTransition(signal, guarded) : interpreted.transition;
+    const status = guarded ? guarded.status
+      : interpreted.kind === "wait" ? "waiting_for_human"
+        : interpreted.kind === "terminate" ? interpreted.termination.status
+          : "completed";
+
+    this.store.completeStepRun(stepRun, signal, {
+      outcome: detail.outcome,
+      responseInput: detail.responseInput,
+      error: detail.error,
+      transition,
+      status
+    });
+    if (detail.responseInput) {
+      this.store.updateRunInput(run.runId, this.forwardedInput(run.input, detail.responseInput));
+    }
+
+    if (guarded) this.store.finishRun(run.runId, guarded);
+    else this.applyDecision(config, theme, run, stepRun, signal, action, interpreted, detail);
+    return this.requireDetails(run.runId);
+  }
+
+  private applyDecision(
+    config: ProjectAutomationConfig,
+    theme: LoopTheme,
+    run: LoopRun,
+    stepRun: StepRun,
+    signal: StepRunResult,
+    configuredAction: TransitionAction,
+    decision: TransitionDecision,
+    detail: { outcome?: AgentOutcome; responseInput?: string }
+  ): void {
+    if (decision.kind === "terminate") {
+      this.store.finishRun(run.runId, decision.termination);
+      return;
+    }
+    if (decision.kind === "wait") {
+      this.store.waitForHuman(run.runId);
+      return;
+    }
+    const payload = detail.responseInput ?? detail.outcome?.summary;
+    const nextInput = this.transitionInput(run.input, payload, decision.inputMode);
+    if (decision.kind === "retry" && configuredAction.action === "retry" && configuredAction.target === undefined) {
+      const target = this.requireLocalExecutable(run, decision.target);
+      this.store.createStepRun(run, target, nextInput, { retryOf: stepRun });
+      return;
+    }
+    this.followTarget(config, theme, run, stepRun, signal, decision.target, nextInput);
   }
 
   private startInTransaction(loop: ProjectLoop, themeSnapshot: LoopTheme, options: StartOptions): LoopRunDetails {
@@ -229,8 +276,13 @@ export class LoopRunEngine {
   }
 
   private followTarget(
-    config: ProjectAutomationConfig, theme: LoopTheme, run: LoopRun, source: StepRun, signal: StepRunResult,
-    target: StepTransitionTarget, input?: string
+    config: ProjectAutomationConfig,
+    theme: LoopTheme,
+    run: LoopRun,
+    source: StepRun,
+    signal: StepRunResult,
+    target: StepTransitionTarget,
+    input?: string
   ): void {
     this.store.incrementTransitionCount(run.runId);
     if (typeof target === "string") {
@@ -238,101 +290,171 @@ export class LoopRunEngine {
       if (isProjectTerminalNode(next)) {
         this.store.finishRun(run.runId, {
           status: next.type,
-          code: terminalCode(next.type, signal),
+          code: "terminal_reached",
           message: `Transition reached the ${next.type} terminal.`,
           stepRunId: source.stepRunId,
           stepId: source.stepId,
           signal,
           target
         });
-      } else this.store.createStepRun(this.requireRun(run.runId), next, input);
+      } else {
+        this.store.createStepRun(this.requireRun(run.runId), next, input);
+      }
       return;
     }
+
     const targetLoop = this.requireLoop(config, target.loop);
     this.store.finishRun(run.runId, {
-      status: "completed", code: "completed", message: `Transition continued in Loop ${target.loop}.`,
-      stepRunId: source.stepRunId, stepId: source.stepId, signal, target
+      status: "completed",
+      code: "completed",
+      message: `Transition continued in Loop ${target.loop}.`,
+      stepRunId: source.stepRunId,
+      stepId: source.stepId,
+      signal,
+      target
     });
     this.startInTransaction(targetLoop, theme, {
-      source: "human", input, rootRunId: run.rootRunId, parentRunId: run.runId,
-      parentStepRunId: source.stepRunId, executionPlan: run.executionPlan
+      source: "transition",
+      input,
+      rootRunId: run.rootRunId,
+      parentRunId: run.runId,
+      parentStepRunId: source.stepRunId,
+      executionPlan: run.executionPlan
     });
   }
 
   private invalidTarget(
-    config: ProjectAutomationConfig, run: LoopRun, stepRun: StepRun, target: StepTransitionTarget,
-    signal: StepRunResult, transition?: StepRunTransition
+    config: ProjectAutomationConfig,
+    run: LoopRun,
+    stepRun: StepRun,
+    target: StepTransitionTarget,
+    signal: StepRunResult,
+    options: { allowScheduledSource?: boolean; requireExecutable?: boolean } = {}
   ): LoopRunTermination | undefined {
     if (typeof target === "string") {
       const node = run.snapshot.nodes.find((candidate) => candidate.id === target);
-      if (!node) return this.termination(run, stepRun, signal, "blocked", "stale_transition", `Transition target ${target} is missing.`, target);
-      if (!isProjectTerminalNode(node) && node.type === "scheduled") {
-        return this.termination(run, stepRun, signal, "blocked", "invalid_transition", `Transition target ${target} is a scheduled start step.`, target);
+      if (!node) {
+        return this.termination(stepRun, signal, "blocked", "stale_transition", `Transition target ${target} is missing.`, target);
       }
-      if (transition?.action === "human" && (isProjectTerminalNode(node) || node.type !== "human")) {
-        return this.termination(run, stepRun, signal, "blocked", "invalid_transition", `needs_input target ${target} is not a human step.`, target);
+      if (!isProjectTerminalNode(node) && node.type === "scheduled"
+        && !(options.allowScheduledSource && node.id === stepRun.stepId)) {
+        return this.termination(stepRun, signal, "blocked", "invalid_transition", `Transition target ${target} is a scheduled start step.`, target);
       }
-      if (transition?.action === "repair" && (isProjectTerminalNode(node) || node.type !== "agent")) {
-        return this.termination(run, stepRun, signal, "blocked", "invalid_transition", `Repair target ${target} is not an agent step.`, target);
+      if (options.requireExecutable && isProjectTerminalNode(node)) {
+        return this.termination(stepRun, signal, "blocked", "invalid_transition", `Retry target ${target} is not executable.`, target);
       }
       return undefined;
     }
-    if (stepRun.type !== "human") return this.termination(run, stepRun, signal, "blocked", "invalid_transition", "Only a human decision may transition to another Loop.", target);
     if (!config.loops.some((candidate) => candidate.id === target.loop)) {
-      return this.termination(run, stepRun, signal, "blocked", "stale_transition", `Transition Loop ${target.loop} is missing.`, target);
+      return this.termination(stepRun, signal, "blocked", "stale_transition", `Transition Loop ${target.loop} is missing.`, target);
+    }
+    if (target.loop === run.loopId) {
+      return this.termination(stepRun, signal, "blocked", "invalid_transition", "A Loop target must name a different Loop.", target);
     }
     return undefined;
   }
 
-  private humanTransition(run: LoopRun, stepRun: StepRun, signal: StepRunResult, target: StepTransitionTarget, input: string): StepRunTransition {
-    if (typeof target !== "string") return { signal, action: "transition", target };
-    const node = run.snapshot.nodes.find((candidate) => candidate.id === target);
-    if (signal.kind !== "human" || signal.decision !== "rejected" || !node || isProjectTerminalNode(node) || node.type !== "agent") {
-      return { signal, action: "transition", target };
+  private ensureTargetAvailable(target: StepTransitionTarget): void {
+    if (isLoopTarget(target) && this.store.hasActiveLoop(target.loop)) {
+      throw new LoopRunConflictError(`Loop ${target.loop} already has an active run.`);
     }
-    const repairs = this.store.listByRoot(run.rootRunId).flatMap((candidate) => candidate.stepRuns)
-      .filter((candidate) => candidate.loopId === stepRun.loopId && candidate.stepId === stepRun.stepId
-        && candidate.transition?.action === "repair" && candidate.transition.target === target);
-    return {
-      signal, action: "repair", target, repairAttempt: repairs.length + 1,
-      evidenceFingerprint: fingerprintRepairEvidence({ outcome: "changes-requested", summary: input, artifacts: {}, checks: [] })
-    };
   }
 
-  private guardTransition(run: LoopRun, stepRun: StepRun, signal: StepRunResult, transition: StepRunTransition): LoopRunTermination | undefined {
-    if (transition.action === "repair" && transition.repairAttempt > MAX_REPAIR_ATTEMPTS) {
-      return this.termination(run, stepRun, signal, "blocked", "repair_limit_exceeded",
-        `The repair loop reached its limit of ${MAX_REPAIR_ATTEMPTS}.`, transition.target, MAX_REPAIR_ATTEMPTS, transition.repairAttempt);
-    }
-    if (this.store.rootTransitionCount(run.rootRunId) + 1 > MAX_ROOT_TRANSITIONS) {
-      return this.termination(run, stepRun, signal, "blocked", "transition_limit_exceeded",
-        `The root transition limit of ${MAX_ROOT_TRANSITIONS} was reached.`, "target" in transition ? transition.target : undefined,
-        MAX_ROOT_TRANSITIONS, this.store.rootTransitionCount(run.rootRunId) + 1);
-    }
-    return undefined;
+  private guardTransition(
+    run: LoopRun,
+    stepRun: StepRun,
+    signal: StepRunResult,
+    target: StepTransitionTarget
+  ): LoopRunTermination | undefined {
+    const count = this.store.rootTransitionCount(run.rootRunId) + 1;
+    if (count <= MAX_ROOT_TRANSITIONS) return undefined;
+    return this.termination(
+      stepRun,
+      signal,
+      "blocked",
+      "transition_limit_exceeded",
+      `The root transition limit of ${MAX_ROOT_TRANSITIONS} was reached.`,
+      target,
+      MAX_ROOT_TRANSITIONS,
+      count
+    );
   }
 
-  private finishMissingTransition(run: LoopRun, stepRun: StepRun, signal: StepRunResult, input: string): LoopRunDetails {
-    const termination = this.termination(run, stepRun, signal, "blocked", "missing_transition", `Step ${stepRun.stepId} has no transition for this decision.`);
-    this.store.completeStepRun(stepRun, signal, { responseInput: input, transition: this.terminalTransition(signal, termination) });
+  private finishMissingTransition(
+    run: LoopRun,
+    stepRun: StepRun,
+    signal: StepRunResult,
+    detail: { outcome?: AgentOutcome; responseInput?: string; error?: string }
+  ): LoopRunDetails {
+    const termination = this.termination(
+      stepRun,
+      signal,
+      "blocked",
+      "missing_transition",
+      `Step ${stepRun.stepId} has no transition for signal ${signalLabel(signal)}.`
+    );
+    this.store.completeStepRun(stepRun, signal, {
+      outcome: detail.outcome,
+      responseInput: detail.responseInput,
+      error: detail.error,
+      transition: this.terminalTransition(signal, termination),
+      status: "blocked"
+    });
     this.store.finishRun(run.runId, termination);
     return this.requireDetails(run.runId);
   }
 
   private terminalTransition(signal: StepRunResult, termination: LoopRunTermination): StepRunTransition {
-    return { signal, action: "terminate", status: termination.status, code: termination.code };
+    return {
+      version: 1,
+      signal,
+      action: "terminate",
+      status: termination.status,
+      code: termination.code
+    };
   }
 
   private termination(
-    _run: LoopRun, stepRun: StepRun, signal: StepRunResult,
-    status: "blocked" | "failed", code: LoopRunTermination["code"], message: string,
-    target?: StepTransitionTarget, limit?: number, count?: number
+    stepRun: StepRun,
+    signal: StepRunResult,
+    status: "blocked" | "failed",
+    code: LoopRunTermination["code"],
+    message: string,
+    target?: StepTransitionTarget,
+    limit?: number,
+    count?: number
   ): LoopRunTermination {
-    return { status, code, message, stepRunId: stepRun.stepRunId, stepId: stepRun.stepId, signal, target, limit, count };
+    return {
+      status,
+      code,
+      message,
+      stepRunId: stepRun.stepRunId,
+      stepId: stepRun.stepId,
+      signal,
+      target,
+      limit,
+      count
+    };
+  }
+
+  private transitionInput(
+    current: string | undefined,
+    signalPayload: string | undefined,
+    mode: TransitionInputMode
+  ): string | undefined {
+    if (mode === "current") return current;
+    if (mode === "signal") return signalPayload;
+    return signalPayload ? this.forwardedInput(current, signalPayload) : current;
   }
 
   private forwardedInput(runInput: string | undefined, responseInput: string): string {
     return runInput ? `${runInput}\n\n${responseInput}` : responseInput;
+  }
+
+  private requireLocalExecutable(run: LoopRun, stepId: string) {
+    const node = run.snapshot.nodes.find((candidate) => candidate.id === stepId);
+    if (!node || isProjectTerminalNode(node)) throw new LoopRunStateError(`Executable transition target ${stepId} is missing.`);
+    return node;
   }
 
   private requireLoop(config: ProjectAutomationConfig, loopId: string): ProjectLoop {
@@ -349,7 +471,9 @@ export class LoopRunEngine {
 
   private requireStepRun(runId: string, stepRunId: string): StepRun {
     const stepRun = this.store.getStepRun(stepRunId);
-    if (!stepRun || stepRun.runId !== runId) throw new LoopRunNotFoundError(`Step run ${stepRunId} was not found in loop run ${runId}.`);
+    if (!stepRun || stepRun.runId !== runId) {
+      throw new LoopRunNotFoundError(`Step run ${stepRunId} was not found in loop run ${runId}.`);
+    }
     return stepRun;
   }
 
@@ -373,11 +497,5 @@ const executionFailure = (message: string): AgentOutcome => ({
   checks: []
 });
 
-const terminalCode = (
-  status: "completed" | "blocked" | "failed",
-  signal: StepRunResult
-): LoopRunTermination["code"] => {
-  if (status === "completed") return "completed";
-  if (signal.kind === "human") return signal.decision === "approved" ? "human_approved" : "human_rejected";
-  return status === "blocked" ? "agent_blocked" : "agent_failed";
-};
+const signalLabel = (signal: StepRunResult): string =>
+  signal.kind === "agent" ? signal.outcome : signal.decision;

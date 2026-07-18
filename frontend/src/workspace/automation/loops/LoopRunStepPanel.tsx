@@ -1,7 +1,7 @@
 import type { ProjectStep, RespondToStepRunRequest, StepRun, StepRunTransition } from "@shared/api/workspace-contracts";
 import { GitCompare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { AgentInputRunPanel } from "./AgentInputRunPanel";
+import { WaitResumePanel } from "./WaitResumePanel";
 import { HumanGateRunPanel } from "./HumanGateRunPanel";
 
 export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
@@ -52,6 +52,9 @@ function StepRunResponseControl({ stepRun, pending, onRespond }: {
   pending: boolean;
   onRespond: (stepRunId: string, request: RespondToStepRunRequest) => Promise<boolean>;
 }) {
+  if (stepRun.status === "waiting_for_human" && stepRun.transition?.action === "wait") {
+    return <div className="-mx-3 mt-3"><WaitResumePanel stepRun={stepRun} pending={pending} onRespond={onRespond} /></div>;
+  }
   if (stepRun.type === "human" && stepRun.status === "waiting_for_human") {
     return <div className="-mx-3 mt-3"><HumanGateRunPanel
       stepRun={stepRun}
@@ -62,10 +65,6 @@ function StepRunResponseControl({ stepRun, pending, onRespond }: {
         input
       })}
     /></div>;
-  }
-  if (stepRun.type === "agent" && stepRun.status === "waiting_for_human"
-    && stepRun.outcome?.outcome === "needs_input" && stepRun.transition?.action === "wait") {
-    return <div className="-mx-3 mt-3"><AgentInputRunPanel stepRun={stepRun} pending={pending} onRespond={onRespond} /></div>;
   }
   return null;
 }
@@ -78,13 +77,14 @@ const formatResult = (stepRun: StepRun) => stepRun.result
 
 const formatTransition = (transition: StepRunTransition | undefined) => {
   if (!transition) return "—";
-  if (transition.action === "wait") return "Wait · human input";
+  if (transition.action === "wait") {
+    const resume = transition.resume === "same-step" ? "same step" : targetLabel(transition.resume.target);
+    return transition.resumed ? `Wait · resumed to ${targetLabel(transition.resumed.target)}` : `Wait · ${resume}`;
+  }
   if (transition.action === "terminate") return `Terminate · ${transition.status} · ${transition.code}`;
-  const target = transition.target;
-  const label = typeof target === "string" ? `Node · ${target}` : `Loop · ${target.loop}`;
-  if (transition.action === "repair") return `Repair ${transition.repairAttempt} · ${label}`;
-  if (transition.action === "retry") return `Transient retry ${transition.retryAttempt} · ${label}`;
-  if (transition.action === "resume") return `Resume · ${label}`;
-  if (transition.action === "human") return `Human decision · ${label}`;
-  return label;
+  if (transition.action === "retry") return `Retry ${transition.attempt}/${transition.maxAttempts} · ${targetLabel(transition.target)}`;
+  return `Go to · ${targetLabel(transition.target)}`;
 };
+
+const targetLabel = (target: string | { loop: string }) =>
+  typeof target === "string" ? `Node · ${target}` : `Loop · ${target.loop}`;

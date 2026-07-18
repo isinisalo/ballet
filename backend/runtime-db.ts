@@ -152,12 +152,14 @@ export class RuntimeDatabase {
     return this.loopRunEngine.respond(config, loopTheme, runId, stepRunId, result, input);
   }
 
-  resumeAgentStepRun(
+  resumeStepRun(
+    config: ProjectAutomationConfig,
+    loopTheme: LoopTheme,
     runId: string,
     stepRunId: string,
     input: string
   ): LoopRunDetails {
-    return this.loopRunEngine.resumeAgentInput(runId, stepRunId, input);
+    return this.loopRunEngine.resumeWait(config, loopTheme, runId, stepRunId, input);
   }
 
   cancelLoopRun(runId: string): LoopRunDetails {

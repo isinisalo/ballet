@@ -41,7 +41,7 @@ const config: ProjectAutomationConfig = {
       nodeStyle: "luna",
       nodeSize: "tiny",
       description: "Approve brief",
-      on: { approved: { loop: "planning" }, rejected: "create" }
+      on: { approved: { action: "goto", target: { loop: "planning" }, input: "append-signal" }, rejected: { action: "goto", target: "create", input: "append-signal" } }
     }, ...defaultTerminalNodes()]
   }, {
     id: "planning",
@@ -71,7 +71,7 @@ describe("terminal canvas nodes", () => {
           nodeStyle: "flat",
           nodeSize: "medium",
           description: "Gate",
-          on: { approved: "blocked", rejected: "blocked" }
+          on: { approved: { action: "goto", target: "blocked", input: "append-signal" }, rejected: { action: "goto", target: "blocked", input: "append-signal" } }
         }, ...defaultTerminalNodes()]
       }]
     };
@@ -130,7 +130,7 @@ describe("v8 compact loop canvas", () => {
     expect(crossLoopEdge).toBeDefined();
     expect(loopEdgeDisplayLabel(crossLoopEdge)).toBeUndefined();
     expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining([
-      "ready", "approved", "changes-requested", "needs_input", "blocked", "failed", "rejected"
+      "ready", "approved", "changes-requested", "needs_input", "blocked", "failed.fallback-1", "rejected"
     ]));
     expect(layout.edges.some((edge) => edge.route?.outputId === "rejected" && ["top", "bottom"].includes(edge.sourceHandleId ?? ""))).toBe(true);
   });
@@ -294,7 +294,7 @@ describe("Loop node style geometry", () => {
       scheduleLabel: "Weekdays · 09:00 · Europe/Helsinki"
     });
     expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining([
-      "ready", "approved", "changes-requested", "blocked", "failed"
+      "ready", "approved", "changes-requested", "blocked", "failed.fallback-1"
     ]));
   });
 

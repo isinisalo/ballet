@@ -25,7 +25,7 @@ const loop: ProjectLoop = {
     nodeStyle: "sol",
     nodeSize: "large",
     description: "Approve delivery",
-    on: { approved: "completed", rejected: "failed" }
+    on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "failed", input: "append-signal" } }
   }, ...defaultTerminalNodes()]
 };
 

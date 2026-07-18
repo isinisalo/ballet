@@ -110,7 +110,7 @@ describe("scheduled automation graph validation", () => {
       message: expect.stringContaining("only as the loop start")
     }));
     expect(issues).toContainEqual(expect.objectContaining({
-      path: "loops.0.nodes.1.on.approved",
+      path: "loops.0.nodes.1.on.approved.target",
       message: "No transition may target a scheduled start step."
     }));
   });
@@ -138,19 +138,23 @@ describe("scheduled automation domain helpers", () => {
     if (step.type !== "scheduled") throw new Error("Expected scheduled fixture node.");
     expect(resolveEffectiveStartStep(scheduledConfig(schedules[0]!).loops[0]!)?.id).toBe(step.id);
     expect(getProjectStepTransitionEntries(step)).toEqual([
-      ["ready", "completed"],
-      ["approved", "completed"],
-      ["changes-requested", "blocked"],
-      ["blocked", "blocked"],
-      ["failed", "failed"]
+      ["ready", { action: "goto", target: "completed" }],
+      ["approved", { action: "goto", target: "completed" }],
+      ["changes-requested", { action: "terminate", status: "blocked" }],
+      ["needs_input", { action: "wait", resume: "same-step", input: "append-signal" }],
+      ["blocked", { action: "terminate", status: "blocked" }],
+      ["failed", {
+        action: "retry",
+        policy: {
+          maxAttempts: 1,
+          when: { failureClassification: "transient" },
+          onExhausted: { action: "terminate", status: "failed" }
+        }
+      }]
     ]);
     expect(mapProjectStepTransitions(step, { approved: () => "next-step" }).on).toEqual({
-      ready: "completed",
-      approved: "next-step",
-      "changes-requested": { terminate: "blocked" },
-      needs_input: { wait: true },
-      blocked: { terminal: "blocked" },
-      failed: { terminal: "failed", retry: { when: "transient", limit: 1 } }
+      ...step.on,
+      approved: { action: "goto", target: "next-step" }
     });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 import {
-  defaultTransitionFor,
+  defaultHumanStepTransitions,
   defaultTerminalNodes,
   loopNodeSizeCatalog,
   loopNodeSizes,
@@ -21,7 +21,7 @@ const config = (): ProjectAutomationConfig => ({
       description: "Approve.",
       nodeStyle: "flat",
       nodeSize: "medium",
-      on: { approved: "completed", rejected: "blocked" }
+      on: defaultHumanStepTransitions()
     }, ...defaultTerminalNodes()]
   }]
 });
@@ -145,8 +145,10 @@ describe("v8 node style and terminal validation", () => {
     }
   });
 
-  it("provides completed and blocked defaults for required outputs", () => {
-    expect(defaultTransitionFor("approved")).toBe("completed");
-    expect(defaultTransitionFor("rejected")).toBe("blocked");
+  it("provides explicit generic actions for human defaults", () => {
+    expect(defaultHumanStepTransitions()).toEqual({
+      approved: { action: "goto", target: "completed", input: "append-signal" },
+      rejected: { action: "goto", target: "blocked", input: "append-signal" }
+    });
   });
 });

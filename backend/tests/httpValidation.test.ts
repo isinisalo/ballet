@@ -18,15 +18,15 @@ describe("HTTP Zod validation", () => {
       input: "Please revise."
     })).toEqual({ kind: "human-decision", decision: "rejected", input: "Please revise." });
     expect(parseUnknown(respondToRunStepBodySchema, {
-      kind: "agent-input",
+      kind: "resume",
       input: "Use SQLite."
-    })).toEqual({ kind: "agent-input", input: "Use SQLite." });
+    })).toEqual({ kind: "resume", input: "Use SQLite." });
     expectValidationError(() => parseUnknown(respondToRunStepBodySchema, {
       result: "rejected",
       input: "Legacy binary response."
     }), "kind");
     expectValidationError(() => parseUnknown(respondToRunStepBodySchema, {
-      kind: "agent-input",
+      kind: "resume",
       input: "   "
     }), "input");
   });

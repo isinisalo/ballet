@@ -27,8 +27,16 @@ import type {
   ProjectHumanStepTransitions,
   ProjectStepTransitionMappers,
   ProjectStepTransitions,
+  GotoTransitionAction,
+  RetryTransitionAction,
+  RetryTransitionPolicy,
   StepEndStatus,
-  StepTransitionTarget
+  StepTransitionTarget,
+  TerminateTransitionAction,
+  TransitionAction,
+  TransitionFallbackAction,
+  TransitionInputMode,
+  WaitTransitionAction
 } from "../domain/automation.js";
 import type {
   LoopConnectionPointStyle,
@@ -128,21 +136,24 @@ export {
   defaultLoopNodeSize,
   defaultLoopNodeStyle,
   defaultTerminalNodes,
-  defaultTransitionFor,
   defaultProjectAutomationConfig,
   getProjectStepTransitionEntries,
   getProjectStepTransitionTargets,
+  getTransitionActionTargets,
+  gotoTransition,
   isCalendarDate,
   isIanaTimeZone,
   isProjectAgentBackedStep,
   isProjectTerminalNode,
-  MAX_ROOT_TRANSITIONS,
+  MAX_TRANSITION_RETRY_ATTEMPTS,
   loopNodeSizes,
   loopNodeSizeCatalog,
   loopNodeStyleCatalog,
   loopNodeStyles,
   mapProjectStepTransitions,
-  resolveEffectiveStartStep
+  mapTransitionActionTargets,
+  resolveEffectiveStartStep,
+  terminateTransition
 } from "../domain/automation.js";
 export { defaultLoopTheme } from "../domain/loopThemes.js";
 
@@ -154,7 +165,10 @@ export type {
   LoopEdgeLineStyle, LoopConnectionPointStyle, ProjectOnceStepSchedule, ProjectRecurringStepSchedule,
   ProjectScheduledStep, ProjectScheduleCadence, ProjectScheduleWeekday,
   ProjectStep, ProjectStepSchedule, ProjectStepTransitionEntry, ProjectStepTransitionId,
-  ProjectAgentStepTransitions, ProjectHumanStepTransitions, ProjectStepTransitionMappers, ProjectStepTransitions, StepEndStatus, StepTransitionTarget, LoopRun, LoopRunDetails,
+  ProjectAgentStepTransitions, ProjectHumanStepTransitions, ProjectStepTransitionMappers, ProjectStepTransitions,
+  GotoTransitionAction, RetryTransitionAction, RetryTransitionPolicy, StepEndStatus, StepTransitionTarget,
+  TerminateTransitionAction, TransitionAction, TransitionFallbackAction, TransitionInputMode, WaitTransitionAction,
+  LoopRun, LoopRunDetails,
   LoopExecutionPlan, LoopScheduleState, LoopRuntimePreflight,
   RespondToStepRunRequest, StepRun, StepRunResult, StepRunTransition, LoopRunTermination, AgentRuntimeConfiguration, AgentOutcome, AgentOutcomeStatus, HumanDecision, ExecutionAgentSnapshot,
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot, PortableAgentRuntimeIntent,

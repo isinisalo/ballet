@@ -78,7 +78,7 @@ function galleryRecord(nodeStyle: LoopNodeStyle, nodeSize: LoopNodeSize, index: 
     description: loopNodeStyleCatalog[nodeStyle].label,
     nodeStyle,
     nodeSize,
-    on: { ...defaultAgentStepTransitions(), ready: "completed", approved: "completed" }
+    on: defaultAgentStepTransitions()
   };
   return {
     stepKey: id,

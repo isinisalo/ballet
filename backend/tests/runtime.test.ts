@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { defaultAgentStepTransitions, defaultTerminalNodes, type ProjectAgentStepTransitions, type ProjectAutomationConfig, type StepTransitionTarget } from "../../shared/domain/automation.js";
+import { defaultAgentStepTransitions, defaultTerminalNodes, gotoTransition, terminateTransition, type ProjectAgentStepTransitions, type ProjectAutomationConfig, type StepTransitionTarget } from "../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
@@ -32,10 +32,13 @@ const agentOn = (
   options: { repair?: string; human?: string } = {}
 ): ProjectAgentStepTransitions => ({
   ...defaultAgentStepTransitions(),
-  ready: success,
-  approved: success,
-  "changes-requested": options.repair ? { repair: options.repair } : { terminate: "blocked" },
-  needs_input: options.human ? { human: options.human } : { wait: true }
+  ready: gotoTransition(success),
+  approved: gotoTransition(success),
+  "changes-requested": options.repair ? {
+    action: "retry", target: options.repair,
+    policy: { maxAttempts: 3, stallDetection: "same-evidence", onExhausted: terminateTransition("blocked") }
+  } : terminateTransition("blocked"),
+  needs_input: options.human ? gotoTransition(options.human, "signal") : { action: "wait", resume: "same-step", input: "append-signal" }
 });
 
 const startLoop = (
@@ -75,7 +78,7 @@ const config = (): ProjectAutomationConfig => ({
       description: "Approve.",
       nodeStyle: "luna",
       nodeSize: "tiny",
-      on: { approved: { loop: "release" }, rejected: "implement" }
+      on: { approved: gotoTransition({ loop: "release" }, "append-signal"), rejected: { action: "retry", target: "implement", input: "append-signal", policy: { maxAttempts: 3, onExhausted: terminateTransition("blocked") } } }
     }, ...defaultTerminalNodes()]
   }, {
     id: "release",
@@ -145,7 +148,7 @@ describe("terminal node runtime transitions", () => {
         start: "gate",
         nodes: [{
           id: "gate", type: "human", description: "Decide.", nodeStyle: "luna", nodeSize: "tiny",
-          on: { approved: "completed", rejected: "blocked" }
+          on: { approved: gotoTransition("completed", "append-signal"), rejected: gotoTransition("blocked", "append-signal") }
         }, ...defaultTerminalNodes()]
       }]
     };
@@ -156,7 +159,7 @@ describe("terminal node runtime transitions", () => {
 
     expect(completed.status).toBe("blocked");
     expect(completed.termination).toMatchObject({
-      code: "human_rejected",
+      code: "terminal_reached",
       signal: { kind: "human", decision: "rejected" }
     });
     runtime.close();
@@ -207,7 +210,7 @@ describe("local runtime database", () => {
       rootRunId: parent.rootRunId,
       parentRunId: parent.runId,
       parentStepRunId: gate.stepRunId,
-      source: "human",
+      source: "transition",
       status: "running"
     });
     expect(child.input).toContain("Original request");
@@ -236,8 +239,9 @@ describe("local runtime database", () => {
     const storedSnapshot = JSON.parse((runtime.connection().prepare(
       "SELECT snapshot_json FROM loop_runs WHERE run_id = ?"
     ).get(parent.runId) as { snapshot_json: string }).snapshot_json) as Record<string, unknown>;
-    expect(Object.keys(storedSnapshot).sort()).toEqual(["loop", "theme"]);
+    expect(Object.keys(storedSnapshot).sort()).toEqual(["automationVersion", "loop", "theme"]);
     expect(storedSnapshot).toEqual({
+      automationVersion: 8,
       loop: automation.loops[0],
       theme: initialTheme
     });
@@ -294,7 +298,7 @@ describe("local runtime safeguards", () => {
     runtime.close();
   });
 
-  it("blocks a root run after the configured transition safety limit", async () => {
+  it("blocks a root run at the technical emergency transition limit", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const cyclic: ProjectAutomationConfig = {
       version: 8,
@@ -313,10 +317,12 @@ describe("local runtime safeguards", () => {
       }]
     };
     let details = startLoop(runtime, cyclic, "cycle");
-    for (let index = 0; index <= MAX_ROOT_TRANSITIONS && details.status === "running"; index += 1) {
-      const step = details.stepRuns.at(-1)!;
-      details = runtime.completeAgentStep(cyclic, openAiTheme, { stepRunId: step.stepRunId, outcome: ready });
-    }
+    runtime.connection().prepare("UPDATE loop_runs SET transition_count = ? WHERE run_id = ?")
+      .run(MAX_ROOT_TRANSITIONS, details.runId);
+    details = runtime.completeAgentStep(cyclic, openAiTheme, {
+      stepRunId: details.stepRuns[0]!.stepRunId,
+      outcome: ready
+    });
     expect(details.status).toBe("blocked");
     expect(details.transitionCount).toBe(MAX_ROOT_TRANSITIONS);
     expect(details.termination).toMatchObject({
@@ -324,7 +330,7 @@ describe("local runtime safeguards", () => {
       limit: MAX_ROOT_TRANSITIONS,
       count: MAX_ROOT_TRANSITIONS + 1
     });
-    expect(details.stepRuns).toHaveLength(MAX_ROOT_TRANSITIONS + 1);
+    expect(details.stepRuns).toHaveLength(1);
     runtime.close();
   });
 
@@ -339,7 +345,7 @@ describe("local runtime safeguards", () => {
 
     expect(advanced.stepRuns[0]).toMatchObject({
       result: { kind: "agent", outcome: "ready" },
-      transition: { signal: { kind: "agent", outcome: "ready" }, action: "transition", target: "verify" }
+      transition: { signal: { kind: "agent", outcome: "ready" }, action: "goto", target: "verify" }
     });
     expect(advanced.stepRuns.at(-1)).toMatchObject({ stepId: "verify", status: "queued" });
     runtime.close();
@@ -350,7 +356,7 @@ describe("local runtime safeguards", () => {
     const automation = twoAgentConfig();
     const first = automation.loops[0]!.nodes[0]!;
     if (first.type !== "agent") throw new Error("Expected agent fixture.");
-    first.on.approved = "completed";
+    first.on.approved = gotoTransition("completed");
     const started = startLoop(runtime, automation, "outcome-flow");
     const completed = runtime.completeAgentStep(automation, openAiTheme, {
       stepRunId: started.stepRuns[0]!.stepRunId,
@@ -361,7 +367,7 @@ describe("local runtime safeguards", () => {
     expect(completed.stepRuns).toHaveLength(1);
     expect(completed.stepRuns[0]).toMatchObject({
       result: { kind: "agent", outcome: "approved" },
-      transition: { action: "transition", target: "completed" }
+      transition: { action: "goto", target: "completed" }
     });
     runtime.close();
   });
@@ -378,7 +384,7 @@ describe("local runtime safeguards", () => {
     expect(waiting.status).toBe("waiting_for_human");
     expect(waiting.stepRuns[0]).toMatchObject({
       result: { kind: "agent", outcome: "needs_input" },
-      transition: { action: "human", target: "gate" }
+      transition: { action: "goto", target: "gate" }
     });
     expect(waiting.stepRuns.at(-1)).toMatchObject({
       stepId: "gate",
@@ -397,7 +403,7 @@ describe("local runtime safeguards", () => {
     const automation = twoAgentConfig();
     const first = automation.loops[0]!.nodes[0]!;
     if (first.type !== "agent") throw new Error("Expected agent fixture.");
-    first.on.needs_input = { wait: true };
+    first.on.needs_input = { action: "wait", resume: "same-step", input: "append-signal" };
     const started = startLoop(runtime, automation, "outcome-flow", openAiTheme, "Build the feature.");
     const waiting = runtime.completeAgentStep(automation, openAiTheme, {
       stepRunId: started.stepRuns[0]!.stepRunId,
@@ -408,11 +414,13 @@ describe("local runtime safeguards", () => {
     expect(waiting.stepRuns[0]).toMatchObject({
       status: "waiting_for_human",
       result: { kind: "agent", outcome: "needs_input" },
-      transition: { action: "wait", reason: "needs_input" }
+      transition: { action: "wait", resume: "same-step" }
     });
     expect(waiting.stepRuns[0]!.completedAt).toBeUndefined();
 
-    const resumed = runtime.resumeAgentStepRun(
+    const resumed = runtime.resumeStepRun(
+      automation,
+      openAiTheme,
       waiting.runId,
       waiting.stepRuns[0]!.stepRunId,
       "Use SQLite."
@@ -422,18 +430,83 @@ describe("local runtime safeguards", () => {
       status: "completed",
       responseInput: "Use SQLite.",
       result: { kind: "agent", outcome: "needs_input" },
-      transition: { action: "resume", target: "implement" }
+      transition: { action: "wait", resumed: { target: "implement" } }
     });
     expect(resumed.stepRuns.at(-1)).toMatchObject({
       stepId: "implement",
       status: "queued",
       input: "Build the feature.\n\nUse SQLite."
     });
-    expect(() => runtime.resumeAgentStepRun(
+    expect(() => runtime.resumeStepRun(
+      automation,
+      openAiTheme,
       waiting.runId,
       waiting.stepRuns[0]!.stepRunId,
       "Duplicate response."
     )).toThrow(LoopRunConflictError);
+    runtime.close();
+  });
+
+  it("pauses and resumes a human decision through the same wait action", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const automation: ProjectAutomationConfig = {
+      version: 8,
+      loops: [{
+        id: "human-wait",
+        start: "operator",
+        nodes: [{
+          id: "operator", type: "human", description: "Choose.", nodeStyle: "luna", nodeSize: "tiny",
+          on: {
+            approved: { action: "wait", resume: { target: "continue" }, input: "append-signal" },
+            rejected: terminateTransition("blocked")
+          }
+        }, {
+          id: "continue", type: "agent", agentId: "developer", description: "Continue.", nodeStyle: "terra", nodeSize: "medium",
+          on: agentOn("completed")
+        }, ...defaultTerminalNodes()]
+      }]
+    };
+    const started = startLoop(runtime, automation, "human-wait", openAiTheme, "Original request.");
+    const waiting = runtime.respondToStepRun(
+      automation,
+      openAiTheme,
+      started.runId,
+      started.stepRuns[0]!.stepRunId,
+      "approved",
+      "Proceed after confirmation."
+    );
+
+    expect(waiting).toMatchObject({ status: "waiting_for_human", input: "Original request.\n\nProceed after confirmation." });
+    expect(waiting.stepRuns[0]).toMatchObject({
+      type: "human",
+      status: "waiting_for_human",
+      result: { kind: "human", decision: "approved" },
+      transition: { action: "wait", resume: { target: "continue" } },
+      responseInput: "Proceed after confirmation."
+    });
+
+    const resumed = runtime.resumeStepRun(
+      automation,
+      openAiTheme,
+      waiting.runId,
+      waiting.stepRuns[0]!.stepRunId,
+      "Confirmation received."
+    );
+    expect(resumed).toMatchObject({
+      status: "running",
+      input: "Original request.\n\nProceed after confirmation.\n\nConfirmation received."
+    });
+    expect(resumed.stepRuns[0]).toMatchObject({
+      status: "completed",
+      responseInput: "Proceed after confirmation.\n\nConfirmation received.",
+      transition: { action: "wait", resumed: { target: "continue" } }
+    });
+    expect(resumed.stepRuns.at(-1)).toMatchObject({
+      stepId: "continue",
+      type: "agent",
+      status: "queued",
+      input: "Original request.\n\nProceed after confirmation.\n\nConfirmation received."
+    });
     runtime.close();
   });
 
@@ -453,10 +526,7 @@ describe("local runtime safeguards", () => {
       });
       expect(completed.status).toBe(status);
       expect(completed.stepRuns).toHaveLength(1);
-      expect(completed.termination).toMatchObject({
-        code: status === "blocked" ? "agent_blocked" : "agent_failed",
-        message: `${status} reason`
-      });
+      expect(completed.termination).toMatchObject({ code: "configured_termination", status });
       runtime.close();
     }
   });
@@ -472,7 +542,7 @@ describe("local runtime safeguards", () => {
 
     expect(completed.status).toBe("blocked");
     expect(completed.termination).toMatchObject({
-      code: "changes_requested",
+      code: "configured_termination",
       signal: { kind: "agent", outcome: "changes-requested" }
     });
     expect(completed.stepRuns).toHaveLength(1);
@@ -499,7 +569,7 @@ describe("local runtime safeguards", () => {
 
     expect(details.status).toBe("blocked");
     expect(details.stepRuns.filter((step) => step.stepId === "implement")).toHaveLength(3);
-    expect(details.termination).toMatchObject({ code: "repair_limit_exceeded", limit: 3, count: 4, target: "implement" });
+    expect(details.termination).toMatchObject({ code: "retry_exhausted", limit: 3, count: 4, target: "implement" });
     runtime.close();
   });
 
@@ -521,7 +591,7 @@ describe("local runtime safeguards", () => {
     });
 
     expect(details.status).toBe("blocked");
-    expect(details.termination).toMatchObject({ code: "stalled_repair", target: "implement" });
+    expect(details.termination).toMatchObject({ code: "retry_stalled", target: "implement" });
     runtime.close();
   });
 
@@ -547,7 +617,46 @@ describe("local runtime safeguards", () => {
 
     expect(details.status).toBe("failed");
     expect(details.stepRuns.filter((step) => step.stepId === "implement")).toHaveLength(2);
-    expect(details.termination).toMatchObject({ code: "agent_failed", message: "Provider still unavailable." });
+    expect(details.termination).toMatchObject({ code: "retry_exhausted", status: "failed" });
+    runtime.close();
+  });
+
+  it("starts a fresh implicit retry budget after a later normal cycle entry", async () => {
+    const runtime = new RuntimeDatabase(await tempDbPath());
+    const automation = twoAgentConfig();
+    const verify = automation.loops[0]!.nodes.find((node) => node.id === "verify");
+    if (!verify || verify.type === "human" || verify.type === "completed" || verify.type === "blocked" || verify.type === "failed") {
+      throw new Error("Expected agent verifier fixture.");
+    }
+    verify.on.ready = gotoTransition("implement");
+    let details = startLoop(runtime, automation, "outcome-flow");
+    details = runtime.completeAgentStep(automation, openAiTheme, {
+      stepRunId: details.stepRuns.at(-1)!.stepRunId,
+      outcome: { outcome: "failed", summary: "First temporary outage.", failure: { classification: "transient" }, checks: [] }
+    });
+    details = runtime.completeAgentStep(automation, openAiTheme, {
+      stepRunId: details.stepRuns.at(-1)!.stepRunId,
+      outcome: ready
+    });
+    details = runtime.completeAgentStep(automation, openAiTheme, {
+      stepRunId: details.stepRuns.at(-1)!.stepRunId,
+      outcome: ready
+    });
+    const normalCycleEntry = details.stepRuns.at(-1)!;
+    expect(normalCycleEntry).toMatchObject({ stepId: "implement", attempt: 1 });
+    expect(normalCycleEntry.retryOfStepRunId).toBeUndefined();
+
+    details = runtime.completeAgentStep(automation, openAiTheme, {
+      stepRunId: normalCycleEntry.stepRunId,
+      outcome: { outcome: "failed", summary: "Second temporary outage.", failure: { classification: "transient" }, checks: [] }
+    });
+    expect(details.status).toBe("running");
+    expect(details.stepRuns.at(-1)).toMatchObject({
+      stepId: "implement",
+      attempt: 2,
+      retryOfStepRunId: normalCycleEntry.stepRunId
+    });
+    expect(details.stepRuns.filter((step) => step.stepId === "implement")).toHaveLength(4);
     runtime.close();
   });
 
@@ -559,7 +668,7 @@ describe("local runtime safeguards", () => {
     const canonical = twoAgentConfig();
     const broken = structuredClone(canonical) as unknown as Record<string, unknown>;
     const first = ((broken.loops as Array<{ nodes: Array<{ on: Record<string, unknown> }> }>)[0]!.nodes[0]!);
-    if (target) first.on.ready = target;
+    if (target) first.on.ready = { action: "goto", target };
     else delete first.on.ready;
     const automation = broken as unknown as ProjectAutomationConfig;
     const started = startLoop(runtime, automation, "outcome-flow");
@@ -584,7 +693,7 @@ const twoAgentConfig = (): ProjectAutomationConfig => ({
       on: agentOn("completed", { human: "gate" })
     }, {
       id: "gate", type: "human", description: "Decide.", nodeStyle: "luna", nodeSize: "tiny",
-      on: { approved: "completed", rejected: "implement" }
+      on: { approved: gotoTransition("completed", "append-signal"), rejected: { action: "retry", target: "implement", input: "append-signal", policy: { maxAttempts: 3, onExhausted: terminateTransition("blocked") } } }
     }, ...defaultTerminalNodes()]
   }]
 });

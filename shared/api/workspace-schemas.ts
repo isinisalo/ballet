@@ -6,10 +6,12 @@ import {
   isIanaTimeZone,
   loopNodeSizes,
   loopNodeStyles,
+  MAX_TRANSITION_RETRY_ATTEMPTS,
+  transitionInputModes,
   type ProjectAutomationConfig,
   type ProjectStepSchedule
 } from "../domain/automation.js";
-import { migrateLegacyBinaryV8 } from "../domain/automationMigration.js";
+import { migrateAutomationConfig } from "../domain/automationMigration.js";
 import type { ProjectConfiguration } from "../domain/projectConfig.js";
 import { portableAgentRuntimeIntentSchema } from "./runtime-schemas.js";
 import {
@@ -130,26 +132,59 @@ export const loopThemeSchema = z.object({
 }).strict() satisfies z.ZodType<LoopTheme>;
 const stepLoopSchema = z.object({ loop: kebabLoopIdSchema }).strict();
 const stepTransitionTargetSchema = z.union([automationStepIdSchema, stepLoopSchema]);
+const transitionInputSchema = z.enum(transitionInputModes).optional();
+const gotoTransitionActionSchema = z.object({
+  action: z.literal("goto"),
+  target: stepTransitionTargetSchema,
+  input: transitionInputSchema
+}).strict();
+const terminateTransitionActionSchema = z.object({
+  action: z.literal("terminate"),
+  status: z.enum(["completed", "blocked", "failed"])
+}).strict();
+const waitTransitionActionSchema = z.object({
+  action: z.literal("wait"),
+  resume: z.union([
+    z.literal("same-step"),
+    z.object({ target: stepTransitionTargetSchema }).strict()
+  ]),
+  input: transitionInputSchema
+}).strict();
+const transitionFallbackActionSchema = z.discriminatedUnion("action", [
+  gotoTransitionActionSchema,
+  terminateTransitionActionSchema,
+  waitTransitionActionSchema
+]);
+const retryTransitionActionSchema = z.object({
+  action: z.literal("retry"),
+  target: automationStepIdSchema.optional(),
+  input: transitionInputSchema,
+  policy: z.object({
+    maxAttempts: z.number().int().positive().max(MAX_TRANSITION_RETRY_ATTEMPTS),
+    onExhausted: transitionFallbackActionSchema,
+    when: z.object({
+      failureClassification: z.enum(["transient", "permanent"])
+    }).strict().optional(),
+    stallDetection: z.literal("same-evidence").optional()
+  }).strict()
+}).strict();
+const transitionActionSchema = z.discriminatedUnion("action", [
+  gotoTransitionActionSchema,
+  terminateTransitionActionSchema,
+  waitTransitionActionSchema,
+  retryTransitionActionSchema
+]);
 const humanStepTransitionsSchema = z.object({
-  approved: stepTransitionTargetSchema,
-  rejected: stepTransitionTargetSchema
+  approved: transitionActionSchema,
+  rejected: transitionActionSchema
 }).strict();
 const agentStepTransitionsSchema = z.object({
-  ready: stepTransitionTargetSchema,
-  approved: stepTransitionTargetSchema,
-  "changes-requested": z.union([
-    z.object({ repair: automationStepIdSchema }).strict(),
-    z.object({ terminate: z.literal("blocked") }).strict()
-  ]),
-  needs_input: z.union([
-    z.object({ human: automationStepIdSchema }).strict(),
-    z.object({ wait: z.literal(true) }).strict()
-  ]),
-  blocked: z.object({ terminal: z.literal("blocked") }).strict(),
-  failed: z.object({
-    terminal: z.literal("failed"),
-    retry: z.object({ when: z.literal("transient"), limit: z.literal(1) }).strict().optional()
-  }).strict()
+  ready: transitionActionSchema,
+  approved: transitionActionSchema,
+  "changes-requested": transitionActionSchema,
+  needs_input: transitionActionSchema,
+  blocked: transitionActionSchema,
+  failed: transitionActionSchema
 }).strict();
 const terminalStatuses = ["completed", "blocked", "failed"] as const;
 const executableNodeIdSchema = automationStepIdSchema.refine(
@@ -265,13 +300,10 @@ const projectLoopSchema = z.object({
   });
 });
 
-const canonicalAutomationConfigSchema = z.object({
-  version: z.literal(8),
-  loops: z.array(projectLoopSchema)
-}).strict();
+const canonicalAutomationConfigSchema = z.object({ version: z.literal(8), loops: z.array(projectLoopSchema) }).strict();
 
 export const automationConfigSchema = z.preprocess(
-  migrateLegacyBinaryV8,
+  migrateAutomationConfig,
   canonicalAutomationConfigSchema
 ) as z.ZodType<ProjectAutomationConfig>;
 
@@ -282,6 +314,6 @@ const canonicalProjectConfigSchema = z.object({
 }).strict();
 
 export const projectConfigSchema = z.preprocess(
-  migrateLegacyBinaryV8,
+  migrateAutomationConfig,
   canonicalProjectConfigSchema
 ) as z.ZodType<ProjectConfiguration>;

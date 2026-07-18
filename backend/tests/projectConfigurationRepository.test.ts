@@ -94,19 +94,48 @@ describe("project configuration repository", () => {
     expect(timer).toMatchObject({
       type: "scheduled",
       on: {
-        ready: "review",
-        approved: "review",
-        "changes-requested": { terminate: "blocked" },
-        needs_input: { human: "gate" },
-        blocked: { terminal: "blocked" },
-        failed: { terminal: "failed", retry: { when: "transient", limit: 1 } }
+        ready: { action: "goto", target: "review" },
+        approved: { action: "goto", target: "review" },
+        "changes-requested": { action: "terminate", status: "blocked" },
+        needs_input: { action: "goto", target: "gate", input: "signal" },
+        blocked: { action: "terminate", status: "blocked" },
+        failed: {
+          action: "retry",
+          policy: {
+            maxAttempts: 1,
+            when: { failureClassification: "transient" },
+            onExhausted: { action: "terminate", status: "failed" }
+          }
+        }
       }
     });
     expect(review).toMatchObject({
       type: "agent",
-      on: { "changes-requested": { repair: "review" }, needs_input: { human: "gate" } }
+      on: {
+        "changes-requested": {
+          action: "retry",
+          target: "review",
+          policy: {
+            maxAttempts: 3,
+            stallDetection: "same-evidence",
+            onExhausted: { action: "terminate", status: "blocked" }
+          }
+        },
+        needs_input: { action: "goto", target: "gate", input: "signal" }
+      }
     });
-    expect(gate).toMatchObject({ type: "human", on: { approved: "completed", rejected: "review" } });
+    expect(gate).toMatchObject({
+      type: "human",
+      on: {
+        approved: { action: "goto", target: "completed", input: "append-signal" },
+        rejected: {
+          action: "retry",
+          target: "review",
+          input: "append-signal",
+          policy: { maxAttempts: 3, onExhausted: { action: "terminate", status: "blocked" } }
+        }
+      }
+    });
 
     repository.putAutomation(projectRoot, loaded.config!.loops);
     const stored = JSON.parse(await readFile(repository.path(projectRoot), "utf8")) as {
@@ -114,6 +143,29 @@ describe("project configuration repository", () => {
     };
     expect(stored.loops[0]!.nodes[0]!.on).not.toHaveProperty("rejected");
     expect(stored.loops[0]!.nodes[1]!.on).toHaveProperty("changes-requested");
+    expect(JSON.stringify(stored)).not.toContain('"repair"');
+    expect(JSON.stringify(stored)).not.toContain('"terminal"');
+  });
+
+  it("does not repair malformed legacy targets into valid actions", async () => {
+    const projectRoot = await root();
+    const repository = new ProjectConfigurationRepository();
+    await mkdir(path.dirname(repository.path(projectRoot)), { recursive: true });
+    await writeFile(repository.path(projectRoot), JSON.stringify({
+      version: 8,
+      agents: {},
+      loops: [{
+        id: "broken",
+        start: "gate",
+        nodes: [{
+          id: "gate", type: "human", description: "", nodeStyle: "flat", nodeSize: "medium",
+          on: { approved: "completed", rejected: 123 }
+        }, ...defaultTerminalNodes()]
+      }]
+    }), "utf8");
+    const loaded = repository.load(projectRoot);
+    expect(loaded.config).toBeUndefined();
+    expect(loaded.issues).not.toEqual([]);
   });
 
   it("continues to reject v7 project configuration", async () => {

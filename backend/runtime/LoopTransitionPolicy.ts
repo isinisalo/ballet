@@ -1,127 +1,228 @@
 import { createHash } from "node:crypto";
-import type { ProjectAgentBackedStep, StepTransitionTarget } from "../../shared/domain/automation.js";
+import type {
+  TransitionAction,
+  TransitionFallbackAction,
+  TransitionInputMode
+} from "../../shared/domain/automation.js";
 import type {
   AgentOutcome,
   LoopRunTermination,
   StepRun,
   StepRunResult,
-  StepRunTransition
+  StepRunTransition,
+  TransitionResolutionCause
 } from "../../shared/domain/runtime.js";
 
-export const MAX_REPAIR_ATTEMPTS = 3;
+export type TransitionDecision =
+  | {
+      kind: "goto";
+      transition: Extract<StepRunTransition, { action: "goto" }>;
+      target: Extract<StepRunTransition, { action: "goto" }>["target"];
+      inputMode: TransitionInputMode;
+    }
+  | {
+      kind: "retry";
+      transition: Extract<StepRunTransition, { action: "retry" }>;
+      target: string;
+      inputMode: TransitionInputMode;
+    }
+  | {
+      kind: "wait";
+      transition: Extract<StepRunTransition, { action: "wait" }>;
+    }
+  | {
+      kind: "terminate";
+      transition: Extract<StepRunTransition, { action: "terminate" }>;
+      termination: LoopRunTermination;
+    };
 
-export type AgentTransitionDecision =
-  | { transition: StepRunTransition; target: StepTransitionTarget }
-  | { transition: StepRunTransition; retry: true }
-  | { transition: StepRunTransition; wait: true }
-  | { transition: StepRunTransition; termination: LoopRunTermination };
-
-export const decideAgentTransition = (input: {
-  step: ProjectAgentBackedStep;
+export const interpretTransitionAction = (input: {
+  action: TransitionAction;
+  signal: StepRunResult;
   stepRun: StepRun;
-  outcome: AgentOutcome;
   history: StepRun[];
-}): AgentTransitionDecision => {
-  const { step, stepRun, outcome, history } = input;
-  const signal = { kind: "agent", outcome: outcome.outcome } as const satisfies StepRunResult;
+  outcome?: AgentOutcome;
+  responseInput?: string;
+}): TransitionDecision => {
+  if (input.action.action !== "retry") return resolveAction(input.action, input);
 
-  if (outcome.outcome === "ready" || outcome.outcome === "approved") {
-    const target = step.on[outcome.outcome];
-    return { transition: { signal, action: "transition", target }, target };
-  }
-
-  if (outcome.outcome === "blocked") {
-    return terminate(signal, stepRun, "blocked", "agent_blocked", outcome.summary);
-  }
-
-  if (outcome.outcome === "failed") {
-    const retry = step.on.failed.retry;
-    if (outcome.failure?.classification === "transient" && retry
-      && !stepRun.retryOfStepRunId && stepRun.attempt <= retry.limit) {
-      return {
-        transition: { signal, action: "retry", target: step.id, retryAttempt: stepRun.attempt },
-        retry: true
-      };
-    }
-    const code = outcome.failure?.code === "execution_failed" ? "execution_failed" : "agent_failed";
-    return terminate(signal, stepRun, "failed", code, outcome.summary);
-  }
-
-  if (outcome.outcome === "needs_input") {
-    const route = step.on.needs_input;
-    if ("human" in route) {
-      return { transition: { signal, action: "human", target: route.human }, target: route.human };
-    }
-    return { transition: { signal, action: "wait", reason: "needs_input" }, wait: true };
-  }
-
-  const route = step.on["changes-requested"];
-  if ("terminate" in route) {
-    return terminate(signal, stepRun, "blocked", "changes_requested", "No repair step is configured for changes-requested.");
-  }
-  const repairs = history.filter((candidate) => candidate.loopId === stepRun.loopId
+  const { action, outcome, history, stepRun } = input;
+  const policyFingerprint = transitionPolicyFingerprint(action, stepRun.stepId, input.signal);
+  const policyHistory = action.target === undefined
+    ? retryChain(history, stepRun)
+    : history.filter((candidate) => candidate.loopId === stepRun.loopId && candidate.stepId === stepRun.stepId);
+  const previous = policyHistory.filter((candidate) => candidate.loopId === stepRun.loopId
     && candidate.stepId === stepRun.stepId
-    && candidate.transition?.action === "repair"
-    && candidate.transition.target === route.repair);
-  const repairAttempt = repairs.length + 1;
-  const evidenceFingerprint = fingerprintRepairEvidence(outcome);
-  if (repairs.some((candidate) => candidate.transition?.action === "repair"
+    && candidate.transition?.action === "retry"
+    && candidate.transition.policyFingerprint === policyFingerprint);
+  const attempt = previous.length + 1;
+  const condition = action.policy.when?.failureClassification;
+  if (condition && outcome?.failure?.classification !== condition) {
+    return resolveAction(action.policy.onExhausted, input, {
+      cause: "condition-not-met",
+      attempt,
+      maxAttempts: action.policy.maxAttempts
+    });
+  }
+
+  const evidenceFingerprint = action.policy.stallDetection === "same-evidence"
+    ? fingerprintEvidence(input.signal, outcome, input.responseInput)
+    : undefined;
+
+  if (evidenceFingerprint && previous.some((candidate) => candidate.transition?.action === "retry"
     && candidate.transition.evidenceFingerprint === evidenceFingerprint)) {
-    return terminate(signal, stepRun, "blocked", "stalled_repair",
-      "The same failing evidence was returned after repair without material change.", {
-        target: route.repair,
-        evidenceFingerprint
-      });
-  }
-  if (repairAttempt > MAX_REPAIR_ATTEMPTS) {
-    return terminate(signal, stepRun, "blocked", "repair_limit_exceeded",
-      `The repair loop reached its limit of ${MAX_REPAIR_ATTEMPTS}.`, {
-        target: route.repair,
-        limit: MAX_REPAIR_ATTEMPTS,
-        count: repairAttempt
-      });
-  }
-  return {
-    transition: {
-      signal,
-      action: "repair",
-      target: route.repair,
-      repairAttempt,
+    return resolveAction(action.policy.onExhausted, input, {
+      cause: "retry-stalled",
+      attempt,
+      maxAttempts: action.policy.maxAttempts,
       evidenceFingerprint
-    },
-    target: route.repair
+    });
+  }
+  if (attempt > action.policy.maxAttempts) {
+    return resolveAction(action.policy.onExhausted, input, {
+      cause: "retry-exhausted",
+      attempt,
+      maxAttempts: action.policy.maxAttempts
+    });
+  }
+
+  const target = action.target ?? stepRun.stepId;
+  return {
+    kind: "retry",
+    target,
+    inputMode: action.input ?? "current",
+    transition: {
+      version: 1,
+      signal: input.signal,
+      action: "retry",
+      target,
+      ...(action.input ? { input: action.input } : {}),
+      attempt,
+      maxAttempts: action.policy.maxAttempts,
+      policyFingerprint,
+      ...(evidenceFingerprint ? { evidenceFingerprint } : {})
+    }
   };
 };
 
-export const fingerprintRepairEvidence = (outcome: AgentOutcome): string => {
-  const checks = outcome.checks
+const retryChain = (history: StepRun[], stepRun: StepRun): StepRun[] => {
+  const byId = new Map(history.map((candidate) => [candidate.stepRunId, candidate]));
+  const chain: StepRun[] = [];
+  let parentId = stepRun.retryOfStepRunId;
+  while (parentId) {
+    const parent = byId.get(parentId);
+    if (!parent) break;
+    chain.push(parent);
+    parentId = parent.retryOfStepRunId;
+  }
+  return chain;
+};
+
+const resolveAction = (
+  action: TransitionFallbackAction,
+  input: Parameters<typeof interpretTransitionAction>[0],
+  resolution?: {
+    cause: TransitionResolutionCause;
+    attempt: number;
+    maxAttempts: number;
+    evidenceFingerprint?: string;
+  }
+): TransitionDecision => {
+  const cause = resolution?.cause;
+  if (action.action === "goto") {
+    return {
+      kind: "goto",
+      target: action.target,
+      inputMode: action.input ?? "current",
+      transition: {
+        version: 1,
+        signal: input.signal,
+        action: "goto",
+        target: action.target,
+        ...(action.input ? { input: action.input } : {}),
+        ...(cause ? { cause } : {})
+      }
+    };
+  }
+  if (action.action === "wait") {
+    return {
+      kind: "wait",
+      transition: {
+        version: 1,
+        signal: input.signal,
+        action: "wait",
+        resume: action.resume,
+        ...(action.input ? { input: action.input } : {}),
+        ...(cause ? { cause } : {})
+      }
+    };
+  }
+
+  const code = cause === "retry-exhausted" ? "retry_exhausted"
+    : cause === "retry-stalled" ? "retry_stalled"
+      : "configured_termination";
+  const message = cause === "retry-exhausted"
+    ? "The configured retry attempt limit was reached."
+    : cause === "retry-stalled"
+      ? "The configured retry policy detected repeated evidence."
+      : cause === "condition-not-met"
+        ? "The configured retry condition did not match; its fallback terminated the Run."
+        : `The configured transition terminated the Run as ${action.status}.`;
+  const termination: LoopRunTermination = {
+    status: action.status,
+    code,
+    message,
+    stepRunId: input.stepRun.stepRunId,
+    stepId: input.stepRun.stepId,
+    signal: input.signal,
+    ...(cause && input.action.action === "retry"
+      ? { target: input.action.target ?? input.stepRun.stepId }
+      : {}),
+    ...(resolution ? {
+      count: resolution.attempt,
+      limit: resolution.maxAttempts,
+      ...(resolution.evidenceFingerprint ? { evidenceFingerprint: resolution.evidenceFingerprint } : {})
+    } : {})
+  };
+  return {
+    kind: "terminate",
+    termination,
+    transition: {
+      version: 1,
+      signal: input.signal,
+      action: "terminate",
+      status: action.status,
+      code,
+      ...(cause ? { cause } : {})
+    }
+  };
+};
+
+export const fingerprintTransitionEvidence = (outcome: AgentOutcome): string =>
+  fingerprintEvidence({ kind: "agent", outcome: outcome.outcome }, outcome);
+
+export const transitionPolicyFingerprint = (
+  action: Extract<TransitionAction, { action: "retry" }>,
+  sourceStepId: string,
+  signal: StepRunResult
+): string => fingerprint({ sourceStepId, signal, action });
+
+const fingerprintEvidence = (
+  signal: StepRunResult,
+  outcome?: AgentOutcome,
+  responseInput?: string
+): string => {
+  if (signal.kind === "human") return fingerprint({ responseInput: responseInput ?? "" });
+  const checks = (outcome?.checks ?? [])
     .filter((check) => check.status === "failed")
     .map((check) => ({ name: check.name, status: check.status, details: check.details ?? "" }))
     .sort((left, right) => left.name.localeCompare(right.name) || left.details.localeCompare(right.details));
-  return createHash("sha256")
-    .update(stableJson({ checks, artifacts: outcome.artifacts ?? {} }))
-    .digest("hex");
+  return fingerprint({ checks, artifacts: outcome?.artifacts ?? {} });
 };
 
-const terminate = (
-  signal: StepRunResult,
-  stepRun: StepRun,
-  status: "blocked" | "failed",
-  code: LoopRunTermination["code"],
-  message: string,
-  detail: Partial<LoopRunTermination> = {}
-): AgentTransitionDecision => {
-  const termination: LoopRunTermination = {
-    status,
-    code,
-    message,
-    stepRunId: stepRun.stepRunId,
-    stepId: stepRun.stepId,
-    signal,
-    ...detail
-  };
-  return { transition: { signal, action: "terminate", status, code }, termination };
-};
+const fingerprint = (value: unknown): string => createHash("sha256")
+  .update(stableJson(value))
+  .digest("hex");
 
 const stableJson = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;

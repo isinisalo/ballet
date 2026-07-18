@@ -14,7 +14,7 @@ const config = (id?: string): ProjectAutomationConfig => ({
       nodeStyle: "flat",
       nodeSize: "medium",
       description: "Review",
-      on: { approved: "completed", rejected: "blocked" }
+      on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "blocked", input: "append-signal" } }
     }, ...defaultTerminalNodes()]
   }] : []
 });

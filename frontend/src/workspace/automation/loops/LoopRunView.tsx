@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { isProjectTerminalNode, MAX_ROOT_TRANSITIONS, type Agent, type AgentExecutionState, type LoopTheme, type ProjectAutomationConfig, type ProjectLoop, type ProjectStep } from "@shared/api/workspace-contracts";
+import { isProjectTerminalNode, type Agent, type AgentExecutionState, type LoopTheme, type ProjectAutomationConfig, type ProjectLoop, type ProjectStep } from "@shared/api/workspace-contracts";
 import type { RootRunDetail } from "@shared/api/workspace-contracts";
 import { CirclePlus, Radio, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -91,7 +91,7 @@ export function LoopRunView({
       {details ? (
         <div className="grid gap-2 border-t border-divider-strong bg-card px-4 py-3 font-mono text-[0.65rem] text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
           <span>source: {rootDetail?.source ?? details.source}</span>
-          <span>loop transitions: {details.transitionCount}/{MAX_ROOT_TRANSITIONS}</span>
+          <span>loop transitions: {details.transitionCount}</span>
           <span>updated: {new Date(details.updatedAt).toLocaleString()}</span>
           {(rootDetail?.termination ?? details.termination) ? <span>reason: {(rootDetail?.termination ?? details.termination)?.code} · {(rootDetail?.termination ?? details.termination)?.message}</span> : null}
           {rootDetail?.finalization?.report ? <span>branch: {rootDetail.finalization.report.branch}</span> : null}

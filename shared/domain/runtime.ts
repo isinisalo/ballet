@@ -1,7 +1,13 @@
 // The canonical runtime contract intentionally stays in one module so frontend and
 // backend cannot drift on persisted execution, provider, and Loop snapshot shapes.
 import type { AgentAvatar } from "./agents.js";
-import type { ProjectLoop } from "./automation.js";
+import type {
+  ProjectLoop,
+  StepEndStatus,
+  StepTransitionTarget,
+  TransitionInputMode,
+  WaitTransitionAction
+} from "./automation.js";
 import type { LoopTheme } from "./loopThemes.js";
 import type { AgentOutcomeStatus, HumanDecision } from "./outcomes.js";
 
@@ -263,7 +269,7 @@ export interface LoopExecutionPlan {
   createdAt: string;
 }
 
-export type LoopRunSource = "manual" | "human" | "schedule";
+export type LoopRunSource = "manual" | "transition" | "schedule";
 export type LoopRunStatus = "running" | "waiting_for_human" | "completed" | "blocked" | "failed" | "cancelled";
 export type StepRunStatus = "queued" | "running" | "waiting_for_human" | "completed" | "blocked" | "failed" | "cancelled";
 export type StepRunResult =
@@ -271,29 +277,55 @@ export type StepRunResult =
   | { kind: "human"; decision: HumanDecision };
 
 export type StepTransitionSignal = StepRunResult;
+export type TransitionResolutionCause = "condition-not-met" | "retry-exhausted" | "retry-stalled";
 
 export type StepRunTransition =
-  | { signal: StepTransitionSignal; action: "transition"; target: string | { loop: string } }
-  | { signal: StepTransitionSignal; action: "repair"; target: string; repairAttempt: number; evidenceFingerprint: string }
-  | { signal: StepTransitionSignal; action: "human"; target: string }
-  | { signal: StepTransitionSignal; action: "wait"; reason: "needs_input" }
-  | { signal: StepTransitionSignal; action: "resume"; target: string }
-  | { signal: StepTransitionSignal; action: "retry"; target: string; retryAttempt: number }
-  | { signal: StepTransitionSignal; action: "terminate"; status: "completed" | "blocked" | "failed" | "cancelled"; code: LoopRunTerminationCode };
+  | {
+      version: 1;
+      signal: StepTransitionSignal;
+      action: "goto";
+      target: StepTransitionTarget;
+      input?: TransitionInputMode;
+      cause?: TransitionResolutionCause;
+    }
+  | {
+      version: 1;
+      signal: StepTransitionSignal;
+      action: "retry";
+      target: string;
+      input?: TransitionInputMode;
+      attempt: number;
+      maxAttempts: number;
+      policyFingerprint: string;
+      evidenceFingerprint?: string;
+    }
+  | {
+      version: 1;
+      signal: StepTransitionSignal;
+      action: "wait";
+      resume: WaitTransitionAction["resume"];
+      input?: TransitionInputMode;
+      cause?: TransitionResolutionCause;
+      resumed?: { target: StepTransitionTarget; at: string };
+    }
+  | {
+      version: 1;
+      signal: StepTransitionSignal;
+      action: "terminate";
+      status: StepEndStatus | "cancelled";
+      code: LoopRunTerminationCode;
+      cause?: TransitionResolutionCause;
+    };
 
 export type LoopRunTerminationCode =
   | "completed"
   | "cancelled"
-  | "agent_blocked"
-  | "agent_failed"
-  | "changes_requested"
-  | "needs_input"
-  | "human_approved"
-  | "human_rejected"
+  | "configured_termination"
+  | "terminal_reached"
   | "execution_failed"
   | "orchestration_failed"
-  | "repair_limit_exceeded"
-  | "stalled_repair"
+  | "retry_exhausted"
+  | "retry_stalled"
   | "transition_limit_exceeded"
   | "missing_transition"
   | "stale_transition"
@@ -371,4 +403,4 @@ export interface StepRun {
 export interface LoopRunDetails extends LoopRun { stepRuns: StepRun[] }
 export type RespondToStepRunRequest =
   | { kind: "human-decision"; decision: HumanDecision; input: string }
-  | { kind: "agent-input"; input: string };
+  | { kind: "resume"; input: string };

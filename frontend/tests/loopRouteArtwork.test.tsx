@@ -19,7 +19,7 @@ const loop = (id: string): ProjectLoop => ({
     nodeStyle: "flat",
     nodeSize: "tiny",
     description: "Gate",
-    on: { approved: "completed", rejected: "blocked" }
+    on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "blocked", input: "append-signal" } }
   }, ...defaultTerminalNodes()]
 });
 
@@ -56,7 +56,7 @@ describe("fixed Loop Route artwork", () => {
     if (!gate || gate.type !== "human") throw new Error("Expected a human gate fixture.");
     const activeWithLink = {
       ...active,
-      nodes: [{ ...gate, on: { ...gate.on, approved: { loop: linked.id } } }, ...active.nodes.slice(1)]
+      nodes: [{ ...gate, on: { ...gate.on, approved: { action: "goto", target: { loop: linked.id }, input: "append-signal" } } }, ...active.nodes.slice(1)]
     } satisfies ProjectLoop;
     const { container } = render(
       <LoopEditor

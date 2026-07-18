@@ -11,7 +11,7 @@ import type {
   StepRun,
   StepTransitionTarget
 } from "@shared/api/workspace-contracts";
-import { getProjectStepTransitionEntries, isProjectTerminalNode } from "@shared/api/workspace-contracts";
+import { getProjectStepTransitionEntries, getTransitionActionTargets, isProjectTerminalNode } from "@shared/api/workspace-contracts";
 import type { LoopOutputTarget, LoopStepRecord } from "./loopGraph";
 import { scheduleSummary } from "./loopSchedulePresentation";
 
@@ -107,8 +107,9 @@ export function buildLoopVisualProjection(
       .map((projectNode, index): LoopStepRecord => {
       const stepKey = visualStepKey(loop.id, projectNode.id);
       const visualStep = stepByKey.get(stepKey);
-      const outputTargets = isProjectTerminalNode(projectNode) ? [] : getProjectStepTransitionEntries(projectNode).map(
-        ([result, target]) => visualTarget(loop.id, projectNode.id, result, target, loopDefinitions)
+      const outputTargets = isProjectTerminalNode(projectNode) ? [] : getProjectStepTransitionEntries(projectNode).flatMap(
+        ([result, action]) => getTransitionActionTargets(action, projectNode.id).map((target, targetIndex) =>
+          visualTarget(loop.id, projectNode.id, targetIndex === 0 ? result : `${result}.fallback-${targetIndex}`, target, loopDefinitions))
       );
       return {
         stepKey,
@@ -136,8 +137,10 @@ function reachableNodeIds(loop: ProjectLoop): Set<string> {
     if (!node) continue;
     reachable.add(nodeId);
     if (isProjectTerminalNode(node)) continue;
-    getProjectStepTransitionEntries(node).forEach(([, target]) => {
-      if (typeof target === "string") pending.push(target);
+    getProjectStepTransitionEntries(node).forEach(([, action]) => {
+      getTransitionActionTargets(action, node.id).forEach((target) => {
+        if (typeof target === "string") pending.push(target);
+      });
     });
   }
   return reachable;

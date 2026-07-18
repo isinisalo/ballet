@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { Agent, LoopTheme, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { defaultAgentStepTransitions } from "@shared/api/workspace-contracts";
+import { defaultAgentStepTransitions, gotoTransition } from "@shared/api/workspace-contracts";
 import { LoopCanvasSurface } from "../loops/LoopCanvasSurface";
 import { calculateCompositeLoopCanvasLayout } from "../loops/loopLayout";
 import { buildLoopVisualProjection } from "../loops/loopVisualProjection";
@@ -20,7 +20,7 @@ const previewConfig: ProjectAutomationConfig = {
       nodeSize: "tiny",
       description: "Tiny Luna schedule",
       schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
-      on: { ...defaultAgentStepTransitions(), ready: "flat", approved: "flat", needs_input: { human: "terra" } }
+      on: { ...defaultAgentStepTransitions(), ready: gotoTransition("flat"), approved: gotoTransition("flat"), needs_input: gotoTransition("terra") }
     }, {
       id: "flat",
       type: "agent",
@@ -28,21 +28,21 @@ const previewConfig: ProjectAutomationConfig = {
       nodeStyle: "flat",
       nodeSize: "medium",
       description: "Medium Flat",
-      on: { ...defaultAgentStepTransitions(), ready: "terra", approved: "terra", needs_input: { human: "terra" } }
+      on: { ...defaultAgentStepTransitions(), ready: gotoTransition("terra"), approved: gotoTransition("terra"), needs_input: gotoTransition("terra") }
     }, {
       id: "terra",
       type: "human",
       nodeStyle: "terra",
       nodeSize: "medium",
       description: "Medium Terra",
-      on: { approved: "sol", rejected: "completed" }
+      on: { approved: gotoTransition("sol"), rejected: gotoTransition("completed") }
     }, {
       id: "sol",
       type: "human",
       nodeStyle: "sol",
       nodeSize: "large",
       description: "Large Sol",
-      on: { approved: { loop: "downstream-loop" }, rejected: "failed" }
+      on: { approved: gotoTransition({ loop: "downstream-loop" }), rejected: gotoTransition("failed") }
     }, {
       id: "completed",
       type: "completed",
@@ -71,7 +71,7 @@ const previewConfig: ProjectAutomationConfig = {
       nodeStyle: "flat",
       nodeSize: "medium",
       description: "Cross-Loop destination",
-      on: { approved: "completed", rejected: "blocked" }
+      on: { approved: gotoTransition("completed"), rejected: gotoTransition("blocked") }
     }, {
       id: "completed",
       type: "completed",

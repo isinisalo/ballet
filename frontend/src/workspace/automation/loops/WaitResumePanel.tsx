@@ -3,7 +3,7 @@ import type { RespondToStepRunRequest, StepRun } from "@shared/api/workspace-con
 import { TextAreaField } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 
-export function AgentInputRunPanel({
+export function WaitResumePanel({
   stepRun,
   pending,
   onRespond
@@ -34,7 +34,7 @@ export function AgentInputRunPanel({
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      if (await onRespond(stepRun.stepRunId, { kind: "agent-input", input })) {
+      if (await onRespond(stepRun.stepRunId, { kind: "resume", input })) {
         setInput("");
         setAttempted(false);
       }
@@ -47,16 +47,16 @@ export function AgentInputRunPanel({
   return (
     <form
       className="grid gap-3 border-t border-tertiary/40 bg-card p-4"
-      aria-label={`Agent input ${stepRun.stepId}`}
+      aria-label={`Resume ${stepRun.stepId}`}
       noValidate
       onSubmit={(event) => void respond(event)}
     >
       <div>
-        <p className="font-mono text-xs font-medium text-tertiary">Additional input required · {stepRun.stepId}</p>
-        <p className="mt-1 text-xs text-muted-foreground">Answer the agent request to resume this step.</p>
+        <p className="font-mono text-xs font-medium text-tertiary">Resume input required · {stepRun.stepId}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Provide the input that continues this configured wait action.</p>
       </div>
       <TextAreaField
-        label="Additional input"
+        label="Resume input"
         density="compact"
         value={input}
         rows={3}
@@ -69,7 +69,7 @@ export function AgentInputRunPanel({
         }}
       />
       <div className="flex justify-end">
-        <Button type="submit" variant="secondary" disabled={busy}>Resume agent</Button>
+        <Button type="submit" variant="secondary" disabled={busy}>Resume step</Button>
       </div>
     </form>
   );

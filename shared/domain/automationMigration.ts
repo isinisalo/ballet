@@ -6,28 +6,36 @@ const isRecord = (value: unknown): value is JsonRecord =>
 const hasOwn = (value: JsonRecord, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
 
-const hasBinaryTransitions = (value: unknown): value is JsonRecord & {
+const hasExactKeys = (value: JsonRecord, keys: string[]): boolean =>
+  Object.keys(value).length === keys.length && keys.every((key) => hasOwn(value, key));
+
+const isLegacyTarget = (value: unknown): boolean =>
+  typeof value === "string"
+  || (isRecord(value) && Object.keys(value).length === 1 && typeof value.loop === "string");
+
+const isBinaryTransitions = (value: unknown): value is JsonRecord & {
   approved: unknown;
   rejected: unknown;
 } => isRecord(value)
   && Object.keys(value).length === 2
   && hasOwn(value, "approved")
   && hasOwn(value, "rejected")
-  && !hasOwn(value, "ready")
-  && !hasOwn(value, "changes-requested")
-  && !hasOwn(value, "needs_input")
-  && !hasOwn(value, "blocked")
-  && !hasOwn(value, "failed");
+  && isLegacyTarget(value.approved)
+  && isLegacyTarget(value.rejected);
+
+const isGenericAction = (value: unknown): boolean => isRecord(value)
+  && ["goto", "terminate", "wait", "retry"].includes(String(value.action));
 
 /**
- * Normalizes only the binary transition shape previously written by v8.
- * It deliberately leaves v7 and malformed values untouched so the strict
- * canonical schema can reject them with their original paths.
+ * Upgrades the two legacy v8 transition shapes to the canonical v8 action model.
+ * Invalid legacy values are deliberately left malformed so the strict schema
+ * reports them instead of silently inventing behavior.
  */
-export const migrateLegacyBinaryV8 = (value: unknown): unknown => {
+export const migrateAutomationConfig = (value: unknown): unknown => {
   if (!isRecord(value) || value.version !== 8 || !Array.isArray(value.loops)) return value;
   return {
     ...value,
+    version: 8,
     loops: value.loops.map((candidate) => migrateLoop(candidate))
   };
 };
@@ -42,24 +50,146 @@ const migrateLoop = (value: unknown): unknown => {
 };
 
 const migrateNode = (value: unknown, nodes: unknown[]): unknown => {
-  if (!isRecord(value) || !hasBinaryTransitions(value.on)) return value;
-  if (value.type === "human") return value;
+  if (!isRecord(value) || !isRecord(value.on)) return value;
+  if (value.type === "human") return migrateHumanNode(value, nodes);
   if (value.type !== "agent" && value.type !== "scheduled") return value;
 
-  const approved = value.on.approved;
-  const rejected = value.on.rejected;
+  const legacy = isBinaryTransitions(value.on)
+    ? expandBinaryAgentTransitions(value.on, nodes)
+    : value.on;
+  if (!hasOutcomeTransitions(legacy)) return value;
+  if (Object.values(legacy).every(isGenericAction)) return { ...value, on: legacy };
+  if (!isOpinionatedAgentTransitions(legacy)) return value;
+
   return {
     ...value,
     on: {
-      ready: approved,
-      approved,
-      "changes-requested": repairTransition(rejected, nodes),
-      needs_input: needsInputTransition(approved, rejected, nodes),
-      blocked: { terminal: "blocked" },
-      failed: { terminal: "failed", retry: { when: "transient", limit: 1 } }
+      ready: goto(legacy.ready),
+      approved: goto(legacy.approved),
+      "changes-requested": migrateChangesRequested(legacy["changes-requested"]),
+      needs_input: migrateNeedsInput(legacy.needs_input),
+      blocked: migrateTerminal(legacy.blocked, "blocked"),
+      failed: migrateFailed(legacy.failed)
     }
   };
 };
+
+const migrateHumanNode = (value: JsonRecord, nodes: unknown[]): unknown => {
+  if (!isBinaryTransitions(value.on)) return value;
+  const rejectedNode = typeof value.on.rejected === "string"
+    ? nodeById(nodes, value.on.rejected)
+    : undefined;
+  return {
+    ...value,
+    on: {
+      approved: goto(value.on.approved, "append-signal"),
+      rejected: rejectedNode?.type === "agent"
+        ? retry(value.on.rejected, 3, terminate("blocked"), undefined, "append-signal")
+        : goto(value.on.rejected, "append-signal")
+    }
+  };
+};
+
+const hasOutcomeTransitions = (value: unknown): value is JsonRecord => isRecord(value)
+  && ["ready", "approved", "changes-requested", "needs_input", "blocked", "failed"]
+    .every((key) => hasOwn(value, key));
+
+const isOpinionatedAgentTransitions = (value: JsonRecord): boolean =>
+  hasExactKeys(value, ["ready", "approved", "changes-requested", "needs_input", "blocked", "failed"])
+  && isLegacyTarget(value.ready)
+  && isLegacyTarget(value.approved)
+  && isLegacyChangesRequested(value["changes-requested"])
+  && isLegacyNeedsInput(value.needs_input)
+  && isLegacyTerminal(value.blocked, "blocked")
+  && isLegacyFailed(value.failed);
+
+const isLegacyChangesRequested = (value: unknown): boolean => isRecord(value)
+  && ((hasExactKeys(value, ["repair"]) && typeof value.repair === "string")
+    || (hasExactKeys(value, ["terminate"]) && value.terminate === "blocked"));
+
+const isLegacyNeedsInput = (value: unknown): boolean => isRecord(value)
+  && ((hasExactKeys(value, ["human"]) && typeof value.human === "string")
+    || (hasExactKeys(value, ["wait"]) && value.wait === true));
+
+const isLegacyTerminal = (value: unknown, status: string): boolean =>
+  isRecord(value) && hasExactKeys(value, ["terminal"]) && value.terminal === status;
+
+const isLegacyFailed = (value: unknown): boolean => {
+  if (!isRecord(value) || value.terminal !== "failed") return false;
+  if (hasExactKeys(value, ["terminal"])) return true;
+  return hasExactKeys(value, ["terminal", "retry"])
+    && isRecord(value.retry)
+    && hasExactKeys(value.retry, ["when", "limit"])
+    && value.retry.when === "transient"
+    && value.retry.limit === 1;
+};
+
+const expandBinaryAgentTransitions = (on: JsonRecord, nodes: unknown[]): JsonRecord => ({
+  ready: on.approved,
+  approved: on.approved,
+  "changes-requested": repairTransition(on.rejected, nodes),
+  needs_input: needsInputTransition(on.approved, on.rejected, nodes),
+  blocked: { terminal: "blocked" },
+  failed: { terminal: "failed", retry: { when: "transient", limit: 1 } }
+});
+
+const migrateChangesRequested = (value: unknown): unknown => {
+  if (!isRecord(value)) return value;
+  if (typeof value.repair === "string") {
+    return retry(value.repair, 3, terminate("blocked"), "same-evidence");
+  }
+  if (value.terminate === "blocked") return terminate("blocked");
+  return value;
+};
+
+const migrateNeedsInput = (value: unknown): unknown => {
+  if (!isRecord(value)) return value;
+  if (typeof value.human === "string") return goto(value.human, "signal");
+  if (value.wait === true) return { action: "wait", resume: "same-step", input: "append-signal" };
+  return value;
+};
+
+const migrateTerminal = (value: unknown, fallback: string): unknown => {
+  if (!isRecord(value)) return value;
+  return typeof value.terminal === "string" ? terminate(value.terminal) : terminate(fallback);
+};
+
+const migrateFailed = (value: unknown): unknown => {
+  if (!isRecord(value)) return value;
+  const status = typeof value.terminal === "string" ? value.terminal : "failed";
+  if (!isRecord(value.retry)) return terminate(status);
+  const maxAttempts = value.retry.limit;
+  return retry(undefined, maxAttempts, terminate(status), undefined, undefined, {
+    failureClassification: value.retry.when === "transient" ? "transient" : value.retry.when
+  });
+};
+
+const goto = (target: unknown, input?: string): JsonRecord => ({
+  action: "goto",
+  target,
+  ...(input ? { input } : {})
+});
+
+const terminate = (status: unknown): JsonRecord => ({ action: "terminate", status });
+
+const retry = (
+  target: unknown,
+  maxAttempts: unknown,
+  onExhausted: JsonRecord,
+  stallDetection?: string,
+  input?: string,
+  when?: JsonRecord
+): JsonRecord => ({
+  action: "retry",
+  ...(typeof target === "string" ? { target } : {}),
+  ...(input ? { input } : {}),
+  policy: {
+    maxAttempts,
+    onExhausted,
+    ...(when ? { when } : {}),
+    ...(stallDetection ? { stallDetection } : {})
+  }
+});
 
 const repairTransition = (target: unknown, nodes: unknown[]): JsonRecord => {
   if (typeof target !== "string") return { terminate: "blocked" };
@@ -88,7 +218,7 @@ const firstReachableHuman = (initial: unknown, nodes: unknown[]): string | undef
     const node = nodeById(nodes, target);
     if (!node) return undefined;
     if (node.type === "human") return target;
-    if ((node.type !== "agent" && node.type !== "scheduled") || !hasBinaryTransitions(node.on)) return undefined;
+    if ((node.type !== "agent" && node.type !== "scheduled") || !isBinaryTransitions(node.on)) return undefined;
     target = node.on.approved;
   }
   return undefined;

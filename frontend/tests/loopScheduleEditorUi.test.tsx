@@ -29,7 +29,7 @@ const executableSteps: ProjectStep[] = [{
   nodeStyle: "luna",
   nodeSize: "tiny",
   description: "Review",
-  on: { approved: "completed", rejected: "build" }
+  on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "build", input: "append-signal" } }
 }];
 const ordinaryLoop: ProjectLoop = { id: "delivery", start: "build", nodes: [...executableSteps, ...defaultTerminalNodes()] };
 
@@ -60,7 +60,7 @@ describe("scheduled Loop editor UI", () => {
     const eligibleLoop: ProjectLoop = {
       ...ordinaryLoop,
       nodes: ordinaryLoop.nodes.map((node) => node.id === "review" && node.type === "human"
-        ? { ...node, on: { ...node.on, rejected: "blocked" } }
+        ? { ...node, on: { ...node.on, rejected: { action: "goto" as const, target: "blocked", input: "append-signal" as const } } }
         : node)
     };
     renderEditor(eligibleLoop, { onChange });

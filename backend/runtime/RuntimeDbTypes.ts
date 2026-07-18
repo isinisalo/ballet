@@ -9,7 +9,7 @@ export interface LoopRunRow {
   root_run_id: string;
   parent_run_id: string | null;
   parent_step_run_id: string | null;
-  source: LoopRunSource;
+  source: LoopRunSource | "human";
   status: LoopRunStatus;
   execution_plan_json: string | null;
   schedule_step_id: string | null;

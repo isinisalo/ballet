@@ -1,5 +1,7 @@
 import {
   defaultAgentStepTransitions,
+  gotoTransition,
+  terminateTransition,
   type ProjectAgentStepTransitions,
   type StepTransitionTarget
 } from "../../shared/domain/automation.js";
@@ -9,8 +11,18 @@ export const agentTransitions = (
   options: { repair?: string; human?: string; wait?: boolean } = {}
 ): ProjectAgentStepTransitions => ({
   ...defaultAgentStepTransitions(),
-  ready: success,
-  approved: success,
-  "changes-requested": options.repair ? { repair: options.repair } : { terminate: "blocked" },
-  needs_input: options.human ? { human: options.human } : { wait: true }
+  ready: gotoTransition(success),
+  approved: gotoTransition(success),
+  "changes-requested": options.repair ? {
+    action: "retry",
+    target: options.repair,
+    policy: {
+      maxAttempts: 3,
+      stallDetection: "same-evidence",
+      onExhausted: terminateTransition("blocked")
+    }
+  } : terminateTransition("blocked"),
+  needs_input: options.human
+    ? gotoTransition(options.human, "signal")
+    : { action: "wait", resume: "same-step", input: "append-signal" }
 });

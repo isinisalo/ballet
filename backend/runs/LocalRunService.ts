@@ -211,7 +211,15 @@ export class LocalRunService {
         response.input
       );
     } else {
-      this.options.database.resumeAgentStepRun(
+      let snapshot;
+      try { snapshot = await this.runConfiguration(root); }
+      catch (error) {
+        await this.failRoot(root, error);
+        throw error;
+      }
+      this.options.database.resumeStepRun(
+        snapshot.automation,
+        snapshot.loopTheme,
         step.runId,
         stepRunId,
         response.input
@@ -244,45 +252,6 @@ export class LocalRunService {
     }
     if (!task.spec.stepRunId) {
       await this.failRoot(root, new LoopRunStateError("Loop task has no Step Run id."), task.spec.runtime);
-      return;
-    }
-    if (task.errorCode === "interrupted") {
-      const timestamp = new Date().toISOString();
-      const message = task.errorMessage ?? "Execution interrupted.";
-      const outcome = {
-        outcome: "failed" as const,
-        summary: message,
-        failure: { classification: "permanent" as const, code: "execution_failed" },
-        checks: []
-      };
-      const transition = {
-        signal: { kind: "agent" as const, outcome: "failed" as const },
-        action: "terminate" as const,
-        status: "failed" as const,
-        code: "execution_failed" as const
-      };
-      const termination: LoopRunTermination = {
-        status: "failed",
-        code: "execution_failed",
-        message,
-        stepRunId: task.spec.stepRunId,
-        signal: { kind: "agent", outcome: "failed" }
-      };
-      this.options.connection().transaction(() => {
-        this.options.connection().prepare(`
-          UPDATE step_runs SET status = 'failed', result = 'failed', outcome_json = ?, transition_json = ?,
-            error = ?, completed_at = ?, updated_at = ?
-          WHERE step_run_id = ? AND status IN ('queued','running')
-        `).run(JSON.stringify(outcome), JSON.stringify(transition), message, timestamp, timestamp, task.spec.stepRunId);
-        this.options.connection().prepare(`
-          UPDATE loop_runs SET status = 'failed', termination_json = ?, completed_at = ?, updated_at = ?
-          WHERE run_id = ? AND status IN ('running','waiting_for_human')
-        `).run(JSON.stringify(termination), timestamp, timestamp, task.spec.loopRunId);
-        this.options.roots.setStatus(task.rootRunId, "failed", {
-          outcome, termination, errorCode: task.errorCode, errorMessage: message, runtime: task.spec.runtime
-        });
-      })();
-      await this.finalizer.finalize(task.rootRunId, "failed");
       return;
     }
     try {
@@ -515,9 +484,7 @@ const standaloneTermination = (
 ): LoopRunTermination => ({
   status: outcome === "ready" || outcome === "approved" ? "completed" : outcome === "failed" ? "failed" : "blocked",
   code: outcome === "ready" || outcome === "approved" ? "completed"
-    : outcome === "failed" ? "agent_failed"
-      : outcome === "changes-requested" ? "changes_requested"
-        : outcome === "needs_input" ? "needs_input" : "agent_blocked",
+    : "configured_termination",
   message,
   signal: { kind: "agent", outcome }
 });

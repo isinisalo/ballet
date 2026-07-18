@@ -17,7 +17,7 @@ const now = "2026-07-10T10:00:00.000Z";
 const loop: ProjectLoop = {
   id: "delivery",
   start: "approval",
-  nodes: [{ id: "approval", type: "human", nodeStyle: "luna", nodeSize: "tiny", description: "Approve delivery", on: { approved: "completed", rejected: "failed" } }, ...defaultTerminalNodes()]
+  nodes: [{ id: "approval", type: "human", nodeStyle: "luna", nodeSize: "tiny", description: "Approve delivery", on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "failed", input: "append-signal" } } }, ...defaultTerminalNodes()]
 };
 const agentInputLoop: ProjectLoop = {
   id: "delivery",
@@ -68,7 +68,7 @@ const agentInputRun = (): LoopRunDetails => ({
     input: "Build the feature.",
     result: { kind: "agent", outcome: "needs_input" },
     outcome: { outcome: "needs_input", summary: "Which storage engine should I use?", checks: [] },
-    transition: { signal: { kind: "agent", outcome: "needs_input" }, action: "wait", reason: "needs_input" },
+    transition: { version: 1, signal: { kind: "agent", outcome: "needs_input" }, action: "wait", resume: "same-step", input: "append-signal" },
     attempt: 1,
     createdAt: now,
     updatedAt: now
@@ -256,7 +256,7 @@ describe("automation v8 UI", () => {
         type: "human",
         nodeStyle: "flat",
         nodeSize: "medium",
-        on: { approved: "completed", rejected: "blocked" }
+        on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "blocked", input: "append-signal" } }
       }), ...defaultTerminalNodes()])
     });
   });
@@ -264,9 +264,9 @@ describe("automation v8 UI", () => {
   it("cancels the active loop run from Run mode", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(run("running"));
-    const cancel = await screen.findByRole("button", { name: "Cancel" });
-    await waitFor(() => expect(cancel).toBeEnabled());
-    await user.click(cancel);
+    await screen.findByText("stream: connected");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/runs/run-1/cancel",
       expect.objectContaining({ method: "POST" })
@@ -280,13 +280,13 @@ describe("resumable needs_input UI", () => {
     const fetchMock = await renderRun(agentInputRun());
     expect(await screen.findByText("Which storage engine should I use?")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approved" })).not.toBeInTheDocument();
-    await user.type(screen.getByLabelText("Additional input"), "Use SQLite.");
-    await user.click(screen.getByRole("button", { name: "Resume agent" }));
+    await user.type(screen.getByLabelText("Resume input"), "Use SQLite.");
+    await user.click(screen.getByRole("button", { name: "Resume step" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/runs/run-1/steps/step-run-1/respond",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ kind: "agent-input", input: "Use SQLite." })
+        body: JSON.stringify({ kind: "resume", input: "Use SQLite." })
       })
     ));
   });

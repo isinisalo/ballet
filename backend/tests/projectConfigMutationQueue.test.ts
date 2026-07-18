@@ -83,6 +83,9 @@ const automationLoop = (id: string): ProjectAutomationConfig["loops"][number] =>
     description: "Approve.",
     nodeStyle: "luna",
     nodeSize: "tiny",
-    on: { approved: "completed", rejected: "failed" }
+    on: {
+      approved: { action: "goto", target: "completed", input: "append-signal" },
+      rejected: { action: "goto", target: "failed", input: "append-signal" }
+    }
   }, ...defaultTerminalNodes()]
 });

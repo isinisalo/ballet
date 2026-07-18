@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { defaultAgentStepTransitions, type Agent, type ExecutionTask, type ProjectStep, type StepRun } from "@shared/api/workspace-contracts";
 import { LoopRunStepInstructions, LoopRunStepOutput } from "../src/workspace/automation/loops/LoopRunStepSheet";
@@ -56,7 +57,7 @@ describe("Loop Run sheet", () => {
       nodeStyle: "luna",
       nodeSize: "tiny",
       description: "Approve.",
-      on: { approved: "completed", rejected: "failed" }
+      on: { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "failed", input: "append-signal" } }
     };
     const humanRun: StepRun = {
       stepRunId: "step-human",
@@ -74,6 +75,57 @@ describe("Loop Run sheet", () => {
     expect(screen.getByRole("button", { name: "Approved" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rejected" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/CLI console/)).not.toBeInTheDocument();
+  });
+
+  it("uses the same resume control when a human decision resolves to wait", async () => {
+    const user = userEvent.setup();
+    const onRespond = vi.fn().mockResolvedValue(true);
+    const humanStep: ProjectStep = {
+      id: "approve",
+      type: "human",
+      nodeStyle: "luna",
+      nodeSize: "tiny",
+      description: "Approve.",
+      on: {
+        approved: { action: "wait", resume: { target: "implement" }, input: "append-signal" },
+        rejected: { action: "terminate", status: "blocked" }
+      }
+    };
+    const humanWait: StepRun = {
+      stepRunId: "step-human-wait",
+      runId: "root-1",
+      loopId: "delivery",
+      stepId: "approve",
+      type: "human",
+      status: "waiting_for_human",
+      responseInput: "Approved pending confirmation.",
+      result: { kind: "human", decision: "approved" },
+      transition: {
+        version: 1,
+        signal: { kind: "human", decision: "approved" },
+        action: "wait",
+        resume: { target: "implement" },
+        input: "append-signal"
+      },
+      attempt: 1,
+      createdAt: "2026-07-11T10:01:00.000Z",
+      updatedAt: "2026-07-11T10:01:00.000Z"
+    };
+    render(<LoopRunStepOutput
+      step={humanStep}
+      stepRun={humanWait}
+      pending={false}
+      onTerminal={vi.fn()}
+      onRespond={onRespond}
+    />);
+
+    expect(screen.queryByRole("button", { name: "Approved" })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Resume input"), "Confirmation received.");
+    await user.click(screen.getByRole("button", { name: "Resume step" }));
+    expect(onRespond).toHaveBeenCalledWith("step-human-wait", {
+      kind: "resume",
+      input: "Confirmation received."
+    });
   });
 });
 

@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import Database from "better-sqlite3";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import type { ExecutionRuntimeSnapshot, ExecutionTask } from "../../shared/domain/runtime.js";
@@ -101,32 +100,26 @@ describe("LocalRunService failure boundaries", () => {
     expect(finalize).toHaveBeenCalledWith("root", "blocked");
   });
 
-  it("persists an interrupted Loop task as an exact failed outcome and routing conclusion", async () => {
-    const connection = new Database(":memory:");
-    connection.exec(`
-      CREATE TABLE step_runs (
-        step_run_id TEXT PRIMARY KEY, status TEXT, result TEXT, outcome_json TEXT,
-        transition_json TEXT, error TEXT, completed_at TEXT, updated_at TEXT
-      );
-      CREATE TABLE loop_runs (
-        run_id TEXT PRIMARY KEY, status TEXT, termination_json TEXT, completed_at TEXT, updated_at TEXT
-      );
-      INSERT INTO step_runs (step_run_id, status) VALUES ('step', 'running');
-      INSERT INTO loop_runs (run_id, status) VALUES ('loop', 'running');
-    `);
+  it("routes an interrupted Loop task through the configured failed action", async () => {
     const root: StoredRootRun = {
       rootRunId: "root", kind: "loop", targetId: "delivery", source: "manual", status: "running",
       worktreePath: "/tmp/worktrees/root", branch: "ballet/run/root", headSha: "a".repeat(40),
       configHash: "config", snapshotHash: "snapshot", runtimeSnapshot: runtime,
       createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
     };
-    const setStatus = vi.fn();
-    const roots = { require: vi.fn(() => root), setStatus } as unknown as RootRunStore;
-    const service = createService({ roots, connection: () => connection });
+    const completeAgentStep = vi.fn();
+    const roots = { require: vi.fn(() => root) } as unknown as RootRunStore;
+    const service = createService({ roots, database: { completeAgentStep } as unknown as RuntimeDatabase });
     const internals = service as unknown as {
-      finalizer: { finalize(rootRunId: string, status: "failed"): Promise<void> };
+      runConfiguration(rootRun: StoredRootRun): Promise<{ automation: AppData["automation"]; loopTheme: AppData["loopTheme"] }>;
+      enqueuePending(rootRunId: string): Promise<void>;
+      syncLoopRoot(rootRunId: string): Promise<void>;
     };
-    const finalize = vi.spyOn(internals.finalizer, "finalize").mockResolvedValue();
+    const automation: AppData["automation"] = { version: 8, loops: [] };
+    const loopTheme = {} as AppData["loopTheme"];
+    vi.spyOn(internals, "runConfiguration").mockResolvedValue({ automation, loopTheme });
+    vi.spyOn(internals, "enqueuePending").mockResolvedValue();
+    const sync = vi.spyOn(internals, "syncLoopRoot").mockResolvedValue();
     const task = {
       rootRunId: "root",
       kind: "loop_step",
@@ -138,22 +131,12 @@ describe("LocalRunService failure boundaries", () => {
 
     await service.handleTerminal(task);
 
-    const step = connection.prepare("SELECT * FROM step_runs WHERE step_run_id = 'step'").get() as {
-      status: string; result: string; outcome_json: string; transition_json: string;
-    };
-    expect(step).toMatchObject({ status: "failed", result: "failed" });
-    expect(JSON.parse(step.outcome_json)).toMatchObject({
-      outcome: "failed", failure: { classification: "permanent", code: "execution_failed" }
+    expect(completeAgentStep).toHaveBeenCalledWith(automation, loopTheme, {
+      stepRunId: "step",
+      outcome: undefined,
+      error: "Runtime exited during execution."
     });
-    expect(JSON.parse(step.transition_json)).toMatchObject({
-      signal: { kind: "agent", outcome: "failed" }, action: "terminate", code: "execution_failed"
-    });
-    expect(setStatus).toHaveBeenCalledWith("root", "failed", expect.objectContaining({
-      outcome: expect.objectContaining({ outcome: "failed" }),
-      termination: expect.objectContaining({ code: "execution_failed" })
-    }));
-    expect(finalize).toHaveBeenCalledWith("root", "failed");
-    connection.close();
+    expect(sync).toHaveBeenCalledWith("root");
   });
 });
 

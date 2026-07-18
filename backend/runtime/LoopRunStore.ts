@@ -119,6 +119,7 @@ export class LoopRunStore {
       scheduledFor: input.schedule?.scheduledFor ?? null,
       input: input.input ?? null,
       snapshotJson: stringifyJson({
+        automationVersion: 8,
         loop: input.loop,
         theme: input.themeSnapshot
       }),

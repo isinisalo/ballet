@@ -1,20 +1,18 @@
 import type { Agent } from "../../shared/domain/agents.js";
 import type {
-  ProjectExecutableStep,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectLoop,
   ProjectLoopNode,
-  StepTransitionTarget
+  StepTransitionTarget,
+  TransitionAction
 } from "../../shared/domain/automation.js";
 import {
   getProjectStepTransitionEntries,
-  getProjectStepTransitionTargets,
   isProjectTerminalNode,
   resolveEffectiveStartStep
 } from "../../shared/domain/automation.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
-import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 
 export class AutomationValidationError extends Error {
   constructor(
@@ -55,7 +53,6 @@ const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } 
 const validateTarget = (
   target: StepTransitionTarget,
   path: string,
-  step: ProjectExecutableStep,
   sourceLoopId: string,
   nodesById: ReadonlyMap<string, ProjectLoopNode>,
   loopIds: ReadonlySet<string>
@@ -67,9 +64,6 @@ const validateTarget = (
   }
   if (!isLoopTarget(target)) return [];
   const issues: ProjectAutomationIssue[] = [];
-  if (step.type !== "human") {
-    issues.push({ path, message: "Only a human step may transition to another loop." });
-  }
   if (!loopIds.has(target.loop)) {
     issues.push({ path, message: `Transition references unknown loop: ${target.loop}.` });
   }
@@ -77,6 +71,33 @@ const validateTarget = (
     issues.push({ path, message: "A loop transition must target a different loop. Use a step id for a same-loop transition." });
   }
   return issues;
+};
+
+const actionTargetReferences = (
+  action: TransitionAction,
+  path: string
+): Array<{ target: StepTransitionTarget; path: string }> => {
+  if (action.action === "goto") return [{ target: action.target, path: `${path}.target` }];
+  if (action.action === "terminate") return [];
+  if (action.action === "wait") return action.resume === "same-step"
+    ? []
+    : [{ target: action.resume.target, path: `${path}.resume.target` }];
+  return [
+    ...(action.target ? [{ target: action.target, path: `${path}.target` }] : []),
+    ...actionTargetReferences(action.policy.onExhausted, `${path}.policy.onExhausted`)
+  ];
+};
+
+const validateActionCompatibility = (
+  action: TransitionAction,
+  path: string,
+  nodesById: ReadonlyMap<string, ProjectLoopNode>
+): ProjectAutomationIssue[] => {
+  if (action.action !== "retry" || !action.target) return [];
+  const target = nodesById.get(action.target);
+  return !target || isProjectTerminalNode(target) || target.type === "scheduled"
+    ? [{ path: `${path}.target`, message: "A retry target must reference a local executable non-scheduled node." }]
+    : [];
 };
 
 const validateLoop = (
@@ -114,124 +135,28 @@ const validateLoop = (
     if (step.type !== "human" && agentIds && !agentIds.has(step.agentId)) {
       issues.push({ path: `${base}.agentId`, message: `Step references unknown agent: ${step.agentId}.` });
     }
-    if (step.type !== "human") {
-      const changes = step.on["changes-requested"];
-      if ("repair" in changes) {
-        const repair = nodesById.get(changes.repair);
-        if (!repair || isProjectTerminalNode(repair) || repair.type !== "agent") {
-          issues.push({
-            path: `${base}.on.changes-requested.repair`,
-            message: "A changes-requested repair must name a local agent step."
-          });
-        }
+    for (const [transitionId, action] of getProjectStepTransitionEntries(step)) {
+      issues.push(...validateActionCompatibility(action, `${base}.on.${transitionId}`, nodesById));
+      for (const reference of actionTargetReferences(action, `${base}.on.${transitionId}`)) {
+        issues.push(...validateTarget(reference.target, reference.path, loop.id, nodesById, loopIds));
       }
-      const needsInput = step.on.needs_input;
-      if ("human" in needsInput) {
-        const human = nodesById.get(needsInput.human);
-        if (!human || isProjectTerminalNode(human) || human.type !== "human") {
-          issues.push({
-            path: `${base}.on.needs_input.human`,
-            message: "A needs_input transition must name a local human step."
-          });
-        }
-      }
-    }
-    for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
-      issues.push(...validateTarget(target, `${base}.on.${transitionId}`, step, loop.id, nodesById, loopIds));
     }
   });
   const scheduledIds = new Set(scheduledSteps.map(({ step }) => step.id));
   loop.nodes.forEach((node, nodeIndex) => {
     if (isProjectTerminalNode(node)) return;
     const step = node;
-    for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
-      if (typeof target === "string" && scheduledIds.has(target)) {
-        issues.push({
-          path: `loops.${loopIndex}.nodes.${nodeIndex}.on.${transitionId}`,
-          message: "No transition may target a scheduled start step."
-        });
+    for (const [transitionId, action] of getProjectStepTransitionEntries(step)) {
+      for (const reference of actionTargetReferences(action, `loops.${loopIndex}.nodes.${nodeIndex}.on.${transitionId}`)) {
+        if (typeof reference.target === "string" && scheduledIds.has(reference.target)) {
+          issues.push({
+            path: reference.path,
+            message: "No transition may target a scheduled start step."
+          });
+        }
       }
     }
   });
-  const reachable = new Set<string>();
-  const pending = [loop.start];
-  let hasReachableExit = false;
-  while (pending.length > 0) {
-    const stepId = pending.shift();
-    if (!stepId || reachable.has(stepId)) continue;
-    reachable.add(stepId);
-    const node = nodesById.get(stepId);
-    if (!node) continue;
-    if (isProjectTerminalNode(node)) {
-      hasReachableExit = true;
-      continue;
-    }
-    const step = node;
-    for (const target of getProjectStepTransitionTargets(step)) {
-      if (typeof target === "string") {
-        const targetNode = nodesById.get(target);
-        if (targetNode && isProjectTerminalNode(targetNode)) hasReachableExit = true;
-        else pending.push(target);
-      }
-      else hasReachableExit = true;
-    }
-  }
-  if (!hasReachableExit) {
-    issues.push({ path: `loops.${loopIndex}.nodes`, message: "Loop must have a terminal or cross-loop transition reachable from its start node." });
-  }
-  return issues;
-};
-
-const validateSuccessPaths = (
-  config: ProjectAutomationConfig
-): ProjectAutomationIssue[] => {
-  const loopsById = new Map(config.loops.map((loop) => [loop.id, loop]));
-  const issues: ProjectAutomationIssue[] = [];
-
-  config.loops.forEach((rootLoop, loopIndex) => {
-    let loop = rootLoop;
-    let step = resolveEffectiveStartStep(rootLoop);
-    let transitionCount = 0;
-    const visited = new Set<string>();
-
-    while (true) {
-      if (!step) return;
-
-      const state = `${loop.id}\0${step.id}`;
-      if (visited.has(state)) {
-        issues.push({
-          path: `loops.${loopIndex}.start`,
-          message: "The success path cycles before reaching a terminal target."
-        });
-        return;
-      }
-      visited.add(state);
-
-      transitionCount += 1;
-      if (transitionCount > MAX_ROOT_TRANSITIONS) {
-        issues.push({
-          path: `loops.${loopIndex}.start`,
-          message: `The success path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
-        });
-        return;
-      }
-
-      const target = step.type === "human" ? step.on.approved : step.on.ready;
-      if (typeof target === "string") {
-        const nextNode = loop.nodes.find((candidate) => candidate.id === target);
-        if (!nextNode || isProjectTerminalNode(nextNode) || nextNode.type === "scheduled") return;
-        step = nextNode;
-        continue;
-      }
-      if (!isLoopTarget(target)) return;
-
-      const targetLoop = loopsById.get(target.loop);
-      if (!targetLoop) return;
-      loop = targetLoop;
-      step = resolveEffectiveStartStep(targetLoop);
-    }
-  });
-
   return issues;
 };
 
@@ -257,6 +182,5 @@ export const validateProjectAutomationConfig = (
   config.loops.forEach((loop, index) => {
     issues.push(...validateLoop(loop, index, loopIds, agentIds));
   });
-  issues.push(...validateSuccessPaths(config));
   return issues;
 };

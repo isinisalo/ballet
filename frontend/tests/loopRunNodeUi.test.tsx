@@ -150,7 +150,7 @@ const record = (
   result?: StepRun["result"]
 ): LoopStepRecord => {
   const id = kind === "agent" ? "implement" : kind === "human" ? "approve" : "deploy";
-  const humanOn = { approved: "completed", rejected: "blocked" } as const;
+  const humanOn = { approved: { action: "goto", target: "completed", input: "append-signal" }, rejected: { action: "goto", target: "blocked", input: "append-signal" } } as const;
   const step: ProjectStep = kind === "agent"
     ? { id, type: "agent", nodeStyle: "flat", nodeSize: "medium", agentId: "developer", description: "Implement.", on: defaultAgentStepTransitions() }
     : kind === "human"

@@ -56,7 +56,7 @@ export const respondToRunStepBodySchema = z.discriminatedUnion("kind", [
     input: runResponseInputSchema
   }).strict(),
   z.object({
-    kind: z.literal("agent-input"),
+    kind: z.literal("resume"),
     input: runResponseInputSchema
   }).strict()
 ]);

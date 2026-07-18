@@ -1,9 +1,15 @@
-import type { AgentOutcomeStatus, HumanDecision } from "./outcomes.js";
+import {
+  agentOutcomeStatuses,
+  humanDecisions,
+  type AgentOutcomeStatus,
+  type HumanDecision
+} from "./outcomes.js";
 
 export type ProjectStepTransitionId = AgentOutcomeStatus | HumanDecision;
 export type StepEndStatus = "completed" | "blocked" | "failed";
 
-export const MAX_ROOT_TRANSITIONS = 64;
+export const MAX_ROOT_TRANSITIONS = 10_000;
+export const MAX_TRANSITION_RETRY_ATTEMPTS = 1024;
 
 export const loopNodeSizes = ["tiny", "small", "medium", "large"] as const;
 export type LoopNodeSize = (typeof loopNodeSizes)[number];
@@ -54,30 +60,50 @@ export type StepTransitionTarget =
   | string
   | { loop: string };
 
-export interface ProjectHumanStepTransitions {
-  approved: StepTransitionTarget;
-  rejected: StepTransitionTarget;
+export const transitionInputModes = ["current", "signal", "append-signal"] as const;
+export type TransitionInputMode = (typeof transitionInputModes)[number];
+
+export type GotoTransitionAction = {
+  action: "goto";
+  target: StepTransitionTarget;
+  input?: TransitionInputMode;
+};
+
+export type TerminateTransitionAction = {
+  action: "terminate";
+  status: StepEndStatus;
+};
+
+export type WaitTransitionAction = {
+  action: "wait";
+  resume: "same-step" | { target: StepTransitionTarget };
+  input?: TransitionInputMode;
+};
+
+export type TransitionFallbackAction =
+  | GotoTransitionAction
+  | TerminateTransitionAction
+  | WaitTransitionAction;
+
+export interface RetryTransitionPolicy {
+  /** Maximum follow-up executions started by this retry action. */
+  maxAttempts: number;
+  onExhausted: TransitionFallbackAction;
+  when?: { failureClassification: "transient" | "permanent" };
+  stallDetection?: "same-evidence";
 }
 
-export type ChangesRequestedTransition =
-  | { repair: string }
-  | { terminate: "blocked" };
+export type RetryTransitionAction = {
+  action: "retry";
+  target?: string;
+  input?: TransitionInputMode;
+  policy: RetryTransitionPolicy;
+};
 
-export type NeedsInputTransition =
-  | { human: string }
-  | { wait: true };
+export type TransitionAction = TransitionFallbackAction | RetryTransitionAction;
 
-export interface ProjectAgentStepTransitions {
-  ready: StepTransitionTarget;
-  approved: StepTransitionTarget;
-  "changes-requested": ChangesRequestedTransition;
-  needs_input: NeedsInputTransition;
-  blocked: { terminal: "blocked" };
-  failed: {
-    terminal: "failed";
-    retry?: { when: "transient"; limit: 1 };
-  };
-}
+export type ProjectHumanStepTransitions = Record<HumanDecision, TransitionAction>;
+export type ProjectAgentStepTransitions = Record<AgentOutcomeStatus, TransitionAction>;
 
 export type ProjectStepTransitions = ProjectAgentStepTransitions | ProjectHumanStepTransitions;
 
@@ -160,86 +186,107 @@ export type ProjectTerminalNode = {
 }[StepEndStatus];
 export type ProjectLoopNode = ProjectStep | ProjectTerminalNode;
 
-export type ProjectStepTransitionEntry = readonly [ProjectStepTransitionId, StepTransitionTarget];
+export type ProjectStepTransitionEntry = readonly [ProjectStepTransitionId, TransitionAction];
 
 export function getProjectStepTransitionEntries(step: ProjectStep): ProjectStepTransitionEntry[] {
-  if (step.type === "human") return [["approved", step.on.approved], ["rejected", step.on.rejected]];
-  const changesRequested = "repair" in step.on["changes-requested"]
-    ? step.on["changes-requested"].repair
-    : "blocked";
-  const needsInput = "human" in step.on.needs_input
-    ? [["needs_input", step.on.needs_input.human] as const]
-    : [];
-  return [
-    ["ready", step.on.ready],
-    ["approved", step.on.approved],
-    ["changes-requested", changesRequested],
-    ...needsInput,
-    ["blocked", "blocked"],
-    ["failed", "failed"]
-  ];
+  const signals = step.type === "human" ? humanDecisions : agentOutcomeStatuses;
+  return signals.map((signal) => [signal, step.on[signal as keyof typeof step.on] as TransitionAction]);
 }
 
 export function getProjectStepTransitionTargets(step: ProjectStep): StepTransitionTarget[] {
-  return getProjectStepTransitionEntries(step).map(([, target]) => target);
+  return getProjectStepTransitionEntries(step)
+    .flatMap(([, action]) => getTransitionActionTargets(action, step.id));
 }
 
-export interface ProjectStepTransitionMappers {
-  ready?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
-  approved?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
-  rejected?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
-  "changes-requested"?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
-  needs_input?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
+export type ProjectStepTransitionMappers = Partial<Record<
+  ProjectStepTransitionId,
+  (target: StepTransitionTarget) => StepTransitionTarget | undefined
+>>;
+
+export function getTransitionActionTargets(
+  action: TransitionAction,
+  sourceStepId: string
+): StepTransitionTarget[] {
+  if (action.action === "goto") return [action.target];
+  if (action.action === "terminate") return [action.status];
+  if (action.action === "wait") {
+    return [action.resume === "same-step" ? sourceStepId : action.resume.target];
+  }
+  return [
+    action.target ?? sourceStepId,
+    ...getTransitionActionTargets(action.policy.onExhausted, sourceStepId)
+  ];
+}
+
+export function mapTransitionActionTargets(
+  action: TransitionAction,
+  mapper: (target: StepTransitionTarget) => StepTransitionTarget | undefined
+): TransitionAction {
+  if (action.action === "terminate") return action;
+  if (action.action === "goto") {
+    const target = mapper(action.target);
+    return target ? { ...action, target } : { action: "terminate", status: "blocked" };
+  }
+  if (action.action === "wait") {
+    if (action.resume === "same-step") return action;
+    const target = mapper(action.resume.target);
+    return target ? { ...action, resume: { target } } : { action: "terminate", status: "blocked" };
+  }
+  const mappedTarget = action.target ? mapper(action.target) : undefined;
+  const onExhausted = mapTransitionActionTargets(
+    action.policy.onExhausted,
+    mapper
+  ) as TransitionFallbackAction;
+  if (action.target && typeof mappedTarget !== "string") return onExhausted;
+  return {
+    action: "retry",
+    ...(typeof mappedTarget === "string" ? { target: mappedTarget } : {}),
+    ...(action.input ? { input: action.input } : {}),
+    policy: {
+      ...action.policy,
+      onExhausted
+    }
+  };
 }
 
 export function mapProjectStepTransitions<T extends ProjectStep>(
   step: T,
   mappers: ProjectStepTransitionMappers
 ): T {
-  if (step.type === "human") {
-    const approved = mappers.approved ? mappers.approved(step.on.approved) ?? "completed" : step.on.approved;
-    const rejected = mappers.rejected ? mappers.rejected(step.on.rejected) ?? "blocked" : step.on.rejected;
-    return { ...step, on: { approved, rejected } } as T;
-  }
-  const ready = mappers.ready ? mappers.ready(step.on.ready) ?? "completed" : step.on.ready;
-  const approved = mappers.approved ? mappers.approved(step.on.approved) ?? "completed" : step.on.approved;
-  const changes = step.on["changes-requested"];
-  const mappedRepair = "repair" in changes && mappers["changes-requested"]
-    ? mappers["changes-requested"](changes.repair)
-    : "repair" in changes ? changes.repair : undefined;
-  const changesRequested = typeof mappedRepair === "string" ? { repair: mappedRepair } : { terminate: "blocked" as const };
-  const needs = step.on.needs_input;
-  const mappedHuman = "human" in needs && mappers.needs_input
-    ? mappers.needs_input(needs.human)
-    : "human" in needs ? needs.human : undefined;
-  const needsInput = typeof mappedHuman === "string" ? { human: mappedHuman } : { wait: true as const };
-  return {
-    ...step,
-    on: {
-      ...step.on,
-      ready,
-      approved,
-      "changes-requested": changesRequested,
-      needs_input: needsInput
-    }
-  } as T;
+  const entries = getProjectStepTransitionEntries(step).map(([signal, action]) => {
+    const mapper = mappers[signal];
+    return [signal, mapper ? mapTransitionActionTargets(action, mapper) : action] as const;
+  });
+  return { ...step, on: Object.fromEntries(entries) } as T;
 }
 
-export const defaultTransitionFor = (output: HumanDecision | "ready" | "approved"): StepTransitionTarget =>
-  output === "rejected" ? "blocked" : "completed";
+export const gotoTransition = (
+  target: StepTransitionTarget,
+  input?: TransitionInputMode
+): GotoTransitionAction => ({ action: "goto", target, ...(input ? { input } : {}) });
+
+export const terminateTransition = (status: StepEndStatus): TerminateTransitionAction =>
+  ({ action: "terminate", status });
 
 export const defaultAgentStepTransitions = (): ProjectAgentStepTransitions => ({
-  ready: "completed",
-  approved: "completed",
-  "changes-requested": { terminate: "blocked" },
-  needs_input: { wait: true },
-  blocked: { terminal: "blocked" },
-  failed: { terminal: "failed", retry: { when: "transient", limit: 1 } }
+  ready: gotoTransition("completed"),
+  approved: gotoTransition("completed"),
+  "changes-requested": terminateTransition("blocked"),
+  needs_input: { action: "wait", resume: "same-step", input: "append-signal" },
+  blocked: terminateTransition("blocked"),
+  failed: {
+    action: "retry",
+    policy: {
+      maxAttempts: 1,
+      when: { failureClassification: "transient" },
+      onExhausted: terminateTransition("failed")
+    }
+  }
 });
 
 export const defaultHumanStepTransitions = (): ProjectHumanStepTransitions => ({
-  approved: "completed",
-  rejected: "blocked"
+  approved: gotoTransition("completed", "append-signal"),
+  rejected: gotoTransition("blocked", "append-signal")
 });
 
 export const isProjectAgentBackedStep = (step: ProjectStep): step is ProjectAgentBackedStep =>
