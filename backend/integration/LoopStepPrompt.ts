@@ -6,7 +6,7 @@ export const MAX_LOOP_STEP_HISTORY_ENTRIES = 3;
 
 const RUN_INPUT_TRUNCATION_MARKER = "\n[... RUN_INPUT TRUNCATED ...]\n";
 const TEXT_TRUNCATION_MARKER = " [... TRUNCATED ...] ";
-const terminalStepStatuses = new Set<StepRun["status"]>(["completed", "failed", "cancelled"]);
+const terminalStepStatuses = new Set<StepRun["status"]>(["completed", "blocked", "failed", "cancelled"]);
 const shaArtifactKey = /^(git_sha|commit_sha)$/;
 const branchArtifactKey = /^branch$/;
 const pathArtifactKey = /^(changed_files|artifact_path|file|files|file_path|path|paths|document|document_path|report|report_path|roadmap|milestone|milestones|task|tasks|design|design_path|deployment|deployment_path)$/;

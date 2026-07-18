@@ -8,8 +8,8 @@ import type {
   LoopRunDetails,
   LoopRunSource,
   LoopScheduleState,
+  HumanDecision,
   StepRun,
-  StepRunResult
 } from "../shared/domain/runtime.js";
 import { LoopRunEngine } from "./runtime/LoopRunEngine.js";
 import { LoopRunStore } from "./runtime/LoopRunStore.js";
@@ -146,10 +146,18 @@ export class RuntimeDatabase {
     loopTheme: LoopTheme,
     runId: string,
     stepRunId: string,
-    result: StepRunResult,
+    result: HumanDecision,
     input: string
   ): LoopRunDetails {
     return this.loopRunEngine.respond(config, loopTheme, runId, stepRunId, result, input);
+  }
+
+  resumeAgentStepRun(
+    runId: string,
+    stepRunId: string,
+    input: string
+  ): LoopRunDetails {
+    return this.loopRunEngine.resumeAgentInput(runId, stepRunId, input);
   }
 
   cancelLoopRun(runId: string): LoopRunDetails {

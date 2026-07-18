@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import Database from "better-sqlite3";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { defaultTerminalNodes } from "../../shared/domain/automation.js";
-import type { ExecutionRuntimeSnapshot } from "../../shared/domain/runtime.js";
+import type { ExecutionRuntimeSnapshot, ExecutionTask } from "../../shared/domain/runtime.js";
 import type { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
@@ -65,6 +66,132 @@ describe("LocalRunService failure boundaries", () => {
       errorCode: "orchestration_failed", errorMessage: "Broken persisted loop state."
     }));
     expect(finalize).toHaveBeenCalledWith("root", "failed");
+  });
+
+  it("propagates the decisive Loop termination and exact agent outcome to root finalization", async () => {
+    const termination = {
+      status: "blocked" as const,
+      code: "agent_blocked" as const,
+      message: "A product decision is missing.",
+      stepRunId: "step-run",
+      stepId: "review",
+      signal: { kind: "agent" as const, outcome: "blocked" as const }
+    };
+    const outcome = { outcome: "blocked" as const, summary: termination.message, checks: [] };
+    const setStatus = vi.fn();
+    const roots = { setStatus } as unknown as RootRunStore;
+    const database = {
+      listRootLoopRuns: vi.fn(() => [{
+        runId: "loop-run", loopId: "delivery", rootRunId: "root", source: "manual", status: "blocked",
+        snapshot: { id: "delivery", start: "review", nodes: [] }, themeSnapshot: {}, transitionCount: 1,
+        termination, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:01:00.000Z",
+        stepRuns: [{ stepRunId: "step-run", runId: "loop-run", loopId: "delivery", stepId: "review", type: "agent", status: "blocked", outcome, attempt: 1, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:01:00.000Z" }]
+      }])
+    } as unknown as RuntimeDatabase;
+    const service = createService({ roots, database });
+    const internals = service as unknown as {
+      syncLoopRoot(rootRunId: string): Promise<void>;
+      finalizer: { finalize(rootRunId: string, status: "blocked"): Promise<void> };
+    };
+    const finalize = vi.spyOn(internals.finalizer, "finalize").mockResolvedValue();
+
+    await internals.syncLoopRoot("root");
+
+    expect(setStatus).toHaveBeenCalledWith("root", "blocked", { termination, outcome });
+    expect(finalize).toHaveBeenCalledWith("root", "blocked");
+  });
+
+  it("persists an interrupted Loop task as an exact failed outcome and routing conclusion", async () => {
+    const connection = new Database(":memory:");
+    connection.exec(`
+      CREATE TABLE step_runs (
+        step_run_id TEXT PRIMARY KEY, status TEXT, result TEXT, outcome_json TEXT,
+        transition_json TEXT, error TEXT, completed_at TEXT, updated_at TEXT
+      );
+      CREATE TABLE loop_runs (
+        run_id TEXT PRIMARY KEY, status TEXT, termination_json TEXT, completed_at TEXT, updated_at TEXT
+      );
+      INSERT INTO step_runs (step_run_id, status) VALUES ('step', 'running');
+      INSERT INTO loop_runs (run_id, status) VALUES ('loop', 'running');
+    `);
+    const root: StoredRootRun = {
+      rootRunId: "root", kind: "loop", targetId: "delivery", source: "manual", status: "running",
+      worktreePath: "/tmp/worktrees/root", branch: "ballet/run/root", headSha: "a".repeat(40),
+      configHash: "config", snapshotHash: "snapshot", runtimeSnapshot: runtime,
+      createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
+    };
+    const setStatus = vi.fn();
+    const roots = { require: vi.fn(() => root), setStatus } as unknown as RootRunStore;
+    const service = createService({ roots, connection: () => connection });
+    const internals = service as unknown as {
+      finalizer: { finalize(rootRunId: string, status: "failed"): Promise<void> };
+    };
+    const finalize = vi.spyOn(internals.finalizer, "finalize").mockResolvedValue();
+    const task = {
+      rootRunId: "root",
+      kind: "loop_step",
+      status: "failed",
+      errorCode: "interrupted",
+      errorMessage: "Runtime exited during execution.",
+      spec: { stepRunId: "step", loopRunId: "loop", runtime }
+    } as unknown as ExecutionTask;
+
+    await service.handleTerminal(task);
+
+    const step = connection.prepare("SELECT * FROM step_runs WHERE step_run_id = 'step'").get() as {
+      status: string; result: string; outcome_json: string; transition_json: string;
+    };
+    expect(step).toMatchObject({ status: "failed", result: "failed" });
+    expect(JSON.parse(step.outcome_json)).toMatchObject({
+      outcome: "failed", failure: { classification: "permanent", code: "execution_failed" }
+    });
+    expect(JSON.parse(step.transition_json)).toMatchObject({
+      signal: { kind: "agent", outcome: "failed" }, action: "terminate", code: "execution_failed"
+    });
+    expect(setStatus).toHaveBeenCalledWith("root", "failed", expect.objectContaining({
+      outcome: expect.objectContaining({ outcome: "failed" }),
+      termination: expect.objectContaining({ code: "execution_failed" })
+    }));
+    expect(finalize).toHaveBeenCalledWith("root", "failed");
+    connection.close();
+  });
+});
+
+describe("LocalRunService change notifications", () => {
+  it("publishes a post-transition invalidation after an agent Loop task completes", async () => {
+    const root = {
+      rootRunId: "root", kind: "loop", targetId: "delivery", source: "manual", status: "running",
+      worktreePath: "/tmp/worktrees/root", branch: "ballet/run/root", headSha: "a".repeat(40),
+      configHash: "config", snapshotHash: "snapshot", runtimeSnapshot: runtime,
+      createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
+    } satisfies StoredRootRun;
+    const onChanged = vi.fn();
+    const completeAgentStep = vi.fn();
+    const service = createService({
+      roots: { require: vi.fn(() => root) } as unknown as RootRunStore,
+      database: { completeAgentStep } as unknown as RuntimeDatabase,
+      onChanged
+    });
+    const internals = service as unknown as {
+      runConfiguration(rootRun: StoredRootRun): Promise<{ automation: AppData["automation"]; loopTheme: AppData["loopTheme"] }>;
+      enqueuePending(rootRunId: string): Promise<void>;
+      syncLoopRoot(rootRunId: string): Promise<void>;
+    };
+    vi.spyOn(internals, "runConfiguration").mockResolvedValue({ automation: { version: 8, loops: [] }, loopTheme: {} as AppData["loopTheme"] });
+    vi.spyOn(internals, "enqueuePending").mockResolvedValue();
+    vi.spyOn(internals, "syncLoopRoot").mockResolvedValue();
+
+    await service.handleTerminal({
+      rootRunId: "root", kind: "loop_step", status: "succeeded",
+      outcome: { outcome: "ready", summary: "Continue.", checks: [] },
+      spec: { stepRunId: "step", runtime }
+    } as unknown as ExecutionTask);
+
+    expect(completeAgentStep).toHaveBeenCalledWith(
+      { version: 8, loops: [] }, expect.anything(),
+      { stepRunId: "step", outcome: { outcome: "ready", summary: "Continue.", checks: [] }, error: undefined }
+    );
+    expect(onChanged).toHaveBeenCalledWith("root");
   });
 });
 

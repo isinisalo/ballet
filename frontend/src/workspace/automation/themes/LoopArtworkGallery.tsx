@@ -1,4 +1,5 @@
 import {
+  defaultAgentStepTransitions,
   loopNodeSizeCatalog,
   loopNodeStyles,
   loopNodeStyleCatalog,
@@ -77,7 +78,7 @@ function galleryRecord(nodeStyle: LoopNodeStyle, nodeSize: LoopNodeSize, index: 
     description: loopNodeStyleCatalog[nodeStyle].label,
     nodeStyle,
     nodeSize,
-    on: { approved: "completed", rejected: "blocked" }
+    on: { ...defaultAgentStepTransitions(), ready: "completed", approved: "completed" }
   };
   return {
     stepKey: id,

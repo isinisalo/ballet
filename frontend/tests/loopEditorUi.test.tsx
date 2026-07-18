@@ -10,6 +10,7 @@ import {
   type ProjectLoop
 } from "@shared/api/workspace-contracts";
 import { LoopEditor } from "../src/workspace/automation/loops/LoopEditor";
+import { agentTransitions } from "./agentTransitionFixture";
 
 const agents: Agent[] = [{
   id: "builder",
@@ -32,7 +33,7 @@ const loop: ProjectLoop = {
     nodeSize: "large",
     agentId: "builder",
     description: "Build release",
-    on: { approved: "review", rejected: "failed" }
+    on: agentTransitions("review", { human: "review" })
   }, {
     id: "review",
     type: "human",
@@ -61,10 +62,18 @@ describe("compact Loop editor UI", () => {
     expect(screen.getByRole("combobox", { name: "Node style" })).toHaveTextContent("Sol");
     expect(screen.getByRole("combobox", { name: "Node size" })).toHaveTextContent("Large");
     expect(screen.getByText("Transitions")).toBeInTheDocument();
+    for (const outcome of ["ready", "approved", "changes-requested"]) {
+      expect(screen.getByRole("combobox", { name: `${outcome} transition kind` })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: `${outcome} transition target` })).toBeInTheDocument();
+    }
+    for (const outcome of ["needs_input", "blocked", "failed"]) {
+      expect(screen.getByRole("combobox", { name: `${outcome} transition target` })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("combobox", { name: "rejected transition target" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove from loop" })).toBeEnabled();
   });
 
-  it("shows locked empty agent and output fields for a terminal node", async () => {
+  it("shows locked agent fields and no decision transitions for a terminal node", async () => {
     const onChange = vi.fn();
     renderEditor({ onChange });
 
@@ -75,10 +84,9 @@ describe("compact Loop editor UI", () => {
     expect(screen.getByRole("combobox", { name: "Node type" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Agent" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Agent" }).parentElement?.querySelector("input[aria-hidden='true']")).toHaveValue("");
-    for (const output of ["approved", "rejected"]) {
-      expect(screen.getByRole("combobox", { name: `${output} transition kind` })).toBeDisabled();
-      expect(screen.getByRole("combobox", { name: `${output} transition target` })).toBeDisabled();
-    }
+    expect(screen.getByText("Terminal nodes have no transitions.")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "approved transition target" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "rejected transition target" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove from loop" })).not.toBeInTheDocument();
   });
 

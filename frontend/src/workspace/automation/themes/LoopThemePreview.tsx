@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import type { Agent, LoopTheme, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import { defaultAgentStepTransitions } from "@shared/api/workspace-contracts";
 import { LoopCanvasSurface } from "../loops/LoopCanvasSurface";
 import { calculateCompositeLoopCanvasLayout } from "../loops/loopLayout";
 import { buildLoopVisualProjection } from "../loops/loopVisualProjection";
@@ -19,7 +20,7 @@ const previewConfig: ProjectAutomationConfig = {
       nodeSize: "tiny",
       description: "Tiny Luna schedule",
       schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
-      on: { approved: "flat", rejected: "failed" }
+      on: { ...defaultAgentStepTransitions(), ready: "flat", approved: "flat", needs_input: { human: "terra" } }
     }, {
       id: "flat",
       type: "agent",
@@ -27,7 +28,7 @@ const previewConfig: ProjectAutomationConfig = {
       nodeStyle: "flat",
       nodeSize: "medium",
       description: "Medium Flat",
-      on: { approved: "terra", rejected: "blocked" }
+      on: { ...defaultAgentStepTransitions(), ready: "terra", approved: "terra", needs_input: { human: "terra" } }
     }, {
       id: "terra",
       type: "human",

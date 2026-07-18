@@ -16,6 +16,7 @@ import {
   saveProjectAutomationConfig,
   validateProjectAutomationConfig
 } from "../automation.js";
+import { agentTransitions } from "./agentTransitionFixture.js";
 
 const roots: string[] = [];
 const tempRoot = async () => {
@@ -52,7 +53,7 @@ const scheduledConfig = (schedule: ProjectStepSchedule): ProjectAutomationConfig
       nodeStyle: "luna",
       nodeSize: "tiny",
       schedule,
-      on: { approved: "completed", rejected: "blocked" }
+      on: agentTransitions("completed")
     }, ...defaultTerminalNodes()]
   }]
 });
@@ -97,7 +98,7 @@ describe("scheduled automation graph validation", () => {
       description: "Gate.",
       nodeStyle: "flat" as const,
       nodeSize: "medium" as const,
-      on: { approved: scheduled.id, rejected: "blocked" }
+      on: { approved: scheduled.id, rejected: "blocked" as const }
     };
     const candidate = {
       ...valid,
@@ -132,17 +133,24 @@ describe("scheduled automation graph validation", () => {
 });
 
 describe("scheduled automation domain helpers", () => {
-  it("treats scheduled as the effective executable start and maps both outputs", () => {
+  it("treats scheduled as the effective executable start and maps outcome routes", () => {
     const step = scheduledConfig(schedules[0]!).loops[0]!.nodes[0]!;
     if (step.type !== "scheduled") throw new Error("Expected scheduled fixture node.");
     expect(resolveEffectiveStartStep(scheduledConfig(schedules[0]!).loops[0]!)?.id).toBe(step.id);
     expect(getProjectStepTransitionEntries(step)).toEqual([
+      ["ready", "completed"],
       ["approved", "completed"],
-      ["rejected", "blocked"]
+      ["changes-requested", "blocked"],
+      ["blocked", "blocked"],
+      ["failed", "failed"]
     ]);
     expect(mapProjectStepTransitions(step, { approved: () => "next-step" }).on).toEqual({
+      ready: "completed",
       approved: "next-step",
-      rejected: "blocked"
+      "changes-requested": { terminate: "blocked" },
+      needs_input: { wait: true },
+      blocked: { terminal: "blocked" },
+      failed: { terminal: "failed", retry: { when: "transient", limit: 1 } }
     });
   });
 });

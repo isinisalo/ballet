@@ -16,6 +16,8 @@ export interface LocalExecutionQueueOptions {
   onChanged?(rootRunId: string): void;
 }
 
+interface ProviderFailure { message: string; retryable: boolean }
+
 export class LocalExecutionQueue {
   private readonly active = new Map<RuntimeProvider, Promise<void>>();
   private readonly controllers = new Map<string, AbortController>();
@@ -89,6 +91,7 @@ export class LocalExecutionQueue {
     this.controllers.set(task.id, controller);
     this.options.onChanged?.(task.rootRunId);
     let outcome: AgentOutcome | undefined;
+    let providerFailure: ProviderFailure | undefined;
     let terminal: ExecutionTask;
     let sequence = 0;
     try {
@@ -114,16 +117,16 @@ export class LocalExecutionQueue {
           if (!parsed.success) throw new Error(`Agent returned an invalid structured outcome: ${parsed.error.message}`);
           outcome = parsed.data as AgentOutcome;
         }
+        if (event.type === "execution.failed") {
+          providerFailure = event;
+          break;
+        }
       }
+      if (providerFailure) throw new Error(providerFailure.message);
       if (!outcome) throw new Error("Runtime completed without a structured agent outcome.");
-      terminal = this.options.store.finish(task.id, "succeeded", { outcome });
-      this.appendTerminal(terminal, terminal.status === "cancelled" ? "Execution cancelled." : "Execution succeeded.");
+      terminal = this.finishSucceeded(task, outcome);
     } catch (error) {
-      const cancelled = controller.signal.aborted || Boolean(this.options.store.require(task.id).cancelRequestedAt);
-      terminal = this.options.store.finish(task.id, cancelled ? "cancelled" : "failed", cancelled ? {} : {
-        errorCode: "execution_failed", errorMessage: error instanceof Error ? error.message : String(error)
-      });
-      this.appendTerminal(terminal, cancelled ? "Execution cancelled." : terminal.errorMessage ?? "Execution failed.", sequence);
+      terminal = this.finishFailed(task, controller, providerFailure, error, sequence);
     } finally {
       this.controllers.delete(task.id);
       this.options.onChanged?.(task.rootRunId);
@@ -131,16 +134,55 @@ export class LocalExecutionQueue {
     await this.applyTerminal(terminal!);
   }
 
+  private finishSucceeded(task: ExecutionTask, outcome: AgentOutcome): ExecutionTask {
+    const terminal = this.options.store.finish(task.id, "succeeded", { outcome });
+    this.appendTerminal(
+      terminal,
+      terminal.status === "cancelled" ? "Execution cancelled." : `Agent outcome: ${outcome.outcome}.`
+    );
+    return terminal;
+  }
+
+  private finishFailed(
+    task: ExecutionTask,
+    controller: AbortController,
+    providerFailure: ProviderFailure | undefined,
+    error: unknown,
+    sequence: number
+  ): ExecutionTask {
+    const cancelled = controller.signal.aborted || Boolean(this.options.store.require(task.id).cancelRequestedAt);
+    const message = providerFailure?.message ?? (error instanceof Error ? error.message : String(error));
+    const outcome: AgentOutcome = {
+      outcome: "failed",
+      summary: message,
+      failure: {
+        classification: providerFailure?.retryable ? "transient" : "permanent",
+        code: "execution_failed"
+      },
+      checks: []
+    };
+    const terminal = this.options.store.finish(task.id, cancelled ? "cancelled" : "failed", cancelled ? {} : {
+      outcome,
+      errorCode: "execution_failed",
+      errorMessage: message
+    });
+    this.appendTerminal(terminal, cancelled ? "Execution cancelled." : terminal.errorMessage ?? "Execution failed.", sequence);
+    return terminal;
+  }
+
   private rootWorktree(task: ExecutionTask): string {
     return path.join(this.options.worktreesRoot, task.spec.rootRunId);
   }
 
   private appendTerminal(task: ExecutionTask, message: string, sequence?: number): void {
+    const failed = task.status === "failed" || task.outcome?.outcome === "failed";
+    const attention = task.status === "cancelled"
+      || ["changes-requested", "needs_input", "blocked"].includes(task.outcome?.outcome ?? "");
     this.options.store.appendEvent(task.id, {
       sequence: sequence ?? Number.MAX_SAFE_INTEGER,
       source: "ballet",
-      kind: task.status === "failed" ? "error" : task.status === "cancelled" ? "warn" : "system",
-      level: task.status === "failed" ? "error" : task.status === "cancelled" ? "warn" : "info",
+      kind: failed ? "error" : attention ? "warn" : "system",
+      level: failed ? "error" : attention ? "warn" : "info",
       phase: "completed", message, terminal: true, createdAt: new Date().toISOString()
     });
   }

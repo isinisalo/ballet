@@ -6,7 +6,8 @@ import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type {
   ExecutionSpec,
   ExecutionTask,
-  StepRunResult
+  LoopRunTermination,
+  RespondToStepRunRequest
 } from "../../shared/domain/runtime.js";
 import type { RootRunDetail, RootRunListQuery, RootRunListResponse, StartRootRunRequest } from "../../shared/domain/runs.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
@@ -187,21 +188,36 @@ export class LocalRunService {
     return this.detailRequired(rootRunId);
   }
 
-  async respond(rootRunId: string, stepRunId: string, result: StepRunResult, input: string): Promise<RootRunDetail> {
+  async respond(rootRunId: string, stepRunId: string, response: RespondToStepRunRequest): Promise<RootRunDetail> {
     const root = this.options.roots.require(rootRunId);
-    if (root.kind !== "loop") throw new LoopRunStateError("Only a Loop Run can contain a human gate.");
+    if (root.kind !== "loop") throw new LoopRunStateError("Only a Loop Run can receive a StepRun response.");
     const step = this.options.database.getStepRun(stepRunId);
     if (!step) throw new LoopRunNotFoundError(`Step Run ${stepRunId} was not found.`);
     if (!this.options.database.listRootLoopRuns(rootRunId).some((run) => run.runId === step.runId)) {
       throw new LoopRunStateError(`Step Run ${stepRunId} does not belong to Root Run ${rootRunId}.`);
     }
-    let snapshot;
-    try { snapshot = await this.runConfiguration(root); }
-    catch (error) {
-      await this.failRoot(root, error);
-      throw error;
+    if (response.kind === "human-decision") {
+      let snapshot;
+      try { snapshot = await this.runConfiguration(root); }
+      catch (error) {
+        await this.failRoot(root, error);
+        throw error;
+      }
+      this.options.database.respondToStepRun(
+        snapshot.automation,
+        snapshot.loopTheme,
+        step.runId,
+        stepRunId,
+        response.decision,
+        response.input
+      );
+    } else {
+      this.options.database.resumeAgentStepRun(
+        step.runId,
+        stepRunId,
+        response.input
+      );
     }
-    this.options.database.respondToStepRun(snapshot.automation, snapshot.loopTheme, step.runId, stepRunId, result, input);
     await this.enqueuePending(rootRunId);
     await this.syncLoopRoot(rootRunId);
     this.changed(rootRunId);
@@ -219,12 +235,9 @@ export class LocalRunService {
       return;
     }
     if (task.kind === "agent_run") {
-      const successful = task.status === "succeeded" && task.outcome
-        && ["ready", "approved"].includes(task.outcome.outcome);
-      const status = task.status === "cancelled" ? "cancelled" : successful ? "completed"
-        : task.status === "succeeded" ? "blocked" : "failed";
+      const { status, termination } = standaloneConclusion(task);
       this.options.roots.setStatus(root.rootRunId, status, {
-        outcome: task.outcome, errorCode: task.errorCode, errorMessage: task.errorMessage,
+        outcome: task.outcome, termination, errorCode: task.errorCode, errorMessage: task.errorMessage,
         runtime: task.spec.runtime
       });
       await this.finalizer.finalize(root.rootRunId, status);
@@ -236,17 +249,38 @@ export class LocalRunService {
     }
     if (task.errorCode === "interrupted") {
       const timestamp = new Date().toISOString();
+      const message = task.errorMessage ?? "Execution interrupted.";
+      const outcome = {
+        outcome: "failed" as const,
+        summary: message,
+        failure: { classification: "permanent" as const, code: "execution_failed" },
+        checks: []
+      };
+      const transition = {
+        signal: { kind: "agent" as const, outcome: "failed" as const },
+        action: "terminate" as const,
+        status: "failed" as const,
+        code: "execution_failed" as const
+      };
+      const termination: LoopRunTermination = {
+        status: "failed",
+        code: "execution_failed",
+        message,
+        stepRunId: task.spec.stepRunId,
+        signal: { kind: "agent", outcome: "failed" }
+      };
       this.options.connection().transaction(() => {
         this.options.connection().prepare(`
-          UPDATE step_runs SET status = 'failed', error = ?, completed_at = ?, updated_at = ?
+          UPDATE step_runs SET status = 'failed', result = 'failed', outcome_json = ?, transition_json = ?,
+            error = ?, completed_at = ?, updated_at = ?
           WHERE step_run_id = ? AND status IN ('queued','running')
-        `).run(task.errorMessage ?? "Execution interrupted.", timestamp, timestamp, task.spec.stepRunId);
+        `).run(JSON.stringify(outcome), JSON.stringify(transition), message, timestamp, timestamp, task.spec.stepRunId);
         this.options.connection().prepare(`
-          UPDATE loop_runs SET status = 'failed', completed_at = ?, updated_at = ?
+          UPDATE loop_runs SET status = 'failed', termination_json = ?, completed_at = ?, updated_at = ?
           WHERE run_id = ? AND status IN ('running','waiting_for_human')
-        `).run(timestamp, timestamp, task.spec.loopRunId);
+        `).run(JSON.stringify(termination), timestamp, timestamp, task.spec.loopRunId);
         this.options.roots.setStatus(task.rootRunId, "failed", {
-          errorCode: task.errorCode, errorMessage: task.errorMessage, runtime: task.spec.runtime
+          outcome, termination, errorCode: task.errorCode, errorMessage: message, runtime: task.spec.runtime
         });
       })();
       await this.finalizer.finalize(task.rootRunId, "failed");
@@ -261,6 +295,7 @@ export class LocalRunService {
       });
       await this.enqueuePending(task.rootRunId);
       await this.syncLoopRoot(task.rootRunId);
+      this.changed(task.rootRunId);
     } catch (error) {
       await this.failRoot(root, error, task.spec.runtime);
     }
@@ -366,16 +401,23 @@ export class LocalRunService {
   private async syncLoopRoot(rootRunId: string): Promise<void> {
     const runs = this.options.database.listRootLoopRuns(rootRunId);
     if (runs.some((run) => run.status === "waiting_for_human")) {
-      this.options.roots.setStatus(rootRunId, "waiting_for_human"); return;
+      const outcome = latestOutcome(runs);
+      this.options.roots.setStatus(rootRunId, "waiting_for_human", { outcome }); return;
     }
     if (runs.some((run) => run.status === "running")) {
       const queued = this.options.executions.listByRoot(rootRunId).some((task) => task.status === "queued");
       this.options.roots.setStatus(rootRunId, queued ? "queued" : "running"); return;
     }
-    const status = runs.some((run) => run.status === "failed") ? "failed"
-      : runs.some((run) => run.status === "blocked") ? "blocked"
-        : runs.some((run) => run.status === "cancelled") ? "cancelled" : "completed";
-    this.options.roots.setStatus(rootRunId, status);
+    const decisive = runs.find((run) => run.status === "failed")
+      ?? runs.find((run) => run.status === "blocked")
+      ?? runs.find((run) => run.status === "cancelled")
+      ?? runs.at(-1);
+    const status = decisive?.status === "failed" ? "failed" : decisive?.status === "blocked" ? "blocked"
+      : decisive?.status === "cancelled" ? "cancelled" : "completed";
+    this.options.roots.setStatus(rootRunId, status, {
+      termination: decisive?.termination,
+      outcome: latestOutcome(runs)
+    });
     await this.finalizer.finalize(rootRunId, status);
   }
 
@@ -404,7 +446,13 @@ export class LocalRunService {
     runtime = root.runtimeSnapshot
   ): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
+    const termination: LoopRunTermination = {
+      status: "failed",
+      code: "orchestration_failed",
+      message
+    };
     this.options.roots.setStatus(root.rootRunId, "failed", {
+      termination,
       errorCode: "orchestration_failed",
       errorMessage: message,
       runtime
@@ -429,3 +477,49 @@ export class LocalRunService {
     return true;
   }
 }
+
+const latestOutcome = (runs: ReturnType<RuntimeDatabase["listRootLoopRuns"]>) =>
+  runs.flatMap((run) => run.stepRuns).filter((step) => step.outcome).at(-1)?.outcome;
+
+const standaloneConclusion = (task: ExecutionTask): {
+  status: "completed" | "blocked" | "failed" | "cancelled";
+  termination: LoopRunTermination;
+} => {
+  if (task.status === "cancelled") {
+    return {
+      status: "cancelled",
+      termination: {
+        status: "cancelled",
+        code: "cancelled",
+        message: task.errorMessage ?? "Execution cancelled.",
+        signal: task.outcome ? { kind: "agent", outcome: task.outcome.outcome } : undefined
+      }
+    };
+  }
+  if (task.status !== "succeeded" || !task.outcome) {
+    return {
+      status: "failed",
+      termination: {
+        status: "failed",
+        code: "execution_failed",
+        message: task.errorMessage ?? "Execution returned no structured outcome.",
+        signal: { kind: "agent", outcome: "failed" }
+      }
+    };
+  }
+  const termination = standaloneTermination(task.outcome.outcome, task.outcome.summary);
+  return { status: termination.status, termination };
+};
+
+const standaloneTermination = (
+  outcome: NonNullable<ExecutionTask["outcome"]>["outcome"],
+  message: string
+): LoopRunTermination => ({
+  status: outcome === "ready" || outcome === "approved" ? "completed" : outcome === "failed" ? "failed" : "blocked",
+  code: outcome === "ready" || outcome === "approved" ? "completed"
+    : outcome === "failed" ? "agent_failed"
+      : outcome === "changes-requested" ? "changes_requested"
+        : outcome === "needs_input" ? "needs_input" : "agent_blocked",
+  message,
+  signal: { kind: "agent", outcome }
+});

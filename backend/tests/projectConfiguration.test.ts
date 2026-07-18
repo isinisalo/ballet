@@ -57,7 +57,16 @@ const routeShape = (config: ProjectAutomationConfig): Record<string, unknown> =>
 const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } =>
   typeof target === "object" && "loop" in target;
 
-const approvedTransitionCount = (config: ProjectAutomationConfig, initialLoopId: string): number => {
+const projectAgentOn = (success: StepTransitionTarget, human: string, repair?: string) => ({
+  ready: success,
+  approved: success,
+  "changes-requested": repair ? { repair } : { terminate: "blocked" as const },
+  needs_input: { human },
+  blocked: { terminal: "blocked" as const },
+  failed: { terminal: "failed" as const, retry: { when: "transient" as const, limit: 1 as const } }
+});
+
+const successTransitionCount = (config: ProjectAutomationConfig, initialLoopId: string): number => {
   const loops = new Map(config.loops.map((loop) => [loop.id, loop]));
   let loop = loops.get(initialLoopId);
   let stepId = loop?.start;
@@ -71,7 +80,7 @@ const approvedTransitionCount = (config: ProjectAutomationConfig, initialLoopId:
     const step = loop.nodes.find((candidate) => candidate.id === stepId);
     if (!step) throw new Error(`Unknown node ${state}.`);
     if (isProjectTerminalNode(step)) return transitions;
-    const target = step.on.approved;
+    const target = step.type === "human" ? step.on.approved : step.on.ready;
     transitions += 1;
     if (typeof target === "string") {
       stepId = target;
@@ -80,7 +89,7 @@ const approvedTransitionCount = (config: ProjectAutomationConfig, initialLoopId:
       stepId = loop?.start;
     }
   }
-  throw new Error(`Approved path from ${initialLoopId} has no end.`);
+  throw new Error(`Success path from ${initialLoopId} has no end.`);
 };
 
 describe("repository Loop engineering configuration", () => {
@@ -109,10 +118,13 @@ describe("repository Loop engineering configuration", () => {
       expect(parsed.frontmatter).not.toHaveProperty("node_style");
       expect(parsed.frontmatter.developer_instructions).toEqual(expect.stringContaining("## Tavoite"));
       expect(parsed.frontmatter.developer_instructions).toEqual(expect.stringContaining("## Pysäytyssäännöt"));
+      if (agentId === "acceptance-test-agent") {
+        expect(parsed.frontmatter.developer_instructions).toEqual(expect.stringContaining("Palauta `approved`, kun kaikki hyväksyntäkriteerit täyttyvät."));
+      }
     }
   });
 
-  it("keeps the four connected Loops and their approved/rejected paths", async () => {
+  it("keeps the four connected Loops and their outcome-aware paths", async () => {
     const project = projectConfigSchema.parse(await readJson(".ballet/project.json"));
     const config: ProjectAutomationConfig = { version: 8, loops: project.loops };
     expect(validateProjectAutomationConfig(config, configuredAgents())).toEqual([]);
@@ -138,46 +150,46 @@ describe("repository Loop engineering configuration", () => {
       "blueprint-design": {
         start: "roadmap",
         nodes: [
-          ["roadmap", "agent", "roadmap-agent", { approved: "data-model", rejected: "blocked" }],
-          ["data-model", "agent", "architecture-agent", { approved: "ui-design", rejected: "blocked" }],
-          ["ui-design", "agent", "ui-design-agent", { approved: "ui-mocks", rejected: "blocked" }],
-          ["ui-mocks", "agent", "ui-design-agent", { approved: "c4-models", rejected: "blocked" }],
-          ["c4-models", "agent", "architecture-agent", { approved: "blueprint-gate", rejected: "blocked" }],
+          ["roadmap", "agent", "roadmap-agent", projectAgentOn("data-model", "blueprint-gate")],
+          ["data-model", "agent", "architecture-agent", projectAgentOn("ui-design", "blueprint-gate")],
+          ["ui-design", "agent", "ui-design-agent", projectAgentOn("ui-mocks", "blueprint-gate")],
+          ["ui-mocks", "agent", "ui-design-agent", projectAgentOn("c4-models", "blueprint-gate")],
+          ["c4-models", "agent", "architecture-agent", projectAgentOn("blueprint-gate", "blueprint-gate")],
           ["blueprint-gate", "human", null, { approved: { loop: "milestone-planning" }, rejected: "roadmap" }]
         ]
       },
       "milestone-planning": {
         start: "plan-milestone-issues",
         nodes: [
-          ["plan-milestone-issues", "agent", "milestone-issues-agent", { approved: "implementation-plan", rejected: "blocked" }],
-          ["implementation-plan", "agent", "implementation-plan-agent", { approved: "test-plan", rejected: "blocked" }],
-          ["test-plan", "agent", "test-plan-agent", { approved: "milestone-gate", rejected: "blocked" }],
+          ["plan-milestone-issues", "agent", "milestone-issues-agent", projectAgentOn("implementation-plan", "milestone-gate")],
+          ["implementation-plan", "agent", "implementation-plan-agent", projectAgentOn("test-plan", "milestone-gate")],
+          ["test-plan", "agent", "test-plan-agent", projectAgentOn("milestone-gate", "milestone-gate")],
           ["milestone-gate", "human", null, { approved: { loop: "milestone-delivery" }, rejected: "plan-milestone-issues" }]
         ]
       },
       "milestone-delivery": {
         start: "implement-milestone",
         nodes: [
-          ["implement-milestone", "agent", "implementation-agent", { approved: "run-acceptance-tests", rejected: "blocked" }],
-          ["run-acceptance-tests", "agent", "acceptance-test-agent", { approved: "implementation-gate", rejected: "implement-milestone" }],
+          ["implement-milestone", "agent", "implementation-agent", projectAgentOn("run-acceptance-tests", "implementation-gate")],
+          ["run-acceptance-tests", "agent", "acceptance-test-agent", projectAgentOn("implementation-gate", "implementation-gate", "implement-milestone")],
           ["implementation-gate", "human", null, { approved: { loop: "release-validation" }, rejected: "implement-milestone" }]
         ]
       },
       "release-validation": {
         start: "make-git-release",
         nodes: [
-          ["make-git-release", "agent", "release-agent", { approved: "deploy-release", rejected: "failed" }],
-          ["deploy-release", "agent", "release-agent", { approved: "verify-release", rejected: "failed" }],
-          ["verify-release", "agent", "release-agent", { approved: "release-gate", rejected: "failed" }],
+          ["make-git-release", "agent", "release-agent", projectAgentOn("deploy-release", "release-gate")],
+          ["deploy-release", "agent", "release-agent", projectAgentOn("verify-release", "release-gate")],
+          ["verify-release", "agent", "release-agent", projectAgentOn("release-gate", "release-gate")],
           ["release-gate", "human", null, { approved: "completed", rejected: "verify-release" }]
         ]
       }
     });
     expect({
-      blueprint: approvedTransitionCount(config, "blueprint-design"),
-      milestone: approvedTransitionCount(config, "milestone-planning"),
-      delivery: approvedTransitionCount(config, "milestone-delivery"),
-      release: approvedTransitionCount(config, "release-validation")
+      blueprint: successTransitionCount(config, "blueprint-design"),
+      milestone: successTransitionCount(config, "milestone-planning"),
+      delivery: successTransitionCount(config, "milestone-delivery"),
+      release: successTransitionCount(config, "release-validation")
     }).toEqual({ blueprint: 17, milestone: 11, delivery: 7, release: 4 });
   });
 });

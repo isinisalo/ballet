@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import {
+  defaultAgentStepTransitions,
   defaultLoopTheme,
   loopNodeStyles,
   type LoopNodeStyle,
@@ -63,6 +64,22 @@ describe("Ballet Run node state", () => {
     expect(node.querySelector(".lucide-calendar-clock")).toBeInTheDocument();
     expect(node.querySelector(".loop-agent-avatar")).not.toBeInTheDocument();
     expect(screen.getByText("Weekdays · 09:00 · Europe/Helsinki")).toBeInTheDocument();
+  });
+
+  it("renders agent outcomes and human decisions with distinct semantic state", () => {
+    const changed = record("agent", "completed", { kind: "agent", outcome: "changes-requested" });
+    const view = render(<LoopCompactStepNode context={context()} record={changed} />);
+    const agent = screen.getByRole("button", { name: "View step implement" });
+    expect(agent).toHaveAttribute("data-loop-run-signal", "changes-requested");
+    expect(agent).toHaveClass("text-tertiary");
+
+    view.rerender(<LoopCompactStepNode
+      context={context()}
+      record={record("human", "completed", { kind: "human", decision: "rejected" })}
+    />);
+    const human = screen.getByRole("button", { name: "View step approve" });
+    expect(human).toHaveAttribute("data-loop-run-signal", "rejected");
+    expect(human).toHaveClass("text-tertiary");
   });
 });
 
@@ -129,14 +146,15 @@ describe("terminal Loop nodes", () => {
 
 const record = (
   kind: "agent" | "human" | "scheduled",
-  status: "running" | "waiting_for_human"
+  status: StepRun["status"],
+  result?: StepRun["result"]
 ): LoopStepRecord => {
   const id = kind === "agent" ? "implement" : kind === "human" ? "approve" : "deploy";
-  const on = { approved: "completed", rejected: "blocked" };
+  const humanOn = { approved: "completed", rejected: "blocked" } as const;
   const step: ProjectStep = kind === "agent"
-    ? { id, type: "agent", nodeStyle: "flat", nodeSize: "medium", agentId: "developer", description: "Implement.", on }
+    ? { id, type: "agent", nodeStyle: "flat", nodeSize: "medium", agentId: "developer", description: "Implement.", on: defaultAgentStepTransitions() }
     : kind === "human"
-      ? { id, type: "human", nodeStyle: "mars", nodeSize: "small", description: "Approve.", on }
+      ? { id, type: "human", nodeStyle: "mars", nodeSize: "small", description: "Approve.", on: humanOn }
       : {
           id,
           type: "scheduled",
@@ -145,7 +163,7 @@ const record = (
           agentId: "developer",
           description: "Deploy.",
           schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
-          on
+          on: defaultAgentStepTransitions()
         };
   const stepRun: StepRun = {
     stepRunId: `step-${id}`,
@@ -155,6 +173,7 @@ const record = (
     type: kind === "human" ? "human" : "agent",
     agentId: kind === "human" ? undefined : "developer",
     status,
+    result,
     attempt: 1,
     createdAt: "2026-07-11T10:00:00.000Z",
     updatedAt: "2026-07-11T10:00:00.000Z"

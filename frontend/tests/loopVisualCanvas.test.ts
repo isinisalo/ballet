@@ -10,6 +10,7 @@ import {
   type ProjectAutomationConfig
 } from "@shared/api/workspace-contracts";
 import { describe, expect, it } from "vitest";
+import { activeRunEdgeId, selectableTransition } from "../src/workspace/automation/loops/LoopCanvas";
 import { loopApprovalEdgePath, loopEdgeDisplayLabel, loopReturnEdgePath, loopToLoopStraightEdgePath } from "../src/workspace/automation/loops/LoopSmartEdge";
 import { loopConnectionPointRadius, loopEdgeEndpointGap, themedLoopEdgeProps } from "../src/workspace/automation/loops/loopFloatingEdgeGeometry";
 import { loopEdgeDomAttributes, loopEdgeLineStyle, loopEdgeStyle } from "../src/workspace/automation/loops/loopEdgeStyle";
@@ -19,6 +20,7 @@ import { loopReasoningGlowLevel } from "../src/workspace/automation/loops/loopRe
 import { loopActiveHandleIdsByNodeKey, loopNodeHandles, toLoopReactFlowEdges } from "../src/workspace/automation/loops/loopReactFlowElements";
 import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/loopSmartEdgeRouting";
 import { buildLoopVisualProjection } from "../src/workspace/automation/loops/loopVisualProjection";
+import { agentTransitions } from "./agentTransitionFixture";
 
 const config: ProjectAutomationConfig = {
   version: 8,
@@ -32,7 +34,7 @@ const config: ProjectAutomationConfig = {
       nodeSize: "medium",
       agentId: "brief-agent",
       description: "Create brief",
-      on: { approved: "gate", rejected: "failed" }
+      on: agentTransitions("gate", { human: "gate" })
     }, {
       id: "gate",
       type: "human",
@@ -51,7 +53,7 @@ const config: ProjectAutomationConfig = {
       nodeSize: "medium",
       agentId: "roadmap-agent",
       description: "Create roadmap",
-      on: { approved: "completed", rejected: "blocked" }
+      on: agentTransitions("completed")
     }, ...defaultTerminalNodes()]
   }]
 };
@@ -86,6 +88,29 @@ describe("terminal canvas nodes", () => {
 });
 
 describe("v8 compact loop canvas", () => {
+  it("selects and animates exact agent and human outcome edges", () => {
+    const agent = config.loops[0]!.nodes[0]!;
+    const human = config.loops[0]!.nodes[1]!;
+    expect(["ready", "approved", "changes-requested", "needs_input", "blocked", "failed"].map(
+      (outcome) => selectableTransition(agent, outcome)
+    )).toEqual(["ready", "approved", "changes-requested", "needs_input", "blocked", "failed"]);
+    expect(selectableTransition(agent, "rejected")).toBeUndefined();
+    expect(selectableTransition(human, "approved")).toBe("approved");
+    expect(selectableTransition(human, "rejected")).toBe("rejected");
+    expect(selectableTransition(human, "ready")).toBeUndefined();
+
+    const edges = [{
+      key: "changes-edge",
+      sourceNodeKey: "step-0",
+      targetNodeKey: "step-1",
+      route: { sourceStepIndex: 0, outputId: "changes-requested" }
+    }];
+    const run = {
+      stepRuns: [{ stepId: "create", result: { kind: "agent", outcome: "changes-requested" } }]
+    } as unknown as LoopRunDetails;
+    expect(activeRunEdgeId(edges, config.loops[0]!, run)).toBe("changes-edge");
+  });
+
   it("projects styled nodes, reachable terminal nodes, and cross-Loop transitions", () => {
     const projection = buildLoopVisualProjection(config, config.loops[0]!);
     const layout = calculateCompositeLoopCanvasLayout({
@@ -99,12 +124,14 @@ describe("v8 compact loop canvas", () => {
     expect(stepNodes).toHaveLength(2);
     expect(stepNodes.map((node) => [node.width, node.height])).toEqual([[48, 48], [24, 24]]);
     expect(layout.nodes.some((node) => node.kind === "loop" && node.loopSummary?.loopId === "roadmap")).toBe(true);
-    expect(terminalNodes.map((node) => node.record?.step?.displayId)).toEqual(["failed"]);
+    expect(terminalNodes.map((node) => node.record?.step?.displayId)).toEqual(["blocked", "failed"]);
     expect(layout.nodes.some((node) => node.kind === "output-event")).toBe(false);
     const crossLoopEdge = layout.edges.find((edge) => edge.tone === "cross-loop" && edge.route?.targetLoopId === "roadmap");
     expect(crossLoopEdge).toBeDefined();
     expect(loopEdgeDisplayLabel(crossLoopEdge)).toBeUndefined();
-    expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining(["approved", "rejected"]));
+    expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining([
+      "ready", "approved", "changes-requested", "needs_input", "blocked", "failed", "rejected"
+    ]));
     expect(layout.edges.some((edge) => edge.route?.outputId === "rejected" && ["top", "bottom"].includes(edge.sourceHandleId ?? ""))).toBe(true);
   });
 
@@ -121,7 +148,7 @@ describe("v8 compact loop canvas", () => {
           nodeSize: "medium",
           agentId: "agent",
           description: "Prepare",
-          on: { approved: "review", rejected: "repair" }
+          on: agentTransitions("review", { repair: "repair" })
         }, {
           id: "review",
           type: "agent",
@@ -129,7 +156,7 @@ describe("v8 compact loop canvas", () => {
           nodeSize: "small",
           agentId: "agent",
           description: "Review",
-          on: { approved: "completed", rejected: "prepare" }
+          on: agentTransitions("completed", { repair: "prepare" })
         }, {
           id: "repair",
           type: "agent",
@@ -137,7 +164,7 @@ describe("v8 compact loop canvas", () => {
           nodeSize: "tiny",
           agentId: "agent",
           description: "Repair",
-          on: { approved: "blocked", rejected: "failed" }
+          on: agentTransitions("blocked")
         }, ...defaultTerminalNodes()]
       }]
     };
@@ -148,14 +175,16 @@ describe("v8 compact loop canvas", () => {
       recordsByLoopId: projection.recordsByLoopId
     });
     const approved = layout.edges.find((edge) => edge.route?.sourceStepIndex === 0 && edge.route.outputId === "approved")!;
-    const rejected = layout.edges.find((edge) => edge.route?.sourceStepIndex === 0 && edge.route.outputId === "rejected")!;
+    const repair = layout.edges.find((edge) => edge.route?.sourceStepIndex === 0 && edge.route.outputId === "changes-requested")!;
     const terminalNodes = layout.nodes.filter((node) => node.record?.step?.terminal);
 
     expect(layout.nodes.filter((node) => node.kind === "step" && !node.record?.step?.terminal)).toHaveLength(3);
-    expect(approved.targetNodeKey).not.toBe(rejected.targetNodeKey);
+    expect(approved.targetNodeKey).not.toBe(repair.targetNodeKey);
     expect(loopEdgeDisplayLabel(approved)).toBeUndefined();
-    expect(loopEdgeDisplayLabel(rejected)).toBeUndefined();
-    expect(layout.edges.some((edge) => edge.tone === "return" && edge.route?.outputId === "rejected")).toBe(true);
+    expect(loopEdgeDisplayLabel(repair)).toEqual({ value: "changes-requested", kind: "output" });
+    expect(layout.edges.some((edge) => edge.tone === "return" && edge.route?.outputId === "changes-requested")).toBe(true);
+    expect(layout.edges.filter((edge) => edge.route?.sourceStepIndex === 1 && edge.route.outputId === "changes-requested")
+      .map((edge) => edge.route?.handlerStepId)).toEqual(["cycle::prepare"]);
     expect(terminalNodes.map((node) => node.record?.step?.displayId)).toEqual(expect.arrayContaining(["completed", "blocked", "failed"]));
     expect(terminalNodes.every((node) => node.width === 24 && node.height === 24)).toBe(true);
     expect(terminalNodes.every((node) => layout.edges.some((edge) => edge.targetNodeKey === node.key))).toBe(true);
@@ -163,7 +192,7 @@ describe("v8 compact loop canvas", () => {
     const activeHandleIds = loopActiveHandleIdsByNodeKey(layout.edges);
     expect(terminalNodes.every((node) => loopNodeHandles(node, activeHandleIds.get(node.key) ?? []).every((handle) => handle.type === "target"))).toBe(true);
     expect(layout.nodes.some((node) => node.kind === "first-step-ghost")).toBe(false);
-    expect(loopEdgeDomAttributes(rejected, defaultLoopTheme, true)).toMatchObject({
+    expect(loopEdgeDomAttributes(repair, defaultLoopTheme, true)).toMatchObject({
       "data-loop-edge-animated": "true",
       "data-loop-edge-output-slot-kind": "rework"
     });
@@ -205,7 +234,7 @@ describe("Loop node style geometry", () => {
       nodeSize,
       agentId: `agent-${nodeStyle}-${nodeSize}`,
       description: "",
-      on: { approved: combinations[index + 1] ? `${combinations[index + 1]![0]}-${combinations[index + 1]![1]}` : "completed", rejected: "blocked" }
+      on: agentTransitions(combinations[index + 1] ? `${combinations[index + 1]![0]}-${combinations[index + 1]![1]}` : "completed")
     }));
     const styledLoop = { id: "styled", start: "flat-tiny", nodes: [...steps, ...defaultTerminalNodes()] } satisfies ProjectAutomationConfig["loops"][number];
     const styledConfig = { version: 8, loops: [styledLoop] } satisfies ProjectAutomationConfig;
@@ -237,7 +266,7 @@ describe("Loop node style geometry", () => {
         agentId: "deploy-agent",
         description: "Deploy",
         schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
-        on: { approved: "completed", rejected: "blocked" }
+        on: agentTransitions("completed")
       }, ...defaultTerminalNodes()]
     } satisfies ProjectAutomationConfig["loops"][number];
     const scheduledConfig = { version: 8, loops: [scheduledLoop] } satisfies ProjectAutomationConfig;
@@ -264,7 +293,9 @@ describe("Loop node style geometry", () => {
       reasoningEffort: "xhigh",
       scheduleLabel: "Weekdays · 09:00 · Europe/Helsinki"
     });
-    expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining(["approved", "rejected"]));
+    expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining([
+      "ready", "approved", "changes-requested", "blocked", "failed"
+    ]));
   });
 
   it("maps increasing reasoning effort to progressively stronger glow levels", () => {
@@ -327,7 +358,7 @@ describe("global Loop theme rendering", () => {
         nodeSize: "medium",
         agentId: "builder",
         description: "",
-        on: { approved: "completed", rejected: "blocked" }
+        on: agentTransitions("completed")
       }, ...defaultTerminalNodes()]
     } satisfies ProjectAutomationConfig["loops"][number];
     const avatarConfig = { version: 8, loops: [avatarLoop] } satisfies ProjectAutomationConfig;

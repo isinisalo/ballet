@@ -3,8 +3,8 @@ import type { LoopCanvasEdge } from "./loopLayoutEdges";
 export type StepOutputSlotKind = "approval" | "rework";
 
 const stepOutputSlotKind = (value: string): StepOutputSlotKind | undefined => {
-  if (value === "approved") return "approval";
-  if (value === "rejected") return "rework";
+  if (value === "ready" || value === "approved") return "approval";
+  if (["rejected", "changes-requested", "needs_input", "blocked", "failed"].includes(value)) return "rework";
   return undefined;
 };
 

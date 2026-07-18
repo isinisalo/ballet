@@ -15,6 +15,7 @@ import {
   validateProjectAutomationConfig
 } from "../automation.js";
 import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
+import { agentTransitions } from "./agentTransitionFixture.js";
 
 const roots: string[] = [];
 const tempRoot = async () => {
@@ -50,7 +51,7 @@ const config = (): ProjectAutomationConfig => ({
       description: "Implement the change.",
       nodeStyle: "terra",
       nodeSize: "medium",
-      on: { approved: "review", rejected: "failed" }
+      on: agentTransitions("review")
     }, {
       id: "review",
       type: "human",
@@ -91,16 +92,16 @@ describe("automation v8 config", () => {
       ...base,
       loops: [{
         ...base.loops[0]!,
-        nodes: [{ ...base.loops[0]!.nodes[0]!, on: { approved: "missing", rejected: "failed" } }, ...defaultTerminalNodes()]
+        nodes: [{ ...base.loops[0]!.nodes[0]!, on: agentTransitions("missing") }, ...defaultTerminalNodes()]
       }]
     }, [agent]).some((issue) => issue.message.includes("unknown node"))).toBe(true);
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{
         ...base.loops[0]!,
-        nodes: [{ ...base.loops[0]!.nodes[0]!, on: { approved: "implement" } }, ...defaultTerminalNodes()]
+        nodes: [{ ...base.loops[0]!.nodes[0]!, on: { ...agentTransitions("implement"), needs_input: undefined } }, ...defaultTerminalNodes()]
       }]
-    }, [agent]).some((issue) => issue.path.includes("on.rejected"))).toBe(true);
+    }, [agent]).some((issue) => issue.path.includes("on.needs_input"))).toBe(true);
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{
@@ -113,10 +114,10 @@ describe("automation v8 config", () => {
           description: "Cycle forever.",
           nodeStyle: "terra",
           nodeSize: "medium",
-          on: { approved: "again", rejected: "again" }
+          on: agentTransitions("again", { repair: "again" })
         }, ...defaultTerminalNodes()]
       }]
-    }, [agent]).some((issue) => issue.message.includes("terminal or cross-loop"))).toBe(true);
+    }, [agent]).some((issue) => issue.message.includes("success path cycles"))).toBe(true);
   });
 
   it("allows cross-loop transitions only from humans and never back to the same loop", () => {
@@ -139,7 +140,7 @@ describe("automation v8 config", () => {
         ...base.loops[0]!,
         nodes: [{
           ...base.loops[0]!.nodes[0]!,
-          on: { approved: { loop: "release" }, rejected: "failed" }
+          on: agentTransitions({ loop: "release" })
         }, ...defaultTerminalNodes()]
       }, target]
     };
@@ -162,8 +163,8 @@ describe("automation v8 config", () => {
   });
 });
 
-describe("all-approved path liveness", () => {
-  it("rejects an all-approved cycle across loops", () => {
+describe("outcome-aware success path liveness", () => {
+  it("rejects a success cycle across loops", () => {
     const cyclic: ProjectAutomationConfig = {
       version: 8,
       loops: [{
@@ -192,10 +193,10 @@ describe("all-approved path liveness", () => {
     };
 
     const issues = validateProjectAutomationConfig(cyclic, [agent]);
-    expect(issues.filter((issue) => issue.message.includes("all-approved path cycles"))).toHaveLength(2);
+    expect(issues.filter((issue) => issue.message.includes("success path cycles"))).toHaveLength(2);
   });
 
-  it("rejects an all-approved cross-loop path longer than the runtime transition limit", () => {
+  it("rejects a success path across loops longer than the runtime transition limit", () => {
     const longSteps: ProjectStep[] = Array.from(
       { length: MAX_ROOT_TRANSITIONS },
       (_, index): ProjectStep => ({
@@ -234,11 +235,11 @@ describe("all-approved path liveness", () => {
 
     expect(validateProjectAutomationConfig(tooLong, [agent])).toContainEqual({
       path: "loops.0.start",
-      message: `The all-approved path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
+      message: `The success path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
     });
   });
 
-  it("allows a short all-approved chain across loops", () => {
+  it("allows a short success chain across loops", () => {
     const short: ProjectAutomationConfig = {
       version: 8,
       loops: [{
@@ -251,7 +252,7 @@ describe("all-approved path liveness", () => {
           description: "Implement the task.",
           nodeStyle: "terra",
           nodeSize: "medium",
-          on: { approved: "code-gate", rejected: "blocked" }
+          on: agentTransitions("code-gate", { human: "code-gate" })
         }, {
           id: "code-gate",
           type: "human",
@@ -270,7 +271,7 @@ describe("all-approved path liveness", () => {
           description: "Deploy to dev.",
           nodeStyle: "terra",
           nodeSize: "medium",
-          on: { approved: "completed", rejected: "failed" }
+          on: agentTransitions("completed")
         }, ...defaultTerminalNodes()]
       }]
     };

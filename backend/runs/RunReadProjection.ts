@@ -9,6 +9,7 @@ export const publicRootSummary = (run: StoredRootRun) => ({
   status: run.status,
   input: run.input,
   outcome: run.outcome,
+  termination: run.termination,
   errorCode: run.errorCode,
   errorMessage: run.errorMessage,
   current: run.current,

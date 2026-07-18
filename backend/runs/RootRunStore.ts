@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import type {
   AgentOutcome,
   ExecutionRuntimeSnapshot,
+  LoopRunTermination,
   RootFinalizationReport
 } from "../../shared/domain/runtime.js";
 import type {
@@ -21,6 +22,7 @@ interface RootRunRow {
   status: DashboardRunStatus;
   input: string | null;
   outcome_json: string | null;
+  termination_json: string | null;
   error_code: string | null;
   error_message: string | null;
   worktree_path: string;
@@ -116,6 +118,7 @@ export class RootRunStore {
 
   setStatus(rootRunId: string, status: DashboardRunStatus, detail: {
     outcome?: AgentOutcome;
+    termination?: LoopRunTermination;
     errorCode?: string;
     errorMessage?: string;
     runtime?: ExecutionRuntimeSnapshot;
@@ -124,11 +127,13 @@ export class RootRunStore {
     const terminal = ["completed", "blocked", "failed", "cancelled"].includes(status);
     this.connection().prepare(`
       UPDATE root_runs SET status = ?, outcome_json = COALESCE(?, outcome_json),
+        termination_json = COALESCE(?, termination_json),
         error_code = COALESCE(?, error_code), error_message = COALESCE(?, error_message),
         runtime_snapshot_json = COALESCE(?, runtime_snapshot_json), updated_at = ?,
         completed_at = CASE WHEN ? THEN COALESCE(completed_at, ?) ELSE completed_at END
       WHERE root_run_id = ?
     `).run(status, detail.outcome ? JSON.stringify(detail.outcome) : null,
+      detail.termination ? JSON.stringify(detail.termination) : null,
       detail.errorCode ?? null, detail.errorMessage ?? null,
       detail.runtime ? JSON.stringify(detail.runtime) : null, timestamp,
       terminal ? 1 : 0, timestamp, rootRunId);
@@ -179,6 +184,7 @@ const toRootRun = (row: RootRunRow): StoredRootRun => ({
   status: row.status,
   input: row.input ?? undefined,
   outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
+  termination: row.termination_json ? JSON.parse(row.termination_json) as LoopRunTermination : undefined,
   errorCode: row.error_code ?? undefined,
   errorMessage: row.error_message ?? undefined,
   worktreePath: row.worktree_path,

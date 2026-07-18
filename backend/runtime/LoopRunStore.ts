@@ -8,9 +8,12 @@ import type {
   LoopExecutionPlan,
   LoopRun,
   LoopRunDetails,
+  LoopRunTermination,
   LoopRunSource,
   StepRun,
-  StepRunResult
+  StepRunResult,
+  StepRunStatus,
+  StepRunTransition
 } from "../../shared/domain/runtime.js";
 import { stringifyJson } from "./RuntimeJson.js";
 import { toLoopRun, toStepRun } from "./RuntimeRowMappers.js";
@@ -127,17 +130,19 @@ export class LoopRunStore {
     return run;
   }
 
-  createStepRun(run: LoopRun, step: ProjectExecutableStep, input?: string): StepRun {
+  createStepRun(run: LoopRun, step: ProjectExecutableStep, input?: string, options: {
+    retryOf?: StepRun;
+  } = {}): StepRun {
     const stepRunId = randomUUID();
     const timestamp = now();
     const status = step.type === "human" ? "waiting_for_human" : "queued";
     this.connection().prepare(`
       INSERT INTO step_runs (
         step_run_id, run_id, loop_id, step_id, step_type, agent_id,
-        status, input, attempt, created_at, updated_at
+        status, input, attempt, retry_of_step_run_id, created_at, updated_at
       ) VALUES (
         @stepRunId, @runId, @loopId, @stepId, @stepType, @agentId,
-        @status, @input, 0, @createdAt, @updatedAt
+        @status, @input, @attempt, @retryOfStepRunId, @createdAt, @updatedAt
       )
     `).run({
       stepRunId,
@@ -148,6 +153,8 @@ export class LoopRunStore {
       agentId: step.type === "human" ? null : step.agentId,
       status,
       input: input ?? null,
+      attempt: options.retryOf ? options.retryOf.attempt + 1 : 1,
+      retryOfStepRunId: options.retryOf?.stepRunId ?? null,
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -166,23 +173,26 @@ export class LoopRunStore {
   completeStepRun(stepRun: StepRun, result: StepRunResult, options: {
     responseInput?: string;
     outcome?: AgentOutcome;
+    transition: StepRunTransition;
     error?: string;
-    failed?: boolean;
+    status?: Extract<StepRunStatus, "waiting_for_human" | "completed" | "blocked" | "failed" | "cancelled">;
   }): void {
     const timestamp = now();
+    const status = options.status ?? "completed";
     this.connection().prepare(`
       UPDATE step_runs SET status = @status, response_input = @responseInput, result = @result,
-        outcome_json = @outcomeJson, error = @error,
+        outcome_json = @outcomeJson, transition_json = @transitionJson, error = @error,
         completed_at = @completedAt, updated_at = @updatedAt
         WHERE step_run_id = @stepRunId
     `).run({
       stepRunId: stepRun.stepRunId,
-      status: options.failed ? "failed" : "completed",
+      status,
       responseInput: options.responseInput ?? null,
-      result,
+      result: result.kind === "agent" ? result.outcome : result.decision,
       outcomeJson: options.outcome ? stringifyJson(options.outcome) : null,
+      transitionJson: stringifyJson(options.transition),
       error: options.error ?? null,
-      completedAt: timestamp,
+      completedAt: status === "waiting_for_human" ? null : timestamp,
       updatedAt: timestamp
     });
   }
@@ -199,7 +209,7 @@ export class LoopRunStore {
 
   markStepRunning(stepRunId: string): StepRun {
     this.connection().prepare(`
-      UPDATE step_runs SET status = 'running', attempt = 1, updated_at = ?
+      UPDATE step_runs SET status = 'running', updated_at = ?
       WHERE step_run_id = ? AND status = 'queued'
     `).run(now(), stepRunId);
     const stepRun = this.getStepRun(stepRunId);
@@ -226,11 +236,23 @@ export class LoopRunStore {
       .run(input, now(), runId);
   }
 
-  finishRun(runId: string, status: "completed" | "blocked" | "failed" | "cancelled"): void {
+  waitForHuman(runId: string): void {
+    this.connection().prepare("UPDATE loop_runs SET status = 'waiting_for_human', updated_at = ? WHERE run_id = ?")
+      .run(now(), runId);
+  }
+
+  finishRun(runId: string, termination: LoopRunTermination): void {
     const timestamp = now();
     this.connection().prepare(`
-      UPDATE loop_runs SET status = @status, completed_at = @completedAt, updated_at = @updatedAt
+      UPDATE loop_runs SET status = @status, termination_json = @terminationJson,
+        completed_at = @completedAt, updated_at = @updatedAt
       WHERE run_id = @runId
-    `).run({ runId, status, completedAt: timestamp, updatedAt: timestamp });
+    `).run({
+      runId,
+      status: termination.status,
+      terminationJson: stringifyJson(termination),
+      completedAt: timestamp,
+      updatedAt: timestamp
+    });
   }
 }

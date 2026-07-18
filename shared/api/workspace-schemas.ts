@@ -9,6 +9,7 @@ import {
   type ProjectAutomationConfig,
   type ProjectStepSchedule
 } from "../domain/automation.js";
+import { migrateLegacyBinaryV8 } from "../domain/automationMigration.js";
 import type { ProjectConfiguration } from "../domain/projectConfig.js";
 import { portableAgentRuntimeIntentSchema } from "./runtime-schemas.js";
 import {
@@ -129,9 +130,26 @@ export const loopThemeSchema = z.object({
 }).strict() satisfies z.ZodType<LoopTheme>;
 const stepLoopSchema = z.object({ loop: kebabLoopIdSchema }).strict();
 const stepTransitionTargetSchema = z.union([automationStepIdSchema, stepLoopSchema]);
-const stepTransitionsSchema = z.object({
+const humanStepTransitionsSchema = z.object({
   approved: stepTransitionTargetSchema,
   rejected: stepTransitionTargetSchema
+}).strict();
+const agentStepTransitionsSchema = z.object({
+  ready: stepTransitionTargetSchema,
+  approved: stepTransitionTargetSchema,
+  "changes-requested": z.union([
+    z.object({ repair: automationStepIdSchema }).strict(),
+    z.object({ terminate: z.literal("blocked") }).strict()
+  ]),
+  needs_input: z.union([
+    z.object({ human: automationStepIdSchema }).strict(),
+    z.object({ wait: z.literal(true) }).strict()
+  ]),
+  blocked: z.object({ terminal: z.literal("blocked") }).strict(),
+  failed: z.object({
+    terminal: z.literal("failed"),
+    retry: z.object({ when: z.literal("transient"), limit: z.literal(1) }).strict().optional()
+  }).strict()
 }).strict();
 const terminalStatuses = ["completed", "blocked", "failed"] as const;
 const executableNodeIdSchema = automationStepIdSchema.refine(
@@ -145,8 +163,7 @@ const nodeVisualBase = {
 };
 const executableStepBase = {
   ...nodeVisualBase,
-  id: executableNodeIdSchema,
-  on: stepTransitionsSchema
+  id: executableNodeIdSchema
 };
 const calendarDateSchema = z.string().refine(isCalendarDate, "Expected a valid date in YYYY-MM-DD format.");
 const clockTimeSchema = z.string().regex(clockTimePattern, "Expected a valid time in HH:mm format.");
@@ -186,13 +203,14 @@ export const projectStepScheduleSchema = z.union([
   recurringScheduleSchema
 ]) satisfies z.ZodType<ProjectStepSchedule>;
 const projectStepSchema = z.discriminatedUnion("type", [
-  z.object({ ...executableStepBase, type: z.literal("agent"), agentId: z.string().min(1) }).strict(),
-  z.object({ ...executableStepBase, type: z.literal("human") }).strict(),
+  z.object({ ...executableStepBase, type: z.literal("agent"), agentId: z.string().min(1), on: agentStepTransitionsSchema }).strict(),
+  z.object({ ...executableStepBase, type: z.literal("human"), on: humanStepTransitionsSchema }).strict(),
   z.object({
     ...executableStepBase,
     type: z.literal("scheduled"),
     agentId: z.string().min(1),
     schedule: projectStepScheduleSchema,
+    on: agentStepTransitionsSchema
   }).strict()
 ]);
 const completedTerminalNodeSchema = z.object({
@@ -247,13 +265,23 @@ const projectLoopSchema = z.object({
   });
 });
 
-export const automationConfigSchema = z.object({
+const canonicalAutomationConfigSchema = z.object({
   version: z.literal(8),
   loops: z.array(projectLoopSchema)
-}).strict() satisfies z.ZodType<ProjectAutomationConfig>;
+}).strict();
 
-export const projectConfigSchema = z.object({
+export const automationConfigSchema = z.preprocess(
+  migrateLegacyBinaryV8,
+  canonicalAutomationConfigSchema
+) as z.ZodType<ProjectAutomationConfig>;
+
+const canonicalProjectConfigSchema = z.object({
   version: z.literal(8),
   agents: z.record(z.string().trim().min(1).max(200), portableAgentRuntimeIntentSchema),
   loops: z.array(projectLoopSchema)
-}).strict() satisfies z.ZodType<ProjectConfiguration>;
+}).strict();
+
+export const projectConfigSchema = z.preprocess(
+  migrateLegacyBinaryV8,
+  canonicalProjectConfigSchema
+) as z.ZodType<ProjectConfiguration>;

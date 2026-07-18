@@ -1,13 +1,14 @@
-import type { ProjectStep, StepRun, StepTransitionTarget } from "@shared/api/workspace-contracts";
+import type { ProjectStep, RespondToStepRunRequest, StepRun, StepRunTransition } from "@shared/api/workspace-contracts";
 import { GitCompare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { AgentInputRunPanel } from "./AgentInputRunPanel";
 import { HumanGateRunPanel } from "./HumanGateRunPanel";
 
 export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
   step: ProjectStep;
   stepRun: StepRun;
   pending: boolean;
-  onRespond: (stepRunId: string, result: "approved" | "rejected", input: string) => Promise<boolean>;
+  onRespond: (stepRunId: string, request: RespondToStepRunRequest) => Promise<boolean>;
 }) {
   return (
     <div aria-label="StepRun details" className="min-w-0 px-3 py-3 text-xs">
@@ -20,8 +21,8 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
           <dt className="text-muted-foreground">Reasoning</dt><dd>{stepRun.execution.reasoning}</dd>
         </> : null}
         <dt className="text-muted-foreground">Attempt</dt><dd>{stepRun.attempt}</dd>
-        <dt className="text-muted-foreground">Result</dt><dd>{stepRun.result ?? "—"}</dd>
-        <dt className="text-muted-foreground">Transition</dt><dd>{stepRun.result ? formatTransition(step.on[stepRun.result]) : "—"}</dd>
+        <dt className="text-muted-foreground">{stepRun.type === "human" ? "Human decision" : "Agent outcome"}</dt><dd>{formatResult(stepRun)}</dd>
+        <dt className="text-muted-foreground">Routing</dt><dd>{formatTransition(stepRun.transition)}</dd>
         <dt className="text-muted-foreground">Created</dt><dd>{formatDate(stepRun.createdAt)}</dd>
         <dt className="text-muted-foreground">Updated</dt><dd>{formatDate(stepRun.updatedAt)}</dd>
         {stepRun.completedAt ? <><dt className="text-muted-foreground">Completed</dt><dd>{formatDate(stepRun.completedAt)}</dd></> : null}
@@ -37,18 +38,53 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
       ) : null}
       {stepRun.responseInput ? (
         <div className="mt-3 border-t border-divider-strong pt-3">
-          <p className="mb-1 text-muted-foreground">Human response</p>
+          <p className="mb-1 text-muted-foreground">{stepRun.type === "human" ? "Human response" : "Provided input"}</p>
           <pre className="whitespace-pre-wrap font-mono text-[0.65rem]">{stepRun.responseInput}</pre>
         </div>
       ) : null}
-      {stepRun.type === "human" && stepRun.status === "waiting_for_human" ? (
-        <div className="-mx-3 mt-3"><HumanGateRunPanel stepRun={stepRun} pending={pending} onRespond={onRespond} /></div>
-      ) : null}
+      <StepRunResponseControl stepRun={stepRun} pending={pending} onRespond={onRespond} />
     </div>
   );
 }
 
+function StepRunResponseControl({ stepRun, pending, onRespond }: {
+  stepRun: StepRun;
+  pending: boolean;
+  onRespond: (stepRunId: string, request: RespondToStepRunRequest) => Promise<boolean>;
+}) {
+  if (stepRun.type === "human" && stepRun.status === "waiting_for_human") {
+    return <div className="-mx-3 mt-3"><HumanGateRunPanel
+      stepRun={stepRun}
+      pending={pending}
+      onRespond={(stepRunId, decision, input) => onRespond(stepRunId, {
+        kind: "human-decision",
+        decision,
+        input
+      })}
+    /></div>;
+  }
+  if (stepRun.type === "agent" && stepRun.status === "waiting_for_human"
+    && stepRun.outcome?.outcome === "needs_input" && stepRun.transition?.action === "wait") {
+    return <div className="-mx-3 mt-3"><AgentInputRunPanel stepRun={stepRun} pending={pending} onRespond={onRespond} /></div>;
+  }
+  return null;
+}
+
 const formatDate = (value: string) => new Date(value).toLocaleString();
 
-const formatTransition = (target: StepTransitionTarget) =>
-  typeof target === "string" ? `Node · ${target}` : `Loop · ${target.loop}`;
+const formatResult = (stepRun: StepRun) => stepRun.result
+  ? stepRun.result.kind === "agent" ? stepRun.result.outcome : stepRun.result.decision
+  : "—";
+
+const formatTransition = (transition: StepRunTransition | undefined) => {
+  if (!transition) return "—";
+  if (transition.action === "wait") return "Wait · human input";
+  if (transition.action === "terminate") return `Terminate · ${transition.status} · ${transition.code}`;
+  const target = transition.target;
+  const label = typeof target === "string" ? `Node · ${target}` : `Loop · ${target.loop}`;
+  if (transition.action === "repair") return `Repair ${transition.repairAttempt} · ${label}`;
+  if (transition.action === "retry") return `Transient retry ${transition.retryAttempt} · ${label}`;
+  if (transition.action === "resume") return `Resume · ${label}`;
+  if (transition.action === "human") return `Human decision · ${label}`;
+  return label;
+};

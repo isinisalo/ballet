@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { ProjectConfigurationRepository, ProjectConfigurationSourceError } from "../project-config/ProjectConfigurationRepository.js";
+import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -58,5 +59,72 @@ describe("project configuration repository", () => {
       provider: "codex", model: "gpt-5", reasoning: "high", policy: { network: false }
     })).toThrow(ProjectConfigurationSourceError);
     expect(await readFile(repository.path(projectRoot), "utf8")).toBe(invalidJson);
+  });
+
+  it("loads legacy binary v8 transitions canonically without mutating source and rewrites them on save", async () => {
+    const projectRoot = await root();
+    const repository = new ProjectConfigurationRepository();
+    await mkdir(path.dirname(repository.path(projectRoot)), { recursive: true });
+    const legacy = {
+      version: 8,
+      agents: {},
+      loops: [{
+        id: "delivery",
+        start: "timer",
+        nodes: [{
+          id: "timer", type: "scheduled", agentId: "builder", description: "Start.", nodeStyle: "luna", nodeSize: "tiny",
+          schedule: { kind: "once", date: "2026-07-20", time: "09:00", timeZone: "UTC" },
+          on: { approved: "review", rejected: "blocked" }
+        }, {
+          id: "review", type: "agent", agentId: "reviewer", description: "Review.", nodeStyle: "terra", nodeSize: "medium",
+          on: { approved: "gate", rejected: "review" }
+        }, {
+          id: "gate", type: "human", description: "Decide.", nodeStyle: "luna", nodeSize: "tiny",
+          on: { approved: "completed", rejected: "review" }
+        }, ...defaultTerminalNodes()]
+      }]
+    };
+    const source = `${JSON.stringify(legacy, null, 2)}\n`;
+    await writeFile(repository.path(projectRoot), source, "utf8");
+
+    const loaded = repository.load(projectRoot);
+    expect(loaded.issues).toEqual([]);
+    expect(await readFile(repository.path(projectRoot), "utf8")).toBe(source);
+    const [timer, review, gate] = loaded.config!.loops[0]!.nodes;
+    expect(timer).toMatchObject({
+      type: "scheduled",
+      on: {
+        ready: "review",
+        approved: "review",
+        "changes-requested": { terminate: "blocked" },
+        needs_input: { human: "gate" },
+        blocked: { terminal: "blocked" },
+        failed: { terminal: "failed", retry: { when: "transient", limit: 1 } }
+      }
+    });
+    expect(review).toMatchObject({
+      type: "agent",
+      on: { "changes-requested": { repair: "review" }, needs_input: { human: "gate" } }
+    });
+    expect(gate).toMatchObject({ type: "human", on: { approved: "completed", rejected: "review" } });
+
+    repository.putAutomation(projectRoot, loaded.config!.loops);
+    const stored = JSON.parse(await readFile(repository.path(projectRoot), "utf8")) as {
+      loops: Array<{ nodes: Array<{ on?: Record<string, unknown> }> }>;
+    };
+    expect(stored.loops[0]!.nodes[0]!.on).not.toHaveProperty("rejected");
+    expect(stored.loops[0]!.nodes[1]!.on).toHaveProperty("changes-requested");
+  });
+
+  it("continues to reject v7 project configuration", async () => {
+    const projectRoot = await root();
+    const repository = new ProjectConfigurationRepository();
+    await mkdir(path.dirname(repository.path(projectRoot)), { recursive: true });
+    await writeFile(repository.path(projectRoot), JSON.stringify({ version: 7, agents: {}, loops: [] }), "utf8");
+    const loaded = repository.load(projectRoot);
+    expect(loaded.config).toBeUndefined();
+    expect(loaded).toMatchObject({
+      issues: [expect.objectContaining({ code: "invalid_schema", path: "version" })]
+    });
   });
 });

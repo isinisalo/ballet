@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { agentOutcomeStatuses, humanDecisions } from "../domain/outcomes.js";
 
 const idSchema = z.string().uuid();
 const runtimeProviderSchema = z.enum(["codex", "copilot"]);
@@ -45,10 +46,20 @@ export const executionEventsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(500)
 }).strict();
 
-export const respondToRunStepBodySchema = z.object({
-  result: z.enum(["approved", "rejected"]),
-  input: z.string().max(20_000)
-}).strict();
+const runResponseInputSchema = z.string().max(20_000)
+  .refine((value) => value.trim().length > 0, "Response input is required.");
+
+export const respondToRunStepBodySchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("human-decision"),
+    decision: z.enum(humanDecisions),
+    input: runResponseInputSchema
+  }).strict(),
+  z.object({
+    kind: z.literal("agent-input"),
+    input: runResponseInputSchema
+  }).strict()
+]);
 
 const runCheckSchema = z.object({
   name: z.string().trim().min(1).max(500),
@@ -57,8 +68,12 @@ const runCheckSchema = z.object({
 }).strict();
 
 export const agentOutcomeSchema = z.object({
-  outcome: z.enum(["ready", "blocked", "needs_input", "approved", "changes-requested", "failed"]),
+  outcome: z.enum(agentOutcomeStatuses),
   summary: z.string().max(20_000),
+  failure: z.object({
+    classification: z.enum(["transient", "permanent"]),
+    code: z.string().trim().min(1).max(200).optional()
+  }).strict().optional(),
   artifacts: z.record(z.string(), z.unknown()).optional(),
   checks: z.array(runCheckSchema).max(500)
 }).strict();

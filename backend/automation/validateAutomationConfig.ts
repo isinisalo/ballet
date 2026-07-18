@@ -114,6 +114,28 @@ const validateLoop = (
     if (step.type !== "human" && agentIds && !agentIds.has(step.agentId)) {
       issues.push({ path: `${base}.agentId`, message: `Step references unknown agent: ${step.agentId}.` });
     }
+    if (step.type !== "human") {
+      const changes = step.on["changes-requested"];
+      if ("repair" in changes) {
+        const repair = nodesById.get(changes.repair);
+        if (!repair || isProjectTerminalNode(repair) || repair.type !== "agent") {
+          issues.push({
+            path: `${base}.on.changes-requested.repair`,
+            message: "A changes-requested repair must name a local agent step."
+          });
+        }
+      }
+      const needsInput = step.on.needs_input;
+      if ("human" in needsInput) {
+        const human = nodesById.get(needsInput.human);
+        if (!human || isProjectTerminalNode(human) || human.type !== "human") {
+          issues.push({
+            path: `${base}.on.needs_input.human`,
+            message: "A needs_input transition must name a local human step."
+          });
+        }
+      }
+    }
     for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
       issues.push(...validateTarget(target, `${base}.on.${transitionId}`, step, loop.id, nodesById, loopIds));
     }
@@ -160,7 +182,7 @@ const validateLoop = (
   return issues;
 };
 
-const validateApprovedPaths = (
+const validateSuccessPaths = (
   config: ProjectAutomationConfig
 ): ProjectAutomationIssue[] => {
   const loopsById = new Map(config.loops.map((loop) => [loop.id, loop]));
@@ -179,7 +201,7 @@ const validateApprovedPaths = (
       if (visited.has(state)) {
         issues.push({
           path: `loops.${loopIndex}.start`,
-          message: "The all-approved path cycles before reaching a terminal target."
+          message: "The success path cycles before reaching a terminal target."
         });
         return;
       }
@@ -189,12 +211,12 @@ const validateApprovedPaths = (
       if (transitionCount > MAX_ROOT_TRANSITIONS) {
         issues.push({
           path: `loops.${loopIndex}.start`,
-          message: `The all-approved path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
+          message: `The success path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
         });
         return;
       }
 
-      const target = step.on.approved;
+      const target = step.type === "human" ? step.on.approved : step.on.ready;
       if (typeof target === "string") {
         const nextNode = loop.nodes.find((candidate) => candidate.id === target);
         if (!nextNode || isProjectTerminalNode(nextNode) || nextNode.type === "scheduled") return;
@@ -235,6 +257,6 @@ export const validateProjectAutomationConfig = (
   config.loops.forEach((loop, index) => {
     issues.push(...validateLoop(loop, index, loopIds, agentIds));
   });
-  issues.push(...validateApprovedPaths(config));
+  issues.push(...validateSuccessPaths(config));
   return issues;
 };

@@ -10,6 +10,7 @@ import {
   saveProjectAutomationConfig,
   validateProjectAutomationConfig
 } from "../automation.js";
+import { agentTransitions } from "./agentTransitionFixture.js";
 import { RuntimeDatabase } from "../runtime-db.js";
 import { MarkdownStore } from "../store.js";
 
@@ -68,7 +69,7 @@ const automation = (): ProjectAutomationConfig => ({
     id: "delivery", start: "review",
     nodes: [{
       id: "review", type: "agent", agentId: "reviewer", description: "Review.", nodeStyle: "luna", nodeSize: "tiny",
-      on: { approved: "completed", rejected: "failed" }
+      on: agentTransitions("completed")
     }, ...defaultTerminalNodes()]
   }, {
     id: "scheduled-delivery",
@@ -81,7 +82,7 @@ const automation = (): ProjectAutomationConfig => ({
       nodeStyle: "luna",
       nodeSize: "tiny",
       schedule: { kind: "once", date: "2026-07-15", time: "09:00", timeZone: "UTC" },
-      on: { approved: "completed", rejected: "blocked" }
+      on: agentTransitions("completed")
     }, ...defaultTerminalNodes()]
   }]
 });

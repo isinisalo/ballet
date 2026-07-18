@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import { parseUnknown } from "../http/validation/httpValidation.js";
+import { agentTransitions } from "./agentTransitionFixture.js";
 import { expectValidationError } from "./expectValidationError.js";
 
 const configWithSchedule = (schedule: unknown) => ({
@@ -17,7 +18,7 @@ const configWithSchedule = (schedule: unknown) => ({
       nodeStyle: "luna",
       nodeSize: "tiny",
       schedule,
-      on: { approved: "completed", rejected: "blocked" }
+      on: agentTransitions("completed")
     }, ...defaultTerminalNodes()]
   }]
 });

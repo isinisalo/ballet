@@ -5,6 +5,7 @@ import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
 import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
+import { agentTransitions } from "../tests/agentTransitionFixture.js";
 
 const agent: Agent = {
   id: "scheduled-agent",
@@ -67,7 +68,7 @@ describe("LoopExecutionPlanner scheduled agents", () => {
             nodeStyle: "luna",
             nodeSize: "tiny",
             schedule: { kind: "once", date: "2026-07-14", time: "21:00", timeZone: "UTC" },
-            on: { approved: "completed", rejected: "blocked" }
+            on: agentTransitions("completed")
           }, ...defaultTerminalNodes()]
         }]
       }

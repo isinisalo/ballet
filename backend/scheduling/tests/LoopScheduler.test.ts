@@ -10,6 +10,7 @@ import { defaultLoopTheme } from "../../../shared/domain/loopThemes.js";
 import { RuntimeDatabase, type DispatchLoopScheduleResult } from "../../runtime-db.js";
 import { LoopScheduler, type LoopSchedulerOptions } from "../LoopScheduler.js";
 import type { ScheduleClock } from "../ScheduleClock.js";
+import { agentTransitions } from "../../tests/agentTransitionFixture.js";
 
 const roots: string[] = [];
 const schedulers: LoopScheduler[] = [];
@@ -33,9 +34,9 @@ const automation = (schedule: ProjectStepSchedule): ProjectAutomationConfig => (
   version: 8,
   loops: [{ id: "scheduled-delivery", start: "timer", nodes: [
     { id: "timer", type: "scheduled", agentId: "delivery-agent", description: "Start on schedule.", nodeStyle: "luna", nodeSize: "tiny", schedule,
-      on: { approved: "work", rejected: "failed" } },
+      on: agentTransitions("work") },
     { id: "work", type: "agent", agentId: "delivery-agent", description: "Deliver.", nodeStyle: "terra", nodeSize: "medium",
-      on: { approved: "completed", rejected: "failed" } },
+      on: agentTransitions("completed") },
     ...defaultTerminalNodes()
   ] }]
 });

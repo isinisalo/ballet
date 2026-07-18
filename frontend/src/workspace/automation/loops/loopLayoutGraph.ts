@@ -75,6 +75,9 @@ function addRootStepBranch(context: LoopLayoutGraphDraftContext, record: LoopSte
 function layoutStepBranch(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, visitedStepIds = new Set<string>()) {
   const canonicalRecord = loopCanonicalRecord(context.loopGraph, record);
   if (canonicalRecord.index !== record.index) return;
+  // Outcome-aware agents commonly send ready and approved to the same child.
+  // Lay out a shared child branch once while retaining both semantic edges.
+  if (context.stepNodeIndexes.has(canonicalRecord.index)) return;
   if (visitedStepIds.has(record.stepKey)) return;
   const nextVisitedStepIds = new Set(visitedStepIds);
   const activeOutputTasks: LoopActiveOutputTask[] = [];

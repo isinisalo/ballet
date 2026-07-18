@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { migrateV1ToV2 } from "./migrateV1ToV2.js";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export class LocalDatabase {
   private database?: Database.Database;
@@ -44,12 +45,18 @@ export class LocalDatabase {
       ? database.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").get() as { value: string } | undefined
       : undefined;
     if (!version && tables.length > 0) throw new Error("Ballet state database has no schema version; persisted state was left unchanged.");
-    if (version && Number(version.value) !== SCHEMA_VERSION) {
-      throw new Error(`Unsupported Ballet state schema ${version.value}; expected ${SCHEMA_VERSION}.`);
+    const currentVersion = version ? Number(version.value) : undefined;
+    if (currentVersion !== undefined && currentVersion !== 1 && currentVersion !== SCHEMA_VERSION) {
+      throw new Error(`Unsupported Ballet state schema ${String(currentVersion)}; expected ${SCHEMA_VERSION}.`);
     }
     database.transaction(() => {
       database.exec(schema);
-      if (!version) database.prepare("INSERT INTO metadata (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
+      if (!version) {
+        database.prepare("INSERT INTO metadata (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
+      } else if (currentVersion === 1) {
+        migrateV1ToV2(database);
+        database.prepare("UPDATE metadata SET value = ? WHERE key = 'schema_version'").run(String(SCHEMA_VERSION));
+      }
     })();
   }
 }
@@ -64,6 +71,7 @@ const schema = `
     status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_human','finalizing','completed','blocked','failed','cancelled')),
     input TEXT,
     outcome_json TEXT,
+    termination_json TEXT,
     error_code TEXT,
     error_message TEXT,
     worktree_path TEXT NOT NULL,
@@ -96,6 +104,7 @@ const schema = `
     input TEXT,
     snapshot_json TEXT NOT NULL,
     transition_count INTEGER NOT NULL DEFAULT 0,
+    termination_json TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     completed_at TEXT
@@ -114,8 +123,10 @@ const schema = `
     response_input TEXT,
     result TEXT,
     outcome_json TEXT,
+    transition_json TEXT,
     error TEXT,
     attempt INTEGER NOT NULL DEFAULT 0,
+    retry_of_step_run_id TEXT REFERENCES step_runs(step_run_id),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     completed_at TEXT

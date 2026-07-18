@@ -85,7 +85,7 @@ export function LoopRunView({
           onOpenChange={(open) => { if (!open) setSelectedStepRunId(undefined); }}
           header={selectedStepRun && selectedStep ? <LoopRunStepHeader step={selectedStep} stepRun={selectedStepRun} /> : null}
           left={selectedStepRun && selectedStep ? <LoopRunStepInstructions step={selectedStep} agents={agents} task={selectedTask} snapshot={selectedAgentSnapshot} /> : null}
-          right={selectedStepRun && selectedStep ? <LoopRunStepOutput step={selectedStep} stepRun={selectedStepRun} task={selectedTask} pending={busy} onTerminal={() => void refresh()} onRespond={async (stepRunId, result, input) => Boolean(await respond(stepRunId, { result, input }))} /> : null}
+          right={selectedStepRun && selectedStep ? <LoopRunStepOutput step={selectedStep} stepRun={selectedStepRun} task={selectedTask} pending={busy} onTerminal={() => void refresh()} onRespond={async (stepRunId, request) => Boolean(await respond(stepRunId, request))} /> : null}
         />
       </div>
       {details ? (
@@ -93,7 +93,9 @@ export function LoopRunView({
           <span>source: {rootDetail?.source ?? details.source}</span>
           <span>loop transitions: {details.transitionCount}/20</span>
           <span>updated: {new Date(details.updatedAt).toLocaleString()}</span>
-          {rootDetail?.finalization?.report?.commitSha ? <span>commit: {rootDetail.finalization.report.commitSha}</span> : details.stepRuns.some((stepRun) => stepRun.executionTaskId) ? <span>branch: ballet/run/{details.rootRunId.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 12)}</span> : null}
+          {(rootDetail?.termination ?? details.termination) ? <span>reason: {(rootDetail?.termination ?? details.termination)?.code} · {(rootDetail?.termination ?? details.termination)?.message}</span> : null}
+          {rootDetail?.finalization?.report ? <span>branch: {rootDetail.finalization.report.branch}</span> : null}
+          {rootDetail?.finalization?.report?.commitSha ? <span>commit: {rootDetail.finalization.report.commitSha}</span> : null}
           {rootDetail?.finalization?.report ? <span>{changedFilesLabel(rootDetail.finalization.report.changedFiles)}{rootDetail.finalization.report.retained ? ` · retained ${rootDetail.finalization.report.worktreePath}` : ""}</span> : null}
         </div>
       ) : null}

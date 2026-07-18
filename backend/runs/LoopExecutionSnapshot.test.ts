@@ -6,6 +6,7 @@ import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurat
 import type { RootRunStore } from "./RootRunStore.js";
 import { LocalRunTargetService } from "./LocalRunTargetService.js";
 import { agentSnapshot } from "./LoopExecutionSnapshot.js";
+import { agentTransitions } from "../tests/agentTransitionFixture.js";
 
 const agent = (enabled = true): Agent => ({
   id: "reviewer", name: "Reviewer", description: "Reviews.", instructions: "Review carefully.", enabled,
@@ -20,7 +21,7 @@ const automation = {
     id: "blueprint-design", start: "review",
     nodes: [{
       id: "review", type: "agent" as const, agentId: "reviewer", description: "Review.", nodeStyle: "luna" as const, nodeSize: "tiny" as const,
-      on: { approved: "completed", rejected: "failed" }
+      on: agentTransitions("completed")
     }, ...defaultTerminalNodes()]
   }]
 };

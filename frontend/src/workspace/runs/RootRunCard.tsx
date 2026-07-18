@@ -23,6 +23,7 @@ export function RootRunCard({ run, pending, navigate, onCancel }: {
           </span>
         </span>
         <span className="mt-1 block truncate font-mono text-[0.65rem] text-muted-foreground">{currentRunLabel(run)} · {run.rootRunId}</span>
+        {run.termination ? <span className="mt-1 block font-mono text-[0.6rem] text-muted-foreground">reason: {run.termination.code} · {run.termination.message}</span> : null}
         {run.finalization ? <span className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[0.6rem] text-muted-foreground">finalization: {run.finalization.status}{report?.commitSha ? <><GitCommitHorizontal className="size-3" />{report.commitSha}</> : null}{report ? ` · ${changedFilesLabel(report.changedFiles)}` : null}{report?.retained ? ` · retained ${report.worktreePath}` : null}</span> : null}
       </button>
       <div className="flex items-center justify-end gap-2">

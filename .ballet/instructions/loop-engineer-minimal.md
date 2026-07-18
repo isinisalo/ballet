@@ -1,7 +1,7 @@
 ---
 title: Loop Engineer Delivery Chain
 createdAt: 2026-07-15
-updatedAt: 2026-07-15
+updatedAt: 2026-07-18
 tags:
   - ballet
   - loop-engineering
@@ -19,7 +19,7 @@ Ihminen omistaa Goal- ja ADR-dokumenttien WHAT- ja WHY-päätökset. Agentit rat
 3. `milestone-delivery`: `implement-milestone` → `run-acceptance-tests` → human `implementation-gate`.
 4. `release-validation`: `make-git-release` → `deploy-release` → `verify-release` → human `release-gate`.
 
-Jokainen approved human gate käynnistää seuraavan Loopin saman root Runin ja worktreen sisällä. Rejected human gate palautuu saman Loopin korjausvaiheeseen. `release-gate` palautuu `verify-release`-Stepiin eikä luo uutta Git-tagia.
+Jokainen human `approved` -päätös käynnistää seuraavan Loopin saman root Runin ja worktreen sisällä. Human `rejected` säilyy ihmisen päätöksenä ja palautuu saman Loopin korjausvaiheeseen. `release-gate` palautuu `verify-release`-Stepiin eikä luo uutta Git-tagia.
 
 ## Node-tyylit
 
@@ -40,7 +40,7 @@ Suunnittelunodeilla on `large`, toteutus- ja validointinodeilla `medium` ja huma
 - `release-gate.approved` → `completed`
 - `release-gate.rejected` → `verify-release`
 
-Agentin `rejected`-outcome päättää suunnittelu- tai release-vaiheen `blocked`/`failed`-tilaan, ellei Loop-konfiguraatio määrittele saman milestonen acceptance-korjausta. `run-acceptance-tests` palautuu aina `implement-milestone`-Stepiin, jotta saman scopen korjaukset voidaan tehdä.
+Agentti-outcomet reititetään sellaisinaan: `ready` ja verifierin `approved` etenevät normaaliin seuraavaan Stepiin, `changes-requested` saa palata vain nimettyyn saman scopen repair-Stepiin, ja `needs_input` siirtyy nimettyyn human gateen. `blocked` päättää Runin blocked-tilaan ja `failed` failed-tilaan; kumpikaan ei saa käynnistää implementation-retryä. Vain eksplisiittisesti `transient`-luokiteltu `failed` voidaan yrittää kerran uudelleen. `run-acceptance-tests.changes-requested` palaa `implement-milestone`-Stepiin enintään kolmen repair-kierroksen ajan.
 
 ## Handoff
 

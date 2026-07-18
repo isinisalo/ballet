@@ -23,6 +23,8 @@ import type {
   ProjectStepSchedule,
   ProjectStepTransitionEntry,
   ProjectStepTransitionId,
+  ProjectAgentStepTransitions,
+  ProjectHumanStepTransitions,
   ProjectStepTransitionMappers,
   ProjectStepTransitions,
   StepEndStatus,
@@ -38,6 +40,7 @@ import type { MarkdownDocument, Project, ProjectDocumentTreeNode, Skill } from "
 import type {
   AgentRuntimeConfiguration,
   AgentOutcome,
+  AgentOutcomeStatus,
   ExecutionAgentSnapshot,
   ExecutionEvent,
   ExecutionEventPage,
@@ -51,15 +54,19 @@ import type {
   LoopExecutionPlan,
   LoopRun,
   LoopRunDetails,
+  LoopRunTermination,
   LoopRuntimePreflight,
   LoopScheduleState,
+  HumanDecision,
   PortableAgentRuntimeIntent,
   ResolvedAgentExecution,
   RespondToStepRunRequest,
   RuntimeConfigurationIssue,
   RuntimePreflightIssue,
   RuntimeProvider,
-  StepRun
+  StepRun,
+  StepRunResult,
+  StepRunTransition
 } from "../domain/runtime.js";
 import type {
   BalletMode,
@@ -116,6 +123,8 @@ export type CollectionName = WorkspaceCollectionName;
 
 export {
   clockTimePattern,
+  defaultAgentStepTransitions,
+  defaultHumanStepTransitions,
   defaultLoopNodeSize,
   defaultLoopNodeStyle,
   defaultTerminalNodes,
@@ -144,9 +153,9 @@ export type {
   LoopEdgeLineStyle, LoopConnectionPointStyle, ProjectOnceStepSchedule, ProjectRecurringStepSchedule,
   ProjectScheduledStep, ProjectScheduleCadence, ProjectScheduleWeekday,
   ProjectStep, ProjectStepSchedule, ProjectStepTransitionEntry, ProjectStepTransitionId,
-  ProjectStepTransitionMappers, ProjectStepTransitions, StepEndStatus, StepTransitionTarget, LoopRun, LoopRunDetails,
+  ProjectAgentStepTransitions, ProjectHumanStepTransitions, ProjectStepTransitionMappers, ProjectStepTransitions, StepEndStatus, StepTransitionTarget, LoopRun, LoopRunDetails,
   LoopExecutionPlan, LoopScheduleState, LoopRuntimePreflight,
-  RespondToStepRunRequest, StepRun, AgentRuntimeConfiguration, AgentOutcome, ExecutionAgentSnapshot,
+  RespondToStepRunRequest, StepRun, StepRunResult, StepRunTransition, LoopRunTermination, AgentRuntimeConfiguration, AgentOutcome, AgentOutcomeStatus, HumanDecision, ExecutionAgentSnapshot,
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot, PortableAgentRuntimeIntent,
   ResolvedAgentExecution, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,

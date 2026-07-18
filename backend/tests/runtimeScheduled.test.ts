@@ -8,6 +8,7 @@ import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase } from "../runtime-db.js";
 import { scheduleDefinitionHash } from "../scheduling/ScheduleDefinition.js";
+import { agentTransitions } from "./agentTransitionFixture.js";
 
 const roots: string[] = [];
 const databases: RuntimeDatabase[] = [];
@@ -30,7 +31,7 @@ const automation: ProjectAutomationConfig = {
       nodeStyle: "luna",
       nodeSize: "tiny",
       schedule: { kind: "once", date: "2026-07-12", time: "09:00", timeZone: "UTC" },
-      on: { approved: "completed", rejected: "blocked" }
+      on: agentTransitions("completed")
     }, ...defaultTerminalNodes()]
   }]
 };
@@ -119,7 +120,7 @@ describe("scheduled runtime starts", () => {
     });
 
     expect(rejected.status).toBe("blocked");
-    expect(rejected.stepRuns[0]).toMatchObject({ result: "rejected", status: "completed" });
+    expect(rejected.stepRuns[0]).toMatchObject({ result: { kind: "agent", outcome: "blocked" }, status: "blocked" });
   });
 });
 

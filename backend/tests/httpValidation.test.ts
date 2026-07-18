@@ -4,11 +4,33 @@ import {
     collectionUpsertSchema,
     projectDocumentSaveSchema
 } from "../../shared/api/workspace-schemas.js";
+import { respondToRunStepBodySchema } from "../../shared/api/runtime-schemas.js";
 import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import { parseUnknown } from "../http/validation/httpValidation.js";
+import { agentTransitions } from "./agentTransitionFixture.js";
 import { expectValidationError } from "./expectValidationError.js";
 
 describe("HTTP Zod validation", () => {
+  it("keeps human decisions and agent input responses distinct", () => {
+    expect(parseUnknown(respondToRunStepBodySchema, {
+      kind: "human-decision",
+      decision: "rejected",
+      input: "Please revise."
+    })).toEqual({ kind: "human-decision", decision: "rejected", input: "Please revise." });
+    expect(parseUnknown(respondToRunStepBodySchema, {
+      kind: "agent-input",
+      input: "Use SQLite."
+    })).toEqual({ kind: "agent-input", input: "Use SQLite." });
+    expectValidationError(() => parseUnknown(respondToRunStepBodySchema, {
+      result: "rejected",
+      input: "Legacy binary response."
+    }), "kind");
+    expectValidationError(() => parseUnknown(respondToRunStepBodySchema, {
+      kind: "agent-input",
+      input: "   "
+    }), "input");
+  });
+
   it("accepts valid project document saves and rejects unknown top-level fields", () => {
     const valid = {
       relativePath: ".ballet/project.md",
@@ -32,7 +54,7 @@ describe("HTTP Zod validation", () => {
           nodeStyle: "terra",
           nodeSize: "medium",
           agentId: "developer-agent",
-          on: { approved: "completed", rejected: "failed" }
+          on: agentTransitions("completed")
         }, ...defaultTerminalNodes()]
       }]
     };

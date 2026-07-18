@@ -2,6 +2,7 @@ import type {
   AgentOutcome,
   ExecutionTask,
   LoopRunDetails,
+  LoopRunTermination,
   RootFinalizationReport,
   RuntimePreflightIssue
 } from "./runtime.js";
@@ -46,6 +47,7 @@ export interface RootRunSummary {
   status: DashboardRunStatus;
   input?: string;
   outcome?: AgentOutcome;
+  termination?: LoopRunTermination;
   errorCode?: string;
   errorMessage?: string;
   current?: RootRunCurrentPosition;

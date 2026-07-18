@@ -108,7 +108,7 @@ export function buildLoopVisualProjection(
       const stepKey = visualStepKey(loop.id, projectNode.id);
       const visualStep = stepByKey.get(stepKey);
       const outputTargets = isProjectTerminalNode(projectNode) ? [] : getProjectStepTransitionEntries(projectNode).map(
-        ([result, target]) => visualTarget(loop.id, result, target, loopDefinitions)
+        ([result, target]) => visualTarget(loop.id, projectNode.id, result, target, loopDefinitions)
       );
       return {
         stepKey,
@@ -145,14 +145,16 @@ function reachableNodeIds(loop: ProjectLoop): Set<string> {
 
 function visualTarget(
   sourceLoopId: string,
+  sourceStepId: string,
   result: string,
   target: StepTransitionTarget,
   loops: ProjectLoop[]
 ): LoopOutputTarget {
+  const eventType = `${visualStepKey(sourceLoopId, sourceStepId)}::${result}`;
   if (typeof target === "string") {
     return {
       outputId: result,
-      eventType: result,
+      eventType,
       type: "step",
       targetLoopId: sourceLoopId,
       targetStepKey: visualStepKey(sourceLoopId, target)
@@ -162,7 +164,7 @@ function visualTarget(
     const targetLoop = loops.find((loop) => loop.id === target.loop);
     return {
       outputId: result,
-      eventType: result,
+      eventType,
       type: "step",
       targetLoopId: target.loop,
       targetStepKey: visualStepKey(target.loop, targetLoop?.start ?? "start")

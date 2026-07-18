@@ -11,6 +11,7 @@ import {
   replaceNode,
   updateLoopAtIndex
 } from "../src/workspace/automation/loops/loopEditorState";
+import { agentTransitions } from "./agentTransitionFixture";
 
 const agentStep = (id: string, approved: StepTransitionTarget): ProjectStep => ({
   id,
@@ -19,7 +20,7 @@ const agentStep = (id: string, approved: StepTransitionTarget): ProjectStep => (
   nodeSize: "medium",
   agentId: "agent",
   description: "",
-  on: { approved, rejected: "failed" }
+  on: agentTransitions(approved)
 });
 
 const loop = (): ProjectLoop => ({
@@ -41,7 +42,7 @@ describe("loop editor state", () => {
       agentId: "builder",
       nodeStyle: "flat",
       nodeSize: "medium",
-      on: { approved: "completed", rejected: "blocked" }
+      on: agentTransitions("completed")
     });
     expect(withAgent.nodes.slice(1)).toEqual(defaultTerminalNodes());
     expect(addFirstStep(createLoopDraft(), []).nodes[0]).toMatchObject({ type: "human", nodeStyle: "flat", nodeSize: "medium" });
@@ -51,11 +52,13 @@ describe("loop editor state", () => {
     const current = loop();
     const review = current.nodes[1]!;
     const next = replaceNode(current, "review", { ...review, id: "final-review" } as ProjectStep);
+    expect((next.nodes[0] as ProjectStep).on.ready).toBe("final-review");
     expect((next.nodes[0] as ProjectStep).on.approved).toBe("final-review");
   });
 
   it("redirects removed Step and Loop references to output-specific terminals", () => {
     const withoutReview = removeStep(loop(), "review");
+    expect((withoutReview.nodes[0] as ProjectStep).on.ready).toBe("completed");
     expect((withoutReview.nodes[0] as ProjectStep).on.approved).toBe("completed");
 
     const referencingLoop: ProjectLoop = {
@@ -112,7 +115,7 @@ describe("loop editor state", () => {
       agentId: "agent",
       nodeStyle: "sol",
       nodeSize: "large",
-      on: { approved: "completed", rejected: "blocked" }
+      on: agentTransitions("completed")
     });
   });
 
@@ -139,14 +142,19 @@ describe("scheduled loop editor state", () => {
       agentId: "agent",
       nodeStyle: "terra",
       nodeSize: "medium",
-      on: { approved: "review", rejected: "failed" },
+      on: agentTransitions("review"),
       schedule: { kind: "once", date: "2026-07-12", time: "11:00" }
     });
   });
 
   it("does not offer Scheduled when a transition points to the start Step", () => {
     const incoming = loop();
-    incoming.nodes[1] = { ...incoming.nodes[1]!, on: { ...(incoming.nodes[1] as ProjectStep).on, rejected: "start" } } as ProjectStep;
+    const incomingStep = incoming.nodes[1] as ProjectStep;
+    if (incomingStep.type === "human") throw new Error("Expected agent fixture.");
+    incoming.nodes[1] = {
+      ...incomingStep,
+      on: { ...incomingStep.on, "changes-requested": { repair: "start" } }
+    };
 
     expect(canChangeStepToScheduled(incoming, "start")).toBe(false);
   });
@@ -169,7 +177,7 @@ describe("scheduled loop editor state", () => {
       agentId: "agent",
       nodeStyle: "mars",
       nodeSize: "small",
-      on: { approved: "completed", rejected: "blocked" }
+      on: agentTransitions("completed")
     });
   });
 
@@ -185,7 +193,7 @@ describe("scheduled loop editor state", () => {
         agentId: "agent",
         description: "",
         schedule: { kind: "once", date: "2026-07-12", time: "11:00", timeZone: "Europe/Helsinki" },
-        on: { approved: "run", rejected: "blocked" }
+        on: agentTransitions("run")
       }, agentStep("run", "completed"), ...defaultTerminalNodes()]
     };
 
@@ -193,7 +201,7 @@ describe("scheduled loop editor state", () => {
     expect(reorderLoopSteps(scheduled, 1, 0)).toBe(scheduled);
     const withoutRun = removeStep(scheduled, "run");
     expect(withoutRun.start).toBe("timer");
-    expect(withoutRun.nodes[0]).toMatchObject({ id: "timer", on: { approved: "completed", rejected: "blocked" } });
+    expect(withoutRun.nodes[0]).toMatchObject({ id: "timer", on: agentTransitions("completed") });
     expect(withoutRun.nodes.slice(1)).toEqual(defaultTerminalNodes());
     const withoutTimer = removeStep(scheduled, "timer");
     expect(withoutTimer.start).toBe("run");

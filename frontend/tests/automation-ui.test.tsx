@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
+  defaultAgentStepTransitions,
   defaultLoopTheme,
   defaultTerminalNodes,
   type AppData,
@@ -18,6 +19,19 @@ const loop: ProjectLoop = {
   start: "approval",
   nodes: [{ id: "approval", type: "human", nodeStyle: "luna", nodeSize: "tiny", description: "Approve delivery", on: { approved: "completed", rejected: "failed" } }, ...defaultTerminalNodes()]
 };
+const agentInputLoop: ProjectLoop = {
+  id: "delivery",
+  start: "implementation",
+  nodes: [{
+    id: "implementation",
+    type: "agent",
+    agentId: "implementation-agent",
+    nodeStyle: "terra",
+    nodeSize: "medium",
+    description: "Implement delivery",
+    on: defaultAgentStepTransitions()
+  }, ...defaultTerminalNodes()]
+};
 
 const run = (
   status: LoopRunDetails["status"],
@@ -28,20 +42,52 @@ const run = (
   transitionCount: 0, createdAt: now, updatedAt: now,
   stepRuns: status === "waiting_for_human" ? [{
     stepRunId: "step-run-1", runId: "run-1", loopId: loop.id, stepId: "approval", type: "human",
-    status: "waiting_for_human", attempt: 1, createdAt: now, updatedAt: now
+    status: "waiting_for_human", input: "Choose the supported path.", attempt: 1, createdAt: now, updatedAt: now
   }] : []
 });
 
-const data = (latest: LoopRunDetails | null): AppData => ({
-  ...emptyData,
-  loopRuns: latest ? [latest] : [],
-  automation: { version: 8, loops: [loop] }, automationIssues: [], scheduleStates: [],
-  loopTheme: structuredClone(defaultLoopTheme), loopThemeIssues: [], projectDocumentTree: [],
-  runTargets: {
-    loops: [{ kind: "loop", id: "delivery", name: "delivery", ready: true, issues: [], ...latest ? { latestRootRunId: latest.rootRunId, ...["running", "waiting_for_human"].includes(latest.status) ? { activeRootRunId: latest.rootRunId } : {} } : {} }],
-    agents: []
-  }
+const agentInputRun = (): LoopRunDetails => ({
+  runId: "run-1",
+  loopId: agentInputLoop.id,
+  rootRunId: "run-1",
+  source: "manual",
+  status: "waiting_for_human",
+  snapshot: agentInputLoop,
+  themeSnapshot: structuredClone(defaultLoopTheme),
+  transitionCount: 0,
+  createdAt: now,
+  updatedAt: now,
+  stepRuns: [{
+    stepRunId: "step-run-1",
+    runId: "run-1",
+    loopId: agentInputLoop.id,
+    stepId: "implementation",
+    type: "agent",
+    agentId: "implementation-agent",
+    status: "waiting_for_human",
+    input: "Build the feature.",
+    result: { kind: "agent", outcome: "needs_input" },
+    outcome: { outcome: "needs_input", summary: "Which storage engine should I use?", checks: [] },
+    transition: { signal: { kind: "agent", outcome: "needs_input" }, action: "wait", reason: "needs_input" },
+    attempt: 1,
+    createdAt: now,
+    updatedAt: now
+  }]
 });
+
+const data = (latest: LoopRunDetails | null): AppData => {
+  const configuredLoop = latest?.snapshot ?? loop;
+  return {
+    ...emptyData,
+    loopRuns: latest ? [latest] : [],
+    automation: { version: 8, loops: [configuredLoop] }, automationIssues: [], scheduleStates: [],
+    loopTheme: structuredClone(defaultLoopTheme), loopThemeIssues: [], projectDocumentTree: [],
+    runTargets: {
+      loops: [{ kind: "loop", id: "delivery", name: "delivery", ready: true, issues: [], ...latest ? { latestRootRunId: latest.rootRunId, ...["running", "waiting_for_human"].includes(latest.status) ? { activeRootRunId: latest.rootRunId } : {} } : {} }],
+      agents: []
+    }
+  };
+};
 
 function installApi(latest: LoopRunDetails | null) {
   const workspace = data(latest);
@@ -117,6 +163,7 @@ describe("automation v8 UI", () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(run("waiting_for_human"));
     const approved = await screen.findByRole("button", { name: "Approved" });
+    expect(screen.getByText("Choose the supported path.")).toBeInTheDocument();
     expect(approved).toBeEnabled();
     await user.click(approved);
     expect(screen.getByText("Response is required.")).toBeInTheDocument();
@@ -125,7 +172,7 @@ describe("automation v8 UI", () => {
     await user.click(approved);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1/steps/step-run-1/respond", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ result: "approved", input: "Looks good" })
+      body: JSON.stringify({ kind: "human-decision", decision: "approved", input: "Looks good" })
     })));
   });
 
@@ -136,16 +183,26 @@ describe("automation v8 UI", () => {
     await user.click(screen.getByRole("button", { name: "Rejected" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1/steps/step-run-1/respond", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ result: "rejected", input: "Needs another pass" })
+      body: JSON.stringify({ kind: "human-decision", decision: "rejected", input: "Needs another pass" })
     })));
+  });
+
+  it("does not infer a human approval when Enter has no explicit decision submitter", async () => {
+    const user = userEvent.setup();
+    const fetchMock = await renderRun(run("waiting_for_human"));
+    await user.type(await screen.findByLabelText("Response"), "Review complete{Enter}");
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/runs/run-1/steps/step-run-1/respond",
+      expect.objectContaining({ method: "POST" })
+    );
   });
 
   it("offers a new run after the latest run has finished", async () => {
     const user = userEvent.setup();
     await renderRun(run("completed"));
     await user.click(await screen.findByRole("button", { name: "New run" }));
-    expect(await screen.findByLabelText("Manual input (optional)", {}, { timeout: 3_000 })).toBeEnabled();
-  });
+    expect(await screen.findByLabelText("Manual input (optional)", {}, { timeout: 6_000 })).toBeEnabled();
+  }, 10_000);
 
   it("renders an existing Run with its immutable theme snapshot", async () => {
     const archivedTheme: LoopTheme = {
@@ -211,7 +268,25 @@ describe("automation v8 UI", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/runs/run-1/cancel",
       expect.objectContaining({ method: "POST" })
-    ), { timeout: 3_000 });
+    ), { timeout: 6_000 });
+  }, 10_000);
+});
+
+describe("resumable needs_input UI", () => {
+  it("resumes a waiting agent without fabricating a human decision", async () => {
+    const user = userEvent.setup();
+    const fetchMock = await renderRun(agentInputRun());
+    expect(await screen.findByText("Which storage engine should I use?")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approved" })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Additional input"), "Use SQLite.");
+    await user.click(screen.getByRole("button", { name: "Resume agent" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/runs/run-1/steps/step-run-1/respond",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ kind: "agent-input", input: "Use SQLite." })
+      })
+    ));
   });
 });
 

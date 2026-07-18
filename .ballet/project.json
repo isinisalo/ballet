@@ -85,8 +85,12 @@
           "nodeSize": "large",
           "id": "roadmap",
           "on": {
+            "ready": "data-model",
             "approved": "data-model",
-            "rejected": "blocked"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "blueprint-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "roadmap-agent"
@@ -97,8 +101,12 @@
           "nodeSize": "large",
           "id": "data-model",
           "on": {
+            "ready": "ui-design",
             "approved": "ui-design",
-            "rejected": "blocked"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "blueprint-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "architecture-agent"
@@ -109,8 +117,12 @@
           "nodeSize": "large",
           "id": "ui-design",
           "on": {
+            "ready": "ui-mocks",
             "approved": "ui-mocks",
-            "rejected": "blocked"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "blueprint-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "ui-design-agent"
@@ -121,8 +133,12 @@
           "nodeSize": "large",
           "id": "ui-mocks",
           "on": {
+            "ready": "c4-models",
             "approved": "c4-models",
-            "rejected": "blocked"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "blueprint-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "ui-design-agent"
@@ -133,8 +149,12 @@
           "nodeSize": "large",
           "id": "c4-models",
           "on": {
+            "ready": "blueprint-gate",
             "approved": "blueprint-gate",
-            "rejected": "blocked"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "blueprint-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "architecture-agent"
@@ -181,24 +201,32 @@
       "nodes": [
         {
           "description": "Lue blueprint-artifactit ja human handoff, hae GitHub-issueiden nykyinen sisältö ja tuota milestone-kohtainen rajaus, riippuvuudet, acceptance criteria ja issue-snapshotit .ballet/outputs/milestones/<milestone-id>/MILESTONE.md-tiedostoon.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
+          "nodeStyle": "luna",
+          "nodeSize": "medium",
           "id": "plan-milestone-issues",
           "on": {
+            "ready": "implementation-plan",
             "approved": "implementation-plan",
-            "rejected": "blocked"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "milestone-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "milestone-issues-agent"
         },
         {
           "description": "Laadi valitulle milestonelle päätöksistä johdettu toteutussuunnitelma tiedostoon .ballet/outputs/milestones/<milestone-id>/IMPLEMENTATION-PLAN.md.",
-          "nodeStyle": "terra",
+          "nodeStyle": "luna",
           "nodeSize": "medium",
           "id": "implementation-plan",
           "on": {
+            "ready": "test-plan",
             "approved": "test-plan",
-            "rejected": "blocked"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "milestone-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "implementation-plan-agent"
@@ -209,16 +237,20 @@
           "nodeSize": "medium",
           "id": "test-plan",
           "on": {
+            "ready": "milestone-gate",
             "approved": "milestone-gate",
-            "rejected": "blocked"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "milestone-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "test-plan-agent"
         },
         {
           "description": "Hyväksy valitun milestonen rajaus, GitHub-issue snapshotit, toteutussuunnitelma ja testisuunnitelma toteutuksen lähtökohdaksi.",
-          "nodeStyle": "mars",
-          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "nodeSize": "tiny",
           "id": "milestone-gate",
           "on": {
             "approved": {
@@ -257,12 +289,16 @@
       "nodes": [
         {
           "description": "Toteuta hyväksytyn milestonen kaikki määritellyt GitHub-issues-muutokset ja testit IMPLEMENTATION-PLAN.md:n, TEST-PLAN.md:n ja UI-artifacttien mukaisesti.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "nodeSize": "medium",
           "id": "implement-milestone",
           "on": {
-            "approved": "review-implementation",
-            "rejected": "implement-milestone"
+            "ready": "run-acceptance-tests",
+            "approved": "run-acceptance-tests",
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "implementation-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "implementation-agent"
@@ -271,10 +307,14 @@
           "description": "Aja milestonen TEST-PLAN.md:n acceptance-testit, tarkasta diff ja tallenna evidenssi tiedostoon .ballet/outputs/milestones/<milestone-id>/ACCEPTANCE.md muuttamatta toteutusta.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
-          "id": "review-implementation",
+          "id": "run-acceptance-tests",
           "on": {
+            "ready": "implementation-gate",
             "approved": "implementation-gate",
-            "rejected": "implement-milestone"
+            "changes-requested": { "repair": "implement-milestone" },
+            "needs_input": { "human": "implementation-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "acceptance-test-agent"
@@ -325,8 +365,12 @@
           "nodeSize": "medium",
           "id": "make-git-release",
           "on": {
+            "ready": "deploy-release",
             "approved": "deploy-release",
-            "rejected": "failed"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "release-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "release-agent"
@@ -337,8 +381,12 @@
           "nodeSize": "medium",
           "id": "deploy-release",
           "on": {
+            "ready": "verify-release",
             "approved": "verify-release",
-            "rejected": "failed"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "release-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "release-agent"
@@ -349,8 +397,12 @@
           "nodeSize": "medium",
           "id": "verify-release",
           "on": {
+            "ready": "release-gate",
             "approved": "release-gate",
-            "rejected": "failed"
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "release-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
           "agentId": "release-agent"

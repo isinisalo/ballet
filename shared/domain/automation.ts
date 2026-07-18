@@ -1,5 +1,6 @@
-export type OutputId = "approved" | "rejected";
-export type ProjectStepTransitionId = OutputId;
+import type { AgentOutcomeStatus, HumanDecision } from "./outcomes.js";
+
+export type ProjectStepTransitionId = AgentOutcomeStatus | HumanDecision;
 export type StepEndStatus = "completed" | "blocked" | "failed";
 
 export const loopNodeSizes = ["tiny", "small", "medium", "large"] as const;
@@ -51,10 +52,32 @@ export type StepTransitionTarget =
   | string
   | { loop: string };
 
-export interface ProjectStepTransitions {
+export interface ProjectHumanStepTransitions {
   approved: StepTransitionTarget;
   rejected: StepTransitionTarget;
 }
+
+export type ChangesRequestedTransition =
+  | { repair: string }
+  | { terminate: "blocked" };
+
+export type NeedsInputTransition =
+  | { human: string }
+  | { wait: true };
+
+export interface ProjectAgentStepTransitions {
+  ready: StepTransitionTarget;
+  approved: StepTransitionTarget;
+  "changes-requested": ChangesRequestedTransition;
+  needs_input: NeedsInputTransition;
+  blocked: { terminal: "blocked" };
+  failed: {
+    terminal: "failed";
+    retry?: { when: "transient"; limit: 1 };
+  };
+}
+
+export type ProjectStepTransitions = ProjectAgentStepTransitions | ProjectHumanStepTransitions;
 
 interface ProjectLoopNodeVisual {
   description: string;
@@ -62,17 +85,17 @@ interface ProjectLoopNodeVisual {
   nodeSize: LoopNodeSize;
 }
 
-interface ProjectStepBase extends ProjectLoopNodeVisual {
+interface ProjectStepBase<TTransitions extends ProjectStepTransitions> extends ProjectLoopNodeVisual {
   id: string;
-  on: ProjectStepTransitions;
+  on: TTransitions;
 }
 
-export interface ProjectAgentStep extends ProjectStepBase {
+export interface ProjectAgentStep extends ProjectStepBase<ProjectAgentStepTransitions> {
   type: "agent";
   agentId: string;
 }
 
-export interface ProjectHumanStep extends ProjectStepBase {
+export interface ProjectHumanStep extends ProjectStepBase<ProjectHumanStepTransitions> {
   type: "human";
   agentId?: never;
 }
@@ -121,7 +144,7 @@ export type ProjectRecurringStepSchedule =
 
 export type ProjectStepSchedule = ProjectOnceStepSchedule | ProjectRecurringStepSchedule;
 
-export interface ProjectScheduledStep extends ProjectStepBase {
+export interface ProjectScheduledStep extends ProjectStepBase<ProjectAgentStepTransitions> {
   type: "scheduled";
   schedule: ProjectStepSchedule;
   agentId: string;
@@ -135,10 +158,24 @@ export type ProjectTerminalNode = {
 }[StepEndStatus];
 export type ProjectLoopNode = ProjectStep | ProjectTerminalNode;
 
-export type ProjectStepTransitionEntry = readonly [OutputId, StepTransitionTarget];
+export type ProjectStepTransitionEntry = readonly [ProjectStepTransitionId, StepTransitionTarget];
 
 export function getProjectStepTransitionEntries(step: ProjectStep): ProjectStepTransitionEntry[] {
-  return [["approved", step.on.approved], ["rejected", step.on.rejected]];
+  if (step.type === "human") return [["approved", step.on.approved], ["rejected", step.on.rejected]];
+  const changesRequested = "repair" in step.on["changes-requested"]
+    ? step.on["changes-requested"].repair
+    : "blocked";
+  const needsInput = "human" in step.on.needs_input
+    ? [["needs_input", step.on.needs_input.human] as const]
+    : [];
+  return [
+    ["ready", step.on.ready],
+    ["approved", step.on.approved],
+    ["changes-requested", changesRequested],
+    ...needsInput,
+    ["blocked", "blocked"],
+    ["failed", "failed"]
+  ];
 }
 
 export function getProjectStepTransitionTargets(step: ProjectStep): StepTransitionTarget[] {
@@ -146,21 +183,62 @@ export function getProjectStepTransitionTargets(step: ProjectStep): StepTransiti
 }
 
 export interface ProjectStepTransitionMappers {
-  approved?: (target: StepTransitionTarget) => StepTransitionTarget;
-  rejected?: (target: StepTransitionTarget) => StepTransitionTarget;
+  ready?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
+  approved?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
+  rejected?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
+  "changes-requested"?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
+  needs_input?: (target: StepTransitionTarget) => StepTransitionTarget | undefined;
 }
 
 export function mapProjectStepTransitions<T extends ProjectStep>(
   step: T,
   mappers: ProjectStepTransitionMappers
 ): T {
-  const approved = mappers.approved?.(step.on.approved) ?? step.on.approved;
-  const rejected = mappers.rejected?.(step.on.rejected) ?? step.on.rejected;
-  return { ...step, on: { approved, rejected } };
+  if (step.type === "human") {
+    const approved = mappers.approved ? mappers.approved(step.on.approved) ?? "completed" : step.on.approved;
+    const rejected = mappers.rejected ? mappers.rejected(step.on.rejected) ?? "blocked" : step.on.rejected;
+    return { ...step, on: { approved, rejected } } as T;
+  }
+  const ready = mappers.ready ? mappers.ready(step.on.ready) ?? "completed" : step.on.ready;
+  const approved = mappers.approved ? mappers.approved(step.on.approved) ?? "completed" : step.on.approved;
+  const changes = step.on["changes-requested"];
+  const mappedRepair = "repair" in changes && mappers["changes-requested"]
+    ? mappers["changes-requested"](changes.repair)
+    : "repair" in changes ? changes.repair : undefined;
+  const changesRequested = typeof mappedRepair === "string" ? { repair: mappedRepair } : { terminate: "blocked" as const };
+  const needs = step.on.needs_input;
+  const mappedHuman = "human" in needs && mappers.needs_input
+    ? mappers.needs_input(needs.human)
+    : "human" in needs ? needs.human : undefined;
+  const needsInput = typeof mappedHuman === "string" ? { human: mappedHuman } : { wait: true as const };
+  return {
+    ...step,
+    on: {
+      ...step.on,
+      ready,
+      approved,
+      "changes-requested": changesRequested,
+      needs_input: needsInput
+    }
+  } as T;
 }
 
-export const defaultTransitionFor = (output: OutputId): StepTransitionTarget =>
-  output === "approved" ? "completed" : "blocked";
+export const defaultTransitionFor = (output: HumanDecision | "ready" | "approved"): StepTransitionTarget =>
+  output === "rejected" ? "blocked" : "completed";
+
+export const defaultAgentStepTransitions = (): ProjectAgentStepTransitions => ({
+  ready: "completed",
+  approved: "completed",
+  "changes-requested": { terminate: "blocked" },
+  needs_input: { wait: true },
+  blocked: { terminal: "blocked" },
+  failed: { terminal: "failed", retry: { when: "transient", limit: 1 } }
+});
+
+export const defaultHumanStepTransitions = (): ProjectHumanStepTransitions => ({
+  approved: "completed",
+  rejected: "blocked"
+});
 
 export const isProjectAgentBackedStep = (step: ProjectStep): step is ProjectAgentBackedStep =>
   step.type === "agent" || step.type === "scheduled";

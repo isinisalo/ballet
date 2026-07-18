@@ -7,6 +7,7 @@ import {
   type LoopTheme,
   type ProjectAutomationConfig,
   type ProjectLoop,
+  type ProjectLoopNode,
   type ProjectStepTransitionId
 } from "@shared/api/workspace-contracts";
 import { LoopCanvasSurface } from "./LoopCanvasSurface";
@@ -66,9 +67,8 @@ export function LoopCanvas({
     const index = edge.route?.sourceStepIndex;
     const result = edge.route?.outputId;
     const node = index === undefined ? undefined : loop.nodes[index];
-    if (node && (node.type === "agent" || node.type === "human" || node.type === "scheduled") && (result === "approved" || result === "rejected")) {
-      onTransitionSelect?.(node.id, result);
-    }
+    const transition = selectableTransition(node, result);
+    if (node && transition) onTransitionSelect?.(node.id, transition);
   };
 
   return (
@@ -106,10 +106,26 @@ export function LoopCanvas({
   );
 }
 
-function activeRunEdgeId(edges: LoopCanvasEdge[], loop: ProjectLoop, run?: LoopRunDetails | null) {
+export function activeRunEdgeId(edges: LoopCanvasEdge[], loop: ProjectLoop, run?: LoopRunDetails | null) {
   const latestWithResult = [...(run?.stepRuns ?? [])].reverse().find((stepRun) => stepRun.result);
   if (!latestWithResult?.result) return null;
+  const result = latestWithResult.result.kind === "agent"
+    ? latestWithResult.result.outcome
+    : latestWithResult.result.decision;
   const sourceStepIndex = loop.nodes.findIndex((node) => node.id === latestWithResult.stepId);
   return edges.find((edge) => edge.route?.sourceStepIndex === sourceStepIndex
-    && edge.route?.outputId === latestWithResult.result)?.key ?? null;
+    && edge.route?.outputId === result)?.key ?? null;
+}
+
+const agentTransitionIds = new Set<ProjectStepTransitionId>([
+  "ready", "approved", "changes-requested", "needs_input", "blocked", "failed"
+]);
+
+export function selectableTransition(
+  node: ProjectLoopNode | undefined,
+  result: string | undefined
+): ProjectStepTransitionId | undefined {
+  if (!node || !result || node.type === "completed" || node.type === "blocked" || node.type === "failed") return undefined;
+  if (node.type === "human") return result === "approved" || result === "rejected" ? result : undefined;
+  return agentTransitionIds.has(result as ProjectStepTransitionId) ? result as ProjectStepTransitionId : undefined;
 }

@@ -1,4 +1,4 @@
-import type { AgentOutcome, LoopRunSource, LoopRunStatus, StepRunResult, StepRunStatus } from "../../shared/domain/runtime.js";
+import type { AgentOutcome, LoopRunSource, LoopRunStatus, StepRunStatus } from "../../shared/domain/runtime.js";
 
 export const MAX_ROOT_TRANSITIONS = 20;
 export const now = () => new Date().toISOString();
@@ -17,6 +17,7 @@ export interface LoopRunRow {
   input: string | null;
   snapshot_json: string;
   transition_count: number;
+  termination_json: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -46,10 +47,12 @@ export interface StepRunRow {
   status: StepRunStatus;
   input: string | null;
   response_input: string | null;
-  result: StepRunResult | null;
+  result: string | null;
   outcome_json: string | null;
+  transition_json: string | null;
   error: string | null;
   attempt: number;
+  retry_of_step_run_id: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

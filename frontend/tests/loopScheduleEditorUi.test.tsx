@@ -12,6 +12,7 @@ import {
 } from "@shared/api/workspace-contracts";
 import { AllLoopsCanvas } from "../src/workspace/automation/loops/AllLoopsCanvas";
 import { LoopEditor } from "../src/workspace/automation/loops/LoopEditor";
+import { agentTransitions } from "./agentTransitionFixture";
 
 const agents: Agent[] = [{ id: "builder", name: "Builder", role: "Implementation", description: "Builds.", enabled: true, skills: [] }];
 const executableSteps: ProjectStep[] = [{
@@ -21,7 +22,7 @@ const executableSteps: ProjectStep[] = [{
   nodeSize: "medium",
   agentId: "builder",
   description: "Build",
-  on: { approved: "review", rejected: "failed" }
+  on: agentTransitions("review", { human: "review" })
 }, {
   id: "review",
   type: "human",
@@ -44,7 +45,7 @@ function scheduledLoop(schedule: ProjectStepSchedule): ProjectLoop {
       agentId: "builder",
       description: "Start delivery",
       schedule,
-      on: { approved: "build", rejected: "blocked" }
+      on: agentTransitions("build", { human: "review" })
     }, ...executableSteps, ...defaultTerminalNodes()]
   };
 }
@@ -71,7 +72,7 @@ describe("scheduled Loop editor UI", () => {
     expect((onChange.mock.calls.at(-1)?.[0] as ProjectLoop).nodes[0]).toMatchObject({
       type: "scheduled",
       agentId: "builder",
-      on: { approved: "review", rejected: "failed" }
+      on: agentTransitions("review", { human: "review" })
     });
   });
 

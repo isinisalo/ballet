@@ -1,22 +1,22 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { StepRun } from "@shared/api/workspace-contracts";
+import type { RespondToStepRunRequest, StepRun } from "@shared/api/workspace-contracts";
 import { TextAreaField } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 
-export function HumanGateRunPanel({
+export function AgentInputRunPanel({
   stepRun,
   pending,
   onRespond
 }: {
   stepRun: StepRun;
   pending: boolean;
-  onRespond: (stepRunId: string, result: "approved" | "rejected", input: string) => Promise<boolean>;
+  onRespond: (stepRunId: string, request: RespondToStepRunRequest) => Promise<boolean>;
 }) {
   const [input, setInput] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
-  const error = attempted && !input.trim() ? "Response is required." : undefined;
+  const error = attempted && !input.trim() ? "Input is required." : undefined;
   const busy = pending || submitting;
 
   useEffect(() => {
@@ -31,13 +31,10 @@ export function HumanGateRunPanel({
     if (submittingRef.current || pending) return;
     setAttempted(true);
     if (!input.trim()) return;
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-    if (submitter?.value !== "approved" && submitter?.value !== "rejected") return;
-    const result = submitter.value;
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      if (await onRespond(stepRun.stepRunId, result, input)) {
+      if (await onRespond(stepRun.stepRunId, { kind: "agent-input", input })) {
         setInput("");
         setAttempted(false);
       }
@@ -50,23 +47,16 @@ export function HumanGateRunPanel({
   return (
     <form
       className="grid gap-3 border-t border-tertiary/40 bg-card p-4"
-      aria-label={`Human gate ${stepRun.stepId}`}
+      aria-label={`Agent input ${stepRun.stepId}`}
       noValidate
       onSubmit={(event) => void respond(event)}
-      onKeyDown={(event) => {
-        if (event.target instanceof HTMLTextAreaElement && event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-          event.preventDefault();
-          setAttempted(true);
-        }
-      }}
     >
       <div>
-        <p className="font-mono text-xs font-medium text-tertiary">Waiting for human · {stepRun.stepId}</p>
-        <p className="mt-1 text-xs text-muted-foreground">Input is required before selecting the transition.</p>
-        {stepRun.input ? <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{stepRun.input}</p> : null}
+        <p className="font-mono text-xs font-medium text-tertiary">Additional input required · {stepRun.stepId}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Answer the agent request to resume this step.</p>
       </div>
       <TextAreaField
-        label="Response"
+        label="Additional input"
         density="compact"
         value={input}
         rows={3}
@@ -78,9 +68,8 @@ export function HumanGateRunPanel({
           if (attempted && value.trim()) setAttempted(false);
         }}
       />
-      <div className="flex justify-end gap-2">
-        <Button type="submit" name="result" value="rejected" variant="destructive" disabled={busy}>Rejected</Button>
-        <Button type="submit" name="result" value="approved" variant="secondary" disabled={busy}>Approved</Button>
+      <div className="flex justify-end">
+        <Button type="submit" variant="secondary" disabled={busy}>Resume agent</Button>
       </div>
     </form>
   );

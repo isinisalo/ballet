@@ -6,6 +6,7 @@ import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { defaultTerminalNodes, type ProjectLoop } from "../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { validateLoopRunStart } from "../services/LoopRunStartPolicy.js";
+import { agentTransitions } from "./agentTransitionFixture.js";
 
 const roots: string[] = [];
 
@@ -23,7 +24,7 @@ const loop = (id: string): ProjectLoop => ({
     description: "Work.",
     nodeStyle: "terra",
     nodeSize: "medium",
-    on: { approved: "completed", rejected: "blocked" }
+    on: agentTransitions("completed")
   }, ...defaultTerminalNodes()]
 });
 

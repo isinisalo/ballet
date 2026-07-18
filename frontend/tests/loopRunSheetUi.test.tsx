@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { Agent, ExecutionTask, ProjectStep, StepRun } from "@shared/api/workspace-contracts";
+import { defaultAgentStepTransitions, type Agent, type ExecutionTask, type ProjectStep, type StepRun } from "@shared/api/workspace-contracts";
 import { LoopRunStepInstructions, LoopRunStepOutput } from "../src/workspace/automation/loops/LoopRunStepSheet";
 
 const agentStep: ProjectStep = {
@@ -10,7 +10,7 @@ const agentStep: ProjectStep = {
   nodeSize: "medium",
   agentId: "developer",
   description: "Implement.",
-  on: { approved: "completed", rejected: "failed" }
+  on: defaultAgentStepTransitions()
 };
 
 describe("Loop Run sheet", () => {

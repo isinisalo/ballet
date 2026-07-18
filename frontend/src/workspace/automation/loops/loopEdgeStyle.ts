@@ -62,8 +62,9 @@ export function loopEdgeLineStyle(edge: LoopCanvasEdge, theme: LoopTheme): LoopE
 }
 
 function loopEdgeIsRejectedOutput(edge: LoopCanvasEdge) {
+  const reworkOutputs = ["rejected", "changes-requested", "needs_input", "blocked", "failed"];
   return [edge.route?.outputId, edge.label, edge.eventType]
-    .some((value) => value === "rejected" || value?.endsWith(".rejected"));
+    .some((value) => reworkOutputs.some((output) => value === output || value?.endsWith(`.${output}`)));
 }
 
 function loopEdgeRenderedOpacity(

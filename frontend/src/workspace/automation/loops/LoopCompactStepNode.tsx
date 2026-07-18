@@ -13,12 +13,22 @@ const stepRunStatusClass: Record<string, string> = {
   running: "border-secondary text-secondary ring-2 ring-secondary/20",
   waiting_for_human: "border-tertiary text-tertiary ring-2 ring-tertiary/20",
   completed: "border-secondary/75 text-secondary ring-2 ring-secondary/15",
+  blocked: "border-destructive text-destructive ring-2 ring-destructive/20",
   failed: "border-destructive text-destructive ring-2 ring-destructive/20",
   cancelled: "border-destructive text-destructive ring-2 ring-destructive/20"
 };
 const stepRunPulseClass: Record<string, string> = {
   running: "loop-run-node-pulse--running",
   waiting_for_human: "loop-run-node-pulse--waiting"
+};
+const stepRunSignalClass: Record<string, string> = {
+  ready: "border-secondary/75 text-secondary ring-2 ring-secondary/15",
+  approved: "border-secondary/75 text-secondary ring-2 ring-secondary/15",
+  "changes-requested": "border-tertiary text-tertiary ring-2 ring-tertiary/20",
+  needs_input: "border-tertiary text-tertiary ring-2 ring-tertiary/20",
+  rejected: "border-tertiary text-tertiary ring-2 ring-tertiary/20",
+  blocked: "border-destructive text-destructive ring-2 ring-destructive/20",
+  failed: "border-destructive text-destructive ring-2 ring-destructive/20"
 };
 
 export function LoopCompactStepNode({
@@ -107,6 +117,7 @@ function StepNodeButton({ context, record, records, selected }: {
       data-loop-reasoning-effort={model.reasoningEffort}
       data-loop-reasoning-glow={model.reasoningGlow}
       data-loop-run-status={model.status}
+      data-loop-run-signal={model.signal}
       aria-label={`${context.readOnly ? "View" : "Edit"} ${model.kind === "terminal" ? "node" : "step"} ${model.title}`}
       title={model.tooltip}
       className={className}
@@ -138,6 +149,7 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
   const nodeStyle = step.nodeStyle;
   const nodeSize = step.nodeSize;
   const status = step.stepRun?.status;
+  const signal = stepRunSignal(step.stepRun);
   const scheduleLabel = step.scheduleLabel;
   return {
     title,
@@ -153,10 +165,21 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
     reasoningGlow: kind === "agent" || kind === "scheduled" ? loopReasoningGlowLevel(step.reasoningEffort) : 0,
     borderClass: kind === "human" ? "border-tertiary/60" : kind === "scheduled" ? "border-muted-foreground/55" : undefined,
     status,
-    statusClass: status ? stepRunStatusClass[status] : undefined,
+    signal,
+    statusClass: stepRunStatusClassFor(signal, status),
     pulseClass: status ? stepRunPulseClass[status] : undefined
   };
 }
+
+const stepRunSignal = (stepRun: NonNullable<LoopStepRecord["step"]>["stepRun"]): string | undefined => {
+  if (!stepRun?.result) return undefined;
+  return stepRun.result.kind === "agent" ? stepRun.result.outcome : stepRun.result.decision;
+};
+
+const stepRunStatusClassFor = (signal: string | undefined, status: string | undefined): string | undefined => {
+  if (signal) return stepRunSignalClass[signal];
+  return status ? stepRunStatusClass[status] : undefined;
+};
 
 function StepNodeMark({ kind, avatar }: { kind: StepNodeKind; avatar?: NonNullable<LoopStepRecord["step"]>["avatar"] }) {
   if (kind === "human") return <Shield aria-hidden="true" className="relative z-10 size-3.5 text-tertiary" strokeWidth={1.8} />;
