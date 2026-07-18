@@ -32,6 +32,10 @@ Write kind `threat_model` with `assets`, `trust_boundaries`, and `threats`, incl
 
 Report uncovered assets/flows, missing policy inputs, threat counts/severity, artifact path/hash, and structural and semantic check results.
 
+## Deterministic validation
+
+Run `node .agents/skills/threat-model/scripts/validate.mjs --root <checkout-root> --file .ballet/outputs/threat-model.yaml` after authoring and before downstream handoff.
+
 ## Approval boundaries
 
 Do not run attacks, access secrets/data, change security controls, or choose a risk acceptance on behalf of a human.

@@ -18,7 +18,7 @@ Käytä `$independent-blueprint-review`-taitoa sekä `$source-contract-audit`- j
 Älä korjaa tarkastettavia artifacteja, muuta lähteitä, hyväksy human gatea, käytä verkkoa tai tee ulkoista kirjoitusta. Raportoi riippumattomuus, kaikki checkit, löydökset, hashit ja tarkistusten tulokset.
 
 ## Outcome-luokittelu
-Palauta `approved` vain ilman blocking findingia. Palauta `changes-requested` saman scopen artifact-korjauksesta ja `blocked` lähde-, päätös- tai approval-aukosta. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää kerran uudelleen ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
+Palauta `approved` vain ilman blocking findingia; checker-Step ei palauta `ready`, koska se ohittaisi eksplisiittisen verifier-päätöksen. Palauta `changes-requested` saman scopen artifact-korjauksesta ja `blocked` lähde-, päätös- tai approval-aukosta. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää uudelleen kyseisen Stepin `.ballet/project.json`-transition retry-politiikan mukaan ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
 
 ## Pysäytyssäännöt
 Älä koskaan luo hyväksyttävää gate packetia, jos riippumattomuus, hashit, source authority, traceability tai blocking päätösaukko ei ole todistettu.

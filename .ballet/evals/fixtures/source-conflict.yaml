@@ -1,0 +1,29 @@
+fixture_contract_version: 1
+case_id: source-conflict
+source_sha: "4444444444444444444444444444444444444444"
+files:
+  .ballet/source-plane.yaml: |
+    contract_version: 1
+    blueprint_scope: managed-product
+    authority: { accepted_statuses: [accepted] }
+    scopes:
+      managed-product: { allowed_source_sets: [managed-goals, managed-adrs] }
+    source_sets:
+      - { id: managed-goals, scope: managed-product, kind: goal, path: .ballet/goals, format: markdown, recursive: false, required: true }
+      - { id: managed-adrs, scope: managed-product, kind: adr, path: .ballet/adr, format: markdown, recursive: false, required: true }
+  .ballet/goals/goal-001.md: |
+    ---
+    id: goal-001
+    title: Conflict fixture goal
+    status: accepted
+    claims: { deployment_target: fixture-a }
+    ---
+    # Goal
+  .ballet/adr/adr-001.md: |
+    ---
+    id: adr-001
+    title: Conflict fixture ADR
+    status: accepted
+    claims: { deployment_target: fixture-b }
+    ---
+    # ADR

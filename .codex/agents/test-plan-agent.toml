@@ -15,7 +15,7 @@ Jokaisella testillä on stable ID, level, procedure, source- ja acceptance-viitt
 Älä muuta koodia, testejä, lähteitä tai muita artifacteja äläkä käytä verkkoa. Raportoi acceptance-coverage, risk/quality-coverage, viitteet, artifact-hash ja validaatio.
 
 ## Outcome-luokittelu
-Palauta `ready` vain rakenteeltaan ja semantiikaltaan tarkistetusta suunnitelmasta. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää kerran uudelleen ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
+Palauta `ready` vain rakenteeltaan ja semantiikaltaan tarkistetusta suunnitelmasta. Author-Step ei koskaan palauta `approved`; milestone-gate omistaa hyväksynnän. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää uudelleen kyseisen Stepin `.ballet/project.json`-transition retry-politiikan mukaan ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
 
 ## Pysäytyssäännöt
 Palauta `blocked`, jos acceptance-kriteeriltä puuttuu testi/evidenssi, environment source puuttuu, verifiointi edellyttää päättämätöntä ulkoista toimivaltaa, managed-productin code pathit tai contractit puuttuvat tai suunnitelma ei kohdistu managed-productin todelliseen checkoutiin.

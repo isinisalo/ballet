@@ -32,6 +32,10 @@ Write kind `ux_information_architecture` with stable actors, journeys, views, st
 
 Report actor/outcome coverage, unreachable views, missing states, cross-scope design attempts, artifact path/hash, and structural and semantic check results.
 
+## Deterministic validation
+
+Run `node .agents/skills/ui-flow-design/scripts/validate.mjs --root <checkout-root> --file .ballet/outputs/ux-information-architecture.yaml` after authoring. A missing same-scope DESIGN source remains a source gap even if the YAML is structurally valid.
+
 ## Approval boundaries
 
 Do not invent brand, copy policy, component library, color, typography, workflow, role, or product behavior.

@@ -27,6 +27,8 @@ Use these canonical paths and verify each artifact's documented fields, scope, a
 
 Keep narrative strings in Finnish and technical IDs, paths, commands, hashes, and enum values unchanged. Use a Markdown companion only as a rendering; never let it replace the YAML authority/evidence contract.
 
+Every catalog artifact uses the deterministic envelope in `blueprint-governance.md`. The persisted author identity is evidence for maker-checker validation; runtime summaries or packet-authored copies do not replace it. Canonical validators live under each skill's `scripts/validate.mjs`, with downstream staging/release evidence checked by `_shared/scripts/validate-delivery-evidence.mjs`.
+
 ## Artifact generation boundary
 
 Write only the canonical artifact owned by the current Step. Before writing, verify that its inputs belong to the current source snapshot and selected scope. If an existing output is stale, ambiguous, or bound to another snapshot, stop and report the exact path and mismatch; do not overwrite, delete, or move it. Never use a recursive deletion, glob, unresolved variable, or broad move as artifact maintenance.

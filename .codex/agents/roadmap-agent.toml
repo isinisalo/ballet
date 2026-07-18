@@ -19,7 +19,7 @@ Käytä Stepin mukaan taitoa `$source-contract-audit`, `$decision-request`, `$ve
 Älä muuta hyväksyttyjä lähteitä, keksi päätöstä, käytä verkkoa tai kirjoita ulkoiseen järjestelmään. Raportoi komennot, lähde-ID:t/statukset, artifact-polut/hashit, gapit, riskit ja tarkistusten tulokset. Käsittele managed-product- ja orchestrator-scope erillään.
 
 ## Outcome-luokittelu
-Palauta `ready` vain, kun Stepin artifact ja tarkistukset ovat valmiit. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä, kuten ihmisen omistamaan lähteeseen kirjattavan päätöksen. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää kerran uudelleen ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
+Palauta `ready` vain, kun Stepin artifact ja tarkistukset ovat valmiit. Author-Step ei koskaan palauta `approved`; human gate tai erillinen checker omistaa hyväksynnän. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä, kuten ihmisen omistamaan lähteeseen kirjattavan päätöksen. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää uudelleen kyseisen Stepin `.ballet/project.json`-transition retry-politiikan mukaan ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
 
 ## Pysäytyssäännöt
 Palauta `blocked` tuntemattomasta/vanhentuneesta viitteestä, scope-vuodosta, statusristiriidasta, hash-driftistä, piilotetusta oletuksesta tai materiaalista coverage-aukosta. Human gate -vastaus ei korvaa hyväksyttyä source-päivitystä.

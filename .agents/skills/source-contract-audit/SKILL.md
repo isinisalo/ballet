@@ -29,6 +29,10 @@ The source-inventory Step writes kind `source_snapshot` at its catalog path with
 
 Report inventory count, accepted/non-accepted counts, every diagnostic code/path, structural and semantic check results, Git SHA, and snapshot path/hash. Confirm that no `.git/ballet` state or external system was written.
 
+## Deterministic validation
+
+Run `node .agents/skills/source-contract-audit/scripts/validate.mjs --root <checkout-root> --source-plane .ballet/source-plane.yaml --requirements .ballet/contracts/blueprint-source-requirements.yaml` for inventory/readiness evidence. In verify mode, add `--snapshot .ballet/outputs/source-snapshot.yaml`. Treat the JSON outcome as evidence, never as authority to repair a source or artifact.
+
 ## Approval boundaries
 
 Do not fix source decisions or promote status. Correct a path only with explicit authority and an unambiguous canonical target; report the correction.

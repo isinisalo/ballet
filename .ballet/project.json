@@ -98,8 +98,8 @@
               "target": "source-validation"
             },
             "approved": {
-              "action": "goto",
-              "target": "source-validation"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -142,8 +142,8 @@
               "target": "gap-and-conflict-audit"
             },
             "approved": {
-              "action": "goto",
-              "target": "gap-and-conflict-audit"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -186,8 +186,8 @@
               "target": "roadmap"
             },
             "approved": {
-              "action": "goto",
-              "target": "roadmap"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -249,8 +249,8 @@
               "target": "domain-map"
             },
             "approved": {
-              "action": "goto",
-              "target": "domain-map"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -293,8 +293,8 @@
               "target": "c4-context-container"
             },
             "approved": {
-              "action": "goto",
-              "target": "c4-context-container"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -337,8 +337,8 @@
               "target": "quality-scenarios"
             },
             "approved": {
-              "action": "goto",
-              "target": "quality-scenarios"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -381,8 +381,8 @@
               "target": "threat-model"
             },
             "approved": {
-              "action": "goto",
-              "target": "threat-model"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -425,8 +425,8 @@
               "target": "ux-information-architecture"
             },
             "approved": {
-              "action": "goto",
-              "target": "ux-information-architecture"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -469,8 +469,8 @@
               "target": "test-strategy"
             },
             "approved": {
-              "action": "goto",
-              "target": "test-strategy"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -513,8 +513,8 @@
               "target": "traceability"
             },
             "approved": {
-              "action": "goto",
-              "target": "traceability"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -557,8 +557,8 @@
               "target": "independent-blueprint-verifier"
             },
             "approved": {
-              "action": "goto",
-              "target": "independent-blueprint-verifier"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -597,8 +597,8 @@
           "id": "independent-blueprint-verifier",
           "on": {
             "ready": {
-              "action": "goto",
-              "target": "blueprint-gate"
+              "action": "terminate",
+              "status": "blocked"
             },
             "approved": {
               "action": "goto",
@@ -708,8 +708,8 @@
               "target": "implementation-plan"
             },
             "approved": {
-              "action": "goto",
-              "target": "implementation-plan"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -752,8 +752,8 @@
               "target": "test-plan"
             },
             "approved": {
-              "action": "goto",
-              "target": "test-plan"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -796,8 +796,8 @@
               "target": "milestone-gate"
             },
             "approved": {
-              "action": "goto",
-              "target": "milestone-gate"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -830,7 +830,7 @@
           "agentId": "test-plan-agent"
         },
         {
-          "description": "Hyväksy hashattuun blueprint-pakettiin sidottu milestone manifest, vain paikalliset issue-luonnokset, toteutussuunnitelma ja testisuunnitelma toteutuksen lähtökohdaksi.",
+          "description": "Hyväksy hashattuun blueprint-pakettiin sidottu milestone manifest, vain paikalliset draft_only issue-luonnokset, toteutussuunnitelma ja testisuunnitelma. Approved-vastaus yksilöi milestone_id:n sekä jokaisen neljän artifactin canonical-polun ja raw-byte SHA-256:n; kaikki GitHub- ja muut ulkoiset toimet jäävät not_executed-tilaan.",
           "nodeStyle": "luna",
           "nodeSize": "tiny",
           "id": "milestone-gate",
@@ -895,8 +895,8 @@
               "target": "run-acceptance-tests"
             },
             "approved": {
-              "action": "goto",
-              "target": "run-acceptance-tests"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -935,8 +935,8 @@
           "id": "run-acceptance-tests",
           "on": {
             "ready": {
-              "action": "goto",
-              "target": "implementation-gate"
+              "action": "terminate",
+              "status": "blocked"
             },
             "approved": {
               "action": "goto",
@@ -981,7 +981,7 @@
           "agentId": "acceptance-test-agent"
         },
         {
-          "description": "Hyväksy milestonen toteutus ja acceptance-evidenssi julkaistavaksi CI/CD-ketjun kautta.",
+          "description": "Hyväksy stagingiin sidottu toteutus vasta riippumattoman acceptance-evidenssin jälkeen. Approved-vastaus on implementation_gate_claim, joka yksilöi milestone_id:n, tarkan Git SHA:n sekä acceptance-evidence- ja staging-report-polut ja niiden raw-byte SHA-256:t; release-agent verifioi väitteen ennen mitään ulkoista toimea.",
           "nodeStyle": "luna",
           "nodeSize": "tiny",
           "id": "implementation-gate",
@@ -1036,7 +1036,7 @@
       "start": "make-git-release",
       "nodes": [
         {
-          "description": "Tarkista implementation-gate ja hyväksytty release contract ennen ulkoista kirjoitusta. Muodosta vain projektin määrittelemä Git-release ja aloita `.ballet/outputs/releases/<version>/release-manifest.yaml` evidensseineen.",
+          "description": "Tarkista implementation_gate_claim, sen tarkka Git SHA, acceptance/staging-hashit sekä hyväksytyt release-, environment- ja rollback-contractit deterministisellä delivery-evidence-validatorilla ennen ulkoista kirjoitusta. Muodosta vain projektin määrittelemä Git-release ja aloita `.ballet/outputs/releases/<version>/release-manifest.yaml` evidensseineen.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "id": "make-git-release",
@@ -1046,8 +1046,8 @@
               "target": "deploy-release"
             },
             "approved": {
-              "action": "goto",
-              "target": "deploy-release"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -1080,7 +1080,7 @@
           "agentId": "release-agent"
         },
         {
-          "description": "Käynnistä vain hyväksytyn release contractin ja olemassa olevan CI/CD-sopimuksen sallima deploy. Kirjaa kaikki ulkoiset toimet ja workflow-evidenssi samaan `release-manifest.yaml`:iin.",
+          "description": "Käynnistä vain saman validoidun implementation-gaten, hyväksytyn release/environment contractin, rollback-evidenssin ja olemassa olevan CI/CD-sopimuksen sallima deploy. Kirjaa kaikki ulkoiset toimet ja workflow-evidenssi samaan `release-manifest.yaml`:iin.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "id": "deploy-release",
@@ -1090,8 +1090,8 @@
               "target": "verify-release"
             },
             "approved": {
-              "action": "goto",
-              "target": "verify-release"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",
@@ -1124,7 +1124,7 @@
           "agentId": "release-agent"
         },
         {
-          "description": "Verifioi deploy health-, smoke-, acceptance- ja observability-checkeillä sekä kirjaa tulokset, hashit ja mahdollinen rollback `release-manifest.yaml`:iin.",
+          "description": "Verifioi deploy health-, smoke-, acceptance- ja observability-checkeillä, tarkista subject Git SHA sekä rollback-valmius uudelleen ja kirjaa tulokset ja hashit `release-manifest.yaml`:iin. Palauta valmis evidenssi ready-tilassa; vain human release-gate hyväksyy releasen.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "id": "verify-release",
@@ -1134,8 +1134,8 @@
               "target": "release-gate"
             },
             "approved": {
-              "action": "goto",
-              "target": "release-gate"
+              "action": "terminate",
+              "status": "blocked"
             },
             "changes-requested": {
               "action": "terminate",

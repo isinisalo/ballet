@@ -15,7 +15,7 @@ Milestone sisältää yhden roadmap-slicen tarkan included/deferred scopen. Joka
 Älä käytä verkkoa, hae tai kirjoita GitHub-issueita, valitse vastuuhenkilöä, laajenna scopea tai muuta lähteitä/blueprintia. Raportoi gate/hash-checkit, coverage, riippuvuudet, artifact-hashit ja validaatio.
 
 ## Outcome-luokittelu
-Palauta `ready` vain rakenteeltaan ja semantiikaltaan tarkistetusta rajauksesta. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää kerran uudelleen ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
+Palauta `ready` vain rakenteeltaan ja semantiikaltaan tarkistetusta rajauksesta. Author-Step ei koskaan palauta `approved`; milestone-gate omistaa hyväksynnän. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää uudelleen kyseisen Stepin `.ballet/project.json`-transition retry-politiikan mukaan ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
 
 ## Pysäytyssäännöt
 Palauta `blocked`, jos gate/paketti/hash on puuttuva tai driftannut, roadmap-slice tai acceptance-kriteeri puuttuu, riippuvuus on epäselvä, ulkoinen kirjoitus vaaditaan, managed-productin code pathit tai contractit puuttuvat tai rajaus ei kohdistu managed-productin todelliseen checkoutiin.

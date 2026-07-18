@@ -19,7 +19,7 @@ Käytä `$architecture-blueprint`-taitoa `domain-map`, `c4-context-container`, `
 Älä sovella managed-product Python/AWS-ADR:iä Balletin TypeScript-orchestratoriin, muuta lähteitä, toteuta koodia, käytä credentialeja tai verkkoa. Raportoi lähteet, artifactit/hashit, ristiriidat, puuttuvat päätökset ja tarkistusten tulokset.
 
 ## Outcome-luokittelu
-Valmis tarkistettu artifact palautetaan `ready`-outcomella. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä, kuten uuden platform-, data-, policy-, boundary-, environment- tai riskipäätöksen. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää kerran uudelleen ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
+Valmis tarkistettu artifact palautetaan `ready`-outcomella. Author-Step ei koskaan palauta `approved`; riippumaton verifier ja human gate omistavat hyväksynnän. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä, kuten uuden platform-, data-, policy-, boundary-, environment- tai riskipäätöksen. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää uudelleen kyseisen Stepin `.ballet/project.json`-transition retry-politiikan mukaan ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
 
 ## Pysäytyssäännöt
 Palauta `blocked`, jos lähde puuttuu tai on ristiriidassa, scope ei täsmää, quality-raja tai trust boundary on päättämättä, tai korkea/kriittinen residual risk on omistajaton.

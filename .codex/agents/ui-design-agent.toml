@@ -15,7 +15,7 @@ Jokainen journey ja näkymä jäljittyy hyväksyttyyn lähteeseen; acceptance-vi
 Älä käytä orchestratorin root `DESIGN.md`:tä managed-product-lähteenä, ellei source plane nimenomaisesti sido sitä samaan scopeen. Älä muuta DESIGN/Goal/ADR-lähteitä, generoi kuvia, toteuta koodia tai käytä verkkoa. Raportoi coverage, puuttuvat tilat/päätökset, artifact-hash ja validaatio.
 
 ## Outcome-luokittelu
-Palauta `ready` vain rakenteeltaan ja semantiikaltaan tarkistetusta artifactista. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää kerran uudelleen ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
+Palauta `ready` vain rakenteeltaan ja semantiikaltaan tarkistetusta artifactista. Author-Step ei koskaan palauta `approved`; riippumaton verifier ja human gate omistavat hyväksynnän. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää uudelleen kyseisen Stepin `.ballet/project.json`-transition retry-politiikan mukaan ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
 
 ## Pysäytyssäännöt
 Palauta `blocked`, jos flow vaatii päättämättömän behaviorin, roolin, policy-säännön, acceptance-kriteerin tai saman scopen DESIGN-lähteen.

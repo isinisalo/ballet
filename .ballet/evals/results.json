@@ -1,0 +1,382 @@
+{
+  "eval_contract_version": 1,
+  "head": "0ea66255bfb0c9687f0d91013db9b487cc29401c",
+  "summary": {
+    "total": 26,
+    "passed": 26,
+    "failed": 0
+  },
+  "records": [
+    {
+      "case": "CONFIG-STRUCTURE",
+      "loop_step": "all Loops / all Steps",
+      "agent": "all configured agents",
+      "expected_outcome": "valid",
+      "artifacts": [
+        ".ballet/project.json",
+        ".codex/agents/*.toml"
+      ],
+      "approval_boundary": "Schema and semantic references must validate before any Run.",
+      "gap": null,
+      "actual_outcome": "valid",
+      "result": "passed"
+    },
+    {
+      "case": "AGENT-SKILL-BOUNDARIES",
+      "loop_step": "all agent Steps",
+      "agent": "10 agents / 9 skills",
+      "expected_outcome": "enforced",
+      "artifacts": [
+        ".codex/agents/*.toml",
+        ".agents/skills/*/SKILL.md",
+        ".agents/skills/*/scripts/validate.mjs"
+      ],
+      "approval_boundary": "Authors return ready; only two independent checker Steps may return approved, while release approval stays human-owned.",
+      "gap": null,
+      "actual_outcome": "enforced",
+      "result": "passed"
+    },
+    {
+      "case": "ALL-CONFIGURED-TRANSITIONS",
+      "loop_step": "20 agent Steps × 6 outcomes; 5 human Steps × 2 decisions",
+      "agent": "all agents and human gates",
+      "expected_outcome": "130/130 passed",
+      "artifacts": [
+        ".ballet/project.json",
+        ".ballet/evals/fixtures/agent-outcomes.yaml"
+      ],
+      "approval_boundary": "Actual RuntimeDatabase transition must equal the project-configured action and retry limit.",
+      "gap": null,
+      "actual_outcome": "130/130 passed",
+      "result": "passed"
+    },
+    {
+      "case": "SOURCE-READINESS-HAPPY",
+      "loop_step": "blueprint-design / source-inventory → source-validation",
+      "agent": "roadmap-agent / source-contract-audit",
+      "expected_outcome": "ready",
+      "artifacts": [
+        "mock source-plane",
+        "mock Goal/ADR/DESIGN",
+        "source-snapshot.yaml"
+      ],
+      "approval_boundary": "Only accepted, same-scope, hash-matching fixture sources may continue.",
+      "gap": null,
+      "actual_outcome": "ready",
+      "result": "passed"
+    },
+    {
+      "case": "CURRENT-SOURCE-READINESS",
+      "loop_step": "blueprint-design / source-validation",
+      "agent": "roadmap-agent / source-contract-audit",
+      "expected_outcome": "needs_input",
+      "artifacts": [
+        ".ballet/source-plane.yaml",
+        ".ballet/goals/**",
+        ".ballet/adr/**"
+      ],
+      "approval_boundary": "Missing same-scope DESIGN, stable acceptance IDs and quality thresholds require a human-owned source update.",
+      "gap": null,
+      "actual_outcome": "needs_input",
+      "result": "passed"
+    },
+    {
+      "case": "SOURCE-MISSING-DECISION",
+      "loop_step": "blueprint-design / gap-and-conflict-audit → source-decision-gate",
+      "agent": "roadmap-agent / source-contract-audit + decision-request",
+      "expected_outcome": "needs_input",
+      "artifacts": [
+        "source-missing.yaml",
+        "specification-gaps.yaml",
+        "decision-requests.yaml"
+      ],
+      "approval_boundary": "A gate response is not source authority; inventory must rerun after accepted source update.",
+      "gap": null,
+      "actual_outcome": "needs_input",
+      "result": "passed"
+    },
+    {
+      "case": "SOURCE-CONFLICT",
+      "loop_step": "blueprint-design / gap-and-conflict-audit → source-decision-gate",
+      "agent": "roadmap-agent / source-contract-audit + decision-request",
+      "expected_outcome": "needs_input",
+      "artifacts": [
+        "source-conflict.yaml",
+        "specification-gaps.yaml",
+        "decision-requests.yaml"
+      ],
+      "approval_boundary": "A gate response is not source authority; inventory must rerun after accepted source update.",
+      "gap": null,
+      "actual_outcome": "needs_input",
+      "result": "passed"
+    },
+    {
+      "case": "SKILL-DETERMINISTIC-VALIDATORS",
+      "loop_step": "blueprint-design + milestone-planning artifact Steps",
+      "agent": "all 9 configured skills",
+      "expected_outcome": "9 skills / 12 modes passed",
+      "artifacts": [
+        "all fixture blueprint artifacts",
+        "milestone manifest",
+        "issue drafts"
+      ],
+      "approval_boundary": "Each persisted artifact is bound to canonical path, source snapshot, author and raw-byte inputs.",
+      "gap": null,
+      "actual_outcome": "9 skills / 12 modes passed",
+      "result": "passed"
+    },
+    {
+      "case": "BLUEPRINT-HUMAN-APPROVAL",
+      "loop_step": "blueprint-design / independent-blueprint-verifier → blueprint-gate",
+      "agent": "blueprint-verifier-agent + human",
+      "expected_outcome": "milestone-planning started",
+      "artifacts": [
+        "blueprint-review.yaml",
+        "blueprint-gate-packet.yaml",
+        "blueprint-approved handoff"
+      ],
+      "approval_boundary": "Only approved independent review with exact packet/source hashes reaches milestone planning.",
+      "gap": "GAP-APPROVAL-ASSERTION (runtime input remains opaque; downstream validator enforces the fixture claim)",
+      "actual_outcome": "milestone-planning started",
+      "result": "passed"
+    },
+    {
+      "case": "BLUEPRINT-VERIFIER-CHANGES-REQUESTED",
+      "loop_step": "blueprint-design / independent-blueprint-verifier",
+      "agent": "blueprint-verifier-agent",
+      "expected_outcome": "changes-requested; stale packet blocked",
+      "artifacts": [
+        "blueprint-review.yaml",
+        "absent-or-stale blueprint-gate-packet.yaml"
+      ],
+      "approval_boundary": "A non-approved review cannot emit or retain an approvable packet.",
+      "gap": null,
+      "actual_outcome": "changes-requested; stale packet blocked",
+      "result": "passed"
+    },
+    {
+      "case": "BLUEPRINT-HUMAN-REJECTION",
+      "loop_step": "blueprint-design / blueprint-gate → source-inventory",
+      "agent": "human + blueprint authors/checker",
+      "expected_outcome": "blocked after 3 repairs",
+      "artifacts": [
+        "human rejection fixture outcomes"
+      ],
+      "approval_boundary": "Rejection never starts milestone planning and uses project.json maxAttempts=3.",
+      "gap": null,
+      "actual_outcome": "blocked after 3 repairs",
+      "result": "passed"
+    },
+    {
+      "case": "MILESTONE-PLANNING-AND-ISSUE-GATE",
+      "loop_step": "milestone-planning / plan-milestone-issues → milestone-gate",
+      "agent": "milestone-issues-agent, implementation-plan-agent, test-plan-agent + human",
+      "expected_outcome": "milestone-delivery started",
+      "artifacts": [
+        "milestone-manifest.yaml",
+        "issue-drafts.yaml",
+        "implementation-plan.yaml",
+        "test-plan.yaml"
+      ],
+      "approval_boundary": "Issue drafts remain draft_only/not_executed through the human milestone gate.",
+      "gap": "No GitHub writer Step is configured; positive publication is intentionally unexpressed.",
+      "actual_outcome": "milestone-delivery started",
+      "result": "passed"
+    },
+    {
+      "case": "IMPLEMENTATION-MAKER-CHECKER-STAGING",
+      "loop_step": "milestone-delivery / implement-milestone → run-acceptance-tests → implementation-gate",
+      "agent": "implementation-agent ≠ acceptance-test-agent + human",
+      "expected_outcome": "release-validation started",
+      "artifacts": [
+        "acceptance-evidence.yaml",
+        "staging-report.yaml",
+        "implementation-gate claim"
+      ],
+      "approval_boundary": "No release child exists before exact staging/Git-SHA human approval.",
+      "gap": "GAP-APPROVAL-ASSERTION",
+      "actual_outcome": "release-validation started",
+      "result": "passed"
+    },
+    {
+      "case": "CHANGES-REQUESTED-BOUNDED-REPAIR",
+      "loop_step": "milestone-delivery / run-acceptance-tests → implement-milestone",
+      "agent": "acceptance-test-agent → implementation-agent",
+      "expected_outcome": "blocked after 3 changed-evidence repairs",
+      "artifacts": [
+        "four distinct failed acceptance fixture outcomes"
+      ],
+      "approval_boundary": "Only same-milestone repair is allowed; project.json maxAttempts=3 and same-evidence stall apply.",
+      "gap": null,
+      "actual_outcome": "blocked after 3 changed-evidence repairs",
+      "result": "passed"
+    },
+    {
+      "case": "CHANGES-REQUESTED-SAME-EVIDENCE",
+      "loop_step": "milestone-delivery / run-acceptance-tests",
+      "agent": "acceptance-test-agent",
+      "expected_outcome": "retry_stalled",
+      "artifacts": [
+        "repeated acceptance evidence fingerprint"
+      ],
+      "approval_boundary": "Unchanged evidence cannot consume repeated repair cycles.",
+      "gap": null,
+      "actual_outcome": "retry_stalled",
+      "result": "passed"
+    },
+    {
+      "case": "NEEDS-INPUT-WAIT-RESUME",
+      "loop_step": "milestone-planning / implementation-plan",
+      "agent": "implementation-plan-agent + human input",
+      "expected_outcome": "resumed same-step",
+      "artifacts": [
+        "needs_input outcome",
+        "resume input"
+      ],
+      "approval_boundary": "Resume appends input but does not skip the current Step or a later gate.",
+      "gap": null,
+      "actual_outcome": "resumed same-step",
+      "result": "passed"
+    },
+    {
+      "case": "BLOCKED-OUTCOME",
+      "loop_step": "release-validation / make-git-release",
+      "agent": "release-agent",
+      "expected_outcome": "blocked",
+      "artifacts": [
+        "blocked fixture outcome",
+        "empty external ledger"
+      ],
+      "approval_boundary": "A missing approval/contract blocks before deploy-release.",
+      "gap": "GAP-LOOP-ENTRY (manual downstream start is platform-permitted, so the agent guard must block it)",
+      "actual_outcome": "blocked",
+      "result": "passed"
+    },
+    {
+      "case": "FAILED-OUTCOME-RETRY",
+      "loop_step": "milestone-planning / implementation-plan",
+      "agent": "implementation-plan-agent",
+      "expected_outcome": "permanent failed; transient retried once",
+      "artifacts": [
+        "failed-permanent outcome",
+        "failed-transient outcome"
+      ],
+      "approval_boundary": "Only transient failure uses project.json maxAttempts=1.",
+      "gap": null,
+      "actual_outcome": "permanent failed; transient retried once",
+      "result": "passed"
+    },
+    {
+      "case": "STALE-APPROVAL-SHA",
+      "loop_step": "milestone-planning / plan-milestone-issues",
+      "agent": "milestone-issues-agent / issue-slicing",
+      "expected_outcome": "blocked",
+      "artifacts": [
+        "mutated blueprint handoff SHA",
+        "unchanged gate packet"
+      ],
+      "approval_boundary": "A stale packet SHA blocks before milestone artifacts can be trusted.",
+      "gap": "GAP-APPROVAL-ASSERTION (project validator catches it; core input is opaque)",
+      "actual_outcome": "blocked",
+      "result": "passed"
+    },
+    {
+      "case": "DOCUMENTATION-DRIFT",
+      "loop_step": "blueprint-design / source-validation",
+      "agent": "roadmap-agent / source-contract-audit",
+      "expected_outcome": "blocked",
+      "artifacts": [
+        "source-snapshot.yaml",
+        "mutated Goal bytes"
+      ],
+      "approval_boundary": "Raw-byte drift invalidates the snapshot before downstream artifacts.",
+      "gap": null,
+      "actual_outcome": "blocked",
+      "result": "passed"
+    },
+    {
+      "case": "STALE-IMPLEMENTATION-APPROVAL-SHA",
+      "loop_step": "release-validation / make-git-release",
+      "agent": "release-agent / delivery-evidence",
+      "expected_outcome": "blocked",
+      "artifacts": [
+        "implementation-gate claim",
+        "release-manifest with different Git SHA"
+      ],
+      "approval_boundary": "Release subject Git SHA must equal the exact human-approved staging SHA.",
+      "gap": "GAP-APPROVAL-ASSERTION (project validator enforces it after opaque handoff)",
+      "actual_outcome": "blocked",
+      "result": "passed"
+    },
+    {
+      "case": "RELEASE-WITHOUT-APPROVAL",
+      "loop_step": "release-validation / make-git-release",
+      "agent": "release-agent / delivery-evidence",
+      "expected_outcome": "blocked",
+      "artifacts": [
+        "rejected implementation-gate claim",
+        "release-manifest fixture"
+      ],
+      "approval_boundary": "No tag/deploy/write is simulated without approved implementation claim.",
+      "gap": "GAP-LOOP-ENTRY + GAP-APPROVAL-ASSERTION",
+      "actual_outcome": "blocked",
+      "result": "passed"
+    },
+    {
+      "case": "RELEASE-AFTER-APPROVAL",
+      "loop_step": "release-validation / make-git-release → deploy-release → verify-release → release-gate",
+      "agent": "release-agent + human",
+      "expected_outcome": "completed without external writes",
+      "artifacts": [
+        "implementation-gate claim",
+        "release/environment contracts",
+        "rollback evidence",
+        "release-manifest.yaml"
+      ],
+      "approval_boundary": "Fixture authorization is allowed, while every external action remains not_executed.",
+      "gap": "Provider-level conditional tool authorization is not machine-enforced by Ballet.",
+      "actual_outcome": "completed without external writes",
+      "result": "passed"
+    },
+    {
+      "case": "ROLLBACK-EVIDENCE-MISSING",
+      "loop_step": "release-validation / make-git-release",
+      "agent": "release-agent / delivery-evidence",
+      "expected_outcome": "blocked",
+      "artifacts": [
+        "release-manifest without rollback evidence"
+      ],
+      "approval_boundary": "Rollback evidence is a precondition, not post-failure documentation.",
+      "gap": null,
+      "actual_outcome": "blocked",
+      "result": "passed"
+    },
+    {
+      "case": "RELEASE-GATE-REJECTION",
+      "loop_step": "release-validation / release-gate → verify-release",
+      "agent": "human → release-agent checker",
+      "expected_outcome": "verify-only repair",
+      "artifacts": [
+        "release verification fixture",
+        "human rejection"
+      ],
+      "approval_boundary": "Rejection retries verification only and never creates another make/deploy Step.",
+      "gap": null,
+      "actual_outcome": "verify-only repair",
+      "result": "passed"
+    },
+    {
+      "case": "FULL-CROSS-LOOP-HAPPY-PATH",
+      "loop_step": "all 4 Loops / 20 normal agent Steps / 4 delivery gates",
+      "agent": "all 10 agents + human",
+      "expected_outcome": "completed",
+      "artifacts": [
+        "complete full-happy fixture bundle"
+      ],
+      "approval_boundary": "Each cross-Loop child starts only after its configured human gate in this simulated path.",
+      "gap": "Manual downstream Loop start and typed approval enforcement remain documented generic gaps.",
+      "actual_outcome": "completed",
+      "result": "passed"
+    }
+  ]
+}

@@ -31,6 +31,10 @@ Author mode writes kind `traceability_manifest` with complete `links` and exact 
 
 Report counts for each registry, duplicate/dangling references, coverage ratios, manifest path/hash, and structural and semantic check results.
 
+## Deterministic validation
+
+Run `node .agents/skills/traceability/scripts/validate.mjs --root <checkout-root> --file .ballet/outputs/traceability-manifest.yaml` in author mode and read-only verifier mode. Verifier mode must not rewrite the manifest after failure.
+
 ## Approval boundaries
 
 Do not change a source, acceptance criterion, test, or upstream artifact to make coverage appear complete.

@@ -1,0 +1,573 @@
+fixture_contract_version: 1
+case_id: full-happy
+source_sha: "1111111111111111111111111111111111111111"
+files:
+  .ballet/source-plane.yaml: |
+    contract_version: 1
+    blueprint_scope: managed-product
+    authority:
+      accepted_statuses: [accepted]
+    scopes:
+      managed-product:
+        allowed_source_sets: [managed-goals, managed-adrs, managed-design]
+        code_paths: [product]
+    source_sets:
+      - id: managed-goals
+        scope: managed-product
+        kind: goal
+        path: .ballet/goals
+        format: markdown
+        recursive: false
+        required: true
+        index: .ballet/goals/index.yaml
+      - id: managed-adrs
+        scope: managed-product
+        kind: adr
+        path: .ballet/adr
+        format: markdown
+        recursive: false
+        required: true
+      - id: managed-design
+        scope: managed-product
+        kind: design
+        path: .ballet/design
+        format: markdown
+        recursive: false
+        required: true
+  .ballet/contracts/blueprint-source-requirements.yaml: |
+    contract_version: 1
+    required_kinds: [goal, adr, design]
+    required_metadata_any_source: [acceptance_ids, quality_thresholds]
+  .ballet/goals/index.yaml: |
+    goals:
+      - id: goal-001
+        title: Fixture goal
+        status: accepted
+        path: .ballet/goals/goal-001.md
+  .ballet/goals/goal-001.md: |
+    ---
+    id: goal-001
+    title: Fixture goal
+    status: accepted
+    acceptance_ids: [acc-001]
+    claims:
+      product_outcome: observable-company-summary
+    ---
+    # Fixture goal
+
+    The user sees one attributable company summary.
+  .ballet/adr/adr-001.md: |
+    ---
+    id: adr-001
+    title: Fixture architecture
+    status: accepted
+    quality_thresholds:
+      response_seconds: 2
+    claims:
+      deployment_target: fixture-local
+    ---
+    # Fixture architecture
+
+    The fixture uses a local mock environment only.
+  .ballet/design/design-001.md: |
+    ---
+    id: design-001
+    title: Fixture interaction design
+    status: accepted
+    claims:
+      primary_view: company-summary
+    ---
+    # Fixture design
+
+    The view defines success, empty, loading, error and permission states.
+  .ballet/outputs/source-snapshot.yaml: |
+    artifact_contract_version: 1
+    kind: source_snapshot
+    id: source-snapshot-managed-product
+    canonical_path: .ballet/outputs/source-snapshot.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    evaluation_fixture: true
+    author:
+      agent_id: roadmap-agent
+      step_id: source-inventory
+    source_plane:
+      path: .ballet/source-plane.yaml
+      sha256: "@SHA256:.ballet/source-plane.yaml@"
+    dirty_paths: []
+    deleted_paths: []
+    sources:
+      - source_id: adr-001
+        kind: adr
+        scope: managed-product
+        status: accepted
+        path: .ballet/adr/adr-001.md
+        sha256: "@SHA256:.ballet/adr/adr-001.md@"
+      - source_id: design-001
+        kind: design
+        scope: managed-product
+        status: accepted
+        path: .ballet/design/design-001.md
+        sha256: "@SHA256:.ballet/design/design-001.md@"
+      - source_id: goal-001
+        kind: goal
+        scope: managed-product
+        status: accepted
+        path: .ballet/goals/goal-001.md
+        sha256: "@SHA256:.ballet/goals/goal-001.md@"
+  .ballet/outputs/specification-gaps.yaml: |
+    artifact_contract_version: 1
+    kind: specification_gaps
+    id: specification-gaps-managed-product
+    canonical_path: .ballet/outputs/specification-gaps.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: &snapshot
+      path: .ballet/outputs/source-snapshot.yaml
+      sha256: "@SHA256:.ballet/outputs/source-snapshot.yaml@"
+    author: { agent_id: roadmap-agent, step_id: gap-and-conflict-audit }
+    input_files:
+      - path: .ballet/source-plane.yaml
+        sha256: "@SHA256:.ballet/source-plane.yaml@"
+    gaps: []
+    open_decision_refs: []
+  .ballet/outputs/roadmap.yaml: |
+    artifact_contract_version: 1
+    kind: roadmap
+    id: roadmap-managed-product
+    canonical_path: .ballet/outputs/roadmap.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: roadmap-agent, step_id: roadmap }
+    input_files:
+      - path: .ballet/outputs/specification-gaps.yaml
+        sha256: "@SHA256:.ballet/outputs/specification-gaps.yaml@"
+    slices:
+      - id: slice-001
+        source_refs: [goal-001]
+        acceptance_refs: [acc-001]
+        dependencies: []
+        risk_refs: [risk-001]
+        validation_points: [test-001]
+    risks:
+      - { id: risk-001, source_refs: [adr-001] }
+    deferred_scope: []
+  .ballet/evals/artifacts/specification-gaps-missing.yaml: |
+    artifact_contract_version: 1
+    kind: specification_gaps
+    id: specification-gaps-missing
+    canonical_path: .ballet/evals/artifacts/specification-gaps-missing.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: roadmap-agent, step_id: gap-and-conflict-audit }
+    input_files:
+      - path: .ballet/source-plane.yaml
+        sha256: "@SHA256:.ballet/source-plane.yaml@"
+    gaps:
+      - id: gap-missing-policy
+        blocking: true
+        source_refs: [goal-001]
+        request_ref: decision-request-missing-policy
+    open_decision_refs: [decision-request-missing-policy]
+  .ballet/evals/artifacts/decision-requests-missing.yaml: |
+    artifact_contract_version: 1
+    kind: decision_requests
+    id: decision-requests-missing
+    canonical_path: .ballet/evals/artifacts/decision-requests-missing.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: roadmap-agent, step_id: gap-and-conflict-audit }
+    input_files:
+      - path: .ballet/evals/artifacts/specification-gaps-missing.yaml
+        sha256: "@SHA256:.ballet/evals/artifacts/specification-gaps-missing.yaml@"
+    requests:
+      - id: decision-request-missing-policy
+        status: awaiting_human
+        recommendation: null
+        gap_refs: [gap-missing-policy]
+        target_source_paths: [.ballet/specifications/missing-policy.yaml]
+        external_actions: [{ id: source-update, status: not_executed }]
+    open_decision_refs: [decision-request-missing-policy]
+  .ballet/outputs/domain-map.yaml: |
+    artifact_contract_version: 1
+    kind: domain_map
+    id: domain-map-managed-product
+    canonical_path: .ballet/outputs/domain-map.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: architecture-agent, step_id: domain-map }
+    input_files:
+      - path: .ballet/outputs/roadmap.yaml
+        sha256: "@SHA256:.ballet/outputs/roadmap.yaml@"
+    domains:
+      - id: company-summary
+        responsibilities: [Assemble attributable company summary]
+        source_refs: [goal-001]
+  .ballet/outputs/c4-context-container.yaml: |
+    artifact_contract_version: 1
+    kind: c4_context_container
+    id: c4-managed-product
+    canonical_path: .ballet/outputs/c4-context-container.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: architecture-agent, step_id: c4-context-container }
+    input_files:
+      - path: .ballet/outputs/domain-map.yaml
+        sha256: "@SHA256:.ballet/outputs/domain-map.yaml@"
+    system:
+      id: company-tracker
+      source_refs: [goal-001]
+    containers:
+      - id: web-application
+        technology: null
+        source_refs: [goal-001]
+  .ballet/outputs/quality-scenarios.yaml: |
+    artifact_contract_version: 1
+    kind: quality_scenarios
+    id: quality-managed-product
+    canonical_path: .ballet/outputs/quality-scenarios.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: architecture-agent, step_id: quality-scenarios }
+    input_files:
+      - path: .ballet/outputs/c4-context-container.yaml
+        sha256: "@SHA256:.ballet/outputs/c4-context-container.yaml@"
+    scenarios:
+      - id: quality-001
+        source_refs: [adr-001]
+        measure: { metric: response_seconds, threshold: 2 }
+  .ballet/outputs/threat-model.yaml: |
+    artifact_contract_version: 1
+    kind: threat_model
+    id: threat-model-managed-product
+    canonical_path: .ballet/outputs/threat-model.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: architecture-agent, step_id: threat-model }
+    input_files:
+      - path: .ballet/outputs/quality-scenarios.yaml
+        sha256: "@SHA256:.ballet/outputs/quality-scenarios.yaml@"
+    assets: [{ id: company-data, source_refs: [goal-001] }]
+    trust_boundaries: [{ id: browser-boundary, source_refs: [adr-001] }]
+    threats:
+      - id: threat-001
+        source_refs: [adr-001]
+        mitigation: Validate access at the boundary.
+        verification: Execute test-001.
+        residual_risk: { severity: high, owner: fixture-human }
+  .ballet/outputs/ux-information-architecture.yaml: |
+    artifact_contract_version: 1
+    kind: ux_information_architecture
+    id: ux-managed-product
+    canonical_path: .ballet/outputs/ux-information-architecture.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: ui-design-agent, step_id: ux-information-architecture }
+    input_files:
+      - path: .ballet/outputs/threat-model.yaml
+        sha256: "@SHA256:.ballet/outputs/threat-model.yaml@"
+    actors: [{ id: signed-in-user, source_refs: [goal-001] }]
+    journeys:
+      - id: view-company-summary
+        source_refs: [goal-001, design-001]
+        acceptance_refs: [acc-001]
+    views:
+      - id: company-summary
+        states: [success, empty, loading, error, permission_denied]
+        source_refs: [design-001]
+  .ballet/outputs/test-strategy.yaml: |
+    artifact_contract_version: 1
+    kind: test_strategy
+    id: test-strategy-managed-product
+    canonical_path: .ballet/outputs/test-strategy.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: architecture-agent, step_id: test-strategy }
+    input_files:
+      - path: .ballet/outputs/ux-information-architecture.yaml
+        sha256: "@SHA256:.ballet/outputs/ux-information-architecture.yaml@"
+    tests:
+      - id: test-001
+        source_refs: [goal-001, adr-001, design-001]
+        acceptance_refs: [acc-001]
+        evidence: Mock browser assertion record.
+  .ballet/outputs/traceability-manifest.yaml: |
+    artifact_contract_version: 1
+    kind: traceability_manifest
+    id: traceability-managed-product
+    canonical_path: .ballet/outputs/traceability-manifest.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: roadmap-agent, step_id: traceability }
+    input_files:
+      - path: .ballet/outputs/test-strategy.yaml
+        sha256: "@SHA256:.ballet/outputs/test-strategy.yaml@"
+    registries:
+      sources: [goal-001]
+      artifacts: [roadmap-managed-product]
+      acceptance: [acc-001]
+      tests: [test-001]
+    links:
+      - source_ref: goal-001
+        artifact_ref: roadmap-managed-product
+        acceptance_ref: acc-001
+        test_ref: test-001
+    coverage: { source_to_test: 1 }
+    uncovered: []
+  .ballet/outputs/blueprint-review.yaml: |
+    artifact_contract_version: 1
+    kind: blueprint_review
+    id: blueprint-review-managed-product
+    canonical_path: .ballet/outputs/blueprint-review.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: blueprint-verifier-agent, step_id: independent-blueprint-verifier }
+    input_files:
+      - path: .ballet/outputs/traceability-manifest.yaml
+        sha256: "@SHA256:.ballet/outputs/traceability-manifest.yaml@"
+    verifier: { id: blueprint-verifier-agent }
+    verdict: approved
+    findings: []
+    checks:
+      - { id: source-hashes, status: passed }
+      - { id: traceability, status: passed }
+  .ballet/outputs/blueprint-gate-packet.yaml: |
+    artifact_contract_version: 1
+    kind: blueprint_gate_packet
+    id: blueprint-gate-packet-managed-product
+    canonical_path: .ballet/outputs/blueprint-gate-packet.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: blueprint-verifier-agent, step_id: independent-blueprint-verifier }
+    input_files:
+      - path: .ballet/outputs/blueprint-review.yaml
+        sha256: "@SHA256:.ballet/outputs/blueprint-review.yaml@"
+    verifier: { id: blueprint-verifier-agent }
+    verdict: approved
+    review:
+      path: .ballet/outputs/blueprint-review.yaml
+      sha256: "@SHA256:.ballet/outputs/blueprint-review.yaml@"
+    artifacts:
+      - { kind: roadmap, path: .ballet/outputs/roadmap.yaml, sha256: "@SHA256:.ballet/outputs/roadmap.yaml@", author: roadmap-agent }
+      - { kind: domain_map, path: .ballet/outputs/domain-map.yaml, sha256: "@SHA256:.ballet/outputs/domain-map.yaml@", author: architecture-agent }
+      - { kind: c4_context_container, path: .ballet/outputs/c4-context-container.yaml, sha256: "@SHA256:.ballet/outputs/c4-context-container.yaml@", author: architecture-agent }
+      - { kind: quality_scenarios, path: .ballet/outputs/quality-scenarios.yaml, sha256: "@SHA256:.ballet/outputs/quality-scenarios.yaml@", author: architecture-agent }
+      - { kind: threat_model, path: .ballet/outputs/threat-model.yaml, sha256: "@SHA256:.ballet/outputs/threat-model.yaml@", author: architecture-agent }
+      - { kind: ux_information_architecture, path: .ballet/outputs/ux-information-architecture.yaml, sha256: "@SHA256:.ballet/outputs/ux-information-architecture.yaml@", author: ui-design-agent }
+      - { kind: test_strategy, path: .ballet/outputs/test-strategy.yaml, sha256: "@SHA256:.ballet/outputs/test-strategy.yaml@", author: architecture-agent }
+      - { kind: traceability_manifest, path: .ballet/outputs/traceability-manifest.yaml, sha256: "@SHA256:.ballet/outputs/traceability-manifest.yaml@", author: roadmap-agent }
+    open_decisions: []
+    new_assumptions: []
+    risks: [risk-001]
+    coverage: { source_to_test: 1 }
+    external_actions:
+      - { id: github-issue-publication, status: not_executed }
+      - { id: release, status: not_executed }
+  .ballet/evals/handoffs/blueprint-approved.yaml: |
+    milestone_id: milestone-001
+    blueprint_gate_packet: .ballet/outputs/blueprint-gate-packet.yaml
+    blueprint_gate_packet_sha256: "@SHA256:.ballet/outputs/blueprint-gate-packet.yaml@"
+    source_sha: "@SOURCE_SHA@"
+  .ballet/outputs/milestones/milestone-001/milestone-manifest.yaml: |
+    artifact_contract_version: 1
+    kind: milestone_manifest
+    id: milestone-manifest-001
+    canonical_path: .ballet/outputs/milestones/milestone-001/milestone-manifest.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: milestone-issues-agent, step_id: plan-milestone-issues }
+    input_files:
+      - path: .ballet/outputs/blueprint-gate-packet.yaml
+        sha256: "@SHA256:.ballet/outputs/blueprint-gate-packet.yaml@"
+    milestone_id: milestone-001
+    slice_ref: slice-001
+    included_scope: [Company summary vertical slice]
+    deferred_scope: []
+    acceptance_refs: [acc-001]
+  .ballet/outputs/milestones/milestone-001/issue-drafts.yaml: |
+    artifact_contract_version: 1
+    kind: issue_drafts
+    id: issue-drafts-001
+    canonical_path: .ballet/outputs/milestones/milestone-001/issue-drafts.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: milestone-issues-agent, step_id: plan-milestone-issues }
+    input_files:
+      - path: .ballet/outputs/milestones/milestone-001/milestone-manifest.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/milestone-manifest.yaml@"
+    issues:
+      - id: issue-draft-001
+        source_refs: [goal-001]
+        artifact_refs: [roadmap-managed-product]
+        acceptance_refs: [acc-001]
+        dependencies: []
+        external_target: null
+        write_status: draft_only
+        external_actions: [{ id: create-github-issue, status: not_executed }]
+  .ballet/outputs/milestones/milestone-001/implementation-plan.yaml: |
+    artifact_contract_version: 1
+    kind: implementation_plan
+    id: implementation-plan-001
+    canonical_path: .ballet/outputs/milestones/milestone-001/implementation-plan.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: implementation-plan-agent, step_id: implementation-plan }
+    input_files:
+      - path: .ballet/outputs/milestones/milestone-001/issue-drafts.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/issue-drafts.yaml@"
+    steps: [{ id: impl-001, acceptance_refs: [acc-001], target_paths: [product] }]
+  .ballet/outputs/milestones/milestone-001/test-plan.yaml: |
+    artifact_contract_version: 1
+    kind: test_plan
+    id: test-plan-001
+    canonical_path: .ballet/outputs/milestones/milestone-001/test-plan.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: test-plan-agent, step_id: test-plan }
+    input_files:
+      - path: .ballet/outputs/milestones/milestone-001/implementation-plan.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/implementation-plan.yaml@"
+    tests: [{ id: test-001, acceptance_refs: [acc-001], expected_evidence: acceptance-result-001 }]
+  .ballet/outputs/milestones/milestone-001/acceptance-evidence.yaml: |
+    artifact_contract_version: 1
+    kind: acceptance_evidence
+    id: acceptance-evidence-001
+    canonical_path: .ballet/outputs/milestones/milestone-001/acceptance-evidence.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: acceptance-test-agent, step_id: run-acceptance-tests }
+    input_files:
+      - path: .ballet/outputs/milestones/milestone-001/test-plan.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/test-plan.yaml@"
+    milestone_id: milestone-001
+    git_sha: "2222222222222222222222222222222222222222"
+    results: [{ id: acceptance-result-001, acceptance_ref: acc-001, status: passed }]
+    external_actions: []
+  .ballet/evals/approvals/milestone-gate.yaml: |
+    approval_contract_version: 1
+    kind: milestone_gate_claim
+    decision: approved
+    approved_by: { type: human, id: fixture-human }
+    subject:
+      milestone_id: milestone-001
+      milestone_manifest:
+        path: .ballet/outputs/milestones/milestone-001/milestone-manifest.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/milestone-manifest.yaml@"
+      issue_drafts:
+        path: .ballet/outputs/milestones/milestone-001/issue-drafts.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/issue-drafts.yaml@"
+      implementation_plan:
+        path: .ballet/outputs/milestones/milestone-001/implementation-plan.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/implementation-plan.yaml@"
+      test_plan:
+        path: .ballet/outputs/milestones/milestone-001/test-plan.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/test-plan.yaml@"
+    external_actions: [{ id: create-github-issues, status: not_executed }]
+  .ballet/evals/contracts/staging-environment.yaml: |
+    contract_version: 1
+    id: fixture-staging
+    status: accepted
+    evaluation_fixture: true
+  .ballet/outputs/milestones/milestone-001/staging-report.yaml: |
+    artifact_contract_version: 1
+    kind: staging_report
+    id: staging-report-001
+    canonical_path: .ballet/outputs/milestones/milestone-001/staging-report.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: acceptance-test-agent, step_id: run-acceptance-tests }
+    input_files:
+      - path: .ballet/outputs/milestones/milestone-001/acceptance-evidence.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/acceptance-evidence.yaml@"
+    milestone_id: milestone-001
+    git_sha: "2222222222222222222222222222222222222222"
+    status: passed
+    implementation_author: { agent_id: implementation-agent, step_id: implement-milestone }
+    environment_source:
+      path: .ballet/evals/contracts/staging-environment.yaml
+      sha256: "@SHA256:.ballet/evals/contracts/staging-environment.yaml@"
+    checks: [{ id: smoke-001, status: passed }]
+    external_actions: []
+  .ballet/evals/approvals/implementation-gate.yaml: |
+    approval_contract_version: 1
+    kind: implementation_gate_claim
+    decision: approved
+    approved_by: { type: human, id: fixture-human }
+    subject:
+      milestone_id: milestone-001
+      git_sha: "2222222222222222222222222222222222222222"
+      acceptance_evidence:
+        path: .ballet/outputs/milestones/milestone-001/acceptance-evidence.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/acceptance-evidence.yaml@"
+      staging_report:
+        path: .ballet/outputs/milestones/milestone-001/staging-report.yaml
+        sha256: "@SHA256:.ballet/outputs/milestones/milestone-001/staging-report.yaml@"
+    external_actions: [{ id: release, status: not_executed }]
+  .ballet/evals/contracts/release-contract.yaml: |
+    contract_version: 1
+    id: fixture-release-contract
+    status: accepted
+    evaluation_fixture: true
+  .ballet/evals/contracts/environment-contract.yaml: |
+    contract_version: 1
+    id: fixture-environment-contract
+    status: accepted
+    evaluation_fixture: true
+  .ballet/evals/evidence/rollback.yaml: |
+    evidence_contract_version: 1
+    id: fixture-rollback-evidence
+    status: ready
+    execution_status: not_executed
+  .ballet/outputs/releases/v1.0.0/release-manifest.yaml: |
+    artifact_contract_version: 1
+    kind: release_manifest
+    id: release-manifest-v1.0.0
+    canonical_path: .ballet/outputs/releases/v1.0.0/release-manifest.yaml
+    scope: managed-product
+    source_sha: "@SOURCE_SHA@"
+    source_snapshot: *snapshot
+    author: { agent_id: release-agent, step_id: verify-release }
+    input_files:
+      - path: .ballet/evals/approvals/implementation-gate.yaml
+        sha256: "@SHA256:.ballet/evals/approvals/implementation-gate.yaml@"
+    git_sha: "2222222222222222222222222222222222222222"
+    implementation_approval:
+      path: .ballet/evals/approvals/implementation-gate.yaml
+      sha256: "@SHA256:.ballet/evals/approvals/implementation-gate.yaml@"
+    release_contract:
+      path: .ballet/evals/contracts/release-contract.yaml
+      sha256: "@SHA256:.ballet/evals/contracts/release-contract.yaml@"
+      status: accepted
+    environment_contract:
+      path: .ballet/evals/contracts/environment-contract.yaml
+      sha256: "@SHA256:.ballet/evals/contracts/environment-contract.yaml@"
+      status: accepted
+    rollback:
+      procedure: Restore the prior fixture version through the approved mock route.
+      evidence:
+        path: .ballet/evals/evidence/rollback.yaml
+        sha256: "@SHA256:.ballet/evals/evidence/rollback.yaml@"
+      status: ready
+    authorization: allowed
+    execution_status: not_executed
+    external_actions:
+      - { id: create-tag, status: not_executed }
+      - { id: deploy, status: not_executed }

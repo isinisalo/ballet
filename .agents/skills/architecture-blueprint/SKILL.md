@@ -32,6 +32,10 @@ Write only the current Step's one named artifact with the kind and fields docume
 
 Report source coverage, orphan domains/elements, conflicting responsibilities, missing measures/tests, artifact paths/hashes, and structural and semantic check results.
 
+## Deterministic validation
+
+Run `node .agents/skills/architecture-blueprint/scripts/validate.mjs --root <checkout-root> --kind <domain_map|c4_context_container|quality_scenarios|test_strategy> --file <current-canonical-artifact>` for the current Step only. A pass never authorizes writing another Step's artifact.
+
 ## Approval boundaries
 
 Do not choose a new platform, framework, datastore, public API, trust boundary, retention rule, or bounded context without accepted authority.

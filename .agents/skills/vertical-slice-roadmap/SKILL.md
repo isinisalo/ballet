@@ -32,6 +32,10 @@ Write kind `roadmap` with stable `slices` and `risks`. Include source refs, acce
 
 Report source/acceptance coverage, dependency cycles, deferred scope, risk ordering, artifact path/hash, and structural and semantic check results.
 
+## Deterministic validation
+
+Run `node .agents/skills/vertical-slice-roadmap/scripts/validate.mjs --root <checkout-root> --file .ballet/outputs/roadmap.yaml` after writing and again before downstream handoff.
+
 ## Approval boundaries
 
 Do not create a new capability, milestone promise, technology, policy, or acceptance criterion.

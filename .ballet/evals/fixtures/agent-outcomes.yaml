@@ -1,0 +1,33 @@
+fixture_contract_version: 1
+outcomes:
+  ready:
+    outcome: ready
+    summary: Fixture author completed the Step.
+    checks: [{ name: fixture, status: passed }]
+  approved:
+    outcome: approved
+    summary: Fixture checker approved the evidence.
+    checks: [{ name: fixture, status: passed }]
+  changes-requested:
+    outcome: changes-requested
+    summary: Fixture checker requested a bounded repair.
+    artifacts: { evidence_revision: 1 }
+    checks: [{ name: fixture, status: failed, details: repair-evidence-1 }]
+  needs_input:
+    outcome: needs_input
+    summary: Fixture requires human input.
+    checks: [{ name: fixture, status: passed }]
+  blocked:
+    outcome: blocked
+    summary: Fixture detected a policy blocker.
+    checks: [{ name: fixture, status: failed, details: policy-blocker }]
+  failed-transient:
+    outcome: failed
+    summary: Fixture transient execution failure.
+    failure: { classification: transient, code: fixture-transient }
+    checks: [{ name: fixture, status: failed, details: transient }]
+  failed-permanent:
+    outcome: failed
+    summary: Fixture permanent execution failure.
+    failure: { classification: permanent, code: fixture-permanent }
+    checks: [{ name: fixture, status: failed, details: permanent }]

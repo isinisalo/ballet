@@ -1,0 +1,10 @@
+contract_version: 1
+scope: managed-product
+description: Deterministic prerequisites implied by the configured blueprint skills.
+required_kinds:
+  - goal
+  - adr
+  - design
+required_metadata_any_source:
+  - acceptance_ids
+  - quality_thresholds

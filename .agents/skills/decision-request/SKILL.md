@@ -32,6 +32,10 @@ Always write kind `specification_gaps`; every blocking gap and conflict has a ma
 
 Report gap/conflict counts, source refs, requested source updates, structural and semantic check results, and whether blueprint work is blocked.
 
+## Deterministic validation
+
+Run `node .agents/skills/decision-request/scripts/validate.mjs --root <checkout-root> --gaps .ballet/outputs/specification-gaps.yaml --requests .ballet/outputs/decision-requests.yaml` when blocking requests exist. Omit `--requests` only when there are no blocking gaps and no stale conditional request artifact.
+
 ## Approval boundaries
 
 Never select an option, edit an accepted source, interpret a gate response as source authority, or approve the request.

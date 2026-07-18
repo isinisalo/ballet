@@ -55,8 +55,8 @@ Verifierin `changes-requested`, blueprint-gaten rejection ja hyväksytty source-
 - Blueprintin source-päätöksen `needs_input` siirtyy nimettyyn `source-decision-gate`en ja palaa hyväksytyn source-päivityksen jälkeen uuteen source-inventaarioon. Downstream-Stepien `needs_input` käyttää wait/resume-politiikkaa ja jatkaa samaa pyytänyttä Stepiä; se ei koskaan siirry final approval gateen eikä ohita artifact-ketjua.
 - `changes-requested` saa käyttää vain eksplisiittistä saman scopen repair-kohdetta.
 - `blocked` ja permanent `failed` päättävät Runin vastaavaan terminaliin.
-- Vain eksplisiittisesti transient `failed` yritetään kerran uudelleen.
-- Acceptance-verifier saa palauttaa toteutukseen enintään kolme kertaa, ja vain uuden evidenssin perusteella.
+- Vain eksplisiittisesti transient `failed` voi käyttää kyseisen Stepin `.ballet/project.json`-transition konfiguroitua retry-politiikkaa.
+- Acceptance-verifier saa palauttaa toteutukseen vain kyseisen Stepin `.ballet/project.json`-transition konfiguroimissa rajoissa ja vain uuden evidenssin perusteella.
 - Yhdellä artifact-polulla on yksi kirjoittaja. Enintään kolme read-only-auditia saa olla rinnakkain.
 
 ## Human blueprint gate ja handoff

@@ -1,0 +1,20 @@
+fixture_contract_version: 1
+case_id: source-missing
+source_sha: "3333333333333333333333333333333333333333"
+files:
+  .ballet/source-plane.yaml: |
+    contract_version: 1
+    blueprint_scope: managed-product
+    authority: { accepted_statuses: [accepted] }
+    scopes:
+      managed-product: { allowed_source_sets: [managed-goals, managed-adrs] }
+    source_sets:
+      - { id: managed-goals, scope: managed-product, kind: goal, path: .ballet/goals, format: markdown, recursive: false, required: true }
+      - { id: managed-adrs, scope: managed-product, kind: adr, path: .ballet/adr, format: markdown, recursive: false, required: true }
+  .ballet/goals/goal-001.md: |
+    ---
+    id: goal-001
+    title: Missing decision fixture
+    status: accepted
+    ---
+    # Goal without the required ADR decision

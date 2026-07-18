@@ -34,6 +34,10 @@ Always write kind `blueprint_review`. Write kind `blueprint_gate_packet` only af
 
 Report independence proof, every structural and semantic check result, recomputed hashes, findings, coverage, artifact paths, and packet hash.
 
+## Deterministic validation
+
+After persisting both approved artifacts, run `node .agents/skills/independent-blueprint-review/scripts/validate.mjs --root <checkout-root> --review .ballet/outputs/blueprint-review.yaml --packet .ballet/outputs/blueprint-gate-packet.yaml`. Never create a packet merely to satisfy this validator after a non-approved verdict.
+
 ## Approval boundaries
 
 Do not repair author artifacts, source decisions, or implementation. Do not approve the human gate or execute proposed external actions.

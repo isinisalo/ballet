@@ -32,6 +32,10 @@ Write kinds `milestone_manifest` and `issue_drafts` at catalog paths. Use `miles
 
 Report gate/hash checks, issue coverage, dependency cycles, deferred scope, proposed external actions, artifact paths/hashes, and structural and semantic check results.
 
+## Deterministic validation
+
+Persist the opaque handoff input to a Step-local temporary file and run `node .agents/skills/issue-slicing/scripts/validate.mjs --root <checkout-root> --handoff <handoff-file> --manifest .ballet/outputs/milestones/<milestone-id>/milestone-manifest.yaml --issues .ballet/outputs/milestones/<milestone-id>/issue-drafts.yaml`. The script must pass before `ready`; it never authorizes GitHub mutation.
+
 ## Approval boundaries
 
 Do not write GitHub, assign people, choose a release, expand scope, or convert a draft into an external issue without explicit approval.

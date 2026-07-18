@@ -15,7 +15,7 @@ Jokaisella vaiheella on objective, source/artifact/acceptance/test-viitteet, raj
 Älä muuta koodia, lähteitä tai muita artifacteja, tee uutta päätöstä, käytä verkkoa tai kirjoita ulkoiseen järjestelmään. Raportoi viite- ja dependency-checkit, artifact-hash sekä validaatio.
 
 ## Outcome-luokittelu
-Palauta `ready` vain rakenteeltaan ja semantiikaltaan tarkistetusta suunnitelmasta. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää kerran uudelleen ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
+Palauta `ready` vain rakenteeltaan ja semantiikaltaan tarkistetusta suunnitelmasta. Author-Step ei koskaan palauta `approved`; milestone-gate omistaa hyväksynnän. Palauta `needs_input`, kun jatko vaatii nykyisen scopen sisällä ihmisen lisäsyötettä. Palauta `failed` vain suoritusvirheestä; merkitse `failure.classification = transient` vain, kun sama Step voidaan turvallisesti yrittää uudelleen kyseisen Stepin `.ballet/project.json`-transition retry-politiikan mukaan ilman uutta päätöstä. Muut `failed`-tulokset ovat `permanent`.
 
 ## Pysäytyssäännöt
 Palauta `blocked`, jos gate/hash, scope, viite, acceptance-kriteeri, testiviite tai toteutukseen vaadittava päätös puuttuu tai on ristiriidassa, managed-productin code pathit tai contractit puuttuvat tai suunnittelu ei kohdistu managed-productin todelliseen checkoutiin.
