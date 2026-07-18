@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vertical Slice Roadmap"
+  short_description: "Derive source-backed delivery slices"
+  default_prompt: "Use $vertical-slice-roadmap to derive a source-backed vertical-slice roadmap."

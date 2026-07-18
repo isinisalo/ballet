@@ -1,0 +1,4 @@
+interface:
+  display_name: "Independent Blueprint Review"
+  short_description: "Verify blueprint integrity independently"
+  default_prompt: "Use $independent-blueprint-review to independently verify blueprint artifacts and assemble the human gate packet."

@@ -18,7 +18,7 @@ const agent = (enabled = true): Agent => ({
 const automation = {
   version: 8 as const,
   loops: [{
-    id: "blueprint-design", start: "review",
+    id: "review-loop", start: "review",
     nodes: [{
       id: "review", type: "agent" as const, agentId: "reviewer", description: "Review.", nodeStyle: "luna" as const, nodeSize: "tiny" as const,
       on: agentTransitions("completed")
@@ -26,9 +26,9 @@ const automation = {
   }]
 };
 
-const gatedAutomation = {
+const alternateAutomation = {
   ...automation,
-  loops: [{ ...automation.loops[0]!, id: "milestone-planning" }]
+  loops: [{ ...automation.loops[0]!, id: "alternate-loop" }]
 };
 
 describe("Loop execution snapshots and targets", () => {
@@ -77,7 +77,7 @@ describe("Loop execution snapshots and targets", () => {
     expect(result.loops[0]).toMatchObject({ ready: false });
   });
 
-  it("marks downstream engineering Loops unavailable for direct starts", async () => {
+  it("keeps configured Loops available when generic preflight succeeds", async () => {
     const configuration: AgentRuntimeConfiguration = {
       localPolicy: { readOnlyRoots: [] },
       resolved: { agentId: "reviewer", provider: "codex", model: "model", reasoning: "medium", policy: { network: false, readOnlyRoots: [] } },
@@ -89,12 +89,9 @@ describe("Loop execution snapshots and targets", () => {
     );
 
     const result = await service.list({
-      agents: [agent()], automation: gatedAutomation, automationIssues: [], loopThemeIssues: []
+      agents: [agent()], automation: alternateAutomation, automationIssues: [], loopThemeIssues: []
     }, { reviewer: configuration });
 
-    expect(result.loops[0]).toMatchObject({ ready: false });
-    expect(result.loops[0]?.issues).toContainEqual(expect.objectContaining({
-      message: "This Loop can only start from its approved human-gate transition."
-    }));
+    expect(result.loops[0]).toMatchObject({ id: "alternate-loop", ready: true, issues: [] });
   });
 });

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architecture Blueprint"
+  short_description: "Derive domain and C4 blueprints"
+  default_prompt: "Use $architecture-blueprint to derive domain, C4, and quality artifacts from accepted sources."

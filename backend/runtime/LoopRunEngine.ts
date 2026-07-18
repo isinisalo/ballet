@@ -9,7 +9,6 @@ import type {
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
 import { isProjectAgentBackedStep, isProjectTerminalNode, resolveEffectiveStartStep } from "../../shared/domain/automation.js";
-import { LoopHandoffValidationError, validateLoopTransitionHandoff } from "../../shared/domain/loopHandoff.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type { HumanDecision } from "../../shared/domain/outcomes.js";
 import type {
@@ -85,7 +84,6 @@ export class LoopRunEngine {
       if (!Object.hasOwn(step.on, decision)) return this.finishMissingTransition(run, stepRun, signal, input);
       const target = step.on[decision];
       const forwardedInput = this.forwardedInput(run.input, input);
-      this.validateHandoff(target, forwardedInput);
       if (isLoopTarget(target) && this.store.hasActiveLoop(target.loop)) {
         throw new LoopRunConflictError(`Loop ${target.loop} already has an active run.`);
       }
@@ -331,15 +329,6 @@ export class LoopRunEngine {
     target?: StepTransitionTarget, limit?: number, count?: number
   ): LoopRunTermination {
     return { status, code, message, stepRunId: stepRun.stepRunId, stepId: stepRun.stepId, signal, target, limit, count };
-  }
-
-  private validateHandoff(target: StepTransitionTarget, input: string): void {
-    if (!isLoopTarget(target)) return;
-    try { validateLoopTransitionHandoff(target.loop, input); }
-    catch (error) {
-      if (error instanceof LoopHandoffValidationError) throw new LoopRunStateError(error.message);
-      throw error;
-    }
   }
 
   private forwardedInput(runInput: string | undefined, responseInput: string): string {

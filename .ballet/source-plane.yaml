@@ -1,0 +1,119 @@
+contract_version: 1
+blueprint_scope: managed-product
+planes:
+  human_owned_sources:
+    owner: human
+    authority: accepted_only
+    paths:
+      - .ballet/specifications
+      - DESIGN.md
+    description: Human-owned WHAT/WHY and explicitly scoped HOW contracts.
+  agent_proposals:
+    owner: agent
+    authority: never
+    paths:
+      - .ballet/proposals
+    description: Drafts and decision requests awaiting a human-owned source update.
+  generated_artifacts:
+    owner: agent
+    authority: derived_only
+    paths:
+      - .ballet/outputs
+    description: Reproducible blueprint, delivery, evidence, and gate artifacts.
+  orchestrator_code:
+    owner: repository
+    authority: implementation_only
+    paths:
+      - backend
+      - frontend
+      - shared
+      - scripts
+      - packaging
+    description: Ballet orchestrator TypeScript, UI, packaging, and local runtime code.
+  managed_project_sources:
+    owner: human
+    authority: accepted_only
+    paths:
+      - .ballet/goals
+      - .ballet/adr
+      - .ballet/design
+    description: Goal, ADR, and design sources for the product managed by Ballet.
+authority:
+  precedence:
+    - explicit_human_scope
+    - accepted_what_why
+    - accepted_scoped_how
+    - verified_generated_evidence
+  accepted_statuses:
+    - accepted
+  proposal_statuses:
+    - draft
+    - proposed
+  human_gate_requires_source_update: true
+  artifact_source_refs_must_be_accepted: true
+scopes:
+  orchestrator:
+    description: Ballet local command center and its TypeScript runtime.
+    code_paths:
+      - backend
+      - frontend
+      - shared
+      - scripts
+      - packaging
+    allowed_source_sets:
+      - orchestrator-design
+  managed-product:
+    description: Human-owned Finnish company-tracking product managed by Ballet; implementation and release remain blocked until its real checkout or code paths are configured.
+    # No product checkout is represented in this repository yet.
+    code_paths: []
+    allowed_source_sets:
+      - managed-goals
+      - managed-adrs
+      - managed-design
+      - managed-specifications
+source_sets:
+  - id: managed-goals
+    plane: managed_project_sources
+    scope: managed-product
+    kind: goal
+    path: .ballet/goals
+    format: markdown
+    recursive: false
+    required: true
+    index: .ballet/goals/index.yaml
+  - id: managed-adrs
+    plane: managed_project_sources
+    scope: managed-product
+    kind: adr
+    path: .ballet/adr
+    format: markdown
+    recursive: false
+    required: true
+  - id: managed-design
+    plane: managed_project_sources
+    scope: managed-product
+    kind: design
+    path: .ballet/design
+    format: markdown
+    recursive: true
+    required: false
+  - id: managed-specifications
+    plane: human_owned_sources
+    scope: managed-product
+    kind: structured_source
+    path: .ballet/specifications
+    format: yaml
+    recursive: true
+    required: false
+  - id: orchestrator-design
+    plane: human_owned_sources
+    scope: orchestrator
+    kind: design
+    path: DESIGN.md
+    format: markdown
+    recursive: false
+    required: true
+    fixed_id: orchestrator-design
+    fixed_status: accepted
+proposal_root: .ballet/proposals
+generated_root: .ballet/outputs

@@ -3,6 +3,8 @@ import type { AgentOutcomeStatus, HumanDecision } from "./outcomes.js";
 export type ProjectStepTransitionId = AgentOutcomeStatus | HumanDecision;
 export type StepEndStatus = "completed" | "blocked" | "failed";
 
+export const MAX_ROOT_TRANSITIONS = 64;
+
 export const loopNodeSizes = ["tiny", "small", "medium", "large"] as const;
 export type LoopNodeSize = (typeof loopNodeSizes)[number];
 export type LoopNodePixels = 24 | 36 | 48 | 64;

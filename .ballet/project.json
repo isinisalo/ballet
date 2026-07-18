@@ -38,7 +38,15 @@
       "model": "gpt-5.6-luna",
       "reasoning": "medium",
       "policy": {
-        "network": true
+        "network": false
+      }
+    },
+    "blueprint-verifier-agent": {
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoning": "medium",
+      "policy": {
+        "network": false
       }
     },
     "release-agent": {
@@ -77,18 +85,18 @@
   "loops": [
     {
       "id": "blueprint-design",
-      "start": "roadmap",
+      "start": "source-inventory",
       "nodes": [
         {
-          "description": "Muodosta hyväksytyistä Goal- ja ADR-lähteistä roadmap tiedostoon .ballet/outputs/ROADMAP.md. Rajaa MVP, myöhemmät inkrementit, riippuvuudet, riskit ja validointipisteet.",
+          "description": "Inventoi `.ballet/source-plane.yaml`:n eksplisiittisen `blueprint_scope`-valinnan kaikki ihmisen omistamat lähteet ja kirjoita deterministinen `.ballet/outputs/source-snapshot.yaml`, joka sitoutuu Git HEAD SHA:han, source-statuksiin, polkuihin ja raw-byte SHA-256 -hasheihin.",
           "nodeStyle": "sol",
           "nodeSize": "large",
-          "id": "roadmap",
+          "id": "source-inventory",
           "on": {
-            "ready": "data-model",
-            "approved": "data-model",
+            "ready": "source-validation",
+            "approved": "source-validation",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "blueprint-gate" },
+            "needs_input": { "human": "source-decision-gate" },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -96,15 +104,74 @@
           "agentId": "roadmap-agent"
         },
         {
-          "description": "Johda hyväksytystä roadmapista projektin domain-, data- ja integraatiomalli tiedostoon .ballet/outputs/DATA-MODEL.md ilman uutta WHAT- tai WHY-päätöstä.",
+          "description": "Tarkista olemassa oleva snapshot täysin read-only-moodissa projektin source plane- ja governance-sääntöjä vasten. Todista ID:iden, statusten, viitteiden, scopejen, polkujen, Git SHA:n ja hashien eheys muuttamatta tai korjaamatta snapshotia ennen yhtäkään johdettua blueprint-artifactia.",
           "nodeStyle": "sol",
           "nodeSize": "large",
-          "id": "data-model",
+          "id": "source-validation",
           "on": {
-            "ready": "ui-design",
-            "approved": "ui-design",
+            "ready": "gap-and-conflict-audit",
+            "approved": "gap-and-conflict-audit",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "blueprint-gate" },
+            "needs_input": { "human": "source-decision-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+          },
+          "type": "agent",
+          "agentId": "roadmap-agent"
+        },
+        {
+          "description": "Kirjoita `.ballet/outputs/specification-gaps.yaml` ja luo `.ballet/outputs/decision-requests.yaml` vain, jos puuttuva, ristiriitainen, epäselvä tai hyväksymätön WHAT/WHY-päätös blokkaa työn. Älä muuta puutetta oletukseksi.",
+          "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "gap-and-conflict-audit",
+          "on": {
+            "ready": "roadmap",
+            "approved": "roadmap",
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "source-decision-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+          },
+          "type": "agent",
+          "agentId": "roadmap-agent"
+        },
+        {
+          "description": "Ratkaise decision request päivittämällä ja hyväksymällä ihmisen omistama lähde. Gate-vastaus ei itsessään ole uusi source authority. Approved käynnistää uuden inventoinnin ja snapshotin; rejected päättää Runin blokattuna.",
+          "nodeStyle": "luna",
+          "nodeSize": "tiny",
+          "id": "source-decision-gate",
+          "on": {
+            "approved": "source-inventory",
+            "rejected": "blocked"
+          },
+          "type": "human"
+        },
+        {
+          "description": "Johda validoiduista hyväksytyistä lähteistä vertikaaliset toimitusslicet `.ballet/outputs/roadmap.yaml`:iin. Säilytä source- ja acceptance-viitteet, riippuvuudet, riskit ja validointipisteet.",
+          "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "roadmap",
+          "on": {
+            "ready": "domain-map",
+            "approved": "domain-map",
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "source-decision-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+          },
+          "type": "agent",
+          "agentId": "roadmap-agent"
+        },
+        {
+          "description": "Johda source-backed domainit, vastuut, omistajuudet ja suhteet `.ballet/outputs/domain-map.yaml`:iin ilman uutta tuote-, alusta- tai data-päätöstä.",
+          "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "domain-map",
+          "on": {
+            "ready": "c4-context-container",
+            "approved": "c4-context-container",
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "source-decision-gate" },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -112,15 +179,63 @@
           "agentId": "architecture-agent"
         },
         {
-          "description": "Suunnittele roadmapin ja data-mallin mukainen käyttöliittymärakenne tiedostoon .ballet/outputs/UI-DESIGN.md käyttäen projektin DESIGN.md-tokeneita.",
+          "description": "Johda domain- ja system context sekä C4 context/container `.ballet/outputs/c4-context-container.yaml`:iin. Jätä teknologia nulliksi, ellei saman scopen hyväksytty lähde päätä sitä.",
           "nodeStyle": "sol",
           "nodeSize": "large",
-          "id": "ui-design",
+          "id": "c4-context-container",
           "on": {
-            "ready": "ui-mocks",
-            "approved": "ui-mocks",
+            "ready": "quality-scenarios",
+            "approved": "quality-scenarios",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "blueprint-gate" },
+            "needs_input": { "human": "source-decision-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+          },
+          "type": "agent",
+          "agentId": "architecture-agent"
+        },
+        {
+          "description": "Muunna vain hyväksytyt quality policy -vaatimukset mitattaviksi `.ballet/outputs/quality-scenarios.yaml`-skenaarioiksi. Puuttuva raja-arvo on päätöspyyntö, ei oletus.",
+          "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "quality-scenarios",
+          "on": {
+            "ready": "threat-model",
+            "approved": "threat-model",
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "source-decision-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+          },
+          "type": "agent",
+          "agentId": "architecture-agent"
+        },
+        {
+          "description": "Johda assetit, trust boundaryt, uhkat, lähdepohjaiset mitigoinnit ja residual riskit `.ballet/outputs/threat-model.yaml`:iin ilman live-probausta, credentialeja tai riskin hyväksymistä ihmisen puolesta.",
+          "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "threat-model",
+          "on": {
+            "ready": "ux-information-architecture",
+            "approved": "ux-information-architecture",
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "source-decision-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+          },
+          "type": "agent",
+          "agentId": "architecture-agent"
+        },
+        {
+          "description": "Johda saman scopen behavior- ja DESIGN-lähteistä actorit, journeyt, näkymät ja success/empty/loading/error/permission-tilat `.ballet/outputs/ux-information-architecture.yaml`:iin. Älä lainaa toisen scopen DESIGN.md:tä.",
+          "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "ux-information-architecture",
+          "on": {
+            "ready": "test-strategy",
+            "approved": "test-strategy",
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "source-decision-gate" },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -128,39 +243,55 @@
           "agentId": "ui-design-agent"
         },
         {
-          "description": "Tuota UI-DESIGN.md:n perusteella tarkistettavat näkymä- ja tilamockit tiedostoon .ballet/outputs/UI-MOCKS.md.",
+          "description": "Määrittele source-, acceptance-, quality- ja threat-viitteisiin sidottu blueprintin testistrategia `.ballet/outputs/test-strategy.yaml`:iin.",
           "nodeStyle": "sol",
           "nodeSize": "large",
-          "id": "ui-mocks",
+          "id": "test-strategy",
           "on": {
-            "ready": "c4-models",
-            "approved": "c4-models",
+            "ready": "traceability",
+            "approved": "traceability",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "blueprint-gate" },
+            "needs_input": { "human": "source-decision-gate" },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
-          "agentId": "ui-design-agent"
+          "agentId": "architecture-agent"
         },
         {
-          "description": "Kuvaa hyväksytyn data-mallin ja UI-ratkaisun C4 context-, container- ja component-tasolla tiedostoon .ballet/outputs/C4.md.",
+          "description": "Rakenna source → artifact → acceptance → test -ketju `.ballet/outputs/traceability-manifest.yaml`:iin ja jätä todellinen uncovered coverage näkyväksi.",
           "nodeStyle": "sol",
           "nodeSize": "large",
-          "id": "c4-models",
+          "id": "traceability",
+          "on": {
+            "ready": "independent-blueprint-verifier",
+            "approved": "independent-blueprint-verifier",
+            "changes-requested": { "terminate": "blocked" },
+            "needs_input": { "human": "source-decision-gate" },
+            "blocked": { "terminal": "blocked" },
+            "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
+          },
+          "type": "agent",
+          "agentId": "roadmap-agent"
+        },
+        {
+          "description": "Tarkista kaikki lähteet ja artifactit suoraan levyltä riippumattomana kirjoittajista. Kirjoita `.ballet/outputs/blueprint-review.yaml` ja vasta hyväksytyn review'n jälkeen `.ballet/outputs/blueprint-gate-packet.yaml`, joka sitoutuu source SHA:han, artifact-hasheihin, oletuksiin, avoimiin päätöksiin, riskeihin, coverageen ja toteuttamattomiin ulkoisiin toimiin.",
+          "nodeStyle": "sol",
+          "nodeSize": "large",
+          "id": "independent-blueprint-verifier",
           "on": {
             "ready": "blueprint-gate",
             "approved": "blueprint-gate",
-            "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "blueprint-gate" },
+            "changes-requested": { "repair": "source-inventory" },
+            "needs_input": { "human": "source-decision-gate" },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
           "type": "agent",
-          "agentId": "architecture-agent"
+          "agentId": "blueprint-verifier-agent"
         },
         {
-          "description": "Hyväksy ROADMAP-, DATA-MODEL-, UI-DESIGN-, UI-MOCKS- ja C4-artifactit. Approved-vastauksen tulee sisältää milestone_id sekä vähintään yksi github_issue-handoff seuraavaa Looppia varten.",
+          "description": "Hyväksy riippumattomasti verifioitu `.ballet/outputs/blueprint-gate-packet.yaml` juuri sen source SHA:lla ja artifact-hasheilla. Approved-vastauksessa on oltava milestone_id, canonical blueprint_gate_packet -polku, paketin SHA-256 ja source_sha; paketin ulkoiset toimet jäävät not_executed-tilaan.",
           "nodeStyle": "luna",
           "nodeSize": "tiny",
           "id": "blueprint-gate",
@@ -168,7 +299,7 @@
             "approved": {
               "loop": "milestone-planning"
             },
-            "rejected": "roadmap"
+            "rejected": "source-inventory"
           },
           "type": "human"
         },
@@ -200,7 +331,7 @@
       "start": "plan-milestone-issues",
       "nodes": [
         {
-          "description": "Lue blueprint-artifactit ja human handoff, hae GitHub-issueiden nykyinen sisältö ja tuota milestone-kohtainen rajaus, riippuvuudet, acceptance criteria ja issue-snapshotit .ballet/outputs/milestones/<milestone-id>/MILESTONE.md-tiedostoon.",
+          "description": "Varmista human handoffin blueprint-paketin polku, SHA-256, source SHA ja kaikki paketin artifact-hashit. Johda hyväksytystä roadmap-slicestä paikallinen `milestone-manifest.yaml` ja `issue-drafts.yaml`; issue-luonnokset pysyvät draft_only-tilassa eikä GitHubiin kirjoiteta.",
           "nodeStyle": "luna",
           "nodeSize": "medium",
           "id": "plan-milestone-issues",
@@ -208,7 +339,7 @@
             "ready": "implementation-plan",
             "approved": "implementation-plan",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "milestone-gate" },
+            "needs_input": { "wait": true },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -216,7 +347,7 @@
           "agentId": "milestone-issues-agent"
         },
         {
-          "description": "Laadi valitulle milestonelle päätöksistä johdettu toteutussuunnitelma tiedostoon .ballet/outputs/milestones/<milestone-id>/IMPLEMENTATION-PLAN.md.",
+          "description": "Laadi valitulle milestonelle päätöksistä johdettu `.ballet/outputs/milestones/<milestone-id>/implementation-plan.yaml`, jossa jokainen vaihe jäljittyy lähteisiin, artifactteihin, acceptance-kriteereihin ja testeihin.",
           "nodeStyle": "luna",
           "nodeSize": "medium",
           "id": "implementation-plan",
@@ -224,7 +355,7 @@
             "ready": "test-plan",
             "approved": "test-plan",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "milestone-gate" },
+            "needs_input": { "wait": true },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -232,7 +363,7 @@
           "agentId": "implementation-plan-agent"
         },
         {
-          "description": "Määrittele milestonen unit-, integration-, acceptance- ja release-verifioinnit tiedostoon .ballet/outputs/milestones/<milestone-id>/TEST-PLAN.md.",
+          "description": "Määrittele milestonen unit-, integration-, contract-, UI-, acceptance-, security- ja release-verifioinnit `.ballet/outputs/milestones/<milestone-id>/test-plan.yaml`:iin.",
           "nodeStyle": "luna",
           "nodeSize": "medium",
           "id": "test-plan",
@@ -240,7 +371,7 @@
             "ready": "milestone-gate",
             "approved": "milestone-gate",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "milestone-gate" },
+            "needs_input": { "wait": true },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -248,7 +379,7 @@
           "agentId": "test-plan-agent"
         },
         {
-          "description": "Hyväksy valitun milestonen rajaus, GitHub-issue snapshotit, toteutussuunnitelma ja testisuunnitelma toteutuksen lähtökohdaksi.",
+          "description": "Hyväksy hashattuun blueprint-pakettiin sidottu milestone manifest, vain paikalliset issue-luonnokset, toteutussuunnitelma ja testisuunnitelma toteutuksen lähtökohdaksi.",
           "nodeStyle": "luna",
           "nodeSize": "tiny",
           "id": "milestone-gate",
@@ -288,7 +419,7 @@
       "start": "implement-milestone",
       "nodes": [
         {
-          "description": "Toteuta hyväksytyn milestonen kaikki määritellyt GitHub-issues-muutokset ja testit IMPLEMENTATION-PLAN.md:n, TEST-PLAN.md:n ja UI-artifacttien mukaisesti.",
+          "description": "Toteuta hyväksytyn milestonen kaikki rajatut muutokset ja testit `milestone-manifest.yaml`:n, `issue-drafts.yaml`:n, `implementation-plan.yaml`:n, `test-plan.yaml`:n ja blueprint-artifacttien mukaisesti.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "id": "implement-milestone",
@@ -296,7 +427,7 @@
             "ready": "run-acceptance-tests",
             "approved": "run-acceptance-tests",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "implementation-gate" },
+            "needs_input": { "wait": true },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -304,7 +435,7 @@
           "agentId": "implementation-agent"
         },
         {
-          "description": "Aja milestonen TEST-PLAN.md:n acceptance-testit, tarkasta diff ja tallenna evidenssi tiedostoon .ballet/outputs/milestones/<milestone-id>/ACCEPTANCE.md muuttamatta toteutusta.",
+          "description": "Aja `test-plan.yaml`:n hyväksyntätarkistukset riippumattomasti, tarkasta diff ja kirjoita `.ballet/outputs/milestones/<milestone-id>/acceptance-evidence.yaml` sekä `staging-report.yaml` muuttamatta toteutusta.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "id": "run-acceptance-tests",
@@ -312,7 +443,7 @@
             "ready": "implementation-gate",
             "approved": "implementation-gate",
             "changes-requested": { "repair": "implement-milestone" },
-            "needs_input": { "human": "implementation-gate" },
+            "needs_input": { "wait": true },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -360,7 +491,7 @@
       "start": "make-git-release",
       "nodes": [
         {
-          "description": "Tarkista implementation-gate, muodosta projektin määrittelemä Git-release ja tallenna release-versio sekä komennot release-artifactiin.",
+          "description": "Tarkista implementation-gate ja hyväksytty release contract ennen ulkoista kirjoitusta. Muodosta vain projektin määrittelemä Git-release ja aloita `.ballet/outputs/releases/<version>/release-manifest.yaml` evidensseineen.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "id": "make-git-release",
@@ -368,7 +499,7 @@
             "ready": "deploy-release",
             "approved": "deploy-release",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "release-gate" },
+            "needs_input": { "wait": true },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -376,7 +507,7 @@
           "agentId": "release-agent"
         },
         {
-          "description": "Käynnistä vain projektin olemassa oleva CI/CD-deploy valitulle Git-releaselle ja tallenna workflow-runin evidenssi release-artifactiin.",
+          "description": "Käynnistä vain hyväksytyn release contractin ja olemassa olevan CI/CD-sopimuksen sallima deploy. Kirjaa kaikki ulkoiset toimet ja workflow-evidenssi samaan `release-manifest.yaml`:iin.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "id": "deploy-release",
@@ -384,7 +515,7 @@
             "ready": "verify-release",
             "approved": "verify-release",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "release-gate" },
+            "needs_input": { "wait": true },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },
@@ -392,7 +523,7 @@
           "agentId": "release-agent"
         },
         {
-          "description": "Verifioi deploy health-, smoke-, acceptance- ja observability-checkeillä sekä kirjaa tulokset ja mahdollisen rollbackin release-artifactiin.",
+          "description": "Verifioi deploy health-, smoke-, acceptance- ja observability-checkeillä sekä kirjaa tulokset, hashit ja mahdollinen rollback `release-manifest.yaml`:iin.",
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "id": "verify-release",
@@ -400,7 +531,7 @@
             "ready": "release-gate",
             "approved": "release-gate",
             "changes-requested": { "terminate": "blocked" },
-            "needs_input": { "human": "release-gate" },
+            "needs_input": { "wait": true },
             "blocked": { "terminal": "blocked" },
             "failed": { "terminal": "failed", "retry": { "when": "transient", "limit": 1 } }
           },

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Source Contract Audit"
+  short_description: "Audit source authority and integrity"
+  default_prompt: "Use $source-contract-audit to inventory and validate approved project sources."

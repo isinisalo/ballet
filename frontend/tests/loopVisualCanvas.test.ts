@@ -41,18 +41,18 @@ const config: ProjectAutomationConfig = {
       nodeStyle: "luna",
       nodeSize: "tiny",
       description: "Approve brief",
-      on: { approved: { loop: "roadmap" }, rejected: "create" }
+      on: { approved: { loop: "planning" }, rejected: "create" }
     }, ...defaultTerminalNodes()]
   }, {
-    id: "roadmap",
-    start: "create-roadmap",
+    id: "planning",
+    start: "create-plan",
     nodes: [{
-      id: "create-roadmap",
+      id: "create-plan",
       type: "agent",
       nodeStyle: "flat",
       nodeSize: "medium",
-      agentId: "roadmap-agent",
-      description: "Create roadmap",
+      agentId: "planner-agent",
+      description: "Create plan",
       on: agentTransitions("completed")
     }, ...defaultTerminalNodes()]
   }]
@@ -123,10 +123,10 @@ describe("v8 compact loop canvas", () => {
 
     expect(stepNodes).toHaveLength(2);
     expect(stepNodes.map((node) => [node.width, node.height])).toEqual([[48, 48], [24, 24]]);
-    expect(layout.nodes.some((node) => node.kind === "loop" && node.loopSummary?.loopId === "roadmap")).toBe(true);
+    expect(layout.nodes.some((node) => node.kind === "loop" && node.loopSummary?.loopId === "planning")).toBe(true);
     expect(terminalNodes.map((node) => node.record?.step?.displayId)).toEqual(["blocked", "failed"]);
     expect(layout.nodes.some((node) => node.kind === "output-event")).toBe(false);
-    const crossLoopEdge = layout.edges.find((edge) => edge.tone === "cross-loop" && edge.route?.targetLoopId === "roadmap");
+    const crossLoopEdge = layout.edges.find((edge) => edge.tone === "cross-loop" && edge.route?.targetLoopId === "planning");
     expect(crossLoopEdge).toBeDefined();
     expect(loopEdgeDisplayLabel(crossLoopEdge)).toBeUndefined();
     expect(layout.edges.map((edge) => edge.route?.outputId)).toEqual(expect.arrayContaining([

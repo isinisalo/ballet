@@ -1,0 +1,4 @@
+interface:
+  display_name: "Threat Model"
+  short_description: "Derive a source-backed threat model"
+  default_prompt: "Use $threat-model to derive and verify a source-backed threat model."

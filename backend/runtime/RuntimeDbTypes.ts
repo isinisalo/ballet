@@ -1,6 +1,6 @@
 import type { AgentOutcome, LoopRunSource, LoopRunStatus, StepRunStatus } from "../../shared/domain/runtime.js";
 
-export const MAX_ROOT_TRANSITIONS = 20;
+export { MAX_ROOT_TRANSITIONS } from "../../shared/domain/automation.js";
 export const now = () => new Date().toISOString();
 
 export interface LoopRunRow {

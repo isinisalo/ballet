@@ -1,0 +1,4 @@
+interface:
+  display_name: "Decision Request"
+  short_description: "Turn source gaps into decisions"
+  default_prompt: "Use $decision-request to draft a human decision request from a blocking source gap."

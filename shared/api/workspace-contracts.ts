@@ -136,6 +136,7 @@ export {
   isIanaTimeZone,
   isProjectAgentBackedStep,
   isProjectTerminalNode,
+  MAX_ROOT_TRANSITIONS,
   loopNodeSizes,
   loopNodeSizeCatalog,
   loopNodeStyleCatalog,

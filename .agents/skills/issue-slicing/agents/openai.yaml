@@ -1,0 +1,4 @@
+interface:
+  display_name: "Issue Slicing"
+  short_description: "Draft traceable milestone issues"
+  default_prompt: "Use $issue-slicing to draft traceable, approval-gated milestone issues."

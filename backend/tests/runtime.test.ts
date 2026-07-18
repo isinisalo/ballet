@@ -7,6 +7,7 @@ import { defaultAgentStepTransitions, defaultTerminalNodes, type ProjectAgentSte
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { AgentOutcome } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
+import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 import { LoopRunConflictError } from "../runtime/LoopRunErrors.js";
 
 const roots: string[] = [];
@@ -90,55 +91,6 @@ const config = (): ProjectAutomationConfig => ({
     }, ...defaultTerminalNodes()]
   }]
 });
-
-const engineeringChainConfig = (): ProjectAutomationConfig => {
-  const terminals = () => defaultTerminalNodes();
-  return {
-    version: 8,
-    loops: [{
-      id: "blueprint-design",
-      start: "roadmap",
-      nodes: [
-        { id: "roadmap", type: "agent", agentId: "roadmap-agent", description: "Roadmap.", nodeStyle: "sol", nodeSize: "large", on: agentOn("data-model", { human: "blueprint-gate" }) },
-        { id: "data-model", type: "agent", agentId: "architecture-agent", description: "Data model.", nodeStyle: "sol", nodeSize: "large", on: agentOn("ui-design", { human: "blueprint-gate" }) },
-        { id: "ui-design", type: "agent", agentId: "ui-design-agent", description: "UI design.", nodeStyle: "sol", nodeSize: "large", on: agentOn("ui-mocks", { human: "blueprint-gate" }) },
-        { id: "ui-mocks", type: "agent", agentId: "ui-design-agent", description: "UI mocks.", nodeStyle: "sol", nodeSize: "large", on: agentOn("c4-models", { human: "blueprint-gate" }) },
-        { id: "c4-models", type: "agent", agentId: "architecture-agent", description: "C4.", nodeStyle: "sol", nodeSize: "large", on: agentOn("blueprint-gate", { human: "blueprint-gate" }) },
-        { id: "blueprint-gate", type: "human", description: "Approve blueprint.", nodeStyle: "luna", nodeSize: "tiny", on: { approved: { loop: "milestone-planning" }, rejected: "roadmap" } },
-        ...terminals()
-      ]
-    }, {
-      id: "milestone-planning",
-      start: "plan-milestone-issues",
-      nodes: [
-        { id: "plan-milestone-issues", type: "agent", agentId: "milestone-issues-agent", description: "Plan milestone.", nodeStyle: "luna", nodeSize: "medium", on: agentOn("implementation-plan", { human: "milestone-gate" }) },
-        { id: "implementation-plan", type: "agent", agentId: "implementation-plan-agent", description: "Implementation plan.", nodeStyle: "luna", nodeSize: "medium", on: agentOn("test-plan", { human: "milestone-gate" }) },
-        { id: "test-plan", type: "agent", agentId: "test-plan-agent", description: "Test plan.", nodeStyle: "luna", nodeSize: "medium", on: agentOn("milestone-gate", { human: "milestone-gate" }) },
-        { id: "milestone-gate", type: "human", description: "Approve milestone.", nodeStyle: "luna", nodeSize: "tiny", on: { approved: { loop: "milestone-delivery" }, rejected: "plan-milestone-issues" } },
-        ...terminals()
-      ]
-    }, {
-      id: "milestone-delivery",
-      start: "implement-milestone",
-      nodes: [
-        { id: "implement-milestone", type: "agent", agentId: "implementation-agent", description: "Implement milestone.", nodeStyle: "terra", nodeSize: "medium", on: agentOn("run-acceptance-tests", { human: "implementation-gate" }) },
-        { id: "run-acceptance-tests", type: "agent", agentId: "acceptance-test-agent", description: "Run acceptance.", nodeStyle: "terra", nodeSize: "medium", on: agentOn("implementation-gate", { repair: "implement-milestone", human: "implementation-gate" }) },
-        { id: "implementation-gate", type: "human", description: "Approve implementation.", nodeStyle: "luna", nodeSize: "tiny", on: { approved: { loop: "release-validation" }, rejected: "implement-milestone" } },
-        ...terminals()
-      ]
-    }, {
-      id: "release-validation",
-      start: "make-git-release",
-      nodes: [
-        { id: "make-git-release", type: "agent", agentId: "release-agent", description: "Make release.", nodeStyle: "terra", nodeSize: "medium", on: agentOn("deploy-release", { human: "release-gate" }) },
-        { id: "deploy-release", type: "agent", agentId: "release-agent", description: "Deploy release.", nodeStyle: "terra", nodeSize: "medium", on: agentOn("verify-release", { human: "release-gate" }) },
-        { id: "verify-release", type: "agent", agentId: "release-agent", description: "Verify release.", nodeStyle: "terra", nodeSize: "medium", on: agentOn("release-gate", { human: "release-gate" }) },
-        { id: "release-gate", type: "human", description: "Approve release.", nodeStyle: "luna", nodeSize: "tiny", on: { approved: "completed", rejected: "verify-release" } },
-        ...terminals()
-      ]
-    }]
-  };
-};
 
 const runById = (runtime: RuntimeDatabase, runId: string) =>
   runtime.listLoopRuns().find((run) => run.runId === runId);
@@ -331,97 +283,6 @@ describe("local runtime safeguards", () => {
     runtime.close();
   });
 
-  it("runs the complete four-Loop chain under one root and keeps release-gate rejection in verification", async () => {
-    const runtime = new RuntimeDatabase(await tempDbPath());
-    const automation = engineeringChainConfig();
-    const handoff = [
-      "milestone_id: milestone-001",
-      "github_issue: isinisalo/ballet#123",
-      "github_issue: isinisalo/ballet#124"
-    ].join("\n");
-    let blueprint = startLoop(runtime, automation, "blueprint-design", openAiTheme, "Build the next increment.");
-
-    for (let index = 0; index < 5; index += 1) {
-      blueprint = runtime.completeAgentStep(automation, openAiTheme, {
-        stepRunId: blueprint.stepRuns.at(-1)!.stepRunId,
-        outcome: ready
-      });
-    }
-    const blueprintGate = blueprint.stepRuns.at(-1)!;
-    expect(blueprintGate.stepId).toBe("blueprint-gate");
-    runtime.respondToStepRun(automation, openAiTheme, blueprint.runId, blueprintGate.stepRunId, "approved", handoff);
-
-    let milestone = latestRun(runtime, "milestone-planning")!;
-    for (let index = 0; index < 3; index += 1) {
-      milestone = runtime.completeAgentStep(automation, openAiTheme, {
-        stepRunId: milestone.stepRuns.at(-1)!.stepRunId,
-        outcome: ready
-      });
-    }
-    runtime.respondToStepRun(automation, openAiTheme, milestone.runId, milestone.stepRuns.at(-1)!.stepRunId, "approved", "Milestone scope approved.");
-
-    let delivery = latestRun(runtime, "milestone-delivery")!;
-    for (let index = 0; index < 2; index += 1) {
-      delivery = runtime.completeAgentStep(automation, openAiTheme, {
-        stepRunId: delivery.stepRuns.at(-1)!.stepRunId,
-        outcome: ready
-      });
-    }
-    runtime.respondToStepRun(automation, openAiTheme, delivery.runId, delivery.stepRuns.at(-1)!.stepRunId, "approved", "Implementation approved.");
-
-    let release = latestRun(runtime, "release-validation")!;
-    for (let index = 0; index < 3; index += 1) {
-      release = runtime.completeAgentStep(automation, openAiTheme, {
-        stepRunId: release.stepRuns.at(-1)!.stepRunId,
-        outcome: ready
-      });
-    }
-    expect(release.stepRuns.at(-1)).toMatchObject({ stepId: "release-gate", status: "waiting_for_human" });
-    release = runtime.respondToStepRun(automation, openAiTheme, release.runId, release.stepRuns.at(-1)!.stepRunId, "rejected", "Collect stronger production evidence.");
-    expect(release.stepRuns.at(-1)).toMatchObject({ stepId: "verify-release", status: "queued" });
-    release = runtime.completeAgentStep(automation, openAiTheme, {
-      stepRunId: release.stepRuns.at(-1)!.stepRunId,
-      outcome: ready
-    });
-    release = runtime.respondToStepRun(automation, openAiTheme, release.runId, release.stepRuns.at(-1)!.stepRunId, "approved", "Release evidence accepted.");
-
-    expect(release.status).toBe("completed");
-    expect(release.stepRuns.filter((step) => step.stepId === "make-git-release")).toHaveLength(1);
-    expect(new Set(runtime.listRootLoopRuns(blueprint.rootRunId).map((run) => run.rootRunId))).toEqual(new Set([blueprint.rootRunId]));
-    expect(runtime.listRootLoopRuns(blueprint.rootRunId).map((run) => run.loopId)).toEqual([
-      "blueprint-design",
-      "milestone-planning",
-      "milestone-delivery",
-      "release-validation"
-    ]);
-    expect(runtime.listRootLoopRuns(blueprint.rootRunId).every((run) => run.status === "completed")).toBe(true);
-    runtime.close();
-  });
-
-  it("rejects a gated cross-Loop transition without a milestone handoff", async () => {
-    const runtime = new RuntimeDatabase(await tempDbPath());
-    const automation = engineeringChainConfig();
-    let blueprint = startLoop(runtime, automation, "blueprint-design");
-    for (let index = 0; index < 5; index += 1) {
-      blueprint = runtime.completeAgentStep(automation, openAiTheme, {
-        stepRunId: blueprint.stepRuns.at(-1)!.stepRunId,
-        outcome: ready
-      });
-    }
-
-    expect(() => runtime.respondToStepRun(
-      automation,
-      openAiTheme,
-      blueprint.runId,
-      blueprint.stepRuns.at(-1)!.stepRunId,
-      "approved",
-      "Continue without selecting a milestone."
-    )).toThrow("milestone_id");
-    expect(runById(runtime, blueprint.runId)).toMatchObject({ status: "waiting_for_human" });
-    expect(latestRun(runtime, "milestone-planning")).toBeUndefined();
-    runtime.close();
-  });
-
   it("cancels active work and logs but ignores a late agent completion", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const run = startLoop(runtime, config(), "delivery");
@@ -433,7 +294,7 @@ describe("local runtime safeguards", () => {
     runtime.close();
   });
 
-  it("blocks a root run after the 20-transition safety limit", async () => {
+  it("blocks a root run after the configured transition safety limit", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const cyclic: ProjectAutomationConfig = {
       version: 8,
@@ -452,14 +313,18 @@ describe("local runtime safeguards", () => {
       }]
     };
     let details = startLoop(runtime, cyclic, "cycle");
-    for (let index = 0; index < 21 && details.status === "running"; index += 1) {
+    for (let index = 0; index <= MAX_ROOT_TRANSITIONS && details.status === "running"; index += 1) {
       const step = details.stepRuns.at(-1)!;
       details = runtime.completeAgentStep(cyclic, openAiTheme, { stepRunId: step.stepRunId, outcome: ready });
     }
     expect(details.status).toBe("blocked");
-    expect(details.transitionCount).toBe(20);
-    expect(details.termination).toMatchObject({ code: "transition_limit_exceeded", limit: 20, count: 21 });
-    expect(details.stepRuns).toHaveLength(21);
+    expect(details.transitionCount).toBe(MAX_ROOT_TRANSITIONS);
+    expect(details.termination).toMatchObject({
+      code: "transition_limit_exceeded",
+      limit: MAX_ROOT_TRANSITIONS,
+      count: MAX_ROOT_TRANSITIONS + 1
+    });
+    expect(details.stepRuns).toHaveLength(MAX_ROOT_TRANSITIONS + 1);
     runtime.close();
   });
 

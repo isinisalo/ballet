@@ -5,75 +5,91 @@ updatedAt: 2026-07-18
 tags:
   - ballet
   - loop-engineering
+  - source-contract
   - delivery-chain
 ---
 
 # Yhtenäinen Loop Engineer -ketju
 
-Ihminen omistaa Goal- ja ADR-dokumenttien WHAT- ja WHY-päätökset. Agentit ratkaisevat HOW-toteutuksen niiden sisällä. Uutta tuotepäätöstä, scopea tai arkkitehtuuria vaativa työ blokataan ja palautetaan ihmiselle.
+Ihminen omistaa hyväksytyissä source plane -lähteissä WHAT- ja WHY-päätökset. Agentit inventoivat, validoivat ja johtavat HOW-artifactit niiden sisällä. Runtime-input, gate-vastaus, issue, agenttiehdotus, summary tai aiempi generated artifact ei ole source authority.
+
+Lue aina `.ballet/source-plane.yaml`, lähimmät `AGENTS.md`-ohjeet ja `.agents/skills/_shared/blueprint-governance.md`. Pidä `orchestrator`- ja `managed-product`-scopet erillään: hallitun tuotteen Python/AWS-ADR:t eivät ohjaa Balletin TypeScript-runtimea, eikä orchestratorin root `DESIGN.md` ohjaa hallitun tuotteen UI:ta ilman eksplisiittistä saman scopen source-sidosta.
+
+Blueprint-design käyttää aina source-plane-contractin eksplisiittistä `blueprint_scope`-valintaa. Nykyinen valinta on `managed-product`; inventaario, snapshot, kaikki 13 juuritason blueprint-artifactia, viitteet, review ja gate-paketti pysyvät tässä samassa scopessa, kunnes ihminen muuttaa valinnan source-plane-contractissa.
+
+`managed-product`-scopen `code_paths` on tällä hetkellä tyhjä. Implementation- ja release-Stepien pitää palauttaa `blocked`, kunnes tämä konfiguraatio ajetaan varsinaisen tuotteen checkoutissa tai source planeen määritetään todelliset koodi- ja sopimuspolut.
 
 ## Neljä toisiinsa liittyvää Loopia
 
-1. `blueprint-design`: `roadmap` → `data-model` → `ui-design` → `ui-mocks` → `c4-models` → human `blueprint-gate`.
-2. `milestone-planning`: `plan-milestone-issues` → `implementation-plan` → `test-plan` → human `milestone-gate`.
-3. `milestone-delivery`: `implement-milestone` → `run-acceptance-tests` → human `implementation-gate`.
-4. `release-validation`: `make-git-release` → `deploy-release` → `verify-release` → human `release-gate`.
+1. `blueprint-design`: source inventory → source validation → gap/conflict audit → conditional decision request → roadmap → domain map → C4 context/container → quality scenarios → threat model → UX information architecture → test strategy → traceability → independent verifier → human blueprint gate.
+2. `milestone-planning`: local milestone manifest + draft-only issue slicing → implementation plan → test plan → human milestone gate.
+3. `milestone-delivery`: implementation → independent acceptance evidence + staging report → human implementation gate.
+4. `release-validation`: approved release → approved deploy → verification → human release gate.
 
-Jokainen human `approved` -päätös käynnistää seuraavan Loopin saman root Runin ja worktreen sisällä. Human `rejected` säilyy ihmisen päätöksenä ja palautuu saman Loopin korjausvaiheeseen. `release-gate` palautuu `verify-release`-Stepiin eikä luo uutta Git-tagia.
+Vain `blueprint-design` on manual root. Approved cross-Loop-siirtymät säilyvät saman root Runin ja worktreen sisällä. Downstream Loopia ei käynnistetä manuaalisesti.
 
-## Node-tyylit
+## Blueprint-loop
 
-- `sol`: roadmap, data model, UI design, UI mocks ja C4-mallit.
-- `luna`: milestone- ja testisuunnittelu sekä kaikki human gatet.
-- `terra`: toteutus, acceptance-testit ja release.
+| Step | Authority ja tuotos |
+| --- | --- |
+| `source-inventory` | Inventoi `blueprint_scope`-valinnan lähteet ja kirjoittaa ainoana tässä vaiheessa source snapshotin tarkalla Git HEAD SHA:lla, source-plane contract -hashilla ja raw-byte source SHA-256 -hasheilla. |
+| `source-validation` | Validoi olemassa olevan snapshotin read-only-tilassa ja todistaa ID-, status-, scope-, path-, reference-, Git- ja hash-eheyden muuttamatta artifactia. |
+| `gap-and-conflict-audit` | Kirjoittaa specification gaps -artifactin; kirjoittaa decision requests -artifactin vain blocking päätöspuutteesta ja palauttaa silloin `needs_input`. |
+| `source-decision-gate` | Ihminen päivittää ja hyväksyy päätöksen sourceen ennen `approved`-vastausta; gate-vastaus ei itsessään ratkaise päätöstä. Approved palaa uuteen inventointiin, rejected päättää Runin blocked-tilaan. |
+| `roadmap` | Johtaa source-backed vertikaaliset slicet ja niiden acceptance-, dependency-, risk- ja validation-viitteet. |
+| `domain-map` | Johtaa domainit, vastuut ja suhteet. |
+| `c4-context-container` | Johtaa actorit, systeemit, containerit ja suhteet; tuntematon teknologia jää `null`:ksi. |
+| `quality-scenarios` | Muuttaa hyväksytyt quality-vaatimukset mitattaviksi skenaarioiksi keksimättä thresholdia. |
+| `threat-model` | Johtaa assetit, trust boundaryt, uhkat, mitigoinnit, verifioinnin ja residual riskin ilman live-probausta. |
+| `ux-information-architecture` | Johtaa saman scopen behavior- ja DESIGN-lähteistä actorit, journeyt, views ja tilat. |
+| `test-strategy` | Sitoo acceptance- ja quality-vaatimukset testitasoihin ja vaadittavaan evidenssiin. |
+| `traceability` | Laskee source → artifact → acceptance → test -ketjut ja jättää uncovered-kohdat eksplisiittisiksi. |
+| `independent-blueprint-verifier` | Lukee lähteet/artifactit suoraan levyltä, todistaa riippumattomuuden, laskee hashit uudelleen ja kirjoittaa review'n sekä gate packetin. Ei korjaa tekijöiden artifactteja. |
+| `blueprint-gate` | Ihminen hyväksyy täsmällisen hashatun packetin. Rejected käynnistää uuden source inventoryn. |
 
-Suunnittelunodeilla on `large`, toteutus- ja validointinodeilla `medium` ja human gateilla `tiny`-koko. Node-tyylit tulevat projektin olemassa olevasta Loop-katalogista; uusia värejä tai visuaalisia sääntöjä ei lisätä.
+Verifierin `changes-requested`, blueprint-gaten rejection ja hyväksytty source-päätös palaavat uuteen `source-inventory`-Stepiin. Agentti ei poista, siirrä tai korvaa aiempia outputteja: stale tai toiseen snapshottiin sidottu artifact raportoidaan täsmällisellä polulla ja pysäyttää työn, kunnes sen käsittelyyn on eksplisiittinen, polkukohtainen lupa. Source-, päätös-, approval- tai independence-aukko on `blocked`/`needs_input`, ei piilotettu artifact-repair.
 
-## Human gate -siirtymät
+## Outcome- ja retry-sopimus
 
-- `blueprint-gate.approved` → `{ "loop": "milestone-planning" }`
-- `blueprint-gate.rejected` → `roadmap`
-- `milestone-gate.approved` → `{ "loop": "milestone-delivery" }`
-- `milestone-gate.rejected` → `plan-milestone-issues`
-- `implementation-gate.approved` → `{ "loop": "release-validation" }`
-- `implementation-gate.rejected` → `implement-milestone`
-- `release-gate.approved` → `completed`
-- `release-gate.rejected` → `verify-release`
+- `ready` ja verifierin `approved` etenevät normaaliin seuraavaan Stepiin.
+- Blueprintin source-päätöksen `needs_input` siirtyy nimettyyn `source-decision-gate`en ja palaa hyväksytyn source-päivityksen jälkeen uuteen source-inventaarioon. Downstream-Stepien `needs_input` käyttää wait/resume-politiikkaa ja jatkaa samaa pyytänyttä Stepiä; se ei koskaan siirry final approval gateen eikä ohita artifact-ketjua.
+- `changes-requested` saa käyttää vain eksplisiittistä saman scopen repair-kohdetta.
+- `blocked` ja permanent `failed` päättävät Runin vastaavaan terminaliin.
+- Vain eksplisiittisesti transient `failed` yritetään kerran uudelleen.
+- Acceptance-verifier saa palauttaa toteutukseen enintään kolme kertaa, ja vain uuden evidenssin perusteella.
+- Yhdellä artifact-polulla on yksi kirjoittaja. Enintään kolme read-only-auditia saa olla rinnakkain.
 
-Agentti-outcomet reititetään sellaisinaan: `ready` ja verifierin `approved` etenevät normaaliin seuraavaan Stepiin, `changes-requested` saa palata vain nimettyyn saman scopen repair-Stepiin, ja `needs_input` siirtyy nimettyyn human gateen. `blocked` päättää Runin blocked-tilaan ja `failed` failed-tilaan; kumpikaan ei saa käynnistää implementation-retryä. Vain eksplisiittisesti `transient`-luokiteltu `failed` voidaan yrittää kerran uudelleen. `run-acceptance-tests.changes-requested` palaa `implement-milestone`-Stepiin enintään kolmen repair-kierroksen ajan.
+## Human blueprint gate ja handoff
 
-## Handoff
+`blueprint-gate-packet.yaml` sisältää vähintään exact source SHA:n, raw-byte artifact-hashit, uudet oletukset, avoimet päätökset, riskit, exact coveragen, verifier review -viitteen ja ehdotetut ulkoiset toimet `not_executed`-tilassa. Blocking gap, piilotettu oletus tai hyväksymätön lähde estää hyväksyttävän packetin.
 
-`blueprint-gate`-approved-vastauksessa pitää olla vähintään:
+Approved-vastauksen tulee sitoa jatko täsmälliseen packettiin:
 
 ```text
 milestone_id: milestone-001
-github_issue: owner/repository#123
+blueprint_gate_packet: .ballet/outputs/blueprint-gate-packet.yaml
+blueprint_gate_packet_sha256: <64 lowercase hex characters>
+source_sha: <40 or 64 lowercase hex characters>
 ```
 
-`milestone_id` on muotoa `milestone-NNN`. `github_issue`-rivi on toistettava ja muotoa `owner/repository#number`. Handoff-parseri vaatii täsmälleen yhden milestone-ID:n ja vähintään yhden yksikäsitteisen GitHub-issue-tunnisteen. Myöhemmät human-palautteet saavat olla vapaamuotoisia; ensimmäinen handoff säilyy accumulated Run-inputissa.
+Ballet core käsittelee cross-Loop-inputin opaque-datana eikä parsii tai valvo tämän projektin packet-kenttiä, polkuja tai hasheja. Vastaanottava milestone-agentti parsii dokumentoidun muodon, vaatii täsmälleen yhden kutakin kenttää, tarkistaa `milestone-NNN`-ID:n ja canonical packet-polun sekä laskee packetin ja kaikkien sen viittaamien artifactien raw-byte SHA-256 -hashit uudelleen. Myöhemmissä delivery- ja release-vaiheissa agentit todentavat milestone-manifestin packet ID/hash-, source SHA-, snapshot-, milestone- ja input-path-sidokset alkuperäiseen hyväksyntään projektin artifacteista; puuttuva tai ristiriitainen sidos pysäyttää Stepin.
 
-Downstream Looppeja ei saa käynnistää manuaalisesti. Vain `blueprint-design` on kelvollinen manual root. Handoffin syntaksi validoidaan ennen cross-Loop-siirtymää; GitHub-issueiden olemassaolo ja sisältö validoidaan milestone-agentissa.
+## Projektikohtainen artifact-sopimus
 
-## Artifact-sopimus
+Agentit todentavat projektin skillien ja artifact catalogin kuvaamat rakenne-, path-, scope-, authority-, viite-, hash-, coverage- ja gate-invariantit suoraan persistoiduista YAML-artifacteista ja niiden inputeista. Kaikki YAML-artifactit sisältävät `artifact_contract_version: 1`. `source_snapshot` on itsenäinen inventory eikä sisällä `input_files`-kenttää; kaikilla muilla generated artifacteilla se on pakollinen ja ei-tyhjä. Canonical-polut ovat:
 
-- `.ballet/outputs/ROADMAP.md`: MVP, inkrementit, riippuvuudet, riskit, validointipisteet ja Goal/ADR-viitteet.
-- `.ballet/outputs/DATA-MODEL.md`: domain-, data- ja integraatiomalli.
-- `.ballet/outputs/UI-DESIGN.md`: näkymät, tilat, komponentit, saavutettavuus ja responsiivisuus.
-- `.ballet/outputs/UI-MOCKS.md`: tarkistettavat näkymä- ja tilamockit.
-- `.ballet/outputs/C4.md`: context-, container- ja component-mallit.
-- `.ballet/outputs/milestones/<milestone-id>/MILESTONE.md`: rajaus ja GitHub-issue snapshotit.
-- `.ballet/outputs/milestones/<milestone-id>/IMPLEMENTATION-PLAN.md`: toteutuksen järjestys, scope ja riippuvuudet.
-- `.ballet/outputs/milestones/<milestone-id>/TEST-PLAN.md`: testit ja acceptance-evidenssi.
-- `.ballet/outputs/milestones/<milestone-id>/ACCEPTANCE.md`: ajetut acceptance-testit ja tulokset.
-- Release-agentin release-artifact: Git-versio, CI/CD-run, ympäristö, verifiointi ja rollback.
+- Blueprint: `source-snapshot.yaml`, `specification-gaps.yaml`, conditional `decision-requests.yaml`, `roadmap.yaml`, `domain-map.yaml`, `c4-context-container.yaml`, `quality-scenarios.yaml`, `threat-model.yaml`, `ux-information-architecture.yaml`, `test-strategy.yaml`, `traceability-manifest.yaml`, `blueprint-review.yaml` ja `blueprint-gate-packet.yaml` aktiivisessa `.ballet/outputs/`-hakemistossa.
+- Milestone: `milestone-manifest.yaml`, `issue-drafts.yaml`, `implementation-plan.yaml`, `test-plan.yaml`, `acceptance-evidence.yaml` ja `staging-report.yaml` hakemistossa `.ballet/outputs/milestones/<milestone-id>/`.
+- Release: `.ballet/outputs/releases/<version>/release-manifest.yaml`.
 
-Artifactit ja summaryt kirjoitetaan suomeksi. Teknisiä tunnisteita ei käännetä. Agentit eivät kirjoita salaisuuksia artifacteihin, eivätkä välitä raakaa reasoning-sisältöä.
+Markdown saa olla vain ihmisluettava renderöinti. Se ei korvaa YAML authority-, viite-, hash- tai evidenssisopimusta. Kirjoittava agentti ja myöhempi riippumaton verifieri tarkistavat artifactin projektikohtaiset invariantit ennen etenemistä ja raportoivat käytetyt inputit, hashit ja tarkistustulokset.
 
-## Release-käytäntö
+## Approval- ja turvallisuusrajat
 
-`release-agent` käyttää vain repositorion olemassa olevia release- ja CI/CD-komentoja tai workflow’ta. Se ei keksi uutta deploy-provideria, ympäristöä tai komentoa. Puuttuva release-sopimus, hyväksyntä, oikeus tai turvallinen rollback palauttaa `blocked`-outcomen ennen ulkoista kirjoitusta. Human `release-gate` hyväksyy jo verifioidun julkaisun; rejection palaa vain verifiointiin.
+Eksplisiittinen human approval vaaditaan ennen GitHub- tai muuta ulkoista kirjoitusta, releasea, deployta, cloud-toimea, credentialien käyttöä, production-dataa, destruktiivista toimea tai hyväksytyn lähdepäätöksen muutosta. Blueprint-paketissa ehdotettu toiminto ei ole vielä lupa suorittaa sitä. Älä koskaan tallenna salaisuutta artifactiin, runtime-summaryyn tai logiin.
 
-## Validointi
+Issue slicing tuottaa aina paikalliset `draft_only`-luonnokset; se ei hae eikä kirjoita GitHubia. Release-agentti pysähtyy ilman hyväksyttyä implementation-gatea sekä saman scopen release- ja environment-contracteja. Uutta provideria, ympäristöä, workflow'ta tai rollback-strategiaa ei keksitä.
 
-Loop-konfiguraation muutoksen jälkeen aja `npm run test`, `npm run lint` ja `npm run build`. UI- tai tyylimuutos noudattaa juuren `AGENTS.md`- ja `DESIGN.md`-ohjeita.
+## Pakollinen evidenssi
+
+Jokainen Step raportoi input source/artifact -viitteet, kirjoitetut polut ja SHA-256:t, Git SHA:n silloin kun soveltuu, checkit/komennot tuloksineen, coverage/gapit/riskit, kaikki ulkoiset toimet ja outcome-perusteen. Pysähdy source-ristiriitaan, stale/unknown-viitteeseen, scope-vuotoon, hash-driftiin, puuttuvaan päätökseen/hyväksyntään, salaiseen tietoon tai toistuvaan muuttumattomaan evidenssiin.

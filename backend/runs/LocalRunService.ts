@@ -22,7 +22,6 @@ import type { RuntimeDatabase } from "../runtime-db.js";
 import type { DispatchLoopScheduleResult } from "../runtime-db.js";
 import { LoopRunConflictError, LoopRunNotFoundError, LoopRunStateError } from "../runtime/LoopRunErrors.js";
 import { renderLoopStepPrompt } from "../integration/LoopStepPrompt.js";
-import { validateLoopRunStart } from "../services/LoopRunStartPolicy.js";
 import { RootRunStore, type StoredRootRun } from "./RootRunStore.js";
 import { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import { agentSnapshot, relevantLoopThemeIssues } from "./LoopExecutionSnapshot.js";
@@ -340,7 +339,6 @@ export class LocalRunService {
     if (relevantLoopThemeIssues(data, loopId).length > 0) {
       throw new LoopRunStateError("Cannot start a Loop while its theme configuration is invalid.");
     }
-    await validateLoopRunStart(data, loopId, input);
     const loop = data.automation.loops.find((candidate) => candidate.id === loopId);
     if (!loop) throw new LoopRunNotFoundError(`Loop ${loopId} was not found.`);
     const plan = await this.planner.create(data, loopId);

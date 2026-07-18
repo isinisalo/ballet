@@ -200,7 +200,9 @@ describe("automation v8 UI", () => {
   it("offers a new run after the latest run has finished", async () => {
     const user = userEvent.setup();
     await renderRun(run("completed"));
-    await user.click(await screen.findByRole("button", { name: "New run" }));
+    await screen.findByText("stream: connected");
+    await waitFor(() => expect(screen.getByRole("button", { name: "New run" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "New run" }));
     expect(await screen.findByLabelText("Manual input (optional)", {}, { timeout: 6_000 })).toBeEnabled();
   }, 10_000);
 

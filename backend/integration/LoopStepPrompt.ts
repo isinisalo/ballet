@@ -9,7 +9,7 @@ const TEXT_TRUNCATION_MARKER = " [... TRUNCATED ...] ";
 const terminalStepStatuses = new Set<StepRun["status"]>(["completed", "blocked", "failed", "cancelled"]);
 const shaArtifactKey = /^(git_sha|commit_sha)$/;
 const branchArtifactKey = /^branch$/;
-const pathArtifactKey = /^(changed_files|artifact_path|file|files|file_path|path|paths|document|document_path|report|report_path|roadmap|milestone|milestones|task|tasks|design|design_path|deployment|deployment_path)$/;
+const pathArtifactKey = /^(?:changed_files|artifact_paths?|(?:[a-z0-9]+_)*(?:file|files|path|paths))$/;
 const safePathCharacters = /^[\p{L}\p{N}._@+/-]+$/u;
 
 interface LoopStepHistoryOutcome {

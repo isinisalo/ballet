@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { isProjectTerminalNode, type Agent, type AgentExecutionState, type LoopTheme, type ProjectAutomationConfig, type ProjectLoop, type ProjectStep } from "@shared/api/workspace-contracts";
+import { isProjectTerminalNode, MAX_ROOT_TRANSITIONS, type Agent, type AgentExecutionState, type LoopTheme, type ProjectAutomationConfig, type ProjectLoop, type ProjectStep } from "@shared/api/workspace-contracts";
 import type { RootRunDetail } from "@shared/api/workspace-contracts";
 import { CirclePlus, Radio, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,7 +37,7 @@ export function LoopRunView({
   startDisabledReason?: string;
 }) {
   const { details, preflight, pendingOperation, error, streamStatus, start, respond, cancel, refresh } = controller;
-  const [showNewRun, setShowNewRun] = useState(false);
+  const [newRunFromRunId, setNewRunFromRunId] = useState<string>();
   const [selectedStepRunId, setSelectedStepRunId] = useState<string | undefined>();
   const busy = pendingOperation !== null;
   const rootActive = rootDetail && ["queued", "running", "waiting_for_human", "finalizing"].includes(rootDetail.status);
@@ -52,13 +52,13 @@ export function LoopRunView({
       && snapshot.stepId === selectedStepRun.stepId
       && snapshot.agentId === selectedStepRun.agentId)?.agent;
   const displayStatus = rootDetail?.status ?? details?.status;
+  const showNewRun = details?.runId === newRunFromRunId;
   const startRun = async (input: string) => {
     const next = await start(input);
     if (next) onRootRunChange?.(next.rootRunId);
     return Boolean(next);
   };
 
-  useEffect(() => setShowNewRun(false), [details?.runId]);
   useEffect(() => {
     const stepRuns = details?.stepRuns ?? [];
     const active = [...stepRuns].reverse().find((stepRun) => ["queued", "running", "waiting_for_human"].includes(stepRun.status));
@@ -91,7 +91,7 @@ export function LoopRunView({
       {details ? (
         <div className="grid gap-2 border-t border-divider-strong bg-card px-4 py-3 font-mono text-[0.65rem] text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
           <span>source: {rootDetail?.source ?? details.source}</span>
-          <span>loop transitions: {details.transitionCount}/20</span>
+          <span>loop transitions: {details.transitionCount}/{MAX_ROOT_TRANSITIONS}</span>
           <span>updated: {new Date(details.updatedAt).toLocaleString()}</span>
           {(rootDetail?.termination ?? details.termination) ? <span>reason: {(rootDetail?.termination ?? details.termination)?.code} · {(rootDetail?.termination ?? details.termination)?.message}</span> : null}
           {rootDetail?.finalization?.report ? <span>branch: {rootDetail.finalization.report.branch}</span> : null}
@@ -108,7 +108,7 @@ export function LoopRunView({
       ) : null}
       {terminal && !showNewRun ? (
         <div className="flex justify-end border-t border-divider-strong bg-card p-4">
-          <Button type="button" variant="outline" disabled={busy} onClick={() => setShowNewRun(true)}><CirclePlus /> New run</Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => setNewRunFromRunId(details.runId)}><CirclePlus /> New run</Button>
         </div>
       ) : null}
       {(!details || (terminal && showNewRun)) ? (

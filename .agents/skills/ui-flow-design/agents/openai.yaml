@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI Flow Design"
+  short_description: "Design source-backed UX flows"
+  default_prompt: "Use $ui-flow-design to create source-backed UX information architecture and state flows."
