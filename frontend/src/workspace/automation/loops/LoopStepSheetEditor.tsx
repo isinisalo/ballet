@@ -56,16 +56,6 @@ export function LoopNodeSheetEditor({ step, loop, loops, agents, scheduleState, 
             {idError ? <FieldError id={idErrorId} className="text-[0.65rem] leading-4">{idError}</FieldError> : null}
           </div>
         </Field>
-        <CompactSelectField
-          label="Type"
-          ariaLabel="Node type"
-          value={step.type}
-          disabled={disabled || terminal}
-          options={typeOptions}
-          onChange={(type) => { if (!terminal) onChange(changeStepType(step, type as ProjectStep["type"], { loop, firstAgentId: agents[0]?.id })); }}
-        />
-        <NodeStyleField node={step} disabled={disabled} onChange={onChange} />
-        <NodeSizeField node={step} disabled={disabled} onChange={onChange} />
         <Field className="gap-1" data-invalid={Boolean(descriptionError)}>
           <FieldLabel htmlFor={`${id}-description`} className="text-xs font-normal text-muted-foreground">Description</FieldLabel>
           <Textarea
@@ -82,8 +72,17 @@ export function LoopNodeSheetEditor({ step, loop, loops, agents, scheduleState, 
           />
           {descriptionError ? <FieldError id={descriptionErrorId} className="text-[0.65rem] leading-4">{descriptionError}</FieldError> : null}
         </Field>
-
+        <CompactSelectField
+          label="Type"
+          ariaLabel="Node type"
+          value={step.type}
+          disabled={disabled || terminal}
+          options={typeOptions}
+          onChange={(type) => { if (!terminal) onChange(changeStepType(step, type as ProjectStep["type"], { loop, firstAgentId: agents[0]?.id })); }}
+        />
         {terminal ? <CompactSelectField label="Agent" ariaLabel="Agent" value="" options={[]} disabled onChange={() => undefined} /> : <StepOwner step={step} agents={agents} disabled={disabled} onChange={onChange} />}
+        <NodeStyleField node={step} disabled={disabled} onChange={onChange} />
+        <NodeSizeField node={step} disabled={disabled} onChange={onChange} />
         {step.type === "scheduled" ? <LoopScheduleEditor step={step} state={scheduleState} disabled={disabled} onChange={onChange} /> : null}
         <LoopTransitionsEditor step={step} loop={loop} loops={loops} disabled={disabled} focusedTransition={focusedTransition} onChange={onChange} />
       </FieldGroup>

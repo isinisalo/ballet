@@ -256,12 +256,12 @@
     {
       "id": "milestone-delivery",
       "start": "implement-milestone",
-      "summaryStyle": "twin-core",
+      "summaryStyle": "route",
       "nodes": [
         {
           "description": "Toteuta hyväksytyn milestonen kaikki määritellyt GitHub-issues-muutokset ja testit IMPLEMENTATION-PLAN.md:n, TEST-PLAN.md:n ja UI-artifacttien mukaisesti.",
-          "nodeStyle": "terra",
-          "nodeSize": "medium",
+          "nodeStyle": "sol",
+          "nodeSize": "large",
           "id": "implement-milestone",
           "on": {
             "approved": "review-implementation",
@@ -272,8 +272,8 @@
         },
         {
           "description": "Aja milestonen TEST-PLAN.md:n acceptance-testit, tarkasta diff ja tallenna evidenssi tiedostoon .ballet/outputs/milestones/<milestone-id>/ACCEPTANCE.md muuttamatta toteutusta.",
-          "nodeStyle": "mars",
-          "nodeSize": "small",
+          "nodeStyle": "terra",
+          "nodeSize": "medium",
           "id": "review-implementation",
           "on": {
             "approved": "implementation-gate",
