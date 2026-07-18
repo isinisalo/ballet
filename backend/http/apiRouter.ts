@@ -104,7 +104,7 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
   router.post("/runs/:rootRunId/steps/:stepRunId/respond", route(async (req, res) => {
     const { rootRunId, stepRunId } = parseParams(stepRunParamsSchema, req);
     const input = parseBody(respondToRunStepBodySchema, req);
-    res.json(await options.runs.respond(rootRunId, stepRunId, input.result, input.input));
+    res.json(await options.runs.respond(rootRunId, stepRunId, input));
   }));
   router.get("/execution-tasks/:taskId/events", route(async (req, res) => {
     const { taskId } = parseParams(executionTaskParamsSchema, req); const query = parseUnknown(executionEventsQuerySchema, req.query);

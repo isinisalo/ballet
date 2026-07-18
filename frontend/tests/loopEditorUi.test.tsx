@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -43,7 +43,20 @@ const loop: ProjectLoop = {
   }, ...defaultTerminalNodes()]
 };
 
-const config: ProjectAutomationConfig = { version: 8, loops: [loop] };
+const nextLoop: ProjectLoop = {
+  id: "release-follow-up",
+  start: "continue",
+  nodes: [{
+    id: "continue",
+    type: "human",
+    nodeStyle: "flat",
+    nodeSize: "medium",
+    description: "Continue delivery",
+    on: { approved: "completed", rejected: "blocked" }
+  }, ...defaultTerminalNodes()]
+};
+
+const config: ProjectAutomationConfig = { version: 8, loops: [loop, nextLoop] };
 
 describe("compact Loop editor UI", () => {
   it("opens the 50/50 sheet with instructions and Step editor panes", async () => {
@@ -58,6 +71,11 @@ describe("compact Loop editor UI", () => {
     expect(workspace).toHaveClass("md:grid-cols-2");
     expect(paneGrid).toBeDefined();
     expect(screen.getByLabelText("Node ID")).toHaveValue("build");
+    expect(screen.getByRole("combobox", { name: "Approved target" })).toHaveTextContent("review");
+    expect(screen.getByRole("combobox", { name: "Rejected target" })).toHaveTextContent("Failed");
+    expect(screen.getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("combobox", { name: "Node style" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Appearance" }));
     expect(screen.getByRole("combobox", { name: "Node style" })).toHaveTextContent("Sol");
     expect(screen.getByRole("combobox", { name: "Node size" })).toHaveTextContent("Large");
     expect(screen.getByText("Transitions")).toBeInTheDocument();
@@ -75,11 +93,45 @@ describe("compact Loop editor UI", () => {
     expect(screen.getByRole("combobox", { name: "Node type" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Agent" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Agent" }).parentElement?.querySelector("input[aria-hidden='true']")).toHaveValue("");
-    for (const output of ["approved", "rejected"]) {
-      expect(screen.getByRole("combobox", { name: `${output} transition kind` })).toBeDisabled();
-      expect(screen.getByRole("combobox", { name: `${output} transition target` })).toBeDisabled();
+    for (const output of ["Approved", "Rejected"]) {
+      expect(screen.getByRole("combobox", { name: `${output} target` })).toBeDisabled();
     }
+    expect(screen.queryByRole("combobox", { name: /transition kind/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Node style" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Appearance" }));
+    expect(screen.getByRole("combobox", { name: "Node style" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Node size" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Remove from loop" })).not.toBeInTheDocument();
+  });
+
+  it("uses exactly one grouped target select for each Approved and Rejected section", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderEditor({ onChange });
+    await user.click(await screen.findByRole("button", { name: "Edit step build" }));
+
+    const editor = screen.getByRole("form", { name: "Node editor" });
+    expect([...editor.querySelectorAll("[data-loop-transition-result]")].map((section) => section.getAttribute("data-loop-transition-result"))).toEqual(["approved", "rejected"]);
+    expect(within(editor).getAllByRole("combobox", { name: /^(Approved|Rejected) target$/ })).toHaveLength(2);
+    expect(within(editor).queryByRole("combobox", { name: /transition kind/i })).not.toBeInTheDocument();
+    expect(within(editor).queryByText(/^Action$/)).not.toBeInTheDocument();
+    expect(within(editor).queryByText(/^Target type$/)).not.toBeInTheDocument();
+    expect(within(editor).queryByText(/^Input$/)).not.toBeInTheDocument();
+
+    for (const result of ["Approved", "Rejected"] as const) {
+      await user.click(within(editor).getByRole("combobox", { name: `${result} target` }));
+      const listbox = await screen.findByRole("listbox");
+      for (const group of ["Node", "Loop", "End Loop"]) {
+        expect(within(listbox).getByText(group)).toBeInTheDocument();
+      }
+      for (const option of ["build", "review", "release-follow-up", "Completed", "Blocked", "Failed"]) {
+        expect(within(listbox).getByRole("option", { name: option })).toBeInTheDocument();
+      }
+      await user.click(within(listbox).getByRole("option", { name: "release-follow-up" }));
+      const next = onChange.mock.calls.at(-1)?.[0] as ProjectLoop;
+      const changed = next.nodes.find((node) => node.id === "build");
+      expect(changed).toMatchObject({ on: { [result.toLowerCase()]: { loop: "release-follow-up" } } });
+    }
   });
 
   it("groups the complete Node style menu and keeps Node size when the style changes", async () => {
@@ -87,6 +139,7 @@ describe("compact Loop editor UI", () => {
     const onChange = vi.fn();
     renderEditor({ onChange });
     await user.click(await screen.findByRole("button", { name: "Edit step build" }));
+    await user.click(screen.getByRole("button", { name: "Appearance" }));
     await user.click(screen.getByRole("combobox", { name: "Node style" }));
     for (const group of ["Classic", "Planets"]) {
       expect(await screen.findByText(group)).toBeInTheDocument();
@@ -140,7 +193,7 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof LoopEditor>
   const props: React.ComponentProps<typeof LoopEditor> = {
     config,
     loop,
-    loops: [loop],
+    loops: config.loops,
     agents,
     theme: defaultLoopTheme,
     locked: false,

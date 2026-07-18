@@ -20,9 +20,9 @@ interface ExpectedAgentConfig {
 const expectedAgents: Record<string, ExpectedAgentConfig> = {
   "acceptance-test-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
   "architecture-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" },
-  "implementation-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: false, nodeStyle: "terra" },
-  "implementation-plan-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeStyle: "luna" },
-  "milestone-issues-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: true, nodeStyle: "luna" },
+  "implementation-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: false, nodeStyle: "sol" },
+  "implementation-plan-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeStyle: "terra" },
+  "milestone-issues-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: true, nodeStyle: "sol" },
   "release-agent": { model: "gpt-5.6-terra", reasoning: "medium", network: true, nodeStyle: "terra" },
   "roadmap-agent": { model: "gpt-5.6-sol", reasoning: "medium", network: false, nodeStyle: "sol" },
   "test-plan-agent": { model: "gpt-5.6-luna", reasoning: "medium", network: false, nodeStyle: "luna" },
@@ -128,9 +128,9 @@ describe("repository Loop engineering configuration", () => {
       expect(loop.nodes.filter(isProjectTerminalNode).map((node) => node.id).sort()).toEqual(["blocked", "completed", "failed"]);
       expect(loop.nodes.filter((node) => node.type === "human")).toHaveLength(1);
       for (const step of loop.nodes.filter((node) => !isProjectTerminalNode(node))) {
-        const expectedStyle = step.type === "human" ? "luna" : expectedAgents[step.agentId]!.nodeStyle;
+        const expectedStyle = step.type === "human" ? step.id === "milestone-gate" ? "mars" : "luna" : expectedAgents[step.agentId]!.nodeStyle;
         expect(step.nodeStyle).toBe(expectedStyle);
-        expect(step.nodeSize).toBe(step.type === "human" ? "tiny" : expectedStyle === "sol" ? "large" : "medium");
+        expect(step.nodeSize).toBe(step.type === "human" ? step.id === "milestone-gate" ? "small" : "tiny" : expectedStyle === "sol" ? "large" : "medium");
       }
     }
 
@@ -158,8 +158,8 @@ describe("repository Loop engineering configuration", () => {
       "milestone-delivery": {
         start: "implement-milestone",
         nodes: [
-          ["implement-milestone", "agent", "implementation-agent", { approved: "run-acceptance-tests", rejected: "blocked" }],
-          ["run-acceptance-tests", "agent", "acceptance-test-agent", { approved: "implementation-gate", rejected: "implement-milestone" }],
+          ["implement-milestone", "agent", "implementation-agent", { approved: "review-implementation", rejected: "implement-milestone" }],
+          ["review-implementation", "agent", "acceptance-test-agent", { approved: "implementation-gate", rejected: "implement-milestone" }],
           ["implementation-gate", "human", null, { approved: { loop: "release-validation" }, rejected: "implement-milestone" }]
         ]
       },

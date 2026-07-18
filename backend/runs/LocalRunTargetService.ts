@@ -1,5 +1,4 @@
 import type { AppData } from "../../shared/api/workspace-contracts.js";
-import { BLUEPRINT_LOOP_ID } from "../../shared/domain/loopHandoff.js";
 import type { AgentRuntimeConfiguration } from "../../shared/domain/runtime.js";
 import type { RunTarget, RunTargetsResponse } from "../../shared/domain/runs.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
@@ -28,12 +27,6 @@ export class LocalRunTargetService {
       const issues: RunTarget["issues"] = data.automationIssues.map((issue) => ({
         code: "invalid_config", message: issue.message, path: issue.path
       }));
-      if (loop.id !== BLUEPRINT_LOOP_ID) {
-        issues.push({
-          code: "invalid_config",
-          message: "This Loop can only start from its approved human-gate transition."
-        });
-      }
       issues.push(...relevantLoopThemeIssues(data, loop.id).map((issue) => ({
         code: "invalid_config" as const, message: issue.message, path: issue.path
       })));

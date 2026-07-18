@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { Agent, ExecutionTask, ProjectStep, StepRun } from "@shared/api/workspace-contracts";
 import { LoopRunStepInstructions, LoopRunStepOutput } from "../src/workspace/automation/loops/LoopRunStepSheet";
@@ -31,7 +32,9 @@ describe("Loop Run sheet", () => {
     expect(screen.queryByText("Mutable instructions")).not.toBeInTheDocument();
   });
 
-  it("shows structured agent output and replaces the console with human response controls", () => {
+  it("shows structured agent output and requires an explicit human transition choice", async () => {
+    const user = userEvent.setup();
+    const onRespond = vi.fn(async () => true);
     const agentRun: StepRun = {
       stepRunId: "step-agent",
       runId: "root-1",
@@ -40,7 +43,8 @@ describe("Loop Run sheet", () => {
       type: "agent",
       agentId: "developer",
       status: "completed",
-      outcome: { outcome: "ready", summary: "Implementation verified.", checks: [{ name: "lint", status: "passed" }] },
+      result: "approved",
+      outcome: { state: "completed", result: "approved", summary: "Implementation verified.", checks: [{ name: "lint", status: "passed" }] },
       attempt: 1,
       createdAt: "2026-07-11T10:00:00.000Z",
       updatedAt: "2026-07-11T10:01:00.000Z",
@@ -69,11 +73,71 @@ describe("Loop Run sheet", () => {
       createdAt: "2026-07-11T10:01:00.000Z",
       updatedAt: "2026-07-11T10:01:00.000Z"
     };
-    view.rerender(<LoopRunStepOutput step={humanStep} stepRun={humanRun} pending={false} onTerminal={vi.fn()} onRespond={vi.fn()} />);
+    view.rerender(<LoopRunStepOutput step={humanStep} stepRun={humanRun} pending={false} onTerminal={vi.fn()} onRespond={onRespond} />);
     expect(screen.getByLabelText("Response")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approved" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rejected" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/CLI console/)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Response"), "Approved by the operator.{enter}");
+    expect(onRespond).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Approved" }));
+    expect(onRespond).toHaveBeenCalledWith("step-human", { kind: "human", result: "approved", input: "Approved by the operator.\n" });
+  });
+
+  it("shows a durable agent question and resumes the same Step without a transition result", async () => {
+    const user = userEvent.setup();
+    const onRespond = vi.fn(async () => true);
+    const needsInput: StepRun = {
+      stepRunId: "step-agent",
+      runId: "root-1",
+      loopId: "delivery",
+      stepId: "implement",
+      type: "agent",
+      agentId: "developer",
+      status: "needs_input",
+      outcome: {
+        state: "needs_input",
+        question: "Which database should I use?",
+        context: "The repository supports SQLite and Postgres.",
+        summary: "A storage decision is required.",
+        checks: []
+      },
+      attempt: 1,
+      createdAt: "2026-07-11T10:00:00.000Z",
+      updatedAt: "2026-07-11T10:01:00.000Z"
+    };
+
+    render(<LoopRunStepOutput step={agentStep} stepRun={needsInput} pending={false} onTerminal={vi.fn()} onRespond={onRespond} />);
+
+    expect(screen.getByText("Which database should I use?")).toBeInTheDocument();
+    expect(screen.getByText("The repository supports SQLite and Postgres.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approved" })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Response"), "Use SQLite.");
+    await user.click(screen.getByRole("button", { name: "Continue step" }));
+    expect(onRespond).toHaveBeenCalledWith("step-agent", { kind: "resume", input: "Use SQLite." });
+  });
+
+  it("shows the blocker reason without fabricating a rejected transition", () => {
+    const blocked: StepRun = {
+      stepRunId: "step-agent",
+      runId: "root-1",
+      loopId: "delivery",
+      stepId: "implement",
+      type: "agent",
+      agentId: "developer",
+      status: "blocked",
+      outcome: { state: "blocked", summary: "Access to the signing key is unavailable.", checks: [] },
+      attempt: 1,
+      createdAt: "2026-07-11T10:00:00.000Z",
+      updatedAt: "2026-07-11T10:01:00.000Z",
+      completedAt: "2026-07-11T10:01:00.000Z"
+    };
+
+    render(<LoopRunStepOutput step={agentStep} stepRun={blocked} pending={false} onTerminal={vi.fn()} onRespond={vi.fn()} />);
+
+    expect(screen.getByText("Access to the signing key is unavailable.")).toBeInTheDocument();
+    expect(screen.getByText("blocked")).toBeInTheDocument();
+    expect(screen.getByText("Transition").nextElementSibling).toHaveTextContent("—");
   });
 });
 

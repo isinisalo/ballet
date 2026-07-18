@@ -40,7 +40,7 @@ const runLiveSmoke = async (adapter: CliRuntimeAdapter, provider: RuntimeProvide
   try {
     for await (const event of adapter.execute({
       executionId: `${provider}-live-smoke`,
-      prompt: "Do not modify files. Return a ready outcome with the summary 'smoke ok' and no checks.",
+      prompt: "Do not modify files. Return a completed outcome with result approved, the summary 'smoke ok', and no checks.",
       workingDirectory: root,
       model: models[0]!.id,
       reasoning: models[0]!.defaultReasoning ?? "provider-default",
@@ -54,6 +54,10 @@ const runLiveSmoke = async (adapter: CliRuntimeAdapter, provider: RuntimeProvide
   }
   expect(events).toContainEqual(expect.objectContaining({
     type: "execution.completed",
-    structuredOutput: expect.objectContaining({ outcome: "ready", summary: "smoke ok" })
+    structuredOutput: expect.objectContaining({
+      state: "completed",
+      result: "approved",
+      summary: "smoke ok"
+    })
   }));
 };

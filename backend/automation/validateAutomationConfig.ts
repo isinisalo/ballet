@@ -1,6 +1,5 @@
 import type { Agent } from "../../shared/domain/agents.js";
 import type {
-  ProjectExecutableStep,
   ProjectAutomationConfig,
   ProjectAutomationIssue,
   ProjectLoop,
@@ -14,7 +13,6 @@ import {
   resolveEffectiveStartStep
 } from "../../shared/domain/automation.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
-import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 
 export class AutomationValidationError extends Error {
   constructor(
@@ -55,7 +53,6 @@ const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } 
 const validateTarget = (
   target: StepTransitionTarget,
   path: string,
-  step: ProjectExecutableStep,
   sourceLoopId: string,
   nodesById: ReadonlyMap<string, ProjectLoopNode>,
   loopIds: ReadonlySet<string>
@@ -67,9 +64,6 @@ const validateTarget = (
   }
   if (!isLoopTarget(target)) return [];
   const issues: ProjectAutomationIssue[] = [];
-  if (step.type !== "human") {
-    issues.push({ path, message: "Only a human step may transition to another loop." });
-  }
   if (!loopIds.has(target.loop)) {
     issues.push({ path, message: `Transition references unknown loop: ${target.loop}.` });
   }
@@ -115,7 +109,7 @@ const validateLoop = (
       issues.push({ path: `${base}.agentId`, message: `Step references unknown agent: ${step.agentId}.` });
     }
     for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
-      issues.push(...validateTarget(target, `${base}.on.${transitionId}`, step, loop.id, nodesById, loopIds));
+      issues.push(...validateTarget(target, `${base}.on.${transitionId}`, loop.id, nodesById, loopIds));
     }
   });
   const scheduledIds = new Set(scheduledSteps.map(({ step }) => step.id));
@@ -160,59 +154,6 @@ const validateLoop = (
   return issues;
 };
 
-const validateApprovedPaths = (
-  config: ProjectAutomationConfig
-): ProjectAutomationIssue[] => {
-  const loopsById = new Map(config.loops.map((loop) => [loop.id, loop]));
-  const issues: ProjectAutomationIssue[] = [];
-
-  config.loops.forEach((rootLoop, loopIndex) => {
-    let loop = rootLoop;
-    let step = resolveEffectiveStartStep(rootLoop);
-    let transitionCount = 0;
-    const visited = new Set<string>();
-
-    while (true) {
-      if (!step) return;
-
-      const state = `${loop.id}\0${step.id}`;
-      if (visited.has(state)) {
-        issues.push({
-          path: `loops.${loopIndex}.start`,
-          message: "The all-approved path cycles before reaching a terminal target."
-        });
-        return;
-      }
-      visited.add(state);
-
-      transitionCount += 1;
-      if (transitionCount > MAX_ROOT_TRANSITIONS) {
-        issues.push({
-          path: `loops.${loopIndex}.start`,
-          message: `The all-approved path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
-        });
-        return;
-      }
-
-      const target = step.on.approved;
-      if (typeof target === "string") {
-        const nextNode = loop.nodes.find((candidate) => candidate.id === target);
-        if (!nextNode || isProjectTerminalNode(nextNode) || nextNode.type === "scheduled") return;
-        step = nextNode;
-        continue;
-      }
-      if (!isLoopTarget(target)) return;
-
-      const targetLoop = loopsById.get(target.loop);
-      if (!targetLoop) return;
-      loop = targetLoop;
-      step = resolveEffectiveStartStep(targetLoop);
-    }
-  });
-
-  return issues;
-};
-
 export const validateProjectAutomationConfig = (
   input: unknown,
   agents?: readonly Agent[]
@@ -235,6 +176,5 @@ export const validateProjectAutomationConfig = (
   config.loops.forEach((loop, index) => {
     issues.push(...validateLoop(loop, index, loopIds, agentIds));
   });
-  issues.push(...validateApprovedPaths(config));
   return issues;
 };

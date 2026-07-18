@@ -6,14 +6,15 @@ export const MAX_LOOP_STEP_HISTORY_ENTRIES = 3;
 
 const RUN_INPUT_TRUNCATION_MARKER = "\n[... RUN_INPUT TRUNCATED ...]\n";
 const TEXT_TRUNCATION_MARKER = " [... TRUNCATED ...] ";
-const terminalStepStatuses = new Set<StepRun["status"]>(["completed", "failed", "cancelled"]);
+const terminalStepStatuses = new Set<StepRun["status"]>(["completed", "blocked", "failed", "cancelled"]);
 const shaArtifactKey = /^(git_sha|commit_sha)$/;
 const branchArtifactKey = /^branch$/;
-const pathArtifactKey = /^(changed_files|artifact_path|file|files|file_path|path|paths|document|document_path|report|report_path|roadmap|milestone|milestones|task|tasks|design|design_path|deployment|deployment_path)$/;
+const pathArtifactKey = /^(changed_files|artifact_path|file|files|file_path|path|paths|document|document_path|report|report_path|task|tasks|design|design_path)$/;
 const safePathCharacters = /^[\p{L}\p{N}._@+/-]+$/u;
 
 interface LoopStepHistoryOutcome {
-  status: AgentOutcome["outcome"];
+  state: AgentOutcome["state"];
+  result?: "approved" | "rejected";
   summary: string;
   checks?: Array<{
     name: string;
@@ -40,6 +41,11 @@ export interface LoopStepPromptEnvelope {
     loop_id: string;
     step_id: string;
     description: string;
+    resume?: {
+      question: string;
+      context: string;
+      response: string;
+    };
   };
   run_input: string;
   recent_steps: LoopStepHistoryEntry[];
@@ -59,7 +65,14 @@ export const renderLoopStepPrompt = (
     current: {
       loop_id: currentRun.loopId,
       step_id: currentStep.stepId,
-      description: snapshotStep.description
+      description: snapshotStep.description,
+      ...(currentStep.outcome?.state === "needs_input" && currentStep.responseInput ? {
+        resume: {
+          question: currentStep.outcome.question,
+          context: currentStep.outcome.context,
+          response: currentStep.responseInput
+        }
+      } : {})
     },
     run_input: truncateMiddle(currentStep.input ?? currentRun.input ?? "", MAX_LOOP_RUN_INPUT_CHARS, RUN_INPUT_TRUNCATION_MARKER),
     recent_steps: recentHistory(runs, currentStep.stepRunId)
@@ -114,7 +127,8 @@ const compactOutcome = (outcome: AgentOutcome): LoopStepHistoryOutcome => {
     }));
   const artifactRefs = safeArtifactRefs(outcome.artifacts);
   return {
-    status: outcome.outcome,
+    state: outcome.state,
+    ...(outcome.state === "completed" ? { result: outcome.result } : {}),
     summary: compactText(outcome.summary, 180),
     ...(checks.length > 0 ? { checks } : {}),
     ...(artifactRefs && Object.keys(artifactRefs).length > 0 ? { artifact_refs: artifactRefs } : {})

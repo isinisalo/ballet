@@ -19,8 +19,9 @@ function Snapshot({ detail, task }: { detail: RootRunDetail; task: ExecutionTask
 
 function Outcome({ outcome }: { outcome?: AgentOutcome }) {
   if (!outcome) return null;
-  const destructive = outcome.outcome === "failed" || outcome.outcome === "blocked";
-  return <section className="grid gap-2 border-t border-divider-strong pt-3" aria-label="Run outcome"><div className="flex items-center gap-2"><ShieldCheck className="size-3.5 text-secondary" /><h3 className="font-semibold">Outcome</h3><Badge variant={destructive ? "destructive" : "secondary"}>{outcome.outcome}</Badge></div><p className="text-muted-foreground">{outcome.summary}</p>{outcome.checks.length ? <ul className="grid gap-1 font-mono text-[0.65rem]">{outcome.checks.map((check) => <li key={check.name} className="flex justify-between gap-3"><span>{check.name}</span><span className={check.status === "failed" ? "text-destructive" : check.status === "passed" ? "text-secondary" : "text-muted-foreground"}>{check.status}</span></li>)}</ul> : null}</section>;
+  const destructive = outcome.state === "failed" || outcome.state === "blocked";
+  const label = outcome.state === "completed" ? `${outcome.state} · ${outcome.result}` : outcome.state;
+  return <section className="grid gap-2 border-t border-divider-strong pt-3" aria-label="Run outcome"><div className="flex items-center gap-2"><ShieldCheck className="size-3.5 text-secondary" /><h3 className="font-semibold">Outcome</h3><Badge variant={destructive ? "destructive" : outcome.state === "needs_input" ? "outline" : "secondary"} className={outcome.state === "needs_input" ? "border-tertiary/30 text-tertiary" : undefined}>{label}</Badge></div><p className="text-muted-foreground">{outcome.summary}</p>{outcome.checks.length ? <ul className="grid gap-1 font-mono text-[0.65rem]">{outcome.checks.map((check) => <li key={check.name} className="flex justify-between gap-3"><span>{check.name}</span><span className={check.status === "failed" ? "text-destructive" : check.status === "passed" ? "text-secondary" : "text-muted-foreground"}>{check.status}</span></li>)}</ul> : null}</section>;
 }
 
 function Finalization({ detail, task }: { detail: RootRunDetail; task: ExecutionTask }) {

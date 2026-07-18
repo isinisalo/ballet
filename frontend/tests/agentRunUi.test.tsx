@@ -31,7 +31,7 @@ describe("direct agent Run UI", () => {
   });
 
   it("shows immutable snapshot, outcome, branch and diff", () => {
-    const outcome = { outcome: "ready" as const, summary: "Implemented and verified the change.", artifacts: { changed_files: ["frontend/src/App.tsx"], diff: "+export const ready = true;" }, checks: [{ name: "lint", status: "passed" as const }] };
+    const outcome = { state: "completed" as const, result: "approved" as const, summary: "Implemented and verified the change.", artifacts: { changed_files: ["frontend/src/App.tsx"], diff: "+export const approved = true;" }, checks: [{ name: "lint", status: "passed" as const }] };
     const completed = agentRootRun({
       status: "completed",
       outcome,
@@ -45,7 +45,7 @@ describe("direct agent Run UI", () => {
     expect(screen.getByText("Follow the immutable review instructions.")).toBeInTheDocument();
     expect(screen.getByText("Implemented and verified the change.")).toBeInTheDocument();
     expect(screen.getByText("codex/review")).toBeInTheDocument();
-    expect(screen.getByText("+export const ready = true;")).toBeInTheDocument();
+    expect(screen.getByText("+export const approved = true;")).toBeInTheDocument();
   });
 
   it("links a blocked Run to Runtimes", () => {

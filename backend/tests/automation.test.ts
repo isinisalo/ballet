@@ -6,15 +6,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Agent } from "../../shared/domain/agents.js";
 import {
   defaultTerminalNodes,
-  type ProjectAutomationConfig,
-  type ProjectStep
+  type ProjectAutomationConfig
 } from "../../shared/domain/automation.js";
 import {
   loadProjectAutomationConfig,
   saveProjectAutomationConfig,
   validateProjectAutomationConfig
 } from "../automation.js";
-import { MAX_ROOT_TRANSITIONS } from "../runtime/RuntimeDbTypes.js";
 
 const roots: string[] = [];
 const tempRoot = async () => {
@@ -119,7 +117,7 @@ describe("automation v8 config", () => {
     }, [agent]).some((issue) => issue.message.includes("terminal or cross-loop"))).toBe(true);
   });
 
-  it("allows cross-loop transitions only from humans and never back to the same loop", () => {
+  it("allows agent and human cross-loop transitions but never back to the same loop", () => {
     const target = {
       id: "release",
       start: "finish",
@@ -143,9 +141,7 @@ describe("automation v8 config", () => {
         }, ...defaultTerminalNodes()]
       }, target]
     };
-    expect(validateProjectAutomationConfig(agentCrossLoop, [agent]).some((issue) =>
-      issue.message === "Only a human step may transition to another loop."
-    )).toBe(true);
+    expect(validateProjectAutomationConfig(agentCrossLoop, [agent])).toEqual([]);
 
     const humanSelfLoop = {
       ...base,
@@ -162,8 +158,8 @@ describe("automation v8 config", () => {
   });
 });
 
-describe("all-approved path liveness", () => {
-  it("rejects an all-approved cycle across loops", () => {
+describe("cyclic and cross-loop paths", () => {
+  it("allows an all-approved cycle across loops when each Step has an exit", () => {
     const cyclic: ProjectAutomationConfig = {
       version: 8,
       loops: [{
@@ -191,51 +187,7 @@ describe("all-approved path liveness", () => {
       }]
     };
 
-    const issues = validateProjectAutomationConfig(cyclic, [agent]);
-    expect(issues.filter((issue) => issue.message.includes("all-approved path cycles"))).toHaveLength(2);
-  });
-
-  it("rejects an all-approved cross-loop path longer than the runtime transition limit", () => {
-    const longSteps: ProjectStep[] = Array.from(
-      { length: MAX_ROOT_TRANSITIONS },
-      (_, index): ProjectStep => ({
-        id: `step-${index + 1}`,
-        type: "human",
-        description: `Complete step ${index + 1}.`,
-        nodeStyle: "luna",
-        nodeSize: "tiny",
-        on: {
-          approved: index === MAX_ROOT_TRANSITIONS - 1
-            ? { loop: "finish" }
-            : `step-${index + 2}`,
-          rejected: "failed"
-        }
-      })
-    );
-    const tooLong: ProjectAutomationConfig = {
-      version: 8,
-      loops: [{
-        id: "delivery",
-        start: "step-1",
-        nodes: [...longSteps, ...defaultTerminalNodes()]
-      }, {
-        id: "finish",
-        start: "complete",
-        nodes: [{
-          id: "complete",
-          type: "human",
-          description: "Complete delivery.",
-          nodeStyle: "luna",
-          nodeSize: "tiny",
-          on: { approved: "completed", rejected: "failed" }
-        }, ...defaultTerminalNodes()]
-      }]
-    };
-
-    expect(validateProjectAutomationConfig(tooLong, [agent])).toContainEqual({
-      path: "loops.0.start",
-      message: `The all-approved path exceeds the root transition limit of ${MAX_ROOT_TRANSITIONS} before reaching a terminal target.`
-    });
+    expect(validateProjectAutomationConfig(cyclic, [agent])).toEqual([]);
   });
 
   it("allows a short all-approved chain across loops", () => {

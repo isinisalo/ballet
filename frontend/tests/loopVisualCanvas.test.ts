@@ -86,6 +86,51 @@ describe("terminal canvas nodes", () => {
 });
 
 describe("v8 compact loop canvas", () => {
+  it("contains only Approved and Rejected edges even when runtime state needs input", () => {
+    const run = {
+      runId: "run-1",
+      loopId: "brief",
+      rootRunId: "root-1",
+      source: "manual",
+      status: "waiting_for_human",
+      snapshot: config.loops[0],
+      themeSnapshot: defaultLoopTheme,
+      transitionCount: 0,
+      createdAt: "2026-07-18T10:00:00.000Z",
+      updatedAt: "2026-07-18T10:01:00.000Z",
+      stepRuns: [{
+        stepRunId: "step-1",
+        runId: "run-1",
+        loopId: "brief",
+        stepId: "create",
+        type: "agent",
+        agentId: "brief-agent",
+        status: "needs_input",
+        outcome: {
+          state: "needs_input",
+          question: "Which audience should the brief target?",
+          context: "The original request names two audiences.",
+          summary: "Audience selection is required.",
+          checks: []
+        },
+        attempt: 1,
+        createdAt: "2026-07-18T10:00:00.000Z",
+        updatedAt: "2026-07-18T10:01:00.000Z"
+      }]
+    } as LoopRunDetails;
+    const projection = buildLoopVisualProjection(config, config.loops[0]!, run);
+    const layout = calculateCompositeLoopCanvasLayout({
+      config: projection.config,
+      selectedLoopId: "brief",
+      recordsByLoopId: projection.recordsByLoopId
+    });
+
+    expect([...new Set(layout.edges.map((edge) => edge.route?.outputId).filter(Boolean))].sort())
+      .toEqual(["approved", "rejected"]);
+    expect(layout.edges.some((edge) => ["needs_input", "blocked", "failed", "ready", "changes-requested"].includes(edge.route?.outputId ?? "")))
+      .toBe(false);
+  });
+
   it("projects styled nodes, reachable terminal nodes, and cross-Loop transitions", () => {
     const projection = buildLoopVisualProjection(config, config.loops[0]!);
     const layout = calculateCompositeLoopCanvasLayout({

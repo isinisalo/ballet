@@ -61,10 +61,10 @@ export function LoopRunView({
   useEffect(() => setShowNewRun(false), [details?.runId]);
   useEffect(() => {
     const stepRuns = details?.stepRuns ?? [];
-    const active = [...stepRuns].reverse().find((stepRun) => ["queued", "running", "waiting_for_human"].includes(stepRun.status));
+    const active = [...stepRuns].reverse().find((stepRun) => ["queued", "running", "waiting_for_human", "needs_input"].includes(stepRun.status));
     const latest = stepRuns.at(-1);
     setSelectedStepRunId(active?.stepRunId ?? latest?.stepRunId);
-  }, [details?.runId, details?.stepRuns.at(-1)?.stepRunId, details?.stepRuns.find((stepRun) => ["queued", "running", "waiting_for_human"].includes(stepRun.status))?.stepRunId]);
+  }, [details?.runId, details?.stepRuns.at(-1)?.stepRunId, details?.stepRuns.find((stepRun) => ["queued", "running", "waiting_for_human", "needs_input"].includes(stepRun.status))?.stepRunId]);
 
   return (
     <div className="grid min-w-0">
@@ -85,7 +85,7 @@ export function LoopRunView({
           onOpenChange={(open) => { if (!open) setSelectedStepRunId(undefined); }}
           header={selectedStepRun && selectedStep ? <LoopRunStepHeader step={selectedStep} stepRun={selectedStepRun} /> : null}
           left={selectedStepRun && selectedStep ? <LoopRunStepInstructions step={selectedStep} agents={agents} task={selectedTask} snapshot={selectedAgentSnapshot} /> : null}
-          right={selectedStepRun && selectedStep ? <LoopRunStepOutput step={selectedStep} stepRun={selectedStepRun} task={selectedTask} pending={busy} onTerminal={() => void refresh()} onRespond={async (stepRunId, result, input) => Boolean(await respond(stepRunId, { result, input }))} /> : null}
+          right={selectedStepRun && selectedStep ? <LoopRunStepOutput step={selectedStep} stepRun={selectedStepRun} task={selectedTask} pending={busy} onTerminal={() => void refresh()} onRespond={async (stepRunId, request) => Boolean(await respond(stepRunId, request))} /> : null}
         />
       </div>
       {details ? (

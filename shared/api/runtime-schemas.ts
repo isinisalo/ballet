@@ -45,10 +45,20 @@ export const executionEventsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(500)
 }).strict();
 
-export const respondToRunStepBodySchema = z.object({
-  result: z.enum(["approved", "rejected"]),
-  input: z.string().max(20_000)
-}).strict();
+const runResponseInputSchema = z.string().max(20_000)
+  .refine((value) => value.trim().length > 0, "Response input is required.");
+
+export const respondToRunStepBodySchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("human"),
+    result: z.enum(["approved", "rejected"]),
+    input: runResponseInputSchema
+  }).strict(),
+  z.object({
+    kind: z.literal("resume"),
+    input: runResponseInputSchema
+  }).strict()
+]);
 
 const runCheckSchema = z.object({
   name: z.string().trim().min(1).max(500),
@@ -56,11 +66,34 @@ const runCheckSchema = z.object({
   details: z.string().max(4000).optional()
 }).strict();
 
-export const agentOutcomeSchema = z.object({
-  outcome: z.enum(["ready", "blocked", "needs_input", "approved", "changes-requested", "failed"]),
+const agentOutcomeFields = {
   summary: z.string().max(20_000),
   artifacts: z.record(z.string(), z.unknown()).optional(),
   checks: z.array(runCheckSchema).max(500)
-}).strict();
+};
+
+export const agentOutcomeSchema = z.discriminatedUnion("state", [
+  z.object({
+    state: z.literal("completed").describe("The Step finished and produced a control-flow result."),
+    result: z.enum(["approved", "rejected"]).describe(
+      "Use rejected when completed work requires another pass; keep feedback in summary and checks."
+    ),
+    ...agentOutcomeFields
+  }).strict(),
+  z.object({
+    state: z.literal("needs_input").describe("The same Step must pause until the user answers a question."),
+    question: z.string().trim().min(1).max(20_000).describe("The exact question for the user."),
+    context: z.string().max(20_000).describe("Context the same Step needs when it resumes."),
+    ...agentOutcomeFields
+  }).strict(),
+  z.object({
+    state: z.literal("blocked").describe("The Step cannot continue because of an external blocker."),
+    ...agentOutcomeFields
+  }).strict(),
+  z.object({
+    state: z.literal("failed").describe("The Step ended because execution failed."),
+    ...agentOutcomeFields
+  }).strict()
+]);
 
 export const agentOutcomeJsonSchema = z.toJSONSchema(agentOutcomeSchema) as Record<string, unknown>;

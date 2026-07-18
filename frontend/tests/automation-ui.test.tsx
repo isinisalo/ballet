@@ -125,7 +125,7 @@ describe("automation v8 UI", () => {
     await user.click(approved);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1/steps/step-run-1/respond", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ result: "approved", input: "Looks good" })
+      body: JSON.stringify({ kind: "human", result: "approved", input: "Looks good" })
     })));
   });
 
@@ -136,7 +136,7 @@ describe("automation v8 UI", () => {
     await user.click(screen.getByRole("button", { name: "Rejected" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1/steps/step-run-1/respond", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ result: "rejected", input: "Needs another pass" })
+      body: JSON.stringify({ kind: "human", result: "rejected", input: "Needs another pass" })
     })));
   });
 

@@ -152,6 +152,10 @@ export class RuntimeDatabase {
     return this.loopRunEngine.respond(config, loopTheme, runId, stepRunId, result, input);
   }
 
+  resumeStepRun(runId: string, stepRunId: string, input: string): LoopRunDetails {
+    return this.loopRunEngine.resumeAgentStep(runId, stepRunId, input);
+  }
+
   cancelLoopRun(runId: string): LoopRunDetails {
     return this.loopRunEngine.cancel(runId);
   }
@@ -161,6 +165,7 @@ export class RuntimeDatabase {
     loopTheme: LoopTheme,
     input: {
       stepRunId: string;
+      executionTaskId?: string;
       outcome?: AgentOutcome;
       error?: string;
     }

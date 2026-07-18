@@ -6,7 +6,7 @@ import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type {
   ExecutionSpec,
   ExecutionTask,
-  StepRunResult
+  RespondToStepRunRequest
 } from "../../shared/domain/runtime.js";
 import type { RootRunDetail, RootRunListQuery, RootRunListResponse, StartRootRunRequest } from "../../shared/domain/runs.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
@@ -21,7 +21,6 @@ import type { RuntimeDatabase } from "../runtime-db.js";
 import type { DispatchLoopScheduleResult } from "../runtime-db.js";
 import { LoopRunConflictError, LoopRunNotFoundError, LoopRunStateError } from "../runtime/LoopRunErrors.js";
 import { renderLoopStepPrompt } from "../integration/LoopStepPrompt.js";
-import { validateLoopRunStart } from "../services/LoopRunStartPolicy.js";
 import { RootRunStore, type StoredRootRun } from "./RootRunStore.js";
 import { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import { agentSnapshot, relevantLoopThemeIssues } from "./LoopExecutionSnapshot.js";
@@ -187,9 +186,9 @@ export class LocalRunService {
     return this.detailRequired(rootRunId);
   }
 
-  async respond(rootRunId: string, stepRunId: string, result: StepRunResult, input: string): Promise<RootRunDetail> {
+  async respond(rootRunId: string, stepRunId: string, request: RespondToStepRunRequest): Promise<RootRunDetail> {
     const root = this.options.roots.require(rootRunId);
-    if (root.kind !== "loop") throw new LoopRunStateError("Only a Loop Run can contain a human gate.");
+    if (root.kind !== "loop") throw new LoopRunStateError("Only a Loop Run can contain a resumable Step.");
     const step = this.options.database.getStepRun(stepRunId);
     if (!step) throw new LoopRunNotFoundError(`Step Run ${stepRunId} was not found.`);
     if (!this.options.database.listRootLoopRuns(rootRunId).some((run) => run.runId === step.runId)) {
@@ -201,7 +200,18 @@ export class LocalRunService {
       await this.failRoot(root, error);
       throw error;
     }
-    this.options.database.respondToStepRun(snapshot.automation, snapshot.loopTheme, step.runId, stepRunId, result, input);
+    if (request.kind === "resume") {
+      this.options.database.resumeStepRun(step.runId, stepRunId, request.input);
+    } else {
+      this.options.database.respondToStepRun(
+        snapshot.automation,
+        snapshot.loopTheme,
+        step.runId,
+        stepRunId,
+        request.result,
+        request.input
+      );
+    }
     await this.enqueuePending(rootRunId);
     await this.syncLoopRoot(rootRunId);
     this.changed(rootRunId);
@@ -219,10 +229,9 @@ export class LocalRunService {
       return;
     }
     if (task.kind === "agent_run") {
-      const successful = task.status === "succeeded" && task.outcome
-        && ["ready", "approved"].includes(task.outcome.outcome);
-      const status = task.status === "cancelled" ? "cancelled" : successful ? "completed"
-        : task.status === "succeeded" ? "blocked" : "failed";
+      const status = task.status === "cancelled" ? "cancelled"
+        : task.status !== "succeeded" || !task.outcome || task.outcome.state === "failed" ? "failed"
+          : task.outcome.state === "completed" && task.outcome.result === "approved" ? "completed" : "blocked";
       this.options.roots.setStatus(root.rootRunId, status, {
         outcome: task.outcome, errorCode: task.errorCode, errorMessage: task.errorMessage,
         runtime: task.spec.runtime
@@ -236,19 +245,29 @@ export class LocalRunService {
     }
     if (task.errorCode === "interrupted") {
       const timestamp = new Date().toISOString();
-      this.options.connection().transaction(() => {
-        this.options.connection().prepare(`
-          UPDATE step_runs SET status = 'failed', error = ?, completed_at = ?, updated_at = ?
-          WHERE step_run_id = ? AND status IN ('queued','running')
-        `).run(task.errorMessage ?? "Execution interrupted.", timestamp, timestamp, task.spec.stepRunId);
+      const message = task.errorMessage ?? "Execution interrupted.";
+      const applied = this.options.connection().transaction(() => {
+        const stepUpdate = this.options.connection().prepare(`
+          UPDATE step_runs SET status = 'failed', result = NULL, outcome_json = ?, error = ?,
+            completed_at = ?, updated_at = ?
+          WHERE step_run_id = ? AND execution_task_id = ? AND status IN ('queued','running')
+        `).run(JSON.stringify({ state: "failed", summary: message, checks: [] }), message,
+          timestamp, timestamp, task.spec.stepRunId, task.id);
+        if (stepUpdate.changes !== 1) return false;
         this.options.connection().prepare(`
           UPDATE loop_runs SET status = 'failed', completed_at = ?, updated_at = ?
           WHERE run_id = ? AND status IN ('running','waiting_for_human')
         `).run(timestamp, timestamp, task.spec.loopRunId);
         this.options.roots.setStatus(task.rootRunId, "failed", {
-          errorCode: task.errorCode, errorMessage: task.errorMessage, runtime: task.spec.runtime
+          errorCode: task.errorCode, errorMessage: message, runtime: task.spec.runtime
         });
+        return true;
       })();
+      if (!applied) {
+        await this.enqueuePending(task.rootRunId);
+        await this.syncLoopRoot(task.rootRunId);
+        return;
+      }
       await this.finalizer.finalize(task.rootRunId, "failed");
       return;
     }
@@ -256,6 +275,7 @@ export class LocalRunService {
       const snapshot = await this.runConfiguration(root);
       this.options.database.completeAgentStep(snapshot.automation, snapshot.loopTheme, {
         stepRunId: task.spec.stepRunId,
+        executionTaskId: task.id,
         outcome: task.outcome,
         error: task.status === "succeeded" ? undefined : task.errorMessage ?? task.status
       });
@@ -305,7 +325,6 @@ export class LocalRunService {
     if (relevantLoopThemeIssues(data, loopId).length > 0) {
       throw new LoopRunStateError("Cannot start a Loop while its theme configuration is invalid.");
     }
-    await validateLoopRunStart(data, loopId, input);
     const loop = data.automation.loops.find((candidate) => candidate.id === loopId);
     if (!loop) throw new LoopRunNotFoundError(`Loop ${loopId} was not found.`);
     const plan = await this.planner.create(data, loopId);
@@ -422,7 +441,7 @@ export class LocalRunService {
       if (!["succeeded", "failed", "cancelled"].includes(task.status)) return false;
       if (task.kind === "agent_run") return root.kind === "agent";
       const step = task.spec.stepRunId ? this.options.database.getStepRun(task.spec.stepRunId) : undefined;
-      return Boolean(step && ["queued", "running"].includes(step.status));
+      return Boolean(step && step.executionTaskId === task.id && ["queued", "running"].includes(step.status));
     });
     if (!terminal) return false;
     await this.handleTerminal(terminal);
