@@ -34,7 +34,7 @@ function resolveEditorActionState({ pending, valid, dirty }: { pending: boolean;
   return dirty ? "dirty" : "saved";
 }
 
-function DeleteAction({ deleteLabel, deleteType, resourceName, disabled = false, onDelete }: DeleteActionProps) {
+export function DeleteAction({ deleteLabel, deleteType, resourceName, disabled = false, onDelete }: DeleteActionProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (

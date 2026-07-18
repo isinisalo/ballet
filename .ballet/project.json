@@ -256,7 +256,7 @@
     {
       "id": "milestone-delivery",
       "start": "implement-milestone",
-      "summaryStyle": "route",
+      "summaryStyle": "twin-core",
       "nodes": [
         {
           "description": "Toteuta hyväksytyn milestonen kaikki määritellyt GitHub-issues-muutokset ja testit IMPLEMENTATION-PLAN.md:n, TEST-PLAN.md:n ja UI-artifacttien mukaisesti.",

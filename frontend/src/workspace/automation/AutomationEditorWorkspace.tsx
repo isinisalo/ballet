@@ -5,13 +5,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AutomationIssues } from "./AutomationIssues";
 import { LoopCreationEditor, LoopEditor } from "./loops/LoopEditor";
 
-export function AutomationEditorWorkspace({ data, agentExecutionStates, draft, candidateConfig, displayedLoop, selectedLoop, scheduleState, creating, locked, dirty, valid, saving, error, issues, onSave, onRemove, onChange }: {
+export function AutomationEditorWorkspace({ data, agentExecutionStates, draft, candidateConfig, displayedLoop, scheduleState, creating, locked, dirty, valid, saving, error, issues, onSave, onChange }: {
   data: AppData;
   agentExecutionStates: AgentExecutionState[];
   draft: ProjectAutomationConfig;
   candidateConfig: ProjectAutomationConfig;
   displayedLoop?: ProjectLoop;
-  selectedLoop?: ProjectLoop;
   scheduleState: AppData["scheduleStates"][number] | undefined;
   creating: boolean;
   locked: boolean;
@@ -21,7 +20,6 @@ export function AutomationEditorWorkspace({ data, agentExecutionStates, draft, c
   error: string;
   issues: ProjectAutomationIssue[];
   onSave: () => Promise<void>;
-  onRemove: () => Promise<void>;
   onChange: (loop: ProjectLoop) => void;
 }) {
   const editActions = (
@@ -31,11 +29,6 @@ export function AutomationEditorWorkspace({ data, agentExecutionStates, draft, c
       dirty={dirty}
       valid={valid && !locked}
       pending={saving}
-      deleteLabel="Delete loop"
-      deleteType="loop"
-      resourceName={selectedLoop?.id}
-      canDelete={Boolean(selectedLoop) && !locked}
-      onDelete={onRemove}
     />
   );
 

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Palette, Route } from "lucide-react";
 import type { AgentExecutionState, AppData, ProjectAutomationConfig, ProjectAutomationIssue, ProjectLoop } from "@shared/api/workspace-contracts";
 import { Panel } from "@/components/shared/workspace-ui";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { AutomationLoopView } from "../types";
-import { automationLoopPath, automationThemePath } from "../routing";
+import { automationAllLoopsPath, automationLoopPath, automationThemePath } from "../routing";
 import { AutomationEditorWorkspace, AutomationIssueBanner } from "./AutomationEditorWorkspace";
 import { useAutomationDraft } from "./useAutomationDraft";
 import { AllLoopsCanvas } from "./loops/AllLoopsCanvas";
@@ -42,12 +43,23 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   }, [creating]);
 
   const issues = [...data.automationIssues, ...data.loopThemeIssues];
-  if (loopView === "all") return <AutomationOverview draft={draft} issues={issues} navigate={navigate} />;
+  const lockedLoopIds = new Set(data.loopRuns.filter((run) => isActiveLoopRun(run)).map((run) => run.loopId));
 
   const updateLoop = (loop: ProjectLoop) => {
     if (operationRef.current) return;
     if (creating) setCreateDraft(loop);
     else if (selectedIndex >= 0) setDraft((config) => updateLoopAtIndex(config, selectedIndex, loop));
+  };
+  const updateLoopFromOverview = async (loop: ProjectLoop) => {
+    if (operationRef.current) return;
+    const index = draft.loops.findIndex((candidate) => candidate.id === loop.id);
+    if (index < 0 || lockedLoopIds.has(loop.id)) return;
+    operationRef.current = true;
+    try {
+      await saveDraft(updateLoopAtIndex(draft, index, loop));
+    } finally {
+      operationRef.current = false;
+    }
   };
   const save = async () => {
     if (!displayedLoop || locked || operationRef.current) return;
@@ -66,17 +78,20 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
       operationRef.current = false;
     }
   };
-  const remove = async () => {
-    if (selectedIndex < 0 || locked || operationRef.current) return;
+  const removeLoopFromOverview = async (loopId: string) => {
+    if (operationRef.current || lockedLoopIds.has(loopId)) return;
+    const index = draft.loops.findIndex((loop) => loop.id === loopId);
+    if (index < 0) return;
     operationRef.current = true;
     try {
-      const nextId = draft.loops.find((_, index) => index !== selectedIndex)?.id;
-      if (!await saveDraft(removeLoopAtIndex(draft, selectedIndex))) return;
-      navigate(automationLoopPath(nextId), { bypassBlocker: true });
+      if (!await saveDraft(removeLoopAtIndex(draft, index))) return;
+      navigate(automationAllLoopsPath(), { bypassBlocker: true });
     } finally {
       operationRef.current = false;
     }
   };
+
+  if (loopView === "all") return <AutomationOverview draft={draft} issues={issues} error={error} saving={saving} lockedLoopIds={lockedLoopIds} navigate={navigate} onChangeLoop={updateLoopFromOverview} onDeleteLoop={removeLoopFromOverview} />;
 
   return (
     <AutomationEditorWorkspace
@@ -85,7 +100,6 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
       draft={draft}
       candidateConfig={candidateConfig}
       displayedLoop={displayedLoop}
-      selectedLoop={selectedLoop}
       scheduleState={scheduleState}
       creating={creating}
       locked={locked}
@@ -95,19 +109,36 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
       error={error}
       issues={issues}
       onSave={save}
-      onRemove={remove}
       onChange={updateLoop}
     />
   );
 }
 
-function AutomationOverview({ draft, issues, navigate }: { draft: ProjectAutomationConfig; issues: ProjectAutomationIssue[]; navigate: WorkspaceNavigation["navigate"] }) {
+function AutomationOverview({ draft, issues, error, saving, lockedLoopIds, navigate, onChangeLoop, onDeleteLoop }: {
+  draft: ProjectAutomationConfig;
+  issues: ProjectAutomationIssue[];
+  error: string;
+  saving: boolean;
+  lockedLoopIds: ReadonlySet<string>;
+  navigate: WorkspaceNavigation["navigate"];
+  onChangeLoop: (loop: ProjectLoop) => unknown | Promise<unknown>;
+  onDeleteLoop: (loopId: string) => unknown | Promise<unknown>;
+}) {
   return (
     <Panel title="Automation" icon={<Route />} contentClassName="p-0" action={<div className="flex items-center gap-2">
       <Button size="sm" variant="outline" onClick={() => navigate(automationThemePath())}><Palette /> Edit theme</Button>
     </div>}>
       <AutomationIssueBanner issues={issues} />
-      <AllLoopsCanvas config={draft} onAddLoop={() => navigate(automationLoopPath())} onOpenLoop={(id) => navigate(automationLoopPath(id))} />
+      {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      <AllLoopsCanvas
+        config={draft}
+        disabled={saving}
+        lockedLoopIds={lockedLoopIds}
+        onAddLoop={() => navigate(automationLoopPath())}
+        onOpenLoop={(id) => navigate(automationLoopPath(id))}
+        onChangeLoop={onChangeLoop}
+        onDeleteLoop={onDeleteLoop}
+      />
     </Panel>
   );
 }

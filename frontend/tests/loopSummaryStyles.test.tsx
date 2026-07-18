@@ -11,7 +11,6 @@ import {
   type ProjectLoop
 } from "@shared/api/workspace-contracts";
 import { AllLoopsCanvas } from "../src/workspace/automation/loops/AllLoopsCanvas";
-import { EditorActions } from "../src/components/shared/editor-actions";
 import { LoopEditor } from "../src/workspace/automation/loops/LoopEditor";
 import { createLoopDraft } from "../src/workspace/automation/loops/loopEditorState";
 import { LoopSummaryArtwork } from "../src/workspace/automation/loops/LoopSummaryArtwork";
@@ -78,32 +77,27 @@ describe("Loop summary styles", () => {
 });
 
 describe("Loop summary style UI", () => {
-  it("defaults new drafts to Route and keeps the labelled selector available before the first Step", async () => {
+  it("renders the labelled selector on an All Loops card and updates the selected Loop", async () => {
     const user = userEvent.setup();
     const draft = createLoopDraft();
     const onChange = vi.fn();
     render(
-      <LoopEditor
+      <AllLoopsCanvas
         config={{ version: 8, loops: [draft] }}
-        loop={draft}
-        loops={[]}
-        agents={[]}
-        theme={defaultLoopTheme}
-        locked={false}
-        canvasControls={<button type="button">Save sentinel</button>}
-        onChange={onChange}
+        onAddLoop={() => undefined}
+        onOpenLoop={() => undefined}
+        onChangeLoop={onChange}
       />
     );
 
     expect(draft.summaryStyle).toBe("route");
     const selector = screen.getByRole("combobox", { name: "Loop style" });
-    expect(selector).toHaveTextContent("Route");
-    expect(selector.querySelector('svg[data-loop-summary-style="route"]')).toHaveAttribute("width", "18");
-    expect(selector.compareDocumentPosition(screen.getByRole("button", { name: "Save sentinel" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(selector).not.toHaveTextContent("Route");
+    expect(selector.querySelector('svg[data-loop-summary-style="route"]')).toHaveAttribute("width", "24");
 
     await user.click(selector);
     await user.click(await screen.findByRole("option", { name: "Ring" }));
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ summaryStyle: "ring" }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ id: draft.id, summaryStyle: "ring" }));
   });
 
   it("uses 24px summary artwork in All Loops cards", () => {
@@ -142,65 +136,71 @@ describe("Loop summary style UI", () => {
     expect(container.querySelector('[data-loop-summary="linked"]')).toBe(linkedNode);
   });
 
-  it("locks the Loop style selector while the Loop is locked or saving", () => {
+  it("locks the Loop card controls while the Loop is locked or saving", () => {
     const draft = createLoopDraft();
     const view = render(
-      <LoopEditor
+      <AllLoopsCanvas
         config={{ version: 8, loops: [draft] }}
-        loop={draft}
-        loops={[]}
-        agents={[]}
-        theme={defaultLoopTheme}
-        locked
-        onChange={() => undefined}
+        onAddLoop={() => undefined}
+        onOpenLoop={() => undefined}
+        onDeleteLoop={() => undefined}
+        lockedLoopIds={new Set([draft.id])}
       />
     );
     expect(screen.getByRole("combobox", { name: "Loop style" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete loop" })).toBeDisabled();
 
     view.rerender(
-      <LoopEditor
+      <AllLoopsCanvas
         config={{ version: 8, loops: [draft] }}
-        loop={draft}
-        loops={[]}
-        agents={[]}
-        theme={defaultLoopTheme}
-        locked={false}
+        onAddLoop={() => undefined}
+        onOpenLoop={() => undefined}
+        onDeleteLoop={() => undefined}
         disabled
-        onChange={() => undefined}
       />
     );
     expect(screen.getByRole("combobox", { name: "Loop style" })).toBeDisabled();
   });
 
-  it("marks the controlled draft dirty and saves after a style change", async () => {
+  it("saves a style change from the All Loops card", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     render(<LoopSummarySaveHarness onSave={onSave} />);
 
-    expect(screen.getByText("Saved")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save loop" })).toBeDisabled();
     await user.click(screen.getByRole("combobox", { name: "Loop style" }));
     await user.click(await screen.findByRole("option", { name: "Edge-on" }));
-    expect(screen.getByText("Unsaved")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Save loop" }));
-    expect(onSave).toHaveBeenCalledOnce();
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ summaryStyle: "edge-on" }));
+  });
+
+  it("confirms deletion from the All Loops card", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    const cardLoop = loop("delete-me", "route");
+    render(
+      <AllLoopsCanvas
+        config={{ version: 8, loops: [cardLoop] }}
+        onAddLoop={() => undefined}
+        onOpenLoop={() => undefined}
+        onDeleteLoop={onDelete}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Delete loop" }));
+    expect(screen.getByRole("dialog", { name: "Delete loop?" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledWith("delete-me");
   });
 });
 
-function LoopSummarySaveHarness({ onSave }: { onSave: () => void }) {
+function LoopSummarySaveHarness({ onSave }: { onSave: (loop: ProjectLoop) => void }) {
   const initial = createLoopDraft();
   const [draft, setDraft] = useState(initial);
-  const dirty = draft.summaryStyle !== initial.summaryStyle;
   return (
-    <LoopEditor
+    <AllLoopsCanvas
       config={{ version: 8, loops: [draft] }}
-      loop={draft}
-      loops={[]}
-      agents={[]}
-      theme={defaultLoopTheme}
-      locked={false}
-      canvasControls={<EditorActions saveLabel="Save loop" dirty={dirty} valid onSave={onSave} />}
-      onChange={setDraft}
+      onAddLoop={() => undefined}
+      onOpenLoop={() => undefined}
+      onChangeLoop={(loop) => { setDraft(loop); onSave(loop); }}
     />
   );
 }
