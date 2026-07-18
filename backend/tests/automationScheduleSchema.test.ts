@@ -9,7 +9,6 @@ const configWithSchedule = (schedule: unknown) => ({
   loops: [{
     id: "delivery",
     start: "scheduled-start",
-    summaryStyle: "route",
     nodes: [{
       id: "scheduled-start",
       type: "scheduled",

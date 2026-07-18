@@ -7,8 +7,6 @@ import {
   loopNodeSizes,
   loopNodeStyleCatalog,
   loopNodeStyles,
-  loopSummaryStyleCatalog,
-  loopSummaryStyles,
   type ProjectAutomationConfig
 } from "../../shared/domain/automation.js";
 
@@ -17,7 +15,6 @@ const config = (): ProjectAutomationConfig => ({
   loops: [{
     id: "delivery",
     start: "gate",
-    summaryStyle: "route",
     nodes: [{
       id: "gate",
       type: "human",
@@ -30,42 +27,17 @@ const config = (): ProjectAutomationConfig => ({
 });
 
 describe("v8 node style and size catalogs", () => {
-  it("defines 27 ordered styles with group and border metadata and four explicit sizes", () => {
+  it("defines six ordered styles with group metadata and four explicit sizes", () => {
     expect(loopNodeStyles).toEqual([
-      "flat", "luna", "black-hole", "satellite", "meteorite", "spaceman", "mars", "terra", "sol",
-      "black-ice-planet", "black-planet", "fire-planet", "shattered-planet", "vector-planet", "battle-station",
-      "ship-arrow", "ship-fang", "ship-crescent", "ship-twin-pod", "ship-needle", "ship-hammer",
-      "monster-void-eye", "monster-star-jelly", "monster-void-manta", "monster-cosmic-serpent",
-      "monster-moon-maw", "monster-astral-kraken"
+      "flat", "luna", "mars", "terra", "sol", "vector-planet"
     ]);
     expect(Object.fromEntries(loopNodeStyles.map((style) => [style, loopNodeStyleCatalog[style]]))).toEqual({
-      flat: { label: "Flat", group: "classic", borderless: false },
-      luna: { label: "Luna", group: "classic", borderless: false },
-      "black-hole": { label: "Black hole", group: "classic", borderless: true },
-      satellite: { label: "Satellite", group: "classic", borderless: true },
-      meteorite: { label: "Meteorite", group: "classic", borderless: true },
-      spaceman: { label: "Spaceman", group: "classic", borderless: false },
-      mars: { label: "Mars", group: "classic", borderless: false },
-      terra: { label: "Terra", group: "classic", borderless: false },
-      sol: { label: "Sol", group: "classic", borderless: false },
-      "black-ice-planet": { label: "Black ice planet", group: "planet", borderless: false },
-      "black-planet": { label: "Black planet", group: "planet", borderless: false },
-      "fire-planet": { label: "Fire planet", group: "planet", borderless: false },
-      "shattered-planet": { label: "Shattered planet", group: "planet", borderless: true },
-      "vector-planet": { label: "Vector planet", group: "planet", borderless: false },
-      "battle-station": { label: "Battle station", group: "planet", borderless: false },
-      "ship-arrow": { label: "Arrow scout", group: "ship", borderless: true },
-      "ship-fang": { label: "Fang interceptor", group: "ship", borderless: true },
-      "ship-crescent": { label: "Crescent courier", group: "ship", borderless: true },
-      "ship-twin-pod": { label: "Twin-pod bomber", group: "ship", borderless: true },
-      "ship-needle": { label: "Needle frigate", group: "ship", borderless: true },
-      "ship-hammer": { label: "Hammer cruiser", group: "ship", borderless: true },
-      "monster-void-eye": { label: "Void eye", group: "monster", borderless: true },
-      "monster-star-jelly": { label: "Star jelly", group: "monster", borderless: true },
-      "monster-void-manta": { label: "Void manta", group: "monster", borderless: true },
-      "monster-cosmic-serpent": { label: "Cosmic serpent", group: "monster", borderless: true },
-      "monster-moon-maw": { label: "Moon maw", group: "monster", borderless: true },
-      "monster-astral-kraken": { label: "Astral kraken", group: "monster", borderless: true }
+      flat: { label: "Flat", group: "classic" },
+      luna: { label: "Luna", group: "classic" },
+      mars: { label: "Mars", group: "classic" },
+      terra: { label: "Terra", group: "classic" },
+      sol: { label: "Sol", group: "classic" },
+      "vector-planet": { label: "Vector planet", group: "planet" }
     });
     expect(loopNodeSizeCatalog).toEqual({
       tiny: { label: "Tiny", pixels: 24 },
@@ -75,7 +47,7 @@ describe("v8 node style and size catalogs", () => {
     });
   });
 
-  it("accepts every one of the 27 × 4 style and size combinations", () => {
+  it("accepts every one of the 6 × 4 style and size combinations", () => {
     const base = config();
     for (const nodeStyle of loopNodeStyles) {
       for (const nodeSize of loopNodeSizes) {
@@ -89,28 +61,30 @@ describe("v8 node style and size catalogs", () => {
       }
     }
   });
+});
 
-  it("defines seven Loop summary styles and defaults legacy v8 Loops to Route", () => {
-    expect(loopSummaryStyles).toEqual([
-      "route", "spiral", "barred-spiral", "ring", "edge-on", "twin-core", "irregular-nebula"
-    ]);
-    expect(loopSummaryStyleCatalog).toEqual({
-      route: { label: "Route" },
-      spiral: { label: "Spiral" },
-      "barred-spiral": { label: "Barred spiral" },
-      ring: { label: "Ring" },
-      "edge-on": { label: "Edge-on" },
-      "twin-core": { label: "Twin core" },
-      "irregular-nebula": { label: "Irregular nebula" }
+describe("v8 node style and terminal validation", () => {
+  it("rejects removed node styles and the removed Loop summary field", () => {
+    const base = config();
+    const removedStyles = [
+      "black-hole", "meteorite", "black-planet", "fire-planet", "shattered-planet",
+      "satellite", "spaceman", "black-ice-planet", "battle-station",
+      "ship-arrow", "ship-fang", "ship-crescent", "ship-twin-pod", "ship-needle", "ship-hammer",
+      "monster-void-eye", "monster-star-jelly", "monster-void-manta", "monster-cosmic-serpent",
+      "monster-moon-maw", "monster-astral-kraken"
+    ];
+    removedStyles.forEach((nodeStyle) => {
+      expect(automationConfigSchema.safeParse({
+        ...base,
+        loops: [{
+          ...base.loops[0],
+          nodes: base.loops[0]!.nodes.map((node) => ({ ...node, nodeStyle }))
+        }]
+      }).success, nodeStyle).toBe(false);
     });
-
-    const legacyLoop = { ...config().loops[0] } as Record<string, unknown>;
-    delete legacyLoop.summaryStyle;
-    const parsed = automationConfigSchema.parse({ version: 8, loops: [legacyLoop] });
-    expect(parsed.loops[0]?.summaryStyle).toBe("route");
     expect(automationConfigSchema.safeParse({
-      ...config(),
-      loops: [{ ...config().loops[0], summaryStyle: "unknown-galaxy" }]
+      ...base,
+      loops: [{ ...base.loops[0], summaryStyle: "route" }]
     }).success).toBe(false);
   });
 

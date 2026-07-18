@@ -133,7 +133,7 @@ describe("v8 compact loop canvas", () => {
         }, {
           id: "repair",
           type: "agent",
-          nodeStyle: "satellite",
+          nodeStyle: "vector-planet",
           nodeSize: "tiny",
           agentId: "agent",
           description: "Repair",

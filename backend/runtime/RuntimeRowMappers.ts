@@ -1,16 +1,10 @@
-import {
-  defaultLoopSummaryStyle,
-  loopSummaryStyles,
-  type LoopSummaryStyle,
-  type ProjectLoop
-} from "../../shared/domain/automation.js";
+import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
   ExecutionRuntimeSnapshot,
   LoopExecutionPlan,
   LoopRun,
-  LoopSummaryStyleSnapshot,
   StepRun
 } from "../../shared/domain/runtime.js";
 import type {
@@ -21,26 +15,7 @@ import type {
 interface StoredLoopRunSnapshot {
   loop: ProjectLoop;
   theme: LoopTheme;
-  loopSummaries?: LoopSummaryStyleSnapshot[];
 }
-
-const normalizeSummaryStyle = (value: unknown): LoopSummaryStyle =>
-  loopSummaryStyles.includes(value as LoopSummaryStyle)
-    ? value as LoopSummaryStyle
-    : defaultLoopSummaryStyle;
-
-const normalizeLoop = (loop: ProjectLoop): ProjectLoop => ({
-  ...loop,
-  summaryStyle: normalizeSummaryStyle(loop.summaryStyle)
-});
-
-const normalizeLoopSummaries = (
-  snapshots: LoopSummaryStyleSnapshot[] | undefined
-): LoopSummaryStyleSnapshot[] | undefined => snapshots?.flatMap((snapshot) =>
-  snapshot && typeof snapshot.loopId === "string"
-    ? [{ loopId: snapshot.loopId, summaryStyle: normalizeSummaryStyle(snapshot.summaryStyle) }]
-    : []
-);
 
 export const toLoopRun = (row: LoopRunRow): LoopRun => {
   const snapshot = JSON.parse(row.snapshot_json) as StoredLoopRunSnapshot;
@@ -57,9 +32,8 @@ export const toLoopRun = (row: LoopRunRow): LoopRun => {
       ? { stepId: row.schedule_step_id, scheduledFor: row.scheduled_for }
       : undefined,
     input: row.input ?? undefined,
-    snapshot: normalizeLoop(snapshot.loop),
+    snapshot: snapshot.loop,
     themeSnapshot: snapshot.theme,
-    loopSummarySnapshots: normalizeLoopSummaries(snapshot.loopSummaries),
     transitionCount: row.transition_count,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

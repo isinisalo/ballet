@@ -25,7 +25,6 @@ const agents: Agent[] = [{
 const loop: ProjectLoop = {
   id: "delivery",
   start: "build",
-  summaryStyle: "route",
   nodes: [{
     id: "build",
     type: "agent",
@@ -89,13 +88,15 @@ describe("compact Loop editor UI", () => {
     renderEditor({ onChange });
     await user.click(await screen.findByRole("button", { name: "Edit step build" }));
     await user.click(screen.getByRole("combobox", { name: "Node style" }));
-    for (const group of ["Classic", "Planets", "Ships", "Monsters"]) {
+    for (const group of ["Classic", "Planets"]) {
       expect(await screen.findByText(group)).toBeInTheDocument();
     }
-    await user.click(await screen.findByRole("option", { name: "Arrow scout" }, { timeout: 3_000 }));
+    expect(screen.queryByText("Ships")).not.toBeInTheDocument();
+    expect(screen.queryByText("Monsters")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("option", { name: "Vector planet" }, { timeout: 3_000 }));
 
     const next = onChange.mock.calls.at(-1)?.[0] as ProjectLoop;
-    expect(next.nodes.find((node) => node.id === "build")).toMatchObject({ nodeStyle: "ship-arrow", nodeSize: "large" });
+    expect(next.nodes.find((node) => node.id === "build")).toMatchObject({ nodeStyle: "vector-planet", nodeSize: "large" });
   });
 
   it("renders Step-owned styles, sizes, reasoning, and connection points", async () => {

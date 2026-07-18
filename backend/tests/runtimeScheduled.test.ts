@@ -22,7 +22,6 @@ const automation: ProjectAutomationConfig = {
   loops: [{
     id: "scheduled-delivery",
     start: "timer",
-    summaryStyle: "route",
     nodes: [{
       id: "timer",
       type: "scheduled",

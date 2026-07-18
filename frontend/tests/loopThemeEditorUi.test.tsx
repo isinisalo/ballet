@@ -5,7 +5,6 @@ import {
   defaultLoopTheme,
   defaultTerminalNodes,
   loopNodeStyles,
-  loopSummaryStyles,
   type AppData,
   type LoopTheme,
   type ProjectLoop
@@ -20,7 +19,6 @@ import { installThemeApi } from "./loopThemeEditorTestApi";
 const loop: ProjectLoop = {
   id: "delivery",
   start: "approval",
-  summaryStyle: "route",
   nodes: [{
     id: "approval",
     type: "human",
@@ -84,13 +82,10 @@ describe("singleton Loop theme editor", () => {
       expect(preview).toBeInTheDocument();
       expect(preview?.querySelector(`[data-loop-node-style='${style}']`)).toBeInTheDocument();
     });
-    loopSummaryStyles.forEach((summaryStyle) => {
-      expect(gallery.querySelector(`[data-loop-summary-preview='${summaryStyle}']`)).toBeInTheDocument();
-      expect(gallery.querySelector(`[data-loop-summary-style='${summaryStyle}']`)).toBeInTheDocument();
-    });
-    expect(gallery.querySelectorAll("[data-loop-artwork-gallery-group]")).toHaveLength(5);
-    expect([...gallery.querySelectorAll<HTMLElement>("[data-loop-artwork-gallery-group='ship'] [data-loop-artwork-preview-size]")]
-      .map((preview) => preview.dataset.loopArtworkPreviewSize)).toEqual(["tiny", "small", "tiny", "small", "tiny", "small"]);
+    expect(gallery.querySelector("[data-loop-route-preview] [data-loop-route-artwork]")).toBeInTheDocument();
+    expect(gallery.querySelectorAll("[data-loop-artwork-gallery-group]")).toHaveLength(3);
+    expect(gallery.querySelector("[data-loop-artwork-gallery-group='ship']")).not.toBeInTheDocument();
+    expect(gallery.querySelector("[data-loop-artwork-gallery-group='monster']")).not.toBeInTheDocument();
     expect(canvas.querySelector("[data-loop-edge-style='solid']")).toBeInTheDocument();
     expect(canvas.querySelector("[data-loop-edge-output-slot-kind='rework']")).toHaveAttribute("data-loop-edge-style", "dotted");
     expect(canvas.querySelector("[data-loop-edge-tone='cross-loop']")).toHaveAttribute("data-loop-edge-style", "dashed");

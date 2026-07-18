@@ -9,7 +9,6 @@ import type {
   LoopRun,
   LoopRunDetails,
   LoopRunSource,
-  LoopSummaryStyleSnapshot,
   StepRun,
   StepRunResult
 } from "../../shared/domain/runtime.js";
@@ -31,7 +30,6 @@ export interface CreateLoopRunInput {
   source: LoopRunSource;
   input?: string;
   executionPlan?: LoopExecutionPlan;
-  loopSummarySnapshots?: LoopSummaryStyleSnapshot[];
   schedule?: { stepId: string; scheduledFor: string };
 }
 
@@ -119,8 +117,7 @@ export class LoopRunStore {
       input: input.input ?? null,
       snapshotJson: stringifyJson({
         loop: input.loop,
-        theme: input.themeSnapshot,
-        loopSummaries: input.loopSummarySnapshots
+        theme: input.themeSnapshot
       }),
       createdAt: timestamp,
       updatedAt: timestamp

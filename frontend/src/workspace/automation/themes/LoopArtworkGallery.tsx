@@ -2,8 +2,6 @@ import {
   loopNodeSizeCatalog,
   loopNodeStyles,
   loopNodeStyleCatalog,
-  loopSummaryStyleCatalog,
-  loopSummaryStyles,
   type LoopNodeSize,
   type LoopNodeStyle,
   type LoopTheme,
@@ -11,19 +9,16 @@ import {
 } from "@shared/api/workspace-contracts";
 import { LoopCompactStepNode } from "../loops/LoopCompactStepNode";
 import type { LoopNodeContext } from "../loops/LoopCanvasTypes";
-import { LoopSummaryArtwork } from "../loops/LoopSummaryArtwork";
+import { LoopRouteArtwork } from "../loops/LoopRouteArtwork";
 import type { LoopStepRecord } from "../loops/loopGraph";
 import { loopThemeCssProperties } from "../loops/loopTheme";
 
 const galleryGroups = [
   { id: "classic", label: "Classic" },
-  { id: "planet", label: "Planets & stations" },
-  { id: "ship", label: "Ships · Tiny / Small" },
-  { id: "monster", label: "Monsters" }
+  { id: "planet", label: "Planets" }
 ] as const;
 
 const allSizes = ["tiny", "small", "medium", "large"] as const;
-const compactSizes = ["tiny", "small"] as const;
 
 export function LoopArtworkGallery({ theme }: { theme: LoopTheme }) {
   const context = galleryContext(theme);
@@ -35,20 +30,12 @@ export function LoopArtworkGallery({ theme }: { theme: LoopTheme }) {
     >
       <div className="grid gap-5">
         <section data-loop-artwork-gallery-group="loop-summary" className="grid gap-3">
-          <h3 className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Loop summaries</h3>
+          <h3 className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Loop summary</h3>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-3">
-            {loopSummaryStyles.map((summaryStyle) => (
-              <div
-                key={summaryStyle}
-                className="grid min-w-0 justify-items-center gap-1 text-center"
-                data-loop-summary-preview={summaryStyle}
-              >
-                <LoopSummaryArtwork summaryStyle={summaryStyle} size={24} />
-                <span className="font-mono text-[0.62rem] leading-4 text-muted-foreground">
-                  {loopSummaryStyleCatalog[summaryStyle].label}
-                </span>
-              </div>
-            ))}
+            <div className="grid min-w-0 justify-items-center gap-1 text-center" data-loop-route-preview>
+              <LoopRouteArtwork size={24} />
+              <span className="font-mono text-[0.62rem] leading-4 text-muted-foreground">Route</span>
+            </div>
           </div>
         </section>
         {galleryGroups.map((group) => {
@@ -58,7 +45,7 @@ export function LoopArtworkGallery({ theme }: { theme: LoopTheme }) {
               <h3 className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{group.label}</h3>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-x-3 gap-y-7">
                 {styles.map((style, index) => {
-                  const size = gallerySize(style, index);
+                  const size = gallerySize(index);
                   const pixels = loopNodeSizeCatalog[size].pixels;
                   return (
                     <div key={style} className="grid min-w-0 justify-items-center gap-1 pb-5" data-loop-artwork-preview={style} data-loop-artwork-preview-size={size}>
@@ -77,10 +64,8 @@ export function LoopArtworkGallery({ theme }: { theme: LoopTheme }) {
   );
 }
 
-function gallerySize(style: LoopNodeStyle, index: number): LoopNodeSize {
-  return loopNodeStyleCatalog[style].group === "ship"
-    ? compactSizes[index % compactSizes.length]
-    : allSizes[index % allSizes.length];
+function gallerySize(index: number): LoopNodeSize {
+  return allSizes[index % allSizes.length];
 }
 
 function galleryRecord(nodeStyle: LoopNodeStyle, nodeSize: LoopNodeSize, index: number): LoopStepRecord {

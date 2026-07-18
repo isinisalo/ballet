@@ -50,7 +50,6 @@ const config = (): ProjectAutomationConfig => ({
   loops: [{
     id: "delivery",
     start: "implement",
-    summaryStyle: "spiral",
     nodes: [{
       id: "implement",
       type: "agent",
@@ -70,7 +69,6 @@ const config = (): ProjectAutomationConfig => ({
   }, {
     id: "release",
     start: "publish",
-    summaryStyle: "ring",
     nodes: [{
       id: "publish",
       type: "agent",
@@ -90,7 +88,6 @@ const engineeringChainConfig = (): ProjectAutomationConfig => {
     loops: [{
       id: "blueprint-design",
       start: "roadmap",
-      summaryStyle: "barred-spiral",
       nodes: [
         { id: "roadmap", type: "agent", agentId: "roadmap-agent", description: "Roadmap.", nodeStyle: "sol", nodeSize: "large", on: { approved: "data-model", rejected: "blocked" } },
         { id: "data-model", type: "agent", agentId: "architecture-agent", description: "Data model.", nodeStyle: "sol", nodeSize: "large", on: { approved: "ui-design", rejected: "blocked" } },
@@ -103,7 +100,6 @@ const engineeringChainConfig = (): ProjectAutomationConfig => {
     }, {
       id: "milestone-planning",
       start: "plan-milestone-issues",
-      summaryStyle: "ring",
       nodes: [
         { id: "plan-milestone-issues", type: "agent", agentId: "milestone-issues-agent", description: "Plan milestone.", nodeStyle: "luna", nodeSize: "medium", on: { approved: "implementation-plan", rejected: "blocked" } },
         { id: "implementation-plan", type: "agent", agentId: "implementation-plan-agent", description: "Implementation plan.", nodeStyle: "luna", nodeSize: "medium", on: { approved: "test-plan", rejected: "blocked" } },
@@ -114,7 +110,6 @@ const engineeringChainConfig = (): ProjectAutomationConfig => {
     }, {
       id: "milestone-delivery",
       start: "implement-milestone",
-      summaryStyle: "twin-core",
       nodes: [
         { id: "implement-milestone", type: "agent", agentId: "implementation-agent", description: "Implement milestone.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "run-acceptance-tests", rejected: "blocked" } },
         { id: "run-acceptance-tests", type: "agent", agentId: "acceptance-test-agent", description: "Run acceptance.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "implementation-gate", rejected: "implement-milestone" } },
@@ -124,7 +119,6 @@ const engineeringChainConfig = (): ProjectAutomationConfig => {
     }, {
       id: "release-validation",
       start: "make-git-release",
-      summaryStyle: "route",
       nodes: [
         { id: "make-git-release", type: "agent", agentId: "release-agent", description: "Make release.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "deploy-release", rejected: "failed" } },
         { id: "deploy-release", type: "agent", agentId: "release-agent", description: "Deploy release.", nodeStyle: "terra", nodeSize: "medium", on: { approved: "verify-release", rejected: "failed" } },
@@ -153,7 +147,6 @@ describe("terminal node runtime transitions", () => {
       loops: [{
         id: `terminal-${terminal}`,
         start: "work",
-        summaryStyle: "route",
         nodes: [{
           id: "work",
           type: "agent",
@@ -236,7 +229,7 @@ describe("local runtime database", () => {
     runtime.close();
   });
 
-  it("persists immutable theme and Loop summary snapshots across child runs", async () => {
+  it("persists immutable theme snapshots across child runs", async () => {
     const runtime = new RuntimeDatabase(await tempDbPath());
     const initialTheme = {
       ...openAiTheme,
@@ -251,28 +244,21 @@ describe("local runtime database", () => {
       node: { ...childTheme.node, glowColor: "#778899" }
     };
     const automation = config();
-    const loopSummaries = [
-      { loopId: "delivery", summaryStyle: "spiral" },
-      { loopId: "release", summaryStyle: "ring" }
-    ];
 
     const parent = startLoop(runtime, automation, "delivery", initialTheme, "Original request");
     const storedSnapshot = JSON.parse((runtime.connection().prepare(
       "SELECT snapshot_json FROM loop_runs WHERE run_id = ?"
     ).get(parent.runId) as { snapshot_json: string }).snapshot_json) as Record<string, unknown>;
-    expect(Object.keys(storedSnapshot).sort()).toEqual(["loop", "loopSummaries", "theme"]);
+    expect(Object.keys(storedSnapshot).sort()).toEqual(["loop", "theme"]);
     expect(storedSnapshot).toEqual({
       loop: automation.loops[0],
-      loopSummaries,
       theme: initialTheme
     });
-    expect(parent.loopSummarySnapshots).toEqual(loopSummaries);
 
     const waiting = runtime.completeAgentStep(automation, initialTheme, {
       stepRunId: parent.stepRuns[0]!.stepRunId,
       outcome: ready
     });
-    automation.loops[1]!.summaryStyle = "edge-on";
     const completedParent = runtime.respondToStepRun(
       automation,
       childTheme,
@@ -291,30 +277,6 @@ describe("local runtime database", () => {
     expect(completedChild).toMatchObject({ status: "completed", themeSnapshot: childTheme });
     expect(runById(runtime, parent.runId)?.themeSnapshot).toEqual(initialTheme);
     expect(runById(runtime, child.runId)?.themeSnapshot).toEqual(childTheme);
-    expect(runById(runtime, parent.runId)?.loopSummarySnapshots).toEqual(loopSummaries);
-    expect(runById(runtime, child.runId)?.loopSummarySnapshots).toEqual(loopSummaries);
-    expect(runById(runtime, child.runId)?.snapshot.summaryStyle).toBe("edge-on");
-    runtime.close();
-  });
-
-  it("normalizes legacy Loop snapshot rows without summary fields", async () => {
-    const runtime = new RuntimeDatabase(await tempDbPath());
-    const run = startLoop(runtime, config(), "delivery");
-    const stored = JSON.parse((runtime.connection().prepare(
-      "SELECT snapshot_json FROM loop_runs WHERE run_id = ?"
-    ).get(run.runId) as { snapshot_json: string }).snapshot_json) as {
-      loop: Record<string, unknown>;
-      theme: unknown;
-      loopSummaries?: unknown;
-    };
-    delete stored.loop.summaryStyle;
-    delete stored.loopSummaries;
-    runtime.connection().prepare("UPDATE loop_runs SET snapshot_json = ? WHERE run_id = ?")
-      .run(JSON.stringify(stored), run.runId);
-
-    const legacy = runById(runtime, run.runId)!;
-    expect(legacy.snapshot.summaryStyle).toBe("route");
-    expect(legacy.loopSummarySnapshots).toBeUndefined();
     runtime.close();
   });
 });
@@ -443,7 +405,6 @@ describe("local runtime safeguards", () => {
       loops: [{
         id: "cycle",
         start: "again",
-        summaryStyle: "route",
         nodes: [{
           id: "again",
           type: "agent",

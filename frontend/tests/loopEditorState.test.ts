@@ -31,7 +31,7 @@ const loop = (): ProjectLoop => ({
 describe("loop editor state", () => {
   it("starts with a serverless empty draft and creates a Flat first Step on demand", () => {
     const draft = createLoopDraft();
-    expect(draft).toEqual({ id: "", start: "", summaryStyle: "route", nodes: defaultTerminalNodes() });
+    expect(draft).toEqual({ id: "", start: "", nodes: defaultTerminalNodes() });
 
     const withAgent = addFirstStep(draft, [{ id: "builder" } as never]);
     expect(withAgent.start).toBe("new-step");

@@ -5,11 +5,7 @@ import type {
   ProjectStep,
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
-import {
-  defaultLoopSummaryStyle,
-  isProjectTerminalNode,
-  resolveEffectiveStartStep
-} from "../../shared/domain/automation.js";
+import { isProjectTerminalNode, resolveEffectiveStartStep } from "../../shared/domain/automation.js";
 import { LoopHandoffValidationError, validateLoopTransitionHandoff } from "../../shared/domain/loopHandoff.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
@@ -18,7 +14,6 @@ import type {
   LoopRun,
   LoopRunDetails,
   LoopRunSource,
-  LoopSummaryStyleSnapshot,
   StepRun,
   StepRunResult
 } from "../../shared/domain/runtime.js";
@@ -33,7 +28,6 @@ interface StartOptions {
   parentRunId?: string;
   parentStepRunId?: string;
   executionPlan?: LoopExecutionPlan;
-  loopSummarySnapshots?: LoopSummaryStyleSnapshot[];
   schedule?: { stepId: string; scheduledFor: string };
 }
 
@@ -64,11 +58,7 @@ export class LoopRunEngine {
   ): LoopRunDetails {
     const transaction = this.connection().transaction(() => {
       const loop = this.requireLoop(config, loopId);
-      const loopSummarySnapshots = config.loops.map((candidate) => ({
-        loopId: candidate.id,
-        summaryStyle: candidate.summaryStyle ?? defaultLoopSummaryStyle
-      }));
-      return this.startInTransaction(loop, themeSnapshot, { ...options, loopSummarySnapshots });
+      return this.startInTransaction(loop, themeSnapshot, options);
     });
     try {
       return transaction() as LoopRunDetails;
@@ -195,7 +185,6 @@ export class LoopRunEngine {
       parentRunId: options.parentRunId,
       parentStepRunId: options.parentStepRunId,
       executionPlan: options.executionPlan,
-      loopSummarySnapshots: options.loopSummarySnapshots,
       schedule: options.schedule,
       source: options.source ?? "manual",
       input: options.input
@@ -243,8 +232,7 @@ export class LoopRunEngine {
       rootRunId: run.rootRunId,
       parentRunId: run.runId,
       parentStepRunId: sourceStepRun.stepRunId,
-      executionPlan: run.executionPlan,
-      loopSummarySnapshots: run.loopSummarySnapshots
+      executionPlan: run.executionPlan
     });
   }
 

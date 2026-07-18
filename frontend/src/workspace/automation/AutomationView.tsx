@@ -50,17 +50,6 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
     if (creating) setCreateDraft(loop);
     else if (selectedIndex >= 0) setDraft((config) => updateLoopAtIndex(config, selectedIndex, loop));
   };
-  const updateLoopFromOverview = async (loop: ProjectLoop) => {
-    if (operationRef.current) return;
-    const index = draft.loops.findIndex((candidate) => candidate.id === loop.id);
-    if (index < 0 || lockedLoopIds.has(loop.id)) return;
-    operationRef.current = true;
-    try {
-      await saveDraft(updateLoopAtIndex(draft, index, loop));
-    } finally {
-      operationRef.current = false;
-    }
-  };
   const save = async () => {
     if (!displayedLoop || locked || operationRef.current) return;
     operationRef.current = true;
@@ -91,7 +80,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
     }
   };
 
-  if (loopView === "all") return <AutomationOverview draft={draft} issues={issues} error={error} saving={saving} lockedLoopIds={lockedLoopIds} navigate={navigate} onChangeLoop={updateLoopFromOverview} onDeleteLoop={removeLoopFromOverview} />;
+  if (loopView === "all") return <AutomationOverview draft={draft} issues={issues} error={error} saving={saving} lockedLoopIds={lockedLoopIds} navigate={navigate} onDeleteLoop={removeLoopFromOverview} />;
 
   return (
     <AutomationEditorWorkspace
@@ -114,14 +103,13 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   );
 }
 
-function AutomationOverview({ draft, issues, error, saving, lockedLoopIds, navigate, onChangeLoop, onDeleteLoop }: {
+function AutomationOverview({ draft, issues, error, saving, lockedLoopIds, navigate, onDeleteLoop }: {
   draft: ProjectAutomationConfig;
   issues: ProjectAutomationIssue[];
   error: string;
   saving: boolean;
   lockedLoopIds: ReadonlySet<string>;
   navigate: WorkspaceNavigation["navigate"];
-  onChangeLoop: (loop: ProjectLoop) => unknown | Promise<unknown>;
   onDeleteLoop: (loopId: string) => unknown | Promise<unknown>;
 }) {
   return (
@@ -136,7 +124,6 @@ function AutomationOverview({ draft, issues, error, saving, lockedLoopIds, navig
         lockedLoopIds={lockedLoopIds}
         onAddLoop={() => navigate(automationLoopPath())}
         onOpenLoop={(id) => navigate(automationLoopPath(id))}
-        onChangeLoop={onChangeLoop}
         onDeleteLoop={onDeleteLoop}
       />
     </Panel>

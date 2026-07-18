@@ -295,8 +295,7 @@ function compactLoopNodes({
       height: loopNodeSizes.loop.height,
       direction,
       loopSummary: {
-        loopId: loop.id,
-        summaryStyle: loop.summaryStyle
+        loopId: loop.id
       }
     };
     nextY += loopNodeSizes.loop.height + loopCanvasLayoutConfig.compactLoopRowGap;

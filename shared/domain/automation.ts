@@ -21,100 +21,31 @@ export const loopNodeSizeCatalog: Readonly<Record<LoopNodeSize, LoopNodeSizeDefi
 export const loopNodeStyles = [
   "flat",
   "luna",
-  "black-hole",
-  "satellite",
-  "meteorite",
-  "spaceman",
   "mars",
   "terra",
   "sol",
-  "black-ice-planet",
-  "black-planet",
-  "fire-planet",
-  "shattered-planet",
-  "vector-planet",
-  "battle-station",
-  "ship-arrow",
-  "ship-fang",
-  "ship-crescent",
-  "ship-twin-pod",
-  "ship-needle",
-  "ship-hammer",
-  "monster-void-eye",
-  "monster-star-jelly",
-  "monster-void-manta",
-  "monster-cosmic-serpent",
-  "monster-moon-maw",
-  "monster-astral-kraken"
+  "vector-planet"
 ] as const;
 export type LoopNodeStyle = (typeof loopNodeStyles)[number];
-export type LoopNodeStyleGroup = "classic" | "planet" | "ship" | "monster";
+export type LoopNodeStyleGroup = "classic" | "planet";
 
 export interface LoopNodeStyleDefinition {
   label: string;
   group: LoopNodeStyleGroup;
-  borderless: boolean;
 }
 
 export const loopNodeStyleCatalog: Readonly<Record<LoopNodeStyle, LoopNodeStyleDefinition>> = {
-  flat: { label: "Flat", group: "classic", borderless: false },
-  luna: { label: "Luna", group: "classic", borderless: false },
-  "black-hole": { label: "Black hole", group: "classic", borderless: true },
-  satellite: { label: "Satellite", group: "classic", borderless: true },
-  meteorite: { label: "Meteorite", group: "classic", borderless: true },
-  spaceman: { label: "Spaceman", group: "classic", borderless: false },
-  mars: { label: "Mars", group: "classic", borderless: false },
-  terra: { label: "Terra", group: "classic", borderless: false },
-  sol: { label: "Sol", group: "classic", borderless: false },
-  "black-ice-planet": { label: "Black ice planet", group: "planet", borderless: false },
-  "black-planet": { label: "Black planet", group: "planet", borderless: false },
-  "fire-planet": { label: "Fire planet", group: "planet", borderless: false },
-  "shattered-planet": { label: "Shattered planet", group: "planet", borderless: true },
-  "vector-planet": { label: "Vector planet", group: "planet", borderless: false },
-  "battle-station": { label: "Battle station", group: "planet", borderless: false },
-  "ship-arrow": { label: "Arrow scout", group: "ship", borderless: true },
-  "ship-fang": { label: "Fang interceptor", group: "ship", borderless: true },
-  "ship-crescent": { label: "Crescent courier", group: "ship", borderless: true },
-  "ship-twin-pod": { label: "Twin-pod bomber", group: "ship", borderless: true },
-  "ship-needle": { label: "Needle frigate", group: "ship", borderless: true },
-  "ship-hammer": { label: "Hammer cruiser", group: "ship", borderless: true },
-  "monster-void-eye": { label: "Void eye", group: "monster", borderless: true },
-  "monster-star-jelly": { label: "Star jelly", group: "monster", borderless: true },
-  "monster-void-manta": { label: "Void manta", group: "monster", borderless: true },
-  "monster-cosmic-serpent": { label: "Cosmic serpent", group: "monster", borderless: true },
-  "monster-moon-maw": { label: "Moon maw", group: "monster", borderless: true },
-  "monster-astral-kraken": { label: "Astral kraken", group: "monster", borderless: true }
-};
-
-export const loopSummaryStyles = [
-  "route",
-  "spiral",
-  "barred-spiral",
-  "ring",
-  "edge-on",
-  "twin-core",
-  "irregular-nebula"
-] as const;
-export type LoopSummaryStyle = (typeof loopSummaryStyles)[number];
-
-export interface LoopSummaryStyleDefinition {
-  label: string;
-}
-
-export const loopSummaryStyleCatalog: Readonly<Record<LoopSummaryStyle, LoopSummaryStyleDefinition>> = {
-  route: { label: "Route" },
-  spiral: { label: "Spiral" },
-  "barred-spiral": { label: "Barred spiral" },
-  ring: { label: "Ring" },
-  "edge-on": { label: "Edge-on" },
-  "twin-core": { label: "Twin core" },
-  "irregular-nebula": { label: "Irregular nebula" }
+  flat: { label: "Flat", group: "classic" },
+  luna: { label: "Luna", group: "classic" },
+  mars: { label: "Mars", group: "classic" },
+  terra: { label: "Terra", group: "classic" },
+  sol: { label: "Sol", group: "classic" },
+  "vector-planet": { label: "Vector planet", group: "planet" }
 };
 
 export const defaultLoopNodeStyle: LoopNodeStyle = "flat";
 export const defaultLoopNodeSize: LoopNodeSize = "medium";
 export const defaultTerminalNodeSize: LoopNodeSize = "tiny";
-export const defaultLoopSummaryStyle: LoopSummaryStyle = "route";
 
 export type StepTransitionTarget =
   | string
@@ -246,7 +177,6 @@ export const defaultTerminalNodes = (): ProjectTerminalNode[] => ([
 export interface ProjectLoop {
   id: string;
   start: string;
-  summaryStyle: LoopSummaryStyle;
   nodes: ProjectLoopNode[];
 }
 

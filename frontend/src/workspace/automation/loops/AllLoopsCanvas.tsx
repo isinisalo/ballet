@@ -3,13 +3,12 @@ import { getProjectStepTransitionTargets } from "@shared/api/workspace-contracts
 import { ArrowRight, Bot, CalendarClock, PanelTopOpen, ShieldCheck } from "lucide-react";
 import { CollectionCardGrid, DeleteAction } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
-import { LoopSummaryStyleField } from "./LoopSummaryStyleField";
+import { LoopRouteArtwork } from "./LoopRouteArtwork";
 
 export function AllLoopsCanvas({
   config,
   onAddLoop,
   onOpenLoop,
-  onChangeLoop,
   onDeleteLoop,
   lockedLoopIds,
   disabled = false
@@ -17,7 +16,6 @@ export function AllLoopsCanvas({
   config: ProjectAutomationConfig;
   onAddLoop: () => void;
   onOpenLoop: (loopId: string) => void;
-  onChangeLoop?: (loop: ProjectAutomationConfig["loops"][number]) => void;
   onDeleteLoop?: (loopId: string) => unknown | Promise<unknown>;
   lockedLoopIds?: ReadonlySet<string>;
   disabled?: boolean;
@@ -38,11 +36,7 @@ export function AllLoopsCanvas({
           >
             <div className="grid gap-3 p-4">
               <div className="flex min-w-0 items-center gap-2 font-mono text-xs text-foreground">
-                <LoopSummaryStyleField
-                  value={loop.summaryStyle ?? "route"}
-                  disabled={loopLocked}
-                  onChange={(summaryStyle) => onChangeLoop?.({ ...loop, summaryStyle })}
-                />
+                <LoopRouteArtwork size={24} className="text-primary" />
                 <span className="truncate">{loop.id}</span>
               </div>
               <span className="grid grid-cols-3 gap-2 font-mono text-[0.65rem] text-muted-foreground">

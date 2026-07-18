@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import {
   defaultLoopTheme,
-  loopNodeStyleCatalog,
   loopNodeStyles,
   type LoopNodeStyle,
   type ProjectLoopNode,
@@ -17,7 +16,6 @@ import type { LoopStepRecord } from "../src/workspace/automation/loops/loopGraph
 
 const artworkCss = readFileSync(`${process.cwd()}/frontend/src/workspace/automation/loops/LoopNodeArtwork.css`, "utf8");
 const cssSurfaceNodeStyles = new Set<LoopNodeStyle>(["flat", "luna", "mars", "terra", "sol"]);
-const borderlessNodeStyles = loopNodeStyles.filter((nodeStyle) => loopNodeStyleCatalog[nodeStyle].borderless);
 
 const context = (): LoopNodeContext => ({
   selectedLoopId: "delivery",
@@ -84,52 +82,33 @@ describe("Loop node artwork", () => {
         expect(svg).toHaveAttribute("viewBox", "0 0 24 24");
       }
     });
-    expect(container.querySelectorAll("svg.loop-node-artwork-svg")).toHaveLength(22);
+    expect(container.querySelectorAll("svg.loop-node-artwork-svg")).toHaveLength(1);
     expect(container.querySelector("img, image")).not.toBeInTheDocument();
     expect(container.innerHTML).not.toMatch(/\s(?:src|href|xlink:href)=/i);
   });
 
-  it("marks shared Tiny and Small detail levels without changing the SVG composition", () => {
+  it("marks the shared Medium detail level without changing the SVG composition", () => {
     const tinyRecord = record("agent", "running");
-    tinyRecord.step!.nodeStyle = "battle-station";
+    tinyRecord.step!.nodeStyle = "vector-planet";
     tinyRecord.step!.nodeSize = "tiny";
     const view = render(<LoopCompactStepNode context={context()} record={tinyRecord} />);
 
     let node = screen.getByRole("button", { name: "View step implement" });
     expect(node).toHaveAttribute("data-loop-node-size", "tiny");
-    expect(node.querySelector(".loop-node-artwork-detail--small")).toBeInTheDocument();
     expect(node.querySelector(".loop-node-artwork-detail--medium")).toBeInTheDocument();
 
     const smallRecord = record("agent", "running");
-    smallRecord.step!.nodeStyle = "battle-station";
+    smallRecord.step!.nodeStyle = "vector-planet";
     smallRecord.step!.nodeSize = "small";
     view.rerender(<LoopCompactStepNode context={context()} record={smallRecord} />);
     node = screen.getByRole("button", { name: "View step implement" });
     expect(node).toHaveAttribute("data-loop-node-size", "small");
-    expect(node.querySelector(".loop-node-artwork-detail--small")).toBeInTheDocument();
     expect(node.querySelector(".loop-node-artwork-detail--medium")).toBeInTheDocument();
     expect(artworkCss).toContain(".loop-step-node[data-loop-node-size=\"tiny\"]");
     expect(artworkCss).toContain(".loop-step-node[data-loop-node-size=\"small\"] .loop-node-artwork-detail--medium");
     expect(artworkCss).toContain("display: none;");
   });
 
-  it.each(borderlessNodeStyles)("keeps %s borderless with glow, selection, and keyboard focus", (nodeStyle) => {
-    const selectedContext = context();
-    selectedContext.selectedStepIndexes = [0];
-    const selectedRecord = record("agent", "running");
-    selectedRecord.step!.nodeStyle = nodeStyle;
-    selectedRecord.step!.reasoningEffort = "ultra";
-    render(<LoopCompactStepNode context={selectedContext} record={selectedRecord} />);
-
-    const node = screen.getByRole("button", { name: "View step implement" });
-    node.focus();
-    expect(node).toHaveFocus();
-    expect(artworkCss).toContain(".loop-step-node--borderless");
-    expect(artworkCss).toContain("border-color: transparent !important;");
-    expect(node).toHaveClass("loop-step-node--borderless", "loop-run-node-pulse--running", "border-primary/80", "ring-2");
-    expect(node).toHaveAttribute("data-loop-reasoning-glow", "7");
-    expect(node.querySelector(".loop-node-reasoning-glow")).toBeInTheDocument();
-  });
 });
 
 describe("terminal Loop nodes", () => {
@@ -137,7 +116,7 @@ describe("terminal Loop nodes", () => {
     render(<>
       <LoopCompactStepNode context={context()} record={terminalRecord("completed", "sol", "medium")} />
       <LoopCompactStepNode context={context()} record={terminalRecord("blocked", "luna", "small")} />
-      <LoopCompactStepNode context={context()} record={terminalRecord("failed", "meteorite", "tiny")} />
+      <LoopCompactStepNode context={context()} record={terminalRecord("failed", "vector-planet", "tiny")} />
     </>);
 
     expect(screen.getByRole("button", { name: "View node completed" })).toHaveAttribute("data-loop-node-size", "medium");

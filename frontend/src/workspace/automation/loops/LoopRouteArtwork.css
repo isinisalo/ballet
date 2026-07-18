@@ -1,0 +1,18 @@
+.loop-route-artwork {
+  display: block;
+  width: var(--loop-route-artwork-size);
+  height: var(--loop-route-artwork-size);
+  flex: none;
+  overflow: visible;
+  color: var(--loop-theme-node-label, var(--primary));
+  pointer-events: none;
+}
+
+.loop-route-artwork path,
+.loop-route-artwork circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

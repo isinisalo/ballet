@@ -65,7 +65,7 @@ const agent: Agent = {
 const automation = (): ProjectAutomationConfig => ({
   version: 8,
   loops: [{
-    id: "delivery", start: "review", summaryStyle: "route",
+    id: "delivery", start: "review",
     nodes: [{
       id: "review", type: "agent", agentId: "reviewer", description: "Review.", nodeStyle: "luna", nodeSize: "tiny",
       on: { approved: "completed", rejected: "failed" }
@@ -73,7 +73,6 @@ const automation = (): ProjectAutomationConfig => ({
   }, {
     id: "scheduled-delivery",
     start: "scheduled-review",
-    summaryStyle: "route",
     nodes: [{
       id: "scheduled-review",
       type: "scheduled",

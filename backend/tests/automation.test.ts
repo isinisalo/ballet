@@ -43,7 +43,6 @@ const config = (): ProjectAutomationConfig => ({
   loops: [{
     id: "delivery",
     start: "implement",
-    summaryStyle: "route",
     nodes: [{
       id: "implement",
       type: "agent",
@@ -107,7 +106,6 @@ describe("automation v8 config", () => {
       loops: [{
         id: "cycle",
         start: "again",
-        summaryStyle: "route",
         nodes: [{
           id: "again",
           type: "agent",
@@ -125,7 +123,6 @@ describe("automation v8 config", () => {
     const target = {
       id: "release",
       start: "finish",
-      summaryStyle: "route" as const,
       nodes: [{
         id: "finish",
         type: "human" as const,
@@ -172,7 +169,6 @@ describe("all-approved path liveness", () => {
       loops: [{
         id: "planning",
         start: "approve-plan",
-        summaryStyle: "route",
         nodes: [{
           id: "approve-plan",
           type: "human",
@@ -184,7 +180,6 @@ describe("all-approved path liveness", () => {
       }, {
         id: "delivery",
         start: "approve-delivery",
-        summaryStyle: "route",
         nodes: [{
           id: "approve-delivery",
           type: "human",
@@ -222,12 +217,10 @@ describe("all-approved path liveness", () => {
       loops: [{
         id: "delivery",
         start: "step-1",
-        summaryStyle: "route",
         nodes: [...longSteps, ...defaultTerminalNodes()]
       }, {
         id: "finish",
         start: "complete",
-        summaryStyle: "route",
         nodes: [{
           id: "complete",
           type: "human",
@@ -251,7 +244,6 @@ describe("all-approved path liveness", () => {
       loops: [{
         id: "delivery",
         start: "implement",
-        summaryStyle: "route",
         nodes: [{
           id: "implement",
           type: "agent",
@@ -271,7 +263,6 @@ describe("all-approved path liveness", () => {
       }, {
         id: "dev-deployment",
         start: "deploy",
-        summaryStyle: "route",
         nodes: [{
           id: "deploy",
           type: "agent",

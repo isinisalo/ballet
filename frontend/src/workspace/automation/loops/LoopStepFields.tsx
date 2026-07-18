@@ -7,9 +7,7 @@ import { LoopEditorSelect } from "./LoopEditorSelect";
 
 const nodeStyleGroupLabels = {
   classic: "Classic",
-  planet: "Planets",
-  ship: "Ships",
-  monster: "Monsters"
+  planet: "Planets"
 } as const;
 
 export function NodeStyleField({ node, disabled, onChange }: {

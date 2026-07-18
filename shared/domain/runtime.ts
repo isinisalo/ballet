@@ -1,7 +1,7 @@
 // The canonical runtime contract intentionally stays in one module so frontend and
 // backend cannot drift on persisted execution, provider, and Loop snapshot shapes.
 import type { AgentAvatar } from "./agents.js";
-import type { LoopSummaryStyle, ProjectLoop } from "./automation.js";
+import type { ProjectLoop } from "./automation.js";
 import type { LoopTheme } from "./loopThemes.js";
 
 export type RuntimeProvider = "codex" | "copilot";
@@ -275,11 +275,6 @@ export interface LoopScheduleState {
   lastError?: string;
 }
 
-export interface LoopSummaryStyleSnapshot {
-  loopId: string;
-  summaryStyle: LoopSummaryStyle;
-}
-
 export interface LoopRun {
   runId: string;
   loopId: string;
@@ -291,7 +286,6 @@ export interface LoopRun {
   input?: string;
   snapshot: ProjectLoop;
   themeSnapshot: LoopTheme;
-  loopSummarySnapshots?: LoopSummaryStyleSnapshot[];
   executionPlan?: LoopExecutionPlan;
   schedule?: LoopScheduleOccurrence;
   transitionCount: number;

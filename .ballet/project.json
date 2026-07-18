@@ -78,7 +78,6 @@
     {
       "id": "blueprint-design",
       "start": "roadmap",
-      "summaryStyle": "route",
       "nodes": [
         {
           "description": "Muodosta hyväksytyistä Goal- ja ADR-lähteistä roadmap tiedostoon .ballet/outputs/ROADMAP.md. Rajaa MVP, myöhemmät inkrementit, riippuvuudet, riskit ja validointipisteet.",
@@ -179,7 +178,6 @@
     {
       "id": "milestone-planning",
       "start": "plan-milestone-issues",
-      "summaryStyle": "route",
       "nodes": [
         {
           "description": "Lue blueprint-artifactit ja human handoff, hae GitHub-issueiden nykyinen sisältö ja tuota milestone-kohtainen rajaus, riippuvuudet, acceptance criteria ja issue-snapshotit .ballet/outputs/milestones/<milestone-id>/MILESTONE.md-tiedostoon.",
@@ -256,7 +254,6 @@
     {
       "id": "milestone-delivery",
       "start": "implement-milestone",
-      "summaryStyle": "twin-core",
       "nodes": [
         {
           "description": "Toteuta hyväksytyn milestonen kaikki määritellyt GitHub-issues-muutokset ja testit IMPLEMENTATION-PLAN.md:n, TEST-PLAN.md:n ja UI-artifacttien mukaisesti.",
@@ -321,7 +318,6 @@
     {
       "id": "release-validation",
       "start": "make-git-release",
-      "summaryStyle": "route",
       "nodes": [
         {
           "description": "Tarkista implementation-gate, muodosta projektin määrittelemä Git-release ja tallenna release-versio sekä komennot release-artifactiin.",

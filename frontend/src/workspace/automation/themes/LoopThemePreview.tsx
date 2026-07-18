@@ -11,7 +11,6 @@ const previewConfig: ProjectAutomationConfig = {
   loops: [{
     id: previewLoopId,
     start: "luna",
-    summaryStyle: "route",
     nodes: [{
       id: "luna",
       type: "scheduled",
@@ -58,14 +57,13 @@ const previewConfig: ProjectAutomationConfig = {
     }, {
       id: "failed",
       type: "failed",
-      nodeStyle: "meteorite",
+      nodeStyle: "vector-planet",
       nodeSize: "tiny",
       description: "Failed terminal"
     }]
   }, {
     id: "downstream-loop",
     start: "downstream-step",
-    summaryStyle: "spiral",
     nodes: [{
       id: "downstream-step",
       type: "human",

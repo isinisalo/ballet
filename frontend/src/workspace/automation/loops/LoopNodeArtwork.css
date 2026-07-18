@@ -1,11 +1,5 @@
 @import "./LoopNodeClassicArtwork.css";
 @import "./LoopNodePlanetArtwork.css";
-@import "./LoopNodeShipArtwork.css";
-@import "./LoopNodeMonsterArtwork.css";
-
-.loop-step-node--borderless {
-  border-color: transparent !important;
-}
 
 .loop-node-surface {
   position: absolute;
@@ -35,40 +29,11 @@
   pointer-events: none;
 }
 
-.loop-node-surface:is(
-  .loop-node-surface--group-planet,
-  .loop-node-surface--group-ship,
-  .loop-node-surface--group-monster
-)::after {
+.loop-node-surface--group-planet::after {
   display: none;
 }
 
-.loop-node-surface:is(
-  .loop-node-surface--group-ship,
-  .loop-node-surface--group-monster,
-  .loop-node-surface--shattered-planet
-) {
-  overflow: visible;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--loop-node-glow-color) 30%, transparent));
-}
-
-.loop-step-node:hover .loop-node-surface:is(
-  .loop-node-surface--group-ship,
-  .loop-node-surface--group-monster,
-  .loop-node-surface--shattered-planet
-),
-.loop-step-node:focus-visible .loop-node-surface:is(
-  .loop-node-surface--group-ship,
-  .loop-node-surface--group-monster,
-  .loop-node-surface--shattered-planet
-) {
-  filter: brightness(1.12) drop-shadow(0 0 5px color-mix(in srgb, var(--loop-node-glow-color) 30%, transparent));
-}
-
-.loop-step-node[data-loop-node-size="tiny"] :is(
-  .loop-node-artwork-detail--small,
-  .loop-node-artwork-detail--medium
-),
+.loop-step-node[data-loop-node-size="tiny"] .loop-node-artwork-detail--medium,
 .loop-step-node[data-loop-node-size="small"] .loop-node-artwork-detail--medium {
   display: none;
 }

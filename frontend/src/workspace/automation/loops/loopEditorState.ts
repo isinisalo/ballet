@@ -10,12 +10,12 @@ import type {
   ProjectStepTransitions,
   StepTransitionTarget
 } from "@shared/api/workspace-contracts";
-import { defaultLoopNodeSize, defaultLoopSummaryStyle, defaultTerminalNodes, defaultTransitionFor, getProjectStepTransitionTargets, isProjectTerminalNode, mapProjectStepTransitions } from "@shared/api/workspace-contracts";
+import { defaultLoopNodeSize, defaultTerminalNodes, defaultTransitionFor, getProjectStepTransitionTargets, isProjectTerminalNode, mapProjectStepTransitions } from "@shared/api/workspace-contracts";
 import { defaultOnceSchedule } from "./loopSchedulePresentation";
 
 export type TransitionTargetKind = "node" | "loop";
 
-export const createLoopDraft = (): ProjectLoop => ({ id: "", start: "", summaryStyle: defaultLoopSummaryStyle, nodes: defaultTerminalNodes() });
+export const createLoopDraft = (): ProjectLoop => ({ id: "", start: "", nodes: defaultTerminalNodes() });
 
 export const addFirstStep = (loop: ProjectLoop, agents: Agent[]): ProjectLoop => {
   if (loop.nodes.some((node) => !isProjectTerminalNode(node))) return loop;
