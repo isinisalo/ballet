@@ -1,7 +1,9 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { z } from "zod";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { agentOutcomeSchema } from "../../shared/api/runtime-schemas.js";
 import type { ExecutionSpec, ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
 import { LocalDatabase } from "../storage/LocalDatabase.js";
 import { ExecutionStore } from "./ExecutionStore.js";
@@ -136,13 +138,7 @@ describe("LocalExecutionQueue", () => {
     await fixture.queue.start();
     await waitFor(() => fixture.store.require("schema").status === "succeeded");
 
-    expect(fixture.codex.outputSchemas[0]).toMatchObject({
-      additionalProperties: false,
-      properties: {
-        summary: { maxLength: 20_000 },
-        checks: { maxItems: 500 }
-      }
-    });
+    expect(fixture.codex.outputSchemas[0]).toEqual(z.toJSONSchema(agentOutcomeSchema));
     await fixture.close();
   });
 
@@ -208,7 +204,9 @@ class ControlledAdapter implements CliRuntimeAdapter {
       yield {
         type: "execution.completed",
         output: "done",
-        structuredOutput: this.validOutcome ? readyOutcome : { summary: "missing outcome and checks" }
+        structuredOutput: this.validOutcome
+          ? approvedOutcome
+          : { state: "completed", summary: "Missing required result.", checks: [] }
       };
     } finally {
       this.active -= 1;
@@ -220,7 +218,12 @@ class ControlledAdapter implements CliRuntimeAdapter {
   }
 }
 
-const readyOutcome = { outcome: "ready" as const, summary: "Ready.", checks: [] };
+const approvedOutcome = {
+  state: "completed" as const,
+  result: "approved" as const,
+  summary: "Approved.",
+  checks: []
+};
 
 const createFixture = async ({ validOutcome = true }: { validOutcome?: boolean } = {}) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "ballet-local-queue-"));

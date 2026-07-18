@@ -1,4 +1,4 @@
-import type { Agent, ExecutionAgentSnapshot, ExecutionTask, ProjectStep, StepRun } from "@shared/api/workspace-contracts";
+import type { Agent, ExecutionAgentSnapshot, ExecutionTask, ProjectStep, RespondToStepRunRequest, StepRun } from "@shared/api/workspace-contracts";
 import { Bot, CalendarClock, ShieldCheck } from "lucide-react";
 import { OperationalStatus, type OperationalStatusTone } from "@/components/shared/workspace-ui";
 import { CliRunConsole } from "../../components/CliRunConsole";
@@ -9,7 +9,7 @@ export function LoopRunStepHeader({ step, stepRun }: { step: ProjectStep; stepRu
   const Icon = step.type === "human" ? ShieldCheck : step.type === "scheduled" ? CalendarClock : Bot;
   const tone: OperationalStatusTone = stepRun.status === "running" ? "active"
     : stepRun.status === "completed" ? "healthy"
-      : ["failed", "cancelled"].includes(stepRun.status) ? "danger" : "attention";
+      : ["blocked", "failed", "cancelled"].includes(stepRun.status) ? "danger" : "attention";
   return (
     <header className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-xs">
       <Icon className="size-3.5 text-muted-foreground" />
@@ -31,7 +31,7 @@ export function LoopRunStepOutput({ step, stepRun, task, pending, onTerminal, on
   task?: ExecutionTask;
   pending: boolean;
   onTerminal: () => void;
-  onRespond: (stepRunId: string, result: "approved" | "rejected", input: string) => Promise<boolean>;
+  onRespond: (stepRunId: string, request: RespondToStepRunRequest) => Promise<boolean>;
 }) {
   const active = ["queued", "running"].includes(stepRun.status);
   return (

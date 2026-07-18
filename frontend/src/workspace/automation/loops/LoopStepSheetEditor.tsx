@@ -1,8 +1,9 @@
 import { useId } from "react";
 import type { Agent, LoopScheduleState, ProjectLoop, ProjectLoopNode, ProjectStep, ProjectStepTransitionId } from "@shared/api/workspace-contracts";
 import { isProjectTerminalNode } from "@shared/api/workspace-contracts";
-import { Trash2 } from "lucide-react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,10 +82,9 @@ export function LoopNodeSheetEditor({ step, loop, loops, agents, scheduleState, 
           onChange={(type) => { if (!terminal) onChange(changeStepType(step, type as ProjectStep["type"], { loop, firstAgentId: agents[0]?.id })); }}
         />
         {terminal ? <CompactSelectField label="Agent" ariaLabel="Agent" value="" options={[]} disabled onChange={() => undefined} /> : <StepOwner step={step} agents={agents} disabled={disabled} onChange={onChange} />}
-        <NodeStyleField node={step} disabled={disabled} onChange={onChange} />
-        <NodeSizeField node={step} disabled={disabled} onChange={onChange} />
         {step.type === "scheduled" ? <LoopScheduleEditor step={step} state={scheduleState} disabled={disabled} onChange={onChange} /> : null}
         <LoopTransitionsEditor step={step} loop={loop} loops={loops} disabled={disabled} focusedTransition={focusedTransition} onChange={onChange} />
+        <NodeAppearanceFields node={step} disabled={disabled} onChange={onChange} />
       </FieldGroup>
       {!terminal ? <div className="mt-3 border-t border-divider-strong pt-2">
         <Button type="button" variant="ghost" size="xs" disabled={disabled || !canRemoveStep(loop, step.id)} className="px-1 text-destructive hover:text-destructive" onClick={onRemove}>
@@ -92,5 +92,25 @@ export function LoopNodeSheetEditor({ step, loop, loops, agents, scheduleState, 
         </Button>
       </div> : null}
     </form>
+  );
+}
+
+function NodeAppearanceFields({ node, disabled, onChange }: {
+  node: ProjectLoopNode;
+  disabled: boolean;
+  onChange: (node: ProjectLoopNode) => void;
+}) {
+  return (
+    <Collapsible className="group/appearance">
+      <CollapsibleTrigger render={
+        <Button type="button" variant="ghost" size="xs" className="w-full justify-start px-0 text-muted-foreground">
+          <ChevronRight className="transition-transform group-data-[state=open]/appearance:rotate-90" /> Appearance
+        </Button>
+      } />
+      <CollapsibleContent className="grid gap-3 border-t border-divider-strong pt-3">
+        <NodeStyleField node={node} disabled={disabled} onChange={onChange} />
+        <NodeSizeField node={node} disabled={disabled} onChange={onChange} />
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

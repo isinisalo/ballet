@@ -36,14 +36,16 @@ const automation: ProjectAutomationConfig = {
 };
 
 const ready: AgentOutcome = {
-  outcome: "ready",
+  state: "completed",
+  result: "approved",
   summary: "Delivered.",
   checks: []
 };
 
-const blocked: AgentOutcome = {
-  outcome: "blocked",
-  summary: "Delivery is blocked.",
+const rejectedOutcome: AgentOutcome = {
+  state: "completed",
+  result: "rejected",
+  summary: "Delivery needs changes.",
   checks: []
 };
 
@@ -115,7 +117,7 @@ describe("scheduled runtime starts", () => {
 
     const rejected = database.completeAgentStep(automation, defaultLoopTheme, {
       stepRunId: run.stepRuns[0]!.stepRunId,
-      outcome: blocked
+      outcome: rejectedOutcome
     });
 
     expect(rejected.status).toBe("blocked");

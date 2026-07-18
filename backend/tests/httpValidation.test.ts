@@ -4,11 +4,86 @@ import {
     collectionUpsertSchema,
     projectDocumentSaveSchema
 } from "../../shared/api/workspace-schemas.js";
+import { agentOutcomeSchema, respondToRunStepBodySchema } from "../../shared/api/runtime-schemas.js";
 import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import { parseUnknown } from "../http/validation/httpValidation.js";
 import { expectValidationError } from "./expectValidationError.js";
 
+describe("AgentOutcome validation", () => {
+  it("enforces the discriminated AgentOutcome contract", () => {
+    const validOutcomes = [
+      { state: "completed", result: "approved", summary: "Approved.", checks: [] },
+      { state: "completed", result: "rejected", summary: "Changes are required.", checks: [] },
+      {
+        state: "needs_input",
+        question: "Which environment should be used?",
+        context: "The task does not identify an environment.",
+        summary: "Waiting for an environment choice.",
+        checks: []
+      },
+      { state: "blocked", summary: "A required dependency is unavailable.", checks: [] },
+      { state: "failed", summary: "The provider process exited.", checks: [] }
+    ];
+    for (const outcome of validOutcomes) {
+      expect(parseUnknown(agentOutcomeSchema, outcome)).toEqual(outcome);
+    }
+
+    const invalidOutcomes = [
+      ["legacy ready", { outcome: "ready", summary: "Ready.", checks: [] }, "state"],
+      [
+        "legacy changes-requested",
+        { outcome: "changes-requested", summary: "Changes are required.", checks: [] },
+        "state"
+      ],
+      ["completed without result", { state: "completed", summary: "Done.", checks: [] }, "result"],
+      [
+        "non-completed with result",
+        { state: "blocked", result: "approved", summary: "Blocked.", checks: [] },
+        "$"
+      ],
+      [
+        "needs_input without question",
+        { state: "needs_input", context: "Context.", summary: "Waiting.", checks: [] },
+        "question"
+      ],
+      [
+        "needs_input without context",
+        { state: "needs_input", question: "Continue?", summary: "Waiting.", checks: [] },
+        "context"
+      ]
+    ] as const;
+    for (const [, outcome, path] of invalidOutcomes) {
+      expectValidationError(() => parseUnknown(agentOutcomeSchema, outcome), path);
+    }
+  });
+});
+
 describe("HTTP Zod validation", () => {
+  it("distinguishes human decisions from agent input resumes", () => {
+    expect(parseUnknown(respondToRunStepBodySchema, {
+      kind: "human",
+      result: "approved",
+      input: "Looks good."
+    })).toEqual({ kind: "human", result: "approved", input: "Looks good." });
+    expect(parseUnknown(respondToRunStepBodySchema, {
+      kind: "resume",
+      input: "Use SQLite."
+    })).toEqual({ kind: "resume", input: "Use SQLite." });
+    expectValidationError(() => parseUnknown(respondToRunStepBodySchema, {
+      kind: "resume",
+      result: "approved",
+      input: "Use SQLite."
+    }), "$");
+    expectValidationError(() => parseUnknown(respondToRunStepBodySchema, {
+      kind: "human",
+      input: "Looks good."
+    }), "result");
+    expectValidationError(() => parseUnknown(respondToRunStepBodySchema, {
+      kind: "resume",
+      input: "   "
+    }), "input");
+  });
+
   it("accepts valid project document saves and rejects unknown top-level fields", () => {
     const valid = {
       relativePath: ".ballet/project.md",

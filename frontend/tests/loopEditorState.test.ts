@@ -9,6 +9,8 @@ import {
   removeStep,
   reorderLoopSteps,
   replaceNode,
+  transitionTargetFromSelectValue,
+  transitionTargetSelectValue,
   updateLoopAtIndex
 } from "../src/workspace/automation/loops/loopEditorState";
 
@@ -29,6 +31,14 @@ const loop = (): ProjectLoop => ({
 });
 
 describe("loop editor state", () => {
+  it("encodes Node and Loop targets without losing their target kind", () => {
+    expect(transitionTargetSelectValue("shared-target")).toBe("node:shared-target");
+    expect(transitionTargetSelectValue({ loop: "shared-target" })).toBe("loop:shared-target");
+    expect(transitionTargetFromSelectValue("node:completed")).toBe("completed");
+    expect(transitionTargetFromSelectValue("loop:next-loop")).toEqual({ loop: "next-loop" });
+    expect(() => transitionTargetFromSelectValue("next-loop")).toThrow("Unsupported transition target select value.");
+  });
+
   it("starts with a serverless empty draft and creates a Flat first Step on demand", () => {
     const draft = createLoopDraft();
     expect(draft).toEqual({ id: "", start: "", nodes: defaultTerminalNodes() });

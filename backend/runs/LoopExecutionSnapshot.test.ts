@@ -25,11 +25,6 @@ const automation = {
   }]
 };
 
-const gatedAutomation = {
-  ...automation,
-  loops: [{ ...automation.loops[0]!, id: "milestone-planning" }]
-};
-
 describe("Loop execution snapshots and targets", () => {
   it("excludes disabled skills from the immutable prompt snapshot", () => {
     const snapshot = agentSnapshot(agent());
@@ -76,7 +71,7 @@ describe("Loop execution snapshots and targets", () => {
     expect(result.loops[0]).toMatchObject({ ready: false });
   });
 
-  it("marks downstream engineering Loops unavailable for direct starts", async () => {
+  it("allows every valid Loop to start directly", async () => {
     const configuration: AgentRuntimeConfiguration = {
       localPolicy: { readOnlyRoots: [] },
       resolved: { agentId: "reviewer", provider: "codex", model: "model", reasoning: "medium", policy: { network: false, readOnlyRoots: [] } },
@@ -88,12 +83,12 @@ describe("Loop execution snapshots and targets", () => {
     );
 
     const result = await service.list({
-      agents: [agent()], automation: gatedAutomation, automationIssues: [], loopThemeIssues: []
+      agents: [agent()],
+      automation: { ...automation, loops: [{ ...automation.loops[0]!, id: "secondary-flow" }] },
+      automationIssues: [],
+      loopThemeIssues: []
     }, { reviewer: configuration });
 
-    expect(result.loops[0]).toMatchObject({ ready: false });
-    expect(result.loops[0]?.issues).toContainEqual(expect.objectContaining({
-      message: "This Loop can only start from its approved human-gate transition."
-    }));
+    expect(result.loops[0]).toMatchObject({ id: "secondary-flow", ready: true, issues: [] });
   });
 });

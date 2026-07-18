@@ -13,8 +13,6 @@ import type {
 import { defaultLoopNodeSize, defaultTerminalNodes, defaultTransitionFor, getProjectStepTransitionTargets, isProjectTerminalNode, mapProjectStepTransitions } from "@shared/api/workspace-contracts";
 import { defaultOnceSchedule } from "./loopSchedulePresentation";
 
-export type TransitionTargetKind = "node" | "loop";
-
 export const createLoopDraft = (): ProjectLoop => ({ id: "", start: "", nodes: defaultTerminalNodes() });
 
 export const addFirstStep = (loop: ProjectLoop, agents: Agent[]): ProjectLoop => {
@@ -120,14 +118,13 @@ export const removeLoopAtIndex = (config: ProjectAutomationConfig, index: number
   };
 };
 
-export const transitionTargetKind = (target: StepTransitionTarget): TransitionTargetKind =>
-  typeof target === "string" ? "node" : "loop";
+export const transitionTargetSelectValue = (target: StepTransitionTarget): string =>
+  typeof target === "string" ? `node:${target}` : `loop:${target.loop}`;
 
-export const transitionTargetValue = (target: StepTransitionTarget): string =>
-  typeof target === "string" ? target : target.loop;
-
-export const transitionTarget = (kind: TransitionTargetKind, value: string): StepTransitionTarget => {
-  return kind === "node" ? value : { loop: value };
+export const transitionTargetFromSelectValue = (value: string): StepTransitionTarget => {
+  if (value.startsWith("node:")) return value.slice("node:".length);
+  if (value.startsWith("loop:")) return { loop: value.slice("loop:".length) };
+  throw new Error("Unsupported transition target select value.");
 };
 
 const defaultOn = (): ProjectStepTransitions => ({

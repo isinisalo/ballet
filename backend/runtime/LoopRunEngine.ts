@@ -5,8 +5,7 @@ import type {
   ProjectStep,
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
-import { isProjectTerminalNode, resolveEffectiveStartStep } from "../../shared/domain/automation.js";
-import { LoopHandoffValidationError, validateLoopTransitionHandoff } from "../../shared/domain/loopHandoff.js";
+import { isProjectAgentBackedStep, isProjectTerminalNode, resolveEffectiveStartStep } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   AgentOutcome,
@@ -31,11 +30,10 @@ interface StartOptions {
   schedule?: { stepId: string; scheduledFor: string };
 }
 
+export type CompleteAgentStepInput = CompleteStepRunInput & { executionTaskId?: string };
+
 const isLoopTarget = (target: StepTransitionTarget): target is { loop: string } =>
   typeof target === "object" && "loop" in target;
-
-const resultForOutcome = (outcome: AgentOutcome): StepRunResult =>
-  outcome.outcome === "ready" || outcome.outcome === "approved" ? "approved" : "rejected";
 
 const isActiveLoopConstraint = (error: unknown): boolean => {
   if (!(error instanceof Error)) return false;
@@ -93,14 +91,6 @@ export class LoopRunEngine {
         return this.requireDetails(runId);
       }
       const forwardedInput = this.forwardedInput(run.input, input);
-      if (isLoopTarget(target)) {
-        try {
-          validateLoopTransitionHandoff(target.loop, forwardedInput);
-        } catch (error) {
-          if (error instanceof LoopHandoffValidationError) throw new LoopRunStateError(error.message);
-          throw error;
-        }
-      }
       if (isLoopTarget(target) && this.store.hasActiveLoop(target.loop)) {
         throw new LoopRunConflictError(`Loop ${target.loop} already has an active run.`);
       }
@@ -122,33 +112,80 @@ export class LoopRunEngine {
   completeAgentStep(
     config: ProjectAutomationConfig,
     loopTheme: LoopTheme,
-    input: CompleteStepRunInput
+    input: CompleteAgentStepInput
   ): LoopRunDetails {
     const transaction = this.connection().transaction(() => {
       const stepRun = this.store.getStepRun(input.stepRunId);
       if (!stepRun) throw new LoopRunNotFoundError(`Step run ${input.stepRunId} was not found.`);
       const run = this.requireRun(stepRun.runId);
       if (run.status === "cancelled" || stepRun.status === "cancelled") return this.requireDetails(run.runId);
+      if (input.executionTaskId && stepRun.executionTaskId !== input.executionTaskId) {
+        return this.requireDetails(run.runId);
+      }
       if (stepRun.type !== "agent") throw new LoopRunStateError("A human step cannot be completed by the local runtime.");
       if (stepRun.status !== "running" && stepRun.status !== "queued") {
         return this.requireDetails(run.runId);
       }
 
       const step = this.requireSnapshotStep(run, stepRun.stepId);
-      if (step.type === "human") throw new LoopRunStateError("An agent StepRun must reference an agent-backed step.");
-      const result = input.outcome ? resultForOutcome(input.outcome) : "rejected";
-      this.store.completeStepRun(stepRun, result, {
-        outcome: input.outcome,
-        error: input.error,
-        failed: Boolean(input.error)
-      });
+      if (!isProjectAgentBackedStep(step)) {
+        throw new LoopRunStateError("An agent StepRun must reference an agent-backed step.");
+      }
+      const outcome = input.error
+        ? this.executionFailure(input.error)
+        : input.outcome ?? this.executionFailure("Runtime completed without a structured agent outcome.");
+      if (outcome.state === "needs_input") {
+        this.store.pauseStepRunForInput(stepRun, outcome);
+        this.store.waitForStepInput(run.runId);
+        return this.requireDetails(run.runId);
+      }
+      if (outcome.state === "blocked" || outcome.state === "failed") {
+        this.store.finishStepRunWithoutTransition(stepRun, outcome.state, outcome, input.error);
+        this.store.finishRun(run.runId, outcome.state);
+        return this.requireDetails(run.runId);
+      }
+
+      if (outcome.state !== "completed" || !outcome.result) {
+        throw new LoopRunStateError("A completed agent outcome must include an approved or rejected result.");
+      }
+      const result = outcome.result;
+      const target = step.on[result];
+      if (isLoopTarget(target) && this.store.hasActiveLoop(target.loop)) {
+        this.store.blockStepRunWithoutTransition(stepRun, run.runId, `Loop ${target.loop} already has an active run.`);
+        return this.requireDetails(run.runId);
+      }
+      this.store.completeStepRun(stepRun, result, { outcome });
       if (this.wouldExceedTransitionLimit(run)) {
         this.blockForTransitionLimit(run, stepRun);
         return this.requireDetails(run.runId);
       }
       this.store.incrementTransitionCount(run.runId);
-      this.applyTransition(config, loopTheme, run, stepRun, step.on[result], run.input);
+      this.applyTransition(config, loopTheme, run, stepRun, target, run.input);
       return this.requireDetails(run.runId);
+    });
+    return transaction() as LoopRunDetails;
+  }
+
+  resumeAgentStep(runId: string, stepRunId: string, input: string): LoopRunDetails {
+    if (!input.trim()) throw new LoopRunStateError("Resume input is required.");
+    const transaction = this.connection().transaction(() => {
+      const run = this.requireRun(runId);
+      const stepRun = this.requireStepRun(runId, stepRunId);
+      const step = this.requireSnapshotStep(run, stepRun.stepId);
+      if (!isProjectAgentBackedStep(step) || stepRun.type !== "agent") {
+        throw new LoopRunStateError("Only an agent step can resume after requesting input.");
+      }
+      if (run.status !== "waiting_for_human" || stepRun.status !== "needs_input"
+        || stepRun.outcome?.state !== "needs_input") {
+        throw new LoopRunConflictError("The agent step is no longer waiting for input.");
+      }
+
+      const runInput = this.forwardedInput(run.input, input);
+      const stepInput = this.forwardedInput(stepRun.input, input);
+      const responseInput = this.forwardedInput(stepRun.responseInput, input);
+      this.store.resumeStepRun(stepRun, stepInput, responseInput);
+      this.store.resumeRun(run.runId, runInput);
+      return this.requireDetails(runId);
     });
     return transaction() as LoopRunDetails;
   }
@@ -162,7 +199,7 @@ export class LoopRunEngine {
       const timestamp = now();
       this.connection().prepare(`
         UPDATE step_runs SET status = 'cancelled', completed_at = @completedAt, updated_at = @updatedAt
-        WHERE run_id = @runId AND status IN ('queued', 'running', 'waiting_for_human')
+        WHERE run_id = @runId AND status IN ('queued', 'running', 'waiting_for_human', 'needs_input')
       `).run({ runId, completedAt: timestamp, updatedAt: timestamp });
       this.store.finishRun(runId, "cancelled");
       return this.requireDetails(runId);
@@ -227,7 +264,7 @@ export class LoopRunEngine {
     const targetLoop = this.requireLoop(config, target.loop);
     this.store.finishRun(run.runId, "completed");
     this.startInTransaction(targetLoop, loopTheme, {
-      source: "human",
+      source: "transition",
       input,
       rootRunId: run.rootRunId,
       parentRunId: run.runId,
@@ -241,13 +278,17 @@ export class LoopRunEngine {
   }
 
   private blockForTransitionLimit(run: LoopRun, stepRun: StepRun): void {
-    void stepRun;
-    this.store.finishRun(run.runId, "blocked");
+    this.store.blockStepRunWithoutTransition(stepRun, run.runId,
+      `Root transition limit of ${MAX_ROOT_TRANSITIONS} reached.`);
   }
 
   private forwardedInput(runInput: string | undefined, responseInput: string): string {
     if (!runInput) return responseInput;
     return `${runInput}\n\n${responseInput}`;
+  }
+
+  private executionFailure(message: string): AgentOutcome {
+    return { state: "failed", summary: message, checks: [] };
   }
 
   private requireLoop(config: ProjectAutomationConfig, loopId: string): ProjectLoop {

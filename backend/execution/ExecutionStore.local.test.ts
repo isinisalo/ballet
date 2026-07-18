@@ -37,7 +37,7 @@ describe("ExecutionStore", () => {
 
     const queued = fixture.store.requestCancel("queued");
     const requested = fixture.store.requestCancel("running");
-    const finished = fixture.store.finish("running", "succeeded", { outcome: readyOutcome });
+    const finished = fixture.store.finish("running", "succeeded", { outcome: approvedOutcome });
 
     expect(queued).toMatchObject({ status: "cancelled", cancelRequestedAt: expect.any(String) });
     expect(requested).toMatchObject({ status: "running", cancelRequestedAt: expect.any(String) });
@@ -93,7 +93,7 @@ describe("ExecutionStore", () => {
     fixture.insertRoot("root-1");
     fixture.store.create(specification("task", "root-1"));
 
-    const completed = fixture.store.finish("task", "succeeded", { outcome: readyOutcome });
+    const completed = fixture.store.finish("task", "succeeded", { outcome: approvedOutcome });
     const replayed = fixture.store.finish("task", "failed", { errorCode: "late", errorMessage: "late failure" });
 
     expect(replayed).toEqual(completed);
@@ -103,7 +103,12 @@ describe("ExecutionStore", () => {
   });
 });
 
-const readyOutcome = { outcome: "ready" as const, summary: "Ready.", checks: [] };
+const approvedOutcome = {
+  state: "completed" as const,
+  result: "approved" as const,
+  summary: "Approved.",
+  checks: []
+};
 
 const specification = (
   taskId: string,

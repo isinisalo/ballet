@@ -27,7 +27,7 @@ class FakeSession implements CopilotSessionLike {
     this.handler?.({ type: "assistant.message_delta", data: { deltaContent: "stream" } });
     const content = this.prompts.length === 1
       ? "not-json"
-      : JSON.stringify({ outcome: "ready", summary: "Done.", checks: [] });
+      : JSON.stringify({ state: "completed", result: "approved", summary: "Done.", checks: [] });
     return { type: "assistant.message", data: { content } };
   }
 
@@ -92,9 +92,10 @@ describe("CopilotSdkAdapter", () => {
       outputSchema: {
         type: "object",
         additionalProperties: false,
-        required: ["outcome", "summary", "checks"],
+        required: ["state", "result", "summary", "checks"],
         properties: {
-          outcome: { type: "string", enum: ["ready"] },
+          state: { type: "string", const: "completed" },
+          result: { type: "string", enum: ["approved", "rejected"] },
           summary: { type: "string" },
           checks: { type: "array" }
         }
@@ -106,7 +107,7 @@ describe("CopilotSdkAdapter", () => {
     expect(events).toContainEqual(expect.objectContaining({ type: "assistant.delta", text: "stream" }));
     expect(events).toContainEqual(expect.objectContaining({
       type: "execution.completed",
-      structuredOutput: { outcome: "ready", summary: "Done.", checks: [] }
+      structuredOutput: { state: "completed", result: "approved", summary: "Done.", checks: [] }
     }));
     expect(client.session.optionUpdates).toContainEqual(expect.objectContaining({
       sandboxConfig: expect.objectContaining({ enabled: true, addCurrentWorkingDirectory: false })

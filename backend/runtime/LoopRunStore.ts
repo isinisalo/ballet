@@ -167,17 +167,16 @@ export class LoopRunStore {
     responseInput?: string;
     outcome?: AgentOutcome;
     error?: string;
-    failed?: boolean;
   }): void {
     const timestamp = now();
     this.connection().prepare(`
-      UPDATE step_runs SET status = @status, response_input = @responseInput, result = @result,
+      UPDATE step_runs SET status = 'completed',
+        response_input = COALESCE(@responseInput, response_input), result = @result,
         outcome_json = @outcomeJson, error = @error,
         completed_at = @completedAt, updated_at = @updatedAt
         WHERE step_run_id = @stepRunId
     `).run({
       stepRunId: stepRun.stepRunId,
-      status: options.failed ? "failed" : "completed",
       responseInput: options.responseInput ?? null,
       result,
       outcomeJson: options.outcome ? stringifyJson(options.outcome) : null,
@@ -187,11 +186,51 @@ export class LoopRunStore {
     });
   }
 
-  bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
+  pauseStepRunForInput(stepRun: StepRun, outcome: AgentOutcome): void {
     this.connection().prepare(`
+      UPDATE step_runs SET status = 'needs_input', result = NULL,
+        outcome_json = ?, error = NULL, completed_at = NULL, updated_at = ?
+      WHERE step_run_id = ?
+    `).run(stringifyJson(outcome), now(), stepRun.stepRunId);
+  }
+
+  finishStepRunWithoutTransition(
+    stepRun: StepRun,
+    status: "blocked" | "failed",
+    outcome: AgentOutcome,
+    error?: string
+  ): void {
+    const timestamp = now();
+    this.connection().prepare(`
+      UPDATE step_runs SET status = ?, result = NULL, outcome_json = ?, error = ?,
+        completed_at = ?, updated_at = ? WHERE step_run_id = ?
+    `).run(status, stringifyJson(outcome), error ?? null, timestamp, timestamp, stepRun.stepRunId);
+  }
+
+  blockStepRunWithoutTransition(stepRun: StepRun, runId: string, summary: string): void {
+    this.finishStepRunWithoutTransition(stepRun, "blocked", { state: "blocked", summary, checks: [] });
+    this.finishRun(runId, "blocked");
+  }
+
+  resumeStepRun(stepRun: StepRun, input: string, responseInput: string): StepRun {
+    const timestamp = now();
+    const result = this.connection().prepare(`
+      UPDATE step_runs SET status = 'queued', execution_task_id = NULL, input = ?,
+        response_input = ?, result = NULL, error = NULL, completed_at = NULL, updated_at = ?
+      WHERE step_run_id = ? AND step_type = 'agent' AND status = 'needs_input'
+    `).run(input, responseInput, timestamp, stepRun.stepRunId);
+    if (result.changes !== 1) throw new Error(`Step run ${stepRun.stepRunId} is no longer waiting for input.`);
+    const stored = this.getStepRun(stepRun.stepRunId);
+    if (!stored) throw new Error(`Step run ${stepRun.stepRunId} was not found.`);
+    return stored;
+  }
+
+  bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
+    const result = this.connection().prepare(`
       UPDATE step_runs SET execution_task_id = ?, execution_snapshot_json = ?, updated_at = ?
       WHERE step_run_id = ? AND step_type = 'agent' AND execution_task_id IS NULL
     `).run(taskId, stringifyJson(snapshot), now(), stepRunId);
+    if (result.changes !== 1) throw new Error(`Step run ${stepRunId} already has an execution task.`);
     const stepRun = this.getStepRun(stepRunId);
     if (!stepRun) throw new Error(`Step run ${stepRunId} was not found.`);
     return stepRun;
@@ -199,7 +238,7 @@ export class LoopRunStore {
 
   markStepRunning(stepRunId: string): StepRun {
     this.connection().prepare(`
-      UPDATE step_runs SET status = 'running', attempt = 1, updated_at = ?
+      UPDATE step_runs SET status = 'running', attempt = attempt + 1, updated_at = ?
       WHERE step_run_id = ? AND status = 'queued'
     `).run(now(), stepRunId);
     const stepRun = this.getStepRun(stepRunId);
@@ -224,6 +263,19 @@ export class LoopRunStore {
   updateRunInput(runId: string, input: string): void {
     this.connection().prepare("UPDATE loop_runs SET input = ?, updated_at = ? WHERE run_id = ?")
       .run(input, now(), runId);
+  }
+
+  waitForStepInput(runId: string): void {
+    this.connection().prepare(`
+      UPDATE loop_runs SET status = 'waiting_for_human', updated_at = ? WHERE run_id = ?
+    `).run(now(), runId);
+  }
+
+  resumeRun(runId: string, input: string): void {
+    this.connection().prepare(`
+      UPDATE loop_runs SET status = 'running', input = ?, completed_at = NULL, updated_at = ?
+      WHERE run_id = ? AND status = 'waiting_for_human'
+    `).run(input, now(), runId);
   }
 
   finishRun(runId: string, status: "completed" | "blocked" | "failed" | "cancelled"): void {

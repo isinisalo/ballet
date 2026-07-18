@@ -104,7 +104,8 @@ export interface AgentRuntimeConfiguration {
 
 export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 export type ExecutionTaskKind = "agent_run" | "loop_step";
-export type AgentOutcomeStatus = "ready" | "blocked" | "needs_input" | "approved" | "changes-requested" | "failed";
+export type AgentOutcomeState = "completed" | "needs_input" | "blocked" | "failed";
+export type StepRunResult = "approved" | "rejected";
 export type RunCheckStatus = "passed" | "failed" | "skipped";
 
 export interface RunCheck {
@@ -113,8 +114,7 @@ export interface RunCheck {
   details?: string;
 }
 
-export interface AgentOutcome {
-  outcome: AgentOutcomeStatus;
+interface AgentOutcomeBase {
   summary: string;
   artifacts?: {
     git_sha?: string;
@@ -125,6 +125,25 @@ export interface AgentOutcome {
   };
   checks: RunCheck[];
 }
+
+export type AgentOutcome = AgentOutcomeBase & {
+      state: "completed";
+      result: StepRunResult;
+      question?: never;
+      context?: never;
+    }
+  | AgentOutcomeBase & {
+      state: "needs_input";
+      question: string;
+      context: string;
+      result?: never;
+    }
+  | AgentOutcomeBase & {
+      state: "blocked" | "failed";
+      result?: never;
+      question?: never;
+      context?: never;
+    };
 
 export interface ExecutionAgentSnapshot {
   id: string;
@@ -257,10 +276,9 @@ export interface LoopExecutionPlan {
   createdAt: string;
 }
 
-export type LoopRunSource = "manual" | "human" | "schedule";
+export type LoopRunSource = "manual" | "transition" | "schedule";
 export type LoopRunStatus = "running" | "waiting_for_human" | "completed" | "blocked" | "failed" | "cancelled";
-export type StepRunStatus = "queued" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
-export type StepRunResult = "approved" | "rejected";
+export type StepRunStatus = "queued" | "running" | "waiting_for_human" | "completed" | "needs_input" | "blocked" | "failed" | "cancelled";
 export type LoopScheduleOccurrenceStatus = "started" | "skipped" | "missed";
 
 export interface LoopScheduleOccurrence { stepId: string; scheduledFor: string }
@@ -316,4 +334,4 @@ export interface StepRun {
 }
 
 export interface LoopRunDetails extends LoopRun { stepRuns: StepRun[] }
-export interface RespondToStepRunRequest { result: StepRunResult; input: string }
+export type RespondToStepRunRequest = { kind: "human"; result: StepRunResult; input: string } | { kind: "resume"; input: string };
