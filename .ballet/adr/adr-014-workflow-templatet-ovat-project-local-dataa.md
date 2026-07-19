@@ -1,14 +1,14 @@
 ---
 id: adr-014
 title: Workflow-templatet ovat project-local dataa
-status: proposed
+status: accepted
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-18T21:21:24.000Z'
+updatedAt: '2026-07-19T05:44:00.000Z'
 tags:
   - arkkitehtuuripäätös
   - workflow-templatet
   - projektidata
-version: 1
+version: 2
 ---
 
 # Workflow-templatet ovat project-local dataa
@@ -21,7 +21,7 @@ Balletin oman roadmap–milestone–release-ketjun pitää lisäksi olla tavalli
 
 ## Päätös
 
-Jos tämä ADR hyväksytään, workflow template on authoring-käsite, ei uusi runtime- tai persistence-entity.
+Workflow template on authoring-käsite, ei uusi runtime- tai persistence-entity.
 
 - Suoritettava workflow koostuu projektin tavallisista Loopeista, Stepeistä, execution profile -viitteistä, Project- tai Built-in-primary instructioneista sekä valituista skills-tiedostoista.
 - Projektissa käytettävän workflow'n Loop- ja Step-rakenne tallennetaan project-local konfiguraationa.

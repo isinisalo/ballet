@@ -4,7 +4,7 @@ Tila: ihmisen tarkistettava ehdotus. Migrationia ei toteuteta eik채 ajeta t채ss�
 
 ## Tavoite ja l채hde
 
-Migration muuntaa strict v8 -projektin ehdotettuun v9-malliin ilman hiljaista fallbackia tai historiallisten Run-evidenssien uudelleenkirjoitusta.
+Migration muuntaa strict v8 -projektin hyv채ksytyn arkkitehtuurin mukaiseen strict v9 -kohteeseen ilman hiljaista fallbackia tai historiallisten Run-evidenssien uudelleenkirjoitusta. T채m채n dokumentin tarkka migration-protokolla on edelleen ihmisen tarkistettava ehdotus.
 
 V8-l채hteet:
 

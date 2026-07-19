@@ -164,9 +164,9 @@ Task- ja Run-konteksti ei kuulu instruction bundleen. Se välitetään erillisen
 {
   "version": 1,
   "current": {
-    "loop_id": "blueprint-design",
-    "step_id": "data-model",
-    "description": "Johda hyväksytyistä päätöksistä tarkistettava data-malli."
+    "loop_id": "change-review",
+    "step_id": "review-change",
+    "description": "Tarkista ehdotettu muutos ja tuota perusteltu päätös."
   },
   "run_input": "...",
   "recent_steps": []
@@ -251,7 +251,7 @@ Validoitu result kirjoitetaan kanoniseen `StepRun.result`-kenttään. Outcome-pa
 
 ## Root Run snapshot
 
-Snapshot-raja on ehdotuksessa Root Runin alku:
+Hyväksytty snapshot-raja on Root Runin alku. Seuraava tarkka resoluutiojärjestys sekä hash- ja evidenssidetaljit ovat edelleen toteutusehdotus:
 
 1. resolve kaikki reachable Stepit samasta project snapshotista;
 2. validoi jokainen profile ja resurssiviite;
@@ -298,6 +298,6 @@ Root Run ei käynnisty, jos:
 
 Instruction- ja skill-sisältöä ei typistetä. Semanttista skill-ristiriitaa ei ratkaista automaattisella `last one wins` -säännöllä; authoring voi varoittaa ja suoritus voi palauttaa blocked-outcomen.
 
-## Ihmisen hyväksyntää vaativat parametrit
+## Avoimet toteutusparametrit
 
-Tämä dokumentti käyttää paketin yhteisiä ehdotusoletuksia skill-setin kanonisesta järjestyksestä, Root Run -snapshotrajasta, origin-scoped ID:stä, Project-versiosta, canonical JSON/bundle -tavuista ja vain valitun `SKILL.md`-tiedoston V1-snapshotista. Kokorajat, Built-in-version pinnaus ja providerien ambient-discovery-kyky ovat vielä päätettäviä. Kaikki on koottu `OPEN-DECISIONS.md`:ään.
+Root Runin atominen snapshotraja on hyväksytty arkkitehtuuripäätös. Tämä dokumentti käyttää edelleen paketin proposal-tason oletuksia skill-setin kanonisesta järjestyksestä, origin-scoped ID:stä, Project-resurssien versiosta, canonical JSON/bundle -tavuista ja vain valitun `SKILL.md`-tiedoston V1-snapshotista. Kokorajat, Built-in-version pinnaus ja providerien ambient-discovery-kyky ovat myös vielä päätettäviä. Avoimet toteutusparametrit on koottu `OPEN-DECISIONS.md`:ään.

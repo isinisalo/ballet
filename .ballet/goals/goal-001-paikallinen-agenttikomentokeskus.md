@@ -3,25 +3,25 @@ id: goal-001
 title: Paikallinen agenttikomentokeskus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-18T00:00:00.000Z'
+updatedAt: '2026-07-19T05:44:00.000Z'
 tags:
   - tavoite
   - paikallinen-käyttö
   - komentokeskus
-version: 1
+version: 2
 ---
 
 # Paikallinen agenttikomentokeskus
 
 ## Tavoite
 
-Ballet tarjoaa yhden Git-checkoutin paikallisen selainkäyttöisen komentokeskuksen agenttien määrittelyyn, automatisointiin, suorittamiseen ja seurantaan.
+Ballet tarjoaa yhden Git-checkoutin paikallisen selainkäyttöisen komentokeskuksen projektimääritysten, automatisoinnin, Step-suoritusten ja seurannan hallintaan.
 
-Käyttäjän pitää voida käynnistää Balletin checkoutin juuresta ja hallita saman projektikontekstin dokumentteja, agentteja, taitoja, Looppeja, ajoympäristön valmiutta ja Runeja yhdestä käyttöliittymästä.
+Käyttäjän pitää voida käynnistää Ballet checkoutin juuresta ja hallita saman projektikontekstin Goals- ja ADR-dokumentteja, Looppeja, Stepejä, ExecutionProfileja, instructioneita, skillsejä, ajoympäristön valmiutta ja Runeja yhdestä käyttöliittymästä.
 
 ## Tarkoitus
 
-Ballet kokoaa projektin agenttityön yhteen paikalliseen prosessiin, jotta konfiguraatio, suorituksen lähtötila ja lopputulos pysyvät ymmärrettävinä. Checkout on tuotteen ensisijainen omistus- ja eristysraja.
+Ballet kokoaa projektin Step-työn yhteen paikalliseen prosessiin, jotta konfiguraatio, suorituksen lähtötila ja lopputulos pysyvät ymmärrettävinä. Checkout on tuotteen ensisijainen omistus- ja eristysraja.
 
 Paikallinen malli pitää käyttäjän lähdekoodin, palveluntarjoajien tunnukset ja ajonaikaisen tilan käyttäjän omalla koneella ilman keskitettyä ohjaustasoa.
 
@@ -29,7 +29,7 @@ Paikallinen malli pitää käyttäjän lähdekoodin, palveluntarjoajien tunnukse
 
 - Git-checkoutin juuren ja olemassa olevan HEAD-commitin tarkistaminen ennen palvelun käynnistystä.
 - Configure-tila versionhallittujen projektiaineistojen muokkaamiseen.
-- Run-tila agenttien ja Looppien käynnistämiseen, seuraamiseen, ohjaamiseen ja peruuttamiseen.
+- Run-tila Looppien ja niiden Step-suoritusten käynnistämiseen, seuraamiseen, ohjaamiseen ja peruuttamiseen.
 - Paikallisten Codex- ja Copilot-palveluntarjoajien valmiuden ja havaittujen ongelmien näyttäminen.
 - Useiden checkoutien samanaikainen käyttö toisistaan eristetyillä palveluilla, porteilla ja tiloilla.
 - Checkout-kohtainen käyttöliittymä, ajastus, suoritusjono, kestävä tallennus ja Git-työtila samassa paikallisessa palvelussa.
@@ -43,4 +43,4 @@ Paikallinen malli pitää käyttäjän lähdekoodin, palveluntarjoajien tunnukse
 
 ## Todentaminen
 
-Tavoite toteutuu, kun käyttäjä voi käynnistää Balletin commitoidun checkoutin juuresta, avata paikallisen käyttöliittymän, määrittää agenttityön ja suorittaa sen ilman tiliä tai ulkoista Ballet-palvelua. Toinen checkout voi toimia samanaikaisesti vaikuttamatta ensimmäisen tilaan.
+Tavoite toteutuu, kun käyttäjä voi käynnistää Balletin commitoidun checkoutin juuresta, avata paikallisen käyttöliittymän, määrittää Loopin ja sen Step-suoritukset sekä suorittaa työn ilman tiliä tai ulkoista Ballet-palvelua. Toinen checkout voi toimia samanaikaisesti vaikuttamatta ensimmäisen tilaan.

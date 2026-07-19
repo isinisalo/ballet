@@ -1,6 +1,6 @@
 # Execution composition — ehdotettu data-malli
 
-Tila: ihmisen tarkistettava ehdotus. Tämä dokumentti ei muuta production-skeemaa eikä hyväksy avoimia tuotepäätöksiä.
+Tila: ihmisen tarkistettava toteutusehdotus. Step + `ExecutionProfile` -omistajuus, strict v9 -kohde ja Root Run -snapshotraja ovat hyväksyttyä arkkitehtuuria; tämän dokumentin tarkat interface- ja serialisointivalinnat eivät vielä muuta production-skeemaa.
 
 ## Rajaus
 
@@ -29,7 +29,7 @@ flowchart LR
   Evidence --> Skill
 ```
 
-Agent ei välitä näitä viitteitä kohdemallin execution-polulla. Nykyinen `agentId` on migration-lähde, ei execution compositionin kohdeviite. Mahdollisen Agent-kokoelman muun tuoteroolin kohtalo on avoin päätös.
+Agent ei välitä näitä viitteitä kohdemallin execution-polulla. Nykyinen `agentId` ja `.codex/agents` ovat vain eksplisiittisen migrationin lähteitä, eivät v9-kohdemallin viitteitä tai kanonista projektimääritystä. Agentin ei-execution-metadatan migration-kohtelu on edelleen avoin toteutuspäätös.
 
 ## ExecutionProfile
 
@@ -100,7 +100,7 @@ V1-invarianssit:
 
 Additional instructions ei ole V1-kenttä. Mahdollinen myöhempi capability lisätään primary instructionin jälkeen ja ennen skillejä vasta erillisellä skeema- ja UX-päätöksellä.
 
-## Ehdotettu project config v9
+## Project config v9 — toteutusehdotus
 
 Kokoelma esitetään listana, koska jokainen profile sisältää vaaditun `id`-kentän. Lista serialisoidaan `id`:n UTF-8 byte -järjestyksessä. Loop- ja nodejärjestys säilyttää käyttäjän määrittämän järjestyksen.
 
@@ -119,20 +119,20 @@ Kokoelma esitetään listana, koska jokainen profile sisältää vaaditun `id`-k
   ],
   "loops": [
     {
-      "id": "blueprint-design",
-      "start": "data-model",
+      "id": "change-review",
+      "start": "review-change",
       "nodes": [
         {
-          "id": "data-model",
+          "id": "review-change",
           "type": "agent",
-          "description": "Johda hyväksytyistä päätöksistä tarkistettava data-malli.",
+          "description": "Tarkista ehdotettu muutos ja tuota perusteltu päätös.",
           "executionProfileId": "focused-local",
-          "primaryInstructionId": "project:architecture",
+          "primaryInstructionId": "project:reviewer",
           "skillIds": [
-            "project:ballet-blueprint"
+            "project:change-review"
           ],
           "on": {
-            "approved": "ui-design",
+            "approved": "completed",
             "rejected": "blocked"
           },
           "nodeStyle": "sol",
@@ -146,7 +146,7 @@ Kokoelma esitetään listana, koska jokainen profile sisältää vaaditun `id`-k
 
 Esimerkki näyttää vain kohdemallin olennaisen osan; validi Loop sisältää edelleen nykyiset pakolliset terminal-nodet.
 
-Versionumero `9` ja listamuoto ovat tämän paketin yhtenäinen ehdotusoletus, eivät hyväksytty päätös. Ne on merkitty `OPEN-DECISIONS.md`:ään.
+Versionumero `9` ja `executionProfiles`-kokoelman olemassaolo ovat hyväksyttyä arkkitehtuuria. Listamuoto, lajittelu ja esimerkin tarkka serialisointi ovat tämän paketin toteutusehdotus ja ne on merkitty `OPEN-DECISIONS.md`:ään.
 
 ## ResourceRef ja origins
 
@@ -293,6 +293,6 @@ Root Run preflight estää koko Runin ennen queuea, jos yksikin reachable Step e
 
 Instruction- tai skill-sisältöä ei typistetä hiljaisesti. Kokorajan ylitys on näkyvä preflight-virhe. Dynaaminen Run input/history saa käyttää erikseen versionoitua determinististä truncationia.
 
-## Suhde nykyisiin hyväksyttyihin päätöksiin
+## Suhde hyväksyttyihin päätöksiin
 
-Kohdemalli edellyttäisi hyväksynnän jälkeen rajattuja muutoksia ADR-002:n, ADR-004:n, ADR-005:n, ADR-006:n ja ADR-008:n Agent-omistajuutta kuvaaviin kohtiin. Tämä paketti ei muuta niiden tilaa tai production-koodia. Ehdotettu muutos astuu voimaan vasta, jos ADR-012 ja muut riippuvat proposed-ADR:t hyväksytään.
+Step + `ExecutionProfile` -kohdemalli on hyväksytty ADR-002:ssa, ADR-004:ssä, ADR-005:ssä, ADR-006:ssa, ADR-008:ssa ja ADR-012:ssa. ADR-013 rajaa workflow-menettelyt eksplisiittisiin skilleihin ja ADR-014 workflow-templatet project-local dataksi. Tämä dokumentti täsmentää hyväksyttyä suuntaa proposal-tason interfaceilla ja serialisointisäännöillä; se ei muuta production-koodia eikä hyväksy `OPEN-DECISIONS.md`:ssä avoimiksi jätettyjä toteutusyksityiskohtia.

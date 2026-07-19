@@ -376,4 +376,4 @@ Tässä dokumentointigoalissa näitä komentoja ei vaadita, koska frontend-, bac
 - Run evidence todistaa jokaisen käytetyn instructionin ja skillin exact version/hash/contentin.
 - Canvas aktivoi vain canonical resultin mukaisen Approved/Rejected-edgen.
 - UI-terminologia täyttää käyttäjätestin ilman runtime-taustatietoa.
-- Avoimet blocking-päätökset on ratkaistu ja vastaavat Goal/ADR-dokumentit hyväksytty erillisessä ihmisen päätöksessä.
+- Hyväksytty Goal/ADR-arkkitehtuuribaseline säilyy, ja `OPEN-DECISIONS.md`:ssä jäljellä olevat blocking-toteutuspäätökset on ratkaistu ennen implementation- tai migration-apply-työtä.

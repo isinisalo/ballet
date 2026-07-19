@@ -1,14 +1,14 @@
 ---
 id: adr-013
 title: Workflow-yksityiskohdat kuuluvat skillsiin
-status: proposed
+status: accepted
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-18T21:21:24.000Z'
+updatedAt: '2026-07-19T05:44:00.000Z'
 tags:
   - arkkitehtuuripäätös
   - skills
   - workflow
-version: 1
+version: 2
 ---
 
 # Workflow-yksityiskohdat kuuluvat skillsiin
@@ -21,7 +21,7 @@ Jos workflow-yksityiskohdat sijoitetaan Systemiin tai runtime-profileen, ne muut
 
 ## Päätös
 
-Jos tämä ADR hyväksytään, uudelleenkäytettävä workflow-menettely mallinnetaan Stepille eksplisiittisesti valittuna skill-tiedostona.
+Uudelleenkäytettävä workflow-menettely mallinnetaan Stepille eksplisiittisesti valittuna skill-tiedostona.
 
 - System sisältää vain minimaalisen execution-sopimuksen, oikeusrajojen noudattamisen, instruction-auktoriteetin ja strukturoidun outputin vaatimuksen.
 - System ei sisällä roadmap-, milestone-, release-, deploy- tai muuta ohjelmistokehityksen workflow-menettelyä.
@@ -39,7 +39,7 @@ Skillien composition order on kanoninen eikä UI:n valintajärjestys muodosta pi
 - Projektikohtainen toimitusmenettely voidaan muuttaa tai poistaa muuttamatta System-ohjetta.
 - Sama primary instruction voidaan yhdistää eri workflow-skilleihin eri Stepeissä.
 - Run-evidenssi kertoo täsmälleen, mikä workflow-menettely oli käytössä.
-- Nykyiset Ballet-kohtaiset roadmap-, milestone- ja release-menettelyt pitää hyväksynnän jälkeen luokitella Project-skills-tiedostoihin; niitä ei saa siirtää System-originiin.
+- Nykyiset Ballet-kohtaiset roadmap-, milestone- ja release-menettelyt luokitellaan Project-skills-tiedostoihin; niitä ei saa siirtää System-originiin.
 - Skill-katalogi ja Node editor tarvitsevat eksplisiittisen monivalinnan sekä puuttuvien viitteiden fail-closed-validoinnin.
 - Päätös riippuu ADR-012:n Step-owned skill-valinnoista ja täsmentää ADR-002:n project-owned skills -mallia.
 

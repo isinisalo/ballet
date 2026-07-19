@@ -35,25 +35,25 @@ Nykyinen Agent instruction preview korvataan Step composition preview'lla. Canva
 │                                                           │
 └───────────────────────────────────────────────────────────┘
 ┌────────────── Step instructions ──────────────┬────────── Node editor ──────────┐
-│ System baseline · always applied · read-only │ data-model · Agent Step         │
+│ System baseline · always applied · read-only │ review-change · Agent Step      │
 │                                              │                                  │
 │ Primary instruction                         │ Task description                 │
-│ Architecture                                │ [ Derive the project data...   ] │
-│ project:architecture                        │                                  │
+│ Reviewer                                    │ [ Review the proposed change... ] │
+│ project:reviewer                            │                                  │
 │ [rendered Markdown preview]                  │ Execution profile                │
 │                                              │ [ Focused local             ▾ ] │
 │ Skills · 2                                  │ How this Step runs.              │
-│ project:ballet-blueprint                     │                                  │
+│ project:change-review                        │                                  │
 │ builtin:structured-review                    │ Primary instruction              │
-│ [rendered summaries in canonical order]      │ [ Architecture             ▾ ] │
+│ [rendered summaries in canonical order]      │ [ Reviewer                 ▾ ] │
 │                                              │ Exactly one instruction.         │
 │                                              │                                  │
 │                                              │ Skills                           │
-│                                              │ [Blueprint ×] [Review ×] [ + ] │
+│                                              │ [Change review ×] [Checks ×] [+] │
 │                                              │ Optional capabilities.           │
 │                                              │                                  │
 │                                              │ Transitions                      │
-│                                              │ Approved target [ ui-design  ▾ ] │
+│                                              │ Approved target [ completed  ▾ ] │
 │                                              │ Rejected target [ blocked    ▾ ] │
 │                                              │                                  │
 │                                              │ ▸ Appearance                     │
@@ -113,7 +113,7 @@ Käyttäytyminen:
 - popover ryhmittelee optionit `Built-in`- ja `Project`-otsikoiden alle;
 - jokainen option ilmoittaa valintatilan tekstinä ja accessibility-statena;
 - valitut skillsit näkyvät removable chippeinä;
-- remove-painikkeen nimi on esimerkiksi `Remove Blueprint skill`;
+- remove-painikkeen nimi on esimerkiksi `Remove Change review skill`;
 - chipit näytetään aina canonical origin/ID -järjestyksessä;
 - drag-reorderia ei ole, koska valintajärjestys ei vaikuta compositioniin; ja
 - duplicate-valintaa ei voi muodostaa UI:ssa eikä hyväksyä API:ssa.
@@ -245,7 +245,7 @@ Tässä scopessa ei rakenneta:
 - uutta Canvas-rendereriä tai graph geometrya; tai
 - production-koodia.
 
-Nykyinen `DESIGN.md` määrää Agentin omistamaan Execution-asetukset ja sitoo Agent-avatarin sekä reasoning glown Canvas-nodeen. Jos proposed-malli hyväksytään, varsinainen implementation-goal joutuu päivittämään `DESIGN.md`:n nämä rajatut kohdat ennen UI-koodia. Tätä tiedostoa ei muuteta nykyisen goalin sallituissa poluissa.
+Nykyinen `DESIGN.md` määrää Agentin omistamaan Execution-asetukset ja sitoo Agent-avatarin sekä reasoning glown Canvas-nodeen. Hyväksytty Step + `ExecutionProfile` -arkkitehtuuri edellyttää, että varsinainen implementation-goal päivittää `DESIGN.md`:n nämä rajatut kohdat ennen UI-koodia. Tämän proposal-tason UI-suunnitelman yhteydessä `DESIGN.md`:ää ei muuteta.
 
 ## Ihmisen tarkistuspisteet
 

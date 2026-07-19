@@ -1,62 +1,68 @@
-# Execution composition — avoimet päätökset
+# Execution composition — avoimet toteutuspäätökset
 
-Tila: kaikki tämän dokumentin päätökset ovat avoimia. Yhtään kohtaa ei ole hyväksytty ihmisen puolesta.
+Tila: Goal- ja ADR-arkkitehtuuriportit on ratkaistu ja hyväksytty. Tämä dokumentti seuraa niiden jälkeen avoimiksi jääviä toteutus-, migration-, UI- ja byte-sopimusten yksityiskohtia.
 
 ## Miten tätä dokumenttia luetaan
 
-Muu päätöspaketti käyttää yhtä johdonmukaista “paketin ehdotus” -oletusta, jotta data-malli, UI, migration ja testit voidaan tarkistaa konkreettisina. Oletus ei ole accepted-päätös. Jos ihminen valitsee toisin, kaikki affected-artifactit päivitetään keskenään yhtenäisiksi ennen production-implementaatiota.
+Step + `ExecutionProfile` -malli, strict v9 -kohde, Stepin composition-omistajuus, Root Run -snapshotraja ja workflow'n project-local-raja ovat hyväksyttyä arkkitehtuuria. Muut execution-composition-paketin tarkat schema-, UI-, migration-, prompt- ja testiratkaisut ovat edelleen ehdotuksia. Jos jokin alla oleva avoin yksityiskohta ratkaistaan toisin kuin pakettiehdotuksessa, kaikki affected-artifactit päivitetään keskenään yhtenäisiksi ennen production-implementaatiota.
 
 `Blocking` tarkoittaa, ettei implementation- tai migration-apply saa alkaa ennen päätöstä. `Deferred` tarkoittaa, että V1 voidaan toteuttaa ilman capabilityä, kun lykkäys hyväksytään eksplisiittisesti.
 
-## Proposed Goal -portit
+## Ratkaistut Goal-portit
 
-| ID | Dokumentti | Ihmisen päätös |
+| Poistettu dokumentti | Kanoninen dokumentti | Ratkaisu |
 |---|---|---|
-| G-009 | `goal-009` — Yksinkertainen Loopin määrittely | Hyväksy, pyydä muutokset tai hylkää tavoite; pidä status toistaiseksi `proposed` |
-| G-010 | `goal-010` — Koostettava Step execution | Hyväksy, pyydä muutokset tai hylkää tavoite; pidä status toistaiseksi `proposed` |
-| G-011 | `goal-011` — Balletin kehittäminen Balletilla | Hyväksy, pyydä muutokset tai hylkää tavoite; pidä status toistaiseksi `proposed` |
+| `goal-009` | `goal-004` | Sisältö yhdistetty kanoniseen Goaliin; `goal-009` poistettu |
+| `goal-010` | `goal-003` | Sisältö yhdistetty kanoniseen Goaliin; `goal-010` poistettu |
+| `goal-011` | `goal-002` | Sisältö yhdistetty kanoniseen Goaliin; `goal-011` poistettu |
 
-## Proposed ADR -portit
+Kaikki kahdeksan jäljelle jäävää Goal-dokumenttia ovat `accepted`.
 
-| ID | Dokumentti | Rajattu päätös, joka vaatii hyväksynnän |
+## Ratkaistut ADR-portit
+
+| Dokumentti | Ratkaisu | Tila |
 |---|---|---|
-| A-010 | `adr-010` | `StepResult` on canonical `approved | rejected`; runtime state ei muodosta resultia |
-| A-011 | `adr-011` | Canvas ja Node editor käyttävät vain `Approved`/`Rejected`-Transitioneita |
-| A-012 | `adr-012` | Execution profile erotetaan Step-owned instruction/skill-valinnoista; Agent ei välitä compositionia |
-| A-013 | `adr-013` | Workflow-yksityiskohdat kuuluvat eksplisiittisesti valittuihin skilleihin, eivät Systemiin |
-| A-014 | `adr-014` | Workflow-templatet ovat tavallista project-local dataa, eivät uusi entity tai pack |
+| `adr-010` | `StepResult` on canonical `approved | rejected`; runtime state ei muodosta resultia | `accepted` |
+| `adr-011` | Canvas- ja editorisemantiikka yhdistetty `adr-004`:ään; `adr-011` poistettu | `adr-004` on `accepted` |
+| `adr-012` | Execution profile erotettu Step-owned instruction/skill-valinnoista; Agent ei välitä compositionia | `accepted` |
+| `adr-013` | Workflow-yksityiskohdat kuuluvat eksplisiittisesti valittuihin skilleihin, eivät Systemiin | `accepted` |
+| `adr-014` | Workflow-templatet ovat tavallista project-local dataa, eivät uusi entity tai pack | `accepted` |
 
-Näiden status pysyy `proposed`. ADR-012 muuttaisi hyväksyttäessä rajattuja kohtia ADR-002:ssa, ADR-004:ssä, ADR-005:ssä, ADR-006:ssa ja ADR-008:ssa. Nykyisiä accepted-ADR:iä ei merkitä supersedediksi ennen erillistä hyväksyntää ja dokumentointipäivitystä.
+ADR-002, ADR-004, ADR-005, ADR-006 ja ADR-008 on yhdenmukaistettu saman Step + `ExecutionProfile` -kohdearkkitehtuurin kanssa ja ne ovat `accepted`.
+
+## Hyväksytty arkkitehtuuribaseline
+
+- `.ballet/project.json` käyttää strict v9 -mallia ja sisältää `executionProfiles`-kokoelman sekä Loopit.
+- Executable Step omistaa `executionProfileId`-, `primaryInstructionId`- ja `skillIds`-viitteet, task descriptionin sekä `approved`- ja `rejected`-Transitionit.
+- Top-level Agent runtime -omistajuus, Stepin `agentId` ja standalone Agent Run eivät kuulu kohdemalliin. `.codex/agents` on vain eksplisiittisen migrationin lähde.
+- Root Run snapshottaa atomisesti kaikki saavutettavat Loopit, Stepit, Transitionit, execution profilet, instructionit, skillsit ja teeman. Worktree-muutos vaikuttaa vasta seuraavaan Root Runiin.
+- Workflow-järjestys on project-local Loop-dataa ja workflow-menettelyt ovat eksplisiittisesti valittuja Project-skillejä. Balletin omalle roadmap–milestone–release-ketjulle ei ole yleisen arkkitehtuurin erikoispolkua.
+- Historialliset Agent-snapshotit säilyvät immutable read-only-historiana.
+- Vain validoitu completed outcome tai Human-vastaus tuottaa `approved | rejected` -tuloksen; tekninen `blocked`, `failed`, `cancelled` tai `needs_input` ei aktivoi Transitionia.
 
 ## Blocking ennen V1-implementaatiota
 
 ### OD-001 — Kohdeskeeman versio ja kokoelmamuoto
 
-Kysymys: Onko kohde `.ballet/project.json` v9 ja onko `executionProfiles` ID:n mukaan lajiteltu lista?
+Hyväksytty reunaehto: kohde on strict `.ballet/project.json` v9, jossa ovat `executionProfiles`-kokoelma ja Loopit.
 
-Paketin ehdotus: `version: 9`, lista, jokaisella profilella eksplisiittinen `id`.
+Avoin toteutuskysymys: Onko `executionProfiles` ID:n mukaan lajiteltu lista vai ID-keyed map?
+
+Paketin ehdotus: lista, jokaisella profilella eksplisiittinen `id`.
 
 Vaihtoehto: ID-keyed map vähentäisi ID:n duplikointia mutta olisi ristiriidassa vaaditun kuusikenttäisen profilen kanssa tai vaatisi ID:n määrittelyn map-avaimeksi kentän sijaan.
 
 Vaikutus: DATA-MODEL, migration serialization, schema- ja golden-testit.
 
-### OD-002 — Agent execution-välikappaleena ja standalone Agent Run
-
-Kysymys: Poistetaanko `agentId` executable Stepistä ja top-level Agent runtime -omistajuus kokonaan V1 execution-polulta? Poistetaanko samalla standalone Agent Run -target?
-
-Paketin ehdotus: kyllä. Step viittaa suoraan profileen, primary instructioniin ja skilleihin. Migration ei luo orphan-Agentille automaattista Loopia; orphan estää migrationin.
-
-Vaihtoehto: Agent voidaan säilyttää erillisenä identity/display-entitynä, mutta se ei saa omistaa tai välittää execution profilea, primary instructionia tai skills-listaa. Tälle tarvitaan tarkka hyöty ja erillinen data/UI-raja, jotta V1-entitymäärä ei kasva turhaan.
-
-Vaikutus: project schema, Step type, Agent-kokoelma, run targets, sidebar, routes, migration ja nykyiset accepted-ADR:t.
-
 ### OD-003 — Agentin ei-execution-metadata
 
-Kysymys: Mitä tehdään `avatar`, enabled, nickname candidates, live status, Agent description ja timestamps -tiedoille, kun Step ei viittaa Agentiin?
+Hyväksytty reunaehto: top-level Agent tai muu Agent-identity-entity ei kuulu v9-authoring-malliin, eikä legacy-metadata saa palauttaa Agentia execution compositionin rinnalle.
+
+Avoin toteutuskysymys: Miten `avatar`, enabled, nickname candidates, live status, Agent description ja timestamps raportoidaan, arkistoidaan tai poistetaan eksplisiittisessä migrationissa?
 
 Paketin ehdotus: name/description/timestamps siirtyvät migrated instruction -provenanceen; `enabled: true` on migration-precondition; avatar/nickname/live status eivät kuulu V1 execution-malliin ja poistetaan vasta eksplisiittisen hyväksynnän jälkeen.
 
-Vaihtoehdot: Step-owned appearance-metadata, erillinen optional identity-entity tai vanhan Agent UI:n poistaminen. Mitään näistä ei pidä lisätä implisiittisesti.
+Vaihtoehdot koskevat vain migration-raporttia, backupia ja eksplisiittistä discard-menettelyä. Legacy-metadatalle ei luoda uutta authoring-entityä tai hiljaista Step-kenttää.
 
 Vaikutus: Canvas-avatar, reasoning glow, Run timeline source, Agent status chips, migrationin data-loss-raja ja UI-reitit.
 
@@ -113,16 +119,6 @@ Vaihtoehto: koko hakemisto. Tällöin tarvitaan path-, symlink-, size-, executab
 
 Vaikutus: todellinen toistettavuus, evidence size, skill authoring ja turvallisuus.
 
-### OD-009 — Root Run -snapshotraja
-
-Kysymys: Snapshottataanko kaikki reachable Step-compositionit Root Runin alussa vai kukin Loop/Step myöhemmin?
-
-Paketin ehdotus: kaikki reachable Stepit atomisesti Root Runin alussa. Resume, retry ja cross-Loop käyttävät samaa snapshotia; repositorymuutos vaikuttaa vasta seuraavaan Root Runiin.
-
-Vaihtoehto: child Loop -kohtainen snapshot sallisi kesken Runin muuttuvan workflow'n mutta heikentäisi “Runin alku” -evidenssiä.
-
-Vaikutus: ADR-004:n nykyinen child-Loop-käytäntö, planner, preflight, config change -semantics ja evidence.
-
 ### OD-010 — System/Built-in-katalogin resoluutio
 
 Kysymykset:
@@ -162,16 +158,6 @@ Vaihtoehdot: Step- tai profile-kohtainen later policy, mutta se laajentaisi V1-m
 
 Vaikutus: migration apply, local settings schema ja permission policy.
 
-### OD-014 — Historiallinen Run-data
-
-Kysymys: Säilytetäänkö v1 Agent-snapshotit immutable read-only-historynä versionoidun read-projektion kautta?
-
-Paketin ehdotus: kyllä; mitään historiallista spec/outcome/event-hashia ei rewriteata eikä paikallista DB:tä resetöidä.
-
-Vaihtoehto: arkistointi tai DB reset menettäisi käytettävyyttä/evidenssiä ja vaatisi erillisen käyttäjän suostumuksen.
-
-Vaikutus: runtime type unionit, UI history ja DB-yhteensopivuus.
-
 ### OD-015 — Migrationin triggeri, backup ja rollback
 
 Kysymykset:
@@ -198,9 +184,11 @@ Vaikutus: scheduler-idempotenssi, migration local state ja acceptance-testit.
 
 Kysymys: Miten `.ballet/instructions/loop-engineer-minimal.md`:n roadmap–milestone–release-sisältö jaetaan Project-skilleiksi ja primary instructioneiksi?
 
-Paketin ehdotus: älä siirrä, muuta tai valitse sitä automaattisesti Agent-migrationissa. Koska tiedostolta puuttuu eksplisiittinen instruction-ID, säilytä se tavallisena byte-identtisenä project-dokumenttina ja näytä `unaddressable_instruction`-warning; se ei ole V1-valitsimissa. Tee ID:n jaottelu project-data authoring -muutoksena ADR-013/014:n hyväksynnän jälkeen; Systemiin sisältöä ei saa siirtää.
+Hyväksytty reunaehto: Balletin workflow-järjestys kuuluu project-local Loop-dataan, menettelyt eksplisiittisesti valittuihin Project-skilleihin eikä sisältöä saa siirtää Systemiin.
 
-Vaikutus: goal-011:n toteutuminen ja Balletin oman workflow'n composition.
+Paketin ehdotus: älä siirrä, muuta tai valitse nykyistä tiedostoa automaattisesti Agent-migrationissa. Koska tiedostolta puuttuu eksplisiittinen instruction-ID, säilytä se tavallisena byte-identtisenä project-dokumenttina ja näytä `unaddressable_instruction`-warning; se ei ole V1-valitsimissa. Tee sisällön jaottelu erillisenä project-data authoring -muutoksena.
+
+Vaikutus: `goal-002`:een yhdistetty Balletin oman kehitysworkflow'n tavoite ja sen execution composition.
 
 ### OD-018 — DESIGN.md ja Agent-sidonnaiset visuaalit
 
@@ -260,13 +248,11 @@ Vaihtoehto: standardoitu ulkoinen canonical JSON -profiili voidaan valita, jos k
 
 Vaikutus: profile-dedupe, prompt/evidence-hashit, schedule definition, dry-run/apply-idempotenssi, rollback ja cross-platform-testit.
 
-## Deferred V1:n ulkopuolelle
+## Hyväksytyt V1-rajaukset
 
 ### OD-024 — `workspace_access: read-only | write`
 
-Kysymys: Lisätäänkö myöhemmin execution profileen workspace-oikeus?
-
-Paketin ehdotus: hyväksy eksplisiittinen defer. Älä lisää kenttää V1:een.
+Päätös: kenttä on deferred eikä sitä lisätä V1:een. Mahdollinen myöhempi lisäys vaatii uuden päätöksen.
 
 Ennen myöhempää päätöstä tarvitaan:
 
@@ -281,26 +267,26 @@ Nykyinen V1-baseline on kirjoitettava Root Run worktree. Tätä ei tallenneta pr
 
 ### OD-025 — Additional instructions
 
-Kysymys: Tarvitaanko primary instructionin lisäksi järjestetty additional instructions -lista?
-
-Paketin ehdotus: defer. V1:ssä ei ole kenttää, API:a tai UI:ta. Mahdollinen insertion point on primaryn jälkeen ja ennen skillejä, mutta määrä, order ja precedence päätetään vasta käyttötapauksen kanssa.
+Päätös: V1:ssä ei ole additional instructions -kenttää, API:a tai UI:ta. Mahdollinen insertion point on primaryn jälkeen ja ennen skillejä, mutta määrä, order ja precedence päätetään vasta käyttötapauksen ja uuden päätöksen kanssa.
 
 ### OD-026 — Workflow template -katalogi
 
-Kysymys: Tarvitaanko myöhemmin template discovery tai sharing?
+Päätös: V1 käyttää tavallista project-local dataa ja optional yksittäisen Built-in-lähteen clonea. Packia, marketplacea, registryä tai Template/Recipe-entityä ei rakenneta. Mahdollinen myöhempi discovery tai sharing vaatii uuden päätöksen.
 
-Paketin ehdotus: defer. V1 käyttää tavallista project-local dataa ja optional yksittäisen Built-in-lähteen clonea. Packia, marketplacea, registryä tai Template/Recipe-entityä ei rakenneta.
+## Review-checklist
 
-## Ihmisen review-checklist
+Ratkaistut arkkitehtuurikohdat:
 
-Ennen implementation-goalin avaamista ihmisen pitää:
+- [x] yhdistää `goal-009` → `goal-004`, `goal-010` → `goal-003` ja `goal-011` → `goal-002` sekä hyväksyä jäljelle jäävät Goalit;
+- [x] yhdistää `adr-011` → `adr-004` sekä hyväksyä `adr-010`, `adr-012`, `adr-013` ja `adr-014`;
+- [x] lukita Step + `ExecutionProfile` -omistajuus, strict v9 -kohde ja Root Runin atominen snapshotraja;
+- [x] säilyttää historiallinen Run-evidenssi immutable read-only-historiana; ja
+- [x] rajata OD-024–OD-026 V1:n ulkopuolelle.
 
-- [ ] reviewata kolme proposed Goalia;
-- [ ] reviewata viisi proposed ADR:ää niiden dependency-järjestyksessä A-010 → A-011 ja A-012 → A-013 → A-014;
-- [ ] päättää OD-001–OD-023 tai merkitä jokaiselle eksplisiittinen accepted default;
-- [ ] hyväksyä OD-024–OD-026 V1:n ulkopuolelle;
+Ennen toteutuksen tai migration-applyn aloittamista pitää vielä:
+
+- [ ] päättää avoimet OD-001, OD-003–OD-008, OD-010–OD-013 ja OD-015–OD-023 tai hyväksyä niille eksplisiittinen default;
 - [ ] varmistaa, ettei Agentin metadataa tai local settings -dataa katoa hiljaisesti;
 - [ ] hyväksyä migrationin current-repository golden counts 9 → 5 profilea, 9 instructionia ja 13 Step-mappingia;
-- [ ] hyväksyä, että historiallista Run-evidenssiä ei rewriteata;
 - [ ] hyväksyä tarvittava rajattu `DESIGN.md`-päivitys tulevassa implementation-goalissa; ja
-- [ ] pitää kaikki tämän paketin Goal- ja ADR-statukset `proposed`-tilassa siihen asti.
+- [ ] päivittää proposal-tason DATA-MODEL-, MIGRATION-, UI-, PROMPT- ja TEST-dokumentit yhdessä aina, kun avoin yksityiskohta ratkaistaan.

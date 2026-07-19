@@ -1,17 +1,17 @@
 ---
 id: adr-010
-title: Step result erotetaan runtime statesta
-status: proposed
+title: StepResult erotetaan runtime-tilasta
+status: accepted
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-18T21:21:24.000Z'
+updatedAt: '2026-07-19T05:44:00.000Z'
 tags:
   - arkkitehtuuripäätös
   - step-result
   - runtime-tila
-version: 1
+version: 2
 ---
 
-# Step result erotetaan runtime statesta
+# StepResult erotetaan runtime-tilasta
 
 ## Konteksti
 
@@ -21,18 +21,19 @@ Nykyinen runtime-malli erottaa jo useimmat näistä arvoista, mutta `AgentOutcom
 
 ## Päätös
 
-Jos tämä ADR hyväksytään, `StepResult` ja runtime state ovat eri käsitteitä ja niillä on eri vastuut.
+`StepResult` ja runtime state ovat eri käsitteitä ja niillä on eri vastuut.
 
 - Kanoninen `StepResult` on täsmälleen `approved | rejected` ja tallennetaan Step Runille.
 - Result syntyy vain validoidusta completed-outcomesta tai Human-Stepin eksplisiittisestä vastauksesta.
-- Execution taskin status kuvaa provider-tehtävän elinkaarta: esimerkiksi `queued`, `running`, `succeeded`, `failed` tai `cancelled`.
-- Step Runin status kuvaa orkestroinnin elinkaarta: esimerkiksi jonossa, käynnissä, inputia odottamassa, valmis, blokattu, epäonnistunut tai peruttu.
+- Execution taskin status kuvaa provider-tehtävän elinkaarta arvoilla `queued`, `running`, `succeeded`, `failed` ja `cancelled`.
+- Step Runin status kuvaa orkestroinnin elinkaarta arvoilla `queued`, `running`, `waiting_for_human`, `completed`, `needs_input`, `blocked`, `failed` ja `cancelled`.
 - Providerin outcome-payload säilyy evidenssinä. Sen sisältämä result validoidaan kerran ja kopioidaan kanoniseen `StepRun.result`-kenttään; Transition engine lukee vain kanonista kenttää.
 - `needs_input` ei tuota resultia vaan pausettaa saman Stepin.
 - `blocked`, `failed`, `cancelled`, timeout ja provider- tai policy-virhe eivät tuota resultia eivätkä seuraa `rejected`-Transitionia.
-- Resultin ja statuksen sallitut yhdistelmät validoidaan. Esimerkiksi valmis agentti- tai Human-Step vaatii resultin, mutta epäonnistunut tai peruttu Step kieltää sen.
+- Resultin ja statuksen sallitut yhdistelmät validoidaan. `completed` Agent- tai Human-Step vaatii resultin, ja kaikki muut terminaaliset Step-statusarvot kieltävät sen.
+- `completed + rejected` voi seurata `rejected`-Transitionia `blocked`- tai `failed`-terminaaliin. Tämä on eri tapahtuma kuin tekninen `blocked` tai `failed`, jossa result puuttuu eikä Transitionia ajeta.
 
-Päätös täsmentää ADR-004:n Transition-mallia sekä ADR-005:n ja ADR-007:n outcome- ja persistence-rajoja. Se ei muuta näiden hyväksyttyjen ADR:ien tilaa ennen tämän ehdotuksen hyväksymistä.
+Päätös täsmentää ADR-004:n Transition-mallia sekä ADR-005:n ja ADR-007:n outcome- ja persistence-rajoja.
 
 ## Seuraukset
 
