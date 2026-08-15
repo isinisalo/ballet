@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProjectStepSchedule } from "../../../shared/domain/automation.js";
+import type { ProjectWorkSchedule } from "../../../shared/domain/automation.js";
 import {
   initialScheduleOccurrence,
   latestScheduleOccurrenceBefore,
@@ -9,11 +9,11 @@ import {
 } from "../ScheduleOccurrences.js";
 
 type DailyOverrides = Partial<Pick<
-  Extract<ProjectStepSchedule, { kind: "recurring" }>,
+  Extract<ProjectWorkSchedule, { kind: "recurring" }>,
   "startsOn" | "time" | "timeZone"
 >>;
 
-const daily = (overrides: DailyOverrides = {}): ProjectStepSchedule => ({
+const daily = (overrides: DailyOverrides = {}): ProjectWorkSchedule => ({
   kind: "recurring",
   startsOn: "2026-07-12",
   time: "09:00",
@@ -50,7 +50,7 @@ describe("schedule occurrence boundaries", () => {
 });
 
 describe("one-time schedules", () => {
-  const schedule: ProjectStepSchedule = {
+  const schedule: ProjectWorkSchedule = {
     kind: "once",
     date: "2026-12-01",
     time: "09:00",
@@ -83,7 +83,7 @@ describe("recurring cadences", () => {
   });
 
   it("skips weekends for the weekdays cadence", () => {
-    const schedule: ProjectStepSchedule = {
+    const schedule: ProjectWorkSchedule = {
       kind: "recurring",
       startsOn: "2026-07-10",
       time: "09:00",
@@ -95,7 +95,7 @@ describe("recurring cadences", () => {
   });
 
   it("uses selected weekdays on and after startsOn", () => {
-    const schedule: ProjectStepSchedule = {
+    const schedule: ProjectWorkSchedule = {
       kind: "recurring",
       startsOn: "2026-07-08",
       time: "09:00",
@@ -110,7 +110,7 @@ describe("recurring cadences", () => {
   });
 
   it("skips months that do not contain dayOfMonth", () => {
-    const schedule: ProjectStepSchedule = {
+    const schedule: ProjectWorkSchedule = {
       kind: "recurring",
       startsOn: "2026-01-30",
       time: "10:00",
@@ -127,7 +127,7 @@ describe("recurring cadences", () => {
   });
 
   it("does not backdate a monthly occurrence before startsOn", () => {
-    const schedule: ProjectStepSchedule = {
+    const schedule: ProjectWorkSchedule = {
       kind: "recurring",
       startsOn: "2026-01-20",
       time: "10:00",

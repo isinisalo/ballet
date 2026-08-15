@@ -56,14 +56,14 @@ export const loopExistingHandlerEdges = ({
       if (handlerRecord.index === sourceIndex) return;
       if (!stepNodeIndexes.has(handlerRecord.index)) return;
       const isReturnEdge = handlerRecord.index < sourceIndex;
-      const isReworkOutput = loopOutputSlotKindForValues(outputId, label, eventType) === "rework";
+      const isNormalOutput = loopOutputSlotKindForValues(outputId, label, eventType) === "normal";
 
       edges.push({
         key: `event-step-${sourceIndex}-${handlerRecord.index}-${eventType}`,
         sourceNodeKey,
         targetNodeKey: `step-${handlerRecord.index}`,
-        sourceHandleId: isReturnEdge && !isReworkOutput ? sourceHandleId : eventSourceHandleId ?? sourceHandleId,
-        targetHandleId: isReworkOutput ? "top" : isReturnEdge ? "top" : targetHandleId,
+        sourceHandleId: isReturnEdge && isNormalOutput ? sourceHandleId : eventSourceHandleId ?? sourceHandleId,
+        targetHandleId: isReturnEdge ? "top" : targetHandleId,
         tone: isReturnEdge ? "return" : undefined,
         eventType,
         label: label ?? loopEventOutputLabel(eventType),

@@ -15,6 +15,7 @@ import {
 import path from "node:path";
 import type { z } from "zod";
 import { projectConfigSchema } from "../../shared/api/workspace-schemas.js";
+import type { ProjectAutomationConfig, ProjectExecutionComposition } from "../../shared/domain/automation.js";
 import {
   defaultProjectConfiguration,
   type ExecutionProfile,
@@ -73,14 +74,24 @@ export class ProjectConfigurationRepository {
         issues: [sourceIssue("invalid_json", ".ballet/project.json", error instanceof Error ? error.message : "Project config is not valid JSON.")]
       };
     }
-    if (isRecord(value) && value.version !== 9) return {
+    if (isRecord(value) && value.version === 9) return {
       path: filename,
       exists: true,
       source,
       issues: [sourceIssue(
         "invalid_schema",
         "version",
-        `Strict project config version 9 is required; version ${String(value.version)} is not supported.`
+        "Project configuration version 9 is not supported; update the project to strict v10."
+      )]
+    };
+    if (isRecord(value) && value.version !== 10) return {
+      path: filename,
+      exists: true,
+      source,
+      issues: [sourceIssue(
+        "invalid_schema",
+        "version",
+        `Strict project config version 10 is required; version ${String(value.version)} is not supported.`
       )]
     };
     const parsed = projectConfigSchema.safeParse(value);
@@ -90,10 +101,16 @@ export class ProjectConfigurationRepository {
     return { path: filename, exists: true, source, config: normalize(parsed.data), issues: [] };
   }
 
-  putAutomation(root: string, loops: ProjectConfiguration["loops"]): ProjectConfiguration {
+  putAutomation(root: string, automation: ProjectAutomationConfig): ProjectConfiguration {
     const loaded = this.load(root);
     assertWritable(loaded);
-    const config = normalize({ ...loaded.config!, version: 9, loops });
+    const config = normalize({
+      ...loaded.config,
+      version: 10,
+      orchestrator: automation.orchestrator,
+      loops: automation.loops,
+      loopEdges: automation.loopEdges
+    });
     this.write(root, config);
     return config;
   }
@@ -106,7 +123,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 9,
+      version: 10,
       executionProfiles: [...loaded.config.executionProfiles, profile]
     });
     this.write(root, config);
@@ -121,7 +138,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 9,
+      version: 10,
       executionProfiles: loaded.config.executionProfiles.map((candidate) =>
         candidate.id === profile.id ? profile : candidate)
     });
@@ -135,7 +152,7 @@ export class ProjectConfigurationRepository {
     if (!loaded.config!.executionProfiles.some((profile) => profile.id === executionProfileId)) return loaded.config!;
     const config = normalize({
       ...loaded.config!,
-      version: 9,
+      version: 10,
       executionProfiles: loaded.config!.executionProfiles.filter((profile) => profile.id !== executionProfileId)
     });
     this.write(root, config);
@@ -169,7 +186,7 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 9,
+  version: 10,
   executionProfiles: config.executionProfiles
     .map((profile) => ({
       id: profile.id,
@@ -180,12 +197,21 @@ const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
       networkAccess: profile.networkAccess
     }))
     .sort((left, right) => compareIds(left.id, right.id)),
+  orchestrator: normalizeComposition(config.orchestrator),
   loops: config.loops.map((loop) => ({
     ...loop,
-    nodes: loop.nodes.map((node) => node.type === "agent" || node.type === "scheduled"
-      ? { ...node, skillIds: [...node.skillIds].sort(compareIds) }
-      : node)
-  }))
+    nodes: loop.nodes.map((node) => ({
+      ...node,
+      work: node.work.type === "human" ? node.work : normalizeComposition(node.work),
+      validation: node.validation.type === "human" ? node.validation : normalizeComposition(node.validation)
+    }))
+  })),
+  loopEdges: config.loopEdges.map((edge) => ({ ...edge }))
+});
+
+const normalizeComposition = <T extends ProjectExecutionComposition>(composition: T): T => ({
+  ...composition,
+  skillIds: [...composition.skillIds].sort(compareIds)
 });
 
 const compareIds = (left: string, right: string): number => left < right ? -1 : left > right ? 1 : 0;

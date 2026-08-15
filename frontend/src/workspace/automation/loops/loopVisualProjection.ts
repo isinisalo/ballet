@@ -1,17 +1,26 @@
-import type {
-  ExecutionProfile,
-  LoopRunDetails,
-  LoopNodeStyle,
-  LoopNodeSize,
-  ProjectAutomationConfig,
-  ProjectLoop,
-  ProjectLoopNode,
-  StepRun,
-  StepTransitionTarget
+import {
+  defaultLoopNodeStyle,
+  getProjectNodeEdges,
+  isProjectNodeTerminalTarget,
+  isProjectProviderWorkNode,
+  type ExecutionProfile,
+  type LoopNodeSize,
+  type LoopNodeStyle,
+  type LoopRunDetails,
+  type LoopTerminal,
+  type ProjectAutomationConfig,
+  type ProjectLoop,
+  type ProjectWorkLoopNode,
+  type StepRun
 } from "@shared/api/workspace-contracts";
-import { getProjectStepTransitionEntries, isProjectTerminalNode } from "@shared/api/workspace-contracts";
 import type { LoopOutputTarget, LoopStepRecord } from "./loopGraph";
 import { scheduleSummary } from "./loopSchedulePresentation";
+
+export interface LoopVisualTerminal {
+  id: LoopTerminal;
+  type: "terminal";
+  terminal: LoopTerminal;
+}
 
 export type LoopVisualStep = {
   id: string;
@@ -25,28 +34,19 @@ export type LoopVisualStep = {
   nodeStyle: LoopNodeStyle;
   nodeSize: LoopNodeSize;
   reasoningEffort?: string;
-  step: ProjectLoopNode;
+  step: ProjectWorkLoopNode | LoopVisualTerminal;
   stepRun?: StepRun;
 };
 
-export type LoopVisualLoop = {
-  id: string;
-  start: string;
-  steps: string[];
-};
-
-export type LoopVisualConfig = {
-  steps: LoopVisualStep[];
-  loops: LoopVisualLoop[];
-};
-
+export type LoopVisualLoop = { id: string; start: string; steps: string[] };
+export type LoopVisualConfig = { steps: LoopVisualStep[]; loops: LoopVisualLoop[] };
 export type LoopVisualProjection = {
   config: LoopVisualConfig;
   stepByKey: Map<string, LoopVisualStep>;
   recordsByLoopId: Map<string, LoopStepRecord[]>;
 };
 
-export const visualStepKey = (loopId: string, stepId: string) => `${loopId}::${stepId}`;
+export const visualStepKey = (loopId: string, nodeId: string) => `${loopId}::${nodeId}`;
 
 export function buildLoopVisualProjection(
   config: ProjectAutomationConfig,
@@ -55,109 +55,83 @@ export function buildLoopVisualProjection(
   executionProfiles: ExecutionProfile[] = [],
   availableExecutionProfileIds?: ReadonlySet<string>
 ): LoopVisualProjection {
-  const loopDefinitions = config.loops.map((loop) => loop.id === displayedLoop.id ? displayedLoop : loop);
-  const visibleNodeIdsByLoopId = new Map(loopDefinitions.map((loop) => [loop.id, reachableNodeIds(loop)]));
-  const latestRunByStepId = latestStepRuns(run?.stepRuns ?? []);
-  const reasoningByProfileId = new Map(executionProfiles
+  const loops = config.loops.map((loop) => loop.id === displayedLoop.id ? displayedLoop : loop);
+  const latestRuns = latestStepRuns(run?.stepRuns ?? []);
+  const reasoning = new Map(executionProfiles
     .filter((profile) => !availableExecutionProfileIds || availableExecutionProfileIds.has(profile.id))
     .map((profile) => [profile.id, profile.reasoningEffort]));
-  const steps = loopDefinitions.flatMap((loop) => loop.nodes.map((node) => ({
-    id: visualStepKey(loop.id, node.id),
-    displayId: node.id,
-    description: node.description,
-    executionProfileId: node.type === "agent" || node.type === "scheduled" ? node.executionProfileId : undefined,
-    humanGate: node.type === "human",
-    scheduled: node.type === "scheduled",
-    terminal: isProjectTerminalNode(node),
-    scheduleLabel: node.type === "scheduled" ? scheduleSummary(node.schedule) : undefined,
-    nodeStyle: node.nodeStyle,
-    nodeSize: node.nodeSize,
-    reasoningEffort: node.type === "agent" || node.type === "scheduled"
-      ? reasoningByProfileId.get(node.executionProfileId)
-      : undefined,
-    step: node,
-    stepRun: loop.id === displayedLoop.id ? latestRunByStepId.get(node.id) : undefined
-  })));
+  const nodesByLoop = new Map(loops.map((loop) => [loop.id, visualNodes(loop, latestRuns, reasoning)]));
+  const steps = [...nodesByLoop.values()].flat();
   const stepByKey = new Map(steps.map((step) => [step.id, step]));
-  const loops = loopDefinitions.map((loop) => ({
+  const visualLoops = loops.map((loop) => ({
     id: loop.id,
-    start: visualStepKey(loop.id, loop.start),
-    steps: loop.nodes
-      .filter((node) => !isProjectTerminalNode(node) || visibleNodeIdsByLoopId.get(loop.id)?.has(node.id))
-      .map((node) => visualStepKey(loop.id, node.id))
+    start: visualStepKey(loop.id, loop.startNodeId),
+    steps: (nodesByLoop.get(loop.id) ?? []).map((step) => step.id)
   }));
-  const recordsByLoopId = new Map(loopDefinitions.map((loop) => {
-    const records = loop.nodes
-      .filter((node) => !isProjectTerminalNode(node) || visibleNodeIdsByLoopId.get(loop.id)?.has(node.id))
-      .map((projectNode, index): LoopStepRecord => {
-      const stepKey = visualStepKey(loop.id, projectNode.id);
-      const visualStep = stepByKey.get(stepKey);
-      const outputTargets = isProjectTerminalNode(projectNode) ? [] : getProjectStepTransitionEntries(projectNode).map(
-        ([result, target]) => visualTarget(loop.id, result, target, loopDefinitions)
-      );
-      return {
-        stepKey,
-        index,
-        loopId: loop.id,
-        step: visualStep,
-        outputTargets
-      };
-    });
-    const startRecord = records.find((record) => record.step?.displayId === loop.start);
-    return [loop.id, startRecord ? [startRecord, ...records.filter((record) => record !== startRecord)] : records] as const;
+  const recordsByLoopId = new Map(loops.map((loop) => {
+    const visual = nodesByLoop.get(loop.id) ?? [];
+    const records = visual.map((step, index): LoopStepRecord => ({
+      stepKey: step.id,
+      index,
+      loopId: loop.id,
+      step,
+      outputTargets: step.terminal ? [] : getProjectNodeEdges(loop, step.displayId).map((edge) => ({
+        outputId: "ok",
+        eventType: `validation.ok.${edge.id}`,
+        type: "step",
+        targetLoopId: loop.id,
+        targetStepKey: visualStepKey(loop.id, isProjectNodeTerminalTarget(edge.target)
+          ? edge.target.terminal
+          : edge.target.nodeId)
+      } satisfies LoopOutputTarget))
+    }));
+    const start = records.find((record) => record.step?.displayId === loop.startNodeId);
+    return [loop.id, start ? [start, ...records.filter((record) => record !== start)] : records] as const;
   }));
-
-  return { config: { steps, loops }, stepByKey, recordsByLoopId };
+  return { config: { steps, loops: visualLoops }, stepByKey, recordsByLoopId };
 }
 
-function reachableNodeIds(loop: ProjectLoop): Set<string> {
-  const nodesById = new Map(loop.nodes.map((node) => [node.id, node]));
-  const reachable = new Set<string>();
-  const pending = [loop.start];
-  while (pending.length > 0) {
-    const nodeId = pending.shift();
-    if (!nodeId || reachable.has(nodeId)) continue;
-    const node = nodesById.get(nodeId);
-    if (!node) continue;
-    reachable.add(nodeId);
-    if (isProjectTerminalNode(node)) continue;
-    getProjectStepTransitionEntries(node).forEach(([, target]) => {
-      if (typeof target === "string") pending.push(target);
-    });
-  }
-  return reachable;
-}
-
-function visualTarget(
-  sourceLoopId: string,
-  result: string,
-  target: StepTransitionTarget,
-  loops: ProjectLoop[]
-): LoopOutputTarget {
-  if (typeof target === "string") {
+const visualNodes = (
+  loop: ProjectLoop,
+  latestRuns: ReadonlyMap<string, StepRun>,
+  reasoning: ReadonlyMap<string, string>
+): LoopVisualStep[] => {
+  const nodes = loop.nodes.map((node): LoopVisualStep => {
+    const work = node.work;
+    const providerWork = isProjectProviderWorkNode(work);
     return {
-      outputId: result,
-      eventType: result,
-      type: "step",
-      targetLoopId: sourceLoopId,
-      targetStepKey: visualStepKey(sourceLoopId, target)
+      id: visualStepKey(loop.id, node.id),
+      displayId: node.id,
+      description: node.description,
+      executionProfileId: providerWork ? work.executionProfileId : undefined,
+      humanGate: work.type === "human" || node.validation.type === "human",
+      scheduled: work.type === "scheduled",
+      terminal: false,
+      scheduleLabel: work.type === "scheduled" ? scheduleSummary(work.schedule) : undefined,
+      nodeStyle: work.nodeStyle,
+      nodeSize: work.nodeSize,
+      reasoningEffort: providerWork ? reasoning.get(work.executionProfileId) : undefined,
+      step: node,
+      stepRun: latestRuns.get(node.id)
     };
-  }
-  if ("loop" in target) {
-    const targetLoop = loops.find((loop) => loop.id === target.loop);
-    return {
-      outputId: result,
-      eventType: result,
-      type: "step",
-      targetLoopId: target.loop,
-      targetStepKey: visualStepKey(target.loop, targetLoop?.start ?? "start")
-    };
-  }
-  throw new Error("Unsupported transition target.");
-}
+  });
+  const terminals = [...new Set(loop.edges.flatMap((edge) =>
+    isProjectNodeTerminalTarget(edge.target) ? [edge.target.terminal] : []))];
+  return [...nodes, ...terminals.map((terminal): LoopVisualStep => ({
+    id: visualStepKey(loop.id, terminal),
+    displayId: terminal,
+    description: `${terminal} Loop terminal`,
+    humanGate: false,
+    scheduled: false,
+    terminal: true,
+    nodeStyle: defaultLoopNodeStyle,
+    nodeSize: "tiny",
+    step: { id: terminal, type: "terminal", terminal }
+  }))];
+};
 
-function latestStepRuns(stepRuns: StepRun[]) {
+const latestStepRuns = (stepRuns: StepRun[]): Map<string, StepRun> => {
   const latest = new Map<string, StepRun>();
   stepRuns.forEach((stepRun) => latest.set(stepRun.stepId, stepRun));
   return latest;
-}
+};

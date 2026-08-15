@@ -1,6 +1,5 @@
 import type Database from "better-sqlite3";
-import type { ProjectLoop, ProjectStep } from "../../shared/domain/automation.js";
-import { isProjectTerminalNode } from "../../shared/domain/automation.js";
+import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import { LoopRunIntegrityError, LoopRunNotFoundError } from "./LoopRunErrors.js";
 
@@ -26,13 +25,5 @@ export class RootExecutionSnapshotStore {
     const loop = snapshot.loops.find((candidate) => candidate.id === loopId);
     if (!loop) throw new LoopRunIntegrityError(`Loop ${loopId} was not found in the Root Run execution snapshot.`);
     return loop;
-  }
-
-  step(snapshot: RootExecutionSnapshot, loopId: string, stepId: string): ProjectStep {
-    const step = this.loop(snapshot, loopId).nodes.find((candidate) => candidate.id === stepId);
-    if (!step || isProjectTerminalNode(step)) {
-      throw new LoopRunIntegrityError(`Step ${stepId} was not found in the immutable Root Run execution snapshot.`);
-    }
-    return step;
   }
 }

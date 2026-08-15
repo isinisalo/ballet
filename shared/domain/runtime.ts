@@ -1,6 +1,6 @@
 // Canonical persisted runtime contracts. Project authoring types live in their
 // own domain modules; this file owns only resolved, immutable Run evidence.
-import type { ProjectExecutableStep, ProjectLoop } from "./automation.js";
+import type { ProjectLoop, ProjectWorkNode } from "./automation.js";
 import type { LoopTheme } from "./loopThemes.js";
 import type { ExecutionProfile } from "./projectConfig.js";
 import type { ExecutionPolicy, RuntimeProvider } from "./localRuntime.js";
@@ -258,7 +258,7 @@ export interface StepRun {
   runId: string;
   loopId: string;
   stepId: string;
-  type: ProjectExecutableStep["type"];
+  type: ProjectWorkNode["type"];
   executionTaskId?: string;
   execution?: ExecutionRuntimeSnapshot;
   status: StepRunStatus;

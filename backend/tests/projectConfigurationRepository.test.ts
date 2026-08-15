@@ -2,7 +2,7 @@ import { lstat, mkdir, mkdtemp, readFile, readdir, readlink, rm, symlink, writeF
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defaultTerminalNodes, type ProjectLoop } from "../../shared/domain/automation.js";
+import type { ProjectAutomationConfig, ProjectLoop } from "../../shared/domain/automation.js";
 import { defaultProjectConfiguration, type ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import { ExecutionProfileConflictError, ExecutionProfileNotFoundError } from "../project-config/ExecutionProfileErrors.js";
 import { ProjectConfigurationRepository, ProjectConfigurationSourceError } from "../project-config/ProjectConfigurationRepository.js";
@@ -30,18 +30,43 @@ const profile = (id: string, networkAccess = false): ExecutionProfile => ({
 
 const loop = (executionProfileId: string): ProjectLoop => ({
   id: "delivery",
-  start: "work",
+  description: "Complete and validate the work.",
+  state: { description: "Shared delivery state.", initial: {} },
+  startNodeId: "work",
   nodes: [{
     id: "work",
-    type: "agent",
+    description: "Complete the work.",
+    work: {
+      type: "agent",
+      task: "Complete the work.",
+      executionProfileId,
+      primaryInstructionId: "project:primary",
+      skillIds: ["project:zeta", "project:alpha"],
+      nodeStyle: "terra",
+      nodeSize: "medium"
+    },
+    validation: {
+      type: "human",
+      task: "Validate the completed work.",
+      nodeStyle: "luna",
+      nodeSize: "small"
+    },
+    maxLocalAttempts: 3
+  }],
+  edges: [{ id: "work-completed", source: "work", target: { terminal: "completed" } }]
+});
+
+const automation = (executionProfileId: string): ProjectAutomationConfig => ({
+  version: 10,
+  orchestrator: {
     executionProfileId,
     primaryInstructionId: "project:primary",
     skillIds: ["project:zeta", "project:alpha"],
-    description: "Complete the work.",
-    nodeStyle: "terra",
-    nodeSize: "medium",
-    on: { approved: "completed", rejected: "blocked" }
-  }, ...defaultTerminalNodes()]
+    maxRepairDepth: 4,
+    maxRepairAttempts: 3
+  },
+  loops: [loop(executionProfileId)],
+  loopEdges: []
 });
 
 describe("project configuration repository", () => {
@@ -50,26 +75,34 @@ describe("project configuration repository", () => {
     const repository = new ProjectConfigurationRepository();
     expect(repository.load(projectRoot)).toMatchObject({
       exists: false,
-      config: { version: 9, executionProfiles: [], loops: [] },
+      config: { version: 10, executionProfiles: [], orchestrator: expect.any(Object), loops: [], loopEdges: [] },
       issues: []
     });
     await expect(readFile(repository.path(projectRoot), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("atomically preserves Loops while sorting ExecutionProfiles and Step skills", async () => {
+  it("atomically preserves Loops while sorting ExecutionProfiles and execution composition skills", async () => {
     const projectRoot = await root();
     const repository = new ProjectConfigurationRepository();
     repository.createExecutionProfile(projectRoot, profile("zeta", true));
     repository.createExecutionProfile(projectRoot, profile("alpha"));
-    repository.putAutomation(projectRoot, [loop("zeta")]);
+    repository.putAutomation(projectRoot, automation("zeta"));
 
     expect(JSON.parse(await readFile(repository.path(projectRoot), "utf8"))).toEqual({
-      version: 9,
+      version: 10,
       executionProfiles: [profile("alpha"), profile("zeta", true)],
+      orchestrator: {
+        ...automation("zeta").orchestrator,
+        skillIds: ["project:alpha", "project:zeta"]
+      },
       loops: [{
         ...loop("zeta"),
-        nodes: [{ ...loop("zeta").nodes[0]!, skillIds: ["project:alpha", "project:zeta"] }, ...defaultTerminalNodes()]
-      }]
+        nodes: [{
+          ...loop("zeta").nodes[0]!,
+          work: { ...loop("zeta").nodes[0]!.work, skillIds: ["project:alpha", "project:zeta"] }
+        }]
+      }],
+      loopEdges: []
     });
     expect(await readdir(path.join(projectRoot, ".ballet"))).toEqual(["project.json"]);
   });
@@ -100,7 +133,7 @@ describe("project configuration repository", () => {
       issues: [expect.objectContaining({
         code: "invalid_schema",
         path: "version",
-        message: expect.stringContaining("version 9 is required")
+        message: expect.stringContaining("version 10 is required")
       })]
     });
     expect(() => repository.createExecutionProfile(projectRoot, profile("primary")))
@@ -150,7 +183,7 @@ describe("project configuration repository source safety", () => {
     const projectRoot = await root();
     const repository = new ProjectConfigurationRepository();
     const outside = path.join(projectRoot, "outside.json");
-    const outsideSource = `${JSON.stringify({ version: 9, executionProfiles: [], loops: [] }, null, 2)}\n`;
+    const outsideSource = `${JSON.stringify(defaultProjectConfiguration(), null, 2)}\n`;
     await writeFile(outside, outsideSource, "utf8");
     await mkdir(path.dirname(repository.path(projectRoot)), { recursive: true });
     await symlink(outside, repository.path(projectRoot));
@@ -228,11 +261,11 @@ describe("project configuration repository source safety", () => {
     expect(await readFile(balletPath, "utf8")).toBe("preserve me");
   });
 
-  it("cannot remove an ExecutionProfile still referenced by a Step", async () => {
+  it("cannot remove an ExecutionProfile still referenced by v10 compositions", async () => {
     const projectRoot = await root();
     const repository = new ProjectConfigurationRepository();
     repository.createExecutionProfile(projectRoot, profile("primary"));
-    repository.putAutomation(projectRoot, [loop("primary")]);
+    repository.putAutomation(projectRoot, automation("primary"));
     const before = await readFile(repository.path(projectRoot), "utf8");
 
     expect(() => repository.removeExecutionProfile(projectRoot, "primary"))

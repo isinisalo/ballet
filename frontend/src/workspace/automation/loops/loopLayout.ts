@@ -453,18 +453,18 @@ function loopEdgesWithDynamicVerticalHandles(
     const outputSlotKind = loopEdgeOutputSlotKind(edge);
     const sourceNode = nodeByKey.get(edge.sourceNodeKey);
     const targetNode = nodeByKey.get(edge.targetNodeKey);
-    if (outputSlotKind === "approval") {
+    if (outputSlotKind === "normal") {
       return {
         ...edge,
         sourceHandleId: sourceNode?.kind === "loop" ? "bottom" : "right",
         targetHandleId: targetNode?.kind === "loop" ? "top" : "left"
       };
     }
-    const isDynamicVerticalEdge = edge.tone === "return" || outputSlotKind === "rework";
+    const isDynamicVerticalEdge = edge.tone === "return";
     if (!isDynamicVerticalEdge) return edge;
     if (!sourceNode || !targetNode) return edge;
     const isUpwardEdge = targetNode.y + targetNode.height / 2 < sourceNode.y + sourceNode.height / 2;
-    if (outputSlotKind === "rework" && (edge.tone === "return" || isUpwardEdge)) {
+    if (isUpwardEdge) {
       return {
         ...edge,
         sourceHandleId: "top",
@@ -474,7 +474,7 @@ function loopEdgesWithDynamicVerticalHandles(
     const { sourceHandleId, targetHandleId } = loopShortestVerticalHandles(
       sourceNode,
       targetNode,
-      outputSlotKind === "rework"
+      false
     );
 
     return {

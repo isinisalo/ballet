@@ -1,4 +1,9 @@
-import type { ProjectLoop } from "./automation.js";
+import {
+  defaultProjectAutomationConfig,
+  type ProjectLoop,
+  type ProjectLoopEdge,
+  type ProjectLoopOrchestrator
+} from "./automation.js";
 import type { RuntimeProvider } from "./runtime.js";
 
 export interface ExecutionProfile {
@@ -11,9 +16,11 @@ export interface ExecutionProfile {
 }
 
 export interface ProjectConfiguration {
-  version: 9;
+  version: 10;
   executionProfiles: ExecutionProfile[];
+  orchestrator: ProjectLoopOrchestrator;
   loops: ProjectLoop[];
+  loopEdges: ProjectLoopEdge[];
 }
 
 export interface ProjectConfigurationIssue {
@@ -23,7 +30,6 @@ export interface ProjectConfigurationIssue {
 }
 
 export const defaultProjectConfiguration = (): ProjectConfiguration => ({
-  version: 9,
-  executionProfiles: [],
-  loops: []
+  ...defaultProjectAutomationConfig(),
+  executionProfiles: []
 });

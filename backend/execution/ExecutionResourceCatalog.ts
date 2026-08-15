@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ProjectExecutionStep } from "../../shared/domain/automation.js";
+import type { ProjectExecutionComposition } from "../../shared/domain/automation.js";
 import type { ProjectInstruction, ProjectResourceCatalog, Skill } from "../../shared/domain/documents.js";
 import type { ExecutionResourceSnapshot } from "../../shared/domain/runtime.js";
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
@@ -14,15 +14,17 @@ export const MAX_SKILL_BYTES = 128 * 1024;
 
 export const resolveExecutionResources = async (
   root: string,
-  steps: readonly ProjectExecutionStep[]
+  compositions: readonly NamedExecutionComposition[]
 ): Promise<ExecutionResourceSnapshot[]> => {
   const catalog = await loadProjectResources(root);
-  return resolveExecutionResourcesFromCatalog(catalog, steps);
+  return resolveExecutionResourcesFromCatalog(catalog, compositions);
 };
+
+export type NamedExecutionComposition = ProjectExecutionComposition & { id: string };
 
 export const resolveExecutionResourcesFromCatalog = (
   catalog: ProjectResourceCatalog,
-  steps: readonly ProjectExecutionStep[]
+  compositions: readonly NamedExecutionComposition[]
 ): ExecutionResourceSnapshot[] => {
   if (catalog.issues.length > 0) {
     const issue = [...catalog.issues].sort(compareIssues)[0]!;
@@ -40,25 +42,25 @@ export const resolveExecutionResourcesFromCatalog = (
   const system = systemExecutionResourceSnapshot();
   selected.set(resourceKey(system), system);
 
-  for (const step of steps) {
-    const primary = instructions.get(step.primaryInstructionId);
+  for (const composition of compositions) {
+    const primary = instructions.get(composition.primaryInstructionId);
     if (!primary?.valid) {
       throw new ExecutionCompositionError(
         "missing_resource",
-        `Step ${step.id} references missing primary instruction ${step.primaryInstructionId}.`
+        `Execution composition ${composition.id} references missing primary instruction ${composition.primaryInstructionId}.`
       );
     }
     addSelected(selected, primarySnapshot(primary));
 
-    if (new Set(step.skillIds).size !== step.skillIds.length) {
-      throw new ExecutionCompositionError("invalid_resource", `Step ${step.id} contains duplicate skill ids.`);
+    if (new Set(composition.skillIds).size !== composition.skillIds.length) {
+      throw new ExecutionCompositionError("invalid_resource", `Execution composition ${composition.id} contains duplicate skill ids.`);
     }
-    for (const skillId of sortedIds(step.skillIds)) {
+    for (const skillId of sortedIds(composition.skillIds)) {
       const skill = skills.get(skillId);
       if (!skill?.valid) {
         throw new ExecutionCompositionError(
           "missing_resource",
-          `Step ${step.id} references missing skill ${skillId}.`
+          `Execution composition ${composition.id} references missing skill ${skillId}.`
         );
       }
       addSelected(selected, skillSnapshot(skill));

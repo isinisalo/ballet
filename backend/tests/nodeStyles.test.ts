@@ -1,32 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 import {
-  defaultTransitionFor,
-  defaultTerminalNodes,
   loopNodeSizeCatalog,
   loopNodeSizes,
   loopNodeStyleCatalog,
   loopNodeStyles,
   type ProjectAutomationConfig
 } from "../../shared/domain/automation.js";
+import { testAutomationConfig } from "./v10TestConfig.js";
 
-const config = (): ProjectAutomationConfig => ({
-  version: 9,
-  loops: [{
-    id: "delivery",
-    start: "gate",
-    nodes: [{
-      id: "gate",
-      type: "human",
-      description: "Approve.",
-      nodeStyle: "flat",
-      nodeSize: "medium",
-      on: { approved: "completed", rejected: "blocked" }
-    }, ...defaultTerminalNodes()]
-  }]
-});
+const config = (): ProjectAutomationConfig => testAutomationConfig();
 
-describe("v9 node style and size catalogs", () => {
+describe("v10 Work and Validation Node appearance catalogs", () => {
   it("defines six ordered styles with group metadata and four explicit sizes", () => {
     expect(loopNodeStyles).toEqual([
       "flat", "luna", "mars", "terra", "sol", "vector-planet"
@@ -47,108 +32,44 @@ describe("v9 node style and size catalogs", () => {
     });
   });
 
-  it("accepts every one of the 6 × 4 style and size combinations", () => {
+  it("accepts every style and size combination for both inner node roles", () => {
     const base = config();
+    const source = base.loops[0]!.nodes[0]!;
     for (const nodeStyle of loopNodeStyles) {
       for (const nodeSize of loopNodeSizes) {
+        const node = {
+          ...source,
+          work: { ...source.work, nodeStyle, nodeSize },
+          validation: { ...source.validation, nodeStyle, nodeSize }
+        };
         expect(automationConfigSchema.safeParse({
           ...base,
-          loops: [{
-            ...base.loops[0],
-            nodes: base.loops[0]!.nodes.map((node) => ({ ...node, nodeStyle, nodeSize }))
-          }]
+          loops: [{ ...base.loops[0]!, nodes: [node] }]
         }).success, `${nodeStyle}/${nodeSize}`).toBe(true);
       }
     }
   });
-});
 
-describe("v9 node style and terminal validation", () => {
-  it("rejects removed node styles and the removed Loop summary field", () => {
+  it("rejects removed styles, missing sizes, legacy theme fields, and reserved node ids", () => {
     const base = config();
-    const removedStyles = [
-      "black-hole", "meteorite", "black-planet", "fire-planet", "shattered-planet",
-      "satellite", "spaceman", "black-ice-planet", "battle-station",
-      "ship-arrow", "ship-fang", "ship-crescent", "ship-twin-pod", "ship-needle", "ship-hammer",
-      "monster-void-eye", "monster-star-jelly", "monster-void-manta", "monster-cosmic-serpent",
-      "monster-moon-maw", "monster-astral-kraken"
-    ];
-    removedStyles.forEach((nodeStyle) => {
-      expect(automationConfigSchema.safeParse({
-        ...base,
-        loops: [{
-          ...base.loops[0],
-          nodes: base.loops[0]!.nodes.map((node) => ({ ...node, nodeStyle }))
-        }]
-      }).success, nodeStyle).toBe(false);
-    });
+    const source = base.loops[0]!.nodes[0]!;
     expect(automationConfigSchema.safeParse({
       ...base,
-      loops: [{ ...base.loops[0], summaryStyle: "route" }]
+      loops: [{ ...base.loops[0]!, nodes: [{
+        ...source,
+        work: { ...source.work, nodeStyle: "black-hole" }
+      }] }]
     }).success).toBe(false);
-  });
 
-  it("requires nodeSize and rejects legacy loop theme fields", () => {
-    const base = config();
+    const workWithoutSize: Record<string, unknown> = { ...source.work };
+    delete workWithoutSize.nodeSize;
     expect(automationConfigSchema.safeParse({
       ...base,
-      loops: [{ ...base.loops[0], theme: "legacy" }]
-    }).success).toBe(false);
-    const withoutNodeSize: Record<string, unknown> = { ...base.loops[0]!.nodes[0]! };
-    delete withoutNodeSize.nodeSize;
-    expect(automationConfigSchema.safeParse({
-      ...base,
-      loops: [{
-        ...base.loops[0],
-        nodes: [withoutNodeSize, ...base.loops[0]!.nodes.slice(1)]
-      }]
-    }).success).toBe(false);
-  });
-
-  it("requires exactly one fixed-id terminal node of every status", () => {
-    const base = config();
-    const nodes = base.loops[0]!.nodes;
-    expect(automationConfigSchema.safeParse({
-      ...base,
-      loops: [{ ...base.loops[0], nodes: nodes.filter((node) => node.id !== "failed") }]
+      loops: [{ ...base.loops[0]!, theme: "legacy", nodes: [{ ...source, work: workWithoutSize }] }]
     }).success).toBe(false);
     expect(automationConfigSchema.safeParse({
       ...base,
-      loops: [{ ...base.loops[0], nodes: [...nodes, { ...nodes.find((node) => node.id === "completed")! }] }]
+      loops: [{ ...base.loops[0]!, startNodeId: "completed", nodes: [{ ...source, id: "completed" }] }]
     }).success).toBe(false);
-    expect(automationConfigSchema.safeParse({
-      ...base,
-      loops: [{ ...base.loops[0], nodes: nodes.map((node) => node.id === "completed" ? { ...node, id: "blocked" } : node) }]
-    }).success).toBe(false);
-  });
-
-  it("reserves terminal ids and forbids composition, schedule, and output fields on terminals", () => {
-    const base = config();
-    const executable = base.loops[0]!.nodes[0]!;
-    const terminals = defaultTerminalNodes();
-    expect(automationConfigSchema.safeParse({
-      ...base,
-      loops: [{ ...base.loops[0], start: "completed", nodes: [{ ...executable, id: "completed" }, ...terminals] }]
-    }).success).toBe(false);
-    for (const forbidden of [
-      { executionProfileId: "primary" },
-      { primaryInstructionId: "project:primary" },
-      { skillIds: ["project:checks"] },
-      { schedule: { kind: "once", date: "2026-07-14", time: "09:00", timeZone: "UTC" } },
-      { on: { approved: "completed", rejected: "blocked" } }
-    ]) {
-      expect(automationConfigSchema.safeParse({
-        ...base,
-        loops: [{
-          ...base.loops[0],
-          nodes: base.loops[0]!.nodes.map((node) => node.id === "completed" ? { ...node, ...forbidden } : node)
-        }]
-      }).success).toBe(false);
-    }
-  });
-
-  it("provides completed and blocked defaults for required outputs", () => {
-    expect(defaultTransitionFor("approved")).toBe("completed");
-    expect(defaultTransitionFor("rejected")).toBe("blocked");
   });
 });

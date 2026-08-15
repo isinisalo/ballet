@@ -5,7 +5,7 @@ import {
   type LoopNodeSize,
   type LoopNodeStyle,
   type LoopTheme,
-  type ProjectLoopNode
+  type ProjectWorkLoopNode
 } from "@shared/api/workspace-contracts";
 import { LoopCompactStepNode } from "../loops/LoopCompactStepNode";
 import type { LoopNodeContext } from "../loops/LoopCanvasTypes";
@@ -70,16 +70,20 @@ function gallerySize(index: number): LoopNodeSize {
 
 function galleryRecord(nodeStyle: LoopNodeStyle, nodeSize: LoopNodeSize, index: number): LoopStepRecord {
   const id = `preview-${nodeStyle}`;
-  const step: ProjectLoopNode = {
+  const step: ProjectWorkLoopNode = {
     id,
-    type: "agent",
-    executionProfileId: "codex-gpt-5-6-sol-medium-network-off",
-    primaryInstructionId: "project:theme-preview",
-    skillIds: [],
     description: loopNodeStyleCatalog[nodeStyle].label,
-    nodeStyle,
-    nodeSize,
-    on: { approved: "completed", rejected: "blocked" }
+    work: {
+      type: "agent",
+      task: "Preview work",
+      executionProfileId: "codex-gpt-5-6-sol-medium-network-off",
+      primaryInstructionId: "project:theme-preview",
+      skillIds: [],
+      nodeStyle,
+      nodeSize
+    },
+    validation: { type: "human", task: "Preview validation", nodeStyle, nodeSize },
+    maxLocalAttempts: 3
   };
   return {
     stepKey: id,
@@ -90,7 +94,7 @@ function galleryRecord(nodeStyle: LoopNodeStyle, nodeSize: LoopNodeSize, index: 
       id,
       displayId: loopNodeStyleCatalog[nodeStyle].label,
       description: step.description,
-      executionProfileId: step.executionProfileId,
+      executionProfileId: step.work.type === "agent" ? step.work.executionProfileId : undefined,
       humanGate: false,
       scheduled: false,
       terminal: false,

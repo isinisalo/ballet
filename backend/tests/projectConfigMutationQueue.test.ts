@@ -2,10 +2,11 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defaultTerminalNodes, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import type { ProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { RuntimeDatabase } from "../runtime-db.js";
 import { AutomationService } from "../services/AutomationService.js";
 import { MarkdownStore } from "../store.js";
+import { testExecutionProfile, testLoop, testOrchestrator, testWorkLoopNode } from "./v10TestConfig.js";
 
 const roots: string[] = [];
 const stores: MarkdownStore[] = [];
@@ -63,30 +64,31 @@ describe("MarkdownStore project config mutation queue", () => {
 const createProject = async (): Promise<string> => {
   const root = await mkdtemp(path.join(os.tmpdir(), "ballet-project-mutation-"));
   roots.push(root);
-  await mkdir(path.join(root, ".ballet"), { recursive: true });
+  await mkdir(path.join(root, ".ballet", "instructions"), { recursive: true });
   await writeFile(path.join(root, ".ballet", "project.md"), "---\nid: mutation-queue\nname: Mutation queue\n---\n", "utf8");
   await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({
-    version: 9,
-    executionProfiles: [],
-    loops: config().loops
+    ...config(),
+    executionProfiles: [testExecutionProfile]
   }, null, 2), "utf8");
+  await writeFile(
+    path.join(root, ".ballet", "instructions", "architect.md"),
+    "---\nid: architect\ntitle: Architect\n---\nCoordinate generic work.\n",
+    "utf8"
+  );
+  await writeFile(
+    path.join(root, ".ballet", "instructions", "worker.md"),
+    "---\nid: worker\ntitle: Worker\n---\nPerform generic work.\n",
+    "utf8"
+  );
   return root;
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 9,
-  loops: [automationLoop("first-loop"), automationLoop("second-loop")]
-});
-
-const automationLoop = (id: string): ProjectAutomationConfig["loops"][number] => ({
-  id,
-  start: "gate",
-  nodes: [{
-    id: "gate",
-    type: "human",
-    description: "Approve.",
-    nodeStyle: "luna",
-    nodeSize: "tiny",
-    on: { approved: "completed", rejected: "failed" }
-  }, ...defaultTerminalNodes()]
+  version: 10,
+  orchestrator: testOrchestrator(),
+  loops: [
+    testLoop("first-loop", testWorkLoopNode("first-work")),
+    testLoop("second-loop", testWorkLoopNode("second-work"))
+  ],
+  loopEdges: []
 });

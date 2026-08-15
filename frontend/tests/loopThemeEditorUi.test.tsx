@@ -3,11 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   defaultLoopTheme,
-  defaultTerminalNodes,
   loopNodeStyles,
   type AppData,
-  type LoopTheme,
-  type ProjectLoop
+  type LoopTheme
 } from "@shared/api/workspace-contracts";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 import { emptyData } from "../src/workspace/types";
@@ -15,24 +13,14 @@ import { LoopThemeEditorView } from "../src/workspace/automation/themes/LoopThem
 import { LoopThemePreview } from "../src/workspace/automation/themes/LoopThemePreview";
 import { useLoopThemeEditor } from "../src/workspace/automation/themes/useLoopThemeEditor";
 import { installThemeApi } from "./loopThemeEditorTestApi";
+import { v10Automation, v10Loop } from "./v10Fixtures";
 
-const loop: ProjectLoop = {
-  id: "delivery",
-  start: "approval",
-  nodes: [{
-    id: "approval",
-    type: "human",
-    nodeStyle: "sol",
-    nodeSize: "large",
-    description: "Approve delivery",
-    on: { approved: "completed", rejected: "failed" }
-  }, ...defaultTerminalNodes()]
-};
+const loop = v10Loop("delivery");
 
 const theme = () => structuredClone(defaultLoopTheme);
 const data = (): AppData => ({
   ...emptyData,
-  automation: { version: 9, loops: [structuredClone(loop)] },
+  automation: v10Automation(structuredClone(loop)),
   automationIssues: [],
   scheduleStates: [],
   loopTheme: theme(),
@@ -87,11 +75,8 @@ describe("singleton Loop theme editor", () => {
     expect(gallery.querySelector("[data-loop-artwork-gallery-group='ship']")).not.toBeInTheDocument();
     expect(gallery.querySelector("[data-loop-artwork-gallery-group='monster']")).not.toBeInTheDocument();
     expect(canvas.querySelector("[data-loop-edge-style='solid']")).toBeInTheDocument();
-    expect(canvas.querySelector("[data-loop-edge-output-slot-kind='rework']")).toHaveAttribute("data-loop-edge-style", "dotted");
-    expect(canvas.querySelector("[data-loop-edge-tone='cross-loop']")).toHaveAttribute("data-loop-edge-style", "dashed");
-    ["completed", "blocked", "failed"].forEach((status) => {
-      expect(canvas.querySelector(`[data-loop-node-kind='terminal'] [data-loop-node-label='${status}']`)).toBeInTheDocument();
-    });
+    expect(canvas.querySelector("[data-loop-edge-output-slot-kind='normal']")).toHaveAttribute("data-loop-edge-style", "solid");
+    expect(canvas.querySelector("[data-loop-node-kind='terminal'] [data-loop-node-label='completed']")).toBeInTheDocument();
     expect(within(canvas).queryByRole("button")).not.toBeInTheDocument();
     expect(within(gallery).queryByRole("button")).not.toBeInTheDocument();
     expect(gallery.querySelector("img")).not.toBeInTheDocument();

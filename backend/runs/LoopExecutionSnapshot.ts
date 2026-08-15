@@ -1,56 +1,47 @@
 import {
-  getProjectStepTransitionTargets,
-  isProjectExecutionStep,
-  isProjectTerminalNode,
-  type ProjectExecutionStep,
+  getReachableProjectLoopIds,
+  getReachableProjectNodeIds,
+  isProjectAgentValidationNode,
+  isProjectProviderWorkNode,
+  type ProjectExecutionComposition,
   type ProjectLoop
 } from "../../shared/domain/automation.js";
 import type { ProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import { LoopRunNotFoundError } from "../runtime/LoopRunErrors.js";
 
-export const reachableExecutionSteps = (
-  config: Pick<ProjectConfiguration, "loops">,
+export interface ReachableProviderComposition {
+  loopId: string;
+  nodeId: string;
+  phase: "work" | "validation";
+  composition: ProjectExecutionComposition;
+}
+
+export const reachableProviderCompositions = (
+  config: Pick<ProjectConfiguration, "loops" | "loopEdges">,
   rootLoopId: string
-): Array<{ loopId: string; step: ProjectExecutionStep }> =>
-  reachableLoops(config, rootLoopId).flatMap((loop) => loop.nodes.flatMap((node) =>
-    !isProjectTerminalNode(node) && isProjectExecutionStep(node) ? [{ loopId: loop.id, step: node }] : []));
+): ReachableProviderComposition[] => reachableLoops(config, rootLoopId).flatMap((loop) =>
+  loop.nodes.flatMap((node) => [
+    ...(isProjectProviderWorkNode(node.work)
+      ? [{ loopId: loop.id, nodeId: node.id, phase: "work" as const, composition: node.work }]
+      : []),
+    ...(isProjectAgentValidationNode(node.validation)
+      ? [{ loopId: loop.id, nodeId: node.id, phase: "validation" as const, composition: node.validation }]
+      : [])
+  ]));
 
 export const reachableLoops = (
-  config: Pick<ProjectConfiguration, "loops">,
+  config: Pick<ProjectConfiguration, "loops" | "loopEdges">,
   rootLoopId: string
 ): ProjectLoop[] => {
   const loops = new Map(config.loops.map((loop) => [loop.id, loop]));
-  const root = loops.get(rootLoopId);
-  if (!root) throw new LoopRunNotFoundError(`Reachable Loop ${rootLoopId} was not found.`);
-  const pending = [{ loopId: root.id, nodeId: root.start }];
-  const visitedNodes = new Set<string>();
-  const reachedLoops = new Set<string>();
-  while (pending.length > 0) {
-    const current = pending.shift()!;
-    const key = nodeKey(current.loopId, current.nodeId);
-    if (visitedNodes.has(key)) continue;
-    visitedNodes.add(key);
-    reachedLoops.add(current.loopId);
-    const loop = loops.get(current.loopId);
-    if (!loop) throw new LoopRunNotFoundError(`Reachable Loop ${current.loopId} was not found.`);
-    const node = loop.nodes.find((candidate) => candidate.id === current.nodeId);
-    if (!node) throw new LoopRunNotFoundError(`Reachable node ${current.loopId}:${current.nodeId} was not found.`);
-    if (isProjectTerminalNode(node)) continue;
-    for (const target of getProjectStepTransitionTargets(node)) {
-      if (typeof target === "string") pending.push({ loopId: loop.id, nodeId: target });
-      else {
-        const targetLoop = loops.get(target.loop);
-        if (!targetLoop) throw new LoopRunNotFoundError(`Reachable Loop ${target.loop} was not found.`);
-        pending.push({ loopId: targetLoop.id, nodeId: targetLoop.start });
-      }
-    }
-  }
-  return config.loops
-    .filter((loop) => reachedLoops.has(loop.id))
-    .map((loop) => ({
+  if (!loops.has(rootLoopId)) throw new LoopRunNotFoundError(`Reachable Loop ${rootLoopId} was not found.`);
+  const reachableLoopIds = getReachableProjectLoopIds(config, rootLoopId);
+  return config.loops.filter((loop) => reachableLoopIds.has(loop.id)).map((loop) => {
+    const reachableNodeIds = getReachableProjectNodeIds(loop);
+    return {
       ...loop,
-      nodes: loop.nodes.filter((node) => visitedNodes.has(nodeKey(loop.id, node.id)))
-    }));
+      nodes: loop.nodes.filter((node) => reachableNodeIds.has(node.id)),
+      edges: loop.edges.filter((edge) => reachableNodeIds.has(edge.source))
+    };
+  });
 };
-
-const nodeKey = (loopId: string, nodeId: string): string => `${loopId}\0${nodeId}`;

@@ -1,4 +1,9 @@
-import { isProjectExecutionStep, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import {
+  isProjectAgentValidationNode,
+  isProjectProviderWorkNode,
+  type ProjectAutomationConfig,
+  type ProjectExecutionComposition
+} from "../../shared/domain/automation.js";
 import type { ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import {
   AutomationConflictError,
@@ -35,7 +40,7 @@ export class AutomationService {
     }
     const resourceIssues = validateProjectExecutionResources(config, resources);
     if (resourceIssues.length > 0) {
-      throw new AutomationValidationError("Step execution resources are invalid.", resourceIssues);
+      throw new AutomationValidationError("Execution resources are invalid.", resourceIssues);
     }
     return saveProjectAutomationConfig(this.root(), config);
   }
@@ -63,12 +68,15 @@ export class AutomationService {
         loaded.issues.map((issue) => ({ path: issue.path, message: issue.message }))
       );
     }
-    const references = loaded.config.loops.flatMap((loop) => loop.nodes
-      .filter((node) => (node.type === "agent" || node.type === "scheduled")
-        && node.executionProfileId === executionProfileId)
-      .map((node) => `${loop.id}:${node.id}`));
+    const references = loaded.config.loops.flatMap((loop) => loop.nodes.flatMap((node) => [
+      ...(isProjectProviderWorkNode(node.work) && node.work.executionProfileId === executionProfileId
+        ? [`${loop.id}:${node.id}:work`] : []),
+      ...(isProjectAgentValidationNode(node.validation) && node.validation.executionProfileId === executionProfileId
+        ? [`${loop.id}:${node.id}:validation`] : [])
+    ]));
+    if (loaded.config.orchestrator.executionProfileId === executionProfileId) references.push("orchestrator");
     if (references.length > 0) throw new AutomationConflictError(
-      `Execution profile ${executionProfileId} is referenced by Steps: ${references.join(", ")}.`
+      `Execution profile ${executionProfileId} is referenced by execution compositions: ${references.join(", ")}.`
     );
   }
 
@@ -77,14 +85,20 @@ export class AutomationService {
     if (automation.issues.length > 0) {
       throw new AutomationValidationError("Automation config is invalid.", automation.issues);
     }
-    const references = automation.config.loops.flatMap((loop) => loop.nodes
-      .filter(isProjectExecutionStep)
-      .filter((node) => node.primaryInstructionId === resourceId || node.skillIds.includes(resourceId))
-      .map((node) => `${loop.id}:${node.id}`));
+    const references = automation.config.loops.flatMap((loop) => loop.nodes.flatMap((node) => [
+      ...(isProjectProviderWorkNode(node.work) && compositionReferences(node.work, resourceId)
+        ? [`${loop.id}:${node.id}:work`] : []),
+      ...(isProjectAgentValidationNode(node.validation) && compositionReferences(node.validation, resourceId)
+        ? [`${loop.id}:${node.id}:validation`] : [])
+    ]));
+    if (compositionReferences(automation.config.orchestrator, resourceId)) references.push("orchestrator");
     if (references.length > 0) {
       throw new AutomationConflictError(
-        `Project resource ${resourceId} is referenced by Steps: ${references.join(", ")}.`
+        `Project resource ${resourceId} is referenced by execution compositions: ${references.join(", ")}.`
       );
     }
   }
 }
+
+const compositionReferences = (composition: ProjectExecutionComposition, resourceId: string): boolean =>
+  composition.primaryInstructionId === resourceId || composition.skillIds.includes(resourceId);

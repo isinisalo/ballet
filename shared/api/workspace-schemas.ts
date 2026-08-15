@@ -1,12 +1,14 @@
 import { z } from "zod";
 import {
-  clockTimePattern,
-  isCalendarDate,
-  isIanaTimeZone,
   loopNodeSizes,
   loopNodeStyles,
+  loopTerminals,
+  maxLocalAttemptsLimit,
+  maxProjectStateBytes,
+  maxRepairAttemptsLimit,
+  maxRepairDepthLimit,
   type ProjectAutomationConfig,
-  type ProjectStepSchedule
+  type JsonValue
 } from "../domain/automation.js";
 import type { ExecutionProfile, ProjectConfiguration } from "../domain/projectConfig.js";
 import {
@@ -15,6 +17,9 @@ import {
   type LoopTheme
 } from "../domain/loopThemes.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
+import { projectWorkScheduleSchema } from "./work-schedule-schema.js";
+
+export { projectWorkScheduleSchema } from "./work-schedule-schema.js";
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -107,16 +112,21 @@ export const executionProfileSchema = z.object({
 }).strict() satisfies z.ZodType<ExecutionProfile>;
 export const executionProfileSaveSchema = executionProfileSchema.omit({ id: true });
 export const executionProfileParamsSchema = z.object({ executionProfileId: executionProfileIdSchema }).strict();
-const optionalAutomationDescriptionSchema = z.string().max(2000);
-const taskDescriptionSchema = optionalAutomationDescriptionSchema.refine(
+const automationDescriptionSchema = z.string().trim().min(1).max(2000);
+const taskDescriptionSchema = z.string().trim().min(1).max(20_000).refine(
   (value) => value.trim().length > 0,
   "Task description must be non-empty."
 );
 const automationLoopIdSchema = z.string().min(2).max(101);
-const automationStepIdSchema = z.string()
+const automationNodeIdSchema = z.string()
   .min(1)
   .max(160)
-  .regex(kebabCaseIdPattern, "Step id must be lowercase kebab-case.");
+  .regex(kebabCaseIdPattern, "Node id must be lowercase kebab-case.")
+  .refine((value) => !loopTerminals.includes(value as (typeof loopTerminals)[number]), "Node id is reserved for a Loop terminal.");
+const automationEdgeIdSchema = z.string()
+  .min(1)
+  .max(200)
+  .regex(kebabCaseIdPattern, "Edge id must be lowercase kebab-case.");
 const kebabLoopIdSchema = automationLoopIdSchema.regex(kebabCaseIdPattern, "Loop id must be lowercase kebab-case.");
 const loopThemeColorSchema = z.string()
   .regex(/^#[0-9a-f]{6}$/, "Expected a six-digit lowercase hex color.");
@@ -139,29 +149,15 @@ export const loopThemeSchema = z.object({
     color: loopThemeColorSchema
   }).strict()
 }).strict() satisfies z.ZodType<LoopTheme>;
-const stepLoopSchema = z.object({ loop: kebabLoopIdSchema }).strict();
-const stepTransitionTargetSchema = z.union([automationStepIdSchema, stepLoopSchema]);
-const stepTransitionsSchema = z.object({
-  approved: stepTransitionTargetSchema,
-  rejected: stepTransitionTargetSchema
-}).strict();
-const terminalStatuses = ["completed", "blocked", "failed"] as const;
-const executableNodeIdSchema = automationStepIdSchema.refine(
-  (value) => !terminalStatuses.includes(value as (typeof terminalStatuses)[number]),
-  "Executable node id is reserved for a terminal node."
-);
 const nodeVisualBase = {
-  description: optionalAutomationDescriptionSchema,
   nodeStyle: z.enum(loopNodeStyles),
   nodeSize: z.enum(loopNodeSizes)
 };
-const executableStepBase = {
+const workOrValidationNodeBase = {
   ...nodeVisualBase,
-  description: taskDescriptionSchema,
-  id: executableNodeIdSchema,
-  on: stepTransitionsSchema
+  task: taskDescriptionSchema
 };
-const stepExecutionComposition = {
+const executionComposition = {
   executionProfileId: executionProfileIdSchema,
   primaryInstructionId: projectInstructionIdSchema,
   skillIds: z.array(projectSkillIdSchema).refine(
@@ -169,114 +165,89 @@ const stepExecutionComposition = {
     "Skill ids must be unique."
   )
 };
-const calendarDateSchema = z.string().refine(isCalendarDate, "Expected a valid date in YYYY-MM-DD format.");
-const clockTimeSchema = z.string().regex(clockTimePattern, "Expected a valid time in HH:mm format.");
-const timeZoneSchema = z.string().min(1).refine(isIanaTimeZone, "Expected a valid IANA time zone.");
-const scheduleBase = {
-  time: clockTimeSchema,
-  timeZone: timeZoneSchema
-};
-const recurringScheduleBase = {
-  ...scheduleBase,
-  kind: z.literal("recurring"),
-  startsOn: calendarDateSchema
-};
-const scheduleWeekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
-const recurringScheduleSchema = z.discriminatedUnion("cadence", [
-  z.object({ ...recurringScheduleBase, cadence: z.literal("daily") }).strict(),
-  z.object({ ...recurringScheduleBase, cadence: z.literal("weekdays") }).strict(),
+const projectWorkNodeSchema = z.discriminatedUnion("type", [
+  z.object({ ...workOrValidationNodeBase, ...executionComposition, type: z.literal("agent") }).strict(),
+  z.object({ ...workOrValidationNodeBase, type: z.literal("human") }).strict(),
   z.object({
-    ...recurringScheduleBase,
-    cadence: z.literal("weekly"),
-    weekdays: z.array(scheduleWeekdaySchema)
-      .min(1)
-      .refine((days) => new Set(days).size === days.length, "Weekdays must be unique.")
-  }).strict(),
-  z.object({
-    ...recurringScheduleBase,
-    cadence: z.literal("monthly"),
-    dayOfMonth: z.number().int().min(1).max(31)
-  }).strict()
-]);
-export const projectStepScheduleSchema = z.union([
-  z.object({
-    ...scheduleBase,
-    kind: z.literal("once"),
-    date: calendarDateSchema
-  }).strict(),
-  recurringScheduleSchema
-]) satisfies z.ZodType<ProjectStepSchedule>;
-const projectStepSchema = z.discriminatedUnion("type", [
-  z.object({ ...executableStepBase, ...stepExecutionComposition, type: z.literal("agent") }).strict(),
-  z.object({ ...executableStepBase, type: z.literal("human") }).strict(),
-  z.object({
-    ...executableStepBase,
-    ...stepExecutionComposition,
+    ...workOrValidationNodeBase,
+    ...executionComposition,
     type: z.literal("scheduled"),
-    schedule: projectStepScheduleSchema,
+    schedule: projectWorkScheduleSchema
   }).strict()
 ]);
-const completedTerminalNodeSchema = z.object({
-  ...nodeVisualBase,
-  id: z.literal("completed"),
-  type: z.literal("completed")
-}).strict();
-const blockedTerminalNodeSchema = z.object({
-  ...nodeVisualBase,
-  id: z.literal("blocked"),
-  type: z.literal("blocked")
-}).strict();
-const failedTerminalNodeSchema = z.object({
-  ...nodeVisualBase,
-  id: z.literal("failed"),
-  type: z.literal("failed")
-}).strict();
-const projectLoopNodeSchema = z.discriminatedUnion("type", [
-  ...projectStepSchema.options,
-  completedTerminalNodeSchema,
-  blockedTerminalNodeSchema,
-  failedTerminalNodeSchema
+const projectValidationNodeSchema = z.discriminatedUnion("type", [
+  z.object({ ...workOrValidationNodeBase, ...executionComposition, type: z.literal("agent") }).strict(),
+  z.object({ ...workOrValidationNodeBase, type: z.literal("human") }).strict()
 ]);
-
+const projectWorkLoopNodeSchema = z.object({
+  id: automationNodeIdSchema,
+  description: automationDescriptionSchema,
+  work: projectWorkNodeSchema,
+  validation: projectValidationNodeSchema,
+  maxLocalAttempts: z.number().int().min(1).max(maxLocalAttemptsLimit)
+}).strict();
+const nodeEdgeTargetSchema = z.union([
+  z.object({ nodeId: automationNodeIdSchema }).strict(),
+  z.object({ terminal: z.enum(loopTerminals) }).strict()
+]);
+const projectNodeEdgeSchema = z.object({
+  id: automationEdgeIdSchema,
+  source: automationNodeIdSchema,
+  target: nodeEdgeTargetSchema
+}).strict();
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
+  z.string(),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+  z.array(jsonValueSchema),
+  z.record(z.string(), jsonValueSchema)
+]));
+const stateInitialSchema = jsonValueSchema.refine((value) =>
+  new TextEncoder().encode(JSON.stringify(value)).byteLength <= maxProjectStateBytes,
+`Initial Loop state must not exceed ${maxProjectStateBytes} bytes.`);
 const projectLoopSchema = z.object({
   id: kebabLoopIdSchema,
-  start: automationStepIdSchema,
-  nodes: z.array(projectLoopNodeSchema).min(4)
-}).strict().superRefine((loop, context) => {
-  const seenNodeIds = new Set<string>();
-  loop.nodes.forEach((node, nodeIndex) => {
-    if (seenNodeIds.has(node.id)) context.addIssue({
-      code: "custom",
-      path: ["nodes", nodeIndex, "id"],
-      message: `Duplicate node id: ${node.id}.`
-    });
-    seenNodeIds.add(node.id);
-  });
-  terminalStatuses.forEach((status) => {
-    const count = loop.nodes.filter((node) => node.type === status).length;
-    if (count !== 1) context.addIssue({
-      code: "custom",
-      path: ["nodes"],
-      message: `Loop must contain exactly one ${status} terminal node.`
-    });
-  });
-  const startNode = loop.nodes.find((node) => node.id === loop.start);
-  if (!startNode || terminalStatuses.includes(startNode.type as (typeof terminalStatuses)[number])) context.addIssue({
-    code: "custom",
-    path: ["start"],
-    message: "Loop start must reference an executable node."
-  });
-});
+  description: automationDescriptionSchema,
+  state: z.object({
+    description: automationDescriptionSchema,
+    initial: stateInitialSchema
+  }).strict(),
+  startNodeId: automationNodeIdSchema,
+  nodes: z.array(projectWorkLoopNodeSchema).min(1),
+  edges: z.array(projectNodeEdgeSchema)
+}).strict();
+const orchestratorComposition = {
+  executionProfileId: z.union([z.literal(""), executionProfileIdSchema]),
+  primaryInstructionId: z.union([z.literal(""), projectInstructionIdSchema]),
+  skillIds: executionComposition.skillIds
+};
+const orchestratorSchema = z.object({
+  ...orchestratorComposition,
+  maxRepairDepth: z.number().int().min(0).max(maxRepairDepthLimit),
+  maxRepairAttempts: z.number().int().min(1).max(maxRepairAttemptsLimit)
+}).strict();
+const projectLoopEdgeSchema = z.object({
+  id: automationEdgeIdSchema,
+  source: kebabLoopIdSchema,
+  target: kebabLoopIdSchema,
+  kind: z.enum(["flow", "repair"]),
+  description: automationDescriptionSchema
+}).strict();
 
 export const automationConfigSchema = z.object({
-  version: z.literal(9),
-  loops: z.array(projectLoopSchema)
+  version: z.literal(10),
+  orchestrator: orchestratorSchema,
+  loops: z.array(projectLoopSchema),
+  loopEdges: z.array(projectLoopEdgeSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(9),
+  version: z.literal(10),
   executionProfiles: z.array(executionProfileSchema),
-  loops: z.array(projectLoopSchema)
+  orchestrator: orchestratorSchema,
+  loops: z.array(projectLoopSchema),
+  loopEdges: z.array(projectLoopEdgeSchema)
 }).strict().superRefine((config, context) => {
   const loopIds = new Set<string>();
   config.loops.forEach((loop, loopIndex) => {
@@ -296,12 +267,45 @@ export const projectConfigSchema = z.object({
     });
     profileIds.add(profile.id);
   });
-  config.loops.forEach((loop, loopIndex) => loop.nodes.forEach((node, nodeIndex) => {
-    if (node.type !== "agent" && node.type !== "scheduled") return;
-    if (!profileIds.has(node.executionProfileId)) context.addIssue({
-      code: "custom",
-      path: ["loops", loopIndex, "nodes", nodeIndex, "executionProfileId"],
-      message: `Step references unknown execution profile: ${node.executionProfileId}.`
+  if (config.orchestrator.executionProfileId && !profileIds.has(config.orchestrator.executionProfileId)) context.addIssue({
+    code: "custom",
+    path: ["orchestrator", "executionProfileId"],
+    message: `Orchestrator references unknown execution profile: ${config.orchestrator.executionProfileId}.`
+  });
+  const nodeIds = new Set<string>();
+  const edgeIds = new Set<string>();
+  config.loops.forEach((loop, loopIndex) => {
+    loop.nodes.forEach((node, nodeIndex) => {
+      if (nodeIds.has(node.id)) context.addIssue({
+        code: "custom",
+        path: ["loops", loopIndex, "nodes", nodeIndex, "id"],
+        message: `Duplicate node id: ${node.id}.`
+      });
+      nodeIds.add(node.id);
+      for (const [partName, part] of [["work", node.work], ["validation", node.validation]] as const) {
+        if (part.type === "human" || profileIds.has(part.executionProfileId)) continue;
+        context.addIssue({
+          code: "custom",
+          path: ["loops", loopIndex, "nodes", nodeIndex, partName, "executionProfileId"],
+          message: `${partName === "work" ? "Work" : "Validation"} Node references unknown execution profile: ${part.executionProfileId}.`
+        });
+      }
     });
-  }));
+    loop.edges.forEach((edge, edgeIndex) => {
+      if (edgeIds.has(edge.id)) context.addIssue({
+        code: "custom",
+        path: ["loops", loopIndex, "edges", edgeIndex, "id"],
+        message: `Duplicate edge id: ${edge.id}.`
+      });
+      edgeIds.add(edge.id);
+    });
+  });
+  config.loopEdges.forEach((edge, edgeIndex) => {
+    if (edgeIds.has(edge.id)) context.addIssue({
+      code: "custom",
+      path: ["loopEdges", edgeIndex, "id"],
+      message: `Duplicate edge id: ${edge.id}.`
+    });
+    edgeIds.add(edge.id);
+  });
 }) satisfies z.ZodType<ProjectConfiguration>;

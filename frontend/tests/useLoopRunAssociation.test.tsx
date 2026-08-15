@@ -2,13 +2,13 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   defaultLoopTheme,
-  defaultTerminalNodes,
   type LoopRunDetails,
   type ProjectLoop,
   type RootRunDetail,
   type RunTarget
 } from "@shared/api/workspace-contracts";
 import { useLoopRun } from "../src/workspace/automation/loops/useLoopRun";
+import { v10Loop } from "./v10Fixtures";
 
 const now = "2026-07-19T10:00:00.000Z";
 const loopId = "archived-loop";
@@ -52,18 +52,7 @@ describe("Loop Run association", () => {
 });
 
 function rootRun(rootRunId: string): RootRunDetail {
-  const snapshot: ProjectLoop = {
-    id: loopId,
-    start: "approval",
-    nodes: [{
-      id: "approval",
-      type: "human",
-      nodeStyle: "luna",
-      nodeSize: "tiny",
-      description: "Approve the captured Run.",
-      on: { approved: "completed", rejected: "failed" }
-    }, ...defaultTerminalNodes()]
-  };
+  const snapshot: ProjectLoop = v10Loop(loopId);
   const run: LoopRunDetails = {
     runId: `loop-${rootRunId}`,
     loopId,

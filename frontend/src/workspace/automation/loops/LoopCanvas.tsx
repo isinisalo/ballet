@@ -6,8 +6,7 @@ import {
   type LoopRunDetails,
   type LoopTheme,
   type ProjectAutomationConfig,
-  type ProjectLoop,
-  type ProjectStepTransitionId
+  type ProjectLoop
 } from "@shared/api/workspace-contracts";
 import { LoopCanvasSurface } from "./LoopCanvasSurface";
 import { calculateCompositeLoopCanvasLayout } from "./loopLayout";
@@ -42,7 +41,7 @@ export function LoopCanvas({
   canvasControls?: ReactNode;
   onAddFirstStep?: () => void;
   onStepSelect?: (stepId: string) => void;
-  onTransitionSelect?: (stepId: string, result: ProjectStepTransitionId) => void;
+  onTransitionSelect?: (nodeId: string, edgeId: string) => void;
   onReorderStep?: (fromIndex: number, toIndex: number) => void;
 }) {
   const theme = run?.themeSnapshot ?? themeOverride ?? defaultLoopTheme;
@@ -72,7 +71,7 @@ export function LoopCanvas({
     const index = edge.route?.sourceStepIndex;
     const result = edge.route?.outputId;
     const node = index === undefined ? undefined : loop.nodes[index];
-    if (node && (node.type === "agent" || node.type === "human" || node.type === "scheduled") && (result === "approved" || result === "rejected")) {
+    if (node && result === "ok") {
       onTransitionSelect?.(node.id, result);
     }
   };
@@ -92,7 +91,7 @@ export function LoopCanvas({
         canvasHeight={interaction.canvasHeight}
         isCanvasPanning={interaction.isCanvasPanning}
         loopCanvasRef={interaction.loopCanvasRef}
-        canAddFirstStep={!readOnly && !loop.nodes.some((node) => node.type === "agent" || node.type === "human" || node.type === "scheduled") && Boolean(onAddFirstStep)}
+        canAddFirstStep={!readOnly && loop.nodes.length === 0 && Boolean(onAddFirstStep)}
         onStepPointerDown={interaction.handleStepPointerDown}
         onStepPointerMove={interaction.handleStepPointerMove}
         onStepPointerUp={interaction.handleStepPointerUp}

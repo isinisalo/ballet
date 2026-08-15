@@ -1,15 +1,11 @@
-import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
-import { isProjectExecutionStep } from "../../shared/domain/automation.js";
-import type { ExecutionSpec, ExecutionTask, LoopRunDetails, StepRun } from "../../shared/domain/runtime.js";
+import type { ExecutionTask } from "../../shared/domain/runtime.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
-import { composeExecutionPrompt, runtimeForStep } from "../execution/ExecutionComposition.js";
 import type { LocalWorkspaceManager } from "../execution/git/LocalWorkspaceManager.js";
-import { renderStepTaskEnvelope } from "../integration/LoopStepPrompt.js";
 import type { RuntimeDatabase } from "../runtime-db.js";
-import { LoopRunIntegrityError } from "../runtime/LoopRunErrors.js";
-import { failedStepOutcome } from "../runtime/LoopRunTransitionPolicy.js";
+import { WorkLoopRuntimeUnavailableError } from "../runtime/LoopRunErrors.js";
+import { failedRuntimeOutcome } from "../runtime/RuntimeOutcomes.js";
 import type { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import type { RootRunStore, StoredRootRun } from "./RootRunStore.js";
 import { isActiveRootStatus } from "./RunReadProjection.js";
@@ -28,47 +24,21 @@ export interface RootRunExecutionCoordinatorOptions {
 type TerminalStatus = "completed" | "blocked" | "failed" | "cancelled";
 type RootTerminalization = {
   status: "failed";
-  outcome: ReturnType<typeof failedStepOutcome>;
+  outcome: ReturnType<typeof failedRuntimeOutcome>;
   error: string;
 } | { status: "cancelled" };
-
-interface PendingExecutionPlan {
-  root: StoredRootRun;
-  run: LoopRunDetails;
-  stepRun: StepRun;
-  runtime: ReturnType<typeof runtimeForStep>;
-  evidence: ReturnType<typeof composeExecutionPrompt>;
-}
 
 export class RootRunExecutionCoordinator {
   constructor(private readonly options: RootRunExecutionCoordinatorOptions) {}
 
-  async enqueuePending(rootRunId: string): Promise<void> {
-    const plan = this.pendingExecutionPlan(rootRunId);
-    if (!plan) return;
-    const { root, run, stepRun, runtime, evidence } = plan;
-    const taskId = randomUUID();
-    const spec: ExecutionSpec = {
-      version: 2,
-      taskId,
-      kind: "loop_step",
-      rootRunId,
-      loopRunId: run.runId,
-      stepRunId: stepRun.stepRunId,
-      evidence,
-      runtime,
-      project: root.executionSnapshot.project,
-      createdAt: new Date().toISOString()
-    };
-    this.options.connection().transaction(() => {
-      this.options.executions.create(spec);
-      this.options.database.bindStepExecution(stepRun.stepRunId, taskId, runtime);
-    })();
-    this.options.queue.wake(runtime.provider);
+  async enqueuePending(_rootRunId: string): Promise<void> {
+    void _rootRunId;
+    throw new WorkLoopRuntimeUnavailableError();
   }
 
-  preflightPending(rootRunId: string): void {
-    this.pendingExecutionPlan(rootRunId);
+  preflightPending(_rootRunId: string): void {
+    void _rootRunId;
+    throw new WorkLoopRuntimeUnavailableError();
   }
 
   async sync(rootRunId: string): Promise<void> {
@@ -114,24 +84,8 @@ export class RootRunExecutionCoordinator {
   }
 
   handleStarted(task: ExecutionTask): boolean {
-    const accepted = this.options.connection().transaction(() => {
-      const persisted = this.options.executions.get(task.id);
-      if (persisted?.status !== "running" || !this.options.database.isExecutionStepRunnable(
-        task.rootRunId,
-        task.spec.stepRunId,
-        task.id
-      )) {
-        if (persisted && ["queued", "running"].includes(persisted.status)) {
-          this.options.executions.requestCancel(task.id);
-        }
-        return false;
-      }
-      this.options.database.markStepRunRunning(task.spec.stepRunId);
-      this.options.roots.setStatus(task.rootRunId, "running");
-      return true;
-    })() as boolean;
-    if (accepted) this.changed(task.rootRunId);
-    return accepted;
+    if (["queued", "running"].includes(task.status)) this.options.executions.requestCancel(task.id);
+    return false;
   }
 
   async reconcile(): Promise<void> {
@@ -159,7 +113,7 @@ export class RootRunExecutionCoordinator {
 
   async failRoot(root: StoredRootRun, error: unknown): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
-    const outcome = failedStepOutcome(message);
+    const outcome = failedRuntimeOutcome(message);
     await this.terminalizeRoot(root.rootRunId, { status: "failed", outcome, error: message });
   }
 
@@ -181,34 +135,6 @@ export class RootRunExecutionCoordinator {
 
   private changed(rootRunId: string): void {
     this.options.onChanged?.(rootRunId);
-  }
-
-  private pendingExecutionPlan(rootRunId: string): PendingExecutionPlan | undefined {
-    const root = this.options.roots.require(rootRunId);
-    const runs = this.options.database.listRootLoopRuns(rootRunId);
-    const pending = runs.flatMap((run) => run.stepRuns.map((stepRun) => ({ run, stepRun })))
-      .find(({ run, stepRun }) => run.status === "running" && stepRun.type !== "human"
-        && stepRun.status === "queued" && !stepRun.executionTaskId);
-    if (!pending) return undefined;
-    const loop = root.executionSnapshot.loops.find((candidate) => candidate.id === pending.run.loopId);
-    const step = loop?.nodes.find((candidate) => candidate.id === pending.stepRun.stepId);
-    if (!step || !isProjectExecutionStep(step) || step.type !== pending.stepRun.type) {
-      throw new LoopRunIntegrityError(
-        `Execution composition is missing from Root snapshot for ${pending.run.loopId}:${pending.stepRun.stepId}.`
-      );
-    }
-    return {
-      root,
-      run: pending.run,
-      stepRun: pending.stepRun,
-      runtime: runtimeForStep(root.executionSnapshot, step.executionProfileId),
-      evidence: composeExecutionPrompt(
-        root.executionSnapshot,
-        pending.run.loopId,
-        step.id,
-        renderStepTaskEnvelope(root.executionSnapshot, runs, pending.run, pending.stepRun)
-      )
-    };
   }
 
   private async terminalizeRoot(rootRunId: string, detail: RootTerminalization): Promise<void> {
@@ -239,8 +165,8 @@ export class RootRunExecutionCoordinator {
         ? {
             status: "failed",
             outcome: root.outcome?.state === "failed"
-              ? root.outcome as ReturnType<typeof failedStepOutcome>
-              : failedStepOutcome(root.errorMessage ?? "Root Run failed."),
+              ? root.outcome as ReturnType<typeof failedRuntimeOutcome>
+              : failedRuntimeOutcome(root.errorMessage ?? "Root Run failed."),
             error: root.errorMessage ?? "Root Run failed."
           }
         : { status: "cancelled" };

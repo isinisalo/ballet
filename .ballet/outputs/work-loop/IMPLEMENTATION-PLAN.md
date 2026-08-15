@@ -1,6 +1,6 @@
 # Work Loop v10 — migraatio- ja toteutussuunnitelma
 
-Tila: toteutusta ohjaava suunnitelma. Runtime-, domain-, persistence-, API- tai UI-koodia ei ole muutettu tämän dokumenttivaiheen yhteydessä.
+Tila: vaihe 1 (v10-domain, strict config ja graph-invariantit) on toteutettu. Vaiheet 2–8 ovat vielä toteutussuunnitelmaa; v10-runtime on siihen asti tarkoituksella fail-closed.
 
 Päätöslähde: [ADR-015 — Work Loop, revisioitu State ja Loop Orchestrator](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md).
 
@@ -93,26 +93,28 @@ Nykyisen v9-käyttäytymisen tärkeimmät testiryhmät ovat:
 
 Tavoite: määritellä yksi kanoninen Work Loop -authoring-malli ja strict-v10-reader ilman runtime-semantiikan kopioita.
 
+Tila: toteutettu tässä vaiheessa. Runtime-persistenssiä tai Work Loop -tilakonetta ei ole toteutettu.
+
 | Alue | Vaikutus |
 | --- | --- |
-| Domain | Korvaa `shared/domain/automation.ts`-tiedoston Step/terminal-tyypit `Loop`, `WorkLoop`, `WorkLoopNode`, `WorkNode`, `ValidationNode`, `Edge`, `LoopEdge`, `NodeExecutor` ja Loop-tason schedule -tyypeillä. Lisää JSON/State/StatePatch-, WorkOutcome-, ValidationOutcome- ja RepairRequest-sopimukset tarkoituksenmukaisiin `shared/domain`-moduuleihin. `ExecutionProfile` säilyy. |
-| Backend | Kirjoita `validateAutomationConfig` uudelleen tarkistamaan entry, node/edge-referenssit, reachable-nodet, FLOW/REPAIR-endpointit, self-routing, outgoing cardinality ja execution-resource-viitteet. Repositoryn `load` hyväksyy vain version 10 ja antaa versiosta 9 täsmällisen `invalid_schema`-virheen. |
+| Domain | Korvaa `shared/domain/automation.ts`-tiedoston Step/terminal-node-tyypit `ProjectLoop`, `ProjectWorkLoopNode`, `ProjectWorkNode`, `ProjectValidationNode`, `ProjectNodeEdge`, `ProjectLoopEdge`, `ProjectLoopOrchestrator` ja Work Node -schedule-tyypeillä. Lisää authoring Staten `JsonValue`-tyyppi; StatePatch-, WorkOutcome-, ValidationOutcome- ja RepairRequest-runtime-sopimukset lisätään vaiheissa 2–3. `ExecutionProfile` säilyy. |
+| Backend | Kirjoita `validateAutomationConfig` uudelleen tarkistamaan `startNodeId`, node/edge-referenssit, reachable-nodet ja terminal target, `flow | repair` -endpointit, self-routing, outgoing cardinality, scheduled-rajoitus ja execution-resource-viitteet. Repositoryn `load` hyväksyy vain version 10 ja antaa versiosta 9 täsmällisen `invalid_schema`-virheen. |
 | Persistence | Ei vielä muuta runtime-tauluja. Määritä persistence-DTO:t ja schema version 4 -taulujen sarakkeet vaihetta 2 varten. |
 | API | `automationConfigSchema` ja `/api/automation` käyttävät v10-shapea. Unknown/v9-kentät hylätään. API:n error payload säilyttää `invalid_schema`, pathin ja tarkan viestin. |
 | Frontend | Päivitä contract-barrel ja draft-validointi kääntymään v10-tyypeillä. Täysi editori tehdään vaiheessa 6; väliaikainen pinta saa vain näyttää validin v10-datan read-onlyna tai explicit unsupported-editor-statea, ei luoda v9-dataa. |
-| Fixturet | Lisää pienet geneeriset v10-schema-fixturet: normaali chain, local self-cycle, FLOW-self-edge, REPAIR-self-edge, nested repair ja invalidit endpointit. Älä vielä muuta tracked Ballet-workflow'ta ilman hyväksyttyä mappingia. |
+| Fixturet | Muunna `.fixture-ballet-project/.ballet/project.json` strict-v10:een. Lisää pienet geneeriset v10-schema-fixturet: normaali chain, local self-cycle, flow-self-edge, repair-self-edge ja invalidit endpointit. Älä vielä muuta repositoryn tracked `.ballet/project.json`-workflow'ta ilman hyväksyttyä mappingia. |
 | Testit | Uudet schema/unit-testit kaikille strict-kentille, ID:ille, description-rajoille, executor-unioneille, duplicate/reachable/cardinality-invarianteille ja v9 hard-cut -virheelle. Poista testeistä oletus, että terminaleja on aina kolme. |
 | Dokumentaatio | Lisää v10 data model -dokumentti tarvittaessa tämän ADR:n pohjalta. README ja DESIGN päivitetään vasta cutoverissa, jotta ne eivät väitä puolivalmista runtimea valmiiksi. |
 
 Toteutusjärjestys:
 
-1. Erota JSON-arvot ja patch-tyypit automaatiograafista.
-2. Määritä `NodeExecutor` strict discriminated unionina; human-executor kieltää profile/resource-kentät.
+1. Erota JSON-arvot ja myöhemmin toteutettavat patch-tyypit automaatiograafista.
+2. Määritä Work ja Validation strict discriminated unioneina; human-tyyppi kieltää profile/resource-kentät ja scheduled kuuluu vain Work-unioniin.
 3. Määritä Work ja Validation erillisiksi tyypeiksi, vaikka niiden executor-rakenne on yhteinen.
-4. Määritä `LoopEdge` role-discriminated unionina niin, että REPAIR-source vaatii `workLoopNodeId`-kentän ja FLOW-source kieltää sen.
+4. Määritä `ProjectLoopEdge` vakaalla ID:llä, source/target Loop -ID:illä, non-empty descriptionilla ja `flow | repair` -kindillä. Repair-edget muodostavat source-Loop-kohtaisen Orchestrator-allowlistin.
 5. Toteuta rakenteellinen Zod-validointi ennen semanttista graph-validointia.
 6. Normalisoi vain set-semanttiset `skillIds` ja ExecutionProfile-järjestys; älä muuta käyttäjän Loop/node/edge-järjestystä hiljaisesti.
-7. Testaa, että `version: 9`, `start`, Step `type`, `on`, terminal nodet sekä v10:n unknown kentät hylätään.
+7. Testaa, että `version: 9`, Loop `start`, sekalaiset Step/terminal-nodet, Step `on` sekä v10:n unknown kentät hylätään. Edgen eksplisiittinen `{ terminal }`-target on v10-dataa eikä terminal node.
 
 Vaiheen portti:
 
@@ -210,7 +212,7 @@ Tavoite: korvata `LoopRunEngine` yhdellä durablella Work Loop -tilakoneella.
 | Domain | Viimeistele Root/Invocation/Node/Frame-statusyhdistelmät ja event kindit. Poista `StepRunResult`, `approved/rejected` ja Step-pohjaiset transition-tyypit runtime-sopimuksista. |
 | Backend | Toteuta `LoopOrchestrator`, snapshot resolver ja transaction commandit jokaiselle ADR:n control-flow-taulukon riville. Päivitä `RootRunExecutionCoordinator` enqueue-, terminal-, reconciliation-, cancellation- ja finalization-polut Node Runeille. Poista `LoopRunEngine` ja sen v9-helperit. |
 | Persistence | Käytä vaiheen 2 storeja. Pakota yksi aktiivinen Root-cursor, LIFO-framet, idempotent terminal-task integration, revision/transition counters ja 3/8/256 safety limitit. |
-| API | Root Run start hyväksyy `initialState`-JSON-objectin vanhan vapaan `input`-stringin sijaan. Human Work/Validation response validoidaan roolikohtaisella skeemalla. |
+| API | Root Run start käyttää valitun Root Loopin snapshotoitua `state.initial`-JSON-arvoa revision 0:aan. Human Work/Validation response validoidaan roolikohtaisella skeemalla. |
 | Frontend | Vain compile/read-model-adaptaatio; täysi control UI vaiheessa 7. Start-form voi tarjota validoidun JSON State -editorin ilman visuaalista graph-refaktorointia. |
 | Fixturet | Runtime graph fixturet kattavat chainin, local retryn, repair call/returnin, nested/self repairin, FLOW-self-cyclen, target failuret ja root cancellationin. |
 | Testit | Jokainen control-flow-taulukon tapahtuma unit- ja persistence-testinä; forced transaction failure; local retry/depth/transition exact boundary; task/cancel race; queued/running restart; child return Validationiin; finalization kerran. |
@@ -218,7 +220,7 @@ Tavoite: korvata `LoopRunEngine` yhdellä durablella Work Loop -tilakoneella.
 
 Toteutuksen command-rajat:
 
-- `startRootRun(rootLoopId, initialState)` luo Rootin, revision 0:n, root invocationin ja entry Work Node Runin yhdessä transaktiossa.
+- `startRootRun(rootLoopId)` luo Rootin, Loopin `state.initial`-arvoon perustuvan revision 0:n, root invocationin ja start Work Node Runin yhdessä transaktiossa.
 - `commitWorkOutcome(nodeRunId, taskId, outcome)` validoi/persistoi patchin ja siirtää Validationiin.
 - `commitValidationOutcome(nodeRunId, taskId, outcome)` seuraa OK-edgeä tai luo local/external Repair Requestin.
 - `completeLoopInvocation(invocationId)` valitsee järjestyksessä repair returnin, FLOW-LoopEdgen tai Root completionin.
@@ -243,7 +245,7 @@ Tavoite: julkaista yksi v10 DTO-malli Configurelle ja Runille ilman Step compati
 | Alue | Vaikutus |
 | --- | --- |
 | Domain | `RootRunCurrentPosition` käyttää invocation-, Work Loop Node-, node role-, Node Run-, task-, revision-, request- ja frame-ID:tä. Root detail sisältää Staten/revisiot, invocationit, node-ajot, framet, route-eventit ja taskit. |
-| Backend | Korvaa `RunReadProjection` v10-projektiolla. WorkspaceData palauttaa Work Loop -configin ja Loop-tasoisen schedule-tilan. SSE-invalidation pysyy refresh-signaalina; console SSE pysyy task-kohtaisena. |
+| Backend | Korvaa `RunReadProjection` v10-projektiolla. WorkspaceData palauttaa Work Loop -configin ja Scheduled Work Node -kohtaisen schedule-tilan. SSE-invalidation pysyy refresh-signaalina; console SSE pysyy task-kohtaisena. |
 | Persistence | Read queryt käyttävät root-owned orderingia ja control-flow sequenceä; N+1-kyselyt rajataan prepared queryillä. State-revision-listaus voi palauttaa metadatan ja valitun revision Staten erikseen, jos payload-koko sitä vaatii. |
 | API | Säilytä `POST/GET /api/runs`, `GET /api/runs/:rootRunId` ja root cancel. Korvaa `/steps/:stepRunId/respond` reitillä `/nodes/:nodeRunId/respond`; älä jätä aliasia. Lisää tarvittaessa revision/detail-read-reitti, mutta älä tarjoa State-mutaatiota orchestration-transaktion ohi. |
 | Frontend | Päivitä `runApi.ts`, query keyt, invalidationit ja Root association v10-ID:ille. Älä päättele aktiivista nodea taulukon viimeisestä rivistä, vaan käytä serverin current-position-projektiota. |
@@ -287,8 +289,8 @@ Configure-projektion säännöt:
 2. Kiinteät invarianttiedget renderöidään mutta niitä ei voi poistaa tai retargetoida.
 3. Käyttäjän `Edge` on muokattava saman Loopin yhteys.
 4. FLOW- ja REPAIR-LoopEdget erotetaan semanttisesti nykyisen Loop theme -järjestelmän sisällä, ei ad hoc -väreillä.
-5. REPAIR-edge näyttää source Validation Noden ja target Loopin.
-6. Terminal nodeja tai ghost-terminaleja ei projisoida.
+5. Repair-edge näyttää source Loopin allowlist-yhteyden target Loopiin; aktiivisen Repair Requestin source Validation Node näytetään vasta Run-projektiossa.
+6. Terminal target voidaan projisoida selitteeksi tai Loop boundaryksi, mutta sitä ei authoroida Work Loop Noden kaltaisena terminal nodena.
 7. Loop description on editorin required-kenttä ja näkyy All Loops -yhteenvedossa.
 
 Vaiheen portti:
@@ -355,14 +357,14 @@ Tracked-data-konversio on reviewattava repository-edit, ei runtime-migraatio. En
 | Loop `id` | WorkLoop `id` | Säilytä identity, ellei explicit rename ole hyväksytty. |
 | Puuttuva Loop description | WorkLoop `description` | Kirjoita project-local tarkoitus; sitä ei johdeta platform-oletuksesta. |
 | Agent/Human/Scheduled Step | WorkLoopNode ja sen Work/Validation executorit | Päätä kumpi tekee työn ja kumpi validoi; tätä ei voi päätellä turvallisesti automaattisesti. |
-| Scheduled Step schedule | WorkLoop `schedule` | Varmista, että scheduled Step oli entry ja säilytä occurrence-semanttiikka. |
-| `approved` paikalliseen nodeen | `Edge` tai Work Loop completion | Varmista normaali OK-flow. |
+| Scheduled Step schedule | Scheduled Work Node `schedule` | Varmista, että scheduled Work Node on `startNodeId`-nodessa ja säilytä occurrence-semanttiikka. |
+| `approved` paikalliseen nodeen | `ProjectNodeEdge.target.nodeId` | Varmista normaali OK-flow. |
 | `rejected` takaisin sourceen | `LOCAL_RETRY`-semantiikka | Kirjaa Validation-taskiin repair-kriteeri; edgeä ei authoroida. |
-| `rejected` toiseen korjauspolkuun/Loopiin | REPAIR-LoopEdge | Nimeä exact source Validation Node ja target Loop. |
-| Cross-Loop approved | FLOW-LoopEdge | Varmista tail-flow eikä call/return. |
-| `completed`/`blocked`/`failed` terminal | Ei nodea | Completion tulee edgejen puuttumisesta; blocked/failed ovat outcome/runtime-statuksia. |
+| `rejected` toiseen korjauspolkuun/Loopiin | `repair`-LoopEdge | Nimeä source- ja target-Loop; ValidationOutcome valitsee exact edge-ID:n. |
+| Cross-Loop approved | `flow`-LoopEdge | Varmista tail-flow eikä call/return. |
+| `completed`/`blocked`/`failed` terminal | `ProjectNodeEdge.target.terminal` | Terminal on strict edge-target-arvo, ei authoroitava node. |
 | Step appearance | Work/Validation appearance | Valitse kumpaan tai molempiin nykyinen artwork kuuluu; ei silent duplicatea. |
-| Step composition | Work/Validation NodeExecutor | Säilytä ExecutionProfile/resource-viitteet vain päätetyllä executorilla. |
+| Step composition | Work/Validation execution composition | Säilytä ExecutionProfile/resource-viitteet vain providerilla suoritettavassa sisäisessä nodessa. |
 
 Vaiheen portti:
 
@@ -477,7 +479,7 @@ Frontend/helperit ja komponentit joko poistetaan tai nimetään sekä kirjoiteta
 - request `{ kind: "human", result: "approved" | "rejected", input }`;
 - Step-target/terminal-editorit ja Approved/Rejected-edge-labelit;
 - Run DTO:n `stepRuns`, `result`, Step composition -nimet ja transition animaatio resultista;
-- Scheduled Step node type; schedule siirtyy Loopille; ja
+- Scheduled Step node type; schedule säilyy vain start Work Noden `scheduled`-variantissa; ja
 - README/DESIGN-copy, joka väittää v9:n olevan current strict config.
 
 ### Poistettavat tai korvattavat testit/fixture-oletukset
@@ -496,19 +498,19 @@ Frontend/helperit ja komponentit joko poistetaan tai nimetään sekä kirjoiteta
 
 ### Config ja graph
 
-- validi minimi-WorkLoop yhdellä WorkLoopNodella ja ilman edgejä;
+- validi minimi-WorkLoop yhdellä WorkLoopNodella ja yhdellä terminal-target Edgellä;
 - required Loop/WorkLoopNode description;
 - invalidi entry, unknown node/Loop/ExecutionProfile/resource;
 - duplicate ID:t kaikilla scopeilla;
-- internal Edge same-Loop-only ja enintään yksi outgoing;
-- FLOW/REPAIR source/target union ja enintään yksi FLOW outgoing;
+- internal Edge same-Loop-only ja täsmälleen yksi outgoing per WorkLoopNode;
+- `flow | repair` LoopEdge source/target -validointi ja enintään yksi flow outgoing;
 - self-edge, same-Loop FLOW ja same-Loop REPAIR;
 - cyclic reachability ilman parser/traversal-loopia;
 - v9 exact invalid schema -virhe ja lähdetiedoston muuttumattomuus.
 
 ### State ja patch
 
-- revision 0 `{}` ja non-empty initialState;
+- revision 0 valitun Root Loopin `state.initial`-JSON-arvosta;
 - add/remove/replace ja sequential operation semantics;
 - exact 256 KiB State, exact 64 KiB patch, 128 operations ja depth 64;
 - jokaiseen rajaan yksi yli;

@@ -1,5 +1,5 @@
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
-import { getProjectStepTransitionTargets } from "@shared/api/workspace-contracts";
+import { getProjectLoopEdges } from "@shared/api/workspace-contracts";
 import { ArrowRight, Bot, CalendarClock, PanelTopOpen, ShieldCheck } from "lucide-react";
 import { CollectionCardGrid, DeleteAction } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
@@ -23,11 +23,10 @@ export function AllLoopsCanvas({
   return (
     <CollectionCardGrid label="All loops" addLabel="Add loop" addAriaLabel="+ Add loop" onAdd={onAddLoop}>
       {config.loops.map((loop) => {
-        const humanSteps = loop.nodes.filter((step) => step.type === "human").length;
-        const agentSteps = loop.nodes.filter((step) => step.type === "agent").length;
-        const scheduledSteps = loop.nodes.filter((step) => step.type === "scheduled").length;
-        const nextLoops = new Set(loop.nodes.flatMap((node) => node.type === "agent" || node.type === "human" || node.type === "scheduled" ? getProjectStepTransitionTargets(node) : [])
-          .flatMap((target) => typeof target === "object" && "loop" in target ? [target.loop] : []));
+        const humanNodes = loop.nodes.filter((node) => node.work.type === "human" || node.validation.type === "human").length;
+        const agentNodes = loop.nodes.filter((node) => node.work.type === "agent" || node.validation.type === "agent").length;
+        const scheduledNodes = loop.nodes.filter((node) => node.work.type === "scheduled").length;
+        const nextLoops = new Set(getProjectLoopEdges(config, loop.id).map((edge) => edge.target));
         const loopLocked = disabled || lockedLoopIds?.has(loop.id) === true;
         return (
           <article
@@ -40,10 +39,10 @@ export function AllLoopsCanvas({
                 <span className="truncate">{loop.id}</span>
               </div>
               <span className="grid grid-cols-3 gap-2 font-mono text-[0.65rem] text-muted-foreground">
-                <span className="flex items-center gap-1"><Bot className="size-3" /> {agentSteps} agent</span>
-                <span className="flex items-center gap-1"><ShieldCheck className="size-3" /> {humanSteps} human</span>
-                <span className="flex items-center gap-1"><CalendarClock className="size-3" /> {scheduledSteps} scheduled</span>
-                <span className="col-span-3">start: {loop.start}</span>
+                <span className="flex items-center gap-1"><Bot className="size-3" /> {agentNodes} agent</span>
+                <span className="flex items-center gap-1"><ShieldCheck className="size-3" /> {humanNodes} human</span>
+                <span className="flex items-center gap-1"><CalendarClock className="size-3" /> {scheduledNodes} scheduled</span>
+                <span className="col-span-3">start: {loop.startNodeId}</span>
               </span>
               {nextLoops.size > 0 ? <span className="flex items-center gap-1 truncate font-mono text-[0.65rem] text-secondary"><ArrowRight className="size-3" /> {[...nextLoops].join(", ")}</span> : null}
             </div>

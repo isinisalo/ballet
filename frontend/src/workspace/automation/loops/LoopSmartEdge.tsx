@@ -65,19 +65,18 @@ export function loopEdgeDisplayLabel(
   edge: LoopCanvasEdge | undefined
 ): LoopEdgeDisplayLabel | undefined {
   if (!edge) return undefined;
-  if (edge.label && !["approved", "rejected"].includes(edge.label)) return { value: edge.label, kind: "output" };
+  if (edge.label && edge.label !== "ok") return { value: edge.label, kind: "output" };
   return undefined;
 }
 
 type LoopEdgePaths = ReturnType<typeof loopEdgePaths>;
 
 export function loopEdgeLabelPlacement(
-  { sourceX, sourceY, sourcePosition, targetX, targetY }: EdgeProps<LoopReactFlowEdge>,
+  { sourceX, sourceY, targetX, targetY }: EdgeProps<LoopReactFlowEdge>,
   edgePaths: LoopEdgePaths,
   displayLabel: LoopEdgeDisplayLabel
 ) {
-  if (displayLabel.value === "rejected") return loopRejectedEdgeLabelPlacement({ sourceX, sourceY, sourcePosition }, edgePaths.returnEdgePath);
-
+  void displayLabel;
   const directLabelPath = edgePaths.compactLoopEdgePath ?? edgePaths.returnEdgePath ?? edgePaths.crossLoopEdgePath ?? edgePaths.approvalEdgePath;
   if (directLabelPath) {
     return {

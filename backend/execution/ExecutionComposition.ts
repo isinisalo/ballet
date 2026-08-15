@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { stepOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
+import { isProjectProviderWorkNode } from "../../shared/domain/automation.js";
 import type {
   ExecutionPromptEvidence,
   ExecutionResourceEvidence,
@@ -33,24 +34,25 @@ export const composeExecutionPrompt = (
   taskEnvelope: string
 ): ExecutionPromptEvidence => {
   const loop = snapshot.loops.find((candidate) => candidate.id === loopId);
-  const step = loop?.nodes.find((candidate) => candidate.id === stepId);
-  if (!step || (step.type !== "agent" && step.type !== "scheduled")) {
+  const node = loop?.nodes.find((candidate) => candidate.id === stepId);
+  const work = node?.work;
+  if (!work || !isProjectProviderWorkNode(work)) {
     throw new ExecutionCompositionError(
       "missing_resource",
       `Root execution snapshot has no executable composition for ${loopId}:${stepId}.`
     );
   }
-  const profile = snapshot.executionProfiles.find((candidate) => candidate.id === step.executionProfileId);
+  const profile = snapshot.executionProfiles.find((candidate) => candidate.id === work.executionProfileId);
   if (!profile) {
     throw new ExecutionCompositionError(
       "missing_resource",
-      `Root execution snapshot is missing execution profile ${step.executionProfileId}.`
+      `Root execution snapshot is missing execution profile ${work.executionProfileId}.`
     );
   }
 
   const system = requireResource(snapshot, "system", SYSTEM_EXECUTION_INSTRUCTION_ID);
-  const primary = requireResource(snapshot, "primary", step.primaryInstructionId);
-  const skills = sortedIds(step.skillIds).map((id) => requireResource(snapshot, "skill", id));
+  const primary = requireResource(snapshot, "primary", work.primaryInstructionId);
+  const skills = sortedIds(work.skillIds).map((id) => requireResource(snapshot, "skill", id));
   const outputSchema = JSON.stringify(stepOutcomeJsonSchema);
   const prompt = [
     section("SYSTEM", system.id, system.content),

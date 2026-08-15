@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { defaultTerminalNodes, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
+import type { ProjectAutomationConfig, ProjectExecutionComposition } from "../../shared/domain/automation.js";
 import { validateProjectExecutionResources } from "../automation.js";
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
 import { loadBalletProjectTree } from "../markdown.js";
@@ -30,6 +30,38 @@ const writeSkill = async (root: string, id: string, body = "Skill body.") => {
   await mkdir(directory, { recursive: true });
   await writeFile(path.join(directory, "SKILL.md"), `---\nname: ${id}\ndescription: Test skill\n---\n${body}`, "utf8");
 };
+
+const automationConfig = (composition: ProjectExecutionComposition): ProjectAutomationConfig => ({
+  version: 10,
+  orchestrator: { ...composition, maxRepairDepth: 4, maxRepairAttempts: 3 },
+  loops: [{
+    id: "delivery",
+    description: "Complete and validate the work.",
+    state: { description: "Shared delivery state.", initial: {} },
+    startNodeId: "work",
+    nodes: [{
+      id: "work",
+      description: "Complete the work.",
+      work: {
+        type: "agent",
+        task: "Complete the work.",
+        ...composition,
+        nodeStyle: "terra",
+        nodeSize: "medium"
+      },
+      validation: {
+        type: "agent",
+        task: "Validate the work.",
+        ...composition,
+        nodeStyle: "luna",
+        nodeSize: "small"
+      },
+      maxLocalAttempts: 3
+    }],
+    edges: [{ id: "work-completed", source: "work", target: { terminal: "completed" } }]
+  }],
+  loopEdges: []
+});
 
 describe("project resource catalog", () => {
   it("hashes the exact raw source bytes", async () => {
@@ -128,7 +160,11 @@ describe("project resource catalog safety regressions", () => {
       code: "invalid_utf8",
       relativePath: ".ballet/instructions/broken.md"
     }));
-    expect(validateProjectExecutionResources({ version: 9, loops: [] }, catalog))
+    expect(validateProjectExecutionResources(automationConfig({
+      executionProfileId: "profile",
+      primaryInstructionId: "project:broken",
+      skillIds: []
+    }), catalog))
       .toContainEqual(expect.objectContaining({ path: ".ballet/instructions/broken.md" }));
   });
 
@@ -151,24 +187,11 @@ describe("project resource catalog safety regressions", () => {
     await writeInstruction(root, "primary.md", "id: primary\ntitle: Primary");
     await writeSkill(root, "review");
     const catalog = await loadProjectResources(root);
-    const config: ProjectAutomationConfig = {
-      version: 9,
-      loops: [{
-        id: "delivery",
-        start: "work",
-        nodes: [{
-          id: "work",
-          type: "agent",
-          executionProfileId: "primary",
-          primaryInstructionId: "project:primary",
-          skillIds: ["project:review"],
-          description: "Complete the work.",
-          nodeStyle: "terra",
-          nodeSize: "medium",
-          on: { approved: "completed", rejected: "blocked" }
-        }, ...defaultTerminalNodes()]
-      }]
-    };
+    const config = automationConfig({
+      executionProfileId: "primary",
+      primaryInstructionId: "project:primary",
+      skillIds: ["project:review"]
+    });
     const missing = catalog.instructions.find((instruction) => instruction.relativePath.endsWith("missing.md"));
     const tree = await loadBalletProjectTree(root);
     const instructions = tree.find((node) => node.type === "directory" && node.label === "instructions");
@@ -184,35 +207,23 @@ describe("project resource catalog safety regressions", () => {
 });
 
 describe("project resource selection validation", () => {
-  it("reports every missing or invalid selected primary instruction and skill at its Step path", async () => {
+  it("reports every missing or invalid selected primary instruction and skill at its composition path", async () => {
     const root = await projectRoot();
     await writeInstruction(root, "first.md", "id: primary\ntitle: First");
     await writeInstruction(root, "second.md", "id: primary\ntitle: Second");
     await writeSkill(root, "invalid", "");
     const catalog = await loadProjectResources(root);
-    const config: ProjectAutomationConfig = {
-      version: 9,
-      loops: [{
-        id: "delivery",
-        start: "work",
-        nodes: [{
-          id: "work",
-          type: "agent",
-          executionProfileId: "primary",
-          primaryInstructionId: "project:primary",
-          skillIds: ["project:invalid", "project:missing"],
-          description: "Complete the work.",
-          nodeStyle: "terra",
-          nodeSize: "medium",
-          on: { approved: "completed", rejected: "blocked" }
-        }, ...defaultTerminalNodes()]
-      }]
-    };
+    const config = automationConfig({
+      executionProfileId: "primary",
+      primaryInstructionId: "project:primary",
+      skillIds: ["project:invalid", "project:missing"]
+    });
 
     expect(validateProjectExecutionResources(config, catalog)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: "loops.0.nodes.0.primaryInstructionId" }),
-      expect.objectContaining({ path: "loops.0.nodes.0.skillIds.0" }),
-      expect.objectContaining({ path: "loops.0.nodes.0.skillIds.1" }),
+      expect.objectContaining({ path: "loops.0.nodes.0.work.primaryInstructionId" }),
+      expect.objectContaining({ path: "loops.0.nodes.0.work.skillIds.0" }),
+      expect.objectContaining({ path: "loops.0.nodes.0.work.skillIds.1" }),
+      expect.objectContaining({ path: "loops.0.nodes.0.validation.primaryInstructionId" }),
       expect.objectContaining({ path: expect.stringContaining(".ballet/instructions/") }),
       expect.objectContaining({ path: ".agents/skills/invalid/SKILL.md" })
     ]));

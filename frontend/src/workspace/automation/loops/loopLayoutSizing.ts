@@ -1,4 +1,3 @@
-import { loopOutputSlotKindForValues } from "./loopEdgeOutputSlot";
 import { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
 import type { LoopCanvasLayoutNode } from "./loopLayoutTypes";
 
@@ -7,15 +6,13 @@ export function loopCanvasNodeAnchorY(layoutNode: Pick<LoopCanvasLayoutNode, "he
 }
 
 export function loopOutputSourceHandleId(output?: { outputId?: string; eventType?: string } | string) {
-  const outputId = typeof output === "string" ? output : output?.outputId;
-  const eventType = typeof output === "string" ? undefined : output?.eventType;
-  return loopOutputSlotKindForValues(outputId, eventType) === "rework" ? "bottom" : "right";
+  void output;
+  return "right";
 }
 
 export function loopOutputTargetHandleId(output?: { outputId?: string; eventType?: string } | string, fallback = "left") {
-  const outputId = typeof output === "string" ? output : output?.outputId;
-  const eventType = typeof output === "string" ? undefined : output?.eventType;
-  return loopOutputSlotKindForValues(outputId, eventType) === "rework" ? "top" : fallback;
+  void output;
+  return fallback;
 }
 
 export function loopShortestVerticalHandles(sourceNode: LoopCanvasLayoutNode, targetNode: LoopCanvasLayoutNode, preferBottomOnTie: boolean) {

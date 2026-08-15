@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-high-network-off",
@@ -10,47 +10,57 @@
       "networkAccess": false
     }
   ],
+  "orchestrator": {
+    "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
+    "primaryInstructionId": "project:architect",
+    "skillIds": [
+      "project:fixture-skill"
+    ],
+    "maxRepairDepth": 4,
+    "maxRepairAttempts": 3
+  },
   "loops": [
     {
       "id": "adr-review",
-      "start": "run",
+      "description": "Review a project change and validate the review result.",
+      "state": {
+        "description": "Provider-neutral context shared by the review Work Loop.",
+        "initial": {}
+      },
+      "startNodeId": "review",
       "nodes": [
         {
-          "id": "run",
-          "nodeStyle": "terra",
-          "nodeSize": "medium",
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
-          "primaryInstructionId": "project:reviewer",
-          "skillIds": [],
-          "description": "Reviews project changes",
-          "on": {
-            "approved": "completed",
-            "rejected": "failed"
-          }
-        },
+          "id": "review",
+          "description": "Run and validate the project review.",
+          "work": {
+            "type": "agent",
+            "task": "Review the project changes and surface concrete risks.",
+            "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
+            "primaryInstructionId": "project:reviewer",
+            "skillIds": [],
+            "nodeStyle": "terra",
+            "nodeSize": "medium"
+          },
+          "validation": {
+            "type": "agent",
+            "task": "Confirm that the review is complete and actionable.",
+            "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
+            "primaryInstructionId": "project:reviewer",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
+        }
+      ],
+      "edges": [
         {
-          "id": "completed",
-          "type": "completed",
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny"
-        },
-        {
-          "id": "blocked",
-          "type": "blocked",
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny"
-        },
-        {
-          "id": "failed",
-          "type": "failed",
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny"
+          "id": "review-ok",
+          "source": "review",
+          "target": { "terminal": "completed" }
         }
       ]
     }
-  ]
+  ],
+  "loopEdges": []
 }

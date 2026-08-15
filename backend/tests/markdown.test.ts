@@ -69,7 +69,7 @@ describe("Markdown parsing", () => {
 });
 
 describe("Markdown collection loading", () => {
-  it("loads fixture content and its strict v9 project configuration without fallback data", async () => {
+  it("loads fixture content and its strict-v10 project configuration without fallback data", async () => {
     const [data, automation, theme] = await Promise.all([
       loadMarkdownAppData(fixtureRoot),
       loadProjectAutomationConfigWithIssues(fixtureRoot),
@@ -126,17 +126,29 @@ describe("Markdown collection loading", () => {
     expect(data.project.relativePath).toBe(".ballet/project.md");
     expect(automation).toEqual({
       config: {
-        version: 9,
+        version: 10,
+        orchestrator: expect.objectContaining({
+          executionProfileId: "codex-gpt-5-6-luna-high-network-off",
+          primaryInstructionId: "project:architect",
+          skillIds: ["project:fixture-skill"]
+        }),
+        loopEdges: [],
         loops: [expect.objectContaining({
           id: "adr-review",
-          start: "run",
+          startNodeId: "review",
           nodes: expect.arrayContaining([expect.objectContaining({
-            id: "run",
-            type: "agent",
-            executionProfileId: "codex-gpt-5-6-luna-high-network-off",
-            primaryInstructionId: "project:reviewer",
-            skillIds: [],
-            description: "Reviews project changes"
+            id: "review",
+            work: expect.objectContaining({
+              type: "agent",
+              executionProfileId: "codex-gpt-5-6-luna-high-network-off",
+              primaryInstructionId: "project:reviewer",
+              skillIds: []
+            }),
+            validation: expect.objectContaining({
+              type: "agent",
+              executionProfileId: "codex-gpt-5-6-luna-high-network-off",
+              primaryInstructionId: "project:reviewer"
+            })
           })])
         })]
       },

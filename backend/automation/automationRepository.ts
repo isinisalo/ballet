@@ -14,7 +14,12 @@ export const loadProjectAutomationConfigWithIssues = async (
     config: defaultProjectAutomationConfig(),
     issues: loaded.issues.map((issue) => ({ path: issue.path, message: issue.message }))
   };
-  const value = { version: 9 as const, loops: loaded.config.loops };
+  const value: ProjectAutomationConfig = {
+    version: 10,
+    orchestrator: loaded.config.orchestrator,
+    loops: loaded.config.loops,
+    loopEdges: loaded.config.loopEdges
+  };
   const issues = validateProjectAutomationConfig(value, loaded.config.executionProfiles);
   return { config: value, issues };
 };
@@ -44,6 +49,6 @@ export const saveProjectAutomationConfig = async (
     throw new AutomationValidationError("Automation config is invalid.", issues);
   }
 
-  repository.putAutomation(root, config.loops);
+  repository.putAutomation(root, config);
   return config;
 };

@@ -1,21 +1,20 @@
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 
-export type StepOutputSlotKind = "approval" | "rework";
+export type NodeOutputSlotKind = "normal";
 
-const stepOutputSlotKind = (value: string): StepOutputSlotKind | undefined => {
-  if (value === "approved") return "approval";
-  if (value === "rejected") return "rework";
-  return undefined;
+const nodeOutputSlotKind = (value: string): NodeOutputSlotKind | undefined => {
+  if (value === "ok") return "normal";
+  return value.includes("validation.ok") ? "normal" : undefined;
 };
 
-export function loopOutputSlotKindForValues(...values: Array<string | undefined>): StepOutputSlotKind | undefined {
+export function loopOutputSlotKindForValues(...values: Array<string | undefined>): NodeOutputSlotKind | undefined {
   for (const value of values) {
     if (!value) continue;
-    const directKind = stepOutputSlotKind(value);
+    const directKind = nodeOutputSlotKind(value);
     if (directKind) return directKind;
     const separatorIndex = value.lastIndexOf(".");
     const eventOutputId = separatorIndex >= 0 ? value.slice(separatorIndex + 1) : "";
-    const eventKind = stepOutputSlotKind(eventOutputId);
+    const eventKind = nodeOutputSlotKind(eventOutputId);
     if (eventKind) return eventKind;
   }
   return undefined;
@@ -23,6 +22,6 @@ export function loopOutputSlotKindForValues(...values: Array<string | undefined>
 
 export function loopEdgeOutputSlotKind(
   edge: Pick<LoopCanvasEdge, "label" | "route"> | undefined
-): StepOutputSlotKind | undefined {
+): NodeOutputSlotKind | undefined {
   return loopOutputSlotKindForValues(edge?.route?.outputId, edge?.label);
 }

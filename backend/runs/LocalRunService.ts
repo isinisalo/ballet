@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import type {
   ExecutionTask,
@@ -17,8 +16,7 @@ import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurat
 import { LocalWorkspaceManager } from "../execution/git/LocalWorkspaceManager.js";
 import type { ProjectContext } from "../project/ProjectContext.js";
 import type { DispatchLoopScheduleResult, RuntimeDatabase } from "../runtime-db.js";
-import { LoopRunNotFoundError, LoopRunStateError } from "../runtime/LoopRunErrors.js";
-import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
+import { LoopRunNotFoundError, WorkLoopRuntimeUnavailableError } from "../runtime/LoopRunErrors.js";
 import { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import { RootRunExecutionCoordinator } from "./RootRunExecutionCoordinator.js";
 import { RootRunStore } from "./RootRunStore.js";
@@ -45,7 +43,6 @@ export interface LocalRunServiceOptions {
 export class LocalRunService {
   private readonly workspaces: LocalWorkspaceManager;
   private readonly finalizer: RootFinalizationCoordinator;
-  private readonly planner: LoopExecutionPlanner;
   private readonly coordinator: RootRunExecutionCoordinator;
 
   constructor(private readonly options: LocalRunServiceOptions) {
@@ -56,7 +53,6 @@ export class LocalRunService {
       this.workspaces,
       (rootRunId) => this.changed(rootRunId)
     );
-    this.planner = new LoopExecutionPlanner(options.configurations, options.runtime);
     this.coordinator = new RootRunExecutionCoordinator({
       ...options,
       finalizer: this.finalizer,
@@ -65,54 +61,14 @@ export class LocalRunService {
   }
 
   async start(
-    input: StartRootRunRequest,
-    source: "manual" | "schedule" = "manual",
-    schedule?: { stepId: string; scheduledFor: string }
+    _input: StartRootRunRequest,
+    _source: "manual" | "schedule" = "manual",
+    _schedule?: { stepId: string; scheduledFor: string }
   ): Promise<RootRunDetail> {
-    const rootRunId = randomUUID();
-    let workspace;
-    try {
-      workspace = await this.workspaces.prepare(rootRunId);
-    } catch (error) {
-      throw new LoopRunStateError(
-        `Run workspace preflight failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-    try {
-      const snapshot = await this.planner.create(workspace, input.targetId, input.input ?? "");
-      assertScheduledStart(snapshot, schedule);
-      await this.workspaces.verifyPreparedSnapshot(workspace);
-      const timestamp = new Date().toISOString();
-      this.options.connection().transaction(() => {
-        this.options.roots.create({
-          rootRunId,
-          kind: "loop",
-          targetId: input.targetId,
-          source,
-          input: input.input,
-          worktreePath: workspace.path,
-          branch: workspace.branch,
-          headSha: workspace.headSha,
-          configHash: workspace.configHash,
-          snapshotHash: workspace.snapshotHash,
-          executionSnapshot: snapshot,
-          createdAt: timestamp
-        });
-        this.options.database.startLoopRun(rootRunId, input.input, source, schedule);
-      })();
-    } catch (error) {
-      await this.workspaces.discard(workspace);
-      throw error;
-    }
-    try {
-      await this.coordinator.enqueuePending(rootRunId);
-      await this.coordinator.sync(rootRunId);
-    } catch (error) {
-      await this.coordinator.failRoot(this.options.roots.require(rootRunId), error);
-      throw error;
-    }
-    this.changed(rootRunId);
-    return this.detailRequired(rootRunId);
+    void _input;
+    void _source;
+    void _schedule;
+    throw new WorkLoopRuntimeUnavailableError();
   }
 
   async dispatchScheduled(input: {
@@ -208,33 +164,14 @@ export class LocalRunService {
   }
 
   async respond(
-    rootRunId: string,
-    stepRunId: string,
-    request: RespondToStepRunRequest
+    _rootRunId: string,
+    _stepRunId: string,
+    _request: RespondToStepRunRequest
   ): Promise<RootRunDetail> {
-    const root = this.options.roots.require(rootRunId);
-    const step = this.options.database.getStepRun(stepRunId);
-    if (!step) throw new LoopRunNotFoundError(`Step Run ${stepRunId} was not found.`);
-    if (!this.options.database.listRootLoopRuns(rootRunId).some((run) => run.runId === step.runId)) {
-      throw new LoopRunStateError(`Step Run ${stepRunId} does not belong to Root Run ${rootRunId}.`);
-    }
-    this.options.connection().transaction(() => {
-      if (request.kind === "resume") {
-        this.options.database.resumeStepRun(step.runId, stepRunId, request.input);
-      } else {
-        this.options.database.respondToStepRun(step.runId, stepRunId, request.result, request.input);
-      }
-      this.coordinator.preflightPending(root.rootRunId);
-    })();
-    try {
-      await this.coordinator.enqueuePending(root.rootRunId);
-      await this.coordinator.sync(root.rootRunId);
-    } catch (error) {
-      await this.coordinator.failRoot(this.options.roots.require(root.rootRunId), error);
-      throw error;
-    }
-    this.changed(root.rootRunId);
-    return this.detailRequired(root.rootRunId);
+    void _rootRunId;
+    void _stepRunId;
+    void _request;
+    throw new WorkLoopRuntimeUnavailableError();
   }
 
   handleTerminal(task: ExecutionTask): Promise<void> {
@@ -259,15 +196,3 @@ export class LocalRunService {
     this.options.onChanged?.(rootRunId);
   }
 }
-
-const assertScheduledStart = (
-  snapshot: Awaited<ReturnType<LoopExecutionPlanner["create"]>>,
-  schedule?: { stepId: string }
-): void => {
-  if (!schedule) return;
-  const loop = snapshot.loops.find((candidate) => candidate.id === snapshot.rootLoopId);
-  const start = loop?.nodes.find((candidate) => candidate.id === loop.start);
-  if (!loop || start?.type !== "scheduled" || start.id !== schedule.stepId) {
-    throw new LoopRunStateError(`Scheduled Step ${schedule.stepId} is not the immutable start of Loop ${snapshot.rootLoopId}.`);
-  }
-};

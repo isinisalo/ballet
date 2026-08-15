@@ -2,7 +2,6 @@ import { access, chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, truncate, w
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { defaultTerminalNodes } from "../../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../../shared/domain/loopThemes.js";
 import type { ProjectConfiguration } from "../../../shared/domain/projectConfig.js";
 import { resolveProjectContext } from "../../project/ProjectContext.js";
@@ -61,7 +60,7 @@ describe("LocalWorkspaceManager", () => {
       .toContain('"name": "Snapshot profile"');
   });
 
-  it("keeps sequential step changes, commits success idempotently, and cleans up only when requested", async () => {
+  it("keeps sequential workspace changes, commits success idempotently, and cleans up only when requested", async () => {
     const fixture = await createFixture();
     const prepared = await fixture.manager.prepare("root-success");
     await writeFile(path.join(prepared.path, "step-one.txt"), "one\n");
@@ -250,16 +249,14 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
     loops: projectConfiguration("Test profile").loops,
     theme: defaultLoopTheme,
     executionProfiles: projectConfiguration("Test profile").executionProfiles,
-    runtimes: [],
-    resources: [],
+    runtimes: [], resources: [],
     createdAt: "2026-01-01T00:00:00.000Z"
   },
-  createdAt: "2026-01-01T00:00:00.000Z",
-  updatedAt: "2026-01-01T00:00:00.000Z"
+  createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
 });
 
 const projectConfiguration = (profileName: string): ProjectConfiguration => ({
-  version: 9,
+  version: 10,
   executionProfiles: [{
     id: "test-profile",
     name: profileName,
@@ -268,21 +265,41 @@ const projectConfiguration = (profileName: string): ProjectConfiguration => ({
     reasoningEffort: "medium",
     networkAccess: false
   }],
+  orchestrator: {
+    executionProfileId: "test-profile",
+    primaryInstructionId: "project:tracked-instruction",
+    skillIds: ["project:review"],
+    maxRepairDepth: 4,
+    maxRepairAttempts: 3
+  },
   loops: [{
     id: "delivery",
-    start: "work",
+    description: "Complete and validate the work.",
+    state: { description: "Shared delivery state.", initial: {} },
+    startNodeId: "work",
     nodes: [{
       id: "work",
-      type: "agent",
-      executionProfileId: "test-profile",
-      primaryInstructionId: "project:tracked-instruction",
-      skillIds: ["project:review"],
       description: "Complete the work.",
-      nodeStyle: "flat",
-      nodeSize: "medium",
-      on: { approved: "completed", rejected: "blocked" }
-    }, ...defaultTerminalNodes()]
-  }]
+      work: {
+        type: "agent",
+        task: "Complete the work.",
+        executionProfileId: "test-profile",
+        primaryInstructionId: "project:tracked-instruction",
+        skillIds: ["project:review"],
+        nodeStyle: "flat",
+        nodeSize: "medium"
+      },
+      validation: {
+        type: "human",
+        task: "Validate the completed work.",
+        nodeStyle: "luna",
+        nodeSize: "small"
+      },
+      maxLocalAttempts: 3
+    }],
+    edges: [{ id: "work-completed", source: "work", target: { terminal: "completed" } }]
+  }],
+  loopEdges: []
 });
 
 const projectJson = (profileName: string): string =>

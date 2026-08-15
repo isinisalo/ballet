@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import type { ProjectExecutableStep, ProjectLoop } from "../../shared/domain/automation.js";
+import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type {
   ExecutionRuntimeSnapshot,
   LoopRun,
@@ -123,41 +123,6 @@ export class LoopRunStore {
     const run = this.getLoopRun(runId);
     if (!run) throw new Error("Loop run was not stored.");
     return run;
-  }
-
-  createStepRun(run: LoopRun, step: ProjectExecutableStep, input?: string): StepRun {
-    const stepRunId = randomUUID();
-    const timestamp = now();
-    const status = step.type === "human" ? "waiting_for_human" : "queued";
-    this.connection().prepare(`
-      INSERT INTO step_runs (
-        step_run_id, run_id, loop_id, step_id, step_type,
-        status, input, attempt, created_at, updated_at
-      ) VALUES (
-        @stepRunId, @runId, @loopId, @stepId, @stepType,
-        @status, @input, 0, @createdAt, @updatedAt
-      )
-    `).run({
-      stepRunId,
-      runId: run.runId,
-      loopId: run.loopId,
-      stepId: step.id,
-      stepType: step.type,
-      status,
-      input: input ?? null,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    });
-    this.connection().prepare(`
-      UPDATE loop_runs SET status = @status, updated_at = @updatedAt WHERE run_id = @runId
-    `).run({
-      runId: run.runId,
-      status: step.type === "human" ? "waiting_for_human" : "running",
-      updatedAt: timestamp
-    });
-    const stored = this.getStepRun(stepRunId);
-    if (!stored) throw new Error("Step run was not stored.");
-    return stored;
   }
 
   completeStepRun(stepRun: StepRun, result: StepRunResult, options: {

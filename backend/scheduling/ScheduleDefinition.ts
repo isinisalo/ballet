@@ -1,19 +1,19 @@
 import { createHash } from "node:crypto";
-import type { ProjectScheduledStep, ProjectStepSchedule } from "../../shared/domain/automation.js";
+import type { ProjectScheduledWorkNode, ProjectWorkSchedule } from "../../shared/domain/automation.js";
 
 const weekdayOrder = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
-export const scheduleDefinitionHash = (step: ProjectScheduledStep): string => {
+export const scheduleDefinitionHash = (work: ProjectScheduledWorkNode): string => {
   const value = JSON.stringify({
-    schedule: normalizedSchedule(step.schedule),
-    executionProfileId: step.executionProfileId,
-    primaryInstructionId: step.primaryInstructionId,
-    skillIds: [...step.skillIds].sort(compareText)
+    schedule: normalizedSchedule(work.schedule),
+    executionProfileId: work.executionProfileId,
+    primaryInstructionId: work.primaryInstructionId,
+    skillIds: [...work.skillIds].sort(compareText)
   });
   return createHash("sha256").update(value, "utf8").digest("hex");
 };
 
-const normalizedSchedule = (schedule: ProjectStepSchedule): object => {
+const normalizedSchedule = (schedule: ProjectWorkSchedule): object => {
   if (schedule.kind === "once") return {
     kind: "once",
     date: schedule.date,
