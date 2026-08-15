@@ -3,6 +3,15 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 
 const SCHEMA_VERSION = 3;
+const EMPTY_RESETTABLE_SCHEMA_VERSIONS = new Set([1]);
+const stateTableNames = [
+  "execution_events",
+  "execution_tasks",
+  "loop_runs",
+  "loop_schedule_state",
+  "root_runs",
+  "step_runs"
+] as const;
 
 export class LocalDatabase {
   private database?: Database.Database;
@@ -44,12 +53,38 @@ export class LocalDatabase {
       ? database.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").get() as { value: string } | undefined
       : undefined;
     if (!version && tables.length > 0) throw new Error("Ballet state database has no schema version; persisted state was left unchanged.");
-    if (version && Number(version.value) !== SCHEMA_VERSION) {
-      throw new Error(`Unsupported Ballet state schema ${version.value}; expected ${SCHEMA_VERSION}.`);
+    const versionNumber = version ? Number(version.value) : undefined;
+    if (versionNumber !== undefined && versionNumber !== SCHEMA_VERSION) {
+      if (EMPTY_RESETTABLE_SCHEMA_VERSIONS.has(versionNumber) && this.isEmptyStateSchema(database, tableNames)) {
+        this.resetEmptyStateSchema(database);
+        return;
+      }
+      throw new Error(`Unsupported Ballet state schema ${version?.value ?? "unknown"}; expected ${SCHEMA_VERSION}.`);
     }
     database.transaction(() => {
       database.exec(schema);
       if (!version) database.prepare("INSERT INTO metadata (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
+    })();
+  }
+
+  private isEmptyStateSchema(database: Database.Database, tableNames: ReadonlySet<string>): boolean {
+    if (!stateTableNames.every((tableName) => tableNames.has(tableName))) return false;
+    return stateTableNames.every((tableName) =>
+      database.prepare(`SELECT 1 FROM ${tableName} LIMIT 1`).get() === undefined);
+  }
+
+  private resetEmptyStateSchema(database: Database.Database): void {
+    database.transaction(() => {
+      database.exec(`
+        DROP TABLE execution_events;
+        DROP TABLE execution_tasks;
+        DROP TABLE step_runs;
+        DROP TABLE loop_schedule_state;
+        DROP TABLE loop_runs;
+        DROP TABLE root_runs;
+      `);
+      database.exec(schema);
+      database.prepare("UPDATE metadata SET value = ? WHERE key = 'schema_version'").run(String(SCHEMA_VERSION));
     })();
   }
 }

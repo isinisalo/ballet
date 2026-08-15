@@ -79,6 +79,59 @@ describe("LocalDatabase schema v3", () => {
     untouched.close();
   });
 
+  it("recreates an empty schema v1 database as schema v3", async () => {
+    const root = await temporaryRoot();
+    const filename = path.join(root, "state.sqlite");
+    const legacy = new Database(filename);
+    legacy.exec(`
+      CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '1');
+      CREATE TABLE root_runs (id TEXT);
+      CREATE TABLE loop_runs (id TEXT);
+      CREATE TABLE step_runs (id TEXT);
+      CREATE TABLE execution_tasks (id TEXT);
+      CREATE TABLE execution_events (id TEXT);
+      CREATE TABLE loop_schedule_state (id TEXT);
+    `);
+    legacy.close();
+
+    const database = new LocalDatabase(filename);
+    const connection = database.connection();
+
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("3");
+    expect((connection.prepare("PRAGMA table_info(root_runs)").all() as Array<{ name: string }>)
+      .map(({ name }) => name)).toContain("execution_snapshot_json");
+    expect((connection.prepare("PRAGMA table_info(root_runs)").all() as Array<{ name: string }>)
+      .map(({ name }) => name)).not.toContain("runtime_snapshot_json");
+    database.close();
+  });
+
+  it("leaves a non-empty schema v1 database unchanged and fails closed", async () => {
+    const root = await temporaryRoot();
+    const filename = path.join(root, "state.sqlite");
+    const legacy = new Database(filename);
+    legacy.exec(`
+      CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '1');
+      CREATE TABLE root_runs (id TEXT);
+      INSERT INTO root_runs (id) VALUES ('preserved');
+      CREATE TABLE loop_runs (id TEXT);
+      CREATE TABLE step_runs (id TEXT);
+      CREATE TABLE execution_tasks (id TEXT);
+      CREATE TABLE execution_events (id TEXT);
+      CREATE TABLE loop_schedule_state (id TEXT);
+    `);
+    legacy.close();
+    const database = new LocalDatabase(filename);
+
+    expect(() => database.connection()).toThrow("Unsupported Ballet state schema 1; expected 3.");
+
+    const untouched = new Database(filename, { readonly: true });
+    expect(untouched.prepare("SELECT id FROM root_runs").pluck().all()).toEqual(["preserved"]);
+    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("1");
+    untouched.close();
+  });
+
   it("rejects an unknown schema version without migrating it", async () => {
     const root = await temporaryRoot();
     const filename = path.join(root, "state.sqlite");
