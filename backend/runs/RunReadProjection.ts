@@ -1,4 +1,6 @@
-import type { ExecutionTask, LoopRunDetails } from "../../shared/domain/runtime.js";
+import type {
+  ExecutionTask, LoopRunDetails, NodeRun, WorkLoopNodeRun
+} from "../../shared/domain/runtime.js";
 import type { StoredRootRun } from "./RootRunStore.js";
 
 export const publicRootSummary = (run: StoredRootRun) => ({
@@ -7,6 +9,7 @@ export const publicRootSummary = (run: StoredRootRun) => ({
   targetId: run.targetId,
   source: run.source,
   status: run.status,
+  stateRevision: run.stateRevision,
   input: run.input,
   outcome: run.outcome,
   errorCode: run.errorCode,
@@ -22,27 +25,47 @@ export const currentPosition = (
   runs: LoopRunDetails[],
   tasks: ExecutionTask[]
 ) => {
-  const run = [...runs].reverse().find((candidate) =>
-    ["running", "waiting_for_human"].includes(candidate.status)) ?? runs.at(-1);
-  const step = [...(run?.stepRuns ?? [])].reverse().find((candidate) =>
-    ["queued", "running", "waiting_for_human", "needs_input"].includes(candidate.status));
-  const task = step
-    ? step.executionTaskId
-      ? tasks.find((candidate) => candidate.id === step.executionTaskId)
-      : undefined
-    : tasks.at(-1);
-  return task || step || run ? {
-    loopRunId: run?.runId,
+  const run = latestActive(runs) ?? runs.at(-1);
+  const workLoopNodeRun = latestActive(run?.workLoopNodeRuns ?? []);
+  const nodeRun = latestActive(run?.nodeRuns ?? []);
+  const task = currentTask(nodeRun, tasks);
+  if (!hasCurrentPosition(run, workLoopNodeRun, nodeRun, task)) return undefined;
+  return positionFields(run, workLoopNodeRun, nodeRun, task);
+};
+
+const positionFields = (
+  run: LoopRunDetails | undefined,
+  workLoopNodeRun: WorkLoopNodeRun | undefined,
+  nodeRun: NodeRun | undefined,
+  task: ExecutionTask | undefined
+) => {
+  return {
+    loopRunId: run?.loopRunId,
     loopId: run?.loopId,
-    stepRunId: step?.stepRunId,
-    stepId: step?.stepId,
+    workLoopNodeRunId: workLoopNodeRun?.workLoopNodeRunId,
+    workLoopNodeId: workLoopNodeRun?.workLoopNodeId ?? nodeRun?.workLoopNodeId,
+    nodeRunId: nodeRun?.nodeRunId,
+    nodeRole: nodeRun?.role,
     taskId: task?.id,
     executionProfileId: task?.spec.evidence.executionProfile.id,
     taskStatus: task?.status
-  } : undefined;
+  };
 };
 
+const currentTask = (nodeRun: NodeRun | undefined, tasks: ExecutionTask[]): ExecutionTask | undefined => {
+  if (!nodeRun) return tasks.at(-1);
+  if (!nodeRun.executionTaskId) return undefined;
+  return tasks.find(({ id }) => id === nodeRun.executionTaskId);
+};
+
+const hasCurrentPosition = (...values: unknown[]): boolean => values.some(Boolean);
+
+const latestActive = <Value extends { status: string }>(values: Value[]): Value | undefined =>
+  [...values].reverse().find(({ status }) => activeRuntimeStatuses.has(status));
+
+const activeRuntimeStatuses = new Set(["queued", "running", "waiting_for_input"]);
+
 export const isActiveRootStatus = (status: StoredRootRun["status"]): boolean =>
-  ["queued", "running", "waiting_for_human", "finalizing"].includes(status);
+  ["queued", "running", "waiting_for_input", "finalizing"].includes(status);
 export const encodeRunCursor = (value: string): string => Buffer.from(value).toString("base64url");
 export const decodeRunCursor = (value: string): string => Buffer.from(value, "base64url").toString("utf8");

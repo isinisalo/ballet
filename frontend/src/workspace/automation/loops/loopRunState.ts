@@ -1,6 +1,6 @@
 import type { LoopRunDetails } from "@shared/api/workspace-contracts";
 
-export const activeLoopRunStatuses = new Set(["running", "waiting_for_human"]);
+export const activeLoopRunStatuses = new Set(["running", "waiting_for_input"]);
 
 export const isActiveLoopRun = (run?: LoopRunDetails | null) =>
   Boolean(run && activeLoopRunStatuses.has(run.status));
@@ -8,6 +8,6 @@ export const isActiveLoopRun = (run?: LoopRunDetails | null) =>
 export const loopRunStatusVariant = (status: LoopRunDetails["status"] | "queued" | "finalizing"): "default" | "secondary" | "destructive" | "outline" => {
   if (status === "failed" || status === "blocked") return "destructive";
   if (status === "completed") return "secondary";
-  if (status === "running" || status === "waiting_for_human") return "default";
+  if (status === "running" || status === "waiting_for_input") return "default";
   return "outline";
 };

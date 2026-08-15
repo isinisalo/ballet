@@ -8,7 +8,7 @@ export class ExecutionTaskStateStore {
       SELECT task_id FROM execution_tasks
       WHERE root_run_id = ? AND status IN ('queued', 'running')
       ORDER BY created_at, rowid
-    `).all(rootRunId) as Array<{ task_id: string }>;
+    `).all(rootRunId).map(readTaskId);
     this.connection().prepare(`
       UPDATE execution_tasks SET status = 'cancelled', outcome_json = NULL,
         error_code = NULL, error_message = NULL,
@@ -19,7 +19,7 @@ export class ExecutionTaskStateStore {
       UPDATE execution_tasks SET cancel_requested_at = COALESCE(cancel_requested_at, ?), updated_at = ?
       WHERE root_run_id = ? AND status = 'running'
     `).run(timestamp, timestamp, rootRunId);
-    return rows.map((row) => row.task_id);
+    return rows;
   }
 
   rejectUnrunnableQueued(timestamp: string): string[] {
@@ -28,11 +28,11 @@ export class ExecutionTaskStateStore {
         SELECT task_id FROM execution_tasks task
         WHERE task.status = 'queued' AND NOT (${runnableTaskSql})
         ORDER BY task.created_at, task.rowid
-      `).all() as Array<{ task_id: string }>;
-      for (const row of rows) this.cancel(row.task_id, timestamp);
-      return rows.map((row) => row.task_id);
+      `).all().map(readTaskId);
+      for (const taskId of rows) this.cancel(taskId, timestamp);
+      return rows;
     });
-    return transaction() as string[];
+    return transaction();
   }
 
   claim(taskId: string, timestamp: string): boolean {
@@ -46,7 +46,7 @@ export class ExecutionTaskStateStore {
       this.cancel(taskId, timestamp);
       return false;
     });
-    return transaction() as boolean;
+    return transaction();
   }
 
   private cancel(taskId: string, timestamp: string): void {
@@ -63,14 +63,23 @@ const runnableTaskSql = `
   EXISTS (
     SELECT 1
     FROM root_runs root
-    JOIN loop_runs loop ON loop.root_run_id = root.root_run_id
-    JOIN step_runs step ON step.run_id = loop.run_id
+    JOIN loop_invocations loop ON loop.root_run_id = root.root_run_id
+    JOIN node_runs node ON node.loop_run_id = loop.loop_run_id
     WHERE root.root_run_id = task.root_run_id
-      AND root.status IN ('queued', 'running', 'waiting_for_human')
-      AND loop.run_id = json_extract(task.spec_json, '$.loopRunId')
+      AND root.status IN ('queued', 'running', 'waiting_for_input')
+      AND loop.loop_run_id = json_extract(task.spec_json, '$.loopRunId')
       AND loop.status = 'running'
-      AND step.step_run_id = json_extract(task.spec_json, '$.stepRunId')
-      AND step.status = 'queued'
-      AND step.execution_task_id = task.task_id
+      AND node.node_run_id = task.node_run_id
+      AND node.node_run_id = json_extract(task.spec_json, '$.nodeRunId')
+      AND node.status = 'queued'
+      AND node.execution_task_id = task.task_id
   )
 `;
+
+const readTaskId = (value: unknown): string => {
+  if (typeof value === "object" && value !== null && "task_id" in value) {
+    const taskId = Reflect.get(value, "task_id");
+    if (typeof taskId === "string") return taskId;
+  }
+  throw new Error("Execution database returned an invalid task id.");
+};

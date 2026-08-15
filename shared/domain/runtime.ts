@@ -1,277 +1,269 @@
 // Canonical persisted runtime contracts. Project authoring types live in their
 // own domain modules; this file owns only resolved, immutable Run evidence.
-import type { ProjectLoop, ProjectWorkNode } from "./automation.js";
+import type { JsonValue, ProjectLoop } from "./automation.js";
+import type { RootExecutionSnapshot } from "./executionRuntime.js";
 import type { LoopTheme } from "./loopThemes.js";
-import type { ExecutionProfile } from "./projectConfig.js";
-import type { ExecutionPolicy, RuntimeProvider } from "./localRuntime.js";
 
-export type {
-  ExecutionPolicy,
-  LocalCheckoutStatus,
-  LocalProviderHealth,
-  LocalProviderStatus,
-  LocalRuntime,
-  ResolvedExecutionProfile,
-  RuntimeAuthStatus,
-  RuntimeCapabilities,
-  RuntimeConfigurationIssue,
-  RuntimeModelCapability,
-  RuntimePolicyCapabilities,
-  RuntimeProvider
-} from "./localRuntime.js";
+export * from "./executionRuntime.js";
 
-export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
-export type ExecutionTaskKind = "loop_step";
-export type StepOutcomeState = "completed" | "needs_input" | "blocked" | "failed";
-export type StepRunResult = "approved" | "rejected";
-export type RunCheckStatus = "passed" | "failed" | "skipped";
+export const maxStatePatchBytes = 65_536;
+export const maxStatePatchOperations = 128;
+export const maxRuntimeJsonDepth = 64;
+export const maxControlFlowTransitions = 256;
 
-export interface RunCheck {
-  name: string;
-  status: RunCheckStatus;
-  details?: string;
+export type JsonPatchOperation =
+  | { op: "add"; path: string; value: JsonValue }
+  | { op: "remove"; path: string }
+  | { op: "replace"; path: string; value: JsonValue };
+export type StatePatch = JsonPatchOperation[];
+
+export interface StatePatchEvidence {
+  patch: StatePatch;
+  patchSha256: string;
 }
 
-interface StepOutcomeBase {
+export interface LoopStateRevision {
+  rootRunId: string;
+  revision: number;
+  parentRevision?: number;
+  state: JsonValue;
+  stateSha256: string;
+  patch?: StatePatchEvidence;
+  sourceNodeRunId?: string;
+  outcome?: CanonicalNodeOutcome;
+  controlFlowEventId?: number;
+  createdAt: string;
+}
+
+export type NodeRunRole = "work" | "validation" | "orchestrator";
+export type NodeRunStatus =
+  | "queued" | "running" | "waiting_for_input" | "completed"
+  | "blocked" | "failed" | "cancelled" | "interrupted";
+export type WorkLoopNodeRunStatus = Exclude<NodeRunStatus, "interrupted">;
+
+export interface NodeOutcomeBase {
   summary: string;
-  artifacts?: {
-    git_sha?: string;
-    changed_files?: string[];
-    branch?: string;
-    diff?: string;
-    [key: string]: unknown;
-  };
-  checks: RunCheck[];
+  statePatch?: StatePatch;
+  evidence?: JsonValue;
 }
 
-export type StepOutcome = StepOutcomeBase & {
-      state: "completed";
-      result: StepRunResult;
-      question?: never;
-      context?: never;
+export type WorkNodeOutcome = NodeOutcomeBase & {
+  role: "work";
+  status: "completed" | "needs_input" | "blocked" | "failed";
+  question?: string;
+  context?: string;
+};
+
+export type ValidationNodeOutcome = NodeOutcomeBase & (
+  | { role: "validation"; decision: "OK" }
+  | {
+      role: "validation";
+      decision: "FAIL";
+      repair: {
+        mode: "LOCAL_RETRY" | "ORCHESTRATOR_REPAIR";
+        requestedCapability?: string;
+        reason: string;
+        evidence?: JsonValue;
+      };
     }
-  | StepOutcomeBase & {
-      state: "needs_input";
-      question: string;
-      context: string;
-      result?: never;
-    }
-  | StepOutcomeBase & {
-      state: "blocked" | "failed";
-      result?: never;
-      question?: never;
-      context?: never;
-    };
+);
 
-export interface ExecutionRuntimeSnapshot {
-  hostname: string;
-  provider: RuntimeProvider;
-  cliVersion: string;
-  model: string;
-  reasoning: string;
-  policy: ExecutionPolicy;
-  capabilityHash: string;
-}
+export type OrchestratorNodeOutcome = NodeOutcomeBase & {
+  role: "orchestrator";
+  status: "routed" | "blocked" | "failed";
+  loopEdgeId?: string;
+  targetLoopId?: string;
+};
 
-export interface ExecutionProjectSnapshot {
-  checkoutRoot: string;
-  headSha: string;
-  configHash: string;
-  snapshotHash: string;
-}
+export type CanonicalNodeOutcome = WorkNodeOutcome | ValidationNodeOutcome | OrchestratorNodeOutcome;
 
-export type ExecutionResourceOrigin = "system" | "project";
-export type ExecutionResourceKind = "system" | "primary" | "skill";
-
-/** Content is stored once in the Root Run snapshot and never re-read while it runs. */
-export interface ExecutionResourceSnapshot {
-  kind: ExecutionResourceKind;
-  origin: ExecutionResourceOrigin;
-  id: string;
-  relativePath?: string;
-  sourceSha256: string;
-  content: string;
-}
-
-export interface ExecutionRuntimeBinding {
-  executionProfileId: string;
-  runtime: ExecutionRuntimeSnapshot;
-}
-
-export interface RootExecutionSnapshot {
-  version: 1;
-  rootLoopId: string;
-  project: ExecutionProjectSnapshot;
-  loops: ProjectLoop[];
-  theme: LoopTheme;
-  executionProfiles: ExecutionProfile[];
-  runtimes: ExecutionRuntimeBinding[];
-  resources: ExecutionResourceSnapshot[];
-  createdAt: string;
-}
-
-export type ExecutionResourceEvidence = Omit<ExecutionResourceSnapshot, "content">;
-
-/** Attempt-specific evidence. The exact composed prompt is retained only here. */
-export interface ExecutionPromptEvidence {
-  compositionVersion: 1;
-  loopId: string;
-  stepId: string;
-  executionProfile: ExecutionProfile;
-  resources: ExecutionResourceEvidence[];
-  prompt: string;
-  promptSha256: string;
-  outputSchemaVersion: 1;
-  outputSchemaSha256: string;
-}
-
-export interface ExecutionSpec {
-  version: 2;
-  taskId: string;
-  kind: ExecutionTaskKind;
-  rootRunId: string;
-  loopRunId: string;
-  stepRunId: string;
-  evidence: ExecutionPromptEvidence;
-  runtime: ExecutionRuntimeSnapshot;
-  project: ExecutionProjectSnapshot;
-  createdAt: string;
-}
-
-export interface ExecutionTask {
-  id: string;
-  kind: ExecutionTaskKind;
-  rootRunId: string;
-  status: ExecutionTaskStatus;
-  spec: ExecutionSpec;
-  startedAt?: string;
-  completedAt?: string;
-  cancelRequestedAt?: string;
-  errorCode?: string;
-  errorMessage?: string;
-  outcome?: StepOutcome;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type ExecutionEventSource = "ballet" | RuntimeProvider;
-export type ExecutionEventKind = "system" | "think" | "agent" | "command" | "output" | "file" | "tool" | "info" | "warn" | "error";
-export type ExecutionEventPhase = "started" | "delta" | "completed";
-
-export interface ExecutionEvent {
-  id: number;
-  taskId: string;
-  sequence: number;
-  source: ExecutionEventSource;
-  kind: ExecutionEventKind;
-  level: "info" | "warn" | "error";
-  phase: ExecutionEventPhase;
-  itemId?: string;
-  message: string;
-  data?: Record<string, unknown>;
-  contentBytes: number;
-  terminal: boolean;
-  createdAt: string;
-}
-
-export interface ExecutionEventPage {
-  entries: ExecutionEvent[];
-  lastId: number;
-  hasMore: boolean;
-  truncated: boolean;
-}
-
-export interface RootFinalizationReport {
-  success: boolean;
-  retained: boolean;
-  branch: string;
-  worktreePath: string;
-  commitSha?: string;
-  changedFiles: string[];
-  snapshotHash: string;
-}
-
-export interface RuntimePreflightIssue {
-  stepId?: string;
-  executionProfileId?: string;
-  code:
-    | "auth_required"
-    | "backend_unhealthy"
-    | "model_unavailable"
-    | "reasoning_unavailable"
-    | "policy_unsupported"
-    | "invalid_runtime_config"
-    | "dirty_checkout"
-    | "missing_resource"
-    | "invalid_resource"
-    | "prompt_too_large";
-  message: string;
-}
-
-export interface LoopRuntimePreflight {
-  ok: boolean;
-  issues: RuntimePreflightIssue[];
-  snapshots: Array<{
-    stepId: string;
-    executionProfileId: string;
-    runtime: ExecutionRuntimeSnapshot;
-  }>;
-}
-
-export type LoopRunSource = "manual" | "transition" | "schedule";
-export type LoopRunStatus = "running" | "waiting_for_human" | "completed" | "blocked" | "failed" | "cancelled";
-export type StepRunStatus = "queued" | "running" | "waiting_for_human" | "completed" | "needs_input" | "blocked" | "failed" | "cancelled";
+export type LoopRunSource = "manual" | "flow" | "repair" | "schedule";
+export type LoopRunStatus =
+  | "queued" | "running" | "waiting_for_input" | "completed"
+  | "blocked" | "failed" | "cancelled";
 export type LoopScheduleOccurrenceStatus = "started" | "skipped" | "missed";
 
-export interface LoopScheduleOccurrence { stepId: string; scheduledFor: string }
+export interface LoopScheduleOccurrence { workLoopNodeId: string; scheduledFor: string }
 
 export interface LoopScheduleState {
   loopId: string;
-  stepId: string;
+  workLoopNodeId: string;
   nextRunAt?: string;
   lastScheduledAt?: string;
   lastStatus?: LoopScheduleOccurrenceStatus;
-  lastRunId?: string;
+  lastLoopRunId?: string;
   lastError?: string;
 }
 
+export interface RootRun {
+  rootRunId: string;
+  kind: "loop";
+  targetId: string;
+  source: "manual" | "schedule";
+  status: LoopRunStatus | "finalizing";
+  stateRevision: number;
+  input?: string;
+  outcome?: CanonicalNodeOutcome;
+  errorCode?: string;
+  errorMessage?: string;
+  worktreePath: string;
+  branch: string;
+  headSha: string;
+  configHash: string;
+  snapshotHash: string;
+  transitionCount: number;
+  activeLoopRunId?: string;
+  activeNodeRunId?: string;
+  executionSnapshot: RootExecutionSnapshot;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
 export interface LoopRun {
-  runId: string;
+  loopRunId: string;
   loopId: string;
   rootRunId: string;
-  parentRunId?: string;
-  parentStepRunId?: string;
+  parentLoopRunId?: string;
   source: LoopRunSource;
   status: LoopRunStatus;
-  input?: string;
+  input?: JsonValue;
   snapshot: ProjectLoop;
   themeSnapshot: LoopTheme;
   schedule?: LoopScheduleOccurrence;
-  transitionCount: number;
+  entryStateRevision: number;
+  completionStateRevision?: number;
+  nestingDepth: number;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
 }
 
-export interface StepRun {
-  stepRunId: string;
-  runId: string;
+export interface WorkLoopNodeRun {
+  workLoopNodeRunId: string;
+  rootRunId: string;
+  loopRunId: string;
   loopId: string;
-  stepId: string;
-  type: ProjectWorkNode["type"];
-  executionTaskId?: string;
-  execution?: ExecutionRuntimeSnapshot;
-  status: StepRunStatus;
-  input?: string;
-  responseInput?: string;
-  result?: StepRunResult;
-  outcome?: StepOutcome;
-  error?: string;
+  workLoopNodeId: string;
   attempt: number;
+  status: WorkLoopNodeRunStatus;
+  stateRevisionBefore: number;
+  stateRevisionAfter?: number;
+  activeNodeRunId?: string;
+  terminal?: "completed" | "blocked" | "failed" | "cancelled";
+  errorCode?: string;
+  errorMessage?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
 }
 
-export interface LoopRunDetails extends LoopRun { stepRuns: StepRun[] }
-export type RespondToStepRunRequest = { kind: "human"; result: StepRunResult; input: string } | { kind: "resume"; input: string };
+export interface NodeRun {
+  nodeRunId: string;
+  rootRunId: string;
+  loopRunId: string;
+  workLoopNodeRunId?: string;
+  role: NodeRunRole;
+  loopId: string;
+  workLoopNodeId?: string;
+  nodeDefinitionId: string;
+  executionTaskId?: string;
+  input?: JsonValue;
+  context?: JsonValue;
+  outcome?: CanonicalNodeOutcome;
+  status: NodeRunStatus;
+  attempt: number;
+  stateRevisionBefore: number;
+  stateRevisionAfter?: number;
+  patch?: StatePatchEvidence;
+  errorCode?: string;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface LoopRunDetails extends LoopRun {
+  workLoopNodeRuns: WorkLoopNodeRun[];
+  nodeRuns: NodeRun[];
+}
+
+export type RepairRequestStatus = "pending" | "routed" | "completed" | "failed" | "cancelled";
+
+export interface RepairRequest {
+  repairRequestId: string;
+  rootRunId: string;
+  requesterLoopRunId: string;
+  requesterWorkLoopNodeRunId: string;
+  requesterValidationNodeRunId: string;
+  requestedCapability?: string;
+  requestedOutcome?: JsonValue;
+  reason: string;
+  evidence?: JsonValue;
+  stateRevisionAtRequest: number;
+  routedLoopEdgeId?: string;
+  routedTargetLoopId?: string;
+  status: RepairRequestStatus;
+  returnLoopId: string;
+  returnWorkLoopNodeId: string;
+  returnValidationNodeDefinitionId: string;
+  nestingDepth: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface OrchestratorRoute {
+  routeId: string;
+  rootRunId: string;
+  repairRequestId: string;
+  orchestratorNodeRunId: string;
+  loopEdgeId: string;
+  sourceLoopId: string;
+  targetLoopId: string;
+  evidence?: JsonValue;
+  createdAt: string;
+}
+
+export type OrchestrationFrameStatus = "open" | "returned" | "failed" | "cancelled";
+
+export interface OrchestrationFrame {
+  frameId: string;
+  rootRunId: string;
+  repairRequestId: string;
+  callerLoopRunId: string;
+  calleeLoopRunId: string;
+  parentFrameId?: string;
+  returnLoopId: string;
+  returnWorkLoopNodeId: string;
+  returnValidationNodeDefinitionId: string;
+  stateRevisionAtCall: number;
+  nestingDepth: number;
+  status: OrchestrationFrameStatus;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export type ControlFlowEventKind =
+  | "work_completed" | "work_needs_input" | "work_terminal"
+  | "validation_ok" | "validation_fail_local" | "validation_fail_orchestrator"
+  | "repair_return" | "repair_terminal" | "root_cancelled" | "root_terminal"
+  | "execution_interrupted";
+
+export interface ControlFlowEvent {
+  id: number;
+  rootRunId: string;
+  sequence: number;
+  kind: ControlFlowEventKind;
+  stateRevision: number;
+  sourceLoopRunId?: string;
+  sourceWorkLoopNodeRunId?: string;
+  sourceNodeRunId?: string;
+  targetLoopRunId?: string;
+  targetWorkLoopNodeRunId?: string;
+  repairRequestId?: string;
+  orchestrationFrameId?: string;
+  createdAt: string;
+}

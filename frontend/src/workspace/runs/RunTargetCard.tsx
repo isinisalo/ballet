@@ -11,7 +11,7 @@ export function RunTargetCard({ target, pending, onOpen, onStart }: {
 }) {
   const Icon = Route;
   const issueLabels = [...new Set(target.issues.map((issue) => {
-    const owner = issue.stepId ?? issue.executionProfileId;
+    const owner = issue.nodeId ?? issue.executionProfileId;
     return owner ? `${owner}: ${issue.message}` : issue.message;
   }))];
   const reason = issueLabels.length > 3

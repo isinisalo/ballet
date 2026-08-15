@@ -1,6 +1,5 @@
-import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
-import { stepOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import { nodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import { createFixture, specification, waitFor } from "./LocalExecutionQueue.test-fixture.js";
 
 describe("LocalExecutionQueue startup and claim boundaries", () => {
@@ -165,7 +164,7 @@ describe("LocalExecutionQueue outcomes and recovery", () => {
 
     expect(fixture.store.require("invalid")).toMatchObject({
       errorCode: "execution_failed",
-      errorMessage: expect.stringMatching(/structured (Step )?outcome/i)
+      errorMessage: expect.stringMatching(/Node.*structured outcome/i)
     });
     expect(fixture.store.events("invalid").entries.at(-1)).toMatchObject({ kind: "error", terminal: true });
     await fixture.close();
@@ -180,7 +179,7 @@ describe("LocalExecutionQueue outcomes and recovery", () => {
     await fixture.queue.start();
     await waitFor(() => fixture.store.require("schema").status === "succeeded");
 
-    expect(fixture.codex.outputSchemas[0]).toEqual(z.toJSONSchema(stepOutcomeSchema));
+    expect(fixture.codex.outputSchemas[0]).toEqual(nodeOutcomeJsonSchema);
     expect(fixture.codex.prompts.get(spec.taskId)).toBe(spec.evidence.prompt);
     await fixture.close();
   });

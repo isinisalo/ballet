@@ -1,14 +1,13 @@
-import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import type Database from "better-sqlite3";
 import os from "node:os";
 import path from "node:path";
 import { afterEach } from "vitest";
-import { stepOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
-import type { ExecutionSpec, ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
+import type { ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase } from "../runtime-db.js";
 import { ExecutionStore } from "./ExecutionStore.js";
 import { LocalExecutionQueue } from "./LocalExecutionQueue.js";
+import { insertRuntimeRoot } from "./LocalExecutionQueue.test-data.js";
 import type { LocalRuntimeService } from "./LocalRuntimeService.js";
 import type {
   CliRuntimeAdapter,
@@ -17,6 +16,8 @@ import type {
   RuntimeModel,
   RuntimeProbe
 } from "./providers/CliRuntimeAdapter.js";
+
+export { specification } from "./LocalExecutionQueue.test-data.js";
 
 const temporaryRoots: string[] = [];
 
@@ -92,7 +93,7 @@ class ControlledAdapter implements CliRuntimeAdapter {
         output: "done",
         structuredOutput: this.validOutcome
           ? approvedOutcome
-          : { state: "completed", summary: "Missing required result.", checks: [] }
+          : { role: "work", status: "completed" }
       };
     } finally {
       this.active -= 1;
@@ -106,10 +107,9 @@ class ControlledAdapter implements CliRuntimeAdapter {
 }
 
 const approvedOutcome = {
-  state: "completed" as const,
-  result: "approved" as const,
-  summary: "Approved.",
-  checks: []
+  role: "work" as const,
+  status: "completed" as const,
+  summary: "Completed."
 };
 
 interface QueueFixture {
@@ -162,29 +162,7 @@ export const createFixture = async (
   });
   const insertRoot = (rootRunId: string, taskIds: string[]): void => {
     const worktreePath = path.join(worktreesRoot, rootRunId);
-    const timestamp = "2026-01-01T00:00:00.000Z";
-    connection().prepare(`
-      INSERT INTO root_runs (
-        root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
-        config_hash, snapshot_hash, execution_snapshot_json, created_at, updated_at
-      ) VALUES (?, 'loop', 'delivery', 'manual', 'queued', ?, ?, ?, 'config', 'snapshot', '{}', ?, ?)
-    `).run(rootRunId, worktreePath, `ballet/run/${rootRunId}`, "a".repeat(40), timestamp, timestamp);
-    connection().prepare(`
-      INSERT INTO loop_runs (
-        run_id, loop_id, root_run_id, source, status, transition_count, created_at, updated_at
-      ) VALUES (?, ?, ?, 'manual', 'running', 0, ?, ?)
-    `).run(`loop-${rootRunId}`, `delivery-${rootRunId}`, rootRunId, timestamp, timestamp);
-    const insertStep = connection().prepare(`
-      INSERT INTO step_runs (
-        step_run_id, run_id, loop_id, step_id, step_type, execution_task_id,
-        status, attempt, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'agent', ?, 'queued', 0, ?, ?)
-    `);
-    for (const taskId of taskIds) {
-      insertStep.run(
-        `step-${taskId}`, `loop-${rootRunId}`, `delivery-${rootRunId}`, taskId, taskId, timestamp, timestamp
-      );
-    }
+    insertRuntimeRoot(connection(), worktreePath, rootRunId, taskIds);
   };
   return {
     database,
@@ -201,67 +179,6 @@ export const createFixture = async (
     }
   };
 };
-
-export const specification = (
-  taskId: string,
-  rootRunId: string,
-  provider: RuntimeProvider = "codex",
-  createdAt = "2026-01-01T00:00:00.000Z"
-): ExecutionSpec => ({
-  version: 2,
-  taskId,
-  kind: "loop_step",
-  rootRunId,
-  loopRunId: `loop-${rootRunId}`,
-  stepRunId: `step-${taskId}`,
-  evidence: {
-    compositionVersion: 1,
-    loopId: "delivery",
-    stepId: taskId,
-    executionProfile: {
-      id: `${provider}-test-medium`,
-      name: `${provider} test · Medium`,
-      provider,
-      model: "provider-default",
-      reasoningEffort: "provider-default",
-      networkAccess: false
-    },
-    resources: [{
-      kind: "system",
-      origin: "system",
-      id: "system:execution-contract-v1",
-      sourceSha256: "b".repeat(64)
-    }, {
-      kind: "primary",
-      origin: "project",
-      id: "project:test-instruction",
-      relativePath: ".ballet/instructions/test-instruction.md",
-      sourceSha256: "c".repeat(64)
-    }],
-    prompt: `Run ${taskId}`,
-    promptSha256: sha256(`Run ${taskId}`),
-    outputSchemaVersion: 1,
-    outputSchemaSha256: sha256(JSON.stringify(stepOutcomeJsonSchema))
-  },
-  runtime: {
-    hostname: "localhost",
-    provider,
-    cliVersion: "1.2.3",
-    model: "provider-default",
-    reasoning: "provider-default",
-    policy: { network: false, readOnlyRoots: [] },
-    capabilityHash: "capabilities"
-  },
-  project: {
-    checkoutRoot: "/checkout",
-    headSha: "a".repeat(40),
-    configHash: "config",
-    snapshotHash: "snapshot"
-  },
-  createdAt
-});
-
-const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
 
 interface Deferred { promise: Promise<void>; resolve(): void }
 

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LoopRunDetails, RespondToStepRunRequest, RootRunDetail, RunTarget, RuntimePreflightIssue } from "@shared/api/workspace-contracts";
+import type { LoopRunDetails, RootRunDetail, RunTarget, RuntimePreflightIssue } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
 import type { AppStreamStatus } from "@/app/useAppStream";
 import { runApi } from "../../runs/runApi";
 import { isRootRunDetailForLoop, rootRunLoopMismatchMessage } from "../../runs/rootRunAssociation";
 
-export type LoopRunPendingOperation = "load" | "start" | "respond" | "cancel" | null;
+export type LoopRunPendingOperation = "load" | "start" | "cancel" | null;
 
 export function useLoopRun(loopId: string | undefined, refreshSignal: string, streamStatus: AppStreamStatus, rootRunId?: string, target?: RunTarget, suppliedRootDetail?: RootRunDetail) {
   const [details, setDetails] = useState<LoopRunDetails | null>(null);
@@ -18,7 +18,7 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     ok: target.ready,
     issues: target.issues.map((issue): RuntimePreflightIssue => ({
       executionProfileId: issue.executionProfileId,
-      stepId: issue.stepId,
+      nodeId: issue.nodeId,
       code: runtimeIssueCode(issue.code),
       message: issue.message
     })),
@@ -62,7 +62,7 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
 
   useEffect(() => { setPendingOperation("load"); applyRoot(undefined); void refresh(); }, [applyRoot, refresh, refreshSignal]);
   useEffect(() => {
-    if (!details || !["running", "waiting_for_human"].includes(details.status)) return;
+    if (!details || !["running", "waiting_for_input"].includes(details.status)) return;
     const timer = window.setInterval(() => { void refresh(); }, 2_000);
     return () => window.clearInterval(timer);
   }, [details, refresh]);
@@ -90,21 +90,17 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     ? rootDetail
     : undefined;
   const currentDetails = currentRootDetail ? details : null;
-  const respond = useCallback(async (stepRunId: string, request: RespondToStepRunRequest) => {
-    if (!currentRootDetail) return false;
-    return mutate("respond", () => runApi.respond(currentRootDetail.rootRunId, stepRunId, request), currentRootDetail.rootRunId);
-  }, [currentRootDetail, mutate]);
   const cancel = useCallback(async () => {
     if (!currentRootDetail) return false;
     return mutate("cancel", () => runApi.cancel(currentRootDetail), currentRootDetail.rootRunId);
   }, [currentRootDetail, mutate]);
 
-  return { details: currentDetails, rootDetail: currentRootDetail, preflight, pendingOperation, error, streamStatus, refresh, start, respond, cancel };
+  return { details: currentDetails, rootDetail: currentRootDetail, preflight, pendingOperation, error, streamStatus, refresh, start, cancel };
 }
 
 const selectedLoopRun = (root: RootRunDetail) => {
   const runs = root.loopRuns.filter((run) => run.rootRunId === root.rootRunId);
-  return runs.find((run) => run.runId === root.current?.loopRunId) ?? [...runs].reverse()[0] ?? null;
+  return runs.find((run) => run.loopRunId === root.current?.loopRunId) ?? [...runs].reverse()[0] ?? null;
 };
 const runtimeIssueCode = (code: RunTarget["issues"][number]["code"]): RuntimePreflightIssue["code"] =>
   code === "invalid_config" ? "invalid_runtime_config" : code;

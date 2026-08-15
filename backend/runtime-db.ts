@@ -1,21 +1,16 @@
 import type Database from "better-sqlite3";
 import type {
-  ExecutionRuntimeSnapshot,
-  LoopRunDetails,
-  LoopRunSource,
-  LoopScheduleState,
-  StepOutcome,
-  StepRun,
-  StepRunResult
+  ControlFlowEvent, LoopRunDetails, LoopRunSource, LoopScheduleState, NodeRun,
+  OrchestrationFrame, OrchestratorRoute, RepairRequest, WorkLoopNodeRun
 } from "../shared/domain/runtime.js";
-import { LoopRunEngine } from "./runtime/LoopRunEngine.js";
+import { ControlFlowStore } from "./runtime/ControlFlowStore.js";
 import { LoopRunStore } from "./runtime/LoopRunStore.js";
-import { RootExecutionSnapshotStore } from "./runtime/RootExecutionSnapshotStore.js";
+import { LoopStateStore } from "./runtime/LoopStateStore.js";
 import {
-  LoopScheduleStateStore,
-  type CompleteScheduleOccurrenceInput,
-  type ScheduleDefinitionState
+  LoopScheduleStateStore, type CompleteScheduleOccurrenceInput, type ScheduleDefinitionState
 } from "./runtime/LoopScheduleStateStore.js";
+import { RepairStore } from "./runtime/RepairStore.js";
+import { WorkLoopRuntimeUnavailableError } from "./runtime/LoopRunErrors.js";
 import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
 
 export { isPatchedSqliteVersion };
@@ -29,68 +24,66 @@ export type DispatchLoopScheduleResult =
 export class RuntimeDatabase {
   private readonly connectionManager: RuntimeDbConnection;
   private readonly loopRunStore: LoopRunStore;
-  private readonly loopRunEngine: LoopRunEngine;
+  readonly state: LoopStateStore;
+  readonly repair: RepairStore;
+  readonly control: ControlFlowStore;
   private readonly loopScheduleStateStore: LoopScheduleStateStore;
 
   constructor(dbPath: string) {
     this.connectionManager = new RuntimeDbConnection(dbPath);
     const connection = () => this.connection();
     this.loopRunStore = new LoopRunStore(connection);
-    this.loopRunEngine = new LoopRunEngine(connection, this.loopRunStore, new RootExecutionSnapshotStore(connection));
+    this.state = new LoopStateStore(connection);
+    this.repair = new RepairStore(connection);
+    this.control = new ControlFlowStore(connection);
     this.loopScheduleStateStore = new LoopScheduleStateStore(connection);
   }
 
-  close(): void {
-    this.connectionManager.close();
-  }
-
-  connection(): Database.Database {
-    return this.connectionManager.connection();
-  }
+  close(): void { this.connectionManager.close(); }
+  connection(): Database.Database { return this.connectionManager.connection(); }
 
   startLoopRun(
-    rootRunId: string,
-    input?: string,
-    source: LoopRunSource = "manual",
-    schedule?: { stepId: string; scheduledFor: string }
+    _rootRunId: string,
+    _input?: string,
+    _source: LoopRunSource = "manual",
+    _schedule?: { workLoopNodeId: string; scheduledFor: string }
   ): LoopRunDetails {
-    return this.loopRunEngine.start(rootRunId, { input, source, schedule });
+    void _rootRunId; void _input; void _source; void _schedule;
+    throw new WorkLoopRuntimeUnavailableError();
   }
 
-  bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
-    return this.loopRunStore.bindStepExecution(stepRunId, taskId, snapshot);
+  listLoopRuns(limit = 500): LoopRunDetails[] { return this.loopRunStore.list(limit); }
+  listRootLoopRuns(rootRunId: string): LoopRunDetails[] { return this.loopRunStore.listByRoot(rootRunId); }
+  activeLoopIds(): string[] { return this.loopRunStore.activeLoopIds(); }
+  getNodeRun(nodeRunId: string): NodeRun | undefined { return this.loopRunStore.getNodeRun(nodeRunId); }
+  getWorkLoopNodeRun(workLoopNodeRunId: string): WorkLoopNodeRun | undefined {
+    return this.loopRunStore.getWorkLoopNodeRun(workLoopNodeRunId);
+  }
+  getRepairRequest(repairRequestId: string): RepairRequest | undefined {
+    return this.repair.getRequest(repairRequestId);
+  }
+  getOrchestrationFrame(frameId: string): OrchestrationFrame | undefined {
+    return this.repair.getFrame(frameId);
+  }
+  getOrchestratorRoute(routeId: string): OrchestratorRoute | undefined {
+    return this.repair.getRoute(routeId);
+  }
+  listControlFlowEvents(rootRunId: string): ControlFlowEvent[] {
+    return this.control.listByRoot(rootRunId);
   }
 
-  markStepRunRunning(stepRunId: string): StepRun {
-    return this.loopRunStore.markStepRunning(stepRunId);
-  }
-
-  listLoopRuns(limit = 500): LoopRunDetails[] {
-    return this.loopRunStore.list(limit);
-  }
-
-  listRootLoopRuns(rootRunId: string): LoopRunDetails[] {
-    return this.loopRunStore.listByRoot(rootRunId);
-  }
-
-  activeLoopIds(): string[] {
-    return this.loopRunStore.activeLoopIds();
-  }
-
-  listLoopScheduleStates(): LoopScheduleState[] {
-    return this.loopScheduleStateStore.list();
-  }
+  listLoopScheduleStates(): LoopScheduleState[] { return this.loopScheduleStateStore.list(); }
 
   syncLoopScheduleDefinitions(definitions: ScheduleDefinitionState[], updatedAt: string): boolean {
-    const validKeys = new Set(definitions.map((definition) => `${definition.loopId}\0${definition.stepId}`));
-    const transaction = this.connection().transaction(() => {
+    const validKeys = new Set(definitions.map((definition) =>
+      `${definition.loopId}\0${definition.workLoopNodeId}`));
+    return this.connection().transaction(() => {
       let changed = false;
       definitions.forEach((definition) => {
         changed = this.loopScheduleStateStore.replaceDefinition(definition, updatedAt) || changed;
       });
       return this.loopScheduleStateStore.prune(validKeys) || changed;
-    });
-    return transaction() as boolean;
+    })();
   }
 
   completeLoopScheduleOccurrence(input: CompleteScheduleOccurrenceInput): boolean {
@@ -99,118 +92,134 @@ export class RuntimeDatabase {
 
   finishReservedScheduleOccurrence(input: {
     loopId: string;
-    stepId: string;
+    workLoopNodeId: string;
     scheduledFor: string;
     status: "started" | "skipped";
-    runId?: string;
+    loopRunId?: string;
     error?: string;
     updatedAt: string;
   }): boolean {
     const result = this.connection().prepare(`
-      UPDATE loop_schedule_state SET last_status = ?, last_run_id = ?, last_error = ?, updated_at = ?
-      WHERE loop_id = ? AND step_id = ? AND last_scheduled_at = ?
-    `).run(input.status, input.runId ?? null, input.error ?? null, input.updatedAt,
-      input.loopId, input.stepId, input.scheduledFor);
+      UPDATE loop_schedule_state SET last_status = ?, last_loop_run_id = ?, last_error = ?, updated_at = ?
+      WHERE loop_id = ? AND work_loop_node_id = ? AND last_scheduled_at = ?
+    `).run(input.status, input.loopRunId ?? null, input.error ?? null, input.updatedAt,
+      input.loopId, input.workLoopNodeId, input.scheduledFor);
     return result.changes === 1;
   }
 
   recoverReservedScheduleOccurrences(updatedAt = new Date().toISOString()): void {
     const rows = this.connection().prepare(`
-      SELECT loop_id, step_id, last_scheduled_at FROM loop_schedule_state
-      WHERE last_status = 'started' AND last_run_id IS NULL AND last_scheduled_at IS NOT NULL
-    `).all() as Array<{ loop_id: string; step_id: string; last_scheduled_at: string }>;
-    const transaction = this.connection().transaction(() => {
+      SELECT loop_id, work_loop_node_id, last_scheduled_at FROM loop_schedule_state
+      WHERE last_status = 'started' AND last_loop_run_id IS NULL AND last_scheduled_at IS NOT NULL
+    `).all().map(readReservedScheduleRow);
+    this.connection().transaction(() => {
       for (const row of rows) {
-        const run = this.connection().prepare(`
-          SELECT run_id FROM loop_runs WHERE loop_id = ? AND schedule_step_id = ? AND scheduled_for = ? LIMIT 1
-        `).get(row.loop_id, row.step_id, row.last_scheduled_at) as { run_id: string } | undefined;
+        const value = this.connection().prepare(`
+          SELECT loop_run_id FROM loop_invocations
+          WHERE loop_id = ? AND schedule_work_loop_node_id = ? AND scheduled_for = ? LIMIT 1
+        `).get(row.loopId, row.workLoopNodeId, row.scheduledFor);
+        const loopRunId = value ? readStringField(value, "loop_run_id") : undefined;
         this.connection().prepare(`
-          UPDATE loop_schedule_state SET last_status = ?, last_run_id = ?, last_error = ?, updated_at = ?
-          WHERE loop_id = ? AND step_id = ? AND last_scheduled_at = ?
-        `).run(run ? "started" : "missed", run?.run_id ?? null,
-          run ? null : "Scheduled occurrence was interrupted before its Run was stored.", updatedAt,
-          row.loop_id, row.step_id, row.last_scheduled_at);
+          UPDATE loop_schedule_state SET last_status = ?, last_loop_run_id = ?, last_error = ?, updated_at = ?
+          WHERE loop_id = ? AND work_loop_node_id = ? AND last_scheduled_at = ?
+        `).run(loopRunId ? "started" : "missed", loopRunId ?? null,
+          loopRunId ? null : "Scheduled occurrence was interrupted before its Loop Run was stored.", updatedAt,
+          row.loopId, row.workLoopNodeId, row.scheduledFor);
       }
-    });
-    transaction();
-  }
-
-  respondToStepRun(
-    runId: string,
-    stepRunId: string,
-    result: StepRunResult,
-    input: string
-  ): LoopRunDetails {
-    return this.loopRunEngine.respond(runId, stepRunId, result, input);
-  }
-
-  resumeStepRun(runId: string, stepRunId: string, input: string): LoopRunDetails {
-    return this.loopRunEngine.resumeExecutionStep(runId, stepRunId, input);
-  }
-
-  cancelLoopRun(runId: string): LoopRunDetails {
-    return this.loopRunEngine.cancel(runId);
+    })();
   }
 
   terminalizeActiveRootRuns(
     rootRunId: string,
-    detail: {
-      status: "failed";
-      outcome: StepOutcome & { state: "failed" };
-      error: string;
-    } | { status: "cancelled" },
+    status: "failed" | "cancelled",
+    error: string | undefined,
     completedAt = new Date().toISOString()
   ): void {
-    if (detail.status === "failed") {
+    this.connection().transaction(() => {
+      const root = this.connection().prepare(`
+        SELECT current_state_revision, transition_count, active_loop_run_id, active_node_run_id
+        FROM root_runs WHERE root_run_id = ?
+      `).get(rootRunId);
+      const stateRevision = readNumberField(root, "current_state_revision");
+      const sequence = readNumberField(root, "transition_count") + 1;
+      const activeLoopRunId = readOptionalStringField(root, "active_loop_run_id");
+      const activeNodeRunId = readOptionalStringField(root, "active_node_run_id");
+      const activeNode = activeNodeRunId ? this.getNodeRun(activeNodeRunId) : undefined;
+      const nodeStatus = status === "failed" ? "failed" : "cancelled";
       this.connection().prepare(`
-        UPDATE step_runs SET status = 'failed', result = NULL, outcome_json = ?, error = ?,
+        UPDATE node_runs SET status = ?, state_revision_after = ?, error_code = ?, error_message = ?,
           completed_at = ?, updated_at = ?
-        WHERE run_id IN (SELECT run_id FROM loop_runs WHERE root_run_id = ?)
-          AND status IN ('queued', 'running', 'waiting_for_human', 'needs_input')
-      `).run(JSON.stringify(detail.outcome), detail.error, completedAt, completedAt, rootRunId);
-    } else {
+        WHERE root_run_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(nodeStatus, stateRevision, status === "failed" ? "orchestration_failed" : null,
+        error ?? null, completedAt, completedAt, rootRunId);
       this.connection().prepare(`
-        UPDATE step_runs SET status = 'cancelled', result = NULL,
-          completed_at = ?, updated_at = ?
-        WHERE run_id IN (SELECT run_id FROM loop_runs WHERE root_run_id = ?)
-          AND status IN ('queued', 'running', 'waiting_for_human', 'needs_input')
+        UPDATE work_loop_node_runs SET status = ?, state_revision_after = ?, terminal = ?,
+          active_node_run_id = NULL, completed_at = ?, updated_at = ?
+        WHERE root_run_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(status, stateRevision, status, completedAt, completedAt, rootRunId);
+      this.connection().prepare(`
+        UPDATE loop_invocations SET status = ?, completion_state_revision = ?, completed_at = ?, updated_at = ?
+        WHERE root_run_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(status, stateRevision, completedAt, completedAt, rootRunId);
+      this.connection().prepare(`
+        UPDATE repair_requests SET status = 'cancelled', completed_at = ?, updated_at = ?
+        WHERE root_run_id = ? AND status IN ('pending','routed')
       `).run(completedAt, completedAt, rootRunId);
-    }
-    this.connection().prepare(`
-      UPDATE loop_runs SET status = ?, completed_at = ?, updated_at = ?
-      WHERE root_run_id = ? AND status IN ('running', 'waiting_for_human')
-    `).run(detail.status, completedAt, completedAt, rootRunId);
+      this.connection().prepare(`
+        UPDATE orchestration_frames SET status = 'cancelled', completed_at = ?, updated_at = ?
+        WHERE root_run_id = ? AND status = 'open'
+      `).run(completedAt, completedAt, rootRunId);
+      this.connection().prepare(`
+        UPDATE root_runs SET transition_count = ?, active_loop_run_id = NULL,
+          active_node_run_id = NULL, updated_at = ? WHERE root_run_id = ?
+      `).run(sequence, completedAt, rootRunId);
+      this.connection().prepare(`
+        INSERT INTO control_flow_events (
+          root_run_id, sequence, kind, state_revision, source_loop_run_id,
+          source_work_loop_node_run_id, source_node_run_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(rootRunId, sequence, status === "cancelled" ? "root_cancelled" : "root_terminal",
+        stateRevision, activeLoopRunId ?? activeNode?.loopRunId ?? null,
+        activeNode?.workLoopNodeRunId ?? null, activeNodeRunId ?? null, completedAt);
+    })();
   }
 
-  isExecutionStepRunnable(rootRunId: string, stepRunId: string, taskId: string): boolean {
+  isExecutionNodeRunnable(rootRunId: string, nodeRunId: string, taskId: string): boolean {
     return Boolean(this.connection().prepare(`
-      SELECT 1
-      FROM root_runs root
-      JOIN loop_runs loop ON loop.root_run_id = root.root_run_id
-      JOIN step_runs step ON step.run_id = loop.run_id
-      WHERE root.root_run_id = ?
-        AND root.status IN ('queued', 'running', 'waiting_for_human')
-        AND loop.status = 'running'
-        AND step.step_run_id = ?
-        AND step.status = 'queued'
-        AND step.execution_task_id = ?
-      LIMIT 1
-    `).get(rootRunId, stepRunId, taskId));
+      SELECT 1 FROM root_runs root
+      JOIN node_runs node ON node.root_run_id = root.root_run_id
+      JOIN loop_invocations loop ON loop.loop_run_id = node.loop_run_id
+      WHERE root.root_run_id = ? AND root.status IN ('queued','running','waiting_for_input')
+        AND loop.status = 'running' AND node.node_run_id = ? AND node.status = 'queued'
+        AND node.execution_task_id = ? LIMIT 1
+    `).get(rootRunId, nodeRunId, taskId));
   }
-
-  completeExecutionStep(
-    input: {
-      stepRunId: string;
-      executionTaskId?: string;
-      outcome?: StepOutcome;
-      error?: string;
-    }
-  ): LoopRunDetails {
-    return this.loopRunEngine.completeExecutionStep(input);
-  }
-
-  getStepRun(stepRunId: string): StepRun | undefined {
-    return this.loopRunStore.getStepRun(stepRunId);
-  }
-
 }
+
+const readStringField = (value: unknown, key: string): string => {
+  if (typeof value === "object" && value !== null && key in value) {
+    const field = Reflect.get(value, key);
+    if (typeof field === "string") return field;
+  }
+  throw new Error(`Runtime database returned an invalid ${key} value.`);
+};
+const readReservedScheduleRow = (value: unknown) => ({
+  loopId: readStringField(value, "loop_id"),
+  workLoopNodeId: readStringField(value, "work_loop_node_id"),
+  scheduledFor: readStringField(value, "last_scheduled_at")
+});
+const readNumberField = (value: unknown, key: string): number => {
+  if (typeof value === "object" && value !== null && key in value) {
+    const field = Reflect.get(value, key);
+    if (typeof field === "number" && Number.isSafeInteger(field)) return field;
+  }
+  throw new Error(`Runtime database returned an invalid ${key} value.`);
+};
+const readOptionalStringField = (value: unknown, key: string): string | undefined => {
+  if (typeof value === "object" && value !== null && key in value) {
+    const field = Reflect.get(value, key);
+    if (field === null) return undefined;
+    if (typeof field === "string") return field;
+  }
+  throw new Error(`Runtime database returned an invalid ${key} value.`);
+};

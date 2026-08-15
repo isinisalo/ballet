@@ -7,17 +7,17 @@ import { loopReasoningGlowLevel } from "./loopReasoningGlow";
 import { loopThemeNodeGlow } from "./loopTheme";
 import { defaultLoopNodeSize, defaultLoopNodeStyle } from "@shared/api/workspace-contracts";
 import { LoopNodeArtwork } from "./LoopNodeArtwork";
-const stepRunStatusClass: Record<string, string> = {
+const nodeRunStatusClass: Record<string, string> = {
   queued: "border-tertiary/70 text-tertiary",
   running: "border-secondary text-secondary ring-2 ring-secondary/20",
-  waiting_for_human: "border-tertiary text-tertiary ring-2 ring-tertiary/20",
+  waiting_for_input: "border-tertiary text-tertiary ring-2 ring-tertiary/20",
   completed: "border-secondary/75 text-secondary ring-2 ring-secondary/15",
   failed: "border-destructive text-destructive ring-2 ring-destructive/20",
   cancelled: "border-destructive text-destructive ring-2 ring-destructive/20"
 };
-const stepRunPulseClass: Record<string, string> = {
+const nodeRunPulseClass: Record<string, string> = {
   running: "loop-run-node-pulse--running",
-  waiting_for_human: "loop-run-node-pulse--waiting"
+  waiting_for_input: "loop-run-node-pulse--waiting"
 };
 
 export function LoopCompactStepNode({
@@ -136,7 +136,7 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
   const kind: StepNodeKind = step.terminal ? "terminal" : step.scheduled ? "scheduled" : step.humanGate ? "human" : "agent";
   const nodeStyle = step.nodeStyle;
   const nodeSize = step.nodeSize;
-  const status = step.stepRun?.status;
+  const status = step.workLoopNodeRun?.status;
   const scheduleLabel = step.scheduleLabel;
   return {
     title,
@@ -150,8 +150,8 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
     reasoningGlow: kind === "agent" || kind === "scheduled" ? loopReasoningGlowLevel(step.reasoningEffort) : 0,
     borderClass: kind === "human" ? "border-tertiary/60" : kind === "scheduled" ? "border-muted-foreground/55" : undefined,
     status,
-    statusClass: status ? stepRunStatusClass[status] : undefined,
-    pulseClass: status ? stepRunPulseClass[status] : undefined
+    statusClass: status ? nodeRunStatusClass[status] : undefined,
+    pulseClass: status ? nodeRunPulseClass[status] : undefined
   };
 }
 

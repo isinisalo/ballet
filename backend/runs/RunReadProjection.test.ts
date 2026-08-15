@@ -1,128 +1,83 @@
 import { describe, expect, it } from "vitest";
-import type { ExecutionTask, LoopRunDetails, StepRun } from "../../shared/domain/runtime.js";
+import { nodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
+import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
+import type { ExecutionTask, LoopRunDetails, NodeRun, WorkLoopNodeRun } from "../../shared/domain/runtime.js";
+import { testLoop } from "../tests/v10TestConfig.js";
 import { currentPosition } from "./RunReadProjection.js";
 
-const stepRun = (overrides: Partial<StepRun>): StepRun => ({
-  stepRunId: "step-run",
-  runId: "loop-run",
-  loopId: "delivery",
-  stepId: "gate",
-  type: "human",
-  status: "waiting_for_human",
-  attempt: 1,
-  createdAt: "2026-01-01T00:00:00.000Z",
-  updatedAt: "2026-01-01T00:00:00.000Z",
-  ...overrides
+const timestamp = "2026-01-01T00:00:00.000Z";
+
+const composite = (overrides: Partial<WorkLoopNodeRun> = {}): WorkLoopNodeRun => ({
+  workLoopNodeRunId: "work-loop-node-run", rootRunId: "root-run", loopRunId: "loop-run",
+  loopId: "main-loop", workLoopNodeId: "work", attempt: 1, status: "running",
+  stateRevisionBefore: 0, createdAt: timestamp, updatedAt: timestamp, ...overrides
 });
 
-const loopRun = (stepRuns: StepRun[], status: LoopRunDetails["status"] = "waiting_for_human"): LoopRunDetails => ({
-  runId: "loop-run",
-  loopId: "delivery",
-  rootRunId: "root-run",
-  source: "manual",
-  status,
-  snapshot: {} as LoopRunDetails["snapshot"],
-  themeSnapshot: {} as LoopRunDetails["themeSnapshot"],
-  transitionCount: 0,
-  createdAt: "2026-01-01T00:00:00.000Z",
-  updatedAt: "2026-01-01T00:00:00.000Z",
-  stepRuns
+const node = (overrides: Partial<NodeRun> = {}): NodeRun => ({
+  nodeRunId: "node-run", rootRunId: "root-run", loopRunId: "loop-run",
+  workLoopNodeRunId: "work-loop-node-run", role: "work", loopId: "main-loop",
+  workLoopNodeId: "work", nodeDefinitionId: "main-loop:work:work", status: "queued",
+  attempt: 1, stateRevisionBefore: 0, createdAt: timestamp, updatedAt: timestamp, ...overrides
 });
 
-const executionTask = (id = "agent-task"): ExecutionTask => ({
-  id,
-  kind: "loop_step",
-  rootRunId: "root-run",
-  status: "succeeded",
+const loopRun = (
+  workLoopNodeRuns: WorkLoopNodeRun[],
+  nodeRuns: NodeRun[],
+  status: LoopRunDetails["status"] = "running"
+): LoopRunDetails => ({
+  loopRunId: "loop-run", loopId: "main-loop", rootRunId: "root-run", source: "manual", status,
+  snapshot: testLoop(), themeSnapshot: defaultLoopTheme, entryStateRevision: 0, nestingDepth: 0,
+  createdAt: timestamp, updatedAt: timestamp, workLoopNodeRuns, nodeRuns
+});
+
+const executionTask = (nodeRunId = "agent-node-run"): ExecutionTask => ({
+  id: "agent-task", kind: "node_execution", rootRunId: "root-run", status: "succeeded",
   spec: {
-    version: 2,
-    taskId: id,
-    kind: "loop_step",
-    rootRunId: "root-run",
-    loopRunId: "loop-run",
-    stepRunId: "agent-step-run",
+    version: 3, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
+    loopRunId: "loop-run", workLoopNodeRunId: "work-loop-node-run", nodeRunId,
     evidence: {
-      compositionVersion: 1,
-      loopId: "delivery",
-      stepId: "agent",
+      compositionVersion: 2, loopId: "main-loop", workLoopNodeId: "work", nodeRole: "work",
+      nodeDefinitionId: "main-loop:work:work",
       executionProfile: {
-        id: "primary",
-        name: "Primary",
-        provider: "codex",
-        model: "gpt-5",
-        reasoningEffort: "high",
-        networkAccess: false
+        id: "primary", name: "Primary", provider: "codex", model: "gpt-5",
+        reasoningEffort: "high", networkAccess: false
       },
-      resources: [],
-      prompt: "prompt",
-      promptSha256: "prompt-hash",
-      outputSchemaVersion: 1,
-      outputSchemaSha256: "schema-hash"
+      resources: [], prompt: "prompt", promptSha256: "a".repeat(64), outputSchemaVersion: 2,
+      outputSchema: nodeOutcomeJsonSchema, outputSchemaSha256: "b".repeat(64)
     },
-    runtime: {} as ExecutionTask["spec"]["runtime"],
-    project: {} as ExecutionTask["spec"]["project"],
-    createdAt: "2026-01-01T00:00:00.000Z"
+    runtime: {
+      hostname: "localhost", provider: "codex", cliVersion: "1", model: "gpt-5", reasoning: "high",
+      policy: { network: false, readOnlyRoots: [] }, capabilityHash: "c".repeat(64)
+    },
+    project: {
+      checkoutRoot: "/workspace", headSha: "d".repeat(40), configHash: "e".repeat(64), snapshotHash: "f".repeat(64)
+    },
+    createdAt: timestamp
   },
-  createdAt: "2026-01-01T00:00:00.000Z",
-  updatedAt: "2026-01-01T00:00:00.000Z"
+  createdAt: timestamp, updatedAt: timestamp
 });
 
 describe("currentPosition", () => {
-  it("does not attribute the previous Agent task to a current Human Step", () => {
-    const previousAgent = stepRun({
-      stepRunId: "agent-step-run",
-      stepId: "agent",
-      type: "agent",
-      executionTaskId: "agent-task",
-      status: "completed",
-      result: "approved"
+  it("does not attribute a previous provider task to a current Human Node Run", () => {
+    const previous = node({
+      nodeRunId: "agent-node-run", executionTaskId: "agent-task", status: "completed",
+      stateRevisionAfter: 0, completedAt: timestamp
     });
-    const currentHuman = stepRun({ stepRunId: "human-step-run", stepId: "human" });
+    const current = node({ nodeRunId: "human-node-run", role: "validation", nodeDefinitionId: "main-loop:work:validation" });
 
-    expect(currentPosition([loopRun([previousAgent, currentHuman])], [executionTask()])).toEqual({
-      loopRunId: "loop-run",
-      loopId: "delivery",
-      stepRunId: "human-step-run",
-      stepId: "human",
-      taskId: undefined,
-      executionProfileId: undefined,
-      taskStatus: undefined
+    expect(currentPosition([loopRun([composite()], [previous, current])], [executionTask()])).toEqual({
+      loopRunId: "loop-run", loopId: "main-loop", workLoopNodeRunId: "work-loop-node-run",
+      workLoopNodeId: "work", nodeRunId: "human-node-run", nodeRole: "validation",
+      taskId: undefined, executionProfileId: undefined, taskStatus: undefined
     });
   });
 
-  it("keeps a needs_input Agent Step as the current position", () => {
+  it("keeps a waiting provider Node Run as the current position", () => {
     const task = executionTask();
-    const waitingAgent = stepRun({
-      stepRunId: "agent-step-run",
-      stepId: "agent",
-      type: "agent",
-      executionTaskId: task.id,
-      status: "needs_input"
-    });
+    const waiting = node({ nodeRunId: "agent-node-run", executionTaskId: task.id, status: "waiting_for_input" });
 
-    expect(currentPosition([loopRun([waitingAgent])], [task])).toMatchObject({
-      stepRunId: "agent-step-run",
-      stepId: "agent",
-      taskId: "agent-task",
-      executionProfileId: "primary"
-    });
-  });
-
-  it("uses the latest task only when projecting a terminal Run", () => {
-    const task = executionTask();
-    const completedAgent = stepRun({
-      stepRunId: "agent-step-run",
-      stepId: "agent",
-      type: "agent",
-      executionTaskId: task.id,
-      status: "completed",
-      result: "approved"
-    });
-
-    expect(currentPosition([loopRun([completedAgent], "completed")], [task])).toMatchObject({
-      loopRunId: "loop-run",
-      taskId: "agent-task",
-      executionProfileId: "primary"
+    expect(currentPosition([loopRun([composite({ status: "waiting_for_input" })], [waiting])], [task])).toMatchObject({
+      nodeRunId: "agent-node-run", workLoopNodeId: "work", taskId: "agent-task", executionProfileId: "primary"
     });
   });
 });

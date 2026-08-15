@@ -1,9 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { z } from "zod";
 import { afterEach, describe, expect, it } from "vitest";
-import { stepOutcomeSchema } from "../../../shared/api/runtime-schemas.js";
+import { nodeOutcomeJsonSchema } from "../../../shared/api/runtime-schemas.js";
 import type { RuntimeProvider } from "../../../shared/domain/runtime.js";
 import type { CliRuntimeAdapter, RuntimeEvent } from "../providers/CliRuntimeAdapter.js";
 import { CodexAppServerAdapter } from "../providers/codex/CodexAppServerAdapter.js";
@@ -40,12 +39,12 @@ const runLiveSmoke = async (adapter: CliRuntimeAdapter, provider: RuntimeProvide
   try {
     for await (const event of adapter.execute({
       executionId: `${provider}-live-smoke`,
-      prompt: "This is an opt-in Ballet runtime smoke test. Do not use tools or modify files. Return a completed outcome with result approved, the summary 'smoke ok', and no checks.",
+      prompt: "This is an opt-in Ballet runtime smoke test. Do not use tools or modify files. Return a completed Work Node outcome with the summary 'smoke ok'.",
       workingDirectory: root,
       model: models[0]!.id,
       reasoning: models[0]!.defaultReasoning ?? "provider-default",
       policy: { network: false, readOnlyRoots: [] },
-      outputSchema: z.toJSONSchema(stepOutcomeSchema) as Record<string, unknown>,
+      outputSchema: nodeOutcomeJsonSchema,
       signal: controller.signal
     })) events.push(event);
   } finally {
@@ -54,8 +53,8 @@ const runLiveSmoke = async (adapter: CliRuntimeAdapter, provider: RuntimeProvide
   expect(events).toContainEqual(expect.objectContaining({
     type: "execution.completed",
     structuredOutput: expect.objectContaining({
-      state: "completed",
-      result: "approved",
+      role: "work",
+      status: "completed",
       summary: "smoke ok"
     })
   }));

@@ -30,12 +30,21 @@ export class RuntimeDbConnection {
 
   connection(): Database.Database {
     const db = this.database.connection();
-    const sqliteVersion = db.prepare("SELECT sqlite_version() AS version").get() as { version: string };
-    if (!isPatchedSqliteVersion(sqliteVersion.version)) {
+    const row = db.prepare("SELECT sqlite_version() AS version").get();
+    const sqliteVersion = readVersion(row);
+    if (!isPatchedSqliteVersion(sqliteVersion)) {
       this.database.close();
-      throw new Error(`SQLite ${sqliteVersion.version} is not supported for WAL runtime storage. Use 3.51.3+, 3.50.7+, or 3.44.6+.`);
+      throw new Error(`SQLite ${sqliteVersion} is not supported for WAL runtime storage. Use 3.51.3+, 3.50.7+, or 3.44.6+.`);
     }
     return db;
   }
 
 }
+
+const readVersion = (value: unknown): string => {
+  if (typeof value === "object" && value !== null && "version" in value) {
+    const version = Reflect.get(value, "version");
+    if (typeof version === "string") return version;
+  }
+  throw new Error("SQLite returned an invalid version response.");
+};

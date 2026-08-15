@@ -50,6 +50,8 @@ import type {
 } from "../domain/documents.js";
 import type { ExecutionProfile } from "../domain/projectConfig.js";
 import type {
+  CanonicalNodeOutcome,
+  ControlFlowEvent,
   ExecutionEvent,
   ExecutionEventPage,
   ExecutionPolicy,
@@ -62,15 +64,21 @@ import type {
   LocalRuntime,
   LoopRun,
   LoopRunDetails,
+  LoopStateRevision,
   LoopRuntimePreflight,
   LoopScheduleState,
-  RespondToStepRunRequest,
+  NodeRun,
+  NodeRunRole,
+  OrchestrationFrame,
+  OrchestratorRoute,
+  RepairRequest,
+  RootRun,
   RootExecutionSnapshot,
   RuntimeConfigurationIssue,
   RuntimePreflightIssue,
   RuntimeProvider,
-  StepOutcome,
-  StepRun
+  StatePatch,
+  WorkLoopNodeRun
 } from "../domain/runtime.js";
 import type {
   BalletMode,
@@ -168,6 +176,9 @@ export {
   resolveProjectLoopStartNode
 } from "../domain/automation.js";
 export { defaultLoopTheme } from "../domain/loopThemes.js";
+export {
+  maxControlFlowTransitions, maxRuntimeJsonDepth, maxStatePatchBytes, maxStatePatchOperations
+} from "../domain/runtime.js";
 export { automationConfigSchema, kebabCaseIdPattern } from "./workspace-schemas.js";
 
 export type {
@@ -182,7 +193,8 @@ export type {
   LoopEdgeLineStyle, LoopConnectionPointStyle, ProjectOnceWorkSchedule, ProjectRecurringWorkSchedule,
   ProjectScheduleCadence, ProjectScheduleWeekday, ProjectWorkSchedule, LoopRun, LoopRunDetails,
   LoopScheduleState, LoopRuntimePreflight,
-  RespondToStepRunRequest, StepRun, StepOutcome,
+  CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, NodeRun, NodeRunRole,
+  OrchestrationFrame, OrchestratorRoute, RepairRequest, RootRun, StatePatch, WorkLoopNodeRun,
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot,
   ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,

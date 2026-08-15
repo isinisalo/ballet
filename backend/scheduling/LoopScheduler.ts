@@ -23,7 +23,7 @@ export interface LoopSchedulerOptions {
   database: () => RuntimeDatabase;
   dispatch: (input: {
     loopId: string;
-    stepId: string;
+    workLoopNodeId: string;
     definitionHash: string;
     scheduledFor: string;
     nextRunAt?: string;
@@ -115,7 +115,7 @@ export class LoopScheduler {
     const definitionStates = definitions.map((definition) => {
       return {
         loopId: definition.loopId,
-        stepId: definition.nodeId,
+        workLoopNodeId: definition.nodeId,
         definitionHash: definition.definitionHash,
         nextRunAt: initialCursor(definition.work, minuteStart, now)
       };
@@ -130,7 +130,7 @@ export class LoopScheduler {
     for (const state of database.listLoopScheduleStates()) {
       if (this.isPaused(generation)) return;
       if (!state.nextRunAt) continue;
-      const definition = definitionsByKey.get(`${state.loopId}\0${state.stepId}`);
+      const definition = definitionsByKey.get(`${state.loopId}\0${state.workLoopNodeId}`);
       if (!definition) continue;
       let scheduledFor = state.nextRunAt;
       let due = Temporal.Instant.from(scheduledFor);
@@ -140,7 +140,7 @@ export class LoopScheduler {
           ?? scheduledFor;
         const completed = database.completeLoopScheduleOccurrence({
           loopId: state.loopId,
-          stepId: state.stepId,
+          workLoopNodeId: state.workLoopNodeId,
           definitionHash: definition.definitionHash,
           scheduledFor,
           lastScheduledAt,
@@ -159,7 +159,7 @@ export class LoopScheduler {
       if (this.isPaused(generation)) return;
       await this.options.dispatch({
         loopId: state.loopId,
-        stepId: state.stepId,
+        workLoopNodeId: state.workLoopNodeId,
         definitionHash: definition.definitionHash,
         scheduledFor,
         nextRunAt,

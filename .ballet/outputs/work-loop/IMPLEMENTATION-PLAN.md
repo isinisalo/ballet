@@ -1,6 +1,6 @@
 # Work Loop v10 — migraatio- ja toteutussuunnitelma
 
-Tila: vaihe 1 (v10-domain, strict config ja graph-invariantit) on toteutettu. Vaiheet 2–8 ovat vielä toteutussuunnitelmaa; v10-runtime on siihen asti tarkoituksella fail-closed.
+Tila: vaiheet 1–2 (v10-domain, strict config, graph-invariantit, SQLite schema v4 ja atominen State) on toteutettu. Vaiheet 3–8 ovat vielä toteutussuunnitelmaa; varsinainen v10-suorituspolku on siihen asti tarkoituksella fail-closed.
 
 Päätöslähde: [ADR-015 — Work Loop, revisioitu State ja Loop Orchestrator](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md).
 

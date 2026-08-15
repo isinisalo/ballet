@@ -11,7 +11,7 @@ import {
   type ProjectAutomationConfig,
   type ProjectLoop,
   type ProjectWorkLoopNode,
-  type StepRun
+  type WorkLoopNodeRun
 } from "@shared/api/workspace-contracts";
 import type { LoopOutputTarget, LoopStepRecord } from "./loopGraph";
 import { scheduleSummary } from "./loopSchedulePresentation";
@@ -35,7 +35,7 @@ export type LoopVisualStep = {
   nodeSize: LoopNodeSize;
   reasoningEffort?: string;
   step: ProjectWorkLoopNode | LoopVisualTerminal;
-  stepRun?: StepRun;
+  workLoopNodeRun?: WorkLoopNodeRun;
 };
 
 export type LoopVisualLoop = { id: string; start: string; steps: string[] };
@@ -56,7 +56,7 @@ export function buildLoopVisualProjection(
   availableExecutionProfileIds?: ReadonlySet<string>
 ): LoopVisualProjection {
   const loops = config.loops.map((loop) => loop.id === displayedLoop.id ? displayedLoop : loop);
-  const latestRuns = latestStepRuns(run?.stepRuns ?? []);
+  const latestRuns = latestWorkLoopNodeRuns(run?.workLoopNodeRuns ?? []);
   const reasoning = new Map(executionProfiles
     .filter((profile) => !availableExecutionProfileIds || availableExecutionProfileIds.has(profile.id))
     .map((profile) => [profile.id, profile.reasoningEffort]));
@@ -93,7 +93,7 @@ export function buildLoopVisualProjection(
 
 const visualNodes = (
   loop: ProjectLoop,
-  latestRuns: ReadonlyMap<string, StepRun>,
+  latestRuns: ReadonlyMap<string, WorkLoopNodeRun>,
   reasoning: ReadonlyMap<string, string>
 ): LoopVisualStep[] => {
   const nodes = loop.nodes.map((node): LoopVisualStep => {
@@ -112,7 +112,7 @@ const visualNodes = (
       nodeSize: work.nodeSize,
       reasoningEffort: providerWork ? reasoning.get(work.executionProfileId) : undefined,
       step: node,
-      stepRun: latestRuns.get(node.id)
+      workLoopNodeRun: latestRuns.get(node.id)
     };
   });
   const terminals = [...new Set(loop.edges.flatMap((edge) =>
@@ -130,8 +130,8 @@ const visualNodes = (
   }))];
 };
 
-const latestStepRuns = (stepRuns: StepRun[]): Map<string, StepRun> => {
-  const latest = new Map<string, StepRun>();
-  stepRuns.forEach((stepRun) => latest.set(stepRun.stepId, stepRun));
+const latestWorkLoopNodeRuns = (runs: WorkLoopNodeRun[]): Map<string, WorkLoopNodeRun> => {
+  const latest = new Map<string, WorkLoopNodeRun>();
+  runs.forEach((run) => latest.set(run.workLoopNodeId, run));
   return latest;
 };

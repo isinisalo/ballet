@@ -2,12 +2,12 @@ import type { DashboardRunStatus, RootRunSummary } from "@shared/api/workspace-c
 import type { OperationalStatusTone } from "@/components/shared/workspace-ui";
 import { runLoopPath } from "../routing";
 
-export const cancellableRunStatuses = new Set<DashboardRunStatus>(["queued", "running", "waiting_for_human"]);
+export const cancellableRunStatuses = new Set<DashboardRunStatus>(["queued", "running", "waiting_for_input"]);
 
 export const runSummaryPath = (run: RootRunSummary) => runLoopPath(run.targetId, run.rootRunId);
 
 export const currentRunLabel = (run: RootRunSummary) => {
-  const parts = [run.current?.loopId, run.current?.stepId, run.current?.executionProfileId].filter(Boolean);
+  const parts = [run.current?.loopId, run.current?.workLoopNodeId, run.current?.nodeRole, run.current?.executionProfileId].filter(Boolean);
   return parts.length > 0 ? parts.join(" · ") : run.targetId;
 };
 

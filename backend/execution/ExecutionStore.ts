@@ -1,32 +1,22 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
-import { stepOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import type {
+  CanonicalNodeOutcome,
   ExecutionEvent,
   ExecutionEventPage,
   ExecutionSpec,
-  ExecutionTask,
-  ExecutionTaskStatus,
-  StepOutcome
+  ExecutionTask
 } from "../../shared/domain/runtime.js";
+import { nodeRunRowSchema } from "../runtime/RuntimeDbTypes.js";
+import {
+  executionEventRowSchema, executionTaskRowSchema, readExecutionInteger,
+  readExecutionString, type ExecutionEventRow
+} from "./ExecutionDbTypes.js";
 import { ExecutionTaskNotFoundError } from "./ExecutionErrors.js";
+import { assertExecutionSpecEvidence, toExecutionEvent, toExecutionTask } from "./ExecutionStoreMappers.js";
 import { ExecutionTaskStateStore } from "./ExecutionTaskStateStore.js";
 
 const MAX_RETAINED_BYTES = 1024 * 1024;
-
-interface TaskRow {
-  task_id: string; kind: ExecutionTask["kind"]; root_run_id: string; status: ExecutionTaskStatus;
-  spec_json: string; spec_hash: string; started_at: string | null; completed_at: string | null;
-  cancel_requested_at: string | null; error_code: string | null; error_message: string | null;
-  outcome_json: string | null; events_truncated: 0 | 1; created_at: string; updated_at: string;
-}
-
-interface EventRow {
-  id: number; task_id: string; sequence: number; source: ExecutionEvent["source"];
-  kind: ExecutionEvent["kind"]; level: ExecutionEvent["level"]; phase: ExecutionEvent["phase"];
-  item_id: string | null; message: string; data_json: string | null; content_bytes: number;
-  terminal: 0 | 1; created_at: string;
-}
 
 export type ExecutionEventInput = Omit<ExecutionEvent, "id" | "taskId" | "contentBytes">;
 
@@ -38,21 +28,28 @@ export class ExecutionStore {
   }
 
   create(spec: ExecutionSpec): ExecutionTask {
-    assertExecutionSpec(spec);
+    assertExecutionSpecEvidence(spec);
     const specJson = JSON.stringify(spec);
-    this.connection().prepare(`
-      INSERT INTO execution_tasks (
-        task_id, provider, kind, root_run_id, status, spec_json, spec_hash, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?)
-    `).run(spec.taskId, spec.runtime.provider, spec.kind, spec.rootRunId, specJson,
-      createHash("sha256").update(specJson).digest("hex"), spec.createdAt, spec.createdAt);
+    this.connection().transaction(() => {
+      this.connection().prepare(`
+        INSERT INTO execution_tasks (
+          task_id, provider, kind, root_run_id, node_run_id, status, spec_json, spec_hash, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)
+      `).run(spec.taskId, spec.runtime.provider, spec.kind, spec.rootRunId, spec.nodeRunId, specJson,
+        createHash("sha256").update(specJson).digest("hex"), spec.createdAt, spec.createdAt);
+      const bound = this.connection().prepare(`
+        UPDATE node_runs SET execution_task_id = ?, updated_at = ?
+        WHERE node_run_id = ? AND root_run_id = ? AND execution_task_id IS NULL AND status = 'queued'
+      `).run(spec.taskId, spec.createdAt, spec.nodeRunId, spec.rootRunId);
+      if (bound.changes !== 1) throw new Error(`Node Run ${spec.nodeRunId} cannot accept execution task ${spec.taskId}.`);
+    })();
     return this.require(spec.taskId);
   }
 
   get(taskId: string): ExecutionTask | undefined {
     const row = this.connection().prepare("SELECT * FROM execution_tasks WHERE task_id = ?")
-      .get(taskId) as TaskRow | undefined;
-    return row ? toTask(row) : undefined;
+      .get(taskId);
+    return row ? toExecutionTask(executionTaskRowSchema.parse(row)) : undefined;
   }
 
   require(taskId: string): ExecutionTask {
@@ -64,36 +61,36 @@ export class ExecutionStore {
   listByRoot(rootRunId: string): ExecutionTask[] {
     const rows = this.connection().prepare(`
       SELECT * FROM execution_tasks WHERE root_run_id = ? ORDER BY created_at, rowid
-    `).all(rootRunId) as TaskRow[];
-    return rows.map(toTask);
+    `).all(rootRunId);
+    return rows.map((row) => toExecutionTask(executionTaskRowSchema.parse(row)));
   }
 
   queued(provider: "codex" | "copilot"): ExecutionTask | undefined {
     const row = this.connection().prepare(`
       SELECT * FROM execution_tasks WHERE provider = ? AND status = 'queued'
       ORDER BY created_at, rowid LIMIT 1
-    `).get(provider) as TaskRow | undefined;
-    return row ? toTask(row) : undefined;
+    `).get(provider);
+    return row ? toExecutionTask(executionTaskRowSchema.parse(row)) : undefined;
   }
 
   activeCount(provider?: "codex" | "copilot"): number {
     const row = provider
       ? this.connection().prepare("SELECT COUNT(*) count FROM execution_tasks WHERE provider = ? AND status IN ('queued','running')").get(provider)
       : this.connection().prepare("SELECT COUNT(*) count FROM execution_tasks WHERE status IN ('queued','running')").get();
-    return (row as { count: number }).count;
+    return readExecutionInteger(row, "count");
   }
 
   runningCount(provider: "codex" | "copilot"): number {
-    return (this.connection().prepare(`
+    return readExecutionInteger(this.connection().prepare(`
       SELECT COUNT(*) count FROM execution_tasks WHERE provider = ? AND status = 'running'
-    `).get(provider) as { count: number }).count;
+    `).get(provider), "count");
   }
 
   activeTasks(): ExecutionTask[] {
     const rows = this.connection().prepare(`
       SELECT * FROM execution_tasks WHERE status IN ('queued','running') ORDER BY created_at, rowid
-    `).all() as TaskRow[];
-    return rows.map(toTask);
+    `).all();
+    return rows.map((row) => toExecutionTask(executionTaskRowSchema.parse(row)));
   }
 
   claim(taskId: string): ExecutionTask | undefined {
@@ -112,7 +109,7 @@ export class ExecutionStore {
   }
 
   finish(taskId: string, status: "succeeded" | "failed" | "cancelled", detail: {
-    outcome?: StepOutcome; errorCode?: string; errorMessage?: string;
+    outcome?: CanonicalNodeOutcome; errorCode?: string; errorMessage?: string;
   } = {}): ExecutionTask {
     const existing = this.require(taskId);
     if (["succeeded", "failed", "cancelled"].includes(existing.status)) return existing;
@@ -146,11 +143,9 @@ export class ExecutionStore {
   }
 
   recoverInterrupted(): ExecutionTask[] {
-    const rows = this.connection().prepare("SELECT task_id FROM execution_tasks WHERE status = 'running'")
-      .all() as Array<{ task_id: string }>;
-    return rows.map((row) => this.finish(row.task_id, "failed", {
-      errorCode: "interrupted", errorMessage: "Ballet stopped while this task was running; it was not replayed."
-    }));
+    const taskIds = this.connection().prepare("SELECT task_id FROM execution_tasks WHERE status = 'running'")
+      .all().map((row) => readExecutionString(row, "task_id"));
+    return taskIds.map((taskId) => this.recoverInterruptedTask(taskId));
   }
 
   appendEvent(taskId: string, event: ExecutionEventInput): ExecutionEvent {
@@ -183,24 +178,26 @@ export class ExecutionStore {
         kind: event.kind, level: event.level, phase: event.phase, item_id: event.itemId ?? null,
         message, data_json: dataJson, content_bytes: bytes, terminal: event.terminal ? 1 : 0,
         created_at: event.createdAt
-      } satisfies EventRow;
+      } satisfies ExecutionEventRow;
     });
-    return toEvent(transaction() as EventRow);
+    return toExecutionEvent(executionEventRowSchema.parse(transaction()));
   }
 
   events(taskId: string, after = 0, limit = 500): ExecutionEventPage {
     this.require(taskId);
     const rows = this.connection().prepare(`
       SELECT * FROM execution_events WHERE task_id = ? AND id > ? ORDER BY id LIMIT ?
-    `).all(taskId, after, limit + 1) as EventRow[];
+    `).all(taskId, after, limit + 1).map((row) => executionEventRowSchema.parse(row));
     const selected = rows.slice(0, limit);
-    const state = this.connection().prepare("SELECT events_truncated FROM execution_tasks WHERE task_id = ?")
-      .get(taskId) as { events_truncated: 0 | 1 };
+    const truncated = readExecutionInteger(
+      this.connection().prepare("SELECT events_truncated FROM execution_tasks WHERE task_id = ?").get(taskId),
+      "events_truncated"
+    );
     return {
-      entries: selected.map(toEvent),
+      entries: selected.map(toExecutionEvent),
       lastId: selected.at(-1)?.id ?? after,
       hasMore: rows.length > limit,
-      truncated: Boolean(state.events_truncated)
+      truncated: Boolean(truncated)
     };
   }
 
@@ -211,77 +208,81 @@ export class ExecutionStore {
   }
 
   private lastSequence(taskId: string): number {
-    const row = this.connection().prepare("SELECT last_sequence FROM execution_tasks WHERE task_id = ?")
-      .get(taskId) as { last_sequence: number };
-    return row.last_sequence;
+    return readExecutionInteger(
+      this.connection().prepare("SELECT last_sequence FROM execution_tasks WHERE task_id = ?").get(taskId),
+      "last_sequence"
+    );
   }
 
   private trim(taskId: string): void {
-    const state = this.connection().prepare("SELECT retained_content_bytes FROM execution_tasks WHERE task_id = ?")
-      .get(taskId) as { retained_content_bytes: number };
-    let retained = state.retained_content_bytes;
+    const retainedBefore = readExecutionInteger(
+      this.connection().prepare("SELECT retained_content_bytes FROM execution_tasks WHERE task_id = ?").get(taskId),
+      "retained_content_bytes"
+    );
+    let retained = retainedBefore;
     while (retained > MAX_RETAINED_BYTES) {
       const oldest = this.connection().prepare(`
         SELECT id, content_bytes FROM execution_events WHERE task_id = ? AND terminal = 0 ORDER BY id LIMIT 1
-      `).get(taskId) as { id: number; content_bytes: number } | undefined;
+      `).get(taskId);
       if (!oldest) break;
-      this.connection().prepare("DELETE FROM execution_events WHERE id = ?").run(oldest.id);
-      retained -= oldest.content_bytes;
+      const id = readExecutionInteger(oldest, "id");
+      const contentBytes = readExecutionInteger(oldest, "content_bytes");
+      this.connection().prepare("DELETE FROM execution_events WHERE id = ?").run(id);
+      retained -= contentBytes;
     }
-    if (retained !== state.retained_content_bytes) this.connection().prepare(`
+    if (retained !== retainedBefore) this.connection().prepare(`
       UPDATE execution_tasks SET retained_content_bytes = ?, events_truncated = 1 WHERE task_id = ?
     `).run(retained, taskId);
   }
+
+  private recoverInterruptedTask(taskId: string): ExecutionTask {
+    const timestamp = new Date().toISOString();
+    const message = "Ballet stopped while this task was running; it was not replayed.";
+    this.connection().transaction(() => {
+      const task = this.require(taskId);
+      this.connection().prepare(`
+        UPDATE execution_tasks SET status = 'failed', error_code = 'interrupted', error_message = ?,
+          completed_at = ?, updated_at = ? WHERE task_id = ? AND status = 'running'
+      `).run(message, timestamp, timestamp, taskId);
+      const value = this.connection().prepare("SELECT * FROM node_runs WHERE node_run_id = ?")
+        .get(task.spec.nodeRunId);
+      if (!value) return;
+      const node = nodeRunRowSchema.parse(value);
+      if (node.status !== "running") return;
+      this.connection().prepare(`
+        UPDATE node_runs SET status = 'interrupted', error_code = 'interrupted', error_message = ?,
+          state_revision_after = ?, completed_at = ?, updated_at = ? WHERE node_run_id = ?
+      `).run(message, node.state_revision_before, timestamp, timestamp, node.node_run_id);
+      if (node.work_loop_node_run_id) this.connection().prepare(`
+        UPDATE work_loop_node_runs SET status = 'failed', terminal = 'failed', active_node_run_id = NULL,
+          state_revision_after = ?, error_code = 'interrupted', error_message = ?, completed_at = ?, updated_at = ?
+        WHERE work_loop_node_run_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(node.state_revision_before, message, timestamp, timestamp, node.work_loop_node_run_id);
+      this.connection().prepare(`
+        UPDATE loop_invocations SET status = 'failed', completion_state_revision = ?,
+          completed_at = ?, updated_at = ?
+        WHERE loop_run_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(node.state_revision_before, timestamp, timestamp, node.loop_run_id);
+      const root = this.connection().prepare(`
+        SELECT current_state_revision, transition_count FROM root_runs WHERE root_run_id = ?
+      `).get(node.root_run_id);
+      const stateRevision = readExecutionInteger(root, "current_state_revision");
+      const sequence = readExecutionInteger(root, "transition_count") + 1;
+      this.connection().prepare(`
+        UPDATE root_runs SET transition_count = ?, active_node_run_id = NULL,
+          active_loop_run_id = NULL, updated_at = ? WHERE root_run_id = ?
+      `).run(sequence, timestamp, node.root_run_id);
+      this.connection().prepare(`
+        INSERT INTO control_flow_events (
+          root_run_id, sequence, kind, state_revision, source_loop_run_id,
+          source_work_loop_node_run_id, source_node_run_id, created_at
+        ) VALUES (?, ?, 'execution_interrupted', ?, ?, ?, ?, ?)
+      `).run(node.root_run_id, sequence, stateRevision, node.loop_run_id,
+        node.work_loop_node_run_id, node.node_run_id, timestamp);
+    })();
+    return this.require(taskId);
+  }
 }
-
-const toTask = (row: TaskRow): ExecutionTask => {
-  if (sha256(row.spec_json) !== row.spec_hash) {
-    throw new Error(`Execution task ${row.task_id} has invalid persisted specification evidence.`);
-  }
-  const spec = JSON.parse(row.spec_json) as ExecutionSpec;
-  assertExecutionSpec(spec);
-  if (spec.taskId !== row.task_id || spec.rootRunId !== row.root_run_id || spec.kind !== row.kind) {
-    throw new Error(`Execution task ${row.task_id} has inconsistent persisted specification identity.`);
-  }
-  return {
-    id: row.task_id, kind: row.kind, rootRunId: row.root_run_id, status: row.status,
-    spec,
-    startedAt: row.started_at ?? undefined, completedAt: row.completed_at ?? undefined,
-    cancelRequestedAt: row.cancel_requested_at ?? undefined, errorCode: row.error_code ?? undefined,
-    errorMessage: row.error_message ?? undefined,
-    outcome: row.outcome_json ? JSON.parse(row.outcome_json) as StepOutcome : undefined,
-    createdAt: row.created_at, updatedAt: row.updated_at
-  };
-};
-
-const assertExecutionSpec = (spec: ExecutionSpec): void => {
-  if (spec.version !== 2 || spec.kind !== "loop_step") {
-    throw new Error(`Execution task ${spec.taskId} has an unsupported persisted specification.`);
-  }
-  const promptHash = sha256(spec.evidence.prompt);
-  if (promptHash !== spec.evidence.promptSha256) {
-    throw new Error(`Execution task ${spec.taskId} has invalid prompt evidence.`);
-  }
-  const schemaHash = sha256(JSON.stringify(stepOutcomeJsonSchema));
-  if (spec.evidence.outputSchemaVersion !== 1 || spec.evidence.outputSchemaSha256 !== schemaHash) {
-    throw new Error(`Execution task ${spec.taskId} has invalid output schema evidence.`);
-  }
-  if (spec.evidence.executionProfile.provider !== spec.runtime.provider
-    || spec.evidence.executionProfile.model !== spec.runtime.model
-    || spec.evidence.executionProfile.reasoningEffort !== spec.runtime.reasoning
-    || spec.evidence.executionProfile.networkAccess !== spec.runtime.policy.network) {
-    throw new Error(`Execution task ${spec.taskId} has inconsistent profile and runtime evidence.`);
-  }
-};
-
-const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
-
-const toEvent = (row: EventRow): ExecutionEvent => ({
-  id: row.id, taskId: row.task_id, sequence: row.sequence, source: row.source, kind: row.kind,
-  level: row.level, phase: row.phase, itemId: row.item_id ?? undefined, message: row.message,
-  data: row.data_json ? JSON.parse(row.data_json) as Record<string, unknown> : undefined,
-  contentBytes: row.content_bytes, terminal: Boolean(row.terminal), createdAt: row.created_at
-});
 
 const truncateUtf8 = (value: string, maxBytes: number): string => {
   if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;

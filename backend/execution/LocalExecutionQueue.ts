@@ -1,6 +1,6 @@
-import type { ExecutionTask, RuntimeProvider, StepOutcome } from "../../shared/domain/runtime.js";
+import type { CanonicalNodeOutcome, ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
 import path from "node:path";
-import { stepOutcomeJsonSchema, stepOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import { nodeOutcomeSchema } from "../../shared/api/runtime-schemas.js";
 import { WorkspacePermissionPolicy } from "./WorkspacePermissionPolicy.js";
 import type { ExecutionStore } from "./ExecutionStore.js";
 import type { LocalRuntimeService } from "./LocalRuntimeService.js";
@@ -109,7 +109,7 @@ export class LocalExecutionQueue {
     const controller = new AbortController();
     this.controllers.set(task.id, controller);
     this.options.onChanged?.(task.rootRunId);
-    let outcome: StepOutcome | undefined;
+    let outcome: CanonicalNodeOutcome | undefined;
     let terminal: ExecutionTask;
     let sequence = 0;
     try {
@@ -128,16 +128,16 @@ export class LocalExecutionQueue {
         policy: expected.policy,
         signal: controller.signal,
         permissionPolicy: new WorkspacePermissionPolicy(this.rootWorktree(task), expected.policy),
-        outputSchema: stepOutcomeJsonSchema
+        outputSchema: task.spec.evidence.outputSchema
       })) {
         this.options.store.appendEvent(task.id, toExecutionEvent(event, sequence++, expected.provider));
         if (event.type === "execution.completed") {
-          const parsed = stepOutcomeSchema.safeParse(event.structuredOutput);
-          if (!parsed.success) throw new Error(`Step returned an invalid structured outcome: ${parsed.error.message}`);
-          outcome = parsed.data as StepOutcome;
+          const parsed = nodeOutcomeSchema.safeParse(event.structuredOutput);
+          if (!parsed.success) throw new Error(`Node returned an invalid structured outcome: ${parsed.error.message}`);
+          outcome = parsed.data;
         }
       }
-      if (!outcome) throw new Error("Runtime completed without a structured Step outcome.");
+      if (!outcome) throw new Error("Runtime completed without a structured Node outcome.");
       terminal = this.options.store.finish(task.id, "succeeded", { outcome });
       this.appendTerminal(terminal, terminalMessage(terminal));
     } catch (error) {

@@ -1,0 +1,137 @@
+export const runtimeSchemaTables = `
+  CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  CREATE TABLE root_runs (
+    root_run_id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL CHECK(kind = 'loop'),
+    target_id TEXT NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('manual','schedule')),
+    status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_input','finalizing','completed','blocked','failed','cancelled')),
+    input TEXT,
+    outcome_json TEXT CHECK(outcome_json IS NULL OR json_valid(outcome_json)),
+    error_code TEXT,
+    error_message TEXT,
+    worktree_path TEXT NOT NULL,
+    branch TEXT NOT NULL,
+    head_sha TEXT NOT NULL,
+    config_hash TEXT NOT NULL,
+    snapshot_hash TEXT NOT NULL,
+    execution_snapshot_json TEXT NOT NULL CHECK(json_valid(execution_snapshot_json)),
+    current_state_revision INTEGER NOT NULL DEFAULT 0 CHECK(current_state_revision >= 0),
+    transition_count INTEGER NOT NULL DEFAULT 0 CHECK(transition_count BETWEEN 0 AND 256),
+    active_loop_run_id TEXT,
+    active_node_run_id TEXT,
+    finalization_status TEXT CHECK(finalization_status IN ('finalizing','completed','failed')),
+    finalization_terminal_status TEXT CHECK(finalization_terminal_status IN ('completed','blocked','failed','cancelled')),
+    finalization_success INTEGER CHECK(finalization_success IN (0,1)),
+    finalization_report_json TEXT CHECK(finalization_report_json IS NULL OR json_valid(finalization_report_json)),
+    finalization_started_at TEXT,
+    finalization_completed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    FOREIGN KEY(root_run_id, current_state_revision)
+      REFERENCES state_revisions(root_run_id, revision) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(active_loop_run_id) REFERENCES loop_invocations(loop_run_id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(active_node_run_id) REFERENCES node_runs(node_run_id) DEFERRABLE INITIALLY DEFERRED
+  );
+  CREATE TABLE state_revisions (
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    revision INTEGER NOT NULL CHECK(revision >= 0),
+    parent_revision INTEGER,
+    state_json TEXT NOT NULL CHECK(json_valid(state_json) AND length(CAST(state_json AS BLOB)) <= 262144),
+    state_hash TEXT NOT NULL CHECK(length(state_hash) = 64),
+    patch_json TEXT CHECK(patch_json IS NULL OR (json_valid(patch_json) AND length(CAST(patch_json AS BLOB)) <= 65536)),
+    patch_hash TEXT CHECK(patch_hash IS NULL OR length(patch_hash) = 64),
+    source_node_run_id TEXT,
+    outcome_json TEXT CHECK(outcome_json IS NULL OR json_valid(outcome_json)),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(root_run_id, revision),
+    FOREIGN KEY(root_run_id, parent_revision)
+      REFERENCES state_revisions(root_run_id, revision) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(source_node_run_id) REFERENCES node_runs(node_run_id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK(
+      (revision = 0 AND parent_revision IS NULL AND patch_json IS NULL AND patch_hash IS NULL AND source_node_run_id IS NULL)
+      OR (revision > 0 AND parent_revision = revision - 1 AND patch_json IS NOT NULL AND patch_hash IS NOT NULL AND source_node_run_id IS NOT NULL)
+    )
+  );
+  CREATE TABLE loop_invocations (
+    loop_run_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    loop_id TEXT NOT NULL,
+    parent_loop_run_id TEXT REFERENCES loop_invocations(loop_run_id),
+    source TEXT NOT NULL CHECK(source IN ('manual','flow','repair','schedule')),
+    status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
+    input_json TEXT CHECK(input_json IS NULL OR json_valid(input_json)),
+    schedule_work_loop_node_id TEXT,
+    scheduled_for TEXT,
+    entry_state_revision INTEGER NOT NULL CHECK(entry_state_revision >= 0),
+    completion_state_revision INTEGER CHECK(completion_state_revision >= entry_state_revision),
+    nesting_depth INTEGER NOT NULL DEFAULT 0 CHECK(nesting_depth >= 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    FOREIGN KEY(root_run_id, entry_state_revision) REFERENCES state_revisions(root_run_id, revision),
+    FOREIGN KEY(root_run_id, completion_state_revision) REFERENCES state_revisions(root_run_id, revision),
+    CHECK((source = 'schedule') = (schedule_work_loop_node_id IS NOT NULL AND scheduled_for IS NOT NULL)),
+    CHECK((status IN ('completed','blocked','failed','cancelled')) = (completed_at IS NOT NULL))
+  );
+  CREATE TABLE work_loop_node_runs (
+    work_loop_node_run_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    loop_run_id TEXT NOT NULL REFERENCES loop_invocations(loop_run_id) ON DELETE CASCADE,
+    loop_id TEXT NOT NULL,
+    work_loop_node_id TEXT NOT NULL,
+    attempt INTEGER NOT NULL CHECK(attempt > 0),
+    status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
+    state_revision_before INTEGER NOT NULL CHECK(state_revision_before >= 0),
+    state_revision_after INTEGER CHECK(state_revision_after >= state_revision_before),
+    active_node_run_id TEXT,
+    terminal TEXT CHECK(terminal IN ('completed','blocked','failed','cancelled')),
+    error_code TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    FOREIGN KEY(root_run_id, state_revision_before) REFERENCES state_revisions(root_run_id, revision),
+    FOREIGN KEY(root_run_id, state_revision_after) REFERENCES state_revisions(root_run_id, revision),
+    FOREIGN KEY(active_node_run_id) REFERENCES node_runs(node_run_id) DEFERRABLE INITIALLY DEFERRED,
+    UNIQUE(loop_run_id, work_loop_node_id, attempt),
+    CHECK((status IN ('completed','blocked','failed','cancelled')) = (completed_at IS NOT NULL)),
+    CHECK((terminal IS NOT NULL) = (status IN ('completed','blocked','failed','cancelled')))
+  );
+  CREATE TABLE node_runs (
+    node_run_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    loop_run_id TEXT NOT NULL REFERENCES loop_invocations(loop_run_id) ON DELETE CASCADE,
+    work_loop_node_run_id TEXT REFERENCES work_loop_node_runs(work_loop_node_run_id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('work','validation','orchestrator')),
+    loop_id TEXT NOT NULL,
+    work_loop_node_id TEXT,
+    node_definition_id TEXT NOT NULL,
+    execution_task_id TEXT UNIQUE,
+    input_json TEXT CHECK(input_json IS NULL OR json_valid(input_json)),
+    context_json TEXT CHECK(context_json IS NULL OR json_valid(context_json)),
+    outcome_json TEXT CHECK(outcome_json IS NULL OR json_valid(outcome_json)),
+    status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled','interrupted')),
+    attempt INTEGER NOT NULL CHECK(attempt > 0),
+    state_revision_before INTEGER NOT NULL CHECK(state_revision_before >= 0),
+    state_revision_after INTEGER CHECK(state_revision_after >= state_revision_before),
+    patch_json TEXT CHECK(patch_json IS NULL OR (json_valid(patch_json) AND length(CAST(patch_json AS BLOB)) <= 65536)),
+    patch_hash TEXT CHECK(patch_hash IS NULL OR length(patch_hash) = 64),
+    error_code TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    FOREIGN KEY(root_run_id, state_revision_before) REFERENCES state_revisions(root_run_id, revision),
+    FOREIGN KEY(root_run_id, state_revision_after) REFERENCES state_revisions(root_run_id, revision),
+    FOREIGN KEY(execution_task_id) REFERENCES execution_tasks(task_id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK(
+      (role = 'orchestrator' AND work_loop_node_run_id IS NULL AND work_loop_node_id IS NULL)
+      OR (role IN ('work','validation') AND work_loop_node_run_id IS NOT NULL AND work_loop_node_id IS NOT NULL)
+    ),
+    CHECK((patch_json IS NULL) = (patch_hash IS NULL)),
+    CHECK((status IN ('completed','blocked','failed','cancelled','interrupted')) = (completed_at IS NOT NULL))
+  );
+`;

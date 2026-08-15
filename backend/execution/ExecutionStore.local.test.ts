@@ -3,9 +3,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { stepOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
+import { nodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import type { ExecutionSpec } from "../../shared/domain/runtime.js";
 import { LocalDatabase } from "../storage/LocalDatabase.js";
+import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import { ExecutionStore } from "./ExecutionStore.js";
 
 const temporaryRoots: string[] = [];
@@ -77,6 +78,7 @@ describe("ExecutionStore", () => {
     fixture.store.create(specification("running", "root-1"));
     fixture.store.create(specification("queued", "root-1"));
     fixture.markRunning("running");
+    fixture.reopen();
 
     const recovered = fixture.store.recoverInterrupted();
 
@@ -88,6 +90,16 @@ describe("ExecutionStore", () => {
       errorMessage: expect.stringContaining("was not replayed")
     });
     expect(fixture.store.require("queued").status).toBe("queued");
+    expect(fixture.connection().prepare(`
+      SELECT status, state_revision_after FROM node_runs WHERE node_run_id = 'node-running'
+    `).get()).toEqual({ status: "interrupted", state_revision_after: 0 });
+    expect(fixture.connection().prepare(`
+      SELECT status, state_revision_after FROM work_loop_node_runs WHERE work_loop_node_run_id = 'work-loop-running'
+    `).get()).toEqual({ status: "failed", state_revision_after: 0 });
+    expect(fixture.connection().prepare("SELECT current_state_revision FROM root_runs WHERE root_run_id = 'root-1'").pluck().get())
+      .toBe(0);
+    expect(fixture.connection().prepare("SELECT kind FROM control_flow_events").pluck().all())
+      .toEqual(["execution_interrupted"]);
     fixture.close();
   });
 
@@ -129,10 +141,9 @@ describe("ExecutionStore", () => {
 });
 
 const approvedOutcome = {
-  state: "completed" as const,
-  result: "approved" as const,
-  summary: "Approved.",
-  checks: []
+  role: "work" as const,
+  status: "completed" as const,
+  summary: "Completed."
 };
 
 const specification = (
@@ -141,16 +152,19 @@ const specification = (
   provider: "codex" | "copilot" = "codex",
   createdAt = new Date().toISOString()
 ): ExecutionSpec => ({
-  version: 2,
+  version: 3,
   taskId,
-  kind: "loop_step",
+  kind: "node_execution",
   rootRunId,
   loopRunId: `loop-${rootRunId}`,
-  stepRunId: `step-${taskId}`,
+  workLoopNodeRunId: `work-loop-${taskId}`,
+  nodeRunId: `node-${taskId}`,
   evidence: {
-    compositionVersion: 1,
+    compositionVersion: 2,
     loopId: "delivery",
-    stepId: taskId,
+    workLoopNodeId: taskId,
+    nodeRole: "work",
+    nodeDefinitionId: `delivery:${taskId}:work`,
     executionProfile: {
       id: `${provider}-test-medium`,
       name: `${provider} test · Medium`,
@@ -162,7 +176,7 @@ const specification = (
     resources: [{
       kind: "system",
       origin: "system",
-      id: "system:execution-contract-v1",
+      id: "system:execution-contract-v2",
       sourceSha256: "b".repeat(64)
     }, {
       kind: "primary",
@@ -173,16 +187,17 @@ const specification = (
     }],
     prompt: `Input for ${taskId}`,
     promptSha256: sha256(`Input for ${taskId}`),
-    outputSchemaVersion: 1,
-    outputSchemaSha256: sha256(JSON.stringify(stepOutcomeJsonSchema))
+    outputSchemaVersion: 2,
+    outputSchema: nodeOutcomeJsonSchema,
+    outputSchemaSha256: sha256(canonicalJson(nodeOutcomeJsonSchema))
   },
   runtime: {
     hostname: "localhost", provider, cliVersion: "1.2.3", model: "provider-default",
     reasoning: "provider-default", policy: { network: false, readOnlyRoots: [] },
-    capabilityHash: `${provider}-capabilities`
+    capabilityHash: "d".repeat(64)
   },
   project: {
-    checkoutRoot: "/checkout", headSha: "a".repeat(40), configHash: "config", snapshotHash: "snapshot"
+    checkoutRoot: "/checkout", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
   },
   createdAt
 });
@@ -203,22 +218,66 @@ const event = (sequence: number, message: string, terminal: boolean, createdAt: 
 const createFixture = async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "ballet-execution-store-"));
   temporaryRoots.push(root);
-  const database = new LocalDatabase(path.join(root, "state.sqlite"));
+  const filename = path.join(root, "state.sqlite");
+  let database = new LocalDatabase(filename);
   const connection = () => database.connection();
   const store = new ExecutionStore(connection);
   const insertRoot = (rootRunId: string): void => {
-    connection().prepare(`
-      INSERT INTO root_runs (
-        root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
-        config_hash, snapshot_hash, execution_snapshot_json, created_at, updated_at
-      ) VALUES (?, 'loop', 'delivery', 'manual', 'queued', ?, ?, ?, 'config', 'snapshot', '{}', ?, ?)
-    `).run(rootRunId, path.join(root, "worktrees", rootRunId), `ballet/run/${rootRunId}`, "a".repeat(40),
-      "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
+    const timestamp = "2026-01-01T00:00:00.000Z";
+    connection().transaction(() => {
+      connection().prepare(`
+        INSERT INTO root_runs (
+          root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
+          config_hash, snapshot_hash, execution_snapshot_json, current_state_revision,
+          transition_count, created_at, updated_at
+        ) VALUES (?, 'loop', 'delivery', 'manual', 'queued', ?, ?, ?, ?, ?, '{}', 0, 0, ?, ?)
+      `).run(rootRunId, path.join(root, "worktrees", rootRunId), `ballet/run/${rootRunId}`,
+        "a".repeat(40), "b".repeat(64), "c".repeat(64), timestamp, timestamp);
+      connection().prepare(`
+        INSERT INTO state_revisions (root_run_id, revision, state_json, state_hash, created_at)
+        VALUES (?, 0, '{}', ?, ?)
+      `).run(rootRunId, sha256("{}"), timestamp);
+      connection().prepare(`
+        INSERT INTO loop_invocations (
+          loop_run_id, root_run_id, loop_id, source, status, entry_state_revision,
+          nesting_depth, created_at, updated_at
+        ) VALUES (?, ?, 'delivery', 'manual', 'running', 0, 0, ?, ?)
+      `).run(`loop-${rootRunId}`, rootRunId, timestamp, timestamp);
+      for (const taskId of ["task-a", "task-b", "queued", "running", "task"]) {
+        connection().prepare(`
+          INSERT OR IGNORE INTO work_loop_node_runs (
+            work_loop_node_run_id, root_run_id, loop_run_id, loop_id, work_loop_node_id,
+            attempt, status, state_revision_before, created_at, updated_at
+          ) VALUES (?, ?, ?, 'delivery', ?, 1, 'running', 0, ?, ?)
+        `).run(`work-loop-${taskId}`, rootRunId, `loop-${rootRunId}`, taskId, timestamp, timestamp);
+        connection().prepare(`
+          INSERT OR IGNORE INTO node_runs (
+            node_run_id, root_run_id, loop_run_id, work_loop_node_run_id, role, loop_id,
+            work_loop_node_id, node_definition_id, status, attempt, state_revision_before,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, 'work', 'delivery', ?, ?, 'queued', 1, 0, ?, ?)
+        `).run(`node-${taskId}`, rootRunId, `loop-${rootRunId}`, `work-loop-${taskId}`,
+          taskId, `delivery:${taskId}:work`, timestamp, timestamp);
+      }
+    })();
   };
   const markRunning = (taskId: string): void => {
     connection().prepare(`
       UPDATE execution_tasks SET status = 'running', started_at = updated_at WHERE task_id = ?
     `).run(taskId);
+    connection().prepare(`
+      UPDATE node_runs SET status = 'running', started_at = updated_at WHERE node_run_id = ?
+    `).run(`node-${taskId}`);
   };
-  return { store, connection, insertRoot, markRunning, close: () => database.close() };
+  return {
+    store,
+    connection,
+    insertRoot,
+    markRunning,
+    reopen: () => {
+      database.close();
+      database = new LocalDatabase(filename);
+    },
+    close: () => database.close()
+  };
 };

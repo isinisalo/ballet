@@ -15,7 +15,7 @@ describe("Root Run cancellation drain barrier", () => {
     expect(fixture.store.claim(taskId)?.status).toBe("running");
     fixture.store.requestCancel(taskId);
     const roots = new RootRunStore(() => fixture.connection());
-    roots.setStatus(rootRunId, "cancelled");
+    roots.startFinalization(rootRunId, false, "cancelled");
     const finalizeWorkspace = vi.fn(async (root: StoredRootRun): Promise<RootFinalizationReport> => ({
       success: false,
       retained: true,
@@ -56,6 +56,7 @@ describe("Root Run cancellation drain barrier", () => {
     expect(fixture.store.require(taskId).status).toBe("cancelled");
     expect(finalizeWorkspace).toHaveBeenCalledOnce();
     expect(roots.require(rootRunId).finalization?.status).toBe("completed");
+    expect(() => roots.setStatus(rootRunId, "running")).toThrow("terminal root run status is immutable");
     await fixture.close();
   });
 });

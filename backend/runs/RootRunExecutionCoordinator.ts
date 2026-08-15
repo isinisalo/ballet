@@ -5,7 +5,6 @@ import type { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
 import type { LocalWorkspaceManager } from "../execution/git/LocalWorkspaceManager.js";
 import type { RuntimeDatabase } from "../runtime-db.js";
 import { WorkLoopRuntimeUnavailableError } from "../runtime/LoopRunErrors.js";
-import { failedRuntimeOutcome } from "../runtime/RuntimeOutcomes.js";
 import type { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import type { RootRunStore, StoredRootRun } from "./RootRunStore.js";
 import { isActiveRootStatus } from "./RunReadProjection.js";
@@ -21,12 +20,7 @@ export interface RootRunExecutionCoordinatorOptions {
   onChanged?(rootRunId: string): void;
 }
 
-type TerminalStatus = "completed" | "blocked" | "failed" | "cancelled";
-type RootTerminalization = {
-  status: "failed";
-  outcome: ReturnType<typeof failedRuntimeOutcome>;
-  error: string;
-} | { status: "cancelled" };
+type RootTerminalization = { status: "failed"; error: string } | { status: "cancelled" };
 
 export class RootRunExecutionCoordinator {
   constructor(private readonly options: RootRunExecutionCoordinatorOptions) {}
@@ -43,44 +37,25 @@ export class RootRunExecutionCoordinator {
 
   async sync(rootRunId: string): Promise<void> {
     const runs = this.options.database.listRootLoopRuns(rootRunId);
-    if (runs.some((run) => run.status === "waiting_for_human")) {
-      this.options.roots.setStatus(rootRunId, "waiting_for_human");
+    if (runs.some((run) => run.status === "waiting_for_input")) {
+      this.options.roots.setStatus(rootRunId, "waiting_for_input");
       return;
     }
-    if (runs.some((run) => run.status === "running")) {
-      const queued = this.options.executions.listByRoot(rootRunId)
-        .some((task) => task.status === "queued");
+    if (runs.some((run) => ["queued", "running"].includes(run.status))) {
+      const queued = this.options.executions.listByRoot(rootRunId).some((task) => task.status === "queued");
       this.options.roots.setStatus(rootRunId, queued ? "queued" : "running");
       return;
     }
     const status = runs.some((run) => run.status === "failed") ? "failed"
       : runs.some((run) => run.status === "blocked") ? "blocked"
         : runs.some((run) => run.status === "cancelled") ? "cancelled" : "completed";
-    const outcome = [...this.options.executions.listByRoot(rootRunId)].reverse()
-      .find((task) => task.outcome)?.outcome;
-    this.options.roots.setStatus(rootRunId, status, { outcome });
     await this.options.finalizer.finalize(rootRunId, status);
   }
 
   async handleTerminal(task: ExecutionTask): Promise<void> {
     const root = this.options.roots.require(task.rootRunId);
-    const terminal = terminalStatus(root);
-    if (terminal) {
-      await this.options.finalizer.finalize(root.rootRunId, terminal);
-      return;
-    }
-    try {
-      this.options.database.completeExecutionStep({
-        stepRunId: task.spec.stepRunId,
-        executionTaskId: task.id,
-        outcome: task.status === "succeeded" ? task.outcome : undefined,
-        error: task.status === "succeeded" ? undefined : task.errorMessage ?? `Execution ${task.status}.`
-      });
-      await this.enqueuePending(task.rootRunId);
-      await this.sync(task.rootRunId);
-    } catch (error) {
-      await this.failRoot(root, error);
-    }
+    if (!isActiveRootStatus(root.status)) return;
+    await this.failRoot(root, new WorkLoopRuntimeUnavailableError());
   }
 
   handleStarted(task: ExecutionTask): boolean {
@@ -94,14 +69,11 @@ export class RootRunExecutionCoordinator {
     for (const root of roots) {
       try {
         if (root.status === "finalizing") {
-          await this.recoverTerminalRoot(root, root.finalizationTerminalStatus ?? "failed");
+          await this.options.finalizer.finalize(root.rootRunId, root.finalizationTerminalStatus ?? "failed");
         } else if (await this.applyUnreconciledTerminal(root)) {
           continue;
         } else if (isActiveRootStatus(root.status)) {
           await this.enqueuePending(root.rootRunId);
-          await this.sync(root.rootRunId);
-        } else if (isTerminalRootStatus(root.status) && !root.finalization) {
-          await this.recoverTerminalRoot(root, root.status);
         } else if (root.status === "completed" && root.finalization?.report?.success) {
           await this.options.workspaces.cleanupSuccessful(root).catch(() => undefined);
         }
@@ -113,8 +85,7 @@ export class RootRunExecutionCoordinator {
 
   async failRoot(root: StoredRootRun, error: unknown): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
-    const outcome = failedRuntimeOutcome(message);
-    await this.terminalizeRoot(root.rootRunId, { status: "failed", outcome, error: message });
+    await this.terminalizeRoot(root.rootRunId, { status: "failed", error: message });
   }
 
   async cancelRoot(root: StoredRootRun): Promise<void> {
@@ -125,16 +96,12 @@ export class RootRunExecutionCoordinator {
     if (!isActiveRootStatus(root.status)) return false;
     const terminal = this.options.executions.listByRoot(root.rootRunId).find((task) => {
       if (!["succeeded", "failed", "cancelled"].includes(task.status)) return false;
-      const step = this.options.database.getStepRun(task.spec.stepRunId);
-      return Boolean(step && step.executionTaskId === task.id && ["queued", "running"].includes(step.status));
+      const node = this.options.database.getNodeRun(task.spec.nodeRunId);
+      return Boolean(node && node.executionTaskId === task.id && ["queued", "running"].includes(node.status));
     });
     if (!terminal) return false;
     await this.handleTerminal(terminal);
     return true;
-  }
-
-  private changed(rootRunId: string): void {
-    this.options.onChanged?.(rootRunId);
   }
 
   private async terminalizeRoot(rootRunId: string, detail: RootTerminalization): Promise<void> {
@@ -142,39 +109,26 @@ export class RootRunExecutionCoordinator {
     const persisted = this.options.connection().transaction(() => {
       const current = this.options.roots.require(rootRunId);
       if (!terminalizableRootStatuses.has(current.status)) return { root: current, taskIds: [] as string[] };
-      this.options.database.terminalizeActiveRootRuns(rootRunId, detail, timestamp);
-      const taskIds = this.options.executions.cancelActiveByRoot(rootRunId, timestamp);
-      const root = this.options.roots.setStatus(rootRunId, detail.status, detail.status === "failed" ? {
-        outcome: detail.outcome,
-        errorCode: "orchestration_failed",
-        errorMessage: detail.error,
+      this.options.database.terminalizeActiveRootRuns(
+        rootRunId,
+        detail.status,
+        detail.status === "failed" ? detail.error : undefined,
         timestamp
-      } : { timestamp });
+      );
+      const taskIds = this.options.executions.cancelActiveByRoot(rootRunId, timestamp);
+      const root = this.options.roots.startFinalization(
+        rootRunId,
+        false,
+        detail.status,
+        detail.status === "failed"
+          ? { errorCode: "orchestration_failed", errorMessage: detail.error, timestamp }
+          : { timestamp }
+      );
       return { root, taskIds };
-    })() as { root: StoredRootRun; taskIds: string[] };
+    })();
     await this.interrupt(persisted.taskIds, `Root Run ${detail.status}.`);
-    const terminal = terminalStatus(persisted.root);
-    if (terminal) await this.options.finalizer.finalize(rootRunId, terminal);
-    this.changed(rootRunId);
-  }
-
-  private async recoverTerminalRoot(root: StoredRootRun, terminal: TerminalStatus): Promise<void> {
-    const timestamp = new Date().toISOString();
-    const taskIds = this.options.connection().transaction(() => {
-      const detail: RootTerminalization = terminal === "failed"
-        ? {
-            status: "failed",
-            outcome: root.outcome?.state === "failed"
-              ? root.outcome as ReturnType<typeof failedRuntimeOutcome>
-              : failedRuntimeOutcome(root.errorMessage ?? "Root Run failed."),
-            error: root.errorMessage ?? "Root Run failed."
-          }
-        : { status: "cancelled" };
-      this.options.database.terminalizeActiveRootRuns(root.rootRunId, detail, timestamp);
-      return this.options.executions.cancelActiveByRoot(root.rootRunId, timestamp);
-    })() as string[];
-    await this.interrupt(taskIds, `Root Run ${terminal}.`);
-    await this.options.finalizer.finalize(root.rootRunId, terminal);
+    if (persisted.root.status === "finalizing") await this.options.finalizer.finalize(rootRunId, detail.status);
+    this.options.onChanged?.(rootRunId);
   }
 
   private async interrupt(taskIds: string[], reason: string): Promise<void> {
@@ -183,11 +137,5 @@ export class RootRunExecutionCoordinator {
 }
 
 const terminalizableRootStatuses = new Set<StoredRootRun["status"]>([
-  "queued", "running", "waiting_for_human"
+  "queued", "running", "waiting_for_input"
 ]);
-const isTerminalRootStatus = (status: StoredRootRun["status"]): status is TerminalStatus =>
-  ["completed", "blocked", "failed", "cancelled"].includes(status);
-const terminalStatus = (root: StoredRootRun): TerminalStatus | undefined =>
-  isTerminalRootStatus(root.status)
-    ? root.status
-    : root.status === "finalizing" ? root.finalizationTerminalStatus : undefined;

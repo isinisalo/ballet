@@ -54,18 +54,20 @@ describe("Loop Run association", () => {
 function rootRun(rootRunId: string): RootRunDetail {
   const snapshot: ProjectLoop = v10Loop(loopId);
   const run: LoopRunDetails = {
-    runId: `loop-${rootRunId}`,
+    loopRunId: `loop-${rootRunId}`,
     loopId,
     rootRunId,
     source: "manual",
     status: "completed",
     snapshot,
     themeSnapshot: structuredClone(defaultLoopTheme),
-    transitionCount: 0,
+    entryStateRevision: 0,
+    nestingDepth: 0,
     createdAt: now,
     updatedAt: now,
     completedAt: now,
-    stepRuns: []
+    workLoopNodeRuns: [],
+    nodeRuns: []
   };
   return {
     rootRunId,
@@ -73,12 +75,13 @@ function rootRun(rootRunId: string): RootRunDetail {
     targetId: loopId,
     source: "manual",
     status: "completed",
-    current: { loopRunId: run.runId, loopId },
+    stateRevision: 0,
+    current: { loopRunId: run.loopRunId, loopId },
     createdAt: now,
     updatedAt: now,
     completedAt: now,
     executionSnapshot: {
-      version: 1,
+      version: 2,
       rootLoopId: loopId,
       project: {
         checkoutRoot: "/workspace/ballet",
@@ -87,6 +90,14 @@ function rootRun(rootRunId: string): RootRunDetail {
         snapshotHash: "c".repeat(64)
       },
       loops: [snapshot],
+      loopEdges: [],
+      orchestrator: {
+        executionProfileId: "",
+        primaryInstructionId: "",
+        skillIds: [],
+        maxRepairDepth: 4,
+        maxRepairAttempts: 3
+      },
       theme: structuredClone(defaultLoopTheme),
       executionProfiles: [],
       runtimes: [],

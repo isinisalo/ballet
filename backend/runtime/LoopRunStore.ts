@@ -1,33 +1,54 @@
-import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import type { ProjectLoop } from "../../shared/domain/automation.js";
+import type Database from "better-sqlite3";
+import type { JsonValue, ProjectLoop } from "../../shared/domain/automation.js";
 import type {
-  ExecutionRuntimeSnapshot,
-  LoopRun,
-  LoopRunDetails,
-  LoopRunSource,
-  StepOutcome,
-  StepRun,
-  StepRunResult
+  LoopRun, LoopRunDetails, LoopRunSource, NodeRun, NodeRunRole, NodeRunStatus,
+  WorkLoopNodeRun
 } from "../../shared/domain/runtime.js";
-import { stringifyJson } from "./RuntimeJson.js";
-import { toLoopRun, toStepRun } from "./RuntimeRowMappers.js";
 import { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
-import type {
-  LoopRunRow,
-  StepRunRow
+import {
+  loopRunRowSchema, nodeRunRowSchema, now, workLoopNodeRunRowSchema
 } from "./RuntimeDbTypes.js";
-import { now } from "./RuntimeDbTypes.js";
+import { toLoopRun, toNodeRun, toWorkLoopNodeRun } from "./RuntimeRowMappers.js";
+import { canonicalJson } from "./state/CanonicalJson.js";
+import { validateState } from "./state/StatePatch.js";
 
 export interface CreateLoopRunInput {
-  runId?: string;
+  loopRunId?: string;
   loop: ProjectLoop;
-  rootRunId?: string;
-  parentRunId?: string;
-  parentStepRunId?: string;
+  rootRunId: string;
+  parentLoopRunId?: string;
   source: LoopRunSource;
-  input?: string;
-  schedule?: { stepId: string; scheduledFor: string };
+  input?: JsonValue;
+  schedule?: { workLoopNodeId: string; scheduledFor: string };
+  entryStateRevision?: number;
+  nestingDepth?: number;
+}
+
+export interface CreateWorkLoopNodeRunInput {
+  workLoopNodeRunId?: string;
+  rootRunId: string;
+  loopRunId: string;
+  loopId: string;
+  workLoopNodeId: string;
+  attempt: number;
+  stateRevisionBefore?: number;
+}
+
+export interface CreateNodeRunInput {
+  nodeRunId?: string;
+  rootRunId: string;
+  loopRunId: string;
+  workLoopNodeRunId?: string;
+  role: NodeRunRole;
+  loopId: string;
+  workLoopNodeId?: string;
+  nodeDefinitionId: string;
+  input?: JsonValue;
+  context?: JsonValue;
+  attempt: number;
+  stateRevisionBefore?: number;
+  status?: Extract<NodeRunStatus, "queued" | "waiting_for_input">;
 }
 
 export class LoopRunStore {
@@ -37,218 +58,210 @@ export class LoopRunStore {
     this.snapshots = new RootExecutionSnapshotStore(connection);
   }
 
-  getLoopRun(runId: string): LoopRun | undefined {
-    const row = this.connection().prepare("SELECT * FROM loop_runs WHERE run_id = ?").get(runId) as LoopRunRow | undefined;
-    if (!row) return undefined;
+  getLoopRun(loopRunId: string): LoopRun | undefined {
+    const value = this.connection().prepare("SELECT * FROM loop_invocations WHERE loop_run_id = ?").get(loopRunId);
+    if (!value) return undefined;
+    const row = loopRunRowSchema.parse(value);
     const snapshot = this.snapshots.require(row.root_run_id);
     return toLoopRun(row, this.snapshots.loop(snapshot, row.loop_id), snapshot.theme);
   }
 
-  getStepRun(stepRunId: string): StepRun | undefined {
-    const row = this.connection().prepare("SELECT * FROM step_runs WHERE step_run_id = ?").get(stepRunId) as StepRunRow | undefined;
-    return row ? toStepRun(row) : undefined;
+  getWorkLoopNodeRun(workLoopNodeRunId: string): WorkLoopNodeRun | undefined {
+    const value = this.connection().prepare(
+      "SELECT * FROM work_loop_node_runs WHERE work_loop_node_run_id = ?"
+    ).get(workLoopNodeRunId);
+    return value ? toWorkLoopNodeRun(workLoopNodeRunRowSchema.parse(value)) : undefined;
   }
 
-  details(runId: string): LoopRunDetails | undefined {
-    const run = this.getLoopRun(runId);
+  getNodeRun(nodeRunId: string): NodeRun | undefined {
+    const value = this.connection().prepare("SELECT * FROM node_runs WHERE node_run_id = ?").get(nodeRunId);
+    return value ? toNodeRun(nodeRunRowSchema.parse(value)) : undefined;
+  }
+
+  details(loopRunId: string): LoopRunDetails | undefined {
+    const run = this.getLoopRun(loopRunId);
     if (!run) return undefined;
-    const rootCount = this.connection().prepare(`
-      SELECT COALESCE(SUM(transition_count), 0) AS count FROM loop_runs WHERE root_run_id = ?
-    `).get(run.rootRunId) as { count: number };
-    const rows = this.connection().prepare(`
-      SELECT * FROM step_runs WHERE run_id = ? ORDER BY created_at ASC, rowid ASC
-    `).all(runId) as StepRunRow[];
-    return { ...run, transitionCount: rootCount.count, stepRuns: rows.map(toStepRun) };
+    return {
+      ...run,
+      workLoopNodeRuns: this.connection().prepare(`
+        SELECT * FROM work_loop_node_runs WHERE loop_run_id = ? ORDER BY created_at, rowid
+      `).all(loopRunId).map((row) => toWorkLoopNodeRun(workLoopNodeRunRowSchema.parse(row))),
+      nodeRuns: this.connection().prepare(`
+        SELECT * FROM node_runs WHERE loop_run_id = ? ORDER BY created_at, rowid
+      `).all(loopRunId).map((row) => toNodeRun(nodeRunRowSchema.parse(row)))
+    };
   }
 
   list(limit = 500): LoopRunDetails[] {
-    const rows = this.connection().prepare(`
-      SELECT run_id FROM loop_runs ORDER BY created_at DESC, rowid DESC LIMIT ?
-    `).all(limit) as Array<{ run_id: string }>;
-    return rows.flatMap((row) => {
-      const details = this.details(row.run_id);
-      return details ? [details] : [];
-    });
+    return this.ids("SELECT loop_run_id FROM loop_invocations ORDER BY created_at DESC, rowid DESC LIMIT ?", limit)
+      .flatMap((id) => this.details(id) ?? []);
   }
 
   listByRoot(rootRunId: string): LoopRunDetails[] {
-    const rows = this.connection().prepare(`
-      SELECT run_id FROM loop_runs WHERE root_run_id = ? ORDER BY created_at ASC, rowid ASC
-    `).all(rootRunId) as Array<{ run_id: string }>;
-    return rows.flatMap((row) => {
-      const details = this.details(row.run_id);
-      return details ? [details] : [];
-    });
-  }
-
-  hasActiveLoop(loopId: string): boolean {
-    return Boolean(this.connection().prepare(`
-      SELECT 1 FROM loop_runs WHERE loop_id = ? AND status IN ('running', 'waiting_for_human') LIMIT 1
-    `).get(loopId));
+    return this.ids(
+      "SELECT loop_run_id FROM loop_invocations WHERE root_run_id = ? ORDER BY created_at, rowid",
+      rootRunId
+    ).flatMap((id) => this.details(id) ?? []);
   }
 
   activeLoopIds(): string[] {
-    const rows = this.connection().prepare(`
-      SELECT DISTINCT loop_id FROM loop_runs WHERE status IN ('running', 'waiting_for_human')
-    `).all() as Array<{ loop_id: string }>;
-    return rows.map((row) => row.loop_id);
+    return this.connection().prepare(`
+      SELECT DISTINCT loop_id FROM loop_invocations WHERE status IN ('queued','running','waiting_for_input')
+    `).all().map((value) => idRow(value, "loop_id"));
   }
 
   createLoopRun(input: CreateLoopRunInput): LoopRun {
-    const runId = input.runId ?? randomUUID();
+    const loopRunId = input.loopRunId ?? randomUUID();
+    const timestamp = now();
+    const snapshot = this.snapshots.require(input.rootRunId);
+    this.snapshots.loop(snapshot, input.loop.id);
+    const nestingDepth = input.nestingDepth ?? 0;
+    if (nestingDepth > snapshot.orchestrator.maxRepairDepth) {
+      throw new Error(`Loop Run nesting depth ${nestingDepth} exceeds limit ${snapshot.orchestrator.maxRepairDepth}.`);
+    }
+    const revision = input.entryStateRevision ?? this.currentRevision(input.rootRunId);
+    const inputJson = input.input === undefined ? null : canonicalJson(validateState(input.input));
+    this.connection().prepare(`
+      INSERT INTO loop_invocations (
+        loop_run_id, root_run_id, loop_id, parent_loop_run_id, source, status, input_json,
+        schedule_work_loop_node_id, scheduled_for, entry_state_revision, nesting_depth, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)
+    `).run(loopRunId, input.rootRunId, input.loop.id, input.parentLoopRunId ?? null, input.source, inputJson,
+      input.schedule?.workLoopNodeId ?? null, input.schedule?.scheduledFor ?? null,
+      revision, nestingDepth, timestamp, timestamp);
+    this.connection().prepare(`
+      UPDATE root_runs SET active_loop_run_id = ?, status = 'running', updated_at = ? WHERE root_run_id = ?
+    `).run(loopRunId, timestamp, input.rootRunId);
+    return this.requireLoopRun(loopRunId);
+  }
+
+  createWorkLoopNodeRun(input: CreateWorkLoopNodeRunInput): WorkLoopNodeRun {
+    const id = input.workLoopNodeRunId ?? randomUUID();
+    const timestamp = now();
+    const snapshot = this.snapshots.require(input.rootRunId);
+    const loop = this.snapshots.loop(snapshot, input.loopId);
+    const node = loop.nodes.find((candidate) => candidate.id === input.workLoopNodeId);
+    if (!node) throw new Error(`Work Loop Node ${input.loopId}:${input.workLoopNodeId} is missing from the Root snapshot.`);
+    if (input.attempt > node.maxLocalAttempts) {
+      throw new Error(`Work Loop Node attempt ${input.attempt} exceeds limit ${node.maxLocalAttempts}.`);
+    }
+    const revision = input.stateRevisionBefore ?? this.currentRevision(input.rootRunId);
+    this.connection().prepare(`
+      INSERT INTO work_loop_node_runs (
+        work_loop_node_run_id, root_run_id, loop_run_id, loop_id, work_loop_node_id, attempt,
+        status, state_revision_before, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?)
+    `).run(id, input.rootRunId, input.loopRunId, input.loopId, input.workLoopNodeId,
+      input.attempt, revision, timestamp, timestamp);
+    return this.requireWorkLoopNodeRun(id);
+  }
+
+  createNodeRun(input: CreateNodeRunInput): NodeRun {
+    const id = input.nodeRunId ?? randomUUID();
+    const timestamp = now();
+    const snapshot = this.snapshots.require(input.rootRunId);
+    if (input.role === "orchestrator") {
+      if (input.workLoopNodeRunId || input.workLoopNodeId) {
+        throw new Error("An orchestrator Node Run cannot belong to a Work Loop Node Run.");
+      }
+      if (input.attempt > snapshot.orchestrator.maxRepairAttempts) {
+        throw new Error(
+          `Orchestrator attempt ${input.attempt} exceeds limit ${snapshot.orchestrator.maxRepairAttempts}.`
+        );
+      }
+    } else {
+      if (!input.workLoopNodeRunId || !input.workLoopNodeId) {
+        throw new Error(`A ${input.role} Node Run must belong to a Work Loop Node Run.`);
+      }
+      const loop = this.snapshots.loop(snapshot, input.loopId);
+      if (!loop.nodes.some((candidate) => candidate.id === input.workLoopNodeId)) {
+        throw new Error(`Work Loop Node ${input.loopId}:${input.workLoopNodeId} is missing from the Root snapshot.`);
+      }
+    }
+    const revision = input.stateRevisionBefore ?? this.currentRevision(input.rootRunId);
+    const status = input.status ?? "queued";
+    const transaction = this.connection().transaction(() => {
+      this.connection().prepare(`
+        INSERT INTO node_runs (
+          node_run_id, root_run_id, loop_run_id, work_loop_node_run_id, role, loop_id,
+          work_loop_node_id, node_definition_id, input_json, context_json, status, attempt,
+          state_revision_before, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, input.rootRunId, input.loopRunId, input.workLoopNodeRunId ?? null, input.role,
+        input.loopId, input.workLoopNodeId ?? null, input.nodeDefinitionId,
+        jsonOrNull(input.input, "Node Run input"), jsonOrNull(input.context, "Node Run context"),
+        status, input.attempt, revision, timestamp, timestamp);
+      if (input.workLoopNodeRunId) this.connection().prepare(`
+        UPDATE work_loop_node_runs SET active_node_run_id = ?, status = ?, updated_at = ?
+        WHERE work_loop_node_run_id = ?
+      `).run(id, status === "waiting_for_input" ? "waiting_for_input" : "running", timestamp, input.workLoopNodeRunId);
+      this.connection().prepare(`
+        UPDATE root_runs SET active_node_run_id = ?, updated_at = ? WHERE root_run_id = ?
+      `).run(id, timestamp, input.rootRunId);
+    });
+    transaction();
+    return this.requireNodeRun(id);
+  }
+
+  markNodeRunning(nodeRunId: string): NodeRun {
     const timestamp = now();
     this.connection().prepare(`
-      INSERT INTO loop_runs (
-        run_id, loop_id, root_run_id, parent_run_id, parent_step_run_id,
-        source, status, schedule_step_id, scheduled_for,
-        input, transition_count, created_at, updated_at
-      ) VALUES (
-        @runId, @loopId, @rootRunId, @parentRunId, @parentStepRunId,
-        @source, 'running', @scheduleStepId, @scheduledFor,
-        @input, 0, @createdAt, @updatedAt
-      )
-    `).run({
-      runId,
-      loopId: input.loop.id,
-      rootRunId: input.rootRunId ?? runId,
-      parentRunId: input.parentRunId ?? null,
-      parentStepRunId: input.parentStepRunId ?? null,
-      source: input.source,
-      scheduleStepId: input.schedule?.stepId ?? null,
-      scheduledFor: input.schedule?.scheduledFor ?? null,
-      input: input.input ?? null,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    });
-    const run = this.getLoopRun(runId);
-    if (!run) throw new Error("Loop run was not stored.");
+      UPDATE node_runs SET status = 'running', started_at = COALESCE(started_at, ?), updated_at = ?
+      WHERE node_run_id = ? AND status = 'queued'
+    `).run(timestamp, timestamp, nodeRunId);
+    return this.requireNodeRun(nodeRunId);
+  }
+
+  bindNodeExecution(nodeRunId: string, taskId: string): NodeRun {
+    const result = this.connection().prepare(`
+      UPDATE node_runs SET execution_task_id = ?, updated_at = ?
+      WHERE node_run_id = ? AND execution_task_id IS NULL AND status = 'queued'
+    `).run(taskId, now(), nodeRunId);
+    if (result.changes !== 1) throw new Error(`Node Run ${nodeRunId} cannot be bound to execution task ${taskId}.`);
+    return this.requireNodeRun(nodeRunId);
+  }
+
+  private requireLoopRun(id: string): LoopRun {
+    const run = this.getLoopRun(id);
+    if (!run) throw new Error(`Loop Run ${id} was not found.`);
     return run;
   }
 
-  completeStepRun(stepRun: StepRun, result: StepRunResult, options: {
-    responseInput?: string;
-    outcome?: StepOutcome;
-    error?: string;
-  }): StepRun {
-    const timestamp = now();
-    const update = this.connection().prepare(`
-      UPDATE step_runs SET status = 'completed',
-        response_input = COALESCE(@responseInput, response_input), result = @result,
-        outcome_json = @outcomeJson, error = @error,
-        completed_at = @completedAt, updated_at = @updatedAt
-        WHERE step_run_id = @stepRunId
-    `).run({
-      stepRunId: stepRun.stepRunId,
-      responseInput: options.responseInput ?? null,
-      result,
-      outcomeJson: options.outcome ? stringifyJson(options.outcome) : null,
-      error: options.error ?? null,
-      completedAt: timestamp,
-      updatedAt: timestamp
-    });
-    if (update.changes !== 1) throw new Error(`Step run ${stepRun.stepRunId} was not completed.`);
-    const stored = this.getStepRun(stepRun.stepRunId);
-    if (!stored) throw new Error(`Step run ${stepRun.stepRunId} was not found after completion.`);
-    return stored;
+  private requireWorkLoopNodeRun(id: string): WorkLoopNodeRun {
+    const run = this.getWorkLoopNodeRun(id);
+    if (!run) throw new Error(`Work Loop Node Run ${id} was not found.`);
+    return run;
   }
 
-  pauseStepRunForInput(stepRun: StepRun, outcome: StepOutcome): void {
-    this.connection().prepare(`
-      UPDATE step_runs SET status = 'needs_input', result = NULL,
-        response_input = NULL, outcome_json = ?, error = NULL, completed_at = NULL, updated_at = ?
-      WHERE step_run_id = ?
-    `).run(stringifyJson(outcome), now(), stepRun.stepRunId);
+  private requireNodeRun(id: string): NodeRun {
+    const run = this.getNodeRun(id);
+    if (!run) throw new Error(`Node Run ${id} was not found.`);
+    return run;
   }
 
-  finishStepRunWithoutTransition(
-    stepRun: StepRun,
-    status: "blocked" | "failed",
-    outcome: StepOutcome,
-    error?: string
-  ): void {
-    const timestamp = now();
-    this.connection().prepare(`
-      UPDATE step_runs SET status = ?, result = NULL, outcome_json = ?, error = ?,
-        completed_at = ?, updated_at = ? WHERE step_run_id = ?
-    `).run(status, stringifyJson(outcome), error ?? null, timestamp, timestamp, stepRun.stepRunId);
+  private currentRevision(rootRunId: string): number {
+    const value = this.connection().prepare("SELECT current_state_revision FROM root_runs WHERE root_run_id = ?").get(rootRunId);
+    if (typeof value !== "object" || value === null || !("current_state_revision" in value)
+      || typeof value.current_state_revision !== "number") throw new Error(`Root Run ${rootRunId} was not found.`);
+    return value.current_state_revision;
   }
 
-  blockStepRunWithoutTransition(stepRun: StepRun, runId: string, summary: string): void {
-    this.finishStepRunWithoutTransition(stepRun, "blocked", { state: "blocked", summary, checks: [] });
-    this.finishRun(runId, "blocked");
-  }
-
-  resumeStepRun(stepRun: StepRun, input: string, responseInput: string): StepRun {
-    const timestamp = now();
-    const result = this.connection().prepare(`
-      UPDATE step_runs SET status = 'queued', execution_task_id = NULL, input = ?,
-        response_input = ?, result = NULL, error = NULL, completed_at = NULL, updated_at = ?
-      WHERE step_run_id = ? AND step_type IN ('agent','scheduled') AND status = 'needs_input'
-    `).run(input, responseInput, timestamp, stepRun.stepRunId);
-    if (result.changes !== 1) throw new Error(`Step run ${stepRun.stepRunId} is no longer waiting for input.`);
-    const stored = this.getStepRun(stepRun.stepRunId);
-    if (!stored) throw new Error(`Step run ${stepRun.stepRunId} was not found.`);
-    return stored;
-  }
-
-  bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
-    const result = this.connection().prepare(`
-      UPDATE step_runs SET execution_task_id = ?, execution_snapshot_json = ?, updated_at = ?
-      WHERE step_run_id = ? AND step_type IN ('agent','scheduled') AND execution_task_id IS NULL
-    `).run(taskId, stringifyJson(snapshot), now(), stepRunId);
-    if (result.changes !== 1) throw new Error(`Step run ${stepRunId} already has an execution task.`);
-    const stepRun = this.getStepRun(stepRunId);
-    if (!stepRun) throw new Error(`Step run ${stepRunId} was not found.`);
-    return stepRun;
-  }
-
-  markStepRunning(stepRunId: string): StepRun {
-    this.connection().prepare(`
-      UPDATE step_runs SET status = 'running', attempt = attempt + 1, updated_at = ?
-      WHERE step_run_id = ? AND status = 'queued'
-    `).run(now(), stepRunId);
-    const stepRun = this.getStepRun(stepRunId);
-    if (!stepRun) throw new Error(`Step run ${stepRunId} was not found.`);
-    return stepRun;
-  }
-
-  rootTransitionCount(rootRunId: string): number {
-    const row = this.connection().prepare(`
-      SELECT COALESCE(SUM(transition_count), 0) AS count FROM loop_runs WHERE root_run_id = ?
-    `).get(rootRunId) as { count: number };
-    return row.count;
-  }
-
-  incrementTransitionCount(runId: string): void {
-    this.connection().prepare(`
-      UPDATE loop_runs SET transition_count = transition_count + 1, updated_at = @updatedAt
-      WHERE run_id = @runId
-    `).run({ runId, updatedAt: now() });
-  }
-
-  updateRunInput(runId: string, input: string): void {
-    this.connection().prepare("UPDATE loop_runs SET input = ?, updated_at = ? WHERE run_id = ?")
-      .run(input, now(), runId);
-  }
-
-  waitForStepInput(runId: string): void {
-    this.connection().prepare(`
-      UPDATE loop_runs SET status = 'waiting_for_human', updated_at = ? WHERE run_id = ?
-    `).run(now(), runId);
-  }
-
-  resumeRun(runId: string, input: string): void {
-    this.connection().prepare(`
-      UPDATE loop_runs SET status = 'running', input = ?, completed_at = NULL, updated_at = ?
-      WHERE run_id = ? AND status = 'waiting_for_human'
-    `).run(input, now(), runId);
-  }
-
-  finishRun(runId: string, status: "completed" | "blocked" | "failed" | "cancelled"): void {
-    const timestamp = now();
-    this.connection().prepare(`
-      UPDATE loop_runs SET status = @status, completed_at = @completedAt, updated_at = @updatedAt
-      WHERE run_id = @runId
-    `).run({ runId, status, completedAt: timestamp, updatedAt: timestamp });
+  private ids(sql: string, parameter: string | number): string[] {
+    return this.connection().prepare(sql).all(parameter).map((value) => idRow(value, "loop_run_id"));
   }
 }
+
+const idRow = (value: unknown, key: string): string => {
+  if (typeof value === "object" && value !== null && key in value) {
+    const field = Reflect.get(value, key);
+    if (typeof field === "string") return field;
+  }
+  throw new Error(`Runtime database returned an invalid ${key} row.`);
+};
+const jsonOrNull = (value: JsonValue | undefined, label: string): string | null =>
+  value === undefined ? null : canonicalJson(validateInput(value, label));
+const validateInput = (value: JsonValue, label: string): JsonValue => {
+  try { return validateState(value); } catch (error) {
+    throw new Error(`${label} is invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};

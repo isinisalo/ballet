@@ -4,14 +4,15 @@ import type {
   RootExecutionSnapshot,
   RootFinalizationReport,
   RuntimePreflightIssue,
-  StepOutcome
+  CanonicalNodeOutcome,
+  NodeRunRole
 } from "./runtime.js";
 
 export type BalletMode = "configure" | "run";
 export type DashboardRunStatus =
   | "queued"
   | "running"
-  | "waiting_for_human"
+  | "waiting_for_input"
   | "finalizing"
   | "completed"
   | "blocked"
@@ -24,8 +25,10 @@ export type RootRunListState = "active" | "recent";
 export interface RootRunCurrentPosition {
   loopRunId?: string;
   loopId?: string;
-  stepRunId?: string;
-  stepId?: string;
+  workLoopNodeRunId?: string;
+  workLoopNodeId?: string;
+  nodeRunId?: string;
+  nodeRole?: NodeRunRole;
   taskId?: string;
   executionProfileId?: string;
   taskStatus?: ExecutionTask["status"];
@@ -45,8 +48,9 @@ export interface RootRunSummary {
   targetId: string;
   source: RootRunSource;
   status: DashboardRunStatus;
+  stateRevision: number;
   input?: string;
-  outcome?: StepOutcome;
+  outcome?: CanonicalNodeOutcome;
   errorCode?: string;
   errorMessage?: string;
   current?: RootRunCurrentPosition;
@@ -91,7 +95,7 @@ export interface RunTargetIssue {
   code: RuntimePreflightIssue["code"] | "invalid_config";
   message: string;
   executionProfileId?: string;
-  stepId?: string;
+  nodeId?: string;
   path?: string;
 }
 

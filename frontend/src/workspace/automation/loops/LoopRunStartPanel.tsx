@@ -52,7 +52,7 @@ export function LoopRunStartPanel({
         <div className="grid gap-1 border border-destructive/30 bg-destructive/5 p-3" role="alert">
           <p className="text-xs font-medium text-destructive">Runtime preflight failed</p>
           <ul className="grid gap-1 font-mono text-[0.65rem] text-destructive">
-            {preflightIssues.map((issue, index) => <li key={`${issue.stepId ?? issue.executionProfileId}-${issue.code}-${index}`}>{issue.stepId ? `${issue.stepId} · ` : ""}{issue.message}</li>)}
+            {preflightIssues.map((issue, index) => <li key={`${issue.nodeId ?? issue.executionProfileId}-${issue.code}-${index}`}>{issue.nodeId ? `${issue.nodeId} · ` : ""}{issue.message}</li>)}
           </ul>
           <a href="/runtimes" className="text-xs text-primary underline-offset-4 hover:underline">Open Runtimes</a>
         </div>

@@ -1,8 +1,5 @@
 import type Database from "better-sqlite3";
-import type {
-  ExecutionTask,
-  RespondToStepRunRequest
-} from "../../shared/domain/runtime.js";
+import type { ExecutionTask } from "../../shared/domain/runtime.js";
 import type {
   RootRunDetail,
   RootRunListQuery,
@@ -63,7 +60,7 @@ export class LocalRunService {
   async start(
     _input: StartRootRunRequest,
     _source: "manual" | "schedule" = "manual",
-    _schedule?: { stepId: string; scheduledFor: string }
+    _schedule?: { workLoopNodeId: string; scheduledFor: string }
   ): Promise<RootRunDetail> {
     void _input;
     void _source;
@@ -73,7 +70,7 @@ export class LocalRunService {
 
   async dispatchScheduled(input: {
     loopId: string;
-    stepId: string;
+    workLoopNodeId: string;
     definitionHash: string;
     scheduledFor: string;
     nextRunAt?: string;
@@ -83,7 +80,7 @@ export class LocalRunService {
     if (!input.canDispatch()) return { status: "stale" };
     const occurrence = {
       loopId: input.loopId,
-      stepId: input.stepId,
+      workLoopNodeId: input.workLoopNodeId,
       definitionHash: input.definitionHash,
       scheduledFor: input.scheduledFor,
       nextRunAt: input.nextRunAt,
@@ -96,16 +93,16 @@ export class LocalRunService {
       const detail = await this.start(
         { kind: "loop", targetId: input.loopId },
         "schedule",
-        { stepId: input.stepId, scheduledFor: input.scheduledFor }
+        { workLoopNodeId: input.workLoopNodeId, scheduledFor: input.scheduledFor }
       );
       const run = detail.loopRuns[0];
       if (!run) throw new Error("Scheduled Root Run did not create a Loop Run.");
       const completed = this.options.database.finishReservedScheduleOccurrence({
         loopId: input.loopId,
-        stepId: input.stepId,
+        workLoopNodeId: input.workLoopNodeId,
         scheduledFor: input.scheduledFor,
         status: "started",
-        runId: run.runId,
+        loopRunId: run.loopRunId,
         updatedAt: input.updatedAt
       });
       return completed ? { status: "started", run } : { status: "stale" };
@@ -113,7 +110,7 @@ export class LocalRunService {
       const message = error instanceof Error ? error.message : String(error);
       const completed = this.options.database.finishReservedScheduleOccurrence({
         loopId: input.loopId,
-        stepId: input.stepId,
+        workLoopNodeId: input.workLoopNodeId,
         scheduledFor: input.scheduledFor,
         status: "skipped",
         error: message,
@@ -161,17 +158,6 @@ export class LocalRunService {
     if (!isActiveRootStatus(root.status) || root.status === "finalizing") return this.detailRequired(rootRunId);
     await this.coordinator.cancelRoot(root);
     return this.detailRequired(rootRunId);
-  }
-
-  async respond(
-    _rootRunId: string,
-    _stepRunId: string,
-    _request: RespondToStepRunRequest
-  ): Promise<RootRunDetail> {
-    void _rootRunId;
-    void _stepRunId;
-    void _request;
-    throw new WorkLoopRuntimeUnavailableError();
   }
 
   handleTerminal(task: ExecutionTask): Promise<void> {

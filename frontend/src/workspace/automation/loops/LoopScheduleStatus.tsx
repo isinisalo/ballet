@@ -14,7 +14,7 @@ export function LoopScheduleStatus({ state, timeZone }: { state?: LoopScheduleSt
           {state?.lastStatus ? <OperationalStatus compact label={state.lastStatus} tone={state.lastStatus === "started" ? "healthy" : "attention"} /> : "No occurrence yet"}
           {state?.lastScheduledAt ? <span>{formatTimestamp(state.lastScheduledAt, timeZone)}</span> : null}
         </dd>
-        {state?.lastRunId ? <><dt className="text-muted-foreground">Run</dt><dd className="break-all">{state.lastRunId}</dd></> : null}
+        {state?.lastLoopRunId ? <><dt className="text-muted-foreground">Run</dt><dd className="break-all">{state.lastLoopRunId}</dd></> : null}
       </dl>
       {state?.lastError ? <p className="break-words text-destructive">{state.lastError}</p> : null}
     </section>
