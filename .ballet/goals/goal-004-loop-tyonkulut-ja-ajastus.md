@@ -3,12 +3,12 @@ id: goal-004
 title: Loop-työnkulut, hyväksyntäportit ja ajastus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - tavoite
   - automaatio
   - ajastus
-version: 2
+version: 3
 ---
 
 # Loop-työnkulut, hyväksyntäportit ja ajastus
@@ -27,14 +27,14 @@ Loop tekee monivaiheisen työn rakenteesta eksplisiittisen. Step kokoaa yhden te
 
 - Aloitus-Stepin sekä `agent`-, `human`- ja `scheduled`-tyyppisten Steppien määrittely samaan Loopiin.
 - Suoritettavan Stepin tehtäväkuvauksen, ExecutionProfilen, primary instructionin, skillsien sekä `approved`- ja `rejected`-kohteiden muokkaaminen samassa Node editorissa.
-- Kiinteiden `approved`- ja `rejected`-Transitionien ohjaaminen paikalliseen nodeen sekä ihmisen Stepistä tarvittaessa eri Loopiin.
+- Kiinteiden `approved`- ja `rejected`-Transitionien ohjaaminen paikalliseen executable nodeen, paikalliseen terminaaliin tai eri Loopiin Agent-, Human- ja Scheduled-Stepistä.
 - Completed outcomen tai Human-vastauksen tuottaman `approved`- tai `rejected`-tuloksen erottaminen teknisistä `blocked`-, `failed`-, `cancelled`- ja `needs_input`-tiloista, jotka eivät aktivoi Transitionia.
 - Terminaalien ja teknisten Run-tilojen näyttäminen osana Loopin rakennetta ja Runin tilannekuvaa.
 - Loopin rakenteen, Transitionien, node-tyylien ja kokojen tarkastelu Loop-visualisoinnissa siten, että Canvasin Transitionit ja Run-tila pysyvät erillisinä käsitteinä.
 - Ihmisen vastauksen ja hyväksytyn tai hylätyn päätöksen antaminen odottavalle Stepille.
 - Kertaluonteinen sekä päivittäin, arkipäivisin, viikoittain tai kuukausittain toistuva ajastus IANA-aikavyöhykkeellä.
 - Ajastuksen viimeisimmän tilan ja seuraavan suoritusajan näyttäminen.
-- Runin aiemman syötteen ja ihmisen Stepin vastauksen välittäminen seuraavaan Loopiin handoffina.
+- Runin aiemman syötteen, Step-tuloksen ja mahdollisen ihmisen vastauksen välittäminen seuraavaan Loopiin handoffina.
 
 ## Tuotteen rajaukset
 
@@ -42,10 +42,11 @@ Loop tekee monivaiheisen työn rakenteesta eksplisiittisen. Step kokoaa yhden te
 - Jokaisessa Loopissa on täsmälleen yksi kutakin kiinteää terminaalityyppiä.
 - Ajastettu Step voi olla vain Loopin aloitus-Step, ja yhdessä Loopissa voi olla enintään yksi ajastettu Step.
 - Terminaalilla ei ole Step-suoritusmääritystä, ajastusta, outputteja eikä seuraavaa Transitionia.
-- Ensimmäiseen versioon ei lisätä Role-, Preset-, Policy- tai Recipe-entityä.
+- Ensimmäiseen versioon ei lisätä Role-, Preset-, Policy-, Recipe-, Template- tai Template Pack -entityä.
 - Node editor ei ole ExecutionProfilejen settings-sivu eikä palveluntarjoajan asetuseditori.
 - Appearance- ja Advanced-osiot pysyvät toissijaisina ja oletuksena suljettuina.
+- Käyttäjän syklisiä Looppeja ei estetä workflow-oletuksen perusteella; runtime rajaa Transition-ketjun yleisellä safety limitillä.
 
 ## Todentaminen
 
-Tavoite toteutuu, kun käyttäjä voi tunnistaa Node editorista Stepin tehtävän, ExecutionProfilen, primary instructionin, skillsit ja molemmat jatkokohteet, käynnistää validoidun Loopin käsin tai ajastuksesta, vastata Human-porttiin ja nähdä Runin päätyvän oikeaan terminaaliin tai jatkavan validoidulla handoffilla määritettyyn toiseen Loopiin.
+Tavoite toteutuu, kun käyttäjä voi tunnistaa Node editorista Stepin tehtävän, ExecutionProfilen, primary instructionin, skillsit ja molemmat jatkokohteet, käynnistää validoidun Loopin käsin tai ajastuksesta, vastata Human-porttiin ja nähdä Runin päätyvän oikeaan terminaaliin tai jatkavan validoidulla handoffilla määritettyyn toiseen Loopiin mistä tahansa executable Step -tyypistä.

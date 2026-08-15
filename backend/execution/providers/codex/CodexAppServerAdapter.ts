@@ -184,7 +184,6 @@ export class CodexAppServerAdapter implements CliRuntimeAdapter {
     const common = {
       cwd: request.workingDirectory,
       model: providerSetting(request.model),
-      developerInstructions: request.systemInstructions,
       approvalPolicy: "never",
       sandbox: "workspace-write"
     };

@@ -1,110 +1,28 @@
-// The canonical runtime contract intentionally stays in one module so frontend and
-// backend cannot drift on persisted execution, provider, and Loop snapshot shapes.
-import type { AgentAvatar } from "./agents.js";
-import type { ProjectLoop } from "./automation.js";
+// Canonical persisted runtime contracts. Project authoring types live in their
+// own domain modules; this file owns only resolved, immutable Run evidence.
+import type { ProjectExecutableStep, ProjectLoop } from "./automation.js";
 import type { LoopTheme } from "./loopThemes.js";
+import type { ExecutionProfile } from "./projectConfig.js";
+import type { ExecutionPolicy, RuntimeProvider } from "./localRuntime.js";
 
-export type RuntimeProvider = "codex" | "copilot";
-export type RuntimeAuthStatus = "ready" | "required" | "expired" | "unknown";
-export type LocalProviderHealth =
-  | "ready"
-  | "probing"
-  | "auth_required"
-  | "unsupported_version"
-  | "policy_unsupported"
-  | "error";
-
-export interface RuntimeModelCapability {
-  id: string;
-  label: string;
-  reasoningOptions: string[];
-  defaultReasoning?: string;
-}
-
-export interface RuntimePolicyCapabilities {
-  workspaceWrite: boolean;
-  networkControl: boolean;
-  readOnlyRoots: boolean;
-}
-
-export interface RuntimeCapabilities {
-  models: RuntimeModelCapability[];
-  supportsStructuredOutput: boolean;
-  policy: RuntimePolicyCapabilities;
-  refreshedAt: string;
-}
-
-export interface LocalProviderStatus {
-  provider: RuntimeProvider;
-  command: string;
-  installed: boolean;
-  compatible: boolean;
-  cliVersion?: string;
-  authStatus: RuntimeAuthStatus;
-  health: LocalProviderHealth;
-  healthMessage?: string;
-  capabilities: RuntimeCapabilities;
-  busy: boolean;
-  activeRunCount: number;
-}
-
-export interface LocalCheckoutStatus {
-  path: string;
-  headSha: string;
-  configHash: string;
-  dirty: boolean;
-}
-
-export interface LocalRuntime {
-  instanceId: string;
-  hostname: string;
-  platform: "darwin";
-  architecture: "arm64" | "x64";
-  checkout: LocalCheckoutStatus;
-  uptimeSeconds: number;
-  startedAt: string;
-  providers: LocalProviderStatus[];
-  activeRunCount: number;
-  logsPath: string;
-}
-
-export interface ExecutionPolicy {
-  network: boolean;
-  readOnlyRoots: string[];
-}
-
-export interface PortableAgentRuntimeIntent {
-  provider: RuntimeProvider;
-  model: string;
-  reasoning: string;
-  policy: Pick<ExecutionPolicy, "network">;
-}
-
-export interface ResolvedAgentExecution {
-  agentId: string;
-  provider: RuntimeProvider;
-  model: string;
-  reasoning: string;
-  policy: ExecutionPolicy;
-}
-
-export interface RuntimeConfigurationIssue {
-  code: "invalid_json" | "invalid_schema" | "missing_intent" | "orphan_intent" | "provider_unavailable";
-  path: string;
-  message: string;
-  agentId?: string;
-}
-
-export interface AgentRuntimeConfiguration {
-  intent?: PortableAgentRuntimeIntent;
-  localPolicy: Pick<ExecutionPolicy, "readOnlyRoots">;
-  resolved?: ResolvedAgentExecution;
-  issues: RuntimeConfigurationIssue[];
-}
+export type {
+  ExecutionPolicy,
+  LocalCheckoutStatus,
+  LocalProviderHealth,
+  LocalProviderStatus,
+  LocalRuntime,
+  ResolvedExecutionProfile,
+  RuntimeAuthStatus,
+  RuntimeCapabilities,
+  RuntimeConfigurationIssue,
+  RuntimeModelCapability,
+  RuntimePolicyCapabilities,
+  RuntimeProvider
+} from "./localRuntime.js";
 
 export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
-export type ExecutionTaskKind = "agent_run" | "loop_step";
-export type AgentOutcomeState = "completed" | "needs_input" | "blocked" | "failed";
+export type ExecutionTaskKind = "loop_step";
+export type StepOutcomeState = "completed" | "needs_input" | "blocked" | "failed";
 export type StepRunResult = "approved" | "rejected";
 export type RunCheckStatus = "passed" | "failed" | "skipped";
 
@@ -114,7 +32,7 @@ export interface RunCheck {
   details?: string;
 }
 
-interface AgentOutcomeBase {
+interface StepOutcomeBase {
   summary: string;
   artifacts?: {
     git_sha?: string;
@@ -126,34 +44,24 @@ interface AgentOutcomeBase {
   checks: RunCheck[];
 }
 
-export type AgentOutcome = AgentOutcomeBase & {
+export type StepOutcome = StepOutcomeBase & {
       state: "completed";
       result: StepRunResult;
       question?: never;
       context?: never;
     }
-  | AgentOutcomeBase & {
+  | StepOutcomeBase & {
       state: "needs_input";
       question: string;
       context: string;
       result?: never;
     }
-  | AgentOutcomeBase & {
+  | StepOutcomeBase & {
       state: "blocked" | "failed";
       result?: never;
       question?: never;
       context?: never;
     };
-
-export interface ExecutionAgentSnapshot {
-  id: string;
-  name: string;
-  description: string;
-  instructions: string;
-  skillIds: string[];
-  avatar?: AgentAvatar;
-  configHash: string;
-}
 
 export interface ExecutionRuntimeSnapshot {
   hostname: string;
@@ -172,15 +80,59 @@ export interface ExecutionProjectSnapshot {
   snapshotHash: string;
 }
 
-export interface ExecutionSpec {
+export type ExecutionResourceOrigin = "system" | "project";
+export type ExecutionResourceKind = "system" | "primary" | "skill";
+
+/** Content is stored once in the Root Run snapshot and never re-read while it runs. */
+export interface ExecutionResourceSnapshot {
+  kind: ExecutionResourceKind;
+  origin: ExecutionResourceOrigin;
+  id: string;
+  relativePath?: string;
+  sourceSha256: string;
+  content: string;
+}
+
+export interface ExecutionRuntimeBinding {
+  executionProfileId: string;
+  runtime: ExecutionRuntimeSnapshot;
+}
+
+export interface RootExecutionSnapshot {
   version: 1;
+  rootLoopId: string;
+  project: ExecutionProjectSnapshot;
+  loops: ProjectLoop[];
+  theme: LoopTheme;
+  executionProfiles: ExecutionProfile[];
+  runtimes: ExecutionRuntimeBinding[];
+  resources: ExecutionResourceSnapshot[];
+  createdAt: string;
+}
+
+export type ExecutionResourceEvidence = Omit<ExecutionResourceSnapshot, "content">;
+
+/** Attempt-specific evidence. The exact composed prompt is retained only here. */
+export interface ExecutionPromptEvidence {
+  compositionVersion: 1;
+  loopId: string;
+  stepId: string;
+  executionProfile: ExecutionProfile;
+  resources: ExecutionResourceEvidence[];
+  prompt: string;
+  promptSha256: string;
+  outputSchemaVersion: 1;
+  outputSchemaSha256: string;
+}
+
+export interface ExecutionSpec {
+  version: 2;
   taskId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;
-  loopRunId?: string;
-  stepRunId?: string;
-  input?: string;
-  agent: ExecutionAgentSnapshot;
+  loopRunId: string;
+  stepRunId: string;
+  evidence: ExecutionPromptEvidence;
   runtime: ExecutionRuntimeSnapshot;
   project: ExecutionProjectSnapshot;
   createdAt: string;
@@ -197,7 +149,7 @@ export interface ExecutionTask {
   cancelRequestedAt?: string;
   errorCode?: string;
   errorMessage?: string;
-  outcome?: AgentOutcome;
+  outcome?: StepOutcome;
   createdAt: string;
   updatedAt: string;
 }
@@ -240,40 +192,30 @@ export interface RootFinalizationReport {
 }
 
 export interface RuntimePreflightIssue {
-  agentId: string;
   stepId?: string;
+  executionProfileId?: string;
   code:
-    | "unbound"
     | "auth_required"
     | "backend_unhealthy"
     | "model_unavailable"
     | "reasoning_unavailable"
     | "policy_unsupported"
     | "invalid_runtime_config"
-    | "dirty_checkout";
+    | "dirty_checkout"
+    | "missing_resource"
+    | "invalid_resource"
+    | "prompt_too_large";
   message: string;
 }
 
 export interface LoopRuntimePreflight {
   ok: boolean;
   issues: RuntimePreflightIssue[];
-  snapshots: Array<{ stepId: string; agentId: string; runtime: ExecutionRuntimeSnapshot }>;
-}
-
-export interface LoopExecutionStepSnapshot {
-  loopId: string;
-  stepId: string;
-  agentId: string;
-  agent: ExecutionAgentSnapshot;
-  runtime: ExecutionRuntimeSnapshot;
-}
-
-export interface LoopExecutionPlan {
-  version: 1;
-  rootLoopId: string;
-  project: ExecutionProjectSnapshot;
-  steps: LoopExecutionStepSnapshot[];
-  createdAt: string;
+  snapshots: Array<{
+    stepId: string;
+    executionProfileId: string;
+    runtime: ExecutionRuntimeSnapshot;
+  }>;
 }
 
 export type LoopRunSource = "manual" | "transition" | "schedule";
@@ -304,7 +246,6 @@ export interface LoopRun {
   input?: string;
   snapshot: ProjectLoop;
   themeSnapshot: LoopTheme;
-  executionPlan?: LoopExecutionPlan;
   schedule?: LoopScheduleOccurrence;
   transitionCount: number;
   createdAt: string;
@@ -317,15 +258,14 @@ export interface StepRun {
   runId: string;
   loopId: string;
   stepId: string;
-  type: "agent" | "human";
-  agentId?: string;
+  type: ProjectExecutableStep["type"];
   executionTaskId?: string;
   execution?: ExecutionRuntimeSnapshot;
   status: StepRunStatus;
   input?: string;
   responseInput?: string;
   result?: StepRunResult;
-  outcome?: AgentOutcome;
+  outcome?: StepOutcome;
   error?: string;
   attempt: number;
   createdAt: string;

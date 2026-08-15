@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type {
-  Agent,
   AppData,
+  ExecutionProfile,
   MarkdownDocument,
   Project,
   ProjectDocumentTreeNode,
@@ -34,7 +34,7 @@ export type WorkspaceSelection = {
   selectedAdr?: MarkdownDocument;
   selectedGoal?: MarkdownDocument;
   selectedInstruction?: MarkdownDocument;
-  selectedAgent?: Agent;
+  selectedExecutionProfile?: ExecutionProfile;
   selectedSkill?: Skill;
 };
 
@@ -54,10 +54,9 @@ export function getWorkspaceSelection({
   const selectedAdr = route.documentPath ? selectedProjectTreeDocument(adrDirectory, route.documentPath) : undefined;
   const selectedGoal = route.documentPath ? selectedProjectTreeDocument(goalsDirectory, route.documentPath) : undefined;
   const selectedInstruction = route.documentPath ? selectedProjectTreeDocument(instructionsDirectory, route.documentPath) : undefined;
-  const selectedAgent =
-    route.view === "agents" && !route.documentPath
-      ? undefined
-      : data.agents.find((agent) => agent.relativePath === route.documentPath) ?? data.agents[0];
+  const selectedExecutionProfile = route.executionProfileId
+    ? data.executionProfiles.find((profile) => profile.id === route.executionProfileId)
+    : undefined;
   const selectedSkill = route.documentPath ? data.skills.find((skill) => skill.relativePath === route.documentPath) : undefined;
 
   return {
@@ -73,7 +72,7 @@ export function getWorkspaceSelection({
     selectedAdr,
     selectedGoal,
     selectedInstruction,
-    selectedAgent,
+    selectedExecutionProfile,
     selectedSkill
   };
 }

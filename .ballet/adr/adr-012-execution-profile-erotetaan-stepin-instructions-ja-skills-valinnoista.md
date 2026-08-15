@@ -3,12 +3,12 @@ id: adr-012
 title: Execution profile erotetaan Stepin instructions- ja skills-valinnoista
 status: accepted
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - arkkitehtuuripäätös
   - execution-profile
   - step-koostaminen
-version: 2
+version: 3
 ---
 
 # Execution profile erotetaan Stepin instructions- ja skills-valinnoista
@@ -30,6 +30,8 @@ Tiukan v9-kohdemallin ainoa uusi authoring-entity on `ExecutionProfile`, joka si
 - `reasoningEffort`
 - `networkAccess`
 
+`id` on yksikäsitteinen lowercase kebab-case, `name` on non-empty käyttäjälle näkyvä nimi ja identity perustuu aina ID:hen. `executionProfiles` on lista, joka tallennetaan deterministisesti ID:n mukaiseen järjestykseen.
+
 Agentti- ja Scheduled-Step viittaavat suoraan yhteen execution profileen ja omistavat:
 
 - yhden `executionProfileId`-viitteen;
@@ -42,11 +44,11 @@ Agent ei ole execution compositionin välikappale eikä top-level Agent kuulu v9
 
 Execution profile ei saa sisältää instruction-, skill-, task-, Transition-, appearance- tai paikallista machine-policy-dataa. `workspace_access: read-only | write` arvioidaan myöhemmin erillisellä päätöksellä; sitä ei lisätä ensimmäiseen versioon, koska nykyinen worktree-, provider-policy- ja finalisointimalli olettaa kirjoitettavan workspacen.
 
-Ensimmäiseen versioon ei lisätä Role-, Preset-, Policy- tai Recipe-entityä. Origin on resurssin provenance-arvo eikä entity.
+Ensimmäiseen versioon ei lisätä Role-, Preset-, Policy-, Recipe-, Template- tai Template Pack -entityä. Origin on resurssin provenance-arvo eikä entity.
 
-Project-primary instructionit ratkaistaan eksplisiittisistä `.ballet/instructions/`-resursseista ja Project-skillsit `.agents/skills/`-puusta. `.codex/agents/*.toml` on vain eksplisiittisen v8→v9-migraation lähde, ja historialliset Agent-snapshotit säilyvät versionoidussa read-only-projektiossa.
+V1:n primary instructionit ratkaistaan vain eksplisiittisistä `.ballet/instructions/**/*.md` Project-resursseista ja skillsit vain `.agents/skills/**/SKILL.md` Project-resursseista. Selectable Built-in-katalogi ja clone-to-project eivät kuulu tähän versioon. `.codex/agents/*.toml` oli tämän repositoryn suoran pre-release-konversion lähde, mutta se ei jää v9:n execution-lähteeksi eikä historiallista Agent compatibility -projektiota rakenneta.
 
-Agentin avatar-, nickname- ja live-status-metadata eivät kuulu v9 execution -malliin. Stepin nykyinen appearance säilyy. Ei-tyhjä legacy `agentReadOnlyRoots` estää migraation; sitä ei siirretä hiljaisesti ExecutionProfileen, Stepille tai checkout-tason policyksi.
+Agentin avatar-, nickname- ja live-status-metadata eivät kuulu v9 execution -malliin. Stepin nykyinen appearance säilyy. Legacy `agentReadOnlyRoots` -kentän havaitseminen estää Runin; arvoja ei poisteta tai siirretä hiljaisesti ExecutionProfileen, Stepille tai checkout-tason policyksi.
 
 Päätös päivittää ADR-002:n, ADR-004:n, ADR-005:n, ADR-006:n ja ADR-008:n kohdat, joissa portable runtime intentio tai execution snapshot oli Agentin omistama.
 
@@ -55,9 +57,9 @@ Päätös päivittää ADR-002:n, ADR-004:n, ADR-005:n, ADR-006:n ja ADR-008:n k
 - Sama execution profile voidaan deduplikoida ja valita usealle Stepille.
 - Instruction- tai skill-viitteen vaihtaminen yhdessä Stepissä ei muuta samaa profilea käyttäviä muita Steppejä. Jaetun resurssin sisällön muutos vaikuttaa tarkoituksella kaikkiin siihen viittaaviin Steppeihin seuraavasta Root Runista alkaen.
 - Node editor voi näyttää execution compositionin ilman provider- ja runtime-asetusten muokkausta.
-- Projektikonfiguraatio tarvitsee eksplisiittisen, ei-hiljaisen version migrationin.
+- Repositoryn tracked pre-release-data muunnetaan suoraan v9:ään; runtime tukee vain strict v9:ää eikä sisällä migration-subsystemia tai v8-readeria.
 - Run-suunnitelman pitää snapshotata Step composition ja execution profile erillisinä immutable-rakenteina.
-- Machine-local `readOnlyRoots` ei siirry execution profileen eikä legacy-arvoja saa kadottaa hiljaisessa migrationissa.
+- Machine-local `readOnlyRoots` ei siirry execution profileen, ja legacy `agentReadOnlyRoots` estää Runin kunnes käyttäjä tekee eksplisiittisen remediationin.
 
 ## Toteutuksen lähteet
 

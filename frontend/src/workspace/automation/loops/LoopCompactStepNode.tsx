@@ -5,7 +5,6 @@ import type { LoopStepRecord } from "./loopGraph";
 import type { LoopNodeContext } from "./LoopCanvasTypes";
 import { loopReasoningGlowLevel } from "./loopReasoningGlow";
 import { loopThemeNodeGlow } from "./loopTheme";
-import { AgentAvatarIcon } from "../../agents/agentAvatars";
 import { defaultLoopNodeSize, defaultLoopNodeStyle } from "@shared/api/workspace-contracts";
 import { LoopNodeArtwork } from "./LoopNodeArtwork";
 const stepRunStatusClass: Record<string, string> = {
@@ -75,7 +74,7 @@ function StepNodeButton({ context, record, records, selected }: {
     <>
       <span aria-hidden="true" className="loop-node-reasoning-glow" />
       <LoopNodeArtwork nodeStyle={model.nodeStyle} />
-      <StepNodeMark kind={model.kind} avatar={model.showAvatar ? model.avatar : undefined} />
+      <StepNodeMark kind={model.kind} />
       <StepNodeLabel title={model.title} scheduleLabel={model.scheduleLabel} />
     </>
   );
@@ -145,8 +144,6 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
     nodeSize,
     nodeStyle,
     glowColor: loopThemeNodeGlow(context.theme),
-    avatar: step.avatar,
-    showAvatar: kind === "agent" && context.theme.node.showAgentAvatarInNode && Boolean(step.avatar),
     scheduleLabel,
     tooltip: scheduleLabel ? `${title} · ${scheduleLabel}` : title,
     reasoningEffort: step.reasoningEffort,
@@ -158,10 +155,9 @@ function stepNodeModel(record: LoopStepRecord, context: LoopNodeContext) {
   };
 }
 
-function StepNodeMark({ kind, avatar }: { kind: StepNodeKind; avatar?: NonNullable<LoopStepRecord["step"]>["avatar"] }) {
+function StepNodeMark({ kind }: { kind: StepNodeKind }) {
   if (kind === "human") return <Shield aria-hidden="true" className="relative z-10 size-3.5 text-tertiary" strokeWidth={1.8} />;
   if (kind === "scheduled") return <CalendarClock aria-hidden="true" className="relative z-10 size-3.5 text-muted-foreground" strokeWidth={1.8} />;
-  if (avatar) return <AgentAvatarIcon avatar={avatar} className="loop-agent-avatar relative z-10 text-[var(--loop-theme-node-label)]" />;
   return null;
 }
 

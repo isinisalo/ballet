@@ -3,12 +3,12 @@ id: adr-014
 title: Workflow-templatet ovat project-local dataa
 status: accepted
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - arkkitehtuuripäätös
   - workflow-templatet
   - projektidata
-version: 2
+version: 3
 ---
 
 # Workflow-templatet ovat project-local dataa
@@ -23,23 +23,19 @@ Balletin oman roadmap–milestone–release-ketjun pitää lisäksi olla tavalli
 
 Workflow template on authoring-käsite, ei uusi runtime- tai persistence-entity.
 
-- Suoritettava workflow koostuu projektin tavallisista Loopeista, Stepeistä, execution profile -viitteistä, Project- tai Built-in-primary instructioneista sekä valituista skills-tiedostoista.
+- Suoritettava V1-workflow koostuu projektin tavallisista Loopeista, Stepeistä, execution profile -viitteistä, Project-primary instructioneista sekä valituista Project-skills-tiedostoista.
 - Projektissa käytettävän workflow'n Loop- ja Step-rakenne tallennetaan project-local konfiguraationa.
 - Projektikohtaiset instructionit ja skillsit ovat repository-owned ja editable Project-resursseja.
-- Ballet voi tarjota optional Built-in-lähteen kloonauksen lähtökohdaksi. Kloonaus luo itsenäisen Project-kopion, jolla on uusi Project-ID; kopio ei säilytä runtime-linkkiä tai automaattista päivityssuhdetta Built-in-lähteeseen.
-- Kloonaus ei vaihda olemassa olevan Stepin viitettä hiljaisesti. `Clone and use` on yksi eksplisiittinen käyttäjätoiminto.
-- Project workflow snapshotataan Runin alussa samalla tavalla riippumatta siitä, onko sen lähtökohta luotu käsin vai kloonattu.
+- Project workflow snapshotataan Root Runin alussa suoraan repository-owned lähteistä.
 
-Ensimmäiseen versioon ei lisätä template packia, template-versioresolveria, marketplacea, override-ketjua tai uutta Template/Recipe-entityä.
+Ensimmäiseen versioon ei lisätä template packia, template-versioresolveria, marketplacea, registryä, clone-to-project-toimintoa, override-ketjua tai uutta Template/Recipe-entityä.
 
 ## Seuraukset
 
 - Workflow näkyy Git-diffissä samoina tiedostoina, joita Run käyttää.
-- Asennetun Ballet-version Built-in-muutos ei muuta jo kloonattua Project-workflow'ta.
 - Projektit voivat eriyttää workflow'nsa ilman globaalin templaten ehtoja.
-- Mahdollinen `clonedFrom`-metadata on vain provenancea eikä vaikuta executioniin.
 - Balletin oma kehitysworkflow pysyy Ballet-repositoryn projektidatana eikä System- tai tuotebinaarikäytäntönä.
-- Built-in-katalogin selaus ja kloonaus voidaan toteuttaa myöhemmin ilman pack-järjestelmää; Node editor ei ole kloonaus- tai template-editori.
+- Node editor ei ole kloonaus- tai template-editori eikä V1:n käyttöliittymässä ole Built-in-katalogia.
 - Päätös riippuu ADR-012:n composition-mallista ja ADR-013:n workflow-skill-rajasta sekä täsmentää ADR-002:n project-local data -periaatetta.
 
 ## Toteutuksen lähteet

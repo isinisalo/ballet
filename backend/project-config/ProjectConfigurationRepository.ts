@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import {
   closeSync,
-  existsSync,
+  constants,
+  fstatSync,
   fsyncSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -13,19 +15,24 @@ import {
 import path from "node:path";
 import type { z } from "zod";
 import { projectConfigSchema } from "../../shared/api/workspace-schemas.js";
-import { defaultProjectConfiguration, type ProjectConfiguration } from "../../shared/domain/projectConfig.js";
-import type { PortableAgentRuntimeIntent, RuntimeConfigurationIssue } from "../../shared/domain/runtime.js";
+import {
+  defaultProjectConfiguration,
+  type ExecutionProfile,
+  type ProjectConfiguration,
+  type ProjectConfigurationIssue
+} from "../../shared/domain/projectConfig.js";
+import { ExecutionProfileConflictError, ExecutionProfileNotFoundError } from "./ExecutionProfileErrors.js";
 
 export interface ProjectConfigurationLoadResult {
   path: string;
   exists: boolean;
   source?: string;
   config?: ProjectConfiguration;
-  issues: RuntimeConfigurationIssue[];
+  issues: ProjectConfigurationIssue[];
 }
 
 export class ProjectConfigurationSourceError extends Error {
-  constructor(readonly issues: RuntimeConfigurationIssue[]) {
+  constructor(readonly issues: ProjectConfigurationIssue[]) {
     super(".ballet/project.json is invalid and was left unchanged.");
     this.name = "ProjectConfigurationSourceError";
   }
@@ -38,10 +45,23 @@ export class ProjectConfigurationRepository {
 
   load(root: string): ProjectConfigurationLoadResult {
     const filename = this.path(root);
-    if (!existsSync(filename)) {
+    const directoryIssue = projectDirectoryIssue(root);
+    if (directoryIssue) return { path: filename, exists: true, issues: [directoryIssue] };
+    const fileStatus = status(filename);
+    if (!fileStatus) {
       return { path: filename, exists: false, config: defaultProjectConfiguration(), issues: [] };
     }
-    const source = readFileSync(filename, "utf8");
+    if (!fileStatus.isFile() || fileStatus.isSymbolicLink()) {
+      return invalidSourceResult(
+        filename,
+        "invalid_schema",
+        ".ballet/project.json must be an ordinary JSON file and must not be a symbolic link."
+      );
+    }
+
+    const sourceResult = readProjectSource(filename);
+    if (typeof sourceResult !== "string") return sourceResult;
+    const source = sourceResult;
     let value: unknown;
     try {
       value = JSON.parse(source) as unknown;
@@ -53,6 +73,16 @@ export class ProjectConfigurationRepository {
         issues: [sourceIssue("invalid_json", ".ballet/project.json", error instanceof Error ? error.message : "Project config is not valid JSON.")]
       };
     }
+    if (isRecord(value) && value.version !== 9) return {
+      path: filename,
+      exists: true,
+      source,
+      issues: [sourceIssue(
+        "invalid_schema",
+        "version",
+        `Strict project config version 9 is required; version ${String(value.version)} is not supported.`
+      )]
+    };
     const parsed = projectConfigSchema.safeParse(value);
     if (!parsed.success) {
       return { path: filename, exists: true, source, issues: parsed.error.issues.map(toSourceIssue) };
@@ -63,43 +93,67 @@ export class ProjectConfigurationRepository {
   putAutomation(root: string, loops: ProjectConfiguration["loops"]): ProjectConfiguration {
     const loaded = this.load(root);
     assertWritable(loaded);
-    const config = normalize({ ...loaded.config!, version: 8, loops });
+    const config = normalize({ ...loaded.config!, version: 9, loops });
     this.write(root, config);
     return config;
   }
 
-  putAgentIntent(root: string, agentId: string, intent: PortableAgentRuntimeIntent): ProjectConfiguration {
+  createExecutionProfile(root: string, profile: ExecutionProfile): ProjectConfiguration {
     const loaded = this.load(root);
     assertWritable(loaded);
+    if (loaded.config.executionProfiles.some((candidate) => candidate.id === profile.id)) {
+      throw new ExecutionProfileConflictError(`Execution profile ${profile.id} already exists.`);
+    }
     const config = normalize({
-      ...loaded.config!,
-      version: 8,
-      agents: { ...loaded.config!.agents, [agentId]: intent }
+      ...loaded.config,
+      version: 9,
+      executionProfiles: [...loaded.config.executionProfiles, profile]
     });
     this.write(root, config);
     return config;
   }
 
-  removeAgentIntent(root: string, agentId: string): ProjectConfiguration {
+  updateExecutionProfile(root: string, profile: ExecutionProfile): ProjectConfiguration {
     const loaded = this.load(root);
     assertWritable(loaded);
-    if (!Object.hasOwn(loaded.config!.agents, agentId)) return loaded.config!;
-    const agents = { ...loaded.config!.agents };
-    delete agents[agentId];
-    const config = normalize({ ...loaded.config!, version: 8, agents });
+    if (!loaded.config.executionProfiles.some((candidate) => candidate.id === profile.id)) {
+      throw new ExecutionProfileNotFoundError(`Execution profile ${profile.id} was not found.`);
+    }
+    const config = normalize({
+      ...loaded.config,
+      version: 9,
+      executionProfiles: loaded.config.executionProfiles.map((candidate) =>
+        candidate.id === profile.id ? profile : candidate)
+    });
+    this.write(root, config);
+    return config;
+  }
+
+  removeExecutionProfile(root: string, executionProfileId: string): ProjectConfiguration {
+    const loaded = this.load(root);
+    assertWritable(loaded);
+    if (!loaded.config!.executionProfiles.some((profile) => profile.id === executionProfileId)) return loaded.config!;
+    const config = normalize({
+      ...loaded.config!,
+      version: 9,
+      executionProfiles: loaded.config!.executionProfiles.filter((profile) => profile.id !== executionProfileId)
+    });
     this.write(root, config);
     return config;
   }
 
   private write(root: string, config: ProjectConfiguration): void {
+    const normalized = normalize(config);
+    const parsed = projectConfigSchema.safeParse(normalized);
+    if (!parsed.success) throw new ProjectConfigurationSourceError(parsed.error.issues.map(toSourceIssue));
     const directory = path.join(root, ".ballet");
     const filename = this.path(root);
-    mkdirSync(directory, { recursive: true });
+    ensureProjectDirectory(root);
     const temporary = path.join(directory, `.project.json.${process.pid}.${randomUUID()}.tmp`);
     let descriptor: number | undefined;
     try {
       descriptor = openSync(temporary, "wx", 0o666);
-      writeFileSync(descriptor, `${JSON.stringify(normalize(config), null, 2)}\n`, "utf8");
+      writeFileSync(descriptor, `${JSON.stringify(parsed.data, null, 2)}\n`, "utf8");
       fsyncSync(descriptor);
       closeSync(descriptor);
       descriptor = undefined;
@@ -115,31 +169,111 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 8,
-  agents: Object.fromEntries(Object.entries(config.agents)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([agentId, intent]) => [agentId, {
-      provider: intent.provider,
-      model: intent.model,
-      reasoning: intent.reasoning,
-      policy: { network: intent.policy.network }
-    }])),
-  loops: config.loops
+  version: 9,
+  executionProfiles: config.executionProfiles
+    .map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+      provider: profile.provider,
+      model: profile.model,
+      reasoningEffort: profile.reasoningEffort,
+      networkAccess: profile.networkAccess
+    }))
+    .sort((left, right) => compareIds(left.id, right.id)),
+  loops: config.loops.map((loop) => ({
+    ...loop,
+    nodes: loop.nodes.map((node) => node.type === "agent" || node.type === "scheduled"
+      ? { ...node, skillIds: [...node.skillIds].sort(compareIds) }
+      : node)
+  }))
 });
+
+const compareIds = (left: string, right: string): number => left < right ? -1 : left > right ? 1 : 0;
 
 const sourceIssue = (
   code: "invalid_json" | "invalid_schema",
   issuePath: string,
-  message: string,
-  agentId?: string
-): RuntimeConfigurationIssue => ({ code, path: issuePath, message, agentId });
+  message: string
+): ProjectConfigurationIssue => ({ code, path: issuePath, message });
 
-const toSourceIssue = (issue: z.core.$ZodIssue): RuntimeConfigurationIssue => sourceIssue(
+const toSourceIssue = (issue: z.core.$ZodIssue): ProjectConfigurationIssue => sourceIssue(
   "invalid_schema",
   issue.path.length > 0 ? issue.path.map(String).join(".") : ".ballet/project.json",
-  issue.message,
-  issue.path[0] === "agents" && typeof issue.path[1] === "string" ? issue.path[1] : undefined
+  issue.message
 );
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const status = (filename: string): ReturnType<typeof lstatSync> | undefined => {
+  try {
+    return lstatSync(filename);
+  } catch (error) {
+    if (isFileSystemError(error, "ENOENT")) return undefined;
+    throw error;
+  }
+};
+
+const projectDirectoryIssue = (root: string): ProjectConfigurationIssue | undefined => {
+  const directoryStatus = status(path.join(root, ".ballet"));
+  if (!directoryStatus || (directoryStatus.isDirectory() && !directoryStatus.isSymbolicLink())) return undefined;
+  return sourceIssue(
+    "invalid_schema",
+    ".ballet",
+    ".ballet must be an ordinary directory and must not be a symbolic link."
+  );
+};
+
+const ensureProjectDirectory = (root: string): void => {
+  const directory = path.join(root, ".ballet");
+  if (!status(directory)) mkdirSync(directory);
+  const issue = projectDirectoryIssue(root);
+  if (issue) throw new ProjectConfigurationSourceError([issue]);
+};
+
+const readProjectSource = (filename: string): string | ProjectConfigurationLoadResult => {
+  let descriptor: number | undefined;
+  try {
+    descriptor = openSync(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
+    if (!fstatSync(descriptor).isFile()) return invalidSourceResult(
+      filename,
+      "invalid_schema",
+      ".ballet/project.json must be an ordinary JSON file."
+    );
+    const bytes = readFileSync(descriptor);
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      return invalidSourceResult(
+        filename,
+        "invalid_json",
+        ".ballet/project.json must contain valid UTF-8 JSON."
+      );
+    }
+  } catch (error) {
+    if (isFileSystemError(error, "ELOOP") || isFileSystemError(error, "EMLINK")) return invalidSourceResult(
+      filename,
+      "invalid_schema",
+      ".ballet/project.json must be an ordinary JSON file and must not be a symbolic link."
+    );
+    throw error;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+};
+
+const invalidSourceResult = (
+  filename: string,
+  code: "invalid_json" | "invalid_schema",
+  message: string
+): ProjectConfigurationLoadResult => ({
+  path: filename,
+  exists: true,
+  issues: [sourceIssue(code, ".ballet/project.json", message)]
+});
+
+const isFileSystemError = (error: unknown, code: string): boolean =>
+  error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
 
 function assertWritable(loaded: ProjectConfigurationLoadResult): asserts loaded is ProjectConfigurationLoadResult & { config: ProjectConfiguration } {
   if (!loaded.config || loaded.issues.length > 0) throw new ProjectConfigurationSourceError(loaded.issues);

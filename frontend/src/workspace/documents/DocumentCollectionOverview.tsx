@@ -1,4 +1,4 @@
-import type { MarkdownDocument } from "@shared/api/workspace-contracts";
+import type { MarkdownDocument, ProjectInstruction } from "@shared/api/workspace-contracts";
 import { Archive, CheckCircle2, FileText, type LucideIcon } from "lucide-react";
 import { CollectionCardGrid, CollectionEntityCard, OperationalStatus, Panel, type OperationalStatusTone } from "@/components/shared/workspace-ui";
 import { projectCollectionCreatePath, projectCollectionDocumentPath } from "../routing";
@@ -33,9 +33,10 @@ const documentStatusTone = (status: string): OperationalStatusTone => {
   return "neutral";
 };
 
-export function DocumentCollectionOverview({ kind, documents, navigate }: {
+export function DocumentCollectionOverview({ kind, documents, instructions = [], navigate }: {
   kind: ProjectDocumentCreateKind;
   documents: MarkdownDocument[];
+  instructions?: ProjectInstruction[];
   navigate: WorkspaceNavigation["navigate"];
 }) {
   const config = collectionConfig[kind];
@@ -44,6 +45,7 @@ export function DocumentCollectionOverview({ kind, documents, navigate }: {
     <Panel title={config.title} icon={<Icon />} contentClassName="p-0">
       <CollectionCardGrid label={config.title} addLabel={config.addLabel} onAdd={() => navigate(projectCollectionCreatePath(kind))}>
         {documents.map((document) => {
+          const instruction = kind === "instruction" ? instructions.find((resource) => resource.relativePath === document.relativePath) : undefined;
           const status = frontmatterString(document, "status");
           const updated = frontmatterString(document, "updatedAt", "updated_date", "updatedDate");
           const tags = documentTags(document);
@@ -51,10 +53,11 @@ export function DocumentCollectionOverview({ kind, documents, navigate }: {
             <CollectionEntityCard
               key={document.relativePath}
               icon={<Icon />}
-              title={documentTitle(document)}
-              identifier={document.id}
-              status={status ? <OperationalStatus compact label={status} tone={documentStatusTone(status)} /> : undefined}
-              metadata={(updated || tags.length > 0) ? <>
+              title={instruction?.title ?? documentTitle(document)}
+              identifier={kind === "instruction" ? instruction?.id ?? "No valid Project ID" : document.id}
+              status={kind === "instruction" ? <OperationalStatus compact label={instruction?.valid ? "Valid" : "Not selectable"} tone={instruction?.valid ? "healthy" : "danger"} /> : status ? <OperationalStatus compact label={status} tone={documentStatusTone(status)} /> : undefined}
+              metadata={(kind === "instruction" || updated || tags.length > 0) ? <>
+                {kind === "instruction" ? <span className="min-w-0 truncate" title={document.relativePath}>path: {document.relativePath}</span> : null}
                 {updated ? <span>updated: {updated}</span> : null}
                 {tags.length > 0 ? <span className="min-w-0 truncate" title={tags.join(", ")}>tags: {tags.join(", ")}</span> : null}
               </> : undefined}

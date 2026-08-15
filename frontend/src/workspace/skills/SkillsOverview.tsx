@@ -12,17 +12,15 @@ export function SkillsOverview({ skills, navigate }: {
     <Panel title="Skills" icon={<FileKey2 />} contentClassName="p-0">
       <CollectionCardGrid label="Skills" addLabel="Add skill" onAdd={() => navigate(skillCreatePath())}>
         {skills.map((skill) => {
-          const enabled = skill.enabled ?? true;
-          const metadataCount = Object.keys(skill.metadata ?? {}).length;
           return (
             <CollectionEntityCard
               key={skill.id}
               icon={<FileKey2 />}
               title={skill.name}
               identifier={skill.id}
-              status={<OperationalStatus compact label={enabled ? "enabled" : "disabled"} tone={enabled ? "healthy" : "neutral"} />}
+              status={<OperationalStatus compact label={skill.valid ? "Valid" : "Invalid"} tone={skill.valid ? "healthy" : "danger"} />}
               description={skill.description}
-              metadata={<span>{metadataCount} metadata {metadataCount === 1 ? "key" : "keys"}</span>}
+              metadata={<><span className="min-w-0 truncate" title={skill.relativePath}>path: {skill.relativePath ?? "Unknown"}</span><span>project ID: {skill.id}</span></>}
               openLabel={`Open skill ${skill.name}`}
               onOpen={() => skill.relativePath && navigate(skillDocumentPath(skill.relativePath))}
             />

@@ -17,7 +17,7 @@ export function LoopTransitionsEditor({ step, loop, loops, disabled, focusedTran
   focusedTransition?: "approved" | "rejected";
   onChange: (step: ProjectLoopNode) => void;
 }) {
-  if (isProjectTerminalNode(step)) return <TerminalTransitions />;
+  if (isProjectTerminalNode(step)) return <p className="border-y border-divider-strong py-2 text-xs text-muted-foreground">Terminal nodes have no transitions.</p>;
   const options = transitionTargetOptions(loop, loops);
   const patch = (result: "approved" | "rejected", target: StepTransitionTarget) => onChange({ ...step, on: { ...step.on, [result]: target } });
   return (
@@ -27,17 +27,6 @@ export function LoopTransitionsEditor({ step, loop, loops, disabled, focusedTran
         {transitionResults.map((result) => (
           <TransitionRow key={result} result={result} target={step.on[result]} options={options} disabled={disabled} focused={focusedTransition === result} onChange={(target) => patch(result, target)} />
         ))}
-      </div>
-    </FieldSet>
-  );
-}
-
-function TerminalTransitions() {
-  return (
-    <FieldSet className="gap-1.5">
-      <FieldLegend variant="label" className="mb-0 text-xs font-normal text-muted-foreground">Transitions</FieldLegend>
-      <div className="divide-y divide-divider-strong border-y border-divider-strong">
-        {transitionResults.map((result) => <TransitionRow key={result} result={result} options={[]} disabled focused={false} />)}
       </div>
     </FieldSet>
   );

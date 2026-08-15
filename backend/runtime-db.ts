@@ -1,18 +1,16 @@
 import type Database from "better-sqlite3";
-import type { ProjectAutomationConfig } from "../shared/domain/automation.js";
-import type { LoopTheme } from "../shared/domain/loopThemes.js";
 import type {
-  AgentOutcome,
   ExecutionRuntimeSnapshot,
-  LoopExecutionPlan,
   LoopRunDetails,
   LoopRunSource,
   LoopScheduleState,
+  StepOutcome,
   StepRun,
   StepRunResult
 } from "../shared/domain/runtime.js";
 import { LoopRunEngine } from "./runtime/LoopRunEngine.js";
 import { LoopRunStore } from "./runtime/LoopRunStore.js";
+import { RootExecutionSnapshotStore } from "./runtime/RootExecutionSnapshotStore.js";
 import {
   LoopScheduleStateStore,
   type CompleteScheduleOccurrenceInput,
@@ -38,7 +36,7 @@ export class RuntimeDatabase {
     this.connectionManager = new RuntimeDbConnection(dbPath);
     const connection = () => this.connection();
     this.loopRunStore = new LoopRunStore(connection);
-    this.loopRunEngine = new LoopRunEngine(connection, this.loopRunStore);
+    this.loopRunEngine = new LoopRunEngine(connection, this.loopRunStore, new RootExecutionSnapshotStore(connection));
     this.loopScheduleStateStore = new LoopScheduleStateStore(connection);
   }
 
@@ -51,16 +49,12 @@ export class RuntimeDatabase {
   }
 
   startLoopRun(
-    config: ProjectAutomationConfig,
-    loopId: string,
-    themeSnapshot: LoopTheme,
     rootRunId: string,
     input?: string,
     source: LoopRunSource = "manual",
-    executionPlan?: LoopExecutionPlan,
     schedule?: { stepId: string; scheduledFor: string }
   ): LoopRunDetails {
-    return this.loopRunEngine.start(config, loopId, themeSnapshot, { input, source, executionPlan, schedule, rootRunId });
+    return this.loopRunEngine.start(rootRunId, { input, source, schedule });
   }
 
   bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
@@ -142,35 +136,77 @@ export class RuntimeDatabase {
   }
 
   respondToStepRun(
-    config: ProjectAutomationConfig,
-    loopTheme: LoopTheme,
     runId: string,
     stepRunId: string,
     result: StepRunResult,
     input: string
   ): LoopRunDetails {
-    return this.loopRunEngine.respond(config, loopTheme, runId, stepRunId, result, input);
+    return this.loopRunEngine.respond(runId, stepRunId, result, input);
   }
 
   resumeStepRun(runId: string, stepRunId: string, input: string): LoopRunDetails {
-    return this.loopRunEngine.resumeAgentStep(runId, stepRunId, input);
+    return this.loopRunEngine.resumeExecutionStep(runId, stepRunId, input);
   }
 
   cancelLoopRun(runId: string): LoopRunDetails {
     return this.loopRunEngine.cancel(runId);
   }
 
-  completeAgentStep(
-    config: ProjectAutomationConfig,
-    loopTheme: LoopTheme,
+  terminalizeActiveRootRuns(
+    rootRunId: string,
+    detail: {
+      status: "failed";
+      outcome: StepOutcome & { state: "failed" };
+      error: string;
+    } | { status: "cancelled" },
+    completedAt = new Date().toISOString()
+  ): void {
+    if (detail.status === "failed") {
+      this.connection().prepare(`
+        UPDATE step_runs SET status = 'failed', result = NULL, outcome_json = ?, error = ?,
+          completed_at = ?, updated_at = ?
+        WHERE run_id IN (SELECT run_id FROM loop_runs WHERE root_run_id = ?)
+          AND status IN ('queued', 'running', 'waiting_for_human', 'needs_input')
+      `).run(JSON.stringify(detail.outcome), detail.error, completedAt, completedAt, rootRunId);
+    } else {
+      this.connection().prepare(`
+        UPDATE step_runs SET status = 'cancelled', result = NULL,
+          completed_at = ?, updated_at = ?
+        WHERE run_id IN (SELECT run_id FROM loop_runs WHERE root_run_id = ?)
+          AND status IN ('queued', 'running', 'waiting_for_human', 'needs_input')
+      `).run(completedAt, completedAt, rootRunId);
+    }
+    this.connection().prepare(`
+      UPDATE loop_runs SET status = ?, completed_at = ?, updated_at = ?
+      WHERE root_run_id = ? AND status IN ('running', 'waiting_for_human')
+    `).run(detail.status, completedAt, completedAt, rootRunId);
+  }
+
+  isExecutionStepRunnable(rootRunId: string, stepRunId: string, taskId: string): boolean {
+    return Boolean(this.connection().prepare(`
+      SELECT 1
+      FROM root_runs root
+      JOIN loop_runs loop ON loop.root_run_id = root.root_run_id
+      JOIN step_runs step ON step.run_id = loop.run_id
+      WHERE root.root_run_id = ?
+        AND root.status IN ('queued', 'running', 'waiting_for_human')
+        AND loop.status = 'running'
+        AND step.step_run_id = ?
+        AND step.status = 'queued'
+        AND step.execution_task_id = ?
+      LIMIT 1
+    `).get(rootRunId, stepRunId, taskId));
+  }
+
+  completeExecutionStep(
     input: {
       stepRunId: string;
       executionTaskId?: string;
-      outcome?: AgentOutcome;
+      outcome?: StepOutcome;
       error?: string;
     }
   ): LoopRunDetails {
-    return this.loopRunEngine.completeAgentStep(config, loopTheme, input);
+    return this.loopRunEngine.completeExecutionStep(input);
   }
 
   getStepRun(stepRunId: string): StepRun | undefined {

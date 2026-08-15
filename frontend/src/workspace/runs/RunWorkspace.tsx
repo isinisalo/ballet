@@ -1,58 +1,68 @@
-import type { AgentExecutionState, AppData, ProjectLoop } from "@shared/api/workspace-contracts";
-import { ArrowLeft, Bot, Route } from "lucide-react";
+import type { AppData, ProjectLoop } from "@shared/api/workspace-contracts";
+import { ArrowLeft, Route } from "lucide-react";
 import { EmptyState, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import type { AppStreamStatus } from "@/app/useAppStream";
-import { AgentRunPane } from "../agents/execution/AgentRunPane";
 import { LoopRunView } from "../automation/loops/LoopRunView";
 import { useLoopRun } from "../automation/loops/useLoopRun";
-import { runAgentPath, runLoopPath, runOverviewPath } from "../routing";
+import { runLoopPath, runOverviewPath } from "../routing";
 import type { RouteState } from "../types";
+import { isRootRunDetailForLoop, rootRunLoopMismatchMessage } from "./rootRunAssociation";
 import type { RunDashboardState } from "./useRunDashboard";
 import { RunOverview } from "./RunOverview";
 
-export function RunWorkspace({ route, data, agentExecutionStates, appStreamStatus, dashboard, navigate }: {
+export function RunWorkspace({ route, data, appStreamStatus, dashboard, navigate }: {
   route: RouteState;
   data: AppData;
-  agentExecutionStates: AgentExecutionState[];
   appStreamStatus: AppStreamStatus;
   dashboard: RunDashboardState;
   navigate: (path: string) => void;
 }) {
   if (!route.runTargetKind || !route.runTargetId) return <RunOverview dashboard={dashboard} navigate={navigate} />;
-  if (route.runTargetKind === "loop") {
-    const loop = data.automation.loops.find((candidate) => candidate.id === route.runTargetId);
-    if (!loop) return <RunMissingTarget kind="Loop" id={route.runTargetId} navigate={navigate} />;
-    return <RunLoopWorkspace loop={loop} route={route} data={data} agentExecutionStates={agentExecutionStates} appStreamStatus={appStreamStatus} dashboard={dashboard} navigate={navigate} />;
+  const liveLoop = data.automation.loops.find((candidate) => candidate.id === route.runTargetId);
+  if (route.rootRunId) {
+    const explicitDetail = dashboard.detail?.rootRunId === route.rootRunId ? dashboard.detail : undefined;
+    if (!explicitDetail && dashboard.loading) return <RunLoadingSnapshot loopId={route.runTargetId} />;
+    if (!explicitDetail) return <RunMissingRoot rootRunId={route.rootRunId} loopId={route.runTargetId} navigate={navigate} />;
+    if (!isRootRunDetailForLoop(explicitDetail, route.runTargetId, route.rootRunId)) {
+      return <RunInvalidAssociation rootRunId={route.rootRunId} loopId={route.runTargetId} navigate={navigate} />;
+    }
+    const snapshotLoop = explicitDetail.executionSnapshot.loops.find((candidate) => candidate.id === route.runTargetId);
+    if (!snapshotLoop) return <RunInvalidAssociation rootRunId={route.rootRunId} loopId={route.runTargetId} navigate={navigate} />;
+    return <RunLoopWorkspace key={`${route.runTargetId}:${route.rootRunId}`} loop={snapshotLoop} liveLoop={liveLoop} route={route} data={data} appStreamStatus={appStreamStatus} dashboard={dashboard} navigate={navigate} />;
   }
-  const agent = data.agents.find((candidate) => candidate.id === route.runTargetId);
-  if (!agent) return <RunMissingTarget kind="agent" id={route.runTargetId} navigate={navigate} />;
-  const target = dashboard.targets.agents.find((candidate) => candidate.id === agent.id);
-  const selectedRootRunId = route.rootRunId ?? target?.activeRootRunId ?? target?.latestRootRunId;
-  return (
-    <Panel title="Ballet Run" titleExtra={<span className="truncate text-muted-foreground">{agent.name}</span>} icon={<Bot />} contentClassName="p-0" action={<OverviewButton navigate={navigate} />}>
-      <AgentRunPane agentId={agent.id} rootRunId={selectedRootRunId} rootDetail={dashboard.detail?.rootRunId === selectedRootRunId ? dashboard.detail : undefined} disabledReason={target?.ready ? undefined : target?.issues.map((issue) => issue.message).join(" · ")} onRootRunChange={(rootRunId) => navigate(runAgentPath(agent.id, rootRunId))} />
-    </Panel>
-  );
+  if (!liveLoop) return <RunMissingTarget kind="Loop" id={route.runTargetId} navigate={navigate} />;
+  return <RunLoopWorkspace key={route.runTargetId} loop={liveLoop} liveLoop={liveLoop} route={route} data={data} appStreamStatus={appStreamStatus} dashboard={dashboard} navigate={navigate} />;
 }
 
-function RunLoopWorkspace({ loop, route, data, agentExecutionStates, appStreamStatus, dashboard, navigate }: {
+function RunLoopWorkspace({ loop, liveLoop, route, data, appStreamStatus, dashboard, navigate }: {
   loop: ProjectLoop;
+  liveLoop?: ProjectLoop;
   route: RouteState;
   data: AppData;
-  agentExecutionStates: AgentExecutionState[];
   appStreamStatus: AppStreamStatus;
   dashboard: RunDashboardState;
   navigate: (path: string) => void;
 }) {
   const refreshSignal = `${dashboard.detail?.updatedAt ?? ""}:${dashboard.streamStatus}`;
-  const target = dashboard.targets.loops.find((candidate) => candidate.id === loop.id);
-  const suppliedRootDetail = dashboard.detail?.rootRunId === route.rootRunId ? dashboard.detail : undefined;
+  const target = liveLoop ? dashboard.targets.loops.find((candidate) => candidate.id === liveLoop.id) : undefined;
+  const detail = dashboard.detail;
+  const suppliedRootDetail = detail && route.rootRunId
+    && detail.rootRunId === route.rootRunId
+    && isRootRunDetailForLoop(detail, loop.id, route.rootRunId)
+    ? detail
+    : undefined;
   const controller = useLoopRun(loop.id, refreshSignal, appStreamStatus, route.rootRunId, target, suppliedRootDetail);
-  const disabledReason = target?.ready ? undefined : target?.issues.map((issue) => issue.message).join(" · ");
+  const disabledReason = !liveLoop
+    ? "This Loop is no longer configured. Historical Run evidence remains available, but starting a new Run requires a configured Loop."
+    : !target
+      ? "This Loop has no available Run target."
+      : target.ready
+        ? undefined
+        : target.issues.map((issue) => issue.message).join(" · ");
   return (
     <Panel title="Ballet Run" titleExtra={<span className="truncate text-muted-foreground">{loop.id}</span>} icon={<Route />} contentClassName="p-0" action={<OverviewButton navigate={navigate} />}>
-      <LoopRunView config={data.automation} loop={loop} agents={data.agents} agentExecutionStates={agentExecutionStates} theme={data.loopTheme} controller={controller} rootDetail={controller.rootDetail ?? suppliedRootDetail} startDisabledReason={disabledReason} onRootRunChange={(rootRunId) => navigate(runLoopPath(loop.id, rootRunId))} />
+      <LoopRunView config={data.automation} loop={loop} executionProfiles={data.executionProfiles} theme={data.loopTheme} controller={controller} rootDetail={controller.rootDetail ?? suppliedRootDetail} startDisabledReason={disabledReason} onRootRunChange={(rootRunId) => navigate(runLoopPath(loop.id, rootRunId))} />
     </Panel>
   );
 }
@@ -63,4 +73,20 @@ function OverviewButton({ navigate }: { navigate: (path: string) => void }) {
 
 function RunMissingTarget({ kind, id, navigate }: { kind: string; id: string; navigate: (path: string) => void }) {
   return <div className="grid gap-3 p-4"><EmptyState title={`${kind} not found.`} action={`No Run target is registered for "${id}".`} /><div><Button type="button" variant="outline" onClick={() => navigate(runOverviewPath())}>Open Run Overview</Button></div></div>;
+}
+
+function RunLoadingSnapshot({ loopId }: { loopId: string }) {
+  return <div className="p-4"><EmptyState title="Loading historical Run…" action={`Resolving immutable snapshot for "${loopId}".`} /></div>;
+}
+
+function RunMissingRoot({ rootRunId, loopId, navigate }: { rootRunId: string; loopId: string; navigate: (path: string) => void }) {
+  return <RunUnavailable title="Run not found." message={`Root Run "${rootRunId}" is unavailable for Loop "${loopId}".`} navigate={navigate} />;
+}
+
+function RunInvalidAssociation({ rootRunId, loopId, navigate }: { rootRunId: string; loopId: string; navigate: (path: string) => void }) {
+  return <RunUnavailable title="Run not found." message={rootRunLoopMismatchMessage(rootRunId, loopId)} navigate={navigate} />;
+}
+
+function RunUnavailable({ title, message, navigate }: { title: string; message: string; navigate: (path: string) => void }) {
+  return <div className="grid gap-3 p-4"><EmptyState title={title} action={message} /><div><Button type="button" variant="outline" onClick={() => navigate(runOverviewPath())}>Open Run Overview</Button></div></div>;
 }

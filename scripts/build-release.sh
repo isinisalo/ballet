@@ -131,6 +131,63 @@ while [ "$ATTEMPT" -lt 80 ]; do
 done
 [ "$READY" = true ] || { cat "$SMOKE_ROOT/server.err.log" >&2; printf 'packaged Ballet server did not become healthy\n' >&2; exit 1; }
 
+curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/data" -o "$SMOKE_ROOT/workspace.json" || {
+  cat "$SMOKE_ROOT/server.err.log" >&2
+  printf 'packaged Ballet server could not load the fixture workspace\n' >&2
+  exit 1
+}
+"$RUNTIME/node" -e '
+const fs = require("node:fs");
+const workspace = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const expectedProfile = {
+  id: "codex-gpt-5-6-luna-high-network-off",
+  name: "Codex GPT-5.6 Luna · High · Network off",
+  provider: "codex",
+  model: "gpt-5.6-luna",
+  reasoningEffort: "high",
+  networkAccess: false
+};
+const loop = workspace.automation?.loops?.[0];
+const step = loop?.nodes?.find((node) => node.id === "run");
+const architect = workspace.instructions?.find((item) => item.id === "project:architect");
+const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
+if (workspace.automation?.version !== 9
+  || workspace.automation.loops.length !== 1
+  || loop?.id !== "adr-review"
+  || loop?.start !== "run"
+  || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
+  || step?.type !== "agent"
+  || step?.description !== "Reviews project changes"
+  || step?.executionProfileId !== expectedProfile.id
+  || step?.primaryInstructionId !== "project:reviewer"
+  || !Array.isArray(step?.skillIds)
+  || step.skillIds.length !== 0
+  || Object.hasOwn(step, "agentId")
+  || workspace.instructions?.length !== 2
+  || architect?.valid !== true
+  || architect?.relativePath !== ".ballet/instructions/migrated-architect.md"
+  || architect?.body !== "## Instructions\n\nDesign architecture, keep decisions traceable, and write ADRs when routing requires it.\n"
+  || architect?.sourceSha256 !== "e14626fb277d87f010307476613b89b0aa8bbb0f6903a10127f4f8e23082b44b"
+  || architect?.contentSha256 !== "3a7b394727be306a4dad011a4152d1502f35da591a406a74281362d9cd19b78d"
+  || architect?.sizeBytes !== 105
+  || reviewer?.valid !== true
+  || reviewer?.relativePath !== ".ballet/instructions/migrated-reviewer.md"
+  || reviewer?.body !== "Review implementation changes and surface risks.\n"
+  || reviewer?.sourceSha256 !== "4e43b53837175e6ac6b1b666b96de045cf2cb37b9f6cda2868e1207dd9ac6df6"
+  || reviewer?.contentSha256 !== "8ce7d15bdcd9cd6e2e4ec3471343e96ee50d1c18bc19aae62a8941f6dfc8ee9a"
+  || reviewer?.sizeBytes !== 49
+  || workspace.resourceIssues?.length !== 0
+  || workspace.automationIssues?.length !== 0
+  || workspace.loopTheme?.version !== 3
+  || Object.hasOwn(workspace.loopTheme?.node ?? {}, "showAgentAvatarInNode")
+  || workspace.loopThemeIssues?.length !== 0) {
+  throw new Error("packaged Ballet server did not load the strict v9 fixture workspace");
+}
+' "$SMOKE_ROOT/workspace.json" || {
+  cat "$SMOKE_ROOT/server.err.log" >&2
+  exit 1
+}
+
 [ -f "$SMOKE_ROOT/project/.git/ballet/state.sqlite" ] || {
   printf 'packaged Ballet server did not create checkout-local state.sqlite\n' >&2
   exit 1

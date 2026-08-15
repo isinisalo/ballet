@@ -10,6 +10,8 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
+const distinctivePrompt = "SYSTEM π\n---\nPRIMARY: preserve  double spaces\nTASK:\tbyte-exact input\nOUTPUT: {\"state\":\"completed\"}\n";
+
 const fixtureSource = `#!/usr/bin/env node
 if (process.argv.includes("--version")) { console.log("codex-cli 0.144.1"); process.exit(0); }
 if (process.argv[2] === "login" && process.argv[3] === "status") { console.log("Logged in"); process.exit(0); }
@@ -18,6 +20,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const rl = readline.createInterface({ input: process.stdin });
 let turnParams;
+const expectedPrompt = ${JSON.stringify(distinctivePrompt)};
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\\n");
 const finish = () => {
   const text = JSON.stringify({ state: "completed", result: "approved", summary: "Codex done.", checks: [] });
@@ -34,6 +37,7 @@ rl.on("line", (line) => {
   if (message.method === "initialize") return send({ id: message.id, result: {} });
   if (message.method === "model/list") return send({ id: message.id, result: { data: [{ id: "gpt-5.4", displayName: "GPT-5.4", isDefault: true, supportedReasoningEfforts: [{ reasoningEffort: "medium", description: "Balanced" }, { reasoningEffort: "high", description: "Deep" }], defaultReasoningEffort: "medium" }] } });
   if (message.method === "thread/start") {
+    if (JSON.stringify(message.params).includes('"developerInstructions"')) process.exit(13);
     if (message.params.sandbox !== "workspace-write" || message.params.approvalPolicy !== "never") process.exit(7);
     return send({ id: message.id, result: { thread: { id: "thread-1" } } });
   }
@@ -42,6 +46,7 @@ rl.on("line", (line) => {
     turnParams = message.params;
     if (turnParams.sandboxPolicy?.type !== "workspaceWrite" || turnParams.sandboxPolicy?.networkAccess !== false) process.exit(8);
     if (turnParams.input?.[0]?.type !== "text" || !Array.isArray(turnParams.input[0].text_elements)) process.exit(10);
+    if (!Buffer.from(turnParams.input[0].text, "utf8").equals(Buffer.from(expectedPrompt, "utf8"))) process.exit(11);
     send({ id: message.id, result: { turn: { id: "turn-1" } } });
     fs.writeFileSync(path.join(process.cwd(), "turn-started"), "");
     if (fs.existsSync(path.join(process.cwd(), "crash-after-turn-start"))) return setImmediate(() => process.exit(12));
@@ -67,7 +72,7 @@ describe("CodexAppServerAdapter", () => {
     const events = [];
     for await (const event of adapter.execute({
       executionId: "task-1",
-      prompt: "Do work.",
+      prompt: distinctivePrompt,
       workingDirectory: context.root,
       model: "provider-default",
       reasoning: "provider-default",
@@ -117,7 +122,7 @@ describe("CodexAppServerAdapter", () => {
     const consume = async () => {
       for await (const event of adapter.execute({
         executionId: "task-crash",
-        prompt: "Do work.",
+        prompt: distinctivePrompt,
         workingDirectory: context.root,
         model: "provider-default",
         reasoning: "provider-default",
@@ -136,7 +141,7 @@ describe("CodexAppServerAdapter", () => {
     const consume = async () => {
       for await (const event of adapter.execute({
         executionId: "task-cancel",
-        prompt: "Do work.",
+        prompt: distinctivePrompt,
         workingDirectory: context.root,
         model: "provider-default",
         reasoning: "provider-default",

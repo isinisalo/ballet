@@ -3,6 +3,7 @@ import type { LoopRunDetails, RespondToStepRunRequest, RootRunDetail, RunTarget,
 import { toErrorMessage } from "@/lib/errors";
 import type { AppStreamStatus } from "@/app/useAppStream";
 import { runApi } from "../../runs/runApi";
+import { isRootRunDetailForLoop, rootRunLoopMismatchMessage } from "../../runs/rootRunAssociation";
 
 export type LoopRunPendingOperation = "load" | "start" | "respond" | "cancel" | null;
 
@@ -16,7 +17,7 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
   const preflight = useMemo(() => target ? {
     ok: target.ready,
     issues: target.issues.map((issue): RuntimePreflightIssue => ({
-      agentId: issue.agentId ?? "loop",
+      executionProfileId: issue.executionProfileId,
       stepId: issue.stepId,
       code: runtimeIssueCode(issue.code),
       message: issue.message
@@ -26,28 +27,38 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
 
   const applyRoot = useCallback((root?: RootRunDetail) => {
     setRootDetail(root);
-    setDetails(root ? selectedLoopRun(root) : null);
-    return root ? selectedLoopRun(root) : null;
+    const selected = root ? selectedLoopRun(root) : null;
+    setDetails(selected);
+    return selected;
   }, []);
+
+  const acceptRoot = useCallback((root: RootRunDetail, expectedRootRunId?: string) => {
+    if (!loopId || !isRootRunDetailForLoop(root, loopId, expectedRootRunId)) {
+      applyRoot(undefined);
+      setError(rootRunLoopMismatchMessage(expectedRootRunId ?? root.rootRunId, loopId ?? "unknown"));
+      return null;
+    }
+    setError("");
+    return applyRoot(root);
+  }, [applyRoot, loopId]);
 
   const refresh = useCallback(async () => {
     const current = ++generation.current;
     if (!loopId || !selectedRootRunId) { applyRoot(undefined); setPendingOperation(null); return; }
     if (suppliedRootDetail?.rootRunId === selectedRootRunId) {
-      applyRoot(suppliedRootDetail);
-      setError("");
+      acceptRoot(suppliedRootDetail, selectedRootRunId);
       setPendingOperation((operation) => operation === "load" ? null : operation);
       return;
     }
     try {
       const next = await runApi.detail(selectedRootRunId);
-      if (generation.current === current) { applyRoot(next); setError(""); }
+      if (generation.current === current) acceptRoot(next, selectedRootRunId);
     } catch (cause) {
       if (generation.current === current) setError(toErrorMessage(cause, "Unable to load the Loop Run."));
     } finally {
       if (generation.current === current) setPendingOperation((operation) => operation === "load" ? null : operation);
     }
-  }, [applyRoot, loopId, selectedRootRunId, suppliedRootDetail]);
+  }, [acceptRoot, applyRoot, loopId, selectedRootRunId, suppliedRootDetail]);
 
   useEffect(() => { setPendingOperation("load"); applyRoot(undefined); void refresh(); }, [applyRoot, refresh, refreshSignal]);
   useEffect(() => {
@@ -56,37 +67,44 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     return () => window.clearInterval(timer);
   }, [details, refresh]);
 
-  const mutate = useCallback(async (operation: Exclude<LoopRunPendingOperation, "load" | null>, request: () => Promise<RootRunDetail>) => {
+  const mutate = useCallback(async (operation: Exclude<LoopRunPendingOperation, "load" | null>, request: () => Promise<RootRunDetail>, expectedRootRunId?: string) => {
     const current = ++generation.current;
     setPendingOperation(operation);
     setError("");
     try {
       const next = await request();
-      return generation.current === current ? applyRoot(next) : null;
+      return generation.current === current ? acceptRoot(next, expectedRootRunId) : null;
     } catch (cause) {
       if (generation.current === current) setError(toErrorMessage(cause, `Unable to ${operation} Loop Run.`));
       return null;
     } finally {
       if (generation.current === current) setPendingOperation(null);
     }
-  }, [applyRoot]);
+  }, [acceptRoot]);
 
   const start = useCallback(async (input: string) => {
     if (!loopId || !preflight?.ok) return false;
     return mutate("start", () => runApi.start("loop", loopId, input));
   }, [loopId, mutate, preflight?.ok]);
+  const currentRootDetail = rootDetail && loopId && isRootRunDetailForLoop(rootDetail, loopId, selectedRootRunId)
+    ? rootDetail
+    : undefined;
+  const currentDetails = currentRootDetail ? details : null;
   const respond = useCallback(async (stepRunId: string, request: RespondToStepRunRequest) => {
-    if (!rootDetail) return false;
-    return mutate("respond", () => runApi.respond(rootDetail.rootRunId, stepRunId, request));
-  }, [mutate, rootDetail]);
+    if (!currentRootDetail) return false;
+    return mutate("respond", () => runApi.respond(currentRootDetail.rootRunId, stepRunId, request), currentRootDetail.rootRunId);
+  }, [currentRootDetail, mutate]);
   const cancel = useCallback(async () => {
-    if (!rootDetail) return false;
-    return mutate("cancel", () => runApi.cancel(rootDetail));
-  }, [mutate, rootDetail]);
+    if (!currentRootDetail) return false;
+    return mutate("cancel", () => runApi.cancel(currentRootDetail), currentRootDetail.rootRunId);
+  }, [currentRootDetail, mutate]);
 
-  return { details, rootDetail, preflight, pendingOperation, error, streamStatus, refresh, start, respond, cancel };
+  return { details: currentDetails, rootDetail: currentRootDetail, preflight, pendingOperation, error, streamStatus, refresh, start, respond, cancel };
 }
 
-const selectedLoopRun = (root: RootRunDetail) => root.loopRuns.find((run) => run.runId === root.current?.loopRunId) ?? [...root.loopRuns].reverse()[0] ?? null;
+const selectedLoopRun = (root: RootRunDetail) => {
+  const runs = root.loopRuns.filter((run) => run.rootRunId === root.rootRunId);
+  return runs.find((run) => run.runId === root.current?.loopRunId) ?? [...runs].reverse()[0] ?? null;
+};
 const runtimeIssueCode = (code: RunTarget["issues"][number]["code"]): RuntimePreflightIssue["code"] =>
-  code === "invalid_config" || code === "disabled" || code === "missing_agent" ? "invalid_runtime_config" : code;
+  code === "invalid_config" ? "invalid_runtime_config" : code;

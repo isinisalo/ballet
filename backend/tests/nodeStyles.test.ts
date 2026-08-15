@@ -11,7 +11,7 @@ import {
 } from "../../shared/domain/automation.js";
 
 const config = (): ProjectAutomationConfig => ({
-  version: 8,
+  version: 9,
   loops: [{
     id: "delivery",
     start: "gate",
@@ -26,7 +26,7 @@ const config = (): ProjectAutomationConfig => ({
   }]
 });
 
-describe("v8 node style and size catalogs", () => {
+describe("v9 node style and size catalogs", () => {
   it("defines six ordered styles with group metadata and four explicit sizes", () => {
     expect(loopNodeStyles).toEqual([
       "flat", "luna", "mars", "terra", "sol", "vector-planet"
@@ -63,7 +63,7 @@ describe("v8 node style and size catalogs", () => {
   });
 });
 
-describe("v8 node style and terminal validation", () => {
+describe("v9 node style and terminal validation", () => {
   it("rejects removed node styles and the removed Loop summary field", () => {
     const base = config();
     const removedStyles = [
@@ -122,7 +122,7 @@ describe("v8 node style and terminal validation", () => {
     }).success).toBe(false);
   });
 
-  it("reserves terminal ids and forbids agent, schedule, and output fields on terminals", () => {
+  it("reserves terminal ids and forbids composition, schedule, and output fields on terminals", () => {
     const base = config();
     const executable = base.loops[0]!.nodes[0]!;
     const terminals = defaultTerminalNodes();
@@ -131,7 +131,9 @@ describe("v8 node style and terminal validation", () => {
       loops: [{ ...base.loops[0], start: "completed", nodes: [{ ...executable, id: "completed" }, ...terminals] }]
     }).success).toBe(false);
     for (const forbidden of [
-      { agentId: "agent" },
+      { executionProfileId: "primary" },
+      { primaryInstructionId: "project:primary" },
+      { skillIds: ["project:checks"] },
       { schedule: { kind: "once", date: "2026-07-14", time: "09:00", timeZone: "UTC" } },
       { on: { approved: "completed", rejected: "blocked" } }
     ]) {

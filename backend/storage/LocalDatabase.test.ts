@@ -11,7 +11,7 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("LocalDatabase schema v1", () => {
+describe("LocalDatabase schema v3", () => {
   it("creates only the checkout-local tables in the clean schema", async () => {
     const database = await createDatabase();
     const connection = database.connection();
@@ -29,7 +29,7 @@ describe("LocalDatabase schema v1", () => {
       "step_runs"
     ]);
     expect(connection.pragma("foreign_keys", { simple: true })).toBe(1);
-    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("1");
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("3");
     database.close();
   });
 
@@ -56,7 +56,7 @@ describe("LocalDatabase schema v1", () => {
     expect(() => connection.prepare(`
       INSERT INTO execution_tasks (
         task_id, provider, kind, root_run_id, status, spec_json, spec_hash, created_at, updated_at
-      ) VALUES ('task', 'codex', 'agent_run', 'missing-root', 'queued', '{}', 'hash', 'now', 'now')
+      ) VALUES ('task', 'codex', 'loop_step', 'missing-root', 'queued', '{}', 'hash', 'now', 'now')
     `).run()).toThrow(/FOREIGN KEY constraint failed/);
     database.close();
   });
@@ -88,7 +88,7 @@ describe("LocalDatabase schema v1", () => {
     future.close();
     const database = new LocalDatabase(filename);
 
-    expect(() => database.connection()).toThrow("Unsupported Ballet state schema 2; expected 1.");
+    expect(() => database.connection()).toThrow("Unsupported Ballet state schema 2; expected 3.");
   });
 });
 

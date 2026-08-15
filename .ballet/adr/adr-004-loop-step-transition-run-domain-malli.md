@@ -3,12 +3,12 @@ id: adr-004
 title: Loop, Step, Transition ja Run automaation käsitemallina
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - arkkitehtuuripäätös
   - automaatio
   - käsitemalli
-version: 2
+version: 3
 ---
 
 # Loop, Step, Transition ja Run automaation käsitemallina
@@ -25,7 +25,7 @@ Automaation kanoniset käsitteet ovat Loop, Step, Transition ja Run, ja ne talle
 - Suoritettava node on tyypiltään `agent`, `human` tai `scheduled`.
 - Agentti- ja Scheduled-Step omistavat task descriptionin, yhden `executionProfileId`-viitteen, yhden `primaryInstructionId`-viitteen ja nollan tai useita uniikkeja `skillIds`-viitteitä. Human-Step ei sisällä execution compositionia.
 - Jokaisella suoritettavalla Stepillä on kiinteät `approved`- ja `rejected`-Transitionit.
-- Transition kohdistuu paikalliseen node-ID:hen. Human-Stepin Transition voi lisäksi kohdistua eri Loopiin muodossa `{ "loop": "target-loop" }`; itseensä kohdistuva Loop-Transition ei ole sallittu.
+- Transition kohdistuu paikalliseen executable nodeen, paikalliseen terminaaliin tai eri Loopiin muodossa `{ "loop": "target-loop" }`. Sama sääntö koskee Agent-, Human- ja Scheduled-Stepiä. Käyttäjän syklisiä Looppeja ei estetä workflow-oletuksen perusteella.
 - Jokainen Loop sisältää täsmälleen yhden kiinteätunnisteisen `completed`-, `blocked`- ja `failed`-terminaalin.
 - Terminaalilla ei ole agenttia, ajastusta, outputteja eikä lähtevää Transitionia.
 - Scheduled-Step saa olla vain Loopin aloitusnode, ja Loopissa saa olla enintään yksi Scheduled-Step.
@@ -41,7 +41,7 @@ Automaation kanoniset käsitteet ovat Loop, Step, Transition ja Run, ja ne talle
 - Oletus-Transitionit ovat `approved → completed` ja `rejected → blocked`.
 - Vain kanoninen `StepResult` aktivoi vastaavan Transitionin. Runtime failure, providerin `blocked`, peruutus tai `needs_input` eivät aktivoi kumpaakaan tulospolkua.
 - Ihmisen vastaus ja agentin validoitu completed-outcome käyttävät samaa `approved | rejected` -tulossopimusta; ajastettu käynnistys etenee saman tilakoneen kautta.
-- Loopien välinen Human-Transition luo lapsi-Loop Runin saman Root Runin sisälle ja välittää aiemman Run-syötteen sekä ihmisen vastauksen handoffina.
+- Loopien välinen Transition luo lapsi-Loop Runin saman Root Runin sisälle ja välittää aiemman Run-syötteen, Step-tuloksen sekä mahdollisen ihmisen vastauksen handoffina riippumatta lähde-Stepin tyypistä.
 - Aktiivisen checkoutin tai Root Runin kirjoitettavan worktreen myöhemmät konfiguraatiomuutokset eivät muuta käynnissä olevan Root Runin rakennetta tai compositionia; ne vaikuttavat vasta seuraavaan Root Runiin.
 - Siirtymäketju on rajattava, jotta virheellinen sykli ei voi jatkua loputtomasti.
 - Vanhempia projektikonfiguraatioversioita ei hyväksytä hiljaisella ajoaikaisella migraatiolla.

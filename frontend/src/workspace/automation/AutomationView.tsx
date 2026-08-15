@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Palette, Route } from "lucide-react";
-import type { AgentExecutionState, AppData, ProjectAutomationConfig, ProjectAutomationIssue, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { AppData, ProjectAutomationConfig, ProjectAutomationIssue, ProjectLoop } from "@shared/api/workspace-contracts";
 import { Panel } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,8 @@ import { automationDraftIsValid } from "./loops/loopFormValidation";
 import { isActiveLoopRun } from "./loops/loopRunState";
 import { useWorkspaceNavigationBlocker, type WorkspaceNavigation } from "../useWorkspaceNavigation";
 
-export function AutomationView({ data, agentExecutionStates, selectedId, loopView, saveAutomation, navigate, setNavigationBlocker }: {
+export function AutomationView({ data, selectedId, loopView, saveAutomation, navigate, setNavigationBlocker }: {
   data: AppData;
-  agentExecutionStates: AgentExecutionState[];
   selectedId?: string;
   loopView?: AutomationLoopView;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
@@ -36,7 +35,7 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   const locked = isActiveLoopRun(data.loopRuns.find((run) => run.loopId === savedLoop?.id));
   const createDirty = creating && JSON.stringify(createDraft) !== JSON.stringify(createLoopDraft());
   const candidateConfig = creating && displayedLoop ? { ...draft, loops: [...draft.loops, displayedLoop] } : draft;
-  const valid = Boolean(displayedLoop) && automationDraftIsValid(candidateConfig);
+  const valid = Boolean(displayedLoop) && automationDraftIsValid(candidateConfig, data.executionProfiles, data.instructions, data.skills, data.runtime);
   useWorkspaceNavigationBlocker(setNavigationBlocker, isDirty || createDirty, "Discard unsaved Loop changes?");
   useEffect(() => {
     if (!creating) setCreateDraft(createLoopDraft());
@@ -85,7 +84,6 @@ export function AutomationView({ data, agentExecutionStates, selectedId, loopVie
   return (
     <AutomationEditorWorkspace
       data={data}
-      agentExecutionStates={agentExecutionStates}
       draft={draft}
       candidateConfig={candidateConfig}
       displayedLoop={displayedLoop}

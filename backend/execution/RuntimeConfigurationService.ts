@@ -1,126 +1,103 @@
-import type { AgentExecutionState } from "../../shared/domain/agents.js";
-import type {
-  AgentRuntimeConfiguration,
-  ExecutionPolicy,
-  PortableAgentRuntimeIntent,
-  RuntimeConfigurationIssue
-} from "../../shared/domain/runtime.js";
-import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
-import type { ExecutionStore } from "./ExecutionStore.js";
+import type { ExecutionProfile } from "../../shared/domain/projectConfig.js";
+import type { ResolvedExecutionProfile, RuntimeConfigurationIssue } from "../../shared/domain/runtime.js";
 import type { LocalRuntimeService } from "./LocalRuntimeService.js";
-import type { LocalSettings, LocalSettingsRepository } from "./LocalSettingsRepository.js";
+import type { LocalSettingsRepository } from "./LocalSettingsRepository.js";
+
+export interface ExecutionProfileRuntimeConfiguration {
+  resolved?: ResolvedExecutionProfile;
+  issues: RuntimeConfigurationIssue[];
+}
+
+export interface RuntimeConfigurationResolution {
+  configurations: Record<string, ExecutionProfileRuntimeConfiguration>;
+  globalIssues: RuntimeConfigurationIssue[];
+}
 
 export class RuntimeConfigurationService {
-  private readonly projectConfig = new ProjectConfigurationRepository();
-  private mutation: Promise<void> = Promise.resolve();
-
   constructor(
-    private readonly root: string,
     private readonly settings: LocalSettingsRepository,
-    private readonly runtime: LocalRuntimeService,
-    private readonly executions: ExecutionStore
+    private readonly runtime: LocalRuntimeService
   ) {}
 
-  async get(agentId: string): Promise<AgentRuntimeConfiguration> {
-    const loaded = this.projectConfig.load(this.root);
-    const roots = await this.settings.rootsFor(agentId);
-    if (!loaded.config) return { localPolicy: { readOnlyRoots: roots }, issues: loaded.issues };
-    const intent = loaded.config.agents[agentId];
-    const issues: RuntimeConfigurationIssue[] = [];
-    if (!intent) issues.push({
-      code: "missing_intent", path: `agents.${agentId}`, agentId,
-      message: "Agent has no runtime configuration in .ballet/project.json."
-    });
-    const provider = intent ? this.runtime.providerStatus(intent.provider) : undefined;
-    if (intent && (!provider || provider.health !== "ready")) issues.push({
-      code: "provider_unavailable", path: `agents.${agentId}.provider`, agentId,
-      message: provider?.healthMessage ?? `The local ${intent.provider} CLI is not ready.`
-    });
+  async readOnlyRootsForRun(): Promise<string[]> {
+    return this.settings.readOnlyRootsForRun();
+  }
+
+  async get(
+    profile: ExecutionProfile,
+    resolvedReadOnlyRoots?: readonly string[]
+  ): Promise<ExecutionProfileRuntimeConfiguration> {
+    let readOnlyRoots = resolvedReadOnlyRoots ? [...resolvedReadOnlyRoots] : undefined;
+    try {
+      readOnlyRoots ??= await this.readOnlyRootsForRun();
+    } catch (error) {
+      return {
+        issues: [{
+          code: "legacy_local_settings",
+          path: ".git/ballet/settings.json",
+          executionProfileId: profile.id,
+          message: error instanceof Error ? error.message : String(error)
+        }]
+      };
+    }
+    const provider = this.runtime.providerStatus(profile.provider);
+    if (provider.health !== "ready") {
+      return {
+        issues: [{
+          code: "provider_unavailable",
+          path: `executionProfiles.${profile.id}.provider`,
+          executionProfileId: profile.id,
+          message: provider.healthMessage ?? `The local ${profile.provider} CLI is not ready.`
+        }]
+      };
+    }
     return {
-      intent,
-      localPolicy: { readOnlyRoots: roots },
-      resolved: intent ? {
-        agentId, provider: intent.provider, model: intent.model, reasoning: intent.reasoning,
-        policy: { network: intent.policy.network, readOnlyRoots: roots }
-      } : undefined,
-      issues
+      resolved: {
+        executionProfileId: profile.id,
+        provider: profile.provider,
+        model: profile.model,
+        reasoning: profile.reasoningEffort,
+        policy: { network: profile.networkAccess, readOnlyRoots }
+      },
+      issues: []
     };
   }
 
-  async list(agentIds: readonly string[]): Promise<Record<string, AgentRuntimeConfiguration>> {
-    return Object.fromEntries(await Promise.all(agentIds.map(async (agentId) => [agentId, await this.get(agentId)] as const)));
+  async require(
+    profile: ExecutionProfile,
+    readOnlyRoots?: readonly string[]
+  ): Promise<ResolvedExecutionProfile> {
+    const configuration = await this.get(profile, readOnlyRoots);
+    if (!configuration.resolved) throw new Error(configuration.issues[0]?.message ?? `Execution profile ${profile.id} is unavailable.`);
+    return configuration.resolved;
   }
 
-  async put(agentId: string, input: {
-    provider: PortableAgentRuntimeIntent["provider"];
-    model: string;
-    reasoning: string;
-    policy: ExecutionPolicy;
-  }): Promise<AgentRuntimeConfiguration> {
-    return this.serialize(async () => {
-      const original = await this.settings.load();
-      const next = withAgentRoots(original, agentId, input.policy.readOnlyRoots);
-      await this.settings.write(next);
-      try {
-        this.projectConfig.putAgentIntent(this.root, agentId, {
-          provider: input.provider, model: input.model, reasoning: input.reasoning,
-          policy: { network: input.policy.network }
-        });
-      } catch (error) {
-        await this.settings.write(original);
-        throw error;
-      }
-      return this.get(agentId);
-    });
-  }
-
-  async remove(agentId: string): Promise<void> {
-    return this.serialize(async () => {
-      const original = await this.settings.load();
-      const next = withAgentRoots(original, agentId, undefined);
-      await this.settings.write(next);
-      try { this.projectConfig.removeAgentIntent(this.root, agentId); }
-      catch (error) { await this.settings.write(original); throw error; }
-    });
-  }
-
-  async executionStates(
-    agentIds: readonly string[],
-    suppliedConfigurations?: Record<string, AgentRuntimeConfiguration>
-  ): Promise<AgentExecutionState[]> {
-    const configurations = suppliedConfigurations ?? await this.list(agentIds);
-    const active = this.executions.activeTasks();
-    return agentIds.map((agentId) => {
-      const configuration = configurations[agentId]!;
-      const task = active.find((candidate) => candidate.spec.agent.id === agentId);
-      if (task) return {
-        agentId, status: task.status === "running" ? "running" : "busy",
-        provider: task.spec.runtime.provider, reasoning: task.spec.runtime.reasoning, activeTaskId: task.id
+  async resolveAll(profiles: readonly ExecutionProfile[]): Promise<RuntimeConfigurationResolution> {
+    let readOnlyRoots: string[];
+    try {
+      readOnlyRoots = await this.readOnlyRootsForRun();
+    } catch (error) {
+      const issue = localSettingsIssue(error);
+      return {
+        configurations: Object.fromEntries(profiles.map((profile) => [profile.id, { issues: [] }])),
+        globalIssues: [issue]
       };
-      if (!configuration.resolved) return { agentId, status: "unbound", reason: configuration.issues[0]?.message };
-      const unavailable = configuration.issues.find((issue) => issue.code === "provider_unavailable");
-      return unavailable
-        ? { agentId, status: "offline", provider: configuration.resolved.provider, reason: unavailable.message }
-        : { agentId, status: "idle", provider: configuration.resolved.provider, reasoning: configuration.resolved.reasoning };
-    });
-  }
-
-  private async serialize<T>(operation: () => Promise<T>): Promise<T> {
-    const predecessor = this.mutation;
-    let release!: () => void;
-    this.mutation = new Promise<void>((resolve) => { release = resolve; });
-    await predecessor;
-    try { return await operation(); }
-    finally { release(); }
+    }
+    return {
+      configurations: Object.fromEntries(await Promise.all(profiles.map(async (profile) => [
+        profile.id,
+        await this.get(profile, readOnlyRoots)
+      ]))),
+      globalIssues: []
+    };
   }
 }
 
-const withAgentRoots = (settings: LocalSettings, agentId: string, roots?: string[]): LocalSettings => {
-  const agentReadOnlyRoots = { ...(settings.agentReadOnlyRoots ?? {}) };
-  if (roots) agentReadOnlyRoots[agentId] = roots;
-  else delete agentReadOnlyRoots[agentId];
+const localSettingsIssue = (error: unknown): RuntimeConfigurationIssue => {
+  const message = error instanceof Error ? error.message : String(error);
   return {
-    ...settings,
-    agentReadOnlyRoots: Object.keys(agentReadOnlyRoots).length > 0 ? agentReadOnlyRoots : undefined
+    code: message.includes("agentReadOnlyRoots") ? "legacy_local_settings" : "invalid_schema",
+    path: ".git/ballet/settings.json",
+    message
   };
 };

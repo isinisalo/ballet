@@ -9,8 +9,8 @@ There is no account, pairing flow, remote daemon, device registry, or multi-proj
 1. `ballet` verifies that the current directory is exactly a Git checkout root with a HEAD commit.
 2. It creates checkout-local state under `.git/ballet`, chooses a free loopback port, and installs one uniquely named launchd job.
 3. The local process probes Codex and Copilot, serves the UI on `127.0.0.1`, schedules Loops, and persists Run state in SQLite.
-4. A Run snapshots `.ballet`, `.codex/agents`, and `.agents/skills` into one root-Run worktree under `.git/ballet/worktrees`.
-5. Agent Steps in that root Run execute sequentially in the same worktree. Codex and Copilot each have a FIFO lane, so the two providers may run concurrently while one provider never runs two tasks at once.
+4. A Root Run resolves every reachable Loop, Step, Transition, ExecutionProfile, Project instruction, Project skill, the fixed System instruction, and the theme into one immutable snapshot before it queues work.
+5. Agent and Scheduled Steps in that Root Run execute sequentially in the same worktree. Codex and Copilot each have a FIFO lane, so the two providers may run concurrently while one provider never runs two tasks at once.
 6. Successful roots are committed and cleaned up. Failed, cancelled, or interrupted roots retain their worktree for inspection.
 
 Queued work survives a Ballet restart. Work that was running when the process exited is marked failed as interrupted and is not silently rerun.
@@ -19,11 +19,13 @@ Queued work survives a Ballet restart. Work that was running when the process ex
 
 Portable, version-controlled automation remains in the checkout:
 
-- `.ballet/project.json` — strict project configuration v8, including `loops[].nodes`, independent per-node artwork and size, fixed terminal nodes, schedules, transitions, and agent provider/model/reasoning/network intent; Loops use a fixed, non-persisted Route icon;
+- `.ballet/project.json` — strict project configuration v9, containing only `version`, an ID-sorted `executionProfiles` list, and `loops`; executable Steps own their task, composition references, transitions, schedule, and appearance;
 - `.ballet/theme.json` — the single project-wide Loop visualization theme;
-- `.ballet/**/*.md` and `.ballet/**/*.mdx` — project documents;
-- `.codex/agents/*.toml` — agent definitions and instructions; and
-- `.agents/skills/**/SKILL.md` — repository skills.
+- `.ballet/instructions/**/*.md` — selectable Project primary instructions identified by frontmatter `id`;
+- `.ballet/**/*.md` and `.ballet/**/*.mdx` — other project documents; and
+- `.agents/skills/**/SKILL.md` — selectable Project skills identified by their relative directory path.
+
+There is no top-level Agent execution entity in v9. `agent` remains a Step type, while `ExecutionProfile` is the only runtime authoring entity. Project instructions and skills are Step-selected resources; `.codex/agents` is not project configuration or a runtime source.
 
 Machine-local state belongs to this clone's Git directory and never appears in Git status:
 
@@ -113,12 +115,16 @@ Different clones may run at the same time. Each has a path-derived service label
 
 The upper-left Ballet dropdown switches the application between **Configure** and **Run**.
 
-- Configure edits repository-backed project documents, agents, skills, the single project Loop theme, Loops, Steps, Transitions, and schedules.
-- Run opens the overview or a Loop/agent target, checks local provider readiness, starts persisted work, and shows immutable instructions beside the durable console or human response controls.
+- Configure edits repository-backed project documents, Project instructions, Project skills, ExecutionProfiles, the single project Loop theme, Loops, Steps, Transitions, and schedules.
+- Run opens the overview or a Loop target, checks local provider readiness, starts persisted work, and shows the immutable Step composition beside the durable console or human response controls.
 
-Loop configuration v8 stores executable and terminal nodes together in `loops[].nodes`. Every node selects one of six code-native artwork styles and one independent size: Tiny 24 px, Small 36 px, Medium 48 px, or Large 64 px. The catalog contains five Classic styles (`flat`, `luna`, `mars`, `terra`, `sol`) and one Planet (`vector-planet`). All styles remain valid at every size. Loops use a fixed Route icon that is not configurable or persisted. Each Loop has exactly one fixed-ID `completed`, `blocked`, and `failed` terminal. Local transitions use a node ID; cross-Loop transitions retain `{ "loop": "target-loop" }`. Terminal nodes have no agent or outputs, and selecting one edits only its description, artwork, and size. The editor creates only the first executable node for a new Loop and offers no terminal insertion action; existing multi-node Loops remain editable.
+Loop configuration v9 stores executable and terminal nodes together in `loops[].nodes`. Every node selects one of six code-native artwork styles and one independent size: Tiny 24 px, Small 36 px, Medium 48 px, or Large 64 px. The catalog contains five Classic styles (`flat`, `luna`, `mars`, `terra`, `sol`) and one Planet (`vector-planet`). All styles remain valid at every size. Loops use a fixed Route icon that is not configurable or persisted. Each Loop has exactly one fixed-ID `completed`, `blocked`, and `failed` terminal. Both `approved` and `rejected` may target a local executable node, a local terminal, or another Loop from Agent, Human, and Scheduled Steps. Terminal nodes have no execution composition or outgoing Transitions, and selecting one edits only its description and appearance. Existing cycles remain valid within the runtime transition safety limit.
 
-Agent execution keeps provider, model, reasoning effort, and network intent in `.ballet/project.json`. Provider commands and absolute read-only roots are local settings. There is no computer or runtime attachment selection because the current checkout's host is always the runtime.
+An executable Agent or Scheduled Step has a non-empty task description, one `executionProfileId`, one `primaryInstructionId`, a set-semantic `skillIds` list, and exactly two Transition targets: `approved` and `rejected`. Human Steps have no execution composition. ExecutionProfiles contain only ID, name, provider, model, reasoning effort, and network access. Provider commands and checkout-wide absolute `readOnlyRoots` are machine-local settings. There is no computer or runtime attachment selection because the current checkout's host is always the runtime.
+
+Every provider prompt is composed in a deterministic five-section order: fixed System instruction, one Project primary instruction, selected Project skills sorted by ID, the Step task envelope, and the structured output schema. Ballet records the exact UTF-8 prompt and SHA-256 alongside the composition version, Step ID, profile snapshot, resource origin/ID/path/source hashes, and output-schema version/hash. A primary instruction or one skill may be at most 128 KiB; the complete prompt may be at most 512 KiB. Content is never silently truncated.
+
+The fixed read-only `system:execution-contract-v1` establishes only instruction authority, tool and permission limits, secret-handling boundaries, the structured outcome contract, the prohibition on returning raw hidden chain-of-thought, and the requirement to report checks and artifact references. Project workflow procedures belong in `.ballet/project.json`, `.ballet/instructions/**`, and `.agents/skills/**`, never in this System instruction or platform-specific workflow code.
 
 ## Local API
 
@@ -142,9 +148,11 @@ The shared invalidation stream sends workspace/Run refresh signals only. A selec
 - The server accepts only loopback Host values and does not grant CORS access.
 - Browser mutations require the Ballet origin; originless localhost requests are reserved for the local CLI lifecycle.
 - Provider processes receive no Ballet service credentials and execute only in the managed root-Run worktree.
-- Run preflight binds execution to the CLI version, model, reasoning setting, policy capabilities, HEAD commit, and configuration hash observed at start.
-- Source code changes block a Run. Uncommitted `.ballet`, `.codex/agents`, and `.agents/skills` changes are captured into the immutable Run snapshot instead.
-- Network access defaults to off and must be enabled explicitly in portable agent intent.
+- Run preflight binds execution to the CLI version, model, reasoning setting, policy capabilities, HEAD commit, configuration hash, and immutable Root Run composition snapshot observed at start.
+- Source code changes block a Run. Uncommitted `.ballet` files and `.agents/skills/**/SKILL.md` manifests are captured into the immutable Run snapshot instead.
+- Network access defaults to off and must be enabled explicitly in the selected ExecutionProfile.
+- A legacy `agentReadOnlyRoots` property in `.git/ballet/settings.json` blocks Run with an explicit remediation message. Ballet never silently drops or reinterprets those values; v9 local settings use only checkout-wide `readOnlyRoots`.
+- A completed provider outcome is validated and persisted as `StepRun.status = completed` plus canonical `StepRun.result`; the Step Run is then read back, and only that persisted result may select the Approved or Rejected Transition. `needs_input`, technical `blocked`, `failed`, and `cancelled` states never select a Transition.
 - Durable non-terminal console content is retained up to 1 MiB per task. Terminal protocol events remain available, and the UI exposes truncation state.
 
 Ballet does not merge or push Run results automatically.
@@ -181,10 +189,11 @@ npm run preview
 Provider adapter tests are fixture-backed and do not invoke installed CLIs.
 
 ```bash
-npm test
+npm run test
 npm run lint
 npm run build
 npx @google/design.md lint DESIGN.md
+git diff --check
 ```
 
-The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed fixture checkout, verifies `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.
+The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v9 fixture checkout, verifies the fixture ExecutionProfile, Loop composition, Project instruction, and v3 theme through `GET /api/data`, checks `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.

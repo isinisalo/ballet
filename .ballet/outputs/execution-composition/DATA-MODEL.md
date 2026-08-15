@@ -1,39 +1,33 @@
-# Execution composition — ehdotettu data-malli
+# Execution composition — strict v9 data model
 
-Tila: ihmisen tarkistettava toteutusehdotus. Step + `ExecutionProfile` -omistajuus, strict v9 -kohde ja Root Run -snapshotraja ovat hyväksyttyä arkkitehtuuria; tämän dokumentin tarkat interface- ja serialisointivalinnat eivät vielä muuta production-skeemaa.
+Tila: hyväksytty V1-sopimus ja production-toteutuksen dokumentaatio.
 
-## Rajaus
+## Omistajuus
 
-Malli erottaa nykyisen Agent-kytkennän kolme vastuuta:
+Balletin execution-mallissa vastuut ovat yksiselitteiset:
 
-1. `ExecutionProfile` kertoo, miten Step ajetaan.
-2. Step kertoo, mitä tehdään, millä primary instructionilla ja millä skilleillä.
-3. Run evidence kertoo, millä täsmällisellä snapshotilla suoritus todella ajettiin.
+1. `ExecutionProfile` kertoo, miten provider-suoritus ajetaan.
+2. Agent- tai Scheduled-Step kertoo, mitä tehdään ja millä Project-resursseilla.
+3. Root Run snapshottaa koko saavutettavan execution-suunnitelman ennen ensimmäistä tehtävää.
+4. `StepRun.result` on ainoa Transition engineä ohjaava tulos.
 
-Ensimmäiseen versioon lisätään vain yksi authoring-entity: `ExecutionProfile`. Loop ja Step ovat nykyisiä entityjä. Instruction ja Skill ovat tiedostopohjaisia resursseja. Origin on enum-arvo ja Run snapshot evidenssirakenne, ei uusi authoring-entity.
+Top-level Agentia, `agentId`-viitettä tai standalone Agent Runia ei ole. `agent` säilyy Step-tyypin nimenä. V1 ei lisää Role-, Preset-, Policy-, Recipe-, Template-, Template Pack- tai workspace-access-entityä.
 
-Rolea, Presetiä, Policyä, Recipeä, Templatea tai Template Packia ei lisätä.
+## Project config v9
 
-## Omistajuudet
+`.ballet/project.json` on strict schema, jonka ylätason kentät ovat täsmälleen:
 
-```mermaid
-flowchart LR
-  Loop["Loop"] -->|owns| Step["Executable Step"]
-  Step -->|one| Profile["Execution profile"]
-  Step -->|exactly one| Primary["Primary instruction"]
-  Step -->|zero or more| Skill["Skill files"]
-  Step -->|approved / rejected| Target["Transition targets"]
-  RootRun["Root Run"] -->|snapshots reachable Steps| Evidence["Composition evidence"]
-  Evidence --> Profile
-  Evidence --> Primary
-  Evidence --> Skill
+```ts
+interface ProjectConfigV9 {
+  version: 9;
+  executionProfiles: ExecutionProfile[];
+  loops: Loop[];
+}
 ```
 
-Agent ei välitä näitä viitteitä kohdemallin execution-polulla. Nykyinen `agentId` ja `.codex/agents` ovat vain eksplisiittisen migrationin lähteitä, eivät v9-kohdemallin viitteitä tai kanonista projektimääritystä. Agentin ei-execution-metadatan migration-kohtelu on edelleen avoin toteutuspäätös.
+V8-konfiguraatiota, top-level `agents`-mapia ja tuntemattomia kenttiä ei hyväksytä runtime-yhteensopivuuskerroksen kautta. `executionProfiles` tallennetaan ID:n mukaiseen deterministiseen järjestykseen. Loopien ja nodejen käyttäjän määrittämä järjestys säilyy.
 
 ## ExecutionProfile
-
-Ehdotettu tarkka v1-rakenne:
 
 ```ts
 interface ExecutionProfile {
@@ -46,32 +40,21 @@ interface ExecutionProfile {
 }
 ```
 
-Sallitut kentät ovat vain nämä kuusi. Strict schema hylkää muun muassa:
+Säännöt:
 
-- instruction- ja skill-viitteet;
-- task descriptionin ja Transitionit;
-- `policy`-aliobjektin;
-- paikalliset komento- tai polkuasetukset;
-- `workspaceAccess`-kentän; sekä
-- Agentin identity- tai appearance-metadatan.
+- `id` on yksikäsitteinen lowercase kebab-case.
+- `name` on non-empty käyttäjälle näkyvä nimi.
+- Identity ja kaikki viitteet perustuvat ID:hen, eivät nimeen.
+- Profiili sisältää täsmälleen yllä olevat kuusi kenttää.
+- Profiili ei sisällä instructioneita, skills-valintoja, taskia, Transitioneita, appearancea, workspace accessia tai machine-local polkuja.
 
-Profiilit ovat versionhallittavaa projektikonfiguraatiota ja niihin viitataan ID:llä. Ihmisen antama `name` on Node editorissa näytettävä nimi; execution ei ratkaise profiilia nimen perusteella.
+## Stepit ja terminaalit
 
-## Executable Step
-
-Nykyiset Loop-, Step type-, schedule- ja appearance-kentät säilyvät automaatiomallin vastuulla. Execution composition korvaa Agent-viitteen seuraavilla kentillä:
+Agent- ja Scheduled-Step omistavat execution compositionin:
 
 ```ts
-interface StepExecutionComposition {
-  executionProfileId: string;
-  primaryInstructionId: string;
-  skillIds: string[];
-}
-
-interface ExecutableStepV1 {
-  id: string;
-  type: "agent" | "scheduled";
-  description: string; // UI-label: Task description
+interface ExecutableStepComposition {
+  description: string;
   executionProfileId: string;
   primaryInstructionId: string;
   skillIds: string[];
@@ -79,220 +62,176 @@ interface ExecutableStepV1 {
     approved: TransitionTarget;
     rejected: TransitionTarget;
   };
-  nodeStyle: LoopNodeStyle;
-  nodeSize: LoopNodeSize;
-  schedule?: StepSchedule; // vain scheduled
 }
 ```
 
-V1-invarianssit:
+Niiden invarianssit:
 
-- `executionProfileId` ratkaisee täsmälleen yhteen olemassa olevaan profileen.
-- `primaryInstructionId` on yksi non-empty, origin-scoped Built-in- tai Project-viite.
-- `skillIds` on set-semanttinen lista: nolla tai useita uniikkeja Built-in- tai Project-viitteitä.
-- System-ohje on pakollinen mutta implisiittinen, joten se ei vie primary instructionin paikkaa.
-- `description` on Stepin task description; Agentin description ei korvaa sitä migrationissa.
-- `approved` ja `rejected` ovat molemmat pakollisia ja ratkaistavissa olevia kohteita.
-- Human-Stepillä ei ole execution profile-, primary instruction- tai skill-kenttiä.
-- Terminal-nodella ei ole execution compositionia.
-- Scheduled-Step käyttää samaa compositionia kuin agentti-Step ja säilyttää schedule-kenttänsä.
-- Uudelle Stepille ei valita profilea tai primary instructionia hiljaisella fallbackilla.
+- `description` on non-empty task description.
+- `executionProfileId` ratkaisee täsmälleen yhteen profileen.
+- `primaryInstructionId` ratkaisee täsmälleen yhteen Project-primary instructioniin.
+- `skillIds` on set-semanttinen lista uniikkeja Project-skill-ID:itä ja tallennetaan ID:n mukaiseen järjestykseen.
+- `approved` ja `rejected` ovat ainoat Transitionit.
+- Nykyinen Step type-, schedule-, `nodeStyle`- ja `nodeSize`-data säilyy.
+- Scheduled-Step käyttää samaa compositionia kuin Agent-Step ja omistaa lisäksi schedulensa.
 
-Additional instructions ei ole V1-kenttä. Mahdollinen myöhempi capability lisätään primary instructionin jälkeen ja ennen skillejä vasta erillisellä skeema- ja UX-päätöksellä.
+Human-Step omistaa non-empty task descriptionin, `approved`- ja `rejected`-Transitionit sekä appearance-datan. Se ei sisällä execution profile-, primary instruction- tai skill-kenttiä.
 
-## Project config v9 — toteutusehdotus
+Terminal-node omistaa vain nykyisen terminaali- ja appearance-datansa. Se ei sisällä execution compositionia, schedulea tai lähteviä Transitioneita.
 
-Kokoelma esitetään listana, koska jokainen profile sisältää vaaditun `id`-kentän. Lista serialisoidaan `id`:n UTF-8 byte -järjestyksessä. Loop- ja nodejärjestys säilyttää käyttäjän määrittämän järjestyksen.
+## TransitionTarget
 
-```json
-{
-  "version": 9,
-  "executionProfiles": [
-    {
-      "id": "focused-local",
-      "name": "Focused local",
-      "provider": "codex",
-      "model": "gpt-5.6-sol",
-      "reasoningEffort": "medium",
-      "networkAccess": false
-    }
-  ],
-  "loops": [
-    {
-      "id": "change-review",
-      "start": "review-change",
-      "nodes": [
-        {
-          "id": "review-change",
-          "type": "agent",
-          "description": "Tarkista ehdotettu muutos ja tuota perusteltu päätös.",
-          "executionProfileId": "focused-local",
-          "primaryInstructionId": "project:reviewer",
-          "skillIds": [
-            "project:change-review"
-          ],
-          "on": {
-            "approved": "completed",
-            "rejected": "blocked"
-          },
-          "nodeStyle": "sol",
-          "nodeSize": "large"
-        }
-      ]
-    }
-  ]
-}
-```
+Molempien domain-tulosten target voi olla:
 
-Esimerkki näyttää vain kohdemallin olennaisen osan; validi Loop sisältää edelleen nykyiset pakolliset terminal-nodet.
+- saman Loopin executable node;
+- saman Loopin terminal-node; tai
+- toinen Loop.
 
-Versionumero `9` ja `executionProfiles`-kokoelman olemassaolo ovat hyväksyttyä arkkitehtuuria. Listamuoto, lajittelu ja esimerkin tarkka serialisointi ovat tämän paketin toteutusehdotus ja ne on merkitty `OPEN-DECISIONS.md`:ään.
+Sama sääntö koskee Agent-, Human- ja Scheduled-Stepiä. Runtime state ei muodosta Transitionia. Käyttäjän syklisiä Looppeja ei estetä workflow-oletuksen perusteella; yleinen runtime safety limit rajaa virheellisen loputtoman ketjun.
 
-## ResourceRef ja origins
+## System instruction
 
-Instruction- ja skill-ID on origin-scoped merkkijono:
+V1:ssä on täsmälleen yksi pakollinen System instruction:
 
 ```text
-system:<id>
-builtin:<id>
-project:<id>
+system:execution-contract-v1
 ```
 
-V1 Step saa viitata primary- ja skill-kentissään vain `builtin:`- ja `project:`-resursseihin. Samannimiset Built-in- ja Project-resurssit eivät varjosta toisiaan.
+Se on Balletin omistama, read-only, aina mukana eikä käyttäjän valittavissa tai muokattavissa. Sen sisältö on rajattu:
 
-| Origin | Pakollisuus | Muokattavuus | V1-käyttö |
-|---|---|---|---|
-| System | Pakollinen | Read-only | Yksi implisiittinen, minimaalinen execution contract; ei valitsimissa |
-| Built-in | Optional | Read-only, cloneable | Primary instruction tai skill voidaan valita eksplisiittisesti |
-| Project | Optional | Repository-owned, editable | Primary instruction tai skill voidaan valita eksplisiittisesti |
+- instruction-auktoriteettiin;
+- tool- ja permission-rajojen noudattamiseen;
+- salaisuuksien käsittelyrajaan;
+- structured outcome -sopimukseen;
+- kieltoon palauttaa raakaa hidden chain-of-thoughtia; sekä
+- vaatimukseen raportoida ajetut tarkistukset ja artifact-viitteet.
 
-`read-only` kuvaa resurssin authoring-oikeutta, ei Run-workspacen käyttöoikeutta.
+System instruction ei sisällä roadmap-, milestone-, issue-, katselmointi-, acceptance-, staging-, release-, deploy- tai Ballet-repositoryn erityismenettelyä.
 
-System-originissa ei ole V1-skillejä. Sen yhden V1-instructionin ehdotettu ID on `system:execution-contract-v1`, eikä sisältö sisällä roadmap-, milestone-, release-, deploy- tai muuta ohjelmistokehityksen workflow-menettelyä.
+## Project primary instructions
 
-Built-in-resurssin clone luo uuden `project:`-ID:n ja itsenäisen Project-tiedoston. Mahdollinen `clonedFrom` on provenance-metadataa ilman runtime-semanticsia.
+Valittavat primary instructionit ovat tiedostoissa:
 
-Project-instructionin ehdotettu pysyvä identiteetti tulee eksplisiittisestä frontmatter-ID:stä ja sisältö `.ballet/instructions/`-Markdown-tiedostosta. Tiedosto ilman validia eksplisiittistä ID:tä on tavallinen project-dokumentti, ei valittava InstructionResource; invalidi tai duplicate eksplisiittinen ID on katalogivirhe. Project-skillin V1-ID johdetaan sen `.agents/skills/`-juureen suhteutetusta POSIX-hakemistopolusta, esimerkiksi `.agents/skills/review/security/SKILL.md` → `project:review/security`. Jokaisen path-segmentin pitää olla lowercase kebab-casea. Frontmatterin title tai name ei muuta ID:tä.
+```text
+.ballet/instructions/**/*.md
+```
 
-Project-resurssin tarkka `sourceVersion` on `project/<projectSnapshotHash>`. System- ja Built-in-resurssilla arvo on `ballet/<balletVersion>/catalog/<catalogVersion>`. `sourceVersion` kertoo katalogi- tai projektiversion ja `sourceSha256` yksilöi juuri kyseisen lähdetiedoston tavut; molemmat tallennetaan evidenssiin. Identiteetti- ja versiosäännöt ovat paketin ehdotusoletuksia ja vaativat ihmisen hyväksynnän.
+Valittavan tiedoston frontmatter sisältää vähintään:
 
-## Run snapshot ja evidence
+```yaml
+---
+id: reviewer
+title: Reviewer
+---
+```
 
-Root Run ratkaisee ennen ensimmäistä queue-operaatiota kaikkien saavutettavien Stepien:
+Runtime-viite on `project:reviewer`. Identity tulee frontmatterin ID:stä, ei tiedostopolusta. Puuttuva ID jättää tiedoston tavalliseksi project-dokumentiksi, jota ei tarjota valitsimessa. Invalidi tai duplicate eksplisiittinen ID estää Runin. Stepillä on täsmälleen yksi Project-primary instruction; selectable Built-in-instructionit ja additional instructions eivät kuulu V1:een.
 
-- execution profilen;
-- System-ohjeen;
-- primary instructionin;
-- valitut skillsit; sekä
-- Stepin task- ja Transition-datan.
+## Project skills
 
-Resoluutio on all-or-nothing samasta project snapshotista. Resume, retry ja saman Root Runin cross-Loop-siirtymät käyttävät samaa immutable snapshotia.
+Valittavat skillsit ovat tiedostoissa:
 
-Ehdotettu Root Runin staattinen Step-snapshot:
+```text
+.agents/skills/**/SKILL.md
+```
+
+Runtime-ID johdetaan `.agents/skills/`-juureen suhteutetusta hakemistopolusta. Esimerkiksi:
+
+```text
+.agents/skills/review/security/SKILL.md -> project:review/security
+```
+
+Jokainen segmentti on lowercase kebab-case. Duplicate skill -viite ja invalidi path ovat virheitä. V1 snapshottaa vain valitun `SKILL.md`-tiedoston, eikä V1-skill saa executionissa riippua snapshotoimattomasta scriptistä, assetista tai muusta tiedostosta. Selectable Built-in-skillsit, registry ja clone-to-project eivät kuulu V1:een.
+
+## Machine-local settings
+
+V9:n execution-mallin ainoa checkout-kohtainen lukujuurikenttä on:
+
+```ts
+interface LocalSettingsV9 {
+  readOnlyRoots: string[];
+}
+```
+
+Provider-komentojen olemassa olevat konekohtaiset asetukset säilyvät oman local settings -sopimuksensa osana. `agentReadOnlyRoots` ei kuulu v9 execution-malliin. Jos legacy-kenttä havaitaan `.git/ballet/settings.json`-tiedostossa, Run estyy ja käyttöliittymä näyttää tarkan remediation-ohjeen. Ballet ei hävitä, yhdistä tai siirrä arvoja hiljaisesti.
+
+## Root Run snapshot
+
+Root Run ratkaisee samasta käynnistyslähtötilasta atomisesti kaikki käynnistyskohdasta saavutettavat:
+
+- Loopit, Stepit ja Transitionit;
+- ExecutionProfilet;
+- System instructionin;
+- Project-primary instructionit;
+- valitut Project-skillsit; sekä
+- teeman.
+
+Resoluutio on all-or-nothing ennen ensimmäisen execution taskin queueamista. Puuttuva, invalidi, duplicate tai liian suuri reachable-resurssi estää koko Runin. Sama immutable snapshot palvelee myöhempiä Steppejä, `needs_input`-resumea, syklejä ja cross-Loop-handoffeja. Checkoutin tai Run-worktreen myöhempi muutos vaikuttaa vasta seuraavaan Root Runiin.
+
+Resurssin sisältö tallennetaan snapshotissa yhteen kanoniseen paikkaan executionia varten. Evidenssirakenteisiin ei kopioida samaa täyttä sisältöä uudelleen.
+
+## Composition- ja attempt-evidence
+
+Run-evidenssi sisältää vähintään:
 
 ```ts
 interface ResourceEvidence {
   kind: "system" | "primary" | "skill";
-  origin: "system" | "builtin" | "project";
+  origin: "system" | "project";
   id: string;
-  sourcePath?: string;
-  sourceVersion: string;
+  relativePath?: string;
   sourceSha256: string;
-  content: string;
-  contentSha256: string;
 }
 
-interface StepControlSnapshot {
-  loopId: string;
-  stepId: string;
-  type: "agent" | "scheduled";
-  description: string;
-  approvedTarget: TransitionTarget;
-  rejectedTarget: TransitionTarget;
-}
-
-interface StepCompositionSnapshot {
+interface StepCompositionEvidence {
   compositionVersion: 1;
-  projectSnapshotHash: string;
-  step: StepControlSnapshot;
-  executionProfile: ExecutionProfile;
-  systemInstruction: ResourceEvidence;
-  primaryInstruction: ResourceEvidence;
-  skills: ResourceEvidence[];
-  canonicalSkillIds: string[];
-  instructionBundle: string;
-  instructionBundleSha256: string;
-  snapshotSha256: string;
-}
-
-interface ExecutionAttemptEvidence {
-  compositionSnapshotSha256: string;
-  loopId: string;
   stepId: string;
-  attempt: number;
-  taskEnvelopeVersion: 1;
-  taskEnvelope: string;
-  taskEnvelopeSha256: string;
-  outputSchemaVersion: string;
-  outputSchema: string;
+  executionProfile: ExecutionProfile;
+  resources: ResourceEvidence[];
+  prompt: string;
+  promptSha256: string;
+  outputSchemaVersion: 1;
   outputSchemaSha256: string;
-  providerAdapterVersion: string;
 }
 ```
 
-Kaikki SHA-256-arvot ovat lowercase hex -muodossa. `sourceSha256` lasketaan snapshottujen lähdetavujen perusteella ja `contentSha256` täsmälleen executioniin käytetystä normalisoidusta body-sisällöstä. Evidenssi säilyttää myös sisällön; pelkkä ID ja hash eivät ole auditointiin riittävä snapshot.
+`sourceSha256` lasketaan täsmälleen käytetyn lähdetiedoston raw-tavuista. `promptSha256` lasketaan täsmälleen provider-suoritukseen välitetyn Ballet-owned promptin UTF-8-tavuista. Project-resurssilla tallennetaan repository-relative POSIX-path. Output schemasta tallennetaan executioniin käytetty versio ja tarkkojen schema-tavujen SHA-256.
 
-Stepin task description ja molemmat Transition-targetit kuuluvat Root Runin staattiseen `StepControlSnapshot`-rakenteeseen. Sen sijaan Run inputista, recent historysta ja mahdollisesta resume-vastauksesta muodostuva task envelope syntyy yrityskohtaisesti. Jokainen ExecutionSpec tallentaa `ExecutionAttemptEvidence`-rakenteen ja viittaa immutableen Step composition -snapshottiin sen hashilla. Näin myöhemmän yrityksen task-envelope-hash ei teeskentele olleensa tiedossa Root Runin alussa.
+Balletin evidenssi todistaa Balletin muodostaman promptin. Se ei väitä todistavansa providerin koko sisäistä tai ambient-kontekstia.
 
-ExecutionSpec ja Loop execution plan saavat uuden version. Historiallisia immutable v1-snapshotteja ei kirjoiteta uudelleen, vaan read-polku tukee versionoitua unionia.
+## Kokorajat
 
-## Step result ja runtime state
+- yksi Project-primary instruction: enintään 128 KiB;
+- yksi Project-skill: enintään 128 KiB; ja
+- koko Balletin muodostama prompt: enintään 512 KiB.
+
+Ylitys estää Runin näkyvällä preflight-virheellä. Instruction- tai skill-sisältöä ei typistetä hiljaisesti.
+
+## StepResult ja runtime state
 
 ```ts
 type StepResult = "approved" | "rejected";
 ```
 
-`StepRun.result` on kanoninen kontrollitulos. Execution taskin status, Step Runin status, provider outcome ja virhe-evidenssi säilyvät erillisinä.
-
-| Tapahtuma | Runtime/Step state | StepResult | Transition |
+| Tapahtuma | Step status | StepResult | Transition |
 |---|---|---|---|
-| Validoitu completed outcome | completed | approved tai rejected | vastaava target |
-| Human-vastaus | completed | approved tai rejected | vastaava target |
-| Needs input | waiting/needs input | ei arvoa | ei Transitionia |
-| Blocked | blocked | ei arvoa | ei Rejected-transitionia |
-| Runtime failure | failed | ei arvoa | ei Rejected-transitionia |
-| Cancel | cancelled | ei arvoa | ei Transitionia |
+| Validoitu completed outcome | `completed` | `approved` tai `rejected` | vastaava target |
+| Human-vastaus | `completed` | `approved` tai `rejected` | vastaava target |
+| Needs input | `needs_input` | ei arvoa | ei Transitionia; sama Step pausettuu |
+| Technical blocked | `blocked` | ei arvoa | ei Transitionia |
+| Runtime/provider failure | `failed` | ei arvoa | ei Transitionia |
+| Cancel | `cancelled` | ei arvoa | ei StepResultia tai Transitionia |
 
-Outcome-payload on evidenssiä. Transition engine lukee vain validoitua `StepRun.result`-kenttää.
+Providerin completed-outcome käsitellään tässä järjestyksessä:
 
-## `workspace_access`-arvio
+1. validoi outcome;
+2. tallenna Step Runin status `completed`;
+3. tallenna kanoninen `StepRun.result`;
+4. lue tallennettu Step Run takaisin storesta; ja
+5. valitse Transition vain takaisin luetun `StepRun.result`-kentän perusteella.
 
-Mahdollinen myöhempi kenttä olisi semanttisesti `workspaceAccess: "read-only" | "write"`, mutta sitä ei lisätä V1:een.
+Outcome-payload säilyy evidenssinä, ei kontrollilähteenä. Invalidi persisted status/result-yhdistelmä on integrity error.
 
-Perustelut:
+## Pre-release conversion
 
-- nykyinen Root Run luo tarkoituksella kirjoitettavan worktreen;
-- provider-adapterien sandbox- ja permission-policy olettavat workspace-write-kyvykkyyden;
-- onnistuneen Runin finalisointi ja muuttuneiden tiedostojen evidenssi perustuvat kirjoituksiin;
-- agenttikohtaiset paikalliset `readOnlyRoots` eivät ole sama asia kuin workspacen write/read-only-valinta; sekä
-- kentän lisääminen ilman enforcementia olisi harhaanjohtava turvallisuuslupaus.
-
-Kenttä vaatii myöhemmin oman ADR:n, provider capability -matriisin, preflight-säännöt, finalisointisemantiikan ja testit. V1:n nykyinen baseline on kirjoitettava Run-worktree eikä profiili tallenna tätä implisiittisenä kenttänä.
-
-## Validointi ja fail-closed-rajat
-
-Authoring-save estää:
-
-- puuttuvan profilen tai primary instructionin;
-- väärän originin tai resurssityypin;
-- duplicate skill-ID:n;
-- tyhjän instruction- tai skill-bodyn; ja
-- tuntemattoman Step- tai profile-kentän.
-
-Root Run preflight estää koko Runin ennen queuea, jos yksikin reachable Step ei ratkea, resurssit muuttuvat kesken snapshotin, hash ei täsmää, provider ei täytä profilea tai Ballet ei pysty hallitsemaan composition-kanavaa deterministisesti.
-
-Instruction- tai skill-sisältöä ei typistetä hiljaisesti. Kokorajan ylitys on näkyvä preflight-virhe. Dynaaminen Run input/history saa käyttää erikseen versionoitua determinististä truncationia.
-
-## Suhde hyväksyttyihin päätöksiin
-
-Step + `ExecutionProfile` -kohdemalli on hyväksytty ADR-002:ssa, ADR-004:ssä, ADR-005:ssä, ADR-006:ssa, ADR-008:ssa ja ADR-012:ssa. ADR-013 rajaa workflow-menettelyt eksplisiittisiin skilleihin ja ADR-014 workflow-templatet project-local dataksi. Tämä dokumentti täsmentää hyväksyttyä suuntaa proposal-tason interfaceilla ja serialisointisäännöillä; se ei muuta production-koodia eikä hyväksy `OPEN-DECISIONS.md`:ssä avoimiksi jätettyjä toteutusyksityiskohtia.
+Repositoryn v8-aineisto muunnetaan suoraan tracked v9 -tiedostoiksi. Runtime ei sisällä v8-readeria, dual-writea, startup-migrationia, migration CLI:tä, journalia, backup/rollback-kehystä tai historiallisten pre-release Runien compatibility-projektiota. Konversion tarkka tulos on dokumentoitu `MIGRATION-PLAN.md`:ssä.

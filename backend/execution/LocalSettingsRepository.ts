@@ -7,23 +7,37 @@ export interface LocalSettings {
   codexCommand?: string;
   copilotCommand?: string;
   readOnlyRoots?: string[];
-  agentReadOnlyRoots?: Record<string, string[]>;
 }
+
+export const LEGACY_AGENT_ROOTS_REMEDIATION = "Legacy setting agentReadOnlyRoots is not supported by project config v9. Remove the \"agentReadOnlyRoots\" key from .git/ballet/settings.json and copy any paths that must be retained into the top-level \"readOnlyRoots\" array before starting a Run.";
 
 export class LocalSettingsRepository {
   constructor(readonly filename: string) {}
 
   async load(): Promise<LocalSettings> {
+    return (await this.inspect()).settings;
+  }
+
+  async inspect(): Promise<{ settings: LocalSettings; legacyAgentReadOnlyRoots: boolean }> {
     try {
       const value = JSON.parse(await readFile(this.filename, "utf8")) as unknown;
-      return validate(value);
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error("Local Ballet settings must be a JSON object.");
+      }
+      return {
+        settings: validate(value),
+        legacyAgentReadOnlyRoots: Object.hasOwn(value, "agentReadOnlyRoots")
+      };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { version: 1 };
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return { settings: { version: 1 }, legacyAgentReadOnlyRoots: false };
+      }
       throw error;
     }
   }
 
   async write(settings: LocalSettings): Promise<void> {
+    if ((await this.inspect()).legacyAgentReadOnlyRoots) throw new Error(LEGACY_AGENT_ROOTS_REMEDIATION);
     const validated = validate(settings);
     await mkdir(path.dirname(this.filename), { recursive: true, mode: 0o700 });
     const temporary = `${this.filename}.${process.pid}.${randomUUID()}.tmp`;
@@ -39,9 +53,10 @@ export class LocalSettingsRepository {
     } finally { await rm(temporary, { force: true }); }
   }
 
-  async rootsFor(agentId: string): Promise<string[]> {
-    const settings = await this.load();
-    return [...(settings.agentReadOnlyRoots?.[agentId] ?? settings.readOnlyRoots ?? [])];
+  async readOnlyRootsForRun(): Promise<string[]> {
+    const loaded = await this.inspect();
+    if (loaded.legacyAgentReadOnlyRoots) throw new Error(LEGACY_AGENT_ROOTS_REMEDIATION);
+    return [...(loaded.settings.readOnlyRoots ?? [])];
   }
 }
 
@@ -52,13 +67,11 @@ const validate = (value: unknown): LocalSettings => {
   const codexCommand = command(source.codexCommand, "codexCommand");
   const copilotCommand = command(source.copilotCommand, "copilotCommand");
   const readOnlyRoots = roots(source.readOnlyRoots, "readOnlyRoots");
-  const agentReadOnlyRoots = agentRoots(source.agentReadOnlyRoots);
   return {
     version: 1,
     ...(codexCommand ? { codexCommand } : {}),
     ...(copilotCommand ? { copilotCommand } : {}),
-    ...(readOnlyRoots ? { readOnlyRoots } : {}),
-    ...(agentReadOnlyRoots ? { agentReadOnlyRoots } : {})
+    ...(readOnlyRoots ? { readOnlyRoots } : {})
   };
 };
 
@@ -67,16 +80,6 @@ const command = (value: unknown, label: string): string | undefined => {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${label} must be a non-empty command.`);
   if (value.includes("/") && !path.isAbsolute(value)) throw new Error(`${label} must be a command name or an absolute path.`);
   return value;
-};
-
-const agentRoots = (value: unknown): Record<string, string[]> | undefined => {
-  if (value === undefined) return undefined;
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agentReadOnlyRoots must be an object.");
-  const entries = Object.entries(value as Record<string, unknown>).map(([agentId, configuredRoots]) => {
-    if (!agentId.trim()) throw new Error("agentReadOnlyRoots keys must be non-empty agent ids.");
-    return [agentId, roots(configuredRoots, `agentReadOnlyRoots.${agentId}`) ?? []] as const;
-  });
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 };
 
 const roots = (value: unknown, label: string): string[] | undefined => {

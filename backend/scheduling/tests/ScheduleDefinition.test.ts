@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectStepSchedule } from "../../../shared/domain/automation.js";
+import type { ProjectScheduledStep, ProjectStepSchedule } from "../../../shared/domain/automation.js";
 import { scheduleDefinitionHash } from "../ScheduleDefinition.js";
+
+const step = (
+  schedule: ProjectStepSchedule,
+  overrides: Partial<ProjectScheduledStep> = {}
+): ProjectScheduledStep => ({
+  id: "scheduled-work",
+  type: "scheduled",
+  executionProfileId: "primary",
+  primaryInstructionId: "project:scheduled-work",
+  skillIds: ["project:checks"],
+  description: "Run scheduled work.",
+  nodeStyle: "luna",
+  nodeSize: "tiny",
+  schedule,
+  on: { approved: "completed", rejected: "blocked" },
+  ...overrides
+});
 
 describe("schedule definition hash", () => {
   it("is stable across object key and weekday ordering", () => {
@@ -21,8 +38,14 @@ describe("schedule definition hash", () => {
       kind: "recurring"
     };
 
-    expect(scheduleDefinitionHash(left, "agent-a")).toBe(scheduleDefinitionHash(right, "agent-a"));
-    expect(scheduleDefinitionHash(left, "agent-a")).toMatch(/^[a-f0-9]{64}$/);
+    const leftHash = scheduleDefinitionHash(step(left, {
+      skillIds: ["project:zeta", "project:alpha"]
+    }));
+    const rightHash = scheduleDefinitionHash(step(right, {
+      skillIds: ["project:alpha", "project:zeta"]
+    }));
+    expect(leftHash).toBe(rightHash);
+    expect(leftHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("changes when an occurrence-defining field changes", () => {
@@ -33,11 +56,12 @@ describe("schedule definition hash", () => {
       timeZone: "Europe/Helsinki"
     };
 
-    expect(scheduleDefinitionHash(schedule, "agent-a")).not.toBe(scheduleDefinitionHash({
-      ...schedule,
-      time: "10:00"
-    }, "agent-a"));
-    expect(scheduleDefinitionHash(schedule, "agent-a"))
-      .not.toBe(scheduleDefinitionHash(schedule, "agent-b"));
+    const original = scheduleDefinitionHash(step(schedule));
+    expect(original).not.toBe(scheduleDefinitionHash(step({ ...schedule, time: "10:00" })));
+    expect(original).not.toBe(scheduleDefinitionHash(step(schedule, { executionProfileId: "secondary" })));
+    expect(original).not.toBe(scheduleDefinitionHash(step(schedule, {
+      primaryInstructionId: "project:alternate"
+    })));
+    expect(original).not.toBe(scheduleDefinitionHash(step(schedule, { skillIds: ["project:review"] })));
   });
 });

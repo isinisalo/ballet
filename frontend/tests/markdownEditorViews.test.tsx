@@ -18,10 +18,16 @@ const projectDocument = (): MarkdownDocument => ({
 });
 
 const skill = (): Skill => ({
-  id: "review",
+  id: "project:review",
+  projectId: "review",
   name: "Review",
   description: "Reviews changes.",
   metadata: {},
+  origin: "project",
+  valid: true,
+  sourceSha256: "a".repeat(64),
+  contentSha256: "b".repeat(64),
+  sizeBytes: 18,
   frontmatter: { name: "Review", description: "Reviews changes." },
   body: "Review the change.",
   relativePath: ".agents/skills/review/SKILL.md",

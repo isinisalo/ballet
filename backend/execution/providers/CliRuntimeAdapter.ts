@@ -58,7 +58,6 @@ export interface RuntimeExecutionRequest {
   model: string;
   reasoning: string;
   policy: ExecutionPolicy;
-  systemInstructions?: string;
   outputSchema?: Record<string, unknown>;
   timeoutMs?: number;
   signal?: AbortSignal;

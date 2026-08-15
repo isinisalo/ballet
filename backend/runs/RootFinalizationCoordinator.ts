@@ -18,14 +18,14 @@ export class RootFinalizationCoordinator {
   async finalize(rootRunId: string, terminal: TerminalStatus): Promise<void> {
     const existing = this.active.get(rootRunId);
     if (existing) return existing;
+    if (this.hasActiveTasks(rootRunId)) return;
     const operation = this.run(rootRunId, terminal).finally(() => this.active.delete(rootRunId));
     this.active.set(rootRunId, operation);
     return operation;
   }
 
   private async run(rootRunId: string, terminal: TerminalStatus): Promise<void> {
-    const tasks = this.executions.listByRoot(rootRunId);
-    if (tasks.some((task) => ["queued", "running"].includes(task.status))) return;
+    if (this.hasActiveTasks(rootRunId)) return;
     let root = this.roots.require(rootRunId);
     if (root.finalization?.status === "completed") return;
     root = root.status === "finalizing"
@@ -41,5 +41,10 @@ export class RootFinalizationCoordinator {
     root = this.roots.finishFinalization(rootRunId, report);
     if (report.success) await this.workspaces.cleanupSuccessful(root).catch(() => undefined);
     this.onChanged(rootRunId);
+  }
+
+  private hasActiveTasks(rootRunId: string): boolean {
+    return this.executions.listByRoot(rootRunId)
+      .some((task) => ["queued", "running"].includes(task.status));
   }
 }

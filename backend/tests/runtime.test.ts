@@ -2,21 +2,24 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   defaultTerminalNodes,
   type ProjectAutomationConfig,
   type ProjectExecutableStep
 } from "../../shared/domain/automation.js";
-import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
+import { defaultLoopTheme, type LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
-  AgentOutcome,
   ExecutionRuntimeSnapshot,
   LoopRunDetails,
+  RootExecutionSnapshot,
+  StepOutcome,
   StepRunResult
 } from "../../shared/domain/runtime.js";
+import { renderStepTaskEnvelope } from "../integration/LoopStepPrompt.js";
 import { RuntimeDatabase, isPatchedSqliteVersion } from "../runtime-db.js";
-import { LoopRunConflictError } from "../runtime/LoopRunErrors.js";
+import { LoopRunConflictError, LoopRunIntegrityError } from "../runtime/LoopRunErrors.js";
+import { LoopRunStore } from "../runtime/LoopRunStore.js";
 
 const roots: string[] = [];
 const databases: RuntimeDatabase[] = [];
@@ -39,7 +42,7 @@ const runtimeSnapshot: ExecutionRuntimeSnapshot = {
 const completed = (
   result: StepRunResult,
   summary = result === "approved" ? "Approved." : "Changes are required."
-): AgentOutcome => ({
+): StepOutcome => ({
   state: "completed",
   result,
   summary,
@@ -56,16 +59,44 @@ const runtimeDatabase = async (): Promise<RuntimeDatabase> => {
   return database;
 };
 
-const insertRoot = (runtime: RuntimeDatabase, loopId: string): string => {
+const insertRoot = (
+  runtime: RuntimeDatabase,
+  automation: ProjectAutomationConfig,
+  loopId: string,
+  theme: LoopTheme = defaultLoopTheme
+): string => {
   const rootRunId = randomUUID();
   const timestamp = new Date().toISOString();
+  const executionSnapshot: RootExecutionSnapshot = {
+    version: 1,
+    rootLoopId: loopId,
+    project: {
+      checkoutRoot: `/tmp/${rootRunId}`,
+      headSha: "a".repeat(40),
+      configHash: "config",
+      snapshotHash: "snapshot"
+    },
+    loops: structuredClone(automation.loops),
+    theme: structuredClone(theme),
+    executionProfiles: [{
+      id: "test-profile",
+      name: "Test profile",
+      provider: "codex",
+      model: "test-model",
+      reasoningEffort: "medium",
+      networkAccess: false
+    }],
+    runtimes: [{ executionProfileId: "test-profile", runtime: runtimeSnapshot }],
+    resources: [],
+    createdAt: timestamp
+  };
   runtime.connection().prepare(`
     INSERT INTO root_runs (
       root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
-      config_hash, snapshot_hash, created_at, updated_at
-    ) VALUES (?, 'loop', ?, 'manual', 'queued', ?, ?, ?, 'config', 'snapshot', ?, ?)
+      config_hash, snapshot_hash, execution_snapshot_json, created_at, updated_at
+    ) VALUES (?, 'loop', ?, 'manual', 'queued', ?, ?, ?, 'config', 'snapshot', ?, ?, ?)
   `).run(rootRunId, loopId, `/tmp/${rootRunId}`, `ballet/run/${rootRunId}`,
-    "a".repeat(40), timestamp, timestamp);
+    "a".repeat(40), JSON.stringify(executionSnapshot), timestamp, timestamp);
   return rootRunId;
 };
 
@@ -75,21 +106,19 @@ const startLoop = (
   loopId: string,
   input?: string
 ): LoopRunDetails => runtime.startLoopRun(
-  automation,
-  loopId,
-  defaultLoopTheme,
-  insertRoot(runtime, loopId),
+  insertRoot(runtime, automation, loopId),
   input
 );
 
 const agentStep = (
   id: string,
-  on: ProjectExecutableStep["on"],
-  agentId = "test-agent"
+  on: ProjectExecutableStep["on"]
 ): ProjectExecutableStep => ({
   id,
   type: "agent",
-  agentId,
+  executionProfileId: "test-profile",
+  primaryInstructionId: "project:test",
+  skillIds: [],
   description: `Execute ${id}.`,
   nodeStyle: "flat",
   nodeSize: "medium",
@@ -112,14 +141,61 @@ const singleStepConfig = (
   step: ProjectExecutableStep,
   loopId = "main-loop"
 ): ProjectAutomationConfig => ({
-  version: 8,
+  version: 9,
   loops: [{ id: loopId, start: step.id, nodes: [step, ...defaultTerminalNodes()] }]
 });
+
+const needsInputOutcome = (question: string, context: string, summary: string): StepOutcome => ({
+  state: "needs_input",
+  question,
+  context,
+  summary,
+  checks: []
+});
+
+const currentTaskEnvelope = (runtime: RuntimeDatabase, run: LoopRunDetails) => {
+  const snapshotRow = runtime.connection().prepare(`
+    SELECT execution_snapshot_json FROM root_runs WHERE root_run_id = ?
+  `).get(run.rootRunId) as { execution_snapshot_json: string };
+  const snapshot = JSON.parse(snapshotRow.execution_snapshot_json) as RootExecutionSnapshot;
+  const current = run.stepRuns.at(-1);
+  if (!current) throw new Error("A current Step Run is required.");
+  return JSON.parse(renderStepTaskEnvelope(snapshot, [run], run, current)) as {
+    runInput: string;
+    resume: { question: string; context: string; response: string };
+  };
+};
 
 describe("Loop runtime technical states and outcomes", () => {
   it("recognizes patched SQLite versions", () => {
     expect(isPatchedSqliteVersion("3.51.3")).toBe(true);
     expect(isPatchedSqliteVersion("3.51.2")).toBe(false);
+  });
+
+  it("projects each Loop Run's Loop and theme from its immutable Root snapshot", async () => {
+    const runtime = await runtimeDatabase();
+    const automation = singleStepConfig(humanStep("gate", {
+      approved: "completed",
+      rejected: "blocked"
+    }), "snapshot-projection");
+    const theme: LoopTheme = {
+      ...structuredClone(defaultLoopTheme),
+      node: { ...defaultLoopTheme.node, labelColor: "#123456" }
+    };
+    const rootRunId = insertRoot(runtime, automation, "snapshot-projection", theme);
+
+    const run = runtime.startLoopRun(rootRunId);
+
+    expect(run.snapshot).toEqual(automation.loops[0]);
+    expect(run.themeSnapshot).toEqual(theme);
+    const columns = runtime.connection().pragma("table_info(loop_runs)") as Array<{ name: string }>;
+    expect(columns.map(({ name }) => name)).not.toEqual(expect.arrayContaining([
+      "snapshot_json",
+      "theme_snapshot_json"
+    ]));
+    expect(() => runtime.connection().prepare(`
+      UPDATE root_runs SET execution_snapshot_json = execution_snapshot_json WHERE root_run_id = ?
+    `).run(rootRunId)).toThrow("root run execution snapshot is immutable");
   });
 
   it.each([
@@ -134,7 +210,7 @@ describe("Loop runtime technical states and outcomes", () => {
     }), `terminal-${terminal}`);
     const run = startLoop(runtime, automation, `terminal-${terminal}`);
 
-    const details = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    const details = runtime.completeExecutionStep({
       stepRunId: run.stepRuns[0]!.stepRunId,
       outcome: completed(result)
     });
@@ -153,12 +229,12 @@ describe("Loop runtime technical states and outcomes", () => {
     async (result) => {
       const runtime = await runtimeDatabase();
       const automation: ProjectAutomationConfig = {
-        version: 8,
+        version: 9,
         loops: [{
           id: "decision",
           start: "review",
           nodes: [
-            agentStep("review", { approved: "accepted", rejected: "revise" }, "reviewer"),
+            agentStep("review", { approved: "accepted", rejected: "revise" }),
             agentStep("accepted", { approved: "completed", rejected: "failed" }),
             agentStep("revise", { approved: "completed", rejected: "failed" }),
             ...defaultTerminalNodes()
@@ -168,7 +244,7 @@ describe("Loop runtime technical states and outcomes", () => {
       const run = startLoop(runtime, automation, "decision");
       const report = completed(result, result === "rejected" ? "Please revise the boundary." : "Boundary accepted.");
 
-      const details = runtime.completeAgentStep(automation, defaultLoopTheme, {
+      const details = runtime.completeExecutionStep({
         stepRunId: run.stepRuns[0]!.stepRunId,
         outcome: report
       });
@@ -184,12 +260,46 @@ describe("Loop runtime technical states and outcomes", () => {
     }
   );
 
+  it("reads the persisted StepRun result and rejects inconsistent outcome evidence before transitioning", async () => {
+    const runtime = await runtimeDatabase();
+    const automation = singleStepConfig(agentStep("work", {
+      approved: "completed",
+      rejected: "blocked"
+    }), "persisted-result");
+    const run = startLoop(runtime, automation, "persisted-result");
+    const original = LoopRunStore.prototype.completeStepRun;
+    vi.spyOn(LoopRunStore.prototype, "completeStepRun").mockImplementation(function (
+      this: LoopRunStore,
+      stepRun,
+      result,
+      options
+    ) {
+      original.call(this, stepRun, result, options);
+      runtime.connection().prepare(`
+        UPDATE step_runs SET result = 'rejected' WHERE step_run_id = ?
+      `).run(stepRun.stepRunId);
+      const persisted = this.getStepRun(stepRun.stepRunId);
+      if (!persisted) throw new Error("Expected persisted Step Run readback.");
+      return persisted;
+    });
+
+    expect(() => runtime.completeExecutionStep({
+      stepRunId: run.stepRuns[0]!.stepRunId,
+      outcome: completed("approved")
+    })).toThrow(LoopRunIntegrityError);
+    expect(runtime.listRootLoopRuns(run.rootRunId)[0]).toMatchObject({
+      status: "running",
+      transitionCount: 0,
+      stepRuns: [expect.objectContaining({ status: "queued", result: undefined })]
+    });
+  });
+
   it.each(["blocked", "failed"] as const)(
     "%s terminalizes the Step and Run without executing either transition",
     async (state) => {
       const runtime = await runtimeDatabase();
       const automation: ProjectAutomationConfig = {
-        version: 8,
+        version: 9,
         loops: [{
           id: `technical-${state}`,
           start: "work",
@@ -202,13 +312,13 @@ describe("Loop runtime technical states and outcomes", () => {
         }]
       };
       const run = startLoop(runtime, automation, `technical-${state}`);
-      const outcome: AgentOutcome = {
+      const outcome: StepOutcome = {
         state,
         summary: state === "blocked" ? "Waiting for an external dependency." : "Provider execution failed.",
         checks: [{ name: "runtime", status: "failed", details: "No transition is safe." }]
       };
 
-      const details = runtime.completeAgentStep(automation, defaultLoopTheme, {
+      const details = runtime.completeExecutionStep({
         stepRunId: run.stepRuns[0]!.stepRunId,
         outcome
       });
@@ -230,7 +340,7 @@ describe("Loop runtime technical states and outcomes", () => {
     }), "execution-error");
     const run = startLoop(runtime, automation, "execution-error");
 
-    const details = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    const details = runtime.completeExecutionStep({
       stepRunId: run.stepRuns[0]!.stepRunId,
       error: "Provider process timed out."
     });
@@ -244,7 +354,7 @@ describe("Loop runtime technical states and outcomes", () => {
     expect(details.stepRuns[0]!.result).toBeUndefined();
   });
 
-  it("pauses needs_input and resumes the same StepRun with durable context", async () => {
+  it("pairs each needs_input question with only its current resume answer across two rounds", async () => {
     const runtime = await runtimeDatabase();
     const automation = singleStepConfig(agentStep("clarify", {
       approved: "completed",
@@ -255,18 +365,16 @@ describe("Loop runtime technical states and outcomes", () => {
     const firstTaskId = randomUUID();
     runtime.bindStepExecution(stepRunId, firstTaskId, runtimeSnapshot);
     expect(runtime.markStepRunRunning(stepRunId).attempt).toBe(1);
-    const needsInput: AgentOutcome = {
-      state: "needs_input",
-      question: "Which deployment region should be used?",
-      context: "The request permits either north or south.",
-      summary: "A deployment region is required.",
-      checks: []
-    };
+    const firstNeedsInput = needsInputOutcome(
+      "Which deployment region should be used?",
+      "The request permits either north or south.",
+      "A deployment region is required."
+    );
 
-    const paused = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    const paused = runtime.completeExecutionStep({
       stepRunId,
       executionTaskId: firstTaskId,
-      outcome: needsInput
+      outcome: firstNeedsInput
     });
 
     expect(paused).toMatchObject({ status: "waiting_for_human", transitionCount: 0 });
@@ -274,65 +382,103 @@ describe("Loop runtime technical states and outcomes", () => {
       stepRunId,
       status: "needs_input",
       input: "Original request",
-      outcome: needsInput,
+      outcome: firstNeedsInput,
       attempt: 1
     })]);
-    expect(paused.stepRuns[0]!.result).toBeUndefined();
-    expect(paused.stepRuns[0]!.completedAt).toBeUndefined();
 
-    const resumed = runtime.resumeStepRun(
-      paused.runId,
-      stepRunId,
-      "Use the north region."
-    );
+    const resumed = runtime.resumeStepRun(paused.runId, stepRunId, "Use the north region.");
 
-    expect(resumed).toMatchObject({ status: "running", transitionCount: 0 });
-    expect(resumed.stepRuns).toHaveLength(1);
-    expect(resumed.stepRuns[0]).toMatchObject({
-      stepRunId,
-      status: "queued",
-      responseInput: "Use the north region.",
-      outcome: needsInput,
-      attempt: 1
+    expect(resumed).toMatchObject({
+      status: "running",
+      transitionCount: 0,
+      stepRuns: [expect.objectContaining({
+        stepRunId,
+        status: "queued",
+        input: "Original request\n\nUse the north region.",
+        responseInput: "Use the north region.",
+        executionTaskId: undefined,
+        outcome: firstNeedsInput,
+        attempt: 1
+      })]
     });
-    expect(resumed.stepRuns[0]!.executionTaskId).toBeUndefined();
-    expect(resumed.stepRuns[0]!.input).toContain("Original request");
-    expect(resumed.stepRuns[0]!.input).toContain("Use the north region.");
-    expect(resumed.stepRuns[0]!.outcome).toMatchObject({
-      state: "needs_input",
-      context: needsInput.context,
-      question: needsInput.question
-    });
+    const firstEnvelope = currentTaskEnvelope(runtime, resumed);
+    expect(firstEnvelope).toEqual(expect.objectContaining({
+      runInput: "Original request\n\nUse the north region.",
+      resume: {
+        question: "Which deployment region should be used?",
+        context: "The request permits either north or south.",
+        response: "Use the north region."
+      }
+    }));
 
-    const resumedTaskId = randomUUID();
-    runtime.bindStepExecution(stepRunId, resumedTaskId, runtimeSnapshot);
+    const secondTaskId = randomUUID();
+    runtime.bindStepExecution(stepRunId, secondTaskId, runtimeSnapshot);
     expect(() => runtime.bindStepExecution(stepRunId, randomUUID(), runtimeSnapshot))
       .toThrow(`Step run ${stepRunId} already has an execution task.`);
-    const afterStaleCompletion = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    const afterStaleCompletion = runtime.completeExecutionStep({
       stepRunId,
       executionTaskId: firstTaskId,
-      outcome: needsInput
+      outcome: firstNeedsInput
     });
     expect(afterStaleCompletion.stepRuns[0]).toMatchObject({
       stepRunId,
       status: "queued",
-      executionTaskId: resumedTaskId,
+      executionTaskId: secondTaskId,
       attempt: 1
     });
     expect(runtime.markStepRunRunning(stepRunId)).toMatchObject({ stepRunId, attempt: 2 });
-    const finished = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    const secondNeedsInput = needsInputOutcome(
+      "Which database should be used?",
+      "The selected region supports SQLite and Postgres.",
+      "A database choice is required."
+    );
+    const pausedAgain = runtime.completeExecutionStep({
       stepRunId,
-      executionTaskId: resumedTaskId,
-      outcome: completed("approved")
+      executionTaskId: secondTaskId,
+      outcome: secondNeedsInput
     });
-    expect(finished).toMatchObject({ status: "completed", transitionCount: 1 });
-    expect(finished.stepRuns).toHaveLength(1);
-    expect(finished.stepRuns[0]).toMatchObject({
+    expect(pausedAgain).toMatchObject({ status: "waiting_for_human", transitionCount: 0 });
+    expect(pausedAgain.stepRuns).toEqual([expect.objectContaining({
       stepRunId,
-      status: "completed",
-      result: "approved",
-      responseInput: "Use the north region.",
+      status: "needs_input",
+      outcome: secondNeedsInput,
+      responseInput: undefined,
       attempt: 2
+    })]);
+
+    const resumedAgain = runtime.resumeStepRun(pausedAgain.runId, stepRunId, "Use PostgreSQL.");
+    expect(resumedAgain).toMatchObject({ status: "running", transitionCount: 0 });
+    expect(resumedAgain.stepRuns).toEqual([expect.objectContaining({
+      stepRunId,
+      status: "queued",
+      input: "Original request\n\nUse the north region.\n\nUse PostgreSQL.",
+      responseInput: "Use PostgreSQL.",
+      outcome: secondNeedsInput,
+      attempt: 2
+    })]);
+    const secondEnvelope = currentTaskEnvelope(runtime, resumedAgain);
+    expect(secondEnvelope).toEqual(expect.objectContaining({
+      runInput: "Original request\n\nUse the north region.\n\nUse PostgreSQL.",
+      resume: {
+        question: "Which database should be used?",
+        context: "The selected region supports SQLite and Postgres.",
+        response: "Use PostgreSQL."
+      }
+    }));
+
+    const finalTaskId = randomUUID();
+    runtime.bindStepExecution(stepRunId, finalTaskId, runtimeSnapshot);
+    expect(runtime.markStepRunRunning(stepRunId)).toMatchObject({ stepRunId, attempt: 3 });
+    expect(runtime.completeExecutionStep({
+      stepRunId,
+      executionTaskId: finalTaskId,
+      outcome: completed("approved")
+    })).toMatchObject({
+      status: "completed",
+      transitionCount: 1,
+      stepRuns: [expect.objectContaining({
+        stepRunId, status: "completed", result: "approved", responseInput: "Use PostgreSQL.", attempt: 3
+      })]
     });
   });
 });
@@ -349,8 +495,6 @@ describe("generic Loop control flow", () => {
       const run = startLoop(runtime, automation, "human-decision", "Original context");
 
       const details = runtime.respondToStepRun(
-        automation,
-        defaultLoopTheme,
         run.runId,
         run.stepRuns[0]!.stepRunId,
         result,
@@ -390,19 +534,19 @@ describe("generic Loop control flow", () => {
       nodes: [agentStep("finish", { approved: "completed", rejected: "failed" }), ...defaultTerminalNodes()]
     });
     const automation: ProjectAutomationConfig = {
-      version: 8,
+      version: 9,
       loops: [{ id: "source-loop", start: source.id, nodes: [source, ...defaultTerminalNodes()] },
         target("approved-loop"), target("rejected-loop")]
     };
     const run = startLoop(runtime, automation, "source-loop", "Root context");
 
     if (type === "agent") {
-      runtime.completeAgentStep(automation, defaultLoopTheme, {
+      runtime.completeExecutionStep({
         stepRunId: run.stepRuns[0]!.stepRunId,
         outcome: completed(result)
       });
     } else {
-      runtime.respondToStepRun(automation, defaultLoopTheme, run.runId,
+      runtime.respondToStepRun(run.runId,
         run.stepRuns[0]!.stepRunId, result, "Human context");
     }
 
@@ -425,7 +569,7 @@ describe("generic Loop control flow", () => {
   it("supports an arbitrary cycle and exits through a configured result", async () => {
     const runtime = await runtimeDatabase();
     const automation: ProjectAutomationConfig = {
-      version: 8,
+      version: 9,
       loops: [{
         id: "cycle",
         start: "first",
@@ -437,15 +581,15 @@ describe("generic Loop control flow", () => {
       }]
     };
     let details = startLoop(runtime, automation, "cycle");
-    details = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    details = runtime.completeExecutionStep({
       stepRunId: details.stepRuns.at(-1)!.stepRunId,
       outcome: completed("approved")
     });
-    details = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    details = runtime.completeExecutionStep({
       stepRunId: details.stepRuns.at(-1)!.stepRunId,
       outcome: completed("approved")
     });
-    details = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    details = runtime.completeExecutionStep({
       stepRunId: details.stepRuns.at(-1)!.stepRunId,
       outcome: completed("rejected")
     });
@@ -469,7 +613,7 @@ describe("generic Loop control flow", () => {
   it("blocks an agent transition when the target Loop is already active", async () => {
     const runtime = await runtimeDatabase();
     const automation: ProjectAutomationConfig = {
-      version: 8,
+      version: 9,
       loops: [{
         id: "source", start: "route",
         nodes: [agentStep("route", { approved: { loop: "target" }, rejected: "failed" }), ...defaultTerminalNodes()]
@@ -481,7 +625,7 @@ describe("generic Loop control flow", () => {
     startLoop(runtime, automation, "target");
     const source = startLoop(runtime, automation, "source");
 
-    const blocked = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    const blocked = runtime.completeExecutionStep({
       stepRunId: source.stepRuns[0]!.stepRunId,
       outcome: completed("approved")
     });
@@ -503,7 +647,7 @@ describe("generic Loop control flow", () => {
     }), "bounded-cycle");
     let details = startLoop(runtime, automation, "bounded-cycle");
     for (let index = 0; index < 21 && details.status === "running"; index += 1) {
-      details = runtime.completeAgentStep(automation, defaultLoopTheme, {
+      details = runtime.completeExecutionStep({
         stepRunId: details.stepRuns.at(-1)!.stepRunId,
         outcome: completed("approved")
       });
@@ -527,7 +671,7 @@ describe("generic Loop control flow", () => {
     }), "cancel-wait");
     const run = startLoop(runtime, automation, "cancel-wait");
     const stepRunId = run.stepRuns[0]!.stepRunId;
-    runtime.completeAgentStep(automation, defaultLoopTheme, {
+    runtime.completeExecutionStep({
       stepRunId,
       outcome: {
         state: "needs_input",
@@ -541,7 +685,7 @@ describe("generic Loop control flow", () => {
     const cancelled = runtime.cancelLoopRun(run.runId);
     expect(cancelled.status).toBe("cancelled");
     expect(cancelled.stepRuns[0]!.status).toBe("cancelled");
-    const late = runtime.completeAgentStep(automation, defaultLoopTheme, {
+    const late = runtime.completeExecutionStep({
       stepRunId,
       outcome: completed("approved")
     });

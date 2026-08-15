@@ -5,8 +5,6 @@ import type {
 } from "@shared/api/workspace-contracts";
 import type { ReactNode } from "react";
 import { SelectField } from "@/components/shared/workspace-ui";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
 import { ThemeColorField } from "./ThemeColorField";
 import type { LoopThemeColorKey, LoopThemeFieldErrors } from "./loopThemeEditorState";
 
@@ -26,7 +24,7 @@ const connectionStyleOptions = [
 ];
 
 export function LoopThemeNodeControls(props: ControlsProps) {
-  const { theme, previewTheme, errors, disabled = false, onChange, onColorChange } = props;
+  const { theme, previewTheme, errors, disabled = false, onColorChange } = props;
 
   return (
     <ThemeControlSection title="Node">
@@ -34,10 +32,6 @@ export function LoopThemeNodeControls(props: ControlsProps) {
         <ThemeColorField label="Label font color" value={theme.node.labelColor} previewValue={previewTheme.node.labelColor} error={errors["node.labelColor"]} disabled={disabled} onChange={(value) => onColorChange("node.labelColor", value)} />
         <ThemeColorField label="Glow color" value={theme.node.glowColor} previewValue={previewTheme.node.glowColor} error={errors["node.glowColor"]} disabled={disabled} onChange={(value) => onColorChange("node.glowColor", value)} />
       </div>
-      <Field orientation="horizontal" className="min-h-7 justify-between rounded border border-divider-strong bg-panel-section px-3 py-1.5">
-        <FieldLabel htmlFor="theme-agent-avatars">Show agent avatars</FieldLabel>
-        <Switch id="theme-agent-avatars" checked={theme.node.showAgentAvatarInNode} disabled={disabled} onCheckedChange={(checked) => onChange({ ...theme, node: { ...theme.node, showAgentAvatarInNode: checked } })} />
-      </Field>
     </ThemeControlSection>
   );
 }

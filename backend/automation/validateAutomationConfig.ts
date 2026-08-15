@@ -1,4 +1,3 @@
-import type { Agent } from "../../shared/domain/agents.js";
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
@@ -6,10 +5,13 @@ import type {
   ProjectLoopNode,
   StepTransitionTarget
 } from "../../shared/domain/automation.js";
+import type { ProjectResourceCatalog } from "../../shared/domain/documents.js";
+import type { ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import {
   getProjectStepTransitionEntries,
   getProjectStepTransitionTargets,
   isProjectTerminalNode,
+  isProjectExecutionStep,
   resolveEffectiveStartStep
 } from "../../shared/domain/automation.js";
 import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
@@ -77,7 +79,7 @@ const validateLoop = (
   loop: ProjectLoop,
   loopIndex: number,
   loopIds: ReadonlySet<string>,
-  agentIds?: ReadonlySet<string>
+  executionProfileIds?: ReadonlySet<string>
 ): ProjectAutomationIssue[] => {
   const issues: ProjectAutomationIssue[] = [];
   const nodesById = new Map(loop.nodes.map((node) => [node.id, node]));
@@ -105,24 +107,14 @@ const validateLoop = (
         issues.push({ path: `${base}.type`, message: "A scheduled step is allowed only as the loop start step." });
       }
     }
-    if (step.type !== "human" && agentIds && !agentIds.has(step.agentId)) {
-      issues.push({ path: `${base}.agentId`, message: `Step references unknown agent: ${step.agentId}.` });
+    if (step.type !== "human" && executionProfileIds && !executionProfileIds.has(step.executionProfileId)) {
+      issues.push({
+        path: `${base}.executionProfileId`,
+        message: `Step references unknown execution profile: ${step.executionProfileId}.`
+      });
     }
     for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
       issues.push(...validateTarget(target, `${base}.on.${transitionId}`, loop.id, nodesById, loopIds));
-    }
-  });
-  const scheduledIds = new Set(scheduledSteps.map(({ step }) => step.id));
-  loop.nodes.forEach((node, nodeIndex) => {
-    if (isProjectTerminalNode(node)) return;
-    const step = node;
-    for (const [transitionId, target] of getProjectStepTransitionEntries(step)) {
-      if (typeof target === "string" && scheduledIds.has(target)) {
-        issues.push({
-          path: `loops.${loopIndex}.nodes.${nodeIndex}.on.${transitionId}`,
-          message: "No transition may target a scheduled start step."
-        });
-      }
     }
   });
   const reachable = new Set<string>();
@@ -156,7 +148,7 @@ const validateLoop = (
 
 export const validateProjectAutomationConfig = (
   input: unknown,
-  agents?: readonly Agent[]
+  executionProfiles?: readonly ExecutionProfile[]
 ): ProjectAutomationIssue[] => {
   const parsed = automationConfigSchema.safeParse(input);
   if (!parsed.success) {
@@ -168,13 +160,45 @@ export const validateProjectAutomationConfig = (
 
   const config: ProjectAutomationConfig = parsed.data;
   const loopIds = new Set(config.loops.map((loop) => loop.id));
-  const agentIds = agents ? new Set(agents.map((agent) => agent.id)) : undefined;
+  const executionProfileIds = executionProfiles
+    ? new Set(executionProfiles.map((profile) => profile.id))
+    : undefined;
   const issues = duplicateIssues(
     config.loops.map((loop, index) => ({ id: loop.id, path: `loops.${index}.id` })),
     "loop"
   );
   config.loops.forEach((loop, index) => {
-    issues.push(...validateLoop(loop, index, loopIds, agentIds));
+    issues.push(...validateLoop(loop, index, loopIds, executionProfileIds));
   });
   return issues;
 };
+
+export const validateProjectExecutionResources = (
+  config: ProjectAutomationConfig,
+  resources: ProjectResourceCatalog
+): ProjectAutomationIssue[] => {
+  const instructionsById = validResourcesById(resources.instructions);
+  const skillsById = validResourcesById(resources.skills);
+  const issues: ProjectAutomationIssue[] = resources.issues.map((issue) => ({
+    path: issue.relativePath,
+    message: issue.message
+  }));
+  config.loops.forEach((loop, loopIndex) => loop.nodes.forEach((node, nodeIndex) => {
+    if (!isProjectExecutionStep(node)) return;
+    const base = `loops.${loopIndex}.nodes.${nodeIndex}`;
+    if (!instructionsById.has(node.primaryInstructionId)) issues.push({
+      path: `${base}.primaryInstructionId`,
+      message: `Step references a missing or invalid primary instruction: ${node.primaryInstructionId}.`
+    });
+    node.skillIds.forEach((skillId, skillIndex) => {
+      if (!skillsById.has(skillId)) issues.push({
+        path: `${base}.skillIds.${skillIndex}`,
+        message: `Step references a missing or invalid skill: ${skillId}.`
+      });
+    });
+  }));
+  return issues;
+};
+
+const validResourcesById = <T extends { id?: string; valid: boolean }>(resources: readonly T[]): Set<string> =>
+  new Set(resources.flatMap((resource) => resource.valid && resource.id ? [resource.id] : []));

@@ -1,4 +1,4 @@
-import type { Agent, AgentExecutionState, ProjectAutomationConfig, ProjectDocumentTreeNode, RuntimeConfigurationIssue, Skill } from "@shared/api/workspace-contracts";
+import type { ExecutionProfile, ProjectAutomationConfig, ProjectDocumentTreeNode, RuntimeConfigurationIssue, Skill } from "@shared/api/workspace-contracts";
 import { Sidebar as ShadcnSidebar } from "@/components/ui/sidebar";
 import type { RouteState } from "../types";
 import { balletModeFromRoute } from "../routing";
@@ -16,8 +16,7 @@ export function AppSidebar({
   route,
   projectDocumentTree,
   automation,
-  agents,
-  agentExecutionStates,
+  executionProfiles,
   skills,
   runDashboard,
   configureGitState,
@@ -27,8 +26,7 @@ export function AppSidebar({
   route: RouteState;
   projectDocumentTree: ProjectDocumentTreeNode[];
   automation: ProjectAutomationConfig;
-  agents: Agent[];
-  agentExecutionStates: AgentExecutionState[];
+  executionProfiles: ExecutionProfile[];
   skills: Skill[];
   runDashboard: RunDashboardState;
   configureGitState?: ConfigureGitState;
@@ -39,7 +37,7 @@ export function AppSidebar({
   return (
     <ShadcnSidebar>
       <div data-slot="sidebar-header" data-sidebar="header" className="flex flex-col gap-2 p-2">
-        <BalletModeSelect mode={mode} onChange={(nextMode) => navigate(pathForBalletMode({ route, nextMode, agents }))} />
+        <BalletModeSelect mode={mode} onChange={(nextMode) => navigate(pathForBalletMode({ route, nextMode }))} />
       </div>
       <div data-slot="sidebar-content" data-sidebar="content" className="no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto group-data-[collapsible=icon]:overflow-hidden">
         <div data-slot="sidebar-group" data-sidebar="group" className="relative flex w-full min-w-0 flex-col p-2">
@@ -50,7 +48,7 @@ export function AppSidebar({
                   <ConfigureGitStatus state={configureGitState} />
                   <ConfigureRuntimeIssues issues={runtimeConfigurationIssues} />
                   <SidebarAutomationMenu route={route} automation={automation} navigate={navigate} />
-                  <SidebarEnvironmentMenu route={route} agents={agents} agentExecutionStates={agentExecutionStates} skills={skills} navigate={navigate} />
+                  <SidebarEnvironmentMenu route={route} executionProfiles={executionProfiles} skills={skills} navigate={navigate} />
                   <SidebarProjectMenu route={route} projectDocumentTree={projectDocumentTree} navigate={navigate} />
                 </>
               )}

@@ -1,8 +1,8 @@
 import { useMemo, type ReactNode } from "react";
 import {
   defaultLoopTheme,
-  type Agent,
-  type AgentExecutionState,
+  type ExecutionProfile,
+  type LocalRuntime,
   type LoopRunDetails,
   type LoopTheme,
   type ProjectAutomationConfig,
@@ -14,12 +14,13 @@ import { calculateCompositeLoopCanvasLayout } from "./loopLayout";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import { buildLoopVisualProjection } from "./loopVisualProjection";
 import { useLoopCanvasInteraction } from "./useLoopCanvasInteraction";
+import { executionProfileBlockingReason } from "../../executionProfiles/executionProfileOptions";
 
 export function LoopCanvas({
   config,
   loop,
-  agents = [],
-  agentExecutionStates = [],
+  executionProfiles = [],
+  runtime,
   run,
   selectedStepId,
   theme: themeOverride,
@@ -32,8 +33,8 @@ export function LoopCanvas({
 }: {
   config: ProjectAutomationConfig;
   loop: ProjectLoop;
-  agents?: Agent[];
-  agentExecutionStates?: AgentExecutionState[];
+  executionProfiles?: ExecutionProfile[];
+  runtime?: LocalRuntime;
   run?: LoopRunDetails | null;
   selectedStepId?: string;
   theme?: LoopTheme;
@@ -45,9 +46,14 @@ export function LoopCanvas({
   onReorderStep?: (fromIndex: number, toIndex: number) => void;
 }) {
   const theme = run?.themeSnapshot ?? themeOverride ?? defaultLoopTheme;
+  const availableExecutionProfileIds = useMemo(() => runtime
+    ? new Set(executionProfiles
+      .filter((profile) => !executionProfileBlockingReason(profile, runtime))
+      .map((profile) => profile.id))
+    : undefined, [executionProfiles, runtime]);
   const projection = useMemo(
-    () => buildLoopVisualProjection(config, loop, run, agents, agentExecutionStates),
-    [agentExecutionStates, agents, config, loop, run]
+    () => buildLoopVisualProjection(config, loop, run, executionProfiles, availableExecutionProfileIds),
+    [availableExecutionProfileIds, config, executionProfiles, loop, run]
   );
   const layout = useMemo(() => calculateCompositeLoopCanvasLayout({
     config: projection.config,

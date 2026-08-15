@@ -137,16 +137,12 @@ export class CopilotSdkAdapter implements CliRuntimeAdapter {
         for (const normalized of normalizeCopilotEvent(event)) queue.push(normalized);
       });
       queue.push({ type: "execution.started", executionId: request.executionId, provider: this.provider, at: new Date().toISOString() });
-      const first = await session.sendAndWait({ prompt: withSchemaInstruction(request.prompt, request.outputSchema) }, request.timeoutMs);
-      let output = copilotMessageText(first);
-      let structured = request.outputSchema ? parseStructuredJson(output, request.outputSchema) : { value: undefined };
+      const first = await session.sendAndWait({ prompt: request.prompt }, request.timeoutMs);
+      const output = copilotMessageText(first);
+      const structured = request.outputSchema ? parseStructuredJson(output, request.outputSchema) : { value: undefined };
       if (request.outputSchema && structured.error) {
-        queue.push({ type: "diagnostic", level: "warning", message: "Copilot output failed schema validation; requesting one repair.", data: structured.error });
-        const repair = await session.sendAndWait({ prompt: repairPrompt(structured.error, request.outputSchema) }, request.timeoutMs);
-        output = copilotMessageText(repair);
-        structured = parseStructuredJson(output, request.outputSchema);
+        throw new Error(`Copilot output failed schema validation: ${structured.error}`);
       }
-      if (request.outputSchema && structured.error) throw new Error(`Copilot output repair failed: ${structured.error}`);
       if (!output.trim()) throw new Error("Copilot completed without a final response.");
       queue.push({ type: "execution.completed", output, structuredOutput: structured.value });
       queue.close();
@@ -197,7 +193,6 @@ export class CopilotSdkAdapter implements CliRuntimeAdapter {
       remoteSession: "off",
       requestCanvasRenderer: false,
       requestExtensions: false,
-      systemMessage: request.systemInstructions ? { mode: "append", content: request.systemInstructions } : undefined,
       onPermissionRequest: async (raw: Record<string, unknown>) => {
         const permission = permissionFromCopilot(raw, request.workingDirectory);
         const policy = request.permissionPolicy ?? denyAllRuntimePermissions;
@@ -272,13 +267,6 @@ const enforceCopilotSandbox = async (
     }
   });
 };
-
-const withSchemaInstruction = (prompt: string, schema?: Record<string, unknown>): string => schema
-  ? `${prompt}\n\nReturn only one JSON value matching this schema exactly:\n${JSON.stringify(schema)}`
-  : prompt;
-
-const repairPrompt = (error: string, schema: Record<string, unknown>): string =>
-  `Your previous response was invalid (${error}). Return only corrected JSON matching this schema. Do not add prose or a code fence:\n${JSON.stringify(schema)}`;
 
 const permissionFromCopilot = (
   raw: Record<string, unknown>,

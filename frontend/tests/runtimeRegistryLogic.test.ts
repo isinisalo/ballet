@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
+import {
+  executionProfileBlockingReason,
+  modelOptions,
+  profileIdFromName,
+  PROVIDER_DEFAULT_REASONING,
+  providerOptions,
+  reasoningOptions
+} from "../src/workspace/executionProfiles/executionProfileOptions";
 import { providerReadiness } from "../src/workspace/runtimes/runtimeRegistry";
-import { emptyExecutionForm, formFromRuntimeConfiguration, modelOptions, PROVIDER_DEFAULT, reasoningOptions } from "../src/workspace/agents/execution/executionOptions";
-import { agentRuntimeConfiguration, localProvider } from "./runtimeFixtures";
+import { localProvider, localRuntime } from "./runtimeFixtures";
 
 describe("local runtime logic", () => {
   it("maps local provider health to runnable readiness", () => {
@@ -16,12 +23,34 @@ describe("local runtime logic", () => {
     expect(providerReadiness(provider)).toEqual({ label: "No models", tone: "error", runnable: false });
   });
 
-  it("builds execution options directly from local provider capability", () => {
-    expect(emptyExecutionForm()).toMatchObject({ provider: "", model: "", reasoning: "" });
-    expect(formFromRuntimeConfiguration(undefined)).toEqual(emptyExecutionForm());
-    expect(formFromRuntimeConfiguration(agentRuntimeConfiguration({ readOnlyRoots: ["/shared"] })).policy.readOnlyRoots).toEqual(["/shared"]);
+  it("derives ExecutionProfile choices directly from provider capabilities", () => {
+    const runtime = localRuntime();
+    expect(providerOptions(runtime)).toEqual([{ value: "codex", label: "codex" }]);
     expect(modelOptions(localProvider())).toEqual([{ value: "gpt-test", label: "GPT Test" }]);
-    const providerWithoutReasoning = localProvider({ capabilities: { ...localProvider().capabilities, models: [{ id: "gpt-no-levels", label: "No levels", reasoningOptions: [] }] } });
-    expect(reasoningOptions(providerWithoutReasoning, "gpt-no-levels")).toEqual([{ value: PROVIDER_DEFAULT, label: "Provider default" }]);
+    expect(reasoningOptions(localProvider(), "gpt-test")).toEqual([
+      { value: "low", label: "low" },
+      { value: "high", label: "high" }
+    ]);
+    const providerWithoutReasoning = localProvider({
+      capabilities: {
+        ...localProvider().capabilities,
+        models: [{ id: "gpt-no-levels", label: "No levels", reasoningOptions: [] }]
+      }
+    });
+    expect(reasoningOptions(providerWithoutReasoning, "gpt-no-levels")).toEqual([
+      { value: PROVIDER_DEFAULT_REASONING, label: "Provider default" }
+    ]);
+  });
+
+  it("generates canonical ids and fails closed for unavailable profile intent", () => {
+    expect(profileIdFromName("  Delivery / Primary  ")).toBe("delivery-primary");
+    expect(executionProfileBlockingReason({
+      id: "review",
+      name: "Review",
+      provider: "copilot",
+      model: "missing",
+      reasoningEffort: "high",
+      networkAccess: false
+    }, localRuntime())).toBe("Provider copilot is unavailable.");
   });
 });

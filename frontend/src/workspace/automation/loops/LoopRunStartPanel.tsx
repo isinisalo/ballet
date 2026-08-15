@@ -52,14 +52,14 @@ export function LoopRunStartPanel({
         <div className="grid gap-1 border border-destructive/30 bg-destructive/5 p-3" role="alert">
           <p className="text-xs font-medium text-destructive">Runtime preflight failed</p>
           <ul className="grid gap-1 font-mono text-[0.65rem] text-destructive">
-            {preflightIssues.map((issue, index) => <li key={`${issue.stepId ?? issue.agentId}-${issue.code}-${index}`}>{issue.stepId ? `${issue.stepId} · ` : ""}{issue.message}</li>)}
+            {preflightIssues.map((issue, index) => <li key={`${issue.stepId ?? issue.executionProfileId}-${issue.code}-${index}`}>{issue.stepId ? `${issue.stepId} · ` : ""}{issue.message}</li>)}
           </ul>
           <a href="/runtimes" className="text-xs text-primary underline-offset-4 hover:underline">Open Runtimes</a>
         </div>
       ) : null}
       <TextAreaField label="Manual input (optional)" density="compact" value={input} rows={3} disabled={busy || blocked} onChange={setInput} />
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{preflightIssues.length > 0 ? "Resolve every runtime issue before starting." : disabledReason ?? (bypassesSchedule ? "Runs the scheduled start agent now without changing its saved schedule." : "Starts a new manual run from this loop's saved start step.")}</p>
+        <p className="text-xs text-muted-foreground">{preflightIssues.length > 0 ? "Resolve every runtime issue before starting." : disabledReason ?? (bypassesSchedule ? "Runs the scheduled start Step now without changing its saved schedule." : "Starts a new manual run from this Loop's saved start Step.")}</p>
         <Button type="submit" disabled={busy || blocked}>
           <Play /> {busy ? "Starting…" : "Start"}
         </Button>

@@ -1,5 +1,0 @@
-name = "Reviewer"
-description = "Reviews project changes"
-developer_instructions = """
-Review implementation changes and surface risks.
-"""

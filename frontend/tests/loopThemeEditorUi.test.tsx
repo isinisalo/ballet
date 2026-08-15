@@ -32,7 +32,7 @@ const loop: ProjectLoop = {
 const theme = () => structuredClone(defaultLoopTheme);
 const data = (): AppData => ({
   ...emptyData,
-  automation: { version: 8, loops: [structuredClone(loop)] },
+  automation: { version: 9, loops: [structuredClone(loop)] },
   automationIssues: [],
   scheduleStates: [],
   loopTheme: theme(),
@@ -99,7 +99,7 @@ describe("singleton Loop theme editor", () => {
     expect(canvas.querySelector("[data-loop-edge-animated='true']")).not.toBeInTheDocument();
   });
 
-  it("applies color, avatar, edge, and connection controls to the live preview and save payload", async () => {
+  it("applies node, edge, and connection controls to the live preview and save payload", async () => {
     const user = userEvent.setup();
     const props = renderEditor();
     const canvas = screen.getByLabelText("Theme preview loop canvas");
@@ -107,7 +107,6 @@ describe("singleton Loop theme editor", () => {
     const edgeSection = controlSection("Edge");
     const connectionSection = controlSection("Connection point");
 
-    await user.click(screen.getByRole("switch", { name: "Show agent avatars" }));
     await replaceValue(user, within(nodeSection).getByLabelText("Label font color"), "#111111");
     await replaceValue(user, within(nodeSection).getByLabelText("Glow color"), "#222222");
     await replaceValue(user, within(edgeSection).getByLabelText("Color"), "#123456");
@@ -118,7 +117,6 @@ describe("singleton Loop theme editor", () => {
     await chooseOption(user, "Style", "Flow · attached");
     await replaceValue(user, within(connectionSection).getByLabelText("Color"), "#444444");
 
-    expect(canvas.querySelector(".loop-agent-avatar")).toBeInTheDocument();
     expect(canvas.style.getPropertyValue("--loop-theme-node-label")).toBe("#111111");
     expect(canvas.style.getPropertyValue("--loop-theme-edge-color")).toBe("#123456");
     expect(canvas.style.getPropertyValue("--loop-theme-edge-label")).toBe("#333333");
@@ -126,8 +124,8 @@ describe("singleton Loop theme editor", () => {
 
     fireEvent.submit(screen.getByRole("form", { name: "Loop theme" }));
     await waitFor(() => expect(props.updateTheme).toHaveBeenCalledWith({
-      version: 2,
-      node: { labelColor: "#111111", glowColor: "#222222", showAgentAvatarInNode: true },
+      version: 3,
+      node: { labelColor: "#111111", glowColor: "#222222" },
       edge: { color: "#123456", labelColor: "#333333", style: "dotted", rejectedStyle: "solid", crossLoopStyle: "dashed" },
       connectionPoint: { style: "flow", color: "#444444" }
     }));
@@ -195,7 +193,7 @@ describe("singleton Loop theme editor", () => {
       expect.objectContaining({ method: "PUT", body: expect.any(String) })
     ));
     const updateCall = fetchMock.mock.calls.find(([input, init]) => String(input) === "/api/loop-theme" && init?.method === "PUT");
-    expect(JSON.parse(String(updateCall?.[1]?.body))).toMatchObject({ version: 2, edge: { color: "#123456" } });
+    expect(JSON.parse(String(updateCall?.[1]?.body))).toMatchObject({ version: 3, edge: { color: "#123456" } });
     expect(`${window.location.pathname}${window.location.search}`).toBe("/automation/theme");
   });
 });

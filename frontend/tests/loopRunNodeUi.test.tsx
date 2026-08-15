@@ -16,6 +16,12 @@ import type { LoopStepRecord } from "../src/workspace/automation/loops/loopGraph
 
 const artworkCss = readFileSync(`${process.cwd()}/frontend/src/workspace/automation/loops/LoopNodeArtwork.css`, "utf8");
 const cssSurfaceNodeStyles = new Set<LoopNodeStyle>(["flat", "luna", "mars", "terra", "sol"]);
+const executionProfileId = "codex-test-high";
+const composition = {
+  executionProfileId,
+  primaryInstructionId: "project:test-instruction",
+  skillIds: []
+};
 
 const context = (): LoopNodeContext => ({
   selectedLoopId: "delivery",
@@ -50,7 +56,7 @@ describe("Ballet Run node state", () => {
     expect(human).toHaveAttribute("data-loop-run-status", "waiting_for_human");
   });
 
-  it("keeps the scheduled mark while applying its selected agent reasoning glow", () => {
+  it("keeps the Scheduled Step mark while applying its selected ExecutionProfile reasoning glow", () => {
     const scheduled = record("scheduled", "running");
     render(<LoopCompactStepNode context={context()} record={scheduled} />);
 
@@ -61,7 +67,6 @@ describe("Ballet Run node state", () => {
     expect(node).toHaveAttribute("data-loop-reasoning-effort", "high");
     expect(node).toHaveAttribute("data-loop-reasoning-glow", "4");
     expect(node.querySelector(".lucide-calendar-clock")).toBeInTheDocument();
-    expect(node.querySelector(".loop-agent-avatar")).not.toBeInTheDocument();
     expect(screen.getByText("Weekdays · 09:00 · Europe/Helsinki")).toBeInTheDocument();
   });
 });
@@ -134,15 +139,15 @@ const record = (
   const id = kind === "agent" ? "implement" : kind === "human" ? "approve" : "deploy";
   const on = { approved: "completed", rejected: "blocked" };
   const step: ProjectStep = kind === "agent"
-    ? { id, type: "agent", nodeStyle: "flat", nodeSize: "medium", agentId: "developer", description: "Implement.", on }
+    ? { id, type: "agent", ...composition, nodeStyle: "flat", nodeSize: "medium", description: "Implement.", on }
     : kind === "human"
       ? { id, type: "human", nodeStyle: "mars", nodeSize: "small", description: "Approve.", on }
       : {
           id,
           type: "scheduled",
+          ...composition,
           nodeStyle: "luna",
           nodeSize: "tiny",
-          agentId: "developer",
           description: "Deploy.",
           schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
           on
@@ -152,8 +157,7 @@ const record = (
     runId: "root-1",
     loopId: "delivery",
     stepId: id,
-    type: kind === "human" ? "human" : "agent",
-    agentId: kind === "human" ? undefined : "developer",
+    type: kind,
     status,
     attempt: 1,
     createdAt: "2026-07-11T10:00:00.000Z",
@@ -168,7 +172,7 @@ const record = (
       id: `delivery::${id}`,
       displayId: id,
       description: step.description,
-      agentId: kind === "human" ? undefined : "developer",
+      executionProfileId: kind === "human" ? undefined : executionProfileId,
       humanGate: kind === "human",
       scheduled: kind === "scheduled",
       terminal: false,
@@ -187,7 +191,12 @@ const terminalRecord = (
   nodeStyle: ProjectLoopNode["nodeStyle"],
   nodeSize: ProjectLoopNode["nodeSize"]
 ): LoopStepRecord => {
-  const step: ProjectLoopNode = { id: status, type: status, description: "", nodeStyle, nodeSize };
+  const visual = { description: "", nodeStyle, nodeSize };
+  const step: ProjectLoopNode = status === "completed"
+    ? { id: "completed", type: "completed", ...visual }
+    : status === "blocked"
+      ? { id: "blocked", type: "blocked", ...visual }
+      : { id: "failed", type: "failed", ...visual };
   return {
     stepKey: `delivery::${status}`,
     loopId: "delivery",

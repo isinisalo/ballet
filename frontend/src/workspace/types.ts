@@ -9,11 +9,11 @@ export type View =
   | "automation"
   | "loop-theme"
   | "runtimes"
-  | "agents"
+  | "execution-profiles"
   | "skills"
   | "run";
 
-export type SaveCollection = "agents" | "skills";
+export type SaveCollection = "skills";
 export type AutomationLoopView = "all";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
@@ -21,9 +21,10 @@ export interface RouteState {
   view: View;
   creating?: boolean;
   documentPath?: string;
+  executionProfileId?: string;
   automationEntityId?: string;
   automationLoopView?: AutomationLoopView;
-  runTargetKind?: "loop" | "agent";
+  runTargetKind?: "loop";
   runTargetId?: string;
   rootRunId?: string;
 }
@@ -37,8 +38,10 @@ export const emptyData: AppData = {
     createdAt: "",
     updatedAt: ""
   },
-  agents: [],
+  executionProfiles: [],
+  instructions: [],
   skills: [],
+  resourceIssues: [],
   loopRuns: [],
   scheduleStates: [],
   automation: defaultProjectAutomationConfig(),
@@ -57,8 +60,7 @@ export const emptyData: AppData = {
     activeRunCount: 0,
     logsPath: ""
   },
-  agentRuntimeConfigurations: {},
-  executionStates: [],
-  runTargets: { loops: [], agents: [] },
+  runtimeConfigurationIssues: [],
+  runTargets: { loops: [] },
   projectDocumentTree: []
 };

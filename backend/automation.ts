@@ -2,6 +2,7 @@ export { defaultProjectAutomationConfig } from "../shared/domain/automation.js";
 export {
   AutomationConflictError,
   AutomationValidationError,
+  validateProjectExecutionResources,
   validateProjectAutomationConfig
 } from "./automation/validateAutomationConfig.js";
 export {

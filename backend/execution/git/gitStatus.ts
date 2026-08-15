@@ -10,7 +10,7 @@ export interface GitCheckoutStatus {
   codeDirty: boolean;
 }
 
-const allowedRuntimePrefixes = [".ballet/", ".codex/agents/", ".agents/skills/"];
+const allowedRuntimePrefixes = [".ballet/", ".agents/skills/"];
 
 export const isAllowedRuntimePath = (value: string): boolean => {
   const normalized = value.replaceAll("\\", "/").replace(/^\.\//, "");

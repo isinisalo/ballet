@@ -5,11 +5,10 @@ export const loopConnectionPointStyles = ["near", "flow"] as const;
 export type LoopConnectionPointStyle = (typeof loopConnectionPointStyles)[number];
 
 export interface LoopTheme {
-  version: 2;
+  version: 3;
   node: {
     labelColor: string;
     glowColor: string;
-    showAgentAvatarInNode: boolean;
   };
   edge: {
     color: string;
@@ -30,11 +29,10 @@ export interface LoopThemeIssue {
 }
 
 export const defaultLoopTheme: LoopTheme = {
-  version: 2,
+  version: 3,
   node: {
     labelColor: "#ffb95f",
-    glowColor: "#8b90a0",
-    showAgentAvatarInNode: false
+    glowColor: "#8b90a0"
   },
   edge: {
     color: "#76d4ca",

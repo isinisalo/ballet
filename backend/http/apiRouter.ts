@@ -4,8 +4,6 @@ import { readFile } from "node:fs/promises";
 import express from "express";
 import { z } from "zod";
 import {
-  agentExecutionParamsSchema,
-  agentRuntimeConfigurationBodySchema,
   emptyBodySchema,
   executionTaskParamsSchema,
   executionEventsQuerySchema,
@@ -19,6 +17,8 @@ import {
   collectionItemParamsSchema,
   collectionParamsSchema,
   collectionUpsertSchema,
+  executionProfileParamsSchema,
+  executionProfileSaveSchema,
   loopThemeSchema,
   projectDocumentCreateSchema,
   projectDocumentSaveSchema,
@@ -27,7 +27,6 @@ import {
 import type { RootRunListQuery } from "../../shared/domain/runs.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
-import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
 import { readProjectConfigStatus } from "../project/configGitStatus.js";
 import type { LocalRunService } from "../runs/LocalRunService.js";
 import type { WorkspaceInvalidationBroadcaster } from "../runs/WorkspaceInvalidationBroadcaster.js";
@@ -37,7 +36,6 @@ import { HttpValidationError, parseBody, parseParams, parseUnknown } from "./val
 export interface ApiRouterOptions {
   store: MarkdownStore;
   runtime: LocalRuntimeService;
-  configurations: RuntimeConfigurationService;
   executions: ExecutionStore;
   runs: LocalRunService;
   invalidations: WorkspaceInvalidationBroadcaster;
@@ -45,7 +43,7 @@ export interface ApiRouterOptions {
 }
 
 const runListQuery = z.object({
-  state: z.enum(["active", "recent"]).optional(), kind: z.enum(["agent", "loop"]).optional(),
+  state: z.enum(["active", "recent"]).optional(),
   cursor: z.string().max(1000).optional(), limit: z.coerce.number().int().min(1).max(200).optional()
 }).strict();
 
@@ -80,14 +78,29 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     path: options.logsPath,
     content: (await readFile(options.logsPath, "utf8").catch(() => "")).slice(-256 * 1024)
   })));
-  router.put("/agents/:agentId/runtime", route(async (req, res) => {
-    const { agentId } = parseParams(agentExecutionParamsSchema, req);
-    res.json(await options.configurations.put(agentId, parseBody(agentRuntimeConfigurationBodySchema, req)));
-    options.invalidations.publish("workspace-changed", { reason: "runtime-configuration" });
+  router.post("/execution-profiles/:executionProfileId", route(async (req, res) => {
+    const { executionProfileId } = parseParams(executionProfileParamsSchema, req);
+    const created = await options.store.createExecutionProfile({
+      id: executionProfileId,
+      ...parseBody(executionProfileSaveSchema, req)
+    });
+    options.invalidations.publish("workspace-changed", { reason: "execution-profile" });
+    res.status(201).json(created);
   }));
-  router.delete("/agents/:agentId/runtime", route(async (req, res) => {
-    const { agentId } = parseParams(agentExecutionParamsSchema, req); await options.configurations.remove(agentId);
-    options.invalidations.publish("workspace-changed", { reason: "runtime-configuration" }); res.status(204).end();
+  router.put("/execution-profiles/:executionProfileId", route(async (req, res) => {
+    const { executionProfileId } = parseParams(executionProfileParamsSchema, req);
+    const saved = await options.store.updateExecutionProfile({
+      id: executionProfileId,
+      ...parseBody(executionProfileSaveSchema, req)
+    });
+    options.invalidations.publish("workspace-changed", { reason: "execution-profile" });
+    res.json(saved);
+  }));
+  router.delete("/execution-profiles/:executionProfileId", route(async (req, res) => {
+    const { executionProfileId } = parseParams(executionProfileParamsSchema, req);
+    await options.store.removeExecutionProfile(executionProfileId);
+    options.invalidations.publish("workspace-changed", { reason: "execution-profile" });
+    res.status(204).end();
   }));
 
   router.post("/runs", route(async (req, res) => res.status(201).json(await options.runs.start(parseBody(startRunBodySchema, req)))));
@@ -138,7 +151,7 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
 const route = (handler: (req: express.Request, res: express.Response) => Promise<unknown>): express.RequestHandler =>
   (req, res, next) => { void handler(req, res).catch(next); };
 const requireCollection = (value: string): MutableCollectionName => {
-  if (value !== "agents" && value !== "skills") throw new HttpValidationError("Unknown collection.", [], 404);
+  if (value !== "skills") throw new HttpValidationError("Unknown collection.", [], 404);
   return value;
 };
 

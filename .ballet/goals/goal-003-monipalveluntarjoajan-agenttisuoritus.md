@@ -3,12 +3,12 @@ id: goal-003
 title: Usean palveluntarjoajan koostettava Step-suoritus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - tavoite
   - step-suoritus
   - palveluntarjoajat
-version: 2
+version: 3
 ---
 
 # Usean palveluntarjoajan koostettava Step-suoritus
@@ -29,11 +29,11 @@ Yhteinen suorituskokemus estää automaatiota sitoutumasta yhden palveluntarjoaj
 
 - Codex CLI:n ja GitHub Copilot CLI:n asennuksen, version, autentikoinnin ja kyvykkyyksien tarkistaminen.
 - Nimetyn, provider-, model-, reasoning effort- ja network access -valinnat sisältävän ExecutionProfilen valitseminen Stepille yhdellä viitteellä.
-- Täsmälleen yhden Built-in- tai Project-originin primary instructionin ja nollan tai useamman eksplisiittisen skillin valitseminen Stepille.
+- Täsmälleen yhden Project-primary instructionin ja nollan tai useamman eksplisiittisen Project-skillin valitseminen Stepille.
 - Pakollisen ja minimaalisen System-ohjeen lisääminen jokaiseen suoritukseen muuttumattomasta Ballet-katalogista ilman käyttäjän valintaa. Katalogin read-only-luonne ei muuta Root Runin worktree-oikeutta.
 - Checkout-kohtaisten vain luku -juurien ratkaiseminen konekohtaisesta policysta ExecutionProfilen ja Step-compositionin ulkopuolella.
 - Palveluntarjoajasta riippumattomien tehtävätilojen, konsolitapahtumien ja strukturoitujen lopputulosten näyttäminen.
-- Instructionien ja skillsien koostaminen versionoidussa, deterministisessä järjestyksessä Root Runin tilannekuvasta sekä käytettyjen lähteiden originin, ID:n, version, sisällön ja SHA-256-tiivisteen säilyttäminen evidenssissä.
+- System-ohjeen, primary instructionin, ID:n mukaan järjestettyjen skillsien, task envelopen ja output scheman koostaminen versionoiduiksi sectioneiksi sekä exact promptin, sen SHA-256:n ja käytettyjen lähteiden originin, ID:n, relative pathin ja source SHA-256:n säilyttäminen evidenssissä ilman redundantteja täyssisältökopioita.
 - Saman palveluntarjoajan ajojen hallittu eteneminen ja eri palveluntarjoajien ajojen mahdollinen rinnakkaisuus.
 - Asennus-, autentikointi- ja yhteensopivuusongelmien selkeä näyttäminen ennen Runia.
 
@@ -47,6 +47,8 @@ Yhteinen suorituskokemus estää automaatiota sitoutumasta yhden palveluntarjoaj
 - ExecutionProfile-editori näyttää ja vaatii provider-, model-, reasoning effort- ja network access -valinnat; Node editor valitsee vain nimetyn profilen eikä muokkaa näitä arvoja.
 - Additional instructions ei kuulu ensimmäisen version skeemaan, ja vain Stepille eksplisiittisesti valitut skillsit osallistuvat koostamiseen.
 - Instruction- tai skill-sisältöä ei typistetä hiljaisesti kokorajan täyttämiseksi.
+- Yksi Project-primary instruction ja yksi Project-skill saavat olla enintään 128 KiB; Balletin koko muodostama prompt saa olla enintään 512 KiB.
+- Balletin evidenssi todistaa Balletin muodostaman promptin, ei providerin koko sisäistä tai ambient-kontekstia.
 
 ## Todentaminen
 

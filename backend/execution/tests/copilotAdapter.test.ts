@@ -25,9 +25,7 @@ class FakeSession implements CopilotSessionLike {
   async sendAndWait(options: { prompt: string }): Promise<unknown> {
     this.prompts.push(options.prompt);
     this.handler?.({ type: "assistant.message_delta", data: { deltaContent: "stream" } });
-    const content = this.prompts.length === 1
-      ? "not-json"
-      : JSON.stringify({ state: "completed", result: "approved", summary: "Done.", checks: [] });
+    const content = JSON.stringify({ state: "completed", result: "approved", summary: "Done.", checks: [] });
     return { type: "assistant.message", data: { content } };
   }
 
@@ -74,7 +72,7 @@ describe("CopilotSdkAdapter", () => {
     })).toContainEqual({ type: "tool.output", toolCallId: "tool-1", text: "final output" });
   });
 
-  it("streams SDK events and performs exactly one structured-output repair", async () => {
+  it("streams SDK events and sends the composed prompt exactly once without a repair turn", async () => {
     const client = new FakeClient();
     const sdk: CopilotSdkModule = {
       CopilotClient: class { constructor() { return client; } } as unknown as CopilotSdkModule["CopilotClient"],
@@ -102,8 +100,8 @@ describe("CopilotSdkAdapter", () => {
       }
     })) events.push(event);
 
-    expect(client.session.prompts).toHaveLength(2);
-    expect(client.session.prompts[1]).toContain("previous response was invalid");
+    expect(client.session.prompts).toEqual(["Do the work."]);
+    expect(client.session.prompts.join("\n")).not.toContain("previous response was invalid");
     expect(events).toContainEqual(expect.objectContaining({ type: "assistant.delta", text: "stream" }));
     expect(events).toContainEqual(expect.objectContaining({
       type: "execution.completed",

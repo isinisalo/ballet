@@ -1,63 +1,56 @@
-import { createHash } from "node:crypto";
-import type { AppData } from "../../shared/api/workspace-contracts.js";
-import type { Agent } from "../../shared/domain/agents.js";
 import {
   getProjectStepTransitionTargets,
+  isProjectExecutionStep,
   isProjectTerminalNode,
-  type ProjectAgentBackedStep,
+  type ProjectExecutionStep,
   type ProjectLoop
 } from "../../shared/domain/automation.js";
-import type { ExecutionAgentSnapshot } from "../../shared/domain/runtime.js";
+import type { ProjectConfiguration } from "../../shared/domain/projectConfig.js";
+import { LoopRunNotFoundError } from "../runtime/LoopRunErrors.js";
 
-export const agentSnapshot = (agent: Agent): ExecutionAgentSnapshot => ({
-  id: agent.id,
-  name: agent.name,
-  description: agent.description,
-  instructions: [agent.instructions, ...agent.skills.filter((skill) => skill.enabled !== false)
-    .map((skill) => skill.body ?? "")]
-    .filter(Boolean)
-    .join("\n\n"),
-  skillIds: agent.skills.filter((skill) => skill.enabled !== false).map((skill) => skill.id),
-  avatar: agent.avatar,
-  configHash: createHash("sha256").update(JSON.stringify(agent)).digest("hex")
-});
-
-export const reachableAgentSteps = (
-  data: Pick<AppData, "automation">,
+export const reachableExecutionSteps = (
+  config: Pick<ProjectConfiguration, "loops">,
   rootLoopId: string
-): Array<{ loopId: string; step: ProjectAgentBackedStep }> =>
-  reachableLoops(data, rootLoopId).flatMap((loop) => loop.nodes.flatMap((node) =>
-    !isProjectTerminalNode(node) && node.type !== "human" ? [{ loopId: loop.id, step: node }] : []));
+): Array<{ loopId: string; step: ProjectExecutionStep }> =>
+  reachableLoops(config, rootLoopId).flatMap((loop) => loop.nodes.flatMap((node) =>
+    !isProjectTerminalNode(node) && isProjectExecutionStep(node) ? [{ loopId: loop.id, step: node }] : []));
 
 export const reachableLoops = (
-  data: Pick<AppData, "automation">,
+  config: Pick<ProjectConfiguration, "loops">,
   rootLoopId: string
 ): ProjectLoop[] => {
-  const loops = new Map(data.automation.loops.map((loop) => [loop.id, loop]));
-  const pending = [rootLoopId];
-  const visited = new Set<string>();
-  const result: ProjectLoop[] = [];
+  const loops = new Map(config.loops.map((loop) => [loop.id, loop]));
+  const root = loops.get(rootLoopId);
+  if (!root) throw new LoopRunNotFoundError(`Reachable Loop ${rootLoopId} was not found.`);
+  const pending = [{ loopId: root.id, nodeId: root.start }];
+  const visitedNodes = new Set<string>();
+  const reachedLoops = new Set<string>();
   while (pending.length > 0) {
-    const loopId = pending.shift()!;
-    if (visited.has(loopId)) continue;
-    visited.add(loopId);
-    const loop = loops.get(loopId);
-    if (!loop) continue;
-    result.push(loop);
-    for (const step of loop.nodes) {
-      if (isProjectTerminalNode(step)) continue;
-      for (const target of getProjectStepTransitionTargets(step)) {
-        if (typeof target === "object" && "loop" in target) pending.push(target.loop);
+    const current = pending.shift()!;
+    const key = nodeKey(current.loopId, current.nodeId);
+    if (visitedNodes.has(key)) continue;
+    visitedNodes.add(key);
+    reachedLoops.add(current.loopId);
+    const loop = loops.get(current.loopId);
+    if (!loop) throw new LoopRunNotFoundError(`Reachable Loop ${current.loopId} was not found.`);
+    const node = loop.nodes.find((candidate) => candidate.id === current.nodeId);
+    if (!node) throw new LoopRunNotFoundError(`Reachable node ${current.loopId}:${current.nodeId} was not found.`);
+    if (isProjectTerminalNode(node)) continue;
+    for (const target of getProjectStepTransitionTargets(node)) {
+      if (typeof target === "string") pending.push({ loopId: loop.id, nodeId: target });
+      else {
+        const targetLoop = loops.get(target.loop);
+        if (!targetLoop) throw new LoopRunNotFoundError(`Reachable Loop ${target.loop} was not found.`);
+        pending.push({ loopId: targetLoop.id, nodeId: targetLoop.start });
       }
     }
   }
-  return result;
+  return config.loops
+    .filter((loop) => reachedLoops.has(loop.id))
+    .map((loop) => ({
+      ...loop,
+      nodes: loop.nodes.filter((node) => visitedNodes.has(nodeKey(loop.id, node.id)))
+    }));
 };
 
-export const relevantLoopThemeIssues = (
-  data: Pick<AppData, "automation" | "loopThemeIssues">,
-  rootLoopId: string
-) => {
-  void rootLoopId;
-  return data.loopThemeIssues;
-};
+const nodeKey = (loopId: string, nodeId: string): string => `${loopId}\0${nodeId}`;

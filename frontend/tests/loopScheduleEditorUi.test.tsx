@@ -4,22 +4,45 @@ import { describe, expect, it, vi } from "vitest";
 import {
   defaultLoopTheme,
   defaultTerminalNodes,
-  type Agent,
+  type ExecutionProfile,
   type ProjectAutomationConfig,
+  type ProjectInstruction,
   type ProjectLoop,
   type ProjectStep,
   type ProjectStepSchedule
 } from "@shared/api/workspace-contracts";
 import { AllLoopsCanvas } from "../src/workspace/automation/loops/AllLoopsCanvas";
 import { LoopEditor } from "../src/workspace/automation/loops/LoopEditor";
+import { localRuntime } from "./runtimeFixtures";
 
-const agents: Agent[] = [{ id: "builder", name: "Builder", role: "Implementation", description: "Builds.", enabled: true, skills: [] }];
+const profile: ExecutionProfile = {
+  id: "builder-profile",
+  name: "Builder",
+  provider: "codex",
+  model: "gpt-test",
+  reasoningEffort: "high",
+  networkAccess: false
+};
+const instruction: ProjectInstruction = {
+  id: "project:builder",
+  projectId: "builder",
+  title: "Builder instruction",
+  origin: "project",
+  valid: true,
+  sourceSha256: "source",
+  contentSha256: "content",
+  sizeBytes: 16,
+  body: "Build the requested change.",
+  relativePath: ".ballet/instructions/builder.md"
+};
 const executableSteps: ProjectStep[] = [{
   id: "build",
   type: "agent",
   nodeStyle: "terra",
   nodeSize: "medium",
-  agentId: "builder",
+  executionProfileId: profile.id,
+  primaryInstructionId: instruction.id!,
+  skillIds: [],
   description: "Build",
   on: { approved: "review", rejected: "failed" }
 }, {
@@ -41,7 +64,9 @@ function scheduledLoop(schedule: ProjectStepSchedule): ProjectLoop {
       type: "scheduled",
       nodeStyle: "luna",
       nodeSize: "tiny",
-      agentId: "builder",
+      executionProfileId: profile.id,
+      primaryInstructionId: instruction.id!,
+      skillIds: [],
       description: "Start delivery",
       schedule,
       on: { approved: "build", rejected: "blocked" }
@@ -50,10 +75,10 @@ function scheduledLoop(schedule: ProjectStepSchedule): ProjectLoop {
 }
 
 const weekdayLoop = scheduledLoop({ kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" });
-const config = (loop: ProjectLoop): ProjectAutomationConfig => ({ version: 8, loops: [loop] });
+const config = (loop: ProjectLoop): ProjectAutomationConfig => ({ version: 9, loops: [loop] });
 
 describe("scheduled Loop editor UI", () => {
-  it("offers Scheduled only for an eligible start Step and preserves its agent and outputs", async () => {
+  it("offers Scheduled only for an eligible start Step and preserves its composition and transitions", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const eligibleLoop: ProjectLoop = {
@@ -65,12 +90,15 @@ describe("scheduled Loop editor UI", () => {
     renderEditor(eligibleLoop, { onChange });
 
     await user.click(await screen.findByRole("button", { name: "Edit step build" }));
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
     await user.click(screen.getByRole("combobox", { name: "Node type" }));
     await user.click(await screen.findByRole("option", { name: "Scheduled" }));
 
     expect((onChange.mock.calls.at(-1)?.[0] as ProjectLoop).nodes[0]).toMatchObject({
       type: "scheduled",
-      agentId: "builder",
+      executionProfileId: profile.id,
+      primaryInstructionId: instruction.id,
+      skillIds: [],
       on: { approved: "review", rejected: "failed" }
     });
   });
@@ -79,11 +107,12 @@ describe("scheduled Loop editor UI", () => {
     const user = userEvent.setup();
     renderEditor(ordinaryLoop);
     await user.click(await screen.findByRole("button", { name: "Edit step review" }));
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
     await user.click(screen.getByRole("combobox", { name: "Node type" }));
     expect(screen.queryByRole("option", { name: "Scheduled" })).not.toBeInTheDocument();
   });
 
-  it("renders the Luna node, selected agent, schedule, required outputs, and scheduler state", async () => {
+  it("renders the Luna node, selected profile, schedule, required transitions, and scheduler state", async () => {
     const user = userEvent.setup();
     const { container } = renderEditor(weekdayLoop, {
       scheduleState: {
@@ -103,7 +132,9 @@ describe("scheduled Loop editor UI", () => {
     expect(container.querySelector("[data-loop-node-schedule-label]")).toHaveTextContent("Weekdays · 09:00 · Europe/Helsinki");
 
     await user.click(node);
-    expect(screen.getByRole("combobox", { name: "Agent" })).toHaveTextContent("builder · Builder");
+    expect(screen.getByRole("combobox", { name: "Execution profile" })).toHaveTextContent("Builder · builder-profile");
+    expect(screen.getByRole("combobox", { name: "Primary instruction" })).toHaveTextContent("Builder instruction · project:builder");
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByRole("combobox", { name: "Schedule kind" })).toHaveTextContent("Recurring");
     expect(screen.getByLabelText("Schedule starts on")).toHaveValue("2026-07-13");
     expect(screen.getByLabelText("Schedule time")).toHaveValue("09:00");
@@ -118,6 +149,7 @@ describe("scheduled Loop editor UI", () => {
     const weekly = scheduledLoop({ kind: "recurring", cadence: "weekly", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki", weekdays: ["mon", "wed"] });
     const view = renderEditor(weekly);
     await user.click(await screen.findByRole("button", { name: "Edit step timer" }));
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByRole("group", { name: "Weekly days" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Mon" })).toHaveAttribute("aria-pressed", "true");
 
@@ -127,12 +159,14 @@ describe("scheduled Loop editor UI", () => {
     expect(screen.getByLabelText("Schedule day of month")).toHaveValue(15);
   });
 
-  it("keeps scheduled agent and schedule controls locked while the Loop has an active Run", async () => {
+  it("keeps scheduled composition and schedule controls locked while the Loop has an active Run", async () => {
     const user = userEvent.setup();
     renderEditor(weekdayLoop, { locked: true });
     await user.click(await screen.findByRole("button", { name: "Edit step timer" }));
 
-    expect(screen.getByRole("combobox", { name: "Agent" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Execution profile" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Primary instruction" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByLabelText("Schedule starts on")).toBeDisabled();
     expect(screen.getByLabelText("Schedule time")).toBeDisabled();
   });
@@ -159,7 +193,7 @@ describe("scheduled Loop editor UI", () => {
   });
 
   it("keeps the Add loop card when no Loops are configured", () => {
-    render(<AllLoopsCanvas config={{ version: 8, loops: [] }} onAddLoop={() => undefined} onOpenLoop={() => undefined} />);
+    render(<AllLoopsCanvas config={{ version: 9, loops: [] }} onAddLoop={() => undefined} onOpenLoop={() => undefined} />);
     expect(screen.getByRole("button", { name: "+ Add loop" })).toBeInTheDocument();
     expect(screen.queryByText("No loops configured.")).not.toBeInTheDocument();
   });
@@ -180,7 +214,10 @@ function editor(loop: ProjectLoop, overrides: Partial<React.ComponentProps<typeo
     config={config(loop)}
     loop={loop}
     loops={[loop]}
-    agents={agents}
+    executionProfiles={[profile]}
+    instructions={[instruction]}
+    skills={[]}
+    runtime={localRuntime()}
     theme={defaultLoopTheme}
     locked={false}
     onChange={() => undefined}

@@ -15,7 +15,7 @@ Nämä ohjeet koskevat `frontend/`-hakemistoa. Noudata lisäksi repositorion juu
 
 - Komponentti saa omistaa vain renderöinnin, paikallisen UI-tilan ja tapahtumien välittämisen.
 - Hookki omistaa sivuvaikutukset, kuten API-kutsut, stream-kuuntelun, selaintapahtumat, tallennusajastukset ja monivaiheisen käyttöliittymätilan.
-- Käytä olemassa olevia hook-rajoja ennen uuden sivuvaikutuspolun lisäämistä. Hyviä rajoja ovat esimerkiksi `useRuntimeStream`, `useWorkspaceNavigation` ja `useAgentEditor`.
+- Käytä olemassa olevia hook-rajoja ennen uuden sivuvaikutuspolun lisäämistä. Hyviä rajoja ovat esimerkiksi `useRuntimeStream`, `useWorkspaceNavigation` ja `useExecutionProfileEditor`.
 - Nimeä uusi hookki sen omistaman sivuvaikutuksen tai tilakokonaisuuden mukaan.
 - Älä tee komponentista väliaikaista säiliötä logiikalle, joka kuuluu hookkiin tai pure `.ts`-moduuliin.
 

@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
-import type { AgentExecutionState, AppData, ProjectAutomationConfig, ProjectAutomationIssue, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { AppData, ProjectAutomationConfig, ProjectAutomationIssue, ProjectLoop } from "@shared/api/workspace-contracts";
 import { EditorActions, EmptyState } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AutomationIssues } from "./AutomationIssues";
-import { LoopCreationEditor, LoopEditor } from "./loops/LoopEditor";
+import { LoopCreationEditor } from "./loops/LoopCreationEditor";
+import { LoopEditor } from "./loops/LoopEditor";
 
-export function AutomationEditorWorkspace({ data, agentExecutionStates, draft, candidateConfig, displayedLoop, scheduleState, creating, locked, dirty, valid, saving, error, issues, onSave, onChange }: {
+export function AutomationEditorWorkspace({ data, draft, candidateConfig, displayedLoop, scheduleState, creating, locked, dirty, valid, saving, error, issues, onSave, onChange }: {
   data: AppData;
-  agentExecutionStates: AgentExecutionState[];
   draft: ProjectAutomationConfig;
   candidateConfig: ProjectAutomationConfig;
   displayedLoop?: ProjectLoop;
@@ -38,10 +38,10 @@ export function AutomationEditorWorkspace({ data, agentExecutionStates, draft, c
       {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
       {!displayedLoop ? <div className="p-4"><EmptyState title="Loop not found." /></div> : null}
       {displayedLoop && creating ? (
-        <LoopCreationEditor config={candidateConfig} loop={displayedLoop} loops={draft.loops} agents={data.agents} theme={data.loopTheme} disabled={saving} canvasControls={editActions} onChange={onChange} />
+        <LoopCreationEditor config={candidateConfig} loop={displayedLoop} loops={draft.loops} executionProfiles={data.executionProfiles} instructions={data.instructions} skills={data.skills} runtime={data.runtime} theme={data.loopTheme} disabled={saving} canvasControls={editActions} onChange={onChange} />
       ) : null}
       {displayedLoop && !creating ? (
-        <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} agents={data.agents} agentExecutionStates={agentExecutionStates} theme={data.loopTheme} scheduleState={scheduleState} locked={locked} disabled={saving} canvasControls={editActions} onChange={onChange} />
+        <LoopEditor config={draft} loop={displayedLoop} loops={draft.loops} executionProfiles={data.executionProfiles} instructions={data.instructions} skills={data.skills} runtime={data.runtime} theme={data.loopTheme} scheduleState={scheduleState} locked={locked} disabled={saving} canvasControls={editActions} onChange={onChange} />
       ) : null}
     </>
   );

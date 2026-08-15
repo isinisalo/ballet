@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../../../shared/api/workspace-contracts.js";
 import { defaultTerminalNodes, type ProjectAutomationConfig, type ProjectStepSchedule } from "../../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../../shared/domain/loopThemes.js";
+import type { ExecutionProfile } from "../../../shared/domain/projectConfig.js";
+import type { RootExecutionSnapshot } from "../../../shared/domain/runtime.js";
 import { RuntimeDatabase, type DispatchLoopScheduleResult } from "../../runtime-db.js";
 import { LoopScheduler, type LoopSchedulerOptions } from "../LoopScheduler.js";
 import type { ScheduleClock } from "../ScheduleClock.js";
@@ -15,6 +17,10 @@ const roots: string[] = [];
 const schedulers: LoopScheduler[] = [];
 const databases: RuntimeDatabase[] = [];
 const openAiTheme = defaultLoopTheme;
+const profile: ExecutionProfile = {
+  id: "delivery-profile", name: "Delivery", provider: "codex", model: "gpt-test",
+  reasoningEffort: "high", networkAccess: false
+};
 
 class FakeScheduleClock implements ScheduleClock {
   private instant: Temporal.Instant;
@@ -30,11 +36,11 @@ afterEach(async () => {
 });
 
 const automation = (schedule: ProjectStepSchedule): ProjectAutomationConfig => ({
-  version: 8,
+  version: 9,
   loops: [{ id: "scheduled-delivery", start: "timer", nodes: [
-    { id: "timer", type: "scheduled", agentId: "delivery-agent", description: "Start on schedule.", nodeStyle: "luna", nodeSize: "tiny", schedule,
+    { id: "timer", type: "scheduled", executionProfileId: profile.id, primaryInstructionId: "project:delivery", skillIds: ["project:schedule"], description: "Start on schedule.", nodeStyle: "luna", nodeSize: "tiny", schedule,
       on: { approved: "work", rejected: "failed" } },
-    { id: "work", type: "agent", agentId: "delivery-agent", description: "Deliver.", nodeStyle: "terra", nodeSize: "medium",
+    { id: "work", type: "agent", executionProfileId: profile.id, primaryInstructionId: "project:delivery", skillIds: ["project:schedule"], description: "Deliver.", nodeStyle: "terra", nodeSize: "medium",
       on: { approved: "completed", rejected: "failed" } },
     ...defaultTerminalNodes()
   ] }]
@@ -45,7 +51,8 @@ const workspace = (config: ProjectAutomationConfig): AppData => ({
     id: "fixture", name: "Fixture", description: "Fixture checkout", status: "active",
     createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
   },
-  agents: [], skills: [], loopRuns: [], scheduleStates: [], automation: config, automationIssues: [],
+  executionProfiles: [profile], instructions: [], skills: [], resourceIssues: [],
+  loopRuns: [], scheduleStates: [], automation: config, automationIssues: [],
   loopTheme: structuredClone(defaultLoopTheme), loopThemeIssues: [],
   runtime: {
     instanceId: "fixture", hostname: "localhost", platform: "darwin", architecture: "arm64",
@@ -53,7 +60,7 @@ const workspace = (config: ProjectAutomationConfig): AppData => ({
     uptimeSeconds: 0, startedAt: "2026-01-01T00:00:00.000Z", providers: [], activeRunCount: 0,
     logsPath: "/fixture/.git/ballet/logs/ballet.log"
   },
-  agentRuntimeConfigurations: {}, executionStates: [], runTargets: { loops: [], agents: [] }, projectDocumentTree: []
+  runtimeConfigurationIssues: [], runTargets: { loops: [] }, projectDocumentTree: []
 });
 
 const once = (time = "09:00"): ProjectStepSchedule => ({ kind: "once", date: "2026-07-12", time, timeZone: "UTC" });
@@ -82,29 +89,37 @@ const dispatchOccurrence = (
     return { status: "skipped", error };
   }
   const rootRunId = `schedule-${createHash("sha256").update(input.scheduledFor).digest("hex").slice(0, 16)}`;
-  insertRoot(database, rootRunId, input.loopId);
-  const run = database.startLoopRun(
-    config,
-    input.loopId,
-    openAiTheme,
-    rootRunId,
-    undefined,
-    "schedule",
-    undefined,
-    { stepId: input.stepId, scheduledFor: input.scheduledFor }
-  );
+  insertRoot(database, rootRunId, input.loopId, config);
+  const run = database.startLoopRun(rootRunId, undefined, "schedule", {
+    stepId: input.stepId, scheduledFor: input.scheduledFor
+  });
   database.completeLoopScheduleOccurrence({ ...input, status: "started", runId: run.runId });
   return { status: "started", run };
 };
 
-const insertRoot = (database: RuntimeDatabase, rootRunId: string, targetId: string): void => {
+const insertRoot = (
+  database: RuntimeDatabase,
+  rootRunId: string,
+  targetId: string,
+  config: ProjectAutomationConfig
+): void => {
   const timestamp = "2026-07-12T00:00:00.000Z";
+  const snapshot: RootExecutionSnapshot = {
+    version: 1,
+    rootLoopId: targetId,
+    project: { checkoutRoot: "/fixture", headSha: "a".repeat(40), configHash: "config", snapshotHash: "snapshot" },
+    loops: structuredClone(config.loops),
+    theme: structuredClone(openAiTheme),
+    executionProfiles: [profile], runtimes: [], resources: [],
+    createdAt: timestamp
+  };
   database.connection().prepare(`
     INSERT INTO root_runs (
       root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
-      config_hash, snapshot_hash, created_at, updated_at
-    ) VALUES (?, 'loop', ?, 'schedule', 'queued', ?, ?, ?, 'config', 'snapshot', ?, ?)
-  `).run(rootRunId, targetId, `/tmp/${rootRunId}`, `ballet/run/${rootRunId}`, "a".repeat(40), timestamp, timestamp);
+      config_hash, snapshot_hash, execution_snapshot_json, created_at, updated_at
+    ) VALUES (?, 'loop', ?, 'schedule', 'queued', ?, ?, ?, 'config', 'snapshot', ?, ?, ?)
+  `).run(rootRunId, targetId, `/tmp/${rootRunId}`, `ballet/run/${rootRunId}`, "a".repeat(40),
+    JSON.stringify(snapshot), timestamp, timestamp);
 };
 
 const startScheduler = async (input: {
@@ -236,10 +251,8 @@ describe("Loop scheduler dispatch outcomes", () => {
     const config = automation(once());
     const data = workspace(config);
     const database = await runtimeDatabase();
-    insertRoot(database, "manual-active", "scheduled-delivery");
-    const active = database.startLoopRun(
-      config, "scheduled-delivery", openAiTheme, "manual-active"
-    );
+    insertRoot(database, "manual-active", "scheduled-delivery", config);
+    const active = database.startLoopRun("manual-active");
     const clock = new FakeScheduleClock("2026-07-12T09:00:10.000Z");
     await startScheduler({ data: () => data, database, clock });
 
@@ -266,7 +279,7 @@ describe("Loop scheduler dispatch outcomes", () => {
       lastStatus: undefined
     })]);
 
-    data = workspace({ version: 8, loops: [] });
+    data = workspace({ version: 9, loops: [] });
     await scheduler.trigger();
     expect(database.listLoopScheduleStates()).toEqual([]);
   });

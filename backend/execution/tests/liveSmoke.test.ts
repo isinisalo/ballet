@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentOutcomeSchema } from "../../../shared/api/runtime-schemas.js";
+import { stepOutcomeSchema } from "../../../shared/api/runtime-schemas.js";
 import type { RuntimeProvider } from "../../../shared/domain/runtime.js";
 import type { CliRuntimeAdapter, RuntimeEvent } from "../providers/CliRuntimeAdapter.js";
 import { CodexAppServerAdapter } from "../providers/codex/CodexAppServerAdapter.js";
@@ -40,13 +40,12 @@ const runLiveSmoke = async (adapter: CliRuntimeAdapter, provider: RuntimeProvide
   try {
     for await (const event of adapter.execute({
       executionId: `${provider}-live-smoke`,
-      prompt: "Do not modify files. Return a completed outcome with result approved, the summary 'smoke ok', and no checks.",
+      prompt: "This is an opt-in Ballet runtime smoke test. Do not use tools or modify files. Return a completed outcome with result approved, the summary 'smoke ok', and no checks.",
       workingDirectory: root,
       model: models[0]!.id,
       reasoning: models[0]!.defaultReasoning ?? "provider-default",
       policy: { network: false, readOnlyRoots: [] },
-      systemInstructions: "This is an opt-in Ballet runtime smoke test. Do not use tools or modify files.",
-      outputSchema: z.toJSONSchema(agentOutcomeSchema) as Record<string, unknown>,
+      outputSchema: z.toJSONSchema(stepOutcomeSchema) as Record<string, unknown>,
       signal: controller.signal
     })) events.push(event);
   } finally {

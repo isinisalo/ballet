@@ -12,16 +12,16 @@ describe("workspace navigation blocker", () => {
     const { result } = renderHook(() => useWorkspaceNavigation());
 
     act(() => result.current.setNavigationBlocker({ isDirty: true, message: "Discard theme changes?" }));
-    act(() => result.current.navigate("/agents"));
+    act(() => result.current.navigate("/execution-profiles"));
 
     expect(confirm).toHaveBeenCalledWith("Discard theme changes?");
     expect(window.location.pathname).toBe("/automation/loops");
     expect(result.current.route).toEqual({ view: "automation", automationLoopView: "all" });
 
     confirm.mockReturnValue(true);
-    act(() => result.current.navigate("/agents"));
-    expect(window.location.pathname).toBe("/agents");
-    expect(result.current.route).toEqual({ view: "agents", documentPath: undefined });
+    act(() => result.current.navigate("/execution-profiles"));
+    expect(window.location.pathname).toBe("/execution-profiles");
+    expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
   });
 
   it("allows navigation after a successful save without asking to discard it", () => {
@@ -29,17 +29,17 @@ describe("workspace navigation blocker", () => {
     const { result } = renderHook(() => useWorkspaceNavigation());
     act(() => result.current.setNavigationBlocker({ isDirty: true }));
 
-    act(() => result.current.navigate("/agents", { bypassBlocker: true }));
+    act(() => result.current.navigate("/execution-profiles", { bypassBlocker: true }));
 
     expect(confirm).not.toHaveBeenCalled();
-    expect(result.current.route).toEqual({ view: "agents", documentPath: undefined });
+    expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
   });
 
   it("restores a cancelled history traversal without losing the back/forward stack", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { result } = renderHook(() => useWorkspaceNavigation());
     act(() => result.current.navigate("/skills"));
-    act(() => result.current.navigate("/agents"));
+    act(() => result.current.navigate("/execution-profiles"));
     act(() => result.current.setNavigationBlocker({ isDirty: true }));
 
     await act(async () => {
@@ -49,8 +49,8 @@ describe("workspace navigation blocker", () => {
     });
 
     expect(confirm).toHaveBeenCalledTimes(1);
-    expect(window.location.pathname).toBe("/agents");
-    expect(result.current.route).toEqual({ view: "agents", documentPath: undefined });
+    expect(window.location.pathname).toBe("/execution-profiles");
+    expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
 
     confirm.mockReturnValue(true);
     await act(async () => {
@@ -66,8 +66,8 @@ describe("workspace navigation blocker", () => {
       window.history.forward();
       await traversed;
     });
-    expect(window.location.pathname).toBe("/agents");
-    expect(result.current.route).toEqual({ view: "agents", documentPath: undefined });
+    expect(window.location.pathname).toBe("/execution-profiles");
+    expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
   });
 
   it("accepts browser history navigation after confirmation", () => {

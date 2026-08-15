@@ -18,3 +18,10 @@ export class LoopRunStateError extends Error {
     this.name = "LoopRunStateError";
   }
 }
+
+export class LoopRunIntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LoopRunIntegrityError";
+  }
+}

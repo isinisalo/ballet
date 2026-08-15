@@ -24,7 +24,6 @@ export function WorkspaceShell() {
   const selection = useWorkspaceSelection({ data, route });
   const runDashboardData = useRunDashboard({ enabled: route.view === "run", rootRunId: route.rootRunId, targets: data.runTargets });
   const configureGitState = useConfigureGitStatus({ enabled: route.view !== "run", refreshSignal: data });
-  const runtimeConfigurationIssues = Object.values(data.agentRuntimeConfigurations).flatMap((configuration) => configuration.issues);
   const appStreamStatus = useAppStream({
     onWorkspaceChanged: refresh,
     onRunsChanged: async () => {
@@ -45,12 +44,11 @@ export function WorkspaceShell() {
           route={route}
           projectDocumentTree={selection.projectDocumentTree}
           automation={data.automation}
-          agents={data.agents}
-          agentExecutionStates={data.executionStates}
+          executionProfiles={data.executionProfiles}
           skills={data.skills}
           runDashboard={runDashboard}
           configureGitState={configureGitState}
-          runtimeConfigurationIssues={runtimeConfigurationIssues}
+          runtimeConfigurationIssues={data.runtimeConfigurationIssues ?? []}
           navigate={navigate}
         />
         <div data-slot="sidebar-inset" className="relative flex w-full flex-1 flex-col bg-background">
@@ -71,7 +69,6 @@ export function WorkspaceShell() {
                 data={data}
                 selection={selection}
                 mutations={mutations}
-                agentExecutionStates={data.executionStates}
                 appStreamStatus={appStreamStatus}
                 runDashboard={runDashboard}
                 navigate={navigate}

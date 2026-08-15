@@ -3,12 +3,12 @@ id: adr-013
 title: Workflow-yksityiskohdat kuuluvat skillsiin
 status: accepted
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - arkkitehtuuripäätös
   - skills
   - workflow
-version: 2
+version: 3
 ---
 
 # Workflow-yksityiskohdat kuuluvat skillsiin
@@ -23,14 +23,14 @@ Jos workflow-yksityiskohdat sijoitetaan Systemiin tai runtime-profileen, ne muut
 
 Uudelleenkäytettävä workflow-menettely mallinnetaan Stepille eksplisiittisesti valittuna skill-tiedostona.
 
-- System sisältää vain minimaalisen execution-sopimuksen, oikeusrajojen noudattamisen, instruction-auktoriteetin ja strukturoidun outputin vaatimuksen.
-- System ei sisällä roadmap-, milestone-, release-, deploy- tai muuta ohjelmistokehityksen workflow-menettelyä.
+- Pakollinen read-only `system:execution-contract-v1` sisältää vain instruction-auktoriteetin, tool- ja permission-rajojen noudattamisen, salaisuuksien käsittelyrajan, structured outcome -sopimuksen, kiellon palauttaa raakaa hidden chain-of-thoughtia sekä vaatimuksen raportoida ajetut tarkistukset ja artifact-viitteet.
+- System ei sisällä roadmap-, milestone-, issue-, katselmointi-, staging-, release-, deploy- tai muuta projekti- tai ohjelmistokehityksen workflow-menettelyä.
 - Primary instruction kuvaa Stepin yleisen roolin, työskentelytavan, laatukriteerit ja pysäytysehdot.
 - Task description kuvaa tämän Loop-noden konkreettisen tehtävän.
 - Skill kuvaa eksplisiittisesti valitun, uudelleenkäytettävän menettelyn, työkalun tai integraatiotavan.
 - Loop ja sen `Approved`/`Rejected`-Transitionit omistavat workflow'n järjestyksen ja kontrollivirran.
 - Vain Stepin `skillIds`-listassa olevat skillsit composedaan. Ambient- tai implisiittinen skill discovery ei kuulu Balletin hallitsemaan ensimmäiseen versioon.
-- Skillit snapshottataan Root Runin alussa ja niiden tarkka origin, ID, versio, sisältö ja SHA-256 säilytetään evidenssissä.
+- Skillit snapshottataan Root Runin alussa. Evidenssi säilyttää niiden originin, ID:n, Project-relative pathin ja exact source SHA-256:n sekä executioniin välitetyn exact promptin ja sen SHA-256:n ilman saman täyssisällön redundantteja kopioita.
 
 Skillien composition order on kanoninen eikä UI:n valintajärjestys muodosta piilotettua precedenceä. Mahdolliset semanttiset ristiriidat eivät ratkea `last one wins` -säännöllä.
 
@@ -46,9 +46,8 @@ Skillien composition order on kanoninen eikä UI:n valintajärjestys muodosta pi
 ## Toteutuksen lähteet
 
 - `.ballet/instructions/loop-engineer-minimal.md`
-- `.codex/agents/*.toml`
 - `.agents/skills/**/SKILL.md`
-- `backend/documents/skillLookup.ts`
+- `backend/documents/projectResourceCatalog.ts`
 - `backend/runs/LoopExecutionSnapshot.ts`
 - `backend/integration/LoopStepPrompt.ts`
 - `.ballet/outputs/execution-composition/PROMPT-COMPOSITION.md`

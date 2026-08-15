@@ -1,5 +1,5 @@
 import type { RunTarget } from "@shared/api/workspace-contracts";
-import { Bot, Play, Route } from "lucide-react";
+import { Play, Route } from "lucide-react";
 import { OperationalStatus } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 
@@ -9,9 +9,9 @@ export function RunTargetCard({ target, pending, onOpen, onStart }: {
   onOpen: () => void;
   onStart: () => void;
 }) {
-  const Icon = target.kind === "loop" ? Route : Bot;
+  const Icon = Route;
   const issueLabels = [...new Set(target.issues.map((issue) => {
-    const owner = issue.stepId ?? issue.agentId;
+    const owner = issue.stepId ?? issue.executionProfileId;
     return owner ? `${owner}: ${issue.message}` : issue.message;
   }))];
   const reason = issueLabels.length > 3

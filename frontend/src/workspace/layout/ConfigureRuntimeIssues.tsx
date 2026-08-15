@@ -10,7 +10,7 @@ export function ConfigureRuntimeIssues({ issues }: { issues: RuntimeConfiguratio
         <TriangleAlert /><span className="font-mono text-[0.68rem]">{issues.length} runtime config issues</span>
       </SidebarMenuButton>
       <SidebarMenuSub className="gap-0">
-        {issues.map((issue, index) => <SidebarMenuSubItem key={`${issue.code}:${issue.path}:${issue.agentId ?? index}`}><span className="block px-2 py-1 font-mono text-[0.6rem] text-destructive" title={`${issue.path}: ${issue.message}`}>{issue.path}: {issue.message}</span></SidebarMenuSubItem>)}
+        {issues.map((issue, index) => <SidebarMenuSubItem key={`${issue.code}:${issue.path}:${issue.executionProfileId ?? index}`}><span className="block px-2 py-1 font-mono text-[0.6rem] text-destructive" title={`${issue.path}: ${issue.message}`}>{issue.path}: {issue.message}</span></SidebarMenuSubItem>)}
       </SidebarMenuSub>
     </SidebarMenuItem>
   );

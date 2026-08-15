@@ -1,8 +1,8 @@
-import type { Agent, ExecutionAgentSnapshot, ExecutionTask, ProjectStep, RespondToStepRunRequest, StepRun } from "@shared/api/workspace-contracts";
+import type { ExecutionTask, ProjectStep, RespondToStepRunRequest, RootRunDetail, StepRun } from "@shared/api/workspace-contracts";
 import { Bot, CalendarClock, ShieldCheck } from "lucide-react";
 import { OperationalStatus, type OperationalStatusTone } from "@/components/shared/workspace-ui";
 import { CliRunConsole } from "../../components/CliRunConsole";
-import { LoopHandlerAgentInstructions } from "./LoopHandlerAgentInstructions";
+import { RunStepCompositionPreview } from "./RunStepCompositionPreview";
 import { LoopRunStepPanel } from "./LoopRunStepPanel";
 
 export function LoopRunStepHeader({ step, stepRun }: { step: ProjectStep; stepRun: StepRun }) {
@@ -21,8 +21,8 @@ export function LoopRunStepHeader({ step, stepRun }: { step: ProjectStep; stepRu
   );
 }
 
-export function LoopRunStepInstructions({ step, agents, task, snapshot }: { step: ProjectStep; agents: Agent[]; task?: ExecutionTask; snapshot?: ExecutionAgentSnapshot }) {
-  return <LoopHandlerAgentInstructions step={step} agents={agents} snapshot={task?.spec.agent ?? snapshot} />;
+export function LoopRunStepComposition({ step, rootDetail, task }: { step: ProjectStep; rootDetail?: RootRunDetail; task?: ExecutionTask }) {
+  return <RunStepCompositionPreview step={step} rootDetail={rootDetail} task={task} />;
 }
 
 export function LoopRunStepOutput({ step, stepRun, task, pending, onTerminal, onRespond }: {

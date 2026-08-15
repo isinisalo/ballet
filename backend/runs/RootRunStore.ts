@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import type {
-  AgentOutcome,
-  ExecutionRuntimeSnapshot,
+  RootExecutionSnapshot,
+  StepOutcome,
   RootFinalizationReport
 } from "../../shared/domain/runtime.js";
 import type {
@@ -28,7 +28,7 @@ interface RootRunRow {
   head_sha: string;
   config_hash: string;
   snapshot_hash: string;
-  runtime_snapshot_json: string | null;
+  execution_snapshot_json: string;
   finalization_status: RootRunFinalization["status"] | null;
   finalization_terminal_status: "completed" | "blocked" | "failed" | "cancelled" | null;
   finalization_success: 0 | 1 | null;
@@ -46,7 +46,7 @@ export interface StoredRootRun extends RootRunSummary {
   headSha: string;
   configHash: string;
   snapshotHash: string;
-  runtimeSnapshot?: ExecutionRuntimeSnapshot;
+  executionSnapshot: RootExecutionSnapshot;
   finalizationTerminalStatus?: "completed" | "blocked" | "failed" | "cancelled";
 }
 
@@ -61,6 +61,7 @@ export interface CreateRootRunInput {
   headSha: string;
   configHash: string;
   snapshotHash: string;
+  executionSnapshot: RootExecutionSnapshot;
   createdAt: string;
 }
 
@@ -71,11 +72,11 @@ export class RootRunStore {
     this.connection().prepare(`
       INSERT INTO root_runs (
         root_run_id, kind, target_id, source, status, input, worktree_path, branch,
-        head_sha, config_hash, snapshot_hash, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?)
+        head_sha, config_hash, snapshot_hash, execution_snapshot_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(input.rootRunId, input.kind, input.targetId, input.source, input.input ?? null,
       input.worktreePath, input.branch, input.headSha, input.configHash, input.snapshotHash,
-      input.createdAt, input.createdAt);
+      JSON.stringify(input.executionSnapshot), input.createdAt, input.createdAt);
     return this.require(input.rootRunId);
   }
 
@@ -115,22 +116,22 @@ export class RootRunStore {
   }
 
   setStatus(rootRunId: string, status: DashboardRunStatus, detail: {
-    outcome?: AgentOutcome;
+    outcome?: StepOutcome;
     errorCode?: string;
     errorMessage?: string;
-    runtime?: ExecutionRuntimeSnapshot;
+    timestamp?: string;
   } = {}): StoredRootRun {
-    const timestamp = new Date().toISOString();
+    const timestamp = detail.timestamp ?? new Date().toISOString();
     const terminal = ["completed", "blocked", "failed", "cancelled"].includes(status);
     this.connection().prepare(`
       UPDATE root_runs SET status = ?, outcome_json = COALESCE(?, outcome_json),
         error_code = COALESCE(?, error_code), error_message = COALESCE(?, error_message),
-        runtime_snapshot_json = COALESCE(?, runtime_snapshot_json), updated_at = ?,
+        updated_at = ?,
         completed_at = CASE WHEN ? THEN COALESCE(completed_at, ?) ELSE completed_at END
       WHERE root_run_id = ?
     `).run(status, detail.outcome ? JSON.stringify(detail.outcome) : null,
       detail.errorCode ?? null, detail.errorMessage ?? null,
-      detail.runtime ? JSON.stringify(detail.runtime) : null, timestamp,
+      timestamp,
       terminal ? 1 : 0, timestamp, rootRunId);
     return this.require(rootRunId);
   }
@@ -178,7 +179,7 @@ const toRootRun = (row: RootRunRow): StoredRootRun => ({
   source: row.source,
   status: row.status,
   input: row.input ?? undefined,
-  outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
+  outcome: row.outcome_json ? JSON.parse(row.outcome_json) as StepOutcome : undefined,
   errorCode: row.error_code ?? undefined,
   errorMessage: row.error_message ?? undefined,
   worktreePath: row.worktree_path,
@@ -186,7 +187,7 @@ const toRootRun = (row: RootRunRow): StoredRootRun => ({
   headSha: row.head_sha,
   configHash: row.config_hash,
   snapshotHash: row.snapshot_hash,
-  runtimeSnapshot: row.runtime_snapshot_json ? JSON.parse(row.runtime_snapshot_json) as ExecutionRuntimeSnapshot : undefined,
+  executionSnapshot: JSON.parse(row.execution_snapshot_json) as RootExecutionSnapshot,
   finalizationTerminalStatus: row.finalization_terminal_status ?? undefined,
   finalization: row.finalization_status && row.finalization_started_at ? {
     status: row.finalization_status,

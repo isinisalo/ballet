@@ -1,9 +1,10 @@
 import type {
-  AgentOutcome,
   ExecutionTask,
   LoopRunDetails,
+  RootExecutionSnapshot,
   RootFinalizationReport,
-  RuntimePreflightIssue
+  RuntimePreflightIssue,
+  StepOutcome
 } from "./runtime.js";
 
 export type BalletMode = "configure" | "run";
@@ -16,7 +17,7 @@ export type DashboardRunStatus =
   | "blocked"
   | "failed"
   | "cancelled";
-export type RootRunKind = "loop" | "agent";
+export type RootRunKind = "loop";
 export type RootRunSource = "manual" | "schedule";
 export type RootRunListState = "active" | "recent";
 
@@ -26,7 +27,7 @@ export interface RootRunCurrentPosition {
   stepRunId?: string;
   stepId?: string;
   taskId?: string;
-  agentId?: string;
+  executionProfileId?: string;
   taskStatus?: ExecutionTask["status"];
 }
 
@@ -45,7 +46,7 @@ export interface RootRunSummary {
   source: RootRunSource;
   status: DashboardRunStatus;
   input?: string;
-  outcome?: AgentOutcome;
+  outcome?: StepOutcome;
   errorCode?: string;
   errorMessage?: string;
   current?: RootRunCurrentPosition;
@@ -56,13 +57,13 @@ export interface RootRunSummary {
 }
 
 export interface RootRunDetail extends RootRunSummary {
+  executionSnapshot: RootExecutionSnapshot;
   loopRuns: LoopRunDetails[];
   tasks: ExecutionTask[];
 }
 
 export interface RootRunListQuery {
   state?: RootRunListState;
-  kind?: RootRunKind;
   cursor?: string;
   limit?: number;
 }
@@ -70,13 +71,13 @@ export interface RootRunListQuery {
 export interface RootRunListResponse { items: RootRunSummary[]; nextCursor?: string }
 
 export interface StartRootRunRequest {
-  kind: RootRunKind;
+  kind: "loop";
   targetId: string;
   input?: string;
 }
 
 export interface RunTarget {
-  kind: RootRunKind;
+  kind: "loop";
   id: string;
   name: string;
   description?: string;
@@ -87,14 +88,14 @@ export interface RunTarget {
 }
 
 export interface RunTargetIssue {
-  code: RuntimePreflightIssue["code"] | "invalid_config" | "disabled" | "missing_agent";
+  code: RuntimePreflightIssue["code"] | "invalid_config";
   message: string;
-  agentId?: string;
+  executionProfileId?: string;
   stepId?: string;
   path?: string;
 }
 
-export interface RunTargetsResponse { loops: RunTarget[]; agents: RunTarget[] }
+export interface RunTargetsResponse { loops: RunTarget[] }
 
 export interface WorkspaceInvalidationEvent {
   id: number;

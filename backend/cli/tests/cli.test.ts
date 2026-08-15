@@ -138,7 +138,7 @@ describe("Ballet checkout CLI", () => {
 });
 
 describe("checkout-local state and launchd contract", () => {
-  it("stores service and settings state under .git/ballet while preserving core fields", async () => {
+  it("stores settings under .git/ballet and fails closed when the removed per-entity roots key is present", async () => {
     const root = await gitProject();
     const project = await resolveProjectContext({ root });
     const state = await loadOrCreateServiceState(project);
@@ -146,16 +146,16 @@ describe("checkout-local state and launchd contract", () => {
     const existing = JSON.parse(await readFile(project.settingsPath, "utf8")) as Record<string, unknown>;
     existing.agentReadOnlyRoots = { builder: ["/tmp/reference"] };
     await writeFile(project.settingsPath, `${JSON.stringify(existing)}\n`);
-    await updateProviderCommands(project, { copilotCommand: "copilot" });
+    await expect(updateProviderCommands(project, { copilotCommand: "copilot" }))
+      .rejects.toThrow("Legacy setting agentReadOnlyRoots is not supported by project config v9.");
 
     expect(state.checkoutRoot).toBe(project.root);
     expect(state.instanceId).toBe(project.instanceId);
     expect(project.stateRoot).toBe(path.join(project.gitDir, "ballet"));
     await expect(loadLocalSettings(project)).resolves.toMatchObject({
-      codexCommand: "/opt/codex",
-      copilotCommand: "copilot",
-      agentReadOnlyRoots: { builder: ["/tmp/reference"] }
+      codexCommand: "/opt/codex"
     });
+    expect(JSON.parse(await readFile(project.settingsPath, "utf8"))).toEqual(existing);
   });
 
   it("renders one unique checkout service that invokes the server directly", async () => {

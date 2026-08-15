@@ -7,7 +7,8 @@ import {
   type AppData,
   type LoopRunDetails,
   type LoopTheme,
-  type ProjectLoop
+  type ProjectLoop,
+  type RootExecutionSnapshot
 } from "@shared/api/workspace-contracts";
 import { WorkspaceApp } from "../src/WorkspaceApp";
 import { emptyData } from "../src/workspace/types";
@@ -35,11 +36,10 @@ const run = (
 const data = (latest: LoopRunDetails | null): AppData => ({
   ...emptyData,
   loopRuns: latest ? [latest] : [],
-  automation: { version: 8, loops: [loop] }, automationIssues: [], scheduleStates: [],
+  automation: { version: 9, loops: [loop] }, automationIssues: [], scheduleStates: [],
   loopTheme: structuredClone(defaultLoopTheme), loopThemeIssues: [], projectDocumentTree: [],
   runTargets: {
     loops: [{ kind: "loop", id: "delivery", name: "delivery", ready: true, issues: [], ...latest ? { latestRootRunId: latest.rootRunId, ...["running", "waiting_for_human"].includes(latest.status) ? { activeRootRunId: latest.rootRunId } : {} } : {} }],
-    agents: []
   }
 });
 
@@ -52,19 +52,7 @@ function installApi(latest: LoopRunDetails | null) {
     if (url === "/api/data") return Response.json(workspace);
     if (url.startsWith("/api/runs?state=active")) return Response.json({ items: [] });
     if (url.startsWith("/api/runs?state=recent")) return Response.json({ items: [] });
-    if (url === "/api/runs/run-1" && current) return Response.json({
-      rootRunId: current.rootRunId,
-      kind: "loop",
-      targetId: current.loopId,
-      source: current.source,
-      status: current.status,
-      current: current.stepRuns[0] ? { loopRunId: current.runId, loopId: current.loopId, stepRunId: current.stepRuns[0].stepRunId, stepId: current.stepRuns[0].stepId } : undefined,
-      createdAt: current.createdAt,
-      updatedAt: current.updatedAt,
-      completedAt: current.completedAt,
-      loopRuns: [current],
-      tasks: []
-    });
+    if (url === "/api/runs/run-1" && current) return Response.json(rootDetail(current));
     if (url === "/api/runs" && method === "POST") {
       current = run("running");
       return Response.json(rootDetail(current));
@@ -98,7 +86,7 @@ async function renderRun(latest: LoopRunDetails | null) {
   return fetchMock;
 }
 
-describe("automation v8 UI", () => {
+describe("automation v9 UI", () => {
   it("starts a saved Loop from global Ballet Run without local mode controls", async () => {
     const user = userEvent.setup();
     const fetchMock = await renderRun(null);
@@ -143,7 +131,9 @@ describe("automation v8 UI", () => {
   it("offers a new run after the latest run has finished", async () => {
     const user = userEvent.setup();
     await renderRun(run("completed"));
-    await user.click(await screen.findByRole("button", { name: "New run" }));
+    const newRun = await screen.findByRole("button", { name: "New run" });
+    await waitFor(() => expect(newRun).toBeEnabled());
+    await user.click(newRun);
     expect(await screen.findByLabelText("Manual input (optional)", {}, { timeout: 3_000 })).toBeEnabled();
   });
 
@@ -178,7 +168,13 @@ describe("automation v8 UI", () => {
     expect(screen.getByRole("button", { name: "Save loop" })).toBeDisabled();
     expect(fetchMock.mock.calls.filter(([input, init]) => String(input) === "/api/automation" && init?.method === "PUT")).toHaveLength(0);
 
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
+    await user.click(screen.getByRole("combobox", { name: "Node type" }));
+    await user.click(await screen.findByRole("option", { name: "Human" }));
     await user.type(screen.getByLabelText("Loop ID"), "new-loop");
+    expect(screen.getByText("Task description is required.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save loop" })).toBeDisabled();
+    await user.type(screen.getByLabelText("Task description"), "Review the new Loop.");
     expect(screen.getByRole("button", { name: "Save loop" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Save loop" }));
 
@@ -188,13 +184,14 @@ describe("automation v8 UI", () => {
     ));
     const saveCall = fetchMock.mock.calls.find(([input, init]) => String(input) === "/api/automation" && init?.method === "PUT");
     const saved = JSON.parse(String(saveCall?.[1]?.body));
-    expect(saved.version).toBe(8);
+    expect(saved.version).toBe(9);
     expect(saved.loops.find((candidate: ProjectLoop) => candidate.id === "new-loop")).toMatchObject({
       id: "new-loop",
       start: "new-step",
       nodes: expect.arrayContaining([expect.objectContaining({
         id: "new-step",
         type: "human",
+        description: "Review the new Loop.",
         nodeStyle: "flat",
         nodeSize: "medium",
         on: { approved: "completed", rejected: "blocked" }
@@ -207,7 +204,7 @@ describe("automation v8 UI", () => {
     const fetchMock = await renderRun(run("running"));
     const cancel = await screen.findByRole("button", { name: "Cancel" });
     await waitFor(() => expect(cancel).toBeEnabled());
-    await user.click(cancel);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/runs/run-1/cancel",
       expect.objectContaining({ method: "POST" })
@@ -225,6 +222,24 @@ const rootDetail = (current: LoopRunDetails) => ({
   createdAt: current.createdAt,
   updatedAt: current.updatedAt,
   completedAt: current.completedAt,
+  executionSnapshot: executionSnapshot(current),
   loopRuns: [current],
   tasks: []
+});
+
+const executionSnapshot = (current: LoopRunDetails): RootExecutionSnapshot => ({
+  version: 1,
+  rootLoopId: current.loopId,
+  project: {
+    checkoutRoot: "/tmp/project",
+    headSha: "a".repeat(40),
+    configHash: "b".repeat(64),
+    snapshotHash: "c".repeat(64)
+  },
+  loops: [structuredClone(current.snapshot)],
+  theme: structuredClone(current.themeSnapshot),
+  executionProfiles: [],
+  runtimes: [],
+  resources: [],
+  createdAt: current.createdAt
 });

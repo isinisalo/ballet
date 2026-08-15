@@ -85,9 +85,10 @@ export function SkillEditor({
       const name = stringFrontmatterValue(frontmatter, "name").trim();
 
       const saved = await save("skills", {
-        ...form,
+        id: form.id,
         name,
         description: stringFrontmatterValue(frontmatter, "description"),
+        metadata: form.metadata ?? {},
         frontmatter,
         body: bodyText
       });

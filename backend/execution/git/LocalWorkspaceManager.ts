@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chmod, lstat, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RootFinalizationReport } from "../../../shared/domain/runtime.js";
 import type { ProjectContext } from "../../project/ProjectContext.js";
@@ -7,8 +7,14 @@ import type { StoredRootRun } from "../../runs/RootRunStore.js";
 import { changedFiles } from "./gitChanges.js";
 import { runGit } from "./gitProcess.js";
 import { inspectGitCheckout } from "./gitStatus.js";
+import {
+  assertOrdinaryPathAncestors,
+  assertOrdinarySnapshotDirectories,
+  readSnapshotFile
+} from "./snapshotPathSafety.js";
 
-const SNAPSHOT_ROOTS = [".ballet", ".codex/agents", ".agents/skills"] as const;
+const SNAPSHOT_ROOTS = [".ballet", ".agents/skills"] as const;
+const SKILLS_ROOT = ".agents/skills";
 const MAX_FILE_BYTES = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES = 256 * 1024 * 1024;
 const MAX_FILES = 10_000;
@@ -66,8 +72,28 @@ export class LocalWorkspaceManager {
     };
   }
 
+  async verifyPreparedSnapshot(workspace: PreparedRootWorkspace, signal?: AbortSignal): Promise<void> {
+    const expectedRoot = path.resolve(workspace.path);
+    const worktreesRoot = path.resolve(this.context.worktreesRoot);
+    if (!expectedRoot.startsWith(`${worktreesRoot}${path.sep}`)) {
+      throw new Error("Prepared Run workspace is outside the checkout state root.");
+    }
+    const checkout = await inspectGitCheckout(expectedRoot, signal);
+    if (checkout.root !== expectedRoot || checkout.headSha !== workspace.headSha
+      || checkout.branch !== workspace.branch || checkout.codeDirty) {
+      throw new Error("Prepared Run workspace changed during execution snapshot resolution.");
+    }
+    await assertSkillOverlayContainsOnlyManifests(expectedRoot);
+    const manifestHash = await configManifestHash(expectedRoot);
+    if (manifestHash !== workspace.snapshotHash || manifestHash !== workspace.configHash) {
+      throw new Error("Prepared Run configuration changed during execution snapshot resolution.");
+    }
+  }
+
   async finalize(run: StoredRootRun, success: boolean, signal?: AbortSignal): Promise<RootFinalizationReport> {
     await this.verify(run, signal);
+    // Failed Runs retain the exact sparse runtime filesystem for diagnosis.
+    if (success) await rehydrateTrackedSkillSupportFiles(run.worktreePath, run.headSha, signal);
     const changed = await changedFiles(run.worktreePath, run.headSha, signal);
     const commitSha = success ? await this.commit(run, signal) : undefined;
     return {
@@ -142,24 +168,23 @@ interface SnapshotFile { relativePath: string; mode: number; bytes: Buffer; hash
 interface Snapshot { hash: string; files: SnapshotFile[] }
 
 const captureSnapshot = async (root: string): Promise<Snapshot> => {
+  await assertOrdinarySnapshotDirectories(root, SNAPSHOT_ROOTS);
   const result = await runGit(["ls-files", "-co", "--exclude-standard", "-z", "--", ...SNAPSHOT_ROOTS], { cwd: root });
-  const paths = [...new Set(result.stdout.split("\0").filter(Boolean))].sort();
+  const paths = [...new Set(result.stdout.split("\0").filter(isSnapshotFile))].sort();
+  for (const relativePath of paths) assertSnapshotPath(relativePath);
+  await assertOrdinaryPathAncestors(root, paths);
   const files: SnapshotFile[] = [];
   let totalBytes = 0;
   for (const relativePath of paths) {
-    assertSnapshotPath(relativePath);
-    const absolute = path.join(root, relativePath);
-    const metadata = await lstat(absolute).catch((error) => {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-      throw error;
-    });
-    if (!metadata) continue;
-    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error(`Snapshot path must be a regular file: ${relativePath}`);
+    await assertOrdinaryPathAncestors(root, [relativePath]);
+    const source = await readSnapshotFile(root, relativePath);
+    if (!source) continue;
+    const { metadata, bytes } = source;
     if (metadata.size > MAX_FILE_BYTES) throw new Error(`Snapshot file exceeds 32 MiB: ${relativePath}`);
-    totalBytes += metadata.size;
+    if (bytes.length > MAX_FILE_BYTES) throw new Error(`Snapshot file exceeds 32 MiB: ${relativePath}`);
+    totalBytes += bytes.length;
     if (totalBytes > MAX_SNAPSHOT_BYTES) throw new Error("Configuration snapshot exceeds 256 MiB.");
     if (files.length >= MAX_FILES) throw new Error("Configuration snapshot exceeds 10,000 files.");
-    const bytes = await readFile(absolute);
     files.push({ relativePath, mode: metadata.mode & 0o777, bytes, hash: sha256(bytes) });
   }
   const manifest = files.map(({ relativePath, mode, hash }) => ({ relativePath, mode, hash }));
@@ -167,6 +192,7 @@ const captureSnapshot = async (root: string): Promise<Snapshot> => {
 };
 
 const materializeSnapshot = async (snapshot: Snapshot, target: string): Promise<void> => {
+  await assertOrdinarySnapshotDirectories(target, SNAPSHOT_ROOTS);
   for (const root of SNAPSHOT_ROOTS) await rm(path.join(target, root), { recursive: true, force: true });
   for (const file of snapshot.files) {
     const destination = path.join(target, file.relativePath);
@@ -176,13 +202,78 @@ const materializeSnapshot = async (snapshot: Snapshot, target: string): Promise<
   }
 };
 
+const assertSkillOverlayContainsOnlyManifests = async (root: string): Promise<void> => {
+  await assertOrdinarySnapshotDirectories(root, [SKILLS_ROOT]);
+  const skillsRoot = path.join(root, SKILLS_ROOT);
+  const metadata = await lstat(skillsRoot).catch((error) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!metadata) return;
+  if (!metadata.isDirectory()) throw new Error(`Prepared Run workspace contains a non-SKILL skill entry: ${SKILLS_ROOT}`);
+
+  const directories = [skillsRoot];
+  while (directories.length > 0) {
+    const directory = directories.pop()!;
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        directories.push(absolute);
+        continue;
+      }
+      const relative = path.relative(root, absolute).split(path.sep).join("/");
+      if (!entry.isFile() || !isSkillManifest(relative)) {
+        throw new Error(`Prepared Run workspace contains a non-SKILL skill entry: ${relative}`);
+      }
+    }
+  }
+};
+
+const rehydrateTrackedSkillSupportFiles = async (
+  root: string,
+  headSha: string,
+  signal?: AbortSignal
+): Promise<void> => {
+  await assertOrdinarySnapshotDirectories(root, [SKILLS_ROOT]);
+  const tree = await runGit(["ls-tree", "-r", "-z", "--name-only", headSha, "--", SKILLS_ROOT], { cwd: root, signal });
+  const supportFiles = tree.stdout.split("\0").filter((value) => value && !isSkillManifest(value));
+  await assertOrdinaryPathAncestors(root, supportFiles);
+  const existingSupportFiles: string[] = [];
+  for (const relativePath of supportFiles) {
+    const collision = await lstat(path.join(root, relativePath)).catch((error) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    });
+    if (collision) existingSupportFiles.push(relativePath);
+  }
+  for (let offset = 0; offset < existingSupportFiles.length; offset += 256) {
+    const candidates = existingSupportFiles.slice(offset, offset + 256);
+    const diff = await runGit([
+      "diff", "--name-only", "-z", headSha, "--", ...candidates
+    ], { cwd: root, signal });
+    const conflictingPath = diff.stdout.split("\0").find(Boolean);
+    if (conflictingPath) {
+      throw new Error(`Run output conflicts with an immutable skill support file: ${conflictingPath}`);
+    }
+  }
+  await assertOrdinaryPathAncestors(root, supportFiles);
+  for (let offset = 0; offset < supportFiles.length; offset += 256) {
+    await runGit([
+      "restore", `--source=${headSha}`, "--worktree", "--", ...supportFiles.slice(offset, offset + 256)
+    ], { cwd: root, signal });
+  }
+};
+
 export const configManifestHash = async (root: string): Promise<string> => (await captureSnapshot(root)).hash;
 const sha256 = (value: Buffer): string => createHash("sha256").update(value).digest("hex");
 const exists = (target: string): Promise<boolean> => stat(target).then(() => true, () => false);
 const safeRunId = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 36);
 const assertSnapshotPath = (value: string): void => {
   if (value.includes("\\") || path.posix.isAbsolute(value) || value.split("/").some((part) => !part || part === "." || part === "..")
-    || !SNAPSHOT_ROOTS.some((root) => value === root || value.startsWith(`${root}/`))) {
+    || !isSnapshotFile(value)) {
     throw new Error(`Unsafe configuration snapshot path: ${value}`);
   }
 };
+
+const isSnapshotFile = (value: string): boolean => value.startsWith(".ballet/") || isSkillManifest(value);
+const isSkillManifest = (value: string): boolean => value.startsWith(`${SKILLS_ROOT}/`) && value.endsWith("/SKILL.md");

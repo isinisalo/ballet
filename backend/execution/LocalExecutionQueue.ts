@@ -1,6 +1,6 @@
-import type { AgentOutcome, ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
+import type { ExecutionTask, RuntimeProvider, StepOutcome } from "../../shared/domain/runtime.js";
 import path from "node:path";
-import { agentOutcomeJsonSchema, agentOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import { stepOutcomeJsonSchema, stepOutcomeSchema } from "../../shared/api/runtime-schemas.js";
 import { WorkspacePermissionPolicy } from "./WorkspacePermissionPolicy.js";
 import type { ExecutionStore } from "./ExecutionStore.js";
 import type { LocalRuntimeService } from "./LocalRuntimeService.js";
@@ -11,7 +11,7 @@ export interface LocalExecutionQueueOptions {
   runtime: LocalRuntimeService;
   worktreesRoot: string;
   onTerminal(task: ExecutionTask): Promise<void> | void;
-  onStarted?(task: ExecutionTask): Promise<void> | void;
+  onStarted?(task: ExecutionTask): Promise<boolean | void> | boolean | void;
   onOrchestrationError?(error: unknown, task: ExecutionTask): void;
   onChanged?(rootRunId: string): void;
 }
@@ -19,21 +19,29 @@ export interface LocalExecutionQueueOptions {
 export class LocalExecutionQueue {
   private readonly active = new Map<RuntimeProvider, Promise<void>>();
   private readonly controllers = new Map<string, AbortController>();
+  private started = false;
   private stopping = false;
 
   constructor(private readonly options: LocalExecutionQueueOptions) {}
 
   async start(): Promise<void> {
+    if (this.started) return;
     const interrupted = this.options.store.recoverInterrupted();
     for (const task of interrupted) {
       this.appendTerminal(task, "Execution was interrupted by a Ballet restart.");
       await this.applyTerminal(task);
     }
+    const rejected = this.options.store.rejectUnrunnableQueued();
+    for (const task of rejected) {
+      this.appendTerminal(task, terminalMessage(task));
+      await this.applyTerminal(task);
+    }
+    this.started = true;
     this.wake();
   }
 
   wake(provider?: RuntimeProvider): void {
-    if (this.stopping) return;
+    if (!this.started || this.stopping) return;
     for (const candidate of provider ? [provider] : ["codex", "copilot"] as const) {
       if (this.active.has(candidate)) continue;
       const promise = this.pump(candidate).finally(() => {
@@ -45,17 +53,29 @@ export class LocalExecutionQueue {
   }
 
   async cancel(taskId: string): Promise<ExecutionTask> {
+    const existing = this.options.store.require(taskId);
+    if (["succeeded", "failed", "cancelled"].includes(existing.status)) return existing;
     const task = this.options.store.requestCancel(taskId);
     if (task.status === "cancelled") {
-      this.appendTerminal(task, "Execution cancelled before it started.");
-      await this.applyTerminal(task);
+      if (this.controllers.has(taskId)) await this.interrupt(taskId, "Run cancellation requested.");
+      else {
+        this.appendTerminal(task, terminalMessage(task));
+        await this.applyTerminal(task);
+      }
     }
     else {
-      this.controllers.get(taskId)?.abort(new Error("Run cancellation requested."));
-      await this.options.runtime.adapter(task.spec.runtime.provider).cancel(taskId, "Run cancellation requested.");
+      await this.interrupt(taskId, "Run cancellation requested.");
     }
     this.options.onChanged?.(task.rootRunId);
     return this.options.store.require(taskId);
+  }
+
+  async interrupt(taskId: string, reason: string): Promise<void> {
+    const controller = this.controllers.get(taskId);
+    if (!controller || controller.signal.aborted) return;
+    const task = this.options.store.require(taskId);
+    controller.abort(new Error(reason));
+    await this.options.runtime.adapter(task.spec.runtime.provider).cancel(taskId, reason);
   }
 
   async shutdown(timeoutMs = 90_000): Promise<void> {
@@ -84,46 +104,48 @@ export class LocalExecutionQueue {
   }
 
   private async execute(queued: ExecutionTask): Promise<void> {
-    const task = this.options.store.start(queued.id);
+    const task = this.options.store.claim(queued.id);
+    if (!task || task.status !== "running") return;
     const controller = new AbortController();
     this.controllers.set(task.id, controller);
     this.options.onChanged?.(task.rootRunId);
-    let outcome: AgentOutcome | undefined;
+    let outcome: StepOutcome | undefined;
     let terminal: ExecutionTask;
     let sequence = 0;
     try {
-      await this.options.onStarted?.(task);
+      if (await this.options.onStarted?.(task) === false) {
+        throw new Error("Execution task is no longer runnable.");
+      }
       const expected = task.spec.runtime;
       await this.options.runtime.verify(expected);
       const adapter = this.options.runtime.adapter(expected.provider);
       for await (const event of adapter.execute({
         executionId: task.id,
-        prompt: task.spec.input ?? "Complete the assigned work.",
-        systemInstructions: task.spec.agent.instructions,
+        prompt: task.spec.evidence.prompt,
         workingDirectory: this.rootWorktree(task),
         model: expected.model,
         reasoning: expected.reasoning,
         policy: expected.policy,
         signal: controller.signal,
         permissionPolicy: new WorkspacePermissionPolicy(this.rootWorktree(task), expected.policy),
-        outputSchema: agentOutcomeJsonSchema
+        outputSchema: stepOutcomeJsonSchema
       })) {
         this.options.store.appendEvent(task.id, toExecutionEvent(event, sequence++, expected.provider));
         if (event.type === "execution.completed") {
-          const parsed = agentOutcomeSchema.safeParse(event.structuredOutput);
-          if (!parsed.success) throw new Error(`Agent returned an invalid structured outcome: ${parsed.error.message}`);
-          outcome = parsed.data as AgentOutcome;
+          const parsed = stepOutcomeSchema.safeParse(event.structuredOutput);
+          if (!parsed.success) throw new Error(`Step returned an invalid structured outcome: ${parsed.error.message}`);
+          outcome = parsed.data as StepOutcome;
         }
       }
-      if (!outcome) throw new Error("Runtime completed without a structured agent outcome.");
+      if (!outcome) throw new Error("Runtime completed without a structured Step outcome.");
       terminal = this.options.store.finish(task.id, "succeeded", { outcome });
-      this.appendTerminal(terminal, terminal.status === "cancelled" ? "Execution cancelled." : "Execution succeeded.");
+      this.appendTerminal(terminal, terminalMessage(terminal));
     } catch (error) {
       const cancelled = controller.signal.aborted || Boolean(this.options.store.require(task.id).cancelRequestedAt);
       terminal = this.options.store.finish(task.id, cancelled ? "cancelled" : "failed", cancelled ? {} : {
         errorCode: "execution_failed", errorMessage: error instanceof Error ? error.message : String(error)
       });
-      this.appendTerminal(terminal, cancelled ? "Execution cancelled." : terminal.errorMessage ?? "Execution failed.", sequence);
+      this.appendTerminal(terminal, terminalMessage(terminal), sequence);
     } finally {
       this.controllers.delete(task.id);
       this.options.onChanged?.(task.rootRunId);
@@ -136,6 +158,7 @@ export class LocalExecutionQueue {
   }
 
   private appendTerminal(task: ExecutionTask, message: string, sequence?: number): void {
+    if (this.options.store.hasTerminalEvent(task.id)) return;
     this.options.store.appendEvent(task.id, {
       sequence: sequence ?? Number.MAX_SAFE_INTEGER,
       source: "ballet",
@@ -150,3 +173,9 @@ export class LocalExecutionQueue {
     catch (error) { this.options.onOrchestrationError?.(error, task); }
   }
 }
+
+const terminalMessage = (task: ExecutionTask): string => {
+  if (task.status === "cancelled") return "Execution cancelled.";
+  if (task.status === "failed") return task.errorMessage ?? "Execution failed.";
+  return "Execution succeeded.";
+};

@@ -11,7 +11,7 @@ import {
 
 type MutableMarkdownCollection = CollectionName;
 
-const markdownCollections = new Set<MutableMarkdownCollection>(["agents", "skills"]);
+const markdownCollections = new Set<MutableMarkdownCollection>(["skills"]);
 
 export class MarkdownEntityService {
   constructor(
@@ -36,11 +36,11 @@ export class MarkdownEntityService {
     const records = data[collection] as unknown as Array<Record<string, unknown>>;
     const existing = records.find((candidate) => candidate.id === item.id);
     if (item.id && !existing) {
-      throw new MarkdownEntityConflictError(`${collection === "agents" ? "Agent" : "Skill"} '${item.id}' no longer exists.`);
+      throw new MarkdownEntityConflictError(`Skill '${item.id}' no longer exists.`);
     }
-    const candidateId = safeSlug(typeof item.name === "string" ? item.name : collection);
+    const candidateId = `project:${safeSlug(typeof item.name === "string" ? item.name : collection)}`;
     if (!existing && records.some((candidate) => candidate.id === candidateId)) {
-      throw new MarkdownEntityConflictError(`${collection === "agents" ? "Agent" : "Skill"} '${candidateId}' already exists.`);
+      throw new MarkdownEntityConflictError(`Skill '${candidateId}' already exists.`);
     }
     const nextInput = { ...existing, ...item } as Record<string, unknown>;
     const saved = await writeEntityMarkdown(

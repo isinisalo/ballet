@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { isProjectTerminalNode, type Agent, type AgentExecutionState, type LoopTheme, type ProjectAutomationConfig, type ProjectLoop, type ProjectStep } from "@shared/api/workspace-contracts";
+import { isProjectTerminalNode, type ExecutionProfile, type LoopTheme, type ProjectAutomationConfig, type ProjectLoop, type ProjectStep } from "@shared/api/workspace-contracts";
 import type { RootRunDetail } from "@shared/api/workspace-contracts";
 import { CirclePlus, Radio, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { LoopCanvas } from "./LoopCanvas";
 import { LoopHandlerSheet } from "./LoopHandlerSheet";
 import { LoopRunStartPanel } from "./LoopRunStartPanel";
-import { LoopRunStepHeader, LoopRunStepInstructions, LoopRunStepOutput } from "./LoopRunStepSheet";
+import { LoopRunStepComposition, LoopRunStepHeader, LoopRunStepOutput } from "./LoopRunStepSheet";
 import { loopRunStatusVariant } from "./loopRunState";
 import type { useLoopRun } from "./useLoopRun";
 import { changedFilesLabel } from "../../runs/runPresentation";
@@ -18,8 +18,7 @@ type LoopRunController = ReturnType<typeof useLoopRun>;
 export function LoopRunView({
   config,
   loop,
-  agents,
-  agentExecutionStates,
+  executionProfiles,
   theme,
   controller,
   rootDetail,
@@ -28,8 +27,7 @@ export function LoopRunView({
 }: {
   config: ProjectAutomationConfig;
   loop: ProjectLoop;
-  agents: Agent[];
-  agentExecutionStates: AgentExecutionState[];
+  executionProfiles: ExecutionProfile[];
   theme: LoopTheme;
   controller: LoopRunController;
   rootDetail?: RootRunDetail;
@@ -42,15 +40,16 @@ export function LoopRunView({
   const busy = pendingOperation !== null;
   const rootActive = rootDetail && ["queued", "running", "waiting_for_human", "finalizing"].includes(rootDetail.status);
   const terminal = details && (rootDetail ? !rootActive : !["running", "waiting_for_human"].includes(details.status));
-  const canvasLoop = details?.snapshot ?? loop;
+  const snapshottedLoop = rootDetail?.executionSnapshot.loops.find((candidate) => candidate.id === details?.loopId);
+  const canvasLoop = snapshottedLoop ?? details?.snapshot ?? loop;
+  const canvasConfig = rootDetail ? { version: 9 as const, loops: rootDetail.executionSnapshot.loops } : config;
+  const canvasProfiles = rootDetail?.executionSnapshot.executionProfiles ?? executionProfiles;
+  const canvasTheme = rootDetail?.executionSnapshot.theme ?? theme;
+  const canvasRun = rootDetail && details ? { ...details, themeSnapshot: rootDetail.executionSnapshot.theme } : details;
   const selectedStepRun = useMemo(() => details?.stepRuns.find((stepRun) => stepRun.stepRunId === selectedStepRunId), [details?.stepRuns, selectedStepRunId]);
   const selectedStep = canvasLoop.nodes.find((step): step is ProjectStep =>
     step.id === selectedStepRun?.stepId && !isProjectTerminalNode(step));
   const selectedTask = rootDetail?.tasks.find((task) => task.id === selectedStepRun?.executionTaskId);
-  const selectedAgentSnapshot = selectedTask?.spec.agent ?? details?.executionPlan?.steps.find((snapshot) =>
-    snapshot.loopId === selectedStepRun?.loopId
-      && snapshot.stepId === selectedStepRun.stepId
-      && snapshot.agentId === selectedStepRun.agentId)?.agent;
   const displayStatus = rootDetail?.status ?? details?.status;
   const startRun = async (input: string) => {
     const next = await start(input);
@@ -78,13 +77,13 @@ export function LoopRunView({
       </div>
       {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <div className={selectedStepRun && selectedStep && details ? "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden md:grid-cols-2" : "grid min-h-[28rem] min-w-0 grid-cols-1 overflow-hidden"}>
-        <LoopCanvas config={config} loop={canvasLoop} agents={agents} agentExecutionStates={agentExecutionStates} theme={theme} run={details} selectedStepId={selectedStepRun?.stepId} readOnly onStepSelect={(stepId) => setSelectedStepRunId([...((details?.stepRuns) ?? [])].reverse().find((stepRun) => stepRun.stepId === stepId)?.stepRunId)} />
+        <LoopCanvas config={canvasConfig} loop={canvasLoop} executionProfiles={canvasProfiles} theme={canvasTheme} run={canvasRun} selectedStepId={selectedStepRun?.stepId} readOnly onStepSelect={(stepId) => setSelectedStepRunId([...((details?.stepRuns) ?? [])].reverse().find((stepRun) => stepRun.stepId === stepId)?.stepRunId)} />
         <LoopHandlerSheet
           open={Boolean(selectedStepRun && selectedStep && details)}
           title="StepRun console"
           onOpenChange={(open) => { if (!open) setSelectedStepRunId(undefined); }}
           header={selectedStepRun && selectedStep ? <LoopRunStepHeader step={selectedStep} stepRun={selectedStepRun} /> : null}
-          left={selectedStepRun && selectedStep ? <LoopRunStepInstructions step={selectedStep} agents={agents} task={selectedTask} snapshot={selectedAgentSnapshot} /> : null}
+          left={selectedStepRun && selectedStep ? <LoopRunStepComposition step={selectedStep} rootDetail={rootDetail} task={selectedTask} /> : null}
           right={selectedStepRun && selectedStep ? <LoopRunStepOutput step={selectedStep} stepRun={selectedStepRun} task={selectedTask} pending={busy} onTerminal={() => void refresh()} onRespond={async (stepRunId, request) => Boolean(await respond(stepRunId, request))} /> : null}
         />
       </div>
@@ -105,8 +104,9 @@ export function LoopRunView({
         </div>
       ) : null}
       {terminal && !showNewRun ? (
-        <div className="flex justify-end border-t border-divider-strong bg-card p-4">
-          <Button type="button" variant="outline" disabled={busy} onClick={() => setShowNewRun(true)}><CirclePlus /> New run</Button>
+        <div className="flex items-center justify-between gap-3 border-t border-divider-strong bg-card p-4">
+          {startDisabledReason ? <p className="text-xs text-muted-foreground">{startDisabledReason}</p> : null}
+          <Button type="button" variant="outline" className="ml-auto" disabled={busy || Boolean(startDisabledReason)} onClick={() => setShowNewRun(true)}><CirclePlus /> New run</Button>
         </div>
       ) : null}
       {(!details || (terminal && showNewRun)) ? (

@@ -9,6 +9,7 @@ import {
 import { AllLoopsCanvas } from "../src/workspace/automation/loops/AllLoopsCanvas";
 import { LoopEditor } from "../src/workspace/automation/loops/LoopEditor";
 import { LoopRouteArtwork } from "../src/workspace/automation/loops/LoopRouteArtwork";
+import { localRuntime } from "./runtimeFixtures";
 
 const loop = (id: string): ProjectLoop => ({
   id,
@@ -39,7 +40,7 @@ describe("fixed Loop Route artwork", () => {
     const cardLoop = loop("delivery");
     const { container } = render(
       <AllLoopsCanvas
-        config={{ version: 8, loops: [cardLoop] }}
+        config={{ version: 9, loops: [cardLoop] }}
         onAddLoop={() => undefined}
         onOpenLoop={() => undefined}
       />
@@ -60,10 +61,13 @@ describe("fixed Loop Route artwork", () => {
     } satisfies ProjectLoop;
     const { container } = render(
       <LoopEditor
-        config={{ version: 8, loops: [activeWithLink, linked] }}
+        config={{ version: 9, loops: [activeWithLink, linked] }}
         loop={activeWithLink}
         loops={[activeWithLink, linked]}
-        agents={[]}
+        executionProfiles={[]}
+        instructions={[]}
+        skills={[]}
+        runtime={localRuntime()}
         theme={defaultLoopTheme}
         locked={false}
         onChange={() => undefined}
@@ -80,7 +84,7 @@ describe("fixed Loop Route artwork", () => {
     const cardLoop = loop("locked");
     render(
       <AllLoopsCanvas
-        config={{ version: 8, loops: [cardLoop] }}
+        config={{ version: 9, loops: [cardLoop] }}
         onAddLoop={() => undefined}
         onOpenLoop={() => undefined}
         onDeleteLoop={() => undefined}
@@ -96,7 +100,7 @@ describe("fixed Loop Route artwork", () => {
     const onDelete = vi.fn();
     render(
       <AllLoopsCanvas
-        config={{ version: 8, loops: [loop("delete-me")] }}
+        config={{ version: 9, loops: [loop("delete-me")] }}
         onAddLoop={() => undefined}
         onOpenLoop={() => undefined}
         onDeleteLoop={onDelete}

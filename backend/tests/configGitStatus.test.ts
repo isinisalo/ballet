@@ -18,14 +18,14 @@ describe("project config Git status", () => {
     expect(parseConfigStatus([
       " M .ballet/project.json",
       "?? .ballet/theme.json",
-      "R  .codex/agents/new.toml",
-      ".codex/agents/old.toml",
+      "R  .agents/skills/new/SKILL.md",
+      ".agents/skills/old/SKILL.md",
       ""
     ].join("\0"))).toEqual([
+      { path: ".agents/skills/new/SKILL.md", status: "renamed" },
+      { path: ".agents/skills/old/SKILL.md", status: "deleted" },
       { path: ".ballet/project.json", status: "modified" },
-      { path: ".ballet/theme.json", status: "untracked" },
-      { path: ".codex/agents/new.toml", status: "renamed" },
-      { path: ".codex/agents/old.toml", status: "deleted" }
+      { path: ".ballet/theme.json", status: "untracked" }
     ]);
   });
 
@@ -36,11 +36,9 @@ describe("project config Git status", () => {
     await execFileAsync("git", ["config", "user.name", "Ballet Test"], { cwd: root });
     await execFileAsync("git", ["config", "user.email", "ballet@example.test"], { cwd: root });
     await mkdir(path.join(root, ".ballet"), { recursive: true });
-    await mkdir(path.join(root, ".codex", "agents"), { recursive: true });
     await mkdir(path.join(root, ".agents", "skills", "review"), { recursive: true });
     await mkdir(path.join(root, "src"), { recursive: true });
     await writeFile(path.join(root, ".ballet", "project.json"), "{}\n");
-    await writeFile(path.join(root, ".codex", "agents", "review.toml"), "name = \"Review\"\n");
     await writeFile(path.join(root, ".agents", "skills", "review", "SKILL.md"), "# Review\n");
     await writeFile(path.join(root, "src", "app.ts"), "export {};\n");
     await execFileAsync("git", ["add", "-A"], { cwd: root });
@@ -48,8 +46,7 @@ describe("project config Git status", () => {
     const headBefore = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: root })).stdout.trim();
     const indexBefore = await readFile(path.join(root, ".git", "index"));
 
-    await writeFile(path.join(root, ".ballet", "project.json"), "{\"version\":7,\"agents\":{},\"loops\":[]}\n");
-    await writeFile(path.join(root, ".codex", "agents", "review.toml"), "name = \"Strict review\"\n");
+    await writeFile(path.join(root, ".ballet", "project.json"), "{\"version\":9,\"executionProfiles\":[],\"loops\":[]}\n");
     await rm(path.join(root, ".agents", "skills", "review", "SKILL.md"));
     await writeFile(path.join(root, "src", "app.ts"), "export const changed = true;\n");
 
@@ -57,8 +54,7 @@ describe("project config Git status", () => {
       clean: false,
       changes: [
         { path: ".agents/skills/review/SKILL.md", status: "deleted" },
-        { path: ".ballet/project.json", status: "modified" },
-        { path: ".codex/agents/review.toml", status: "modified" }
+        { path: ".ballet/project.json", status: "modified" }
       ]
     });
     expect((await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: root })).stdout.trim()).toBe(headBefore);

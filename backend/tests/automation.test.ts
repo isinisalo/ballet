@@ -3,20 +3,22 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent } from "../../shared/domain/agents.js";
 import {
   defaultTerminalNodes,
+  type ProjectAgentStep,
   type ProjectAutomationConfig
 } from "../../shared/domain/automation.js";
+import type { ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import {
   loadProjectAutomationConfig,
   saveProjectAutomationConfig,
   validateProjectAutomationConfig
 } from "../automation.js";
+import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 
 const roots: string[] = [];
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v8-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-automation-v9-"));
   roots.push(root);
   return root;
 };
@@ -25,31 +27,37 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-const agent: Agent = {
-  id: "developer-agent",
-  name: "Developer",
-  description: "Implements work.",
-  instructions: "Implement.",
-  skills: [],
-  enabled: true,
-  createdAt: "2026-07-10T00:00:00.000Z",
-  updatedAt: "2026-07-10T00:00:00.000Z"
+const profile: ExecutionProfile = {
+  id: "primary",
+  name: "Primary",
+  provider: "codex",
+  model: "gpt-5",
+  reasoningEffort: "medium",
+  networkAccess: false
 };
 
+const agentStep = (
+  id: string,
+  on: ProjectAgentStep["on"],
+  executionProfileId = profile.id
+): ProjectAgentStep => ({
+  id,
+  type: "agent",
+  executionProfileId,
+  primaryInstructionId: "project:primary",
+  skillIds: [],
+  description: `Execute ${id}.`,
+  nodeStyle: "terra",
+  nodeSize: "medium",
+  on
+});
+
 const config = (): ProjectAutomationConfig => ({
-  version: 8,
+  version: 9,
   loops: [{
     id: "delivery",
     start: "implement",
-    nodes: [{
-      id: "implement",
-      type: "agent",
-      agentId: agent.id,
-      description: "Implement the change.",
-      nodeStyle: "terra",
-      nodeSize: "medium",
-      on: { approved: "review", rejected: "failed" }
-    }, {
+    nodes: [agentStep("implement", { approved: "review", rejected: "failed" }), {
       id: "review",
       type: "human",
       description: "Review the change.",
@@ -60,64 +68,58 @@ const config = (): ProjectAutomationConfig => ({
   }]
 });
 
-describe("automation v8 config", () => {
-  it("round-trips only the canonical v8 shape", async () => {
+describe("automation v9 config", () => {
+  it("round-trips only the canonical v9 shape while preserving ExecutionProfiles", async () => {
     const root = await tempRoot();
-    const saved = await saveProjectAutomationConfig(root, config(), [agent]);
+    new ProjectConfigurationRepository().createExecutionProfile(root, profile);
+    const saved = await saveProjectAutomationConfig(root, config(), [profile]);
     expect(saved).toEqual(config());
-    expect(await loadProjectAutomationConfig(root, [agent])).toEqual(config());
+    expect(await loadProjectAutomationConfig(root)).toEqual(config());
     const raw = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as Record<string, unknown>;
-    expect(raw.version).toBe(8);
-    expect(raw.agents).toEqual({});
+    expect(raw.version).toBe(9);
+    expect(raw.executionProfiles).toEqual([profile]);
+    expect(raw).not.toHaveProperty("agents");
     expect(raw).not.toHaveProperty("runtimes");
     expect(raw).not.toHaveProperty("actions");
     expect(raw).not.toHaveProperty("outputRoutes");
     expect(raw).not.toHaveProperty("humanGateResponses");
   });
 
-  it("rejects missing starts, duplicate nodes, and unknown targets", () => {
+  it("rejects missing starts, duplicate nodes, unknown targets, and missing profiles", () => {
     const base = config();
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{ ...base.loops[0]!, start: "missing" }]
-    }, [agent]).some((issue) => issue.message.includes("executable node"))).toBe(true);
+    }, [profile]).some((issue) => issue.message.includes("executable node"))).toBe(true);
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{ ...base.loops[0]!, nodes: [base.loops[0]!.nodes[0]!, base.loops[0]!.nodes[0]!, ...defaultTerminalNodes()] }]
-    }, [agent]).some((issue) => issue.message.includes("Duplicate node"))).toBe(true);
+    }, [profile]).some((issue) => issue.message.includes("Duplicate node"))).toBe(true);
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{
         ...base.loops[0]!,
         nodes: [{ ...base.loops[0]!.nodes[0]!, on: { approved: "missing", rejected: "failed" } }, ...defaultTerminalNodes()]
       }]
-    }, [agent]).some((issue) => issue.message.includes("unknown node"))).toBe(true);
+    }, [profile]).some((issue) => issue.message.includes("unknown node"))).toBe(true);
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{
         ...base.loops[0]!,
-        nodes: [{ ...base.loops[0]!.nodes[0]!, on: { approved: "implement" } }, ...defaultTerminalNodes()]
+        nodes: [agentStep("implement", { approved: "completed", rejected: "failed" }, "missing"), ...defaultTerminalNodes()]
       }]
-    }, [agent]).some((issue) => issue.path.includes("on.rejected"))).toBe(true);
+    }, [profile])).toContainEqual(expect.objectContaining({ path: "loops.0.nodes.0.executionProfileId" }));
     expect(validateProjectAutomationConfig({
       ...base,
       loops: [{
         id: "cycle",
         start: "again",
-        nodes: [{
-          id: "again",
-          type: "agent",
-          agentId: agent.id,
-          description: "Cycle forever.",
-          nodeStyle: "terra",
-          nodeSize: "medium",
-          on: { approved: "again", rejected: "again" }
-        }, ...defaultTerminalNodes()]
+        nodes: [agentStep("again", { approved: "again", rejected: "again" }), ...defaultTerminalNodes()]
       }]
-    }, [agent]).some((issue) => issue.message.includes("terminal or cross-loop"))).toBe(true);
+    }, [profile]).some((issue) => issue.message.includes("terminal or cross-loop"))).toBe(true);
   });
 
-  it("allows agent and human cross-loop transitions but never back to the same loop", () => {
+  it("allows Agent and Human cross-Loop transitions but never back to the same Loop", () => {
     const target = {
       id: "release",
       start: "finish",
@@ -135,13 +137,10 @@ describe("automation v8 config", () => {
       ...base,
       loops: [{
         ...base.loops[0]!,
-        nodes: [{
-          ...base.loops[0]!.nodes[0]!,
-          on: { approved: { loop: "release" }, rejected: "failed" }
-        }, ...defaultTerminalNodes()]
+        nodes: [agentStep("implement", { approved: { loop: "release" }, rejected: "failed" }), ...defaultTerminalNodes()]
       }, target]
     };
-    expect(validateProjectAutomationConfig(agentCrossLoop, [agent])).toEqual([]);
+    expect(validateProjectAutomationConfig(agentCrossLoop, [profile])).toEqual([]);
 
     const humanSelfLoop = {
       ...base,
@@ -152,16 +151,16 @@ describe("automation v8 config", () => {
           : node)
       }]
     };
-    expect(validateProjectAutomationConfig(humanSelfLoop, [agent]).some((issue) =>
+    expect(validateProjectAutomationConfig(humanSelfLoop, [profile]).some((issue) =>
       issue.message.includes("different loop")
     )).toBe(true);
   });
 });
 
-describe("cyclic and cross-loop paths", () => {
-  it("allows an all-approved cycle across loops when each Step has an exit", () => {
+describe("cyclic and cross-Loop paths", () => {
+  it("allows an all-approved cycle across Loops when each Step has an exit", () => {
     const cyclic: ProjectAutomationConfig = {
-      version: 8,
+      version: 9,
       loops: [{
         id: "planning",
         start: "approve-plan",
@@ -187,46 +186,30 @@ describe("cyclic and cross-loop paths", () => {
       }]
     };
 
-    expect(validateProjectAutomationConfig(cyclic, [agent])).toEqual([]);
+    expect(validateProjectAutomationConfig(cyclic, [profile])).toEqual([]);
   });
 
-  it("allows a short all-approved chain across loops", () => {
+  it("allows a short all-approved chain across Loops", () => {
     const short: ProjectAutomationConfig = {
-      version: 8,
+      version: 9,
       loops: [{
         id: "delivery",
         start: "implement",
-        nodes: [{
-          id: "implement",
-          type: "agent",
-          agentId: agent.id,
-          description: "Implement the task.",
-          nodeStyle: "terra",
-          nodeSize: "medium",
-          on: { approved: "code-gate", rejected: "blocked" }
-        }, {
+        nodes: [agentStep("implement", { approved: "code-gate", rejected: "blocked" }), {
           id: "code-gate",
           type: "human",
           description: "Approve the task.",
           nodeStyle: "luna",
           nodeSize: "tiny",
-          on: { approved: { loop: "dev-deployment" }, rejected: "implement" }
+          on: { approved: { loop: "deployment" }, rejected: "implement" }
         }, ...defaultTerminalNodes()]
       }, {
-        id: "dev-deployment",
+        id: "deployment",
         start: "deploy",
-        nodes: [{
-          id: "deploy",
-          type: "agent",
-          agentId: agent.id,
-          description: "Deploy to dev.",
-          nodeStyle: "terra",
-          nodeSize: "medium",
-          on: { approved: "completed", rejected: "failed" }
-        }, ...defaultTerminalNodes()]
+        nodes: [agentStep("deploy", { approved: "completed", rejected: "failed" }), ...defaultTerminalNodes()]
       }]
     };
 
-    expect(validateProjectAutomationConfig(short, [agent])).toEqual([]);
+    expect(validateProjectAutomationConfig(short, [profile])).toEqual([]);
   });
 });

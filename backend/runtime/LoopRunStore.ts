@@ -1,19 +1,18 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import type { ProjectExecutableStep, ProjectLoop } from "../../shared/domain/automation.js";
-import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
-  AgentOutcome,
   ExecutionRuntimeSnapshot,
-  LoopExecutionPlan,
   LoopRun,
   LoopRunDetails,
   LoopRunSource,
+  StepOutcome,
   StepRun,
   StepRunResult
 } from "../../shared/domain/runtime.js";
 import { stringifyJson } from "./RuntimeJson.js";
 import { toLoopRun, toStepRun } from "./RuntimeRowMappers.js";
+import { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
 import type {
   LoopRunRow,
   StepRunRow
@@ -23,22 +22,26 @@ import { now } from "./RuntimeDbTypes.js";
 export interface CreateLoopRunInput {
   runId?: string;
   loop: ProjectLoop;
-  themeSnapshot: LoopTheme;
   rootRunId?: string;
   parentRunId?: string;
   parentStepRunId?: string;
   source: LoopRunSource;
   input?: string;
-  executionPlan?: LoopExecutionPlan;
   schedule?: { stepId: string; scheduledFor: string };
 }
 
 export class LoopRunStore {
-  constructor(private readonly connection: () => Database.Database) {}
+  private readonly snapshots: RootExecutionSnapshotStore;
+
+  constructor(private readonly connection: () => Database.Database) {
+    this.snapshots = new RootExecutionSnapshotStore(connection);
+  }
 
   getLoopRun(runId: string): LoopRun | undefined {
     const row = this.connection().prepare("SELECT * FROM loop_runs WHERE run_id = ?").get(runId) as LoopRunRow | undefined;
-    return row ? toLoopRun(row) : undefined;
+    if (!row) return undefined;
+    const snapshot = this.snapshots.require(row.root_run_id);
+    return toLoopRun(row, this.snapshots.loop(snapshot, row.loop_id), snapshot.theme);
   }
 
   getStepRun(stepRunId: string): StepRun | undefined {
@@ -97,12 +100,12 @@ export class LoopRunStore {
     this.connection().prepare(`
       INSERT INTO loop_runs (
         run_id, loop_id, root_run_id, parent_run_id, parent_step_run_id,
-        source, status, execution_plan_json, schedule_step_id, scheduled_for,
-        input, snapshot_json, transition_count, created_at, updated_at
+        source, status, schedule_step_id, scheduled_for,
+        input, transition_count, created_at, updated_at
       ) VALUES (
         @runId, @loopId, @rootRunId, @parentRunId, @parentStepRunId,
-        @source, 'running', @executionPlanJson, @scheduleStepId, @scheduledFor,
-        @input, @snapshotJson, 0, @createdAt, @updatedAt
+        @source, 'running', @scheduleStepId, @scheduledFor,
+        @input, 0, @createdAt, @updatedAt
       )
     `).run({
       runId,
@@ -111,14 +114,9 @@ export class LoopRunStore {
       parentRunId: input.parentRunId ?? null,
       parentStepRunId: input.parentStepRunId ?? null,
       source: input.source,
-      executionPlanJson: input.executionPlan ? stringifyJson(input.executionPlan) : null,
       scheduleStepId: input.schedule?.stepId ?? null,
       scheduledFor: input.schedule?.scheduledFor ?? null,
       input: input.input ?? null,
-      snapshotJson: stringifyJson({
-        loop: input.loop,
-        theme: input.themeSnapshot
-      }),
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -133,10 +131,10 @@ export class LoopRunStore {
     const status = step.type === "human" ? "waiting_for_human" : "queued";
     this.connection().prepare(`
       INSERT INTO step_runs (
-        step_run_id, run_id, loop_id, step_id, step_type, agent_id,
+        step_run_id, run_id, loop_id, step_id, step_type,
         status, input, attempt, created_at, updated_at
       ) VALUES (
-        @stepRunId, @runId, @loopId, @stepId, @stepType, @agentId,
+        @stepRunId, @runId, @loopId, @stepId, @stepType,
         @status, @input, 0, @createdAt, @updatedAt
       )
     `).run({
@@ -144,8 +142,7 @@ export class LoopRunStore {
       runId: run.runId,
       loopId: run.loopId,
       stepId: step.id,
-      stepType: step.type === "human" ? "human" : "agent",
-      agentId: step.type === "human" ? null : step.agentId,
+      stepType: step.type,
       status,
       input: input ?? null,
       createdAt: timestamp,
@@ -165,11 +162,11 @@ export class LoopRunStore {
 
   completeStepRun(stepRun: StepRun, result: StepRunResult, options: {
     responseInput?: string;
-    outcome?: AgentOutcome;
+    outcome?: StepOutcome;
     error?: string;
-  }): void {
+  }): StepRun {
     const timestamp = now();
-    this.connection().prepare(`
+    const update = this.connection().prepare(`
       UPDATE step_runs SET status = 'completed',
         response_input = COALESCE(@responseInput, response_input), result = @result,
         outcome_json = @outcomeJson, error = @error,
@@ -184,12 +181,16 @@ export class LoopRunStore {
       completedAt: timestamp,
       updatedAt: timestamp
     });
+    if (update.changes !== 1) throw new Error(`Step run ${stepRun.stepRunId} was not completed.`);
+    const stored = this.getStepRun(stepRun.stepRunId);
+    if (!stored) throw new Error(`Step run ${stepRun.stepRunId} was not found after completion.`);
+    return stored;
   }
 
-  pauseStepRunForInput(stepRun: StepRun, outcome: AgentOutcome): void {
+  pauseStepRunForInput(stepRun: StepRun, outcome: StepOutcome): void {
     this.connection().prepare(`
       UPDATE step_runs SET status = 'needs_input', result = NULL,
-        outcome_json = ?, error = NULL, completed_at = NULL, updated_at = ?
+        response_input = NULL, outcome_json = ?, error = NULL, completed_at = NULL, updated_at = ?
       WHERE step_run_id = ?
     `).run(stringifyJson(outcome), now(), stepRun.stepRunId);
   }
@@ -197,7 +198,7 @@ export class LoopRunStore {
   finishStepRunWithoutTransition(
     stepRun: StepRun,
     status: "blocked" | "failed",
-    outcome: AgentOutcome,
+    outcome: StepOutcome,
     error?: string
   ): void {
     const timestamp = now();
@@ -217,7 +218,7 @@ export class LoopRunStore {
     const result = this.connection().prepare(`
       UPDATE step_runs SET status = 'queued', execution_task_id = NULL, input = ?,
         response_input = ?, result = NULL, error = NULL, completed_at = NULL, updated_at = ?
-      WHERE step_run_id = ? AND step_type = 'agent' AND status = 'needs_input'
+      WHERE step_run_id = ? AND step_type IN ('agent','scheduled') AND status = 'needs_input'
     `).run(input, responseInput, timestamp, stepRun.stepRunId);
     if (result.changes !== 1) throw new Error(`Step run ${stepRun.stepRunId} is no longer waiting for input.`);
     const stored = this.getStepRun(stepRun.stepRunId);
@@ -228,7 +229,7 @@ export class LoopRunStore {
   bindStepExecution(stepRunId: string, taskId: string, snapshot: ExecutionRuntimeSnapshot): StepRun {
     const result = this.connection().prepare(`
       UPDATE step_runs SET execution_task_id = ?, execution_snapshot_json = ?, updated_at = ?
-      WHERE step_run_id = ? AND step_type = 'agent' AND execution_task_id IS NULL
+      WHERE step_run_id = ? AND step_type IN ('agent','scheduled') AND execution_task_id IS NULL
     `).run(taskId, stringifyJson(snapshot), now(), stepRunId);
     if (result.changes !== 1) throw new Error(`Step run ${stepRunId} already has an execution task.`);
     const stepRun = this.getStepRun(stepRunId);

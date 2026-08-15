@@ -16,7 +16,7 @@ export function StepResponsePanel({
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
-  const needsInput = stepRun.type === "agent" && stepRun.status === "needs_input";
+  const needsInput = stepRun.type !== "human" && stepRun.status === "needs_input";
   const error = attempted && !input.trim() ? "Response is required." : undefined;
   const busy = pending || submitting;
 
@@ -56,7 +56,7 @@ export function StepResponsePanel({
   return (
     <form
       className="grid gap-3 border-t border-tertiary/40 bg-card p-4"
-      aria-label={needsInput ? `Agent input ${stepRun.stepId}` : `Human gate ${stepRun.stepId}`}
+      aria-label={needsInput ? `Step input ${stepRun.stepId}` : `Human gate ${stepRun.stepId}`}
       noValidate
       onSubmit={(event) => void respond(event)}
       onKeyDown={(event) => {

@@ -1,20 +1,22 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
+import { stepOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import type {
-  AgentOutcome,
   ExecutionEvent,
   ExecutionEventPage,
   ExecutionSpec,
   ExecutionTask,
-  ExecutionTaskStatus
+  ExecutionTaskStatus,
+  StepOutcome
 } from "../../shared/domain/runtime.js";
 import { ExecutionTaskNotFoundError } from "./ExecutionErrors.js";
+import { ExecutionTaskStateStore } from "./ExecutionTaskStateStore.js";
 
 const MAX_RETAINED_BYTES = 1024 * 1024;
 
 interface TaskRow {
   task_id: string; kind: ExecutionTask["kind"]; root_run_id: string; status: ExecutionTaskStatus;
-  spec_json: string; started_at: string | null; completed_at: string | null;
+  spec_json: string; spec_hash: string; started_at: string | null; completed_at: string | null;
   cancel_requested_at: string | null; error_code: string | null; error_message: string | null;
   outcome_json: string | null; events_truncated: 0 | 1; created_at: string; updated_at: string;
 }
@@ -29,9 +31,14 @@ interface EventRow {
 export type ExecutionEventInput = Omit<ExecutionEvent, "id" | "taskId" | "contentBytes">;
 
 export class ExecutionStore {
-  constructor(private readonly connection: () => Database.Database) {}
+  private readonly states: ExecutionTaskStateStore;
+
+  constructor(private readonly connection: () => Database.Database) {
+    this.states = new ExecutionTaskStateStore(connection);
+  }
 
   create(spec: ExecutionSpec): ExecutionTask {
+    assertExecutionSpec(spec);
     const specJson = JSON.stringify(spec);
     this.connection().prepare(`
       INSERT INTO execution_tasks (
@@ -89,17 +96,23 @@ export class ExecutionStore {
     return rows.map(toTask);
   }
 
-  start(taskId: string): ExecutionTask {
-    const timestamp = new Date().toISOString();
-    this.connection().prepare(`
-      UPDATE execution_tasks SET status = 'running', started_at = COALESCE(started_at, ?), updated_at = ?
-      WHERE task_id = ? AND status = 'queued'
-    `).run(timestamp, timestamp, taskId);
-    return this.require(taskId);
+  claim(taskId: string): ExecutionTask | undefined {
+    return this.states.claim(taskId, new Date().toISOString())
+      ? this.require(taskId)
+      : undefined;
+  }
+
+  cancelActiveByRoot(rootRunId: string, timestamp: string): string[] {
+    return this.states.cancelActiveByRoot(rootRunId, timestamp);
+  }
+
+  rejectUnrunnableQueued(): ExecutionTask[] {
+    return this.states.rejectUnrunnableQueued(new Date().toISOString())
+      .map((taskId) => this.require(taskId));
   }
 
   finish(taskId: string, status: "succeeded" | "failed" | "cancelled", detail: {
-    outcome?: AgentOutcome; errorCode?: string; errorMessage?: string;
+    outcome?: StepOutcome; errorCode?: string; errorMessage?: string;
   } = {}): ExecutionTask {
     const existing = this.require(taskId);
     if (["succeeded", "failed", "cancelled"].includes(existing.status)) return existing;
@@ -191,6 +204,12 @@ export class ExecutionStore {
     };
   }
 
+  hasTerminalEvent(taskId: string): boolean {
+    return Boolean(this.connection().prepare(`
+      SELECT 1 FROM execution_events WHERE task_id = ? AND terminal = 1 LIMIT 1
+    `).get(taskId));
+  }
+
   private lastSequence(taskId: string): number {
     const row = this.connection().prepare("SELECT last_sequence FROM execution_tasks WHERE task_id = ?")
       .get(taskId) as { last_sequence: number };
@@ -215,15 +234,47 @@ export class ExecutionStore {
   }
 }
 
-const toTask = (row: TaskRow): ExecutionTask => ({
-  id: row.task_id, kind: row.kind, rootRunId: row.root_run_id, status: row.status,
-  spec: JSON.parse(row.spec_json) as ExecutionSpec,
-  startedAt: row.started_at ?? undefined, completedAt: row.completed_at ?? undefined,
-  cancelRequestedAt: row.cancel_requested_at ?? undefined, errorCode: row.error_code ?? undefined,
-  errorMessage: row.error_message ?? undefined,
-  outcome: row.outcome_json ? JSON.parse(row.outcome_json) as AgentOutcome : undefined,
-  createdAt: row.created_at, updatedAt: row.updated_at
-});
+const toTask = (row: TaskRow): ExecutionTask => {
+  if (sha256(row.spec_json) !== row.spec_hash) {
+    throw new Error(`Execution task ${row.task_id} has invalid persisted specification evidence.`);
+  }
+  const spec = JSON.parse(row.spec_json) as ExecutionSpec;
+  assertExecutionSpec(spec);
+  if (spec.taskId !== row.task_id || spec.rootRunId !== row.root_run_id || spec.kind !== row.kind) {
+    throw new Error(`Execution task ${row.task_id} has inconsistent persisted specification identity.`);
+  }
+  return {
+    id: row.task_id, kind: row.kind, rootRunId: row.root_run_id, status: row.status,
+    spec,
+    startedAt: row.started_at ?? undefined, completedAt: row.completed_at ?? undefined,
+    cancelRequestedAt: row.cancel_requested_at ?? undefined, errorCode: row.error_code ?? undefined,
+    errorMessage: row.error_message ?? undefined,
+    outcome: row.outcome_json ? JSON.parse(row.outcome_json) as StepOutcome : undefined,
+    createdAt: row.created_at, updatedAt: row.updated_at
+  };
+};
+
+const assertExecutionSpec = (spec: ExecutionSpec): void => {
+  if (spec.version !== 2 || spec.kind !== "loop_step") {
+    throw new Error(`Execution task ${spec.taskId} has an unsupported persisted specification.`);
+  }
+  const promptHash = sha256(spec.evidence.prompt);
+  if (promptHash !== spec.evidence.promptSha256) {
+    throw new Error(`Execution task ${spec.taskId} has invalid prompt evidence.`);
+  }
+  const schemaHash = sha256(JSON.stringify(stepOutcomeJsonSchema));
+  if (spec.evidence.outputSchemaVersion !== 1 || spec.evidence.outputSchemaSha256 !== schemaHash) {
+    throw new Error(`Execution task ${spec.taskId} has invalid output schema evidence.`);
+  }
+  if (spec.evidence.executionProfile.provider !== spec.runtime.provider
+    || spec.evidence.executionProfile.model !== spec.runtime.model
+    || spec.evidence.executionProfile.reasoningEffort !== spec.runtime.reasoning
+    || spec.evidence.executionProfile.networkAccess !== spec.runtime.policy.network) {
+    throw new Error(`Execution task ${spec.taskId} has inconsistent profile and runtime evidence.`);
+  }
+};
+
+const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
 
 const toEvent = (row: EventRow): ExecutionEvent => ({
   id: row.id, taskId: row.task_id, sequence: row.sequence, source: row.source, kind: row.kind,

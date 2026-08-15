@@ -2,33 +2,30 @@ import path from "node:path";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
-import { loadAgents, loadBalletProject, loadBalletProjectTree, loadSkills } from "../markdown.js";
-import { agentFromDocument, projectFromDocument, skillDocumentFromDocument } from "./documentMappers.js";
-import { buildSkillLookup } from "./skillLookup.js";
+import { loadBalletProject, loadBalletProjectTree } from "../markdown.js";
+import { projectFromDocument } from "./documentMappers.js";
+import { loadProjectResources } from "./projectResourceCatalog.js";
 
 export type WorkspaceContentData = Omit<AppData,
-  "runtime" | "agentRuntimeConfigurations" | "executionStates" | "runTargets" | "loopRuns" | "scheduleStates">;
+  "runtime" | "runtimeConfigurationIssues" | "runTargets" | "loopRuns" | "scheduleStates">;
 
 export const loadMarkdownAppData = async (root: string): Promise<WorkspaceContentData> => {
-  const [projectDocs, projectDocumentTree, agentDocs, skillDocs] = await Promise.all([
+  const [projectDocs, projectDocumentTree, resources] = await Promise.all([
     loadBalletProject(root),
     loadBalletProjectTree(root),
-    loadAgents(root),
-    loadSkills(root)
+    loadProjectResources(root)
   ]);
 
   const project = projectDocs[0] ? projectFromDocument(projectDocs[0]) : {
     id: path.basename(root), name: path.basename(root), description: "Local Git checkout",
     status: "active" as const, createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString()
   };
-  const skills = skillDocs.map(skillDocumentFromDocument);
-  const skillLookup = buildSkillLookup(skills);
-  const agents = agentDocs.map((doc) => agentFromDocument(doc, skillLookup));
-
   return {
     project,
-    agents,
-    skills,
+    executionProfiles: [],
+    instructions: resources.instructions,
+    skills: resources.skills,
+    resourceIssues: resources.issues,
     automation: defaultProjectAutomationConfig(),
     automationIssues: [],
     loopTheme: structuredClone(defaultLoopTheme),

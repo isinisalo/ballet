@@ -227,11 +227,6 @@ body {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
-.loop-agent-avatar {
-  width: 42%;
-  height: 42%;
-}
-
 .loop-react-flow .loop-react-flow-handle {
   width: 1px;
   height: 1px;
@@ -471,31 +466,6 @@ body {
 
 .markdown-document-preview code {
   font-family: var(--font-mono);
-}
-
-.agent-instructions-preview .markdown-body {
-  font-size: 0.8125rem;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-
-.agent-instructions-preview .markdown-body h1 {
-  font-size: 1.05rem;
-}
-
-.agent-instructions-preview .markdown-body h2 {
-  font-size: 0.95rem;
-}
-
-.agent-instructions-preview .markdown-body h3 {
-  font-size: 0.875rem;
-}
-
-.agent-instructions-preview .markdown-body h1,
-.agent-instructions-preview .markdown-body h2,
-.agent-instructions-preview .markdown-body h3,
-.agent-instructions-preview .markdown-body h4 {
-  margin-top: 0.9rem;
 }
 
 @theme inline {

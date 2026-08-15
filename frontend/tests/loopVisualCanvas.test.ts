@@ -5,7 +5,7 @@ import {
   loopNodeSizeCatalog,
   loopNodeSizes,
   loopNodeStyles,
-  type Agent,
+  type ExecutionProfile,
   type LoopRunDetails,
   type ProjectAutomationConfig
 } from "@shared/api/workspace-contracts";
@@ -20,17 +20,34 @@ import { loopActiveHandleIdsByNodeKey, loopNodeHandles, toLoopReactFlowEdges } f
 import { loopSmartEdgeRoutingOptions } from "../src/workspace/automation/loops/loopSmartEdgeRouting";
 import { buildLoopVisualProjection } from "../src/workspace/automation/loops/loopVisualProjection";
 
+const profileId = "codex-test-medium";
+const primaryInstructionId = "project:test-instruction";
+const profile = (id = profileId, reasoningEffort = "medium"): ExecutionProfile => ({
+  id,
+  name: `Codex test · ${reasoningEffort}`,
+  provider: "codex",
+  model: "gpt-test",
+  reasoningEffort,
+  networkAccess: false
+});
+const composition = (executionProfileId = profileId) => ({
+  executionProfileId,
+  primaryInstructionId,
+  skillIds: []
+});
+const executionProfiles = [profile()];
+
 const config: ProjectAutomationConfig = {
-  version: 8,
+  version: 9,
   loops: [{
     id: "brief",
     start: "create",
     nodes: [{
       id: "create",
       type: "agent",
+      ...composition(),
       nodeStyle: "terra",
       nodeSize: "medium",
-      agentId: "brief-agent",
       description: "Create brief",
       on: { approved: "gate", rejected: "failed" }
     }, {
@@ -47,9 +64,9 @@ const config: ProjectAutomationConfig = {
     nodes: [{
       id: "create-roadmap",
       type: "agent",
+      ...composition(),
       nodeStyle: "flat",
       nodeSize: "medium",
-      agentId: "roadmap-agent",
       description: "Create roadmap",
       on: { approved: "completed", rejected: "blocked" }
     }, ...defaultTerminalNodes()]
@@ -59,7 +76,7 @@ const config: ProjectAutomationConfig = {
 describe("terminal canvas nodes", () => {
   it("shares one terminal node across multiple incoming transitions", () => {
     const sharedTerminalConfig: ProjectAutomationConfig = {
-      version: 8,
+      version: 9,
       loops: [{
         id: "shared-terminal",
         start: "gate",
@@ -85,7 +102,7 @@ describe("terminal canvas nodes", () => {
   });
 });
 
-describe("v8 compact loop canvas", () => {
+describe("v9 compact loop canvas", () => {
   it("contains only Approved and Rejected edges even when runtime state needs input", () => {
     const run = {
       runId: "run-1",
@@ -104,7 +121,6 @@ describe("v8 compact loop canvas", () => {
         loopId: "brief",
         stepId: "create",
         type: "agent",
-        agentId: "brief-agent",
         status: "needs_input",
         outcome: {
           state: "needs_input",
@@ -118,7 +134,7 @@ describe("v8 compact loop canvas", () => {
         updatedAt: "2026-07-18T10:01:00.000Z"
       }]
     } as LoopRunDetails;
-    const projection = buildLoopVisualProjection(config, config.loops[0]!, run);
+    const projection = buildLoopVisualProjection(config, config.loops[0]!, run, executionProfiles);
     const layout = calculateCompositeLoopCanvasLayout({
       config: projection.config,
       selectedLoopId: "brief",
@@ -132,7 +148,7 @@ describe("v8 compact loop canvas", () => {
   });
 
   it("projects styled nodes, reachable terminal nodes, and cross-Loop transitions", () => {
-    const projection = buildLoopVisualProjection(config, config.loops[0]!);
+    const projection = buildLoopVisualProjection(config, config.loops[0]!, undefined, executionProfiles);
     const layout = calculateCompositeLoopCanvasLayout({
       config: projection.config,
       selectedLoopId: "brief",
@@ -145,7 +161,7 @@ describe("v8 compact loop canvas", () => {
     expect(stepNodes.map((node) => [node.width, node.height])).toEqual([[48, 48], [24, 24]]);
     expect(layout.nodes.some((node) => node.kind === "loop" && node.loopSummary?.loopId === "roadmap")).toBe(true);
     expect(terminalNodes.map((node) => node.record?.step?.displayId)).toEqual(["failed"]);
-    expect(layout.nodes.some((node) => node.kind === "output-event")).toBe(false);
+    expect(new Set(layout.nodes.map((node) => node.kind))).toEqual(new Set(["step", "loop"]));
     const crossLoopEdge = layout.edges.find((edge) => edge.tone === "cross-loop" && edge.route?.targetLoopId === "roadmap");
     expect(crossLoopEdge).toBeDefined();
     expect(loopEdgeDisplayLabel(crossLoopEdge)).toBeUndefined();
@@ -155,38 +171,38 @@ describe("v8 compact loop canvas", () => {
 
   it("keeps direct branches, semantic terminals, and cycle return arcs", () => {
     const cyclic: ProjectAutomationConfig = {
-      version: 8,
+      version: 9,
       loops: [{
         id: "cycle",
         start: "prepare",
         nodes: [{
           id: "prepare",
           type: "agent",
+          ...composition(),
           nodeStyle: "flat",
           nodeSize: "medium",
-          agentId: "agent",
           description: "Prepare",
           on: { approved: "review", rejected: "repair" }
         }, {
           id: "review",
           type: "agent",
+          ...composition(),
           nodeStyle: "mars",
           nodeSize: "small",
-          agentId: "agent",
           description: "Review",
           on: { approved: "completed", rejected: "prepare" }
         }, {
           id: "repair",
           type: "agent",
+          ...composition(),
           nodeStyle: "vector-planet",
           nodeSize: "tiny",
-          agentId: "agent",
           description: "Repair",
           on: { approved: "blocked", rejected: "failed" }
         }, ...defaultTerminalNodes()]
       }]
     };
-    const projection = buildLoopVisualProjection(cyclic, cyclic.loops[0]!);
+    const projection = buildLoopVisualProjection(cyclic, cyclic.loops[0]!, undefined, executionProfiles);
     const layout = calculateCompositeLoopCanvasLayout({
       config: projection.config,
       selectedLoopId: "cycle",
@@ -206,7 +222,8 @@ describe("v8 compact loop canvas", () => {
     expect(terminalNodes.every((node) => layout.edges.some((edge) => edge.targetNodeKey === node.key))).toBe(true);
     expect(terminalNodes.every((node) => layout.edges.every((edge) => edge.sourceNodeKey !== node.key))).toBe(true);
     const activeHandleIds = loopActiveHandleIdsByNodeKey(layout.edges);
-    expect(terminalNodes.every((node) => loopNodeHandles(node, activeHandleIds.get(node.key) ?? []).every((handle) => handle.type === "target"))).toBe(true);
+    expect(terminalNodes.every((node) => (loopNodeHandles(node, activeHandleIds.get(node.key) ?? []) ?? [])
+      .every((handle) => handle.type === "target"))).toBe(true);
     expect(layout.nodes.some((node) => node.kind === "first-step-ghost")).toBe(false);
     expect(loopEdgeDomAttributes(rejected, defaultLoopTheme, true)).toMatchObject({
       "data-loop-edge-animated": "true",
@@ -246,16 +263,15 @@ describe("Loop node style geometry", () => {
     const steps = combinations.map(([nodeStyle, nodeSize], index) => ({
       id: `${nodeStyle}-${nodeSize}`,
       type: "agent" as const,
+      ...composition(),
       nodeStyle,
       nodeSize,
-      agentId: `agent-${nodeStyle}-${nodeSize}`,
-      description: "",
+      description: `Render ${nodeStyle} at ${nodeSize} size`,
       on: { approved: combinations[index + 1] ? `${combinations[index + 1]![0]}-${combinations[index + 1]![1]}` : "completed", rejected: "blocked" }
     }));
     const styledLoop = { id: "styled", start: "flat-tiny", nodes: [...steps, ...defaultTerminalNodes()] } satisfies ProjectAutomationConfig["loops"][number];
-    const styledConfig = { version: 8, loops: [styledLoop] } satisfies ProjectAutomationConfig;
-    const agents = steps.map((step) => ({ id: step.agentId })) as Agent[];
-    const projection = buildLoopVisualProjection(styledConfig, styledLoop, null, agents);
+    const styledConfig = { version: 9, loops: [styledLoop] } satisfies ProjectAutomationConfig;
+    const projection = buildLoopVisualProjection(styledConfig, styledLoop, null, executionProfiles);
     const layout = calculateCompositeLoopCanvasLayout({ config: projection.config, selectedLoopId: styledLoop.id, recordsByLoopId: projection.recordsByLoopId });
     const stepNodes = layout.nodes.filter((node) => node.kind === "step" && !node.record?.step?.terminal);
 
@@ -270,41 +286,30 @@ describe("Loop node style geometry", () => {
     expect(loopLayoutNodeSizes.step).toMatchObject({ minWidth: 24, maxWidth: 64, height: 64 });
   });
 
-  it("projects a scheduled agent into Luna geometry with immutable agent reasoning", () => {
+  it("projects a Scheduled Step into Luna geometry with its selected ExecutionProfile reasoning", () => {
+    const scheduledProfileId = "codex-deploy-xhigh";
     const scheduledLoop = {
       id: "scheduled",
       start: "timer",
       nodes: [{
         id: "timer",
         type: "scheduled",
+        ...composition(scheduledProfileId),
         nodeStyle: "luna",
         nodeSize: "tiny",
-        agentId: "deploy-agent",
         description: "Deploy",
         schedule: { kind: "recurring", cadence: "weekdays", startsOn: "2026-07-13", time: "09:00", timeZone: "Europe/Helsinki" },
         on: { approved: "completed", rejected: "blocked" }
       }, ...defaultTerminalNodes()]
     } satisfies ProjectAutomationConfig["loops"][number];
-    const scheduledConfig = { version: 8, loops: [scheduledLoop] } satisfies ProjectAutomationConfig;
-    const run = {
-      executionPlan: {
-        steps: [{
-          loopId: scheduledLoop.id,
-          stepId: "timer",
-          agentId: "deploy-agent",
-          agent: {},
-          runtime: { reasoning: "xhigh" }
-        }]
-      },
-      stepRuns: []
-    } as unknown as LoopRunDetails;
-    const projection = buildLoopVisualProjection(scheduledConfig, scheduledLoop, run, [], [{ agentId: "deploy-agent", status: "idle", reasoning: "low" }]);
+    const scheduledConfig = { version: 9, loops: [scheduledLoop] } satisfies ProjectAutomationConfig;
+    const projection = buildLoopVisualProjection(scheduledConfig, scheduledLoop, undefined, [profile(scheduledProfileId, "xhigh")]);
     const layout = calculateCompositeLoopCanvasLayout({ config: projection.config, selectedLoopId: scheduledLoop.id, recordsByLoopId: projection.recordsByLoopId });
     const scheduledNode = layout.nodes.find((node) => node.record?.step?.scheduled);
 
     expect(scheduledNode).toMatchObject({ width: 24, height: 24 });
     expect(scheduledNode?.record?.step).toMatchObject({
-      agentId: "deploy-agent",
+      executionProfileId: scheduledProfileId,
       nodeStyle: "luna",
       reasoningEffort: "xhigh",
       scheduleLabel: "Weekdays · 09:00 · Europe/Helsinki"
@@ -352,39 +357,40 @@ describe("global Loop theme rendering", () => {
     expect(loopEdgeLineStyle(rejected, themed)).toBe("solid");
   });
 
-  it("keeps the global theme tokens and avatar visibility explicit", () => {
+  it("keeps the strict v3 global theme tokens explicit", () => {
     expect(defaultLoopTheme).toMatchObject({
-      version: 2,
-      node: { labelColor: "#ffb95f", glowColor: "#8b90a0", showAgentAvatarInNode: false },
+      version: 3,
+      node: { labelColor: "#ffb95f", glowColor: "#8b90a0" },
       edge: { color: "#76d4ca", labelColor: "#c1c6d7" },
       connectionPoint: { style: "near", color: "#e3fffb" }
     });
   });
 
-  it("uses the immutable execution-plan avatar instead of mutable live agent metadata", () => {
-    const avatarLoop = {
-      id: "avatar-loop",
+  it("derives reasoning from the Step's selected ExecutionProfile", () => {
+    const selectedProfileId = "codex-builder-medium";
+    const profileLoop = {
+      id: "profile-loop",
       start: "build",
       nodes: [{
         id: "build",
         type: "agent",
+        ...composition(selectedProfileId),
         nodeStyle: "flat",
         nodeSize: "medium",
-        agentId: "builder",
-        description: "",
+        description: "Build",
         on: { approved: "completed", rejected: "blocked" }
       }, ...defaultTerminalNodes()]
     } satisfies ProjectAutomationConfig["loops"][number];
-    const avatarConfig = { version: 8, loops: [avatarLoop] } satisfies ProjectAutomationConfig;
-    const run = {
-      executionPlan: {
-        steps: [{ loopId: avatarLoop.id, stepId: "build", agentId: "builder", agent: { avatar: "rocket" }, runtime: { reasoning: "medium" } }]
-      },
-      stepRuns: []
-    } as unknown as LoopRunDetails;
+    const profileConfig = { version: 9, loops: [profileLoop] } satisfies ProjectAutomationConfig;
+    const profiles = [profile("codex-unrelated-ultra", "ultra"), profile(selectedProfileId, "medium")];
 
-    const projection = buildLoopVisualProjection(avatarConfig, avatarLoop, run, [{ id: "builder", avatar: "bot" } as Agent]);
-    expect(projection.config.steps[0]).toMatchObject({ avatar: "rocket", reasoningEffort: "medium" });
+    const projection = buildLoopVisualProjection(profileConfig, profileLoop, undefined, profiles);
+    expect(projection.config.steps[0]).toMatchObject({ executionProfileId: selectedProfileId, reasoningEffort: "medium" });
+    expect(projection.config.steps[0]).not.toHaveProperty("avatar");
+
+    const unavailable = buildLoopVisualProjection(profileConfig, profileLoop, undefined, profiles, new Set());
+    expect(unavailable.config.steps[0]).toMatchObject({ executionProfileId: selectedProfileId });
+    expect(unavailable.config.steps[0]?.reasoningEffort).toBeUndefined();
   });
 
   it("resolves near and flow endpoints and uses five-pixel connection points", () => {

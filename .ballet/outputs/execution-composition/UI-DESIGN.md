@@ -1,258 +1,255 @@
-# Execution composition — Node editor -suunnitelma
+# Execution composition — v9 UI contract
 
-Tila: ihmisen tarkistettava UI-ehdotus. Production-koodia tai `DESIGN.md`:ää ei ole muutettu.
+Tila: hyväksytty V1-suunnitelma ja production-käyttöliittymän dokumentaatio.
 
 ## Käyttäjän tavoite
 
-Käyttäjä ymmärtää yhdestä näkymästä:
+Käyttäjä ymmärtää yhdestä Node editorista:
 
-- mitä valittu Step tekee;
-- millä nimetyllä execution profilella se ajetaan;
-- mikä yksi primary instruction ohjaa työtä;
-- mitkä optional skillsit ovat mukana; ja
-- mihin `Approved`- ja `Rejected`-tulokset johtavat.
+- mitä Step tekee;
+- millä nimetyllä ExecutionProfilella se ajetaan;
+- mikä yksi Project-primary instruction ohjaa työtä;
+- mitkä optional Project-skillsit ovat mukana; ja
+- mihin Approved- ja Rejected-tulokset johtavat.
 
-Node editor ei edellytä sanojen runtime, provider, model, reasoning effort, policy, sandbox tai CLI tuntemusta. Näitä arvoja ei muokata eikä näytetä editorin pääosassa.
+Runtime-arvot muokataan ExecutionProfile-editorissa, eivät Node editorissa. Agent collectionia, Agent editoria, avatar-authoringia, Agent live-status-entityä tai standalone Agent Run -pintaa ei ole.
 
-## Säilytettävä workspace-rakenne
+## Configure-navigation
 
-Nykyinen valitun Loopin visual boundary säilyy:
+Configure sisältää v9 execution -mallille:
 
-- desktopissa Canvas ja sheet ovat 50/50-jaossa;
-- sheetissä vasen preview ja oikea Node editor käyttävät nykyistä noin 3:2-jakoa;
-- kapeassa containerissa preview ja editor pinoutuvat;
-- mobiilissa sheet käyttää koko ruutua ja 40 px kontrolleja; sekä
-- Loop tallennetaan yhdellä eksplisiittisellä `Save loop` -toiminnolla, ei kenttäkohtaisella autosavella.
+- `Execution Profiles`;
+- `Instructions`;
+- `Skills`; ja
+- nykyisen Loop/Node-editorin.
 
-Nykyinen Agent instruction preview korvataan Step composition preview'lla. Canvasin renderer-, graph geometry-, route-, node artwork- ja edge-rakennetta ei muuteta tämän ominaisuuden sivuvaikutuksena.
-
-## Yksinkertainen Node editor
+ExecutionProfile-authoring käyttää yhtä selkeää reittiä:
 
 ```text
-┌─────────────────────── Loop canvas ───────────────────────┐
-│                                                           │
-│                 [ selected Step node ]                    │
-│                                                           │
-└───────────────────────────────────────────────────────────┘
-┌────────────── Step instructions ──────────────┬────────── Node editor ──────────┐
-│ System baseline · always applied · read-only │ review-change · Agent Step      │
-│                                              │                                  │
-│ Primary instruction                         │ Task description                 │
-│ Reviewer                                    │ [ Review the proposed change... ] │
-│ project:reviewer                            │                                  │
-│ [rendered Markdown preview]                  │ Execution profile                │
-│                                              │ [ Focused local             ▾ ] │
-│ Skills · 2                                  │ How this Step runs.              │
-│ project:change-review                        │                                  │
-│ builtin:structured-review                    │ Primary instruction              │
-│ [rendered summaries in canonical order]      │ [ Reviewer                 ▾ ] │
-│                                              │ Exactly one instruction.         │
-│                                              │                                  │
-│                                              │ Skills                           │
-│                                              │ [Change review ×] [Checks ×] [+] │
-│                                              │ Optional capabilities.           │
-│                                              │                                  │
-│                                              │ Transitions                      │
-│                                              │ Approved target [ completed  ▾ ] │
-│                                              │ Rejected target [ blocked    ▾ ] │
-│                                              │                                  │
-│                                              │ ▸ Appearance                     │
-│                                              │ ▸ Advanced                       │
-│                                              │                                  │
-│                                              │ Remove from loop                 │
-└──────────────────────────────────────────────┴──────────────────────────────────┘
+/execution-profiles
 ```
 
-Molemmat disclosuret ovat oletuksena suljettuja. Ne eivät ole tyhjiä tulevaisuusplaceholder-kontrolleja:
+Yleistä Settings-frameworkia ei rakenneta. Run käyttää Overview'ta ja Loop-kohteita; `/run/agents/...`-reittejä tai standalone Agent Run -toimintoa ei ole.
 
-- `Appearance` sisältää nykyiset `Node style`- ja `Node size` -kentät.
-- `Advanced` sisältää nykyisen Node ID:n, Step typen, Scheduled-Stepin schedule-kentät tarvittaessa sekä read-only composition-ID:t ja kanonisen järjestyksen.
+## Execution Profiles
 
-Additional instructions- tai `workspace_access`-kontrollia ei renderöidä V1:ssä.
+Collection näyttää jokaisesta profilesta nimen, ID:n, providerin, modelin, reasoning effortin, network accessin ja validointitilan. ID disambiguoi samannimiset profilet.
 
-## Pääkentät ja copy
+Editorissa ovat vain:
 
-| Järjestys | Label | Kontrolli | Käyttäjälle näkyvä selite | Validointi |
-|---:|---|---|---|---|
-| 1 | `Task description` | Textarea | Mitä tämä Step tuottaa tai ratkaisee | Ehdotuksessa non-empty; enintään nykyinen sallittu pituus |
-| 2 | `Execution profile` | Required single select | `How this Step runs.` | Yksi olemassa oleva, runnable profile |
-| 3 | `Primary instruction` | Required single select | `Exactly one instruction defines the Step's role and working method.` | Yksi Built-in tai Project |
-| 4 | `Skills` | Optional multi-select | `Optional capabilities used by this Step.` | Nolla tai useita uniikkeja Built-in/Project-valintoja |
-| 5 | `Approved target` | Required single select | Tulos on hyväksytty | Yksi sallittu target |
-| 6 | `Rejected target` | Required single select | Tulos tarvitsee muun polun | Yksi sallittu target |
+1. Name;
+2. Provider;
+3. Model;
+4. Reasoning effort; ja
+5. Network access.
 
-Editorin otsikko näyttää Node ID:n ja käyttäjäystävällisen Step kindin. ID ja type muokataan Advanced-osiossa, jotta compositionin pääpolku pysyy tiiviinä.
+Editor käyttää explicit Savea ja näyttää dirty-, pending-, valid- ja error-tilat. `id` on lowercase kebab-case technical identity. Profiilissa ei näytetä instruction-, skill-, task-, Transition-, appearance-, workspace access- tai machine-local path -kontrolleja.
 
-## Execution profile single select
+## Project Instructions
 
-- Trigger näyttää ihmisen nimeämän profilen `name`-arvon.
-- ID voidaan näyttää toissijaisena Geist-rivinä tai vain silloin, kun nimet ovat samat.
-- Provideria, modelia, reasoning effortia tai network accessia ei luetella Node editorissa.
-- Option näkyvä availability-tila on `Available` tai tarkka blocking reason; runtime-termejä ei tarvita onnistuneen valinnan ymmärtämiseen.
-- Puuttuva valinta näyttää inline-virheen `Select an execution profile.`
-- Uusi Step alkaa tyhjällä required-valinnalla. Ensimmäistä profilea ei valita hiljaisesti.
-- Node editor ei luo tai muokkaa profilea eikä sisällä linkkiä uuteen settings-sivuun. Profilejen authoring-surface on avoin päätös.
+Instructions-collection löytää `.ballet/instructions/**/*.md`-tiedostot. Jokainen rivi tai kortti näyttää:
 
-## Primary instruction single select
+- `title`-arvon;
+- `project:<id>`-viitteen, jos validi;
+- repository-relative pathin; ja
+- validointitilan.
 
-- System-baseline ei ole optiona, koska se on aina mukana.
-- Vaihtoehdot ryhmitellään näkyvillä tekstiryhmillä `Built-in` ja `Project`.
-- Option näyttää titlen ja toissijaisena origin-scoped ID:n.
-- Origin ei välity vain värillä.
-- Tyhjä tila näyttää `No instructions available` ja suoran syyn, miksi Loopia ei voi tallentaa runnable-muotoon.
-- Puuttuva valinta näyttää inline-virheen `Select one primary instruction.`
-- Built-in-resurssin `Clone` kuuluu Instruction-kokoelman authoring-näkymään, ei selectiin.
+Tiedosto ilman frontmatter-ID:tä näkyy tavallisena project-dokumenttina mutta ei primary instruction -valitsimessa. Invalidi tai duplicate eksplisiittinen ID näkyy blocking-virheenä. System instruction ei ole tässä collectionissa muokattavana eikä selectable Built-in-ryhmää tai Clone-to-project-toimintoa ole.
 
-## Skills multi-select
+## Project Skills
 
-V1 tarvitsee yhden saavutettavan multi-select-käytännön. Repossa ei ole valmista multi-select- tai Checkbox-primitiiviä, joten toteutuksessa käytetään nykyisten shadcn/Base UI -käytäntöjen mukaista yleistä `components/ui`-primitiveä ja domain-kohtaista `StepSkillsField`-koostetta.
+Skills-collection löytää `.agents/skills/**/SKILL.md`-tiedostot. Jokainen item näyttää:
 
-Käyttäytyminen:
+- titlen tai namen;
+- path-derived `project:<relative-directory>`-ID:n;
+- repository-relative pathin; ja
+- validointitilan.
 
-- suljettu trigger näyttää valintojen määrän tai `No skills selected`;
-- popover ryhmittelee optionit `Built-in`- ja `Project`-otsikoiden alle;
-- jokainen option ilmoittaa valintatilan tekstinä ja accessibility-statena;
-- valitut skillsit näkyvät removable chippeinä;
-- remove-painikkeen nimi on esimerkiksi `Remove Change review skill`;
-- chipit näytetään aina canonical origin/ID -järjestyksessä;
-- drag-reorderia ei ole, koska valintajärjestys ei vaikuta compositioniin; ja
-- duplicate-valintaa ei voi muodostaa UI:ssa eikä hyväksyä API:ssa.
+Invalidi path-segmentti näkyy blocking-virheenä. V1:ssä ei ole Built-in-skill-ryhmää, registryä, clone-to-projectia tai skill-hakemiston tukitiedostojen snapshot-UI:ta.
 
-Semanttisesti mahdollisesti ristiriitaiset skillsit voivat näyttää non-blocking-varoituksen. UI ei väitä pystyvänsä automaattisesti todistamaan skillien yhteensopivuutta.
+## Node editorin rakenne
 
-## Transitions
+Agent- ja Scheduled-Step näyttävät pääkentät täsmälleen tässä järjestyksessä:
 
-`Approved target` ja `Rejected target` ovat samassa `Transitions`-fieldsetissä nykyisen käytännön mukaisesti.
+1. Task description;
+2. Execution profile;
+3. Primary instruction;
+4. Skills;
+5. Approved target;
+6. Rejected target;
+7. Appearance, oletuksena suljettu; ja
+8. Advanced, oletuksena suljettu.
 
-- Kummallakin tuloksella on täsmälleen yksi select.
-- Optionit ryhmitellään `Node`, `Loop` ja `End Loop` -ryhmiin nykyisen target-mallin mukaan.
-- `Approved` käyttää Secondary/Emerald-signaalia vain semanttiseen hyväksyntään.
-- `Rejected` käyttää muted-signaalia; sitä ei esitetä runtime errorina.
-- Runtime failure, blocked, cancelled ja needs-input eivät muuta valittua targetia tai aktivoi tulosedgeä.
-- Field label ja Canvas edge käyttävät samoja termejä `Approved` ja `Rejected`.
+Desktopissa task, molemmat required resource-valinnat ja molemmat Transitionit pysyvät ymmärrettävinä ilman pitkää provider-asetus- tai runtime-error-transition-listaa.
 
-## Step composition preview
+### Task description
 
-Vasen preview vastaa kysymykseen “mitä executioniin todella composedaan” ilman, että käyttäjä avaa tiedostoja erikseen.
+- Non-empty textarea.
+- Kuvaa tämän Stepin konkreettisen tehtävän.
+- Virhe näkyy suoraan kontrollin alla.
 
-Järjestys:
+### Execution profile
 
-1. staattinen `System baseline · always applied · read-only` -rivi;
-2. primary instructionin title, origin, ID ja rendered Markdown;
-3. valitut skillsit canonical järjestyksessä, jokaisesta title, origin, ID ja tiivis rendered content; sekä
-4. read-only composition version ja bundle-status teknisessä footerissa.
+- Required single select.
+- Option näyttää ensisijaisesti ihmisen antaman nimen ja tarvittaessa ID:n.
+- Missing tai unavailable profile säilyy näkyvänä exact blocking reasonin kanssa.
+- Provideria, modelia, reasoning effortia tai network accessia ei muokata tässä.
+- Uudelle Stepille ei valita ensimmäistä profilea hiljaisesti.
 
-Systemin koko body voidaan avata read-only disclosureen, mutta sitä ei voi muokata tai poistaa. Task description ei toistu preview'n instruction-sisältönä; se näkyy editorissa ja Run task envelope -preview'ssa erillisenä datana.
+### Primary instruction
 
-Preview päivittyy draftista ennen tallennusta. Invalidi valinta näyttää affected-kohdassa syyn eikä fallback-sisältöä.
+- Required single select.
+- Sisältää vain validit Project-resurssit.
+- Option näyttää titlen, `project:<id>`-viitteen ja relative pathin.
+- Fixed System baseline ei ole optiona, koska se on aina mukana.
+- Uudelle Stepille ei valita instructionia hiljaisesti.
 
-## Advanced ja Appearance
+### Skills
 
-### Appearance, default closed
+- Optional keyboard-accessible multi-select.
+- Sisältää vain validit Project-skillsit.
+- Valitut arvot näkyvät removable chippeinä.
+- Chipit ja preview järjestetään origin-scoped ID:n mukaan.
+- Duplicatea ei voi muodostaa UI:ssa eikä hyväksyä API:ssa.
+- Drag-reorderia ei ole, koska klikkausjärjestys ei vaikuta compositioniin.
 
-- `Node style`
-- `Node size`
+### Transitions
 
-Nykyiset catalogit, tokenit ja Canvas-renderöinti säilyvät. Execution profile ei omista appearancea.
+`Approved target` ja `Rejected target` ovat samassa fieldsetissä. Kummallakin on yksi required select. Molemmat voivat valita:
 
-### Advanced, default closed
+- saman Loopin executable noden;
+- saman Loopin terminaalin; tai
+- toisen Loopin.
 
-- `Node ID`
-- `Step type`
-- Scheduled-Stepille nykyiset schedule-kentät
-- read-only `Execution profile ID`
-- read-only primary- ja skill-ID:t
-- read-only `Composition order: System → Primary → Skills → Task`
+Sama valikoima koskee Agent-, Human- ja Scheduled-Stepiä. Runtime failure, technical blocked, cancelled ja needs-input eivät näy lisä-Transitioneina eivätkä muuta valittua targetia.
 
-Kun type vaihtuu Human-Stepiksi, execution profile-, primary instruction- ja skill-kentät poistuvat DOM:sta eivätkä jää disabled-placeholder-kontrolleiksi. Takaisin agentti- tai Scheduled-Stepiksi vaihto vaatii uudet eksplisiittiset required-valinnat, ellei editorin saman draft-session aiempien arvojen säilytys hyväksytä erikseen.
+### Appearance
+
+Oletuksena suljettu disclosure sisältää vain:
+
+- Node style; ja
+- Node size.
+
+Appearance kuuluu Stepille. ExecutionProfile ei omista node artworkia.
+
+### Advanced
+
+Oletuksena suljettu disclosure sisältää:
+
+- Node ID;
+- Step type;
+- Scheduled-Stepin schedule-kentät tarvittaessa; ja
+- read-only execution profile-, primary instruction- ja skill-ID:t.
+
+Additional instructions-, workspace access-, policy- tai future-placeholder-kontrolleja ei renderöidä.
 
 ## Eri node-tyypit
 
 ### Agent Step
 
-Näyttää koko pääeditorin ja Step composition preview'n.
+Näyttää koko execution composition -editorin ja Step composition preview'n.
 
 ### Scheduled Step
 
-Näyttää saman execution compositionin kuin Agent Step. Schedule on Advanced-osiossa, mutta seuraava suoritus ja schedule-status voidaan näyttää otsikon metadata-rivillä.
+Näyttää saman compositionin kuin Agent Step. Schedule on Advanced-osiossa; seuraava execution-aika ja schedule-status voidaan näyttää header-metadatana.
 
 ### Human Step
 
-Näyttää Task descriptionin ja molemmat Transitionit. Preview kertoo `Human operator` eikä näytä tyhjiä profile-, instruction- tai skill-kontrolleja.
+Näyttää vain:
+
+- Task descriptionin;
+- Approved targetin;
+- Rejected targetin;
+- Appearancen; ja
+- Advanced-osion.
+
+Execution profile-, primary instruction- ja skill-kontrollit eivät jää disabled-placeholder-arvoina DOM:iin.
 
 ### Terminal node
 
-Säilyttää nykyisen suppean editorin: lukittu ID/type, description ja Appearance. Execution compositionia, schedulea tai Transition-kontrolleja ei renderöidä.
+Näyttää nykyisen description- ja appearance-editorin. Execution compositionia, schedulea tai Transition-kontrolleja ei renderöidä. Editor voi näyttää read-only tekstin:
 
-## Tilat ja virheet
+```text
+Terminal nodes have no transitions.
+```
+
+## Step composition preview
+
+Nykyinen Agent instruction preview korvataan Step composition preview'lla. Preview näyttää tässä järjestyksessä:
+
+1. `System baseline · always applied · read-only`;
+2. Project-primary instructionin titlen, originin, ID:n, pathin ja rendered bodyn;
+3. valitut Project-skillsit canonical ID -järjestyksessä, jokaisesta origin, ID, path ja rendered body;
+4. composition validityn; ja
+5. composition-version sekä read-only resource-ID:t.
+
+System instructionin body voidaan näyttää read-only disclosurella, mutta sitä ei voi muokata tai poistaa. Preview ei näytä providerin raw-tapahtumia, ambient-kontekstia tai hidden reasoningia. Invalidi draft näyttää exact affected-resurssin eikä substituoi fallbackia.
+
+## Run snapshot -näkymä
+
+Run-näkymä näyttää immutable Step compositionista vähintään:
+
+- composition-version;
+- Step ID:n;
+- ExecutionProfile-snapshotin;
+- resource origin/ID/path/source SHA-256 -tiedot;
+- exact prompt SHA-256:n; ja
+- output-schema-version ja SHA-256:n.
+
+Exact prompt voidaan avata read-only-evidenssinä. UI kertoo, että evidence todistaa Balletin muodostaman promptin, ei providerin koko sisäistä tai ambient-kontekstia.
+
+## Blocking-tilat
 
 | Tila | UI-käyttäytyminen |
 |---|---|
-| Loading catalogs | Kenttien layout säilyy; selkeä loading-state, ei tyhjää option-listaa |
-| No profiles | Blocking Alert ja `No execution profiles available`; ei hiljaista Human-muunnosta |
-| No instructions | Blocking inline-state primary-kentässä |
-| No skills | Sallittu tyhjä tila `No skills selected` |
-| Missing saved ref | Kenttä näyttää puuttuvan ID:n ja blocking-virheen; mitään muuta resurssia ei substituoida |
-| Unavailable profile | Valinta säilyy näkyvänä, blocking reason näytetään; Run ei käynnisty |
-| Dirty draft | Nykyinen explicit Save loop, dirty-indikaatio ja navigointivaroitus |
-| Save pending | Estä duplicate submit; säilytä arvot |
-| Save failure | Yksi form-wide destructive Alert ja kenttäkohtaiset virheet |
-| Locked Run snapshot | Kaikki arvot read-only; näytä snapshot-ID:t ja hashit Run-sheetissä |
+| No profiles | Blocking Alert; executable Stepiä ei muuteta Humaniksi |
+| Missing profile | Exact ID ja korjausohje; Run estyy |
+| Unavailable profile | Valinta säilyy, provider-specific blocking reason näkyy |
+| No valid instructions | Primary-kentän blocking empty state |
+| Missing/invalid instruction | Exact ID/path ja validation reason |
+| No skills | Sallittu `No skills selected` -tila |
+| Missing/invalid skill | Exact ID/path ja blocking reason |
+| Resource too large | Exact resource ja 128 KiB raja |
+| Prompt too large | 512 KiB blocking preflight |
+| Legacy local setting | `agentReadOnlyRoots`-path ja exact remediation; arvoja ei poisteta |
+| Save failure | Yksi form-wide destructive Alert sekä affected field errors |
 
-Save-painikkeen disabled-tila ei korvaa näkyvää validation messagea.
+Disabled Save ei korvaa näkyvää validation messagea.
 
 ## Saavutettavuus
 
 - Jokaisella kontrollilla on ohjelmallinen label.
-- Helper ja error yhdistetään `aria-describedby`-viitteillä.
-- Invalidi kontrolli saa `aria-invalid="true"`.
-- Transitions käyttää `fieldset`/`legend`-rakennetta.
-- Multi-select on kokonaan näppäimistökäyttöinen ja ilmoittaa valintojen määrän sekä option tilan.
-- Chip-remove-painikkeilla on yksilölliset accessible nimet.
-- Collapsible-triggerit ilmoittavat `aria-expanded`-tilan.
-- Origin, availability, Approved ja Rejected eivät välity yksin värillä.
+- Helper- ja error-tekstit yhdistetään `aria-describedby`-viitteillä.
+- Invalidi kontrolli käyttää `aria-invalid="true"`.
+- Transitionit käyttävät `fieldset`/`legend`-rakennetta.
+- Multi-select, chip removal ja disclosuret toimivat näppäimistöllä.
+- Chip-remove-painikkeilla on yksilöllinen accessible name.
+- Origin, availability, Approved ja Rejected eivät välity vain värillä.
 - Focus palautuu popoverin sulkeutuessa triggeriin.
 - Mobiilissa input-fontti on vähintään 16 px ja kontrolli vähintään 40 px.
 
-## DESIGN.md-tokenien käyttö
+## Design-sopimus
 
-Suunnitelma ei lisää uutta palettia, typografiaa, radius- tai shape-kieltä.
+UI käyttää `DESIGN.md`-frontmatterin väri-, typografia-, spacing-, control- ja radius-tokeneita. Muutos ei lisää uutta palettia, gradienttia, shape-kieltä tai typografiaa.
 
-- workspace base: `surface-container-lowest` / `#0c0e11`
-- panelit: `surface` / `#111316`
-- nested header/disclosure: `surface-container-low` / `#1a1c1f`
-- popover: `surface-container` / `#1e2023`
-- hover/selected: `surface-container-high` / `#282a2d`
-- teksti: `on-surface` / `#e2e2e6`
-- muted teksti: `on-surface-variant` / `#c1c6d7`
-- border: `outline-variant` / `#414755`
-- focus/selection: `primary` / `#adc6ff`
-- Approved: `secondary` / `#4edea3`
-- attention: `tertiary` / `#ffb95f`
-- blocking error: `error` / `#ffb4ab`
+- Primary ilmaisee focus- ja selection-tilan.
+- Secondary ilmaisee Approved- ja successful-tilan.
+- Tertiary ilmaisee waiting- ja attention-tilan.
+- Error ilmaisee blocking validationin sekä failed/blocked Run-tilan.
+- Geist näyttää ID:t, pathit, hashit ja Transition-targetit.
+- Inter näyttää labelit, selitteet ja instruction-sisällön.
 
-Inter säilyy käyttöliittymätekstissä ja Geist ID:issä, poluissa, Transition-targeteissa sekä composition-metadatassa. Desktop-formit käyttävät 28 px / 12 px densityä, 88 px label-saraketta ja 4 px spacing-yksikköä. Kontrollit käyttävät 4 px ja panelit 8 px radius-sääntöä.
+## V1:n ulkopuolella
 
-## Toteutusrajat
+Tässä mallissa ei rakenneta:
 
-Tässä scopessa ei rakenneta:
-
-- settings-sivua;
-- execution profile -editoria Node sheetin sisään;
-- template packia tai Recipe-editoria;
+- Agent collectionia tai editoria;
+- avatar-authoringia;
+- standalone Agent Runia;
+- yleistä Settings-frameworkia;
+- Built-in instruction- tai skill-katalogia;
+- clone-to-project-toimintoa;
+- template packia, registryä tai marketplacea;
 - additional instructions -UI:ta;
-- workspace access -UI:ta;
-- uutta Canvas-rendereriä tai graph geometrya; tai
-- production-koodia.
-
-Nykyinen `DESIGN.md` määrää Agentin omistamaan Execution-asetukset ja sitoo Agent-avatarin sekä reasoning glown Canvas-nodeen. Hyväksytty Step + `ExecutionProfile` -arkkitehtuuri edellyttää, että varsinainen implementation-goal päivittää `DESIGN.md`:n nämä rajatut kohdat ennen UI-koodia. Tämän proposal-tason UI-suunnitelman yhteydessä `DESIGN.md`:ää ei muuteta.
-
-## Ihmisen tarkistuspisteet
-
-- Onko `Execution profile` käyttäjälle hyväksyttävä termi, kun sen sisäisiä runtime-arvoja ei näytetä Node editorissa?
-- Hyväksytäänkö tyhjä required-valinta uuden Stepin turvalliseksi oletukseksi?
-- Hyväksytäänkö Node ID:n ja Step typen sijoitus Advanced-osioon?
-- Missä execution profilet luodaan ja muokataan ilman settings-sivua?
-- Mitä Agent-avatarille, reasoning glow'lle, Agent-statusille ja agenttikohtaisille Run-reiteille tapahtuu?
-
-Nämä ja muut päätökset ovat `OPEN-DECISIONS.md`:ssä.
+- workspace access -UI:ta; tai
+- workflow-kohtaista platform-UI:ta.

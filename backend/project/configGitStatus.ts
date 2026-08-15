@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import type { ProjectConfigChange, ProjectConfigChangeStatus, ProjectConfigStatus } from "../../shared/domain/projectStatus.js";
 
 const execFileAsync = promisify(execFile);
-const configRoots = [".ballet", ".codex/agents", ".agents/skills"];
+const configRoots = [".ballet", ".agents/skills"];
 
 export const readProjectConfigStatus = async (root: string): Promise<ProjectConfigStatus> => {
   const output = await execFileAsync("git", [

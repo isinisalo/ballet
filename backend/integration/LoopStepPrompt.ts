@@ -1,4 +1,19 @@
-import type { AgentOutcome, LoopRunDetails, StepRun } from "../../shared/domain/runtime.js";
+import type {
+  LoopRunDetails,
+  RootExecutionSnapshot,
+  StepOutcome,
+  StepRun
+} from "../../shared/domain/runtime.js";
+import {
+  serializeTaskEnvelopeRecentStepV1,
+  serializeTaskEnvelopeV1,
+  type TaskEnvelopeOutcomeV1,
+  type TaskEnvelopeRecentStepV1,
+  type TaskEnvelopeV1
+} from "./TaskEnvelopeV1.js";
+
+export { serializeTaskEnvelopeV1 } from "./TaskEnvelopeV1.js";
+export type { TaskEnvelopeRecentStepV1, TaskEnvelopeV1 } from "./TaskEnvelopeV1.js";
 
 export const MAX_LOOP_RUN_INPUT_CHARS = 20_000;
 export const MAX_LOOP_STEP_HISTORY_BYTES = 8 * 1024;
@@ -12,82 +27,58 @@ const branchArtifactKey = /^branch$/;
 const pathArtifactKey = /^(changed_files|artifact_path|file|files|file_path|path|paths|document|document_path|report|report_path|task|tasks|design|design_path)$/;
 const safePathCharacters = /^[\p{L}\p{N}._@+/-]+$/u;
 
-interface LoopStepHistoryOutcome {
-  state: AgentOutcome["state"];
-  result?: "approved" | "rejected";
-  summary: string;
-  checks?: Array<{
-    name: string;
-    status: AgentOutcome["checks"][number]["status"];
-    details?: string;
-  }>;
-  artifact_refs?: Record<string, string | string[]>;
-}
-
-export interface LoopStepHistoryEntry {
-  loop_id: string;
-  step_id: string;
-  type: StepRun["type"];
-  status: StepRun["status"];
-  result?: StepRun["result"];
-  human_response?: string;
-  outcome?: LoopStepHistoryOutcome;
-  error?: string;
-}
-
-export interface LoopStepPromptEnvelope {
-  version: 1;
-  current: {
-    loop_id: string;
-    step_id: string;
-    description: string;
-    resume?: {
-      question: string;
-      context: string;
-      response: string;
-    };
-  };
-  run_input: string;
-  recent_steps: LoopStepHistoryEntry[];
-}
-
-export const renderLoopStepPrompt = (
-  runs: LoopRunDetails[],
+/** Builds the attempt envelope only from immutable Loop snapshots and persisted Run data. */
+export const taskEnvelopeForStep = (
+  snapshot: RootExecutionSnapshot,
+  runs: readonly LoopRunDetails[],
   currentRun: LoopRunDetails,
   currentStep: StepRun
-): string => {
-  const snapshotStep = currentRun.snapshot.nodes.find((step) => step.id === currentStep.stepId);
-  if (!snapshotStep) {
+): TaskEnvelopeV1 => {
+  const snapshotStep = snapshot.loops.find((loop) => loop.id === currentRun.loopId)?.nodes
+    .find((step) => step.id === currentStep.stepId);
+  if (!snapshotStep || !("description" in snapshotStep)) {
     throw new Error(`Loop step snapshot is missing ${currentRun.loopId}:${currentStep.stepId}.`);
   }
-  const envelope: LoopStepPromptEnvelope = {
+  if (!snapshotStep.description.trim()) {
+    throw new Error(`Loop step task is empty for ${currentRun.loopId}:${currentStep.stepId}.`);
+  }
+  return {
     version: 1,
-    current: {
-      loop_id: currentRun.loopId,
-      step_id: currentStep.stepId,
-      description: snapshotStep.description,
-      ...(currentStep.outcome?.state === "needs_input" && currentStep.responseInput ? {
-        resume: {
-          question: currentStep.outcome.question,
-          context: currentStep.outcome.context,
-          response: currentStep.responseInput
-        }
-      } : {})
-    },
-    run_input: truncateMiddle(currentStep.input ?? currentRun.input ?? "", MAX_LOOP_RUN_INPUT_CHARS, RUN_INPUT_TRUNCATION_MARKER),
-    recent_steps: recentHistory(runs, currentStep.stepRunId)
+    loopId: currentRun.loopId,
+    stepId: currentStep.stepId,
+    task: snapshotStep.description,
+    runInput: truncateMiddle(
+      currentStep.input ?? currentRun.input ?? "",
+      MAX_LOOP_RUN_INPUT_CHARS,
+      RUN_INPUT_TRUNCATION_MARKER
+    ),
+    recentSteps: recentHistory(runs, currentStep.stepRunId),
+    ...(currentStep.outcome?.state === "needs_input" && currentStep.responseInput ? {
+      resume: {
+        question: currentStep.outcome.question,
+        context: currentStep.outcome.context,
+        response: currentStep.responseInput
+      }
+    } : {})
   };
-  return JSON.stringify(envelope);
 };
 
-const recentHistory = (runs: LoopRunDetails[], currentStepRunId: string): LoopStepHistoryEntry[] => {
+export const renderStepTaskEnvelope = (
+  snapshot: RootExecutionSnapshot,
+  runs: readonly LoopRunDetails[],
+  currentRun: LoopRunDetails,
+  currentStep: StepRun
+): string => serializeTaskEnvelopeV1(taskEnvelopeForStep(snapshot, runs, currentRun, currentStep));
+
+const recentHistory = (
+  runs: readonly LoopRunDetails[],
+  currentStepRunId: string
+): TaskEnvelopeRecentStepV1[] => {
   const candidates = runs
-    .flatMap((run, runIndex) => run.stepRuns.map((step, stepIndex) => ({
-      step,
-      runIndex,
-      stepIndex
-    })))
-    .filter(({ step }) => step.stepRunId !== currentStepRunId && terminalStepStatuses.has(step.status) && Boolean(step.completedAt))
+    .flatMap((run, runIndex) => run.stepRuns.map((step, stepIndex) => ({ step, runIndex, stepIndex })))
+    .filter(({ step }) => step.stepRunId !== currentStepRunId
+      && terminalStepStatuses.has(step.status)
+      && Boolean(step.completedAt))
     .sort((left, right) => {
       const timestampDifference = Date.parse(right.step.completedAt!) - Date.parse(left.step.completedAt!);
       return timestampDifference || right.runIndex - left.runIndex || right.stepIndex - left.stepIndex;
@@ -95,28 +86,29 @@ const recentHistory = (runs: LoopRunDetails[], currentStepRunId: string): LoopSt
     .slice(0, MAX_LOOP_STEP_HISTORY_ENTRIES)
     .map(({ step }) => historyEntry(step));
 
-  const retained: LoopStepHistoryEntry[] = [];
+  const retained: TaskEnvelopeRecentStepV1[] = [];
   for (const candidate of candidates) {
-    if (utf8Bytes(JSON.stringify([...retained, candidate])) > MAX_LOOP_STEP_HISTORY_BYTES) break;
+    if (utf8Bytes(`[${[...retained, candidate].map(serializeTaskEnvelopeRecentStepV1).join(",")}]`)
+      > MAX_LOOP_STEP_HISTORY_BYTES) break;
     retained.push(candidate);
   }
   return retained;
 };
 
-const historyEntry = (step: StepRun): LoopStepHistoryEntry => ({
-  loop_id: step.loopId,
-  step_id: step.stepId,
+const historyEntry = (step: StepRun): TaskEnvelopeRecentStepV1 => ({
+  loopId: step.loopId,
+  stepId: step.stepId,
   type: step.type,
   status: step.status,
   ...(step.result ? { result: step.result } : {}),
   ...(step.type === "human" && step.responseInput
-    ? { human_response: compactText(step.responseInput, 180) }
+    ? { humanResponse: compactText(step.responseInput, 180) }
     : {}),
   ...(step.outcome ? { outcome: compactOutcome(step.outcome) } : {}),
   ...(step.error ? { error: compactText(step.error, 180) } : {})
 });
 
-const compactOutcome = (outcome: AgentOutcome): LoopStepHistoryOutcome => {
+const compactOutcome = (outcome: StepOutcome): TaskEnvelopeOutcomeV1 => {
   const checks = [...outcome.checks]
     .sort((left, right) => checkPriority(left.status) - checkPriority(right.status))
     .slice(0, 3)
@@ -131,22 +123,23 @@ const compactOutcome = (outcome: AgentOutcome): LoopStepHistoryOutcome => {
     ...(outcome.state === "completed" ? { result: outcome.result } : {}),
     summary: compactText(outcome.summary, 180),
     ...(checks.length > 0 ? { checks } : {}),
-    ...(artifactRefs && Object.keys(artifactRefs).length > 0 ? { artifact_refs: artifactRefs } : {})
+    ...(artifactRefs && Object.keys(artifactRefs).length > 0 ? { artifactRefs } : {})
   };
 };
 
-const checkPriority = (status: AgentOutcome["checks"][number]["status"]): number => {
+const checkPriority = (status: StepOutcome["checks"][number]["status"]): number => {
   if (status === "failed") return 0;
   if (status === "skipped") return 1;
   return 2;
 };
 
-const safeArtifactRefs = (artifacts: AgentOutcome["artifacts"]): Record<string, string | string[]> | undefined => {
+const safeArtifactRefs = (artifacts: StepOutcome["artifacts"]): Record<string, string | string[]> | undefined => {
   if (!artifacts) return undefined;
   const result: Record<string, string | string[]> = {};
   let remainingValues = 4;
-  for (const [key, value] of Object.entries(artifacts)) {
+  for (const key of Object.keys(artifacts).sort(compareText)) {
     if (remainingValues === 0) break;
+    const value = artifacts[key];
     if (!/^[a-z0-9_]{1,32}$/.test(key)) continue;
     if (typeof value === "string") {
       const reference = safeArtifactReference(key, value);
@@ -178,21 +171,14 @@ const safeArtifactReference = (key: string, value: string): string | undefined =
 };
 
 const isSafeGitRef = (value: string): boolean => /^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$/.test(value)
-  && !value.includes("..")
-  && !value.includes("//")
-  && !value.includes("@{")
-  && !value.endsWith("/")
-  && !value.endsWith(".")
-  && !value.endsWith(".lock");
+  && !value.includes("..") && !value.includes("//") && !value.includes("@{")
+  && !value.endsWith("/") && !value.endsWith(".") && !value.endsWith(".lock");
 
 const isSafeRepoPath = (value: string): boolean => safePathCharacters.test(value)
-  && !value.startsWith("/")
-  && !value.startsWith("~")
-  && !/^[a-zA-Z]:\//.test(value)
+  && !value.startsWith("/") && !value.startsWith("~") && !/^[a-zA-Z]:\//.test(value)
   && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value)
   && !value.split("/").some((segment) => !segment || segment === "." || segment === "..")
-  && value !== ".git"
-  && !value.startsWith(".git/");
+  && value !== ".git" && !value.startsWith(".git/");
 
 const compactText = (value: string, maxChars: number): string =>
   truncateMiddle(value.replace(/\s+/g, " ").trim(), maxChars, TEXT_TRUNCATION_MARKER);
@@ -210,6 +196,7 @@ const truncateMiddle = (value: string, maxChars: number, marker: string): string
   return `${head}${marker}${tail}`;
 };
 
+const compareText = (left: string, right: string): number => left < right ? -1 : left > right ? 1 : 0;
 const isHighSurrogate = (value: number): boolean => value >= 0xd800 && value <= 0xdbff;
 const isLowSurrogate = (value: number): boolean => value >= 0xdc00 && value <= 0xdfff;
 const utf8Bytes = (value: string): number => Buffer.byteLength(value, "utf8");

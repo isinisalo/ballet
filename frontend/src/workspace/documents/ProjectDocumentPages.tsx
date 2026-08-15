@@ -1,4 +1,4 @@
-import type { MarkdownDocument, Project } from "@shared/api/workspace-contracts";
+import type { MarkdownDocument, Project, ProjectInstruction } from "@shared/api/workspace-contracts";
 import { EmptyState } from "@/components/shared/workspace-ui";
 import { DocumentCollectionOverview } from "./DocumentCollectionOverview";
 import { ProjectMarkdownEditorView } from "./ProjectMarkdownEditorView";
@@ -28,6 +28,7 @@ export function ProjectDocumentPage({ document, saveProjectDocument, setNavigati
 type ProjectCollectionPageProps = {
   project?: Project;
   documents: MarkdownDocument[];
+  instructions?: ProjectInstruction[];
   selectedDocument?: MarkdownEntity;
   creating?: boolean;
   kind: ProjectDocumentCreateKind;
@@ -38,9 +39,9 @@ type ProjectCollectionPageProps = {
   setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 };
 
-function ProjectCollectionPage({ project, documents, selectedDocument, creating = false, kind, emptyTitle, saveProjectDocument, createProjectDocument, navigate, setNavigationBlocker }: ProjectCollectionPageProps) {
+function ProjectCollectionPage({ project, documents, instructions, selectedDocument, creating = false, kind, emptyTitle, saveProjectDocument, createProjectDocument, navigate, setNavigationBlocker }: ProjectCollectionPageProps) {
   if (!project) return <EmptyState title="No project selected." action={`Open the Project page before reading ${kind === "goal" ? "GOALS" : kind === "adr" ? "ADRs" : "instructions"}.`} />;
-  if (!selectedDocument && !creating) return <DocumentCollectionOverview kind={kind} documents={documents} navigate={navigate} />;
+  if (!selectedDocument && !creating) return <DocumentCollectionOverview kind={kind} documents={documents} instructions={instructions} navigate={navigate} />;
   return (
     <ProjectMarkdownEditorView
       document={selectedDocument}

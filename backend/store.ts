@@ -10,6 +10,7 @@ import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
 import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
 import type { WorkspaceContentData } from "./documents/markdownAppDataLoader.js";
 import type { LoopTheme } from "../shared/domain/loopThemes.js";
+import type { ExecutionProfile } from "../shared/domain/projectConfig.js";
 import { LoopThemeRepository } from "./loop-themes/LoopThemeRepository.js";
 import { LoopThemeService } from "./services/LoopThemeService.js";
 
@@ -22,7 +23,6 @@ export class MarkdownStore {
   private readonly markdownEntityService: MarkdownEntityService;
   private readonly automationService: AutomationService;
   private readonly loopThemeService: LoopThemeService;
-  private agentRemovalHook?: (agentId: string) => Promise<void> | void;
 
   constructor(root = getProjectRoot(), runtimeDatabase?: RuntimeDatabase) {
     this.projectRoot = root;
@@ -49,10 +49,6 @@ export class MarkdownStore {
     this.workspaceDataService.setEnricher(enrich);
   }
 
-  setAgentRemovalHook(hook: (agentId: string) => Promise<void> | void): void {
-    this.agentRemovalHook = hook;
-  }
-
   list<T extends CollectionName>(collection: T): Promise<AppData[T]> {
     return this.markdownEntityService.list(collection);
   }
@@ -65,19 +61,26 @@ export class MarkdownStore {
   }
 
   async remove(collection: CollectionName, id: string): Promise<void> {
-    if (collection !== "agents") {
-      await this.markdownEntityService.remove(collection, id);
-      return;
-    }
     await this.runProjectConfigMutation(async () => {
-      await this.automationService.assertAgentRemovable(id);
+      await this.automationService.assertProjectResourceRemovable(id);
       await this.markdownEntityService.remove(collection, id);
-      await this.agentRemovalHook?.(id);
     });
   }
 
   saveAutomation(config: ProjectAutomationConfig): Promise<ProjectAutomationConfig> {
     return this.runProjectConfigMutation(() => this.automationService.save(config));
+  }
+
+  createExecutionProfile(profile: ExecutionProfile): Promise<ExecutionProfile> {
+    return this.runProjectConfigMutation(async () => this.automationService.createExecutionProfile(profile));
+  }
+
+  updateExecutionProfile(profile: ExecutionProfile): Promise<ExecutionProfile> {
+    return this.runProjectConfigMutation(async () => this.automationService.updateExecutionProfile(profile));
+  }
+
+  removeExecutionProfile(executionProfileId: string): Promise<void> {
+    return this.runProjectConfigMutation(async () => this.automationService.removeExecutionProfile(executionProfileId));
   }
 
   updateLoopTheme(theme: LoopTheme): Promise<LoopTheme> {

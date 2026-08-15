@@ -1,6 +1,8 @@
 import type {
   AppData,
   CollectionName,
+  ExecutionProfile,
+  ExecutionProfileSaveRequest,
   LoopTheme,
   ProjectAutomationConfig,
   WorkspaceSaveRequestByCollection
@@ -10,6 +12,18 @@ import { request } from "@/apiClient";
 
 export const api = {
   getData: () => request<AppData>("/api/data"),
+  createExecutionProfile: (id: string, profile: ExecutionProfileSaveRequest) =>
+    request<ExecutionProfile>(`/api/execution-profiles/${encodeURIComponent(id)}`, {
+      method: "POST",
+      body: JSON.stringify(profile)
+    }),
+  updateExecutionProfile: (id: string, profile: ExecutionProfileSaveRequest) =>
+    request<ExecutionProfile>(`/api/execution-profiles/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(profile)
+    }),
+  removeExecutionProfile: (id: string) =>
+    request<void>(`/api/execution-profiles/${encodeURIComponent(id)}`, { method: "DELETE" }),
   saveAutomation: (config: ProjectAutomationConfig) =>
     request<ProjectAutomationConfig>("/api/automation", {
       method: "PUT",

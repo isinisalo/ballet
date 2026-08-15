@@ -1,12 +1,17 @@
 import type express from "express";
 import { AutomationConflictError, AutomationValidationError } from "../automation.js";
 import { ExecutionTaskNotFoundError } from "../execution/ExecutionErrors.js";
+import { ExecutionCompositionError } from "../execution/ExecutionCompositionError.js";
 import {
   MarkdownEntityConflictError,
   MarkdownEntityNotFoundError,
   MarkdownEntityValidationError
 } from "../documents/MarkdownEntityErrors.js";
 import { ProjectConfigurationSourceError } from "../project-config/ProjectConfigurationRepository.js";
+import {
+  ExecutionProfileConflictError,
+  ExecutionProfileNotFoundError
+} from "../project-config/ExecutionProfileErrors.js";
 import {
   LoopRunConflictError,
   LoopRunNotFoundError,
@@ -35,6 +40,16 @@ export const sendKnownHttpError = (error: unknown, res: express.Response): boole
     res.status(400).json({ error: error.message, issues: error.issues });
     return true;
   }
+  if (error instanceof ExecutionCompositionError) {
+    res.status(400).json({
+      error: error.message,
+      issues: [{
+        code: error.code === "resource_too_large" ? "invalid_resource" : error.code,
+        message: error.message
+      }]
+    });
+    return true;
+  }
   if (error instanceof LoopThemeValidationError) {
     res.status(400).json({ error: error.message, issues: error.issues });
     return true;
@@ -43,20 +58,14 @@ export const sendKnownHttpError = (error: unknown, res: express.Response): boole
     res.status(400).json({ error: error.message });
     return true;
   }
-  if (error instanceof AutomationConflictError
-    || error instanceof LoopThemeConflictError
-    || error instanceof LoopRunConflictError
-    || error instanceof MarkdownEntityConflictError
-    || error instanceof ProjectConfigurationSourceError) {
+  if (isConflictError(error)) {
     res.status(409).json({
       error: error.message,
       ...(error instanceof ProjectConfigurationSourceError ? { issues: error.issues } : {})
     });
     return true;
   }
-  if (error instanceof LoopRunNotFoundError
-    || error instanceof ExecutionTaskNotFoundError
-    || error instanceof MarkdownEntityNotFoundError) {
+  if (isNotFoundError(error)) {
     res.status(404).json({ error: error.message });
     return true;
   }
@@ -66,6 +75,20 @@ export const sendKnownHttpError = (error: unknown, res: express.Response): boole
   }
   return false;
 };
+
+const isConflictError = (error: unknown): error is Error =>
+  error instanceof AutomationConflictError
+  || error instanceof ExecutionProfileConflictError
+  || error instanceof LoopThemeConflictError
+  || error instanceof LoopRunConflictError
+  || error instanceof MarkdownEntityConflictError
+  || error instanceof ProjectConfigurationSourceError;
+
+const isNotFoundError = (error: unknown): error is Error =>
+  error instanceof LoopRunNotFoundError
+  || error instanceof ExecutionProfileNotFoundError
+  || error instanceof ExecutionTaskNotFoundError
+  || error instanceof MarkdownEntityNotFoundError;
 
 const isBodyParserError = (error: unknown, status: number, type: string): boolean =>
   error instanceof Error

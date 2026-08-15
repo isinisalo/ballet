@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { agentAvatars } from "../domain/agents.js";
 import {
   clockTimePattern,
   isCalendarDate,
@@ -9,8 +8,7 @@ import {
   type ProjectAutomationConfig,
   type ProjectStepSchedule
 } from "../domain/automation.js";
-import type { ProjectConfiguration } from "../domain/projectConfig.js";
-import { portableAgentRuntimeIntentSchema } from "./runtime-schemas.js";
+import type { ExecutionProfile, ProjectConfiguration } from "../domain/projectConfig.js";
 import {
   loopConnectionPointStyles,
   loopEdgeLineStyles,
@@ -29,12 +27,21 @@ const editableMarkdownFields = {
 const serverManagedFields = {
   relativePath: z.unknown().optional(),
   slug: z.unknown().optional(),
-  errors: z.unknown().optional()
+  errors: z.unknown().optional(),
+  projectId: z.unknown().optional(),
+  origin: z.unknown().optional(),
+  valid: z.unknown().optional(),
+  sourceSha256: z.unknown().optional(),
+  contentSha256: z.unknown().optional(),
+  sizeBytes: z.unknown().optional()
 };
 
 const omitServerManagedFields = <T extends Record<string, unknown>>(value: T) => {
   const result = { ...value };
-  for (const key of ["relativePath", "slug", "errors", "createdAt", "updatedAt"]) delete result[key];
+  for (const key of [
+    "relativePath", "slug", "errors", "createdAt", "updatedAt", "projectId", "origin", "valid",
+    "sourceSha256", "contentSha256", "sizeBytes"
+  ]) delete result[key];
   return result;
 };
 
@@ -43,7 +50,6 @@ const skillSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: stringRecordSchema.optional(),
-  enabled: z.boolean().optional(),
   ...editableMarkdownFields,
   ...serverManagedFields
 }).strict().transform(omitServerManagedFields);
@@ -68,25 +74,7 @@ export const collectionItemParamsSchema = z.object({
   id: z.string().min(1)
 }).strict();
 
-const agentUpsertSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  instructions: z.string().optional(),
-  skills: z.array(skillSchema).optional(),
-  enabled: z.boolean().optional(),
-  avatar: z.enum(agentAvatars)
-    .nullable()
-    .optional(),
-  createdAt: z.unknown().optional(),
-  updatedAt: z.unknown().optional(),
-  nicknameCandidates: z.array(z.string()).optional(),
-  ...editableMarkdownFields,
-  ...serverManagedFields
-}).strict().transform(omitServerManagedFields);
-
 const collectionUpsertSchemas = {
-  agents: agentUpsertSchema,
   skills: skillSchema
 } as const;
 
@@ -97,8 +85,33 @@ export const collectionUpsertSchema = <T extends MutableCollectionName>(
 ): z.ZodType<WorkspaceSaveRequestByCollection[T]> =>
   collectionUpsertSchemas[collection] as unknown as z.ZodType<WorkspaceSaveRequestByCollection[T]>;
 
-const kebabCaseIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const kebabCaseIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const executionProfileIdSchema = z.string()
+  .min(1)
+  .max(200)
+  .regex(kebabCaseIdPattern, "Execution profile id must be lowercase kebab-case.");
+export const projectInstructionIdSchema = z.string()
+  .regex(/^project:[a-z0-9]+(?:-[a-z0-9]+)*$/, "Primary instruction id must be a project:<lowercase-kebab-case> id.");
+export const projectSkillIdSchema = z.string()
+  .regex(
+    /^project:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/,
+    "Skill id must be a project:<lowercase-kebab-case/path> id."
+  );
+export const executionProfileSchema = z.object({
+  id: executionProfileIdSchema,
+  name: z.string().trim().min(1).max(200),
+  provider: z.enum(["codex", "copilot"]),
+  model: z.string().trim().min(1).max(200),
+  reasoningEffort: z.string().trim().min(1).max(100),
+  networkAccess: z.boolean()
+}).strict() satisfies z.ZodType<ExecutionProfile>;
+export const executionProfileSaveSchema = executionProfileSchema.omit({ id: true });
+export const executionProfileParamsSchema = z.object({ executionProfileId: executionProfileIdSchema }).strict();
 const optionalAutomationDescriptionSchema = z.string().max(2000);
+const taskDescriptionSchema = optionalAutomationDescriptionSchema.refine(
+  (value) => value.trim().length > 0,
+  "Task description must be non-empty."
+);
 const automationLoopIdSchema = z.string().min(2).max(101);
 const automationStepIdSchema = z.string()
   .min(1)
@@ -109,11 +122,10 @@ const loopThemeColorSchema = z.string()
   .regex(/^#[0-9a-f]{6}$/, "Expected a six-digit lowercase hex color.");
 
 export const loopThemeSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   node: z.object({
     labelColor: loopThemeColorSchema,
-    glowColor: loopThemeColorSchema,
-    showAgentAvatarInNode: z.boolean()
+    glowColor: loopThemeColorSchema
   }).strict(),
   edge: z.object({
     color: loopThemeColorSchema,
@@ -145,8 +157,17 @@ const nodeVisualBase = {
 };
 const executableStepBase = {
   ...nodeVisualBase,
+  description: taskDescriptionSchema,
   id: executableNodeIdSchema,
   on: stepTransitionsSchema
+};
+const stepExecutionComposition = {
+  executionProfileId: executionProfileIdSchema,
+  primaryInstructionId: projectInstructionIdSchema,
+  skillIds: z.array(projectSkillIdSchema).refine(
+    (ids) => new Set(ids).size === ids.length,
+    "Skill ids must be unique."
+  )
 };
 const calendarDateSchema = z.string().refine(isCalendarDate, "Expected a valid date in YYYY-MM-DD format.");
 const clockTimeSchema = z.string().regex(clockTimePattern, "Expected a valid time in HH:mm format.");
@@ -186,12 +207,12 @@ export const projectStepScheduleSchema = z.union([
   recurringScheduleSchema
 ]) satisfies z.ZodType<ProjectStepSchedule>;
 const projectStepSchema = z.discriminatedUnion("type", [
-  z.object({ ...executableStepBase, type: z.literal("agent"), agentId: z.string().min(1) }).strict(),
+  z.object({ ...executableStepBase, ...stepExecutionComposition, type: z.literal("agent") }).strict(),
   z.object({ ...executableStepBase, type: z.literal("human") }).strict(),
   z.object({
     ...executableStepBase,
+    ...stepExecutionComposition,
     type: z.literal("scheduled"),
-    agentId: z.string().min(1),
     schedule: projectStepScheduleSchema,
   }).strict()
 ]);
@@ -248,12 +269,39 @@ const projectLoopSchema = z.object({
 });
 
 export const automationConfigSchema = z.object({
-  version: z.literal(8),
+  version: z.literal(9),
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(8),
-  agents: z.record(z.string().trim().min(1).max(200), portableAgentRuntimeIntentSchema),
+  version: z.literal(9),
+  executionProfiles: z.array(executionProfileSchema),
   loops: z.array(projectLoopSchema)
-}).strict() satisfies z.ZodType<ProjectConfiguration>;
+}).strict().superRefine((config, context) => {
+  const loopIds = new Set<string>();
+  config.loops.forEach((loop, loopIndex) => {
+    if (loopIds.has(loop.id)) context.addIssue({
+      code: "custom",
+      path: ["loops", loopIndex, "id"],
+      message: `Duplicate loop id: ${loop.id}.`
+    });
+    loopIds.add(loop.id);
+  });
+  const profileIds = new Set<string>();
+  config.executionProfiles.forEach((profile, profileIndex) => {
+    if (profileIds.has(profile.id)) context.addIssue({
+      code: "custom",
+      path: ["executionProfiles", profileIndex, "id"],
+      message: `Duplicate execution profile id: ${profile.id}.`
+    });
+    profileIds.add(profile.id);
+  });
+  config.loops.forEach((loop, loopIndex) => loop.nodes.forEach((node, nodeIndex) => {
+    if (node.type !== "agent" && node.type !== "scheduled") return;
+    if (!profileIds.has(node.executionProfileId)) context.addIssue({
+      code: "custom",
+      path: ["loops", loopIndex, "nodes", nodeIndex, "executionProfileId"],
+      message: `Step references unknown execution profile: ${node.executionProfileId}.`
+    });
+  }));
+}) satisfies z.ZodType<ProjectConfiguration>;

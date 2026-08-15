@@ -4,13 +4,13 @@ import {
     collectionUpsertSchema,
     projectDocumentSaveSchema
 } from "../../shared/api/workspace-schemas.js";
-import { agentOutcomeSchema, respondToRunStepBodySchema } from "../../shared/api/runtime-schemas.js";
+import { respondToRunStepBodySchema, stepOutcomeSchema } from "../../shared/api/runtime-schemas.js";
 import { defaultTerminalNodes } from "../../shared/domain/automation.js";
 import { parseUnknown } from "../http/validation/httpValidation.js";
 import { expectValidationError } from "./expectValidationError.js";
 
-describe("AgentOutcome validation", () => {
-  it("enforces the discriminated AgentOutcome contract", () => {
+describe("StepOutcome validation", () => {
+  it("enforces the discriminated StepOutcome contract", () => {
     const validOutcomes = [
       { state: "completed", result: "approved", summary: "Approved.", checks: [] },
       { state: "completed", result: "rejected", summary: "Changes are required.", checks: [] },
@@ -25,7 +25,7 @@ describe("AgentOutcome validation", () => {
       { state: "failed", summary: "The provider process exited.", checks: [] }
     ];
     for (const outcome of validOutcomes) {
-      expect(parseUnknown(agentOutcomeSchema, outcome)).toEqual(outcome);
+      expect(parseUnknown(stepOutcomeSchema, outcome)).toEqual(outcome);
     }
 
     const invalidOutcomes = [
@@ -53,13 +53,13 @@ describe("AgentOutcome validation", () => {
       ]
     ] as const;
     for (const [, outcome, path] of invalidOutcomes) {
-      expectValidationError(() => parseUnknown(agentOutcomeSchema, outcome), path);
+      expectValidationError(() => parseUnknown(stepOutcomeSchema, outcome), path);
     }
   });
 });
 
 describe("HTTP Zod validation", () => {
-  it("distinguishes human decisions from agent input resumes", () => {
+  it("distinguishes Human decisions from execution input resumes", () => {
     expect(parseUnknown(respondToRunStepBodySchema, {
       kind: "human",
       result: "approved",
@@ -96,7 +96,7 @@ describe("HTTP Zod validation", () => {
 
   it("accepts valid automation configs and rejects malformed automation payloads", () => {
     const valid = {
-      version: 8,
+      version: 9,
       loops: [{
         id: "delivery",
         start: "implementation",
@@ -106,7 +106,9 @@ describe("HTTP Zod validation", () => {
           description: "Implementation",
           nodeStyle: "terra",
           nodeSize: "medium",
-          agentId: "developer-agent",
+          executionProfileId: "primary",
+          primaryInstructionId: "project:primary",
+          skillIds: ["project:checks"],
           on: { approved: "completed", rejected: "failed" }
         }, ...defaultTerminalNodes()]
       }]
@@ -114,10 +116,7 @@ describe("HTTP Zod validation", () => {
     expect(parseUnknown(automationConfigSchema, valid)).toEqual(valid);
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, events: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, triggers: [] }), "$");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 1 }), "version");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 3 }), "version");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 4 }), "version");
-    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 7 }), "version");
+    expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, version: 8 }), "version");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, loops: undefined }), "loops");
     expectValidationError(() => parseUnknown(automationConfigSchema, { ...valid, gates: [] }), "$");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
@@ -126,54 +125,35 @@ describe("HTTP Zod validation", () => {
     }), "loops.0.id");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
       ...valid,
-      loops: [{ ...valid.loops[0], nodes: [{ ...valid.loops[0]!.nodes[0], type: "human", agentId: "legacy" }, ...defaultTerminalNodes()] }]
+      loops: [{
+        ...valid.loops[0],
+        nodes: [{ ...valid.loops[0]!.nodes[0], type: "human", executionProfileId: "primary" }, ...defaultTerminalNodes()]
+      }]
     }), "loops.0.nodes.0");
   });
 
   it("uses collection-specific upsert schemas", () => {
-    expect(parseUnknown(collectionUpsertSchema("agents"), {
-      name: "Developer",
-      description: "Does work",
-      instructions: "Implement",
-      skills: [],
-      enabled: true,
-      avatar: "rocket",
-      frontmatter: {}
-    })).toMatchObject({ name: "Developer", avatar: "rocket", frontmatter: {} });
-
-    expect(parseUnknown(collectionUpsertSchema("agents"), {
-      id: "developer",
-      avatar: null,
-      relativePath: "README.md",
-      slug: "forged",
-      errors: ["forged"],
-      createdAt: "forged",
-      updatedAt: "forged"
-    })).toEqual({ id: "developer", avatar: null });
-
-    expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
-      name: "Developer",
-      avatar: "mars"
-    }), "avatar");
-
-    expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
-      name: "Developer",
-      nodeStyle: "luna"
-    }), "$" );
-
-    expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
-      name: "Developer",
-      status: "online"
-    }), "$");
-
     expect(parseUnknown(collectionUpsertSchema("skills"), {
       name: "Kubernetes",
       description: "Triage",
+      metadata: { domain: "platform" },
+      relativePath: ".agents/skills/kubernetes/SKILL.md",
+      slug: "forged",
+      errors: ["forged"],
+      projectId: "forged",
+      origin: "project",
+      valid: false,
+      sourceSha256: "forged",
+      contentSha256: "forged",
+      sizeBytes: 999
+    })).toEqual({
+      name: "Kubernetes",
+      description: "Triage",
       metadata: { domain: "platform" }
-    })).toMatchObject({ metadata: { domain: "platform" } });
+    });
 
-    expectValidationError(() => parseUnknown(collectionUpsertSchema("agents"), {
-      name: "Developer",
+    expectValidationError(() => parseUnknown(collectionUpsertSchema("skills"), {
+      name: "Kubernetes",
       unexpected: true
     }), "$");
   });

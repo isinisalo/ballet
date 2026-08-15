@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  agentCreatePath,
-  agentDocumentPath,
   automationAllLoopsPath,
   automationLoopPath,
   automationThemePath,
+  executionProfileCreatePath,
+  executionProfilePath,
   projectCollectionCreatePath,
   projectCollectionDocumentPath,
   projectDocumentPath,
   routeFromPath,
-  runAgentPath,
   runLoopPath,
   runOverviewPath,
   runtimePath,
@@ -46,8 +45,21 @@ describe("workspace routing", () => {
   });
 
   it("parses canonical automation and runtime routes with selected entities", () => {
-    expect(routeFromPath("/agents")).toEqual({ view: "agents" });
-    expect(routeFromPath("/agents?new=1")).toEqual({ view: "agents", creating: true });
+    expect(routeFromPath("/execution-profiles")).toEqual({
+      view: "execution-profiles",
+      executionProfileId: undefined,
+      creating: undefined
+    });
+    expect(routeFromPath("/execution-profiles?id=reviewer")).toEqual({
+      view: "execution-profiles",
+      executionProfileId: "reviewer",
+      creating: undefined
+    });
+    expect(routeFromPath("/execution-profiles?new=1")).toEqual({
+      view: "execution-profiles",
+      executionProfileId: undefined,
+      creating: true
+    });
     expect(routeFromPath("/skills?new=1")).toEqual({ view: "skills", creating: true });
     expect(routeFromPath("/skills?new=1&path=.agents%2Fskills%2Freview%2FSKILL.md")).toEqual({
       view: "skills",
@@ -67,7 +79,7 @@ describe("workspace routing", () => {
   it("parses URL-backed Ballet Run routes", () => {
     expect(routeFromPath("/run")).toEqual({ view: "run", rootRunId: undefined });
     expect(routeFromPath("/run/loops/release%20train?run=root-1")).toEqual({ view: "run", runTargetKind: "loop", runTargetId: "release train", rootRunId: "root-1" });
-    expect(routeFromPath("/run/agents/reviewer?run=root-2")).toEqual({ view: "run", runTargetKind: "agent", runTargetId: "reviewer", rootRunId: "root-2" });
+    expect(routeFromPath("/run/agents/reviewer?run=root-2")).toEqual({ view: "projects" });
   });
 
   it("does not keep legacy automation route aliases", () => {
@@ -83,8 +95,9 @@ describe("workspace routing", () => {
     expect(projectCollectionCreatePath("adr")).toBe("/project/adrs?new=1");
     expect(projectCollectionCreatePath("goal")).toBe("/project/goals?new=1");
     expect(projectCollectionCreatePath("instruction")).toBe("/project/instructions?new=1");
-    expect(agentDocumentPath(".codex/agents/a b.toml")).toBe("/agents?path=.codex%2Fagents%2Fa%20b.toml");
-    expect(agentCreatePath()).toBe("/agents?new=1");
+    expect(executionProfilePath("profile one")).toBe("/execution-profiles?id=profile%20one");
+    expect(executionProfilePath()).toBe("/execution-profiles");
+    expect(executionProfileCreatePath()).toBe("/execution-profiles?new=1");
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(skillCreatePath()).toBe("/skills?new=1");
     expect(automationAllLoopsPath()).toBe("/automation/loops?view=all");
@@ -92,7 +105,6 @@ describe("workspace routing", () => {
     expect(automationThemePath()).toBe("/automation/theme");
     expect(runOverviewPath("root 1")).toBe("/run?run=root%201");
     expect(runLoopPath("wf 1", "root 1")).toBe("/run/loops/wf%201?run=root%201");
-    expect(runAgentPath("agent 1", "root 1")).toBe("/run/agents/agent%201?run=root%201");
     expect(runtimePath()).toBe("/runtimes");
   });
 });

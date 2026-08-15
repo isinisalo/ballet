@@ -4,7 +4,7 @@ import { defaultTerminalNodes, type ProjectAutomationConfig } from "@shared/api/
 import { useAutomationDraft } from "../src/workspace/automation/useAutomationDraft";
 
 const config = (id?: string): ProjectAutomationConfig => ({
-  version: 8,
+  version: 9,
   loops: id ? [{
     id,
     start: "first",

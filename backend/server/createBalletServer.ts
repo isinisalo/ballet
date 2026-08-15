@@ -47,10 +47,10 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     copilotCommand: options.copilotCommand ?? savedSettings.copilotCommand
   });
   await runtime.start();
-  const configurations = new RuntimeConfigurationService(context.root, settings, runtime, executions);
+  const configurations = new RuntimeConfigurationService(settings, runtime);
   const invalidations = new WorkspaceInvalidationBroadcaster();
   const store = new MarkdownStore(context.root, database);
-  const targets = new LocalRunTargetService(roots, configurations);
+  const targets = new LocalRunTargetService(roots);
   const runHolder: { service?: LocalRunService } = {};
   const queue = new LocalExecutionQueue({
     store: executions, runtime, worktreesRoot: context.worktreesRoot,
@@ -63,20 +63,25 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   });
   const runs = new LocalRunService({
     context, connection: () => database.connection(), database, roots, executions, runtime,
-    configurations, queue, readData: () => store.read(),
+    configurations, queue,
     onChanged: (rootRunId) => invalidations.publish("runs-changed", { rootRunId })
   });
   runHolder.service = runs;
-  store.setAgentRemovalHook((agentId) => configurations.remove(agentId));
   store.setWorkspaceEnricher(async (content) => {
-    const agentIds = content.agents.map((agent) => agent.id);
-    const agentRuntimeConfigurations = await configurations.list(agentIds);
+    const configurationResolution = await configurations.resolveAll(content.executionProfiles);
     return {
       ...content,
       runtime: await runtime.snapshot(),
-      agentRuntimeConfigurations,
-      executionStates: await configurations.executionStates(agentIds, agentRuntimeConfigurations),
-      runTargets: await targets.list(content, agentRuntimeConfigurations)
+      runtimeConfigurationIssues: [
+        ...configurationResolution.globalIssues,
+        ...Object.values(configurationResolution.configurations)
+        .flatMap((configuration) => configuration.issues),
+      ],
+      runTargets: targets.list(
+        content,
+        configurationResolution.configurations,
+        configurationResolution.globalIssues
+      )
     };
   });
   await runs.reconcile();
@@ -106,7 +111,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     setTimeout(() => { void shutdown(); }, 25).unref();
   });
   app.use("/api", createApiRouter({
-    store, runtime, configurations, executions, runs, invalidations, logsPath: context.logsPath
+    store, runtime, executions, runs, invalidations, logsPath: context.logsPath
   }));
 
   const clientDist = resolveClientDist(options.webDist);

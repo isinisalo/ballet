@@ -1,79 +1,47 @@
 {
-  "version": 8,
-  "agents": {
-    "acceptance-test-agent": {
-      "provider": "codex",
-      "model": "gpt-5.6-terra",
-      "reasoning": "medium",
-      "policy": {
-        "network": true
-      }
-    },
-    "architecture-agent": {
-      "provider": "codex",
-      "model": "gpt-5.6-sol",
-      "reasoning": "medium",
-      "policy": {
-        "network": false
-      }
-    },
-    "implementation-agent": {
-      "provider": "codex",
-      "model": "gpt-5.6-terra",
-      "reasoning": "medium",
-      "policy": {
-        "network": false
-      }
-    },
-    "implementation-plan-agent": {
+  "version": 9,
+  "executionProfiles": [
+    {
+      "id": "codex-gpt-5-6-luna-medium-network-off",
+      "name": "Codex GPT-5.6 Luna · Medium · Network off",
       "provider": "codex",
       "model": "gpt-5.6-luna",
-      "reasoning": "medium",
-      "policy": {
-        "network": false
-      }
+      "reasoningEffort": "medium",
+      "networkAccess": false
     },
-    "milestone-issues-agent": {
+    {
+      "id": "codex-gpt-5-6-luna-medium-network-on",
+      "name": "Codex GPT-5.6 Luna · Medium · Network on",
       "provider": "codex",
       "model": "gpt-5.6-luna",
-      "reasoning": "medium",
-      "policy": {
-        "network": true
-      }
+      "reasoningEffort": "medium",
+      "networkAccess": true
     },
-    "release-agent": {
+    {
+      "id": "codex-gpt-5-6-sol-medium-network-off",
+      "name": "Codex GPT-5.6 Sol · Medium · Network off",
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "medium",
+      "networkAccess": false
+    },
+    {
+      "id": "codex-gpt-5-6-terra-medium-network-off",
+      "name": "Codex GPT-5.6 Terra · Medium · Network off",
       "provider": "codex",
       "model": "gpt-5.6-terra",
-      "reasoning": "medium",
-      "policy": {
-        "network": true
-      }
+      "reasoningEffort": "medium",
+      "networkAccess": false
     },
-    "roadmap-agent": {
+    {
+      "id": "codex-gpt-5-6-terra-medium-network-on",
+      "name": "Codex GPT-5.6 Terra · Medium · Network on",
       "provider": "codex",
-      "model": "gpt-5.6-sol",
-      "reasoning": "medium",
-      "policy": {
-        "network": false
-      }
-    },
-    "test-plan-agent": {
-      "provider": "codex",
-      "model": "gpt-5.6-luna",
-      "reasoning": "medium",
-      "policy": {
-        "network": false
-      }
-    },
-    "ui-design-agent": {
-      "provider": "codex",
-      "model": "gpt-5.6-sol",
-      "reasoning": "medium",
-      "policy": {
-        "network": false
-      }
+      "model": "gpt-5.6-terra",
+      "reasoningEffort": "medium",
+      "networkAccess": true
     }
-  },
+  ],
   "loops": [
     {
       "id": "blueprint-design",
@@ -89,7 +57,9 @@
             "rejected": "blocked"
           },
           "type": "agent",
-          "agentId": "roadmap-agent"
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:roadmap-agent",
+          "skillIds": []
         },
         {
           "description": "Johda hyväksytystä roadmapista projektin domain-, data- ja integraatiomalli tiedostoon .ballet/outputs/DATA-MODEL.md ilman uutta WHAT- tai WHY-päätöstä.",
@@ -101,7 +71,9 @@
             "rejected": "blocked"
           },
           "type": "agent",
-          "agentId": "architecture-agent"
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:architecture-agent",
+          "skillIds": []
         },
         {
           "description": "Suunnittele roadmapin ja data-mallin mukainen käyttöliittymärakenne tiedostoon .ballet/outputs/UI-DESIGN.md käyttäen projektin DESIGN.md-tokeneita.",
@@ -113,7 +85,9 @@
             "rejected": "blocked"
           },
           "type": "agent",
-          "agentId": "ui-design-agent"
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:ui-design-agent",
+          "skillIds": []
         },
         {
           "description": "Tuota UI-DESIGN.md:n perusteella tarkistettavat näkymä- ja tilamockit tiedostoon .ballet/outputs/UI-MOCKS.md.",
@@ -125,7 +99,9 @@
             "rejected": "blocked"
           },
           "type": "agent",
-          "agentId": "ui-design-agent"
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:ui-design-agent",
+          "skillIds": []
         },
         {
           "description": "Kuvaa hyväksytyn data-mallin ja UI-ratkaisun C4 context-, container- ja component-tasolla tiedostoon .ballet/outputs/C4.md.",
@@ -137,7 +113,9 @@
             "rejected": "blocked"
           },
           "type": "agent",
-          "agentId": "architecture-agent"
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:architecture-agent",
+          "skillIds": []
         },
         {
           "description": "Hyväksy ROADMAP-, DATA-MODEL-, UI-DESIGN-, UI-MOCKS- ja C4-artifactit. Approved-vastauksen tulee sisältää milestone_id sekä vähintään yksi github_issue-handoff seuraavaa Looppia varten.",
@@ -189,7 +167,9 @@
             "rejected": "blocked"
           },
           "type": "agent",
-          "agentId": "milestone-issues-agent"
+          "executionProfileId": "codex-gpt-5-6-luna-medium-network-on",
+          "primaryInstructionId": "project:milestone-issues-agent",
+          "skillIds": []
         },
         {
           "description": "Laadi valitulle milestonelle päätöksistä johdettu toteutussuunnitelma tiedostoon .ballet/outputs/milestones/<milestone-id>/IMPLEMENTATION-PLAN.md.",
@@ -201,7 +181,9 @@
             "rejected": "blocked"
           },
           "type": "agent",
-          "agentId": "implementation-plan-agent"
+          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+          "primaryInstructionId": "project:implementation-plan-agent",
+          "skillIds": []
         },
         {
           "description": "Määrittele milestonen unit-, integration-, acceptance- ja release-verifioinnit tiedostoon .ballet/outputs/milestones/<milestone-id>/TEST-PLAN.md.",
@@ -213,7 +195,9 @@
             "rejected": "blocked"
           },
           "type": "agent",
-          "agentId": "test-plan-agent"
+          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+          "primaryInstructionId": "project:test-plan-agent",
+          "skillIds": []
         },
         {
           "description": "Hyväksy valitun milestonen rajaus, GitHub-issue snapshotit, toteutussuunnitelma ja testisuunnitelma toteutuksen lähtökohdaksi.",
@@ -265,7 +249,9 @@
             "rejected": "implement-milestone"
           },
           "type": "agent",
-          "agentId": "implementation-agent"
+          "executionProfileId": "codex-gpt-5-6-terra-medium-network-off",
+          "primaryInstructionId": "project:implementation-agent",
+          "skillIds": []
         },
         {
           "description": "Aja milestonen TEST-PLAN.md:n acceptance-testit, tarkasta diff ja tallenna evidenssi tiedostoon .ballet/outputs/milestones/<milestone-id>/ACCEPTANCE.md muuttamatta toteutusta.",
@@ -277,7 +263,9 @@
             "rejected": "implement-milestone"
           },
           "type": "agent",
-          "agentId": "acceptance-test-agent"
+          "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+          "primaryInstructionId": "project:acceptance-test-agent",
+          "skillIds": []
         },
         {
           "description": "Hyväksy milestonen toteutus ja acceptance-evidenssi julkaistavaksi CI/CD-ketjun kautta.",
@@ -329,7 +317,9 @@
             "rejected": "failed"
           },
           "type": "agent",
-          "agentId": "release-agent"
+          "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+          "primaryInstructionId": "project:release-agent",
+          "skillIds": []
         },
         {
           "description": "Käynnistä vain projektin olemassa oleva CI/CD-deploy valitulle Git-releaselle ja tallenna workflow-runin evidenssi release-artifactiin.",
@@ -341,7 +331,9 @@
             "rejected": "failed"
           },
           "type": "agent",
-          "agentId": "release-agent"
+          "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+          "primaryInstructionId": "project:release-agent",
+          "skillIds": []
         },
         {
           "description": "Verifioi deploy health-, smoke-, acceptance- ja observability-checkeillä sekä kirjaa tulokset ja mahdollisen rollbackin release-artifactiin.",
@@ -353,7 +345,9 @@
             "rejected": "failed"
           },
           "type": "agent",
-          "agentId": "release-agent"
+          "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+          "primaryInstructionId": "project:release-agent",
+          "skillIds": []
         },
         {
           "description": "Tarkasta release-, deploy- ja verifiointievidenssi. Rejection palauttaa verifiointiin eikä luo uutta Git-tagia.",

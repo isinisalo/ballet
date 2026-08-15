@@ -1,94 +1,106 @@
-import { describe, expect, it, vi } from "vitest";
-import type { Agent } from "../../shared/domain/agents.js";
-import type { AgentRuntimeConfiguration } from "../../shared/domain/runtime.js";
-import { defaultTerminalNodes } from "../../shared/domain/automation.js";
-import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
-import type { RootRunStore } from "./RootRunStore.js";
-import { LocalRunTargetService } from "./LocalRunTargetService.js";
-import { agentSnapshot } from "./LoopExecutionSnapshot.js";
+import { describe, expect, it } from "vitest";
+import { defaultTerminalNodes, type ProjectLoop } from "../../shared/domain/automation.js";
+import type { ProjectConfiguration } from "../../shared/domain/projectConfig.js";
+import { LoopRunNotFoundError } from "../runtime/LoopRunErrors.js";
+import { reachableExecutionSteps, reachableLoops } from "./LoopExecutionSnapshot.js";
 
-const agent = (enabled = true): Agent => ({
-  id: "reviewer", name: "Reviewer", description: "Reviews.", instructions: "Review carefully.", enabled,
-  skills: [{ id: "active", name: "Active", description: "", metadata: {}, body: "Use active.", enabled: true },
-    { id: "disabled", name: "Disabled", description: "", metadata: {}, body: "Never use this.", enabled: false }],
-  createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
-});
-
-const automation = {
-  version: 8 as const,
-  loops: [{
-    id: "blueprint-design", start: "review",
-    nodes: [{
-      id: "review", type: "agent" as const, agentId: "reviewer", description: "Review.", nodeStyle: "luna" as const, nodeSize: "tiny" as const,
-      on: { approved: "completed", rejected: "failed" }
-    }, ...defaultTerminalNodes()]
-  }]
+const composition = {
+  executionProfileId: "primary",
+  primaryInstructionId: "project:primary",
+  skillIds: ["project:checks"]
 };
 
-describe("Loop execution snapshots and targets", () => {
-  it("excludes disabled skills from the immutable prompt snapshot", () => {
-    const snapshot = agentSnapshot(agent());
-    expect(snapshot.instructions).toContain("Use active.");
-    expect(snapshot.instructions).not.toContain("Never use this.");
-    expect(snapshot.skillIds).toEqual(["active"]);
+const targetLoop = (): ProjectLoop => ({
+  id: "target",
+  start: "scheduled",
+  nodes: [{
+    id: "scheduled",
+    type: "scheduled",
+    ...composition,
+    description: "Start scheduled work.",
+    nodeStyle: "luna",
+    nodeSize: "tiny",
+    schedule: { kind: "once", date: "2026-08-01", time: "09:00", timeZone: "UTC" },
+    on: { approved: "completed", rejected: "blocked" }
+  }, {
+    id: "unreachable",
+    type: "agent",
+    ...composition,
+    description: "Never reached.",
+    nodeStyle: "flat",
+    nodeSize: "medium",
+    on: { approved: "completed", rejected: "failed" }
+  }, ...defaultTerminalNodes()]
+});
+
+const sourceLoop = (): ProjectLoop => ({
+  id: "source",
+  start: "work",
+  nodes: [{
+    id: "work",
+    type: "agent",
+    ...composition,
+    description: "Complete the work.",
+    nodeStyle: "terra",
+    nodeSize: "medium",
+    on: { approved: "gate", rejected: "failed" }
+  }, {
+    id: "gate",
+    type: "human",
+    description: "Review the work.",
+    nodeStyle: "luna",
+    nodeSize: "tiny",
+    on: { approved: { loop: "target" }, rejected: "blocked" }
+  }, ...defaultTerminalNodes()]
+});
+
+const config = (): ProjectConfiguration => ({
+  version: 9,
+  executionProfiles: [{
+    id: "primary",
+    name: "Primary",
+    provider: "codex",
+    model: "gpt-5",
+    reasoningEffort: "medium",
+    networkAccess: false
+  }],
+  loops: [sourceLoop(), targetLoop()]
+});
+
+describe("reachable Root Run execution snapshot graph", () => {
+  it("traverses every configured result across Human and cross-Loop boundaries", () => {
+    const loops = reachableLoops(config(), "source");
+    expect(loops.map((loop) => loop.id)).toEqual(["source", "target"]);
+    expect(loops[0]!.nodes.map((node) => node.id)).toEqual([
+      "work", "gate", "blocked", "failed"
+    ]);
+    expect(loops[1]!.nodes.map((node) => node.id)).toEqual([
+      "scheduled", "completed", "blocked"
+    ]);
   });
 
-  it("marks loops unavailable for disabled agents and theme issues", async () => {
-    const configuration: AgentRuntimeConfiguration = {
-      localPolicy: { readOnlyRoots: [] },
-      resolved: { agentId: "reviewer", provider: "codex", model: "model", reasoning: "medium", policy: { network: false, readOnlyRoots: [] } },
-      issues: []
-    };
-    const configurations = { get: vi.fn(async () => configuration) } as unknown as RuntimeConfigurationService;
-    const roots = { active: vi.fn(), latest: vi.fn() } as unknown as RootRunStore;
-    const service = new LocalRunTargetService(roots, configurations);
-
-    const result = await service.list({
-      agents: [agent(false)], automation, automationIssues: [],
-      loopThemeIssues: [{ path: ".ballet/theme.json", message: "Invalid theme." }]
-    }, { reviewer: configuration });
-
-    expect(result.loops[0]).toMatchObject({ ready: false });
-    expect(result.loops[0]?.issues.map(({ code }) => code)).toEqual(expect.arrayContaining(["disabled", "invalid_config"]));
+  it("returns only composed Agent and Scheduled Steps in deterministic Loop order", () => {
+    expect(reachableExecutionSteps(config(), "source").map(({ loopId, step }) => [
+      loopId,
+      step.id,
+      step.type,
+      step.executionProfileId,
+      step.primaryInstructionId,
+      step.skillIds
+    ])).toEqual([
+      ["source", "work", "agent", "primary", "project:primary", ["project:checks"]],
+      ["target", "scheduled", "scheduled", "primary", "project:primary", ["project:checks"]]
+    ]);
   });
 
-  it("marks every loop unavailable when the global theme is invalid", async () => {
-    const configuration: AgentRuntimeConfiguration = {
-      localPolicy: { readOnlyRoots: [] },
-      resolved: { agentId: "reviewer", provider: "codex", model: "model", reasoning: "medium", policy: { network: false, readOnlyRoots: [] } },
-      issues: []
-    };
-    const service = new LocalRunTargetService(
-      { active: vi.fn(), latest: vi.fn() } as unknown as RootRunStore,
-      { get: vi.fn(async () => configuration) } as unknown as RuntimeConfigurationService
-    );
+  it("fails closed when a reachable Loop or node is missing", () => {
+    expect(() => reachableLoops(config(), "missing")).toThrow(LoopRunNotFoundError);
+    const missingTarget = config();
+    missingTarget.loops = [sourceLoop()];
+    expect(() => reachableLoops(missingTarget, "source")).toThrow("Reachable Loop target was not found.");
 
-    const result = await service.list({
-      agents: [agent()], automation, automationIssues: [],
-      loopThemeIssues: [{ path: ".ballet/theme.json", message: "Invalid theme." }]
-    }, { reviewer: configuration });
-
-    expect(result.loops[0]).toMatchObject({ ready: false });
-  });
-
-  it("allows every valid Loop to start directly", async () => {
-    const configuration: AgentRuntimeConfiguration = {
-      localPolicy: { readOnlyRoots: [] },
-      resolved: { agentId: "reviewer", provider: "codex", model: "model", reasoning: "medium", policy: { network: false, readOnlyRoots: [] } },
-      issues: []
-    };
-    const service = new LocalRunTargetService(
-      { active: vi.fn(), latest: vi.fn() } as unknown as RootRunStore,
-      { get: vi.fn(async () => configuration) } as unknown as RuntimeConfigurationService
-    );
-
-    const result = await service.list({
-      agents: [agent()],
-      automation: { ...automation, loops: [{ ...automation.loops[0]!, id: "secondary-flow" }] },
-      automationIssues: [],
-      loopThemeIssues: []
-    }, { reviewer: configuration });
-
-    expect(result.loops[0]).toMatchObject({ id: "secondary-flow", ready: true, issues: [] });
+    const missingNode = config();
+    missingNode.loops[0] = { ...sourceLoop(), start: "missing" };
+    expect(() => reachableLoops(missingNode, "source")).toThrow("Reachable node source:missing was not found.");
   });
 });

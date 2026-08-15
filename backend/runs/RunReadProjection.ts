@@ -20,15 +20,16 @@ export const publicRootSummary = (run: StoredRootRun) => ({
 
 export const currentPosition = (
   runs: LoopRunDetails[],
-  tasks: ExecutionTask[],
-  fallbackAgentId: string
+  tasks: ExecutionTask[]
 ) => {
   const run = [...runs].reverse().find((candidate) =>
     ["running", "waiting_for_human"].includes(candidate.status)) ?? runs.at(-1);
   const step = [...(run?.stepRuns ?? [])].reverse().find((candidate) =>
-    ["queued", "running", "waiting_for_human"].includes(candidate.status));
-  const task = step?.executionTaskId
-    ? tasks.find((candidate) => candidate.id === step.executionTaskId)
+    ["queued", "running", "waiting_for_human", "needs_input"].includes(candidate.status));
+  const task = step
+    ? step.executionTaskId
+      ? tasks.find((candidate) => candidate.id === step.executionTaskId)
+      : undefined
     : tasks.at(-1);
   return task || step || run ? {
     loopRunId: run?.runId,
@@ -36,7 +37,7 @@ export const currentPosition = (
     stepRunId: step?.stepRunId,
     stepId: step?.stepId,
     taskId: task?.id,
-    agentId: step?.agentId ?? task?.spec.agent.id ?? fallbackAgentId,
+    executionProfileId: task?.spec.evidence.executionProfile.id,
     taskStatus: task?.status
   } : undefined;
 };

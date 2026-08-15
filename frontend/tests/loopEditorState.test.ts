@@ -19,8 +19,10 @@ const agentStep = (id: string, approved: StepTransitionTarget): ProjectStep => (
   type: "agent",
   nodeStyle: "terra",
   nodeSize: "medium",
-  agentId: "agent",
-  description: "",
+  executionProfileId: "primary",
+  primaryInstructionId: "project:primary",
+  skillIds: ["project:checks"],
+  description: `Execute ${id}.`,
   on: { approved, rejected: "failed" }
 });
 
@@ -43,18 +45,19 @@ describe("loop editor state", () => {
     const draft = createLoopDraft();
     expect(draft).toEqual({ id: "", start: "", nodes: defaultTerminalNodes() });
 
-    const withAgent = addFirstStep(draft, [{ id: "builder" } as never]);
+    const withAgent = addFirstStep(draft);
     expect(withAgent.start).toBe("new-step");
     expect(withAgent.nodes[0]).toMatchObject({
       id: "new-step",
       type: "agent",
-      agentId: "builder",
+      executionProfileId: "",
+      primaryInstructionId: "",
+      skillIds: [],
       nodeStyle: "flat",
       nodeSize: "medium",
       on: { approved: "completed", rejected: "blocked" }
     });
     expect(withAgent.nodes.slice(1)).toEqual(defaultTerminalNodes());
-    expect(addFirstStep(createLoopDraft(), []).nodes[0]).toMatchObject({ type: "human", nodeStyle: "flat", nodeSize: "medium" });
   });
 
   it("renames a Step and every local transition that points to it", () => {
@@ -76,11 +79,11 @@ describe("loop editor state", () => {
         type: "human",
         nodeStyle: "luna",
         nodeSize: "tiny",
-        description: "",
+        description: "Review the first Loop.",
         on: { approved: { loop: "first-loop" }, rejected: { loop: "first-loop" } }
       }, ...defaultTerminalNodes()]
     };
-    const config: ProjectAutomationConfig = { version: 8, loops: [loop(), referencingLoop] };
+    const config: ProjectAutomationConfig = { version: 9, loops: [loop(), referencingLoop] };
     const remaining = removeLoopAtIndex(config, 0).loops[0]!.nodes[0] as ProjectStep;
     expect(remaining.on.approved).toBe("completed");
     expect(remaining.on.rejected).toBe("blocked");
@@ -95,34 +98,35 @@ describe("loop editor state", () => {
         type: "human",
         nodeStyle: "luna",
         nodeSize: "tiny",
-        description: "",
+        description: "Review the renamed Loop.",
         on: { approved: { loop: "first-loop" }, rejected: "failed" }
       }, ...defaultTerminalNodes()]
     };
-    const config: ProjectAutomationConfig = { version: 8, loops: [loop(), second] };
+    const config: ProjectAutomationConfig = { version: 9, loops: [loop(), second] };
     const next = updateLoopAtIndex(config, 0, { ...config.loops[0]!, id: "renamed-loop" });
     expect((next.loops[1]!.nodes[0] as ProjectStep).on.approved).toEqual({ loop: "renamed-loop" });
   });
 
-  it("replaces cross-Loop transitions with output-specific defaults when changing to agent", () => {
+  it("preserves cross-Loop transitions and starts blank composition when changing Human to Agent", () => {
     const step: ProjectStep = {
       id: "gate",
       type: "human",
       nodeStyle: "sol",
       nodeSize: "large",
-      description: "",
+      description: "Gate the next Step.",
       on: { approved: { loop: "other" }, rejected: { loop: "other" } }
     };
     const changed = changeStepType(step, "agent", {
-      loop: { id: "current", start: step.id, nodes: [step, ...defaultTerminalNodes()] },
-      firstAgentId: "agent"
+      loop: { id: "current", start: step.id, nodes: [step, ...defaultTerminalNodes()] }
     });
     expect(changed).toMatchObject({
       type: "agent",
-      agentId: "agent",
+      executionProfileId: "",
+      primaryInstructionId: "",
+      skillIds: [],
       nodeStyle: "sol",
       nodeSize: "large",
-      on: { approved: "completed", rejected: "blocked" }
+      on: { approved: { loop: "other" }, rejected: { loop: "other" } }
     });
   });
 
@@ -146,7 +150,9 @@ describe("scheduled loop editor state", () => {
     expect(next).toMatchObject({
       id: "start",
       type: "scheduled",
-      agentId: "agent",
+      executionProfileId: "primary",
+      primaryInstructionId: "project:primary",
+      skillIds: ["project:checks"],
       nodeStyle: "terra",
       nodeSize: "medium",
       on: { approved: "review", rejected: "failed" },
@@ -154,14 +160,18 @@ describe("scheduled loop editor state", () => {
     });
   });
 
-  it("does not offer Scheduled when a transition points to the start Step", () => {
+  it("offers Scheduled when incoming transitions form a cycle to the start Step", () => {
     const incoming = loop();
-    incoming.nodes[1] = { ...incoming.nodes[1]!, on: { ...(incoming.nodes[1] as ProjectStep).on, rejected: "start" } } as ProjectStep;
+    incoming.nodes[1] = { ...incoming.nodes[1]!, on: { approved: "start", rejected: "start" } } as ProjectStep;
 
-    expect(canChangeStepToScheduled(incoming, "start")).toBe(false);
+    expect(canChangeStepToScheduled(incoming, "start")).toBe(true);
+    const scheduledStart = changeStepType(incoming.nodes[0] as ProjectStep, "scheduled", { loop: incoming });
+    const authored = replaceNode(incoming, "start", scheduledStart);
+    expect(authored.nodes[0]).toMatchObject({ id: "start", type: "scheduled" });
+    expect((authored.nodes[1] as ProjectStep).on).toEqual({ approved: "start", rejected: "start" });
   });
 
-  it("replaces Human cross-Loop outputs with scheduled terminal defaults", () => {
+  it("preserves Human cross-Loop outputs with blank composition when changing to Scheduled", () => {
     const gate: ProjectStep = {
       id: "gate",
       type: "human",
@@ -172,14 +182,15 @@ describe("scheduled loop editor state", () => {
     };
 
     expect(changeStepType(gate, "scheduled", {
-      loop: { id: "current-loop", start: gate.id, nodes: [gate, ...defaultTerminalNodes()] },
-      firstAgentId: "agent"
+      loop: { id: "current-loop", start: gate.id, nodes: [gate, ...defaultTerminalNodes()] }
     })).toMatchObject({
       type: "scheduled",
-      agentId: "agent",
+      executionProfileId: "",
+      primaryInstructionId: "",
+      skillIds: [],
       nodeStyle: "mars",
       nodeSize: "small",
-      on: { approved: "completed", rejected: "blocked" }
+      on: { approved: { loop: "next-loop" }, rejected: { loop: "retry-loop" } }
     });
   });
 
@@ -192,8 +203,10 @@ describe("scheduled loop editor state", () => {
         type: "scheduled",
         nodeStyle: "luna",
         nodeSize: "tiny",
-        agentId: "agent",
-        description: "",
+        executionProfileId: "primary",
+        primaryInstructionId: "project:primary",
+        skillIds: ["project:checks"],
+        description: "Run scheduled work.",
         schedule: { kind: "once", date: "2026-07-12", time: "11:00", timeZone: "Europe/Helsinki" },
         on: { approved: "run", rejected: "blocked" }
       }, agentStep("run", "completed"), ...defaultTerminalNodes()]

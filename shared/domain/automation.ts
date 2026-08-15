@@ -67,14 +67,21 @@ interface ProjectStepBase extends ProjectLoopNodeVisual {
   on: ProjectStepTransitions;
 }
 
-export interface ProjectAgentStep extends ProjectStepBase {
+interface ProjectStepExecutionComposition {
+  executionProfileId: string;
+  primaryInstructionId: string;
+  skillIds: string[];
+}
+
+export interface ProjectAgentStep extends ProjectStepBase, ProjectStepExecutionComposition {
   type: "agent";
-  agentId: string;
 }
 
 export interface ProjectHumanStep extends ProjectStepBase {
   type: "human";
-  agentId?: never;
+  executionProfileId?: never;
+  primaryInstructionId?: never;
+  skillIds?: never;
 }
 
 export type ProjectScheduleWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -121,14 +128,13 @@ export type ProjectRecurringStepSchedule =
 
 export type ProjectStepSchedule = ProjectOnceStepSchedule | ProjectRecurringStepSchedule;
 
-export interface ProjectScheduledStep extends ProjectStepBase {
+export interface ProjectScheduledStep extends ProjectStepBase, ProjectStepExecutionComposition {
   type: "scheduled";
   schedule: ProjectStepSchedule;
-  agentId: string;
 }
 
-export type ProjectAgentBackedStep = ProjectAgentStep | ProjectScheduledStep;
-export type ProjectExecutableStep = ProjectAgentBackedStep | ProjectHumanStep;
+export type ProjectExecutionStep = ProjectAgentStep | ProjectScheduledStep;
+export type ProjectExecutableStep = ProjectExecutionStep | ProjectHumanStep;
 export type ProjectStep = ProjectExecutableStep;
 export type ProjectTerminalNode = {
   [Status in StepEndStatus]: ProjectLoopNodeVisual & { id: Status; type: Status }
@@ -162,8 +168,8 @@ export function mapProjectStepTransitions<T extends ProjectStep>(
 export const defaultTransitionFor = (output: OutputId): StepTransitionTarget =>
   output === "approved" ? "completed" : "blocked";
 
-export const isProjectAgentBackedStep = (step: ProjectStep): step is ProjectAgentBackedStep =>
-  step.type === "agent" || step.type === "scheduled";
+export const isProjectExecutionStep = (node: ProjectLoopNode): node is ProjectExecutionStep =>
+  node.type === "agent" || node.type === "scheduled";
 
 export const isProjectTerminalNode = (node: ProjectLoopNode): node is ProjectTerminalNode =>
   node.type === "completed" || node.type === "blocked" || node.type === "failed";
@@ -188,12 +194,12 @@ export const resolveEffectiveStartStep = (
 };
 
 export interface ProjectAutomationConfig {
-  version: 8;
+  version: 9;
   loops: ProjectLoop[];
 }
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
-  version: 8,
+  version: 9,
   loops: []
 });
 

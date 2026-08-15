@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
-import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
 import { createApiRouter } from "../http/apiRouter.js";
 import { sendKnownHttpError } from "../http/errors.js";
 import type { LocalRunService } from "../runs/LocalRunService.js";
@@ -30,7 +29,6 @@ describe("singular Loop theme HTTP API", () => {
     app.use("/api", createApiRouter({
       store: { updateLoopTheme } as unknown as MarkdownStore,
       runtime: {} as LocalRuntimeService,
-      configurations: {} as RuntimeConfigurationService,
       executions: {} as ExecutionStore,
       runs: {} as LocalRunService,
       invalidations: { publish } as unknown as WorkspaceInvalidationBroadcaster,
@@ -78,7 +76,6 @@ describe("singular Loop theme HTTP API", () => {
     app.use("/api", createApiRouter({
       store: { updateLoopTheme } as unknown as MarkdownStore,
       runtime: {} as LocalRuntimeService,
-      configurations: {} as RuntimeConfigurationService,
       executions: {} as ExecutionStore,
       runs: {} as LocalRunService,
       invalidations: { publish: vi.fn() } as unknown as WorkspaceInvalidationBroadcaster,

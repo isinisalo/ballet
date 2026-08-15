@@ -1,4 +1,4 @@
-import { Bot, CircleDot, Gauge, Route } from "lucide-react";
+import { CircleDot, Gauge, Route } from "lucide-react";
 import { StatusDot } from "@/components/shared/workspace-ui";
 import {
   SidebarGroupLabel,
@@ -8,7 +8,7 @@ import {
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
 import type { RouteState } from "../types";
-import { runAgentPath, runLoopPath, runOverviewPath } from "../routing";
+import { runLoopPath, runOverviewPath } from "../routing";
 import { SidebarNavLinkItem } from "../layout/SidebarNavLinkItem";
 import type { RunDashboardState } from "./useRunDashboard";
 import { runSummaryPath } from "./runPresentation";
@@ -38,13 +38,6 @@ export function RunSidebar({ route, dashboard, navigate }: {
         {dashboard.targets.loops.map((target) => (
           <SidebarNavLinkItem key={target.id} path={runLoopPath(target.id, target.activeRootRunId)} isActive={route.runTargetKind === "loop" && route.runTargetId === target.id} navigate={navigate} className="h-7 min-w-0">
             <ReadinessDot ready={target.ready} active={Boolean(target.activeRootRunId)} /><span className="truncate font-mono text-[0.68rem]">{target.name}</span>
-          </SidebarNavLinkItem>
-        ))}
-      </RunSection>
-      <RunSection label="Agents" icon={<Bot />} empty="No agents.">
-        {dashboard.targets.agents.map((target) => (
-          <SidebarNavLinkItem key={target.id} path={runAgentPath(target.id, target.activeRootRunId)} isActive={route.runTargetKind === "agent" && route.runTargetId === target.id} navigate={navigate} className="h-7 min-w-0">
-            <ReadinessDot ready={target.ready} active={Boolean(target.activeRootRunId)} /><span className="truncate">{target.name}</span>
           </SidebarNavLinkItem>
         ))}
       </RunSection>

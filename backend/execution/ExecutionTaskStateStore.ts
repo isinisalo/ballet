@@ -1,0 +1,76 @@
+import type Database from "better-sqlite3";
+
+export class ExecutionTaskStateStore {
+  constructor(private readonly connection: () => Database.Database) {}
+
+  cancelActiveByRoot(rootRunId: string, timestamp: string): string[] {
+    const rows = this.connection().prepare(`
+      SELECT task_id FROM execution_tasks
+      WHERE root_run_id = ? AND status IN ('queued', 'running')
+      ORDER BY created_at, rowid
+    `).all(rootRunId) as Array<{ task_id: string }>;
+    this.connection().prepare(`
+      UPDATE execution_tasks SET status = 'cancelled', outcome_json = NULL,
+        error_code = NULL, error_message = NULL,
+        cancel_requested_at = COALESCE(cancel_requested_at, ?), completed_at = ?, updated_at = ?
+      WHERE root_run_id = ? AND status = 'queued'
+    `).run(timestamp, timestamp, timestamp, rootRunId);
+    this.connection().prepare(`
+      UPDATE execution_tasks SET cancel_requested_at = COALESCE(cancel_requested_at, ?), updated_at = ?
+      WHERE root_run_id = ? AND status = 'running'
+    `).run(timestamp, timestamp, rootRunId);
+    return rows.map((row) => row.task_id);
+  }
+
+  rejectUnrunnableQueued(timestamp: string): string[] {
+    const transaction = this.connection().transaction(() => {
+      const rows = this.connection().prepare(`
+        SELECT task_id FROM execution_tasks task
+        WHERE task.status = 'queued' AND NOT (${runnableTaskSql})
+        ORDER BY task.created_at, task.rowid
+      `).all() as Array<{ task_id: string }>;
+      for (const row of rows) this.cancel(row.task_id, timestamp);
+      return rows.map((row) => row.task_id);
+    });
+    return transaction() as string[];
+  }
+
+  claim(taskId: string, timestamp: string): boolean {
+    const transaction = this.connection().transaction(() => {
+      const result = this.connection().prepare(`
+        UPDATE execution_tasks AS task SET status = 'running',
+          started_at = COALESCE(started_at, ?), updated_at = ?
+        WHERE task_id = ? AND status = 'queued' AND (${runnableTaskSql})
+      `).run(timestamp, timestamp, taskId);
+      if (result.changes === 1) return true;
+      this.cancel(taskId, timestamp);
+      return false;
+    });
+    return transaction() as boolean;
+  }
+
+  private cancel(taskId: string, timestamp: string): void {
+    this.connection().prepare(`
+      UPDATE execution_tasks SET status = 'cancelled', outcome_json = NULL,
+        error_code = NULL, error_message = NULL,
+        cancel_requested_at = COALESCE(cancel_requested_at, ?), completed_at = ?, updated_at = ?
+      WHERE task_id = ? AND status = 'queued'
+    `).run(timestamp, timestamp, timestamp, taskId);
+  }
+}
+
+const runnableTaskSql = `
+  EXISTS (
+    SELECT 1
+    FROM root_runs root
+    JOIN loop_runs loop ON loop.root_run_id = root.root_run_id
+    JOIN step_runs step ON step.run_id = loop.run_id
+    WHERE root.root_run_id = task.root_run_id
+      AND root.status IN ('queued', 'running', 'waiting_for_human')
+      AND loop.run_id = json_extract(task.spec_json, '$.loopRunId')
+      AND loop.status = 'running'
+      AND step.step_run_id = json_extract(task.spec_json, '$.stepRunId')
+      AND step.status = 'queued'
+      AND step.execution_task_id = task.task_id
+  )
+`;

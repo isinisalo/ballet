@@ -3,12 +3,12 @@ id: goal-002
 title: Versionhallittu projektimalli
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - tavoite
   - versionhallinta
   - projektimalli
-version: 2
+version: 3
 ---
 
 # Versionhallittu projektimalli
@@ -42,9 +42,9 @@ Balletin oman repositoryn kehitystyönkulku on tavallista project-local dataa. S
 - Palveluntarjoajakomentojen konekohtaiset ohitukset, absoluuttiset vain luku -juuret ja ajohistoria eivät kuulu versionhallittuun projektimalliin.
 - Palveluntarjoajien tunnuksia, tokeneita tai muita salaisuuksia ei tallenneta projektiaineistoon.
 - Kohdemallissa ei ole top-level Agentin runtime-omistajuutta, `agentId`-viitettä eikä standalone Agent Runia; `agent` säilyy Step-tyyppinä.
-- `.codex/agents` on vain eksplisiittisen migraation lähde, ei kanoninen projektimääritys. Historialliset Agent-snapshotit säilyvät read-only-historiana.
+- Pre-release v8 -aineisto muunnetaan repositoryssä suoraan v9-muotoon. `.codex/agents` ei ole v9:n kanoninen projektimääritys tai runtime-lähde, eikä Ballet rakenna v8-readeria tai historiallisten pre-release-snapshotien compatibility-projektiota.
 - System-ohje ei sisällä Balletin tai muun projektin ohjelmistotoimitusmenettelyä, vaan workflow-järjestys kuuluu project-local Loop-dataan ja menettelyt Stepeille eksplisiittisesti valittuihin Project-skillseihin.
-- Workflow-template ei ole uusi entity, pack, registry tai live-linkki. Built-in-lähteestä projektin lähtökohdaksi kloonattu workflow on itsenäistä Project-dataa.
+- Workflow-template ei ole V1:n entity, pack, registry, marketplace, clone-to-project-toiminto tai live-linkki. V1 suorittaa vain tavallista Project-dataa.
 - Ballet löytää Goal- ja ADR-dokumentit niiden kanonisista Markdown-tiedostoista; erillinen indeksi ei ole tietolähde.
 - Virheellinen konfiguraatio voidaan näyttää ja korjata Configure-tilassa, mutta sitä ei saa suorittaa Runina.
 

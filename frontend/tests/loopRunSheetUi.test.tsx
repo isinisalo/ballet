@@ -1,37 +1,89 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { Agent, ExecutionTask, ProjectStep, StepRun } from "@shared/api/workspace-contracts";
-import { LoopRunStepInstructions, LoopRunStepOutput } from "../src/workspace/automation/loops/LoopRunStepSheet";
+import {
+  defaultLoopTheme,
+  type ExecutionProfile,
+  type ExecutionProjectSnapshot,
+  type ExecutionRuntimeSnapshot,
+  type ExecutionTask,
+  type ProjectStep,
+  type RootRunDetail,
+  type StepRun
+} from "@shared/api/workspace-contracts";
+import { LoopRunStepComposition, LoopRunStepOutput } from "../src/workspace/automation/loops/LoopRunStepSheet";
+
+type ExecutionResourceSnapshot = RootRunDetail["executionSnapshot"]["resources"][number];
+
+const executionProfile: ExecutionProfile = {
+  id: "codex-test-high",
+  name: "Codex test · High",
+  provider: "codex",
+  model: "gpt-5",
+  reasoningEffort: "high",
+  networkAccess: false
+};
 
 const agentStep: ProjectStep = {
   id: "implement",
   type: "agent",
+  executionProfileId: executionProfile.id,
+  primaryInstructionId: "project:developer",
+  skillIds: ["project:review"],
   nodeStyle: "terra",
   nodeSize: "medium",
-  agentId: "developer",
   description: "Implement.",
   on: { approved: "completed", rejected: "failed" }
 };
 
+describe("Loop Run composition", () => {
+  it("renders task evidence using immutable Root Run resource content", () => {
+    const task = taskSnapshot();
+    const capturedProfile = {
+      ...executionProfile,
+      name: "Attempt-captured profile",
+      model: "gpt-5-task-snapshot",
+      reasoningEffort: "max",
+      networkAccess: true
+    };
+    task.spec.evidence.executionProfile = capturedProfile;
+    render(<LoopRunStepComposition step={agentStep} rootDetail={rootDetailSnapshot()} task={task} />);
+
+    expect(screen.getByText("Immutable composition")).toBeInTheDocument();
+    expect(screen.getByText("Immutable instructions")).toBeInTheDocument();
+    expect(screen.getByText("Review workflow")).toBeInTheDocument();
+    expect(screen.getByText(`profile · ${executionProfile.id}`)).toBeInTheDocument();
+    expect(screen.getByText(`Prompt SHA-256 · ${"e".repeat(64)}`)).toBeInTheDocument();
+    expect(screen.getByText("Output schema version · 1")).toBeInTheDocument();
+    expect(screen.getByText(`Output schema SHA-256 · ${"f".repeat(64)}`)).toBeInTheDocument();
+    const profileSnapshot = screen.getByRole("region", { name: "Captured ExecutionProfile" });
+    for (const value of [
+      capturedProfile.id,
+      capturedProfile.name,
+      capturedProfile.provider,
+      capturedProfile.model,
+      capturedProfile.reasoningEffort,
+      "Enabled"
+    ]) expect(within(profileSnapshot).getByText(value)).toBeInTheDocument();
+    expect(within(profileSnapshot).queryByText(executionProfile.name)).not.toBeInTheDocument();
+    expect(screen.queryByText(task.spec.evidence.prompt)).not.toBeInTheDocument();
+  });
+
+  it("uses the immutable Root Run snapshot before a Step task has been attached", () => {
+    render(<LoopRunStepComposition step={agentStep} rootDetail={rootDetailSnapshot()} />);
+
+    expect(screen.getByText("Immutable instructions")).toBeInTheDocument();
+    expect(screen.getByText("Review workflow")).toBeInTheDocument();
+    const profileSnapshot = screen.getByRole("region", { name: "Captured ExecutionProfile" });
+    expect(within(profileSnapshot).getByText(executionProfile.name)).toBeInTheDocument();
+    expect(within(profileSnapshot).getByText(executionProfile.model)).toBeInTheDocument();
+    expect(screen.getByText("Prompt SHA-256 · Unavailable until an execution attempt is created")).toBeInTheDocument();
+    expect(screen.getByText("Output schema version · Unavailable until an execution attempt is created")).toBeInTheDocument();
+    expect(screen.getByText("Output schema SHA-256 · Unavailable until an execution attempt is created")).toBeInTheDocument();
+  });
+});
+
 describe("Loop Run sheet", () => {
-  it("renders immutable task instructions instead of the mutable agent definition", () => {
-    const agents = [{ id: "developer", name: "Live developer", instructions: "Mutable instructions", enabled: true }] as Agent[];
-    render(<LoopRunStepInstructions step={agentStep} agents={agents} task={taskSnapshot()} />);
-
-    expect(screen.getByText("Immutable Run snapshot")).toBeInTheDocument();
-    expect(screen.getByText("Immutable instructions")).toBeInTheDocument();
-    expect(screen.queryByText("Mutable instructions")).not.toBeInTheDocument();
-  });
-
-  it("uses the immutable Loop execution plan before a Step task has been attached", () => {
-    const agents = [{ id: "developer", name: "Live developer", instructions: "Mutable instructions", enabled: true }] as Agent[];
-    render(<LoopRunStepInstructions step={agentStep} agents={agents} snapshot={taskSnapshot().spec.agent} />);
-
-    expect(screen.getByText("Immutable instructions")).toBeInTheDocument();
-    expect(screen.queryByText("Mutable instructions")).not.toBeInTheDocument();
-  });
-
   it("shows structured agent output and requires an explicit human transition choice", async () => {
     const user = userEvent.setup();
     const onRespond = vi.fn(async () => true);
@@ -41,7 +93,6 @@ describe("Loop Run sheet", () => {
       loopId: "delivery",
       stepId: "implement",
       type: "agent",
-      agentId: "developer",
       status: "completed",
       result: "approved",
       outcome: { state: "completed", result: "approved", summary: "Implementation verified.", checks: [{ name: "lint", status: "passed" }] },
@@ -93,7 +144,6 @@ describe("Loop Run sheet", () => {
       loopId: "delivery",
       stepId: "implement",
       type: "agent",
-      agentId: "developer",
       status: "needs_input",
       outcome: {
         state: "needs_input",
@@ -124,7 +174,6 @@ describe("Loop Run sheet", () => {
       loopId: "delivery",
       stepId: "implement",
       type: "agent",
-      agentId: "developer",
       status: "blocked",
       outcome: { state: "blocked", summary: "Access to the signing key is unavailable.", checks: [] },
       attempt: 1,
@@ -141,7 +190,44 @@ describe("Loop Run sheet", () => {
   });
 });
 
-const taskSnapshot = () => ({
+const runtimeSnapshot: ExecutionRuntimeSnapshot = {
+  hostname: "Studio Mac",
+  provider: "codex",
+  cliVersion: "1.0.0",
+  model: "gpt-5",
+  reasoning: "high",
+  policy: { network: false, readOnlyRoots: [] },
+  capabilityHash: "b".repeat(64)
+};
+const projectSnapshot: ExecutionProjectSnapshot = {
+  checkoutRoot: "/workspace/ballet",
+  headSha: "c".repeat(40),
+  configHash: "d".repeat(64),
+  snapshotHash: "d".repeat(64)
+};
+const resourceSnapshots: ExecutionResourceSnapshot[] = [{
+  kind: "system",
+  origin: "system",
+  id: "system:execution-contract-v1",
+  sourceSha256: "1".repeat(64),
+  content: "# System baseline"
+}, {
+  kind: "primary",
+  origin: "project",
+  id: agentStep.primaryInstructionId,
+  relativePath: ".ballet/instructions/developer.md",
+  sourceSha256: "2".repeat(64),
+  content: "# Immutable instructions"
+}, {
+  kind: "skill",
+  origin: "project",
+  id: agentStep.skillIds[0]!,
+  relativePath: ".agents/skills/review/SKILL.md",
+  sourceSha256: "3".repeat(64),
+  content: "# Review workflow"
+}];
+
+const taskSnapshot = (): ExecutionTask => ({
   id: "task-1",
   kind: "loop_step",
   rootRunId: "root-1",
@@ -149,15 +235,54 @@ const taskSnapshot = () => ({
   createdAt: "2026-07-11T10:00:00.000Z",
   updatedAt: "2026-07-11T10:00:00.000Z",
   spec: {
-    version: 1,
+    version: 2,
     taskId: "task-1",
     kind: "loop_step",
     rootRunId: "root-1",
     loopRunId: "root-1",
     stepRunId: "step-agent",
-    agent: { id: "developer", name: "Snapshotted developer", description: "Snapshot.", instructions: "# Immutable instructions", skillIds: [], configHash: "a".repeat(64) },
-    runtime: { hostname: "Studio Mac", provider: "codex", cliVersion: "1.0.0", model: "gpt-5", reasoning: "high", policy: { network: false, readOnlyRoots: [] }, capabilityHash: "b".repeat(64) },
-    project: { checkoutRoot: "/workspace/ballet", headSha: "c".repeat(40), configHash: "d".repeat(64), snapshotHash: "d".repeat(64) },
+    evidence: {
+      compositionVersion: 1,
+      loopId: "delivery",
+      stepId: agentStep.id,
+      executionProfile,
+      resources: resourceSnapshots.map(({ kind, origin, id, relativePath, sourceSha256 }) => ({
+        kind,
+        origin,
+        id,
+        relativePath,
+        sourceSha256
+      })),
+      prompt: "# System\n\n# Primary\n\n# Skill\n\n# Task",
+      promptSha256: "e".repeat(64),
+      outputSchemaVersion: 1,
+      outputSchemaSha256: "f".repeat(64)
+    },
+    runtime: runtimeSnapshot,
+    project: projectSnapshot,
     createdAt: "2026-07-11T10:00:00.000Z"
   }
-}) as ExecutionTask;
+});
+
+const rootDetailSnapshot = (): RootRunDetail => ({
+  rootRunId: "root-1",
+  kind: "loop",
+  targetId: "delivery",
+  source: "manual",
+  status: "running",
+  createdAt: "2026-07-11T10:00:00.000Z",
+  updatedAt: "2026-07-11T10:00:00.000Z",
+  executionSnapshot: {
+    version: 1,
+    rootLoopId: "delivery",
+    project: projectSnapshot,
+    loops: [{ id: "delivery", start: agentStep.id, nodes: [agentStep] }],
+    theme: defaultLoopTheme,
+    executionProfiles: [executionProfile],
+    runtimes: [{ executionProfileId: executionProfile.id, runtime: runtimeSnapshot }],
+    resources: resourceSnapshots,
+    createdAt: "2026-07-11T10:00:00.000Z"
+  },
+  loopRuns: [],
+  tasks: []
+});

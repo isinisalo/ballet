@@ -11,15 +11,15 @@ const activeRun: RootRunSummary = {
   targetId: "delivery",
   source: "manual",
   status: "running",
-  current: { loopId: "delivery", stepId: "implement", agentId: "developer", taskStatus: "running" },
+  current: { loopId: "delivery", stepId: "implement", executionProfileId: "developer", taskStatus: "running" },
   createdAt: "2026-07-11T10:00:00.000Z",
   updatedAt: "2026-07-11T10:01:00.000Z"
 };
 
 const recentRun: RootRunSummary = {
   rootRunId: "root-recent",
-  kind: "agent",
-  targetId: "reviewer",
+  kind: "loop",
+  targetId: "review",
   source: "schedule",
   status: "completed",
   finalization: {
@@ -52,8 +52,16 @@ describe("Run Overview", () => {
       active: [activeRun],
       recent: [recentRun],
       targets: {
-        loops: [{ kind: "loop", id: "release", name: "Release", ready: true, issues: [] }],
-        agents: [{ kind: "agent", id: "publisher", name: "Publisher", ready: false, issues: [{ code: "unbound", message: "No local provider is configured.", agentId: "publisher" }] }]
+        loops: [
+          { kind: "loop", id: "release", name: "Release", ready: true, issues: [] },
+          {
+            kind: "loop",
+            id: "publishing",
+            name: "Publishing",
+            ready: false,
+            issues: [{ code: "backend_unhealthy", message: "No local provider is configured.", executionProfileId: "publisher" }]
+          }
+        ]
       },
       loading: false,
       error: "",

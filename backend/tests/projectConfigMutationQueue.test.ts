@@ -65,12 +65,16 @@ const createProject = async (): Promise<string> => {
   roots.push(root);
   await mkdir(path.join(root, ".ballet"), { recursive: true });
   await writeFile(path.join(root, ".ballet", "project.md"), "---\nid: mutation-queue\nname: Mutation queue\n---\n", "utf8");
-  await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({ ...config(), agents: {} }, null, 2), "utf8");
+  await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({
+    version: 9,
+    executionProfiles: [],
+    loops: config().loops
+  }, null, 2), "utf8");
   return root;
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 8,
+  version: 9,
   loops: [automationLoop("first-loop"), automationLoop("second-loop")]
 });
 

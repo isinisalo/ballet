@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { stepOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import type { ExecutionSpec } from "../../shared/domain/runtime.js";
 import { LocalDatabase } from "../storage/LocalDatabase.js";
 import { ExecutionStore } from "./ExecutionStore.js";
@@ -33,7 +35,7 @@ describe("ExecutionStore", () => {
     fixture.insertRoot("root-1");
     fixture.store.create(specification("queued", "root-1"));
     fixture.store.create(specification("running", "root-1"));
-    fixture.store.start("running");
+    fixture.markRunning("running");
 
     const queued = fixture.store.requestCancel("queued");
     const requested = fixture.store.requestCancel("running");
@@ -46,12 +48,35 @@ describe("ExecutionStore", () => {
     fixture.close();
   });
 
+  it("keeps running Root tasks active until their workers drain", async () => {
+    const fixture = await createFixture();
+    fixture.insertRoot("root-1");
+    fixture.store.create(specification("queued", "root-1"));
+    fixture.store.create(specification("running", "root-1"));
+    fixture.markRunning("running");
+
+    const taskIds = fixture.store.cancelActiveByRoot("root-1", "2026-01-02T00:00:00.000Z");
+
+    expect(taskIds).toEqual(["queued", "running"]);
+    expect(fixture.store.require("queued")).toMatchObject({
+      status: "cancelled",
+      cancelRequestedAt: "2026-01-02T00:00:00.000Z",
+      completedAt: "2026-01-02T00:00:00.000Z"
+    });
+    expect(fixture.store.require("running")).toMatchObject({
+      status: "running",
+      cancelRequestedAt: "2026-01-02T00:00:00.000Z",
+      completedAt: undefined
+    });
+    fixture.close();
+  });
+
   it("fails only interrupted running tasks on recovery and leaves queued work replayable", async () => {
     const fixture = await createFixture();
     fixture.insertRoot("root-1");
     fixture.store.create(specification("running", "root-1"));
     fixture.store.create(specification("queued", "root-1"));
-    fixture.store.start("running");
+    fixture.markRunning("running");
 
     const recovered = fixture.store.recoverInterrupted();
 
@@ -116,14 +141,40 @@ const specification = (
   provider: "codex" | "copilot" = "codex",
   createdAt = new Date().toISOString()
 ): ExecutionSpec => ({
-  version: 1,
+  version: 2,
   taskId,
-  kind: "agent_run",
+  kind: "loop_step",
   rootRunId,
-  input: `Input for ${taskId}`,
-  agent: {
-    id: "agent", name: "Agent", description: "Test agent", instructions: "Work carefully.",
-    skillIds: [], configHash: "agent-config"
+  loopRunId: `loop-${rootRunId}`,
+  stepRunId: `step-${taskId}`,
+  evidence: {
+    compositionVersion: 1,
+    loopId: "delivery",
+    stepId: taskId,
+    executionProfile: {
+      id: `${provider}-test-medium`,
+      name: `${provider} test · Medium`,
+      provider,
+      model: "provider-default",
+      reasoningEffort: "provider-default",
+      networkAccess: false
+    },
+    resources: [{
+      kind: "system",
+      origin: "system",
+      id: "system:execution-contract-v1",
+      sourceSha256: "b".repeat(64)
+    }, {
+      kind: "primary",
+      origin: "project",
+      id: "project:test-instruction",
+      relativePath: ".ballet/instructions/test-instruction.md",
+      sourceSha256: "c".repeat(64)
+    }],
+    prompt: `Input for ${taskId}`,
+    promptSha256: sha256(`Input for ${taskId}`),
+    outputSchemaVersion: 1,
+    outputSchemaSha256: sha256(JSON.stringify(stepOutcomeJsonSchema))
   },
   runtime: {
     hostname: "localhost", provider, cliVersion: "1.2.3", model: "provider-default",
@@ -135,6 +186,8 @@ const specification = (
   },
   createdAt
 });
+
+const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
 
 const event = (sequence: number, message: string, terminal: boolean, createdAt: string) => ({
   sequence,
@@ -157,10 +210,15 @@ const createFixture = async () => {
     connection().prepare(`
       INSERT INTO root_runs (
         root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
-        config_hash, snapshot_hash, created_at, updated_at
-      ) VALUES (?, 'agent', 'agent', 'manual', 'queued', ?, ?, ?, 'config', 'snapshot', ?, ?)
+        config_hash, snapshot_hash, execution_snapshot_json, created_at, updated_at
+      ) VALUES (?, 'loop', 'delivery', 'manual', 'queued', ?, ?, ?, 'config', 'snapshot', '{}', ?, ?)
     `).run(rootRunId, path.join(root, "worktrees", rootRunId), `ballet/run/${rootRunId}`, "a".repeat(40),
       "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
   };
-  return { store, connection, insertRoot, close: () => database.close() };
+  const markRunning = (taskId: string): void => {
+    connection().prepare(`
+      UPDATE execution_tasks SET status = 'running', started_at = updated_at WHERE task_id = ?
+    `).run(taskId);
+  };
+  return { store, connection, insertRoot, markRunning, close: () => database.close() };
 };

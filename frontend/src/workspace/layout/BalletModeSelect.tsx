@@ -31,7 +31,7 @@ export function BalletModeSelect({ mode, onChange }: {
         <SelectItem value="configure" className="items-start rounded-md px-2.5 py-2.5">
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="text-sm font-medium leading-5">Configure</span>
-            <span className="text-xs leading-4 text-muted-foreground">Define projects, agents, and automation</span>
+            <span className="text-xs leading-4 text-muted-foreground">Define projects, execution profiles, and automation</span>
           </span>
         </SelectItem>
       </SelectContent>

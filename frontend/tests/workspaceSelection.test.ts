@@ -50,28 +50,27 @@ describe("workspace selection", () => {
       frontmatter: { title: "Project A" },
       body: "Project A"
     },
-    agents: [
-      {
-        id: "agent-a",
-        name: "Agent A",
-        description: "",
-        runtime: "codex",
-        enabled: true,
-        path: ".codex/agents/a.toml",
-        relativePath: ".codex/agents/a.toml",
-        config: {},
-        skills: [],
-        frontmatter: {},
-        body: ""
-      }
-    ],
+    executionProfiles: [{
+      id: "profile-a",
+      name: "Profile A",
+      provider: "codex" as const,
+      model: "gpt-test",
+      reasoningEffort: "medium",
+      networkAccess: false
+    }],
     skills: [
       {
-        id: "skill-a",
+        id: "project:skill-a",
+        projectId: "skill-a",
         name: "Skill A",
         description: "",
-        path: ".agents/skills/a/SKILL.md",
         relativePath: ".agents/skills/a/SKILL.md",
+        origin: "project" as const,
+        valid: true,
+        sourceSha256: "source",
+        contentSha256: "content",
+        sizeBytes: 0,
+        metadata: {},
         frontmatter: { name: "Skill A" },
         body: ""
       }
@@ -97,20 +96,25 @@ describe("workspace selection", () => {
     expect(fallback.selectedGoal?.id).toBe("first-goal");
   });
 
-  it("preserves agent and skill selected-item behavior", () => {
+  it("selects ExecutionProfiles by id and Skills by project path", () => {
     expect(getWorkspaceSelection({
       data,
-      route: { view: "agents" }
-    }).selectedAgent).toBeUndefined();
+      route: { view: "execution-profiles" }
+    }).selectedExecutionProfile).toBeUndefined();
 
     expect(getWorkspaceSelection({
       data,
-      route: { view: "agents", documentPath: ".codex/agents/missing.toml" }
-    }).selectedAgent?.id).toBe("agent-a");
+      route: { view: "execution-profiles", executionProfileId: "profile-a" }
+    }).selectedExecutionProfile?.id).toBe("profile-a");
+
+    expect(getWorkspaceSelection({
+      data,
+      route: { view: "execution-profiles", executionProfileId: "missing" }
+    }).selectedExecutionProfile).toBeUndefined();
 
     expect(getWorkspaceSelection({
       data,
       route: { view: "skills", documentPath: ".agents/skills/a/SKILL.md" }
-    }).selectedSkill?.id).toBe("skill-a");
+    }).selectedSkill?.id).toBe("project:skill-a");
   });
 });

@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
 import os from "node:os";
 import type {
-  ExecutionProjectSnapshot,
   ExecutionRuntimeSnapshot,
   LocalProviderStatus,
   LocalRuntime,
-  ResolvedAgentExecution,
+  ResolvedExecutionProfile,
   RuntimeCapabilities,
   RuntimeProvider
 } from "../../shared/domain/runtime.js";
@@ -28,7 +27,6 @@ export interface LocalRuntimeServiceOptions {
 
 export interface RuntimePreflightSnapshot {
   runtime: ExecutionRuntimeSnapshot;
-  project: ExecutionProjectSnapshot;
 }
 
 export class LocalRuntimeService {
@@ -102,7 +100,7 @@ export class LocalRuntimeService {
     };
   }
 
-  async preflight(execution: ResolvedAgentExecution): Promise<RuntimePreflightSnapshot> {
+  async preflight(execution: ResolvedExecutionProfile): Promise<RuntimePreflightSnapshot> {
     const status = await this.refreshProvider(execution.provider);
     if (status.health !== "ready" || !status.cliVersion) {
       throw new Error(status.healthMessage ?? `${execution.provider} CLI is not ready.`);
@@ -120,19 +118,11 @@ export class LocalRuntimeService {
       || (execution.policy.readOnlyRoots.length > 0 && !status.capabilities.policy.readOnlyRoots)) {
       throw new Error(`${execution.provider} cannot enforce the selected execution policy.`);
     }
-    const checkout = await this.workspace.inspect();
-    if (checkout.codeDirty) throw new Error(`Commit or stash source changes before running: ${checkout.dirtyPaths.join(", ")}`);
     return {
       runtime: {
         hostname: os.hostname(), provider: execution.provider, cliVersion: status.cliVersion,
         model: execution.model, reasoning: execution.reasoning, policy: execution.policy,
         capabilityHash: capabilityHash(status.capabilities)
-      },
-      project: {
-        checkoutRoot: this.options.context.root,
-        headSha: checkout.headSha,
-        configHash: checkout.configHash,
-        snapshotHash: checkout.configHash
       }
     };
   }

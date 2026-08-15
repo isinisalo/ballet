@@ -1,30 +1,22 @@
-import type { Agent, MarkdownDocument, Skill } from "@shared/api/workspace-contracts";
+import type { MarkdownDocument, ProjectInstruction, Skill } from "@shared/api/workspace-contracts";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { AgentsOverview } from "../src/workspace/agents/AgentsOverview";
 import { DocumentCollectionOverview } from "../src/workspace/documents/DocumentCollectionOverview";
 import { SkillsOverview } from "../src/workspace/skills/SkillsOverview";
 
-const agent: Agent = {
-  id: "review-agent",
-  name: "Review Agent",
-  description: "Reviews implementation changes.",
-  instructions: "Review the change.",
-  skills: [],
-  enabled: true,
-  avatar: "search",
-  createdAt: "2026-07-13T10:00:00.000Z",
-  updatedAt: "2026-07-13T11:00:00.000Z",
-  relativePath: ".codex/agents/review-agent.toml"
-};
-
 const skill: Skill = {
-  id: "review",
+  id: "project:review",
+  projectId: "review",
   name: "Review",
   description: "Reviews changes.",
   metadata: { owner: "quality" },
-  enabled: true,
+  origin: "project",
+  valid: true,
+  sourceSha256: "source",
+  contentSha256: "content",
+  sizeBytes: 16,
+  body: "Review changes.",
   relativePath: ".agents/skills/review/SKILL.md"
 };
 
@@ -46,31 +38,28 @@ const document = (collection: "adr" | "goal" | "instruction"): MarkdownDocument 
   slug: `${collection}-001`
 });
 
+const instructionResource = (source: MarkdownDocument): ProjectInstruction => ({
+  id: `project:${source.id}`,
+  projectId: source.id,
+  title: source.title!,
+  body: source.body,
+  relativePath: source.relativePath,
+  origin: "project",
+  valid: true,
+  sourceSha256: "source",
+  contentSha256: "content",
+  sizeBytes: 0
+});
+
 describe("collection overviews", () => {
-  it("renders the add card first and opens an agent card with live status metadata", async () => {
-    const user = userEvent.setup();
-    const navigate = vi.fn();
-    render(<AgentsOverview agents={[agent]} executionStates={[{ agentId: agent.id, status: "running" }]} navigate={navigate} />);
-
-    const grid = screen.getByLabelText("Agents");
-    const buttons = within(grid).getAllByRole("button");
-    expect(buttons[0]).toHaveAccessibleName("Add agent");
-    expect(screen.getByText("Reviews implementation changes.")).toBeInTheDocument();
-    expect(screen.getByText("running")).toBeInTheDocument();
-
-    await user.click(buttons[0]);
-    expect(navigate).toHaveBeenCalledWith("/agents?new=1");
-    await user.click(screen.getByRole("button", { name: "Open agent Review Agent" }));
-    expect(navigate).toHaveBeenCalledWith("/agents?path=.codex%2Fagents%2Freview-agent.toml");
-  });
-
   it("renders skill metadata and keeps an empty collection actionable", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
     const { rerender } = render(<SkillsOverview skills={[skill]} navigate={navigate} />);
 
-    expect(screen.getByText("1 metadata key")).toBeInTheDocument();
-    expect(screen.getByText("enabled")).toBeInTheDocument();
+    expect(screen.getByText("Valid")).toBeInTheDocument();
+    expect(screen.getByText("path: .agents/skills/review/SKILL.md")).toBeInTheDocument();
+    expect(screen.getByText("project ID: project:review")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open skill Review" }));
     expect(navigate).toHaveBeenCalledWith("/skills?path=.agents%2Fskills%2Freview%2FSKILL.md");
 
@@ -88,11 +77,16 @@ describe("collection overviews", () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
     const source = document(kind);
-    render(<DocumentCollectionOverview kind={kind} documents={[source]} navigate={navigate} />);
+    render(<DocumentCollectionOverview
+      kind={kind}
+      documents={[source]}
+      instructions={kind === "instruction" ? [instructionResource(source)] : []}
+      navigate={navigate}
+    />);
 
     const buttons = within(screen.getByLabelText(label)).getAllByRole("button");
     expect(buttons[0]).toHaveAccessibleName(addLabel);
-    expect(screen.getByText("accepted")).toBeInTheDocument();
+    expect(screen.getByText(kind === "instruction" ? "Valid" : "accepted")).toBeInTheDocument();
     expect(screen.getByText("updated: 2026-07-13")).toBeInTheDocument();
     expect(screen.getByText(`tags: ${kind}, technical`)).toBeInTheDocument();
 

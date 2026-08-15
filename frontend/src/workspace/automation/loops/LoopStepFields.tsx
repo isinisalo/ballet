@@ -1,7 +1,6 @@
 import { useId, type ReactNode } from "react";
-import type { Agent, LoopNodeSize, LoopNodeStyle, ProjectLoopNode, ProjectStep } from "@shared/api/workspace-contracts";
+import type { LoopNodeSize, LoopNodeStyle, ProjectLoopNode } from "@shared/api/workspace-contracts";
 import { loopNodeSizeCatalog, loopNodeSizes, loopNodeStyleCatalog, loopNodeStyles } from "@shared/api/workspace-contracts";
-import { ShieldCheck } from "lucide-react";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { LoopEditorSelect } from "./LoopEditorSelect";
 
@@ -48,39 +47,11 @@ export function NodeSizeField({ node, disabled, onChange }: {
   );
 }
 
-export function StepOwner({ step, agents, disabled, onChange }: {
-  step: ProjectStep;
-  agents: Agent[];
-  disabled: boolean;
-  onChange: (step: ProjectStep) => void;
-}) {
-  if (step.type === "agent" || step.type === "scheduled") {
-    return (
-      <CompactSelectField
-        label="Agent"
-        ariaLabel="Agent"
-        value={step.agentId}
-        disabled={disabled || agents.length === 0}
-        invalid={!step.agentId}
-        error={!step.agentId ? "Select an agent." : undefined}
-        options={agents.map((agent) => ({ value: agent.id, label: agent.name ? `${agent.id} · ${agent.name}` : agent.id }))}
-        onChange={(agentId) => onChange({ ...step, agentId } as ProjectStep)}
-      />
-    );
-  }
-  return (
-    <Field className="grid grid-cols-1 items-start gap-1.5 @sm/loop-form:grid-cols-[5.5rem_minmax(0,1fr)] @sm/loop-form:items-center @sm/loop-form:gap-2">
-      <span className="text-xs font-normal text-muted-foreground">Agent</span>
-      <div className="flex min-w-0 items-center gap-1.5 text-xs text-tertiary"><ShieldCheck className="size-3.5 shrink-0" /><span>Human operator</span></div>
-    </Field>
-  );
-}
-
 export function CompactSelectField({ label, ariaLabel, value, options, disabled, invalid, error, onChange }: {
   label: ReactNode;
   ariaLabel: string;
   value: string;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; label: string; group?: string }>;
   disabled: boolean;
   invalid?: boolean;
   error?: string;

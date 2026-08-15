@@ -5,14 +5,16 @@ import { parseUnknown } from "../http/validation/httpValidation.js";
 import { expectValidationError } from "./expectValidationError.js";
 
 const configWithSchedule = (schedule: unknown) => ({
-  version: 8,
+  version: 9,
   loops: [{
     id: "delivery",
     start: "scheduled-start",
     nodes: [{
       id: "scheduled-start",
       type: "scheduled",
-      agentId: "developer-agent",
+      executionProfileId: "scheduled-work",
+      primaryInstructionId: "project:delivery",
+      skillIds: ["project:release/checks"],
       description: "Deliver.",
       nodeStyle: "luna",
       nodeSize: "tiny",
@@ -33,20 +35,20 @@ const monthly = {
 };
 
 describe("scheduled automation schema", () => {
-  it("accepts strict agent-backed schedules", () => {
+  it("accepts strict composed schedules", () => {
     for (const schedule of [once, weekly, monthly]) {
       expect(parseUnknown(automationConfigSchema, configWithSchedule(schedule))).toEqual(configWithSchedule(schedule));
     }
   });
 
-  it("rejects missing agent, legacy triggered output, and invalid node size", () => {
+  it("rejects missing composition, legacy triggered output, and invalid node size", () => {
     const valid = configWithSchedule(once);
     const step = valid.loops[0]!.nodes[0]!;
-    const withoutAgent: Record<string, unknown> = { ...step };
-    delete withoutAgent.agentId;
+    const withoutProfile: Record<string, unknown> = { ...step };
+    delete withoutProfile.executionProfileId;
     expectValidationError(() => parseUnknown(automationConfigSchema, {
-      ...valid, loops: [{ ...valid.loops[0], nodes: [withoutAgent, ...defaultTerminalNodes()] }]
-    }), "loops.0.nodes.0.agentId");
+      ...valid, loops: [{ ...valid.loops[0], nodes: [withoutProfile, ...defaultTerminalNodes()] }]
+    }), "loops.0.nodes.0.executionProfileId");
     expectValidationError(() => parseUnknown(automationConfigSchema, {
       ...valid, loops: [{ ...valid.loops[0], nodes: [{ ...step, on: { triggered: "work" } }, ...defaultTerminalNodes()] }]
     }), "loops.0.nodes.0.on");

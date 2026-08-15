@@ -1,10 +1,10 @@
 // This is the single frontend/backend contract barrel. Keeping the related
 // domain exports here avoids duplicate DTO shapes in the application layers.
-import type { Agent, AgentAvatar, AgentExecutionState } from "../domain/agents.js";
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
-  ProjectAgentBackedStep,
+  ProjectAgentStep,
+  ProjectExecutionStep,
   ProjectExecutableStep,
   ProjectLoop,
   ProjectLoopNode,
@@ -34,31 +34,36 @@ import type {
   LoopTheme,
   LoopThemeIssue
 } from "../domain/loopThemes.js";
-import type { MarkdownDocument, Project, ProjectDocumentTreeNode, Skill } from "../domain/documents.js";
 import type {
-  AgentRuntimeConfiguration,
-  AgentOutcome,
-  ExecutionAgentSnapshot,
+  MarkdownDocument,
+  Project,
+  ProjectDocumentTreeNode,
+  ProjectInstruction,
+  ProjectResourceIssue,
+  Skill
+} from "../domain/documents.js";
+import type { ExecutionProfile } from "../domain/projectConfig.js";
+import type {
   ExecutionEvent,
   ExecutionEventPage,
   ExecutionPolicy,
   ExecutionProjectSnapshot,
+  ExecutionResourceEvidence,
   ExecutionRuntimeSnapshot,
   ExecutionSpec,
   ExecutionTask,
   LocalProviderStatus,
   LocalRuntime,
-  LoopExecutionPlan,
   LoopRun,
   LoopRunDetails,
   LoopRuntimePreflight,
   LoopScheduleState,
-  PortableAgentRuntimeIntent,
-  ResolvedAgentExecution,
   RespondToStepRunRequest,
+  RootExecutionSnapshot,
   RuntimeConfigurationIssue,
   RuntimePreflightIssue,
   RuntimeProvider,
+  StepOutcome,
   StepRun
 } from "../domain/runtime.js";
 import type {
@@ -82,8 +87,10 @@ export type ProjectDocumentSaveRequest = Pick<MarkdownDocument, "relativePath" |
 
 export interface WorkspaceDataDto {
   project: Project;
-  agents: Agent[];
+  executionProfiles: ExecutionProfile[];
+  instructions: ProjectInstruction[];
   skills: Skill[];
+  resourceIssues: ProjectResourceIssue[];
   loopRuns: LoopRunDetails[];
   scheduleStates: LoopScheduleState[];
   automation: ProjectAutomationConfig;
@@ -91,21 +98,28 @@ export interface WorkspaceDataDto {
   loopTheme: LoopTheme;
   loopThemeIssues: LoopThemeIssue[];
   runtime: LocalRuntime;
-  agentRuntimeConfigurations: Record<string, AgentRuntimeConfiguration>;
-  executionStates: AgentExecutionState[];
+  runtimeConfigurationIssues: RuntimeConfigurationIssue[];
   runTargets: RunTargetsResponse;
   projectDocumentTree?: ProjectDocumentTreeNode[];
 }
 
-export type WorkspaceCollectionName = "agents" | "skills";
-type ServerManagedEntityField = "relativePath" | "slug" | "errors";
-export type AgentSaveRequest = Omit<Partial<Agent>, ServerManagedEntityField | "createdAt" | "updatedAt" | "avatar">
-  & { avatar?: AgentAvatar | null };
+export type WorkspaceCollectionName = "skills";
+type ServerManagedEntityField =
+  | "relativePath"
+  | "slug"
+  | "errors"
+  | "projectId"
+  | "origin"
+  | "valid"
+  | "sourceSha256"
+  | "contentSha256"
+  | "sizeBytes";
 export type SkillSaveRequest = Omit<Partial<Skill>, ServerManagedEntityField>;
+export type ExecutionProfileSaveRequest = Omit<ExecutionProfile, "id">;
 export type WorkspaceAutomationResponseDto = { config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] };
 
 export type WorkspaceSaveRequestByCollection = {
-  [K in WorkspaceCollectionName]: K extends "agents" ? AgentSaveRequest : SkillSaveRequest;
+  skills: SkillSaveRequest;
 };
 export type WorkspaceSaveResponseByCollection = {
   [K in WorkspaceCollectionName]: WorkspaceDataDto[K][number];
@@ -125,7 +139,7 @@ export {
   getProjectStepTransitionTargets,
   isCalendarDate,
   isIanaTimeZone,
-  isProjectAgentBackedStep,
+  isProjectExecutionStep,
   isProjectTerminalNode,
   loopNodeSizes,
   loopNodeSizeCatalog,
@@ -137,18 +151,18 @@ export {
 export { defaultLoopTheme } from "../domain/loopThemes.js";
 
 export type {
-  Agent, AgentAvatar, AgentExecutionState, MarkdownDocument, Project,
-  ProjectAutomationConfig, ProjectAutomationIssue, ProjectAgentBackedStep, ProjectDocumentTreeNode, ProjectExecutableStep,
+  MarkdownDocument, Project, ProjectInstruction, ProjectResourceIssue, ExecutionProfile,
+  ProjectAutomationConfig, ProjectAutomationIssue, ProjectAgentStep, ProjectExecutionStep, ProjectDocumentTreeNode, ProjectExecutableStep,
   ProjectLoop, ProjectLoopNode, ProjectTerminalNode, LoopNodeSize, LoopNodeSizeDefinition, LoopNodeStyle, LoopNodeStyleDefinition, LoopNodeStyleGroup,
   LoopTheme, LoopThemeIssue,
   LoopEdgeLineStyle, LoopConnectionPointStyle, ProjectOnceStepSchedule, ProjectRecurringStepSchedule,
   ProjectScheduledStep, ProjectScheduleCadence, ProjectScheduleWeekday,
   ProjectStep, ProjectStepSchedule, ProjectStepTransitionEntry, ProjectStepTransitionId,
   ProjectStepTransitionMappers, ProjectStepTransitions, StepEndStatus, StepTransitionTarget, LoopRun, LoopRunDetails,
-  LoopExecutionPlan, LoopScheduleState, LoopRuntimePreflight,
-  RespondToStepRunRequest, StepRun, AgentRuntimeConfiguration, AgentOutcome, ExecutionAgentSnapshot,
-  ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot, PortableAgentRuntimeIntent,
-  ResolvedAgentExecution, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
+  LoopScheduleState, LoopRuntimePreflight,
+  RespondToStepRunRequest, StepRun, StepOutcome,
+  ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot,
+  ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,
   BalletMode, DashboardRunStatus, RootRunDetail, RootRunKind, RootRunListResponse, RootRunListState,
   RootRunSource, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, StartRootRunRequest,

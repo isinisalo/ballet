@@ -1,4 +1,4 @@
-import type { AgentOutcome, ProjectStep, RespondToStepRunRequest, StepRun, StepTransitionTarget } from "@shared/api/workspace-contracts";
+import type { ProjectStep, RespondToStepRunRequest, StepOutcome, StepRun, StepTransitionTarget } from "@shared/api/workspace-contracts";
 import { GitCompare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { StepResponsePanel } from "./StepResponsePanel";
@@ -14,7 +14,7 @@ export function LoopRunStepPanel({ step, stepRun, pending, onRespond }: {
     <div aria-label="StepRun details" className="min-w-0 px-3 py-3 text-xs">
       <dl className="grid grid-cols-[5rem_minmax(0,1fr)] gap-x-2 gap-y-2 font-mono text-[0.65rem]">
         <dt className="text-muted-foreground">Type</dt><dd>{step.type}</dd>
-        <dt className="text-muted-foreground">Agent</dt><dd className="break-words">{stepRun.agentId ?? "Human operator"}</dd>
+        <dt className="text-muted-foreground">Execution profile</dt><dd className="break-words">{step.type === "agent" || step.type === "scheduled" ? step.executionProfileId : "Human operator"}</dd>
         {stepRun.execution ? <>
           <dt className="text-muted-foreground">Runtime</dt><dd className="break-words">{stepRun.execution.hostname} · {stepRun.execution.provider}</dd>
           <dt className="text-muted-foreground">Model</dt><dd className="break-all">{stepRun.execution.model}</dd>
@@ -54,10 +54,10 @@ const formatDate = (value: string) => new Date(value).toLocaleString();
 const formatTransition = (target: StepTransitionTarget) =>
   typeof target === "string" ? `Node · ${target}` : `Loop · ${target.loop}`;
 
-const formatOutcome = (outcome: AgentOutcome) =>
+const formatOutcome = (outcome: StepOutcome) =>
   outcome.state === "completed" ? `${outcome.state} · ${outcome.result}` : outcome.state;
 
-const outcomeBadgePresentation = (outcome?: AgentOutcome) => {
+const outcomeBadgePresentation = (outcome?: StepOutcome) => {
   if (outcome?.state === "failed" || outcome?.state === "blocked") return { variant: "destructive" as const };
   if (outcome?.state === "needs_input") {
     return { variant: "outline" as const, className: "border-tertiary/30 text-tertiary" };
@@ -67,4 +67,4 @@ const outcomeBadgePresentation = (outcome?: AgentOutcome) => {
 
 const awaitsStepResponse = (stepRun: StepRun) =>
   (stepRun.type === "human" && stepRun.status === "waiting_for_human")
-  || (stepRun.type === "agent" && stepRun.status === "needs_input");
+  || (stepRun.type !== "human" && stepRun.status === "needs_input");

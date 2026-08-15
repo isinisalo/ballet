@@ -1,7 +1,10 @@
-import { access, mkdir, mkdtemp, readFile, rm, stat, symlink, truncate, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, truncate, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { defaultTerminalNodes } from "../../../shared/domain/automation.js";
+import { defaultLoopTheme } from "../../../shared/domain/loopThemes.js";
+import type { ProjectConfiguration } from "../../../shared/domain/projectConfig.js";
 import { resolveProjectContext } from "../../project/ProjectContext.js";
 import type { StoredRootRun } from "../../runs/RootRunStore.js";
 import { LocalWorkspaceManager, type PreparedRootWorkspace } from "./LocalWorkspaceManager.js";
@@ -23,18 +26,21 @@ describe("LocalWorkspaceManager", () => {
     );
 
     await writeFile(path.join(fixture.root, "README.md"), "initial\n");
-    await writeFile(path.join(fixture.root, ".ballet", "project.json"), "{\"version\":6,\"changed\":true}\n");
+    await writeFile(path.join(fixture.root, ".ballet", "project.json"), projectJson("Changed profile"));
     await expect(fixture.manager.inspect()).resolves.toMatchObject({
       codeDirty: false,
       ignoredRuntimePaths: expect.arrayContaining([".ballet/project.json"])
     });
   });
 
-  it("snapshots uncommitted config, agents, skills, and tracked deletions into one root worktree", async () => {
+  it("snapshots uncommitted config, instructions, skills, and tracked deletions into one root worktree", async () => {
     const fixture = await createFixture();
-    await writeFile(path.join(fixture.root, ".ballet", "project.json"), "{\"version\":6,\"snapshot\":true}\n");
-    await rm(path.join(fixture.root, ".codex", "agents", "tracked.md"));
-    await writeFile(path.join(fixture.root, ".codex", "agents", "new.md"), "new agent\n");
+    await writeFile(path.join(fixture.root, ".ballet", "project.json"), projectJson("Snapshot profile"));
+    await rm(path.join(fixture.root, ".ballet", "instructions", "tracked.md"));
+    await writeFile(
+      path.join(fixture.root, ".ballet", "instructions", "new.md"),
+      "---\nid: new-instruction\ntitle: New instruction\n---\nNew instruction.\n"
+    );
     await writeFile(path.join(fixture.root, ".agents", "skills", "review", "SKILL.md"), "updated skill\n");
 
     const prepared = await fixture.manager.prepare("root-snapshot");
@@ -42,15 +48,17 @@ describe("LocalWorkspaceManager", () => {
     expect(prepared.path).toBe(path.join(fixture.context.worktreesRoot, "root-snapshot"));
     expect(prepared.configHash).toBe(prepared.snapshotHash);
     expect(await readFile(path.join(prepared.path, ".ballet", "project.json"), "utf8"))
-      .toContain('"snapshot":true');
-    expect(await readFile(path.join(prepared.path, ".codex", "agents", "new.md"), "utf8")).toBe("new agent\n");
-    await expect(access(path.join(prepared.path, ".codex", "agents", "tracked.md"))).rejects.toMatchObject({ code: "ENOENT" });
+      .toContain('"name": "Snapshot profile"');
+    expect(await readFile(path.join(prepared.path, ".ballet", "instructions", "new.md"), "utf8"))
+      .toContain("id: new-instruction");
+    await expect(access(path.join(prepared.path, ".ballet", "instructions", "tracked.md")))
+      .rejects.toMatchObject({ code: "ENOENT" });
     expect(await readFile(path.join(prepared.path, ".agents", "skills", "review", "SKILL.md"), "utf8"))
       .toBe("updated skill\n");
 
-    await writeFile(path.join(fixture.root, ".ballet", "project.json"), "{\"version\":6,\"later\":true}\n");
+    await writeFile(path.join(fixture.root, ".ballet", "project.json"), projectJson("Later profile"));
     expect(await readFile(path.join(prepared.path, ".ballet", "project.json"), "utf8"))
-      .toContain('"snapshot":true');
+      .toContain('"name": "Snapshot profile"');
   });
 
   it("keeps sequential step changes, commits success idempotently, and cleans up only when requested", async () => {
@@ -85,7 +93,7 @@ describe("LocalWorkspaceManager", () => {
     await expect(access(prepared.path)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("retains an unsuccessful worktree without committing its changes", async () => {
+  it("retains an unsuccessful sparse worktree without committing its changes", async () => {
     const fixture = await createFixture();
     const prepared = await fixture.manager.prepare("root-failed");
     await writeFile(path.join(prepared.path, "diagnostic.txt"), "keep for inspection\n");
@@ -97,9 +105,15 @@ describe("LocalWorkspaceManager", () => {
       success: false,
       retained: true,
       commitSha: undefined,
-      changedFiles: expect.arrayContaining(["diagnostic.txt"])
+      changedFiles: expect.arrayContaining([
+        ".agents/skills/review/assets/rules.txt",
+        ".agents/skills/review/scripts/check.sh",
+        "diagnostic.txt"
+      ])
     });
     expect(await readFile(path.join(prepared.path, "diagnostic.txt"), "utf8")).toBe("keep for inspection\n");
+    await expect(access(path.join(prepared.path, ".agents", "skills", "review", "scripts", "check.sh")))
+      .rejects.toMatchObject({ code: "ENOENT" });
     expect((await runGit(["rev-parse", "HEAD"], { cwd: prepared.path })).stdout.trim()).toBe(prepared.headSha);
   });
 
@@ -135,10 +149,88 @@ describe("LocalWorkspaceManager", () => {
   });
 });
 
+it("rehydrates immutable skill support files before finalizing the complete branch tree", async () => {
+  const fixture = await createFixture();
+  const skillRoot = path.join(fixture.root, ".agents", "skills", "review");
+  const beforeExcludedChanges = await fixture.manager.inspect();
+  await writeFile(path.join(skillRoot, "scripts", "check.sh"), "echo changed\n");
+  await writeFile(path.join(skillRoot, "assets", "rules.txt"), "changed asset\n");
+  const afterExcludedChanges = await fixture.manager.inspect();
+  const prepared = await fixture.manager.prepare("skill-file-filter");
+
+  expect(afterExcludedChanges.codeDirty).toBe(false);
+  expect(afterExcludedChanges.configHash).toBe(beforeExcludedChanges.configHash);
+  expect(prepared.snapshotHash).toBe(beforeExcludedChanges.configHash);
+  expect(await readFile(path.join(prepared.path, ".agents", "skills", "review", "SKILL.md"), "utf8"))
+    .toBe("initial skill\n");
+  await expect(access(path.join(prepared.path, ".agents", "skills", "review", "scripts", "check.sh")))
+    .rejects.toMatchObject({ code: "ENOENT" });
+  await expect(access(path.join(prepared.path, ".agents", "skills", "review", "assets", "rules.txt")))
+    .rejects.toMatchObject({ code: "ENOENT" });
+
+  const generatedPath = path.join(prepared.path, ".agents", "skills", "review", "generated", "report.txt");
+  await mkdir(path.dirname(generatedPath), { recursive: true });
+  await writeFile(generatedPath, "generated during execution\n");
+  await writeFile(path.join(prepared.path, "run-output.txt"), "completed\n");
+
+  const report = await fixture.manager.finalize(storedRun("skill-file-filter", prepared), true);
+
+  expect([...report.changedFiles].sort()).toEqual([
+    ".agents/skills/review/generated/report.txt",
+    "run-output.txt"
+  ]);
+  expect((await runGit(["ls-tree", "-r", "-z", "--name-only", prepared.branch], { cwd: fixture.root }))
+    .stdout.split("\0").filter(Boolean)).toEqual([
+    ".agents/skills/review/SKILL.md",
+    ".agents/skills/review/assets/rules.txt",
+    ".agents/skills/review/generated/report.txt",
+    ".agents/skills/review/scripts/check.sh",
+    ".ballet/instructions/tracked.md",
+    ".ballet/project.json",
+    "README.md",
+    "run-output.txt"
+  ]);
+  expect((await runGit(["show", `${prepared.branch}:.agents/skills/review/scripts/check.sh`], { cwd: fixture.root })).stdout)
+    .toBe("echo tracked\n");
+  expect((await runGit(["show", `${prepared.branch}:.agents/skills/review/assets/rules.txt`], { cwd: fixture.root })).stdout)
+    .toBe("tracked asset\n");
+  expect((await runGit(["show", `${prepared.branch}:.agents/skills/review/generated/report.txt`], { cwd: fixture.root })).stdout)
+    .toBe("generated during execution\n");
+  expect((await runGit(["ls-tree", prepared.branch, "--", ".agents/skills/review/scripts/check.sh"], { cwd: fixture.root })).stdout)
+    .toMatch(/^100755 blob /);
+});
+
+it("rejects non-SKILL files introduced before prepared snapshot verification", async () => {
+  const fixture = await createFixture();
+  const prepared = await fixture.manager.prepare("skill-overlay-verification");
+  await expect(fixture.manager.verifyPreparedSnapshot(prepared)).resolves.toBeUndefined();
+  const introduced = path.join(prepared.path, ".agents", "skills", "review", "scripts", "check.sh");
+  await mkdir(path.dirname(introduced), { recursive: true });
+  await writeFile(introduced, "echo introduced\n");
+
+  await expect(fixture.manager.verifyPreparedSnapshot(prepared)).rejects.toThrow(
+    "Prepared Run workspace contains a non-SKILL skill entry: .agents/skills/review/scripts/check.sh"
+  );
+});
+
+it("fails closed instead of overwriting output at a tracked skill support path", async () => {
+  const fixture = await createFixture();
+  const prepared = await fixture.manager.prepare("skill-support-collision");
+  const collision = path.join(prepared.path, ".agents", "skills", "review", "scripts", "check.sh");
+  await mkdir(path.dirname(collision), { recursive: true });
+  await writeFile(collision, "generated collision\n");
+
+  await expect(fixture.manager.finalize(storedRun("skill-support-collision", prepared), true)).rejects.toThrow(
+    "Run output conflicts with an immutable skill support file: .agents/skills/review/scripts/check.sh"
+  );
+  expect(await readFile(collision, "utf8")).toBe("generated collision\n");
+  expect((await runGit(["rev-parse", "HEAD"], { cwd: prepared.path })).stdout.trim()).toBe(prepared.headSha);
+});
+
 const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRootRun => ({
   rootRunId,
-  kind: "agent",
-  targetId: "agent",
+  kind: "loop",
+  targetId: "delivery",
   source: "manual",
   status: "running",
   worktreePath: prepared.path,
@@ -146,22 +238,76 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
   headSha: prepared.headSha,
   configHash: prepared.configHash,
   snapshotHash: prepared.snapshotHash,
+  executionSnapshot: {
+    version: 1,
+    rootLoopId: "delivery",
+    project: {
+      checkoutRoot: prepared.path,
+      headSha: prepared.headSha,
+      configHash: prepared.configHash,
+      snapshotHash: prepared.snapshotHash
+    },
+    loops: projectConfiguration("Test profile").loops,
+    theme: defaultLoopTheme,
+    executionProfiles: projectConfiguration("Test profile").executionProfiles,
+    runtimes: [],
+    resources: [],
+    createdAt: "2026-01-01T00:00:00.000Z"
+  },
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z"
 });
+
+const projectConfiguration = (profileName: string): ProjectConfiguration => ({
+  version: 9,
+  executionProfiles: [{
+    id: "test-profile",
+    name: profileName,
+    provider: "codex",
+    model: "test-model",
+    reasoningEffort: "medium",
+    networkAccess: false
+  }],
+  loops: [{
+    id: "delivery",
+    start: "work",
+    nodes: [{
+      id: "work",
+      type: "agent",
+      executionProfileId: "test-profile",
+      primaryInstructionId: "project:tracked-instruction",
+      skillIds: ["project:review"],
+      description: "Complete the work.",
+      nodeStyle: "flat",
+      nodeSize: "medium",
+      on: { approved: "completed", rejected: "blocked" }
+    }, ...defaultTerminalNodes()]
+  }]
+});
+
+const projectJson = (profileName: string): string =>
+  `${JSON.stringify(projectConfiguration(profileName), null, 2)}\n`;
 
 const createFixture = async () => {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), "ballet-local-workspace-"));
   temporaryRoots.push(fixtureRoot);
   const root = path.join(fixtureRoot, "checkout");
-  await mkdir(path.join(root, ".ballet"), { recursive: true });
-  await mkdir(path.join(root, ".codex", "agents"), { recursive: true });
+  await mkdir(path.join(root, ".ballet", "instructions"), { recursive: true });
   await mkdir(path.join(root, ".agents", "skills", "review"), { recursive: true });
   await runGit(["init", "-b", "main"], { cwd: root });
   await writeFile(path.join(root, "README.md"), "initial\n");
-  await writeFile(path.join(root, ".ballet", "project.json"), "{\"version\":6}\n");
-  await writeFile(path.join(root, ".codex", "agents", "tracked.md"), "tracked agent\n");
+  await writeFile(path.join(root, ".ballet", "project.json"), projectJson("Initial profile"));
+  await writeFile(
+    path.join(root, ".ballet", "instructions", "tracked.md"),
+    "---\nid: tracked-instruction\ntitle: Tracked instruction\n---\nTracked instruction.\n"
+  );
   await writeFile(path.join(root, ".agents", "skills", "review", "SKILL.md"), "initial skill\n");
+  await mkdir(path.join(root, ".agents", "skills", "review", "scripts"), { recursive: true });
+  await mkdir(path.join(root, ".agents", "skills", "review", "assets"), { recursive: true });
+  const scriptPath = path.join(root, ".agents", "skills", "review", "scripts", "check.sh");
+  await writeFile(scriptPath, "echo tracked\n");
+  await chmod(scriptPath, 0o755);
+  await writeFile(path.join(root, ".agents", "skills", "review", "assets", "rules.txt"), "tracked asset\n");
   await runGit(["add", "-A"], { cwd: root });
   await runGit([
     "-c", "user.name=Ballet Test", "-c", "user.email=ballet@example.test",

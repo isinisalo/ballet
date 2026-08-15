@@ -1,6 +1,15 @@
 {
-  "version": 8,
-  "agents": {},
+  "version": 9,
+  "executionProfiles": [
+    {
+      "id": "codex-gpt-5-6-luna-high-network-off",
+      "name": "Codex GPT-5.6 Luna · High · Network off",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "reasoningEffort": "high",
+      "networkAccess": false
+    }
+  ],
   "loops": [
     {
       "id": "adr-review",
@@ -11,8 +20,10 @@
           "nodeStyle": "terra",
           "nodeSize": "medium",
           "type": "agent",
-          "agentId": "reviewer",
-          "description": "",
+          "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
+          "primaryInstructionId": "project:reviewer",
+          "skillIds": [],
+          "description": "Reviews project changes",
           "on": {
             "approved": "completed",
             "rejected": "failed"

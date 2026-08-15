@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 3;
 
 export class LocalDatabase {
   private database?: Database.Database;
@@ -58,7 +58,7 @@ const schema = `
   CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS root_runs (
     root_run_id TEXT PRIMARY KEY,
-    kind TEXT NOT NULL CHECK(kind IN ('agent','loop')),
+    kind TEXT NOT NULL CHECK(kind = 'loop'),
     target_id TEXT NOT NULL,
     source TEXT NOT NULL CHECK(source IN ('manual','schedule')),
     status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_human','finalizing','completed','blocked','failed','cancelled')),
@@ -71,7 +71,7 @@ const schema = `
     head_sha TEXT NOT NULL,
     config_hash TEXT NOT NULL,
     snapshot_hash TEXT NOT NULL,
-    runtime_snapshot_json TEXT,
+    execution_snapshot_json TEXT NOT NULL,
     finalization_status TEXT CHECK(finalization_status IN ('finalizing','completed','failed')),
     finalization_terminal_status TEXT CHECK(finalization_terminal_status IN ('completed','blocked','failed','cancelled')),
     finalization_success INTEGER CHECK(finalization_success IN (0,1)),
@@ -90,11 +90,9 @@ const schema = `
     parent_step_run_id TEXT,
     source TEXT NOT NULL,
     status TEXT NOT NULL,
-    execution_plan_json TEXT,
     schedule_step_id TEXT,
     scheduled_for TEXT,
     input TEXT,
-    snapshot_json TEXT NOT NULL,
     transition_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -105,25 +103,28 @@ const schema = `
     run_id TEXT NOT NULL REFERENCES loop_runs(run_id) ON DELETE CASCADE,
     loop_id TEXT NOT NULL,
     step_id TEXT NOT NULL,
-    step_type TEXT NOT NULL CHECK(step_type IN ('agent','human')),
-    agent_id TEXT,
+    step_type TEXT NOT NULL CHECK(step_type IN ('agent','scheduled','human')),
     execution_task_id TEXT,
     execution_snapshot_json TEXT,
-    status TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_human','completed','needs_input','blocked','failed','cancelled')),
     input TEXT,
     response_input TEXT,
-    result TEXT,
+    result TEXT CHECK(result IN ('approved','rejected')),
     outcome_json TEXT,
     error TEXT,
     attempt INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    completed_at TEXT
+    completed_at TEXT,
+    CHECK(
+      (status = 'completed' AND result IN ('approved','rejected'))
+      OR (status <> 'completed' AND result IS NULL)
+    )
   );
   CREATE TABLE IF NOT EXISTS execution_tasks (
     task_id TEXT PRIMARY KEY,
     provider TEXT NOT NULL CHECK(provider IN ('codex','copilot')),
-    kind TEXT NOT NULL CHECK(kind IN ('agent_run','loop_step')),
+    kind TEXT NOT NULL CHECK(kind = 'loop_step'),
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     status TEXT NOT NULL CHECK(status IN ('queued','running','succeeded','failed','cancelled')),
     spec_json TEXT NOT NULL,
@@ -182,4 +183,7 @@ const schema = `
   CREATE TRIGGER IF NOT EXISTS execution_task_spec_is_immutable
   BEFORE UPDATE OF provider, kind, root_run_id, spec_json, spec_hash ON execution_tasks
   BEGIN SELECT RAISE(ABORT, 'execution task specification is immutable'); END;
+  CREATE TRIGGER IF NOT EXISTS root_run_execution_snapshot_is_immutable
+  BEFORE UPDATE OF execution_snapshot_json ON root_runs
+  BEGIN SELECT RAISE(ABORT, 'root run execution snapshot is immutable'); END;
 `;

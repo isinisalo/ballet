@@ -1,33 +1,68 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { z } from "zod";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { agentOutcomeSchema } from "../../shared/api/runtime-schemas.js";
-import type { ExecutionSpec, ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
-import { LocalDatabase } from "../storage/LocalDatabase.js";
-import { ExecutionStore } from "./ExecutionStore.js";
-import { LocalExecutionQueue } from "./LocalExecutionQueue.js";
-import type { LocalRuntimeService } from "./LocalRuntimeService.js";
-import type {
-  CliRuntimeAdapter,
-  RuntimeEvent,
-  RuntimeExecutionRequest,
-  RuntimeModel,
-  RuntimeProbe
-} from "./providers/CliRuntimeAdapter.js";
+import { describe, expect, it, vi } from "vitest";
+import { stepOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import { createFixture, specification, waitFor } from "./LocalExecutionQueue.test-fixture.js";
 
-const temporaryRoots: string[] = [];
+describe("LocalExecutionQueue startup and claim boundaries", () => {
+  it("does not pump a reconciliation wake before startup recovery completes", async () => {
+    const fixture = await createFixture();
+    fixture.insertRoot("root", ["deferred"]);
+    fixture.store.create(specification("deferred", "root"));
 
-afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+    fixture.queue.wake("codex");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(fixture.codex.started).toEqual([]);
+    expect(fixture.store.require("deferred").status).toBe("queued");
+    await fixture.queue.start();
+    await waitFor(() => fixture.store.require("deferred").status === "succeeded");
+    expect(fixture.codex.started).toEqual(["deferred"]);
+    await fixture.close();
+  });
+
+  it.each(["queued", "running"] as const)(
+    "never invokes the adapter for a persisted %s task whose Root is terminal at startup",
+    async (status) => {
+      const fixture = await createFixture();
+      fixture.insertRoot("root", ["stale"]);
+      fixture.store.create(specification("stale", "root"));
+      if (status === "running") expect(fixture.store.claim("stale")?.status).toBe("running");
+      fixture.connection().prepare(`
+        UPDATE root_runs SET status = 'failed', completed_at = updated_at WHERE root_run_id = 'root'
+      `).run();
+
+      await fixture.queue.start();
+      await waitFor(() => ["cancelled", "failed"].includes(fixture.store.require("stale").status));
+
+      expect(fixture.codex.started).toEqual([]);
+      expect(fixture.connection().prepare(`
+        SELECT status FROM root_runs WHERE root_run_id = 'root'
+      `).get()).toEqual({ status: "failed" });
+      expect(fixture.store.require("stale").status).toBe(status === "queued" ? "cancelled" : "failed");
+      await fixture.close();
+    }
+  );
+
+  it("allows only one caller to win a queued task claim", async () => {
+    const fixture = await createFixture();
+    fixture.insertRoot("root", ["claimed"]);
+    fixture.store.create(specification("claimed", "root"));
+
+    const winner = fixture.store.claim("claimed");
+    const loser = fixture.store.claim("claimed");
+
+    expect(winner?.status).toBe("running");
+    expect(loser).toBeUndefined();
+    expect(fixture.codex.started).toEqual([]);
+    await fixture.close();
+  });
 });
 
-describe("LocalExecutionQueue", () => {
+describe("LocalExecutionQueue scheduling and cancellation", () => {
   it("runs provider FIFO queues one-at-a-time while Codex and Copilot overlap", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("codex-root");
-    fixture.insertRoot("copilot-root");
+    fixture.insertRoot("codex-root", ["codex-a", "codex-b"]);
+    fixture.insertRoot("copilot-root", ["copilot-a"]);
     fixture.store.create(specification("codex-a", "codex-root", "codex", "2026-01-01T00:00:00.000Z"));
     fixture.store.create(specification("codex-b", "codex-root", "codex", "2026-01-01T00:00:00.001Z"));
     fixture.store.create(specification("copilot-a", "copilot-root", "copilot", "2026-01-01T00:00:00.000Z"));
@@ -54,9 +89,9 @@ describe("LocalExecutionQueue", () => {
     await fixture.close();
   });
 
-  it("cancels queued work without invoking the adapter", async () => {
+  it("cancels queued work idempotently without invoking the adapter", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root");
+    fixture.insertRoot("root", ["running", "queued"]);
     fixture.store.create(specification("running", "root"));
     fixture.store.create(specification("queued", "root", "codex", "2099-01-01T00:00:00.000Z"));
     fixture.codex.hold("running");
@@ -64,10 +99,14 @@ describe("LocalExecutionQueue", () => {
     await waitFor(() => fixture.store.require("running").status === "running");
 
     const cancelled = await fixture.queue.cancel("queued");
+    const repeated = await fixture.queue.cancel("queued");
 
     expect(cancelled.status).toBe("cancelled");
+    expect(repeated).toEqual(cancelled);
     expect(fixture.codex.started).toEqual(["running"]);
     expect(fixture.terminal).toContainEqual(expect.objectContaining({ id: "queued", status: "cancelled" }));
+    expect(fixture.terminal.filter(({ id }) => id === "queued")).toHaveLength(1);
+    expect(fixture.store.events("queued").entries.filter(({ terminal }) => terminal)).toHaveLength(1);
     fixture.codex.release("running");
     await waitFor(() => fixture.store.require("running").status === "succeeded");
     expect(fixture.codex.started).not.toContain("queued");
@@ -76,7 +115,7 @@ describe("LocalExecutionQueue", () => {
 
   it("aborts and persists cancellation for running work", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root");
+    fixture.insertRoot("root", ["running"]);
     fixture.store.create(specification("running", "root"));
     fixture.codex.hold("running");
     fixture.queue.start();
@@ -97,12 +136,14 @@ describe("LocalExecutionQueue", () => {
     });
     await fixture.close();
   });
+});
 
+describe("LocalExecutionQueue outcomes and recovery", () => {
   it("fails interrupted running work at startup and resumes only queued work", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root");
+    fixture.insertRoot("root", ["interrupted", "queued"]);
     fixture.store.create(specification("interrupted", "root"));
-    fixture.store.start("interrupted");
+    fixture.store.claim("interrupted");
     fixture.store.create(specification("queued", "root", "codex", "2026-01-01T00:00:00.001Z"));
 
     fixture.queue.start();
@@ -116,7 +157,7 @@ describe("LocalExecutionQueue", () => {
 
   it("rejects a provider completion without a valid structured outcome", async () => {
     const fixture = await createFixture({ validOutcome: false });
-    fixture.insertRoot("root");
+    fixture.insertRoot("root", ["invalid"]);
     fixture.store.create(specification("invalid", "root"));
 
     fixture.queue.start();
@@ -124,7 +165,7 @@ describe("LocalExecutionQueue", () => {
 
     expect(fixture.store.require("invalid")).toMatchObject({
       errorCode: "execution_failed",
-      errorMessage: expect.stringMatching(/structured (agent )?outcome/i)
+      errorMessage: expect.stringMatching(/structured (Step )?outcome/i)
     });
     expect(fixture.store.events("invalid").entries.at(-1)).toMatchObject({ kind: "error", terminal: true });
     await fixture.close();
@@ -132,13 +173,15 @@ describe("LocalExecutionQueue", () => {
 
   it("derives the provider output schema from the outcome validator", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root");
-    fixture.store.create(specification("schema", "root"));
+    fixture.insertRoot("root", ["schema"]);
+    const spec = specification("schema", "root");
+    fixture.store.create(spec);
 
     await fixture.queue.start();
     await waitFor(() => fixture.store.require("schema").status === "succeeded");
 
-    expect(fixture.codex.outputSchemas[0]).toEqual(z.toJSONSchema(agentOutcomeSchema));
+    expect(fixture.codex.outputSchemas[0]).toEqual(z.toJSONSchema(stepOutcomeSchema));
+    expect(fixture.codex.prompts.get(spec.taskId)).toBe(spec.evidence.prompt);
     await fixture.close();
   });
 
@@ -154,170 +197,3 @@ describe("LocalExecutionQueue", () => {
     }
   });
 });
-
-class ControlledAdapter implements CliRuntimeAdapter {
-  readonly minimumVersion = "0.0.0";
-  readonly started: string[] = [];
-  readonly cancelled: string[] = [];
-  readonly outputSchemas: Array<Record<string, unknown> | undefined> = [];
-  maximumActive = 0;
-  private active = 0;
-  private readonly gates = new Map<string, Deferred>();
-
-  constructor(readonly provider: RuntimeProvider, private readonly validOutcome: boolean) {}
-
-  hold(taskId: string): void {
-    this.gates.set(taskId, deferred());
-  }
-
-  release(taskId: string): void {
-    this.gates.get(taskId)?.resolve();
-  }
-
-  async probe(): Promise<RuntimeProbe> {
-    return {
-      provider: this.provider,
-      command: `fake-${this.provider}`,
-      installed: true,
-      compatible: true,
-      version: "1.2.3",
-      minimumVersion: this.minimumVersion,
-      authStatus: "ready",
-      policyCapabilities: { workspaceWrite: true, networkControl: true, readOnlyRoots: true }
-    };
-  }
-
-  async listModels(): Promise<RuntimeModel[]> {
-    return [];
-  }
-
-  async *execute(request: RuntimeExecutionRequest): AsyncIterable<RuntimeEvent> {
-    this.started.push(request.executionId);
-    this.outputSchemas.push(request.outputSchema);
-    this.active += 1;
-    this.maximumActive = Math.max(this.maximumActive, this.active);
-    try {
-      yield { type: "execution.started", executionId: request.executionId, provider: this.provider, at: new Date().toISOString() };
-      const gate = this.gates.get(request.executionId);
-      if (gate) await abortable(gate.promise, request.signal);
-      if (request.signal?.aborted) throw request.signal.reason;
-      yield {
-        type: "execution.completed",
-        output: "done",
-        structuredOutput: this.validOutcome
-          ? approvedOutcome
-          : { state: "completed", summary: "Missing required result.", checks: [] }
-      };
-    } finally {
-      this.active -= 1;
-    }
-  }
-
-  async cancel(executionId: string): Promise<void> {
-    this.cancelled.push(executionId);
-  }
-}
-
-const approvedOutcome = {
-  state: "completed" as const,
-  result: "approved" as const,
-  summary: "Approved.",
-  checks: []
-};
-
-const createFixture = async ({ validOutcome = true }: { validOutcome?: boolean } = {}) => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-local-queue-"));
-  temporaryRoots.push(root);
-  const worktreesRoot = path.join(root, "worktrees");
-  await mkdir(worktreesRoot);
-  const database = new LocalDatabase(path.join(root, "state.sqlite"));
-  const connection = () => database.connection();
-  const store = new ExecutionStore(connection);
-  const codex = new ControlledAdapter("codex", validOutcome);
-  const copilot = new ControlledAdapter("copilot", validOutcome);
-  const adapters = new Map<RuntimeProvider, CliRuntimeAdapter>([["codex", codex], ["copilot", copilot]]);
-  const runtime = {
-    verify: async () => undefined,
-    adapter: (provider: RuntimeProvider) => adapters.get(provider)!
-  } as unknown as LocalRuntimeService;
-  const terminal: ExecutionTask[] = [];
-  const queue = new LocalExecutionQueue({
-    store,
-    runtime,
-    worktreesRoot,
-    onTerminal: (task) => { terminal.push(task); }
-  });
-  const insertRoot = (rootRunId: string): void => {
-    const worktreePath = path.join(worktreesRoot, rootRunId);
-    connection().prepare(`
-      INSERT INTO root_runs (
-        root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
-        config_hash, snapshot_hash, created_at, updated_at
-      ) VALUES (?, 'agent', 'agent', 'manual', 'queued', ?, ?, ?, 'config', 'snapshot', ?, ?)
-    `).run(rootRunId, worktreePath, `ballet/run/${rootRunId}`, "a".repeat(40),
-      "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
-  };
-  return {
-    store, queue, codex, copilot, terminal, insertRoot,
-    close: async () => {
-      await queue.shutdown(100);
-      database.close();
-    }
-  };
-};
-
-const specification = (
-  taskId: string,
-  rootRunId: string,
-  provider: RuntimeProvider = "codex",
-  createdAt = "2026-01-01T00:00:00.000Z"
-): ExecutionSpec => ({
-  version: 1,
-  taskId,
-  kind: "agent_run",
-  rootRunId,
-  input: `Run ${taskId}`,
-  agent: {
-    id: "agent", name: "Agent", description: "Test agent", instructions: "Work carefully.",
-    skillIds: [], configHash: "agent-config"
-  },
-  runtime: {
-    hostname: "localhost", provider, cliVersion: "1.2.3", model: "provider-default",
-    reasoning: "provider-default", policy: { network: false, readOnlyRoots: [] },
-    capabilityHash: "capabilities"
-  },
-  project: {
-    checkoutRoot: "/checkout", headSha: "a".repeat(40), configHash: "config", snapshotHash: "snapshot"
-  },
-  createdAt
-});
-
-interface Deferred {
-  promise: Promise<void>;
-  resolve(): void;
-}
-
-const deferred = (): Deferred => {
-  let resolve!: () => void;
-  const promise = new Promise<void>((done) => { resolve = done; });
-  return { promise, resolve };
-};
-
-const abortable = (promise: Promise<void>, signal?: AbortSignal): Promise<void> => {
-  if (!signal) return promise;
-  if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise<void>((resolve, reject) => {
-    const abort = () => reject(signal.reason);
-    signal.addEventListener("abort", abort, { once: true });
-    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
-  });
-};
-
-const waitFor = async (predicate: () => boolean, timeoutMs = 2_000): Promise<void> => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  throw new Error("Timed out waiting for local execution queue state.");
-};

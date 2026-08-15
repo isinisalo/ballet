@@ -3,12 +3,12 @@ id: adr-005
 title: Palveluntarjoajariippumaton Codex- ja Copilot-suoritus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - arkkitehtuuripäätös
   - agenttisuoritus
   - palveluntarjoajarajapinta
-version: 2
+version: 3
 ---
 
 # Palveluntarjoajariippumaton Codex- ja Copilot-suoritus
@@ -27,7 +27,7 @@ Codex ja Copilot integroidaan yhteisen paikallisen suoritussovittimen rajapinnan
 - Palveluntarjoajakomennon ohitus ja checkout-kohtaiset absoluuttiset vain luku -juuret ratkaistaan konekohtaisista asetuksista.
 - Ennakkotarkistus tarkistaa asennuksen, CLI-version, autentikoinnin, mallin, reasoning-valinnan ja vaaditut käyttöoikeuskyvykkyydet ennen tehtävän jonotusta.
 - Ballet normalisoi palveluntarjoajatapahtumat yhteiseen `ExecutionEvent`-muotoon.
-- Palveluntarjoajan lopputulos validoidaan yhteistä strukturoitua `AgentOutcome`-skeemaa vasten. Outcome säilyy evidenssinä, ja vain validoidusta completed-outcomesta kopioitu kanoninen `StepRun.result` ohjaa Transitionia.
+- Palveluntarjoajan lopputulos validoidaan yhteistä strukturoitua `AgentOutcome`-skeemaa vasten. Completed-outcomen result tallennetaan samassa orkestrointivaiheessa `StepRun.status = completed`- ja kanoniseen `StepRun.result` -kenttään. Tämän jälkeen Step Run luetaan storesta takaisin, ja Transition valitaan vain takaisin luetun persisted `StepRun.result` -kentän perusteella. Outcome säilyy evidenssinä, ei toisena kontrollilähteenä.
 - Codexilla ja Copilotilla on erilliset FIFO-kaistat. Yksi palveluntarjoaja suorittaa vain yhtä tehtävää kerrallaan, mutta eri palveluntarjoajat voivat toimia rinnakkain.
 - Ballet ei tallenna palveluntarjoajan tunnuksia. Autentikointi tulee palveluntarjoajan CLI:stä tai sen tukemasta ympäristöstä, eikä palveluntarjoajaprosessi saa Balletin palvelutunnuksia.
 

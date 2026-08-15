@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import type {
+  ExecutionProfileSaveRequest,
   MarkdownDocument,
   LoopTheme,
   ProjectAutomationConfig,
@@ -51,6 +52,30 @@ export function useWorkspaceMutations({
     );
   }, [runMutation]);
 
+  const createExecutionProfile = useCallback(async (id: string, profile: ExecutionProfileSaveRequest) => {
+    return runMutation(
+      () => api.createExecutionProfile(id, profile),
+      "Execution profile created.",
+      "Unable to create execution profile."
+    );
+  }, [runMutation]);
+
+  const updateExecutionProfile = useCallback(async (id: string, profile: ExecutionProfileSaveRequest) => {
+    return runMutation(
+      () => api.updateExecutionProfile(id, profile),
+      "Execution profile saved.",
+      "Unable to save execution profile."
+    );
+  }, [runMutation]);
+
+  const removeExecutionProfile = useCallback(async (id: string) => {
+    await runMutation(
+      () => api.removeExecutionProfile(id),
+      "Execution profile deleted.",
+      "Unable to delete execution profile."
+    );
+  }, [runMutation]);
+
   const createProjectDocument = useCallback(async (kind: ProjectDocumentCreateKind, title: string) => {
     const config = projectDocumentCreateConfig[kind];
     const saved = await runMutation(
@@ -91,6 +116,9 @@ export function useWorkspaceMutations({
 
   return {
     save,
+    createExecutionProfile,
+    updateExecutionProfile,
+    removeExecutionProfile,
     saveProjectDocument,
     createProjectDocument,
     remove,
