@@ -103,7 +103,7 @@ const insertRunnableNode = (
 };
 
 const rootExecutionSnapshot = (): RootExecutionSnapshot => ({
-  version: 2,
+  version: 3,
   rootLoopId: "delivery",
   project: {
     checkoutRoot: "/checkout", headSha: "a".repeat(40),
@@ -112,6 +112,7 @@ const rootExecutionSnapshot = (): RootExecutionSnapshot => ({
   orchestrator: testOrchestrator(),
   loops: [testLoop("delivery")],
   loopEdges: [],
+  terminals: ["completed", "blocked", "failed"],
   theme: defaultLoopTheme,
   executionProfiles: [testExecutionProfile],
   runtimes: [],

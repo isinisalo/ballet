@@ -279,19 +279,50 @@ export const getReachableProjectNodeIds = (loop: ProjectLoop): Set<string> => {
 export const getReachableProjectLoopIds = (
   config: Pick<ProjectAutomationConfig, "loopEdges">,
   startLoopId: string,
-  kinds?: ReadonlySet<ProjectLoopEdgeKind>
-): Set<string> => {
-  const reachable = new Set<string>();
-  const pending = [startLoopId];
+  maxRepairDepth: number
+): Set<string> => getReachableProjectLoopGraph(config, startLoopId, maxRepairDepth).loopIds;
+
+export interface ReachableProjectLoopGraph {
+  loopIds: Set<string>;
+  loopEdgeIds: Set<string>;
+  minimumRepairDepthByLoopId: Map<string, number>;
+}
+
+/**
+ * Computes every statically usable Loop route. Flow Edges preserve the repair
+ * depth and Repair Edges consume one level, so cycles terminate while a Loop
+ * can still be revisited at a shallower, more permissive depth.
+ */
+export const getReachableProjectLoopGraph = (
+  config: Pick<ProjectAutomationConfig, "loopEdges">,
+  startLoopId: string,
+  maxRepairDepth: number
+): ReachableProjectLoopGraph => {
+  if (!Number.isInteger(maxRepairDepth) || maxRepairDepth < 0 || maxRepairDepth > maxRepairDepthLimit) {
+    throw new Error(`maxRepairDepth must be an integer between 0 and ${maxRepairDepthLimit}.`);
+  }
+  const minimumRepairDepthByLoopId = new Map<string, number>([[startLoopId, 0]]);
+  const loopEdgeIds = new Set<string>();
+  const pending: Array<{ loopId: string; repairDepth: number }> = [{ loopId: startLoopId, repairDepth: 0 }];
   while (pending.length > 0) {
-    const loopId = pending.shift();
-    if (!loopId || reachable.has(loopId)) continue;
-    reachable.add(loopId);
-    for (const edge of getProjectLoopEdges(config, loopId)) {
-      if ((!kinds || kinds.has(edge.kind)) && !reachable.has(edge.target)) pending.push(edge.target);
+    const current = pending.shift();
+    if (!current || minimumRepairDepthByLoopId.get(current.loopId) !== current.repairDepth) continue;
+    for (const edge of getProjectLoopEdges(config, current.loopId)) {
+      if (edge.kind === "repair" && current.repairDepth >= maxRepairDepth) continue;
+      const targetDepth = current.repairDepth + (edge.kind === "repair" ? 1 : 0);
+      loopEdgeIds.add(edge.id);
+      const previousDepth = minimumRepairDepthByLoopId.get(edge.target);
+      if (previousDepth === undefined || targetDepth < previousDepth) {
+        minimumRepairDepthByLoopId.set(edge.target, targetDepth);
+        pending.push({ loopId: edge.target, repairDepth: targetDepth });
+      }
     }
   }
-  return reachable;
+  return {
+    loopIds: new Set(minimumRepairDepthByLoopId.keys()),
+    loopEdgeIds,
+    minimumRepairDepthByLoopId
+  };
 };
 
 export const hasReachableProjectLoopTerminal = (loop: ProjectLoop): boolean => {

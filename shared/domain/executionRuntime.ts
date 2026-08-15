@@ -1,5 +1,5 @@
 import type {
-  JsonValue, ProjectLoop, ProjectLoopEdge, ProjectLoopOrchestrator
+  JsonValue, LoopTerminal, ProjectLoop, ProjectLoopEdge, ProjectLoopOrchestrator
 } from "./automation.js";
 import type { LoopTheme } from "./loopThemes.js";
 import type { ExecutionPolicy, RuntimeProvider } from "./localRuntime.js";
@@ -48,12 +48,13 @@ export interface ExecutionRuntimeBinding {
 }
 
 export interface RootExecutionSnapshot {
-  version: 2;
+  version: 3;
   rootLoopId: string;
   project: ExecutionProjectSnapshot;
   orchestrator: ProjectLoopOrchestrator;
   loops: ProjectLoop[];
   loopEdges: ProjectLoopEdge[];
+  terminals: LoopTerminal[];
   theme: LoopTheme;
   executionProfiles: ExecutionProfile[];
   runtimes: ExecutionRuntimeBinding[];

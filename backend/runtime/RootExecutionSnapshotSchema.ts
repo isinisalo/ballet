@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { automationConfigSchema, executionProfileSchema, loopThemeSchema } from "../../shared/api/workspace-schemas.js";
+import {
+  getReachableProjectLoopGraph,
+  getReachableProjectNodeIds,
+  loopTerminals
+} from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
+import { validateProjectAutomationConfig } from "../automation.js";
 
 const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
 const runtimeSnapshotSchema = z.object({
@@ -23,7 +29,7 @@ const resourceSchema = z.object({
 }).strict();
 
 export const rootExecutionSnapshotSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   rootLoopId: z.string(),
   project: z.object({
     checkoutRoot: z.string(),
@@ -34,6 +40,7 @@ export const rootExecutionSnapshotSchema = z.object({
   orchestrator: automationConfigSchema.shape.orchestrator,
   loops: automationConfigSchema.shape.loops,
   loopEdges: automationConfigSchema.shape.loopEdges,
+  terminals: z.array(z.enum(loopTerminals)).length(loopTerminals.length),
   theme: loopThemeSchema,
   executionProfiles: z.array(executionProfileSchema),
   runtimes: z.array(z.object({
@@ -43,9 +50,55 @@ export const rootExecutionSnapshotSchema = z.object({
   resources: z.array(resourceSchema),
   createdAt: z.string()
 }).strict().superRefine((snapshot, context) => {
-  if (!snapshot.loops.some((loop) => loop.id === snapshot.rootLoopId)) context.addIssue({
+  const automationIssues = validateProjectAutomationConfig({
+    version: 10,
+    orchestrator: snapshot.orchestrator,
+    loops: snapshot.loops,
+    loopEdges: snapshot.loopEdges
+  }, snapshot.executionProfiles);
+  automationIssues.forEach((issue) => context.addIssue({
+    code: "custom",
+    path: issue.path.split("."),
+    message: issue.message
+  }));
+  const loopIds = new Set(snapshot.loops.map((loop) => loop.id));
+  if (!loopIds.has(snapshot.rootLoopId)) context.addIssue({
     code: "custom",
     path: ["rootLoopId"],
     message: `Root Loop ${snapshot.rootLoopId} is missing from the execution snapshot.`
   });
+  if (snapshot.terminals.some((terminal, index) => terminal !== loopTerminals[index])) context.addIssue({
+    code: "custom",
+    path: ["terminals"],
+    message: "Execution snapshot Loop terminals are not in canonical order."
+  });
+  snapshot.loops.forEach((loop, loopIndex) => {
+    const reachableNodeIds = getReachableProjectNodeIds(loop);
+    if (loop.nodes.some((node) => !reachableNodeIds.has(node.id))) context.addIssue({
+      code: "custom",
+      path: ["loops", loopIndex, "nodes"],
+      message: `Loop ${loop.id} contains a Work Loop Node that is not reachable by Validation OK Edges.`
+    });
+  });
+  snapshot.loopEdges.forEach((edge, edgeIndex) => {
+    if (!loopIds.has(edge.source) || !loopIds.has(edge.target)) context.addIssue({
+      code: "custom",
+      path: ["loopEdges", edgeIndex],
+      message: `Loop Edge ${edge.id} has an endpoint outside the execution snapshot.`
+    });
+  });
+  if (loopIds.has(snapshot.rootLoopId)) {
+    const reachable = getReachableProjectLoopGraph(
+      snapshot,
+      snapshot.rootLoopId,
+      snapshot.orchestrator.maxRepairDepth
+    );
+    snapshot.loops.forEach((loop, loopIndex) => {
+      if (!reachable.loopIds.has(loop.id)) context.addIssue({
+        code: "custom",
+        path: ["loops", loopIndex, "id"],
+        message: `Loop ${loop.id} is outside the snapshotted flow and repair graph.`
+      });
+    });
+  }
 }) satisfies z.ZodType<RootExecutionSnapshot>;

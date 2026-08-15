@@ -45,6 +45,7 @@ describe("strict-v10 Work Loop domain helpers", () => {
     expect(getProjectLoopEdges(config, "main-loop", "repair")).toHaveLength(1);
     expect(isAllowedProjectRepairRoute(config, "main-loop", "self-repair")).toBe(true);
     expect(isAllowedProjectRepairRoute(config, "main-loop", "self-flow")).toBe(false);
-    expect(getReachableProjectLoopIds(config, "main-loop")).toEqual(new Set(["main-loop"]));
+    expect(getReachableProjectLoopIds(config, "main-loop", config.orchestrator.maxRepairDepth))
+      .toEqual(new Set(["main-loop"]));
   });
 });

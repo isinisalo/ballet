@@ -23,7 +23,7 @@ const providerNode = (): ProjectWorkLoopNode => {
 const snapshot = (): RootExecutionSnapshot => {
   const loop = testLoop("main-loop", providerNode());
   return {
-    version: 2,
+    version: 3,
     rootLoopId: loop.id,
     project: {
       checkoutRoot: "/workspace", headSha: "a".repeat(40),
@@ -32,6 +32,7 @@ const snapshot = (): RootExecutionSnapshot => {
     orchestrator: testOrchestrator(),
     loops: [loop],
     loopEdges: [],
+    terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme,
     executionProfiles: [testExecutionProfile],
     runtimes: [],

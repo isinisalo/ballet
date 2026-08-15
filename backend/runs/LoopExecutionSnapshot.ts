@@ -1,47 +1,129 @@
 import {
-  getReachableProjectLoopIds,
+  getReachableProjectLoopGraph,
   getReachableProjectNodeIds,
   isProjectAgentValidationNode,
+  isProjectNodeTerminalTarget,
   isProjectProviderWorkNode,
+  type JsonValue,
   type ProjectExecutionComposition,
-  type ProjectLoop
+  type ProjectLoop,
+  type ProjectLoopEdge
 } from "../../shared/domain/automation.js";
 import type { ProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import { LoopRunNotFoundError } from "../runtime/LoopRunErrors.js";
+import { canonicalJson } from "../runtime/state/CanonicalJson.js";
+
+type ReachableConfiguration = Pick<
+  ProjectConfiguration,
+  "loops" | "loopEdges" | "orchestrator"
+>;
 
 export interface ReachableProviderComposition {
+  id: string;
   loopId: string;
   nodeId: string;
-  phase: "work" | "validation";
+  role: "work" | "validation";
   composition: ProjectExecutionComposition;
 }
 
-export const reachableProviderCompositions = (
-  config: Pick<ProjectConfiguration, "loops" | "loopEdges">,
+export interface ReachableExecutionGraph {
+  loops: ProjectLoop[];
+  loopEdges: ProjectLoopEdge[];
+  minimumRepairDepthByLoopId: ReadonlyMap<string, number>;
+}
+
+export const reachableExecutionGraph = (
+  config: ReachableConfiguration,
   rootLoopId: string
-): ReachableProviderComposition[] => reachableLoops(config, rootLoopId).flatMap((loop) =>
+): ReachableExecutionGraph => {
+  const loopsById = new Map(config.loops.map((loop) => [loop.id, loop]));
+  if (!loopsById.has(rootLoopId)) {
+    throw new LoopRunNotFoundError(`Reachable Loop ${rootLoopId} was not found.`);
+  }
+  const reachability = getReachableProjectLoopGraph(
+    config,
+    rootLoopId,
+    config.orchestrator.maxRepairDepth
+  );
+  const loops = [...reachability.loopIds].map((loopId) => {
+    const loop = loopsById.get(loopId);
+    if (!loop) throw new LoopRunNotFoundError(`Reachable Loop ${loopId} was not found.`);
+    return snapshotLoop(loop);
+  }).sort((left, right) => compareUtf8(left.id, right.id));
+  const reachableLoopIds = new Set(loops.map((loop) => loop.id));
+  const loopEdges = config.loopEdges
+    .filter((edge) => reachability.loopEdgeIds.has(edge.id))
+    .map((edge) => {
+      if (!reachableLoopIds.has(edge.source) || !reachableLoopIds.has(edge.target)) {
+        throw new LoopRunNotFoundError(`Reachable Loop Edge ${edge.id} has a missing endpoint.`);
+      }
+      return { ...edge };
+    })
+    .sort((left, right) => compareUtf8(left.id, right.id));
+  return { loops, loopEdges, minimumRepairDepthByLoopId: reachability.minimumRepairDepthByLoopId };
+};
+
+export const reachableProviderCompositions = (
+  config: ReachableConfiguration,
+  rootLoopId: string
+): ReachableProviderComposition[] => providerCompositionsForLoops(
+  reachableExecutionGraph(config, rootLoopId).loops
+);
+
+export const providerCompositionsForLoops = (
+  loops: readonly ProjectLoop[]
+): ReachableProviderComposition[] => loops.flatMap((loop) =>
   loop.nodes.flatMap((node) => [
-    ...(isProjectProviderWorkNode(node.work)
-      ? [{ loopId: loop.id, nodeId: node.id, phase: "work" as const, composition: node.work }]
-      : []),
-    ...(isProjectAgentValidationNode(node.validation)
-      ? [{ loopId: loop.id, nodeId: node.id, phase: "validation" as const, composition: node.validation }]
-      : [])
+    ...(isProjectProviderWorkNode(node.work) ? [{
+      id: `${loop.id}:${node.id}:work`,
+      loopId: loop.id,
+      nodeId: node.id,
+      role: "work" as const,
+      composition: node.work
+    }] : []),
+    ...(isProjectAgentValidationNode(node.validation) ? [{
+      id: `${loop.id}:${node.id}:validation`,
+      loopId: loop.id,
+      nodeId: node.id,
+      role: "validation" as const,
+      composition: node.validation
+    }] : [])
   ]));
 
 export const reachableLoops = (
-  config: Pick<ProjectConfiguration, "loops" | "loopEdges">,
+  config: ReachableConfiguration,
   rootLoopId: string
-): ProjectLoop[] => {
-  const loops = new Map(config.loops.map((loop) => [loop.id, loop]));
-  if (!loops.has(rootLoopId)) throw new LoopRunNotFoundError(`Reachable Loop ${rootLoopId} was not found.`);
-  const reachableLoopIds = getReachableProjectLoopIds(config, rootLoopId);
-  return config.loops.filter((loop) => reachableLoopIds.has(loop.id)).map((loop) => {
-    const reachableNodeIds = getReachableProjectNodeIds(loop);
-    return {
-      ...loop,
-      nodes: loop.nodes.filter((node) => reachableNodeIds.has(node.id)),
-      edges: loop.edges.filter((edge) => reachableNodeIds.has(edge.source))
-    };
-  });
+): ProjectLoop[] => reachableExecutionGraph(config, rootLoopId).loops;
+
+const snapshotLoop = (loop: ProjectLoop): ProjectLoop => {
+  const reachableNodeIds = getReachableProjectNodeIds(loop);
+  return {
+    id: loop.id,
+    description: loop.description,
+    state: {
+      description: loop.state.description,
+      initial: canonicalClone(loop.state.initial)
+    },
+    startNodeId: loop.startNodeId,
+    nodes: loop.nodes
+      .filter((node) => reachableNodeIds.has(node.id))
+      .map((node) => ({
+        ...node,
+        work: normalizeComposition(node.work),
+        validation: normalizeComposition(node.validation)
+      }))
+      .sort((left, right) => compareUtf8(left.id, right.id)),
+    edges: loop.edges
+      .filter((edge) => reachableNodeIds.has(edge.source)
+        && (isProjectNodeTerminalTarget(edge.target) || reachableNodeIds.has(edge.target.nodeId)))
+      .map((edge) => ({ ...edge, target: { ...edge.target } }))
+      .sort((left, right) => compareUtf8(left.id, right.id))
+  };
 };
+
+const normalizeComposition = <T extends { type: string } & Partial<ProjectExecutionComposition>>(node: T): T =>
+  node.type === "human" ? { ...node } : { ...node, skillIds: [...(node.skillIds ?? [])].sort(compareUtf8) };
+
+const canonicalClone = (value: JsonValue): JsonValue => JSON.parse(canonicalJson(value)) as JsonValue;
+const compareUtf8 = (left: string, right: string): number =>
+  Buffer.compare(Buffer.from(left), Buffer.from(right));

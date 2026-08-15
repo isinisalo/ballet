@@ -236,7 +236,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
   worktreePath: prepared.path, branch: prepared.branch, headSha: prepared.headSha,
   configHash: prepared.configHash, snapshotHash: prepared.snapshotHash,
   executionSnapshot: {
-    version: 2,
+    version: 3,
     rootLoopId: "delivery",
     project: {
       checkoutRoot: prepared.path,
@@ -247,6 +247,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
     loops: projectConfiguration("Test profile").loops,
     orchestrator: projectConfiguration("Test profile").orchestrator,
     loopEdges: projectConfiguration("Test profile").loopEdges,
+    terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme,
     executionProfiles: projectConfiguration("Test profile").executionProfiles,
     runtimes: [], resources: [],

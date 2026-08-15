@@ -81,7 +81,7 @@ function rootRun(rootRunId: string): RootRunDetail {
     updatedAt: now,
     completedAt: now,
     executionSnapshot: {
-      version: 2,
+      version: 3,
       rootLoopId: loopId,
       project: {
         checkoutRoot: "/workspace/ballet",
@@ -91,6 +91,7 @@ function rootRun(rootRunId: string): RootRunDetail {
       },
       loops: [snapshot],
       loopEdges: [],
+      terminals: ["completed", "blocked", "failed"],
       orchestrator: {
         executionProfileId: "",
         primaryInstructionId: "",

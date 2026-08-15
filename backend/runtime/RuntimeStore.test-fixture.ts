@@ -42,7 +42,7 @@ export const createRuntimeStoreFixture = async (initial: JsonValue = {}): Promis
   let connection = () => database.connection();
   const loop = { ...testLoop(), state: { description: "Test state.", initial } };
   const snapshot: RootExecutionSnapshot = {
-    version: 2,
+    version: 3,
     rootLoopId: loop.id,
     project: {
       checkoutRoot: "/workspace", headSha: "a".repeat(40),
@@ -51,6 +51,7 @@ export const createRuntimeStoreFixture = async (initial: JsonValue = {}): Promis
     orchestrator: testOrchestrator(),
     loops: [loop],
     loopEdges: [{ id: "self-repair", source: loop.id, target: loop.id, kind: "repair", description: "Self repair." }],
+    terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme,
     executionProfiles: [testExecutionProfile],
     runtimes: [],
