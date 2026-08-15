@@ -145,6 +145,19 @@ describe("strict-v10 schema boundaries", () => {
     expect(issues.some((issue) => issue.message === `Duplicate Edge id: ${config.loopEdges[0]!.id}.`)).toBe(true);
     expect(issues.some((issue) => issue.message === "Loop Edge references an unknown target Loop: missing-loop.")).toBe(true);
   });
+
+  it("requires one unambiguous repair Loop Edge per source and target pair", () => {
+    const config = testAutomationConfig();
+    config.loopEdges = [
+      { id: "repair-a", source: "main-loop", target: "main-loop", kind: "repair", description: "First route." },
+      { id: "repair-b", source: "main-loop", target: "main-loop", kind: "repair", description: "Ambiguous route." }
+    ];
+
+    expect(validateProjectAutomationConfig(config, testProjectConfiguration().executionProfiles)).toContainEqual({
+      path: "loopEdges.1.target",
+      message: "Duplicate repair Loop Edge source/target route id: main-loop→main-loop."
+    });
+  });
 });
 
 const messages = (value: unknown, profiles: ReturnType<typeof testProjectConfiguration>["executionProfiles"]): string[] =>

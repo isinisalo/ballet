@@ -14,7 +14,7 @@ const projectSchema = z.object({
 }).strict();
 
 export const executionSpecSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   taskId: z.string(),
   kind: z.literal("node_execution"),
   rootRunId: z.string(),
@@ -22,14 +22,19 @@ export const executionSpecSchema = z.object({
   workLoopNodeRunId: z.string().optional(),
   nodeRunId: z.string(),
   evidence: z.object({
-    compositionVersion: z.literal(2), loopId: z.string(), workLoopNodeId: z.string().optional(),
+    compositionVersion: z.literal(3), loopId: z.string(), workLoopNodeId: z.string().optional(),
     nodeRole: z.enum(["work", "validation", "orchestrator"]), nodeDefinitionId: z.string(),
     executionProfile: executionProfileSchema,
     resources: z.array(z.object({
       kind: z.enum(["system", "primary", "skill"]), origin: z.enum(["system", "project"]),
       id: z.string(), relativePath: z.string().optional(), sourceSha256: sha256Schema
     }).strict()),
-    prompt: z.string(), promptSha256: sha256Schema, outputSchemaVersion: z.literal(2),
+    prompt: z.string(), promptSha256: sha256Schema,
+    taskEnvelopeVersion: z.literal(2), taskEnvelopeSha256: sha256Schema,
+    outputSchemaVersion: z.literal(3),
+    outputSchemaId: z.enum([
+      "work-node-outcome-v3", "validation-node-outcome-v3", "orchestrator-node-outcome-v3"
+    ]),
     outputSchema: z.record(z.string(), z.json()), outputSchemaSha256: sha256Schema
   }).strict(),
   runtime: runtimeSchema,

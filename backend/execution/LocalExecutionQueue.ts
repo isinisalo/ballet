@@ -1,6 +1,6 @@
 import type { CanonicalNodeOutcome, ExecutionTask, RuntimeProvider } from "../../shared/domain/runtime.js";
 import path from "node:path";
-import { nodeOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import { parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
 import { WorkspacePermissionPolicy } from "./WorkspacePermissionPolicy.js";
 import type { ExecutionStore } from "./ExecutionStore.js";
 import type { LocalRuntimeService } from "./LocalRuntimeService.js";
@@ -132,9 +132,13 @@ export class LocalExecutionQueue {
       })) {
         this.options.store.appendEvent(task.id, toExecutionEvent(event, sequence++, expected.provider));
         if (event.type === "execution.completed") {
-          const parsed = nodeOutcomeSchema.safeParse(event.structuredOutput);
-          if (!parsed.success) throw new Error(`Node returned an invalid structured outcome: ${parsed.error.message}`);
-          outcome = parsed.data;
+          try {
+            outcome = parseNodeOutcomeForRole(task.spec.evidence.nodeRole, event.structuredOutput);
+          } catch (error) {
+            throw new Error(
+              `Node returned an invalid ${task.spec.evidence.nodeRole} structured outcome: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
         }
       }
       if (!outcome) throw new Error("Runtime completed without a structured Node outcome.");

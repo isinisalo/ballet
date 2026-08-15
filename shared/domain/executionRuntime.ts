@@ -65,7 +65,7 @@ export type ExecutionResourceEvidence = Omit<ExecutionResourceSnapshot, "content
 
 /** Attempt-specific evidence. The exact composed prompt and output schema are immutable. */
 export interface ExecutionPromptEvidence {
-  compositionVersion: 2;
+  compositionVersion: 3;
   loopId: string;
   workLoopNodeId?: string;
   nodeRole: NodeRunRole;
@@ -74,7 +74,13 @@ export interface ExecutionPromptEvidence {
   resources: ExecutionResourceEvidence[];
   prompt: string;
   promptSha256: string;
-  outputSchemaVersion: 2;
+  taskEnvelopeVersion: 2;
+  taskEnvelopeSha256: string;
+  outputSchemaVersion: 3;
+  outputSchemaId:
+    | "work-node-outcome-v3"
+    | "validation-node-outcome-v3"
+    | "orchestrator-node-outcome-v3";
   outputSchema: { [key: string]: JsonValue };
   outputSchemaSha256: string;
 }
@@ -83,7 +89,7 @@ export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" 
 export type ExecutionTaskKind = "node_execution";
 
 export interface ExecutionSpec {
-  version: 3;
+  version: 4;
   taskId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;

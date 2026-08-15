@@ -71,15 +71,34 @@ import type {
   NodeRunRole,
   OrchestrationFrame,
   OrchestratorRoute,
+  OrchestratorNodeOutcome,
   RepairRequest,
+  RunCheck,
   RootRun,
   RootExecutionSnapshot,
   RuntimeConfigurationIssue,
   RuntimePreflightIssue,
   RuntimeProvider,
   StatePatch,
+  ValidationNodeOutcome,
+  WorkNodeOutcome,
   WorkLoopNodeRun
 } from "../domain/runtime.js";
+import type {
+  OrchestratorTaskEnvelopeV2,
+  TaskEnvelopeHistoryEntry,
+  TaskEnvelopeLoopIdentity,
+  TaskEnvelopeProviderRunIdentity,
+  TaskEnvelopeRepairRequest,
+  TaskEnvelopeResumeContext,
+  TaskEnvelopeRunIdentity,
+  TaskEnvelopeState,
+  TaskEnvelopeTargetLoop,
+  TaskEnvelopeV2,
+  TaskEnvelopeWorkLoopNodeIdentity,
+  ValidationTaskEnvelopeV2,
+  WorkTaskEnvelopeV2
+} from "../domain/taskEnvelope.js";
 import type {
   BalletMode,
   DashboardRunStatus,
@@ -179,6 +198,10 @@ export { defaultLoopTheme } from "../domain/loopThemes.js";
 export {
   maxControlFlowTransitions, maxRuntimeJsonDepth, maxStatePatchBytes, maxStatePatchOperations
 } from "../domain/runtime.js";
+export {
+  maxRelevantHistoryBytes, maxRelevantHistoryEntries, maxRepairRequestEnvelopeBytes,
+  maxResumeContextBytes, maxTaskEnvelopeBytes, taskEnvelopeVersion
+} from "../domain/taskEnvelope.js";
 export { automationConfigSchema, kebabCaseIdPattern } from "./workspace-schemas.js";
 
 export type {
@@ -194,7 +217,13 @@ export type {
   ProjectScheduleCadence, ProjectScheduleWeekday, ProjectWorkSchedule, LoopRun, LoopRunDetails,
   LoopScheduleState, LoopRuntimePreflight,
   CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, NodeRun, NodeRunRole,
-  OrchestrationFrame, OrchestratorRoute, RepairRequest, RootRun, StatePatch, WorkLoopNodeRun,
+  OrchestrationFrame, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RootRun, RunCheck,
+  StatePatch, ValidationNodeOutcome, WorkLoopNodeRun, WorkNodeOutcome,
+  OrchestratorTaskEnvelopeV2, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
+  TaskEnvelopeProviderRunIdentity, TaskEnvelopeRepairRequest, TaskEnvelopeResumeContext,
+  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeTargetLoop, TaskEnvelopeV2,
+  TaskEnvelopeWorkLoopNodeIdentity,
+  ValidationTaskEnvelopeV2, WorkTaskEnvelopeV2,
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot,
   ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,

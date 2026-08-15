@@ -1,5 +1,7 @@
 # Execution composition — prompt contract V1
 
+Status: strict-v9 historical contract. Strict-v10 uses [Work Loop execution contract V3](../work-loop/EXECUTION-CONTRACT-V3.md); the remainder of this document is not an active runtime contract.
+
 Tila: hyväksytty V1-sopimus ja production-toteutuksen dokumentaatio.
 
 ## Tavoite

@@ -1,4 +1,6 @@
-import { nodeOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import {
+  canonicalNodeOutcomeSchema, parseNodeOutcomeForRole
+} from "../../shared/api/runtime-schemas.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
@@ -64,7 +66,7 @@ export const toNodeRun = (row: NodeRunRow): NodeRun => ({
   executionTaskId: row.execution_task_id ?? undefined,
   input: row.input_json ? parseJsonValue(row.input_json, `Node Run ${row.node_run_id} input`) : undefined,
   context: row.context_json ? parseJsonValue(row.context_json, `Node Run ${row.node_run_id} context`) : undefined,
-  outcome: row.outcome_json ? parseOutcome(row.outcome_json, row.node_run_id) : undefined,
+  outcome: row.outcome_json ? parseRoleOutcome(row.outcome_json, row.node_run_id, row.role) : undefined,
   status: row.status,
   attempt: row.attempt,
   stateRevisionBefore: row.state_revision_before,
@@ -161,7 +163,18 @@ const parsePatchEvidence = (source: string, hash: string, owner: string) => {
 const parseOutcome = (source: string, owner: string): CanonicalNodeOutcome => {
   let value: unknown;
   try { value = JSON.parse(source); } catch { throw new Error(`Persisted node outcome for ${owner} is invalid JSON.`); }
-  const parsed = nodeOutcomeSchema.safeParse(value);
+  const parsed = canonicalNodeOutcomeSchema.safeParse(value);
   if (!parsed.success) throw new Error(`Persisted node outcome for ${owner} is invalid.`);
   return parsed.data;
+};
+
+const parseRoleOutcome = (
+  source: string,
+  owner: string,
+  role: NodeRun["role"]
+): CanonicalNodeOutcome => {
+  let value: unknown;
+  try { value = JSON.parse(source); } catch { throw new Error(`Persisted node outcome for ${owner} is invalid JSON.`); }
+  try { return parseNodeOutcomeForRole(role, value); }
+  catch { throw new Error(`Persisted ${role} outcome for ${owner} is invalid.`); }
 };

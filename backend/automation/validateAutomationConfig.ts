@@ -155,6 +155,14 @@ export const validateProjectAutomationConfig = (
     flowSources.map((edge) => ({ id: edge.source, path: `loopEdges.${config.loopEdges.indexOf(edge)}.source` })),
     "outgoing flow Loop Edge source"
   ));
+  const repairRoutes = config.loopEdges.filter((edge) => edge.kind === "repair");
+  issues.push(...duplicateIssues(
+    repairRoutes.map((edge) => ({
+      id: `${edge.source}→${edge.target}`,
+      path: `loopEdges.${config.loopEdges.indexOf(edge)}.target`
+    })),
+    "repair Loop Edge source/target route"
+  ));
   return issues;
 };
 

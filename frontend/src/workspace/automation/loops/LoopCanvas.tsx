@@ -113,7 +113,8 @@ export function LoopCanvas({
 
 function activeRunEdgeId(edges: LoopCanvasEdge[], loop: ProjectLoop, run?: LoopRunDetails | null) {
   const latestValidation = [...(run?.nodeRuns ?? [])].reverse().find((nodeRun) =>
-    nodeRun.role === "validation" && nodeRun.outcome?.role === "validation" && nodeRun.outcome.decision === "OK");
+    nodeRun.role === "validation" && nodeRun.outcome?.role === "validation"
+      && nodeRun.outcome.state === "completed" && nodeRun.outcome.decision === "OK");
   if (!latestValidation?.workLoopNodeId) return null;
   const sourceStepIndex = loop.nodes.findIndex((node) => node.id === latestValidation.workLoopNodeId);
   return edges.find((edge) => edge.route?.sourceStepIndex === sourceStepIndex

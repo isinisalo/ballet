@@ -92,8 +92,8 @@ class ControlledAdapter implements CliRuntimeAdapter {
         type: "execution.completed",
         output: "done",
         structuredOutput: this.validOutcome
-          ? approvedOutcome
-          : { role: "work", status: "completed" }
+          ? completedWorkOutcome
+          : { role: "work", state: "completed" }
       };
     } finally {
       this.active -= 1;
@@ -106,10 +106,12 @@ class ControlledAdapter implements CliRuntimeAdapter {
   }
 }
 
-const approvedOutcome = {
+const completedWorkOutcome = {
   role: "work" as const,
-  status: "completed" as const,
-  summary: "Completed."
+  state: "completed" as const,
+  summary: "Completed.",
+  artifacts: {},
+  checks: []
 };
 
 interface QueueFixture {

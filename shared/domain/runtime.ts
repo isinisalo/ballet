@@ -41,39 +41,100 @@ export type NodeRunStatus =
   | "blocked" | "failed" | "cancelled" | "interrupted";
 export type WorkLoopNodeRunStatus = Exclude<NodeRunStatus, "interrupted">;
 
-export interface NodeOutcomeBase {
-  summary: string;
-  statePatch?: StatePatch;
-  evidence?: JsonValue;
+export type RunCheckStatus = "passed" | "failed" | "skipped";
+
+export interface RunCheck {
+  name: string;
+  status: RunCheckStatus;
+  details?: string;
 }
 
-export type WorkNodeOutcome = NodeOutcomeBase & {
+interface OutcomeSummary {
+  summary: string;
+}
+
+interface CheckedOutcomeSummary extends OutcomeSummary {
+  checks: RunCheck[];
+}
+
+export type WorkCompletedOutcome = CheckedOutcomeSummary & {
   role: "work";
-  status: "completed" | "needs_input" | "blocked" | "failed";
-  question?: string;
-  context?: string;
+  state: "completed";
+  artifacts: { [key: string]: JsonValue };
+  statePatch?: StatePatch;
 };
 
-export type ValidationNodeOutcome = NodeOutcomeBase & (
-  | { role: "validation"; decision: "OK" }
-  | {
-      role: "validation";
-      decision: "FAIL";
-      repair: {
-        mode: "LOCAL_RETRY" | "ORCHESTRATOR_REPAIR";
-        requestedCapability?: string;
-        reason: string;
-        evidence?: JsonValue;
-      };
+export type WorkNodeOutcome =
+  | WorkCompletedOutcome
+  | CheckedOutcomeSummary & {
+      role: "work";
+      state: "needs_input";
+      question: string;
+      context: string;
     }
+  | CheckedOutcomeSummary & {
+      role: "work";
+      state: "blocked" | "failed";
+    };
+
+export interface LocalRetryRepair {
+  mode: "LOCAL_RETRY";
+  feedback: string;
+  expectedCorrection: string;
+}
+
+interface OrchestratorRepairBase {
+  mode: "ORCHESTRATOR_REPAIR";
+  reason: string;
+  evidenceRefs: string[];
+}
+
+export type OrchestratorRepair = OrchestratorRepairBase & (
+  | { requestedCapability: string; requestedOutcome?: never }
+  | { requestedCapability?: never; requestedOutcome: JsonValue }
 );
 
-export type OrchestratorNodeOutcome = NodeOutcomeBase & {
-  role: "orchestrator";
-  status: "routed" | "blocked" | "failed";
-  loopEdgeId?: string;
-  targetLoopId?: string;
-};
+export type ValidationCompletedOutcome = CheckedOutcomeSummary & {
+  role: "validation";
+  state: "completed";
+  evidence: JsonValue;
+} & (
+  | { decision: "OK"; statePatch?: StatePatch; repair?: never }
+  | { decision: "FAIL"; repair: LocalRetryRepair | OrchestratorRepair; statePatch?: never }
+);
+
+export type ValidationNodeOutcome =
+  | ValidationCompletedOutcome
+  | CheckedOutcomeSummary & {
+      role: "validation";
+      state: "needs_input";
+      question: string;
+      context: string;
+    }
+  | CheckedOutcomeSummary & {
+      role: "validation";
+      state: "blocked" | "failed";
+    };
+
+export type OrchestratorNodeOutcome =
+  | {
+      role: "orchestrator";
+      state: "completed";
+      targetLoopId: string;
+      routeReason: string;
+      repairInput: JsonValue;
+      expectedOutcome: JsonValue;
+    }
+  | OutcomeSummary & {
+      role: "orchestrator";
+      state: "needs_input";
+      question: string;
+      context: string;
+    }
+  | OutcomeSummary & {
+      role: "orchestrator";
+      state: "blocked" | "failed";
+    };
 
 export type CanonicalNodeOutcome = WorkNodeOutcome | ValidationNodeOutcome | OrchestratorNodeOutcome;
 

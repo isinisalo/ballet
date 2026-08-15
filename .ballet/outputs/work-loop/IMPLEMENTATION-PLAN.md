@@ -1,6 +1,6 @@
 # Work Loop v10 — migraatio- ja toteutussuunnitelma
 
-Tila: vaiheet 1–2 (v10-domain, strict config, graph-invariantit, SQLite schema v4 ja atominen State) on toteutettu. Vaiheet 3–8 ovat vielä toteutussuunnitelmaa; varsinainen v10-suorituspolku on siihen asti tarkoituksella fail-closed.
+Tila: vaiheet 1–3 (v10-domain, strict config, graph-invariantit, SQLite schema v4, atominen State sekä roolikohtaiset provider-sopimukset) on toteutettu. Vaiheet 4–8 ovat vielä toteutussuunnitelmaa; varsinainen v10-control-flow on siihen asti tarkoituksella fail-closed.
 
 Päätöslähde: [ADR-015 — Work Loop, revisioitu State ja Loop Orchestrator](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md).
 
@@ -167,20 +167,22 @@ Vaiheen portti:
 - `npm run build`; ja
 - `git diff --check`.
 
-## Vaihe 3 — Task Envelope v2 ja Work/Validation structured output
+## Vaihe 3 — Task Envelope v2 ja roolikohtainen structured output
+
+Tila: toteutettu. Work-, Validation- ja Orchestrator-outcomeilla on omat strict JSON Schemansa ja hash-evidenssinsä; tämä vaihe ei vielä aktivoi v10-control-flow'ta.
 
 Tavoite: erottaa Work- ja Validation-provider-sopimukset ja sitoa ne State revisioniin ilman provider-riippuvuutta.
 
 | Alue | Vaikutus |
 | --- | --- |
 | Domain | `ExecutionTaskKind` erottaa `work_node`- ja `validation_node`-tehtävät tai käyttää yhtä `node_execution`-kindiä exact node role -kentällä. `ExecutionPromptEvidence` tallentaa node rolen ja outcome schema version/hash -arvon. |
-| Backend | Korvaa `TaskEnvelopeV1`/`LoopStepPrompt` Envelope v2 -serialisoinnilla. `ExecutionComposition` valitsee WorkOutcome- tai ValidationOutcome-skeeman. `SystemExecutionContract` puhuu Ballet Nodesta, ei Stepistä, ja pitää workflow/CoT-rajat ennallaan. |
+| Backend | Korvaa `TaskEnvelopeV1`/`LoopStepPrompt` Envelope v2 -serialisoinnilla. `ExecutionComposition` valitsee WorkOutcome-, ValidationOutcome- tai OrchestratorOutcome-skeeman. `SystemExecutionContract` puhuu Ballet Nodesta, ei Stepistä, ja pitää workflow/CoT-rajat ennallaan. |
 | Persistence | `execution_tasks.spec_json` käyttää uutta immutable spec-versiota; vanhaa spec version 2:ta ei lueta schema 4:ssä. Raw terminal output säilyy evidenssinä ennen orchestration-commitia. |
 | API | Execution event/console -reitit säilyvät provider-neutraaleina. Julkiset task DTO:t näyttävät node rolen ja schema evidenssin, eivät hidden reasoningia. |
 | Frontend | Run composition preview nimeää Work/Validation-roolin ja näyttää exact snapshot resources/prompt hashin; varsinainen Run sheet uudistetaan vaiheessa 7. |
-| Fixturet | Lisää exact-byte Envelope v2 fixturet Workille, Validationille, local retrylle, external repairille, human resumelle ja Unicode/size-boundarylle. Provider-adapter-fixturet palauttavat kumpaakin outcomea. |
-| Testit | Exact serialization, schema hashit, unknown-field rejection, OK/FAIL union, mode/loopEdgeId-invariantit, Work patch union, prompt size, State/Repair Request context, adapter equality Codex/Copilot. |
-| Dokumentaatio | Päivitä prompt-composition- ja output-contract-dokumentit v2:een. Kirjaa näkyvästi, ettei Orchestrator ole provider eikä reasoning payloadia tallenneta. |
+| Fixturet | Lisää exact-byte Envelope v2 fixturet Workille, Validationille, local retrylle, external repairille, resumelle ja size-boundarylle. Provider-adapter-fixturet palauttavat roolikohtaisen outcomen ilman Approved/Rejected-kenttiä. |
+| Testit | Exact serialization, schema hashit, unknown-field rejection, OK/FAIL union, repair-mode-invariantit, Work/Validation patch union, target Loop -allowlist, prompt size, State/Repair Request context ja adapter equality Codex/Copilot. |
+| Dokumentaatio | Päivitä prompt-composition- ja output-contract-dokumentit. Kirjaa näkyvästi, ettei provider-adapteri ole control-flow-auktoriteetti eikä reasoning payloadia tallenneta. |
 
 Envelope v2:n kanoninen järjestys on versioitava exact-byte-sopimus. Sen tulee sisältää:
 
@@ -191,7 +193,7 @@ Envelope v2:n kanoninen järjestys on versioitava exact-byte-sopimus. Sen tulee 
 5. Validationille viimeisin WorkOutcome;
 6. mahdollinen Repair Request ja local retry count/call depth;
 7. human/provider resume-konteksti; ja
-8. Validationille sallitut REPAIR-LoopEdge-ID:t deterministisesti ID-järjestyksessä.
+8. Orchestratorille sallitut target Loopit ID:n ja descriptionin kanssa deterministisesti UTF-8 ID -järjestyksessä.
 
 Statea, Repair Requestia tai provider-outputia ei typistetä hiljaisesti. Jos koko Ballet-owned prompt ylittää versionoidun prompt-rajan, Node Run epäonnistuu näkyvällä `prompt_too_large`-preflight/runtime-virheellä ennen provider-kutsua.
 
@@ -526,8 +528,9 @@ Frontend/helperit ja komponentit joko poistetaan tai nimetään sekä kirjoiteta
 - Work blocked/failed ilman flow-edgeä;
 - Validation OK ilman repairia;
 - FAIL vaatii repairin;
-- LOCAL_RETRY kieltää loopEdgeId:n;
-- ORCHESTRATOR_REPAIR vaatii exact allowed loopEdgeId:n;
+- LOCAL_RETRY vaatii feedback- ja expectedCorrection-kentät;
+- ORCHESTRATOR_REPAIR vaatii reason/evidenceRefs-kentät ja täsmälleen requested capabilityn tai outcomen;
+- Orchestrator completed vaatii allowlistiin kuuluvan target Loop ID:n eikä saa sisältää continuation- tai return target -kenttiä;
 - human ja execution_profile -executorit kummassakin node-rolessa;
 - invalid provider output jää evidenssiksi mutta ei ohjaa cursoria.
 

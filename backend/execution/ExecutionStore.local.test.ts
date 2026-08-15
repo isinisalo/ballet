@@ -3,11 +3,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { nodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
-import type { ExecutionSpec } from "../../shared/domain/runtime.js";
+import {
+  validationNodeOutcomeJsonSchema
+} from "../../shared/api/runtime-schemas.js";
 import { LocalDatabase } from "../storage/LocalDatabase.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import { ExecutionStore } from "./ExecutionStore.js";
+import { specification } from "./LocalExecutionQueue.test-data.js";
 
 const temporaryRoots: string[] = [];
 
@@ -40,7 +42,7 @@ describe("ExecutionStore", () => {
 
     const queued = fixture.store.requestCancel("queued");
     const requested = fixture.store.requestCancel("running");
-    const finished = fixture.store.finish("running", "succeeded", { outcome: approvedOutcome });
+    const finished = fixture.store.finish("running", "succeeded", { outcome: completedWorkOutcome });
 
     expect(queued).toMatchObject({ status: "cancelled", cancelRequestedAt: expect.any(String) });
     expect(requested).toMatchObject({ status: "running", cancelRequestedAt: expect.any(String) });
@@ -125,12 +127,15 @@ describe("ExecutionStore", () => {
     fixture.close();
   });
 
+});
+
+describe("ExecutionStore outcome contracts", () => {
   it("keeps a terminal result idempotent", async () => {
     const fixture = await createFixture();
     fixture.insertRoot("root-1");
     fixture.store.create(specification("task", "root-1"));
 
-    const completed = fixture.store.finish("task", "succeeded", { outcome: approvedOutcome });
+    const completed = fixture.store.finish("task", "succeeded", { outcome: completedWorkOutcome });
     const replayed = fixture.store.finish("task", "failed", { errorCode: "late", errorMessage: "late failure" });
 
     expect(replayed).toEqual(completed);
@@ -138,69 +143,57 @@ describe("ExecutionStore", () => {
     expect(replayed.errorCode).toBeUndefined();
     fixture.close();
   });
+
+  it("canonicalizes only the immutable task role outcome before persistence", async () => {
+    const fixture = await createFixture();
+    fixture.insertRoot("root-1");
+    fixture.store.create(specification("task", "root-1"));
+
+    expect(() => fixture.store.finish("task", "succeeded", { outcome: {
+      role: "validation", state: "completed", decision: "OK", summary: "Wrong role.", evidence: {}, checks: []
+    } })).toThrow();
+    expect(fixture.store.require("task").status).toBe("queued");
+
+    const completed = fixture.store.finish("task", "succeeded", { outcome: {
+      role: "work", state: "completed", summary: "Canonical.", artifacts: { z: 1, a: 2 }, checks: []
+    } });
+    expect(completed.outcome).toMatchObject({ role: "work", state: "completed" });
+    expect(fixture.connection().prepare(
+      "SELECT outcome_json FROM execution_tasks WHERE task_id = 'task'"
+    ).pluck().get()).toBe(
+      '{"artifacts":{"a":2,"z":1},"checks":[],"role":"work","state":"completed","summary":"Canonical."}'
+    );
+    fixture.close();
+  });
+
+  it("rejects output schema evidence for a different Node role", async () => {
+    const fixture = await createFixture();
+    fixture.insertRoot("root-1");
+    const invalid = specification("task", "root-1");
+    invalid.evidence.outputSchema = validationNodeOutcomeJsonSchema;
+    invalid.evidence.outputSchemaId = "validation-node-outcome-v3";
+    invalid.evidence.outputSchemaSha256 = sha256(canonicalJson(validationNodeOutcomeJsonSchema));
+    expect(() => fixture.store.create(invalid)).toThrow(/output schema evidence/);
+    fixture.close();
+  });
+
+  it("rejects Task Envelope hash evidence that does not match the exact prompt section", async () => {
+    const fixture = await createFixture();
+    fixture.insertRoot("root-1");
+    const invalid = specification("task", "root-1");
+    invalid.evidence.taskEnvelopeSha256 = "0".repeat(64);
+    expect(() => fixture.store.create(invalid)).toThrow(/Task Envelope evidence/);
+    fixture.close();
+  });
 });
 
-const approvedOutcome = {
+const completedWorkOutcome = {
   role: "work" as const,
-  status: "completed" as const,
-  summary: "Completed."
+  state: "completed" as const,
+  summary: "Completed.",
+  artifacts: {},
+  checks: []
 };
-
-const specification = (
-  taskId: string,
-  rootRunId: string,
-  provider: "codex" | "copilot" = "codex",
-  createdAt = new Date().toISOString()
-): ExecutionSpec => ({
-  version: 3,
-  taskId,
-  kind: "node_execution",
-  rootRunId,
-  loopRunId: `loop-${rootRunId}`,
-  workLoopNodeRunId: `work-loop-${taskId}`,
-  nodeRunId: `node-${taskId}`,
-  evidence: {
-    compositionVersion: 2,
-    loopId: "delivery",
-    workLoopNodeId: taskId,
-    nodeRole: "work",
-    nodeDefinitionId: `delivery:${taskId}:work`,
-    executionProfile: {
-      id: `${provider}-test-medium`,
-      name: `${provider} test · Medium`,
-      provider,
-      model: "provider-default",
-      reasoningEffort: "provider-default",
-      networkAccess: false
-    },
-    resources: [{
-      kind: "system",
-      origin: "system",
-      id: "system:execution-contract-v2",
-      sourceSha256: "b".repeat(64)
-    }, {
-      kind: "primary",
-      origin: "project",
-      id: "project:test-instruction",
-      relativePath: ".ballet/instructions/test-instruction.md",
-      sourceSha256: "c".repeat(64)
-    }],
-    prompt: `Input for ${taskId}`,
-    promptSha256: sha256(`Input for ${taskId}`),
-    outputSchemaVersion: 2,
-    outputSchema: nodeOutcomeJsonSchema,
-    outputSchemaSha256: sha256(canonicalJson(nodeOutcomeJsonSchema))
-  },
-  runtime: {
-    hostname: "localhost", provider, cliVersion: "1.2.3", model: "provider-default",
-    reasoning: "provider-default", policy: { network: false, readOnlyRoots: [] },
-    capabilityHash: "d".repeat(64)
-  },
-  project: {
-    checkoutRoot: "/checkout", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
-  },
-  createdAt
-});
 
 const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
 

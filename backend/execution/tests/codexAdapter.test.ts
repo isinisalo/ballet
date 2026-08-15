@@ -23,7 +23,9 @@ let turnParams;
 const expectedPrompt = ${JSON.stringify(distinctivePrompt)};
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\\n");
 const finish = () => {
-  const text = JSON.stringify({ state: "completed", result: "approved", summary: "Codex done.", checks: [] });
+  const text = JSON.stringify({
+    role: "work", state: "completed", summary: "Codex done.", artifacts: {}, checks: []
+  });
   send({ method: "item/completed", params: { item: { id: "message-1", type: "agentMessage", phase: "final_answer", text } } });
   send({ method: "turn/completed", params: { turn: { id: "turn-1", status: "completed" } } });
 };
@@ -79,11 +81,12 @@ describe("CodexAppServerAdapter", () => {
       policy: { network: false, readOnlyRoots: [] },
       outputSchema: {
         type: "object",
-        required: ["state", "result", "summary", "checks"],
+        required: ["role", "state", "summary", "artifacts", "checks"],
         properties: {
+          role: { type: "string", const: "work" },
           state: { type: "string", const: "completed" },
-          result: { type: "string", enum: ["approved", "rejected"] },
           summary: { type: "string" },
+          artifacts: { type: "object" },
           checks: { type: "array" }
         }
       }
@@ -93,9 +96,10 @@ describe("CodexAppServerAdapter", () => {
     expect(events).toContainEqual(expect.objectContaining({
       type: "execution.completed",
       structuredOutput: {
+        role: "work",
         state: "completed",
-        result: "approved",
         summary: "Codex done.",
+        artifacts: {},
         checks: []
       }
     }));

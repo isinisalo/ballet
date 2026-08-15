@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
-import { nodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
+import { workNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import type { ExecutionSpec, RootExecutionSnapshot, RuntimeProvider } from "../../shared/domain/runtime.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
+import { serializeTaskEnvelopeV2 } from "../integration/TaskEnvelopeV2.js";
 import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v10TestConfig.js";
 
 export const specification = (
@@ -12,7 +13,7 @@ export const specification = (
   provider: RuntimeProvider = "codex",
   createdAt = "2026-01-01T00:00:00.000Z"
 ): ExecutionSpec => ({
-  version: 3,
+  version: 4,
   taskId,
   kind: "node_execution",
   rootRunId,
@@ -20,7 +21,7 @@ export const specification = (
   workLoopNodeRunId: `work-loop-${taskId}`,
   nodeRunId: `node-${taskId}`,
   evidence: {
-    compositionVersion: 2,
+    compositionVersion: 3,
     loopId: "delivery",
     workLoopNodeId: taskId,
     nodeRole: "work",
@@ -30,16 +31,16 @@ export const specification = (
       model: "provider-default", reasoningEffort: "provider-default", networkAccess: false
     },
     resources: [{
-      kind: "system", origin: "system", id: "system:execution-contract-v2", sourceSha256: "b".repeat(64)
+      kind: "system", origin: "system", id: "system:execution-contract-v3", sourceSha256: "b".repeat(64)
     }, {
       kind: "primary", origin: "project", id: "project:test-instruction",
       relativePath: ".ballet/instructions/test-instruction.md", sourceSha256: "c".repeat(64)
     }],
-    prompt: `Run ${taskId}`,
-    promptSha256: sha256(`Run ${taskId}`),
-    outputSchemaVersion: 2,
-    outputSchema: nodeOutcomeJsonSchema,
-    outputSchemaSha256: sha256(canonicalJson(nodeOutcomeJsonSchema))
+    ...workPromptEvidence(taskId, rootRunId),
+    outputSchemaVersion: 3,
+    outputSchemaId: "work-node-outcome-v3",
+    outputSchema: workNodeOutcomeJsonSchema,
+    outputSchemaSha256: sha256(canonicalJson(workNodeOutcomeJsonSchema))
   },
   runtime: {
     hostname: "localhost", provider, cliVersion: "1.2.3", model: "provider-default",
@@ -117,5 +118,35 @@ const rootExecutionSnapshot = (): RootExecutionSnapshot => ({
   resources: [],
   createdAt: "2026-01-01T00:00:00.000Z"
 });
+
+const workPromptEvidence = (taskId: string, rootRunId: string) => {
+  const envelope = serializeTaskEnvelopeV2({
+    version: 2, role: "work",
+    run: {
+      rootRunId, loopRunId: `loop-${rootRunId}`, nodeRunId: `node-${taskId}`,
+      workLoopNodeRunId: `work-loop-${taskId}`
+    },
+    loop: { id: "delivery", description: "Test Loop delivery." },
+    workLoopNode: { id: taskId, description: `Test Node ${taskId}.` },
+    task: `Run ${taskId}.`,
+    state: { revision: 0, value: {}, sha256: sha256("{}") },
+    localAttempt: 1,
+    relevantHistory: []
+  });
+  const schema = canonicalJson(workNodeOutcomeJsonSchema);
+  const prompt = [
+    section("TASK-ENVELOPE", "v2", envelope.serialized),
+    section("OUTPUT-SCHEMA", "v3", schema)
+  ].join("\n\n");
+  return {
+    prompt,
+    promptSha256: sha256(prompt),
+    taskEnvelopeVersion: 2 as const,
+    taskEnvelopeSha256: envelope.sha256
+  };
+};
+
+const section = (kind: string, id: string, content: string): string =>
+  `<<< BALLET EXECUTION COMPOSITION V3 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
 
 const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");

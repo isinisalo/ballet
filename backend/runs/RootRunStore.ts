@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { nodeOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import { canonicalNodeOutcomeSchema } from "../../shared/api/runtime-schemas.js";
 import type {
   CanonicalNodeOutcome, RootExecutionSnapshot, RootFinalizationReport, RootRun
 } from "../../shared/domain/runtime.js";
@@ -184,7 +184,7 @@ const toRootRun = (row: RootRunRow): StoredRootRun => ({
 });
 
 const parseOutcome = (source: string, rootRunId: string): CanonicalNodeOutcome => {
-  const parsed = nodeOutcomeSchema.safeParse(parseJsonValue(source, `Root Run ${rootRunId} outcome`));
+  const parsed = canonicalNodeOutcomeSchema.safeParse(parseJsonValue(source, `Root Run ${rootRunId} outcome`));
   if (!parsed.success) throw new Error(`Root Run ${rootRunId} has an invalid persisted outcome.`);
   return parsed.data;
 };

@@ -25,7 +25,9 @@ class FakeSession implements CopilotSessionLike {
   async sendAndWait(options: { prompt: string }): Promise<unknown> {
     this.prompts.push(options.prompt);
     this.handler?.({ type: "assistant.message_delta", data: { deltaContent: "stream" } });
-    const content = JSON.stringify({ state: "completed", result: "approved", summary: "Done.", checks: [] });
+    const content = JSON.stringify({
+      role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: []
+    });
     return { type: "assistant.message", data: { content } };
   }
 
@@ -90,11 +92,12 @@ describe("CopilotSdkAdapter", () => {
       outputSchema: {
         type: "object",
         additionalProperties: false,
-        required: ["state", "result", "summary", "checks"],
+        required: ["role", "state", "summary", "artifacts", "checks"],
         properties: {
+          role: { type: "string", const: "work" },
           state: { type: "string", const: "completed" },
-          result: { type: "string", enum: ["approved", "rejected"] },
           summary: { type: "string" },
+          artifacts: { type: "object" },
           checks: { type: "array" }
         }
       }
@@ -105,7 +108,7 @@ describe("CopilotSdkAdapter", () => {
     expect(events).toContainEqual(expect.objectContaining({ type: "assistant.delta", text: "stream" }));
     expect(events).toContainEqual(expect.objectContaining({
       type: "execution.completed",
-      structuredOutput: { state: "completed", result: "approved", summary: "Done.", checks: [] }
+      structuredOutput: { role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: [] }
     }));
     expect(client.session.optionUpdates).toContainEqual(expect.objectContaining({
       sandboxConfig: expect.objectContaining({ enabled: true, addCurrentWorkingDirectory: false })

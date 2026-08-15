@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { nodeOutcomeJsonSchema } from "../../../shared/api/runtime-schemas.js";
+import { workNodeOutcomeJsonSchema } from "../../../shared/api/runtime-schemas.js";
 import type { RuntimeProvider } from "../../../shared/domain/runtime.js";
 import type { CliRuntimeAdapter, RuntimeEvent } from "../providers/CliRuntimeAdapter.js";
 import { CodexAppServerAdapter } from "../providers/codex/CodexAppServerAdapter.js";
@@ -44,7 +44,7 @@ const runLiveSmoke = async (adapter: CliRuntimeAdapter, provider: RuntimeProvide
       model: models[0]!.id,
       reasoning: models[0]!.defaultReasoning ?? "provider-default",
       policy: { network: false, readOnlyRoots: [] },
-      outputSchema: nodeOutcomeJsonSchema,
+      outputSchema: workNodeOutcomeJsonSchema,
       signal: controller.signal
     })) events.push(event);
   } finally {

@@ -3,13 +3,13 @@ id: adr-015
 title: Work Loop, revisioitu State ja Loop Orchestrator
 status: accepted
 createdAt: '2026-08-15T00:00:00.000Z'
-updatedAt: '2026-08-15T00:00:00.000Z'
+updatedAt: '2026-08-15T21:00:00.000Z'
 tags:
   - arkkitehtuuripäätös
   - work-loop
   - state
   - orchestrator
-version: 2
+version: 3
 ---
 
 # Work Loop, revisioitu State ja Loop Orchestrator
@@ -71,7 +71,7 @@ Loop description on pakollinen, trimmaamisen jälkeen non-empty, enintään 2 00
 
 #### Validation Node
 
-`ValidationNode` arvioi Work Loop Noden tavoitteen nykyistä kanonista Statea, worktreen tilaa ja viimeisintä Work-outcomea vasten. Sen tyyppi on `agent` tai `human`; scheduled Validation Node ei kuulu skeemaan. Agent Validation Node omistaa provider-neutraalin execution compositionin ja Human Validation Node kieltää sen. Validation Node ei tuota Approved/Rejected-tulosta eikä State patchia. Se tuottaa vain tässä ADR:ssä lukitun Validation-sopimuksen.
+`ValidationNode` arvioi Work Loop Noden tavoitteen nykyistä kanonista Statea, worktreen tilaa ja viimeisintä Work-outcomea vasten. Sen tyyppi on `agent` tai `human`; scheduled Validation Node ei kuulu skeemaan. Agent Validation Node omistaa provider-neutraalin execution compositionin ja Human Validation Node kieltää sen. Validation Node ei tuota Approved/Rejected-tulosta. `OK` saa tuottaa yhden State patchin; `FAIL` kieltää patchin ja tuottaa tässä ADR:ssä lukitun repair-sopimuksen.
 
 #### State ja state revision
 
@@ -88,13 +88,13 @@ Jokainen Loop määrittelee `state.description`-kentässä odottamansa State-sop
 `LoopEdge` on käyttäjän konfiguroima, kahden Loopin välinen sallittu yhteys. Sen `kind` on joko `flow` tai `repair`:
 
 - `flow` siirtää tavallisesti `completed`-tilaan päättyneen top-level Loop invocationin seuraavaan Loopiin ilman return-continuationia. Yhdellä source-Loopilla saa olla enintään yksi lähtevä flow-LoopEdge.
-- `repair` lisää target-Loopin source-Loopin Orchestrator-allowlistiin. Source-Loopin mikä tahansa Validation Node voi pyytää täsmällistä repair-edge-ID:tä; hyväksytty route luo call framen ja palaa requestin luoneeseen Validation Nodeen.
+- `repair` lisää target-Loopin source-Loopin Orchestrator-allowlistiin. Source-Loopin Validation Node kuvaa tarvittavan capabilityn tai outcomen; hyväksytty Orchestrator-route valitsee yhden sallitun target Loopin, ratkaisee sen vakaan repair-edge-ID:n, luo call framen ja palaa requestin luoneeseen Validation Nodeen.
 
 LoopEdge ei itsessään käynnistä mitään. Runtime voi käyttää vain immutableen Root Run snapshotiin sisältyvää, skeemassa validoitua edgeä.
 
 #### Repair Request
 
-`RepairRequest` on Validation-päätöksestä johdettu, runtimen ID:llä ja provenienssilla täydentämä immutable pyyntö. Siinä ovat vähintään source Loop, Work Loop Node ja Validation Node, Validation attempt, luontihetken State revision, mode, summary ja konkreettinen repair instruction. `ORCHESTRATOR_REPAIR` sisältää lisäksi Validation-outcomen valitseman `loopEdgeId`-arvon. Repair Request ei sisällä piilotettua chain-of-thoughtia.
+`RepairRequest` on Validation-päätöksestä johdettu, runtimen ID:llä ja provenienssilla täydentämä immutable pyyntö. Siinä ovat vähintään source Loop, Work Loop Node ja Validation Node, Validation attempt, luontihetken State revision, summary, reason, evidence sekä requested capability tai outcome. Validation-outcome ei valitse LoopEdgeä, continuationia tai return targetia. Repair Request ei sisällä piilotettua chain-of-thoughtia.
 
 #### Loop Orchestrator
 
@@ -102,7 +102,7 @@ LoopEdge ei itsessään käynnistä mitään. Runtime voi käyttää vain immuta
 
 #### Orchestrator route
 
-`OrchestratorRoute` on yhden Repair Requestin runtime-päätös käyttää yhtä snapshotattua `repair`-LoopEdgeä. Route tallentaa repair requestin, source invocationin, source Validation Noden, valitun LoopEdgen, target invocationin ja call framen ID:t. Validation executor voi nimetä vain `loopEdgeId`-arvon; Loop Orchestrator todentaa, että edge on `repair`, sen source on requestin nykyinen Loop ja target on snapshotissa. Executor ei voi nimetä mielivaltaista target-Loopia.
+`OrchestratorRoute` on yhden Repair Requestin runtime-päätös käyttää yhtä snapshotattua `repair`-LoopEdgeä. Route tallentaa repair requestin, source invocationin, source Validation Noden, valitun LoopEdgen, target invocationin ja call framen ID:t. Orchestrator executor voi nimetä vain yhden envelope-allowlistissä olevan `targetLoopId`-arvon. Loop Orchestrator ratkaisee ja todentaa, että sitä vastaava edge on `repair`, sen source on requestin nykyinen Loop ja target on snapshotissa. Executor ei voi nimetä edgeä, continuationia tai return targetia.
 
 #### Continuation ja call frame
 
@@ -129,28 +129,39 @@ Käyttäjä konfiguroi:
 
 ### Validation-sopimus
 
-Validation Noden kanoninen structured output on täsmälleen toinen seuraavista päätösmuodoista:
+Validation Noden `completed` structured output on täsmälleen toinen seuraavista päätösmuodoista:
 
 ```ts
 type ValidationOutcome =
   | {
       decision: "OK";
       summary: string;
+      evidence: JsonValue;
       checks: RunCheck[];
+      statePatch?: StatePatch;
     }
   | {
       decision: "FAIL";
       summary: string;
+      evidence: JsonValue;
       checks: RunCheck[];
       repair:
         | {
             mode: "LOCAL_RETRY";
-            request: RepairRequestPayload;
+            feedback: string;
+            expectedCorrection: string;
           }
         | {
             mode: "ORCHESTRATOR_REPAIR";
-            loopEdgeId: string;
-            request: RepairRequestPayload;
+            reason: string;
+            requestedCapability: string;
+            evidenceRefs: string[];
+          }
+        | {
+            mode: "ORCHESTRATOR_REPAIR";
+            reason: string;
+            requestedOutcome: JsonValue;
+            evidenceRefs: string[];
           };
     };
 ```
@@ -163,7 +174,7 @@ tai
 decision = FAIL + repair.mode = LOCAL_RETRY | ORCHESTRATOR_REPAIR
 ```
 
-`OK` kieltää `repair`-kentän. `FAIL` vaatii `repair`-kentän. `LOCAL_RETRY` kieltää `loopEdgeId`-kentän, ja `ORCHESTRATOR_REPAIR` vaatii sen. Unknown kentät, tuntematon mode, puuttuva request, invalidi edge tai rajat ylittävä sisältö hylätään fail-closed ennen control-flow'ta. Providerin raw payload säilyy ExecutionTask-evidenssinä, mutta vain validoitu ja samassa transaktiossa kanonisoitu ValidationOutcome ohjaa Orchestratoria.
+`OK` kieltää `repair`-kentän ja voi sisältää atomisesti validoitavan `statePatch`-kentän. `FAIL` vaatii `repair`-kentän ja kieltää State patchin. `LOCAL_RETRY` vaatii palautteen ja odotetun korjauksen. `ORCHESTRATOR_REPAIR` vaatii syyn, evidence-viitteet ja täsmälleen toisen kentistä `requestedCapability | requestedOutcome`; Validation ei valitse target Loopia. Unknown kentät, tuntematon mode tai rajat ylittävä sisältö hylätään fail-closed ennen control-flow'ta. Providerin raw payload ei ohjaa control-flow'ta; vain roolin mukaan validoitu ja kanonisoitu ValidationOutcome voi muodostaa persistoidun Repair Requestin.
 
 ### Work outcome ja State patch
 
@@ -175,8 +186,8 @@ type WorkOutcome =
       state: "completed";
       summary: string;
       checks: RunCheck[];
-      artifacts?: Record<string, unknown>;
-      patch?: StatePatch;
+      artifacts: Record<string, JsonValue>;
+      statePatch?: StatePatch;
     }
   | {
       state: "needs_input";
@@ -191,17 +202,14 @@ type WorkOutcome =
       checks: RunCheck[];
     };
 
-interface StatePatch {
-  baseRevision: number;
-  operations: Array<
+type StatePatch = Array<
     | { op: "add"; path: string; value: JsonValue }
     | { op: "remove"; path: string }
     | { op: "replace"; path: string; value: JsonValue }
   >;
-}
 ```
 
-Patch on RFC 6902 JSON Patchin strict mutating subset. Tyhjä JSON Pointer, `move`, `copy`, `test`, tuntemattomat operaatiot ja prototype-segmentit hylätään. Lopputuloksen pitää pysyä kelvollisena JSON-arvona; primitiiviseen root-arvoon ei voi kohdistaa tämän version child-path-operaatioita. Operaatiot sovelletaan järjestyksessä erilliseen kopioon, ja vasta kokonaan validoitu lopputulos voidaan hyväksyä.
+Patch on RFC 6902 JSON Patchin strict mutating subset. Base revision kuuluu immutableen Node Run / Task Envelope -evidenssiin eikä providerin valittavaksi patch-kentäksi. Tyhjä JSON Pointer, `move`, `copy`, `test`, tuntemattomat operaatiot ja prototype-segmentit hylätään. Lopputuloksen pitää pysyä kelvollisena JSON-arvona; primitiiviseen root-arvoon ei voi kohdistaa tämän version child-path-operaatioita. Operaatiot sovelletaan järjestyksessä erilliseen kopioon, ja vasta kokonaan validoitu lopputulos voidaan hyväksyä.
 
 Work Noden hyväksytty patch kirjataan ennen Validation Nodea, jotta paikallinen retry ja ulkoinen repair näkevät saman toteutuneen, revisioidun tilan. Tässä "hyväksytty" tarkoittaa State-skeeman, base revisionin ja rajojen läpäissyttä atomista patchia; se ei tarkoita Validation-päätöstä `OK`. Epäonnistunutta validointia ei peruta historiasta. Korjaus tuottaa uuden patchin ja revision, jolloin koko muutospolku säilyy auditoitavana.
 
@@ -228,9 +236,11 @@ State noudattaa seuraavia invariantteja:
 | Work completed | Validoi WorkOutcome ja mahdollinen patch; luo tarvittaessa State revisionin; tallentaa Work-outcomen ja kiinteän `Work → Validation`-siirtymän. | Sama Work Loop Node, Validation Node queued/waiting executorin mukaan. |
 | Work needs input | Tallentaa kysymyksen ja contextin, ei hyväksy patchia eikä siirrä cursoria. | Sama Work Node ja Root Run `waiting_for_human`; vastaus luo uuden attemptin samalla State revisionilla. |
 | Work blocked/failed | Tallentaa outcomen ilman patchia ja päättää nykyisen Loop invocationin samalla statuksella. | Tavallisessa flow'ssa Root Run propagoi `blocked`/`failed`; repair-targetissa käytetään alla kuvattua frame-propagointia. |
-| Validation OK | Tallentaa ValidationOutcomen ja seuraa source Work Loop Noden täsmälleen yhtä käyttäjän Edgeä. | Target Work Loop Node tai target Loop-terminal; `completed` voi tämän jälkeen returnata repair-framesta, seurata flow-LoopEdgeä tai päättää Root Runin. |
+| Validation OK | Validoi mahdollisen patchin nykyistä base revisionia vasten, tallentaa uuden revision tarvittaessa ja seuraa source Work Loop Noden täsmälleen yhtä käyttäjän Edgeä samassa transaktiossa. | Target Work Loop Node tai target Loop-terminal; `completed` voi tämän jälkeen returnata repair-framesta, seurata flow-LoopEdgeä tai päättää Root Runin. |
 | Validation FAIL/local | Luo Repair Requestin, kasvattaa saman Work Loop Noden local retry -laskuria ja tallentaa kiinteän paluun Work Nodeen. | Sama Work Node saa Repair Requestin ja uusimman Staten. |
-| Validation FAIL/orchestrator | Validoi `loopEdgeId`-arvon tyypin, exact source Loopin ja target Loopin allowlistia vasten; luo Repair Requestin, Orchestrator Routen, call framen ja target Loop invocationin. | Caller suspendoidaan; target repair Loop aloittaa `startNodeId`-nodestaan samalla kanonisella Statella. |
+| Validation FAIL/orchestrator | Validoi repair-payloadin, luo pending Repair Requestin ja Orchestrator Node Runin; ei vielä luo routea tai framea. | Caller suspendoidaan odottamaan roolikohtaista OrchestratorOutcomea. |
+| Orchestrator completed | Validoi `targetLoopId`-arvon persisted Repair Requestin source-Loopin snapshot-allowlistia vasten, ratkaisee vakaan repair-LoopEdgen ja luo Orchestrator Routen, call framen sekä target Loop invocationin. | Target repair Loop aloittaa `startNodeId`-nodestaan samalla kanonisella Statella. |
+| Orchestrator needs input / blocked / failed | Persistoi roolikohtaisen outcomen ilman routea. Needs input säilyttää pending Repair Requestin; terminal outcome päättää pyynnön ja propagoi terminaalin. | Caller pysyy suspendoituna inputin ajan tai päättyy fail-closed ilman target-kutsua. |
 | Target repair Loop completed | Ohittaa targetin mahdollisen flow-LoopEdgen, sulkee call framen ja tallentaa kiinteän return-siirtymän. | Caller aktivoituu ja sama Validation Node suoritetaan uudelleen uusinta State revisionia vasten. |
 | Target repair Loop blocked/failed/cancelled | Sulkee framen vastaavalla terminal-statuksella; targetin failure evidenssi liitetään callerin repair-kontekstiin. | `blocked` tai `failed` propagoi call stackin kautta Root Runiin; `cancelled` peruuttaa koko Root Runin. Validationia ei ajeta uudelleen. |
 | Root cancellation | Merkitsee Root Runin cancellation-requestin, peruuttaa queued/running execution taskit ja päättää aktiiviset Node Runit, Loop invocationit ja framet yhdessä transaktiossa. | Root Run `cancelled`; uusia patcheja tai reittejä ei hyväksytä cancellation-commitin jälkeen. |
@@ -273,9 +283,9 @@ sequenceDiagram
   participant F as Durable Call Frame
   participant R as Target Repair Loop
 
-  V->>O: decision=FAIL, mode=ORCHESTRATOR_REPAIR, loopEdgeId
-  O->>O: validate persisted outcome and repair LoopEdge
-  O->>F: persist Repair Request, route and continuation
+  V->>O: decision=FAIL, requested capability/outcome
+  O->>O: persist Repair Request and validate targetLoopId against allowlist
+  O->>F: persist resolved repair LoopEdge, route and continuation
   O->>R: call target Loop with Root-owned State
   R-->>O: completed with newer committed State revision
   O->>F: close frame as returned
@@ -288,7 +298,7 @@ sequenceDiagram
 ```mermaid
 flowchart TD
   I["Validated root Loop state.initial"] -->|"Root creation transaction"| R0["Revision 0"]
-  R0 --> O["Work outcome proposes patch at baseRevision N"]
+  R0 --> O["Work completed or Validation OK proposes patch at revision N"]
   O --> A{"Patch valid, within limits,<br/>and baseRevision is current?"}
   A -->|"No"| E["Reject whole patch<br/>State remains at revision N"]
   A -->|"Yes"| T["Single SQLite transaction"]
@@ -548,9 +558,9 @@ SQLite-skeema vaihtuu v10-runtimea varten uuteen versioon ilman v9-Run compatibi
 
 ## Task envelope, structured output ja evidenssi
 
-Task envelope versioidaan v2:een. Se sisältää vähintään Root Run ID:n, Loop ID:n ja descriptionin, Work Loop Node ID:n ja descriptionin, node-roolin `work | validation`, taskin, current State revisionin, kanonisen Staten, viimeisimmän relevantin Work-outcomen, mahdollisen Repair Requestin ja resume-vastauksen. Validation-envelope sisältää vain nykyisen source-Loopin allowlistiin kuuluvat repair-LoopEdge-ID:t.
+Task envelope versioidaan v2:een. Se sisältää roolin mukaan Root Run-, Loop Run-, Node Run- ja Work Loop Node Run -identiteetit, Loopin ja Work Loop Noden descriptionit, node-roolin `work | validation | orchestrator`, taskin, current State revisionin/arvon/hashin, rajatun relevantin historian ja mahdollisen resume-vastauksen. Validation-envelope sisältää viimeisimmän kanonisen Work-outcomen. Workin local retry sisältää vain viimeisimmän Validation-palautteen. Orchestrator-envelope sisältää persistoidusta Repair Requestista rajatun projektion sekä source-Loopin repair-allowlistista johdetut target Loopit ID:n ja descriptionin kanssa deterministisesti järjestettyinä.
 
-WorkOutcome- ja ValidationOutcome-JSON-skeemat ovat eri versioituja sopimuksia ja niiden exact UTF-8 schema/hash tallennetaan execution evidenceen. Nykyinen viiden sectionin composition order, resurssien SHA-256:t, promptin exact bytes, ExecutionProfile snapshot ja provider-neutraali adapteriraja säilyvät. System instruction päivitetään kuvaamaan Work- tai Validation-nodea ilman project-workflow'ta.
+WorkOutcome-, ValidationOutcome- ja OrchestratorOutcome-JSON-skeemat ovat eri strict, versioituja sopimuksia ja niiden schema-ID, exact kanoninen UTF-8 schema sekä SHA-256 tallennetaan execution evidenceen. OrchestratorOutcome saa valita vain `targetLoopId`-arvon allowlististä; runtime määrää LoopEdgen, continuationin ja return targetin persistoidusta Repair Requestista. Nykyinen viiden sectionin composition order, resurssien SHA-256:t, promptin exact bytes, ExecutionProfile snapshot ja provider-neutraali adapteriraja säilyvät.
 
 Providerin julkaistut tapahtumat ja reasoning-yhteenvedot voidaan näyttää kuten nykyään. Piilotettua tai raakaa chain-of-thoughtia ei pyydetä, tallenneta Stateen, Repair Requestiin, outcomeen, tapahtumiin tai käyttöliittymään.
 
@@ -588,7 +598,7 @@ Tämä toistaa jo valmistuneen työn, kasvattaa sivuvaikutusten riskiä ja voi h
 
 ### Provider tai LLM toimii vapaana Orchestratorina
 
-Malli voisi valita snapshotin ulkopuolisen targetin tai tuottaa provider-riippuvaista control-flow'ta. Orchestrator on deterministinen platform-palvelu; provider tuottaa vain strict outcomen ja sallitun edge-ID:n.
+Malli voisi valita snapshotin ulkopuolisen targetin tai tuottaa provider-riippuvaista control-flow'ta. Orchestrator on deterministinen platform-palvelu; provider tuottaa vain strict outcomen ja yhden envelope-allowlistiin kuuluvan target Loop ID:n. Platform ratkaisee Edgen ja kaikki continuation-tiedot.
 
 ### V9 ja v10 luetaan rinnakkain
 

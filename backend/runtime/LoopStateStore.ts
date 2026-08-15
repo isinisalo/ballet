@@ -1,12 +1,12 @@
 import type Database from "better-sqlite3";
-import { nodeOutcomeSchema } from "../../shared/api/runtime-schemas.js";
+import { parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
 import type {
   CanonicalNodeOutcome, ControlFlowEventKind, LoopStateRevision, NodeRunStatus,
   WorkLoopNodeRunStatus
 } from "../../shared/domain/runtime.js";
 import { nodeRunRowSchema, stateRevisionRowSchema } from "./RuntimeDbTypes.js";
 import { toStateRevision } from "./RuntimeRowMappers.js";
-import { canonicalJson, jsonSha256 } from "./state/CanonicalJson.js";
+import { assertJsonValue, canonicalJson, jsonSha256 } from "./state/CanonicalJson.js";
 import { applyStatePatch, statePatchSha256 } from "./state/StatePatch.js";
 
 export interface CommitNodeOutcomeInput {
@@ -62,7 +62,6 @@ export class LoopStateStore {
   }
 
   commitNodeOutcome(input: CommitNodeOutcomeInput): CommitNodeOutcomeResult {
-    const parsedOutcome = nodeOutcomeSchema.parse(input.outcome);
     const committedAt = input.committedAt ?? new Date().toISOString();
     const transaction = this.connection().transaction(() => {
       const currentRevision = this.currentRevisionNumber(input.rootRunId);
@@ -73,11 +72,13 @@ export class LoopStateStore {
       }
       const current = this.require(input.rootRunId, currentRevision);
       const node = this.requireActiveNode(input.nodeRunId, input.rootRunId, input.baseRevision);
-      if (node.role !== parsedOutcome.role) {
-        throw new Error(`Node Run ${input.nodeRunId} role ${node.role} does not match ${parsedOutcome.role} outcome.`);
-      }
-      const applied = parsedOutcome.statePatch
-        ? applyStatePatch(current.state, parsedOutcome.statePatch)
+      const parsedOutcome = parseNodeOutcomeForRole(node.role, input.outcome);
+      const statePatch = "statePatch" in parsedOutcome ? parsedOutcome.statePatch : undefined;
+      const outcomeValue: unknown = parsedOutcome;
+      assertJsonValue(outcomeValue, { label: `Node Run ${input.nodeRunId} outcome` });
+      const outcomeJson = canonicalJson(outcomeValue);
+      const applied = statePatch
+        ? applyStatePatch(current.state, statePatch)
         : undefined;
       const nextRevision = applied ? currentRevision + 1 : currentRevision;
       if (applied) this.connection().prepare(`
@@ -86,14 +87,14 @@ export class LoopStateStore {
           patch_hash, source_node_run_id, outcome_json, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(input.rootRunId, nextRevision, currentRevision, applied.stateJson, applied.stateSha256,
-        applied.patchJson, applied.patchSha256, input.nodeRunId, canonicalJson(parsedOutcome), committedAt);
+        applied.patchJson, applied.patchSha256, input.nodeRunId, outcomeJson, committedAt);
 
       const nodeStatus = input.nodeStatus ?? "completed";
       this.connection().prepare(`
         UPDATE node_runs SET status = ?, outcome_json = ?, state_revision_after = ?,
           patch_json = ?, patch_hash = ?, error_code = ?, error_message = ?,
           completed_at = ?, updated_at = ? WHERE node_run_id = ?
-      `).run(nodeStatus, canonicalJson(parsedOutcome), nextRevision, applied?.patchJson ?? null,
+      `).run(nodeStatus, outcomeJson, nextRevision, applied?.patchJson ?? null,
         applied?.patchSha256 ?? null, input.errorCode ?? null, input.errorMessage ?? null,
         committedAt, committedAt, input.nodeRunId);
 

@@ -7,6 +7,7 @@ import type {
   ExecutionSpec,
   ExecutionTask
 } from "../../shared/domain/runtime.js";
+import { parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
 import { nodeRunRowSchema } from "../runtime/RuntimeDbTypes.js";
 import {
   executionEventRowSchema, executionTaskRowSchema, readExecutionInteger,
@@ -15,6 +16,7 @@ import {
 import { ExecutionTaskNotFoundError } from "./ExecutionErrors.js";
 import { assertExecutionSpecEvidence, toExecutionEvent, toExecutionTask } from "./ExecutionStoreMappers.js";
 import { ExecutionTaskStateStore } from "./ExecutionTaskStateStore.js";
+import { assertJsonValue, canonicalJson } from "../runtime/state/CanonicalJson.js";
 
 const MAX_RETAINED_BYTES = 1024 * 1024;
 
@@ -114,11 +116,19 @@ export class ExecutionStore {
     const existing = this.require(taskId);
     if (["succeeded", "failed", "cancelled"].includes(existing.status)) return existing;
     const effectiveStatus = existing.cancelRequestedAt ? "cancelled" : status;
+    let outcomeJson: string | null = null;
+    if (effectiveStatus === "succeeded") {
+      if (!detail.outcome) throw new Error(`Execution task ${taskId} cannot succeed without a structured outcome.`);
+      const outcome = parseNodeOutcomeForRole(existing.spec.evidence.nodeRole, detail.outcome);
+      const value: unknown = outcome;
+      assertJsonValue(value, { label: `Execution task ${taskId} outcome` });
+      outcomeJson = canonicalJson(value);
+    }
     const timestamp = new Date().toISOString();
     this.connection().prepare(`
       UPDATE execution_tasks SET status = ?, outcome_json = ?, error_code = ?, error_message = ?,
         completed_at = ?, updated_at = ? WHERE task_id = ? AND status IN ('queued','running')
-    `).run(effectiveStatus, effectiveStatus === "cancelled" ? null : detail.outcome ? JSON.stringify(detail.outcome) : null,
+    `).run(effectiveStatus, outcomeJson,
       effectiveStatus === "cancelled" ? null : detail.errorCode ?? null,
       effectiveStatus === "cancelled" ? null : detail.errorMessage ?? null,
       timestamp, timestamp, taskId);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
+import { workNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { ExecutionTask, LoopRunDetails, NodeRun, WorkLoopNodeRun } from "../../shared/domain/runtime.js";
 import { testLoop } from "../tests/v10TestConfig.js";
@@ -33,17 +33,19 @@ const loopRun = (
 const executionTask = (nodeRunId = "agent-node-run"): ExecutionTask => ({
   id: "agent-task", kind: "node_execution", rootRunId: "root-run", status: "succeeded",
   spec: {
-    version: 3, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
+    version: 4, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
     loopRunId: "loop-run", workLoopNodeRunId: "work-loop-node-run", nodeRunId,
     evidence: {
-      compositionVersion: 2, loopId: "main-loop", workLoopNodeId: "work", nodeRole: "work",
+      compositionVersion: 3, loopId: "main-loop", workLoopNodeId: "work", nodeRole: "work",
       nodeDefinitionId: "main-loop:work:work",
       executionProfile: {
         id: "primary", name: "Primary", provider: "codex", model: "gpt-5",
         reasoningEffort: "high", networkAccess: false
       },
-      resources: [], prompt: "prompt", promptSha256: "a".repeat(64), outputSchemaVersion: 2,
-      outputSchema: nodeOutcomeJsonSchema, outputSchemaSha256: "b".repeat(64)
+      resources: [], prompt: "prompt", promptSha256: "a".repeat(64),
+      taskEnvelopeVersion: 2, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 3,
+      outputSchemaId: "work-node-outcome-v3", outputSchema: workNodeOutcomeJsonSchema,
+      outputSchemaSha256: "c".repeat(64)
     },
     runtime: {
       hostname: "localhost", provider: "codex", cliVersion: "1", model: "gpt-5", reasoning: "high",
