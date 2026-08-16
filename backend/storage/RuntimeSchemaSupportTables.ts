@@ -97,7 +97,7 @@ export const runtimeSchemaSupportTables = `
     sequence INTEGER NOT NULL CHECK(sequence BETWEEN 1 AND 256),
     kind TEXT NOT NULL CHECK(kind IN (
       'work_completed','work_needs_input','work_terminal','validation_ok','validation_fail_local',
-      'validation_fail_orchestrator','repair_return','repair_terminal','root_cancelled','root_terminal',
+      'validation_fail_orchestrator','validation_terminal','repair_return','repair_terminal','root_cancelled','root_terminal',
       'execution_interrupted'
     )),
     state_revision INTEGER NOT NULL CHECK(state_revision >= 0),

@@ -1,8 +1,9 @@
 import type Database from "better-sqlite3";
 import type {
-  ControlFlowEvent, LoopRunDetails, LoopRunSource, LoopScheduleState, NodeRun,
+  CanonicalNodeOutcome, ControlFlowEvent, LoopRunDetails, LoopRunSource, LoopScheduleState, NodeRun,
   OrchestrationFrame, OrchestratorRoute, RepairRequest, WorkLoopNodeRun
 } from "../shared/domain/runtime.js";
+import { maxControlFlowTransitions } from "../shared/domain/runtime.js";
 import { ControlFlowStore } from "./runtime/ControlFlowStore.js";
 import { LoopRunStore } from "./runtime/LoopRunStore.js";
 import { LoopStateStore } from "./runtime/LoopStateStore.js";
@@ -10,7 +11,7 @@ import {
   LoopScheduleStateStore, type CompleteScheduleOccurrenceInput, type ScheduleDefinitionState
 } from "./runtime/LoopScheduleStateStore.js";
 import { RepairStore } from "./runtime/RepairStore.js";
-import { WorkLoopRuntimeUnavailableError } from "./runtime/LoopRunErrors.js";
+import { WorkLoopEngine } from "./runtime/WorkLoopEngine.js";
 import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
 
 export { isPatchedSqliteVersion };
@@ -24,6 +25,7 @@ export type DispatchLoopScheduleResult =
 export class RuntimeDatabase {
   private readonly connectionManager: RuntimeDbConnection;
   private readonly loopRunStore: LoopRunStore;
+  private readonly workLoopEngine: WorkLoopEngine;
   readonly state: LoopStateStore;
   readonly repair: RepairStore;
   readonly control: ControlFlowStore;
@@ -35,6 +37,7 @@ export class RuntimeDatabase {
     this.loopRunStore = new LoopRunStore(connection);
     this.state = new LoopStateStore(connection);
     this.repair = new RepairStore(connection);
+    this.workLoopEngine = new WorkLoopEngine(connection, this.loopRunStore, this.state, this.repair);
     this.control = new ControlFlowStore(connection);
     this.loopScheduleStateStore = new LoopScheduleStateStore(connection);
   }
@@ -43,14 +46,23 @@ export class RuntimeDatabase {
   connection(): Database.Database { return this.connectionManager.connection(); }
 
   startLoopRun(
-    _rootRunId: string,
-    _input?: string,
-    _source: LoopRunSource = "manual",
-    _schedule?: { workLoopNodeId: string; scheduledFor: string }
+    rootRunId: string,
+    input?: string,
+    source: LoopRunSource = "manual",
+    schedule?: { workLoopNodeId: string; scheduledFor: string }
   ): LoopRunDetails {
-    void _rootRunId; void _input; void _source; void _schedule;
-    throw new WorkLoopRuntimeUnavailableError();
+    return this.workLoopEngine.start(rootRunId, input, source, schedule);
   }
+
+  applyNodeOutcome(rootRunId: string, nodeRunId: string, outcome: CanonicalNodeOutcome): LoopRunDetails {
+    return this.workLoopEngine.applyNodeOutcome(rootRunId, nodeRunId, outcome);
+  }
+
+  resumeNode(rootRunId: string, nodeRunId: string, response: string): LoopRunDetails {
+    return this.workLoopEngine.resumeNode(rootRunId, nodeRunId, response);
+  }
+
+  markNodeRunRunning(nodeRunId: string): NodeRun { return this.workLoopEngine.markNodeRunning(nodeRunId); }
 
   listLoopRuns(limit = 500): LoopRunDetails[] { return this.loopRunStore.list(limit); }
   listRootLoopRuns(rootRunId: string): LoopRunDetails[] { return this.loopRunStore.listByRoot(rootRunId); }
@@ -133,7 +145,8 @@ export class RuntimeDatabase {
     rootRunId: string,
     status: "failed" | "cancelled",
     error: string | undefined,
-    completedAt = new Date().toISOString()
+    completedAt = new Date().toISOString(),
+    errorCode = "orchestration_failed"
   ): void {
     this.connection().transaction(() => {
       const root = this.connection().prepare(`
@@ -141,7 +154,9 @@ export class RuntimeDatabase {
         FROM root_runs WHERE root_run_id = ?
       `).get(rootRunId);
       const stateRevision = readNumberField(root, "current_state_revision");
-      const sequence = readNumberField(root, "transition_count") + 1;
+      const transitionCount = readNumberField(root, "transition_count");
+      const sequence = transitionCount + 1;
+      const recordTransition = sequence <= maxControlFlowTransitions;
       const activeLoopRunId = readOptionalStringField(root, "active_loop_run_id");
       const activeNodeRunId = readOptionalStringField(root, "active_node_run_id");
       const activeNode = activeNodeRunId ? this.getNodeRun(activeNodeRunId) : undefined;
@@ -150,7 +165,7 @@ export class RuntimeDatabase {
         UPDATE node_runs SET status = ?, state_revision_after = ?, error_code = ?, error_message = ?,
           completed_at = ?, updated_at = ?
         WHERE root_run_id = ? AND status IN ('queued','running','waiting_for_input')
-      `).run(nodeStatus, stateRevision, status === "failed" ? "orchestration_failed" : null,
+      `).run(nodeStatus, stateRevision, status === "failed" ? errorCode : null,
         error ?? null, completedAt, completedAt, rootRunId);
       this.connection().prepare(`
         UPDATE work_loop_node_runs SET status = ?, state_revision_after = ?, terminal = ?,
@@ -172,15 +187,15 @@ export class RuntimeDatabase {
       this.connection().prepare(`
         UPDATE root_runs SET transition_count = ?, active_loop_run_id = NULL,
           active_node_run_id = NULL, updated_at = ? WHERE root_run_id = ?
-      `).run(sequence, completedAt, rootRunId);
-      this.connection().prepare(`
-        INSERT INTO control_flow_events (
-          root_run_id, sequence, kind, state_revision, source_loop_run_id,
-          source_work_loop_node_run_id, source_node_run_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(rootRunId, sequence, status === "cancelled" ? "root_cancelled" : "root_terminal",
-        stateRevision, activeLoopRunId ?? activeNode?.loopRunId ?? null,
-        activeNode?.workLoopNodeRunId ?? null, activeNodeRunId ?? null, completedAt);
+      `).run(recordTransition ? sequence : transitionCount, completedAt, rootRunId);
+      if (recordTransition) this.connection().prepare(`
+          INSERT INTO control_flow_events (
+            root_run_id, sequence, kind, state_revision, source_loop_run_id,
+            source_work_loop_node_run_id, source_node_run_id, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(rootRunId, sequence, status === "cancelled" ? "root_cancelled" : "root_terminal",
+          stateRevision, activeLoopRunId ?? activeNode?.loopRunId ?? null,
+          activeNode?.workLoopNodeRunId ?? null, activeNodeRunId ?? null, completedAt);
     })();
   }
 
@@ -191,7 +206,8 @@ export class RuntimeDatabase {
       JOIN loop_invocations loop ON loop.loop_run_id = node.loop_run_id
       WHERE root.root_run_id = ? AND root.status IN ('queued','running','waiting_for_input')
         AND loop.status = 'running' AND node.node_run_id = ? AND node.status = 'queued'
-        AND node.execution_task_id = ? LIMIT 1
+        AND node.execution_task_id = ? AND root.active_loop_run_id = loop.loop_run_id
+        AND root.active_node_run_id = node.node_run_id LIMIT 1
     `).get(rootRunId, nodeRunId, taskId));
   }
 }

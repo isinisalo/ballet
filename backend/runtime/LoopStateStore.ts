@@ -4,6 +4,7 @@ import type {
   CanonicalNodeOutcome, ControlFlowEventKind, LoopStateRevision, NodeRunStatus,
   WorkLoopNodeRunStatus
 } from "../../shared/domain/runtime.js";
+import { maxControlFlowTransitions } from "../../shared/domain/runtime.js";
 import { nodeRunRowSchema, stateRevisionRowSchema } from "./RuntimeDbTypes.js";
 import { toStateRevision } from "./RuntimeRowMappers.js";
 import { assertJsonValue, canonicalJson, jsonSha256 } from "./state/CanonicalJson.js";
@@ -32,6 +33,14 @@ export interface CommitNodeOutcomeInput {
 export interface CommitNodeOutcomeResult {
   revision: LoopStateRevision;
   controlFlowEventId: number;
+}
+
+export interface PauseNodeOutcomeInput {
+  rootRunId: string;
+  nodeRunId: string;
+  baseRevision: number;
+  outcome: CanonicalNodeOutcome;
+  pausedAt?: string;
 }
 
 export class LoopStateStore {
@@ -126,6 +135,40 @@ export class LoopStateStore {
     return transaction();
   }
 
+  pauseNodeOutcome(input: PauseNodeOutcomeInput): void {
+    const pausedAt = input.pausedAt ?? new Date().toISOString();
+    this.connection().transaction(() => {
+      const currentRevision = this.currentRevisionNumber(input.rootRunId);
+      if (currentRevision !== input.baseRevision) {
+        throw new Error(
+          `Node Run ${input.nodeRunId} pause revision ${input.baseRevision} is stale; Root Run ${input.rootRunId} is at revision ${currentRevision}.`
+        );
+      }
+      const node = this.requireActiveNode(input.nodeRunId, input.rootRunId, input.baseRevision);
+      const outcome = parseNodeOutcomeForRole(node.role, input.outcome);
+      if (outcome.state !== "needs_input") {
+        throw new Error(`Node Run ${input.nodeRunId} can pause only with a needs_input outcome.`);
+      }
+      const outcomeValue: unknown = outcome;
+      assertJsonValue(outcomeValue, { label: `Node Run ${input.nodeRunId} outcome` });
+      this.connection().prepare(`
+        UPDATE node_runs SET status = 'waiting_for_input', outcome_json = ?,
+          state_revision_after = ?, updated_at = ? WHERE node_run_id = ?
+      `).run(canonicalJson(outcomeValue), currentRevision, pausedAt, input.nodeRunId);
+      if (node.work_loop_node_run_id) this.connection().prepare(`
+        UPDATE work_loop_node_runs SET status = 'waiting_for_input', state_revision_after = ?,
+          updated_at = ? WHERE work_loop_node_run_id = ?
+      `).run(currentRevision, pausedAt, node.work_loop_node_run_id);
+      this.connection().prepare(`
+        UPDATE loop_invocations SET status = 'waiting_for_input', updated_at = ?
+        WHERE loop_run_id = ? AND status = 'running'
+      `).run(pausedAt, node.loop_run_id);
+      this.connection().prepare(`
+        UPDATE root_runs SET status = 'waiting_for_input', updated_at = ? WHERE root_run_id = ?
+      `).run(pausedAt, input.rootRunId);
+    })();
+  }
+
   private updateWorkLoopNode(
     workLoopNodeRunId: string,
     input: CommitNodeOutcomeInput,
@@ -156,6 +199,14 @@ export class LoopStateStore {
     if (!["queued", "running", "waiting_for_input"].includes(node.status)) {
       throw new Error(`Node Run ${nodeRunId} is not active.`);
     }
+    const cursor = this.connection().prepare(`
+      SELECT active_loop_run_id, active_node_run_id FROM root_runs WHERE root_run_id = ?
+    `).get(rootRunId);
+    const activeLoopRunId = readCursorId(cursor, "active_loop_run_id");
+    const activeNodeRunId = readCursorId(cursor, "active_node_run_id");
+    if (activeLoopRunId !== node.loop_run_id || activeNodeRunId !== nodeRunId) {
+      throw new Error(`Node Run ${nodeRunId} is not the active cursor of Root Run ${rootRunId}.`);
+    }
     return node;
   }
 
@@ -172,7 +223,15 @@ export class LoopStateStore {
     const value = this.connection().prepare("SELECT transition_count FROM root_runs WHERE root_run_id = ?")
       .get(rootRunId);
     if (typeof value === "object" && value !== null && "transition_count" in value
-      && typeof value.transition_count === "number") return value.transition_count + 1;
+      && typeof value.transition_count === "number") {
+      const next = value.transition_count + 1;
+      if (next > maxControlFlowTransitions) {
+        throw new Error(
+          `Root Run ${rootRunId} exceeded the control-flow transition limit ${maxControlFlowTransitions}.`
+        );
+      }
+      return next;
+    }
     throw new Error(`Root Run ${rootRunId} was not found.`);
   }
 
@@ -186,3 +245,12 @@ export class LoopStateStore {
     return state;
   }
 }
+
+const readCursorId = (value: unknown, key: "active_loop_run_id" | "active_node_run_id"): string | undefined => {
+  if (typeof value === "object" && value !== null && key in value) {
+    const field = Reflect.get(value, key);
+    if (field === null) return undefined;
+    if (typeof field === "string") return field;
+  }
+  throw new Error(`Root Run returned an invalid ${key} cursor.`);
+};

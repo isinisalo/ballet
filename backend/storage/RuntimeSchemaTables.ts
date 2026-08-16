@@ -95,7 +95,6 @@ export const runtimeSchemaTables = `
     FOREIGN KEY(root_run_id, state_revision_before) REFERENCES state_revisions(root_run_id, revision),
     FOREIGN KEY(root_run_id, state_revision_after) REFERENCES state_revisions(root_run_id, revision),
     FOREIGN KEY(active_node_run_id) REFERENCES node_runs(node_run_id) DEFERRABLE INITIALLY DEFERRED,
-    UNIQUE(loop_run_id, work_loop_node_id, attempt),
     CHECK((status IN ('completed','blocked','failed','cancelled')) = (completed_at IS NOT NULL)),
     CHECK((terminal IS NOT NULL) = (status IN ('completed','blocked','failed','cancelled')))
   );

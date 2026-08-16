@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LoopRunDetails, RootRunDetail, RunTarget, RuntimePreflightIssue } from "@shared/api/workspace-contracts";
+import type {
+  LoopRunDetails, RespondToNodeRunRequest, RootRunDetail, RunTarget, RuntimePreflightIssue
+} from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
 import type { AppStreamStatus } from "@/app/useAppStream";
 import { runApi } from "../../runs/runApi";
 import { isRootRunDetailForLoop, rootRunLoopMismatchMessage } from "../../runs/rootRunAssociation";
 
-export type LoopRunPendingOperation = "load" | "start" | "cancel" | null;
+export type LoopRunPendingOperation = "load" | "start" | "respond" | "cancel" | null;
 
 export function useLoopRun(loopId: string | undefined, refreshSignal: string, streamStatus: AppStreamStatus, rootRunId?: string, target?: RunTarget, suppliedRootDetail?: RootRunDetail) {
   const [details, setDetails] = useState<LoopRunDetails | null>(null);
@@ -94,8 +96,19 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
     if (!currentRootDetail) return false;
     return mutate("cancel", () => runApi.cancel(currentRootDetail), currentRootDetail.rootRunId);
   }, [currentRootDetail, mutate]);
+  const respond = useCallback(async (nodeRunId: string, body: RespondToNodeRunRequest) => {
+    if (!currentRootDetail) return false;
+    return mutate(
+      "respond",
+      () => runApi.respond(currentRootDetail.rootRunId, nodeRunId, body),
+      currentRootDetail.rootRunId
+    );
+  }, [currentRootDetail, mutate]);
 
-  return { details: currentDetails, rootDetail: currentRootDetail, preflight, pendingOperation, error, streamStatus, refresh, start, cancel };
+  return {
+    details: currentDetails, rootDetail: currentRootDetail, preflight, pendingOperation,
+    error, streamStatus, refresh, start, respond, cancel
+  };
 }
 
 const selectedLoopRun = (root: RootRunDetail) => {

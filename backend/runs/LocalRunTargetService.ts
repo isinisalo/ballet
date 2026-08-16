@@ -3,7 +3,7 @@ import type { RunTarget, RunTargetsResponse } from "../../shared/domain/runs.js"
 import type { ExecutionProfileRuntimeConfiguration } from "../execution/RuntimeConfigurationService.js";
 import type { RuntimeConfigurationIssue } from "../../shared/domain/runtime.js";
 import type { RootRunStore } from "./RootRunStore.js";
-import { compositionIssuesForLoop } from "./RunTargetPreflight.js";
+import { compositionIssuesForLoop, reachableProfileReferences } from "./RunTargetPreflight.js";
 
 type TargetData = Pick<
   AppData,
@@ -19,6 +19,7 @@ export class LocalRunTargetService {
     configurations: Readonly<Record<string, ExecutionProfileRuntimeConfiguration>>,
     globalRuntimeIssues: readonly RuntimeConfigurationIssue[] = []
   ): RunTargetsResponse {
+    const profiles = new Map(data.executionProfiles.map((profile) => [profile.id, profile]));
     const globalAutomationIssues = data.automationIssues.filter((issue) =>
       !isStepResourceReferenceIssue(issue.path));
     const loops = data.automation.loops.map((loop): RunTarget => {
@@ -41,8 +42,29 @@ export class LocalRunTargetService {
       ];
       if (globalAutomationIssues.length === 0) {
         issues.push(...compositionIssuesForLoop(data, loop.id));
+        for (const reference of reachableProfileReferences(data, loop.id)) {
+          const profile = profiles.get(reference.executionProfileId);
+          const configuration = profile ? configurations[profile.id] : undefined;
+          if (!profile || !configuration) {
+            issues.push({
+              code: profile ? "invalid_runtime_config" : "missing_resource",
+              message: profile
+                ? `Execution profile ${profile.id} has not been resolved locally.`
+                : `Execution profile ${reference.executionProfileId} does not exist.`,
+              executionProfileId: reference.executionProfileId,
+              nodeId: reference.nodeId
+            });
+            continue;
+          }
+          issues.push(...configuration.issues.map((issue) => ({
+            code: "invalid_runtime_config" as const,
+            message: issue.message,
+            executionProfileId: profile.id,
+            nodeId: reference.nodeId,
+            path: issue.path
+          })));
+        }
       }
-      void configurations;
       return target(this.roots, loop.id, loop.description, issues);
     });
     return { loops };

@@ -1,13 +1,14 @@
 import type Database from "better-sqlite3";
-import type { ExecutionTask } from "../../shared/domain/runtime.js";
+import type { ExecutionTask, NodeRun } from "../../shared/domain/runtime.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
 import type { LocalWorkspaceManager } from "../execution/git/LocalWorkspaceManager.js";
 import type { RuntimeDatabase } from "../runtime-db.js";
-import { WorkLoopRuntimeUnavailableError } from "../runtime/LoopRunErrors.js";
+import { StatePatchValidationError } from "../runtime/state/StatePatch.js";
 import type { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import type { RootRunStore, StoredRootRun } from "./RootRunStore.js";
 import { isActiveRootStatus } from "./RunReadProjection.js";
+import { createNodeExecutionSpec } from "./NodeExecutionPlan.js";
 
 export interface RootRunExecutionCoordinatorOptions {
   connection: () => Database.Database;
@@ -20,19 +21,44 @@ export interface RootRunExecutionCoordinatorOptions {
   onChanged?(rootRunId: string): void;
 }
 
-type RootTerminalization = { status: "failed"; error: string } | { status: "cancelled" };
+type RootTerminalization = {
+  status: "failed";
+  error: string;
+  errorCode: "invalid_state_patch" | "orchestration_failed";
+} | { status: "cancelled" };
 
 export class RootRunExecutionCoordinator {
   constructor(private readonly options: RootRunExecutionCoordinatorOptions) {}
 
-  async enqueuePending(_rootRunId: string): Promise<void> {
-    void _rootRunId;
-    throw new WorkLoopRuntimeUnavailableError();
+  async enqueuePending(rootRunId: string): Promise<void> {
+    const plan = this.pendingNode(rootRunId);
+    if (!plan) return;
+    if (plan.node.executionTaskId) {
+      const task = this.options.executions.require(plan.node.executionTaskId);
+      if (task.status === "queued") this.options.queue.wake(task.spec.runtime.provider);
+      return;
+    }
+    const spec = createNodeExecutionSpec({
+      ...plan,
+      state: this.options.database.state.current(rootRunId),
+      events: this.options.database.listControlFlowEvents(rootRunId)
+    });
+    this.options.connection().transaction(() => {
+      const current = this.options.database.getNodeRun(plan.node.nodeRunId);
+      if (!current || current.status !== "queued" || current.executionTaskId) return;
+      this.options.executions.create(spec);
+    })();
+    this.options.queue.wake(spec.runtime.provider);
   }
 
-  preflightPending(_rootRunId: string): void {
-    void _rootRunId;
-    throw new WorkLoopRuntimeUnavailableError();
+  preflightPending(rootRunId: string): void {
+    const plan = this.pendingNode(rootRunId);
+    if (!plan || plan.node.executionTaskId) return;
+    createNodeExecutionSpec({
+      ...plan,
+      state: this.options.database.state.current(rootRunId),
+      events: this.options.database.listControlFlowEvents(rootRunId)
+    });
   }
 
   async sync(rootRunId: string): Promise<void> {
@@ -54,13 +80,60 @@ export class RootRunExecutionCoordinator {
 
   async handleTerminal(task: ExecutionTask): Promise<void> {
     const root = this.options.roots.require(task.rootRunId);
-    if (!isActiveRootStatus(root.status)) return;
-    await this.failRoot(root, new WorkLoopRuntimeUnavailableError());
+    if (!isActiveRootStatus(root.status)) {
+      if (root.status === "finalizing") await this.options.finalizer.finalize(
+        root.rootRunId,
+        root.finalizationTerminalStatus ?? "failed"
+      );
+      return;
+    }
+    try {
+      const persisted = this.options.executions.require(task.id);
+      const node = this.options.database.getNodeRun(persisted.spec.nodeRunId);
+      if (!node || node.executionTaskId !== persisted.id) return;
+      if (persisted.status === "succeeded") {
+        const outcome = persisted.outcome;
+        if (!outcome) throw new Error(`Execution task ${persisted.id} has no canonical outcome.`);
+        this.options.connection().transaction(() => {
+          this.options.database.applyNodeOutcome(root.rootRunId, node.nodeRunId, outcome);
+          this.preflightPending(root.rootRunId);
+        })();
+      } else if (["interrupted", "failed", "cancelled"].includes(node.status)) {
+        await this.sync(root.rootRunId);
+        return;
+      } else if (persisted.status === "cancelled") {
+        await this.cancelRoot(root);
+        return;
+      } else {
+        throw new Error(persisted.errorMessage ?? `Execution task ${persisted.id} failed.`);
+      }
+      await this.enqueuePending(root.rootRunId);
+      await this.sync(root.rootRunId);
+      this.options.onChanged?.(root.rootRunId);
+    } catch (error) {
+      await this.failRoot(root, error);
+    }
   }
 
   handleStarted(task: ExecutionTask): boolean {
-    if (["queued", "running"].includes(task.status)) this.options.executions.requestCancel(task.id);
-    return false;
+    const accepted = this.options.connection().transaction(() => {
+      const persisted = this.options.executions.get(task.id);
+      if (persisted?.status !== "running" || !this.options.database.isExecutionNodeRunnable(
+        task.rootRunId,
+        task.spec.nodeRunId,
+        task.id
+      )) {
+        if (persisted && ["queued", "running"].includes(persisted.status)) {
+          this.options.executions.requestCancel(task.id);
+        }
+        return false;
+      }
+      this.options.database.markNodeRunRunning(task.spec.nodeRunId);
+      this.options.roots.setStatus(task.rootRunId, "running");
+      return true;
+    })();
+    if (accepted) this.options.onChanged?.(task.rootRunId);
+    return accepted;
   }
 
   async reconcile(): Promise<void> {
@@ -85,7 +158,11 @@ export class RootRunExecutionCoordinator {
 
   async failRoot(root: StoredRootRun, error: unknown): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
-    await this.terminalizeRoot(root.rootRunId, { status: "failed", error: message });
+    await this.terminalizeRoot(root.rootRunId, {
+      status: "failed",
+      error: message,
+      errorCode: error instanceof StatePatchValidationError ? "invalid_state_patch" : "orchestration_failed"
+    });
   }
 
   async cancelRoot(root: StoredRootRun): Promise<void> {
@@ -104,6 +181,25 @@ export class RootRunExecutionCoordinator {
     return true;
   }
 
+  private pendingNode(rootRunId: string): {
+    root: StoredRootRun;
+    run: ReturnType<RuntimeDatabase["listRootLoopRuns"]>[number];
+    composite: NonNullable<ReturnType<RuntimeDatabase["getWorkLoopNodeRun"]>>;
+    node: NodeRun;
+  } | undefined {
+    const root = this.options.roots.require(rootRunId);
+    if (!root.activeNodeRunId) return undefined;
+    const node = this.options.database.getNodeRun(root.activeNodeRunId);
+    if (!node || node.rootRunId !== rootRunId || node.status !== "queued") return undefined;
+    const run = this.options.database.listRootLoopRuns(rootRunId)
+      .find((candidate) => candidate.loopRunId === node.loopRunId);
+    const composite = node.workLoopNodeRunId
+      ? this.options.database.getWorkLoopNodeRun(node.workLoopNodeRunId)
+      : undefined;
+    if (!run || !composite || run.status !== "running") return undefined;
+    return { root, run, composite, node };
+  }
+
   private async terminalizeRoot(rootRunId: string, detail: RootTerminalization): Promise<void> {
     const timestamp = new Date().toISOString();
     const persisted = this.options.connection().transaction(() => {
@@ -113,7 +209,8 @@ export class RootRunExecutionCoordinator {
         rootRunId,
         detail.status,
         detail.status === "failed" ? detail.error : undefined,
-        timestamp
+        timestamp,
+        detail.status === "failed" ? detail.errorCode : undefined
       );
       const taskIds = this.options.executions.cancelActiveByRoot(rootRunId, timestamp);
       const root = this.options.roots.startFinalization(
@@ -121,7 +218,7 @@ export class RootRunExecutionCoordinator {
         false,
         detail.status,
         detail.status === "failed"
-          ? { errorCode: "orchestration_failed", errorMessage: detail.error, timestamp }
+          ? { errorCode: detail.errorCode, errorMessage: detail.error, timestamp }
           : { timestamp }
       );
       return { root, taskIds };

@@ -2,7 +2,7 @@ import { runtimeSchemaInvariants } from "./RuntimeSchemaInvariants.js";
 import { runtimeSchemaSupportTables } from "./RuntimeSchemaSupportTables.js";
 import { runtimeSchemaTables } from "./RuntimeSchemaTables.js";
 
-export const localDatabaseSchemaVersion = 4;
+export const localDatabaseSchemaVersion = 5;
 export const localDatabaseTableNames = [
   "control_flow_events", "execution_events", "execution_tasks", "loop_invocations",
   "loop_schedule_state", "metadata", "node_runs", "orchestration_frames",

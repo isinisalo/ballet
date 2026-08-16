@@ -5,7 +5,9 @@ import type {
   RootFinalizationReport,
   RuntimePreflightIssue,
   CanonicalNodeOutcome,
-  NodeRunRole
+  NodeRunRole,
+  ValidationNodeOutcome,
+  WorkNodeOutcome
 } from "./runtime.js";
 
 export type BalletMode = "configure" | "run";
@@ -79,6 +81,11 @@ export interface StartRootRunRequest {
   targetId: string;
   input?: string;
 }
+
+export type RespondToNodeRunRequest =
+  | { kind: "work"; outcome: WorkNodeOutcome }
+  | { kind: "validation"; outcome: ValidationNodeOutcome }
+  | { kind: "resume"; response: string };
 
 export interface RunTarget {
   kind: "loop";

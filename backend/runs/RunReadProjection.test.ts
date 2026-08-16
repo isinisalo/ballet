@@ -82,4 +82,25 @@ describe("currentPosition", () => {
       nodeRunId: "agent-node-run", workLoopNodeId: "work", taskId: "agent-task", executionProfileId: "primary"
     });
   });
+
+  it("keeps the requester Validation identity while a Repair Request is pending", () => {
+    const validation = node({
+      nodeRunId: "validation-node-run", role: "validation",
+      nodeDefinitionId: "main-loop:work:validation", status: "completed",
+      outcome: {
+        role: "validation", state: "completed", decision: "FAIL", summary: "Repair required.",
+        evidence: {}, checks: [], repair: {
+          mode: "ORCHESTRATOR_REPAIR", reason: "Specialist required.",
+          requestedCapability: "repair", evidenceRefs: []
+        }
+      },
+      stateRevisionAfter: 0, completedAt: timestamp
+    });
+
+    expect(currentPosition([
+      loopRun([composite({ status: "waiting_for_input", activeNodeRunId: undefined })], [validation], "waiting_for_input")
+    ], [])).toMatchObject({
+      workLoopNodeRunId: "work-loop-node-run", nodeRunId: "validation-node-run", nodeRole: "validation"
+    });
+  });
 });

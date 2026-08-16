@@ -1,5 +1,6 @@
 // This is the single frontend/backend contract barrel. Keeping the related
 // domain exports here avoids duplicate DTO shapes in the application layers.
+export { validationNodeOutcomeSchema, workNodeOutcomeSchema } from "./runtime-schemas.js";
 import type {
   JsonValue,
   LoopTerminal,
@@ -112,6 +113,7 @@ import type {
   RunTarget,
   RunTargetIssue,
   RunTargetsResponse,
+  RespondToNodeRunRequest,
   StartRootRunRequest,
   WorkspaceInvalidationEvent
 } from "../domain/runs.js";
@@ -230,6 +232,6 @@ export type {
   ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,
   BalletMode, DashboardRunStatus, RootRunDetail, RootRunKind, RootRunListResponse, RootRunListState,
-  RootRunSource, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, StartRootRunRequest,
+  RootRunSource, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, RespondToNodeRunRequest, StartRootRunRequest,
   WorkspaceInvalidationEvent, Skill
 };

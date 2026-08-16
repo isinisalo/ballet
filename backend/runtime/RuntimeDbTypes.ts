@@ -69,7 +69,7 @@ export const controlFlowEventRowSchema = z.object({
   id: z.number().int(), root_run_id: z.string(), sequence: z.number().int(),
   kind: z.enum([
     "work_completed", "work_needs_input", "work_terminal", "validation_ok",
-    "validation_fail_local", "validation_fail_orchestrator", "repair_return",
+    "validation_fail_local", "validation_fail_orchestrator", "validation_terminal", "repair_return",
     "repair_terminal", "root_cancelled", "root_terminal", "execution_interrupted"
   ]),
   state_revision: z.number().int(), source_loop_run_id: nullableString,

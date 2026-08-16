@@ -4,7 +4,8 @@ import type {
   RootRunKind,
   RootRunListResponse,
   RootRunListState,
-  RootRunSummary
+  RootRunSummary,
+  RespondToNodeRunRequest
 } from "@shared/api/workspace-contracts";
 
 export const runApi = {
@@ -24,5 +25,10 @@ export const runApi = {
     request<RootRunDetail>(`/api/runs/${encodeURIComponent(summary.rootRunId)}/cancel`, {
       method: "POST",
       body: "{}"
-    })
+    }),
+  respond: (rootRunId: string, nodeRunId: string, body: RespondToNodeRunRequest) =>
+    request<RootRunDetail>(
+      `/api/runs/${encodeURIComponent(rootRunId)}/nodes/${encodeURIComponent(nodeRunId)}/respond`,
+      { method: "POST", body: JSON.stringify(body) }
+    )
 };

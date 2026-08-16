@@ -101,6 +101,12 @@ export const validationNodeOutcomeSchema = z.union([
   z.object({ role: z.literal("validation"), state: z.literal("failed"), ...checkedSummary }).strict()
 ]);
 
+export const respondToNodeRunBodySchema = z.union([
+  z.object({ kind: z.literal("work"), outcome: workNodeOutcomeSchema }).strict(),
+  z.object({ kind: z.literal("validation"), outcome: validationNodeOutcomeSchema }).strict(),
+  z.object({ kind: z.literal("resume"), response: nonEmptyText }).strict()
+]);
+
 export const orchestratorNodeOutcomeSchema = z.union([
   z.object({
     role: z.literal("orchestrator"), state: z.literal("completed"),

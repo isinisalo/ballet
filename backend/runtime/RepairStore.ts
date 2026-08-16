@@ -74,6 +74,21 @@ export class RepairStore {
     `).all(rootRunId).map((row) => toRepairRequest(repairRequestRowSchema.parse(row)));
   }
 
+  finishRequest(
+    repairRequestId: string,
+    status: "completed" | "failed" | "cancelled",
+    completedAt = new Date().toISOString()
+  ): RepairRequest {
+    const result = this.connection().prepare(`
+      UPDATE repair_requests SET status = ?, completed_at = ?, updated_at = ?
+      WHERE repair_request_id = ? AND status IN ('pending','routed')
+    `).run(status, completedAt, completedAt, repairRequestId);
+    if (result.changes !== 1) {
+      throw new Error(`Repair Request ${repairRequestId} is not pending or routed.`);
+    }
+    return this.requireRequest(repairRequestId);
+  }
+
   getRoute(routeId: string): OrchestratorRoute | undefined {
     const value = this.connection().prepare("SELECT * FROM orchestrator_routes WHERE route_id = ?").get(routeId);
     return value ? toOrchestratorRoute(orchestratorRouteRowSchema.parse(value)) : undefined;

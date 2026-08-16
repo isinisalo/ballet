@@ -7,6 +7,8 @@ import {
   emptyBodySchema,
   executionTaskParamsSchema,
   executionEventsQuerySchema,
+  nodeRunParamsSchema,
+  respondToNodeRunBodySchema,
   rootRunParamsSchema,
   startRunBodySchema
 } from "../../shared/api/runtime-schemas.js";
@@ -111,6 +113,14 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     const { rootRunId } = parseParams(rootRunParamsSchema, req);
     parseBody(emptyBodySchema, req);
     res.json(await options.runs.cancel(rootRunId));
+  }));
+  router.post("/runs/:rootRunId/nodes/:nodeRunId/respond", route(async (req, res) => {
+    const { rootRunId, nodeRunId } = parseParams(nodeRunParamsSchema, req);
+    res.json(await options.runs.respond(
+      rootRunId,
+      nodeRunId,
+      parseBody(respondToNodeRunBodySchema, req)
+    ));
   }));
   router.get("/execution-tasks/:taskId/events", route(async (req, res) => {
     const { taskId } = parseParams(executionTaskParamsSchema, req); const query = parseUnknown(executionEventsQuerySchema, req.query);

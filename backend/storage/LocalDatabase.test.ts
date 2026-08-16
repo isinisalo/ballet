@@ -12,7 +12,7 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("LocalDatabase schema v4", () => {
+describe("LocalDatabase schema v5", () => {
   it("creates the clean Work Loop runtime table inventory", async () => {
     const database = await createDatabase();
     const connection = database.connection();
@@ -24,7 +24,7 @@ describe("LocalDatabase schema v4", () => {
     expect(tables).not.toContain("step_runs");
     expect(tables).not.toContain("loop_runs");
     expect(connection.pragma("foreign_keys", { simple: true })).toBe(1);
-    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("4");
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("5");
     database.close();
   });
 
@@ -93,37 +93,37 @@ describe("LocalDatabase schema v4", () => {
     untouched.close();
   });
 
-  it("rejects schema v3 without an empty-database migration exception", async () => {
+  it("rejects schema v4 without an empty-database migration exception", async () => {
     const root = await temporaryRoot();
     const filename = path.join(root, "state.sqlite");
     const legacy = new Database(filename);
     legacy.exec(`
       CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO metadata (key, value) VALUES ('schema_version', '3');
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '4');
       CREATE TABLE root_runs (root_run_id TEXT PRIMARY KEY);
     `);
     legacy.close();
 
     expect(() => new LocalDatabase(filename).connection())
-      .toThrow("Unsupported Ballet state schema 3; expected 4.");
+      .toThrow("Unsupported Ballet state schema 4; expected 5.");
     const untouched = new Database(filename, { readonly: true });
-    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("3");
+    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("4");
     expect(untouched.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").pluck().all())
       .not.toContain("state_revisions");
     untouched.close();
   });
 
-  it("rejects incomplete schema v4 instead of silently repairing it", async () => {
+  it("rejects incomplete schema v5 instead of silently repairing it", async () => {
     const root = await temporaryRoot();
     const filename = path.join(root, "state.sqlite");
     const partial = new Database(filename);
     partial.exec(`
       CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO metadata (key, value) VALUES ('schema_version', '4');
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '5');
     `);
     partial.close();
 
-    expect(() => new LocalDatabase(filename).connection()).toThrow("schema 4 is incomplete");
+    expect(() => new LocalDatabase(filename).connection()).toThrow("schema 5 is incomplete");
   });
 });
 

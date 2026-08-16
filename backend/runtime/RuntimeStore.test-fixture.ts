@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import os from "node:os";
 import path from "node:path";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
-import type { JsonValue } from "../../shared/domain/automation.js";
+import type { JsonValue, ProjectLoop, ProjectLoopEdge } from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import { RootRunStore } from "../runs/RootRunStore.js";
 import { LocalDatabase } from "../storage/LocalDatabase.js";
@@ -34,13 +34,16 @@ export interface RuntimeStoreTestFixture extends RuntimeStores {
   close(): Promise<void>;
 }
 
-export const createRuntimeStoreFixture = async (initial: JsonValue = {}): Promise<RuntimeStoreTestFixture> => {
+export const createRuntimeStoreFixture = async (
+  initial: JsonValue = {},
+  options: { loop?: ProjectLoop; loops?: ProjectLoop[]; loopEdges?: ProjectLoopEdge[] } = {}
+): Promise<RuntimeStoreTestFixture> => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "ballet-runtime-store-"));
   const filename = path.join(directory, "state.sqlite");
   let database = new LocalDatabase(filename);
   let databaseOpen = true;
   let connection = () => database.connection();
-  const loop = { ...testLoop(), state: { description: "Test state.", initial } };
+  const loop = { ...(options.loop ?? testLoop()), state: { description: "Test state.", initial } };
   const snapshot: RootExecutionSnapshot = {
     version: 3,
     rootLoopId: loop.id,
@@ -49,8 +52,10 @@ export const createRuntimeStoreFixture = async (initial: JsonValue = {}): Promis
       configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
     },
     orchestrator: testOrchestrator(),
-    loops: [loop],
-    loopEdges: [{ id: "self-repair", source: loop.id, target: loop.id, kind: "repair", description: "Self repair." }],
+    loops: [loop, ...(options.loops ?? []).filter((candidate) => candidate.id !== loop.id)],
+    loopEdges: options.loopEdges ?? [{
+      id: "self-repair", source: loop.id, target: loop.id, kind: "repair", description: "Self repair."
+    }],
     terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme,
     executionProfiles: [testExecutionProfile],

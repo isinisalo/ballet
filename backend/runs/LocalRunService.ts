@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import type { ExecutionTask } from "../../shared/domain/runtime.js";
 import type {
   RootRunDetail,
   RootRunListQuery,
   RootRunListResponse,
+  RespondToNodeRunRequest,
   StartRootRunRequest
 } from "../../shared/domain/runs.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
@@ -13,10 +15,11 @@ import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurat
 import { LocalWorkspaceManager } from "../execution/git/LocalWorkspaceManager.js";
 import type { ProjectContext } from "../project/ProjectContext.js";
 import type { DispatchLoopScheduleResult, RuntimeDatabase } from "../runtime-db.js";
-import { LoopRunNotFoundError, WorkLoopRuntimeUnavailableError } from "../runtime/LoopRunErrors.js";
+import { LoopRunNotFoundError, LoopRunStateError } from "../runtime/LoopRunErrors.js";
+import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
 import { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import { RootRunExecutionCoordinator } from "./RootRunExecutionCoordinator.js";
-import { RootRunStore } from "./RootRunStore.js";
+import { RootRunStore, type StoredRootRun } from "./RootRunStore.js";
 import {
   currentPosition,
   decodeRunCursor,
@@ -40,6 +43,7 @@ export interface LocalRunServiceOptions {
 export class LocalRunService {
   private readonly workspaces: LocalWorkspaceManager;
   private readonly finalizer: RootFinalizationCoordinator;
+  private readonly planner: LoopExecutionPlanner;
   private readonly coordinator: RootRunExecutionCoordinator;
 
   constructor(private readonly options: LocalRunServiceOptions) {
@@ -50,6 +54,7 @@ export class LocalRunService {
       this.workspaces,
       (rootRunId) => this.changed(rootRunId)
     );
+    this.planner = new LoopExecutionPlanner(options.configurations, options.runtime);
     this.coordinator = new RootRunExecutionCoordinator({
       ...options,
       finalizer: this.finalizer,
@@ -58,14 +63,55 @@ export class LocalRunService {
   }
 
   async start(
-    _input: StartRootRunRequest,
-    _source: "manual" | "schedule" = "manual",
-    _schedule?: { workLoopNodeId: string; scheduledFor: string }
+    input: StartRootRunRequest,
+    source: "manual" | "schedule" = "manual",
+    schedule?: { workLoopNodeId: string; scheduledFor: string }
   ): Promise<RootRunDetail> {
-    void _input;
-    void _source;
-    void _schedule;
-    throw new WorkLoopRuntimeUnavailableError();
+    const rootRunId = randomUUID();
+    let workspace;
+    try {
+      workspace = await this.workspaces.prepare(rootRunId);
+    } catch (error) {
+      throw new LoopRunStateError(
+        `Run workspace preflight failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    try {
+      const snapshot = await this.planner.create(workspace, input.targetId, input.input ?? "");
+      assertScheduledStart(snapshot, schedule);
+      await this.workspaces.verifyPreparedSnapshot(workspace);
+      const timestamp = new Date().toISOString();
+      this.options.connection().transaction(() => {
+        this.options.roots.create({
+          rootRunId,
+          kind: "loop",
+          targetId: input.targetId,
+          source,
+          input: input.input,
+          worktreePath: workspace.path,
+          branch: workspace.branch,
+          headSha: workspace.headSha,
+          configHash: workspace.configHash,
+          snapshotHash: workspace.snapshotHash,
+          executionSnapshot: snapshot,
+          createdAt: timestamp
+        });
+        this.options.database.startLoopRun(rootRunId, input.input, source, schedule);
+        this.coordinator.preflightPending(rootRunId);
+      })();
+    } catch (error) {
+      await this.workspaces.discard(workspace);
+      throw error;
+    }
+    try {
+      await this.coordinator.enqueuePending(rootRunId);
+      await this.coordinator.sync(rootRunId);
+    } catch (error) {
+      await this.coordinator.failRoot(this.options.roots.require(rootRunId), error);
+      throw error;
+    }
+    this.changed(rootRunId);
+    return this.detailRequired(rootRunId);
   }
 
   async dispatchScheduled(input: {
@@ -160,6 +206,31 @@ export class LocalRunService {
     return this.detailRequired(rootRunId);
   }
 
+  async respond(
+    rootRunId: string,
+    nodeRunId: string,
+    request: RespondToNodeRunRequest
+  ): Promise<RootRunDetail> {
+    const root = this.options.roots.require(rootRunId);
+    const node = this.options.database.getNodeRun(nodeRunId);
+    if (!node || node.rootRunId !== rootRunId) {
+      throw new LoopRunStateError(`Node Run ${nodeRunId} does not belong to Root Run ${rootRunId}.`);
+    }
+    if (request.kind !== "resume") assertHumanNodeResponse(root, node, request.kind);
+    this.options.connection().transaction(() => {
+      if (request.kind === "resume") {
+        this.options.database.resumeNode(rootRunId, nodeRunId, request.response);
+      } else {
+        this.options.database.applyNodeOutcome(rootRunId, nodeRunId, request.outcome);
+      }
+      this.coordinator.preflightPending(rootRunId);
+    })();
+    await this.coordinator.enqueuePending(rootRunId);
+    await this.coordinator.sync(rootRunId);
+    this.changed(rootRunId);
+    return this.detailRequired(rootRunId);
+  }
+
   handleTerminal(task: ExecutionTask): Promise<void> {
     return this.coordinator.handleTerminal(task);
   }
@@ -182,3 +253,30 @@ export class LocalRunService {
     this.options.onChanged?.(rootRunId);
   }
 }
+
+const assertScheduledStart = (
+  snapshot: Awaited<ReturnType<LoopExecutionPlanner["create"]>>,
+  schedule?: { workLoopNodeId: string }
+): void => {
+  if (!schedule) return;
+  const loop = snapshot.loops.find((candidate) => candidate.id === snapshot.rootLoopId);
+  const start = loop?.nodes.find((candidate) => candidate.id === loop.startNodeId);
+  if (!loop || start?.work.type !== "scheduled" || start.id !== schedule.workLoopNodeId) {
+    throw new LoopRunStateError(
+      `Scheduled Work Node ${schedule.workLoopNodeId} is not the immutable start of Loop ${snapshot.rootLoopId}.`
+    );
+  }
+};
+
+const assertHumanNodeResponse = (
+  root: StoredRootRun,
+  node: NonNullable<ReturnType<RuntimeDatabase["getNodeRun"]>>,
+  role: "work" | "validation"
+): void => {
+  const loop = root.executionSnapshot.loops.find((candidate) => candidate.id === node.loopId);
+  const definition = loop?.nodes.find((candidate) => candidate.id === node.workLoopNodeId);
+  const human = role === "work" ? definition?.work.type === "human" : definition?.validation.type === "human";
+  if (node.role !== role || !human || node.executionTaskId) {
+    throw new LoopRunStateError(`Node Run ${node.nodeRunId} is not a Human ${role} Node awaiting this outcome.`);
+  }
+};

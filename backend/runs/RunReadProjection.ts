@@ -27,7 +27,11 @@ export const currentPosition = (
 ) => {
   const run = latestActive(runs) ?? runs.at(-1);
   const workLoopNodeRun = latestActive(run?.workLoopNodeRuns ?? []);
-  const nodeRun = latestActive(run?.nodeRuns ?? []);
+  const nodeRun = latestActive(run?.nodeRuns ?? [])
+    ?? (workLoopNodeRun?.status === "waiting_for_input"
+      ? [...(run?.nodeRuns ?? [])].reverse().find((node) =>
+        node.workLoopNodeRunId === workLoopNodeRun.workLoopNodeRunId)
+      : undefined);
   const task = currentTask(nodeRun, tasks);
   if (!hasCurrentPosition(run, workLoopNodeRun, nodeRun, task)) return undefined;
   return positionFields(run, workLoopNodeRun, nodeRun, task);

@@ -7,6 +7,7 @@ import type {
   ExecutionSpec,
   ExecutionTask
 } from "../../shared/domain/runtime.js";
+import { maxControlFlowTransitions } from "../../shared/domain/runtime.js";
 import { parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
 import { nodeRunRowSchema } from "../runtime/RuntimeDbTypes.js";
 import {
@@ -277,18 +278,20 @@ export class ExecutionStore {
         SELECT current_state_revision, transition_count FROM root_runs WHERE root_run_id = ?
       `).get(node.root_run_id);
       const stateRevision = readExecutionInteger(root, "current_state_revision");
-      const sequence = readExecutionInteger(root, "transition_count") + 1;
+      const transitionCount = readExecutionInteger(root, "transition_count");
+      const sequence = transitionCount + 1;
+      const recordTransition = sequence <= maxControlFlowTransitions;
       this.connection().prepare(`
         UPDATE root_runs SET transition_count = ?, active_node_run_id = NULL,
           active_loop_run_id = NULL, updated_at = ? WHERE root_run_id = ?
-      `).run(sequence, timestamp, node.root_run_id);
-      this.connection().prepare(`
-        INSERT INTO control_flow_events (
-          root_run_id, sequence, kind, state_revision, source_loop_run_id,
-          source_work_loop_node_run_id, source_node_run_id, created_at
-        ) VALUES (?, ?, 'execution_interrupted', ?, ?, ?, ?, ?)
-      `).run(node.root_run_id, sequence, stateRevision, node.loop_run_id,
-        node.work_loop_node_run_id, node.node_run_id, timestamp);
+      `).run(recordTransition ? sequence : transitionCount, timestamp, node.root_run_id);
+      if (recordTransition) this.connection().prepare(`
+          INSERT INTO control_flow_events (
+            root_run_id, sequence, kind, state_revision, source_loop_run_id,
+            source_work_loop_node_run_id, source_node_run_id, created_at
+          ) VALUES (?, ?, 'execution_interrupted', ?, ?, ?, ?, ?)
+        `).run(node.root_run_id, sequence, stateRevision, node.loop_run_id,
+          node.work_loop_node_run_id, node.node_run_id, timestamp);
     })();
     return this.require(taskId);
   }
