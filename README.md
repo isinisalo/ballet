@@ -94,6 +94,14 @@ export PATH="$HOME/.local/bin:$PATH"
 ballet version
 ```
 
+During repository development, run the following from the checkout root to build and smoke-test the current source, atomically install it, restart this checkout's Ballet service from the new bundle, and print its health status:
+
+```bash
+make
+```
+
+`make latest` is the equivalent explicit target. Override the local installation prefix with `BALLET_INSTALL_PREFIX=/path make` when needed. The restart is graceful but interrupts queued or running work according to the normal `ballet restart` lifecycle contract.
+
 To run directly from source without installing the CLI, use `npm run dev` and open `http://127.0.0.1:5173`.
 
 The Homebrew and verified curl methods below require a published GitHub release. If the repository has no release yet, use the current-checkout installation above.

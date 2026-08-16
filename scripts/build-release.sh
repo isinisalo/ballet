@@ -176,13 +176,13 @@ if (workspace.automation?.version !== 10
   || Object.hasOwn(workLoopNode, "state")
   || workspace.instructions?.length !== 2
   || architect?.valid !== true
-  || architect?.relativePath !== ".ballet/instructions/migrated-architect.md"
+  || architect?.relativePath !== ".ballet/instructions/architect.md"
   || architect?.body !== "## Instructions\n\nDesign architecture, keep decisions traceable, and write ADRs when routing requires it.\n"
   || architect?.sourceSha256 !== "e14626fb277d87f010307476613b89b0aa8bbb0f6903a10127f4f8e23082b44b"
   || architect?.contentSha256 !== "3a7b394727be306a4dad011a4152d1502f35da591a406a74281362d9cd19b78d"
   || architect?.sizeBytes !== 105
   || reviewer?.valid !== true
-  || reviewer?.relativePath !== ".ballet/instructions/migrated-reviewer.md"
+  || reviewer?.relativePath !== ".ballet/instructions/reviewer.md"
   || reviewer?.body !== "Review implementation changes and surface risks.\n"
   || reviewer?.sourceSha256 !== "4e43b53837175e6ac6b1b666b96de045cf2cb37b9f6cda2868e1207dd9ac6df6"
   || reviewer?.contentSha256 !== "8ce7d15bdcd9cd6e2e4ec3471343e96ee50d1c18bc19aae62a8941f6dfc8ee9a"
