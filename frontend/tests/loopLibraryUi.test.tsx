@@ -18,7 +18,11 @@ describe("Loop Library dialog", () => {
     render(<LoopLibraryDialog open actions={actions} onOpenChange={onOpenChange} onCreateBlank={vi.fn()} onInstalled={onInstalled} />);
 
     const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveClass("w-[min(64rem,calc(100vw-2rem))]");
+    expect(dialog).toHaveClass("w-[min(80rem,calc(100vw-1rem))]", "max-h-[min(52rem,calc(100dvh-1rem))]");
+    expect(screen.getByRole("list", { name: "Available Loop modules" })).toHaveClass(
+      "grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))]",
+      "gap-4"
+    );
     expect(screen.getByLabelText("Search Loop Library")).toHaveFocus();
     expect(screen.getByRole("heading", { name: "Sample module" })).toBeInTheDocument();
     expect(screen.queryByText("Internal Work Loop Node")).not.toBeInTheDocument();

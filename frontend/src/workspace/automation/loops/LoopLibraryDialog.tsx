@@ -106,32 +106,32 @@ export function LoopLibraryDialog({ open, actions, onOpenChange, onCreateBlank, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(46rem,calc(100vh-2rem))] w-[min(64rem,calc(100vw-2rem))] max-w-none flex-col overflow-hidden p-0">
-        <DialogHeader className="border-b border-divider-strong p-4 pr-12">
+      <DialogContent className="flex max-h-[min(52rem,calc(100dvh-1rem))] w-[min(80rem,calc(100vw-1rem))] max-w-none flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-divider-strong p-4 pr-12">
           <DialogTitle className="flex items-center gap-2"><Library className="size-4 text-primary" /> Loop Library</DialogTitle>
           <DialogDescription>Add one ready module, import a local package, or author a blank Loop.</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3 border-b border-divider-strong p-4 sm:flex-row">
-          <label className="relative min-w-0 flex-1">
+        <div className="flex shrink-0 flex-wrap items-stretch gap-3 border-b border-divider-strong p-4 sm:p-5">
+          <label className="relative min-w-64 flex-[1_1_20rem]">
             <span className="sr-only">Search Loop Library</span><Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search modules" className="pl-8" />
           </label>
           <input ref={inputRef} className="sr-only" type="file" accept=".json,.ballet-loop.json,application/json" aria-label="Import Loop module file" onChange={(event) => void importFile(event.target.files?.[0])} />
-          <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={pending}><FileJson /> Import file</Button>
-          <Button type="button" variant="outline" onClick={onCreateBlank}><Plus /> Create blank Loop</Button>
+          <Button type="button" variant="outline" className="min-w-fit flex-1 whitespace-nowrap sm:flex-none" onClick={() => inputRef.current?.click()} disabled={pending}><FileJson /> Import file</Button>
+          <Button type="button" variant="outline" className="min-w-fit flex-1 whitespace-nowrap sm:flex-none" onClick={onCreateBlank}><Plus /> Create blank Loop</Button>
         </div>
-        {categories.length ? <div className="flex gap-2 overflow-x-auto px-4 pt-3" aria-label="Loop module categories">
+        {categories.length ? <div className="flex shrink-0 gap-2 overflow-x-auto px-4 py-3 sm:px-5" aria-label="Loop module categories">
           {["all", ...categories].map((value) => <Button key={value} type="button" size="xs" variant={category === value ? "secondary" : "ghost"} onClick={() => setCategory(value)}>{value === "all" ? "All" : value}</Button>)}
         </div> : null}
         {error ? <Alert variant="destructive" className="mx-4 mt-3"><TriangleAlert /><AlertDescription>{error}</AlertDescription></Alert> : null}
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-5">
           {plan ? <InstallPreview plan={plan} pending={pending} onMap={replan} onBack={() => setPlan(undefined)} onInstall={() => selectedPackage && void (async () => {
             setPending(true); setError("");
             try { await commit(plan, selectedPackage.package, selectedPackage.source, profileMappings); }
             catch (reason) { setError(toErrorMessage(reason, "Unable to install Loop module.")); }
             finally { setPending(false); }
           })()} /> : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy={loading || pending}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4" role="list" aria-label="Available Loop modules" aria-busy={loading || pending}>
               {visible.map((entry) => <ModuleCard key={entry.source} entry={entry} disabled={pending} onAdd={() => entry.package && void prepare(entry.package, entry.source)} />)}
               {!loading && visible.length === 0 ? <p className="col-span-full py-10 text-center text-sm text-muted-foreground">No matching Loop modules.</p> : null}
             </div>
@@ -143,8 +143,8 @@ export function LoopLibraryDialog({ open, actions, onOpenChange, onCreateBlank, 
 }
 
 function ModuleCard({ entry, disabled, onAdd }: { entry: LoopModuleLibraryEntry; disabled: boolean; onAdd: () => void }) {
-  return <article className="grid min-h-48 grid-rows-[auto_1fr_auto] rounded-lg border border-divider-strong bg-card p-4">
-    <header className="grid gap-1"><h3 className="font-mono text-sm font-semibold">{entry.manifest?.title ?? entry.source}</h3><p className="line-clamp-2 text-xs text-muted-foreground">{entry.manifest?.description ?? entry.issues[0]?.message}</p></header>
+  return <article className="grid min-h-52 min-w-0 grid-rows-[auto_1fr_auto] rounded-lg border border-divider-strong bg-card p-4" role="listitem">
+    <header className="grid min-w-0 gap-1"><h3 className="break-words font-mono text-sm font-semibold leading-5">{entry.manifest?.title ?? entry.source}</h3><p className="line-clamp-2 break-words text-xs leading-4 text-muted-foreground">{entry.manifest?.description ?? entry.issues[0]?.message}</p></header>
     <div className="flex content-start flex-wrap gap-1.5 py-3">
       {entry.manifest ? <><Badge variant="outline">v{entry.manifest.version}</Badge>{entry.manifest.category ? <Badge variant="secondary">{entry.manifest.category}</Badge> : null}</> : null}
       {entry.permissions?.network === "required" ? <Badge variant="outline"><Network /> network</Badge> : null}
