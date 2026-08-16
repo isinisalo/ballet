@@ -1,6 +1,13 @@
 ---
+id: ballet-goals-summary
 title: Ballet-projektin yhteenveto
-updatedAt: '2026-08-15'
+status: accepted
+createdAt: '2026-07-18'
+updatedAt: '2026-08-16'
+version: 2
+tags:
+  - yhteenveto
+  - tavoitteet
 ---
 
 # Ballet-projektin yhteenveto
@@ -17,7 +24,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 ## Mitä Balletilla tehdään?
 
-1. **Määritellään työ** repositoryssä: Loopit, Stepit, Transitionit, ExecutionProfilet, instructionit, skillsit ja teema.
+1. **Määritellään työ** repositoryssä: Goalit, ADR:t, arc42-arkkitehtuuri, Loopit, Work Loop Nodet, Edget, ExecutionProfilet, instructionit, skillsit ja teema.
 2. **Koostetaan provider-tehtävä** deterministisesti System-ohjeesta, primary instructionista, valituista skillseistä, roolikohtaisesta Task Envelopesta ja tulosskeemasta.
 3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; composite Work Loop Node erottaa Work- ja Validation-vaiheen, ja Loop Orchestrator reitittää vain allowlistattuja korjauksia.
 4. **Seurataan ajoa** selainkäyttöliittymästä: tila, konsolitapahtumat, hyväksytty/hylätty jatkopolku, virheet ja finalisointi.
@@ -36,20 +43,22 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 ## Nykytila tämän repositoryn perusteella
 
-- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v9** -skeemaa.
-- Projektissa on **8 hyväksyttyä Goalia**, **13 ADR:ää** ja laaja toteutus kaikille ydinkerroksille.
-- Balletin omassa automaatiossa on **4 Loopia**, **13 agentti-Stepiä**, **4 Human-porttia** ja **5 Codex-ExecutionProfilea**.
+- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v10** -skeemaa.
+- Projektissa on **9 hyväksyttyä Goalia** ja **15 ADR:ää**, joista ADR-004 ja ADR-010 ovat superseded-tilassa.
+- Balletin oma kehitysautomaatio käyttää arc42 Templatea ja 6+1 Method -Loopia sekä erillistä, ketjuttamatonta `release-validation`-tukilooppia.
+- Konfiguraatiossa on **18 Work Loop Nodea**, **6 Human Validation -porttia**, **6 Codex-ExecutionProfilea** ja viikoittainen continuous-learning-schedule.
+- Project-local menettelyt on jaettu **10 arc42-skilliin**; execution composition ei enää käytä `migrated-*`-instructioneita.
 - Koodissa ovat sekä Codex- että Copilot-adapterit, scheduler, provider-kohtaiset FIFO-jonot, SQLite-palautuminen, Git-worktree-eristys ja macOS-jakelutyökalut.
-- Repositoryssä on **87 testitiedostoa**. Execution composition -aineiston mukaan avoimia V1-päätösblockereita ei ole.
+- Arkkitehtuurin yhteinen entrypoint on `ARCHITECTURE.md`, ja `npm run validate:arc42` tarkistaa dokumentit, traceabilityn, resurssit ja Loop-graafin.
 
 ## Mitä puuttuu tai ei vielä näy käytössä?
 
-**Oman projektikonfiguraation näyttöaukot:** Ballet tukee näitä, mutta nykyinen `.ballet/project.json` ei vielä harjoita niitä end-to-end.
+**Todentamatta end-to-end:**
 
-- Ei Copilot-ExecutionProfilea tai Copilot-Stepiä.
-- Ei Scheduled-Stepiä.
-- Ei `.agents/skills/**/SKILL.md`-resursseja; nykyisten Steppien `skillIds`-listat ovat tyhjiä.
-- Tässä checkoutissa ei ole Git-release-tagia, vaikka pakkaus-, Homebrew-, varmennus- ja päivityspolut on toteutettu.
+- Ensimmäistä arc42-initiativea ei ole vielä viety clarify → structures → concepts → communicate → implementation → evaluate -polun läpi.
+- Method-healthin runtime-baselinet ja scheduled learning -ajon evidenssi puuttuvat ensimmäiseen pilottiin asti.
+- Konfiguraatiossa ei ole Copilot-ExecutionProfilea tai Copilot-Nodea, vaikka platform-adapteri on toteutettu.
+- Tässä checkoutissa ei ole Git-release-tagia; release/deploy/rollback edellyttää aina erillisen ihmisvaltuutuksen.
 
 **Tarkoituksella nykyversion ulkopuolella:**
 
@@ -66,4 +75,4 @@ Balletin vahvin idea ei ole “agenttien määrä”, vaan **todennettava suorit
 
 `versionhallittu intentio → immutable snapshot → eristetty työtila → strukturoitu tulos → pysyvä evidenssi`
 
-Seuraava hyödyllinen kypsyysaskel olisi tagattu alpha-julkaisu ja yksi end-to-end-esimerkkiajo, joka käyttää samassa projektissa Copilotia, Scheduled-Stepiä ja Project-skilliä. Se todentaisi myös ne ydinkyvykkyydet, joita Balletin oma nykykonfiguraatio ei vielä käytä.
+Seuraava hyödyllinen kypsyysaskel on yksi rajattu pilotti Root Loopilla `arc42-clarify-requirements`. Se todentaa yhteisen Staten, initiative-handoffin, traceabilityn, capability-repairit ja menetelmäterveyden ennen erikseen päätettävää alpha-julkaisua.

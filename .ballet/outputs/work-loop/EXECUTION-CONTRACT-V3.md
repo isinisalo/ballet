@@ -1,110 +1,13 @@
-# Work Loop provider contract — output schemas V3
+---
+id: superseded-work-loop-execution-contract-v3
+title: Superseded Work Loop execution contract V3 document
+status: superseded
+createdAt: '2026-08-15'
+updatedAt: '2026-08-16'
+version: 2
+tags: [historical, superseded]
+---
 
-Tämä dokumentti kuvaa strict-v10:n aktiivisen provider-neutraalin prompt-, Task Envelope- ja structured output -sopimuksen sekä niiden durable Loop Orchestrator -rajat.
+# Superseded: duplicate Work Loop contract document
 
-Päätöslähde: [ADR-015 — Work Loop, revisioitu State ja Loop Orchestrator](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md).
-
-## Versiot ja evidence
-
-| Sopimus | Versio | Pysyvä evidence |
-| --- | ---: | --- |
-| Execution spec | 5 | Immutable `spec_json` ja spec hash |
-| Prompt composition | 4 | Exact UTF-8 prompt ja SHA-256 |
-| Task Envelope | 3 | Versio ja canonical envelope SHA-256 |
-| Role output schema | 3 | Node role, schema ID, canonical JSON Schema ja SHA-256 |
-| System execution contract | 3 | Snapshotoitu system-resurssi ja source SHA-256 |
-
-Schema-ID:t ovat `work-node-outcome-v3`, `validation-node-outcome-v3` ja `orchestrator-node-outcome-v3`. ExecutionTaskin immutable `nodeRole` valitsee täsmälleen yhden skeeman. Eri roolin outcome hylätään, vaikka se olisi toisen skeeman mukaan validi.
-
-## Task Envelope V3
-
-Kaikille rooleille välitetään:
-
-- version ja rooli;
-- Root Run-, Loop Run- ja Node Run -identiteetit;
-- Loopin ID ja description;
-- roolikohtainen task;
-- State revision, koko kanoninen JSON-arvo ja State SHA-256;
-- mahdollinen resume-konteksti; sekä
-- enintään kahdeksan relevanttia historiayhteenvetoa.
-
-Work ja Validation saavat lisäksi Work Loop Node Run -identiteetin, Work Loop Noden ID:n/descriptionin ja local attemptin. Validation saa viimeisimmän kanonisen completed Work-outcomen. Local retry -Work saa vain Validationin `feedback`- ja `expectedCorrection`-kentät.
-
-Orchestrator saa persistoidusta Repair Requestista rajatun projektion. Se ei saa continuationia eikä return targetia. Sallitut target Loopit johdetaan immutable snapshotin source-Loop-kohtaisista repair-LoopEdgeistä ja välitetään UTF-8 ID -järjestyksessä. Jokaisessa candidate-rivissä ovat Loopin ID ja description sekä allowlist-LoopEdgen ID ja routing description.
-
-Repair-targetin valmistuttua uusi callerin Validation-envelope saa alkuperäisen Repair Request -projektion ja persistoidun Repair Resultin. Resultissa ovat target Loop/Loop Run, call frame, valmistumisrevision numero, summary ja mahdollinen kanoninen target-outcome. Paluuosoitetta ei edelleenkään välitetä providerille.
-
-Historia järjestetään `(sequence, nodeRunId)`-avaimella ja rajataan deterministisesti kahdeksaan uusimpaan entryyn. Entryä, Statea, Repair Requestia, resume-kontekstia tai provider-outputia ei typistetä sisältä. Jos valittu semanttinen sisältö ylittää rajansa, rakentaminen epäonnistuu näkyvästi.
-
-| Sisältö | Raja |
-| --- | ---: |
-| State | 262144 tavua |
-| Relevantti historia | 65536 tavua |
-| Repair Request -projektio | 65536 tavua |
-| Resume-konteksti | 32768 tavua |
-| Koko Task Envelope | 393216 tavua |
-| Koko Ballet-owned prompt | 524288 tavua |
-
-Envelope serialisoidaan canonical JSONina: object-avaimet järjestetään, taulukkojärjestys säilyy roolisopimuksen mukaisena ja hash lasketaan täsmälleen providerille välitettävistä envelope-tavuista. State SHA-256 tarkistetaan ennen compositionia.
-
-## Work Node outcome
-
-Work tekee työn eikä saa palauttaa `decision`, `OK`, `FAIL`, `approved` tai `rejected` -control-kenttiä.
-
-- `completed` vaatii `summary`, `artifacts` ja `checks`; `statePatch` on optional.
-- `needs_input` vaatii `question`, `context`, `summary` ja `checks`; patch on kielletty.
-- `blocked` ja `failed` vaativat `summary`- ja `checks`-kentät; patch on kielletty.
-
-## Validation Node outcome
-
-Validationin `completed`-tila lukitsee päätöksen:
-
-```text
-decision = OK
-tai
-decision = FAIL + repair.mode = LOCAL_RETRY | ORCHESTRATOR_REPAIR
-```
-
-`OK` vaatii summaryn, evidencen ja checksit, kieltää repairin ja voi ehdottaa State patchia. `FAIL` vaatii summaryn, evidencen, checksit ja repairin sekä kieltää State patchin.
-
-`LOCAL_RETRY` vaatii `feedback`- ja `expectedCorrection`-kentät. `ORCHESTRATOR_REPAIR` vaatii `reason`- ja `evidenceRefs`-kentät sekä täsmälleen toisen kentistä `requestedCapability | requestedOutcome`. Validation ei nimeä target Loopia tai LoopEdgeä.
-
-`needs_input`, `blocked` ja `failed` ovat erilliset strict-haarat eivätkä sisällä decision- tai repair-kenttiä.
-
-## Orchestrator outcome
-
-Orchestratorin `completed` vaatii:
-
-- `targetLoopId`;
-- `routeReason`;
-- `repairInput`; sekä
-- `expectedOutcome`.
-
-`targetLoopId` ei ole sellaisenaan route. Platform tarkistaa sen persisted Repair Requestin source-Loopin allowlistia vasten ja ratkaisee vakaan repair-LoopEdgen. `continuation`, `returnLoopId`, `returnWorkLoopNodeId`, `returnValidationNodeDefinitionId`, `loopEdgeId` ja `statePatch` ovat outcome-skeemassa kiellettyjä.
-
-Orchestratorin `needs_input`, `blocked` ja `failed` ovat strict-haaroja. Provider-adapteri ei koskaan määrää control-flow'ta raakatekstillä.
-`needs_input`-resume säilyttää saman Orchestrator Node Run -identiteetin ja Repair Requestin. Jokainen yritys saa uuden immutable ExecutionSpecin ja execution taskin; aiemmat taskit jäävät append-only-evidenssiksi.
-
-Hyväksytty route suspendoi callerin, luo saman Root Runin ja worktreen target Loop Runin sekä durable call framen yhdessä SQLite-transaktiossa. Root Loopin `state.initial` luo revision 0:n täsmälleen kerran Root Runia luotaessa. Flow- ja repair-Loopit liittyvät tämän saman Root Runin uusimpaan revision-ketjuun; niiden omia authoring-`state.initial`-arvoja ei yhdistetä, namespaceta eikä käytetä invocationin alussa. Repair-target käyttää normaalia Work → Validation -engineä. Targetin valmistuminen sulkee pinon ylimmän framen ja luo callerin samalle Work Loop Nodelle uuden Validation Node Runin uusimmalla revisionilla; alkuperäistä Work Nodea ei ajeta automaattisesti uudelleen.
-
-Repair-framet suljetaan LIFO-järjestyksessä. Snapshotin `maxRepairDepth`, saman Work Loop Node Runin `maxRepairAttempts` ja Root Runin transition limit rajaavat self-route- ja cycle-polut. Running provider execution muuttuu restartissa interrupted-failediksi, mutta jo commitoitua State-revisiota ei peruta. Pending request, canonical route, frame ja Repair Result säilyvät reopenin yli. Root cancellation sulkee koko aktiivisen repair-pinon cancelled-tilaan ja kirjoittaa jokaiselle avoimelle framelle failure-result-evidenssin.
-
-## Prompt composition
-
-Exact prompt muodostetaan aina järjestyksessä:
-
-1. fixed System execution contract;
-2. Project primary instruction;
-3. valitut Project skillsit nousevassa UTF-8 ID -järjestyksessä;
-4. roolikohtainen Task Envelope V3; ja
-5. roolikohtainen output JSON Schema V3.
-
-System contract määrittelee vain instruction authorityn, runtime-permissionit, secret-rajat, structured outputin, check/artifact-referenssit ja hidden chain-of-thoughtin kiellon. Project-kohtainen workflow kuuluu Project instructioneihin ja skilleihin.
-
-## Parse-, canonicalization- ja persistence-raja
-
-Provider-adapteri tuottaa provider-neutraalin structured JSON -payloadin. Queue valitsee immutablella Node rolella Zod-skeeman, hylkää unknown-kentät ja väärän union-haaran sekä välittää eteenpäin vain parsed outcomen. ExecutionStore validoi roolin uudelleen ja tallentaa outcomen canonical JSONina.
-
-State patchin JSON-rakenne validoidaan outcome-skeemassa. Ennen commitia persistence-raja validoi lisäksi enintään 128 operaatiota, 65536 tavun patch-rajan, sallitut `add | remove | replace` -operaatiot, JSON Pointerit, prototype-segmenttien kiellon, nykyisen base revisionin sekä post-patch Staten 262144 tavun ja 64 tason rajat. Patch sovelletaan kopioon; outcome, uusi revision ja control-flow-event kirjoitetaan atomisesti tai ei lainkaan.
-
-Providerin prose, assistant-teksti tai julkaistu reasoning-yhteenveto ei ole control-flow-lähde. Piilotettua chain-of-thoughtia ei pyydetä eikä tallenneta envelopeen, outcomeen, Repair Requestiin, Stateen tai UI DTO:hon.
+The implementation contract remains in source and [ADR-015](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md). Project-local State usage is defined by [STATE-CONTRACT](../../arc42/STATE-CONTRACT.md), and significant interactions are in [runtime view](../../arc42/06-runtime-view.md).

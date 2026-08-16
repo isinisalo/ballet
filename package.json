@@ -12,6 +12,7 @@
     "build": "rm -rf dist dist-server && tsc -b --force && vite build",
     "test": "vitest run",
     "lint": "eslint .",
+    "validate:arc42": "tsx .ballet/tools/validate-arc42.mjs",
     "preview": "npm run build && node dist-server/backend/index.js --root . --state-root .git/ballet --port 4317"
   },
   "dependencies": {

@@ -93,7 +93,7 @@ describe("Markdown collection loading", () => {
         title: "Architect",
         body: "## Instructions\n\nDesign architecture, keep decisions traceable, and write ADRs when routing requires it.\n",
         valid: true,
-        relativePath: ".ballet/instructions/migrated-architect.md",
+        relativePath: ".ballet/instructions/architect.md",
         sourceSha256: "e14626fb277d87f010307476613b89b0aa8bbb0f6903a10127f4f8e23082b44b",
         contentSha256: "3a7b394727be306a4dad011a4152d1502f35da591a406a74281362d9cd19b78d",
         sizeBytes: 105
@@ -104,7 +104,7 @@ describe("Markdown collection loading", () => {
         title: "Reviewer",
         body: "Review implementation changes and surface risks.\n",
         valid: true,
-        relativePath: ".ballet/instructions/migrated-reviewer.md",
+        relativePath: ".ballet/instructions/reviewer.md",
         sourceSha256: "4e43b53837175e6ac6b1b666b96de045cf2cb37b9f6cda2868e1207dd9ac6df6",
         contentSha256: "8ce7d15bdcd9cd6e2e4ec3471343e96ee50d1c18bc19aae62a8941f6dfc8ee9a",
         sizeBytes: 49

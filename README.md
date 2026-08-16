@@ -40,6 +40,45 @@ Machine-local state belongs to this clone's Git directory and never appears in G
 
 The checkout-specific plist at `~/Library/LaunchAgents/ai.ballet.<checkout-hash>.plist` is the only Ballet-managed project state outside the Git directory. Provider credentials remain in the providers' own stores.
 
+## Architecture and continuous development
+
+Humans and agents start from [`ARCHITECTURE.md`](ARCHITECTURE.md). It links the canonical twelve-section arc42 Template under `.ballet/arc42/`, persistent project status and handoff, traceability, method health, the shared State contract, accepted Goals/ADRs and `DESIGN.md`.
+
+The repository's default development Method is implemented as project-local Ballet Loops:
+
+```text
+arc42-clarify-requirements
+  → arc42-design-structures
+  → arc42-design-concepts
+  → arc42-communicate-document
+  → arc42-accompany-implementation
+  → arc42-analyze-evaluate
+  → completed
+```
+
+This is a default path, not a waterfall. Validation describes a missing capability or outcome, the Orchestrator selects only a source-Loop-allowlisted repair target, and runtime returns to the requesting Validation Node through its persisted continuation. An ambiguous target yields `needs_input`; the first candidate is never a fallback. `arc42-continuous-learning` is a separate scheduled support Loop, and `release-validation` is an unchained support Loop.
+
+To start a new initiative:
+
+1. Copy `.ballet/arc42/initiatives/TEMPLATE/` to `.ballet/arc42/initiatives/<initiative-id>/`.
+2. Give BRIEF, PLAN, EVIDENCE and REVIEW unique stable frontmatter IDs and start their status as `draft`.
+3. Run `arc42-clarify-requirements` with the initiative ID and human-owned WHAT/WHY, priority and acceptance intent.
+4. Stop for human input when intent, a top-quality priority/measure or another required decision is missing.
+
+Markdown contains long-lived project truth: accepted intent and decisions, architecture views, initiative plans/reviews and evidence references. Root Run State and the Runtime UI contain execution truth: the current bounded initiative/architecture/delivery/release/evaluation/handoff references, revision history, attempts, Repair Requests, routes and outcomes. State never copies full documents, logs or source diffs.
+
+Validate the complete project-local contract with:
+
+```bash
+npm run validate:arc42
+```
+
+Human approval is required for new or changed WHAT/WHY, top-quality priority/acceptance measures, significant ADR acceptance, implementation acceptance before release, release/deploy/rollback or another external write, and changes to Loop topology, permissions, network access or automation instruction/skill behavior. Mechanical non-semantic link/index/format/lint fixes do not need a dedicated gate.
+
+The learning start Node runs weekly on Monday at 09:00 in `Europe/Helsinki`. Change `loops[arc42-continuous-learning].nodes[learning-authoritative-research].work.schedule` and its `startsOn` value in `.ballet/project.json` only as a reviewed automation-behavior change, then run `npm run validate:arc42`, tests, lint and build. Network stays enabled only for that research Work Node and explicitly authorized release evidence Nodes.
+
+Ballet does not merge or push Run results automatically, and the arc42 Method does not grant release, deploy or rollback permission.
+
 ## Install on macOS
 
 Ballet supports macOS `arm64` and `x64`. Install and authenticate at least one provider CLI first.
