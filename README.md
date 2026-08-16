@@ -22,10 +22,14 @@ Portable, version-controlled automation remains in the checkout:
 - `.ballet/project.json` — strict project configuration v10, containing only `version`, `executionProfiles`, `orchestrator`, `loops`, and `loopEdges`; composite Work Loop Nodes own their Work and Validation definitions, while mutable State remains runtime-only;
 - `.ballet/theme.json` — the strict-v4 single project-wide Loop visualization theme;
 - `.ballet/instructions/**/*.md` — selectable Project primary instructions identified by frontmatter `id`;
+- `.ballet/loop-library/**/*.ballet-loop.json` — version-controlled one-Loop authoring packages listed by the local Loop Library;
+- `.ballet/loop-modules/installed.json` — installed-module provenance and resource ownership metadata, never a runtime definition;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` — other project documents; and
 - `.agents/skills/**/SKILL.md` — selectable Project skills identified by their relative directory path.
 
 There is no top-level Agent execution entity in v10. `agent` is a Work or Validation Node type, while `ExecutionProfile` is the only runtime authoring entity. Project instructions and skills are Node-selected resources; `.codex/agents` is not project configuration or a runtime source.
+
+`LoopModulePackageV1` is a portable authoring artifact, not a project-config field or runtime entity. `Add Loop` can inspect and materialize one package into a strict-v10 Loop plus namespaced project instructions and skills. Profile slots map to existing ExecutionProfiles during install; project-global `loopEdges`, the Orchestrator and machine-local settings remain operator-owned. Root Runs snapshot only the materialized project resources.
 
 Machine-local state belongs to this clone's Git directory and never appears in Git status:
 
@@ -187,6 +191,7 @@ The process binds only to `127.0.0.1`. The UI uses these primary API groups:
 | --- | --- |
 | Workspace snapshot | `GET /api/data` |
 | Automation and theme | `PUT /api/automation`, `PUT /api/loop-theme` |
+| Loop modules | `GET /api/loop-modules/library`, inspection, install-plan/commit, export, status and provenance-aware remove routes under `/api/loop-modules` |
 | Unified Runs | `POST/GET /api/runs`, `GET /api/runs/:rootRunId`, `GET /api/runs/:rootRunId/state`, `POST /api/runs/:rootRunId/cancel` |
 | Human/resume response | `POST /api/runs/:rootRunId/nodes/:nodeRunId/respond` |
 | Invalidations | `GET /api/stream` |
@@ -214,6 +219,7 @@ Human Work and Validation responses use the same strict role-specific outcomes a
 
 ## Security and Git behavior
 
+- Imported Loop packages are untrusted prompt-bearing JSON. Inspection is strict and size-bounded; install exposes source, SHA-256, profile/network compatibility and exact project files, performs no remote fetch or script hook, and writes `.ballet/project.json` last.
 - The server accepts only loopback Host values and does not grant CORS access.
 - Browser mutations require the Ballet origin; originless localhost requests are reserved for the local CLI lifecycle.
 - Provider processes receive no Ballet service credentials and execute only in the managed root-Run worktree.

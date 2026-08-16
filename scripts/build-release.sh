@@ -136,6 +136,24 @@ curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/data" -o "$SMOKE_ROOT/workspace.js
   printf 'packaged Ballet server could not load the fixture workspace\n' >&2
   exit 1
 }
+curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/loop-modules/library" -o "$SMOKE_ROOT/loop-library.json" || {
+  cat "$SMOKE_ROOT/server.err.log" >&2
+  printf 'packaged Ballet server could not list the fixture Loop Library\n' >&2
+  exit 1
+}
+"$RUNTIME/node" -e '
+const fs = require("node:fs");
+const entries = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (!Array.isArray(entries)
+  || entries.length !== 1
+  || entries[0]?.source !== ".ballet/loop-library/fixture-clarify.ballet-loop.json"
+  || entries[0]?.valid !== true
+  || entries[0]?.manifest?.title !== "Clarify requirements"
+  || entries[0]?.permissions?.externalWrites !== false
+  || entries[0]?.package?.loop?.nodes?.length !== 2) {
+  throw new Error("packaged Ballet server did not list the fixture Loop Library package");
+}
+' "$SMOKE_ROOT/loop-library.json"
 "$RUNTIME/node" -e '
 const fs = require("node:fs");
 const workspace = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));

@@ -5,6 +5,15 @@ import type {
   ExecutionProfileSaveRequest,
   LoopTheme,
   ProjectAutomationConfig,
+  InstalledLoopModuleStatus,
+  LoopModuleExportRequest,
+  LoopModuleExportResult,
+  LoopModuleInspectRequest,
+  LoopModuleInspection,
+  LoopModuleInstallCommitRequest,
+  LoopModuleInstallPlan,
+  LoopModuleInstallPlanRequest,
+  LoopModuleLibraryEntry,
   WorkspaceSaveRequestByCollection
 } from "@shared/api/workspace-contracts";
 import type { MarkdownDocument } from "@shared/api/workspace-contracts";
@@ -29,6 +38,18 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(config)
     }),
+  listLoopModuleLibrary: () => request<LoopModuleLibraryEntry[]>("/api/loop-modules/library"),
+  inspectLoopModule: (input: LoopModuleInspectRequest) =>
+    request<LoopModuleInspection>("/api/loop-modules/inspect", { method: "POST", body: JSON.stringify(input) }),
+  planLoopModuleInstall: (input: LoopModuleInstallPlanRequest) =>
+    request<LoopModuleInstallPlan>("/api/loop-modules/install-plan", { method: "POST", body: JSON.stringify(input) }),
+  installLoopModule: (input: LoopModuleInstallCommitRequest) =>
+    request<InstalledLoopModuleStatus>("/api/loop-modules/install", { method: "POST", body: JSON.stringify(input) }),
+  exportLoopModule: (input: LoopModuleExportRequest) =>
+    request<LoopModuleExportResult>("/api/loop-modules/export", { method: "POST", body: JSON.stringify(input) }),
+  loopModuleStatuses: () => request<InstalledLoopModuleStatus[]>("/api/loop-modules/status"),
+  removeInstalledLoopModule: (loopId: string) =>
+    request<void>(`/api/loop-modules/installed/${encodeURIComponent(loopId)}`, { method: "DELETE" }),
   updateLoopTheme: (theme: LoopTheme) =>
     request<LoopTheme>("/api/loop-theme", {
       method: "PUT",

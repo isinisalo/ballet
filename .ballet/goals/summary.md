@@ -4,7 +4,7 @@ title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-16'
-version: 2
+version: 3
 tags:
   - yhteenveto
   - tavoitteet
@@ -44,7 +44,8 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 ## Nykytila tämän repositoryn perusteella
 
 - Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v10** -skeemaa.
-- Projektissa on **9 hyväksyttyä Goalia** ja **15 ADR:ää**, joista ADR-004 ja ADR-010 ovat superseded-tilassa.
+- Projektissa on **10 hyväksyttyä Goalia** ja **16 ADR:ää**, joista ADR-004 ja ADR-010 ovat superseded-tilassa ja ADR-014:n V1-rajaus on osittain superseded ADR-016:lla.
+- Paikallinen Loop Library, yhden Loopin package/install/export ja content-derived provenance on toteutettu ilman strict-v10-runtimen package-riippuvuutta.
 - Balletin oma kehitysautomaatio käyttää arc42 Templatea ja 6+1 Method -Loopia sekä erillistä, ketjuttamatonta `release-validation`-tukilooppia.
 - Konfiguraatiossa on **18 Work Loop Nodea**, **6 Human Validation -porttia**, **6 Codex-ExecutionProfilea** ja viikoittainen continuous-learning-schedule.
 - Project-local menettelyt on jaettu **10 arc42-skilliin**; execution composition ei enää käytä `migrated-*`-instructioneita.
@@ -66,7 +67,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 - automaattinen merge tai push;
 - Linux- ja Windows-jakelu;
 - provider-fallback ja Codex/Copilotin ulkopuoliset providerit;
-- template-/registry-/marketplace-ekosysteemi, Built-in-resurssikatalogi ja standalone Agent -entity;
+- remote registry, marketplace, automaattiset module-päivitykset, executable package code, Built-in-resurssikatalogi ja standalone Agent -entity;
 - vaalea teema sekä keskeytyneen käynnissä olleen työn hiljainen automaattinen uudelleenajo.
 
 ## Tiivis arvio

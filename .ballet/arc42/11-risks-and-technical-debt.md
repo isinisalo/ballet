@@ -4,7 +4,7 @@ title: Risks and technical debt
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - risks
@@ -31,6 +31,9 @@ The migration baseline is accepted; risk closure requires cited evidence.
 | RISK-005 | State misuse | Agents could copy documents into State or encode control decisions in patches. | medium/possible | Arc42MethodStateV1 bounded references, strict patch evidence, reviewer validation. | controlled; verify in pilot |
 | RISK-006 | method churn | Scheduled learning could rewrite process/docs from model preference. | medium/possible | Primary-source evidence, materiality threshold, no-change outcome and human approval for behavior changes. Trace QS-008. | controlled; verify in pilot |
 | RISK-007 | provider capability | Selected GPT-5.6 model/profile may be unavailable or change capability. | medium/possible | Explicit preflight and no fallback; evaluate changes before profile mutation. | accepted operational risk |
+| RISK-008 | prompt supply chain | Imported instructions/skills can influence provider execution. | high/possible | Strict local JSON only, source/hash/diff/permission preview, no code/hooks/remote fetch, explicit install. Trace QS-009. | controlled |
+| RISK-009 | partial/stale install | Concurrent config/resource changes or write failure could leave broken references. | high/possible | Shared mutation queue, current-state plan hash, re-plan on commit, exclusive namespaced resources, config-last atomic write and cleanup tests. | controlled |
+| RISK-010 | provenance drift | Stored metadata could falsely claim an installed Loop is unchanged. | medium/likely over time | Compute exact/modified/missing-resources from current Loop/resource content; never persist status as truth. | controlled |
 
 ## Canonical sources
 
@@ -38,7 +41,7 @@ This section owns project-level architecture risks. Initiative-specific risks be
 
 ## Relevant decisions
 
-`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`.
+`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`.
 
 ## Evidence
 

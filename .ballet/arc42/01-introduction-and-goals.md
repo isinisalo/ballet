@@ -4,7 +4,7 @@ title: Introduction and goals
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - requirements
@@ -19,7 +19,7 @@ Summarize Ballet's business purpose, essential requirements, top quality goals a
 
 ## Status
 
-The baseline reflects accepted `goal-001`–`goal-009`.
+The baseline reflects accepted `goal-001`–`goal-010`.
 
 ## Requirements overview
 
@@ -34,6 +34,7 @@ The baseline reflects accepted `goal-001`–`goal-009`.
 | REQ-007 | goal-007 | Provide a dense, accessible and unambiguous operator experience. |
 | REQ-008 | goal-008 | Support verified macOS packaging and checkout-specific lifecycle management. |
 | REQ-009 | goal-009 | Use arc42 as shared architecture truth and Ballet Loops as a continuous, evidence-driven Method. |
+| REQ-010 | goal-010 | Inspect, install, export and remove portable one-Loop modules without adding a live package dependency to runtime. |
 
 ## Top quality goals
 
@@ -59,7 +60,7 @@ Detailed measurable scenarios are in [section 10](10-quality-requirements.md).
 
 ## Relevant decisions
 
-`adr-001`, `adr-002`, `adr-011`, `adr-015`.
+`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`.
 
 ## Evidence
 

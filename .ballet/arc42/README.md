@@ -4,7 +4,7 @@ title: Ballet arc42 architecture index
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - architecture
@@ -44,7 +44,7 @@ Accepted Goals own WHAT/WHY, accepted ADRs own architecture decisions, these twe
 
 ## Relevant decisions
 
-`goal-009`, `adr-011`, `adr-013`, `adr-014` and `adr-015`.
+`goal-009`, `goal-010`, `adr-011`, `adr-013`, `adr-014`, `adr-015` and `adr-016`.
 
 ## Evidence
 

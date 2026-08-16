@@ -1,0 +1,361 @@
+{
+  "capabilities": {
+    "provides": [
+      "arc42.architecture-evaluated"
+    ],
+    "recommendedConnections": [
+      {
+        "capability": "arc42.requirements-clarified",
+        "description": "Clarify criteria required for evaluation.",
+        "direction": "outgoing",
+        "kind": "repair"
+      },
+      {
+        "capability": "arc42.structures-designed",
+        "description": "Repair architecture drift in structures.",
+        "direction": "outgoing",
+        "kind": "repair"
+      },
+      {
+        "capability": "arc42.concepts-designed",
+        "description": "Repair a concept or reassess a decision.",
+        "direction": "outgoing",
+        "kind": "repair"
+      },
+      {
+        "capability": "arc42.implementation-accompanied",
+        "description": "Repair implementation or evidence gaps.",
+        "direction": "outgoing",
+        "kind": "repair"
+      }
+    ],
+    "requires": [
+      "arc42.implementation-accompanied"
+    ]
+  },
+  "format": "ballet-loop-module",
+  "loop": {
+    "description": "Evaluate implementation against measurable quality evidence and update risks, debt, drift, traceability, review and method health.",
+    "edges": [
+      {
+        "key": "evaluate-quality-ok",
+        "source": "evaluate-quality-evidence",
+        "target": {
+          "node": "evaluate-risk-debt-drift"
+        }
+      },
+      {
+        "key": "evaluate-risk-ok",
+        "source": "evaluate-risk-debt-drift",
+        "target": {
+          "node": "evaluate-method-health"
+        }
+      },
+      {
+        "key": "evaluate-completed",
+        "source": "evaluate-method-health",
+        "target": {
+          "terminal": "completed"
+        }
+      }
+    ],
+    "key": "loop",
+    "nodes": [
+      {
+        "description": "Evaluate actual evidence against every in-scope measurable quality scenario.",
+        "key": "evaluate-quality-evidence",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "arc42-reviewer",
+          "profileSlot": "slot-2",
+          "skills": [
+            "conformance-review"
+          ],
+          "task": "Validate every QS verdict against its exact measurable criterion and evidence reference. Do not change implementation, tests or verdict sources.",
+          "type": "agent"
+        },
+        "work": {
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-evaluation-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "evaluation",
+            "traceability"
+          ],
+          "task": "Evaluate the initiative against each in-scope measurable quality scenario. Record pass/fail/blocked/missing evidence separately and update TRACEABILITY plus initiative REVIEW without inferring success from absent evidence.",
+          "type": "agent"
+        }
+      },
+      {
+        "description": "Assess risks, technical debt, architecture drift and decision fitness.",
+        "key": "evaluate-risk-debt-drift",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "arc42-reviewer",
+          "profileSlot": "slot-2",
+          "skills": [
+            "conformance-review"
+          ],
+          "task": "Validate that each retained risk/debt/drift finding has concrete evidence, affected stable IDs, impact and an appropriate capability/outcome. Do not edit findings.",
+          "type": "agent"
+        },
+        "work": {
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-evaluation-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "conformance-review",
+            "evaluation"
+          ],
+          "task": "Analyze risk, technical debt, architecture drift, stale/contradictory documentation and whether relevant ADRs/concepts still achieve their intended quality response. Update section 11 and REVIEW only for evidence-backed Findings.",
+          "type": "agent"
+        }
+      },
+      {
+        "description": "Update method health and derive only evidence-backed improvement actions and handoff.",
+        "key": "evaluate-method-health",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "arc42-reviewer",
+          "profileSlot": "slot-2",
+          "skills": [
+            "method-health"
+          ],
+          "task": "Validate that method-health changes come from cited evidence, preserve human approval boundaries and contain no preference-only churn. Do not modify evaluated records.",
+          "type": "agent"
+        },
+        "work": {
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-evaluation-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "initiative-handoff",
+            "method-health"
+          ],
+          "task": "Update METHOD-HEALTH from actual Validation FAILs, retries, repair targets, open questions, drift, evidence gaps and interventions. For any proposed method change record baseline, hypothesis, expected metric and later eval; require human approval for behavior changes.",
+          "type": "agent"
+        }
+      }
+    ],
+    "startNode": "evaluate-quality-evidence",
+    "state": {
+      "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
+      "initial": {
+        "architecture": {
+          "adrIds": [],
+          "buildingBlockIds": [],
+          "qualityScenarioIds": [],
+          "riskIds": [],
+          "status": "baseline"
+        },
+        "contractVersion": "Arc42MethodStateV1",
+        "delivery": {
+          "changedArtifactPaths": [],
+          "checkIds": [],
+          "conformanceFindingIds": [],
+          "planPath": null,
+          "status": "not_started"
+        },
+        "evaluation": {
+          "evidenceIds": [],
+          "findingIds": [],
+          "methodHealthUpdatedAt": null,
+          "status": "not_started"
+        },
+        "handoff": {
+          "changedArtifactPaths": [],
+          "checks": [],
+          "nextAction": null,
+          "nextLoopId": null,
+          "stableIds": [],
+          "status": "pending",
+          "summary": null
+        },
+        "initiative": {
+          "briefPath": null,
+          "goalIds": [],
+          "id": null,
+          "openQuestionIds": [],
+          "status": "unselected"
+        },
+        "release": {
+          "authorization": null,
+          "evidenceIds": [],
+          "status": "not_requested"
+        }
+      }
+    }
+  },
+  "manifest": {
+    "category": "arc42",
+    "description": "Evaluate implementation against measurable quality evidence and update risks, debt, drift, traceability, review and method health.",
+    "id": "arc42-analyze-evaluate",
+    "tags": [
+      "arc42",
+      "method"
+    ],
+    "title": "Analyze and evaluate",
+    "version": "1.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [
+    {
+      "description": "Compatible codex profile for Codex GPT-5.6 Sol · Medium · Network off.",
+      "key": "slot-1",
+      "network": "forbidden",
+      "providers": [
+        "codex"
+      ],
+      "title": "Codex GPT-5.6 Sol · Medium · Network off"
+    },
+    {
+      "description": "Compatible codex profile for Codex GPT-5.6 Luna · Medium · Network off.",
+      "key": "slot-2",
+      "network": "forbidden",
+      "providers": [
+        "codex"
+      ],
+      "title": "Codex GPT-5.6 Luna · Medium · Network off"
+    }
+  ],
+  "resources": [
+    {
+      "body": "\n# arc42 Evaluation Agent\n\n## Role\n\nEvaluate delivered behavior against measurable quality scenarios and assess risks, technical debt, architecture drift and decision fitness.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → initiative BRIEF/PLAN/EVIDENCE and canonical arc42 sources → Node task → runtime/test evidence.\n\n## Writes\n\nMay update section 11, TRACEABILITY, initiative REVIEW, METHOD-HEALTH and non-decision status/handoff records. Do not modify the evaluated implementation/tests, silently change accepted ADRs, alter automation behavior or write externally.\n\n## Sources and evidence\n\nUse actual checks, diffs and runtime evidence. Mark missing evidence, risk and drift explicitly. Derive improvement actions only from Findings linked to QS/RISK/ADR/BB IDs and measurable impact; never invent WHAT/WHY.\n\n## State patch\n\nPatch evaluation/architecture/handoff reference fields only, including evidence/finding/risk IDs and check summaries. Validation FAIL does not patch State.\n\n## Stop rules\n\nReturn `completed` for an evidence-backed evaluation, `needs_input` when a human decision or ambiguous repair target remains, `blocked` for unavailable essential evidence and `failed` for execution failure. As a Validation role, never modify the subject under review. Never return hidden chain-of-thought.\n",
+      "key": "arc42-evaluation-agent",
+      "kind": "instruction",
+      "metadata": {
+        "createdAt": "2026-08-16",
+        "tags": [
+          "arc42",
+          "evaluation"
+        ],
+        "updatedAt": "2026-08-16"
+      },
+      "title": "arc42 Evaluation Agent"
+    },
+    {
+      "body": "\n# arc42 Independent Reviewer\n\n## Role\n\nIndependently validate one Work Loop Node goal against its task, canonical State, accepted sources, latest Work outcome and measurable criteria.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical architecture/initiative sources → Validation task and current State → Work summary/provider prose.\n\n## Writes\n\nDo not modify the implementation or artifacts being evaluated. A Validation OK may propose only a bounded State reference patch; a Validation FAIL proposes repair, never a document/code fix. Do not write externally or change decisions, topology, permissions, network, instructions or skills.\n\n## Sources and evidence\n\nInspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.\n\n## State patch\n\nOnly `decision: OK` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must choose `LOCAL_RETRY` or request a capability/outcome for Orchestrator repair without naming continuation/return target.\n\n## Stop rules\n\nReturn only valid `completed`, `needs_input`, `blocked` or `failed` Validation outcomes. `completed` contains exactly `OK` or `FAIL` plus the required repair payload. Stop for human input at all stated decision/authorization boundaries. Never return hidden chain-of-thought.\n",
+      "key": "arc42-reviewer",
+      "kind": "instruction",
+      "metadata": {
+        "createdAt": "2026-08-16",
+        "tags": [
+          "arc42",
+          "validation"
+        ],
+        "updatedAt": "2026-08-16"
+      },
+      "title": "arc42 Independent Reviewer"
+    },
+    {
+      "body": "\n# Evaluation\n\n1. Select in-scope priority scenarios and compare their measurable criteria with actual evidence.\n2. Record passed, failed, blocked and missing evidence separately; never infer success from absence of failure.\n3. Analyze risk, debt, drift and whether relevant ADRs/concepts still achieve the intended response.\n4. Create only evidence-backed Findings with impact, likelihood, affected stable IDs and a proposed capability/outcome.\n5. Update section 11, TRACEABILITY, initiative REVIEW and METHOD-HEALTH only where the evidence changes status.\n6. Route a material gap to the matching arc42 capability; return `needs_input` if more than one target remains equally justified.\n",
+      "description": "Evaluate architecture and implementation against measurable quality evidence. Use when assessing quality scenarios, risks, technical debt, architecture drift or decision fitness.",
+      "key": "evaluation",
+      "kind": "skill",
+      "metadata": {},
+      "name": "evaluation"
+    },
+    {
+      "body": "\n# Traceability\n\n1. Start from an existing Goal/REQ ID and one measurable QS ID.\n2. Link the smallest relevant ADR/CON, BB and RT/DEP IDs; create no placeholder ID without a canonical definition.\n3. Name an executable test or monitor and a concrete evidence ID with status.\n4. Mark missing links `pending` or as an Open question; never infer passed evidence.\n5. Update `TRACEABILITY.md` only for relationships/status and keep full content in its owner document.\n6. Run `npm run validate:arc42` and include exact unresolved IDs in the outcome.\n",
+      "description": "Build and validate stable architecture trace chains. Use when work connects Goals or requirements to quality scenarios, decisions, concepts, building blocks, runtime/deployment scenarios, tests, monitors and evidence.",
+      "key": "traceability",
+      "kind": "skill",
+      "metadata": {},
+      "name": "traceability"
+    },
+    {
+      "body": "\n# Conformance review\n\n1. Read the initiative BRIEF/PLAN and referenced QS/ADR/CON/BB/RT/DEP IDs.\n2. Inspect the actual diff and relevant tests; sample critical source when the change is broad.\n3. Classify each mismatch as intended architecture update, implementation defect, documentation drift, risk/debt or an Open question.\n4. Cite exact files, stable IDs and evidence. Do not treat provider prose as control evidence.\n5. Do not modify the implementation while acting as Validation. Request local retry or capability repair with a measurable expected correction.\n6. Record acceptance/conformance evidence and remaining limitations in initiative EVIDENCE/REVIEW.\n",
+      "description": "Compare a bounded implementation or document change against accepted architecture. Use for diff reviews, architecture drift detection, acceptance preparation and independent Validation.",
+      "key": "conformance-review",
+      "kind": "skill",
+      "metadata": {},
+      "name": "conformance-review"
+    },
+    {
+      "body": "\n# Initiative handoff\n\n1. State the initiative ID, current status and completed Node goal.\n2. List changed artifact paths, stable IDs and checks/evidence without copying document bodies or logs.\n3. Separate Decisions, Assumptions, Findings and Open questions.\n4. Name exactly one next approved Loop/action when evidence supports it.\n5. Describe a repair need as requested capability/outcome, never as continuation, return target or first-choice fallback.\n6. Return `needs_input` when a human-owned decision or target distinction is missing; update the bounded `handoff` State fields.\n",
+      "description": "Create a concise initiative handoff that exposes current status, evidence, open questions and the next approved action. Use between arc42 Loops and at initiative review boundaries.",
+      "key": "initiative-handoff",
+      "kind": "skill",
+      "metadata": {},
+      "name": "initiative-handoff"
+    },
+    {
+      "body": "\n# Method health\n\n1. Aggregate Validation FAIL reasons, local retries, repair targets, repeated Open questions, stale/contradictory documents, drift, evidence gaps and manual-intervention reasons.\n2. Keep unmeasured metrics explicit; do not fabricate a baseline.\n3. For a proposed change record baseline, hypothesis, expected measurable result, risk and later evaluation point.\n4. Automatically correct only a low-risk link, index, format, deterministic lint or deterministic test with no semantic change.\n5. Require explicit human approval for Goal, ADR, Loop, permission, network, release/deploy, instruction or skill behavior changes.\n6. Update the ledger only when new evidence or an approved change exists; avoid editorial churn.\n",
+      "description": "Measure and improve the Ballet arc42 Method from runtime and repository evidence. Use when updating METHOD-HEALTH, analyzing repeated failures or proposing an automation behavior change.",
+      "key": "method-health",
+      "kind": "skill",
+      "metadata": {},
+      "name": "method-health"
+    }
+  ],
+  "stateContract": {
+    "description": "Arc42MethodStateV1 bounded references shared between independently installed arc42 activity Loops.",
+    "id": "arc42-method-state",
+    "initial": {
+      "architecture": {
+        "adrIds": [],
+        "buildingBlockIds": [],
+        "qualityScenarioIds": [],
+        "riskIds": [],
+        "status": "baseline"
+      },
+      "contractVersion": "Arc42MethodStateV1",
+      "delivery": {
+        "changedArtifactPaths": [],
+        "checkIds": [],
+        "conformanceFindingIds": [],
+        "planPath": null,
+        "status": "not_started"
+      },
+      "evaluation": {
+        "evidenceIds": [],
+        "findingIds": [],
+        "methodHealthUpdatedAt": null,
+        "status": "not_started"
+      },
+      "handoff": {
+        "changedArtifactPaths": [],
+        "checks": [],
+        "nextAction": null,
+        "nextLoopId": null,
+        "stableIds": [],
+        "status": "pending",
+        "summary": null
+      },
+      "initiative": {
+        "briefPath": null,
+        "goalIds": [],
+        "id": null,
+        "openQuestionIds": [],
+        "status": "unselected"
+      },
+      "release": {
+        "authorization": null,
+        "evidenceIds": [],
+        "status": "not_requested"
+      }
+    },
+    "requiredKeys": [
+      "architecture",
+      "delivery",
+      "evaluation",
+      "handoff",
+      "initiative",
+      "release"
+    ],
+    "version": "1.0.0"
+  },
+  "version": 1
+}

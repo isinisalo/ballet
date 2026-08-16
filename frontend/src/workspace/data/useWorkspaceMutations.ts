@@ -1,9 +1,12 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type {
   ExecutionProfileSaveRequest,
   MarkdownDocument,
   LoopTheme,
   ProjectAutomationConfig,
+  LoopModuleInstallCommitRequest,
+  LoopModuleInstallPlanRequest,
+  LoopModuleExportRequest,
   WorkspaceSaveRequestByCollection
 } from "../../../../shared/api/workspace-contracts";
 import { api } from "../../api";
@@ -114,6 +117,36 @@ export function useWorkspaceMutations({
     );
   }, [runMutation]);
 
+  const installLoopModule = useCallback(async (input: LoopModuleInstallCommitRequest) => runMutation(
+    () => api.installLoopModule(input),
+    "Loop module installed.",
+    "Unable to install Loop module."
+  ), [runMutation]);
+
+  const removeInstalledLoopModule = useCallback(async (loopId: string) => {
+    await runMutation(
+      () => api.removeInstalledLoopModule(loopId),
+      "Installed Loop removed.",
+      "Unable to remove installed Loop."
+    );
+  }, [runMutation]);
+
+  const exportLoopModule = useCallback(async (input: LoopModuleExportRequest) => runMutation(
+    () => api.exportLoopModule(input),
+    "Loop module exported.",
+    "Unable to export Loop module."
+  ), [runMutation]);
+
+  const loopModules = useMemo(() => ({
+    listLibrary: api.listLoopModuleLibrary,
+    inspect: api.inspectLoopModule,
+    plan: (input: LoopModuleInstallPlanRequest) => api.planLoopModuleInstall(input),
+    install: installLoopModule,
+    statuses: api.loopModuleStatuses,
+    exportLoop: exportLoopModule,
+    remove: removeInstalledLoopModule
+  }), [exportLoopModule, installLoopModule, removeInstalledLoopModule]);
+
   return {
     save,
     createExecutionProfile,
@@ -124,6 +157,7 @@ export function useWorkspaceMutations({
     remove,
     saveAutomation,
     updateLoopTheme,
+    loopModules,
     refresh
   };
 }

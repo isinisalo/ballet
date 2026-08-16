@@ -4,7 +4,7 @@ title: Crosscutting concepts
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - concepts
@@ -29,6 +29,7 @@ The concepts are selected for architectural significance; this is not a catalog 
 | CON-004 | Portable project resources: repository paths own config, docs, instructions and skills; machine state remains under `.git/ballet`. | BB-003, BB-008 | QS-002, QS-005 | ADR-002, ADR-014, project resource catalog |
 | CON-005 | Cyber-industrial operator UI: dense, accessible, token-driven React/Tailwind/shadcn surfaces with explicit operational state. | BB-001 | QS-001 | [DESIGN.md](../../DESIGN.md), goal-007 |
 | CON-006 | Evidence-driven arc42 Method: stable IDs, explicit fact/decision/assumption/hypothesis/finding/question types, initiative handoff, traceability and measured method health. | BB-003, BB-004, BB-005, BB-008 | QS-005, QS-006, QS-008 | goal-009, ADR-011, project-local arc42 resources |
+| CON-007 | Copy-to-project module trust: strict bounded JSON, canonical hash, deterministic namespace, compatible profile slots, revalidated plan, config-last commit and content-derived provenance. | BB-001, BB-002, BB-003, BB-009 | QS-002, QS-004, QS-009 | ADR-016, Loop module schemas/service/tests |
 
 ## Information classification
 
@@ -45,7 +46,7 @@ ADRs own decisions, `DESIGN.md` owns the UI system, and the linked implementatio
 
 ## Relevant decisions
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-015`.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`.
 
 ## Evidence
 

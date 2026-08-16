@@ -25,6 +25,13 @@ import {
   projectDocumentSaveSchema,
   type MutableCollectionName
 } from "../../shared/api/workspace-schemas.js";
+import {
+  loopModuleExportRequestSchema,
+  loopModuleInspectRequestSchema,
+  loopModuleInstallCommitRequestSchema,
+  loopModuleInstallPlanRequestSchema,
+  loopModuleLoopParamsSchema
+} from "../../shared/api/loop-module-schemas.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import { readProjectConfigStatus } from "../project/configGitStatus.js";
@@ -64,6 +71,28 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     options.invalidations.publish({ type: "workspace-changed", reason: "document" });
   }));
   router.get("/project/config-status", route(async (_req, res) => res.json(await readProjectConfigStatus(options.store.root))));
+
+  router.get("/loop-modules/library", route(async (_req, res) => res.json(await options.store.listLoopModuleLibrary())));
+  router.post("/loop-modules/inspect", route(async (req, res) => {
+    const input = parseBody(loopModuleInspectRequestSchema, req);
+    res.json(options.store.inspectLoopModule(input.package, input.source));
+  }));
+  router.post("/loop-modules/install-plan", route(async (req, res) =>
+    res.json(await options.store.planLoopModuleInstall(parseBody(loopModuleInstallPlanRequestSchema, req)))));
+  router.post("/loop-modules/install", route(async (req, res) => {
+    const installed = await options.store.installLoopModule(parseBody(loopModuleInstallCommitRequestSchema, req));
+    options.invalidations.publish({ type: "workspace-changed", reason: "loop-module-install" });
+    res.status(201).json(installed);
+  }));
+  router.post("/loop-modules/export", route(async (req, res) =>
+    res.json(await options.store.exportLoopModule(parseBody(loopModuleExportRequestSchema, req)))));
+  router.get("/loop-modules/status", route(async (_req, res) => res.json(await options.store.loopModuleStatuses())));
+  router.delete("/loop-modules/installed/:loopId", route(async (req, res) => {
+    const { loopId } = parseParams(loopModuleLoopParamsSchema, req);
+    await options.store.removeInstalledLoopModule(loopId);
+    options.invalidations.publish({ type: "workspace-changed", reason: "loop-module-remove" });
+    res.status(204).end();
+  }));
 
   router.post("/runtime/refresh", route(async (req, res) => {
     parseBody(emptyBodySchema, req);

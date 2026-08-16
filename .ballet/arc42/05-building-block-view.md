@@ -4,7 +4,7 @@ title: Building block view
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - building-blocks
@@ -31,6 +31,7 @@ Level 1 is verified from the repository. Deeper detail is added only for risk, c
 | BB-006 | Provider execution: compose prompts, enforce runtime policy, queue Codex/Copilot and normalize events. | `ExecutionProfile`, provider adapters and `ExecutionTask`. | Provider neutrality, least privilege and evidence integrity. | `backend/execution/`, `backend/integration/` | REQ-003, REQ-005 | Provider capability changes can block preflight. |
 | BB-007 | Checkout lifecycle and distribution: CLI, launchd, Git worktrees, packaging and verified update. | Local shell/Git, launchd and release artifacts. | Isolation and supply-chain integrity. | `backend/cli/`, `backend/execution/git/`, `scripts/`, `packaging/` | REQ-005, REQ-008 | Remote release dependencies require explicit authority and availability. |
 | BB-008 | Project-local arc42 Method resources: architecture docs, initiative artifacts, Loops, instructions, skills and validator. | Stable Markdown/JSON paths and npm validation command. | Shared intent, traceability and evidence-driven improvement. | `.ballet/arc42/`, `.ballet/project.json`, `.ballet/instructions/`, `.agents/skills/arc42/` | REQ-002, REQ-009 | First-pilot effectiveness evidence is pending. |
+| BB-009 | Loop module authoring boundary: strict package inspection, local library, deterministic install plan/materialization, export closure and provenance-aware removal. | Loop module DTOs/API; project config mutation queue; resource catalog. | Supply-chain visibility, atomic project references and portable reuse. | `shared/domain/loopModules.ts`, `shared/api/loop-module-schemas.ts`, `backend/loop-modules/`, Loop Library UI | REQ-002, REQ-007, REQ-010 | Remote distribution/update trust is intentionally undecided. |
 
 ## Canonical sources
 
@@ -38,7 +39,7 @@ Source directories and shared contracts are authoritative for implementation; AD
 
 ## Relevant decisions
 
-`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-015`.
+`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`.
 
 ## Evidence
 

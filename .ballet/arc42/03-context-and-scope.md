@@ -4,7 +4,7 @@ title: Context and scope
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - context
@@ -34,6 +34,7 @@ Ballet helps a project owner and delivery team define, execute and inspect repea
 | GitHub Copilot CLI | Alternative provider through the same adapter boundary. | No automatic provider fallback. |
 | Git/GitHub/CI/CD | Supplies local history and, only when authorized, remote release/deploy evidence. | Remote writes require explicit human permission. |
 | macOS/launchd | Hosts the checkout-specific background service. | Current distribution scope is macOS. |
+| Local Loop package file | Browser reads a user-selected UTF-8 JSON envelope and submits its content for inspection; a version-controlled Loop Library supplies the same envelope shape. | Backend never accepts an arbitrary server path or performs a remote package fetch. |
 
 ## Technical context
 
@@ -49,7 +50,7 @@ Centralized project management, account/authentication services, cloud-hosted Ba
 
 ## Relevant decisions
 
-`adr-001`, `adr-005`, `adr-006`, `adr-008`, `adr-009`.
+`adr-001`, `adr-005`, `adr-006`, `adr-008`, `adr-009`, `adr-016`.
 
 ## Evidence
 

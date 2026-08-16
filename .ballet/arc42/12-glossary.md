@@ -4,7 +4,7 @@ title: Glossary
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - glossary
@@ -41,6 +41,10 @@ Terms reflect accepted v10 and arc42 decisions.
 | Finding | Evidence-backed observation requiring no invented intent. |
 | Open question | Missing information that may require `needs_input`. |
 | External write | Push, merge, release, deploy, rollback, message or any mutation outside the authorized Root Run worktree. |
+| Loop Module Package | Portable strict one-Loop authoring JSON inspected and materialized before runtime; never a live runtime source. |
+| Installed Loop | Materialized strict-v10 ProjectLoop and project resources plus non-runtime provenance/ownership metadata. |
+| Profile slot | Package-local execution requirement mapped during install to an existing compatible project ExecutionProfile. |
+| Provenance status | Content-derived `exact`, `modified` or `missing-resources` comparison; not a stored authority field. |
 
 ## Canonical sources
 
@@ -48,7 +52,7 @@ Accepted Goals/ADRs and shared domain terminology take precedence over this summ
 
 ## Relevant decisions
 
-`adr-011`, `adr-013`, `adr-015`.
+`adr-011`, `adr-013`, `adr-015`, `adr-016`.
 
 ## Evidence
 

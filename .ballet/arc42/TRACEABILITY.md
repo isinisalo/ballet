@@ -4,7 +4,7 @@ title: Ballet architecture traceability
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - traceability
@@ -34,6 +34,7 @@ The baseline covers the highest-risk architecture qualities and the new continuo
 | goal-009 / REQ-009 | QS-006 | adr-011 / CON-006 | BB-004 / BB-008 | RT-003 / DEP-002 | TEST-006 | EVID-006 | pending pilot |
 | goal-008 / REQ-008 | QS-007 | adr-009 / CON-001 | BB-007 | RT-005 / DEP-003 | TEST-007 | EVID-007 | policy verified; execution pending |
 | goal-009 / REQ-009 | QS-008 | adr-011 / CON-006 | BB-003 / BB-008 | RT-004 / DEP-001 | TEST-008 | EVID-008 | pending pilot |
+| goal-010 / REQ-010 | QS-009 | adr-016 / CON-007 | BB-001 / BB-002 / BB-003 / BB-009 | RT-006 / RT-007 / DEP-001 | TEST-009 | EVID-009 | implementation verified; full gate pending |
 <!-- traceability:end -->
 
 ## Test and monitor catalog
@@ -48,6 +49,7 @@ The baseline covers the highest-risk architecture qualities and the new continuo
 | TEST-006 | First initiative trace completeness and handoff review | arc42 evaluate Loop |
 | TEST-007 | Release authorization gate and release-validation evidence | release-validation Loop |
 | TEST-008 | Method-health comparison against the first pilot baseline | continuous learning/evaluate Loops |
+| TEST-009 | Loop module package/service/API/UI tests, strict build gates and packaged Loop Library smoke | module platform test suite |
 
 ## Evidence catalog
 
@@ -61,6 +63,7 @@ The baseline covers the highest-risk architecture qualities and the new continuo
 | EVID-006 | Initiative BRIEF/PLAN/EVIDENCE/REVIEW chain | pending first initiative |
 | EVID-007 | Human authorization plus release/deploy/rollback checks | pending an explicitly authorized release |
 | EVID-008 | Before/after method metrics | pending first pilot evaluation |
+| EVID-009 | Installable Loop modules initiative evidence | `.ballet/arc42/initiatives/installable-loop-modules/EVIDENCE.md` |
 
 ## Canonical sources
 
@@ -68,7 +71,7 @@ Goals, quality scenarios, ADRs/concepts, building blocks, runtime/deployment sce
 
 ## Relevant decisions
 
-`adr-011`, `adr-015`.
+`adr-011`, `adr-015`, `adr-016`.
 
 ## Evidence
 

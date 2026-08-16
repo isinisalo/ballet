@@ -20,12 +20,14 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 - Aja `npm run build`, kun muutos vaikuttaa frontend-koodiin, komponenttien rajapintoihin, CSS:ään, Tailwind-luokkiin tai bundlaukseen.
 - Aja `npx @google/design.md lint DESIGN.md`, kun muutat `DESIGN.md`-tiedostoa ja komento on saatavilla ilman manuaalista tunnistautumista.
 - Aja `git diff --check` ennen muutoksen luovuttamista.
+- Aja Loop-module-sopimuksen package-, install/export-, API-, UI- ja release smoke -testit, kun muutos vaikuttaa `.ballet/loop-library/**`, `.ballet/loop-modules/**` tai niiden materialisointiin.
 - Raportoi selvästi, jos validointikomentoa ei voi ajaa tai se epäonnistuu ympäristösyyn vuoksi.
 
 ## Platformin ja projektin raja
 
 - Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Loop, WorkLoopNode, WorkNode, ValidationNode, State, Edge, LoopEdge, RepairRequest, LoopOrchestrator, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Root Run snapshot, provider-suoritus ja runtime state.
 - Roadmap-, milestone-, issue-, acceptance-, staging-, release-, deploy- ja arc42-menettelyt kuuluvat project-local dataan tiedostoissa `.ballet/project.json`, `.ballet/instructions/**`, `.agents/skills/**` ja `.ballet/arc42/**`.
+- Loop-module package-, katalogi-, install-, export- ja provenance-primitiveet ovat geneerisiä platform-ominaisuuksia. Moduulien nimet, capabilityt, instructionit, skillsit ja recommended connectionit ovat `.ballet/loop-library/**`-dataa; runtime lukee vain materialisoitua project-local dataa.
 - Älä kovakoodaa project-workflow'ta `backend/`, `frontend/` tai `shared/`-koodiin tai Balletin pakolliseen System instructioniin.
 - Tarkista execution- tai orchestration-muutoksen jälkeen, ettei platform-koodiin tullut project-workflow-kohtaisia tunnisteita:
 

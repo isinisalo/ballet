@@ -4,7 +4,7 @@ title: Architecture decisions
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - decisions
@@ -36,8 +36,9 @@ The index reflects repository state on 2026-08-16.
 | adr-011 | accepted | [arc42 Template and continuous Ballet Method](../adr/adr-011-arc42-template-ja-jatkuva-ballet-method.md) |
 | adr-012 | accepted | [ExecutionProfile separation](../adr/adr-012-execution-profile-erotetaan-stepin-instructions-ja-skills-valinnoista.md) |
 | adr-013 | accepted | [Workflow details belong to skills](../adr/adr-013-workflow-yksityiskohdat-kuuluvat-skillsiin.md) |
-| adr-014 | accepted | [Workflow templates are project-local data](../adr/adr-014-workflow-templatet-ovat-project-local-dataa.md) |
+| adr-014 | accepted; V1 scope partially superseded by adr-016 | [Workflow templates are project-local data](../adr/adr-014-workflow-templatet-ovat-project-local-dataa.md) |
 | adr-015 | accepted | [Work Loop, revisioned State and Loop Orchestrator](../adr/adr-015-work-loop-state-ja-loop-orchestrator.md) |
+| adr-016 | accepted | [One-Loop module package and project-local materialization](../adr/adr-016-yhden-loopin-moduulipaketti-ja-project-local-materialisointi.md) |
 
 ## Canonical sources
 

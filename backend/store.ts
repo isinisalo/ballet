@@ -13,6 +13,14 @@ import type { LoopTheme } from "../shared/domain/loopThemes.js";
 import type { ExecutionProfile } from "../shared/domain/projectConfig.js";
 import { LoopThemeRepository } from "./loop-themes/LoopThemeRepository.js";
 import { LoopThemeService } from "./services/LoopThemeService.js";
+import type {
+  InstalledLoopModuleStatus,
+  LoopModuleExportResult,
+  LoopModuleInspection,
+  LoopModuleInstallPlan,
+  LoopModuleLibraryEntry
+} from "../shared/domain/loopModules.js";
+import { LoopModuleService } from "./loop-modules/LoopModuleService.js";
 
 export class MarkdownStore {
   private readonly projectRoot: string;
@@ -23,6 +31,7 @@ export class MarkdownStore {
   private readonly markdownEntityService: MarkdownEntityService;
   private readonly automationService: AutomationService;
   private readonly loopThemeService: LoopThemeService;
+  private readonly loopModuleService: LoopModuleService;
 
   constructor(root = getProjectRoot(), runtimeDatabase?: RuntimeDatabase) {
     this.projectRoot = root;
@@ -33,6 +42,7 @@ export class MarkdownStore {
     this.markdownEntityService = new MarkdownEntityService(() => this.root, () => this.read());
     this.automationService = new AutomationService(() => this.root, this.runtimeDatabaseProvider);
     this.loopThemeService = new LoopThemeService(() => this.root, this.loopThemeRepository);
+    this.loopModuleService = new LoopModuleService(() => this.root, this.runtimeDatabaseProvider);
   }
 
   get root(): string {
@@ -85,6 +95,46 @@ export class MarkdownStore {
 
   updateLoopTheme(theme: LoopTheme): Promise<LoopTheme> {
     return this.loopThemeService.update(theme);
+  }
+
+  listLoopModuleLibrary(): Promise<LoopModuleLibraryEntry[]> {
+    return this.loopModuleService.listLibrary();
+  }
+
+  inspectLoopModule(input: unknown, source?: string): LoopModuleInspection {
+    return this.loopModuleService.inspect(input, source);
+  }
+
+  planLoopModuleInstall(input: { package: unknown; source: string; profileMappings?: Record<string, string> }): Promise<LoopModuleInstallPlan> {
+    return this.loopModuleService.plan(input);
+  }
+
+  installLoopModule(input: {
+    package: unknown;
+    source: string;
+    profileMappings?: Record<string, string>;
+    expectedPlanHash: string;
+  }): Promise<InstalledLoopModuleStatus> {
+    return this.runProjectConfigMutation(() => this.loopModuleService.commit(input));
+  }
+
+  exportLoopModule(input: {
+    loopId: string;
+    title?: string;
+    description?: string;
+    version?: string;
+    category?: string;
+    tags?: string[];
+  }): Promise<LoopModuleExportResult> {
+    return this.loopModuleService.exportLoop(input);
+  }
+
+  loopModuleStatuses(): Promise<InstalledLoopModuleStatus[]> {
+    return this.loopModuleService.statuses();
+  }
+
+  removeInstalledLoopModule(loopId: string): Promise<void> {
+    return this.runProjectConfigMutation(() => this.loopModuleService.remove(loopId));
   }
 
   saveProjectDocument(input: {

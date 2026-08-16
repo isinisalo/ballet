@@ -4,7 +4,7 @@ title: Constraints
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - constraints
@@ -35,6 +35,7 @@ The baseline is accepted from Goals, ADRs, repository instructions and current r
 | CTR-008 | external effects | Merge, push, release, deploy and rollback require explicit human authority. | goal-005, goal-009, adr-011 |
 | CTR-009 | model | ExecutionProfile has no Responses API `reasoning.mode`; `medium` remains the baseline without eval evidence for higher effort or pro-mode. | adr-012, OpenAI model guidance |
 | CTR-010 | design | `DESIGN.md` owns UI tokens and visual principles. | goal-007, DESIGN.md |
+| CTR-011 | module trust | A Loop package is bounded untrusted UTF-8 JSON, has one Loop and no executable code/external writes; runtime uses only explicitly materialized project-local resources. | goal-010, adr-016 |
 
 ## Canonical sources
 
@@ -42,7 +43,7 @@ Accepted Goals and ADRs, `AGENTS.md`, `DESIGN.md`, `.ballet/project.json` and ma
 
 ## Relevant decisions
 
-`adr-001`, `adr-002`, `adr-003`, `adr-006`, `adr-008`, `adr-009`, `adr-011`–`adr-015`.
+`adr-001`, `adr-002`, `adr-003`, `adr-006`, `adr-008`, `adr-009`, `adr-011`–`adr-016`.
 
 ## Evidence
 

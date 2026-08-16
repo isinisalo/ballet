@@ -22,6 +22,11 @@ import {
   LoopThemeConflictError,
   LoopThemeValidationError
 } from "../loop-themes/LoopThemeErrors.js";
+import {
+  LoopModuleConflictError,
+  LoopModuleNotFoundError,
+  LoopModuleValidationError
+} from "../loop-modules/LoopModuleErrors.js";
 
 export const sendKnownHttpError = (error: unknown, res: express.Response): boolean => {
   if (isBodyParserError(error, 400, "entity.parse.failed")) {
@@ -52,6 +57,18 @@ export const sendKnownHttpError = (error: unknown, res: express.Response): boole
   }
   if (error instanceof LoopThemeValidationError) {
     res.status(400).json({ error: error.message, issues: error.issues });
+    return true;
+  }
+  if (error instanceof LoopModuleValidationError) {
+    res.status(400).json({ error: error.message, issues: error.issues });
+    return true;
+  }
+  if (error instanceof LoopModuleConflictError) {
+    res.status(409).json({ error: error.message, issues: error.issues });
+    return true;
+  }
+  if (error instanceof LoopModuleNotFoundError) {
+    res.status(404).json({ error: error.message });
     return true;
   }
   if (error instanceof MarkdownEntityValidationError) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Palette, Route } from "lucide-react";
-import type { AppData, ProjectAutomationConfig, ProjectAutomationIssue, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { AppData, InstalledLoopModuleStatus, ProjectAutomationConfig, ProjectAutomationIssue, ProjectLoop } from "@shared/api/workspace-contracts";
 import { EditorActions, Panel } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,14 @@ import { createLoopDraft, removeLoopAtIndex, updateLoopAtIndex } from "./loops/l
 import { automationDraftIssues } from "./loops/loopFormValidation";
 import { isActiveLoopRun } from "./loops/loopRunState";
 import { useWorkspaceNavigationBlocker, type WorkspaceNavigation } from "../useWorkspaceNavigation";
+import { LoopLibraryDialog, type LoopModuleActions } from "./loops/LoopLibraryDialog";
 
-export function AutomationView({ data, selectedId, loopView, saveAutomation, navigate, setNavigationBlocker }: {
+export function AutomationView({ data, selectedId, loopView, saveAutomation, loopModules, navigate, setNavigationBlocker }: {
   data: AppData;
   selectedId?: string;
   loopView?: AutomationLoopView;
   saveAutomation: (config: ProjectAutomationConfig) => Promise<ProjectAutomationConfig>;
+  loopModules?: LoopModuleActions;
   navigate: WorkspaceNavigation["navigate"];
   setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"];
 }) {
@@ -91,6 +93,7 @@ export function AutomationView({ data, selectedId, loopView, saveAutomation, nav
       onDeleteLoop={removeLoop}
       onChange={setDraft}
       onSave={() => saveDraft()}
+      loopModules={loopModules}
       dirty={isDirty}
       valid={draftIssues.length === 0}
     />
@@ -114,7 +117,7 @@ export function AutomationView({ data, selectedId, loopView, saveAutomation, nav
   />;
 }
 
-function AutomationOverview({ draft, data, issues, error, saving, dirty, valid, lockedLoopIds, navigate, onDeleteLoop, onChange, onSave }: {
+function AutomationOverview({ draft, data, issues, error, saving, dirty, valid, lockedLoopIds, navigate, onDeleteLoop, onChange, onSave, loopModules }: {
   draft: ProjectAutomationConfig;
   data: AppData;
   issues: ProjectAutomationIssue[];
@@ -127,7 +130,30 @@ function AutomationOverview({ draft, data, issues, error, saving, dirty, valid, 
   onDeleteLoop: (loopId: string) => unknown | Promise<unknown>;
   onChange: (config: ProjectAutomationConfig) => void;
   onSave: () => Promise<boolean>;
+  loopModules?: LoopModuleActions;
 }) {
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [moduleStatuses, setModuleStatuses] = useState<InstalledLoopModuleStatus[]>([]);
+  const [moduleError, setModuleError] = useState("");
+  const loadStatuses = async () => {
+    if (!loopModules) return;
+    try { setModuleStatuses(await loopModules.statuses()); setModuleError(""); }
+    catch (reason) { setModuleError(reason instanceof Error ? reason.message : "Unable to load Loop module status."); }
+  };
+  useEffect(() => { void loadStatuses(); }, [loopModules]);
+  const exportLoop = async (loopId: string) => {
+    if (!loopModules) return;
+    try {
+      const result = await loopModules.exportLoop({ loopId });
+      downloadJson(result.canonicalJson, result.filename);
+      setModuleError("");
+    } catch (reason) { setModuleError(reason instanceof Error ? reason.message : "Unable to export Loop module."); }
+  };
+  const removeInstalled = async (loopId: string) => {
+    if (!loopModules) return;
+    try { await loopModules.remove(loopId); await loadStatuses(); }
+    catch (reason) { setModuleError(reason instanceof Error ? reason.message : "Unable to remove installed Loop."); }
+  };
   return (
     <Panel title="Automation" icon={<Route />} contentClassName="p-0" action={<div className="flex items-center gap-2">
       <Button size="sm" variant="outline" onClick={() => navigate(automationThemePath())}><Palette /> Edit theme</Button>
@@ -135,6 +161,7 @@ function AutomationOverview({ draft, data, issues, error, saving, dirty, valid, 
     </div>}>
       <AutomationIssueBanner issues={issues} />
       {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {moduleError ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{moduleError}</AlertDescription></Alert> : null}
       <AllLoopsCanvas
         config={draft}
         disabled={saving}
@@ -143,12 +170,28 @@ function AutomationOverview({ draft, data, issues, error, saving, dirty, valid, 
         instructions={data.instructions}
         skills={data.skills}
         runtime={data.runtime}
-        theme={data.loopTheme}
         onOrchestratorChange={(orchestrator) => onChange({ ...draft, orchestrator })}
-        onAddLoop={() => navigate(automationLoopPath())}
+        installedModules={moduleStatuses}
+        onAddLoop={() => loopModules ? setLibraryOpen(true) : navigate(automationLoopPath())}
         onOpenLoop={(id) => navigate(automationLoopPath(id))}
         onDeleteLoop={onDeleteLoop}
+        onExportLoop={loopModules ? exportLoop : undefined}
+        onRemoveInstalledLoop={loopModules ? removeInstalled : undefined}
       />
+      {loopModules ? <LoopLibraryDialog
+        open={libraryOpen}
+        actions={loopModules}
+        onOpenChange={setLibraryOpen}
+        onCreateBlank={() => { setLibraryOpen(false); navigate(automationLoopPath()); }}
+        onInstalled={() => { void loadStatuses(); }}
+      /> : null}
     </Panel>
   );
 }
+
+const downloadJson = (source: string, filename: string) => {
+  const url = URL.createObjectURL(new Blob([source], { type: "application/json;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url; anchor.download = filename; anchor.click();
+  URL.revokeObjectURL(url);
+};

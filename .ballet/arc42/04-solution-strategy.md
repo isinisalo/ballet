@@ -4,7 +4,7 @@ title: Solution strategy
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - arc42
   - solution-strategy
@@ -30,6 +30,7 @@ The strategy is implemented unless a row explicitly names pending pilot evidence
 | STRAT-005 | Strict-v10 Work/Validation, revisioned State and capability repair call/return. | Makes decisions, retries and repairs deterministic and recoverable. | adr-015 |
 | STRAT-006 | arc42 Template as durable truth and 6+1 Ballet Loops as the continuous Method. | Connects architecture, implementation and evaluation through stable evidence. | goal-009, adr-011 |
 | STRAT-007 | Explicit human gates for intent, significant decisions and external writes. | Preserves authority at high-impact boundaries. | adr-011 |
+| STRAT-008 | Strict one-Loop authoring package plus inspect/plan/commit materialization into existing project primitives. | Enables reuse without a live registry/runtime dependency and makes prompt trust visible. | goal-010, adr-016 |
 
 ## Canonical sources
 
@@ -37,7 +38,7 @@ Accepted ADRs own the decisions; this section owns only their strategic synthesi
 
 ## Relevant decisions
 
-`adr-001`–`adr-003`, `adr-005`–`adr-009`, `adr-011`–`adr-015`.
+`adr-001`–`adr-003`, `adr-005`–`adr-009`, `adr-011`–`adr-016`.
 
 ## Evidence
 

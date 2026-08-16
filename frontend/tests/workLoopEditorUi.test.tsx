@@ -79,7 +79,7 @@ describe("strict-v10 Work Loop editor", () => {
     });
   });
 
-  it("shows Loop groups, composite roles, repair semantics, and the orchestrator as a separate component", () => {
+  it("shows each Loop as one box and keeps internal nodes, State, and Edges in the detailed editor", () => {
     const first = v10Loop("source-loop");
     const target = v10Loop("target-loop");
     const config = v10Automation(first, target);
@@ -89,10 +89,11 @@ describe("strict-v10 Work Loop editor", () => {
     expect(screen.getByRole("heading", { name: "Loop Orchestrator" })).toBeInTheDocument();
     expect(screen.getByText("Routing component")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "source-loop" })).toBeInTheDocument();
-    expect(screen.getAllByText(/Work · agent/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Validation · human/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/REPAIR/)).toBeInTheDocument();
-    expect(screen.getByText("Repair generic work.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "target-loop" })).toBeInTheDocument();
+    expect(screen.getAllByText("Custom Loop")).toHaveLength(2);
+    expect(screen.queryByText(/Work · agent/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Validation · human/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Repair generic work.")).not.toBeInTheDocument();
   });
 
   it("edits Validation OK and repair Loop Edges without exposing fixed internal edges", async () => {

@@ -139,6 +139,14 @@ import type {
   WorkspaceInvalidationEvent,
   WorkspaceInvalidationInput
 } from "../domain/runs.js";
+import type {
+  InstalledLoopModuleStatus,
+  LoopModuleExportResult,
+  LoopModuleInspection,
+  LoopModuleInstallPlan,
+  LoopModuleLibraryEntry,
+  LoopModulePackageV1
+} from "../domain/loopModules.js";
 
 export type ProjectDocumentCreateRequest = { directoryPath: string; title: string };
 export type ProjectDocumentSaveRequest = Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">;
@@ -175,6 +183,17 @@ type ServerManagedEntityField =
 export type SkillSaveRequest = Omit<Partial<Skill>, ServerManagedEntityField>;
 export type ExecutionProfileSaveRequest = Omit<ExecutionProfile, "id">;
 export type WorkspaceAutomationResponseDto = { config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] };
+export type LoopModuleInspectRequest = { package: unknown; source?: string };
+export type LoopModuleInstallPlanRequest = { package: unknown; source: string; profileMappings?: Record<string, string> };
+export type LoopModuleInstallCommitRequest = LoopModuleInstallPlanRequest & { expectedPlanHash: string };
+export type LoopModuleExportRequest = {
+  loopId: string;
+  title?: string;
+  description?: string;
+  version?: string;
+  category?: string;
+  tags?: string[];
+};
 
 export type WorkspaceSaveRequestByCollection = {
   skills: SkillSaveRequest;
@@ -230,6 +249,7 @@ export {
   maxResumeContextBytes, maxTaskEnvelopeBytes, taskEnvelopeVersion
 } from "../domain/taskEnvelope.js";
 export { automationConfigSchema, kebabCaseIdPattern } from "./workspace-schemas.js";
+export { loopModulePackageV1Schema } from "./loop-module-schemas.js";
 
 export type {
   MarkdownDocument, Project, ProjectInstruction, ProjectResourceIssue, ExecutionProfile,
@@ -258,4 +278,12 @@ export type {
   RootRunStateProjection, RootRunKind, RootRunListResponse, RootRunListState,
   RootRunSource, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, RespondToNodeRunRequest, StartRootRunRequest,
   WorkspaceInvalidationEvent, WorkspaceInvalidationInput, Skill
+};
+export type {
+  InstalledLoopModuleStatus,
+  LoopModuleExportResult,
+  LoopModuleInspection,
+  LoopModuleInstallPlan,
+  LoopModuleLibraryEntry,
+  LoopModulePackageV1
 };

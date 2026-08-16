@@ -3,15 +3,17 @@ id: adr-014
 title: Workflow-templatet ovat project-local dataa
 status: accepted
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-19T06:45:37.000Z'
+updatedAt: '2026-08-16T00:00:00.000Z'
 tags:
   - arkkitehtuuripäätös
   - workflow-templatet
   - projektidata
-version: 3
+version: 4
 ---
 
 # Workflow-templatet ovat project-local dataa
+
+> Osittain superseded by [ADR-016](adr-016-yhden-loopin-moduulipaketti-ja-project-local-materialisointi.md): yhden Loopin portable authoring package, paikallinen katalogi ja explicit copy-to-project-install kuuluvat nyt V1:een. Tämän ADR:n repository-owned runtime data- ja no-live-runtime-dependency-periaatteet säilyvät hyväksyttyinä.
 
 ## Konteksti
 

@@ -4,7 +4,7 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 1
+version: 2
 tags:
   - architecture
   - arc42
@@ -19,7 +19,7 @@ This is the shared human and agent entrypoint to Ballet's version-controlled arc
 
 ## Status
 
-The arc42 structure and 6+1 Ballet Method are accepted by `goal-009` and `adr-011`. The first end-to-end initiative pilot is pending.
+The arc42 structure and 6+1 Ballet Method are accepted by `goal-009` and `adr-011`. Installable one-Loop authoring packages are accepted by `goal-010` and `adr-016`; they materialize into project-local runtime sources and never become a live runtime dependency.
 
 ## Canonical sources
 
@@ -34,11 +34,11 @@ The arc42 structure and 6+1 Ballet Method are accepted by `goal-009` and `adr-01
 
 ## Relevant decisions
 
-`adr-011` defines the source-of-truth and method. `adr-015` defines Work/Validation, State revisions, repair and continuation. Existing accepted Goals and ADRs remain authoritative.
+`adr-011` defines the source-of-truth and method. `adr-015` defines Work/Validation, State revisions, repair and continuation. `adr-016` defines the package/install boundary and partially supersedes only ADR-014's no-package V1 scope. Existing accepted Goals and ADRs remain authoritative.
 
 ## Evidence
 
-Run `npm run validate:arc42` to validate documents, traceability, project resources and the strict-v10 Loop graph. Runtime UI and State revisions remain the execution truth for an active Root Run.
+Run `npm run validate:arc42` to validate documents, traceability, project resources and the strict-v10 Loop graph. Package/service/API/UI tests validate module materialization; the packaged release smoke lists project-provided library packages. Runtime UI and State revisions remain the execution truth for an active Root Run.
 
 ## Open questions
 
