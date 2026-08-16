@@ -1,10 +1,9 @@
 import { cn } from "@/lib/utils";
 import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
-import { BaseEdge, EdgeLabelRenderer, Position, useNodes, type EdgeProps, type Node } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, useNodes, type EdgeProps, type Node } from "@xyflow/react";
 import type { LoopReactFlowEdge } from "./LoopCanvasTypes";
 import { loopCrossLoopSmoothStepPath } from "./loopCrossLoopSmoothStepPath";
 import { loopRoutedEdgeLabelAnchor, type LoopEdgePoint } from "./loopEdgeLabelGeometry";
-import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
 import { loopConnectionPointRadius, themedLoopEdgeProps } from "./loopFloatingEdgeGeometry";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import { loopSmartEdgeRoutingOptions, loopSmartSmoothStepDrawEdge } from "./loopSmartEdgeRouting";
@@ -12,7 +11,6 @@ import { loopSmartEdgeRoutingOptions, loopSmartSmoothStepDrawEdge } from "./loop
 // This module intentionally keeps all selectable Loop edge path variants together;
 // label placement and return/cross-loop geometry must use the exact same path choice.
 
-const loopEdgeLabelCenterRatio = 0.5;
 const loopEdgeLabelVerticalOffset = 4;
 type LoopEdgeDisplayLabel =
   { value: string; kind: "output" };
@@ -21,8 +19,7 @@ export function LoopSmartEdge(props: EdgeProps<LoopReactFlowEdge>) {
   const nodes = useNodes();
   const detachedProps = themedLoopEdgeProps(props, props.data?.context?.theme.connectionPoint.style ?? "near");
   const loopEdge = props.data?.loopEdge;
-  const outputSlotKind = loopEdgeOutputSlotKind(loopEdge);
-  const edgePaths = loopEdgePaths(detachedProps, nodes, outputSlotKind);
+  const edgePaths = loopEdgePaths(detachedProps, nodes);
   const displayLabel = loopEdgeDisplayLabel(loopEdge);
   const labelPlacement = displayLabel ? loopEdgeLabelPlacement(detachedProps, edgePaths, displayLabel) : undefined;
 
@@ -77,7 +74,7 @@ export function loopEdgeLabelPlacement(
   displayLabel: LoopEdgeDisplayLabel
 ) {
   void displayLabel;
-  const directLabelPath = edgePaths.compactLoopEdgePath ?? edgePaths.returnEdgePath ?? edgePaths.crossLoopEdgePath ?? edgePaths.approvalEdgePath;
+  const directLabelPath = edgePaths.compactLoopEdgePath ?? edgePaths.returnEdgePath ?? edgePaths.crossLoopEdgePath;
   if (directLabelPath) {
     return {
       x: directLabelPath.labelX,
@@ -99,34 +96,14 @@ export function loopEdgeLabelPlacement(
   };
 }
 
-export function loopRejectedEdgeLabelPlacement(
-  { sourceX, sourceY, sourcePosition }: Pick<EdgeProps<LoopReactFlowEdge>, "sourceX" | "sourceY" | "sourcePosition">,
-  returnEdgePath?: ReturnType<typeof loopReturnEdgePath>
-) {
-  if (returnEdgePath) {
-    return {
-      x: returnEdgePath.startLabelX,
-      y: returnEdgePath.startLabelY,
-      translate: returnEdgePath.startLabelTranslate
-    };
-  }
-
-  if (sourcePosition === Position.Bottom) return { x: sourceX, y: sourceY + loopEdgeLabelVerticalOffset, translate: "translate(-50%, 0)" };
-  if (sourcePosition === Position.Top) return { x: sourceX, y: sourceY - loopEdgeLabelVerticalOffset, translate: "translate(-50%, -100%)" };
-  if (sourcePosition === Position.Left) return { x: sourceX - loopEdgeLabelVerticalOffset, y: sourceY, translate: "translate(-100%, -50%)" };
-  return { x: sourceX + loopEdgeLabelVerticalOffset, y: sourceY, translate: "translate(0, -50%)" };
-}
-
 function loopEdgePaths(
   props: EdgeProps<LoopReactFlowEdge>,
-  nodes: Node[],
-  outputSlotKind: string | undefined
+  nodes: Node[]
 ) {
   const compactLoopEdgePath = compactLoopStraightPath(props);
   const crossLoopEdgePath = crossLoopPath(props, Boolean(compactLoopEdgePath));
-  const approvalEdgePath = approvalPath(props, outputSlotKind, Boolean(compactLoopEdgePath || crossLoopEdgePath));
-  const returnEdgePath = returnPath(props, Boolean(compactLoopEdgePath || approvalEdgePath));
-  const directPaths = [compactLoopEdgePath, returnEdgePath, crossLoopEdgePath, approvalEdgePath];
+  const returnEdgePath = returnPath(props, Boolean(compactLoopEdgePath || crossLoopEdgePath));
+  const directPaths = [compactLoopEdgePath, returnEdgePath, crossLoopEdgePath];
   const smartEdgePath = directPaths.some(Boolean) ? undefined : loopSmartEdgePath(props, nodes);
   const path = [...directPaths, smartEdgePath].find((candidate) => candidate)?.path ?? straightEdgeFallback(props);
 
@@ -135,7 +112,6 @@ function loopEdgePaths(
     compactLoopEdgePath,
     returnEdgePath,
     crossLoopEdgePath,
-    approvalEdgePath,
     smartEdgePath
   };
 }
@@ -148,11 +124,6 @@ function compactLoopStraightPath(props: EdgeProps<LoopReactFlowEdge>) {
 function crossLoopPath(props: EdgeProps<LoopReactFlowEdge>, blocked: boolean) {
   if (blocked || props.data?.loopEdge.tone !== "cross-loop") return undefined;
   return loopCrossLoopSmoothStepPath(props);
-}
-
-function approvalPath(props: EdgeProps<LoopReactFlowEdge>, outputSlotKind: string | undefined, blocked: boolean) {
-  if (blocked || outputSlotKind !== "approval") return undefined;
-  return loopApprovalEdgePath(props);
 }
 
 function returnPath(props: EdgeProps<LoopReactFlowEdge>, blocked: boolean) {
@@ -207,25 +178,6 @@ function loopSmartEdgePath(
       x: smartEdgeResponse.edgeCenterX,
       y: smartEdgeResponse.edgeCenterY
     }
-  };
-}
-
-export function loopApprovalEdgePath({
-  sourceX,
-  sourceY,
-  targetX,
-  targetY
-}: Pick<EdgeProps<LoopReactFlowEdge>, "sourceX" | "sourceY" | "targetX" | "targetY">) {
-  const labelX = sourceX + (targetX - sourceX) * loopEdgeLabelCenterRatio;
-  const labelY = sourceY + (targetY - sourceY) * loopEdgeLabelCenterRatio;
-  const path = sourceY === targetY
-    ? `M ${sourceX},${sourceY} L ${targetX},${targetY}`
-    : `M ${sourceX},${sourceY} L ${labelX},${sourceY} L ${labelX},${targetY} L ${targetX},${targetY}`;
-
-  return {
-    path,
-    labelX,
-    labelY
   };
 }
 

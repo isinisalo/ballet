@@ -7,10 +7,10 @@ import {
   type LoopTheme,
   type ProjectWorkLoopNode
 } from "@shared/api/workspace-contracts";
-import { LoopCompactStepNode } from "../loops/LoopCompactStepNode";
+import { LoopCompositeNode } from "../loops/LoopCompositeNode";
 import type { LoopNodeContext } from "../loops/LoopCanvasTypes";
 import { LoopRouteArtwork } from "../loops/LoopRouteArtwork";
-import type { LoopStepRecord } from "../loops/loopGraph";
+import type { LoopNodeRecord } from "../loops/loopGraph";
 import { loopThemeCssProperties } from "../loops/loopTheme";
 
 const galleryGroups = [
@@ -50,7 +50,7 @@ export function LoopArtworkGallery({ theme }: { theme: LoopTheme }) {
                   return (
                     <div key={style} className="grid min-w-0 justify-items-center gap-1 pb-5" data-loop-artwork-preview={style} data-loop-artwork-preview-size={size}>
                       <div className="relative" style={{ width: pixels, height: pixels }}>
-                        <LoopCompactStepNode context={context} record={galleryRecord(style, size, index)} />
+                        <LoopCompositeNode context={context} record={galleryRecord(style, size, index)} />
                       </div>
                     </div>
                   );
@@ -68,9 +68,9 @@ function gallerySize(index: number): LoopNodeSize {
   return allSizes[index % allSizes.length];
 }
 
-function galleryRecord(nodeStyle: LoopNodeStyle, nodeSize: LoopNodeSize, index: number): LoopStepRecord {
+function galleryRecord(nodeStyle: LoopNodeStyle, nodeSize: LoopNodeSize, index: number): LoopNodeRecord {
   const id = `preview-${nodeStyle}`;
-  const step: ProjectWorkLoopNode = {
+  const definition: ProjectWorkLoopNode = {
     id,
     description: loopNodeStyleCatalog[nodeStyle].label,
     work: {
@@ -86,21 +86,18 @@ function galleryRecord(nodeStyle: LoopNodeStyle, nodeSize: LoopNodeSize, index: 
     maxLocalAttempts: 3
   };
   return {
-    stepKey: id,
+    nodeKey: id,
     index,
     loopId: "theme-preview",
     outputTargets: [],
-    step: {
+    node: {
       id,
       displayId: loopNodeStyleCatalog[nodeStyle].label,
-      description: step.description,
-      executionProfileId: step.work.type === "agent" ? step.work.executionProfileId : undefined,
-      humanGate: false,
-      scheduled: false,
+      description: definition.description,
       terminal: false,
       nodeStyle,
       nodeSize,
-      step
+      definition
     }
   };
 }
@@ -109,19 +106,19 @@ function galleryContext(theme: LoopTheme): LoopNodeContext {
   return {
     selectedLoopId: "theme-preview",
     theme,
-    stepByKey: new Map(),
-    draggedStepIndex: null,
-    dragOverStepIndex: null,
-    selectedStepIndexes: [],
+    nodeByKey: new Map(),
+    draggedNodeIndex: null,
+    dragOverNodeIndex: null,
+    selectedNodeIndexes: [],
     readOnly: true,
     staticPreview: true,
-    canAddFirstStep: false,
-    onStepPointerDown: () => undefined,
-    onStepPointerMove: () => undefined,
-    onStepPointerUp: () => false,
-    onStepPointerCancel: () => undefined,
-    onStepSelect: () => undefined,
+    canAddFirstNode: false,
+    onNodePointerDown: () => undefined,
+    onNodePointerMove: () => undefined,
+    onNodePointerUp: () => false,
+    onNodePointerCancel: () => undefined,
+    onNodeSelect: () => undefined,
     onOutputHandlerSelect: () => undefined,
-    onAddFirstStep: () => undefined
+    onAddFirstNode: () => undefined
   };
 }

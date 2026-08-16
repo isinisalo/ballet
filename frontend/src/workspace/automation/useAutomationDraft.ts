@@ -33,6 +33,7 @@ export function useAutomationDraft({
 
   const saveDraft = async (nextDraft: ProjectAutomationConfig = draft) => {
     if (savingRef.current) return false;
+    const startingFingerprint = JSON.stringify(draft);
     const submittedFingerprint = JSON.stringify(nextDraft);
     savingRef.current = true;
     setSaving(true);
@@ -40,7 +41,10 @@ export function useAutomationDraft({
     try {
       const saved = await saveAutomation(nextDraft);
       receivedFingerprintRef.current = JSON.stringify(saved);
-      setDraft((current) => JSON.stringify(current) === submittedFingerprint ? saved : current);
+      setDraft((current) => {
+        const currentFingerprint = JSON.stringify(current);
+        return currentFingerprint === submittedFingerprint || currentFingerprint === startingFingerprint ? saved : current;
+      });
       return true;
     } catch (cause) {
       setError(toErrorMessage(cause, "Unable to save Loop changes."));

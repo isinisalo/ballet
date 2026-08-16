@@ -125,7 +125,7 @@ body {
   pointer-events: none;
 }
 
-.loop-step-node {
+.loop-artwork-node {
   position: relative;
   isolation: isolate;
   padding: 0;
@@ -144,6 +144,11 @@ body {
   pointer-events: none;
   content: "";
   animation: loop-run-node-pulse 1.8s ease-in-out infinite;
+}
+
+.loop-work-loop-node.loop-run-node-pulse--running::before,
+.loop-work-loop-node.loop-run-node-pulse--waiting::before {
+  border-radius: var(--radius-lg);
 }
 
 .loop-run-node-pulse--running::before {
@@ -169,60 +174,62 @@ body {
   transition: inset 180ms ease, filter 180ms ease, opacity 180ms ease;
 }
 
-.loop-step-node[data-loop-reasoning-glow="1"] .loop-node-reasoning-glow {
+.loop-artwork-node[data-loop-reasoning-glow="1"] .loop-node-reasoning-glow {
   --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 88%, var(--loop-node-glow-color));
   inset: -6px;
   opacity: 0.11;
 }
 
-.loop-step-node[data-loop-reasoning-glow="2"] .loop-node-reasoning-glow {
+.loop-artwork-node[data-loop-reasoning-glow="2"] .loop-node-reasoning-glow {
   --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 76%, var(--loop-node-glow-color));
   inset: -8px;
   filter: blur(6px);
   opacity: 0.18;
 }
 
-.loop-step-node[data-loop-reasoning-glow="3"] .loop-node-reasoning-glow {
+.loop-artwork-node[data-loop-reasoning-glow="3"] .loop-node-reasoning-glow {
   --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 62%, var(--loop-node-glow-color));
   inset: -10px;
   filter: blur(7px);
   opacity: 0.28;
 }
 
-.loop-step-node[data-loop-reasoning-glow="4"] .loop-node-reasoning-glow {
+.loop-artwork-node[data-loop-reasoning-glow="4"] .loop-node-reasoning-glow {
   --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 46%, var(--loop-node-glow-color));
   inset: -13px;
   filter: blur(9px);
   opacity: 0.4;
 }
 
-.loop-step-node[data-loop-reasoning-glow="5"] .loop-node-reasoning-glow {
+.loop-artwork-node[data-loop-reasoning-glow="5"] .loop-node-reasoning-glow {
   --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 30%, var(--loop-node-glow-color));
   inset: -16px;
   filter: blur(11px);
   opacity: 0.52;
 }
 
-.loop-step-node[data-loop-reasoning-glow="6"] .loop-node-reasoning-glow {
+.loop-artwork-node[data-loop-reasoning-glow="6"] .loop-node-reasoning-glow {
   --loop-node-reasoning-glow: color-mix(in srgb, var(--muted-foreground) 14%, var(--loop-node-glow-color));
   inset: -20px;
   filter: blur(14px);
   opacity: 0.66;
 }
 
-.loop-step-node[data-loop-reasoning-glow="7"] .loop-node-reasoning-glow {
+.loop-artwork-node[data-loop-reasoning-glow="7"] .loop-node-reasoning-glow {
   --loop-node-reasoning-glow: var(--loop-node-glow-color);
   inset: -25px;
   filter: blur(17px);
   opacity: 0.82;
 }
 
-.loop-step-node:hover .loop-node-surface,
-.loop-step-node:focus-visible .loop-node-surface {
+.loop-artwork-node:hover .loop-node-surface,
+.loop-artwork-node:focus-visible .loop-node-surface,
+.loop-work-loop-node:hover .loop-node-surface,
+.loop-work-loop-node:focus-visible .loop-node-surface {
   filter: brightness(1.12);
 }
 
-.loop-step-node:focus-visible {
+.loop-artwork-node:focus-visible {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
 }

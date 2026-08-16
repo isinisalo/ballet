@@ -1,6 +1,7 @@
 import {
   defaultLoopNodeStyle,
   getProjectNodeEdges,
+  isProjectAgentValidationNode,
   isProjectNodeTerminalTarget,
   isProjectProviderWorkNode,
   type ExecutionProfile,
@@ -13,8 +14,7 @@ import {
   type ProjectWorkLoopNode,
   type WorkLoopNodeRun
 } from "@shared/api/workspace-contracts";
-import type { LoopOutputTarget, LoopStepRecord } from "./loopGraph";
-import { scheduleSummary } from "./loopSchedulePresentation";
+import type { LoopNodeRecord, LoopOutputTarget } from "./loopGraph";
 
 export interface LoopVisualTerminal {
   id: LoopTerminal;
@@ -22,31 +22,28 @@ export interface LoopVisualTerminal {
   terminal: LoopTerminal;
 }
 
-export type LoopVisualStep = {
+export type LoopVisualNode = {
   id: string;
   displayId: string;
   description: string;
-  executionProfileId?: string;
-  humanGate: boolean;
-  scheduled: boolean;
   terminal: boolean;
-  scheduleLabel?: string;
   nodeStyle: LoopNodeStyle;
   nodeSize: LoopNodeSize;
-  reasoningEffort?: string;
-  step: ProjectWorkLoopNode | LoopVisualTerminal;
+  workReasoningEffort?: string;
+  validationReasoningEffort?: string;
+  definition: ProjectWorkLoopNode | LoopVisualTerminal;
   workLoopNodeRun?: WorkLoopNodeRun;
 };
 
-export type LoopVisualLoop = { id: string; start: string; steps: string[] };
-export type LoopVisualConfig = { steps: LoopVisualStep[]; loops: LoopVisualLoop[] };
+export type LoopVisualLoop = { id: string; description: string; start: string; nodes: string[] };
+export type LoopVisualConfig = { nodes: LoopVisualNode[]; loops: LoopVisualLoop[] };
 export type LoopVisualProjection = {
   config: LoopVisualConfig;
-  stepByKey: Map<string, LoopVisualStep>;
-  recordsByLoopId: Map<string, LoopStepRecord[]>;
+  nodeByKey: Map<string, LoopVisualNode>;
+  recordsByLoopId: Map<string, LoopNodeRecord[]>;
 };
 
-export const visualStepKey = (loopId: string, nodeId: string) => `${loopId}::${nodeId}`;
+export const visualNodeKey = (loopId: string, nodeId: string) => `${loopId}::${nodeId}`;
 
 export function buildLoopVisualProjection(
   config: ProjectAutomationConfig,
@@ -61,72 +58,70 @@ export function buildLoopVisualProjection(
     .filter((profile) => !availableExecutionProfileIds || availableExecutionProfileIds.has(profile.id))
     .map((profile) => [profile.id, profile.reasoningEffort]));
   const nodesByLoop = new Map(loops.map((loop) => [loop.id, visualNodes(loop, latestRuns, reasoning)]));
-  const steps = [...nodesByLoop.values()].flat();
-  const stepByKey = new Map(steps.map((step) => [step.id, step]));
+  const nodes = [...nodesByLoop.values()].flat();
+  const nodeByKey = new Map(nodes.map((node) => [node.id, node]));
   const visualLoops = loops.map((loop) => ({
     id: loop.id,
-    start: visualStepKey(loop.id, loop.startNodeId),
-    steps: (nodesByLoop.get(loop.id) ?? []).map((step) => step.id)
+    description: loop.description,
+    start: visualNodeKey(loop.id, loop.startNodeId),
+    nodes: (nodesByLoop.get(loop.id) ?? []).map((node) => node.id)
   }));
   const recordsByLoopId = new Map(loops.map((loop) => {
     const visual = nodesByLoop.get(loop.id) ?? [];
-    const records = visual.map((step, index): LoopStepRecord => ({
-      stepKey: step.id,
+    const records = visual.map((node, index): LoopNodeRecord => ({
+      nodeKey: node.id,
       index,
       loopId: loop.id,
-      step,
-      outputTargets: step.terminal ? [] : getProjectNodeEdges(loop, step.displayId).map((edge) => ({
+      node,
+      outputTargets: node.terminal ? [] : getProjectNodeEdges(loop, node.displayId).map((edge) => ({
         outputId: "ok",
         eventType: `validation.ok.${edge.id}`,
-        type: "step",
+        type: "node",
         targetLoopId: loop.id,
-        targetStepKey: visualStepKey(loop.id, isProjectNodeTerminalTarget(edge.target)
+        targetNodeKey: visualNodeKey(loop.id, isProjectNodeTerminalTarget(edge.target)
           ? edge.target.terminal
           : edge.target.nodeId)
       } satisfies LoopOutputTarget))
     }));
-    const start = records.find((record) => record.step?.displayId === loop.startNodeId);
+    const start = records.find((record) => record.node?.displayId === loop.startNodeId);
     return [loop.id, start ? [start, ...records.filter((record) => record !== start)] : records] as const;
   }));
-  return { config: { steps, loops: visualLoops }, stepByKey, recordsByLoopId };
+  return { config: { nodes, loops: visualLoops }, nodeByKey, recordsByLoopId };
 }
 
 const visualNodes = (
   loop: ProjectLoop,
   latestRuns: ReadonlyMap<string, WorkLoopNodeRun>,
   reasoning: ReadonlyMap<string, string>
-): LoopVisualStep[] => {
-  const nodes = loop.nodes.map((node): LoopVisualStep => {
+): LoopVisualNode[] => {
+  const nodes = loop.nodes.map((node): LoopVisualNode => {
     const work = node.work;
     const providerWork = isProjectProviderWorkNode(work);
     return {
-      id: visualStepKey(loop.id, node.id),
+      id: visualNodeKey(loop.id, node.id),
       displayId: node.id,
       description: node.description,
-      executionProfileId: providerWork ? work.executionProfileId : undefined,
-      humanGate: work.type === "human" || node.validation.type === "human",
-      scheduled: work.type === "scheduled",
       terminal: false,
-      scheduleLabel: work.type === "scheduled" ? scheduleSummary(work.schedule) : undefined,
       nodeStyle: work.nodeStyle,
       nodeSize: work.nodeSize,
-      reasoningEffort: providerWork ? reasoning.get(work.executionProfileId) : undefined,
-      step: node,
+      workReasoningEffort: providerWork ? reasoning.get(work.executionProfileId) : undefined,
+      validationReasoningEffort: isProjectAgentValidationNode(node.validation)
+        ? reasoning.get(node.validation.executionProfileId)
+        : undefined,
+      definition: node,
       workLoopNodeRun: latestRuns.get(node.id)
     };
   });
   const terminals = [...new Set(loop.edges.flatMap((edge) =>
     isProjectNodeTerminalTarget(edge.target) ? [edge.target.terminal] : []))];
-  return [...nodes, ...terminals.map((terminal): LoopVisualStep => ({
-    id: visualStepKey(loop.id, terminal),
+  return [...nodes, ...terminals.map((terminal): LoopVisualNode => ({
+    id: visualNodeKey(loop.id, terminal),
     displayId: terminal,
     description: `${terminal} Loop terminal`,
-    humanGate: false,
-    scheduled: false,
     terminal: true,
     nodeStyle: defaultLoopNodeStyle,
     nodeSize: "tiny",
-    step: { id: terminal, type: "terminal", terminal }
+    definition: { id: terminal, type: "terminal", terminal }
   }))];
 };
 

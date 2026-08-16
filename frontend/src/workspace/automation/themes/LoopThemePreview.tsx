@@ -14,25 +14,25 @@ export function LoopThemePreview({ theme }: { theme: LoopTheme }) {
         layout={previewLayout}
         theme={theme}
         selectedLoopId={previewLoopId}
-        stepByKey={previewProjection.stepByKey}
-        draggedStepIndex={null}
-        dragOverStepIndex={null}
-        selectedStepIndexes={[]}
+        nodeByKey={previewProjection.nodeByKey}
+        draggedNodeIndex={null}
+        dragOverNodeIndex={null}
+        selectedNodeIndexes={[]}
         readOnly
         staticPreview
         canvasHeight={360}
         isCanvasPanning={false}
         loopCanvasRef={canvasRef}
-        canAddFirstStep={false}
-        onStepPointerDown={() => undefined}
-        onStepPointerMove={() => undefined}
-        onStepPointerUp={() => false}
-        onStepPointerCancel={() => undefined}
+        canAddFirstNode={false}
+        onNodePointerDown={() => undefined}
+        onNodePointerMove={() => undefined}
+        onNodePointerUp={() => false}
+        onNodePointerCancel={() => undefined}
         onCanvasMoveStart={() => undefined}
         onCanvasMoveEnd={() => undefined}
-        onStepSelect={() => undefined}
+        onNodeSelect={() => undefined}
         onOutputHandlerSelect={() => undefined}
-        onAddFirstStep={() => undefined}
+        onAddFirstNode={() => undefined}
       />
     </div>
   );

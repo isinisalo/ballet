@@ -7,7 +7,7 @@ import { loopEdgeDasharray, type LoopEdgeLineStyle, type LoopTheme } from "./loo
 const loopSolidEdgeStroke = "var(--loop-theme-edge-color)";
 const loopGhostEdgeStroke = "color-mix(in srgb, var(--loop-theme-edge-color) 35%, transparent)";
 const loopMutedThemeEdgeStroke = "color-mix(in srgb, var(--loop-theme-edge-color) 42%, var(--muted-foreground))";
-const loopCrossLoopApprovalEdgeStroke = "var(--loop-theme-edge-color)";
+const loopCrossLoopEdgeStroke = "var(--loop-theme-edge-color)";
 const loopNormalOutputEdgeStroke = "var(--loop-theme-edge-color)";
 const loopEdgeOpacity = 0.64;
 const loopGhostTargetEdgeOpacity = 0.5;
@@ -49,12 +49,13 @@ function loopEdgeStroke(edge: LoopCanvasEdge, targetNode: LoopCanvasLayoutNode |
   const outputSlotKind = loopEdgeOutputSlotKind(edge);
   if (outputSlotKind === "normal") return loopNormalOutputEdgeStroke;
   if (edge.tone === "return") return loopMutedThemeEdgeStroke;
-  if (edge.tone === "cross-loop") return loopCrossLoopApprovalEdgeStroke;
+  if (edge.tone === "cross-loop") return loopCrossLoopEdgeStroke;
   return loopSolidEdgeStroke;
 }
 
 export function loopEdgeLineStyle(edge: LoopCanvasEdge, theme: LoopTheme): LoopEdgeLineStyle {
   if (edge.tone === "cross-loop") return theme.edge.crossLoopStyle;
+  if (edge.tone === "return") return theme.edge.rejectedStyle;
   return theme.edge.style;
 }
 
@@ -71,7 +72,7 @@ function loopEdgeTargetsGhostNode(
   edge: LoopCanvasEdge,
   targetNode: LoopCanvasLayoutNode | undefined
 ) {
-  if (targetNode?.kind === "first-step-ghost") return true;
-  return edge.targetNodeKey === "first-step-ghost" ||
-    edge.targetNodeKey.endsWith(":first-step-ghost");
+  if (targetNode?.kind === "first-node-ghost") return true;
+  return edge.targetNodeKey === "first-node-ghost" ||
+    edge.targetNodeKey.endsWith(":first-node-ghost");
 }

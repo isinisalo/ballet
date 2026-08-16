@@ -1,8 +1,8 @@
 // The composite layout stays in one pure module because its lane, edge, and cross-Loop
 // passes share a single coordinate model; splitting them would duplicate that state.
-import type { LoopVisualConfig, LoopVisualLoop, LoopVisualStep } from "./loopVisualProjection";
+import type { LoopVisualConfig, LoopVisualLoop, LoopVisualNode } from "./loopVisualProjection";
 import { loopEdgeOutputSlotKind } from "./loopEdgeOutputSlot";
-import { buildLoopGraph, loopCanonicalRecord, type LoopGraph, type LoopOutputTarget, type LoopStepRecord } from "./loopGraph";
+import { buildLoopGraph, loopCanonicalRecord, type LoopGraph, type LoopOutputTarget, type LoopNodeRecord } from "./loopGraph";
 import { loopCanvasLayoutConfig, loopNodeSizes } from "./loopLayoutConfig";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import { buildLoopLayoutGraphDraft } from "./loopLayoutGraph";
@@ -12,7 +12,7 @@ import type { LoopCanvasLayout, LoopCanvasLayoutNode, LoopLayoutDirection } from
 
 type LoopLayoutRow = {
   loop: LoopVisualLoop;
-  records: LoopStepRecord[];
+  records: LoopNodeRecord[];
   loopGraph: LoopGraph;
   layout: LoopCanvasLayout;
 };
@@ -20,11 +20,11 @@ type LoopLayoutRow = {
 type LoopEventLink = {
   sourceLoopId: string;
   targetLoopId: string;
-  sourceStepIndex: number;
-  sourceStepId: string;
+  sourceNodeIndex: number;
+  sourceNodeId: string;
   outputId: string;
   eventType: string;
-  targetStepId: string;
+  targetNodeId: string;
 };
 
 // This module intentionally centralizes loop graph layout rules because
@@ -34,8 +34,8 @@ export type { LoopCanvasEdge } from "./loopLayoutEdges";
 export {
   loopCanvasNodeAnchorY,
   loopOutputSourceHandleId,
-  loopStepOutputHandleY,
-  loopStepStackHeight
+  loopWorkLoopNodeOutputHandleY,
+  loopWorkLoopNodeStackHeight
 } from "./loopLayoutSizing";
 export type {
   LoopCanvasLayout,
@@ -46,16 +46,16 @@ export type {
 
 export function calculateLoopCanvasLayout({
   loopGraph,
-  editingStepIndex,
+  editingNodeIndex,
   direction = "horizontal"
 }: {
   loopGraph: LoopGraph;
-  editingStepIndex: number | null;
+  editingNodeIndex: number | null;
   direction?: LoopLayoutDirection;
 }): LoopCanvasLayout {
   const graphDraft = buildLoopLayoutGraphDraft({
     loopGraph,
-    editingStepIndex,
+    editingNodeIndex,
     direction
   });
   const positionedNodes = positionLoopNodes(graphDraft.nodes, graphDraft.dagreEdges, direction);
@@ -71,26 +71,26 @@ export function calculateCompositeLoopCanvasLayout({
   config,
   selectedLoopId,
   recordsByLoopId,
-  editingStepIndexByLoopId = new Map(),
+  editingNodeIndexByLoopId = new Map(),
   direction = "horizontal"
 }: {
   config: LoopVisualConfig;
   selectedLoopId: string;
-  recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingStepIndexByLoopId?: ReadonlyMap<string, number | null>;
+  recordsByLoopId: ReadonlyMap<string, LoopNodeRecord[]>;
+  editingNodeIndexByLoopId?: ReadonlyMap<string, number | null>;
   direction?: LoopLayoutDirection;
 }): LoopCanvasLayout {
   const selectedLoop = config.loops.find((loop) => loop.id === selectedLoopId);
   if (!selectedLoop) return { nodes: [], edges: [], direction };
 
-  const stepById = new Map(config.steps.map((step) => [step.id, step]));
+  const nodeById = new Map(config.nodes.map((node) => [node.id, node]));
   return calculateSelectedLoopCanvasLayout({
     config,
     selectedLoop,
     recordsByLoopId,
-    editingStepIndexByLoopId,
+    editingNodeIndexByLoopId,
     direction,
-    stepById
+    nodeById
   });
 }
 
@@ -98,23 +98,23 @@ function calculateSelectedLoopCanvasLayout({
   config,
   selectedLoop,
   recordsByLoopId,
-  editingStepIndexByLoopId,
+  editingNodeIndexByLoopId,
   direction,
-  stepById
+  nodeById
 }: {
   config: LoopVisualConfig;
   selectedLoop: LoopVisualLoop;
-  recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingStepIndexByLoopId: ReadonlyMap<string, number | null>;
+  recordsByLoopId: ReadonlyMap<string, LoopNodeRecord[]>;
+  editingNodeIndexByLoopId: ReadonlyMap<string, number | null>;
   direction: LoopLayoutDirection;
-  stepById: ReadonlyMap<string, LoopVisualStep>;
+  nodeById: ReadonlyMap<string, LoopVisualNode>;
 }): LoopCanvasLayout {
   const selectedRow = loopLayoutRow({
     loop: selectedLoop,
     recordsByLoopId,
-    editingStepIndexByLoopId,
+    editingNodeIndexByLoopId,
     direction,
-    stepById
+    nodeById
   });
   const links = loopEventLinks(config, recordsByLoopId);
   const downstreamLoopIds = linkedLoopIds(config, links, selectedLoop.id, "downstream");
@@ -185,20 +185,20 @@ function calculateSelectedLoopCanvasLayout({
 function loopLayoutRow({
   loop,
   recordsByLoopId,
-  editingStepIndexByLoopId,
+  editingNodeIndexByLoopId,
   direction,
-  stepById
+  nodeById
 }: {
   loop: LoopVisualLoop;
-  recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>;
-  editingStepIndexByLoopId: ReadonlyMap<string, number | null>;
+  recordsByLoopId: ReadonlyMap<string, LoopNodeRecord[]>;
+  editingNodeIndexByLoopId: ReadonlyMap<string, number | null>;
   direction: LoopLayoutDirection;
-  stepById: ReadonlyMap<string, LoopVisualStep>;
+  nodeById: ReadonlyMap<string, LoopVisualNode>;
 }): LoopLayoutRow {
   const records = (recordsByLoopId.get(loop.id) ?? []).map((record) => ({
     ...record,
     loopId: loop.id,
-    step: record.step ?? stepById.get(record.stepKey)
+    node: record.node ?? nodeById.get(record.nodeKey)
   }));
   const loopGraph = buildLoopGraph(records);
 
@@ -208,7 +208,7 @@ function loopLayoutRow({
     loopGraph,
     layout: calculateLoopCanvasLayout({
       loopGraph,
-      editingStepIndex: editingStepIndexByLoopId.get(loop.id) ?? null,
+      editingNodeIndex: editingNodeIndexByLoopId.get(loop.id) ?? null,
       direction
     })
   };
@@ -216,24 +216,24 @@ function loopLayoutRow({
 
 function loopEventLinks(
   config: LoopVisualConfig,
-  recordsByLoopId: ReadonlyMap<string, LoopStepRecord[]>
+  recordsByLoopId: ReadonlyMap<string, LoopNodeRecord[]>
 ): LoopEventLink[] {
   return config.loops.flatMap((loop) => {
     const records = recordsByLoopId.get(loop.id) ?? [];
     return records.flatMap((record) =>
       (record.outputTargets ?? [])
         .flatMap((target) => {
-          if (target.type !== "step") return [];
+          if (target.type !== "node") return [];
           const targetLoop = resolveEventTargetLoop(config, target);
           if (!targetLoop || targetLoop.id === loop.id) return [];
           return [{
             sourceLoopId: loop.id,
             targetLoopId: targetLoop.id,
-            sourceStepIndex: record.index,
-            sourceStepId: record.stepKey,
+            sourceNodeIndex: record.index,
+            sourceNodeId: record.nodeKey,
             outputId: target.outputId,
             eventType: target.eventType,
-            targetStepId: target.targetStepKey
+            targetNodeId: target.targetNodeKey
           } satisfies LoopEventLink];
         })
     );
@@ -320,12 +320,12 @@ function compactLoopEventEdges({
     const targetIsSelected = link.targetLoopId === selectedLoopId;
     if (!sourceIsCompact || (!targetIsCompact && !targetIsSelected)) return [];
     const targetNodeKey = targetIsSelected
-      ? selectedLoopTargetStepNodeKey(selectedRow, link)
+      ? selectedLoopTargetNodeKey(selectedRow, link)
       : compactLoopNodeKey(link.targetLoopId);
     if (!targetNodeKey) return [];
 
     return [{
-      key: `loop:${link.sourceLoopId}:output:${link.sourceStepIndex}:${link.outputId}:to:${link.targetLoopId}:loop`,
+      key: `loop:${link.sourceLoopId}:output:${link.sourceNodeIndex}:${link.outputId}:to:${link.targetLoopId}:loop`,
       sourceNodeKey: compactLoopNodeKey(link.sourceLoopId),
       targetNodeKey,
       sourceHandleId: "bottom",
@@ -336,9 +336,9 @@ function compactLoopEventEdges({
       route: {
         sourceLoopId: link.sourceLoopId,
         targetLoopId: link.targetLoopId,
-        sourceStepIndex: link.sourceStepIndex,
-        sourceStepId: link.sourceStepId,
-        handlerStepId: targetIsSelected ? link.targetStepId : undefined,
+        sourceNodeIndex: link.sourceNodeIndex,
+        sourceNodeId: link.sourceNodeId,
+        handlerNodeId: targetIsSelected ? link.targetNodeId : undefined,
         handlerLoopId: targetIsSelected ? selectedLoopId : undefined,
         eventType: link.eventType,
         outputId: link.outputId
@@ -359,13 +359,13 @@ function selectedToCompactLoopEventEdges({
   return links
     .filter((link) => link.sourceLoopId === selectedRow.loop.id && targetLoopIds.has(link.targetLoopId))
     .flatMap((link) => {
-      const record = selectedRow.records.find((candidate) => candidate.index === link.sourceStepIndex);
+      const record = selectedRow.records.find((candidate) => candidate.index === link.sourceNodeIndex);
       if (!record) return [];
       const canonicalRecord = loopCanonicalRecord(selectedRow.loopGraph, record);
 
       return [{
-        key: `loop:${selectedRow.loop.id}:output:${link.sourceStepIndex}:${link.outputId}:to:${link.targetLoopId}:loop`,
-        sourceNodeKey: namespaceLoopKey(selectedRow.loop.id, `step-${canonicalRecord.index}`),
+        key: `loop:${selectedRow.loop.id}:output:${link.sourceNodeIndex}:${link.outputId}:to:${link.targetLoopId}:loop`,
+        sourceNodeKey: namespaceLoopKey(selectedRow.loop.id, `node-${canonicalRecord.index}`),
         targetNodeKey: compactLoopNodeKey(link.targetLoopId),
         sourceHandleId: loopOutputSourceHandleId({ outputId: link.outputId, eventType: link.eventType }),
         targetHandleId: "top",
@@ -375,8 +375,8 @@ function selectedToCompactLoopEventEdges({
         route: {
           sourceLoopId: selectedRow.loop.id,
           targetLoopId: link.targetLoopId,
-          sourceStepIndex: link.sourceStepIndex,
-          sourceStepId: link.sourceStepId,
+          sourceNodeIndex: link.sourceNodeIndex,
+          sourceNodeId: link.sourceNodeId,
           eventType: link.eventType,
           outputId: link.outputId
         }
@@ -389,7 +389,7 @@ function compactLoopNodeKey(loopId: string) {
 }
 
 function resolveEventTargetLoop(config: LoopVisualConfig, target: LoopOutputTarget): LoopVisualLoop | undefined {
-  if (target.type === "step") return config.loops.find((loop) => loop.id === target.targetLoopId);
+  if (target.type === "node") return config.loops.find((loop) => loop.id === target.targetLoopId);
   return undefined;
 }
 
@@ -398,7 +398,7 @@ function loopLayoutBounds(nodes: LoopCanvasLayoutNode[]) {
     return {
       minY: loopCanvasLayoutConfig.startY,
       maxY: loopCanvasLayoutConfig.startY,
-      height: loopNodeSizes.step.height
+      height: loopNodeSizes.workLoopNode.height
     };
   }
   const minY = Math.min(...nodes.map((node) => node.y));
@@ -406,21 +406,21 @@ function loopLayoutBounds(nodes: LoopCanvasLayoutNode[]) {
   return { minY, maxY, height: maxY - minY };
 }
 
-function selectedLoopTargetStepNodeKey(row: LoopLayoutRow, link: LoopEventLink) {
+function selectedLoopTargetNodeKey(row: LoopLayoutRow, link: LoopEventLink) {
   if (row.loop.id !== link.targetLoopId) return undefined;
-  return targetLoopStepNodeKey(row.loop.id, link.targetStepId, new Map([[row.loop.id, row]]));
+  return targetLoopNodeKey(row.loop.id, link.targetNodeId, new Map([[row.loop.id, row]]));
 }
 
-function targetLoopStepNodeKey(
+function targetLoopNodeKey(
   loopId: string,
-  stepId: string,
+  nodeId: string,
   rowByLoopId: ReadonlyMap<string, LoopLayoutRow>
 ) {
   const row = rowByLoopId.get(loopId);
-  const targetRecord = row?.records.find((record) => record.stepKey === stepId);
+  const targetRecord = row?.records.find((record) => record.nodeKey === nodeId);
   if (!row || !targetRecord) return undefined;
   const canonicalTargetRecord = loopCanonicalRecord(row.loopGraph, targetRecord);
-  return namespaceLoopKey(loopId, `step-${canonicalTargetRecord.index}`);
+  return namespaceLoopKey(loopId, `node-${canonicalTargetRecord.index}`);
 }
 
 function namespaceLoopEdge(loopId: string, edge: LoopCanvasEdge): LoopCanvasEdge {

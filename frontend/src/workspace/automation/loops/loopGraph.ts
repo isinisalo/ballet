@@ -1,49 +1,49 @@
-import type { LoopVisualStep } from "./loopVisualProjection";
+import type { LoopVisualNode } from "./loopVisualProjection";
 
 export type LoopOutputTarget =
   {
     outputId: string;
     eventType: string;
-    type: "step";
+    type: "node";
     targetLoopId: string;
-    targetStepKey: string;
+    targetNodeKey: string;
   };
 
-export type LoopStepRecord = {
-  stepKey: string;
+export type LoopNodeRecord = {
+  nodeKey: string;
   index: number;
   loopId?: string;
-  step?: LoopVisualStep;
+  node?: LoopVisualNode;
   outputTargets?: LoopOutputTarget[];
 };
 
-export type LoopStepFold = {
-  stepKey: string;
-  canonicalRecord: LoopStepRecord;
-  records: LoopStepRecord[];
+export type LoopNodeFold = {
+  nodeKey: string;
+  canonicalRecord: LoopNodeRecord;
+  records: LoopNodeRecord[];
 };
 
-export type LoopStepFoldModel = {
+export type LoopNodeFoldModel = {
   canonicalIndexByRecordIndex: Map<number, number>;
-  canonicalRecordByIndex: Map<number, LoopStepRecord>;
-  recordsByCanonicalIndex: Map<number, LoopStepRecord[]>;
-  folds: LoopStepFold[];
+  canonicalRecordByIndex: Map<number, LoopNodeRecord>;
+  recordsByCanonicalIndex: Map<number, LoopNodeRecord[]>;
+  folds: LoopNodeFold[];
 };
 
 export type LoopGraph = {
-  stepFoldModel: LoopStepFoldModel;
-  childRecordsByParentEvent: Map<string, LoopStepRecord[]>;
-  eventHandlerRecordsByEvent: Map<string, LoopStepRecord[]>;
-  rootRecords: LoopStepRecord[];
+  nodeFoldModel: LoopNodeFoldModel;
+  childRecordsByParentEvent: Map<string, LoopNodeRecord[]>;
+  eventHandlerRecordsByEvent: Map<string, LoopNodeRecord[]>;
+  rootRecords: LoopNodeRecord[];
 };
 
-export const loopCanonicalRecord = (loopGraph: LoopGraph, record: LoopStepRecord): LoopStepRecord =>
-  loopGraph.stepFoldModel.canonicalRecordByIndex.get(record.index) ?? record;
+export const loopCanonicalRecord = (loopGraph: LoopGraph, record: LoopNodeRecord): LoopNodeRecord =>
+  loopGraph.nodeFoldModel.canonicalRecordByIndex.get(record.index) ?? record;
 
-export const loopFoldedRecords = (loopGraph: LoopGraph, record: LoopStepRecord): LoopStepRecord[] =>
-  loopGraph.stepFoldModel.recordsByCanonicalIndex.get(loopCanonicalRecord(loopGraph, record).index) ?? [record];
+export const loopFoldedRecords = (loopGraph: LoopGraph, record: LoopNodeRecord): LoopNodeRecord[] =>
+  loopGraph.nodeFoldModel.recordsByCanonicalIndex.get(loopCanonicalRecord(loopGraph, record).index) ?? [record];
 
-export const loopFoldedOutputTargets = (loopGraph: LoopGraph, record: LoopStepRecord): LoopOutputTarget[] => {
+export const loopFoldedOutputTargets = (loopGraph: LoopGraph, record: LoopNodeRecord): LoopOutputTarget[] => {
   const targetsByKey = new Map<string, LoopOutputTarget>();
   loopFoldedRecords(loopGraph, record).forEach((foldedRecord) => {
     const outputTargets = foldedRecord.outputTargets ?? [];
@@ -57,16 +57,16 @@ export const loopFoldedOutputTargets = (loopGraph: LoopGraph, record: LoopStepRe
   return [...targetsByKey.values()];
 };
 
-export const buildLoopGraph = (loopStepRecords: LoopStepRecord[]): LoopGraph => {
-  const stepFoldModel = buildLoopStepFoldModel(loopStepRecords);
-  const childRecordsByParentEvent = new Map<string, LoopStepRecord[]>();
-  const eventHandlerRecordsByEvent = new Map<string, LoopStepRecord[]>();
+export const buildLoopGraph = (loopNodeRecords: LoopNodeRecord[]): LoopGraph => {
+  const nodeFoldModel = buildLoopNodeFoldModel(loopNodeRecords);
+  const childRecordsByParentEvent = new Map<string, LoopNodeRecord[]>();
+  const eventHandlerRecordsByEvent = new Map<string, LoopNodeRecord[]>();
   const childRecordIndexes = new Set<number>();
 
-  loopStepRecords.forEach((record) => {
+  loopNodeRecords.forEach((record) => {
     record.outputTargets?.forEach((target) => {
-      if (target.type !== "step" || target.targetLoopId !== record.loopId) return;
-      const childRecord = loopStepRecords.find((candidate) => candidate.stepKey === target.targetStepKey);
+      if (target.type !== "node" || target.targetLoopId !== record.loopId) return;
+      const childRecord = loopNodeRecords.find((candidate) => candidate.nodeKey === target.targetNodeKey);
       if (!childRecord) return;
       eventHandlerRecordsByEvent.set(target.eventType, [
         ...(eventHandlerRecordsByEvent.get(target.eventType) ?? []),
@@ -78,41 +78,41 @@ export const buildLoopGraph = (loopStepRecords: LoopStepRecord[]): LoopGraph => 
     });
   });
 
-  const rootRecords = loopStepRecords.length > 0
-    ? [loopStepRecords[0]]
-    : loopStepRecords.filter((record) => !childRecordIndexes.has(record.index));
+  const rootRecords = loopNodeRecords.length > 0
+    ? [loopNodeRecords[0]]
+    : loopNodeRecords.filter((record) => !childRecordIndexes.has(record.index));
   return {
-    stepFoldModel,
+    nodeFoldModel,
     childRecordsByParentEvent,
     eventHandlerRecordsByEvent,
-    rootRecords: rootRecords.length > 0 ? rootRecords : loopStepRecords.slice(0, 1)
+    rootRecords: rootRecords.length > 0 ? rootRecords : loopNodeRecords.slice(0, 1)
   };
 };
 
-function buildLoopStepFoldModel(loopStepRecords: LoopStepRecord[]): LoopStepFoldModel {
-  const recordsByStepKey = new Map<string, LoopStepRecord[]>();
+function buildLoopNodeFoldModel(loopNodeRecords: LoopNodeRecord[]): LoopNodeFoldModel {
+  const recordsByNodeKey = new Map<string, LoopNodeRecord[]>();
 
-  loopStepRecords.forEach((record) => {
-    const stepKey = record.stepKey;
-    if (!stepKey) return;
-    recordsByStepKey.set(stepKey, [...(recordsByStepKey.get(stepKey) ?? []), record]);
+  loopNodeRecords.forEach((record) => {
+    const nodeKey = record.nodeKey;
+    if (!nodeKey) return;
+    recordsByNodeKey.set(nodeKey, [...(recordsByNodeKey.get(nodeKey) ?? []), record]);
   });
 
   const canonicalIndexByRecordIndex = new Map<number, number>();
-  const canonicalRecordByIndex = new Map<number, LoopStepRecord>();
-  const recordsByCanonicalIndex = new Map<number, LoopStepRecord[]>();
-  const folds: LoopStepFold[] = [];
+  const canonicalRecordByIndex = new Map<number, LoopNodeRecord>();
+  const recordsByCanonicalIndex = new Map<number, LoopNodeRecord[]>();
+  const folds: LoopNodeFold[] = [];
 
-  loopStepRecords.forEach((record) => {
+  loopNodeRecords.forEach((record) => {
     canonicalIndexByRecordIndex.set(record.index, record.index);
     canonicalRecordByIndex.set(record.index, record);
     recordsByCanonicalIndex.set(record.index, [record]);
   });
 
-  recordsByStepKey.forEach((records, stepKey) => {
+  recordsByNodeKey.forEach((records, nodeKey) => {
     const canonicalRecord = records[0];
     if (!canonicalRecord) return;
-    folds.push({ stepKey, canonicalRecord, records });
+    folds.push({ nodeKey, canonicalRecord, records });
     recordsByCanonicalIndex.set(canonicalRecord.index, records);
     records.forEach((record) => {
       canonicalIndexByRecordIndex.set(record.index, canonicalRecord.index);

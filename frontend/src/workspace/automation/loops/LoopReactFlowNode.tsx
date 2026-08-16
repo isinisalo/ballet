@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
-import { LoopCompactStepNode } from "./LoopCompactStepNode";
+import { LoopCompositeNode } from "./LoopCompositeNode";
 import type { LoopNodeContext, LoopReactFlowNode } from "./LoopCanvasTypes";
 import { LoopRouteArtwork } from "./LoopRouteArtwork";
 
@@ -42,9 +42,9 @@ function LoopNodeHandles({ activeHandleIds, layoutNode }: { activeHandleIds: str
 
 function renderNodeContent(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   if (node.kind === "loop") return renderLoopNode(node);
-  if (node.kind === "first-step-ghost") return renderFirstStepGhost(node, context);
+  if (node.kind === "first-node-ghost") return renderFirstNodeGhost(node, context);
   if (!node.record) return null;
-  return <LoopCompactStepNode context={context} record={node.record} records={node.records ?? [node.record]} />;
+  return <LoopCompositeNode context={context} record={node.record} records={node.records ?? [node.record]} />;
 }
 
 function renderLoopNode(node: LoopCanvasLayoutNode) {
@@ -67,13 +67,13 @@ function renderLoopNode(node: LoopCanvasLayoutNode) {
   );
 }
 
-function renderFirstStepGhost(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
+function renderFirstNodeGhost(node: LoopCanvasLayoutNode, context: LoopNodeContext) {
   const editable = (node.loopId ?? context.selectedLoopId) === context.selectedLoopId;
   return (
     <LoopGhostNode
-      ariaLabel="Add first step"
-      onClick={context.onAddFirstStep}
-      disabled={!editable || !context.canAddFirstStep}
+      ariaLabel="Add first Work Loop Node"
+      onClick={context.onAddFirstNode}
+      disabled={!editable || !context.canAddFirstNode}
       className="nodrag"
     />
   );

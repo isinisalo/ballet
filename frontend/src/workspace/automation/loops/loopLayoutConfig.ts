@@ -1,16 +1,8 @@
 import type { LoopLayoutDirection } from "./loopLayoutTypes";
-import type { LoopNodeSize } from "@shared/api/workspace-contracts";
-
-export const loopStepNodeSizes: Record<LoopNodeSize, number> = {
-  tiny: 24,
-  small: 36,
-  medium: 48,
-  large: 64
-};
 
 export const loopNodeSizes = {
   loop: { minWidth: 22, maxWidth: 22, height: 22 },
-  step: { minWidth: 24, maxWidth: 64, height: 64 },
+  workLoopNode: { minWidth: 224, maxWidth: 224, height: 132 },
   event: { width: 22, height: 22 }
 };
 

@@ -32,7 +32,7 @@ export function ExecutionProfileEditor({ profile, existingProfileIds, runtime, c
         <aside className="border-b border-divider-strong bg-background px-5 py-5 @3xl/execution-profile:border-b-0 @3xl/execution-profile:border-r">
           <div className="grid gap-3">
             <Cpu className="size-8 text-primary" aria-hidden="true" />
-            <div><h1 className="text-base font-semibold leading-5">{profile ? editor.draft.name || "Unnamed execution profile" : "New execution profile"}</h1><p className="mt-1 text-xs text-muted-foreground">Portable runtime intent for executable Steps.</p></div>
+            <div><h1 className="text-base font-semibold leading-5">{profile ? editor.draft.name || "Unnamed execution profile" : "New execution profile"}</h1><p className="mt-1 text-xs text-muted-foreground">Portable runtime intent for provider-backed Nodes.</p></div>
             <dl className="grid gap-3 border-t border-divider-strong pt-4 text-xs">
               <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3"><dt className="text-muted-foreground">ID</dt><dd className="truncate font-mono" title={editor.id}>{editor.id || "Generated from name"}</dd></div>
               <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3"><dt className="text-muted-foreground">Availability</dt><dd className={editor.availabilityError ? "text-destructive" : "text-secondary"}>{editor.availabilityError ?? (editor.valid ? "Available" : "Incomplete")}</dd></div>

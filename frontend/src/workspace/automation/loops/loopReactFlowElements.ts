@@ -25,7 +25,7 @@ export function loopNodeHandles(
 ): LoopReactFlowNode["handles"] {
   const anchorTop = loopCanvasNodeAnchorY(layoutNode);
   const ids = new Set(activeHandleIds);
-  const terminal = Boolean(layoutNode.record?.step?.terminal);
+  const terminal = Boolean(layoutNode.record?.node?.terminal);
   const handles: NonNullable<LoopReactFlowNode["handles"]> = [];
   if (ids.has("left")) handles.push({ id: "left", type: "target", position: Position.Left, x: 0, y: anchorTop, width: 1, height: 1 });
   if (ids.has("right") && !terminal) handles.push({ id: "right", type: "source", position: Position.Right, x: layoutNode.width, y: anchorTop, width: 1, height: 1 });

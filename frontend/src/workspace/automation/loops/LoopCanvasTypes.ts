@@ -1,7 +1,7 @@
 import type { PointerEvent, RefObject } from "react";
 import type { Edge, Node } from "@xyflow/react";
-import type { LoopVisualStep } from "./loopVisualProjection";
-import type { LoopStepRecord } from "./loopGraph";
+import type { LoopVisualNode } from "./loopVisualProjection";
+import type { LoopNodeRecord } from "./loopGraph";
 import type { LoopCanvasEdge, LoopCanvasLayout, LoopCanvasLayoutNode } from "./loopLayout";
 import type { LoopTheme } from "@shared/api/workspace-contracts";
 
@@ -9,25 +9,25 @@ export type LoopCanvasProps = {
   layout: LoopCanvasLayout;
   theme: LoopTheme;
   selectedLoopId: string;
-  stepByKey: Map<string, LoopVisualStep>;
-  draggedStepIndex: number | null;
-  dragOverStepIndex: number | null;
-  selectedStepIndexes: number[];
+  nodeByKey: Map<string, LoopVisualNode>;
+  draggedNodeIndex: number | null;
+  dragOverNodeIndex: number | null;
+  selectedNodeIndexes: number[];
   readOnly: boolean;
   staticPreview: boolean;
   canvasHeight: number | null;
   isCanvasPanning: boolean;
   loopCanvasRef: RefObject<HTMLDivElement>;
-  canAddFirstStep: boolean;
-  onStepPointerDown: (event: PointerEvent<HTMLDivElement>, loopId: string, index: number) => void;
-  onStepPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
-  onStepPointerUp: (event: PointerEvent<HTMLDivElement>) => boolean;
-  onStepPointerCancel: () => void;
+  canAddFirstNode: boolean;
+  onNodePointerDown: (event: PointerEvent<HTMLDivElement>, loopId: string, index: number) => void;
+  onNodePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
+  onNodePointerUp: (event: PointerEvent<HTMLDivElement>) => boolean;
+  onNodePointerCancel: () => void;
   onCanvasMoveStart: () => void;
   onCanvasMoveEnd: () => void;
-  onStepSelect: (records: LoopStepRecord[]) => void;
+  onNodeSelect: (records: LoopNodeRecord[]) => void;
   onOutputHandlerSelect: (edge: LoopCanvasEdge) => void;
-  onAddFirstStep: () => void;
+  onAddFirstNode: () => void;
 };
 
 export type LoopNodeContext = Omit<LoopCanvasProps, "layout" | "canvasHeight" | "isCanvasPanning" | "loopCanvasRef" | "onCanvasMoveStart" | "onCanvasMoveEnd">;

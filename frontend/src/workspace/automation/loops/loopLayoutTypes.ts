@@ -1,12 +1,12 @@
-import type { LoopOutputTarget, LoopStepRecord } from "./loopGraph";
+import type { LoopOutputTarget, LoopNodeRecord } from "./loopGraph";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 
 export type LoopLayoutDirection = "horizontal" | "vertical";
 
 export type LoopCanvasNodeKind =
   | "loop"
-  | "step"
-  | "first-step-ghost";
+  | "work-loop-node"
+  | "first-node-ghost";
 
 export type LoopCanvasLoopSummary = {
   loopId: string;
@@ -21,10 +21,10 @@ export type LoopCanvasLayoutNode = {
   width: number;
   height: number;
   direction: LoopLayoutDirection;
-  record?: LoopStepRecord;
-  records?: LoopStepRecord[];
+  record?: LoopNodeRecord;
+  records?: LoopNodeRecord[];
   loopSummary?: LoopCanvasLoopSummary;
-  isEditingStep?: boolean;
+  isEditingNode?: boolean;
   outputHandleCount?: number;
 };
 
@@ -43,14 +43,14 @@ export type LoopDagreEdge = {
 };
 
 export type LoopActiveOutputTask =
-  | { kind: "children"; output: LoopOutputTarget; childRecords: LoopStepRecord[] }
+  | { kind: "children"; output: LoopOutputTarget; childRecords: LoopNodeRecord[] }
   | { kind: "existing-handler"; output: LoopOutputTarget; hasBackwardHandler: boolean };
 
 export type LoopLayoutMetrics = {
-  horizontalRootStepX: number;
-  horizontalStepColumnGap: number;
-  horizontalRowStep: number;
-  verticalRootStepY: number;
-  verticalStepRankGap: number;
-  verticalColumnStep: number;
+  horizontalRootNodeX: number;
+  horizontalNodeColumnGap: number;
+  horizontalRowNodeGap: number;
+  verticalRootNodeY: number;
+  verticalNodeRankGap: number;
+  verticalColumnNodeGap: number;
 };

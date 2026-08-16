@@ -2,7 +2,7 @@ import {
   loopFoldedRecords,
   type LoopGraph,
   type LoopOutputTarget,
-  type LoopStepRecord
+  type LoopNodeRecord
 } from "./loopGraph";
 import {
   loopEventOutputLabel,
@@ -21,7 +21,7 @@ export type LoopLayoutGraphDraft = {
 
 export type LoopLayoutGraphDraftContext = {
   loopGraph: LoopGraph;
-  editingStepIndex: number | null;
+  editingNodeIndex: number | null;
   direction: LoopLayoutDirection;
   sourceHandleId: string;
   targetHandleId: string;
@@ -29,7 +29,7 @@ export type LoopLayoutGraphDraftContext = {
   dagreEdges: LoopDagreEdge[];
   canvasEdges: LoopCanvasEdge[];
   edgeKeys: Set<string>;
-  stepNodeIndexes: Set<number>;
+  workLoopNodeIndexes: Set<number>;
   handledEventNodes: LoopHandledEventNode[];
 };
 
@@ -47,28 +47,29 @@ export function addCanvasEdge(context: LoopLayoutGraphDraftContext, edge: LoopCa
   context.canvasEdges.push(edge);
 }
 
-export function addStepNode(context: LoopLayoutGraphDraftContext, record: LoopStepRecord, outputHandleCount: number) {
+export function addWorkLoopNodeLayout(context: LoopLayoutGraphDraftContext, record: LoopNodeRecord, outputHandleCount: number) {
   const records = loopFoldedRecords(context.loopGraph, record);
-  const isEditingStep = context.editingStepIndex === record.index;
-  const nodeSize = loopNodeSizeCatalog[record.step?.nodeSize ?? defaultLoopNodeSize].pixels;
+  const isEditingNode = context.editingNodeIndex === record.index;
+  const nodeSize = loopNodeSizeCatalog[record.node?.nodeSize ?? defaultLoopNodeSize].pixels;
+  const terminal = record.node?.terminal === true;
   addNode(context, {
-    key: `step-${record.index}`,
-    kind: "step",
-    width: nodeSize,
-    height: nodeSize,
+    key: `node-${record.index}`,
+    kind: "work-loop-node",
+    width: terminal ? nodeSize : loopNodeSizes.workLoopNode.maxWidth,
+    height: terminal ? nodeSize : loopNodeSizes.workLoopNode.height,
     direction: context.direction,
     record,
     records,
-    isEditingStep,
+    isEditingNode,
     outputHandleCount
   });
-  context.stepNodeIndexes.add(record.index);
+  context.workLoopNodeIndexes.add(record.index);
 }
 
-export function addFirstStepGhost(context: LoopLayoutGraphDraftContext) {
+export function addFirstNodeGhost(context: LoopLayoutGraphDraftContext) {
   addNode(context, {
-    key: "first-step-ghost",
-    kind: "first-step-ghost",
+    key: "first-node-ghost",
+    kind: "first-node-ghost",
     width: loopNodeSizes.event.width,
     height: loopNodeSizes.event.height,
     direction: context.direction

@@ -33,7 +33,7 @@
   display: none;
 }
 
-.loop-step-node[data-loop-node-size="tiny"] .loop-node-artwork-detail--medium,
-.loop-step-node[data-loop-node-size="small"] .loop-node-artwork-detail--medium {
+.loop-artwork-node[data-loop-node-size="tiny"] .loop-node-artwork-detail--medium,
+.loop-artwork-node[data-loop-node-size="small"] .loop-node-artwork-detail--medium {
   display: none;
 }

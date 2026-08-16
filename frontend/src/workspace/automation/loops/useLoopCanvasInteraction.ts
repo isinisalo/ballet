@@ -2,17 +2,17 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 
 export function useLoopCanvasInteraction({
   selectedId,
-  reorderStep
+  reorderNode
 }: {
   selectedId?: string;
-  reorderStep: (loopId: string, fromIndex: number, toIndex: number) => void;
+  reorderNode: (loopId: string, fromIndex: number, toIndex: number) => void;
 }) {
-  const draggedStepRef = useRef<{ loopId: string; index: number } | null>(null);
+  const draggedNodeRef = useRef<{ loopId: string; index: number } | null>(null);
   const dragStartPointRef = useRef<{ x: number; y: number } | null>(null);
-  const hasDraggedStepRef = useRef(false);
+  const hasDraggedNodeRef = useRef(false);
   const loopCanvasRef = useRef<HTMLDivElement | null>(null);
-  const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null);
-  const [dragOverStepIndex, setDragOverStepIndex] = useState<number | null>(null);
+  const [draggedNodeIndex, setDraggedNodeIndex] = useState<number | null>(null);
+  const [dragOverNodeIndex, setDragOverNodeIndex] = useState<number | null>(null);
   const [canvasHeight, setCanvasHeight] = useState<number | null>(null);
   const [isCanvasPanning, setIsCanvasPanning] = useState(false);
 
@@ -38,55 +38,55 @@ export function useLoopCanvasInteraction({
     };
   }, [selectedId]);
 
-  const resetStepDrag = () => {
-    draggedStepRef.current = null;
+  const resetNodeDrag = () => {
+    draggedNodeRef.current = null;
     dragStartPointRef.current = null;
-    hasDraggedStepRef.current = false;
-    setDraggedStepIndex(null);
-    setDragOverStepIndex(null);
+    hasDraggedNodeRef.current = false;
+    setDraggedNodeIndex(null);
+    setDragOverNodeIndex(null);
   };
 
-  const stepFromPoint = (event: PointerEvent<HTMLDivElement>) => {
+  const nodeFromPoint = (event: PointerEvent<HTMLDivElement>) => {
     if (typeof document.elementFromPoint !== "function") return null;
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-loop-step-index]");
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-loop-node-index]");
     if (!(target instanceof HTMLElement)) return null;
-    const targetIndex = Number(target.dataset.loopStepIndex);
+    const targetIndex = Number(target.dataset.loopNodeIndex);
     const loopId = target.dataset.loopId;
     if (!loopId || Number.isNaN(targetIndex)) return null;
     return { loopId, index: targetIndex };
   };
 
-  const handleStepPointerDown = (event: PointerEvent<HTMLDivElement>, loopId: string, index: number) => {
+  const handleNodePointerDown = (event: PointerEvent<HTMLDivElement>, loopId: string, index: number) => {
     if (event.button !== 0) return;
     if (loopId !== selectedId) return;
     if (event.target instanceof Element && event.target.closest("button, input, select, textarea, [role='combobox']")) return;
-    draggedStepRef.current = { loopId, index };
+    draggedNodeRef.current = { loopId, index };
     dragStartPointRef.current = { x: event.clientX, y: event.clientY };
-    hasDraggedStepRef.current = false;
-    setDraggedStepIndex(index);
-    setDragOverStepIndex(index);
+    hasDraggedNodeRef.current = false;
+    setDraggedNodeIndex(index);
+    setDragOverNodeIndex(index);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const handleStepPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    const draggedStep = draggedStepRef.current;
-    if (draggedStep === null) return;
+  const handleNodePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const draggedNode = draggedNodeRef.current;
+    if (draggedNode === null) return;
     const startPoint = dragStartPointRef.current;
     if (startPoint && Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) > 4) {
-      hasDraggedStepRef.current = true;
+      hasDraggedNodeRef.current = true;
     }
-    const targetStep = stepFromPoint(event);
-    if (targetStep && targetStep.loopId === draggedStep.loopId) setDragOverStepIndex(targetStep.index);
+    const targetNode = nodeFromPoint(event);
+    if (targetNode && targetNode.loopId === draggedNode.loopId) setDragOverNodeIndex(targetNode.index);
   };
 
-  const handleStepPointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    const draggedStep = draggedStepRef.current;
-    if (draggedStep === null) return false;
-    const targetStep = stepFromPoint(event);
-    const toIndex = targetStep?.loopId === draggedStep.loopId ? targetStep.index : dragOverStepIndex ?? draggedStep.index;
-    const shouldActivate = !hasDraggedStepRef.current && toIndex === draggedStep.index;
-    reorderStep(draggedStep.loopId, draggedStep.index, toIndex);
-    resetStepDrag();
+  const handleNodePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    const draggedNode = draggedNodeRef.current;
+    if (draggedNode === null) return false;
+    const targetNode = nodeFromPoint(event);
+    const toIndex = targetNode?.loopId === draggedNode.loopId ? targetNode.index : dragOverNodeIndex ?? draggedNode.index;
+    const shouldActivate = !hasDraggedNodeRef.current && toIndex === draggedNode.index;
+    reorderNode(draggedNode.loopId, draggedNode.index, toIndex);
+    resetNodeDrag();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     return shouldActivate;
   };
@@ -101,14 +101,14 @@ export function useLoopCanvasInteraction({
 
   return {
     loopCanvasRef,
-    draggedStepIndex,
-    dragOverStepIndex,
+    draggedNodeIndex,
+    dragOverNodeIndex,
     canvasHeight,
     isCanvasPanning,
-    handleStepPointerDown,
-    handleStepPointerMove,
-    handleStepPointerUp,
-    resetStepDrag,
+    handleNodePointerDown,
+    handleNodePointerMove,
+    handleNodePointerUp,
+    resetNodeDrag,
     handleCanvasMoveStart,
     handleCanvasMoveEnd
   };

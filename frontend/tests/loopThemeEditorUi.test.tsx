@@ -97,7 +97,7 @@ describe("singleton Loop theme editor", () => {
     await replaceValue(user, within(edgeSection).getByLabelText("Color"), "#123456");
     await replaceValue(user, within(edgeSection).getByLabelText("Label font color"), "#333333");
     await chooseOption(user, "Normal style", "dotted");
-    await chooseOption(user, "Rejected style", "solid");
+    await chooseOption(user, "Repair / retry style", "solid");
     await chooseOption(user, "Cross-Loop style", "dashed");
     await chooseOption(user, "Style", "Flow · attached");
     await replaceValue(user, within(connectionSection).getByLabelText("Color"), "#444444");

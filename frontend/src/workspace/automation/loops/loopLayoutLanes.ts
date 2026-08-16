@@ -62,7 +62,7 @@ export function loopHorizontalLaneYOffsets(
   let nextOffset = 0;
   laneHeights.forEach((laneHeight, laneIndex) => {
     laneYOffsets.set(laneIndex, nextOffset);
-    nextOffset += Math.max(laneHeight, loopNodeSizes.step.height) + loopCanvasLayoutConfig.branchGap;
+    nextOffset += Math.max(laneHeight, loopNodeSizes.workLoopNode.height) + loopCanvasLayoutConfig.branchGap;
   });
   return laneYOffsets;
 }
