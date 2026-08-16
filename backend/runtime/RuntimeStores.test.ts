@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { RuntimeDatabase } from "../runtime-db.js";
 import { createRuntimeStoreFixture, runtimeTestTimestamp } from "./RuntimeStore.test-fixture.js";
+import { RepairResultStore } from "./RepairResultStore.js";
+import { RootRuntimeReadStore } from "./RootRuntimeReadStore.js";
 
 describe("Work Loop runtime stores", () => {
   it("round-trips Root, Loop, Work Loop Node, and role-specific Node Runs", async () => {
@@ -137,9 +139,35 @@ describe("Repair runtime stores", () => {
       sourceLoopId: "main-loop", targetLoopId: "main-loop", evidence: { route: "allowlisted" }
     });
     expect(reopened.states.current("root-run")).toMatchObject({ revision: 0, state: { repaired: false } });
+    assertRepairReadProjection(fixture, reopened);
     await fixture.close();
   });
 });
+
+type RuntimeFixture = Awaited<ReturnType<typeof createRuntimeStoreFixture>>;
+type ReopenedStores = ReturnType<RuntimeFixture["reopen"]>;
+
+const assertRepairReadProjection = (fixture: RuntimeFixture, stores: ReopenedStores): void => {
+  const projection = new RootRuntimeReadStore(
+    () => fixture.connection(), stores.states, stores.repairs,
+    new RepairResultStore(() => fixture.connection()), stores.control
+  ).read("root-run");
+  expect(projection.repair).toMatchObject({
+    requests: [
+      { repairRequestId: "repair-request", status: "routed" },
+      { repairRequestId: "pending-repair", status: "pending" }
+    ],
+    routes: [{ repairRequestId: "repair-request", targetLoopId: "main-loop" }],
+    continuations: [{ frameId: "frame", status: "open", nestingDepth: 1 }],
+    activeContinuationChain: [{ frameId: "frame", status: "open", nestingDepth: 1 }],
+    pendingRepair: { repairRequestId: "pending-repair" },
+    returnDestination: {
+      loopId: "main-loop", workLoopNodeId: "work",
+      validationNodeDefinitionId: "main-loop:work:validation"
+    }
+  });
+  expect(projection.repair.routedTarget).toBeUndefined();
+};
 
 describe("Work Loop runtime invariants", () => {
   it("enforces one active phase for each Work Loop Node Run", async () => {
@@ -253,6 +281,11 @@ describe("Work Loop runtime invariants", () => {
     expect(runtime.listControlFlowEvents("root-run")).toEqual([
       expect.objectContaining({ kind: "root_cancelled", stateRevision: 0, sourceNodeRunId: "validation" })
     ]);
+    expect(runtime.readRootRuntime("root-run")).toMatchObject({
+      state: { currentRevision: 0, currentState: { committed: true } },
+      repair: { requests: [{ repairRequestId: "pending-repair", status: "cancelled" }] },
+      controlFlowEvents: [{ kind: "root_cancelled", stateRevision: 0 }]
+    });
     runtime.close();
     await fixture.close();
   });

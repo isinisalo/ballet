@@ -1,6 +1,21 @@
 // This is the single frontend/backend contract barrel. Keeping the related
 // domain exports here avoids duplicate DTO shapes in the application layers.
-export { validationNodeOutcomeSchema, workNodeOutcomeSchema } from "./runtime-schemas.js";
+export {
+  controlFlowEventSchema,
+  loopStateRevisionMetadataSchema,
+  orchestrationFrameSchema,
+  orchestratorRouteSchema,
+  repairRequestSchema,
+  repairResultSchema,
+  respondToNodeRunBodySchema,
+  rootRunListQuerySchema,
+  rootRunRepairProjectionSchema,
+  rootRunReturnDestinationSchema,
+  rootRunStateProjectionSchema,
+  validationNodeOutcomeSchema,
+  workNodeOutcomeSchema,
+  workspaceInvalidationEventSchema
+} from "./runtime-schemas.js";
 import type {
   JsonValue,
   LoopTerminal,
@@ -67,6 +82,7 @@ import type {
   LoopRun,
   LoopRunDetails,
   LoopStateRevision,
+  LoopStateRevisionMetadata,
   LoopRuntimePreflight,
   LoopScheduleState,
   NodeRun,
@@ -107,6 +123,9 @@ import type {
   BalletMode,
   DashboardRunStatus,
   RootRunDetail,
+  RootRunRepairProjection,
+  RootRunReturnDestination,
+  RootRunStateProjection,
   RootRunKind,
   RootRunListResponse,
   RootRunListState,
@@ -117,7 +136,8 @@ import type {
   RunTargetsResponse,
   RespondToNodeRunRequest,
   StartRootRunRequest,
-  WorkspaceInvalidationEvent
+  WorkspaceInvalidationEvent,
+  WorkspaceInvalidationInput
 } from "../domain/runs.js";
 
 export type ProjectDocumentCreateRequest = { directoryPath: string; title: string };
@@ -202,7 +222,8 @@ export {
 } from "../domain/automation.js";
 export { defaultLoopTheme } from "../domain/loopThemes.js";
 export {
-  maxControlFlowTransitions, maxRuntimeJsonDepth, maxStatePatchBytes, maxStatePatchOperations
+  maxControlFlowTransitions, maxReadStatePatchEvidenceBytes, maxReadStateRevisionMetadata,
+  maxRuntimeJsonDepth, maxStatePatchBytes, maxStatePatchOperations
 } from "../domain/runtime.js";
 export {
   maxRelevantHistoryBytes, maxRelevantHistoryEntries, maxRepairRequestEnvelopeBytes,
@@ -222,7 +243,7 @@ export type {
   LoopEdgeLineStyle, LoopConnectionPointStyle, ProjectOnceWorkSchedule, ProjectRecurringWorkSchedule,
   ProjectScheduleCadence, ProjectScheduleWeekday, ProjectWorkSchedule, LoopRun, LoopRunDetails,
   LoopScheduleState, LoopRuntimePreflight,
-  CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, NodeRun, NodeRunRole,
+  CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, LoopStateRevisionMetadata, NodeRun, NodeRunRole,
   OrchestrationFrame, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RepairResult, RootRun, RunCheck,
   StatePatch, ValidationNodeOutcome, WorkLoopNodeRun, WorkNodeOutcome,
   OrchestratorTaskEnvelopeV3, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
@@ -233,7 +254,8 @@ export type {
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot,
   ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,
-  BalletMode, DashboardRunStatus, RootRunDetail, RootRunKind, RootRunListResponse, RootRunListState,
+  BalletMode, DashboardRunStatus, RootRunDetail, RootRunRepairProjection, RootRunReturnDestination,
+  RootRunStateProjection, RootRunKind, RootRunListResponse, RootRunListState,
   RootRunSource, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, RespondToNodeRunRequest, StartRootRunRequest,
-  WorkspaceInvalidationEvent, Skill
+  WorkspaceInvalidationEvent, WorkspaceInvalidationInput, Skill
 };

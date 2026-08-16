@@ -82,6 +82,24 @@ export class RepairStore {
     `).all(rootRunId).map((row) => toRepairRequest(repairRequestRowSchema.parse(row)));
   }
 
+  listRequests(rootRunId: string): RepairRequest[] {
+    return this.connection().prepare(`
+      SELECT * FROM repair_requests WHERE root_run_id = ? ORDER BY created_at, rowid
+    `).all(rootRunId).map((row) => toRepairRequest(repairRequestRowSchema.parse(row)));
+  }
+
+  listRoutes(rootRunId: string): OrchestratorRoute[] {
+    return this.connection().prepare(`
+      SELECT * FROM orchestrator_routes WHERE root_run_id = ? ORDER BY created_at, rowid
+    `).all(rootRunId).map((row) => toOrchestratorRoute(orchestratorRouteRowSchema.parse(row)));
+  }
+
+  listFrames(rootRunId: string): OrchestrationFrame[] {
+    return this.connection().prepare(`
+      SELECT * FROM orchestration_frames WHERE root_run_id = ? ORDER BY created_at, rowid
+    `).all(rootRunId).map((row) => toOrchestrationFrame(orchestrationFrameRowSchema.parse(row)));
+  }
+
   finishRequest(
     repairRequestId: string,
     status: "repaired" | "failed" | "cancelled",

@@ -9,8 +9,8 @@ There is no account, pairing flow, remote daemon, device registry, or multi-proj
 1. `ballet` verifies that the current directory is exactly a Git checkout root with a HEAD commit.
 2. It creates checkout-local state under `.git/ballet`, chooses a free loopback port, and installs one uniquely named launchd job.
 3. The local process probes Codex and Copilot, serves the UI on `127.0.0.1`, schedules Loops, and persists Run state in SQLite.
-4. A Root Run resolves every reachable Loop, Step, Transition, ExecutionProfile, Project instruction, Project skill, the fixed System instruction, and the theme into one immutable snapshot before it queues work.
-5. Agent and Scheduled Steps in that Root Run execute sequentially in the same worktree. Codex and Copilot each have a FIFO lane, so the two providers may run concurrently while one provider never runs two tasks at once.
+4. A Root Run resolves every reachable Loop, Work Loop Node, Node Edge, allowed Loop Edge, ExecutionProfile, Project instruction, Project skill, the fixed System instruction, and the theme into one immutable snapshot before it queues work.
+5. Work, Validation, and Orchestrator Node Runs in that Root Run execute sequentially in the same worktree. Codex and Copilot each have a FIFO lane, so the two providers may run concurrently while one provider never runs two tasks at once.
 6. Successful roots are committed and cleaned up. Failed, cancelled, or interrupted roots retain their worktree for inspection.
 
 Queued work survives a Ballet restart. Work that was running when the process exited is marked failed as interrupted and is not silently rerun.
@@ -19,19 +19,19 @@ Queued work survives a Ballet restart. Work that was running when the process ex
 
 Portable, version-controlled automation remains in the checkout:
 
-- `.ballet/project.json` — strict project configuration v9, containing only `version`, an ID-sorted `executionProfiles` list, and `loops`; executable Steps own their task, composition references, transitions, schedule, and appearance;
+- `.ballet/project.json` — strict project configuration v10, containing only `version`, `executionProfiles`, `orchestrator`, `loops`, and `loopEdges`; composite Work Loop Nodes own their Work and Validation definitions, while mutable State remains runtime-only;
 - `.ballet/theme.json` — the single project-wide Loop visualization theme;
 - `.ballet/instructions/**/*.md` — selectable Project primary instructions identified by frontmatter `id`;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` — other project documents; and
 - `.agents/skills/**/SKILL.md` — selectable Project skills identified by their relative directory path.
 
-There is no top-level Agent execution entity in v9. `agent` remains a Step type, while `ExecutionProfile` is the only runtime authoring entity. Project instructions and skills are Step-selected resources; `.codex/agents` is not project configuration or a runtime source.
+There is no top-level Agent execution entity in v10. `agent` is a Work or Validation Node type, while `ExecutionProfile` is the only runtime authoring entity. Project instructions and skills are Node-selected resources; `.codex/agents` is not project configuration or a runtime source.
 
 Machine-local state belongs to this clone's Git directory and never appears in Git status:
 
 | Path | Contents |
 | --- | --- |
-| `.git/ballet/state.sqlite` | Runs, Steps, execution tasks and events, and schedule state |
+| `.git/ballet/state.sqlite` | Root/Loop/Work Loop Node/Node Runs, State revisions, repair continuations, execution tasks/events, and schedule state |
 | `.git/ballet/settings.json` | Provider command overrides and absolute read-only roots |
 | `.git/ballet/service.json` | Stable checkout service identity and loopback port |
 | `.git/ballet/instance-id` | Stable health-check identity for this clone |
@@ -134,13 +134,30 @@ The process binds only to `127.0.0.1`. The UI uses these primary API groups:
 | --- | --- |
 | Workspace snapshot | `GET /api/data` |
 | Automation and theme | `PUT /api/automation`, `PUT /api/loop-theme` |
-| Unified Runs | `POST/GET /api/runs`, `GET /api/runs/:rootRunId`, `POST /api/runs/:rootRunId/cancel` |
+| Unified Runs | `POST/GET /api/runs`, `GET /api/runs/:rootRunId`, `GET /api/runs/:rootRunId/state`, `POST /api/runs/:rootRunId/cancel` |
+| Human/resume response | `POST /api/runs/:rootRunId/nodes/:nodeRunId/respond` |
 | Invalidations | `GET /api/stream` |
 | Console | `GET /api/execution-tasks/:taskId/events`, `GET /api/execution-tasks/:taskId/console/stream` |
 | Local Runtime | runtime status/refresh/settings routes used by the Runtime view |
 | Health | `GET /api/health` |
 
-The shared invalidation stream sends workspace/Run refresh signals only. A selected task's provider-neutral console events use its dedicated cursor-resumable SSE stream.
+The shared invalidation stream sends workspace/Run refresh signals only. A `runs-changed` event identifies the Root Run and its canonical State revision and status; it never carries provider text or a route decision. A selected task's provider-neutral console events use its dedicated cursor-resumable SSE stream.
+
+Human Work and Validation responses use the same strict role-specific outcomes as provider execution. A paused Work, Validation, or Orchestrator Node resumes without a caller-selected return target:
+
+```json
+{"kind":"work","outcome":{"role":"work","state":"completed","summary":"Done.","artifacts":{},"checks":[]}}
+```
+
+```json
+{"kind":"validation","outcome":{"role":"validation","state":"completed","decision":"FAIL","summary":"Retry required.","evidence":{},"checks":[],"repair":{"mode":"LOCAL_RETRY","feedback":"Fix the check.","expectedCorrection":"The check passes."}}}
+```
+
+```json
+{"kind":"resume","response":"Use the project-local evidence."}
+```
+
+`GET /api/runs/:rootRunId/state` returns the current revision, current State and hash, plus bounded revision metadata and patch evidence. It does not accept mutations; State changes only through an atomically committed Node outcome.
 
 ## Security and Git behavior
 
@@ -195,4 +212,4 @@ npx @google/design.md lint DESIGN.md
 git diff --check
 ```
 
-The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v9 fixture checkout, verifies the fixture ExecutionProfile, Loop composition, Project instruction, and v3 theme through `GET /api/data`, checks `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.
+The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v10 fixture checkout, verifies the fixture ExecutionProfile, Work Loop composition, Project instruction, and v3 theme through `GET /api/data`, checks `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.

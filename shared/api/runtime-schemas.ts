@@ -23,6 +23,12 @@ export const nodeRunParamsSchema = z.object({
 }).strict();
 export const executionTaskParamsSchema = z.object({ taskId: idSchema }).strict();
 
+export const rootRunListQuerySchema = z.object({
+  state: z.enum(["active", "recent"]).optional(),
+  cursor: z.string().min(1).max(500).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional()
+}).strict();
+
 export const executionEventsQuerySchema = z.object({
   after: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().min(1).max(1000).default(500)
@@ -125,6 +131,164 @@ export const canonicalNodeOutcomeSchema = z.union([
   workNodeOutcomeSchema,
   validationNodeOutcomeSchema,
   orchestratorNodeOutcomeSchema
+]);
+
+const patchEvidenceSchema = z.object({
+  patch: statePatchSchema,
+  patchSha256: z.string().regex(/^[a-f0-9]{64}$/)
+}).strict();
+
+export const loopStateRevisionMetadataSchema = z.object({
+  rootRunId: idSchema,
+  revision: z.number().int().nonnegative(),
+  parentRevision: z.number().int().nonnegative().optional(),
+  stateSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  sourceNodeRunId: idSchema.optional(),
+  patch: patchEvidenceSchema.optional(),
+  patchOmitted: z.boolean(),
+  createdAt: z.string()
+}).strict();
+
+export const rootRunStateProjectionSchema = z.object({
+  currentRevision: z.number().int().nonnegative(),
+  currentState: z.json().optional(),
+  currentStateSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  revisions: z.array(loopStateRevisionMetadataSchema).max(64),
+  totalRevisionCount: z.number().int().positive(),
+  historyTruncated: z.boolean()
+}).strict();
+
+export const rootRunReturnDestinationSchema = z.object({
+  loopId: z.string().min(1),
+  workLoopNodeId: z.string().min(1),
+  validationNodeDefinitionId: z.string().min(1)
+}).strict();
+
+export const repairRequestSchema = z.object({
+  repairRequestId: idSchema,
+  rootRunId: idSchema,
+  requesterLoopRunId: idSchema,
+  requesterWorkLoopNodeRunId: idSchema,
+  requesterValidationNodeRunId: idSchema,
+  mode: z.enum(["local", "orchestrator"]),
+  attempt: z.number().int().positive(),
+  validationSummary: nonEmptyText,
+  requestedCapability: nonEmptyText.optional(),
+  requestedOutcome: z.json().optional(),
+  reason: nonEmptyText,
+  evidence: z.json().optional(),
+  stateRevisionAtRequest: z.number().int().nonnegative(),
+  orchestratorNodeRunId: idSchema.optional(),
+  routedLoopEdgeId: z.string().min(1).optional(),
+  routedTargetLoopId: z.string().min(1).optional(),
+  status: z.enum(["pending", "routed", "repaired", "failed", "cancelled"]),
+  returnLoopId: z.string().min(1),
+  returnWorkLoopNodeId: z.string().min(1),
+  returnValidationNodeDefinitionId: z.string().min(1),
+  nestingDepth: z.number().int().nonnegative(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  completedAt: z.string().optional()
+}).strict().refine((value) =>
+  (value.requestedCapability === undefined) !== (value.requestedOutcome === undefined), {
+  message: "Repair Request requires exactly one requested capability or requested outcome."
+});
+
+export const orchestratorRouteSchema = z.object({
+  routeId: idSchema,
+  rootRunId: idSchema,
+  repairRequestId: idSchema,
+  orchestratorNodeRunId: idSchema,
+  loopEdgeId: z.string().min(1),
+  sourceLoopId: z.string().min(1),
+  targetLoopId: z.string().min(1),
+  evidence: z.json().optional(),
+  createdAt: z.string()
+}).strict();
+
+export const orchestrationFrameSchema = z.object({
+  frameId: idSchema,
+  rootRunId: idSchema,
+  repairRequestId: idSchema,
+  routeId: idSchema,
+  callerLoopRunId: idSchema,
+  calleeLoopRunId: idSchema,
+  parentFrameId: idSchema.optional(),
+  returnLoopId: z.string().min(1),
+  returnWorkLoopNodeId: z.string().min(1),
+  returnValidationNodeDefinitionId: z.string().min(1),
+  stateRevisionAtCall: z.number().int().nonnegative(),
+  nestingDepth: z.number().int().nonnegative(),
+  status: z.enum(["open", "returned", "failed", "cancelled"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  completedAt: z.string().optional()
+}).strict();
+
+export const repairResultSchema = z.object({
+  repairResultId: idSchema,
+  rootRunId: idSchema,
+  repairRequestId: idSchema,
+  orchestrationFrameId: idSchema,
+  targetLoopRunId: idSchema,
+  targetLoopId: z.string().min(1),
+  status: z.enum(["repaired", "blocked", "failed", "cancelled"]),
+  stateRevision: z.number().int().nonnegative(),
+  outcome: canonicalNodeOutcomeSchema.optional(),
+  summary: boundedText,
+  createdAt: z.string()
+}).strict();
+
+export const rootRunRepairProjectionSchema = z.object({
+  requests: z.array(repairRequestSchema).max(256),
+  routes: z.array(orchestratorRouteSchema).max(256),
+  continuations: z.array(orchestrationFrameSchema).max(256),
+  results: z.array(repairResultSchema).max(256),
+  activeContinuationChain: z.array(orchestrationFrameSchema).max(256),
+  pendingRepair: repairRequestSchema.optional(),
+  routedTarget: orchestratorRouteSchema.optional(),
+  returnDestination: rootRunReturnDestinationSchema.optional()
+}).strict();
+
+export const controlFlowEventSchema = z.object({
+  id: z.number().int().positive(),
+  rootRunId: idSchema,
+  sequence: z.number().int().positive(),
+  kind: z.enum([
+    "work_completed", "work_needs_input", "work_terminal", "validation_ok",
+    "validation_fail_local", "validation_fail_orchestrator", "validation_terminal",
+    "repair_call", "repair_return", "repair_terminal", "flow_transition",
+    "orchestrator_terminal", "root_cancelled", "root_terminal", "execution_interrupted"
+  ]),
+  stateRevision: z.number().int().nonnegative(),
+  sourceLoopRunId: idSchema.optional(),
+  sourceWorkLoopNodeRunId: idSchema.optional(),
+  sourceNodeRunId: idSchema.optional(),
+  targetLoopRunId: idSchema.optional(),
+  targetWorkLoopNodeRunId: idSchema.optional(),
+  repairRequestId: idSchema.optional(),
+  orchestrationFrameId: idSchema.optional(),
+  createdAt: z.string()
+}).strict();
+
+export const workspaceInvalidationEventSchema = z.discriminatedUnion("type", [
+  z.object({
+    id: z.number().int().nonnegative(),
+    type: z.literal("workspace-changed"),
+    at: z.string(),
+    reason: z.string().max(1_000).optional()
+  }).strict(),
+  z.object({
+    id: z.number().int().nonnegative(),
+    type: z.literal("runs-changed"),
+    at: z.string(),
+    rootRunId: idSchema,
+    stateRevision: z.number().int().nonnegative(),
+    status: z.enum([
+      "queued", "running", "waiting_for_input", "finalizing", "completed",
+      "blocked", "failed", "cancelled"
+    ])
+  }).strict()
 ]);
 
 export const workNodeOutcomeJsonSchema = jsonSchema(workNodeOutcomeSchema);

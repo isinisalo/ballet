@@ -103,6 +103,7 @@ export class RootRunExecutionCoordinator {
       } else if (["interrupted", "failed", "cancelled"].includes(node.status)) {
         this.options.database.reconcileTerminalNode(node.nodeRunId);
         await this.sync(root.rootRunId);
+        this.options.onChanged?.(root.rootRunId);
         return;
       } else if (persisted.status === "cancelled") {
         await this.cancelRoot(root);

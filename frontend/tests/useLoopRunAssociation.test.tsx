@@ -106,7 +106,13 @@ function rootRun(rootRunId: string): RootRunDetail {
       createdAt: now
     },
     loopRuns: [run],
-    tasks: []
+    tasks: [],
+    state: {
+      currentRevision: 0, currentState: {}, currentStateSha256: "d".repeat(64),
+      revisions: [], totalRevisionCount: 1, historyTruncated: false
+    },
+    repair: { requests: [], routes: [], continuations: [], results: [], activeContinuationChain: [] },
+    controlFlowEvents: []
   };
 }
 

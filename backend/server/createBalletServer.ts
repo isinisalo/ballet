@@ -52,6 +52,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   const store = new MarkdownStore(context.root, database);
   const targets = new LocalRunTargetService(roots);
   const runHolder: { service?: LocalRunService } = {};
+  const publishRunChanged = runInvalidationPublisher(roots, invalidations);
   const queue = new LocalExecutionQueue({
     store: executions, runtime, worktreesRoot: context.worktreesRoot,
     onTerminal: (task) => runHolder.service!.handleTerminal(task),
@@ -59,12 +60,12 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     onOrchestrationError: (error, task) => logger.error("Task terminal reconciliation failed.", {
       taskId: task.id, error: error instanceof Error ? error.message : String(error)
     }),
-    onChanged: (rootRunId) => invalidations.publish("runs-changed", { rootRunId })
+    onChanged: publishRunChanged
   });
   const runs = new LocalRunService({
     context, connection: () => database.connection(), database, roots, executions, runtime,
     configurations, queue,
-    onChanged: (rootRunId) => invalidations.publish("runs-changed", { rootRunId })
+    onChanged: publishRunChanged
   });
   runHolder.service = runs;
   store.setWorkspaceEnricher(async (content) => {
@@ -93,7 +94,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     subscribeChanges: (listener) => invalidations.subscribe((event) => {
       if (event.type === "workspace-changed") listener(event.reason);
     }),
-    onChanged: () => invalidations.publish("workspace-changed", { reason: "schedules" })
+    onChanged: () => invalidations.publish({ type: "workspace-changed", reason: "schedules" })
   });
   scheduler.start();
 
@@ -173,6 +174,17 @@ const health = (context: ProjectContext, port: number, runtime: LocalRuntimeServ
   version: process.env.BALLET_VERSION ?? "0.1.0",
   startedAt: runtime.startedAtIso
 });
+
+const runInvalidationPublisher = (
+  roots: RootRunStore,
+  invalidations: WorkspaceInvalidationBroadcaster
+) => (rootRunId: string): void => {
+  const root = roots.get(rootRunId);
+  if (!root) return;
+  invalidations.publish({
+    type: "runs-changed", rootRunId, stateRevision: root.stateRevision, status: root.status
+  });
+};
 
 const resolveClientDist = (configured?: string): string => {
   const candidates = [configured, path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist"), path.resolve(process.cwd(), "dist")]

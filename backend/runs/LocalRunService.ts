@@ -5,6 +5,7 @@ import type {
   RootRunDetail,
   RootRunListQuery,
   RootRunListResponse,
+  RootRunStateProjection,
   RespondToNodeRunRequest,
   StartRootRunRequest
 } from "../../shared/domain/runs.js";
@@ -15,7 +16,9 @@ import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurat
 import { LocalWorkspaceManager } from "../execution/git/LocalWorkspaceManager.js";
 import type { ProjectContext } from "../project/ProjectContext.js";
 import type { DispatchLoopScheduleResult, RuntimeDatabase } from "../runtime-db.js";
-import { LoopRunNotFoundError, LoopRunStateError } from "../runtime/LoopRunErrors.js";
+import {
+  LoopRunConflictError, LoopRunNotFoundError, LoopRunStateError
+} from "../runtime/LoopRunErrors.js";
 import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
 import { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import { RootRunExecutionCoordinator } from "./RootRunExecutionCoordinator.js";
@@ -177,7 +180,8 @@ export class LocalRunService {
       items: items.map((run) => {
         const loops = this.options.database.listRootLoopRuns(run.rootRunId);
         const tasks = this.options.executions.listByRoot(run.rootRunId);
-        return { ...publicRootSummary(run), current: currentPosition(loops, tasks) };
+        const repair = this.options.database.readRootRepair(run.rootRunId);
+        return { ...publicRootSummary(run), current: currentPosition(run, loops, tasks, repair) };
       }),
       nextCursor: offset + items.length < runs.length && items.length > 0
         ? encodeRunCursor(items.at(-1)!.rootRunId)
@@ -190,13 +194,20 @@ export class LocalRunService {
     if (!root) return undefined;
     const loopRuns = this.options.database.listRootLoopRuns(rootRunId);
     const tasks = this.options.executions.listByRoot(rootRunId);
+    const runtime = this.options.database.readRootRuntime(rootRunId);
     return {
       ...publicRootSummary(root),
-      current: currentPosition(loopRuns, tasks),
+      current: currentPosition(root, loopRuns, tasks, runtime.repair),
       executionSnapshot: root.executionSnapshot,
       loopRuns,
-      tasks
+      tasks,
+      ...runtime
     };
+  }
+
+  state(rootRunId: string): RootRunStateProjection | undefined {
+    if (!this.options.roots.get(rootRunId)) return undefined;
+    return this.options.database.readRootState(rootRunId);
   }
 
   async cancel(rootRunId: string): Promise<RootRunDetail> {
@@ -214,17 +225,22 @@ export class LocalRunService {
     const root = this.options.roots.require(rootRunId);
     const node = this.options.database.getNodeRun(nodeRunId);
     if (!node || node.rootRunId !== rootRunId) {
-      throw new LoopRunStateError(`Node Run ${nodeRunId} does not belong to Root Run ${rootRunId}.`);
+      throw new LoopRunNotFoundError(`Node Run ${nodeRunId} was not found in Root Run ${rootRunId}.`);
     }
     if (request.kind !== "resume") assertHumanNodeResponse(root, node, request.kind);
-    this.options.connection().transaction(() => {
-      if (request.kind === "resume") {
-        this.options.database.resumeNode(rootRunId, nodeRunId, request.response);
-      } else {
-        this.options.database.applyNodeOutcome(rootRunId, nodeRunId, request.outcome);
-      }
-      this.coordinator.preflightPending(rootRunId);
-    })();
+    try {
+      this.options.connection().transaction(() => {
+        if (request.kind === "resume") {
+          this.options.database.resumeNode(rootRunId, nodeRunId, request.response);
+        } else {
+          this.options.database.applyNodeOutcome(rootRunId, nodeRunId, request.outcome);
+        }
+        this.coordinator.preflightPending(rootRunId);
+      })();
+    } catch (error) {
+      if (error instanceof LoopRunStateError) throw new LoopRunConflictError(error.message);
+      throw error;
+    }
     await this.coordinator.enqueuePending(rootRunId);
     await this.coordinator.sync(rootRunId);
     this.changed(rootRunId);
@@ -277,6 +293,6 @@ const assertHumanNodeResponse = (
   const definition = loop?.nodes.find((candidate) => candidate.id === node.workLoopNodeId);
   const human = role === "work" ? definition?.work.type === "human" : definition?.validation.type === "human";
   if (node.role !== role || !human || node.executionTaskId) {
-    throw new LoopRunStateError(`Node Run ${node.nodeRunId} is not a Human ${role} Node awaiting this outcome.`);
+    throw new LoopRunConflictError(`Node Run ${node.nodeRunId} is not a Human ${role} Node awaiting this outcome.`);
   }
 };

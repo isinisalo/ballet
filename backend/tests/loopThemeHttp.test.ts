@@ -53,7 +53,7 @@ describe("singular Loop theme HTTP API", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(theme);
     expect(updateLoopTheme).toHaveBeenCalledWith(theme);
-    expect(publish).toHaveBeenCalledWith("workspace-changed", { reason: "loop-theme" });
+    expect(publish).toHaveBeenCalledWith({ type: "workspace-changed", reason: "loop-theme" });
 
     const legacyUpdate = await fetch(`${base}/loop-themes/default`, {
       method: "PUT",

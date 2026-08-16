@@ -21,6 +21,19 @@ describe("LoopOrchestrator nesting and limits", () => {
     const innerRequest = requestExternalRepair(runtime, { requestedCapability: "nested capability" });
     const repairBRun = routeRepair(runtime, innerRequest.orchestrator, "repair-b");
 
+    expect(runtime.readRootRuntime("root-run").repair).toMatchObject({
+      pendingRepair: { repairRequestId: innerRequest.request.repairRequestId, nestingDepth: 2 },
+      routedTarget: { targetLoopId: "repair-b" },
+      returnDestination: {
+        loopId: "repair-a", workLoopNodeId: "repair-a-work",
+        validationNodeDefinitionId: "repair-a:repair-a-work:validation"
+      },
+      activeContinuationChain: [
+        { repairRequestId: outerRequest.request.repairRequestId, nestingDepth: 1 },
+        { repairRequestId: innerRequest.request.repairRequestId, nestingDepth: 2 }
+      ]
+    });
+
     completeActiveLoop(runtime);
     const returnedToA = activeNode(runtime);
     expect(returnedToA).toMatchObject({ role: "validation", loopRunId: repairARun.loopRunId, loopId: "repair-a" });

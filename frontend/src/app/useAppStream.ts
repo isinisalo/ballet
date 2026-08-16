@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  workspaceInvalidationEventSchema,
+  type WorkspaceInvalidationEvent
+} from "@shared/api/workspace-contracts";
 
 export type AppStreamStatus = "connecting" | "connected" | "reconnecting" | "disconnected";
 
 type AppStreamCallbacks = {
-  onWorkspaceChanged: () => void | Promise<void>;
-  onRunsChanged: () => void | Promise<void>;
+  onWorkspaceChanged: (event?: Extract<WorkspaceInvalidationEvent, { type: "workspace-changed" }>) => void | Promise<void>;
+  onRunsChanged: (event?: Extract<WorkspaceInvalidationEvent, { type: "runs-changed" }>) => void | Promise<void>;
 };
 
 const reconnectDelays = [1_000, 2_000, 5_000, 10_000, 15_000];
@@ -44,11 +48,13 @@ export function useAppStream(callbacks: AppStreamCallbacks) {
         setStatus("connected");
         if (reconnected) void callbacksRef.current.onRunsChanged();
       };
-      source.addEventListener("workspace-changed", () => {
-        void callbacksRef.current.onWorkspaceChanged();
+      source.addEventListener("workspace-changed", (raw) => {
+        const event = parseInvalidation(raw, "workspace-changed");
+        if (event) void callbacksRef.current.onWorkspaceChanged(event);
       });
-      source.addEventListener("runs-changed", () => {
-        void callbacksRef.current.onRunsChanged();
+      source.addEventListener("runs-changed", (raw) => {
+        const event = parseInvalidation(raw, "runs-changed");
+        if (event) void callbacksRef.current.onRunsChanged(event);
       });
       source.onerror = () => {
         cleanupSource();
@@ -72,3 +78,15 @@ export function useAppStream(callbacks: AppStreamCallbacks) {
 
   return status;
 }
+
+const parseInvalidation = <Type extends WorkspaceInvalidationEvent["type"]>(
+  raw: Event,
+  type: Type
+): Extract<WorkspaceInvalidationEvent, { type: Type }> | undefined => {
+  if (!(raw instanceof MessageEvent) || typeof raw.data !== "string") return undefined;
+  let value: unknown;
+  try { value = JSON.parse(raw.data); } catch { return undefined; }
+  const parsed = workspaceInvalidationEventSchema.safeParse(value);
+  if (!parsed.success || parsed.data.type !== type) return undefined;
+  return parsed.data as Extract<WorkspaceInvalidationEvent, { type: Type }>;
+};

@@ -2,14 +2,15 @@
 // decisions remain in injected services and every request body is Zod-validated.
 import { readFile } from "node:fs/promises";
 import express from "express";
-import { z } from "zod";
 import {
   emptyBodySchema,
   executionTaskParamsSchema,
   executionEventsQuerySchema,
   nodeRunParamsSchema,
   respondToNodeRunBodySchema,
+  rootRunListQuerySchema,
   rootRunParamsSchema,
+  rootRunStateProjectionSchema,
   startRunBodySchema
 } from "../../shared/api/runtime-schemas.js";
 import {
@@ -24,7 +25,6 @@ import {
   projectDocumentSaveSchema,
   type MutableCollectionName
 } from "../../shared/api/workspace-schemas.js";
-import type { RootRunListQuery } from "../../shared/domain/runs.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import { readProjectConfigStatus } from "../project/configGitStatus.js";
@@ -42,31 +42,26 @@ export interface ApiRouterOptions {
   logsPath: string;
 }
 
-const runListQuery = z.object({
-  state: z.enum(["active", "recent"]).optional(),
-  cursor: z.string().max(1000).optional(), limit: z.coerce.number().int().min(1).max(200).optional()
-}).strict();
-
 export const createApiRouter = (options: ApiRouterOptions): express.Router => {
   const router = express.Router();
   router.get("/data", route(async (_req, res) => res.json(await options.store.read())));
   router.put("/automation", route(async (req, res) => {
     const config = parseBody(automationConfigSchema, req);
     const saved = await options.store.saveAutomation(config);
-    options.invalidations.publish("workspace-changed", { reason: "automation" });
+    options.invalidations.publish({ type: "workspace-changed", reason: "automation" });
     res.json(saved);
   }));
   router.put("/loop-theme", route(async (req, res) => {
     res.json(await options.store.updateLoopTheme(parseBody(loopThemeSchema, req)));
-    options.invalidations.publish("workspace-changed", { reason: "loop-theme" });
+    options.invalidations.publish({ type: "workspace-changed", reason: "loop-theme" });
   }));
   router.post("/project-documents", route(async (req, res) => {
     res.json(await options.store.saveProjectDocument(parseBody(projectDocumentSaveSchema, req)));
-    options.invalidations.publish("workspace-changed", { reason: "document" });
+    options.invalidations.publish({ type: "workspace-changed", reason: "document" });
   }));
   router.post("/project-documents/create", route(async (req, res) => {
     res.status(201).json(await options.store.createProjectDocument(parseBody(projectDocumentCreateSchema, req)));
-    options.invalidations.publish("workspace-changed", { reason: "document" });
+    options.invalidations.publish({ type: "workspace-changed", reason: "document" });
   }));
   router.get("/project/config-status", route(async (_req, res) => res.json(await readProjectConfigStatus(options.store.root))));
 
@@ -84,7 +79,7 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
       id: executionProfileId,
       ...parseBody(executionProfileSaveSchema, req)
     });
-    options.invalidations.publish("workspace-changed", { reason: "execution-profile" });
+    options.invalidations.publish({ type: "workspace-changed", reason: "execution-profile" });
     res.status(201).json(created);
   }));
   router.put("/execution-profiles/:executionProfileId", route(async (req, res) => {
@@ -93,21 +88,28 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
       id: executionProfileId,
       ...parseBody(executionProfileSaveSchema, req)
     });
-    options.invalidations.publish("workspace-changed", { reason: "execution-profile" });
+    options.invalidations.publish({ type: "workspace-changed", reason: "execution-profile" });
     res.json(saved);
   }));
   router.delete("/execution-profiles/:executionProfileId", route(async (req, res) => {
     const { executionProfileId } = parseParams(executionProfileParamsSchema, req);
     await options.store.removeExecutionProfile(executionProfileId);
-    options.invalidations.publish("workspace-changed", { reason: "execution-profile" });
+    options.invalidations.publish({ type: "workspace-changed", reason: "execution-profile" });
     res.status(204).end();
   }));
 
   router.post("/runs", route(async (req, res) => res.status(201).json(await options.runs.start(parseBody(startRunBodySchema, req)))));
-  router.get("/runs", route(async (req, res) => res.json(options.runs.list(parseUnknown(runListQuery, req.query) as RootRunListQuery))));
+  router.get("/runs", route(async (req, res) =>
+    res.json(options.runs.list(parseUnknown(rootRunListQuerySchema, req.query)))));
   router.get("/runs/:rootRunId", route(async (req, res) => {
     const { rootRunId } = parseParams(rootRunParamsSchema, req); const detail = options.runs.detail(rootRunId);
     if (!detail) throw new HttpValidationError(`Root Run ${rootRunId} was not found.`, [], 404); res.json(detail);
+  }));
+  router.get("/runs/:rootRunId/state", route(async (req, res) => {
+    const { rootRunId } = parseParams(rootRunParamsSchema, req);
+    const state = options.runs.state(rootRunId);
+    if (!state) throw new HttpValidationError(`Root Run ${rootRunId} was not found.`, [], 404);
+    res.json(rootRunStateProjectionSchema.parse(state));
   }));
   router.post("/runs/:rootRunId/cancel", route(async (req, res) => {
     const { rootRunId } = parseParams(rootRunParamsSchema, req);
@@ -140,12 +142,14 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     const collection = requireCollection(rawCollection);
     const body = parseBody(collectionUpsertSchema(collection), req);
     res.status(body.id ? 200 : 201).json(await options.store.upsert(collection, body));
-    options.invalidations.publish("workspace-changed", { reason: collection });
+    options.invalidations.publish({ type: "workspace-changed", reason: collection });
   }));
   router.delete("/:collection/:id", route(async (req, res) => {
     const { collection: rawCollection, id } = parseParams(collectionItemParamsSchema, req);
     const collection = requireCollection(rawCollection);
-    await options.store.remove(collection, id); options.invalidations.publish("workspace-changed", { reason: collection }); res.status(204).end();
+    await options.store.remove(collection, id);
+    options.invalidations.publish({ type: "workspace-changed", reason: collection });
+    res.status(204).end();
   }));
 
   return router;
@@ -188,7 +192,7 @@ const streamInvalidations = (req: express.Request, res: express.Response, broadc
   const send = (event: { id: number; type: string }) => {
     res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
   };
-  if (replay.reset) res.write(`event: workspace-changed\ndata: {"reason":"reconnected"}\n\n`);
+  if (replay.reset) send(broadcaster.resetEvent());
   else replay.events.forEach(send);
   const unsubscribe = broadcaster.subscribe(send);
   const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15_000); heartbeat.unref();

@@ -22,7 +22,7 @@ export const resolveLoopRunView = (
   const canvasLoop = root?.executionSnapshot.loops.find((candidate) => candidate.id === loop.id)
     ?? details?.snapshot
     ?? loop;
-  const activeNode = [...(details?.nodeRuns ?? [])].reverse().find((node) => node.status === "waiting_for_input");
+  const activeNode = responseNode(details, root);
   return {
     rootActive,
     terminal: Boolean(details && !rootActive),
@@ -34,6 +34,11 @@ export const resolveLoopRunView = (
     displayStatus: root?.status ?? details?.status,
     bypassesSchedule: canvasLoop.nodes.find((node) => node.id === canvasLoop.startNodeId)?.work.type === "scheduled"
   };
+};
+
+const responseNode = (details?: LoopRunDetails | null, root?: RootRunDetail): NodeRun | undefined => {
+  if (root) return details?.nodeRuns.find((node) => node.nodeRunId === root.current?.nodeRunId);
+  return [...(details?.nodeRuns ?? [])].reverse().find((node) => node.status === "waiting_for_input");
 };
 
 const canRespond = (loop: ProjectLoop, nodeRun: NodeRun): boolean => {

@@ -1,6 +1,12 @@
 import type {
+  ControlFlowEvent,
   ExecutionTask,
   LoopRunDetails,
+  LoopStateRevisionMetadata,
+  OrchestrationFrame,
+  OrchestratorRoute,
+  RepairRequest,
+  RepairResult,
   RootExecutionSnapshot,
   RootFinalizationReport,
   RuntimePreflightIssue,
@@ -9,6 +15,7 @@ import type {
   ValidationNodeOutcome,
   WorkNodeOutcome
 } from "./runtime.js";
+import type { JsonValue } from "./automation.js";
 
 export type BalletMode = "configure" | "run";
 export type DashboardRunStatus =
@@ -34,6 +41,41 @@ export interface RootRunCurrentPosition {
   taskId?: string;
   executionProfileId?: string;
   taskStatus?: ExecutionTask["status"];
+  loopDescription?: string;
+  workLoopNodeDescription?: string;
+  localRetryAttempt?: number;
+  repairDepth?: number;
+  lastWorkOutcome?: WorkNodeOutcome;
+  lastValidationDecision?: "OK" | "FAIL";
+  repairRequestId?: string;
+  routedTargetLoopId?: string;
+  returnDestination?: RootRunReturnDestination;
+}
+
+export interface RootRunReturnDestination {
+  loopId: string;
+  workLoopNodeId: string;
+  validationNodeDefinitionId: string;
+}
+
+export interface RootRunStateProjection {
+  currentRevision: number;
+  currentState?: JsonValue;
+  currentStateSha256: string;
+  revisions: LoopStateRevisionMetadata[];
+  totalRevisionCount: number;
+  historyTruncated: boolean;
+}
+
+export interface RootRunRepairProjection {
+  requests: RepairRequest[];
+  routes: OrchestratorRoute[];
+  continuations: OrchestrationFrame[];
+  results: RepairResult[];
+  activeContinuationChain: OrchestrationFrame[];
+  pendingRepair?: RepairRequest;
+  routedTarget?: OrchestratorRoute;
+  returnDestination?: RootRunReturnDestination;
 }
 
 export interface RootRunFinalization {
@@ -66,6 +108,9 @@ export interface RootRunDetail extends RootRunSummary {
   executionSnapshot: RootExecutionSnapshot;
   loopRuns: LoopRunDetails[];
   tasks: ExecutionTask[];
+  state: RootRunStateProjection;
+  repair: RootRunRepairProjection;
+  controlFlowEvents: ControlFlowEvent[];
 }
 
 export interface RootRunListQuery {
@@ -108,10 +153,22 @@ export interface RunTargetIssue {
 
 export interface RunTargetsResponse { loops: RunTarget[] }
 
-export interface WorkspaceInvalidationEvent {
-  id: number;
-  type: "workspace-changed" | "runs-changed";
-  at: string;
-  rootRunId?: string;
-  reason?: string;
-}
+export type WorkspaceInvalidationEvent =
+  | { id: number; type: "workspace-changed"; at: string; reason?: string }
+  | {
+      id: number;
+      type: "runs-changed";
+      at: string;
+      rootRunId: string;
+      stateRevision: number;
+      status: DashboardRunStatus;
+    };
+
+export type WorkspaceInvalidationInput =
+  | { type: "workspace-changed"; reason?: string }
+  | {
+      type: "runs-changed";
+      rootRunId: string;
+      stateRevision: number;
+      status: DashboardRunStatus;
+    };

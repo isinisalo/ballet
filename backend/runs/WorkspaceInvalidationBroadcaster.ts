@@ -1,5 +1,8 @@
 import { EventEmitter } from "node:events";
-import type { WorkspaceInvalidationEvent } from "../../shared/domain/runs.js";
+import { workspaceInvalidationEventSchema } from "../../shared/api/runtime-schemas.js";
+import type {
+  WorkspaceInvalidationEvent, WorkspaceInvalidationInput
+} from "../../shared/domain/runs.js";
 
 export class WorkspaceInvalidationBroadcaster {
   private readonly emitter = new EventEmitter();
@@ -8,13 +11,25 @@ export class WorkspaceInvalidationBroadcaster {
 
   constructor(private readonly limit = 200) { this.emitter.setMaxListeners(200); }
 
-  publish(type: WorkspaceInvalidationEvent["type"], detail: { rootRunId?: string; reason?: string } = {}) {
-    const event: WorkspaceInvalidationEvent = {
-      id: ++this.revision, type, at: new Date().toISOString(), ...detail
-    };
+  publish(input: WorkspaceInvalidationInput): WorkspaceInvalidationEvent {
+    const id = this.revision + 1;
+    const event = workspaceInvalidationEventSchema.parse({
+      id, at: new Date().toISOString(), ...input
+    });
+    this.revision = id;
     this.history.push(event);
     if (this.history.length > this.limit) this.history.splice(0, this.history.length - this.limit);
     this.emitter.emit("event", event);
+    return event;
+  }
+
+  resetEvent(): WorkspaceInvalidationEvent {
+    return workspaceInvalidationEventSchema.parse({
+      id: this.revision,
+      type: "workspace-changed",
+      at: new Date().toISOString(),
+      reason: "reconnected"
+    });
   }
 
   replay(lastId: number): { events: WorkspaceInvalidationEvent[]; reset: boolean } {

@@ -59,6 +59,7 @@ describe("loopRunViewModel", () => {
       completedAt: timestamp
     };
     const root = rootDetail(details);
+    root.current = { ...root.current, nodeRunId: "orchestrator-node", nodeRole: "orchestrator" };
     const view = resolveLoopRunView(automation, loop, [], defaultLoopTheme, details, root);
 
     expect(view.responseNode).toBeUndefined();
@@ -87,6 +88,10 @@ const loopRunDetails = (): LoopRunDetails => ({
 const rootDetail = (details: LoopRunDetails): RootRunDetail => ({
   rootRunId: "root-run", kind: "loop", targetId: loop.id, source: "manual",
   status: "waiting_for_input", stateRevision: 0, createdAt: timestamp, updatedAt: timestamp,
+  current: {
+    loopRunId: details.loopRunId, loopId: details.loopId,
+    workLoopNodeRunId: "composite", workLoopNodeId: "work", nodeRunId: "work-node", nodeRole: "work"
+  },
   executionSnapshot: {
     version: 3,
     rootLoopId: loop.id,
@@ -96,5 +101,11 @@ const rootDetail = (details: LoopRunDetails): RootRunDetail => ({
     theme: defaultLoopTheme, executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },
   loopRuns: [details],
-  tasks: []
+  tasks: [],
+  state: {
+    currentRevision: 0, currentState: {}, currentStateSha256: "a".repeat(64),
+    revisions: [], totalRevisionCount: 1, historyTruncated: false
+  },
+  repair: { requests: [], routes: [], continuations: [], results: [], activeContinuationChain: [] },
+  controlFlowEvents: []
 });

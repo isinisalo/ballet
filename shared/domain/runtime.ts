@@ -11,6 +11,8 @@ export const maxStatePatchBytes = 65_536;
 export const maxStatePatchOperations = 128;
 export const maxRuntimeJsonDepth = 64;
 export const maxControlFlowTransitions = 256;
+export const maxReadStateRevisionMetadata = 64;
+export const maxReadStatePatchEvidenceBytes = 262_144;
 
 export type JsonPatchOperation =
   | { op: "add"; path: string; value: JsonValue }
@@ -33,6 +35,18 @@ export interface LoopStateRevision {
   sourceNodeRunId?: string;
   outcome?: CanonicalNodeOutcome;
   controlFlowEventId?: number;
+  createdAt: string;
+}
+
+/** Bounded read evidence. Historical state values and outcomes are never exposed here. */
+export interface LoopStateRevisionMetadata {
+  rootRunId: string;
+  revision: number;
+  parentRevision?: number;
+  stateSha256: string;
+  sourceNodeRunId?: string;
+  patch?: StatePatchEvidence;
+  patchOmitted: boolean;
   createdAt: string;
 }
 

@@ -14,6 +14,7 @@ import { RepairStore } from "./runtime/RepairStore.js";
 import { RepairResultStore } from "./runtime/RepairResultStore.js";
 import { WorkLoopEngine } from "./runtime/WorkLoopEngine.js";
 import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
+import { RootRuntimeReadStore, type RootRuntimeReadProjection } from "./runtime/RootRuntimeReadStore.js";
 
 export { isPatchedSqliteVersion };
 
@@ -31,6 +32,7 @@ export class RuntimeDatabase {
   readonly repair: RepairStore;
   readonly repairResults: RepairResultStore;
   readonly control: ControlFlowStore;
+  readonly reads: RootRuntimeReadStore;
   private readonly loopScheduleStateStore: LoopScheduleStateStore;
 
   constructor(dbPath: string) {
@@ -42,6 +44,7 @@ export class RuntimeDatabase {
     this.repairResults = new RepairResultStore(connection);
     this.workLoopEngine = new WorkLoopEngine(connection, this.loopRunStore, this.state, this.repair);
     this.control = new ControlFlowStore(connection);
+    this.reads = new RootRuntimeReadStore(connection, this.state, this.repair, this.repairResults, this.control);
     this.loopScheduleStateStore = new LoopScheduleStateStore(connection);
   }
 
@@ -90,6 +93,9 @@ export class RuntimeDatabase {
   listControlFlowEvents(rootRunId: string): ControlFlowEvent[] {
     return this.control.listByRoot(rootRunId);
   }
+  readRootRuntime(rootRunId: string): RootRuntimeReadProjection { return this.reads.read(rootRunId); }
+  readRootState(rootRunId: string) { return this.reads.stateProjection(rootRunId); }
+  readRootRepair(rootRunId: string) { return this.reads.repairProjection(rootRunId); }
 
   listLoopScheduleStates(): LoopScheduleState[] { return this.loopScheduleStateStore.list(); }
 
