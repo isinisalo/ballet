@@ -12,6 +12,11 @@ import { Button } from "@/components/ui/button";
 import { LoopCanvas } from "./LoopCanvas";
 import { LoopRunStartPanel } from "./LoopRunStartPanel";
 import { NodeRunResponsePanel } from "./NodeRunResponsePanel";
+import { RunLoopMap } from "./RunLoopMap";
+import { RunStatePanel } from "./RunStatePanel";
+import { RunStatusSummary } from "./RunStatusSummary";
+import { RunTaskConsole } from "./RunTaskConsole";
+import { RunTimeline } from "./RunTimeline";
 import { loopRunStatusVariant } from "./loopRunState";
 import { resolveLoopRunView } from "./loopRunViewModel";
 import type { useLoopRun } from "./useLoopRun";
@@ -62,6 +67,10 @@ export function LoopRunView({
         <Alert className="m-4 mb-0"><AlertDescription>{startDisabledReason}</AlertDescription></Alert>
       ) : null}
       {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {rootDetail ? <>
+        <RunStatusSummary root={rootDetail} />
+        <RunLoopMap root={rootDetail} />
+      </> : null}
       <div className="grid min-h-[28rem] min-w-0 overflow-hidden">
         <LoopCanvas
           config={view.canvasConfig}
@@ -80,6 +89,11 @@ export function LoopRunView({
           onRespond={(request) => respond(responseNode.nodeRunId, request).then(Boolean)}
         />
       ) : null}
+      {rootDetail ? <div className="grid min-w-0 gap-4 border-t border-divider-strong bg-panel p-4 xl:grid-cols-2">
+        <RunTimeline root={rootDetail} />
+        <RunStatePanel root={rootDetail} />
+        <div className="xl:col-span-2"><RunTaskConsole root={rootDetail} /></div>
+      </div> : null}
       {details && view.rootActive && rootDetail?.status !== "finalizing" ? (
         <div className="flex justify-end border-t border-divider-strong bg-card p-4">
           <Button type="button" variant="destructive" disabled={busy} onClick={() => void cancel()}>

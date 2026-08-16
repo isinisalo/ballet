@@ -64,6 +64,26 @@ describe("loopRunViewModel", () => {
 
     expect(view.responseNode).toBeUndefined();
   });
+
+  it("renders the active repair Loop from the immutable snapshot instead of mutable project config", () => {
+    const details = loopRunDetails();
+    const repairLoop = { ...loop, id: "repair-loop", description: "Repair target." };
+    const repairDetails = { ...details, loopId: repairLoop.id, snapshot: repairLoop, source: "repair" as const };
+    const root = rootDetail(details);
+    root.executionSnapshot.loops.push(repairLoop);
+    root.loopRuns.push(repairDetails);
+    root.current = { ...root.current, loopRunId: repairDetails.loopRunId, loopId: repairLoop.id };
+    const liveConfig = { ...automation, loopEdges: [{
+      id: "mutable-edge", source: loop.id, target: repairLoop.id, kind: "flow" as const, description: "Mutable edge."
+    }] };
+    root.executionSnapshot.loopEdges = [{
+      id: "repair-edge", source: loop.id, target: repairLoop.id, kind: "repair", description: "Snapshotted allowlist."
+    }];
+
+    const view = resolveLoopRunView(liveConfig, loop, [], defaultLoopTheme, repairDetails, root);
+    expect(view.canvasLoop.id).toBe("repair-loop");
+    expect(view.canvasConfig.loopEdges).toEqual(root.executionSnapshot.loopEdges);
+  });
 });
 
 const timestamp = "2026-01-01T00:00:00.000Z";

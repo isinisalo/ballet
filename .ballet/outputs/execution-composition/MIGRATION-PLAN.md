@@ -1,5 +1,7 @@
 # V8 Agent -mallista strict v9 execution compositioniin — suora konversio
 
+Status: superseded by [ADR-015](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md) and the [Work Loop v10 implementation plan](../work-loop/IMPLEMENTATION-PLAN.md). The remainder is historical migration evidence.
+
 Tila: hyväksytty ja tämän repositoryn tracked dataan sovellettava pre-release-konversio.
 
 ## Menettely

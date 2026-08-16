@@ -1,6 +1,6 @@
 # Work Loop v10 — migraatio- ja toteutussuunnitelma
 
-Tila: vaiheet 1–4 on toteutettu (v10-domain, strict config, graph-invariantit, SQLite schema v6, atominen State, roolikohtaiset provider-sopimukset, Work → Validation → OK/local retry sekä durable Orchestrator route/call/return). Vaiheet 5–8 ovat vielä toteutussuunnitelmaa.
+Tila 2026-08-16: vaiheet 1–8 ja lopullinen integraatio-/legacy-siivous on toteutettu hard cutina. Aktiiviset versiot ovat strict project configuration v10, LocalDatabase schema v6, RootExecutionSnapshot v3, ExecutionSpec v5, composition v4, Task Envelope V3, output schema v3 ja Loop theme v4. Alla oleva alkuperäinen vaiheistus, nykytilakartta ja poistoinventaario säilytetään migraatiopäätösten evidenssinä; niissä nimetyt v9-symbolit eivät ole aktiivisia compatibility-sopimuksia.
 
 Päätöslähde: [ADR-015 — Work Loop, revisioitu State ja Loop Orchestrator](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md).
 

@@ -25,7 +25,7 @@ Kestävä tila estää agenttityön katoamisen prosessin elinkaaren mukana. Eksp
 
 ## Kyvykkyydet
 
-- Root Run-, Loop Run-, Step Run-, suoritustehtävä-, tapahtuma- ja ajastustilan paikallinen tallennus.
+- Root Run-, Loop Run-, Work Loop Node Run-, roolikohtaisen Node Run-, State revision-, repair-, suoritustehtävä-, tapahtuma- ja ajastustilan paikallinen tallennus.
 - Jonossa olevan työn säilyttäminen odottamattoman palvelukatkoksen yli.
 - Kesken olleen suorituksen merkitseminen keskeytyneenä epäonnistuneeksi käynnistyksen yhteydessä.
 - Runin peruuttaminen sekä jonossa olevien ja käynnissä olevien tehtävien hallittu lopettaminen.

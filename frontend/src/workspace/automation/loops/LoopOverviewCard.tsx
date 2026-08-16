@@ -39,7 +39,7 @@ export function LoopOverviewCard({ loop, config, theme, locked, onOpen, onDelete
         {outgoing.map((edge) => (
           <div key={edge.id} className="flex items-start gap-2 border-t border-divider-strong pt-2 text-xs" data-loop-edge-kind={edge.kind}>
             {edge.kind === "repair" ? <Wrench className="mt-0.5 size-3.5 text-tertiary" /> : <ArrowRight className="mt-0.5 size-3.5 text-secondary" />}
-            <span aria-hidden="true" className="mt-2 w-4 shrink-0 border-t-2" style={{ borderColor: theme.edge.color, borderTopStyle: edge.kind === "repair" ? theme.edge.rejectedStyle : theme.edge.crossLoopStyle }} />
+            <span aria-hidden="true" className="mt-2 w-4 shrink-0 border-t-2" style={{ borderColor: theme.edge.color, borderTopStyle: edge.kind === "repair" ? theme.edge.repairStyle : theme.edge.crossLoopStyle }} />
             <span><strong className="font-mono text-[0.62rem] uppercase">{edge.kind}</strong> · {loop.id} → {edge.target}<span className="block text-muted-foreground">{edge.description}</span></span>
           </div>
         ))}

@@ -41,7 +41,7 @@ Balletin oman repositoryn kehitystyönkulku on tavallista project-local dataa. S
 
 - Palveluntarjoajakomentojen konekohtaiset ohitukset, absoluuttiset vain luku -juuret ja ajohistoria eivät kuulu versionhallittuun projektimalliin.
 - Palveluntarjoajien tunnuksia, tokeneita tai muita salaisuuksia ei tallenneta projektiaineistoon.
-- Kohdemallissa ei ole top-level Agentin runtime-omistajuutta, `agentId`-viitettä eikä standalone Agent Runia; `agent` säilyy Step-tyyppinä.
+- Kohdemallissa ei ole top-level Agentin runtime-omistajuutta, `agentId`-viitettä eikä standalone Agent Runia; `agent` on providerilla suoritettavan Work- tai Validation Noden tyyppi.
 - Pre-release v8 -aineisto muunnetaan repositoryssä suoraan v9-muotoon. `.codex/agents` ei ole v9:n kanoninen projektimääritys tai runtime-lähde, eikä Ballet rakenna v8-readeria tai historiallisten pre-release-snapshotien compatibility-projektiota.
 - System-ohje ei sisällä Balletin tai muun projektin ohjelmistotoimitusmenettelyä, vaan workflow-järjestys kuuluu project-local Loop-dataan ja menettelyt Stepeille eksplisiittisesti valittuihin Project-skillseihin.
 - Workflow-template ei ole V1:n entity, pack, registry, marketplace, clone-to-project-toiminto tai live-linkki. V1 suorittaa vain tavallista Project-dataa.

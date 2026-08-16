@@ -20,7 +20,7 @@ Queued work survives a Ballet restart. Work that was running when the process ex
 Portable, version-controlled automation remains in the checkout:
 
 - `.ballet/project.json` — strict project configuration v10, containing only `version`, `executionProfiles`, `orchestrator`, `loops`, and `loopEdges`; composite Work Loop Nodes own their Work and Validation definitions, while mutable State remains runtime-only;
-- `.ballet/theme.json` — the single project-wide Loop visualization theme;
+- `.ballet/theme.json` — the strict-v4 single project-wide Loop visualization theme;
 - `.ballet/instructions/**/*.md` — selectable Project primary instructions identified by frontmatter `id`;
 - `.ballet/**/*.md` and `.ballet/**/*.mdx` — other project documents; and
 - `.agents/skills/**/SKILL.md` — selectable Project skills identified by their relative directory path.
@@ -31,7 +31,7 @@ Machine-local state belongs to this clone's Git directory and never appears in G
 
 | Path | Contents |
 | --- | --- |
-| `.git/ballet/state.sqlite` | Root/Loop/Work Loop Node/Node Runs, State revisions, repair continuations, execution tasks/events, and schedule state |
+| `.git/ballet/state.sqlite` | LocalDatabase schema v6: Root/Loop/Work Loop Node/Node Runs, State revisions, repair continuations, execution tasks/events, and schedule state |
 | `.git/ballet/settings.json` | Provider command overrides and absolute read-only roots |
 | `.git/ballet/service.json` | Stable checkout service identity and loopback port |
 | `.git/ballet/instance-id` | Stable health-check identity for this clone |
@@ -120,11 +120,17 @@ The upper-left Ballet dropdown switches the application between **Configure** an
 
 Strict project configuration v10 stores `loops[].nodes` as composite Work Loop Nodes. Each composite owns one Work Node, one Validation Node, a local-attempt limit, and immutable authoring descriptions; mutable State belongs only to the Root Run. User-authored node Edges connect a Validation `OK` result to the next Work Loop Node or a Loop terminal target. Loop Edges describe normal `flow` routes or the source-Loop-specific `repair` allowlist. There are no authorable terminal nodes or `approved`/`rejected` transitions.
 
+A Loop has a required functional description and a State definition consisting of a description and JSON initial value. A manual or scheduled Root Run creates State revision 0 from the root Loop's initial value. A completed Work outcome may atomically commit a JSON Patch before Validation; Validation `OK` may do the same before its configured Node Edge is followed. Every accepted patch creates exactly one append-only revision with a hash, source Node Run and bounded patch evidence. An invalid or oversized patch rolls back the outcome transaction, and the UI never reconstructs State from event text.
+
+Validation `FAIL/LOCAL_RETRY` returns to the Work phase of the same composite Work Loop Node and increments its local attempt within `maxLocalAttempts`. Validation `FAIL/ORCHESTRATOR_REPAIR` persists a Repair Request and continuation, then invokes the Loop Orchestrator. The Orchestrator can select only a target described in the immutable snapshot and allowlisted by a source-specific repair Loop Edge. The target repair Loop shares the Root Run's canonical State. On successful completion, runtime pops the persisted continuation and calls the original Validation phase again; model output cannot choose the return target. Nested repair uses the same engine and returns in LIFO order under explicit depth, attempt and transition limits.
+
 Provider-executed Work and Validation Nodes have a non-empty task, one `executionProfileId`, one `primaryInstructionId`, and set-semantic `skillIds`. Human Nodes have no execution composition, scheduled execution is available only to a Loop's starting Work Node, and Validation is never scheduled. ExecutionProfiles contain only ID, name, provider, model, reasoning effort, and network access. Provider commands and checkout-wide absolute `readOnlyRoots` are machine-local settings.
 
 Every provider prompt is composed in a deterministic five-section order: fixed System instruction, one Project primary instruction, selected Project skills sorted by UTF-8 ID, Task Envelope V3, and the role-specific structured output schema. Work, Validation, and Orchestrator use separate strict schemas. Ballet records the exact UTF-8 prompt and SHA-256 alongside composition version 4, envelope version/hash, Node identity and role, profile snapshot, resource origin/ID/path/source hashes, and output-schema version 3/ID/hash. State is limited to 256 KiB, selected relevant history to 64 KiB, Task Envelope to 384 KiB, and the complete prompt to 512 KiB; semantic payloads are never silently truncated.
 
 The fixed read-only `system:execution-contract-v3` establishes only instruction authority, tool and permission limits, secret-handling boundaries, role-specific structured outcomes, the prohibition on returning hidden chain-of-thought, and the requirement to report checks and artifact references where the schema requires them. Project workflow procedures belong in `.ballet/project.json`, `.ballet/instructions/**`, and `.agents/skills/**`, never in this System instruction or platform-specific workflow code.
+
+Run shows the immutable All Loops graph, active Loop and composite Work Loop Node, active Work/Validation/Orchestrator role, local attempt, repair depth, pending Repair Request, routed target, return destination, canonical State revision history, finalization and each provider task's cursor-resumable console. Human Work and Human Validation use separate labeled forms; an Orchestrator that needs input accepts only a resume response. Configure edits repository-backed definitions, while Run is a read-only projection of snapshot and SQLite evidence.
 
 ## Local API
 
@@ -167,9 +173,10 @@ Human Work and Validation responses use the same strict role-specific outcomes a
 - Run preflight binds execution to the CLI version, model, reasoning setting, policy capabilities, HEAD commit, configuration hash, and immutable Root Run composition snapshot observed at start.
 - Source code changes block a Run. Uncommitted `.ballet` files and `.agents/skills/**/SKILL.md` manifests are captured into the immutable Run snapshot instead.
 - Network access defaults to off and must be enabled explicitly in the selected ExecutionProfile.
-- A legacy `agentReadOnlyRoots` property in `.git/ballet/settings.json` blocks Run with an explicit remediation message. Ballet never silently drops or reinterprets those values; v9 local settings use only checkout-wide `readOnlyRoots`.
+- A legacy `agentReadOnlyRoots` property in `.git/ballet/settings.json` blocks Run with an explicit remediation message. Ballet never silently drops or reinterprets those values; the current local settings contract uses only checkout-wide `readOnlyRoots`.
 - A provider outcome is validated against the immutable Node role and persisted canonically before the engine reads it back for control flow. Work completion advances only to Validation; Validation `OK` follows its Node Edge, `FAIL/LOCAL_RETRY` returns to Work within the configured limit, and `FAIL/ORCHESTRATOR_REPAIR` creates a durable request. Orchestrator routes only to a snapshotted repair allowlist target, while the persisted continuation—not model output—determines the return Validation Node.
 - Durable non-terminal console content is retained up to 1 MiB per task. Terminal protocol events remain available, and the UI exposes truncation state.
+- Cancellation terminalizes the active Root/Loop/composite/Node records and every open repair frame without reverting a committed State revision. On restart, queued work and pending repair continuations remain durable; an execution that was running is marked interrupted according to policy, and recovery resumes only from the last fully committed revision.
 
 Ballet does not merge or push Run results automatically.
 
@@ -212,4 +219,4 @@ npx @google/design.md lint DESIGN.md
 git diff --check
 ```
 
-The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v10 fixture checkout, verifies the fixture ExecutionProfile, Work Loop composition, Project instruction, and v3 theme through `GET /api/data`, checks `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.
+The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v10 fixture checkout, verifies the fixture ExecutionProfile, Work Loop composition, Project instruction, Orchestrator, and strict-v4 theme through `GET /api/data`, checks `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.

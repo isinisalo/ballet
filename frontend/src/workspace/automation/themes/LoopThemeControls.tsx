@@ -38,7 +38,7 @@ export function LoopThemeNodeControls(props: ControlsProps) {
 
 export function LoopThemeEdgeControls(props: ControlsProps) {
   const { theme, previewTheme, errors, disabled = false, onChange, onColorChange } = props;
-  const setStyle = (key: "style" | "rejectedStyle" | "crossLoopStyle", style: string) => onChange({
+  const setStyle = (key: "style" | "repairStyle" | "crossLoopStyle", style: string) => onChange({
     ...theme,
     edge: { ...theme.edge, [key]: style as LoopEdgeLineStyle }
   });
@@ -51,7 +51,7 @@ export function LoopThemeEdgeControls(props: ControlsProps) {
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <SelectField label="Normal style" density="compact" value={theme.edge.style} options={lineStyleOptions} disabled={disabled} onChange={(value) => setStyle("style", value)} />
-        <SelectField label="Repair / retry style" density="compact" value={theme.edge.rejectedStyle} options={lineStyleOptions} disabled={disabled} onChange={(value) => setStyle("rejectedStyle", value)} />
+        <SelectField label="Repair / retry style" density="compact" value={theme.edge.repairStyle} options={lineStyleOptions} disabled={disabled} onChange={(value) => setStyle("repairStyle", value)} />
         <SelectField label="Cross-Loop style" density="compact" value={theme.edge.crossLoopStyle} options={lineStyleOptions} disabled={disabled} onChange={(value) => setStyle("crossLoopStyle", value)} />
       </div>
     </ThemeControlSection>

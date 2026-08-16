@@ -109,9 +109,9 @@ describe("singleton Loop theme editor", () => {
 
     fireEvent.submit(screen.getByRole("form", { name: "Loop theme" }));
     await waitFor(() => expect(props.updateTheme).toHaveBeenCalledWith({
-      version: 3,
+      version: 4,
       node: { labelColor: "#111111", glowColor: "#222222" },
-      edge: { color: "#123456", labelColor: "#333333", style: "dotted", rejectedStyle: "solid", crossLoopStyle: "dashed" },
+      edge: { color: "#123456", labelColor: "#333333", style: "dotted", repairStyle: "solid", crossLoopStyle: "dashed" },
       connectionPoint: { style: "flow", color: "#444444" }
     }));
   });
@@ -178,7 +178,7 @@ describe("singleton Loop theme editor", () => {
       expect.objectContaining({ method: "PUT", body: expect.any(String) })
     ));
     const updateCall = fetchMock.mock.calls.find(([input, init]) => String(input) === "/api/loop-theme" && init?.method === "PUT");
-    expect(JSON.parse(String(updateCall?.[1]?.body))).toMatchObject({ version: 3, edge: { color: "#123456" } });
+    expect(JSON.parse(String(updateCall?.[1]?.body))).toMatchObject({ version: 4, edge: { color: "#123456" } });
     expect(`${window.location.pathname}${window.location.search}`).toBe("/automation/theme");
   });
 });

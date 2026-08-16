@@ -1,5 +1,7 @@
 # Execution composition — v9 UI contract
 
+Status: superseded by [ADR-015](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md), `DESIGN.md`, and the v10 Run/Configure implementation. The remainder is historical UI evidence.
+
 Tila: hyväksytty V1-suunnitelma ja production-käyttöliittymän dokumentaatio.
 
 ## Käyttäjän tavoite

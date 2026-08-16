@@ -132,7 +132,7 @@ const loopThemeColorSchema = z.string()
   .regex(/^#[0-9a-f]{6}$/, "Expected a six-digit lowercase hex color.");
 
 export const loopThemeSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   node: z.object({
     labelColor: loopThemeColorSchema,
     glowColor: loopThemeColorSchema
@@ -141,7 +141,7 @@ export const loopThemeSchema = z.object({
     color: loopThemeColorSchema,
     labelColor: loopThemeColorSchema,
     style: z.enum(loopEdgeLineStyles),
-    rejectedStyle: z.enum(loopEdgeLineStyles),
+    repairStyle: z.enum(loopEdgeLineStyles),
     crossLoopStyle: z.enum(loopEdgeLineStyles)
   }).strict(),
   connectionPoint: z.object({

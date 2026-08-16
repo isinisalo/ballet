@@ -1,5 +1,7 @@
 # Execution composition — strict v9 test plan
 
+Status: superseded by the [Work Loop execution contract V3](../work-loop/EXECUTION-CONTRACT-V3.md) and the v10 test phases in the [implementation plan](../work-loop/IMPLEMENTATION-PLAN.md). The remainder is historical test evidence.
+
 Tila: hyväksytty V1-testisopimus.
 
 ## Tavoite

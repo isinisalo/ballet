@@ -1,5 +1,7 @@
 # Execution composition — ratkaistut V1-päätökset
 
+Status: superseded by [ADR-015](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md). The remainder records resolved strict-v9 decisions and is not an active contract.
+
 Tila: kaikki strict v9 ExecutionProfile + Step execution composition -toteutusta estäneet päätökset on ratkaistu. Avoimia V1-blockereita ei ole.
 
 ## Kanoninen baseline

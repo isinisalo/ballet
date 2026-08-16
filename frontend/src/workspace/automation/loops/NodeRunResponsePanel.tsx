@@ -1,13 +1,11 @@
-import { useMemo, useState, type FormEvent } from "react";
-import {
-  validationNodeOutcomeSchema,
-  workNodeOutcomeSchema,
-  type NodeRun,
-  type RespondToNodeRunRequest
-} from "@shared/api/workspace-contracts";
+import { useState, type FormEvent } from "react";
+import type { NodeRun, RespondToNodeRunRequest } from "@shared/api/workspace-contracts";
 import { TextAreaField } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { HumanValidationResponseForm } from "./HumanValidationResponseForm";
+import { HumanWorkResponseForm } from "./HumanWorkResponseForm";
+import { buildResumeResponse } from "./humanNodeResponse";
 
 export function NodeRunResponsePanel({
   node,
@@ -19,68 +17,38 @@ export function NodeRunResponsePanel({
   onRespond: (request: RespondToNodeRunRequest) => Promise<boolean>;
 }) {
   const needsInput = node.outcome?.state === "needs_input" ? node.outcome : undefined;
-  const [value, setValue] = useState(() => needsInput ? "" : template(node.role));
-  const [error, setError] = useState("");
-  const label = needsInput ? "Response" : `${title(node.role)} structured outcome`;
-  const help = useMemo(() => needsInput
-    ? `${needsInput.question}${needsInput.context ? ` · ${needsInput.context}` : ""}`
-    : `Submit a strict ${title(node.role)} outcome. Control flow uses only the validated structure.`,
-  [needsInput, node.role]);
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError("");
-    try {
-      const request = needsInput
-        ? resumeRequest(value)
-        : outcomeRequest(node.role, value);
-      await onRespond(request);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    }
-  };
-
   return (
-    <form className="grid gap-3 border-t border-divider-strong bg-card p-4" onSubmit={(event) => void submit(event)}>
+    <section className="grid gap-3 border-t border-divider-strong bg-card p-4" aria-labelledby={`node-response-${node.nodeRunId}`}>
       <div>
-        <p className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+        <h2 id={`node-response-${node.nodeRunId}`} className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
           {title(node.role)} Node response · attempt {node.attempt}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">{help}</p>
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">Only the role-specific validated payload can advance control flow.</p>
       </div>
-      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
-      <TextAreaField
-        label={label}
-        density="compact"
-        value={value}
-        rows={needsInput ? 3 : 10}
-        disabled={pending}
-        onChange={setValue}
-      />
-      <div className="flex justify-end">
-        <Button type="submit" disabled={pending || !value.trim()}>{pending ? "Submitting…" : "Submit"}</Button>
-      </div>
-    </form>
+      {needsInput ? <ResumeForm question={needsInput.question} context={needsInput.context} pending={pending} onRespond={onRespond} />
+        : node.role === "work" ? <HumanWorkResponseForm pending={pending} onRespond={onRespond} />
+          : node.role === "validation" ? <HumanValidationResponseForm pending={pending} onRespond={onRespond} />
+            : <Alert><AlertDescription>Orchestrator routing is provider-controlled. A human response is accepted only when this Node requests input.</AlertDescription></Alert>}
+    </section>
   );
 }
 
-const resumeRequest = (response: string): RespondToNodeRunRequest => {
-  if (!response.trim()) throw new Error("Response must not be empty.");
-  return { kind: "resume", response };
-};
-
-const outcomeRequest = (role: NodeRun["role"], source: string): RespondToNodeRunRequest => {
-  let value: unknown;
-  try { value = JSON.parse(source); }
-  catch (error) { throw new Error(`Outcome is not valid JSON: ${error instanceof Error ? error.message : String(error)}`); }
-  if (role === "work") return { kind: "work", outcome: workNodeOutcomeSchema.parse(value) };
-  if (role === "validation") return { kind: "validation", outcome: validationNodeOutcomeSchema.parse(value) };
-  throw new Error("Orchestrator responses are not available in this runtime phase.");
-};
+function ResumeForm({ question, context, pending, onRespond }: {
+  question: string; context: string; pending: boolean;
+  onRespond: (request: RespondToNodeRunRequest) => Promise<boolean>;
+}) {
+  const [response, setResponse] = useState("");
+  const [error, setError] = useState("");
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setError("");
+    try { await onRespond(buildResumeResponse(response)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+  };
+  return <form className="grid gap-3" aria-label="Resume Node response" onSubmit={(event) => void submit(event)}>
+    {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+    <TextAreaField label="Response" description={`${question}${context ? ` · ${context}` : ""}`} density="compact" required value={response} disabled={pending} onChange={setResponse} />
+    <div className="flex justify-end"><Button type="submit" disabled={pending}>{pending ? "Submitting…" : "Resume"}</Button></div>
+  </form>;
+}
 
 const title = (role: NodeRun["role"]): string => role === "work" ? "Work" : role === "validation" ? "Validation" : "Orchestrator";
-const template = (role: NodeRun["role"]): string => JSON.stringify(role === "validation" ? {
-  role: "validation", state: "completed", decision: "OK", summary: "", evidence: {}, checks: []
-} : {
-  role: "work", state: "completed", summary: "", artifacts: {}, checks: []
-}, null, 2);

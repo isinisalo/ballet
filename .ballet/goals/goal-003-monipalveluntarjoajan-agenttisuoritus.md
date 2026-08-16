@@ -1,17 +1,17 @@
 ---
 id: goal-003
-title: Usean palveluntarjoajan koostettava Step-suoritus
+title: Usean palveluntarjoajan koostettava Node-suoritus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
 updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - tavoite
-  - step-suoritus
+  - node-suoritus
   - palveluntarjoajat
 version: 3
 ---
 
-# Usean palveluntarjoajan koostettava Step-suoritus
+# Usean palveluntarjoajan koostettava Node-suoritus
 
 ## Tavoite
 
@@ -21,7 +21,7 @@ Käyttäjän pitää voida valita suoritettavalle Stepille nimetty ExecutionProf
 
 ## Tarkoitus
 
-ExecutionProfile kuvaa vain, miten suoritus ajetaan. Step omistaa tehtävän sekä instruction- ja skill-valinnat, joten samaa runtime-konfiguraatiota voidaan käyttää uudelleen kopioimatta workflow-sisältöä tai sitomatta Steppejä toisiinsa.
+ExecutionProfile kuvaa vain, miten suoritus ajetaan. Providerilla suoritettava Work Node, Validation Node tai Loop Orchestrator omistaa tehtävän sekä instruction- ja skill-valinnat, joten samaa runtime-konfiguraatiota voidaan käyttää uudelleen kopioimatta workflow-sisältöä tai sitomatta Nodeja toisiinsa.
 
 Yhteinen suorituskokemus estää automaatiota sitoutumasta yhden palveluntarjoajan tapahtuma- tai tulosmuotoon. Eksplisiittiset valinnat tekevät Root Runin lähtökohdista toistettavia eivätkä peitä provider-vaihtoja oletusten taakse.
 
@@ -31,7 +31,7 @@ Yhteinen suorituskokemus estää automaatiota sitoutumasta yhden palveluntarjoaj
 - Nimetyn, provider-, model-, reasoning effort- ja network access -valinnat sisältävän ExecutionProfilen valitseminen Stepille yhdellä viitteellä.
 - Täsmälleen yhden Project-primary instructionin ja nollan tai useamman eksplisiittisen Project-skillin valitseminen Stepille.
 - Pakollisen ja minimaalisen System-ohjeen lisääminen jokaiseen suoritukseen muuttumattomasta Ballet-katalogista ilman käyttäjän valintaa. Katalogin read-only-luonne ei muuta Root Runin worktree-oikeutta.
-- Checkout-kohtaisten vain luku -juurien ratkaiseminen konekohtaisesta policysta ExecutionProfilen ja Step-compositionin ulkopuolella.
+- Checkout-kohtaisten vain luku -juurien ratkaiseminen konekohtaisesta policysta ExecutionProfilen ja Node-compositionin ulkopuolella.
 - Palveluntarjoajasta riippumattomien tehtävätilojen, konsolitapahtumien ja strukturoitujen lopputulosten näyttäminen.
 - System-ohjeen, primary instructionin, ID:n mukaan järjestettyjen skillsien, task envelopen ja output scheman koostaminen versionoiduiksi sectioneiksi sekä exact promptin, sen SHA-256:n ja käytettyjen lähteiden originin, ID:n, relative pathin ja source SHA-256:n säilyttäminen evidenssissä ilman redundantteja täyssisältökopioita.
 - Saman palveluntarjoajan ajojen hallittu eteneminen ja eri palveluntarjoajien ajojen mahdollinen rinnakkaisuus.

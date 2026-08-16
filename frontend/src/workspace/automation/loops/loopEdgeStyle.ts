@@ -55,7 +55,7 @@ function loopEdgeStroke(edge: LoopCanvasEdge, targetNode: LoopCanvasLayoutNode |
 
 export function loopEdgeLineStyle(edge: LoopCanvasEdge, theme: LoopTheme): LoopEdgeLineStyle {
   if (edge.tone === "cross-loop") return theme.edge.crossLoopStyle;
-  if (edge.tone === "return") return theme.edge.rejectedStyle;
+  if (edge.tone === "return") return theme.edge.repairStyle;
   return theme.edge.style;
 }
 

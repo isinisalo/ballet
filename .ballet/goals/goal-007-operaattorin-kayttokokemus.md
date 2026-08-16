@@ -15,7 +15,7 @@ version: 2
 
 ## Tavoite
 
-Ballet tarjoaa tiiviin, teknisen ja rauhallisen operaatiotyötilan, jossa projektin konfiguraatio ja käynnissä olevien Step-suoritusten tila ovat nopeasti ymmärrettäviä.
+Ballet tarjoaa tiiviin, teknisen ja rauhallisen operaatiotyötilan, jossa projektin konfiguraatio ja käynnissä olevien Work-, Validation- ja Orchestrator-suoritusten tila ovat nopeasti ymmärrettäviä.
 
 Käyttäjän pitää pystyä siirtymään määrittelystä suoritukseen, löytämään korjattavat ongelmat ja seuraamaan aktiivista Runia ilman epäselviä tai päällekkäisiä käyttöliittymätiloja.
 
@@ -38,7 +38,7 @@ Käyttöliittymä palvelee DevOps-asiantuntijoita, AI-arkkitehteja ja agenttiope
 
 - Käyttöliittymä on nykytilassa vain tumma; vaaleaa tai järjestelmäteemaa ei tarjota.
 - Operaatiotilaa ei peitetä markkinointikielellä, koristeellisilla näkymillä tai epätarkoilla statuksilla.
-- Configure- ja Run-vastuut pidetään erillään, eikä Loop- tai Step-kohtaisia rinnakkaisia tilavalitsimia lisätä.
+- Configure- ja Run-vastuut pidetään erillään, eikä Loop- tai Work Loop Node -kohtaisia rinnakkaisia tilavalitsimia lisätä.
 - Projektin Loop-teema vaikuttaa vain Loop-visualisointeihin, ei Balletin muuhun käyttöliittymään.
 
 ## Todentaminen

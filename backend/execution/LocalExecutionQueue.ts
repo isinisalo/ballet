@@ -31,8 +31,8 @@ export class LocalExecutionQueue {
       this.appendTerminal(task, "Execution was interrupted by a Ballet restart.");
       await this.applyTerminal(task);
     }
-    const rejected = this.options.store.rejectUnrunnableQueued();
-    for (const task of rejected) {
+    const terminalized = this.options.store.rejectUnrunnableQueued();
+    for (const task of terminalized) {
       this.appendTerminal(task, terminalMessage(task));
       await this.applyTerminal(task);
     }

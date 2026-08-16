@@ -17,11 +17,11 @@ version: 2
 
 Jokainen Balletin Root Run aloitetaan rajatussa Git-työtilassa tiivisteellä todennetusta lähdekoodin ja projektimääritysten käynnistyslähtötilasta.
 
-Käyttäjän aktiivinen checkout ei saa muuttua Step-suorituksen sivuvaikutuksena, ja jokaisen onnistuneen tai epäonnistuneen Runin tuloksen pitää olla tarkastettavissa.
+Käyttäjän aktiivinen checkout ei saa muuttua Node-suorituksen sivuvaikutuksena, ja jokaisen onnistuneen tai epäonnistuneen Runin tuloksen pitää olla tarkastettavissa.
 
 ## Tarkoitus
 
-Git-eristys suojaa käyttäjän työtilaa ja tekee monivaiheisestä Step-työstä jäljitettävää. Atominen tilannekuva sitoo koko Root Runin lähdekoodiin, saavutettavaan workflow'hun ja suoritusvalintoihin, jotka olivat voimassa Runin alussa.
+Git-eristys suojaa käyttäjän työtilaa ja tekee monivaiheisestä Work/Validation-työstä jäljitettävää. Atominen tilannekuva sitoo koko Root Runin lähdekoodiin, saavutettavaan Loop-graafiin ja suoritusvalintoihin, jotka olivat voimassa Runin alussa.
 
 ## Kyvykkyydet
 
@@ -37,7 +37,7 @@ Git-eristys suojaa käyttäjän työtilaa ja tekee monivaiheisestä Step-työst�
 ## Tuotteen rajaukset
 
 - Likaiset lähdekoodimuutokset estävät Runin käynnistyksen.
-- Ballet ei kirjoita Step-suorituksen muutoksia käyttäjän aktiiviseen checkoutiin.
+- Ballet ei kirjoita Node-suorituksen muutoksia käyttäjän aktiiviseen checkoutiin.
 - Ballet ei yhdistä Run-branchia eikä lähetä sitä etärepositoryyn automaattisesti.
 - Kirjoittaminen worktreen ulkopuolelle sekä tuntemattomat käyttöoikeuspyynnöt estetään.
 - Verkko on pois käytöstä, ellei sitä ole sallittu eksplisiittisesti Stepin ExecutionProfilessa.

@@ -58,9 +58,9 @@ export function LoopCompositeNode({ context, record, records = [record] }: {
       >
         <span className="flex min-w-0 items-center justify-between gap-2"><strong className="truncate font-mono text-[0.68rem]">{visual.displayId}</strong><span className="font-mono text-[0.58rem] text-muted-foreground">max {definition.maxLocalAttempts}</span></span>
         <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <PhaseMark role="Work" node={definition.work} glowColor={loopThemeNodeGlow(context.theme)} reasoningEffort={visual.workReasoningEffort} />
+          <PhaseMark role="Work" active={visual.activeRole === "work"} node={definition.work} glowColor={loopThemeNodeGlow(context.theme)} reasoningEffort={visual.workReasoningEffort} />
           <span aria-label="Fixed Work completed to Validation edge" className="text-muted-foreground">→</span>
-          <PhaseMark role="Validation" node={definition.validation} glowColor={loopThemeNodeGlow(context.theme)} reasoningEffort={visual.validationReasoningEffort} />
+          <PhaseMark role="Validation" active={visual.activeRole === "validation"} node={definition.validation} glowColor={loopThemeNodeGlow(context.theme)} reasoningEffort={visual.validationReasoningEffort} />
         </span>
         <span className="flex items-center gap-1 font-mono text-[0.56rem] text-muted-foreground"><RotateCcw className="size-2.5 text-tertiary" /> FAIL / LOCAL_RETRY → Work · OK → edge</span>
       </button>
@@ -68,8 +68,9 @@ export function LoopCompositeNode({ context, record, records = [record] }: {
   );
 }
 
-function PhaseMark({ role, node, glowColor, reasoningEffort }: {
+function PhaseMark({ role, active, node, glowColor, reasoningEffort }: {
   role: "Work" | "Validation";
+  active: boolean;
   node: { type: string; nodeStyle: Parameters<typeof LoopNodeArtwork>[0]["nodeStyle"]; nodeSize: keyof typeof loopNodeSizeCatalog };
   glowColor: string;
   reasoningEffort?: string;
@@ -77,7 +78,11 @@ function PhaseMark({ role, node, glowColor, reasoningEffort }: {
   const pixels = Math.min(loopNodeSizeCatalog[node.nodeSize].pixels, 36);
   const glow = reasoningEffort ? loopReasoningGlowLevel(reasoningEffort) : 0;
   return (
-    <span className={`grid min-w-0 grid-cols-[auto_1fr] items-center gap-2 rounded border px-2 py-1 ${role === "Work" ? "border-primary/30" : "border-secondary/30"}`}>
+    <span data-active-node-role={active || undefined} className={cn(
+      "grid min-w-0 grid-cols-[auto_1fr] items-center gap-2 rounded border px-2 py-1",
+      role === "Work" ? "border-primary/30" : "border-secondary/30",
+      active && (role === "Work" ? "border-primary ring-2 ring-primary/25" : "border-secondary ring-2 ring-secondary/25")
+    )}>
       <span className="loop-artwork-node relative block shrink-0" data-loop-reasoning-glow={glow} style={{ width: pixels, height: pixels, "--loop-node-glow-color": glowColor } as CSSProperties}>
         <span aria-hidden="true" className="loop-node-reasoning-glow" /><LoopNodeArtwork nodeStyle={node.nodeStyle} />
       </span>

@@ -1,9 +1,10 @@
 ---
 id: adr-004
 title: Loop, Step, Transition ja Run automaation käsitemallina
-status: accepted
+status: superseded
+supersededBy: adr-015
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T06:45:37.000Z'
+updatedAt: '2026-08-16T00:00:00.000Z'
 tags:
   - arkkitehtuuripäätös
   - automaatio

@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 const tempRoot = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-theme-v2-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-theme-v4-"));
   roots.push(root);
   return root;
 };
@@ -86,8 +86,8 @@ describe("singular Loop theme repository", () => {
   });
 });
 
-describe("Loop theme v2 validation and service", () => {
-  it("accepts only the id-less renderer-less v2 contract", () => {
+describe("Loop theme v4 validation and service", () => {
+  it("accepts only the id-less renderer-less v4 contract", () => {
     expect(loopThemeSchema.parse(defaultLoopTheme)).toEqual(defaultLoopTheme);
     expect(loopThemeSchema.safeParse({ ...defaultLoopTheme, id: "legacy" }).success).toBe(false);
     expect(loopThemeSchema.safeParse({

@@ -23,7 +23,7 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 
 ## Platformin ja projektin raja
 
-- Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Loop, Step, Approved/Rejected Transition, Human Step, Scheduled Step, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Root Run snapshot, provider-suoritus ja runtime state.
+- Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Loop, WorkLoopNode, WorkNode, ValidationNode, State, Edge, LoopEdge, RepairRequest, LoopOrchestrator, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Root Run snapshot, provider-suoritus ja runtime state.
 - Roadmap-, milestone-, issue-, acceptance-, staging-, release- ja deploy-menettelyt kuuluvat project-local dataan tiedostoissa `.ballet/project.json`, `.ballet/instructions/**` ja `.agents/skills/**`.
 - Älä kovakoodaa project-workflow'ta `backend/`, `frontend/` tai `shared/`-koodiin tai Balletin pakolliseen System instructioniin.
 - Tarkista execution- tai orchestration-muutoksen jälkeen, ettei platform-koodiin tullut project-workflow-kohtaisia tunnisteita:

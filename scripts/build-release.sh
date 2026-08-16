@@ -148,21 +148,32 @@ const expectedProfile = {
   networkAccess: false
 };
 const loop = workspace.automation?.loops?.[0];
-const step = loop?.nodes?.find((node) => node.id === "run");
+const workLoopNode = loop?.nodes?.find((node) => node.id === "review");
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 9
+if (workspace.automation?.version !== 10
   || workspace.automation.loops.length !== 1
   || loop?.id !== "adr-review"
-  || loop?.start !== "run"
+  || loop?.description !== "Review a project change and validate the review result."
+  || loop?.startNodeId !== "review"
+  || loop?.state?.description !== "Provider-neutral context shared by the review Work Loop."
+  || JSON.stringify(loop?.state?.initial) !== "{}"
   || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
-  || step?.type !== "agent"
-  || step?.description !== "Reviews project changes"
-  || step?.executionProfileId !== expectedProfile.id
-  || step?.primaryInstructionId !== "project:reviewer"
-  || !Array.isArray(step?.skillIds)
-  || step.skillIds.length !== 0
-  || Object.hasOwn(step, "agentId")
+  || workspace.automation.orchestrator?.executionProfileId !== expectedProfile.id
+  || workspace.automation.orchestrator?.primaryInstructionId !== "project:architect"
+  || workLoopNode?.description !== "Run and validate the project review."
+  || workLoopNode?.work?.type !== "agent"
+  || workLoopNode?.work?.task !== "Review the project changes and surface concrete risks."
+  || workLoopNode?.work?.executionProfileId !== expectedProfile.id
+  || workLoopNode?.work?.primaryInstructionId !== "project:reviewer"
+  || !Array.isArray(workLoopNode?.work?.skillIds)
+  || workLoopNode.work.skillIds.length !== 0
+  || workLoopNode?.validation?.type !== "agent"
+  || workLoopNode?.validation?.task !== "Confirm that the review is complete and actionable."
+  || workLoopNode?.maxLocalAttempts !== 3
+  || loop?.edges?.[0]?.source !== "review"
+  || loop?.edges?.[0]?.target?.terminal !== "completed"
+  || Object.hasOwn(workLoopNode, "state")
   || workspace.instructions?.length !== 2
   || architect?.valid !== true
   || architect?.relativePath !== ".ballet/instructions/migrated-architect.md"
@@ -178,10 +189,10 @@ if (workspace.automation?.version !== 9
   || reviewer?.sizeBytes !== 49
   || workspace.resourceIssues?.length !== 0
   || workspace.automationIssues?.length !== 0
-  || workspace.loopTheme?.version !== 3
+  || workspace.loopTheme?.version !== 4
   || Object.hasOwn(workspace.loopTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.loopThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v9 fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v10 fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2

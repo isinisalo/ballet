@@ -1,5 +1,7 @@
 # Execution composition — strict v9 data model
 
+Status: superseded by [ADR-015](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md) and the [Work Loop execution contract V3](../work-loop/EXECUTION-CONTRACT-V3.md). The remainder is historical cutover evidence, not an active runtime contract.
+
 Tila: hyväksytty V1-sopimus ja production-toteutuksen dokumentaatio.
 
 ## Omistajuus

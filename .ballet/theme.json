@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "node": {
     "labelColor": "#ffb95f",
     "glowColor": "#8b90a0"
@@ -8,7 +8,7 @@
     "color": "#76d4ca",
     "labelColor": "#c1c6d7",
     "style": "solid",
-    "rejectedStyle": "dotted",
+    "repairStyle": "dotted",
     "crossLoopStyle": "dashed"
   },
   "connectionPoint": {

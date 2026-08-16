@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -42,346 +42,374 @@
       "networkAccess": true
     }
   ],
+  "orchestrator": {
+    "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+    "primaryInstructionId": "project:loop-orchestrator",
+    "skillIds": [],
+    "maxRepairDepth": 4,
+    "maxRepairAttempts": 3
+  },
   "loops": [
     {
       "id": "blueprint-design",
-      "start": "roadmap",
+      "description": "Tuota Goal- ja ADR-päätöksistä validoitu tekninen blueprint seuraavan toteutusvaiheen lähtökohdaksi.",
+      "state": {
+        "description": "Blueprint-artifactien ja downstream-handoffin kanoninen jaettu tila.",
+        "initial": { "artifacts": {}, "handoff": null }
+      },
+      "startNodeId": "roadmap",
       "nodes": [
         {
-          "description": "Muodosta hyväksytyistä Goal- ja ADR-lähteistä roadmap tiedostoon .ballet/outputs/ROADMAP.md. Rajaa MVP, myöhemmät inkrementit, riippuvuudet, riskit ja validointipisteet.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
           "id": "roadmap",
-          "on": {
-            "approved": "data-model",
-            "rejected": "blocked"
+          "description": "Muodosta hyväksytyistä Goal- ja ADR-lähteistä rajattu roadmap.",
+          "work": {
+            "type": "agent",
+            "task": "Muodosta hyväksytyistä Goal- ja ADR-lähteistä roadmap tiedostoon .ballet/outputs/ROADMAP.md. Rajaa MVP, myöhemmät inkrementit, riippuvuudet, riskit ja validointipisteet.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:roadmap-agent",
+            "skillIds": [],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:roadmap-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta, että roadmap perustuu hyväksyttyihin Goal- ja ADR-päätöksiin ja on toteutuskelpoinen.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:roadmap-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
         },
         {
-          "description": "Johda hyväksytystä roadmapista projektin domain-, data- ja integraatiomalli tiedostoon .ballet/outputs/DATA-MODEL.md ilman uutta WHAT- tai WHY-päätöstä.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
           "id": "data-model",
-          "on": {
-            "approved": "ui-design",
-            "rejected": "blocked"
+          "description": "Johda roadmapista projektin domain-, data- ja integraatiomalli.",
+          "work": {
+            "type": "agent",
+            "task": "Johda hyväksytystä roadmapista projektin domain-, data- ja integraatiomalli tiedostoon .ballet/outputs/DATA-MODEL.md ilman uutta WHAT- tai WHY-päätöstä.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:architecture-agent",
+            "skillIds": [],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:architecture-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta data- ja integraatiomallin johdonmukaisuus hyväksyttyä roadmapia ja ADR:iä vasten.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:architecture-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
         },
         {
-          "description": "Suunnittele roadmapin ja data-mallin mukainen käyttöliittymärakenne tiedostoon .ballet/outputs/UI-DESIGN.md käyttäen projektin DESIGN.md-tokeneita.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
           "id": "ui-design",
-          "on": {
-            "approved": "ui-mocks",
-            "rejected": "blocked"
+          "description": "Suunnittele data-malliin ja DESIGN.md:hen perustuva käyttöliittymärakenne.",
+          "work": {
+            "type": "agent",
+            "task": "Suunnittele roadmapin ja data-mallin mukainen käyttöliittymärakenne tiedostoon .ballet/outputs/UI-DESIGN.md käyttäen projektin DESIGN.md-tokeneita.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:ui-design-agent",
+            "skillIds": [],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:ui-design-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta UI-suunnitelman saavutettavuus, responsiivisuus ja DESIGN.md-yhteensopivuus.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:ui-design-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
         },
         {
-          "description": "Tuota UI-DESIGN.md:n perusteella tarkistettavat näkymä- ja tilamockit tiedostoon .ballet/outputs/UI-MOCKS.md.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
           "id": "ui-mocks",
-          "on": {
-            "approved": "c4-models",
-            "rejected": "blocked"
+          "description": "Tuota tarkistettavat näkymä- ja tilamockit hyväksytystä UI-suunnitelmasta.",
+          "work": {
+            "type": "agent",
+            "task": "Tuota UI-DESIGN.md:n perusteella tarkistettavat näkymä- ja tilamockit tiedostoon .ballet/outputs/UI-MOCKS.md.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:ui-design-agent",
+            "skillIds": [],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:ui-design-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta, että mockit kattavat suunnitelman olennaiset näkymät, tilat ja saavutettavuuden.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:ui-design-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
         },
         {
-          "description": "Kuvaa hyväksytyn data-mallin ja UI-ratkaisun C4 context-, container- ja component-tasolla tiedostoon .ballet/outputs/C4.md.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
           "id": "c4-models",
-          "on": {
-            "approved": "blueprint-gate",
-            "rejected": "blocked"
+          "description": "Kuvaa hyväksytyn ratkaisun C4-mallit ja pyydä blueprintin lopullinen ihmishyväksyntä.",
+          "work": {
+            "type": "agent",
+            "task": "Kuvaa hyväksytyn data-mallin ja UI-ratkaisun C4 context-, container- ja component-tasolla tiedostoon .ballet/outputs/C4.md.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:architecture-agent",
+            "skillIds": [],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:architecture-agent",
-          "skillIds": []
-        },
-        {
-          "description": "Hyväksy ROADMAP-, DATA-MODEL-, UI-DESIGN-, UI-MOCKS- ja C4-artifactit. Approved-vastauksen tulee sisältää milestone_id sekä vähintään yksi github_issue-handoff seuraavaa Looppia varten.",
-          "nodeStyle": "luna",
-          "nodeSize": "tiny",
-          "id": "blueprint-gate",
-          "on": {
-            "approved": {
-              "loop": "milestone-planning"
-            },
-            "rejected": "roadmap"
+          "validation": {
+            "type": "human",
+            "task": "Tarkasta ROADMAP-, DATA-MODEL-, UI-DESIGN-, UI-MOCKS- ja C4-artifactit. OK-vastauksen evidenssin tulee yksilöidä milestone ja vähintään yksi GitHub-issue seuraavaa Loopia varten.",
+            "nodeStyle": "luna",
+            "nodeSize": "tiny"
           },
-          "type": "human"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "completed",
-          "type": "completed"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "blocked",
-          "type": "blocked"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "failed",
-          "type": "failed"
+          "maxLocalAttempts": 3
         }
+      ],
+      "edges": [
+        { "id": "blueprint-roadmap-ok", "source": "roadmap", "target": { "nodeId": "data-model" } },
+        { "id": "blueprint-data-model-ok", "source": "data-model", "target": { "nodeId": "ui-design" } },
+        { "id": "blueprint-ui-design-ok", "source": "ui-design", "target": { "nodeId": "ui-mocks" } },
+        { "id": "blueprint-ui-mocks-ok", "source": "ui-mocks", "target": { "nodeId": "c4-models" } },
+        { "id": "blueprint-completed", "source": "c4-models", "target": { "terminal": "completed" } }
       ]
     },
     {
       "id": "milestone-planning",
-      "start": "plan-milestone-issues",
+      "description": "Muodosta valitulle milestonelle validoitu issue-rajaus, toteutussuunnitelma ja testisuunnitelma.",
+      "state": {
+        "description": "Milestone-tunnisteen, issueiden ja suunnitelma-artifactien kanoninen jaettu tila.",
+        "initial": { "milestone": null, "issues": [], "artifacts": {} }
+      },
+      "startNodeId": "plan-milestone-issues",
       "nodes": [
         {
-          "description": "Lue blueprint-artifactit ja human handoff, hae GitHub-issueiden nykyinen sisältö ja tuota milestone-kohtainen rajaus, riippuvuudet, acceptance criteria ja issue-snapshotit .ballet/outputs/milestones/<milestone-id>/MILESTONE.md-tiedostoon.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
           "id": "plan-milestone-issues",
-          "on": {
-            "approved": "implementation-plan",
-            "rejected": "blocked"
+          "description": "Rajaa milestone ja snapshottaa siihen kuuluvat GitHub-issuet.",
+          "work": {
+            "type": "agent",
+            "task": "Lue blueprint-artifactit ja handoff, hae GitHub-issueiden nykyinen sisältö ja tuota milestone-kohtainen rajaus, riippuvuudet, acceptance criteria ja issue-snapshotit .ballet/outputs/milestones/<milestone-id>/MILESTONE.md-tiedostoon.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-on",
+            "primaryInstructionId": "project:milestone-issues-agent",
+            "skillIds": [],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-on",
-          "primaryInstructionId": "project:milestone-issues-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta milestonen rajaus, issue-snapshotit, riippuvuudet ja acceptance criteria.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-on",
+            "primaryInstructionId": "project:milestone-issues-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
         },
         {
-          "description": "Laadi valitulle milestonelle päätöksistä johdettu toteutussuunnitelma tiedostoon .ballet/outputs/milestones/<milestone-id>/IMPLEMENTATION-PLAN.md.",
-          "nodeStyle": "terra",
-          "nodeSize": "medium",
           "id": "implementation-plan",
-          "on": {
-            "approved": "test-plan",
-            "rejected": "blocked"
+          "description": "Laadi rajatulle milestonelle yksityiskohtainen toteutussuunnitelma.",
+          "work": {
+            "type": "agent",
+            "task": "Laadi valitulle milestonelle päätöksistä johdettu toteutussuunnitelma tiedostoon .ballet/outputs/milestones/<milestone-id>/IMPLEMENTATION-PLAN.md.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:implementation-plan-agent",
+            "skillIds": [],
+            "nodeStyle": "terra",
+            "nodeSize": "medium"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-          "primaryInstructionId": "project:implementation-plan-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta toteutussuunnitelman järjestys, kattavuus, riskit ja riippuvuudet.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:implementation-plan-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
         },
         {
-          "description": "Määrittele milestonen unit-, integration-, acceptance- ja release-verifioinnit tiedostoon .ballet/outputs/milestones/<milestone-id>/TEST-PLAN.md.",
-          "nodeStyle": "luna",
-          "nodeSize": "medium",
           "id": "test-plan",
-          "on": {
-            "approved": "milestone-gate",
-            "rejected": "blocked"
+          "description": "Määrittele testaus ja pyydä milestone-suunnitelman lopullinen ihmishyväksyntä.",
+          "work": {
+            "type": "agent",
+            "task": "Määrittele milestonen unit-, integration-, acceptance- ja release-verifioinnit tiedostoon .ballet/outputs/milestones/<milestone-id>/TEST-PLAN.md.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:test-plan-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "medium"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-          "primaryInstructionId": "project:test-plan-agent",
-          "skillIds": []
-        },
-        {
-          "description": "Hyväksy valitun milestonen rajaus, GitHub-issue snapshotit, toteutussuunnitelma ja testisuunnitelma toteutuksen lähtökohdaksi.",
-          "nodeStyle": "mars",
-          "nodeSize": "small",
-          "id": "milestone-gate",
-          "on": {
-            "approved": {
-              "loop": "milestone-delivery"
-            },
-            "rejected": "plan-milestone-issues"
+          "validation": {
+            "type": "human",
+            "task": "Tarkasta milestonen rajaus, issue-snapshotit, toteutussuunnitelma ja testisuunnitelma. Päätä OK tai FAIL ja valitse FAIL-tilassa korjaustapa.",
+            "nodeStyle": "luna",
+            "nodeSize": "tiny"
           },
-          "type": "human"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "completed",
-          "type": "completed"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "blocked",
-          "type": "blocked"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "failed",
-          "type": "failed"
+          "maxLocalAttempts": 3
         }
+      ],
+      "edges": [
+        { "id": "planning-issues-ok", "source": "plan-milestone-issues", "target": { "nodeId": "implementation-plan" } },
+        { "id": "planning-implementation-ok", "source": "implementation-plan", "target": { "nodeId": "test-plan" } },
+        { "id": "planning-completed", "source": "test-plan", "target": { "terminal": "completed" } }
       ]
     },
     {
       "id": "milestone-delivery",
-      "start": "implement-milestone",
+      "description": "Toteuta hyväksytty milestone, tuota acceptance-evidenssi ja validoi julkaisuvalmius.",
+      "state": {
+        "description": "Toteutuksen, testien ja acceptance-evidenssin kanoninen jaettu tila.",
+        "initial": { "changes": [], "checks": [], "artifacts": {} }
+      },
+      "startNodeId": "implement-milestone",
       "nodes": [
         {
-          "description": "Toteuta hyväksytyn milestonen kaikki määritellyt GitHub-issues-muutokset ja testit IMPLEMENTATION-PLAN.md:n, TEST-PLAN.md:n ja UI-artifacttien mukaisesti.",
-          "nodeStyle": "sol",
-          "nodeSize": "large",
           "id": "implement-milestone",
-          "on": {
-            "approved": "review-implementation",
-            "rejected": "implement-milestone"
+          "description": "Toteuta hyväksytyn milestonen kaikki rajatut muutokset ja tarkasta niiden tekninen eheys.",
+          "work": {
+            "type": "agent",
+            "task": "Toteuta hyväksytyn milestonen kaikki määritellyt GitHub-issues-muutokset ja testit IMPLEMENTATION-PLAN.md:n, TEST-PLAN.md:n ja UI-artifacttien mukaisesti.",
+            "executionProfileId": "codex-gpt-5-6-terra-medium-network-off",
+            "primaryInstructionId": "project:implementation-agent",
+            "skillIds": [],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-terra-medium-network-off",
-          "primaryInstructionId": "project:implementation-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta toteutuksen diff, rajaus, arkkitehtuuri ja automatisoidut testit muuttamatta toteutusta.",
+            "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+            "primaryInstructionId": "project:acceptance-test-agent",
+            "skillIds": [],
+            "nodeStyle": "terra",
+            "nodeSize": "medium"
+          },
+          "maxLocalAttempts": 3
         },
         {
-          "description": "Aja milestonen TEST-PLAN.md:n acceptance-testit, tarkasta diff ja tallenna evidenssi tiedostoon .ballet/outputs/milestones/<milestone-id>/ACCEPTANCE.md muuttamatta toteutusta.",
-          "nodeStyle": "terra",
-          "nodeSize": "medium",
           "id": "review-implementation",
-          "on": {
-            "approved": "implementation-gate",
-            "rejected": "implement-milestone"
+          "description": "Tuota acceptance-evidenssi ja pyydä toteutuksen lopullinen ihmishyväksyntä.",
+          "work": {
+            "type": "agent",
+            "task": "Aja milestonen TEST-PLAN.md:n acceptance-testit, tarkasta diff ja tallenna evidenssi tiedostoon .ballet/outputs/milestones/<milestone-id>/ACCEPTANCE.md muuttamatta toteutusta.",
+            "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+            "primaryInstructionId": "project:acceptance-test-agent",
+            "skillIds": [],
+            "nodeStyle": "terra",
+            "nodeSize": "medium"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
-          "primaryInstructionId": "project:acceptance-test-agent",
-          "skillIds": []
-        },
-        {
-          "description": "Hyväksy milestonen toteutus ja acceptance-evidenssi julkaistavaksi CI/CD-ketjun kautta.",
-          "nodeStyle": "luna",
-          "nodeSize": "tiny",
-          "id": "implementation-gate",
-          "on": {
-            "approved": {
-              "loop": "release-validation"
-            },
-            "rejected": "implement-milestone"
+          "validation": {
+            "type": "human",
+            "task": "Tarkasta milestonen toteutus ja acceptance-evidenssi. Päätä OK tai FAIL ja valitse FAIL-tilassa korjaustapa.",
+            "nodeStyle": "luna",
+            "nodeSize": "tiny"
           },
-          "type": "human"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "completed",
-          "type": "completed"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "blocked",
-          "type": "blocked"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "failed",
-          "type": "failed"
+          "maxLocalAttempts": 3
         }
+      ],
+      "edges": [
+        { "id": "delivery-implementation-ok", "source": "implement-milestone", "target": { "nodeId": "review-implementation" } },
+        { "id": "delivery-completed", "source": "review-implementation", "target": { "terminal": "completed" } }
       ]
     },
     {
       "id": "release-validation",
-      "start": "make-git-release",
+      "description": "Muodosta, deployaa ja verifioi projektin määrittelemä julkaisu turvallisten oikeusrajojen sisällä.",
+      "state": {
+        "description": "Julkaisu-, deploy-, verifiointi- ja rollback-evidenssin kanoninen jaettu tila.",
+        "initial": { "release": null, "deployment": null, "verification": null }
+      },
+      "startNodeId": "make-git-release",
       "nodes": [
         {
-          "description": "Tarkista implementation-gate, muodosta projektin määrittelemä Git-release ja tallenna release-versio sekä komennot release-artifactiin.",
-          "nodeStyle": "terra",
-          "nodeSize": "medium",
           "id": "make-git-release",
-          "on": {
-            "approved": "deploy-release",
-            "rejected": "failed"
+          "description": "Muodosta hyväksytystä toteutuksesta projektin määrittelemä Git-release.",
+          "work": {
+            "type": "agent",
+            "task": "Tarkista toteutuksen hyväksyntä, muodosta projektin määrittelemä Git-release ja tallenna release-versio sekä komennot release-artifactiin.",
+            "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+            "primaryInstructionId": "project:release-agent",
+            "skillIds": [],
+            "nodeStyle": "terra",
+            "nodeSize": "medium"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
-          "primaryInstructionId": "project:release-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta release-evidenssin yksikäsitteisyys, idempotenssi ja turvallisuus ennen deployta.",
+            "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+            "primaryInstructionId": "project:release-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 2
         },
         {
-          "description": "Käynnistä vain projektin olemassa oleva CI/CD-deploy valitulle Git-releaselle ja tallenna workflow-runin evidenssi release-artifactiin.",
-          "nodeStyle": "terra",
-          "nodeSize": "medium",
           "id": "deploy-release",
-          "on": {
-            "approved": "verify-release",
-            "rejected": "failed"
+          "description": "Käynnistä olemassa oleva CI/CD-deploy ja tallenna canonical evidenssi.",
+          "work": {
+            "type": "agent",
+            "task": "Käynnistä vain projektin olemassa oleva CI/CD-deploy valitulle Git-releaselle ja tallenna workflow-runin evidenssi release-artifactiin.",
+            "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+            "primaryInstructionId": "project:release-agent",
+            "skillIds": [],
+            "nodeStyle": "terra",
+            "nodeSize": "medium"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
-          "primaryInstructionId": "project:release-agent",
-          "skillIds": []
+          "validation": {
+            "type": "agent",
+            "task": "Tarkasta deploy-runin tila, ympäristö, oikeudet ja rollback-valmius.",
+            "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+            "primaryInstructionId": "project:release-agent",
+            "skillIds": [],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 2
         },
         {
-          "description": "Verifioi deploy health-, smoke-, acceptance- ja observability-checkeillä sekä kirjaa tulokset ja mahdollisen rollbackin release-artifactiin.",
-          "nodeStyle": "terra",
-          "nodeSize": "medium",
           "id": "verify-release",
-          "on": {
-            "approved": "release-gate",
-            "rejected": "failed"
+          "description": "Verifioi deploy ja pyydä julkaisun lopullinen ihmishyväksyntä.",
+          "work": {
+            "type": "agent",
+            "task": "Verifioi deploy health-, smoke-, acceptance- ja observability-checkeillä sekä kirjaa tulokset ja mahdollinen rollback release-artifactiin.",
+            "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
+            "primaryInstructionId": "project:release-agent",
+            "skillIds": [],
+            "nodeStyle": "terra",
+            "nodeSize": "medium"
           },
-          "type": "agent",
-          "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
-          "primaryInstructionId": "project:release-agent",
-          "skillIds": []
-        },
-        {
-          "description": "Tarkasta release-, deploy- ja verifiointievidenssi. Rejection palauttaa verifiointiin eikä luo uutta Git-tagia.",
-          "nodeStyle": "luna",
-          "nodeSize": "tiny",
-          "id": "release-gate",
-          "on": {
-            "approved": "completed",
-            "rejected": "verify-release"
+          "validation": {
+            "type": "human",
+            "task": "Tarkasta release-, deploy- ja verifiointievidenssi. Päätä OK tai FAIL ja valitse FAIL-tilassa korjaustapa; paikallinen retry ei muodosta uutta Git-tagia.",
+            "nodeStyle": "luna",
+            "nodeSize": "tiny"
           },
-          "type": "human"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "completed",
-          "type": "completed"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "blocked",
-          "type": "blocked"
-        },
-        {
-          "description": "",
-          "nodeStyle": "flat",
-          "nodeSize": "tiny",
-          "id": "failed",
-          "type": "failed"
+          "maxLocalAttempts": 2
         }
+      ],
+      "edges": [
+        { "id": "release-created-ok", "source": "make-git-release", "target": { "nodeId": "deploy-release" } },
+        { "id": "release-deployed-ok", "source": "deploy-release", "target": { "nodeId": "verify-release" } },
+        { "id": "release-completed", "source": "verify-release", "target": { "terminal": "completed" } }
       ]
     }
+  ],
+  "loopEdges": [
+    { "id": "flow-blueprint-planning", "source": "blueprint-design", "target": "milestone-planning", "kind": "flow", "description": "Hyväksytty blueprint siirtyy milestone-suunnitteluun." },
+    { "id": "flow-planning-delivery", "source": "milestone-planning", "target": "milestone-delivery", "kind": "flow", "description": "Hyväksytty milestone-suunnitelma siirtyy toteutukseen." },
+    { "id": "flow-delivery-release", "source": "milestone-delivery", "target": "release-validation", "kind": "flow", "description": "Hyväksytty toteutus siirtyy release-validointiin." },
+    { "id": "repair-blueprint-self", "source": "blueprint-design", "target": "blueprint-design", "kind": "repair", "description": "Orchestrator saa kutsua uuden eristetyn blueprint-korjausinvokaation." },
+    { "id": "repair-planning-self", "source": "milestone-planning", "target": "milestone-planning", "kind": "repair", "description": "Orchestrator saa kutsua uuden eristetyn milestone-suunnittelun korjausinvokaation." },
+    { "id": "repair-delivery-self", "source": "milestone-delivery", "target": "milestone-delivery", "kind": "repair", "description": "Orchestrator saa kutsua uuden eristetyn toteutuskorjausinvokaation." },
+    { "id": "repair-release-self", "source": "release-validation", "target": "release-validation", "kind": "repair", "description": "Orchestrator saa kutsua uuden eristetyn release-korjausinvokaation." }
   ]
 }

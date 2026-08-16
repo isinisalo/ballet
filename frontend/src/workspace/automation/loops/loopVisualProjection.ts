@@ -8,6 +8,7 @@ import {
   type LoopNodeSize,
   type LoopNodeStyle,
   type LoopRunDetails,
+  type NodeRunRole,
   type LoopTerminal,
   type ProjectAutomationConfig,
   type ProjectLoop,
@@ -33,6 +34,7 @@ export type LoopVisualNode = {
   validationReasoningEffort?: string;
   definition: ProjectWorkLoopNode | LoopVisualTerminal;
   workLoopNodeRun?: WorkLoopNodeRun;
+  activeRole?: NodeRunRole;
 };
 
 export type LoopVisualLoop = { id: string; description: string; start: string; nodes: string[] };
@@ -54,10 +56,11 @@ export function buildLoopVisualProjection(
 ): LoopVisualProjection {
   const loops = config.loops.map((loop) => loop.id === displayedLoop.id ? displayedLoop : loop);
   const latestRuns = latestWorkLoopNodeRuns(run?.workLoopNodeRuns ?? []);
+  const nodeRuns = new Map((run?.nodeRuns ?? []).map((nodeRun) => [nodeRun.nodeRunId, nodeRun]));
   const reasoning = new Map(executionProfiles
     .filter((profile) => !availableExecutionProfileIds || availableExecutionProfileIds.has(profile.id))
     .map((profile) => [profile.id, profile.reasoningEffort]));
-  const nodesByLoop = new Map(loops.map((loop) => [loop.id, visualNodes(loop, latestRuns, reasoning)]));
+  const nodesByLoop = new Map(loops.map((loop) => [loop.id, visualNodes(loop, latestRuns, nodeRuns, reasoning)]));
   const nodes = [...nodesByLoop.values()].flat();
   const nodeByKey = new Map(nodes.map((node) => [node.id, node]));
   const visualLoops = loops.map((loop) => ({
@@ -92,11 +95,14 @@ export function buildLoopVisualProjection(
 const visualNodes = (
   loop: ProjectLoop,
   latestRuns: ReadonlyMap<string, WorkLoopNodeRun>,
+  nodeRuns: ReadonlyMap<string, LoopRunDetails["nodeRuns"][number]>,
   reasoning: ReadonlyMap<string, string>
 ): LoopVisualNode[] => {
   const nodes = loop.nodes.map((node): LoopVisualNode => {
     const work = node.work;
     const providerWork = isProjectProviderWorkNode(work);
+    const workLoopNodeRun = latestRuns.get(node.id);
+    const activeNodeRun = workLoopNodeRun?.activeNodeRunId ? nodeRuns.get(workLoopNodeRun.activeNodeRunId) : undefined;
     return {
       id: visualNodeKey(loop.id, node.id),
       displayId: node.id,
@@ -109,7 +115,10 @@ const visualNodes = (
         ? reasoning.get(node.validation.executionProfileId)
         : undefined,
       definition: node,
-      workLoopNodeRun: latestRuns.get(node.id)
+      workLoopNodeRun,
+      activeRole: activeNodeRun && ["queued", "running", "waiting_for_input"].includes(activeNodeRun.status)
+        ? activeNodeRun.role
+        : undefined
     };
   });
   const terminals = [...new Set(loop.edges.flatMap((edge) =>

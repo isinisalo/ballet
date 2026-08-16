@@ -3,13 +3,13 @@ id: adr-015
 title: Work Loop, revisioitu State ja Loop Orchestrator
 status: accepted
 createdAt: '2026-08-15T00:00:00.000Z'
-updatedAt: '2026-08-15T21:00:00.000Z'
+updatedAt: '2026-08-16T00:00:00.000Z'
 tags:
   - arkkitehtuuripäätös
   - work-loop
   - state
   - orchestrator
-version: 3
+version: 4
 ---
 
 # Work Loop, revisioitu State ja Loop Orchestrator
@@ -32,7 +32,7 @@ Nykyinen toteutus muodostaa seuraavan lähtötilan:
 | Runtime-rivit | `LoopRun` kuvaa Loop-instanssia ja parent-viitteitä. `StepRun` kuvaa executable Stepiä, sen attemptia, runtime-statusta ja mahdollista `approved \| rejected`-tulosta. Provider-tehtävä on erillinen `ExecutionTask`. | `LoopRun` ja `StepRun` korvataan Loop invocation-, Node Run-, call frame-, Repair Request- ja control-flow-riveillä. |
 | Engine | `LoopRunEngine` lukee persistoidun `StepRun.result`-arvon, seuraa vastaavaa Transitionia, luo paikallisen Step Runin tai uuden lapsi-Loop Runin ja päättää lähde-Loopin cross-Loop-siirtymässä. Paluupistettä ei ole. | `LoopOrchestrator` omistaa deterministisen call/return-polun, State-revision, retryn, repair depthin ja transition limitin. |
 | SQLite schema v3 | Kanoniset taulut ovat `root_runs`, `loop_runs`, `step_runs`, `execution_tasks`, `execution_events` ja `loop_schedule_state`. Yksi aktiivinen Run per Loop pakotetaan uniikki-indeksillä. | State-revisiot, node-ajot, control-flow-eventit, repair requestit ja call framet tarvitsevat omat relaationsa. Saman Loopin sisäkkäinen repair-kutsu on sallittava. |
-| Task envelope ja outcome | `TaskEnvelopeV1` välittää Loop/Step-ID:t, taskin, Run inputin, kolme viimeistä Step-yhteenvetoa ja resume-kontekstin. `StepOutcome` on `completed + approved/rejected`, `needs_input`, `blocked` tai `failed`. | Envelope v2 välittää Loop descriptionin, node-roolin, State revisionin, kanonisen Staten ja mahdollisen Repair Requestin. Work- ja Validation-outcomeilla on eri skeemat. |
+| Task envelope ja outcome | `TaskEnvelopeV1` välittää Loop/Step-ID:t, taskin, Run inputin, kolme viimeistä Step-yhteenvetoa ja resume-kontekstin. `StepOutcome` on `completed + approved/rejected`, `needs_input`, `blocked` tai `failed`. | Task Envelope V3 välittää Loop descriptionin, node-roolin, State revisionin, kanonisen Staten ja mahdollisen Repair Requestin. Work-, Validation- ja Orchestrator-outcomeilla on eri strict skeemat. |
 | Configure-graafi | `buildLoopVisualProjection` projisoi v9-nodet ja niiden kaksi tuloskohdetta visuaalisiksi nodeiksi ja edgeiksi; saavuttamattomat terminalit suodatetaan. | Canvas näyttää Work Loop Noden sisäisen Work/Validation-rakenteen, käyttäjän Edget ja LoopEdget ilman terminal-nodeja. |
 | Run-graafi | Run käyttää immutablea snapshot-Loopia, liittää viimeisimmän `StepRun`-tilan nodeen ja animoi viimeisimmän Approved/Rejected-edgen. | Run projisoi Node Runit, aktiivisen call framen, repair-reitin ja State revisionin snapshot-graafiin. |
 
@@ -541,14 +541,15 @@ Runtime ei tarjoa v9-readeria, v9→v10-autokonversiota, dual-writea, fallback-p
 
 ## Persistenssipäätös
 
-SQLite-skeema vaihtuu v10-runtimea varten uuteen versioon ilman v9-Run compatibility -mallia. V9:n `loop_runs` ja `step_runs` poistetaan. Uuden kanonisen mallin taulut ovat vähintään:
+SQLite-skeema vaihtuu v10-runtimea varten puhtaaseen skeemaversioon 6 ilman v9-Run compatibility -mallia. V9:n `loop_runs` ja `step_runs` poistetaan. Uuden kanonisen mallin taulut ovat:
 
 - `root_runs` — Root Run, immutable execution snapshot, current State revision ja terminal/finalization state;
 - `state_revisions` — revision 0 ja jokainen immutable post-patch State;
-- `loop_invocations` — saman Loopin tavalliset ja nested invocationit;
-- `node_runs` — Work- ja Validation-nodejen attemptit ja kanoniset outcomet;
+- `loop_invocations` — tavalliset, flow-, repair- ja scheduled Loop Run -invokaatiot;
+- `work_loop_node_runs` — composite Work Loop Node -yritykset ja aktiivisen vaiheen omistus;
+- `node_runs` — Work-, Validation- ja Orchestrator-attemptit ja kanoniset outcomet;
 - `repair_requests` — persisted FAIL-korjauspyynnöt;
-- `call_frames` — durable continuation stack;
+- `orchestration_frames` — durable LIFO continuation stack;
 - `orchestrator_routes` — valitut repair-LoopEdge-reitit;
 - `control_flow_events` — cursorin jokainen durable siirto;
 - `execution_tasks` ja `execution_events` — provider-neutraali suoritus ja konsolievidenssi; sekä
@@ -558,7 +559,7 @@ SQLite-skeema vaihtuu v10-runtimea varten uuteen versioon ilman v9-Run compatibi
 
 ## Task envelope, structured output ja evidenssi
 
-Task envelope versioidaan v2:een. Se sisältää roolin mukaan Root Run-, Loop Run-, Node Run- ja Work Loop Node Run -identiteetit, Loopin ja Work Loop Noden descriptionit, node-roolin `work | validation | orchestrator`, taskin, current State revisionin/arvon/hashin, rajatun relevantin historian ja mahdollisen resume-vastauksen. Validation-envelope sisältää viimeisimmän kanonisen Work-outcomen. Workin local retry sisältää vain viimeisimmän Validation-palautteen. Orchestrator-envelope sisältää persistoidusta Repair Requestista rajatun projektion sekä source-Loopin repair-allowlistista johdetut target Loopit ID:n ja descriptionin kanssa deterministisesti järjestettyinä.
+Task Envelope V3 sisältää roolin mukaan Root Run-, Loop Run-, Node Run- ja Work Loop Node Run -identiteetit, Loopin ja Work Loop Noden descriptionit, node-roolin `work | validation | orchestrator`, taskin, current State revisionin/arvon/hashin, rajatun relevantin historian ja mahdollisen resume-vastauksen. Validation-envelope sisältää viimeisimmän kanonisen Work-outcomen. Workin local retry sisältää vain viimeisimmän Validation-palautteen. Orchestrator-envelope sisältää persistoidusta Repair Requestista rajatun projektion sekä source-Loopin repair-allowlistista johdetut target Loopit ID:n ja descriptionin kanssa deterministisesti järjestettyinä.
 
 WorkOutcome-, ValidationOutcome- ja OrchestratorOutcome-JSON-skeemat ovat eri strict, versioituja sopimuksia ja niiden schema-ID, exact kanoninen UTF-8 schema sekä SHA-256 tallennetaan execution evidenceen. OrchestratorOutcome saa valita vain `targetLoopId`-arvon allowlististä; runtime määrää LoopEdgen, continuationin ja return targetin persistoidusta Repair Requestista. Nykyinen viiden sectionin composition order, resurssien SHA-256:t, promptin exact bytes, ExecutionProfile snapshot ja provider-neutraali adapteriraja säilyvät.
 
@@ -585,6 +586,20 @@ Providerin julkaistut tapahtumat ja reasoning-yhteenvedot voidaan näyttää kut
 - ExecutionProfile ja provider-adapterit säilyvät; mallia tai provideria ei hardkoodata.
 - V10 aiheuttaa tarkoituksellisen breaking project-config- ja local runtime schema -cutoverin.
 - Configure- ja Run-käyttöliittymät on rakennettava Work/Validation-komposiitin, LoopEdgejen, State revisionien ja call framejen ympärille ilman riippumatonta visuaalista redesignia.
+
+## Toteutettu versiolukitus
+
+Päätös on toteutettu hard cutina seuraavilla aktiivisilla sopimuksilla:
+
+- strict project configuration v10;
+- LocalDatabase schema v6;
+- RootExecutionSnapshot v3;
+- ExecutionSpec v5 ja prompt composition v4;
+- Task Envelope V3;
+- roolikohtaiset output schema v3 -sopimukset; sekä
+- project Loop theme v4, jossa repair/return-viivan nimi on `repairStyle`.
+
+Run-projektio lukee aktiivisen Loopin, Work Loop Noden, roolin, Staten, repair-reitin, continuation-ketjun ja finalizationin vain canonical persistence -tietueista. Käyttöliittymä näyttää immutable All Loops -snapshotin, roolikohtaisen timeline-evidenssin, revision storesta luetun Staten ja execution task -kohtaisen provider-neutraalin konsolin. Se ei parsii providerin raakatekstiä eikä laske Statea tai return targetia uudelleen.
 
 ## Hylätyt vaihtoehdot
 
@@ -623,10 +638,12 @@ Yksityiskohtainen cutover-järjestys, poistoinventaario ja validointimatriisi ov
 - `backend/runs/LoopExecutionSnapshot.ts`
 - `backend/runs/LoopExecutionPlanner.ts`
 - `backend/runs/RootRunExecutionCoordinator.ts`
-- `backend/runtime/LoopRunEngine.ts`
+- `backend/runtime/WorkLoopEngine.ts`
+- `backend/runtime/LoopOrchestrator.ts`
+- `backend/runtime/RootRuntimeReadStore.ts`
 - `backend/runtime/LoopRunStore.ts`
 - `backend/storage/LocalDatabase.ts`
-- `backend/integration/TaskEnvelopeV1.ts`
+- `backend/integration/TaskEnvelopeV3.ts`
 - `backend/execution/ExecutionComposition.ts`
 - `frontend/src/workspace/automation/loops/loopVisualProjection.ts`
 - `frontend/src/workspace/automation/loops/LoopCanvas.tsx`

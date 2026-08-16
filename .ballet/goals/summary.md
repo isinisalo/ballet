@@ -18,8 +18,8 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 ## Mitä Balletilla tehdään?
 
 1. **Määritellään työ** repositoryssä: Loopit, Stepit, Transitionit, ExecutionProfilet, instructionit, skillsit ja teema.
-2. **Koostetaan agentin tehtävä** deterministisesti System-ohjeesta, primary instructionista, valituista skillseistä, Step-tehtävästä ja tulosskeemasta.
-3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; Step voi olla agentin suoritus, ihmisen päätösportti tai ajastettu käynnistys.
+2. **Koostetaan provider-tehtävä** deterministisesti System-ohjeesta, primary instructionista, valituista skillseistä, roolikohtaisesta Task Envelopesta ja tulosskeemasta.
+3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; composite Work Loop Node erottaa Work- ja Validation-vaiheen, ja Loop Orchestrator reitittää vain allowlistattuja korjauksia.
 4. **Seurataan ajoa** selainkäyttöliittymästä: tila, konsolitapahtumat, hyväksytty/hylätty jatkopolku, virheet ja finalisointi.
 5. **Suojataan aktiivinen checkout**: onnistunut työ commitoidaan Run-branchille ja siivotaan, muu worktree säilytetään tutkittavaksi. Ballet ei mergeä eikä pushaa automaattisesti.
 

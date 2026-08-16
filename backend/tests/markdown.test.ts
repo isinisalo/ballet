@@ -160,7 +160,7 @@ describe("Markdown collection loading", () => {
       issues: data.resourceIssues
     })).toEqual([]);
     expect(theme.issues).toEqual([]);
-    expect(theme.theme.version).toBe(3);
+    expect(theme.theme.version).toBe(4);
     expect(theme.theme.node).toEqual({ labelColor: "#ffb95f", glowColor: "#8b90a0" });
     expect(theme.theme.node).not.toHaveProperty("showAgentAvatarInNode");
   });

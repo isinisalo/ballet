@@ -19,15 +19,20 @@ export const resolveLoopRunView = (
   const rootActive = Boolean(root && [
     "queued", "running", "waiting_for_input", "finalizing"
   ].includes(root.status));
-  const canvasLoop = root?.executionSnapshot.loops.find((candidate) => candidate.id === loop.id)
-    ?? details?.snapshot
+  const canvasLoop = details?.snapshot
+    ?? root?.executionSnapshot.loops.find((candidate) => candidate.id === loop.id)
     ?? loop;
   const activeNode = responseNode(details, root);
   return {
     rootActive,
     terminal: Boolean(details && !rootActive),
     canvasLoop,
-    canvasConfig: root ? { ...config, loops: root.executionSnapshot.loops } : config,
+    canvasConfig: root ? {
+      ...config,
+      orchestrator: root.executionSnapshot.orchestrator,
+      loops: root.executionSnapshot.loops,
+      loopEdges: root.executionSnapshot.loopEdges
+    } : config,
     canvasProfiles: root?.executionSnapshot.executionProfiles ?? executionProfiles,
     canvasTheme: root?.executionSnapshot.theme ?? theme,
     responseNode: activeNode && canRespond(canvasLoop, activeNode) ? activeNode : undefined,

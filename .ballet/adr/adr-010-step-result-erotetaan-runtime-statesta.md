@@ -1,9 +1,10 @@
 ---
 id: adr-010
 title: StepResult erotetaan runtime-tilasta
-status: accepted
+status: superseded
+supersededBy: adr-015
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-19T06:45:37.000Z'
+updatedAt: '2026-08-16T00:00:00.000Z'
 tags:
   - arkkitehtuuripäätös
   - step-result
