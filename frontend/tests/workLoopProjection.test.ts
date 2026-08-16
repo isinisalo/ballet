@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { calculateDetailLoopCanvasLayout } from "../src/workspace/automation/loops/loopDetailLayout";
 import { calculateCompositeLoopCanvasLayout } from "../src/workspace/automation/loops/loopLayout";
 import { buildLoopVisualProjection, visualNodeKey } from "../src/workspace/automation/loops/loopVisualProjection";
 import { v10Automation, v10Loop } from "./v10Fixtures";
@@ -48,5 +49,20 @@ describe("strict-v10 graph projection", () => {
     });
 
     expect(layout.nodes.find((node) => node.kind === "work-loop-node")).toMatchObject({ width: 24, height: 24 });
+  });
+
+  it("lays out Level 2 from selected-Loop records without compact linked Loops", () => {
+    const selected = v10Loop("selected-loop");
+    const linked = v10Loop("linked-loop");
+    const config = v10Automation(selected, linked);
+    config.loopEdges = [{ id: "global", source: selected.id, target: linked.id, kind: "flow", description: "Continue." }];
+    const projection = buildLoopVisualProjection(config, selected);
+    const records = projection.recordsByLoopId.get(selected.id)!;
+
+    const layout = calculateDetailLoopCanvasLayout({ records });
+
+    expect(layout.nodes.some((node) => node.kind === "loop")).toBe(false);
+    expect(layout.nodes.every((node) => !node.key.includes(linked.id))).toBe(true);
+    expect(layout.edges.every((edge) => edge.tone !== "cross-loop")).toBe(true);
   });
 });

@@ -4,7 +4,7 @@ title: Architecture decisions
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 2
+version: 3
 tags:
   - arc42
   - decisions
@@ -39,6 +39,7 @@ The index reflects repository state on 2026-08-16.
 | adr-014 | accepted; V1 scope partially superseded by adr-016 | [Workflow templates are project-local data](../adr/adr-014-workflow-templatet-ovat-project-local-dataa.md) |
 | adr-015 | accepted | [Work Loop, revisioned State and Loop Orchestrator](../adr/adr-015-work-loop-state-ja-loop-orchestrator.md) |
 | adr-016 | accepted | [One-Loop module package and project-local materialization](../adr/adr-016-yhden-loopin-moduulipaketti-ja-project-local-materialisointi.md) |
+| adr-017 | accepted | [Loop Engineer authoring projections and level-specific Edge ownership](../adr/adr-017-loop-engineer-authoring-projektiot.md) |
 
 ## Canonical sources
 

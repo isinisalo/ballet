@@ -4,7 +4,7 @@ import { useWorkspaceNavigation } from "../src/workspace/useWorkspaceNavigation"
 
 describe("workspace navigation blocker", () => {
   beforeEach(() => {
-    window.history.replaceState({}, "", "/automation/loops?view=all");
+    window.history.replaceState({}, "", "/automation/loops?level=1");
   });
 
   it("confirms and blocks internal navigation while the workspace is dirty", () => {
@@ -16,7 +16,7 @@ describe("workspace navigation blocker", () => {
 
     expect(confirm).toHaveBeenCalledWith("Discard theme changes?");
     expect(window.location.pathname).toBe("/automation/loops");
-    expect(result.current.route).toEqual({ view: "automation", automationLoopView: "all" });
+    expect(result.current.route).toEqual({ view: "automation", automationLevel: "composition", automationEntityId: undefined, creating: undefined });
 
     confirm.mockReturnValue(true);
     act(() => result.current.navigate("/execution-profiles"));

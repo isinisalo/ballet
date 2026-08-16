@@ -4,7 +4,7 @@ import { useId, type FormEvent } from "react";
 import { EditorActions, Panel } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { automationAllLoopsPath } from "../../routing";
+import { automationCompositionPath } from "../../routing";
 import { useWorkspaceNavigationBlocker, type WorkspaceNavigation } from "../../useWorkspaceNavigation";
 import {
   LoopThemeConnectionControls,
@@ -54,7 +54,7 @@ export function LoopThemeEditorView({
       icon={<Palette />}
       contentClassName="p-0"
       action={<div className="flex flex-wrap items-center justify-end gap-2">
-        <Button type="button" variant="ghost" size="sm" disabled={editor.saving} onClick={() => navigate(automationAllLoopsPath())}><ArrowLeft /> All loops</Button>
+        <Button type="button" variant="ghost" size="sm" disabled={editor.saving} onClick={() => navigate(automationCompositionPath())}><ArrowLeft /> Level 1 · Loops</Button>
         <EditorActions saveLabel="Save" formId={formId} dirty={editor.dirty} valid={editor.valid} pending={editor.saving} />
       </div>}
     >

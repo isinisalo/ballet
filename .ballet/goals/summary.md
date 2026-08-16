@@ -4,7 +4,7 @@ title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-16'
-version: 3
+version: 4
 tags:
   - yhteenveto
   - tavoitteet
@@ -34,7 +34,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 | Osa | Tehtävä |
 | --- | --- |
-| React/Vite-käyttöliittymä | Configure- ja Run-työtilat, Loop-canvas, editorit, runtime- ja Run-näkymät |
+| React/Vite-käyttöliittymä | Configure- ja Run-työtilat, kolmitasoinen Loop Engineer, editorit, runtime- ja Run-näkymät |
 | Paikallinen Express-palvelu | Loopback-API, validointi, orkestrointi, ajastus ja tapahtumavirrat |
 | Provider-adapterit | Codex CLI ja GitHub Copilot CLI yhteisen tehtävä-, tapahtuma- ja tulosmallin takana |
 | SQLite-tila | Runien, Stepien, jonojen, tapahtumien ja ajastusten kestävä paikallinen historia |
@@ -44,8 +44,9 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 ## Nykytila tämän repositoryn perusteella
 
 - Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v10** -skeemaa.
-- Projektissa on **10 hyväksyttyä Goalia** ja **16 ADR:ää**, joista ADR-004 ja ADR-010 ovat superseded-tilassa ja ADR-014:n V1-rajaus on osittain superseded ADR-016:lla.
+- Projektissa on **11 hyväksyttyä Goalia** ja **17 ADR:ää**, joista ADR-004 ja ADR-010 ovat superseded-tilassa ja ADR-014:n V1-rajaus on osittain superseded ADR-016:lla.
 - Paikallinen Loop Library, yhden Loopin package/install/export ja content-derived provenance on toteutettu ilman strict-v10-runtimen package-riippuvuutta.
+- Loop Engineer erottaa read-only Contextin, Looppien välisen Level 1 -compositionin ja valitun Loopin sisäisen Level 2 -detailin samoista strict-v10-lähteistä.
 - Balletin oma kehitysautomaatio käyttää arc42 Templatea ja 6+1 Method -Loopia sekä erillistä, ketjuttamatonta `release-validation`-tukilooppia.
 - Konfiguraatiossa on **18 Work Loop Nodea**, **6 Human Validation -porttia**, **6 Codex-ExecutionProfilea** ja viikoittainen continuous-learning-schedule.
 - Project-local menettelyt on jaettu **10 arc42-skilliin**; execution composition ei enää käytä `migrated-*`-instructioneita.

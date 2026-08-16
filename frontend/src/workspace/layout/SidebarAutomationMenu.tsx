@@ -2,7 +2,7 @@ import { Activity, ChevronRight, Route } from "lucide-react";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem } from "@/components/ui/sidebar";
-import { automationAllLoopsPath, automationLoopPath } from "../routing";
+import { automationContextPath, automationLoopPath } from "../routing";
 import type { RouteState } from "../types";
 import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
@@ -25,8 +25,8 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
         } />
         <CollapsibleContent>
           <SidebarMenuSub className="gap-0.5">
-            <SidebarNavLinkItem path={automationAllLoopsPath()} isActive={route.view === "automation" && route.automationLoopView === "all"} navigate={navigate}>
-              <Activity /> <span>Loops</span>
+            <SidebarNavLinkItem path={automationContextPath()} isActive={route.view === "automation"} navigate={navigate}>
+              <Activity /> <span>Loop Engineer</span>
             </SidebarNavLinkItem>
             {automation.loops.length === 0 ? (
               <SidebarMenuSubItem><span className="block px-2 py-1 text-xs text-muted-foreground">No loops.</span></SidebarMenuSubItem>

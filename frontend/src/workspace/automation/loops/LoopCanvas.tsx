@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import {
   defaultLoopTheme,
   type ExecutionProfile,
@@ -9,7 +9,7 @@ import {
   type ProjectLoop
 } from "@shared/api/workspace-contracts";
 import { LoopCanvasSurface } from "./LoopCanvasSurface";
-import { calculateCompositeLoopCanvasLayout } from "./loopLayout";
+import { calculateDetailLoopCanvasLayout } from "./loopDetailLayout";
 import type { LoopCanvasEdge } from "./loopLayoutEdges";
 import { buildLoopVisualProjection } from "./loopVisualProjection";
 import { useLoopCanvasInteraction } from "./useLoopCanvasInteraction";
@@ -24,7 +24,6 @@ export function LoopCanvas({
   selectedNodeId,
   theme: themeOverride,
   readOnly = false,
-  canvasControls,
   onAddFirstNode,
   onNodeSelect,
   onNodeEdgeSelect,
@@ -38,7 +37,6 @@ export function LoopCanvas({
   selectedNodeId?: string;
   theme?: LoopTheme;
   readOnly?: boolean;
-  canvasControls?: ReactNode;
   onAddFirstNode?: () => void;
   onNodeSelect?: (nodeId: string) => void;
   onNodeEdgeSelect?: (nodeId: string, edgeId: string) => void;
@@ -54,10 +52,8 @@ export function LoopCanvas({
     () => buildLoopVisualProjection(config, loop, run, executionProfiles, availableExecutionProfileIds),
     [availableExecutionProfileIds, config, executionProfiles, loop, run]
   );
-  const layout = useMemo(() => calculateCompositeLoopCanvasLayout({
-    config: projection.config,
-    selectedLoopId: loop.id,
-    recordsByLoopId: projection.recordsByLoopId,
+  const layout = useMemo(() => calculateDetailLoopCanvasLayout({
+    records: projection.recordsByLoopId.get(loop.id) ?? [],
     direction: "horizontal"
   }), [loop.id, projection]);
   const interaction = useLoopCanvasInteraction({
@@ -80,6 +76,7 @@ export function LoopCanvas({
     <div className="relative min-w-0">
       <LoopCanvasSurface
         layout={layout}
+        ariaLabel={run ? "Run selected Loop internal Edge canvas" : "Level 2 · Detail internal Edge canvas"}
         theme={theme}
         selectedLoopId={loop.id}
         nodeByKey={projection.nodeByKey}
@@ -106,7 +103,6 @@ export function LoopCanvas({
         onAddFirstNode={() => onAddFirstNode?.()}
         activeEdgeId={activeEdgeId}
       />
-      {canvasControls ? <div data-loop-canvas-controls className="absolute top-3 right-3 z-30">{canvasControls}</div> : null}
     </div>
   );
 }

@@ -33,7 +33,7 @@ export function LoopLibraryDialog({ open, actions, onOpenChange, onCreateBlank, 
   actions: LoopModuleActions;
   onOpenChange: (open: boolean) => void;
   onCreateBlank: () => void;
-  onInstalled: (installed: InstalledLoopModuleStatus) => void;
+  onInstalled: (installed: InstalledLoopModuleStatus) => void | Promise<void>;
 }) {
   const [library, setLibrary] = useState<LoopModuleLibraryEntry[]>([]);
   const [query, setQuery] = useState("");
@@ -76,7 +76,8 @@ export function LoopLibraryDialog({ open, actions, onOpenChange, onCreateBlank, 
 
   const commit = async (next: LoopModuleInstallPlan, pkg: unknown, source: string, mappings: Record<string, string>) => {
     const installed = await actions.install({ package: pkg, source, profileMappings: mappings, expectedPlanHash: next.planHash });
-    onInstalled(installed); onOpenChange(false);
+    await onInstalled(installed);
+    onOpenChange(false);
   };
 
   const replan = async (slot: string, profileId: string) => {

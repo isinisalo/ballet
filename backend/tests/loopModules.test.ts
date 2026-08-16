@@ -250,6 +250,40 @@ describe("Loop module install/export service", () => {
     expect(validateProjectExecutionResources(automation, resources)).toEqual([]);
     expect(automation.loopEdges).toHaveLength(1);
   });
+
+  it("installs, exports, and removes each software-delivery starter without implicit Loop Edges", async () => {
+    const packageRoot = path.resolve(process.cwd(), ".ballet/loop-library/software-delivery");
+    const packageFiles = (await readdir(packageRoot)).filter((filename) => filename.endsWith(".ballet-loop.json")).sort();
+    expect(packageFiles).toEqual([
+      "backend-implementation.ballet-loop.json",
+      "frontend-implementation.ballet-loop.json"
+    ]);
+
+    for (const filename of packageFiles) {
+      const root = await project();
+      const modules = service(root);
+      const pkg = loopModulePackageV1Schema.parse(JSON.parse(await readFile(path.join(packageRoot, filename), "utf8")));
+      expect(pkg.loop.nodes).toHaveLength(3);
+      expect(pkg.capabilities.requires).toEqual([]);
+      expect(pkg.capabilities.provides).toHaveLength(1);
+      const source = `project-library:software-delivery/${filename}`;
+      const inspection = modules.inspect(pkg, source);
+      expect(inspection).toMatchObject({ valid: true, issues: [] });
+      const plan = await modules.plan({ package: pkg, source });
+      expect(plan.canInstall).toBe(true);
+      const installed = await modules.commit({ package: pkg, source, expectedPlanHash: plan.planHash });
+      expect(installed).toMatchObject({ loopId: pkg.manifest.id, status: "exact" });
+      const loaded = new ProjectConfigurationRepository().load(root).config!;
+      expect(loaded.loops).toHaveLength(1);
+      expect(loaded.loops[0]?.nodes).toHaveLength(3);
+      expect(loaded.loopEdges).toEqual([]);
+      const exported = await modules.exportLoop({ loopId: installed.loopId });
+      expect(loopModulePackageV1Schema.parse(exported.package).loop.nodes).toHaveLength(3);
+      await modules.remove(installed.loopId);
+      expect(new ProjectConfigurationRepository().load(root).config?.loops).toEqual([]);
+      expect(await modules.statuses()).toEqual([]);
+    }
+  });
 });
 
 const service = (root: string, active: string[] = []) => new LoopModuleService(() => root, runtime(active));

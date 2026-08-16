@@ -33,8 +33,9 @@ export function LoopCanvasSurface({
   onCanvasMoveStart,
   onCanvasMoveEnd,
   activeEdgeId,
+  ariaLabel,
   ...nodeContextProps
-}: LoopCanvasProps & { activeEdgeId?: string | null }) {
+}: LoopCanvasProps & { activeEdgeId?: string | null; ariaLabel?: string }) {
   const nodeContext = useMemo(() => nodeContextProps, [nodeContextProps]);
   const nodes = useLoopNodes(layout.nodes, layout.edges, nodeContext);
   const nodeIds = useMemo(() => layout.nodes.map((node) => node.key), [layout.nodes]);
@@ -57,9 +58,9 @@ export function LoopCanvasSurface({
     setAnimatedEdgeId(null);
   }, [animatedEdgeId, layout.edges]);
 
-  const label = nodeContext.staticPreview
+  const label = ariaLabel ?? (nodeContext.staticPreview
     ? "Theme preview loop canvas"
-    : `${nodeContext.readOnly ? "Run" : "Edit"} loop canvas`;
+    : `${nodeContext.readOnly ? "Run" : "Edit"} loop canvas`);
 
   return (
     <div

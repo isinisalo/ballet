@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  automationAllLoopsPath,
+  automationCompositionPath,
+  automationContextPath,
+  automationCreateLoopPath,
   automationLoopPath,
   automationThemePath,
   executionProfileCreatePath,
@@ -65,12 +67,14 @@ describe("workspace routing", () => {
       view: "skills",
       documentPath: ".agents/skills/review/SKILL.md"
     });
-    expect(routeFromPath("/automation/loops?id=build")).toEqual({ view: "automation", automationEntityId: "build" });
+    expect(routeFromPath("/automation/loops")).toEqual({ view: "automation", automationLevel: "context" });
+    expect(routeFromPath("/automation/loops?level=context")).toEqual({ view: "automation", automationLevel: "context" });
+    expect(routeFromPath("/automation/loops?level=1")).toEqual({ view: "automation", automationLevel: "composition", automationEntityId: undefined, creating: undefined });
+    expect(routeFromPath("/automation/loops?level=1&id=build")).toEqual({ view: "automation", automationLevel: "composition", automationEntityId: "build", creating: undefined });
+    expect(routeFromPath("/automation/loops?level=2&id=build")).toEqual({ view: "automation", automationLevel: "detail", automationEntityId: "build", creating: undefined });
+    expect(routeFromPath("/automation/loops?level=2&new=1")).toEqual({ view: "automation", automationLevel: "detail", automationEntityId: undefined, creating: true });
+    expect(routeFromPath("/automation/loops?level=invalid&id=build")).toEqual({ view: "automation", automationLevel: "context" });
     expect(routeFromPath("/automation/outputs?id=artifact")).toEqual({ view: "projects" });
-    expect(routeFromPath("/automation/loops?view=all")).toEqual({
-      view: "automation",
-      automationLoopView: "all"
-    });
     expect(routeFromPath("/automation/gates?id=gate-1")).toEqual({ view: "projects" });
     expect(routeFromPath("/automation/theme")).toEqual({ view: "loop-theme" });
     expect(routeFromPath("/runtimes?id=ignored-local-device")).toEqual({ view: "runtimes" });
@@ -100,8 +104,11 @@ describe("workspace routing", () => {
     expect(executionProfileCreatePath()).toBe("/execution-profiles?new=1");
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(skillCreatePath()).toBe("/skills?new=1");
-    expect(automationAllLoopsPath()).toBe("/automation/loops?view=all");
-    expect(automationLoopPath("wf 1")).toBe("/automation/loops?id=wf+1");
+    expect(automationContextPath()).toBe("/automation/loops?level=context");
+    expect(automationCompositionPath()).toBe("/automation/loops?level=1");
+    expect(automationCompositionPath("wf 1")).toBe("/automation/loops?level=1&id=wf+1");
+    expect(automationLoopPath("wf 1")).toBe("/automation/loops?level=2&id=wf+1");
+    expect(automationCreateLoopPath()).toBe("/automation/loops?level=2&new=1");
     expect(automationThemePath()).toBe("/automation/theme");
     expect(runOverviewPath("root 1")).toBe("/run?run=root%201");
     expect(runLoopPath("wf 1", "root 1")).toBe("/run/loops/wf%201?run=root%201");

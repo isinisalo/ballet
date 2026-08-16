@@ -59,7 +59,7 @@ export function WorkspaceRouteOutlet({
     case "project-instructions":
       return <InstructionsPage project={selection.project} documents={selection.instructionDocuments} instructions={data.instructions} selectedInstruction={selection.selectedInstruction} creating={route.creating} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "automation":
-      return <AutomationView data={data} selectedId={route.automationEntityId} loopView={route.automationLoopView} saveAutomation={mutations.saveAutomation} loopModules={mutations.loopModules} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
+      return <AutomationView data={data} selectedId={route.automationEntityId} level={route.automationLevel ?? "context"} creating={route.creating === true} saveAutomation={mutations.saveAutomation} refreshWorkspace={mutations.refresh} loopModules={mutations.loopModules} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "loop-theme":
       return <LoopThemeEditorView data={data} updateTheme={mutations.updateLoopTheme} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "runtimes":

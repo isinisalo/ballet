@@ -4,7 +4,7 @@ title: Quality requirements
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-16'
-version: 2
+version: 3
 tags:
   - arc42
   - quality
@@ -34,6 +34,7 @@ Priorities and criteria are accepted by the authorization for `goal-009`; runtim
 | QS-007 | goal-005, goal-008, goal-009 | A release, deploy or rollback is requested. | Release-validation Loop with network capability. | BB-006, BB-007, RT-005, DEP-003 | Stop for exact human authorization before each unapproved external action. | 0 external write commands occur before recorded authorization; merge and push remain absent from automatic behavior; all attempted commands are listed in evidence. | 1 | EVID-007 | policy verified; execution pending |
 | QS-008 | goal-009 | Scheduled learning finds a possible technology or method improvement. | Monday research run with primary-source network access. | BB-006, BB-008, RT-004 | Record only material evidence and route change through the correct approval boundary. | Every retained finding has source, impact, QS/RISK/ADR/BB reference and expected metric; no material finding yields 0 semantic document changes. | 2 | EVID-008 | pending pilot |
 | QS-009 | goal-010 | Operator imports, installs, exports or removes a Loop module, including injected failure, conflict or active Run. | Loop-empty or configured project through loopback API/UI. | BB-001, BB-002, BB-003, BB-009, RT-006, RT-007 | Validate/hash untrusted content, expose exact plan, materialize deterministically and preserve project/runtime boundaries. | All package/service/API/UI/release smoke scenarios pass; stale/incompatible/active operations write 0 config changes; injected config failure leaves 0 new referenced resources; removal deletes 0 shared resources. | 1 | EVID-009 | implementation verified; full gate pending |
+| QS-010 | goal-011 | Operator navigates Context, composition and selected-Loop detail, edits either Edge kind or installs a starter module. | Local browser at 1440×900 and 390×844 with configured, cyclic and empty Loop fixtures. | BB-001, BB-009, RT-006 | Preserve one hierarchy, deterministic data boundaries, keyboard access and authoritative post-install state. | Route/projection/UI/module tests pass; each canvas contains 0 foreign-level node or Edge kinds; Space selects and Enter opens a Level 1 Loop; both viewports show all three levels without clipped core actions or horizontal page overflow. | 1 | EVID-010 | verified |
 <!-- quality-scenarios:end -->
 
 ## Canonical sources
@@ -42,7 +43,7 @@ Goals own quality intent. This section owns measurable scenarios; TRACEABILITY o
 
 ## Relevant decisions
 
-`adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`.
+`adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-017`.
 
 ## Evidence
 

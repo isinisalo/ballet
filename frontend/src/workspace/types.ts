@@ -14,7 +14,7 @@ export type View =
   | "run";
 
 export type SaveCollection = "skills";
-export type AutomationLoopView = "all";
+export type LoopEngineerLevel = "context" | "composition" | "detail";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
@@ -23,7 +23,7 @@ export interface RouteState {
   documentPath?: string;
   executionProfileId?: string;
   automationEntityId?: string;
-  automationLoopView?: AutomationLoopView;
+  automationLevel?: LoopEngineerLevel;
   runTargetKind?: "loop";
   runTargetId?: string;
   rootRunId?: string;

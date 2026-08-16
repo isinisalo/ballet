@@ -34,6 +34,19 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
 ]));
 const jsonObjectSchema = z.record(z.string().max(200), jsonValueSchema);
 const unique = <T>(items: T[]): boolean => new Set(items).size === items.length;
+const canonicalJson = (value: JsonValue): JsonValue => {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalJson(entry)])
+    );
+  }
+  return value;
+};
+const jsonValuesEqual = (left: JsonValue, right: JsonValue): boolean =>
+  JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right));
 const body = z.string().min(1).max(maxLoopModuleStringLength).refine(
   (value) => new TextEncoder().encode(value).byteLength <= maxLoopModuleResourceBodyBytes,
   `Resource body must not exceed ${maxLoopModuleResourceBodyBytes} UTF-8 bytes.`
@@ -161,7 +174,7 @@ export const loopModulePackageV1Schema = z.object({
     if ("node" in edge.target && !nodes.has(edge.target.node)) context.addIssue({ code: "custom", path: ["loop", "edges", index, "target", "node"], message: "Edge target must reference a module node." });
   });
   for (const node of pkg.loop.nodes) if (pkg.loop.edges.filter((edge) => edge.source === node.key).length !== 1) context.addIssue({ code: "custom", path: ["loop", "edges"], message: `Node ${node.key} must have exactly one outgoing edge.` });
-  if (JSON.stringify(pkg.loop.state.initial) !== JSON.stringify(pkg.stateContract.initial)) context.addIssue({ code: "custom", path: ["stateContract", "initial"], message: "State contract initial value must equal Loop state initial value." });
+  if (!jsonValuesEqual(pkg.loop.state.initial, pkg.stateContract.initial)) context.addIssue({ code: "custom", path: ["stateContract", "initial"], message: "State contract initial value must equal Loop state initial value." });
   if (pkg.stateContract.requiredKeys.length > 0) {
     const initial = pkg.stateContract.initial;
     if (!initial || typeof initial !== "object" || Array.isArray(initial)) {

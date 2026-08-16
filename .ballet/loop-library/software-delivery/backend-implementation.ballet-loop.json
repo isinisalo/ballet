@@ -1,0 +1,178 @@
+{
+  "capabilities": {
+    "provides": [
+      "software.backend-implemented"
+    ],
+    "recommendedConnections": [
+      {
+        "capability": "software.frontend-implemented",
+        "description": "Continue an accepted backend contract to a compatible user-interface implementation when the project needs one.",
+        "direction": "outgoing",
+        "kind": "flow"
+      }
+    ],
+    "requires": []
+  },
+  "format": "ballet-loop-module",
+  "loop": {
+    "description": "Analyze, implement, and validate a bounded backend change across domain, API, persistence, and compatibility boundaries.",
+    "edges": [
+      {
+        "key": "analysis-ok",
+        "source": "analyze-backend-change",
+        "target": { "node": "implement-backend-change" }
+      },
+      {
+        "key": "implementation-ok",
+        "source": "implement-backend-change",
+        "target": { "node": "validate-backend-change" }
+      },
+      {
+        "key": "validation-ok",
+        "source": "validate-backend-change",
+        "target": { "terminal": "completed" }
+      }
+    ],
+    "key": "loop",
+    "nodes": [
+      {
+        "description": "Clarify the requested backend behavior, affected contracts, persistence implications, and acceptance evidence.",
+        "key": "analyze-backend-change",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Validate that the analysis identifies the bounded behavior, affected domain and API contracts, persistence or migration implications, compatibility constraints, and executable acceptance checks. Return a precise repair request when evidence is missing.",
+          "type": "agent"
+        },
+        "work": {
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Inspect the repository and describe the smallest backend change that satisfies the requested behavior. Identify domain, API, persistence, migration, compatibility, and test boundaries without implementing yet.",
+          "type": "agent"
+        }
+      },
+      {
+        "description": "Implement the approved backend behavior with explicit contracts and minimal architectural scope.",
+        "key": "implement-backend-change",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Review the implementation against the requested behavior, repository architecture, API and persistence contracts, compatibility constraints, and security boundaries. Do not modify the implementation while validating it.",
+          "type": "agent"
+        },
+        "work": {
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Implement the bounded backend change using the repository's existing domain, API, persistence, and test patterns. Remove replaced code in scope and preserve unrelated behavior.",
+          "type": "agent"
+        }
+      },
+      {
+        "description": "Run and evaluate backend tests, contract checks, migrations, and compatibility evidence.",
+        "key": "validate-backend-change",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Independently confirm that the named tests and contract checks passed, migrations are safe where applicable, no blocking architecture drift remains, and the evidence supports completion.",
+          "type": "agent"
+        },
+        "work": {
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Run the repository's relevant backend tests, API contract checks, persistence or migration checks, lint, and build gates. Fix in-scope failures and summarize exact evidence and limitations.",
+          "type": "agent"
+        }
+      }
+    ],
+    "startNode": "analyze-backend-change",
+    "state": {
+      "description": "Bounded backend delivery state containing intent, changed areas, checks, and evidence references.",
+      "initial": {
+        "checks": [],
+        "evidence": [],
+        "implementationAreas": [],
+        "request": null,
+        "status": "not_started"
+      }
+    }
+  },
+  "manifest": {
+    "category": "software-delivery",
+    "description": "Analyze, implement, and validate a bounded backend change across domain, API, persistence, and compatibility boundaries.",
+    "id": "backend-implementation",
+    "tags": ["backend", "implementation", "validation"],
+    "title": "Backend implementation",
+    "version": "1.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [
+    {
+      "description": "A provider profile for repository-local backend analysis and implementation.",
+      "key": "engineer",
+      "network": "forbidden",
+      "providers": ["codex", "copilot"],
+      "title": "Backend engineer"
+    },
+    {
+      "description": "A provider profile for independent repository-local backend validation.",
+      "key": "reviewer",
+      "network": "forbidden",
+      "providers": ["codex", "copilot"],
+      "title": "Backend reviewer"
+    }
+  ],
+  "resources": [
+    {
+      "body": "\n# Backend engineer\n\nAnalyze and implement one bounded backend change. Follow the repository's accepted architecture and existing domain, API, persistence, migration, and test patterns. Keep changes minimal, remove replaced code in scope, run relevant checks, and report concrete evidence. Never perform external writes or invent missing product intent.\n",
+      "key": "backend-engineer",
+      "kind": "instruction",
+      "metadata": { "tags": ["backend", "implementation"] },
+      "title": "Backend engineer"
+    },
+    {
+      "body": "\n# Backend reviewer\n\nIndependently validate one bounded backend change against its requested behavior, accepted architecture, domain and API contracts, persistence safety, compatibility constraints, and executable evidence. Do not edit the implementation while validating it. Return a precise repair request for every blocking gap.\n",
+      "key": "backend-reviewer",
+      "kind": "instruction",
+      "metadata": { "tags": ["backend", "validation"] },
+      "title": "Backend reviewer"
+    }
+  ],
+  "stateContract": {
+    "description": "Bounded backend delivery state containing intent, changed areas, checks, and evidence references.",
+    "id": "backend-delivery-state",
+    "initial": {
+      "checks": [],
+      "evidence": [],
+      "implementationAreas": [],
+      "request": null,
+      "status": "not_started"
+    },
+    "requiredKeys": ["checks", "evidence", "implementationAreas", "request", "status"],
+    "version": "1.0.0"
+  },
+  "version": 1
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ExecutionProfile,
   LocalRuntime,
@@ -20,7 +20,7 @@ import { parseInitialState } from "./loopFormValidation";
 
 export function LoopEditor({
   config, loop, executionProfiles, instructions, skills, runtime, theme, scheduleStates,
-  locked, disabled = false, canvasControls, onLoopChange, onConfigChange, onLocalValidityChange
+  locked, disabled = false, onLoopChange, onLocalValidityChange, onBackToComposition
 }: {
   config: ProjectAutomationConfig;
   loop: ProjectLoop;
@@ -32,10 +32,9 @@ export function LoopEditor({
   scheduleStates: LoopScheduleState[];
   locked: boolean;
   disabled?: boolean;
-  canvasControls?: ReactNode;
   onLoopChange: (loop: ProjectLoop) => void;
-  onConfigChange: (config: ProjectAutomationConfig) => void;
   onLocalValidityChange: (valid: boolean) => void;
+  onBackToComposition: () => void;
 }) {
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const initialFingerprint = JSON.stringify(loop.state.initial);
@@ -78,9 +77,8 @@ export function LoopEditor({
     <div className="grid min-w-0">
       {locked ? <LoopLockedAlert /> : null}
       <header className="flex min-w-0 items-center gap-3 border-b border-divider-strong px-4 py-3">
-        <div className="min-w-0 flex-1"><h1 className="truncate font-mono text-sm font-semibold">{loop.id}</h1><p className="truncate text-xs text-muted-foreground">{loop.description || "Description required"}</p></div>
+        <p className="min-w-0 flex-1 truncate font-mono text-[0.68rem] uppercase tracking-[0.08em] text-muted-foreground">Internal graph · Work Loop Nodes and Internal Edges</p>
         <Button type="button" size="sm" variant={selectedNode ? "outline" : "secondary"} onClick={() => setSelectedNodeId(undefined)}><Settings2 /> Loop definition</Button>
-        {canvasControls}
       </header>
       <div role="region" aria-label="Work Loop editor workspace" className="grid min-h-[36rem] min-w-0 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,3fr)_minmax(22rem,2fr)]">
         <LoopCanvas
@@ -126,9 +124,9 @@ export function LoopEditor({
               initialStateError={initialStateError}
               disabled={editingDisabled}
               onLoopChange={onLoopChange}
-              onConfigChange={onConfigChange}
               onInitialStateTextChange={updateInitialState}
               onNodeSelect={setSelectedNodeId}
+              onBackToComposition={onBackToComposition}
             />
           )}
         </aside>
