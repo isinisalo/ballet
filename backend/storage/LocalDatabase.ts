@@ -47,7 +47,11 @@ export class LocalDatabase {
     const row = database.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").get();
     const version = readSchemaVersion(row);
     if (version !== localDatabaseSchemaVersion) {
-      throw new Error(`Unsupported Ballet state schema ${version ?? "unknown"}; expected ${localDatabaseSchemaVersion}.`);
+      throw new Error([
+        `Unsupported Ballet state schema ${version ?? "unknown"}; expected ${localDatabaseSchemaVersion}.`,
+        `Runtime state at ${this.path} was left unchanged.`,
+        "This release does not migrate prior Run history; archive state.sqlite and its -wal/-shm companions, then start Ballet again."
+      ].join(" "));
     }
     const missing = localDatabaseTableNames.filter((tableName) => !tableNames.has(tableName));
     if (missing.length > 0) {

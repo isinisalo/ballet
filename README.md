@@ -191,6 +191,8 @@ launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/ai.ballet.daemon.plist 2
 
 The old `~/.ballet/control-plane.sqlite`, pairing state, attachments, history, and daemon configuration are intentionally not migrated or deleted. Each checkout starts a clean local schema under `.git/ballet`.
 
+Local runtime schema cutovers also fail closed: Ballet leaves an incompatible `.git/ballet/state.sqlite` unchanged and reports both the found and expected schema versions before launchd startup. After `ballet stop`, archive `state.sqlite` and any `state.sqlite-wal`/`state.sqlite-shm` companions together if the pre-release Run history is no longer active; the next `ballet` start creates the current clean schema. There is no automatic runtime migration or deletion.
+
 ## Local development
 
 ```bash

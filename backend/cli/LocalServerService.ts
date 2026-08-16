@@ -11,6 +11,7 @@ import {
 } from "./CheckoutState.js";
 import type { LaunchdService, LaunchdStatus } from "./LaunchdService.js";
 import type { ProjectContext } from "../project/ProjectContext.js";
+import { LocalDatabase } from "../storage/LocalDatabase.js";
 
 export interface LocalHealth {
   ok: true;
@@ -46,8 +47,18 @@ export class LocalServerService {
     let state = await loadOrCreateServiceState(this.options.project);
     const { settings, commandOverridesChanged } = await this.prepareSettings(commands);
     if (await this.reuseOrStopExisting(state, commandOverridesChanged)) return state;
+    this.preflightDatabase();
     state = await this.ensureAvailablePort(state);
     return this.installWithConflictRecovery(state, settings);
+  }
+
+  private preflightDatabase(): void {
+    const database = new LocalDatabase(this.options.project.databasePath);
+    try {
+      database.connection();
+    } finally {
+      database.close();
+    }
   }
 
   private async prepareSettings(commands: {
