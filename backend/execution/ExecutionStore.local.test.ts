@@ -20,24 +20,51 @@ afterEach(async () => {
 describe("ExecutionStore", () => {
   it("persists immutable queued task specifications in provider FIFO order", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
+    fixture.insertRoot("root-1", "task-a");
+    fixture.insertRoot("root-2", "task-b");
     const first = fixture.store.create(specification("task-a", "root-1", "codex", "2026-01-01T00:00:00.000Z"));
-    fixture.store.create(specification("task-b", "root-1", "codex", "2026-01-01T00:00:00.000Z"));
+    fixture.store.create(specification("task-b", "root-2", "codex", "2026-01-01T00:00:00.000Z"));
 
     expect(first.status).toBe("queued");
     expect(fixture.store.queued("codex")?.id).toBe("task-a");
-    expect(fixture.store.listByRoot("root-1").map(({ id }) => id)).toEqual(["task-a", "task-b"]);
+    expect(fixture.store.listByRoot("root-1").map(({ id }) => id)).toEqual(["task-a"]);
     expect(() => fixture.connection().prepare(
       "UPDATE execution_tasks SET spec_json = '{}' WHERE task_id = 'task-a'"
     ).run()).toThrow("execution task specification is immutable");
     fixture.close();
   });
 
+  it("retains immutable execution attempts when one Node Run is resumed", async () => {
+    const fixture = await createFixture();
+    fixture.insertRoot("root-1", "orchestrator");
+    const firstSpec = specification("orchestrator", "root-1");
+    fixture.store.create(firstSpec);
+    fixture.store.finish(firstSpec.taskId, "succeeded", { outcome: completedWorkOutcome });
+    fixture.connection().prepare(`
+      UPDATE node_runs SET execution_task_id = NULL WHERE node_run_id = ?
+    `).run(firstSpec.nodeRunId);
+
+    const resumedSpec = {
+      ...firstSpec,
+      taskId: "orchestrator-resumed",
+      createdAt: "2026-01-01T00:01:00.000Z"
+    };
+    fixture.store.create(resumedSpec);
+
+    expect(fixture.store.listByRoot("root-1").map(({ id, spec }) => ({ id, nodeRunId: spec.nodeRunId })))
+      .toEqual([
+        { id: "orchestrator", nodeRunId: firstSpec.nodeRunId },
+        { id: "orchestrator-resumed", nodeRunId: firstSpec.nodeRunId }
+      ]);
+    fixture.close();
+  });
+
   it("records cancellation requests separately for queued and running tasks", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
-    fixture.store.create(specification("queued", "root-1"));
-    fixture.store.create(specification("running", "root-1"));
+    fixture.insertRoot("queued-root", "queued");
+    fixture.insertRoot("running-root", "running");
+    fixture.store.create(specification("queued", "queued-root"));
+    fixture.store.create(specification("running", "running-root"));
     fixture.markRunning("running");
 
     const queued = fixture.store.requestCancel("queued");
@@ -53,19 +80,13 @@ describe("ExecutionStore", () => {
 
   it("keeps running Root tasks active until their workers drain", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
-    fixture.store.create(specification("queued", "root-1"));
+    fixture.insertRoot("root-1", "running");
     fixture.store.create(specification("running", "root-1"));
     fixture.markRunning("running");
 
     const taskIds = fixture.store.cancelActiveByRoot("root-1", "2026-01-02T00:00:00.000Z");
 
-    expect(taskIds).toEqual(["queued", "running"]);
-    expect(fixture.store.require("queued")).toMatchObject({
-      status: "cancelled",
-      cancelRequestedAt: "2026-01-02T00:00:00.000Z",
-      completedAt: "2026-01-02T00:00:00.000Z"
-    });
+    expect(taskIds).toEqual(["running"]);
     expect(fixture.store.require("running")).toMatchObject({
       status: "running",
       cancelRequestedAt: "2026-01-02T00:00:00.000Z",
@@ -76,9 +97,10 @@ describe("ExecutionStore", () => {
 
   it("fails only interrupted running tasks on recovery and leaves queued work replayable", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
+    fixture.insertRoot("root-1", "running");
+    fixture.insertRoot("root-2", "queued");
     fixture.store.create(specification("running", "root-1"));
-    fixture.store.create(specification("queued", "root-1"));
+    fixture.store.create(specification("queued", "root-2"));
     fixture.markRunning("running");
     fixture.reopen();
 
@@ -107,7 +129,7 @@ describe("ExecutionStore", () => {
 
   it("retains terminal events, caps ordinary console content, and pages by durable cursor", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
+    fixture.insertRoot("root-1", "task");
     fixture.store.create(specification("task", "root-1"));
     const timestamp = "2026-01-01T00:00:00.000Z";
     fixture.store.appendEvent("task", event(0, "terminal marker", true, timestamp));
@@ -132,7 +154,7 @@ describe("ExecutionStore", () => {
 describe("ExecutionStore outcome contracts", () => {
   it("keeps a terminal result idempotent", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
+    fixture.insertRoot("root-1", "task");
     fixture.store.create(specification("task", "root-1"));
 
     const completed = fixture.store.finish("task", "succeeded", { outcome: completedWorkOutcome });
@@ -146,7 +168,7 @@ describe("ExecutionStore outcome contracts", () => {
 
   it("canonicalizes only the immutable task role outcome before persistence", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
+    fixture.insertRoot("root-1", "task");
     fixture.store.create(specification("task", "root-1"));
 
     expect(() => fixture.store.finish("task", "succeeded", { outcome: {
@@ -168,7 +190,7 @@ describe("ExecutionStore outcome contracts", () => {
 
   it("rejects output schema evidence for a different Node role", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
+    fixture.insertRoot("root-1", "task");
     const invalid = specification("task", "root-1");
     invalid.evidence.outputSchema = validationNodeOutcomeJsonSchema;
     invalid.evidence.outputSchemaId = "validation-node-outcome-v3";
@@ -179,7 +201,7 @@ describe("ExecutionStore outcome contracts", () => {
 
   it("rejects Task Envelope hash evidence that does not match the exact prompt section", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root-1");
+    fixture.insertRoot("root-1", "task");
     const invalid = specification("task", "root-1");
     invalid.evidence.taskEnvelopeSha256 = "0".repeat(64);
     expect(() => fixture.store.create(invalid)).toThrow(/Task Envelope evidence/);
@@ -215,7 +237,7 @@ const createFixture = async () => {
   let database = new LocalDatabase(filename);
   const connection = () => database.connection();
   const store = new ExecutionStore(connection);
-  const insertRoot = (rootRunId: string): void => {
+  const insertRoot = (rootRunId: string, taskId: string): void => {
     const timestamp = "2026-01-01T00:00:00.000Z";
     connection().transaction(() => {
       connection().prepare(`
@@ -236,22 +258,23 @@ const createFixture = async () => {
           nesting_depth, created_at, updated_at
         ) VALUES (?, ?, 'delivery', 'manual', 'running', 0, 0, ?, ?)
       `).run(`loop-${rootRunId}`, rootRunId, timestamp, timestamp);
-      for (const taskId of ["task-a", "task-b", "queued", "running", "task"]) {
-        connection().prepare(`
-          INSERT OR IGNORE INTO work_loop_node_runs (
-            work_loop_node_run_id, root_run_id, loop_run_id, loop_id, work_loop_node_id,
-            attempt, status, state_revision_before, created_at, updated_at
-          ) VALUES (?, ?, ?, 'delivery', ?, 1, 'running', 0, ?, ?)
-        `).run(`work-loop-${taskId}`, rootRunId, `loop-${rootRunId}`, taskId, timestamp, timestamp);
-        connection().prepare(`
-          INSERT OR IGNORE INTO node_runs (
-            node_run_id, root_run_id, loop_run_id, work_loop_node_run_id, role, loop_id,
-            work_loop_node_id, node_definition_id, status, attempt, state_revision_before,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, 'work', 'delivery', ?, ?, 'queued', 1, 0, ?, ?)
-        `).run(`node-${taskId}`, rootRunId, `loop-${rootRunId}`, `work-loop-${taskId}`,
-          taskId, `delivery:${taskId}:work`, timestamp, timestamp);
-      }
+      connection().prepare(`
+        INSERT INTO work_loop_node_runs (
+          work_loop_node_run_id, root_run_id, loop_run_id, loop_id, work_loop_node_id,
+          attempt, status, state_revision_before, created_at, updated_at
+        ) VALUES (?, ?, ?, 'delivery', ?, 1, 'running', 0, ?, ?)
+      `).run(`work-loop-${taskId}`, rootRunId, `loop-${rootRunId}`, taskId, timestamp, timestamp);
+      connection().prepare(`
+        INSERT INTO node_runs (
+          node_run_id, root_run_id, loop_run_id, work_loop_node_run_id, role, loop_id,
+          work_loop_node_id, node_definition_id, status, attempt, state_revision_before,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'work', 'delivery', ?, ?, 'queued', 1, 0, ?, ?)
+      `).run(`node-${taskId}`, rootRunId, `loop-${rootRunId}`, `work-loop-${taskId}`,
+        taskId, `delivery:${taskId}:work`, timestamp, timestamp);
+      connection().prepare(`
+        UPDATE root_runs SET active_loop_run_id = ?, active_node_run_id = ? WHERE root_run_id = ?
+      `).run(`loop-${rootRunId}`, `node-${taskId}`, rootRunId);
     })();
   };
   const markRunning = (taskId: string): void => {

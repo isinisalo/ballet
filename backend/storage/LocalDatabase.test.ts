@@ -12,7 +12,7 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("LocalDatabase schema v5", () => {
+describe("LocalDatabase schema v6", () => {
   it("creates the clean Work Loop runtime table inventory", async () => {
     const database = await createDatabase();
     const connection = database.connection();
@@ -24,7 +24,7 @@ describe("LocalDatabase schema v5", () => {
     expect(tables).not.toContain("step_runs");
     expect(tables).not.toContain("loop_runs");
     expect(connection.pragma("foreign_keys", { simple: true })).toBe(1);
-    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("5");
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("6");
     database.close();
   });
 
@@ -42,8 +42,15 @@ describe("LocalDatabase schema v5", () => {
     expect(columns(connection, "work_loop_node_runs")).toEqual(expect.arrayContaining([
       "work_loop_node_run_id", "state_revision_before", "state_revision_after", "active_node_run_id"
     ]));
-    expect(columns(connection, "repair_requests")).toContain("requester_validation_node_run_id");
-    expect(columns(connection, "orchestration_frames")).toContain("return_validation_node_definition_id");
+    expect(columns(connection, "repair_requests")).toEqual(expect.arrayContaining([
+      "requester_validation_node_run_id", "orchestrator_node_run_id", "validation_summary", "attempt"
+    ]));
+    expect(columns(connection, "orchestration_frames")).toEqual(expect.arrayContaining([
+      "route_id", "return_validation_node_definition_id"
+    ]));
+    expect(columns(connection, "repair_results")).toEqual(expect.arrayContaining([
+      "repair_request_id", "orchestration_frame_id", "target_loop_run_id", "state_revision", "outcome_json"
+    ]));
     database.close();
   });
 
@@ -56,8 +63,11 @@ describe("LocalDatabase schema v5", () => {
     expect(indexes).toEqual(expect.arrayContaining([
       "idx_control_flow_root", "idx_events_cursor", "idx_frames_open",
       "idx_loop_invocations_root", "idx_loop_schedule_occurrence", "idx_node_runs_composite",
-      "idx_one_active_node_phase", "idx_repair_requests_pending", "idx_schedule_due",
-      "idx_state_revisions_latest", "idx_tasks_queue", "idx_tasks_root", "idx_work_loop_node_runs_loop"
+      "idx_one_active_node_phase", "idx_one_active_root_node", "idx_one_open_frame_per_callee",
+      "idx_one_open_frame_per_caller", "idx_one_running_loop_invocation",
+      "idx_repair_requests_pending", "idx_repair_results_root", "idx_schedule_due",
+      "idx_state_revisions_latest", "idx_tasks_node", "idx_tasks_queue", "idx_tasks_root",
+      "idx_work_loop_node_runs_loop"
     ]));
     database.close();
   });
@@ -93,37 +103,37 @@ describe("LocalDatabase schema v5", () => {
     untouched.close();
   });
 
-  it("rejects schema v4 without an empty-database migration exception", async () => {
+  it("rejects schema v5 without an empty-database migration exception", async () => {
     const root = await temporaryRoot();
     const filename = path.join(root, "state.sqlite");
     const legacy = new Database(filename);
     legacy.exec(`
       CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO metadata (key, value) VALUES ('schema_version', '4');
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '5');
       CREATE TABLE root_runs (root_run_id TEXT PRIMARY KEY);
     `);
     legacy.close();
 
     expect(() => new LocalDatabase(filename).connection())
-      .toThrow("Unsupported Ballet state schema 4; expected 5.");
+      .toThrow("Unsupported Ballet state schema 5; expected 6.");
     const untouched = new Database(filename, { readonly: true });
-    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("4");
+    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("5");
     expect(untouched.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").pluck().all())
       .not.toContain("state_revisions");
     untouched.close();
   });
 
-  it("rejects incomplete schema v5 instead of silently repairing it", async () => {
+  it("rejects incomplete schema v6 instead of silently repairing it", async () => {
     const root = await temporaryRoot();
     const filename = path.join(root, "state.sqlite");
     const partial = new Database(filename);
     partial.exec(`
       CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO metadata (key, value) VALUES ('schema_version', '5');
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '6');
     `);
     partial.close();
 
-    expect(() => new LocalDatabase(filename).connection()).toThrow("schema 5 is incomplete");
+    expect(() => new LocalDatabase(filename).connection()).toThrow("schema 6 is incomplete");
   });
 });
 

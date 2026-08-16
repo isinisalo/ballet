@@ -11,8 +11,8 @@ import type {
   ExecutionPromptEvidence, ExecutionResourceEvidence, ExecutionResourceSnapshot,
   NodeRunRole, RootExecutionSnapshot
 } from "../../shared/domain/runtime.js";
-import type { TaskEnvelopeV2 } from "../../shared/domain/taskEnvelope.js";
-import { serializeTaskEnvelopeV2 } from "../integration/TaskEnvelopeV2.js";
+import type { TaskEnvelopeV3 } from "../../shared/domain/taskEnvelope.js";
+import { serializeTaskEnvelopeV3 } from "../integration/TaskEnvelopeV3.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import { ExecutionCompositionError } from "./ExecutionCompositionError.js";
 import { SYSTEM_EXECUTION_INSTRUCTION_ID } from "./SystemExecutionContract.js";
@@ -24,7 +24,7 @@ export {
 } from "./ExecutionResourceCatalog.js";
 export { SYSTEM_EXECUTION_INSTRUCTION, SYSTEM_EXECUTION_INSTRUCTION_ID } from "./SystemExecutionContract.js";
 
-export const EXECUTION_COMPOSITION_VERSION = 3 as const;
+export const EXECUTION_COMPOSITION_VERSION = 4 as const;
 export const NODE_OUTCOME_SCHEMA_VERSION = 3 as const;
 export const MAX_EXECUTION_PROMPT_BYTES = 512 * 1024;
 
@@ -38,10 +38,10 @@ export const NODE_OUTCOME_SCHEMA_SHA256: Readonly<Record<NodeRunRole, string>> =
 
 export const composeExecutionPrompt = (
   snapshot: RootExecutionSnapshot,
-  envelopeInput: TaskEnvelopeV2
+  envelopeInput: TaskEnvelopeV3
 ): ExecutionPromptEvidence => {
   assertEnvelopeSnapshot(snapshot, envelopeInput);
-  const envelope = serializeTaskEnvelopeV2(envelopeInput);
+  const envelope = serializeTaskEnvelopeV3(envelopeInput);
   const { role, loop } = envelope.envelope;
   const workLoopNodeId = role === "orchestrator" ? undefined : envelope.envelope.workLoopNode.id;
   const composition = resolveComposition(snapshot, loop.id, workLoopNodeId, role);
@@ -59,7 +59,7 @@ export const composeExecutionPrompt = (
     section("SYSTEM", system.id, system.content),
     section("PRIMARY", primary.id, primary.content),
     ...skills.map((skill) => section("SKILL", skill.id, skill.content)),
-    section("TASK-ENVELOPE", "v2", envelope.serialized),
+    section("TASK-ENVELOPE", "v3", envelope.serialized),
     section("OUTPUT-SCHEMA", "v3", outputSchemaJson)
   ].join("\n\n");
   const promptBytes = Buffer.byteLength(prompt, "utf8");
@@ -77,7 +77,7 @@ export const composeExecutionPrompt = (
     resources: [system, primary, ...skills].map(resourceEvidence),
     prompt,
     promptSha256: sha256(prompt),
-    taskEnvelopeVersion: 2,
+    taskEnvelopeVersion: 3,
     taskEnvelopeSha256: envelope.sha256,
     outputSchemaVersion: NODE_OUTCOME_SCHEMA_VERSION,
     outputSchemaId: NODE_OUTCOME_SCHEMA_IDS[role],
@@ -95,7 +95,7 @@ export const runtimeForNode = (snapshot: RootExecutionSnapshot, executionProfile
   return binding.runtime;
 };
 
-const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskEnvelopeV2): void => {
+const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskEnvelopeV3): void => {
   const loop = snapshot.loops.find((candidate) => candidate.id === envelope.loop.id);
   if (!loop || loop.description !== envelope.loop.description) throw new ExecutionCompositionError(
     "missing_resource",
@@ -106,11 +106,18 @@ const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskE
       .filter((edge) => edge.kind === "repair" && edge.source === loop.id)
       .map((edge) => snapshot.loops.find((candidate) => candidate.id === edge.target))
       .filter((candidate) => candidate !== undefined)
-      .map(({ id, description }) => ({ id, description }));
+      .map(({ id, description }) => {
+        const edge = snapshot.loopEdges.find((candidate) =>
+          candidate.kind === "repair" && candidate.source === loop.id && candidate.target === id);
+        if (!edge) throw new ExecutionCompositionError("missing_resource", `Repair route to ${id} is missing.`);
+        return { id, description, loopEdgeId: edge.id, routingDescription: edge.description };
+      });
     const actual = sortedTargets(envelope.allowedTargetLoops);
     const expected = sortedTargets(expectedTargets);
     if (actual.length !== expected.length || actual.some((target, index) =>
-      target.id !== expected[index]?.id || target.description !== expected[index]?.description)) {
+      target.id !== expected[index]?.id || target.description !== expected[index]?.description
+      || target.loopEdgeId !== expected[index]?.loopEdgeId
+      || target.routingDescription !== expected[index]?.routingDescription)) {
       throw new ExecutionCompositionError(
         "missing_resource",
         `Task Envelope allowed target Loops do not match the repair allowlist for ${loop.id}.`
@@ -159,7 +166,7 @@ const resourceEvidence = (resource: ExecutionResourceSnapshot): ExecutionResourc
   relativePath: resource.relativePath, sourceSha256: resource.sourceSha256
 });
 const section = (kind: string, id: string, content: string): string =>
-  `<<< BALLET EXECUTION COMPOSITION V3 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
+  `<<< BALLET EXECUTION COMPOSITION V4 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
 const compareUtf8 = (left: string, right: string): number => Buffer.compare(Buffer.from(left), Buffer.from(right));
 const sortedIds = (ids: readonly string[]): string[] => [...ids].sort(compareUtf8);
 const sortedTargets = <T extends { id: string }>(targets: readonly T[]): T[] => [...targets].sort((left, right) => compareUtf8(left.id, right.id));

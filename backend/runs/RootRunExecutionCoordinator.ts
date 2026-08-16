@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import type { ExecutionTask, NodeRun } from "../../shared/domain/runtime.js";
+import type { ExecutionTask } from "../../shared/domain/runtime.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
 import type { LocalWorkspaceManager } from "../execution/git/LocalWorkspaceManager.js";
@@ -8,7 +8,7 @@ import { StatePatchValidationError } from "../runtime/state/StatePatch.js";
 import type { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import type { RootRunStore, StoredRootRun } from "./RootRunStore.js";
 import { isActiveRootStatus } from "./RunReadProjection.js";
-import { createNodeExecutionSpec } from "./NodeExecutionPlan.js";
+import { createNodeExecutionSpec, type NodeExecutionPlanInput } from "./NodeExecutionPlan.js";
 
 export interface RootRunExecutionCoordinatorOptions {
   connection: () => Database.Database;
@@ -26,6 +26,8 @@ type RootTerminalization = {
   error: string;
   errorCode: "invalid_state_patch" | "orchestration_failed";
 } | { status: "cancelled" };
+
+type PendingNodePlan = Omit<NodeExecutionPlanInput, "state" | "events">;
 
 export class RootRunExecutionCoordinator {
   constructor(private readonly options: RootRunExecutionCoordinatorOptions) {}
@@ -63,13 +65,13 @@ export class RootRunExecutionCoordinator {
 
   async sync(rootRunId: string): Promise<void> {
     const runs = this.options.database.listRootLoopRuns(rootRunId);
-    if (runs.some((run) => run.status === "waiting_for_input")) {
-      this.options.roots.setStatus(rootRunId, "waiting_for_input");
-      return;
-    }
     if (runs.some((run) => ["queued", "running"].includes(run.status))) {
       const queued = this.options.executions.listByRoot(rootRunId).some((task) => task.status === "queued");
       this.options.roots.setStatus(rootRunId, queued ? "queued" : "running");
+      return;
+    }
+    if (runs.some((run) => run.status === "waiting_for_input")) {
+      this.options.roots.setStatus(rootRunId, "waiting_for_input");
       return;
     }
     const status = runs.some((run) => run.status === "failed") ? "failed"
@@ -99,6 +101,7 @@ export class RootRunExecutionCoordinator {
           this.preflightPending(root.rootRunId);
         })();
       } else if (["interrupted", "failed", "cancelled"].includes(node.status)) {
+        this.options.database.reconcileTerminalNode(node.nodeRunId);
         await this.sync(root.rootRunId);
         return;
       } else if (persisted.status === "cancelled") {
@@ -181,12 +184,7 @@ export class RootRunExecutionCoordinator {
     return true;
   }
 
-  private pendingNode(rootRunId: string): {
-    root: StoredRootRun;
-    run: ReturnType<RuntimeDatabase["listRootLoopRuns"]>[number];
-    composite: NonNullable<ReturnType<RuntimeDatabase["getWorkLoopNodeRun"]>>;
-    node: NodeRun;
-  } | undefined {
+  private pendingNode(rootRunId: string): PendingNodePlan | undefined {
     const root = this.options.roots.require(rootRunId);
     if (!root.activeNodeRunId) return undefined;
     const node = this.options.database.getNodeRun(root.activeNodeRunId);
@@ -196,8 +194,11 @@ export class RootRunExecutionCoordinator {
     const composite = node.workLoopNodeRunId
       ? this.options.database.getWorkLoopNodeRun(node.workLoopNodeRunId)
       : undefined;
-    if (!run || !composite || run.status !== "running") return undefined;
-    return { root, run, composite, node };
+    if (!run || run.status !== "running" || (node.role !== "orchestrator" && !composite)) return undefined;
+    const repairRequest = node.role === "orchestrator"
+      ? this.options.database.repair.requestForOrchestrator(node.nodeRunId)
+      : undefined;
+    return { root, run, composite, node, repairRequest };
   }
 
   private async terminalizeRoot(rootRunId: string, detail: RootTerminalization): Promise<void> {

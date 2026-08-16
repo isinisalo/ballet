@@ -29,7 +29,9 @@ describe("Work Loop runtime stores", () => {
     expect(work).toMatchObject({ status: "queued", stateRevisionBefore: 0 });
     await fixture.close();
   });
+});
 
+describe("Repair runtime stores", () => {
   it("persists pending Repair Requests and orchestration continuations across reopen", async () => {
     const fixture = await createRuntimeStoreFixture({ repaired: false });
     const loopRun = fixture.loops.createLoopRun({
@@ -47,22 +49,33 @@ describe("Work Loop runtime stores", () => {
     const request = fixture.repairs.createRequest({
       repairRequestId: "repair-request", rootRunId: "root-run", requesterLoopRunId: loopRun.loopRunId,
       requesterWorkLoopNodeRunId: composite.workLoopNodeRunId,
-      requesterValidationNodeRunId: validation.nodeRunId, requestedCapability: "repair-state",
+      requesterValidationNodeRunId: validation.nodeRunId,
+      mode: "orchestrator", attempt: 1, validationSummary: "Repairable mismatch.",
       requestedOutcome: { repaired: true }, reason: "Validation found a repairable mismatch.",
       evidence: { check: "failed" }, stateRevisionAtRequest: 0, returnLoopId: fixture.loop.id,
       returnWorkLoopNodeId: fixture.loop.startNodeId,
       returnValidationNodeDefinitionId: "main-loop:work:validation", nestingDepth: 1,
       createdAt: runtimeTestTimestamp
     });
-    const callee = fixture.loops.createLoopRun({
-      loopRunId: "callee-loop-run", rootRunId: "root-run", loop: fixture.loop,
-      parentLoopRunId: loopRun.loopRunId, source: "repair", nestingDepth: 1
-    });
+    fixture.connection().prepare(`
+      UPDATE node_runs SET status = 'completed', outcome_json = ?, state_revision_after = 0,
+        completed_at = ?, updated_at = ? WHERE node_run_id = ?
+    `).run(JSON.stringify({
+      role: "validation", state: "completed", decision: "FAIL", summary: "Repairable mismatch.",
+      evidence: {}, checks: [], repair: {
+        mode: "ORCHESTRATOR_REPAIR", reason: "Repair.",
+        requestedCapability: "repair-state", evidenceRefs: []
+      }
+    }), runtimeTestTimestamp, runtimeTestTimestamp, validation.nodeRunId);
+    fixture.connection().prepare(`
+      UPDATE work_loop_node_runs SET status = 'waiting_for_input' WHERE work_loop_node_run_id = ?
+    `).run(composite.workLoopNodeRunId);
     const orchestrator = fixture.loops.createNodeRun({
       nodeRunId: "orchestrator-node-run", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
       role: "orchestrator", loopId: fixture.loop.id,
       nodeDefinitionId: "root:orchestrator", attempt: 1
     });
+    fixture.repairs.bindOrchestrator(request.repairRequestId, orchestrator.nodeRunId);
     expect(() => fixture.repairs.routeRequest({
       repairRequestId: request.repairRequestId, loopEdgeId: "not-allowlisted",
       sourceLoopId: fixture.loop.id, targetLoopId: fixture.loop.id,
@@ -73,17 +86,36 @@ describe("Work Loop runtime stores", () => {
       sourceLoopId: fixture.loop.id, targetLoopId: fixture.loop.id,
       orchestratorNodeRunId: orchestrator.nodeRunId, evidence: { route: "allowlisted" }
     });
-    fixture.repairs.createFrame({
+    fixture.connection().prepare(`
+      UPDATE node_runs SET status = 'completed', outcome_json = ?, state_revision_after = 0,
+        completed_at = ?, updated_at = ? WHERE node_run_id = ?
+    `).run(JSON.stringify({
+      role: "orchestrator", state: "completed", targetLoopId: fixture.loop.id,
+      routeReason: "Allowlisted.", repairInput: {}, expectedOutcome: {}
+    }), runtimeTestTimestamp, runtimeTestTimestamp, orchestrator.nodeRunId);
+    fixture.connection().prepare(`
+      UPDATE loop_invocations SET status = 'waiting_for_input' WHERE loop_run_id = ?
+    `).run(loopRun.loopRunId);
+    const callee = fixture.loops.createLoopRun({
+      loopRunId: "callee-loop-run", rootRunId: "root-run", loop: fixture.loop,
+      parentLoopRunId: loopRun.loopRunId, source: "repair",
+      repairRequestId: request.repairRequestId, nestingDepth: 1
+    });
+    const frame = fixture.repairs.createFrame({
       frameId: "frame", rootRunId: "root-run", repairRequestId: request.repairRequestId,
+      routeId: fixture.repairs.routeForRequest(request.repairRequestId)!.routeId,
       callerLoopRunId: loopRun.loopRunId, calleeLoopRunId: callee.loopRunId,
       returnLoopId: fixture.loop.id, returnWorkLoopNodeId: fixture.loop.startNodeId,
       returnValidationNodeDefinitionId: "main-loop:work:validation",
       stateRevisionAtCall: 0, nestingDepth: 1, createdAt: runtimeTestTimestamp
     });
+    fixture.loops.bindOrchestrationFrame(callee.loopRunId, frame.frameId);
     fixture.repairs.createRequest({
       repairRequestId: "pending-repair", rootRunId: "root-run", requesterLoopRunId: loopRun.loopRunId,
       requesterWorkLoopNodeRunId: composite.workLoopNodeRunId,
-      requesterValidationNodeRunId: validation.nodeRunId, reason: "Awaiting a route.",
+      requesterValidationNodeRunId: validation.nodeRunId,
+      mode: "orchestrator", attempt: 2, validationSummary: "Another repair is required.",
+      reason: "Awaiting a route.", requestedCapability: "repair-state",
       stateRevisionAtRequest: 0, returnLoopId: fixture.loop.id,
       returnWorkLoopNodeId: fixture.loop.startNodeId,
       returnValidationNodeDefinitionId: "main-loop:work:validation", nestingDepth: 1
@@ -191,7 +223,9 @@ describe("Work Loop runtime invariants", () => {
     fixture.repairs.createRequest({
       repairRequestId: "pending-repair", rootRunId: "root-run", requesterLoopRunId: loopRun.loopRunId,
       requesterWorkLoopNodeRunId: composite.workLoopNodeRunId,
-      requesterValidationNodeRunId: validation.nodeRunId, reason: "Pending at cancellation.",
+      requesterValidationNodeRunId: validation.nodeRunId,
+      mode: "orchestrator", attempt: 1, validationSummary: "Repair required.",
+      reason: "Pending at cancellation.", requestedCapability: "repair-state",
       stateRevisionAtRequest: 0, returnLoopId: fixture.loop.id,
       returnWorkLoopNodeId: fixture.loop.startNodeId,
       returnValidationNodeDefinitionId: "main-loop:work:validation", nestingDepth: 1

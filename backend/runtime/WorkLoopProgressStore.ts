@@ -39,15 +39,11 @@ export class WorkLoopProgressStore {
     return readInteger(result, "attempt", `Work Loop Node Run ${workLoopNodeRunId} cannot retry.`);
   }
 
-  waitForRepair(node: NodeRun, timestamp = new Date().toISOString()): void {
+  suspendLoop(loopRunId: string, timestamp = new Date().toISOString()): void {
     this.connection().prepare(`
       UPDATE loop_invocations SET status = 'waiting_for_input', updated_at = ?
       WHERE loop_run_id = ? AND status = 'running'
-    `).run(timestamp, node.loopRunId);
-    this.connection().prepare(`
-      UPDATE root_runs SET status = 'waiting_for_input', active_node_run_id = NULL, updated_at = ?
-      WHERE root_run_id = ?
-    `).run(timestamp, node.rootRunId);
+    `).run(timestamp, loopRunId);
   }
 
   waitForHuman(node: NodeRun, timestamp = new Date().toISOString()): void {
@@ -64,20 +60,75 @@ export class WorkLoopProgressStore {
     node: NodeRun,
     terminal: LoopTerminal,
     stateRevision: number,
-    outcome: CanonicalNodeOutcome,
     timestamp = new Date().toISOString()
   ): void {
-    const outcomeValue: unknown = outcome;
-    assertJsonValue(outcomeValue, { label: `Node Run ${node.nodeRunId} outcome` });
     const result = this.connection().prepare(`
       UPDATE loop_invocations SET status = ?, completion_state_revision = ?, completed_at = ?, updated_at = ?
       WHERE loop_run_id = ? AND status IN ('running','waiting_for_input')
     `).run(terminal, stateRevision, timestamp, timestamp, node.loopRunId);
     if (result.changes !== 1) throw new Error(`Loop Run ${node.loopRunId} cannot finish as ${terminal}.`);
     this.connection().prepare(`
+      UPDATE root_runs SET active_loop_run_id = NULL, active_node_run_id = NULL, updated_at = ?
+      WHERE root_run_id = ? AND active_loop_run_id = ?
+    `).run(timestamp, node.rootRunId, node.loopRunId);
+  }
+
+  activateCaller(loopRunId: string, workLoopNodeRunId: string, rootRunId: string, timestamp = new Date().toISOString()): void {
+    const loop = this.connection().prepare(`
+      UPDATE loop_invocations SET status = 'running', updated_at = ?
+      WHERE loop_run_id = ? AND status IN ('running','waiting_for_input')
+    `).run(timestamp, loopRunId);
+    const composite = this.connection().prepare(`
+      UPDATE work_loop_node_runs SET status = 'running', updated_at = ?
+      WHERE work_loop_node_run_id = ? AND status = 'waiting_for_input'
+    `).run(timestamp, workLoopNodeRunId);
+    if (loop.changes !== 1 || composite.changes !== 1) {
+      throw new Error(`Repair continuation ${loopRunId}:${workLoopNodeRunId} is not suspended.`);
+    }
+    this.connection().prepare(`
+      UPDATE root_runs SET status = 'running', active_loop_run_id = ?, active_node_run_id = NULL,
+        updated_at = ? WHERE root_run_id = ?
+    `).run(loopRunId, timestamp, rootRunId);
+  }
+
+  terminalizeCaller(
+    loopRunId: string,
+    workLoopNodeRunId: string,
+    rootRunId: string,
+    status: "blocked" | "failed" | "cancelled",
+    revision: number,
+    errorCode: string,
+    errorMessage: string,
+    timestamp = new Date().toISOString()
+  ): void {
+    this.connection().prepare(`
+      UPDATE work_loop_node_runs SET status = ?, terminal = ?, state_revision_after = ?,
+        active_node_run_id = NULL, error_code = ?, error_message = ?, completed_at = ?, updated_at = ?
+      WHERE work_loop_node_run_id = ? AND status = 'waiting_for_input'
+    `).run(status, status, revision, errorCode, errorMessage, timestamp, timestamp, workLoopNodeRunId);
+    this.connection().prepare(`
+      UPDATE loop_invocations SET status = ?, completion_state_revision = ?, completed_at = ?, updated_at = ?
+      WHERE loop_run_id = ? AND status IN ('running','waiting_for_input')
+    `).run(status, revision, timestamp, timestamp, loopRunId);
+    this.connection().prepare(`
       UPDATE root_runs SET active_loop_run_id = NULL, active_node_run_id = NULL,
-        outcome_json = ?, updated_at = ? WHERE root_run_id = ?
-    `).run(canonicalJson(outcomeValue), timestamp, node.rootRunId);
+        error_code = ?, error_message = ?, updated_at = ? WHERE root_run_id = ?
+    `).run(errorCode, errorMessage, timestamp, rootRunId);
+  }
+
+  finishRoot(
+    rootRunId: string,
+    outcome: CanonicalNodeOutcome | undefined,
+    error?: { code: string; message: string },
+    timestamp = new Date().toISOString()
+  ): void {
+    const outcomeValue: unknown = outcome;
+    if (outcomeValue !== undefined) assertJsonValue(outcomeValue, { label: `Root Run ${rootRunId} outcome` });
+    this.connection().prepare(`
+      UPDATE root_runs SET active_loop_run_id = NULL, active_node_run_id = NULL,
+        outcome_json = ?, error_code = ?, error_message = ?, updated_at = ? WHERE root_run_id = ?
+    `).run(outcomeValue === undefined ? null : canonicalJson(outcomeValue),
+      error?.code ?? null, error?.message ?? null, timestamp, rootRunId);
   }
 
   blockAtTransitionLimit(

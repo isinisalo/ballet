@@ -4,7 +4,7 @@ import { workNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import type { ExecutionSpec, RootExecutionSnapshot, RuntimeProvider } from "../../shared/domain/runtime.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
-import { serializeTaskEnvelopeV2 } from "../integration/TaskEnvelopeV2.js";
+import { serializeTaskEnvelopeV3 } from "../integration/TaskEnvelopeV3.js";
 import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v10TestConfig.js";
 
 export const specification = (
@@ -13,7 +13,7 @@ export const specification = (
   provider: RuntimeProvider = "codex",
   createdAt = "2026-01-01T00:00:00.000Z"
 ): ExecutionSpec => ({
-  version: 4,
+  version: 5,
   taskId,
   kind: "node_execution",
   rootRunId,
@@ -21,7 +21,7 @@ export const specification = (
   workLoopNodeRunId: `work-loop-${taskId}`,
   nodeRunId: `node-${taskId}`,
   evidence: {
-    compositionVersion: 3,
+    compositionVersion: 4,
     loopId: "delivery",
     workLoopNodeId: taskId,
     nodeRole: "work",
@@ -80,6 +80,10 @@ export const insertRuntimeRoot = (
       ) VALUES (?, ?, ?, 'manual', 'running', 0, 0, ?, ?)
     `).run(`loop-${rootRunId}`, rootRunId, "delivery", timestamp, timestamp);
     for (const taskId of taskIds) insertRunnableNode(connection, rootRunId, taskId, timestamp);
+    const activeTaskId = taskIds[0];
+    if (activeTaskId) connection.prepare(`
+      UPDATE root_runs SET active_loop_run_id = ?, active_node_run_id = ? WHERE root_run_id = ?
+    `).run(`loop-${rootRunId}`, `node-${activeTaskId}`, rootRunId);
   })();
 };
 
@@ -121,8 +125,8 @@ const rootExecutionSnapshot = (): RootExecutionSnapshot => ({
 });
 
 const workPromptEvidence = (taskId: string, rootRunId: string) => {
-  const envelope = serializeTaskEnvelopeV2({
-    version: 2, role: "work",
+  const envelope = serializeTaskEnvelopeV3({
+    version: 3, role: "work",
     run: {
       rootRunId, loopRunId: `loop-${rootRunId}`, nodeRunId: `node-${taskId}`,
       workLoopNodeRunId: `work-loop-${taskId}`
@@ -136,18 +140,18 @@ const workPromptEvidence = (taskId: string, rootRunId: string) => {
   });
   const schema = canonicalJson(workNodeOutcomeJsonSchema);
   const prompt = [
-    section("TASK-ENVELOPE", "v2", envelope.serialized),
+    section("TASK-ENVELOPE", "v3", envelope.serialized),
     section("OUTPUT-SCHEMA", "v3", schema)
   ].join("\n\n");
   return {
     prompt,
     promptSha256: sha256(prompt),
-    taskEnvelopeVersion: 2 as const,
+    taskEnvelopeVersion: 3 as const,
     taskEnvelopeSha256: envelope.sha256
   };
 };
 
 const section = (kind: string, id: string, content: string): string =>
-  `<<< BALLET EXECUTION COMPOSITION V3 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
+  `<<< BALLET EXECUTION COMPOSITION V4 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
 
 const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");

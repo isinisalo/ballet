@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import {
-  orchestratorTaskEnvelopeV2Schema, validationTaskEnvelopeV2Schema,
-  workTaskEnvelopeV2Schema
+  orchestratorTaskEnvelopeV3Schema, validationTaskEnvelopeV3Schema,
+  workTaskEnvelopeV3Schema
 } from "../../shared/api/task-envelope-schemas.js";
 import type { JsonValue } from "../../shared/domain/automation.js";
 import {
   maxRelevantHistoryBytes, maxRelevantHistoryEntries, maxRepairRequestEnvelopeBytes,
   maxResumeContextBytes, maxTaskEnvelopeBytes, type TaskEnvelopeHistoryEntry,
-  type TaskEnvelopeV2
+  type TaskEnvelopeV3
 } from "../../shared/domain/taskEnvelope.js";
 import { assertJsonValue, canonicalJson, jsonSha256 } from "../runtime/state/CanonicalJson.js";
 import { validateState } from "../runtime/state/StatePatch.js";
@@ -19,14 +19,14 @@ export class TaskEnvelopeValidationError extends Error {
   }
 }
 
-export interface SerializedTaskEnvelopeV2 {
-  envelope: TaskEnvelopeV2;
+export interface SerializedTaskEnvelopeV3 {
+  envelope: TaskEnvelopeV3;
   serialized: string;
   sha256: string;
   sizeBytes: number;
 }
 
-export const serializeTaskEnvelopeV2 = (input: TaskEnvelopeV2): SerializedTaskEnvelopeV2 => {
+export const serializeTaskEnvelopeV3 = (input: TaskEnvelopeV3): SerializedTaskEnvelopeV3 => {
   const relevantHistory = selectRelevantHistory(input.relevantHistory);
   const normalized = input.role === "orchestrator"
     ? { ...input, relevantHistory, allowedTargetLoops: [...input.allowedTargetLoops].sort((left, right) => compareUtf8(left.id, right.id)) }
@@ -56,7 +56,7 @@ export const serializeTaskEnvelopeV2 = (input: TaskEnvelopeV2): SerializedTaskEn
   };
 };
 
-export const parseSerializedTaskEnvelopeV2 = (serialized: string): SerializedTaskEnvelopeV2 => {
+export const parseSerializedTaskEnvelopeV3 = (serialized: string): SerializedTaskEnvelopeV3 => {
   let value: unknown;
   try { value = JSON.parse(serialized); }
   catch (error) {
@@ -64,9 +64,9 @@ export const parseSerializedTaskEnvelopeV2 = (serialized: string): SerializedTas
       `Task Envelope is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  const result = serializeTaskEnvelopeV2(parseEnvelope(value));
+  const result = serializeTaskEnvelopeV3(parseEnvelope(value));
   if (result.serialized !== serialized) throw new TaskEnvelopeValidationError(
-    "Task Envelope is not in canonical V2 serialization order."
+    "Task Envelope is not in canonical V3 serialization order."
   );
   return result;
 };
@@ -77,14 +77,14 @@ export const selectRelevantHistory = (
   .sort((left, right) => left.sequence - right.sequence || compareUtf8(left.nodeRunId, right.nodeRunId))
   .slice(-maxRelevantHistoryEntries);
 
-const parseEnvelope = (input: unknown): TaskEnvelopeV2 => {
+const parseEnvelope = (input: unknown): TaskEnvelopeV3 => {
   if (typeof input !== "object" || input === null || !("role" in input)) {
     throw new TaskEnvelopeValidationError("Task Envelope must declare a Node role.");
   }
   try {
-    if (input.role === "work") return workTaskEnvelopeV2Schema.parse(input);
-    if (input.role === "validation") return validationTaskEnvelopeV2Schema.parse(input);
-    if (input.role === "orchestrator") return orchestratorTaskEnvelopeV2Schema.parse(input);
+    if (input.role === "work") return workTaskEnvelopeV3Schema.parse(input);
+    if (input.role === "validation") return validationTaskEnvelopeV3Schema.parse(input);
+    if (input.role === "orchestrator") return orchestratorTaskEnvelopeV3Schema.parse(input);
     throw new TaskEnvelopeValidationError(`Task Envelope has unsupported Node role ${String(input.role)}.`);
   } catch (error) {
     if (error instanceof TaskEnvelopeValidationError) throw error;

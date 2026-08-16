@@ -1,6 +1,6 @@
 # Work Loop v10 — migraatio- ja toteutussuunnitelma
 
-Tila: vaiheet 1–3 sekä vaiheen 4 paikallinen suoritusosuus on toteutettu (v10-domain, strict config, graph-invariantit, SQLite schema v5, atominen State, roolikohtaiset provider-sopimukset sekä Work → Validation → OK/local retry -control-flow). Ulkoisen korjauksen RepairRequest ja paluukohde persistoidaan, mutta orchestratorin route/call/return sekä vaiheet 5–8 ovat vielä toteutussuunnitelmaa.
+Tila: vaiheet 1–4 on toteutettu (v10-domain, strict config, graph-invariantit, SQLite schema v6, atominen State, roolikohtaiset provider-sopimukset, Work → Validation → OK/local retry sekä durable Orchestrator route/call/return). Vaiheet 5–8 ovat vielä toteutussuunnitelmaa.
 
 Päätöslähde: [ADR-015 — Work Loop, revisioitu State ja Loop Orchestrator](../../adr/adr-015-work-loop-state-ja-loop-orchestrator.md).
 
@@ -206,6 +206,8 @@ Vaiheen portti:
 - `git diff --check`.
 
 ## Vaihe 4 — LoopOrchestrator ja täydellinen control-flow-cutover
+
+Tila: toteutettu. Repair-allowlist validoidaan immutable snapshotista, target käyttää Root Runin yhteistä State-revisioketjua, continuation palaa samaan Validation Nodeen LIFO-järjestyksessä ja failure/cancellation/recovery säilyttävät request-, route-, frame- ja result-evidenssin.
 
 Tavoite: korvata `LoopRunEngine` yhdellä durablella Work Loop -tilakoneella.
 

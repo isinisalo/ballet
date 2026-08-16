@@ -5,6 +5,7 @@ import type { RootExecutionSnapshot } from "./executionRuntime.js";
 import type { LoopTheme } from "./loopThemes.js";
 
 export * from "./executionRuntime.js";
+export * from "./runtimeOrchestration.js";
 
 export const maxStatePatchBytes = 65_536;
 export const maxStatePatchOperations = 128;
@@ -192,6 +193,8 @@ export interface LoopRun {
   snapshot: ProjectLoop;
   themeSnapshot: LoopTheme;
   schedule?: LoopScheduleOccurrence;
+  repairRequestId?: string;
+  orchestrationFrameId?: string;
   entryStateRevision: number;
   completionStateRevision?: number;
   nestingDepth: number;
@@ -248,83 +251,4 @@ export interface NodeRun {
 export interface LoopRunDetails extends LoopRun {
   workLoopNodeRuns: WorkLoopNodeRun[];
   nodeRuns: NodeRun[];
-}
-
-export type RepairRequestStatus = "pending" | "routed" | "completed" | "failed" | "cancelled";
-
-export interface RepairRequest {
-  repairRequestId: string;
-  rootRunId: string;
-  requesterLoopRunId: string;
-  requesterWorkLoopNodeRunId: string;
-  requesterValidationNodeRunId: string;
-  requestedCapability?: string;
-  requestedOutcome?: JsonValue;
-  reason: string;
-  evidence?: JsonValue;
-  stateRevisionAtRequest: number;
-  routedLoopEdgeId?: string;
-  routedTargetLoopId?: string;
-  status: RepairRequestStatus;
-  returnLoopId: string;
-  returnWorkLoopNodeId: string;
-  returnValidationNodeDefinitionId: string;
-  nestingDepth: number;
-  createdAt: string;
-  updatedAt: string;
-  completedAt?: string;
-}
-
-export interface OrchestratorRoute {
-  routeId: string;
-  rootRunId: string;
-  repairRequestId: string;
-  orchestratorNodeRunId: string;
-  loopEdgeId: string;
-  sourceLoopId: string;
-  targetLoopId: string;
-  evidence?: JsonValue;
-  createdAt: string;
-}
-
-export type OrchestrationFrameStatus = "open" | "returned" | "failed" | "cancelled";
-
-export interface OrchestrationFrame {
-  frameId: string;
-  rootRunId: string;
-  repairRequestId: string;
-  callerLoopRunId: string;
-  calleeLoopRunId: string;
-  parentFrameId?: string;
-  returnLoopId: string;
-  returnWorkLoopNodeId: string;
-  returnValidationNodeDefinitionId: string;
-  stateRevisionAtCall: number;
-  nestingDepth: number;
-  status: OrchestrationFrameStatus;
-  createdAt: string;
-  updatedAt: string;
-  completedAt?: string;
-}
-
-export type ControlFlowEventKind =
-  | "work_completed" | "work_needs_input" | "work_terminal"
-  | "validation_ok" | "validation_fail_local" | "validation_fail_orchestrator" | "validation_terminal"
-  | "repair_return" | "repair_terminal" | "root_cancelled" | "root_terminal"
-  | "execution_interrupted";
-
-export interface ControlFlowEvent {
-  id: number;
-  rootRunId: string;
-  sequence: number;
-  kind: ControlFlowEventKind;
-  stateRevision: number;
-  sourceLoopRunId?: string;
-  sourceWorkLoopNodeRunId?: string;
-  sourceNodeRunId?: string;
-  targetLoopRunId?: string;
-  targetWorkLoopNodeRunId?: string;
-  repairRequestId?: string;
-  orchestrationFrameId?: string;
-  createdAt: string;
 }

@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import type {
   CanonicalNodeOutcome, ControlFlowEvent, LoopRunDetails, LoopRunSource, LoopScheduleState, NodeRun,
-  OrchestrationFrame, OrchestratorRoute, RepairRequest, WorkLoopNodeRun
+  OrchestrationFrame, OrchestratorRoute, RepairRequest, RepairResult, WorkLoopNodeRun
 } from "../shared/domain/runtime.js";
 import { maxControlFlowTransitions } from "../shared/domain/runtime.js";
 import { ControlFlowStore } from "./runtime/ControlFlowStore.js";
@@ -11,6 +11,7 @@ import {
   LoopScheduleStateStore, type CompleteScheduleOccurrenceInput, type ScheduleDefinitionState
 } from "./runtime/LoopScheduleStateStore.js";
 import { RepairStore } from "./runtime/RepairStore.js";
+import { RepairResultStore } from "./runtime/RepairResultStore.js";
 import { WorkLoopEngine } from "./runtime/WorkLoopEngine.js";
 import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
 
@@ -28,6 +29,7 @@ export class RuntimeDatabase {
   private readonly workLoopEngine: WorkLoopEngine;
   readonly state: LoopStateStore;
   readonly repair: RepairStore;
+  readonly repairResults: RepairResultStore;
   readonly control: ControlFlowStore;
   private readonly loopScheduleStateStore: LoopScheduleStateStore;
 
@@ -37,6 +39,7 @@ export class RuntimeDatabase {
     this.loopRunStore = new LoopRunStore(connection);
     this.state = new LoopStateStore(connection);
     this.repair = new RepairStore(connection);
+    this.repairResults = new RepairResultStore(connection);
     this.workLoopEngine = new WorkLoopEngine(connection, this.loopRunStore, this.state, this.repair);
     this.control = new ControlFlowStore(connection);
     this.loopScheduleStateStore = new LoopScheduleStateStore(connection);
@@ -80,6 +83,10 @@ export class RuntimeDatabase {
   getOrchestratorRoute(routeId: string): OrchestratorRoute | undefined {
     return this.repair.getRoute(routeId);
   }
+  getRepairResult(repairResultId: string): RepairResult | undefined {
+    return this.repairResults.get(repairResultId);
+  }
+  listRepairResults(rootRunId: string): RepairResult[] { return this.repairResults.list(rootRunId); }
   listControlFlowEvents(rootRunId: string): ControlFlowEvent[] {
     return this.control.listByRoot(rootRunId);
   }
@@ -161,6 +168,20 @@ export class RuntimeDatabase {
       const activeNodeRunId = readOptionalStringField(root, "active_node_run_id");
       const activeNode = activeNodeRunId ? this.getNodeRun(activeNodeRunId) : undefined;
       const nodeStatus = status === "failed" ? "failed" : "cancelled";
+      const repairStatus = status === "failed" ? "failed" : "cancelled";
+      for (const frame of [...this.repair.openFrames(rootRunId)].reverse()) {
+        const target = this.loopRunStore.details(frame.calleeLoopRunId);
+        if (!target) throw new Error(`Repair target Loop Run ${frame.calleeLoopRunId} was not found.`);
+        if (!this.repairResults.forRequest(frame.repairRequestId)) this.repairResults.create({
+            rootRunId, repairRequestId: frame.repairRequestId,
+            orchestrationFrameId: frame.frameId, targetLoopRunId: frame.calleeLoopRunId,
+            targetLoopId: target.loopId, status,
+            stateRevision, summary: `Repair Loop ${target.loopId} was ${status} with its Root Run.`,
+            createdAt: completedAt
+          });
+        this.repair.finishRequest(frame.repairRequestId, repairStatus, completedAt);
+        this.repair.closeFrame(frame.frameId, repairStatus, completedAt);
+      }
       this.connection().prepare(`
         UPDATE node_runs SET status = ?, state_revision_after = ?, error_code = ?, error_message = ?,
           completed_at = ?, updated_at = ?
@@ -177,13 +198,9 @@ export class RuntimeDatabase {
         WHERE root_run_id = ? AND status IN ('queued','running','waiting_for_input')
       `).run(status, stateRevision, completedAt, completedAt, rootRunId);
       this.connection().prepare(`
-        UPDATE repair_requests SET status = 'cancelled', completed_at = ?, updated_at = ?
+        UPDATE repair_requests SET status = ?, completed_at = ?, updated_at = ?
         WHERE root_run_id = ? AND status IN ('pending','routed')
-      `).run(completedAt, completedAt, rootRunId);
-      this.connection().prepare(`
-        UPDATE orchestration_frames SET status = 'cancelled', completed_at = ?, updated_at = ?
-        WHERE root_run_id = ? AND status = 'open'
-      `).run(completedAt, completedAt, rootRunId);
+      `).run(repairStatus, completedAt, completedAt, rootRunId);
       this.connection().prepare(`
         UPDATE root_runs SET transition_count = ?, active_loop_run_id = NULL,
           active_node_run_id = NULL, updated_at = ? WHERE root_run_id = ?
@@ -209,6 +226,10 @@ export class RuntimeDatabase {
         AND node.execution_task_id = ? AND root.active_loop_run_id = loop.loop_run_id
         AND root.active_node_run_id = node.node_run_id LIMIT 1
     `).get(rootRunId, nodeRunId, taskId));
+  }
+
+  reconcileTerminalNode(nodeRunId: string): void {
+    this.workLoopEngine.reconcileTerminalNode(nodeRunId);
   }
 }
 

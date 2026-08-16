@@ -69,10 +69,12 @@ const runnableTaskSql = `
       AND root.status IN ('queued', 'running', 'waiting_for_input')
       AND loop.loop_run_id = json_extract(task.spec_json, '$.loopRunId')
       AND loop.status = 'running'
+      AND root.active_loop_run_id = loop.loop_run_id
       AND node.node_run_id = task.node_run_id
       AND node.node_run_id = json_extract(task.spec_json, '$.nodeRunId')
       AND node.status = 'queued'
       AND node.execution_task_id = task.task_id
+      AND root.active_node_run_id = node.node_run_id
   )
 `;
 

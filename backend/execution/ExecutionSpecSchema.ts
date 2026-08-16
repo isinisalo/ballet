@@ -14,7 +14,7 @@ const projectSchema = z.object({
 }).strict();
 
 export const executionSpecSchema = z.object({
-  version: z.literal(4),
+  version: z.literal(5),
   taskId: z.string(),
   kind: z.literal("node_execution"),
   rootRunId: z.string(),
@@ -22,7 +22,7 @@ export const executionSpecSchema = z.object({
   workLoopNodeRunId: z.string().optional(),
   nodeRunId: z.string(),
   evidence: z.object({
-    compositionVersion: z.literal(3), loopId: z.string(), workLoopNodeId: z.string().optional(),
+    compositionVersion: z.literal(4), loopId: z.string(), workLoopNodeId: z.string().optional(),
     nodeRole: z.enum(["work", "validation", "orchestrator"]), nodeDefinitionId: z.string(),
     executionProfile: executionProfileSchema,
     resources: z.array(z.object({
@@ -30,7 +30,7 @@ export const executionSpecSchema = z.object({
       id: z.string(), relativePath: z.string().optional(), sourceSha256: sha256Schema
     }).strict()),
     prompt: z.string(), promptSha256: sha256Schema,
-    taskEnvelopeVersion: z.literal(2), taskEnvelopeSha256: sha256Schema,
+    taskEnvelopeVersion: z.literal(3), taskEnvelopeSha256: sha256Schema,
     outputSchemaVersion: z.literal(3),
     outputSchemaId: z.enum([
       "work-node-outcome-v3", "validation-node-outcome-v3", "orchestrator-node-outcome-v3"

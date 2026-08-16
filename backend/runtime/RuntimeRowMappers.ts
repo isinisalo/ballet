@@ -5,11 +5,11 @@ import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   CanonicalNodeOutcome, ControlFlowEvent, LoopRun, LoopStateRevision, NodeRun,
-  OrchestrationFrame, OrchestratorRoute, RepairRequest, StatePatch, WorkLoopNodeRun
+  OrchestrationFrame, OrchestratorRoute, RepairRequest, RepairResult, StatePatch, WorkLoopNodeRun
 } from "../../shared/domain/runtime.js";
 import type {
   ControlFlowEventRow, LoopRunRow, NodeRunRow, OrchestrationFrameRow,
-  OrchestratorRouteRow, RepairRequestRow, StateRevisionRow, WorkLoopNodeRunRow
+  OrchestratorRouteRow, RepairRequestRow, RepairResultRow, StateRevisionRow, WorkLoopNodeRunRow
 } from "./RuntimeDbTypes.js";
 import { parseJsonValue } from "./state/CanonicalJson.js";
 import { statePatchSha256, validateStatePatch } from "./state/StatePatch.js";
@@ -22,6 +22,8 @@ export const toLoopRun = (row: LoopRunRow, loop: ProjectLoop, theme: LoopTheme):
   source: row.source,
   status: row.status,
   input: row.input_json ? parseJsonValue(row.input_json, `Loop Run ${row.loop_run_id} input`) : undefined,
+  repairRequestId: row.repair_request_id ?? undefined,
+  orchestrationFrameId: row.orchestration_frame_id ?? undefined,
   snapshot: loop,
   themeSnapshot: theme,
   schedule: row.schedule_work_loop_node_id && row.scheduled_for
@@ -101,12 +103,16 @@ export const toRepairRequest = (row: RepairRequestRow): RepairRequest => ({
   requesterLoopRunId: row.requester_loop_run_id,
   requesterWorkLoopNodeRunId: row.requester_work_loop_node_run_id,
   requesterValidationNodeRunId: row.requester_validation_node_run_id,
+  mode: row.mode,
+  attempt: row.attempt,
+  validationSummary: row.validation_summary,
   requestedCapability: row.requested_capability ?? undefined,
   requestedOutcome: row.requested_outcome_json
     ? parseJsonValue(row.requested_outcome_json, `Repair Request ${row.repair_request_id} outcome`) : undefined,
   reason: row.reason,
   evidence: row.evidence_json ? parseJsonValue(row.evidence_json, `Repair Request ${row.repair_request_id} evidence`) : undefined,
   stateRevisionAtRequest: row.state_revision_at_request,
+  orchestratorNodeRunId: row.orchestrator_node_run_id ?? undefined,
   routedLoopEdgeId: row.routed_loop_edge_id ?? undefined,
   routedTargetLoopId: row.routed_target_loop_id ?? undefined,
   status: row.status,
@@ -119,6 +125,7 @@ export const toRepairRequest = (row: RepairRequestRow): RepairRequest => ({
 
 export const toOrchestrationFrame = (row: OrchestrationFrameRow): OrchestrationFrame => ({
   frameId: row.frame_id, rootRunId: row.root_run_id, repairRequestId: row.repair_request_id,
+  routeId: row.route_id,
   callerLoopRunId: row.caller_loop_run_id, calleeLoopRunId: row.callee_loop_run_id,
   parentFrameId: row.parent_frame_id ?? undefined, returnLoopId: row.return_loop_id,
   returnWorkLoopNodeId: row.return_work_loop_node_id,
@@ -126,6 +133,15 @@ export const toOrchestrationFrame = (row: OrchestrationFrameRow): OrchestrationF
   stateRevisionAtCall: row.state_revision_at_call, nestingDepth: row.nesting_depth,
   status: row.status, createdAt: row.created_at, updatedAt: row.updated_at,
   completedAt: row.completed_at ?? undefined
+});
+
+export const toRepairResult = (row: RepairResultRow): RepairResult => ({
+  repairResultId: row.repair_result_id, rootRunId: row.root_run_id,
+  repairRequestId: row.repair_request_id, orchestrationFrameId: row.orchestration_frame_id,
+  targetLoopRunId: row.target_loop_run_id, targetLoopId: row.target_loop_id,
+  status: row.status, stateRevision: row.state_revision,
+  outcome: row.outcome_json ? parseOutcome(row.outcome_json, `Repair Result ${row.repair_result_id}`) : undefined,
+  summary: row.summary, createdAt: row.created_at
 });
 
 export const toOrchestratorRoute = (row: OrchestratorRouteRow): OrchestratorRoute => ({

@@ -79,7 +79,7 @@ describe("WorkLoopEngine normal and local routing", () => {
     });
     const request = runtime.connection().prepare("SELECT repair_request_id FROM repair_requests").pluck().get();
     expect(typeof request).toBe("string");
-    expect(runtime.getRepairRequest(String(request))).toMatchObject({ status: "completed" });
+    expect(runtime.getRepairRequest(String(request))).toMatchObject({ status: "repaired" });
     runtime.close();
     await fixture.close();
   });
@@ -144,7 +144,7 @@ describe("WorkLoopEngine retry and suspension", () => {
     await fixture.close();
   });
 
-  it("parks ORCHESTRATOR_REPAIR without selecting a target or creating a call frame", async () => {
+  it("creates a pending Orchestrator Node without selecting a target or creating a call frame", async () => {
     const fixture = await createRuntimeStoreFixture({ repaired: false });
     fixture.release();
     const runtime = new RuntimeDatabase(fixture.filename);
@@ -161,8 +161,9 @@ describe("WorkLoopEngine retry and suspension", () => {
       }
     });
 
-    expect(waiting.status).toBe("waiting_for_input");
+    expect(waiting.status).toBe("running");
     expect(waiting.workLoopNodeRuns[0]).toMatchObject({ status: "waiting_for_input", activeNodeRunId: undefined });
+    expect(waiting.nodeRuns.at(-1)).toMatchObject({ role: "orchestrator", status: "queued" });
     const requestId = runtime.connection().prepare("SELECT repair_request_id FROM repair_requests").pluck().get();
     expect(runtime.getRepairRequest(String(requestId))).toMatchObject({
       status: "pending", routedTargetLoopId: undefined,

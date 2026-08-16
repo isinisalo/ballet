@@ -5,9 +5,9 @@ import {
 } from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV2,
-  ValidationTaskEnvelopeV2,
-  WorkTaskEnvelopeV2
+  OrchestratorTaskEnvelopeV3,
+  ValidationTaskEnvelopeV3,
+  WorkTaskEnvelopeV3
 } from "../../shared/domain/taskEnvelope.js";
 import { composeExecutionPrompt } from "../execution/ExecutionComposition.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
@@ -40,11 +40,11 @@ export const preflightExecutionPrompts = (snapshot: RootExecutionSnapshot): void
 const workEnvelope = (
   loop: ProjectLoop,
   nodeId: string,
-  state: WorkTaskEnvelopeV2["state"]
-): WorkTaskEnvelopeV2 => {
+  state: WorkTaskEnvelopeV3["state"]
+): WorkTaskEnvelopeV3 => {
   const node = requireNode(loop, nodeId);
   return {
-    version: 2,
+    version: 3,
     role: "work",
     run: providerRunIdentity,
     loop: { id: loop.id, description: loop.description },
@@ -59,11 +59,11 @@ const workEnvelope = (
 const validationEnvelope = (
   loop: ProjectLoop,
   nodeId: string,
-  state: ValidationTaskEnvelopeV2["state"]
-): ValidationTaskEnvelopeV2 => {
+  state: ValidationTaskEnvelopeV3["state"]
+): ValidationTaskEnvelopeV3 => {
   const node = requireNode(loop, nodeId);
   return {
-    version: 2,
+    version: 3,
     role: "validation",
     run: providerRunIdentity,
     loop: { id: loop.id, description: loop.description },
@@ -85,9 +85,9 @@ const validationEnvelope = (
 const orchestratorEnvelope = (
   snapshot: RootExecutionSnapshot,
   loop: ProjectLoop,
-  state: OrchestratorTaskEnvelopeV2["state"]
-): OrchestratorTaskEnvelopeV2 => ({
-  version: 2,
+  state: OrchestratorTaskEnvelopeV3["state"]
+): OrchestratorTaskEnvelopeV3 => ({
+  version: 3,
   role: "orchestrator",
   run: orchestratorRunIdentity,
   loop: { id: loop.id, description: loop.description },
@@ -98,6 +98,8 @@ const orchestratorEnvelope = (
     requesterLoopRunId: "preflight-loop-run",
     requesterWorkLoopNodeRunId: "preflight-work-loop-node-run",
     requesterValidationNodeRunId: "preflight-validation-node-run",
+    attempt: 1,
+    validationSummary: "Preflight Validation finding.",
     reason: "Preflight the immutable Orchestrator composition.",
     requestedCapability: "Preflight routing capability.",
     stateRevisionAtRequest: 0,
@@ -105,8 +107,13 @@ const orchestratorEnvelope = (
   },
   allowedTargetLoops: snapshot.loopEdges
     .filter((edge) => edge.kind === "repair" && edge.source === loop.id)
-    .map((edge) => requireLoop(snapshot, edge.target))
-    .map(({ id, description }) => ({ id, description })),
+    .map((edge) => {
+      const target = requireLoop(snapshot, edge.target);
+      return {
+        id: target.id, description: target.description,
+        loopEdgeId: edge.id, routingDescription: edge.description
+      };
+    }),
   relevantHistory: []
 });
 

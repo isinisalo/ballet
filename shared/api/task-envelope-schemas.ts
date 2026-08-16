@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { workCompletedOutcomeSchema } from "./runtime-schemas.js";
+import { canonicalNodeOutcomeSchema, workCompletedOutcomeSchema } from "./runtime-schemas.js";
 
 const boundedText = z.string().max(20_000);
 const nonEmptyText = boundedText.trim().min(1);
@@ -40,7 +40,7 @@ const historyEntrySchema = z.object({
 const relevantHistorySchema = z.array(historyEntrySchema).max(8);
 
 const commonProviderFields = {
-  version: z.literal(2),
+  version: z.literal(3),
   run: providerRunIdentitySchema,
   loop: loopIdentitySchema,
   workLoopNode: workLoopNodeIdentitySchema,
@@ -51,7 +51,7 @@ const commonProviderFields = {
   relevantHistory: relevantHistorySchema
 };
 
-export const workTaskEnvelopeV2Schema = z.object({
+export const workTaskEnvelopeV3Schema = z.object({
   role: z.literal("work"),
   ...commonProviderFields,
   previousValidationFeedback: z.object({
@@ -60,42 +60,65 @@ export const workTaskEnvelopeV2Schema = z.object({
   }).strict().optional()
 }).strict();
 
-export const validationTaskEnvelopeV2Schema = z.object({
-  role: z.literal("validation"),
-  ...commonProviderFields,
-  workOutcome: workCompletedOutcomeSchema
-}).strict();
-
 const repairRequestFields = {
   id: identifier,
   requesterLoopRunId: identifier,
   requesterWorkLoopNodeRunId: identifier,
   requesterValidationNodeRunId: identifier,
+  attempt: z.number().int().min(1).max(100),
+  validationSummary: nonEmptyText,
   reason: nonEmptyText,
   evidence: z.json().optional(),
   stateRevisionAtRequest: z.number().int().nonnegative(),
   nestingDepth: z.number().int().nonnegative().max(32)
 };
-const repairRequestSchema = z.union([
+export const taskEnvelopeRepairRequestSchema = z.union([
   z.object({ ...repairRequestFields, requestedCapability: nonEmptyText }).strict(),
   z.object({ ...repairRequestFields, requestedOutcome: z.json() }).strict()
 ]);
 
-export const orchestratorTaskEnvelopeV2Schema = z.object({
-  version: z.literal(2),
+export const taskEnvelopeRepairReturnSchema = z.object({
+  repairRequest: taskEnvelopeRepairRequestSchema,
+  repairResult: z.object({
+    id: identifier,
+    frameId: identifier,
+    targetLoopRunId: identifier,
+    targetLoopId: identifier,
+    stateRevision: z.number().int().nonnegative(),
+    outcome: canonicalNodeOutcomeSchema.optional(),
+    summary: nonEmptyText
+  }).strict()
+}).strict();
+
+export const validationTaskEnvelopeV3Schema = z.object({
+  role: z.literal("validation"),
+  ...commonProviderFields,
+  workOutcome: workCompletedOutcomeSchema,
+  repairReturn: taskEnvelopeRepairReturnSchema.optional()
+}).strict();
+
+const targetLoopSchema = z.object({
+  id: identifier,
+  description: nonEmptyText,
+  loopEdgeId: identifier,
+  routingDescription: nonEmptyText
+}).strict();
+
+export const orchestratorTaskEnvelopeV3Schema = z.object({
+  version: z.literal(3),
   role: z.literal("orchestrator"),
   run: orchestratorRunIdentitySchema,
   loop: loopIdentitySchema,
   task: nonEmptyText,
   state: stateSchema,
-  repairRequest: repairRequestSchema,
-  allowedTargetLoops: z.array(loopIdentitySchema).max(100),
+  repairRequest: taskEnvelopeRepairRequestSchema,
+  allowedTargetLoops: z.array(targetLoopSchema).max(100),
   resume: resumeSchema.optional(),
   relevantHistory: relevantHistorySchema
 }).strict();
 
-export const taskEnvelopeV2Schema = z.union([
-  workTaskEnvelopeV2Schema,
-  validationTaskEnvelopeV2Schema,
-  orchestratorTaskEnvelopeV2Schema
+export const taskEnvelopeV3Schema = z.union([
+  workTaskEnvelopeV3Schema,
+  validationTaskEnvelopeV3Schema,
+  orchestratorTaskEnvelopeV3Schema
 ]);

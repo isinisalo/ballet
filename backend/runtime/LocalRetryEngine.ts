@@ -8,15 +8,16 @@ import type { WorkLoopProgressStore } from "./WorkLoopProgressStore.js";
 
 type ValidationFailOutcome = ValidationNodeOutcome & { state: "completed"; decision: "FAIL" };
 
-export interface RepairContext {
+export interface LocalRetryContext {
   loop: ProjectLoop;
   definition: ProjectWorkLoopNode;
   compositeId: string;
   nestingDepth: number;
   createWork(attempt: number, revision: number, context: JsonValue): void;
+  completeBlocked(node: NodeRun, revision: number, outcome: ValidationNodeOutcome): void;
 }
 
-export class WorkLoopRepairEngine {
+export class LocalRetryEngine {
   constructor(
     private readonly loops: LoopRunStore,
     private readonly states: LoopStateStore,
@@ -24,7 +25,7 @@ export class WorkLoopRepairEngine {
     private readonly progress: WorkLoopProgressStore
   ) {}
 
-  localRetry(node: NodeRun, outcome: ValidationFailOutcome, context: RepairContext): void {
+  apply(node: NodeRun, outcome: ValidationFailOutcome, context: LocalRetryContext): void {
     if (outcome.repair.mode !== "LOCAL_RETRY") throw new LoopRunIntegrityError("Expected a local retry repair.");
     const { definition, compositeId } = context;
     const composite = this.loops.getWorkLoopNodeRun(compositeId);
@@ -32,6 +33,7 @@ export class WorkLoopRepairEngine {
     const request = this.repairs.createRequest({
       rootRunId: node.rootRunId, requesterLoopRunId: node.loopRunId,
       requesterWorkLoopNodeRunId: compositeId, requesterValidationNodeRunId: node.nodeRunId,
+      mode: "local", attempt: composite.attempt, validationSummary: outcome.summary,
       requestedCapability: outcome.repair.expectedCorrection, reason: outcome.repair.feedback,
       evidence: outcome.evidence, stateRevisionAtRequest: node.stateRevisionBefore,
       returnLoopId: node.loopId, returnWorkLoopNodeId: definition.id,
@@ -51,11 +53,11 @@ export class WorkLoopRepairEngine {
     const revision = persisted.stateRevisionAfter ?? node.stateRevisionBefore;
     if (limited) {
       this.repairs.finishRequest(request.repairRequestId, "failed");
-      this.progress.finishLoop(node, "blocked", revision, persisted.outcome);
+      context.completeBlocked(persisted, revision, persisted.outcome);
       return;
     }
     const attempt = this.progress.incrementLocalAttempt(compositeId, definition.maxLocalAttempts);
-    this.repairs.finishRequest(request.repairRequestId, "completed");
+    this.repairs.finishRequest(request.repairRequestId, "repaired");
     context.createWork(attempt, revision, {
       previousValidationFeedback: {
         feedback: outcome.repair.feedback,
@@ -64,34 +66,10 @@ export class WorkLoopRepairEngine {
     });
   }
 
-  externalRepair(node: NodeRun, outcome: ValidationFailOutcome, context: RepairContext): void {
-    if (outcome.repair.mode !== "ORCHESTRATOR_REPAIR") throw new LoopRunIntegrityError("Expected an orchestrator repair.");
-    const { definition, compositeId } = context;
-    // Before a target exists, the durable continuation is the Request's fixed
-    // return identity. A call frame is created only with the routed callee.
-    const request = this.repairs.createRequest({
-      rootRunId: node.rootRunId, requesterLoopRunId: node.loopRunId,
-      requesterWorkLoopNodeRunId: compositeId, requesterValidationNodeRunId: node.nodeRunId,
-      requestedCapability: outcome.repair.requestedCapability,
-      requestedOutcome: outcome.repair.requestedOutcome,
-      reason: outcome.repair.reason, evidence: outcome.evidence,
-      stateRevisionAtRequest: node.stateRevisionBefore, returnLoopId: node.loopId,
-      returnWorkLoopNodeId: definition.id, returnValidationNodeDefinitionId: node.nodeDefinitionId,
-      nestingDepth: context.nestingDepth + 1
-    });
-    this.states.commitNodeOutcome({
-      rootRunId: node.rootRunId, nodeRunId: node.nodeRunId, baseRevision: node.stateRevisionBefore,
-      outcome, workLoopNodeStatus: "waiting_for_input",
-      control: { kind: "validation_fail_orchestrator", repairRequestId: request.repairRequestId }
-    });
-    this.requirePersisted(node);
-    this.progress.waitForRepair(node);
-  }
-
   private requirePersisted(node: NodeRun): NodeRun & { outcome: ValidationNodeOutcome } {
     const persisted = this.loops.getNodeRun(node.nodeRunId);
     if (!persisted?.outcome || persisted.outcome.role !== "validation" || persisted.outcome.state !== "completed") {
-      throw new LoopRunIntegrityError("Persisted Validation outcome was not available for repair readback.");
+      throw new LoopRunIntegrityError("Persisted Validation outcome was not available for local retry readback.");
     }
     return persisted as NodeRun & { outcome: ValidationNodeOutcome };
   }

@@ -37,7 +37,7 @@ export const resolveLoopRunView = (
 };
 
 const canRespond = (loop: ProjectLoop, nodeRun: NodeRun): boolean => {
-  if (nodeRun.outcome?.state === "needs_input") return nodeRun.role !== "orchestrator";
+  if (nodeRun.outcome?.state === "needs_input") return true;
   const definition = loop.nodes.find((node) => node.id === nodeRun.workLoopNodeId);
   return nodeRun.role === "work"
     ? definition?.work.type === "human"

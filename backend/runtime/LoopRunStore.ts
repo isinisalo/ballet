@@ -12,7 +12,6 @@ import {
 import { toLoopRun, toNodeRun, toWorkLoopNodeRun } from "./RuntimeRowMappers.js";
 import { canonicalJson } from "./state/CanonicalJson.js";
 import { validateState } from "./state/StatePatch.js";
-
 export interface CreateLoopRunInput {
   loopRunId?: string;
   loop: ProjectLoop;
@@ -21,6 +20,7 @@ export interface CreateLoopRunInput {
   source: LoopRunSource;
   input?: JsonValue;
   schedule?: { workLoopNodeId: string; scheduledFor: string };
+  repairRequestId?: string;
   entryStateRevision?: number;
   nestingDepth?: number;
 }
@@ -121,17 +121,30 @@ export class LoopRunStore {
     }
     const revision = input.entryStateRevision ?? this.currentRevision(input.rootRunId);
     const inputJson = input.input === undefined ? null : canonicalJson(validateState(input.input));
+    if ((input.source === "repair") !== Boolean(input.repairRequestId)) {
+      throw new Error("A repair Loop Run requires exactly one Repair Request identity.");
+    }
     this.connection().prepare(`
       INSERT INTO loop_invocations (
         loop_run_id, root_run_id, loop_id, parent_loop_run_id, source, status, input_json,
-        schedule_work_loop_node_id, scheduled_for, entry_state_revision, nesting_depth, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)
+        repair_request_id, schedule_work_loop_node_id, scheduled_for, entry_state_revision,
+        nesting_depth, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(loopRunId, input.rootRunId, input.loop.id, input.parentLoopRunId ?? null, input.source, inputJson,
-      input.schedule?.workLoopNodeId ?? null, input.schedule?.scheduledFor ?? null,
+      input.repairRequestId ?? null, input.schedule?.workLoopNodeId ?? null, input.schedule?.scheduledFor ?? null,
       revision, nestingDepth, timestamp, timestamp);
     this.connection().prepare(`
       UPDATE root_runs SET active_loop_run_id = ?, status = 'running', updated_at = ? WHERE root_run_id = ?
     `).run(loopRunId, timestamp, input.rootRunId);
+    return this.requireLoopRun(loopRunId);
+  }
+
+  bindOrchestrationFrame(loopRunId: string, frameId: string): LoopRun {
+    const result = this.connection().prepare(`
+      UPDATE loop_invocations SET orchestration_frame_id = ?, updated_at = ?
+      WHERE loop_run_id = ? AND source = 'repair' AND orchestration_frame_id IS NULL
+    `).run(frameId, now(), loopRunId);
+    if (result.changes !== 1) throw new Error(`Repair Loop Run ${loopRunId} cannot accept frame ${frameId}.`);
     return this.requireLoopRun(loopRunId);
   }
 
@@ -163,11 +176,6 @@ export class LoopRunStore {
     if (input.role === "orchestrator") {
       if (input.workLoopNodeRunId || input.workLoopNodeId) {
         throw new Error("An orchestrator Node Run cannot belong to a Work Loop Node Run.");
-      }
-      if (input.attempt > snapshot.orchestrator.maxRepairAttempts) {
-        throw new Error(
-          `Orchestrator attempt ${input.attempt} exceeds limit ${snapshot.orchestrator.maxRepairAttempts}.`
-        );
       }
     } else {
       if (!input.workLoopNodeRunId || !input.workLoopNodeId) {
@@ -203,21 +211,46 @@ export class LoopRunStore {
     return this.requireNodeRun(id);
   }
 
+  resumeOrchestratorNode(
+    nodeRunId: string,
+    attempt: number,
+    revision: number,
+    context: JsonValue
+  ): NodeRun {
+    const timestamp = now();
+    const contextJson = jsonOrNull(context, `Orchestrator Node Run ${nodeRunId} resume context`);
+    const transaction = this.connection().transaction(() => {
+      const resumed = this.connection().prepare(`
+        UPDATE node_runs SET status = 'queued', attempt = ?, state_revision_before = ?,
+          state_revision_after = NULL, context_json = ?, outcome_json = NULL,
+          execution_task_id = NULL, patch_json = NULL, patch_hash = NULL,
+          error_code = NULL, error_message = NULL, completed_at = NULL, updated_at = ?
+        WHERE node_run_id = ? AND role = 'orchestrator' AND status = 'waiting_for_input'
+          AND attempt < ?
+      `).run(attempt, revision, contextJson, timestamp, nodeRunId, attempt);
+      if (resumed.changes !== 1) {
+        throw new Error(`Orchestrator Node Run ${nodeRunId} cannot resume at attempt ${attempt}.`);
+      }
+      const node = this.requireNodeRun(nodeRunId);
+      this.connection().prepare(`
+        UPDATE loop_invocations SET status = 'running', updated_at = ?
+        WHERE loop_run_id = ? AND status = 'waiting_for_input'
+      `).run(timestamp, node.loopRunId);
+      this.connection().prepare(`
+        UPDATE root_runs SET status = 'running', active_loop_run_id = ?, active_node_run_id = ?, updated_at = ?
+        WHERE root_run_id = ? AND status = 'waiting_for_input'
+      `).run(node.loopRunId, nodeRunId, timestamp, node.rootRunId);
+    });
+    transaction();
+    return this.requireNodeRun(nodeRunId);
+  }
+
   markNodeRunning(nodeRunId: string): NodeRun {
     const timestamp = now();
     this.connection().prepare(`
       UPDATE node_runs SET status = 'running', started_at = COALESCE(started_at, ?), updated_at = ?
       WHERE node_run_id = ? AND status = 'queued'
     `).run(timestamp, timestamp, nodeRunId);
-    return this.requireNodeRun(nodeRunId);
-  }
-
-  bindNodeExecution(nodeRunId: string, taskId: string): NodeRun {
-    const result = this.connection().prepare(`
-      UPDATE node_runs SET execution_task_id = ?, updated_at = ?
-      WHERE node_run_id = ? AND execution_task_id IS NULL AND status = 'queued'
-    `).run(taskId, now(), nodeRunId);
-    if (result.changes !== 1) throw new Error(`Node Run ${nodeRunId} cannot be bound to execution task ${taskId}.`);
     return this.requireNodeRun(nodeRunId);
   }
 

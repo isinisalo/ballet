@@ -4,7 +4,7 @@ import type { ProjectWorkLoopNode } from "../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV2, ValidationTaskEnvelopeV2, WorkTaskEnvelopeV2
+  OrchestratorTaskEnvelopeV3, ValidationTaskEnvelopeV3, WorkTaskEnvelopeV3
 } from "../../shared/domain/taskEnvelope.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 import { testExecutionProfile, testLoop, testOrchestrator, testWorkLoopNode } from "../tests/v10TestConfig.js";
@@ -57,8 +57,8 @@ const resource = (kind: "primary" | "skill", id: string, content: string) => ({
   content
 });
 
-const envelope = (): WorkTaskEnvelopeV2 => ({
-  version: 2,
+const envelope = (): WorkTaskEnvelopeV3 => ({
+  version: 3,
   role: "work",
   run: {
     rootRunId: "root-run", loopRunId: "loop-run", nodeRunId: "node-run",
@@ -72,13 +72,13 @@ const envelope = (): WorkTaskEnvelopeV2 => ({
   relevantHistory: []
 });
 
-describe("ExecutionComposition V3", () => {
+describe("ExecutionComposition V4", () => {
   it("composes and hashes exact role-specific prompt bytes deterministically", () => {
     const evidence = composeExecutionPrompt(snapshot(), envelope());
 
     expect(evidence).toMatchObject({
-      compositionVersion: 3,
-      taskEnvelopeVersion: 2,
+      compositionVersion: 4,
+      taskEnvelopeVersion: 3,
       outputSchemaVersion: 3,
       outputSchemaId: "work-node-outcome-v3",
       outputSchemaSha256: NODE_OUTCOME_SCHEMA_SHA256.work,
@@ -88,10 +88,10 @@ describe("ExecutionComposition V3", () => {
       "system:execution-contract-v3", "project:worker", "project:a-skill", "project:z-skill"
     ]);
     expect(evidence.prompt.indexOf("project:a-skill")).toBeLessThan(evidence.prompt.indexOf("project:z-skill"));
-    expect(evidence.prompt).toContain("TASK-ENVELOPE · v2");
+    expect(evidence.prompt).toContain("TASK-ENVELOPE · v3");
     expect(evidence.prompt).toContain("OUTPUT-SCHEMA · v3");
     expect(evidence.promptSha256).toBe(sha256(evidence.prompt));
-    expect(evidence.promptSha256).toBe("2bcc2c41fa5a4d6fca233645bc6ce6a0a4938fadff788950a5d6c770ec017c9c");
+    expect(evidence.promptSha256).toBe("748f2817bee02a4a4a24057b985e58366e9bac847db29846b4f28dc8b9fbb145");
   });
 
   it("rejects an envelope that diverges from the immutable snapshot", () => {
@@ -101,7 +101,7 @@ describe("ExecutionComposition V3", () => {
   });
 
   it("selects Validation and Orchestrator schemas from immutable Node role", () => {
-    const validation: ValidationTaskEnvelopeV2 = {
+    const validation: ValidationTaskEnvelopeV3 = {
       ...envelope(), role: "validation", task: "Validate produce.",
       workOutcome: { role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: [] }
     };
@@ -117,8 +117,8 @@ describe("ExecutionComposition V3", () => {
       id: "main-to-repair", source: "main-loop", target: "repair-loop", kind: "repair",
       description: "Allow a bounded repair."
     });
-    const orchestrator: OrchestratorTaskEnvelopeV2 = {
-      version: 2, role: "orchestrator",
+    const orchestrator: OrchestratorTaskEnvelopeV3 = {
+      version: 3, role: "orchestrator",
       run: { rootRunId: "root-run", loopRunId: "loop-run", nodeRunId: "orchestrator-run" },
       loop: { id: "main-loop", description: "Test Loop main-loop." },
       task: "Route the persisted Repair Request.",
@@ -126,10 +126,14 @@ describe("ExecutionComposition V3", () => {
       repairRequest: {
         id: "repair-request", requesterLoopRunId: "loop-run",
         requesterWorkLoopNodeRunId: "work-loop-node-run", requesterValidationNodeRunId: "validation-run",
+        attempt: 1, validationSummary: "A repair is required.",
         reason: "A repair capability is required.", requestedCapability: "repair state",
         stateRevisionAtRequest: 0, nestingDepth: 0
       },
-      allowedTargetLoops: [{ id: "repair-loop", description: "Test Loop repair-loop." }],
+      allowedTargetLoops: [{
+        id: "repair-loop", description: "Test Loop repair-loop.",
+        loopEdgeId: "main-to-repair", routingDescription: "Allow a bounded repair."
+      }],
       relevantHistory: []
     };
     expect(composeExecutionPrompt(orchestratorSnapshot, orchestrator)).toMatchObject({
@@ -138,6 +142,8 @@ describe("ExecutionComposition V3", () => {
       outputSchemaId: "orchestrator-node-outcome-v3",
       outputSchemaSha256: NODE_OUTCOME_SCHEMA_SHA256.orchestrator
     });
+    orchestrator.allowedTargetLoops[0]!.loopEdgeId = "forged-edge";
+    expect(() => composeExecutionPrompt(orchestratorSnapshot, orchestrator)).toThrow(/repair allowlist/);
   });
 
   it("fails visibly before provider execution when exact prompt bytes exceed the limit", () => {

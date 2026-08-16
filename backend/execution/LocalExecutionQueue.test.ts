@@ -60,10 +60,11 @@ describe("LocalExecutionQueue startup and claim boundaries", () => {
 describe("LocalExecutionQueue scheduling and cancellation", () => {
   it("runs provider FIFO queues one-at-a-time while Codex and Copilot overlap", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("codex-root", ["codex-a", "codex-b"]);
+    fixture.insertRoot("codex-root-a", ["codex-a"]);
+    fixture.insertRoot("codex-root-b", ["codex-b"]);
     fixture.insertRoot("copilot-root", ["copilot-a"]);
-    fixture.store.create(specification("codex-a", "codex-root", "codex", "2026-01-01T00:00:00.000Z"));
-    fixture.store.create(specification("codex-b", "codex-root", "codex", "2026-01-01T00:00:00.001Z"));
+    fixture.store.create(specification("codex-a", "codex-root-a", "codex", "2026-01-01T00:00:00.000Z"));
+    fixture.store.create(specification("codex-b", "codex-root-b", "codex", "2026-01-01T00:00:00.001Z"));
     fixture.store.create(specification("copilot-a", "copilot-root", "copilot", "2026-01-01T00:00:00.000Z"));
     fixture.codex.hold("codex-a");
     fixture.copilot.hold("copilot-a");
@@ -90,9 +91,10 @@ describe("LocalExecutionQueue scheduling and cancellation", () => {
 
   it("cancels queued work idempotently without invoking the adapter", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root", ["running", "queued"]);
-    fixture.store.create(specification("running", "root"));
-    fixture.store.create(specification("queued", "root", "codex", "2099-01-01T00:00:00.000Z"));
+    fixture.insertRoot("running-root", ["running"]);
+    fixture.insertRoot("queued-root", ["queued"]);
+    fixture.store.create(specification("running", "running-root"));
+    fixture.store.create(specification("queued", "queued-root", "codex", "2099-01-01T00:00:00.000Z"));
     fixture.codex.hold("running");
     fixture.queue.start();
     await waitFor(() => fixture.store.require("running").status === "running");
@@ -140,10 +142,11 @@ describe("LocalExecutionQueue scheduling and cancellation", () => {
 describe("LocalExecutionQueue outcomes and recovery", () => {
   it("fails interrupted running work at startup and resumes only queued work", async () => {
     const fixture = await createFixture();
-    fixture.insertRoot("root", ["interrupted", "queued"]);
-    fixture.store.create(specification("interrupted", "root"));
+    fixture.insertRoot("interrupted-root", ["interrupted"]);
+    fixture.insertRoot("queued-root", ["queued"]);
+    fixture.store.create(specification("interrupted", "interrupted-root"));
     fixture.store.claim("interrupted");
-    fixture.store.create(specification("queued", "root", "codex", "2026-01-01T00:00:00.001Z"));
+    fixture.store.create(specification("queued", "queued-root", "codex", "2026-01-01T00:00:00.001Z"));
 
     fixture.queue.start();
     await waitFor(() => fixture.store.require("queued").status === "succeeded");

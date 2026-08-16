@@ -10,7 +10,7 @@ export const requireWorkLoopNode = (loop: ProjectLoop, nodeId: string): ProjectW
 
 export const requireOutcome = (
   node: NodeRun | undefined,
-  role: "work" | "validation",
+  role: CanonicalNodeOutcome["role"],
   state: string
 ): NodeRun & { outcome: CanonicalNodeOutcome } => {
   if (!node?.outcome || node.outcome.role !== role || node.outcome.state !== state) {
@@ -24,7 +24,7 @@ export const resumeContext = (
   question: string,
   context: string,
   response: string
-): JsonValue => {
+) => {
   const previousFeedback = readPreviousFeedback(node.context);
   return {
     ...(previousFeedback ? { previousValidationFeedback: previousFeedback } : {}),

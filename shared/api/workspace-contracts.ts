@@ -75,6 +75,7 @@ import type {
   OrchestratorRoute,
   OrchestratorNodeOutcome,
   RepairRequest,
+  RepairResult,
   RunCheck,
   RootRun,
   RootExecutionSnapshot,
@@ -87,19 +88,20 @@ import type {
   WorkLoopNodeRun
 } from "../domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV2,
+  OrchestratorTaskEnvelopeV3,
   TaskEnvelopeHistoryEntry,
   TaskEnvelopeLoopIdentity,
   TaskEnvelopeProviderRunIdentity,
   TaskEnvelopeRepairRequest,
+  TaskEnvelopeRepairReturn,
   TaskEnvelopeResumeContext,
   TaskEnvelopeRunIdentity,
   TaskEnvelopeState,
   TaskEnvelopeTargetLoop,
-  TaskEnvelopeV2,
+  TaskEnvelopeV3,
   TaskEnvelopeWorkLoopNodeIdentity,
-  ValidationTaskEnvelopeV2,
-  WorkTaskEnvelopeV2
+  ValidationTaskEnvelopeV3,
+  WorkTaskEnvelopeV3
 } from "../domain/taskEnvelope.js";
 import type {
   BalletMode,
@@ -221,13 +223,13 @@ export type {
   ProjectScheduleCadence, ProjectScheduleWeekday, ProjectWorkSchedule, LoopRun, LoopRunDetails,
   LoopScheduleState, LoopRuntimePreflight,
   CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, NodeRun, NodeRunRole,
-  OrchestrationFrame, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RootRun, RunCheck,
+  OrchestrationFrame, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RepairResult, RootRun, RunCheck,
   StatePatch, ValidationNodeOutcome, WorkLoopNodeRun, WorkNodeOutcome,
-  OrchestratorTaskEnvelopeV2, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
-  TaskEnvelopeProviderRunIdentity, TaskEnvelopeRepairRequest, TaskEnvelopeResumeContext,
-  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeTargetLoop, TaskEnvelopeV2,
+  OrchestratorTaskEnvelopeV3, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
+  TaskEnvelopeProviderRunIdentity, TaskEnvelopeRepairRequest, TaskEnvelopeRepairReturn, TaskEnvelopeResumeContext,
+  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeTargetLoop, TaskEnvelopeV3,
   TaskEnvelopeWorkLoopNodeIdentity,
-  ValidationTaskEnvelopeV2, WorkTaskEnvelopeV2,
+  ValidationTaskEnvelopeV3, WorkTaskEnvelopeV3,
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot,
   ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,

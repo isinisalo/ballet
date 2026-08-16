@@ -4,15 +4,25 @@ export const runtimeSchemaInvariants = `
   CREATE UNIQUE INDEX idx_one_active_node_phase
     ON node_runs(work_loop_node_run_id)
     WHERE work_loop_node_run_id IS NOT NULL AND status IN ('queued','running','waiting_for_input');
+  CREATE UNIQUE INDEX idx_one_active_root_node
+    ON node_runs(root_run_id) WHERE status IN ('queued','running','waiting_for_input');
+  CREATE UNIQUE INDEX idx_one_running_loop_invocation
+    ON loop_invocations(root_run_id) WHERE status = 'running';
   CREATE INDEX idx_loop_invocations_root ON loop_invocations(root_run_id, created_at);
   CREATE INDEX idx_work_loop_node_runs_loop ON work_loop_node_runs(loop_run_id, created_at);
   CREATE INDEX idx_node_runs_composite ON node_runs(work_loop_node_run_id, created_at);
   CREATE INDEX idx_state_revisions_latest ON state_revisions(root_run_id, revision DESC);
   CREATE INDEX idx_repair_requests_pending ON repair_requests(root_run_id, status, created_at);
+  CREATE INDEX idx_repair_results_root ON repair_results(root_run_id, created_at);
   CREATE INDEX idx_frames_open ON orchestration_frames(root_run_id, status, created_at);
+  CREATE UNIQUE INDEX idx_one_open_frame_per_caller
+    ON orchestration_frames(caller_loop_run_id) WHERE status = 'open';
+  CREATE UNIQUE INDEX idx_one_open_frame_per_callee
+    ON orchestration_frames(callee_loop_run_id) WHERE status = 'open';
   CREATE INDEX idx_control_flow_root ON control_flow_events(root_run_id, sequence);
   CREATE INDEX idx_tasks_queue ON execution_tasks(provider, status, created_at);
   CREATE INDEX idx_tasks_root ON execution_tasks(root_run_id, created_at);
+  CREATE INDEX idx_tasks_node ON execution_tasks(node_run_id, created_at);
   CREATE INDEX idx_events_cursor ON execution_events(task_id, id);
   CREATE INDEX idx_schedule_due ON loop_schedule_state(next_run_at);
 
@@ -76,10 +86,46 @@ export const runtimeSchemaInvariants = `
   END;
   CREATE TRIGGER repair_requester_must_be_validation BEFORE INSERT ON repair_requests
   WHEN NOT EXISTS (
-    SELECT 1 FROM node_runs WHERE node_run_id = NEW.requester_validation_node_run_id
-      AND role = 'validation' AND work_loop_node_run_id = NEW.requester_work_loop_node_run_id
+    SELECT 1 FROM node_runs node
+    JOIN loop_invocations loop ON loop.loop_run_id = node.loop_run_id
+    WHERE node.node_run_id = NEW.requester_validation_node_run_id
+      AND node.root_run_id = NEW.root_run_id AND node.role = 'validation'
+      AND node.work_loop_node_run_id = NEW.requester_work_loop_node_run_id
+      AND node.loop_run_id = NEW.requester_loop_run_id AND node.loop_id = NEW.return_loop_id
   )
   BEGIN SELECT RAISE(ABORT, 'repair requester must be the Validation Node Run of its Work Loop Node Run'); END;
+  CREATE TRIGGER repair_orchestrator_must_be_orchestrator BEFORE UPDATE OF orchestrator_node_run_id ON repair_requests
+  WHEN NEW.orchestrator_node_run_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM node_runs WHERE node_run_id = NEW.orchestrator_node_run_id
+      AND root_run_id = NEW.root_run_id AND loop_run_id = NEW.requester_loop_run_id AND role = 'orchestrator'
+  )
+  BEGIN SELECT RAISE(ABORT, 'repair orchestrator must be an Orchestrator Node Run of the requester Loop Run'); END;
+  CREATE TRIGGER orchestration_frame_owner BEFORE INSERT ON orchestration_frames
+  WHEN NOT EXISTS (
+    SELECT 1 FROM repair_requests request
+    JOIN orchestrator_routes route ON route.route_id = NEW.route_id
+    JOIN loop_invocations caller ON caller.loop_run_id = NEW.caller_loop_run_id
+    JOIN loop_invocations callee ON callee.loop_run_id = NEW.callee_loop_run_id
+    WHERE request.repair_request_id = NEW.repair_request_id
+      AND request.root_run_id = NEW.root_run_id AND request.status = 'routed'
+      AND request.requester_loop_run_id = NEW.caller_loop_run_id
+      AND route.repair_request_id = request.repair_request_id
+      AND caller.root_run_id = NEW.root_run_id AND caller.loop_id = route.source_loop_id
+      AND caller.status = 'waiting_for_input'
+      AND callee.root_run_id = NEW.root_run_id AND callee.loop_id = route.target_loop_id
+      AND callee.source = 'repair' AND callee.status IN ('running','waiting_for_input')
+      AND callee.repair_request_id = request.repair_request_id
+  )
+  BEGIN SELECT RAISE(ABORT, 'orchestration frame owner does not match its request, route, caller, and callee'); END;
+  CREATE TRIGGER repair_result_owner BEFORE INSERT ON repair_results
+  WHEN NOT EXISTS (
+    SELECT 1 FROM orchestration_frames frame
+    JOIN loop_invocations target ON target.loop_run_id = frame.callee_loop_run_id
+    WHERE frame.frame_id = NEW.orchestration_frame_id
+      AND frame.root_run_id = NEW.root_run_id AND frame.repair_request_id = NEW.repair_request_id
+      AND frame.callee_loop_run_id = NEW.target_loop_run_id AND target.loop_id = NEW.target_loop_id
+  )
+  BEGIN SELECT RAISE(ABORT, 'repair result owner does not match its orchestration frame'); END;
 
   CREATE TRIGGER root_run_terminal_is_final BEFORE UPDATE OF status ON root_runs
   WHEN OLD.status IN ('completed','blocked','failed','cancelled') AND NEW.status <> OLD.status
@@ -94,7 +140,7 @@ export const runtimeSchemaInvariants = `
   WHEN OLD.status IN ('completed','blocked','failed','cancelled','interrupted') AND NEW.status <> OLD.status
   BEGIN SELECT RAISE(ABORT, 'terminal Node Run status is immutable'); END;
   CREATE TRIGGER repair_request_terminal_is_final BEFORE UPDATE OF status ON repair_requests
-  WHEN OLD.status IN ('completed','failed','cancelled') AND NEW.status <> OLD.status
+  WHEN OLD.status IN ('repaired','failed','cancelled') AND NEW.status <> OLD.status
   BEGIN SELECT RAISE(ABORT, 'terminal Repair Request status is immutable'); END;
   CREATE TRIGGER orchestration_frame_terminal_is_final BEFORE UPDATE OF status ON orchestration_frames
   WHEN OLD.status IN ('returned','failed','cancelled') AND NEW.status <> OLD.status

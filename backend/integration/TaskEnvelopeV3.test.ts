@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { TaskEnvelopeV2, WorkTaskEnvelopeV2 } from "../../shared/domain/taskEnvelope.js";
+import type { TaskEnvelopeV3, WorkTaskEnvelopeV3 } from "../../shared/domain/taskEnvelope.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 import {
-  selectRelevantHistory, serializeTaskEnvelopeV2, TaskEnvelopeValidationError
-} from "./TaskEnvelopeV2.js";
+  selectRelevantHistory, serializeTaskEnvelopeV3, TaskEnvelopeValidationError
+} from "./TaskEnvelopeV3.js";
 
-const workEnvelope = (): WorkTaskEnvelopeV2 => ({
-  version: 2,
+const workEnvelope = (): WorkTaskEnvelopeV3 => ({
+  version: 3,
   role: "work",
   run: {
     rootRunId: "root-run", loopRunId: "loop-run", nodeRunId: "node-run",
@@ -24,18 +24,18 @@ const workEnvelope = (): WorkTaskEnvelopeV2 => ({
   ]
 });
 
-describe("Task Envelope V2", () => {
+describe("Task Envelope V3", () => {
   it("serializes deterministically with canonical State and history order", () => {
-    const first = serializeTaskEnvelopeV2(workEnvelope());
+    const first = serializeTaskEnvelopeV3(workEnvelope());
     const reordered = workEnvelope();
     reordered.state.value = { alpha: 1, beta: 2 };
     reordered.relevantHistory.reverse();
-    const second = serializeTaskEnvelopeV2(reordered);
+    const second = serializeTaskEnvelopeV3(reordered);
 
     expect(first.serialized).toBe(second.serialized);
     expect(first.sha256).toBe(second.sha256);
     expect(first.serialized).toBe(
-      "{\"localAttempt\":2,\"loop\":{\"description\":\"Produce one validated result.\",\"id\":\"main-loop\"},\"previousValidationFeedback\":{\"expectedCorrection\":\"Add the missing value.\",\"feedback\":\"Value is incomplete.\"},\"relevantHistory\":[{\"nodeRunId\":\"work-1\",\"role\":\"work\",\"sequence\":1,\"state\":\"completed\",\"stateRevision\":1,\"summary\":\"Produced.\"},{\"nodeRunId\":\"validation-1\",\"role\":\"validation\",\"sequence\":2,\"state\":\"completed\",\"stateRevision\":2,\"summary\":\"Retry.\"}],\"role\":\"work\",\"run\":{\"loopRunId\":\"loop-run\",\"nodeRunId\":\"node-run\",\"rootRunId\":\"root-run\",\"workLoopNodeRunId\":\"work-loop-node-run\"},\"state\":{\"revision\":2,\"sha256\":\"955c071f4fbee40a01b9bc6e8fb3627e81bda84811ae9c29fcc5812ba3a45162\",\"value\":{\"alpha\":1,\"beta\":2}},\"task\":\"Produce the requested result.\",\"version\":2,\"workLoopNode\":{\"description\":\"Produce the result.\",\"id\":\"produce\"}}"
+      "{\"localAttempt\":2,\"loop\":{\"description\":\"Produce one validated result.\",\"id\":\"main-loop\"},\"previousValidationFeedback\":{\"expectedCorrection\":\"Add the missing value.\",\"feedback\":\"Value is incomplete.\"},\"relevantHistory\":[{\"nodeRunId\":\"work-1\",\"role\":\"work\",\"sequence\":1,\"state\":\"completed\",\"stateRevision\":1,\"summary\":\"Produced.\"},{\"nodeRunId\":\"validation-1\",\"role\":\"validation\",\"sequence\":2,\"state\":\"completed\",\"stateRevision\":2,\"summary\":\"Retry.\"}],\"role\":\"work\",\"run\":{\"loopRunId\":\"loop-run\",\"nodeRunId\":\"node-run\",\"rootRunId\":\"root-run\",\"workLoopNodeRunId\":\"work-loop-node-run\"},\"state\":{\"revision\":2,\"sha256\":\"955c071f4fbee40a01b9bc6e8fb3627e81bda84811ae9c29fcc5812ba3a45162\",\"value\":{\"alpha\":1,\"beta\":2}},\"task\":\"Produce the requested result.\",\"version\":3,\"workLoopNode\":{\"description\":\"Produce the result.\",\"id\":\"produce\"}}"
     );
   });
 
@@ -50,7 +50,7 @@ describe("Task Envelope V2", () => {
   it("measures Unicode as UTF-8 bytes while preserving exact semantic content", () => {
     const value = workEnvelope();
     value.task = "Tarkista ääkköset ja π.";
-    const result = serializeTaskEnvelopeV2(value);
+    const result = serializeTaskEnvelopeV3(value);
     expect(result.serialized).toContain("Tarkista ääkköset ja π.");
     expect(result.sizeBytes).toBe(Buffer.byteLength(result.serialized, "utf8"));
   });
@@ -58,77 +58,86 @@ describe("Task Envelope V2", () => {
   it("includes Validation work evidence and Orchestrator repair allowlist", () => {
     const { previousValidationFeedback: _feedback, ...validationBase } = workEnvelope();
     void _feedback;
-    const validation: TaskEnvelopeV2 = {
+    const validation: TaskEnvelopeV3 = {
       ...validationBase, role: "validation", task: "Validate the result.",
       workOutcome: { role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: [] }
     };
-    const orchestrator: TaskEnvelopeV2 = {
-      version: 2, role: "orchestrator",
+    const orchestrator: TaskEnvelopeV3 = {
+      version: 3, role: "orchestrator",
       run: { rootRunId: "root-run", loopRunId: "loop-run", nodeRunId: "orchestrator-run" },
       loop: { id: "main-loop", description: "Produce one validated result." },
       task: "Route the persisted Repair Request.", state: workEnvelope().state,
       repairRequest: {
         id: "repair-request", requesterLoopRunId: "loop-run",
         requesterWorkLoopNodeRunId: "work-loop-node-run", requesterValidationNodeRunId: "validation-run",
+        attempt: 1, validationSummary: "A specialist repair is required.",
         reason: "A specialist capability is required.", requestedCapability: "repair structured state",
         stateRevisionAtRequest: 2, nestingDepth: 0
       },
       allowedTargetLoops: [
-        { id: "z-loop", description: "Z repair." },
-        { id: "a-loop", description: "A repair." }
+        { id: "z-loop", description: "Z repair.", loopEdgeId: "z-edge", routingDescription: "Use Z." },
+        { id: "a-loop", description: "A repair.", loopEdgeId: "a-edge", routingDescription: "Use A." }
       ],
       relevantHistory: []
     };
 
-    expect(serializeTaskEnvelopeV2(validation).envelope).toMatchObject({ role: "validation", workOutcome: { role: "work" } });
-    expect(serializeTaskEnvelopeV2(orchestrator).envelope).toMatchObject({
+    expect(serializeTaskEnvelopeV3(validation).envelope).toMatchObject({ role: "validation", workOutcome: { role: "work" } });
+    expect(serializeTaskEnvelopeV3(orchestrator).envelope).toMatchObject({
       role: "orchestrator",
       allowedTargetLoops: [{ id: "a-loop" }, { id: "z-loop" }],
       repairRequest: { id: "repair-request" }
     });
   });
+});
 
+describe("Task Envelope V3 limits", () => {
   it.each([
-    ["State hash mismatch", (value: WorkTaskEnvelopeV2) => { value.state.sha256 = "0".repeat(64); }, /State SHA-256/],
-    ["unknown field", (value: WorkTaskEnvelopeV2) => Object.assign(value, { hiddenReasoning: "private" }), /unrecognized/i],
-    ["oversized State", (value: WorkTaskEnvelopeV2) => {
+    ["State hash mismatch", (value: WorkTaskEnvelopeV3) => { value.state.sha256 = "0".repeat(64); }, /State SHA-256/],
+    ["unknown field", (value: WorkTaskEnvelopeV3) => Object.assign(value, { hiddenReasoning: "private" }), /unrecognized/i],
+    ["oversized State", (value: WorkTaskEnvelopeV3) => {
       value.state.value = "x".repeat(262_144);
       value.state.sha256 = jsonSha256(value.state.value);
     }, /maximum is 262144 bytes/],
-    ["oversized relevant history", (value: WorkTaskEnvelopeV2) => {
+    ["oversized relevant history", (value: WorkTaskEnvelopeV3) => {
       value.relevantHistory = Array.from({ length: 8 }, (_, sequence) => ({
         sequence, nodeRunId: `node-${sequence}`, role: "work", state: "completed",
         summary: "x".repeat(9_000), stateRevision: sequence
       }));
     }, /relevant history.*maximum/i],
-    ["oversized resume context", (value: WorkTaskEnvelopeV2) => {
+    ["oversized resume context", (value: WorkTaskEnvelopeV3) => {
       value.resume = { question: "q".repeat(16_000), context: "c".repeat(16_000), response: "r".repeat(16_000) };
     }, /resume context.*maximum/i]
   ])("fails closed for %s", (_label, mutate, message) => {
     const value = workEnvelope();
     mutate(value);
-    expect(() => serializeTaskEnvelopeV2(value)).toThrow(message);
+    expect(() => serializeTaskEnvelopeV3(value)).toThrow(message);
   });
 
   it("rejects duplicate Orchestrator target Loops and an oversized Repair Request", () => {
-    const base: TaskEnvelopeV2 = {
-      version: 2, role: "orchestrator",
+    const base: TaskEnvelopeV3 = {
+      version: 3, role: "orchestrator",
       run: { rootRunId: "root", loopRunId: "loop", nodeRunId: "node" },
       loop: { id: "source", description: "Source Loop." }, task: "Route repair.",
       state: { revision: 0, value: {}, sha256: jsonSha256({}) },
       repairRequest: {
         id: "repair", requesterLoopRunId: "loop", requesterWorkLoopNodeRunId: "work",
-        requesterValidationNodeRunId: "validation", reason: "Repair.", requestedOutcome: {},
+        requesterValidationNodeRunId: "validation", attempt: 1, validationSummary: "Repair required.",
+        reason: "Repair.", requestedOutcome: {},
         stateRevisionAtRequest: 0, nestingDepth: 0
       },
-      allowedTargetLoops: [{ id: "target", description: "Target." }, { id: "target", description: "Target." }],
+      allowedTargetLoops: [
+        { id: "target", description: "Target.", loopEdgeId: "edge-a", routingDescription: "A." },
+        { id: "target", description: "Target.", loopEdgeId: "edge-b", routingDescription: "B." }
+      ],
       relevantHistory: []
     };
-    expect(() => serializeTaskEnvelopeV2(base)).toThrow(/duplicate allowed target Loop/);
-    base.allowedTargetLoops = [{ id: "target", description: "Target." }];
+    expect(() => serializeTaskEnvelopeV3(base)).toThrow(/duplicate allowed target Loop/);
+    base.allowedTargetLoops = [{
+      id: "target", description: "Target.", loopEdgeId: "edge", routingDescription: "Route."
+    }];
     base.repairRequest.evidence = "x".repeat(65_536);
-    expect(() => serializeTaskEnvelopeV2(base)).toThrow(TaskEnvelopeValidationError);
-    expect(() => serializeTaskEnvelopeV2(base)).toThrow(/Repair Request.*maximum/i);
+    expect(() => serializeTaskEnvelopeV3(base)).toThrow(TaskEnvelopeValidationError);
+    expect(() => serializeTaskEnvelopeV3(base)).toThrow(/Repair Request.*maximum/i);
   });
 
   it("fails the complete Envelope limit without truncating individually valid fields", () => {
@@ -144,7 +153,7 @@ describe("Task Envelope V2", () => {
       summary: "h".repeat(7_000), stateRevision: sequence
     }));
 
-    expect(() => serializeTaskEnvelopeV2(value)).toThrow(/Task Envelope is .*maximum is 393216 bytes/);
+    expect(() => serializeTaskEnvelopeV3(value)).toThrow(/Task Envelope is .*maximum is 393216 bytes/);
     expect(value.state.value).toHaveLength(250_000);
   });
 });

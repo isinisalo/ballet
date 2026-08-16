@@ -36,7 +36,12 @@ export interface RuntimeStoreTestFixture extends RuntimeStores {
 
 export const createRuntimeStoreFixture = async (
   initial: JsonValue = {},
-  options: { loop?: ProjectLoop; loops?: ProjectLoop[]; loopEdges?: ProjectLoopEdge[] } = {}
+  options: {
+    loop?: ProjectLoop;
+    loops?: ProjectLoop[];
+    loopEdges?: ProjectLoopEdge[];
+    orchestrator?: ReturnType<typeof testOrchestrator>;
+  } = {}
 ): Promise<RuntimeStoreTestFixture> => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "ballet-runtime-store-"));
   const filename = path.join(directory, "state.sqlite");
@@ -51,7 +56,7 @@ export const createRuntimeStoreFixture = async (
       checkoutRoot: "/workspace", headSha: "a".repeat(40),
       configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
     },
-    orchestrator: testOrchestrator(),
+    orchestrator: options.orchestrator ?? testOrchestrator(),
     loops: [loop, ...(options.loops ?? []).filter((candidate) => candidate.id !== loop.id)],
     loopEdges: options.loopEdges ?? [{
       id: "self-repair", source: loop.id, target: loop.id, kind: "repair", description: "Self repair."

@@ -113,9 +113,13 @@ export class LoopStateStore {
         nextRevision,
         committedAt
       );
+      this.connection().prepare(`
+        UPDATE loop_invocations SET status = 'running', updated_at = ?
+        WHERE loop_run_id = ? AND status = 'waiting_for_input'
+      `).run(committedAt, node.loop_run_id);
       const sequence = this.nextControlSequence(input.rootRunId);
       this.connection().prepare(`
-        UPDATE root_runs SET current_state_revision = ?, transition_count = ?,
+        UPDATE root_runs SET current_state_revision = ?, transition_count = ?, status = 'running',
           active_node_run_id = NULL, updated_at = ? WHERE root_run_id = ?
       `).run(nextRevision, sequence, committedAt, input.rootRunId);
       const result = this.connection().prepare(`
