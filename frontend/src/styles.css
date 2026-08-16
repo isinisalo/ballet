@@ -146,11 +146,6 @@ body {
   animation: loop-run-node-pulse 1.8s ease-in-out infinite;
 }
 
-.loop-work-loop-node.loop-run-node-pulse--running::before,
-.loop-work-loop-node.loop-run-node-pulse--waiting::before {
-  border-radius: var(--radius-lg);
-}
-
 .loop-run-node-pulse--running::before {
   color: var(--secondary);
   box-shadow: 0 0 10px color-mix(in srgb, var(--secondary) 44%, transparent);
@@ -223,9 +218,7 @@ body {
 }
 
 .loop-artwork-node:hover .loop-node-surface,
-.loop-artwork-node:focus-visible .loop-node-surface,
-.loop-work-loop-node:hover .loop-node-surface,
-.loop-work-loop-node:focus-visible .loop-node-surface {
+.loop-artwork-node:focus-visible .loop-node-surface {
   filter: brightness(1.12);
 }
 

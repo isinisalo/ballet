@@ -24,14 +24,6 @@ export function loopShortestVerticalHandles(sourceNode: LoopCanvasLayoutNode, ta
   return { sourceHandleId: handleId, targetHandleId: handleId };
 }
 
-export function loopWorkLoopNodeOutputHandleY(outputIndex: number, outputHandleCount: number, nodeHeight = loopNodeSizes.workLoopNode.height) {
-  if (outputHandleCount <= 1) return nodeHeight / 2;
-  const firstHandleY = loopCanvasLayoutConfig.edgePad / 2;
-  const lastHandleY = nodeHeight - loopCanvasLayoutConfig.edgePad / 2;
-  const clampedIndex = Math.min(Math.max(outputIndex, 0), outputHandleCount - 1);
-  return firstHandleY + (lastHandleY - firstHandleY) * (clampedIndex / (outputHandleCount - 1));
-}
-
 export function loopWorkLoopNodeStackHeight() {
   return loopNodeSizes.workLoopNode.height;
 }
@@ -40,8 +32,6 @@ export function loopHorizontalEdgeGap() {
   return loopCanvasLayoutConfig.horizontalEdgeGap;
 }
 
-export function loopBranchStackHeight(node: Pick<LoopCanvasLayoutNode, "height" | "kind">) {
-  return node.kind === "work-loop-node"
-    ? loopWorkLoopNodeStackHeight()
-    : node.height;
+export function loopBranchStackHeight(node: Pick<LoopCanvasLayoutNode, "height">) {
+  return node.height;
 }

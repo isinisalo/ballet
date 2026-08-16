@@ -16,7 +16,7 @@ describe("strict-v10 graph projection", () => {
     expect(projection.nodeByKey.get(visualNodeKey(loop.id, "completed"))?.terminal).toBe(true);
   });
 
-  it("lays out composite nodes deterministically without changing domain order", () => {
+  it("lays out single Work-owned artwork nodes deterministically without changing domain order", () => {
     const loop = v10Loop();
     const config = v10Automation(loop);
     const projection = buildLoopVisualProjection(config, loop);
@@ -28,9 +28,25 @@ describe("strict-v10 graph projection", () => {
     };
     const first = calculateCompositeLoopCanvasLayout(input);
     const second = calculateCompositeLoopCanvasLayout(input);
-    const composite = first.nodes.find((node) => node.kind === "work-loop-node");
+    const artwork = first.nodes.find((node) => node.kind === "work-loop-node");
     expect(second).toEqual(first);
-    expect(composite).toMatchObject({ width: 224, height: 132 });
+    expect(artwork).toMatchObject({ width: 48, height: 48 });
     expect(loop.nodes.map((node) => node.id)).toEqual(["work"]);
+  });
+
+  it("uses Work nodeSize and ignores Validation appearance in canvas geometry", () => {
+    const loop = v10Loop();
+    loop.nodes[0]!.work.nodeSize = "tiny";
+    loop.nodes[0]!.validation.nodeSize = "large";
+    const projection = buildLoopVisualProjection(v10Automation(loop), loop);
+
+    const layout = calculateCompositeLoopCanvasLayout({
+      config: projection.config,
+      selectedLoopId: loop.id,
+      recordsByLoopId: projection.recordsByLoopId,
+      direction: "horizontal"
+    });
+
+    expect(layout.nodes.find((node) => node.kind === "work-loop-node")).toMatchObject({ width: 24, height: 24 });
   });
 });

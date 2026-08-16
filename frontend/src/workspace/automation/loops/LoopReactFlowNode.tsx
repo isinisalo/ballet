@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { loopCanvasNodeAnchorY, type LoopCanvasLayoutNode } from "./loopLayout";
 import { LoopGhostNode } from "./LoopGhostNode";
-import { LoopCompositeNode } from "./LoopCompositeNode";
+import { LoopNodeVisual } from "./LoopNodeVisual";
 import type { LoopNodeContext, LoopReactFlowNode } from "./LoopCanvasTypes";
 import { LoopRouteArtwork } from "./LoopRouteArtwork";
 
@@ -44,7 +44,7 @@ function renderNodeContent(node: LoopCanvasLayoutNode, context: LoopNodeContext)
   if (node.kind === "loop") return renderLoopNode(node);
   if (node.kind === "first-node-ghost") return renderFirstNodeGhost(node, context);
   if (!node.record) return null;
-  return <LoopCompositeNode context={context} record={node.record} records={node.records ?? [node.record]} />;
+  return <LoopNodeVisual context={context} record={node.record} records={node.records ?? [node.record]} />;
 }
 
 function renderLoopNode(node: LoopCanvasLayoutNode) {

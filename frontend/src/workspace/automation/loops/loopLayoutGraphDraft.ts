@@ -51,12 +51,11 @@ export function addWorkLoopNodeLayout(context: LoopLayoutGraphDraftContext, reco
   const records = loopFoldedRecords(context.loopGraph, record);
   const isEditingNode = context.editingNodeIndex === record.index;
   const nodeSize = loopNodeSizeCatalog[record.node?.nodeSize ?? defaultLoopNodeSize].pixels;
-  const terminal = record.node?.terminal === true;
   addNode(context, {
     key: `node-${record.index}`,
     kind: "work-loop-node",
-    width: terminal ? nodeSize : loopNodeSizes.workLoopNode.maxWidth,
-    height: terminal ? nodeSize : loopNodeSizes.workLoopNode.height,
+    width: nodeSize,
+    height: nodeSize,
     direction: context.direction,
     record,
     records,

@@ -7,7 +7,7 @@ import {
   type LoopTheme,
   type ProjectWorkLoopNode
 } from "@shared/api/workspace-contracts";
-import { LoopCompositeNode } from "../loops/LoopCompositeNode";
+import { LoopNodeVisual } from "../loops/LoopNodeVisual";
 import type { LoopNodeContext } from "../loops/LoopCanvasTypes";
 import { LoopRouteArtwork } from "../loops/LoopRouteArtwork";
 import type { LoopNodeRecord } from "../loops/loopGraph";
@@ -50,7 +50,7 @@ export function LoopArtworkGallery({ theme }: { theme: LoopTheme }) {
                   return (
                     <div key={style} className="grid min-w-0 justify-items-center gap-1 pb-5" data-loop-artwork-preview={style} data-loop-artwork-preview-size={size}>
                       <div className="relative" style={{ width: pixels, height: pixels }}>
-                        <LoopCompositeNode context={context} record={galleryRecord(style, size, index)} />
+                        <LoopNodeVisual context={context} record={galleryRecord(style, size, index)} />
                       </div>
                     </div>
                   );

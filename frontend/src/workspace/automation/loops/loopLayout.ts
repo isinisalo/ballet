@@ -34,7 +34,6 @@ export type { LoopCanvasEdge } from "./loopLayoutEdges";
 export {
   loopCanvasNodeAnchorY,
   loopOutputSourceHandleId,
-  loopWorkLoopNodeOutputHandleY,
   loopWorkLoopNodeStackHeight
 } from "./loopLayoutSizing";
 export type {
