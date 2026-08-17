@@ -3,19 +3,19 @@ id: goal-006
 title: Kestävä tila, palautuminen ja havainnoitavuus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-18T00:00:00.000Z'
+updatedAt: '2026-08-17T00:00:00.000Z'
 tags:
   - tavoite
   - jatkuvuus
   - havainnoitavuus
-version: 1
+version: 2
 ---
 
 # Kestävä tila, palautuminen ja havainnoitavuus
 
 ## Tavoite
 
-Ballet säilyttää Runien, Steppien, suoritustehtävien, tapahtumien ja ajastusten tilan paikallisesti niin, että operaattori ymmärtää, mitä tapahtui myös prosessin uudelleenkäynnistyksen jälkeen.
+Ballet säilyttää Root Runien, Loop Runien, Work Loop Node Runien, roolikohtaisten Node Runien, State-revisioiden, suoritustehtävien, tapahtumien ja ajastusten tilan paikallisesti niin, että operaattori ymmärtää, mitä tapahtui myös prosessin uudelleenkäynnistyksen jälkeen.
 
 Aktiivisen työn, ihmisen vastausta odottavan vaiheen, finalisoinnin ja päättyneen Runin tilan pitää olla yksiselitteisesti havaittavissa.
 
@@ -29,7 +29,7 @@ Kestävä tila estää agenttityön katoamisen prosessin elinkaaren mukana. Eksp
 - Jonossa olevan työn säilyttäminen odottamattoman palvelukatkoksen yli.
 - Kesken olleen suorituksen merkitseminen keskeytyneenä epäonnistuneeksi käynnistyksen yhteydessä.
 - Runin peruuttaminen sekä jonossa olevien ja käynnissä olevien tehtävien hallittu lopettaminen.
-- Aktiivisten ja viimeaikaisten Runien, nykyisen Stepin ja finalisoinnin tuloksen näyttäminen.
+- Aktiivisten ja viimeaikaisten Runien, nykyisen Work Loop Noden ja roolin sekä finalisoinnin tuloksen näyttäminen.
 - Palveluntarjoajasta riippumattoman, yhteyskatkon jälkeen jatkettavan konsolitapahtumavirran näyttäminen.
 - Ajastuksen edellisen esiintymän, seuraavan suoritusajan ja ohitetun ajon syyn säilyttäminen.
 - Konsolisisällön katkaisutilan näyttäminen säilytysrajan täyttyessä.

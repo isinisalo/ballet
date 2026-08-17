@@ -3,12 +3,12 @@ id: goal-005
 title: Turvallinen ja toistettava Git-suoritus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-08-17T00:00:00.000Z'
 tags:
   - tavoite
   - git
   - turvallisuus
-version: 2
+version: 3
 ---
 
 # Turvallinen ja toistettava Git-suoritus
@@ -27,9 +27,9 @@ Git-eristys suojaa käyttäjän työtilaa ja tekee monivaiheisestä Work/Validat
 
 - Git-tilan ja todennettavan käynnistyslähtötilan tarkistaminen ennen Runia.
 - Root Runin suorittaminen omalla branchilla eristetyssä Git-worktreessä.
-- Kaikkien Root Runista saavutettavien Looppien, Steppien, Transitionien, ExecutionProfilejen, instructionien, skillsien ja teeman atominen snapshottaaminen Runin alussa.
+- Kaikkien Root Runista saavutettavien Looppien, Work Loop Nodejen, Edgejen, LoopEdgejen, ExecutionProfilejen, instructionien, skillsien ja teeman atominen snapshottaaminen Runin alussa.
 - Sallittujen commitoimattomien projektimääritysten ottaminen mukaan Runin tiivisteellä sidottuun käynnistyslähtötilaan.
-- Saman Root Runin Steppien suorittaminen järjestyksessä samassa worktreessä.
+- Saman Root Runin Node-roolien suorittaminen runtime-control flow’n määräämässä järjestyksessä samassa worktreessä.
 - Kirjoitusoikeuden rajaaminen Root Runin worktreehen.
 - Onnistuneen Root Runin muutosten commitointi ja onnistuneen worktreen siivoaminen.
 - Epäonnistuneen, estetyn, perutun tai keskeytyneen Root Runin worktreen säilyttäminen tutkintaa varten.
@@ -40,7 +40,7 @@ Git-eristys suojaa käyttäjän työtilaa ja tekee monivaiheisestä Work/Validat
 - Ballet ei kirjoita Node-suorituksen muutoksia käyttäjän aktiiviseen checkoutiin.
 - Ballet ei yhdistä Run-branchia eikä lähetä sitä etärepositoryyn automaattisesti.
 - Kirjoittaminen worktreen ulkopuolelle sekä tuntemattomat käyttöoikeuspyynnöt estetään.
-- Verkko on pois käytöstä, ellei sitä ole sallittu eksplisiittisesti Stepin ExecutionProfilessa.
+- Verkko on pois käytöstä, ellei sitä ole sallittu eksplisiittisesti Node-roolin ExecutionProfilessa.
 - Root Runin worktreessä tehdyt konfiguraatiomuutokset eivät muuta käynnissä olevan Runin tilannekuvaa, vaan vaikuttavat vasta seuraavaan Root Runiin.
 
 ## Todentaminen

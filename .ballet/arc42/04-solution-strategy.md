@@ -1,53 +1,72 @@
 ---
 id: arc42-section-04
-title: Solution strategy
+title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-16'
-version: 2
+updatedAt: '2026-08-17'
+version: 3
 tags:
   - arc42
   - solution-strategy
 arc42Section: 4
 ---
 
-# 4. Solution strategy
+# 4. Ratkaisustrategia
 
-## Purpose
+## Tarkoitus
 
-Summarize the fundamental solution choices that satisfy the top quality goals and constraints.
+Tämä osio kokoaa perustavat ratkaisut, joilla Ballet vastaa Goaleihin, laatutavoitteisiin ja rajoitteisiin. Hyväksytyn päätöksen koko perustelu säilyy ADR:ssä; tässä kuvataan valintojen yhteisvaikutus ja todennettava seuraus.
 
-## Status
+## Tila
 
-The strategy is implemented unless a row explicitly names pending pilot evidence.
+STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. Menetelmän vaikuttavuuden tuotantokaltainen baseline ja UI:n pidempiaikainen tulkintavirheiden seuranta ovat vielä avointa evidenssiä.
 
-| ID | Strategy | Quality impact | Source |
-| --- | --- | --- | --- |
-| STRAT-001 | One checkout-local Node/TypeScript service with React UI and shared strict contracts. | Limits context drift and deployment complexity. | adr-001, adr-003 |
-| STRAT-002 | Version-controlled project intent separated from `.git/ballet` runtime state. | Makes intent reviewable while keeping machine state local. | adr-002 |
-| STRAT-003 | Immutable Root Run snapshot plus isolated Git branch/worktree. | Protects the active checkout and makes results attributable. | adr-006 |
-| STRAT-004 | Provider-neutral adapters and explicit ExecutionProfiles/resources. | Avoids hidden provider/model fallback and preserves prompt evidence. | adr-005, adr-012, adr-013 |
-| STRAT-005 | Strict-v10 Work/Validation, revisioned State and capability repair call/return. | Makes decisions, retries and repairs deterministic and recoverable. | adr-015 |
-| STRAT-006 | arc42 Template as durable truth and 6+1 Ballet Loops as the continuous Method. | Connects architecture, implementation and evaluation through stable evidence. | goal-009, adr-011 |
-| STRAT-007 | Explicit human gates for intent, significant decisions and external writes. | Preserves authority at high-impact boundaries. | adr-011 |
-| STRAT-008 | Strict one-Loop authoring package plus inspect/plan/commit materialization into existing project primitives. | Enables reuse without a live registry/runtime dependency and makes prompt trust visible. | goal-010, adr-016 |
+## Strategiat ja jäljitettävyys
 
-## Canonical sources
+| ID | Strategia | Goal / REQ | QS | ADR / rajoite | Todennettava seuraus |
+| --- | --- | --- | --- | --- | --- |
+| STRAT-001 | Yksi checkout-local Node/TypeScript-palvelu, React UI ja shared strict contracts. | goal-001 / REQ-001 | QS-001 | adr-001, adr-003, CTR-001, CTR-003 | Palvelu ei tarvitse tiliä tai remote control planea; UI ja backend jakavat validoidut sopimukset. |
+| STRAT-002 | Versionhallittu project intent erotetaan `.git/ballet` runtime-statesta. | goal-002, goal-006 / REQ-002, REQ-006 | QS-002, QS-012 | adr-002, adr-007, CTR-004 | Projektitotuus on katselmoitava; restart käyttää vain commitoituja machine-local-faktoja. |
+| STRAT-003 | Root Run käyttää immutable snapshotia ja erillistä Git-branch/worktree-paria. | goal-005 / REQ-005 | QS-004 | adr-006, CTR-005, CTR-008 | Active checkout ei muutu Node-suorituksessa eikä tulosta integroida automaattisesti. |
+| STRAT-004 | Provider-neutral adapterit sekä eksplisiittiset `ExecutionProfile`-, instruction- ja skill-resurssit. | goal-003 / REQ-003 | QS-011 | adr-005, adr-012, adr-013, CTR-009 | Sama snapshot ja Task Envelope tuottavat saman tehtävän; fallbackia tai ambient resurssia ei ole. |
+| STRAT-005 | Strict-v10 Work/Validation, revisionoitu State ja capability repair call/return. | goal-004, goal-006 / REQ-004, REQ-006 | QS-003, QS-012 | adr-015 | Ohjausvirta, retry, repair, return ja finalization perustuvat commitoituihin tapahtumiin. |
+| STRAT-006 | arc42 on pitkäikäinen totuus ja 6+1 Ballet Loops jatkuva menetelmä. | goal-009 / REQ-009 | QS-005, QS-006, QS-008 | adr-011, CTR-006, CTR-007 | Muutos etenee clarificationista evidenssiin vakaiden ID:iden kautta ilman runtime-logien kopiointia dokumentteihin. |
+| STRAT-007 | Intentio, merkittävä päätös ja ulkoinen kirjoitus pysähtyvät eksplisiittiseen ihmisrajaan. | goal-005, goal-009 / REQ-005, REQ-009 | QS-004, QS-006 | adr-011, CTR-007, CTR-008 | Agentti palauttaa `needs_input` tai odottaa valtuutusta eikä päättele lupaa testituloksesta. |
+| STRAT-008 | Yhden Loopin strict authoring package materialisoidaan inspect/plan/commit-vaiheissa olemassa oleviksi project-local-primitiveiksi. | goal-010, goal-011 / REQ-010, REQ-011 | QS-009, QS-010 | adr-016, adr-017, CTR-011 | Reuse ei lisää live registry- tai runtime-riippuvuutta; authoring-projektiot säilyttävät runtime-semantikan. |
 
-Accepted ADRs own the decisions; this section owns only their strategic synthesis.
+## Keskeiset trade-offit
 
-## Relevant decisions
+| Valinta | Saatu hyöty | Hyväksytty kustannus tai raja |
+| --- | --- | --- |
+| Checkout-local monoliitti | Vähäinen operointipinta, selkeä trust boundary ja yhteiset sopimukset. | Ei keskitettyä monen checkoutin hallintaa eikä selainkäyttöä verkon yli. |
+| SQLite runtime-totuutena | Atominen paikallinen persistence ja restart-recovery ilman infrastruktuuria. | Ei jaettua HA-kantaa; yksi checkout on operatiivinen yksikkö. |
+| Sekventiaalinen Root Run | Yksiselitteinen State-, repair- ja control-flow-järjestys. | Yhden Runin sisällä ei maksimoida rinnakkaisuutta; rinnakkaisuus syntyy provider-kohtaisista kaistoista eri työtehtäville. |
+| Strict composition ja ei fallbackia | Promptin provenance, toistettavuus ja virheen havaittavuus. | Konfiguraatiovirhe pysäyttää työn sen sijaan, että järjestelmä yrittäisi “parasta arvausta”. |
+| Immutable snapshot | Run on selitettävissä myöhemmistä checkout-muutoksista riippumatta. | Käynnissä oleva Run ei omaksu config-muutosta ilman uutta Runia. |
+| Project-local method | Workflow on versionhallittu, muokattava ja irti platform-releaseistä. | Jokainen projekti vastaa oman menetelmädatansa laadusta ja validoinnista. |
+| Kanoniseen dataan perustuva UI | Operaattorin tulkinta vastaa runtime-faktoja. | Koristeellista progressia, ETA:a tai provider-tekstistä pääteltyä tilaa ei näytetä. |
 
-`adr-001`–`adr-003`, `adr-005`–`adr-009`, `adr-011`–`adr-016`.
+## Arkkitehtuurin toteutusjärjestys
 
-## Evidence
+Konteksti ja vaatimukset määräävät luottamusrajat. Building block -rakenne toteuttaa rajat, runtime-skenaariot todentavat ohjausvirran ja poikkileikkaavat konseptit määräävät yhteiset invariantit. QS-skenaariot ja trace-ketjut toimivat hyväksymisenä. Uusi toteutus ei saa oikaista tätä ketjua lisäämällä project workflow -tietoa platform-koodiin.
 
-Existing source and tests implement strategies 1–5. `validate:arc42` verifies strategy 6 configuration; the first initiative will supply effectiveness evidence.
+## Kanoniset lähteet
 
-## Open questions
+Hyväksytyt ADR:t omistavat päätökset; tämä osio omistaa niiden strategisen synteesin. Goalit omistavat tavoitteen ja [osio 10](10-quality-requirements.md) mittarit.
 
-- Does the first pilot show that the current human gates are sufficient without becoming repetitive?
+## Relevantit päätökset
 
-## Next review basis
+`adr-001`–`adr-003`, `adr-005`–`adr-009` ja `adr-011`–`adr-017`.
 
-Review when a top quality goal changes or evaluation finds that a fundamental strategy does not produce its measurable response.
+## Evidenssi
+
+Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä authoring-projektiot. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v10-graafin. Module-testit todentavat STRAT-008:n materialisointirajan. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
+
+## Avoimet kysymykset
+
+- Osoittaako ensimmäinen end-to-end-pilotti, että ihmisrajat ovat riittäviä ilman tarpeetonta toistoa?
+- Miten usein operaattorit tarvitsevat selitystä Run-kartan koristeellisten ja semanttisten elementtien erosta?
+
+## Seuraava katselmointiperuste
+
+Katselmoi osio, kun tärkein laatutavoite muuttuu, uusi ADR muuttaa perustavaa ratkaisua tai evaluation osoittaa, ettei strategia tuota nimettyä QS-vastetta.

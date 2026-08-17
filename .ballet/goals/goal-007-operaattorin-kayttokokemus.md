@@ -3,12 +3,12 @@ id: goal-007
 title: Operaattorin käyttökokemus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-08-17T00:00:00.000Z'
 tags:
   - tavoite
   - käyttökokemus
   - operaatiot
-version: 2
+version: 3
 ---
 
 # Operaattorin käyttökokemus
@@ -26,9 +26,10 @@ Käyttöliittymä palvelee DevOps-asiantuntijoita, AI-arkkitehteja ja agenttiope
 ## Kyvykkyydet
 
 - Yksi globaali Ballet-valinta Configure- ja Run-tilojen välillä.
-- Goals-, ADR-, instruction-, skill-, ExecutionProfile- ja All Loops -aineistojen tiiviit kokoelmanäkymät sekä suora yhden projektiteeman editori.
+- Goals-, ADR-, instruction-, skill- ja ExecutionProfile-aineistojen tiiviit kokoelmanäkymät sekä Loop Engineer ja suora yhden projektiteeman editori.
 - Markdown-, ExecutionProfile-, Loop- ja teemaeditorit, joissa on näkyvä validointi ja yksiselitteinen tallennustila. ExecutionProfilejen runtime-valinnat muokataan erillään Node editorin nimetystä profile-valinnasta.
-- Loop-visualisointi, joka näyttää nodet, Transitionit, terminaalit, aktiivisen vaiheen ja Run-tilannekuvan.
+- Authoring-visualisointi, joka erottaa Context-, composition- ja selected-Loop detail -tasot sekä niiden `LoopEdge`- ja `Edge`-omistajuuden.
+- Run mission control, jossa Mission, All Loops ja live inspector näyttävät immutable snapshotin, aktiivisen Work/Validation/Orchestrator-roolin, repair/return-reitin, State-revisionin ja finalisoinnin ilman keksittyä prosenttia tai ETA:a.
 - Ajoympäristön valmiuden ja havaittujen ongelmien sekä saatavilla olevien kirjautumiskomentojen näyttäminen.
 - Aktiivisten ja viimeaikaisten Runien, ihmisen hyväksyntäporttien, konsolin ja strukturoidun lopputuloksen näyttäminen.
 - Yhdenmukaiset lataus-, tyhjä-, huomio-, virhe- ja estotilat.
@@ -43,4 +44,4 @@ Käyttöliittymä palvelee DevOps-asiantuntijoita, AI-arkkitehteja ja agenttiope
 
 ## Todentaminen
 
-Tavoite toteutuu, kun käyttäjä löytää samasta navigaatiosta määriteltävän kohteen, näkee sen validoinnin, vaihtaa Stepin tai Loopin vastaavaan Run-kohteeseen ja ymmärtää aktiivisen vaiheen, odottavan päätöksen, virheen tai lopputuloksen ilman piilotettua tilaa.
+Tavoite toteutuu, kun käyttäjä löytää samasta navigaatiosta määriteltävän kohteen, näkee sen validoinnin, vaihtaa Work Loop Noden tai Loopin vastaavaan Run-kohteeseen ja ymmärtää Mission-/All Loops-/live inspector -näkymistä aktiivisen roolin, yrityksen, revisionin, repair/return-polun, odottavan päätöksen, virheen tai lopputuloksen ilman piilotettua tai keksittyä tilaa.

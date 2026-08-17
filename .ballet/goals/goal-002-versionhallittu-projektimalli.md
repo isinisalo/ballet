@@ -3,12 +3,12 @@ id: goal-002
 title: Versionhallittu projektimalli
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T06:45:37.000Z'
+updatedAt: '2026-08-17T00:00:00.000Z'
 tags:
   - tavoite
   - versionhallinta
   - projektimalli
-version: 3
+version: 4
 ---
 
 # Versionhallittu projektimalli
@@ -17,7 +17,7 @@ version: 3
 
 Balletin projektimääritykset ja työnkulut ovat repositoryn mukana siirtyvää, katselmoitavaa ja toistettavaa aineistoa.
 
-Käyttäjän pitää voida ymmärtää projektin tavoitteet, päätökset, Loopit, Stepit, ExecutionProfilet, instructionit ja skillsit suoraan checkoutin tiedostoista sekä muokata niitä Balletin Configure-tilassa.
+Käyttäjän pitää voida ymmärtää projektin tavoitteet, päätökset, Loopit, Work Loop Nodet, Edget, LoopEdget, ExecutionProfilet, instructionit ja skillsit suoraan checkoutin tiedostoista sekä muokata niitä Balletin Configure-tilassa.
 
 ## Tarkoitus
 
@@ -29,8 +29,8 @@ Balletin oman repositoryn kehitystyönkulku on tavallista project-local dataa. S
 
 ## Kyvykkyydet
 
-- Looppien ja nimettyjen ExecutionProfilejen säilyttäminen strict v9 -muotoisessa `.ballet/project.json`-tiedostossa.
-- Suoritettavan Stepin tehtäväkuvauksen, `executionProfileId`-, `primaryInstructionId`- ja `skillIds`-viitteiden sekä Transitionien säilyttäminen Loopin project-local datana.
+- Looppien, Work Loop Nodejen, Edgejen, LoopEdgejen ja nimettyjen ExecutionProfilejen säilyttäminen strict-v10-muotoisessa `.ballet/project.json`-tiedostossa.
+- Suoritettavien Work-, Validation- ja Orchestrator-roolien tehtäväkuvausten, `executionProfileId`-, `primaryInstructionId`- ja `skillIds`-viitteiden sekä control-flow-yhteyksien säilyttäminen Loopin project-local-datana.
 - Goals-, ADR-, instruction-, skill- ja teema-aineistojen säilyttäminen checkoutin versionhallituissa tiedostoissa.
 - Projektiaineistojen selaaminen, muokkaaminen ja katselmointi samoina tiedostoina, jotka siirtyvät repositoryn mukana.
 - Syötteiden validointi ja tallennus niiden omiin versionhallittuihin tiedostoihin ennen uuden projektitilan käyttämistä.
@@ -42,12 +42,12 @@ Balletin oman repositoryn kehitystyönkulku on tavallista project-local dataa. S
 - Palveluntarjoajakomentojen konekohtaiset ohitukset, absoluuttiset vain luku -juuret ja ajohistoria eivät kuulu versionhallittuun projektimalliin.
 - Palveluntarjoajien tunnuksia, tokeneita tai muita salaisuuksia ei tallenneta projektiaineistoon.
 - Kohdemallissa ei ole top-level Agentin runtime-omistajuutta, `agentId`-viitettä eikä standalone Agent Runia; `agent` on providerilla suoritettavan Work- tai Validation Noden tyyppi.
-- Pre-release v8 -aineisto muunnetaan repositoryssä suoraan v9-muotoon. `.codex/agents` ei ole v9:n kanoninen projektimääritys tai runtime-lähde, eikä Ballet rakenna v8-readeria tai historiallisten pre-release-snapshotien compatibility-projektiota.
-- System-ohje ei sisällä Balletin tai muun projektin ohjelmistotoimitusmenettelyä, vaan workflow-järjestys kuuluu project-local Loop-dataan ja menettelyt Stepeille eksplisiittisesti valittuihin Project-skillseihin.
-- Workflow-template ei ole V1:n entity, pack, registry, marketplace, clone-to-project-toiminto tai live-linkki. V1 suorittaa vain tavallista Project-dataa.
+- Legacy pre-release -aineisto muunnetaan repositoryssä suoraan nykyiseen strict-v10-muotoon. `.codex/agents` ei ole kanoninen projektimääritys tai runtime-lähde, eikä Ballet rakenna legacy-readeria tai historiallisten pre-release-snapshotien compatibility-projektiota.
+- System-ohje ei sisällä Balletin tai muun projektin ohjelmistotoimitusmenettelyä, vaan workflow-järjestys kuuluu project-local Loop-dataan ja menettelyt Node-rooleille eksplisiittisesti valittuihin Project-skillseihin.
+- Loop Module Package ei ole runtime-entity, registry- tai live-linkki: hyväksytty yhden Loopin paketti materialisoidaan tavalliseksi project-local strict-v10-dataksi ennen suoritusta.
 - Ballet löytää Goal- ja ADR-dokumentit niiden kanonisista Markdown-tiedostoista; erillinen indeksi ei ole tietolähde.
 - Virheellinen konfiguraatio voidaan näyttää ja korjata Configure-tilassa, mutta sitä ei saa suorittaa Runina.
 
 ## Todentaminen
 
-Tavoite toteutuu, kun projektin Goals, ADR:t, Loopit, Stepit, ExecutionProfilet, instructionit, skillsit ja teema voidaan katselmoida Git-diffistä, kloonata toiselle koneelle ja ladata Balletiin ilman alkuperäisen kloonin paikallista ajonaikaista tilaa. Sama malli riittää Balletin oman kehitystyönkulun kuvaamiseen ilman System-ohjeeseen, tuotebinaariin tai erilliseen template packiin lisättyä erikoispolkua.
+Tavoite toteutuu, kun projektin Goals, ADR:t, Loopit, Work Loop Nodet, Edget, LoopEdget, ExecutionProfilet, instructionit, skillsit ja teema voidaan katselmoida Git-diffistä, kloonata toiselle koneelle ja ladata Balletiin ilman alkuperäisen kloonin paikallista ajonaikaista tilaa. Sama malli riittää Balletin oman kehitystyönkulun kuvaamiseen ilman System-ohjeeseen, tuotebinaariin tai runtime-aikaiseen template-riippuvuuteen lisättyä erikoispolkua.

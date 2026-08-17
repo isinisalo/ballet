@@ -1,61 +1,132 @@
 ---
 id: arc42-section-08
-title: Crosscutting concepts
+title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-16'
-version: 2
+updatedAt: '2026-08-17'
+version: 3
 tags:
   - arc42
   - concepts
 arc42Section: 8
 ---
 
-# 8. Crosscutting concepts
+# 8. Poikkileikkaavat konseptit
 
-## Purpose
+## Tarkoitus
 
-Explain recurring, quality-driven solution approaches that affect multiple building blocks.
+Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johdetut ratkaisuperiaatteet. Se ei ole kaikkien ohjelmointikäytäntöjen katalogi. Konsepti kuuluu tänne, kun sen rikkominen muuttaisi usean BB:n turvallisuutta, determinismiä, palautumista, evidenssiä tai operaattorin tulkintaa.
 
-## Status
+## Tila
 
-The concepts are selected for architectural significance; this is not a catalog of every implementation convention.
+CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. Uudet QS-011–QS-013 tarkentavat niiden mitattavia vasteita muuttamatta concept-ID:itä.
 
-| ID | Concept | Applies to | Quality scenarios | Implementation anchors |
+## Konseptikartta
+
+| ID | Konsepti | Soveltuu | QS | Toteutusankkurit |
 | --- | --- | --- | --- | --- |
-| CON-001 | Least-authority local execution: loopback API, explicit Origin policy, worktree-only writes, network-off default and human external-write authorization. | BB-002, BB-004, BB-006, BB-007 | QS-001, QS-004, QS-007 | ADR-006, ADR-008, execution permission policy |
-| CON-002 | Durable canonical control: strict role outcomes, atomic State patches, append-only revisions, bounded retries and runtime-owned continuation. | BB-004, BB-005, BB-006 | QS-003 | ADR-015, runtime/state stores |
-| CON-003 | Deterministic execution composition: System → primary → sorted skills → Task Envelope → role schema, all snapshotted and hashed. | BB-003, BB-004, BB-006 | QS-002, QS-004 | ADR-012, ADR-013, ExecutionComposition |
-| CON-004 | Portable project resources: repository paths own config, docs, instructions and skills; machine state remains under `.git/ballet`. | BB-003, BB-008 | QS-002, QS-005 | ADR-002, ADR-014, project resource catalog |
-| CON-005 | Cyber-industrial operator UI: dense, accessible, token-driven React/Tailwind/shadcn surfaces with explicit operational state. | BB-001 | QS-001 | [DESIGN.md](../../DESIGN.md), goal-007 |
-| CON-006 | Evidence-driven arc42 Method: stable IDs, explicit fact/decision/assumption/hypothesis/finding/question types, initiative handoff, traceability and measured method health. | BB-003, BB-004, BB-005, BB-008 | QS-005, QS-006, QS-008 | goal-009, ADR-011, project-local arc42 resources |
-| CON-007 | Copy-to-project module trust: strict bounded JSON, canonical hash, deterministic namespace, compatible profile slots, revalidated plan, config-last commit and content-derived provenance. | BB-001, BB-002, BB-003, BB-009 | QS-002, QS-004, QS-009 | ADR-016, Loop module schemas/service/tests |
+| CON-001 | Least-authority local execution: loopback API, eksplisiittinen Origin-politiikka, worktree-only Node-kirjoitukset, network-off-oletus ja ihmisen external-write-valtuutus. | BB-002, BB-004, BB-006, BB-007 | QS-001, QS-004, QS-007 | ADR-006, ADR-008, workspace permission policy |
+| CON-002 | Durable canonical control: strict role outcomes, atomiset State patchit, append-only revisionit, bounded retry, repair-frame ja runtime-owned continuation. | BB-004–BB-006 | QS-003, QS-012 | ADR-015, runtime/state/queue-storet |
+| CON-003 | Deterministinen execution composition: System → primary → vakaasti järjestetyt skillit → `TaskEnvelope` → role/output schema, kaikki snapshotattuna ja hashattuna. | BB-003, BB-004, BB-006 | QS-002, QS-004, QS-011 | ADR-012, ADR-013, `ExecutionComposition` |
+| CON-004 | Siirrettävät project resources: repository-polut omistavat configin, dokumentit, instructionit ja skillit; machine state jää `.git/ballet`-hakemistoon. | BB-003, BB-008, BB-009 | QS-002, QS-005, QS-009 | ADR-002, ADR-014, ADR-016, resource catalog |
+| CON-005 | Cyber-industrial operator UI ja canonical projection: dense, accessible, token-driven React/Tailwind/shadcn-pinnat näyttävät vain nimetyn runtime/project-totuuden. | BB-001, BB-002, BB-005 | QS-001, QS-010, QS-013 | [DESIGN.md](../../DESIGN.md), `loopEngineerProjections.ts`, `loopRunViewModel.ts` |
+| CON-006 | Evidenssipohjainen arc42 Method: stable ID:t, väitetyypit, initiative handoff, traceability, conformance ja mitattu method health. | BB-003–BB-005, BB-008 | QS-005, QS-006, QS-008 | goal-009, ADR-011, project-local arc42-resurssit |
+| CON-007 | Copy-to-project module trust: strict rajattu JSON, canonical hash, deterministic namespace, compatible profile slots, revalidated plan, config-last commit ja content-derived provenance. | BB-001–BB-003, BB-009 | QS-002, QS-004, QS-009 | ADR-016, Loop module schemas/service/tests |
 
-## Information classification
+## Turvallisuus ja auktorisointi
 
-- **Fact**: directly verifiable from accepted source, code, configuration or evidence.
-- **Decision**: accepted choice owned by a Goal/ADR or an explicitly authorized initiative decision.
-- **Assumption**: unverified premise with owner and review trigger.
-- **Hypothesis**: proposed causal improvement with baseline and measurable expected result.
-- **Finding**: evidence-backed observation from review, validation or research.
-- **Open question**: missing information that may require `needs_input` and must not be invented.
+Turvallisuus muodostuu useasta erillisestä portista:
 
-## Canonical sources
+1. **Checkout identity:** palvelu palvelee yhtä ratkaistua checkoutia.
+2. **Request validation:** shared schema ja HTTP boundary estävät malformed-inputin ennen käyttötapausta.
+3. **Snapshot/preflight:** target, reachable graph, resource closure, profiili ja oikeudet validoidaan ennen queuea.
+4. **Workspace policy:** providerin kirjoitusalue on Root Run -worktree ja verkko riippuu profiilista.
+5. **Outcome validation:** provider-output ei ole canonical ennen role/output-skeemaa.
+6. **External effect:** merge, push, release, deploy ja rollback vaativat täsmällisen ihmisvaltuutuksen, vaikka muut portit olisivat läpäisty.
 
-ADRs own decisions, `DESIGN.md` owns the UI system, and the linked implementation anchors own executable behavior.
+Authentication-palvelua ei lisätä loopback-arkkitehtuuriin implisiittisesti. Tämä ei tee kaikesta paikallisesta inputista luotettua: Origin, checkout, schema, package trust ja provider output validoidaan omissa rajoissaan.
 
-## Relevant decisions
+## Validointi ja virheiden käsittely
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`.
+| Raja | Validointi | Virheen muoto | Sivuvaikutus |
+| --- | --- | --- | --- |
+| Project config/resources | Strict-v10 schema, uniikit ID:t, referenssit, capability/edge-säännöt. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
+| HTTP/API | Shared request/response schema ja application precondition. | 4xx odotetulle inputille, 5xx vain odottamattomalle virheelle. | Service-transaktio ei ala malformed-inputilla. |
+| Composition | Profiili, instructionit, skillit, order, envelope ja output schema. | `ExecutionCompositionError` tai vastaava blocking outcome. | Nolla jonotettua taskia ja nolla fallbackia. |
+| Runtime outcome | Roolikohtainen strict schema, current revision ja rajat. | Failed/needs_input/interrupted/terminal outcome. | Vain atomisesti commitoitu fakta näkyy. |
+| Loop module | Koko, UTF-8, strict schema, canonical hash, conflict, stale plan ja active Run. | Domain issue -lista. | Config-last ja rollback; ei puuttuvia referenssejä. |
+| UI projection | Shared DTO ja exhaustive presentation mapping. | Unknown/explicit unavailable; ei arvattua tilaa. | Display-only; canonical data ei muutu. |
 
-## Evidence
+Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logirivi tai providerin teksti ei yksinään muuta control flow’ta. Retry on rajattu runtime-sääntö, ei yleinen “catch and try again” -käytäntö.
 
-Crosscutting concepts map to specific QS and BB IDs and are covered by TRACEABILITY.
+## Persistence, atomisuus ja idempotenssi
 
-## Open questions
+- SQLite on machine-local canonical runtime truth; repository on canonical project truth.
+- State-revisio käyttää monotonista revisionia ja expected-revision-tarkistusta.
+- Outcome, revision ja control-flow-tapahtuma commitoidaan yhdessä, jos niiden erottaminen voisi näyttää mahdottoman välitilan.
+- Queue/task lifecycle on persistentoitu: queued voidaan palauttaa, running muuttuu restartissa interrupted-tilaan eikä terminal-tulosta replayata.
+- Cancellation/finalization toimii durable barrierina myöhäiselle adapter-payloadille.
+- Module commit revalidoi suunnitelman ja kirjoittaa project configin viimeisenä, jotta config ei koskaan viittaa vielä puuttuvaan resurssiin.
 
-- No additional concept is promoted without cross-block impact or quality significance.
+## Determinismi ja provenance
 
-## Next review basis
+Compositionin järjestys, resolved resource -sisältö, role schema, Task Envelope ja hash ovat osa suoritusevidenssiä. Provider tai adapteri ei valitse toista profiilia, mallia, instructionia tai skilliä puuttuvan tilalle. Loop module canonicalization tuottaa sisältöpohjaisen hashin; asennettu provenance kertoo, mistä materialisoitu project-local-sisältö on peräisin. Immutable Root Run -snapshot estää myöhempää config-muutosta muuttamasta ajon selitystä.
 
-Review when evaluation finds repeated inconsistency across building blocks or a priority quality scenario lacks a crosscutting solution.
+## Evidenssi, observability ja tietoluokitus
+
+### Väiteluokat
+
+- **Fakta:** suoraan todennettava hyväksytystä lähteestä, koodista, konfiguraatiosta tai nimetystä evidenssistä.
+- **Päätös:** hyväksytty valinta, jonka omistaa Goal/ADR tai eksplisiittisesti valtuutettu initiative-päätös.
+- **Oletus:** todentamaton lähtökohta, jolla on omistaja ja review-trigger.
+- **Hypoteesi:** ehdotettu syy–seuraus-parannus, jolla on baseline ja mitattava odotus.
+- **Löydös:** review’n, validoinnin tai tutkimuksen evidenssiin perustuva havainto.
+- **Avoin kysymys:** puuttuva tieto, joka voi johtaa `needs_input`-tilaan eikä sitä saa keksiä.
+
+### Evidenssitasot
+
+1. Runtime UI näyttää ajonaikaisen canonical-tilan, ei pitkäikäistä arkkitehtuuriselitystä.
+2. SQLite säilyttää tarkat Run/task/outcome/State/event-faktat, ei dokumenttien kopioita.
+3. Initiative EVIDENCE indeksoi hyväksymiseen tarvittavan rajatun evidenssin ja nimeää komennot/polut/rajoitukset.
+4. TRACEABILITY yhdistää Goal/REQ/QS:n päätökseen, rakenteeseen, testiin ja evidenssiin.
+5. STATUS ja METHOD-HEALTH muuttuvat vain uuden evidenssin tai päätöksen perusteella.
+
+Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat hyväksymistä. Salaisuuksia, provider credentialeja tai hidden reasoning -sisältöä ei kopioida arkkitehtuuridokumentteihin.
+
+## UI:n totuusperiaate
+
+- `DESIGN.md` omistaa värit, typografian, spacingin, radius-säännöt ja visuaalisen periaatteen.
+- Context, composition ja detail ovat authoring-projektioita; vain omistetut `LoopEdge`/`Edge`-entiteetit ovat muokattavaa domain-dataa.
+- Mission kokoaa nykyisen tavoitteen ja aktiivisen polun; All Loops näyttää immutable snapshotin koko topologian.
+- Position, role, profile, attempt, revision, repair, return ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
+- Visuaalinen artwork, orbit, glow tai reittikorostus auttaa lukemista mutta ei muodosta uutta runtime-tilaa.
+- Prosenttia, ETA:a, elapsed-telemetriaa tai provider-tekstistä pääteltyä statusta ei esitetä, ellei tuleva kanoninen sopimus ja ADR sitä erikseen määritä.
+
+## Versiointi ja yhteensopivuus
+
+- `.ballet/project.json` käyttää strict-v10-skeemaa; vanhan termin näyttäminen dokumentaatiossa ei muuta runtime-versiota ja on korjattava aktiivisesta lähteestä.
+- Shared API/TypeScript-sopimuksen semanttinen muutos vaatii toteutuksen ja kuluttajien koordinoidun päivityksen sekä testit.
+- SQLite-schema muuttuu numeroiduilla migraatioilla; dokumentaatiotyö ei muuta schema versionia.
+- Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
+- Hyväksytty ADR ei muutu hiljaisesti; uusi päätös supersedoi sen eksplisiittisesti.
+
+## Kanoniset lähteet
+
+ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schemas suoritettavan käyttäytymisen ja tässä linkitetyt arc42-lähteet pitkäikäisen selityksen.
+
+## Relevantit päätökset
+
+`adr-002`, `adr-005`–`adr-008` ja `adr-011`–`adr-017`.
+
+## Evidenssi
+
+Konseptit mapittuvat BB-, RT-, DEP- ja QS-tunnisteisiin. TRACEABILITY nimeää testit ja evidenssit; tämän dokumentaatiotyön conformance review tarkistaa, ettei kuvaus väitä runtime-sopimuksen muutosta.
+
+## Avoimet kysymykset
+
+- Uutta konseptia ei nosteta tänne ilman usean rakennusosan vaikutusta tai priorisoitua laatuskenaariota.
+- Operatiivisen telemetry-retentionin tarve arvioidaan ennen tuotantokäyttöä erillään arkkitehtuuridokumentaation säilytyksestä.
+
+## Seuraava katselmointiperuste
+
+Katselmoi osio, kun evaluation löytää toistuvan ristiriidan rakennusosien välillä tai prioriteetti-1-QS vailla yhteistä ratkaisua.

@@ -3,21 +3,21 @@ id: goal-003
 title: Usean palveluntarjoajan koostettava Node-suoritus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T06:45:37.000Z'
+updatedAt: '2026-08-17T00:00:00.000Z'
 tags:
   - tavoite
   - node-suoritus
   - palveluntarjoajat
-version: 3
+version: 4
 ---
 
 # Usean palveluntarjoajan koostettava Node-suoritus
 
 ## Tavoite
 
-Ballet suorittaa Codex- ja Copilot-pohjaiset Stepit samalla paikallisella toimintamallilla säilyttäen palveluntarjoajakohtaiset ominaisuudet ja valmiustiedot näkyvinä.
+Ballet suorittaa Codex- ja Copilot-pohjaiset Work-, Validation- ja Orchestrator-roolit samalla paikallisella toimintamallilla säilyttäen palveluntarjoajakohtaiset ominaisuudet ja valmiustiedot näkyvinä.
 
-Käyttäjän pitää voida valita suoritettavalle Stepille nimetty ExecutionProfile, yksi primary instruction ja tarvittavat skillsit sekä nähdä ennen Runia, voidaanko profilen provider-, model-, reasoning effort- ja network access -yhdistelmä suorittaa.
+Käyttäjän pitää voida valita suoritettavalle Node-roolille nimetty ExecutionProfile, yksi primary instruction ja tarvittavat skillsit sekä nähdä ennen Runia, voidaanko profilen provider-, model-, reasoning effort- ja network access -yhdistelmä suorittaa.
 
 ## Tarkoitus
 
@@ -28,8 +28,8 @@ Yhteinen suorituskokemus estää automaatiota sitoutumasta yhden palveluntarjoaj
 ## Kyvykkyydet
 
 - Codex CLI:n ja GitHub Copilot CLI:n asennuksen, version, autentikoinnin ja kyvykkyyksien tarkistaminen.
-- Nimetyn, provider-, model-, reasoning effort- ja network access -valinnat sisältävän ExecutionProfilen valitseminen Stepille yhdellä viitteellä.
-- Täsmälleen yhden Project-primary instructionin ja nollan tai useamman eksplisiittisen Project-skillin valitseminen Stepille.
+- Nimetyn, provider-, model-, reasoning effort- ja network access -valinnat sisältävän ExecutionProfilen valitseminen Node-roolille yhdellä viitteellä.
+- Täsmälleen yhden Project-primary instructionin ja nollan tai useamman eksplisiittisen Project-skillin valitseminen Node-roolille.
 - Pakollisen ja minimaalisen System-ohjeen lisääminen jokaiseen suoritukseen muuttumattomasta Ballet-katalogista ilman käyttäjän valintaa. Katalogin read-only-luonne ei muuta Root Runin worktree-oikeutta.
 - Checkout-kohtaisten vain luku -juurien ratkaiseminen konekohtaisesta policysta ExecutionProfilen ja Node-compositionin ulkopuolella.
 - Palveluntarjoajasta riippumattomien tehtävätilojen, konsolitapahtumien ja strukturoitujen lopputulosten näyttäminen.
@@ -43,13 +43,13 @@ Yhteinen suorituskokemus estää automaatiota sitoutumasta yhden palveluntarjoaj
 - Autentikointi tulee palveluntarjoajan CLI:stä tai sen tukemasta ympäristöstä; Ballet ei pyydä eikä tallenna palveluntarjoajan tunnuksia.
 - Tuettu suoritusympäristö on nykyisen checkoutin paikallinen macOS-isäntä; erillistä konevalintaa ei ole.
 - Palveluntarjoajan raakaa tapahtumamuotoa tai piilotettua reasoning-sisältöä ei näytetä sellaisenaan käyttöliittymässä.
-- ExecutionProfile sisältää vain ID:n, nimen, providerin, modelin, reasoning effortin ja network access -valinnan; se ei sisällä instructioneita, skills-valintoja, tehtäväkuvausta, Transitioneita tai workspace-oikeutta.
+- ExecutionProfile sisältää vain ID:n, nimen, providerin, modelin, reasoning effortin ja network access -valinnan; se ei sisällä instructioneita, skills-valintoja, tehtäväkuvausta, Edgejä, LoopEdgejä tai workspace-oikeutta.
 - ExecutionProfile-editori näyttää ja vaatii provider-, model-, reasoning effort- ja network access -valinnat; Node editor valitsee vain nimetyn profilen eikä muokkaa näitä arvoja.
-- Additional instructions ei kuulu ensimmäisen version skeemaan, ja vain Stepille eksplisiittisesti valitut skillsit osallistuvat koostamiseen.
+- Additional instructions ei kuulu nykyiseen skeemaan, ja vain Node-roolille eksplisiittisesti valitut skillsit osallistuvat koostamiseen.
 - Instruction- tai skill-sisältöä ei typistetä hiljaisesti kokorajan täyttämiseksi.
 - Yksi Project-primary instruction ja yksi Project-skill saavat olla enintään 128 KiB; Balletin koko muodostama prompt saa olla enintään 512 KiB.
 - Balletin evidenssi todistaa Balletin muodostaman promptin, ei providerin koko sisäistä tai ambient-kontekstia.
 
 ## Todentaminen
 
-Tavoite toteutuu, kun kaksi Stepiä voi käyttää samaa ExecutionProfilea eri primary instructioneilla ja skills-valinnoilla, käyttäjä näkee valitun palveluntarjoajan todellisen valmiuden ja samasta Root Runin tilannekuvasta muodostuu tavutasolla sama instruction bundle. Evidenssistä voidaan tarkistaa jokainen käytetty lähde ilman implisiittistä palveluntarjoajan vaihtoa.
+Tavoite toteutuu, kun kaksi Node-roolia voi käyttää samaa ExecutionProfilea eri primary instructioneilla ja skills-valinnoilla, käyttäjä näkee valitun palveluntarjoajan todellisen valmiuden ja samasta Root Runin snapshotista sekä Task Envelopesta muodostuu tavutasolla sama instruction bundle. Evidenssistä voidaan tarkistaa jokainen käytetty lähde ilman implisiittistä palveluntarjoajan vaihtoa.

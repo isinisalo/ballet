@@ -1,65 +1,69 @@
 ---
 id: arc42-method-health
-title: Ballet arc42 method health
+title: Balletin arc42-menetelmän terveys
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-16'
-version: 1
+updatedAt: '2026-08-17'
+version: 2
 tags:
   - arc42
   - method-health
   - continuous-learning
 ---
 
-# Ballet arc42 method health
+# Balletin arc42-menetelmän terveys
 
-## Purpose
+## Tarkoitus
 
-Track evidence about how the development method behaves and authorize improvements only from measured need.
+Tämä tiedosto seuraa evidenssiä siitä, miten kehitysmenetelmä toimii, ja sallii parannusehdotukset vain mitatun tarpeen perusteella. Se ei ole yleinen changelog eikä runtime-logien kopio.
 
-## Status
+## Tila
 
-The measurement contract is accepted. Operational values are `not measured` until the first arc42 Root Run supplies runtime evidence.
+Mittauskontrakti on accepted. Operatiiviset arvot ovat `not measured`, kunnes ensimmäinen arc42 Root Run tuottaa runtime-evidenssin. Dokumentaatiodriftin uusi havainto on kirjattu MH-STALEen, mutta se ei muodosta end-to-end-method-baselinea.
 
-## Health metrics
+## Terveysmittarit
 
-| Metric ID | Metric | Baseline | Source | Review trigger |
+| Metric ID | Mittari | Baseline | Lähde | Review-trigger |
 | --- | --- | --- | --- | --- |
-| MH-FAIL | Validation FAIL count and categorized reasons | not measured | Root Run Validation outcomes | repeated reason in 2 initiatives |
-| MH-RETRY | Local retries by Node and cause | not measured | Node Run attempts | same Node exceeds 1 retry in 2 runs |
-| MH-REPAIR | Orchestrator repairs and selected targets | not measured | Repair Requests and routes | ambiguity or repeated target mismatch |
-| MH-OQ | Repeated open questions | not measured | BRIEF/REVIEW and STATUS | same question survives 2 reviews |
-| MH-STALE | Stale or contradictory document findings | migration baseline: summary had v9 facts while config was v10 | evaluation findings | any accepted source contradiction |
-| MH-DRIFT | Architecture drift findings | not measured | conformance review | any high-impact unaccepted drift |
-| MH-EVID | Test and quality-scenario evidence gaps | initial QS rows include pending evidence | TRACEABILITY and REVIEW | release candidate has a pending priority-1 QS |
-| MH-MANUAL | Manual interventions and reasons | not measured | needs_input and Human Node outcomes | same avoidable reason in 2 runs |
+| MH-FAIL | Validation FAIL -määrä ja luokitellut syyt | not measured | Root Run Validation outcomes | sama syy kahdessa initiativessa |
+| MH-RETRY | Local retryt Nodea ja syytä kohti | not measured | Node Run attempts | sama Node ylittää yhden retryn kahdessa Runissa |
+| MH-REPAIR | Orchestrator repairit ja valitut targetit | not measured | Repair Requests ja routes | ambiguiteetti tai toistuva target mismatch |
+| MH-OQ | Toistuvat open questionit | not measured | BRIEF/REVIEW ja STATUS | sama kysymys säilyy kahden review’n yli |
+| MH-STALE | Vanhentuneet tai ristiriitaiset dokumenttifindingit | migration baseline: summary sisälsi legacy-faktoja; 2026-08-17 active Goal/support -lähteissä havaittiin strict-v10:n vastainen sanasto | evaluation findingit ja legacy-haku | mikä tahansa accepted source contradiction |
+| MH-DRIFT | Architecture drift -findingit | not measured | conformance review | mikä tahansa high-impact unaccepted drift |
+| MH-EVID | Testi- ja quality scenario -evidenssivajeet | QS-riveillä on pending pilot/release/final verification -evidenssiä | TRACEABILITY ja REVIEW | release candidate sisältää pending priority-1-QS:n |
+| MH-MANUAL | Manual interventionit ja syyt | not measured | `needs_input` ja Human Node outcomes | sama vältettävä syy kahdessa Runissa |
 
-## Improvement ledger
+## Parannusloki
 
-| Change ID | Baseline | Hypothesis | Proposed improvement | Expected measurable result | Approval | Actual impact | Evaluation due |
+| Change ID | Baseline | Hypoteesi | Ehdotettu parannus | Odotettu mitattava tulos | Hyväksyntä | Toteutunut vaikutus | Evaluation due |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| MHC-001 | 4 delivery Loops, 0 selected project skills, legacy `migrated-*` instructions, no shared architecture trace | 6+1 capability Loops plus stable arc42 artifacts reduce drift and ambiguous handoffs | Adopt `adr-011` and the strict-v10 arc42 graph | `validate:arc42` has 0 issues; first pilot has complete Goal→evidence trace and no fallback route | explicitly authorized 2026-08-16 | pending pilot | after first REVIEW |
+| MHC-001 | 4 delivery Loopia, 0 valittua project skilliä, legacy `migrated-*`-instructionit, ei jaettua architecture tracea | 6+1 capability Loops ja vakaat arc42-artefaktit vähentävät driftiä ja ambiguous handoffeja | Ota `adr-011` ja strict-v10 arc42 -graafi käyttöön | `validate:arc42` = 0 issuea; ensimmäinen pilotti sisältää täydellisen Goal→evidence-tracen eikä fallback routea | eksplisiittisesti valtuutettu 2026-08-16 | pending pilot | ensimmäisen REVIEW’n jälkeen |
+| MHC-002 | Aktiiviset arkkitehtuurilähteet olivat lyhyitä ja osa Goal/support-sanastosta ristiriidassa strict-v10:n sekä nykyisen Run UI:n kanssa | Kattava suomenkielinen, trace- ja lähdeankkuroitu arc42-korpus vähentää ihmis- ja agenttitulkinnan driftiä | Toteuta `comprehensive-arc42-documentation` muuttamatta runtimea tai ADR-semanttiikkaa | 0 arc42-validointivirhettä, 8/8 Mermaid-renderöintiä, 11/11 Goal/REQ-paria tracettuna ja rajatusta legacy-hausta 0 aktiivista ristiriitaa | käyttäjän hyväksymä suunnitelma 2026-08-17 | paikalliset rakenteelliset mittarit täyttyivät; ihmis- ja pilottivaikutus pending | initiative REVIEW ja ensimmäinen pilotti |
 
-## Change policy
+## Muutospolitiikka
 
-Automatic correction is limited to a low-risk broken document link, index, format, deterministic lint or deterministic test when semantics do not change. Goal, ADR, Loop, permission, network, release/deploy, instruction and skill behavior changes require explicit human approval. Every method change records a baseline, hypothesis, expected result and later evaluation.
+Automaattinen korjaus rajautuu matalariskiseen rikkoutuneeseen dokumenttilinkkiin, indeksiin, formaattiin, deterministiseen lintiin tai deterministiseen testiin, kun semantiikka ei muutu. Goal-, ADR-, Loop-, permission-, network-, release/deploy-, instruction- ja skill-käyttäytymismuutokset vaativat eksplisiittisen ihmisvaltuutuksen. Jokainen menetelmämuutos kirjaa baselinen, hypoteesin, odotetun tuloksen ja myöhemmän evaluationin.
 
-## Canonical sources
+Dokumentaation kielen tai kattavuuden muutos ei itsessään muuta Loop-topologiaa, schedulea, permissionia tai agenttikäyttäytymistä. Jos dokumentaatiotyö paljastaa tällaisen tarpeen, se kirjataan findingiksi ja pysäytetään ihmisrajalle.
 
-Runtime counts come from Root Run evidence; persistent findings and decisions come from initiative REVIEWs, [TRACEABILITY](TRACEABILITY.md), [STATUS](STATUS.md) and section 11.
+## Kanoniset lähteet
 
-## Relevant decisions
+Runtime-lukumäärät tulevat Root Run -evidenssistä. Persistent findingit ja päätökset tulevat initiative-REVIEWistä, [TRACEABILITYsta](TRACEABILITY.md), [STATUSesta](STATUS.md) ja [osiosta 11](11-risks-and-technical-debt.md).
 
-`goal-009`, `adr-011`, `adr-015`.
+## Relevantit päätökset
 
-## Evidence
+`goal-009`, `adr-011` ja `adr-015`.
 
-The migration assessment documents the initial stale-document and legacy findings. No runtime counter is fabricated.
+## Evidenssi
 
-## Open questions
+Migration assessment dokumentoi ensimmäisen stale-document- ja legacy-baselinen. `comprehensive-arc42-documentation` kirjaa uuden rajatun findingin sekä final verification -tulokset. Runtime-countereita ei johdeta dokumenttimuutoksesta eikä keksitä.
 
-- `OQ-002`: Which first initiative will establish the operational baselines?
+## Avoimet kysymykset
 
-## Next review basis
+- `OQ-002`: mikä ensimmäinen initiative tuottaa operatiiviset baselinet?
+- Vähentääkö MHC-002 todellisia review-korjauksia ensimmäisessä pilotissa vai vain dokumentin kattavuuspuutetta? Tämä arvioidaan pilotin findingeistä.
 
-Update from the evaluate Loop after an initiative or from scheduled continuous learning only when material evidence exists.
+## Seuraava katselmointiperuste
+
+Päivitä Evaluate Loopista initiativen jälkeen tai scheduled continuous learningista vain, kun materiaalista evidenssiä on.

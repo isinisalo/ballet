@@ -1,10 +1,10 @@
 ---
 id: arc42-section-10
-title: Quality requirements
+title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-16'
-version: 3
+updatedAt: '2026-08-17'
+version: 4
 tags:
   - arc42
   - quality
@@ -12,47 +12,84 @@ tags:
 arc42Section: 10
 ---
 
-# 10. Quality requirements
+# 10. Laatuvaatimukset
 
-## Purpose
+## Tarkoitus
 
-Define specific, measurable scenarios used for architecture design and evaluation.
+Tämä osio määrittää arkkitehtuurin suunnitteluun, hyväksymiseen ja evaluationiin käytettävät mitattavat laatuskenaariot. Goal omistaa laatuaikeen; skenaario määrittää havaittavan ärsykkeen, ympäristön, vasteen ja onnistumisen rajan.
 
-## Status
+## Tila
 
-Priorities and criteria are accepted by the authorization for `goal-009`; runtime effectiveness evidence marked pending requires a real run.
+QS-001–QS-010 sekä niiden prioriteetit perustuvat hyväksyttyihin Goaleihin ja `goal-009`:n valtuutukseen. Käyttäjä hyväksyi 2026-08-17 QS-011–QS-013:n prioriteetin 1. Evidenssistatus on erillinen: pending pilot tai pending verification ei ole onnistumisväite.
+
+## Laatupuu
+
+```mermaid
+flowchart TD
+  quality["Balletin laatu"] --> safety["Turvallisuus ja auktorisointi"]
+  quality --> integrity["Determinismi ja eheys"]
+  quality --> recovery["Palautettavuus ja observability"]
+  quality --> usability["Käytettävyys ja ylläpidettävyys"]
+  safety --> q1["QS-001 paikallinen raja"]
+  safety --> q4["QS-004 worktree ja network"]
+  safety --> q7["QS-007 external write"]
+  integrity --> q2["QS-002 resurssit"]
+  integrity --> q3["QS-003 repair"]
+  integrity --> q11["QS-011 composition"]
+  recovery --> q6["QS-006 evaluation"]
+  recovery --> q12["QS-012 restart ja cancel"]
+  usability --> q5["QS-005 arkkitehtuuritotuus"]
+  usability --> q8["QS-008 learning"]
+  usability --> q9["QS-009 module trust"]
+  usability --> q10["QS-010 authoring"]
+  usability --> q13["QS-013 Run projection"]
+```
+
+Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voivat estää toiminnon, vaikka käytettävyys kärsisi. UI:n ymmärrettävyys ei oikeuta keksittyä runtime-telemetriaa.
+
+## Laatuskenaariot
 
 <!-- quality-scenarios:start -->
 | ID | Source | Stimulus | Environment | Affected artifact | Expected response | Measurable response criterion | Priority | Evidence | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| QS-001 | goal-001, goal-007 | Operator starts and uses Ballet from a committed checkout. | Supported macOS host, local browser. | BB-001, BB-002, DEP-001 | Serve only the checkout-local command center and expose exact operational state. | API binds only to loopback; a second checkout has a distinct service identity and state; automated lifecycle/API checks pass. | 1 | EVID-001 | verified |
-| QS-002 | goal-002, goal-003 | A Root Run is requested with changed or invalid project resources. | Preflight before any provider task. | BB-003, BB-004 | Snapshot one deterministic valid composition or fail closed. | Invalid/duplicate/missing profile, instruction or skill produces at least one exact issue and queues 0 provider tasks; same sources produce the same resource hashes. | 1 | EVID-002 | verified |
-| QS-003 | goal-004, goal-006 | Validation requests an external repair. | Active Root Run with one or more repair candidates. | BB-004, BB-005, RT-003 | Route only by capability within the source allowlist and return to the same Validation. | Target is allowlisted; continuation is runtime-owned; ambiguous evidence returns `needs_input`; repair depth/attempt/transition limits are never exceeded. | 1 | EVID-003 | verified |
-| QS-004 | goal-005 | A normal architecture or implementation Node executes. | Root Run worktree, no explicit research/release need. | BB-004, BB-006, DEP-002 | Keep network disabled and writes inside the Run worktree. | 100% of non-research/non-release configured Nodes use a network-off profile; permission-policy and worktree tests pass. | 1 | EVID-004 | verified |
-| QS-005 | goal-009 | A project architecture or method artifact changes. | Repository validation before handoff. | BB-003, BB-008 | Preserve one resolvable source of truth with stable IDs. | `npm run validate:arc42` reports 0 missing required docs, duplicate IDs, broken local links, unresolved traces or resource references. | 1 | EVID-005 | verified |
-| QS-006 | goal-009 | An initiative reaches architecture evaluation. | Evaluate Loop after bounded implementation. | BB-004, BB-008, RT-003 | Compare implementation against measurable QS and record evidence, risks and drift. | Every initiative REVIEW traces each in-scope priority-1 QS to a test/monitor and evidence status; unresolved gaps are findings or repair requests, never silently accepted. | 1 | EVID-006 | pending pilot |
-| QS-007 | goal-005, goal-008, goal-009 | A release, deploy or rollback is requested. | Release-validation Loop with network capability. | BB-006, BB-007, RT-005, DEP-003 | Stop for exact human authorization before each unapproved external action. | 0 external write commands occur before recorded authorization; merge and push remain absent from automatic behavior; all attempted commands are listed in evidence. | 1 | EVID-007 | policy verified; execution pending |
-| QS-008 | goal-009 | Scheduled learning finds a possible technology or method improvement. | Monday research run with primary-source network access. | BB-006, BB-008, RT-004 | Record only material evidence and route change through the correct approval boundary. | Every retained finding has source, impact, QS/RISK/ADR/BB reference and expected metric; no material finding yields 0 semantic document changes. | 2 | EVID-008 | pending pilot |
-| QS-009 | goal-010 | Operator imports, installs, exports or removes a Loop module, including injected failure, conflict or active Run. | Loop-empty or configured project through loopback API/UI. | BB-001, BB-002, BB-003, BB-009, RT-006, RT-007 | Validate/hash untrusted content, expose exact plan, materialize deterministically and preserve project/runtime boundaries. | All package/service/API/UI/release smoke scenarios pass; stale/incompatible/active operations write 0 config changes; injected config failure leaves 0 new referenced resources; removal deletes 0 shared resources. | 1 | EVID-009 | implementation verified; full gate pending |
-| QS-010 | goal-011 | Operator navigates Context, composition and selected-Loop detail, edits either Edge kind or installs a starter module. | Local browser at 1440×900 and 390×844 with configured, cyclic and empty Loop fixtures. | BB-001, BB-009, RT-006 | Preserve one hierarchy, deterministic data boundaries, keyboard access and authoritative post-install state. | Route/projection/UI/module tests pass; each canvas contains 0 foreign-level node or Edge kinds; Space selects and Enter opens a Level 1 Loop; both viewports show all three levels without clipped core actions or horizontal page overflow. | 1 | EVID-010 | verified |
+| QS-001 | goal-001, goal-007 | Operaattori käynnistää ja käyttää Balletia commitoidusta checkoutista. | Tuettu macOS-host ja paikallinen selain. | BB-001, BB-002, DEP-001 | Palvele vain checkout-local-komentokeskusta ja näytä täsmällinen operatiivinen tila. | API bindaa vain loopbackiin; toisella checkoutilla on eri service identity ja runtime state; automatisoidut lifecycle/API-tarkistukset läpäisevät. | 1 | EVID-001 | verified |
+| QS-002 | goal-002, goal-003 | Root Run pyydetään muuttuneilla, puuttuvilla tai virheellisillä project-resursseilla. | Preflight ennen yhtäkään provider-tehtävää. | BB-003, BB-004, CON-003 | Snapshottaa yksi deterministinen validi resource closure tai failaa suljetusti. | Invalidi/duplikaatti/puuttuva profile, instruction tai skill tuottaa vähintään yhden tarkan issuen ja jonottaa 0 provider-tehtävää; samat lähteet tuottavat samat resource hashit. | 1 | EVID-002 | verified |
+| QS-003 | goal-004, goal-006 | Validation pyytää ulkoista repairia. | Active Root Run, jossa on nolla, yksi tai useita capability-candidateja. | BB-004, BB-005, RT-003 | Reititä vain capabilityn ja source allowlistin perusteella ja palaa samaan Validationiin. | Target kuuluu allowlistiin; continuation on runtime-owned; ambiguous/puuttuva target tuottaa `needs_input`; repair depth-, attempt- ja transition-rajat ylittyvät 0 kertaa. | 1 | EVID-003 | verified |
+| QS-004 | goal-005 | Normaali architecture- tai implementation-Node suoritetaan. | Root Run -worktree ilman eksplisiittistä research/release-tarvetta. | BB-004, BB-006, DEP-002, CON-001 | Pidä verkko pois päältä ja kirjoitukset Run-worktreessä. | 100 % non-research/non-release-konfiguroiduista Nodeista käyttää network-off-profiilia; permission-policy- ja worktree-testit läpäisevät; active checkout -kirjoituksia 0. | 1 | EVID-004 | verified |
+| QS-005 | goal-009 | Project architecture- tai method-artefakti muuttuu. | Repository-validointi ennen handoffia. | BB-003, BB-008, CON-006 | Säilytä yksi ratkaistava source of truth vakailla ID:illä. | `npm run validate:arc42` raportoi 0 puuttuvaa required docia, duplicate ID:tä, broken local linkkiä, unresolved tracea tai resource referenceä. | 1 | EVID-005 | verified |
+| QS-006 | goal-009 | Initiative saavuttaa architecture evaluation -vaiheen. | Evaluate Loop rajatun toteutuksen jälkeen. | BB-004, BB-008, RT-003, CON-006 | Vertaa toteutusta mitattaviin QS-kriteereihin ja kirjaa evidenssi, riski ja drift. | Jokainen REVIEW traceaa 100 % in-scope priority-1-QS:istä testiin/monitoriin ja evidenssistatukseen; puuttuva näyttö kirjataan findingiksi tai repair requestiksi, ei accepted-tilaksi. | 1 | EVID-006 | pending pilot |
+| QS-007 | goal-005, goal-008, goal-009 | Release, deploy tai rollback pyydetään. | Release-validation Loop network-capabilitylla. | BB-006, BB-007, RT-005, DEP-003, CON-001 | Pysähdy täsmälliseen ihmisvaltuutukseen ennen jokaista hyväksymätöntä ulkoista toimintoa. | Ennen kirjattua valtuutusta suoritetaan 0 external write -komentoa; automatic behavior sisältää 0 merge/push-toimintoa; kaikki yritetyt komennot nimetään evidenssissä. | 1 | EVID-007 | policy verified; execution pending |
+| QS-008 | goal-009 | Scheduled learning löytää mahdollisen teknologia- tai menetelmäparannuksen. | Maanantain research-ajo primary-source-network-oikeudella. | BB-006, BB-008, RT-004, CON-006 | Säilytä vain materiaalinen evidenssi ja reititä muutos oikeaan hyväksyntärajaan. | Jokaisella säilytetyllä findingillä on lähde, vaikutus, QS/RISK/ADR/BB-viite ja odotettu metriikka; ei materiaalista findingiä → 0 semanttista dokumenttimuutosta. | 2 | EVID-008 | pending pilot |
+| QS-009 | goal-010 | Operaattori importoi, asentaa, exportoi tai poistaa Loop modulen myös injected failure-, conflict- tai active Run -tilanteessa. | Tyhjä tai konfiguroitu projekti loopback API/UI:n kautta. | BB-001–BB-003, BB-009, RT-006, RT-007, CON-007 | Validoi/hashaa epäluotettu sisältö, näytä täsmällinen plan, materialisoi deterministisesti ja säilytä project/runtime-rajat. | Kaikki package/service/API/UI/release smoke -skenaariot läpäisevät; stale/incompatible/active-operaatio kirjoittaa 0 config-muutosta; injected config failure jättää 0 uutta referoitua resurssia; removal poistaa 0 shared-resurssia. | 1 | EVID-009 | implementation verified; full gate pending |
+| QS-010 | goal-011 | Operaattori navigoi Context-, composition- ja selected-Loop detail -tasot, muokkaa kumpaakin Edge-lajia tai asentaa starter-modulen. | Paikallinen selain 1440×900 ja 390×844 configured/cyclic/empty-fixtureillä. | BB-001, BB-009, RT-006, CON-005 | Säilytä yksi hierarkia, deterministiset datarajat, keyboard access ja authoritative post-install state. | Route/projection/UI/module-testit läpäisevät; canvas sisältää 0 foreign-level node/Edge-kind-lajia; Space valitsee ja Enter avaa Level 1 Loopin; molemmat viewportit näyttävät kolme tasoa ilman clipped core actionia tai horizontal page overflow’ta. | 1 | EVID-010 | verified |
+| QS-011 | goal-003 | Sama immutable Root Run -snapshot ja sama `TaskEnvelope` koostetaan toistuvasti, minkä lisäksi yksi required resource rikotaan. | Provider-task preflight Codex- ja Copilot-adapterirajojen edessä. | BB-003, BB-004, BB-006, RT-008, CON-003 | Tuota validille inputille tavutasolla sama provider-payload ja estä invalidi composition ilman fallbackia. | Validin inputin prompt-bytes, composition hash, resolved resource -järjestys ja output schema ovat 100 % identtiset jokaisessa toistossa ja molempien adapterien inputissa; invalidi composition jonottaa 0 taskia ja provider/model/profile-fallbackien määrä on 0. | 1 | EVID-011 | verified |
+| QS-012 | goal-006 | Palvelu restarttaa, kun task on queued tai running, ja cancellation commitoidaan ennen myöhäistä provider-payloadia. | Checkout-local SQLite, queue reconciliation ja active Root Run. | BB-004–BB-006, RT-009, DEP-001, DEP-002, CON-002 | Säilytä queued-työ, merkitse running-työ keskeytyneeksi ilman replayta ja estä duplicate/post-cancel-vaikutus. | Restartin jälkeen 100 % queued-tehtävistä säilyy; 100 % aiemmin running-tehtävistä on täsmälleen kerran `interrupted` eikä automaattista replayta synny; commitoituja State-revisioita/control-flow-eventtejä monistuu 0; cancellationin jälkeinen payload luo 0 state/outcome/continuation-muutosta. | 1 | EVID-012 | verified |
+| QS-013 | goal-007 | Operaattori tarkastaa aktiivista, repairissa olevaa, palannutta ja finalisoitua Runia sekä vastaa Human Nodeen. | Run mission control paikallisessa selaimessa immutable snapshotin ja canonical persistencen päällä. | BB-001, BB-002, BB-005, RT-010, CON-005 | Johda position, role, profile, attempt, revision, repair, return ja finalization vain snapshotista/read storesta; älä keksi telemetriaa. | View-model/panel-testit osoittavat 100 % nimetyistä kentistä canonical DTO -lähteeseen; provider-tekstistä johdettuja state-kenttiä on 0; UI näyttää 0 keksittyä prosenttia, ETA:a tai elapsed-arvoa; repair/return/human/finalization-fixtureiden expected projectionit läpäisevät. | 1 | EVID-013 | verified |
 <!-- quality-scenarios:end -->
 
-## Canonical sources
+## Priorisoinnin tulkinta
 
-Goals own quality intent. This section owns measurable scenarios; TRACEABILITY owns their relationship to implementation and evidence.
+- **Prioriteetti 1:** release/acceptance estyy, jos kriteeriä ei ole osoitettu tai puuttumisen vaikutusta ei ole eksplisiittisesti hyväksytty.
+- **Prioriteetti 2:** skenaario vaikuttaa menetelmän kehitykseen mutta voi odottaa oikeaa triggeriä; pending-evidenssi ei oikeuta semanttista muutosta.
+- Testin läpäisy todentaa nimetyn ympäristön. Se ei yksin todista tuotantokaltaista operointia, jos skenaario vaatii pilotin tai ulkoisen valtuutuksen.
 
-## Relevant decisions
+## Kanoniset lähteet
 
-`adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-017`.
+Goalit omistavat quality intention. Tämä osio omistaa mitattavat skenaariot; [TRACEABILITY](TRACEABILITY.md) omistaa niiden suhteet päätöksiin, rakenteisiin, testeihin ja evidenssiin.
 
-## Evidence
+## Relevantit päätökset
 
-Evidence IDs resolve in TRACEABILITY. Pending evidence is not treated as success.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016` ja `adr-017`.
 
-## Open questions
+## Evidenssi
 
-- Pilot-specific performance or usability thresholds require human acceptance in the initiative BRIEF before becoming in-scope scenarios.
+EVID-001–EVID-013 ratkaistaan TRACEABILITYssa. EVID-011–EVID-013 on merkitty verifiediksi 2026-08-17 ajettujen nimettyjen testien ja conformance-katselmoinnin jälkeen. Pending- tai failed-evidenssiä ei käsitellä onnistumisena.
 
-## Next review basis
+## Avoimet kysymykset
 
-Review when a Goal changes, a scenario cannot be measured, or evaluation shows the criterion does not distinguish success from failure.
+- Pilot-specific performance-, latency- tai usability-threshold vaatii ihmisen hyväksynnän initiative-BRIEFissä ennen priorisointia.
+- QS-012:n paikalliset fault-injection-testit tulee myöhemmin täydentää operatiivisella restart-evidenssillä ennen production-readiness-väitettä.
+
+## Seuraava katselmointiperuste
+
+Katselmoi osio, kun Goal muuttuu, skenaariota ei voi mitata tai evaluation osoittaa, ettei kriteeri erota onnistumista epäonnistumisesta.

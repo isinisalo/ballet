@@ -1,50 +1,67 @@
 ---
 id: ballet-architecture-entrypoint
-title: Ballet architecture entrypoint
+title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-16'
-version: 3
+updatedAt: '2026-08-17'
+version: 4
 tags:
   - architecture
   - arc42
   - entrypoint
 ---
 
-# Ballet architecture
+# Balletin arkkitehtuuri
 
-## Purpose
+## Tarkoitus
 
-This is the shared human and agent entrypoint to Ballet's version-controlled architecture and continuous development method.
+Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallittuun arkkitehtuuriin ja jatkuvaan kehitysmenetelmään. Lue ensin nykytila ja tarvittava arc42-osio; älä päättele project workflow’ta runtime-koodista tai kopioi machine-local-tilaa dokumentaatioksi.
 
-## Status
+## Tila
 
-The arc42 structure and 6+1 Ballet Method are accepted by `goal-009` and `adr-011`. Installable one-Loop authoring packages are accepted by `goal-010` and `adr-016`; they materialize into project-local runtime sources and never become a live runtime dependency. The three-level Loop Engineer authoring projection is accepted by `goal-011` and `adr-017` without adding runtime entities.
+- `goal-001`–`goal-011` omistavat hyväksytyn WHAT/WHY:n.
+- Virallisen [arc42-rakenteen 12 osiota](https://docs.arc42.org/home/) ovat kanonisesti `.ballet/arc42/`-hakemistossa.
+- `goal-009` ja `adr-011` hyväksyvät 6+1 Ballet Methodin.
+- `goal-010` ja `adr-016` hyväksyvät yhden Loopin authoring package -rajan: paketti materialisoidaan project-local-runtime-resursseiksi eikä ole live runtime dependency.
+- `goal-011` ja `adr-017` hyväksyvät Loop Engineerin Context-, composition- ja selected-Loop detail -projektiot lisäämättä runtime-entiteettejä.
+- Root Runin Mission / All Loops / live inspector on canonical snapshot/persistence -projektio; se ei muodosta uutta control statea.
+- `comprehensive-arc42-documentation` on draft-initiative, kunnes projektin omistaja arvioi sen EVIDENCE/REVIEW-ketjun.
 
-## Canonical sources
+## Kanoniset lähteet
 
-- [arc42 index](.ballet/arc42/README.md)
-- [persistent project status and handoff](.ballet/arc42/STATUS.md)
+- [arc42-indeksi](.ballet/arc42/README.md)
+- [pitkäikäinen status ja handoff](.ballet/arc42/STATUS.md)
 - [traceability](.ballet/arc42/TRACEABILITY.md)
 - [method health](.ballet/arc42/METHOD-HEALTH.md)
-- [State contract](.ballet/arc42/STATE-CONTRACT.md)
-- [Goals](.ballet/goals/summary.md)
-- [Architecture decisions](.ballet/arc42/09-architecture-decisions.md)
-- [UI design system](DESIGN.md)
+- [State-sopimus](.ballet/arc42/STATE-CONTRACT.md)
+- [Goal-yhteenveto](.ballet/goals/summary.md)
+- [arkkitehtuuripäätösindeksi](.ballet/arc42/09-architecture-decisions.md)
+- [UI-designjärjestelmä](DESIGN.md)
 
-## Relevant decisions
+## Omistajuus ja lukujärjestys
 
-`adr-011` defines the source-of-truth and method. `adr-015` defines Work/Validation, State revisions, repair and continuation. `adr-016` defines the package/install boundary and partially supersedes only ADR-014's no-package V1 scope. `adr-017` defines the authoring projections and level-specific Edge ownership. Existing accepted Goals and ADRs remain authoritative.
+1. Goalit: WHAT/WHY, rajaus ja hyväksymisaie.
+2. ADR:t: tärkeät, riskialttiit tai vaikeasti peruttavat päätökset.
+3. arc42-osiot 1–12: konteksti, rakenteet, runtime, deployment, konseptit, laatu, riskit ja sanasto.
+4. Initiative BRIEF/PLAN/EVIDENCE/REVIEW: yhden rajatun muutoksen sopimus ja näyttö.
+5. `DESIGN.md`: UI-tokenit ja visuaaliset periaatteet.
+6. `.ballet/project.json`, instructionit ja skillit: runtimeen materialisoitu project-local-menetelmä.
+7. `.git/ballet`: machine-local canonical runtime state, ei pitkäikäinen arkkitehtuuriteksti.
 
-## Evidence
+## Relevantit päätökset
 
-Run `npm run validate:arc42` to validate documents, traceability, project resources and the strict-v10 Loop graph. Package/service/API/UI tests validate module materialization; the packaged release smoke lists project-provided library packages. Runtime UI and State revisions remain the execution truth for an active Root Run.
+`adr-011` määrittää source-of-truth- ja menetelmärajan. `adr-015` määrittää Work/Validation-rakenteen, State-revisiot, repairin ja continuationin. `adr-016` supersedoi vain ADR-014:n no-package-V1-rajan. `adr-017` määrittää authoring-projektiot ja tasokohtaisen Edge-omistajuuden.
 
-## Open questions
+## Evidenssi
 
-- Which bounded initiative will be the first pilot?
-- What baseline values will the first pilot establish for method-health metrics?
+`npm run validate:arc42` tarkistaa dokumentit, traceabilityn, project-resurssit ja strict-v10 Loop-graafin. Runtime-, module-, provider-, recovery- ja UI-testit tarkistavat toteutuksen. Aktiivisen Root Runin execution truth tulee immutable snapshotista ja canonical SQLite -faktoista; pitkäikäinen hyväksymisevidenssi indeksoidaan initiative-EVIDENCEen.
 
-## Next review basis
+## Avoimet kysymykset
 
-Review after the first initiative completes the clarify → structures → concepts → communicate → implementation → evaluate flow.
+- Mikä rajattu initiative toimii ensimmäisenä 6+1-menetelmän end-to-end-pilottina?
+- Mitkä lähtöarvot ensimmäinen pilotti tuottaa METHOD-HEALTH-mittareille?
+- Hyväksyykö projektin omistaja `comprehensive-arc42-documentation`-draftin lopputarkistuksen jälkeen?
+
+## Seuraava katselmointiperuste
+
+Katselmoi aloituspiste, kun kanoninen polku, accepted Goal/ADR, deployment boundary tai persistent handoff muuttuu.

@@ -1,27 +1,27 @@
 ---
 id: arc42-state-contract-v1
-title: Arc42MethodStateV1 contract
+title: Arc42MethodStateV1-sopimus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-16'
-version: 1
+updatedAt: '2026-08-17'
+version: 2
 tags:
   - arc42
   - state
   - runtime-contract
 ---
 
-# Arc42MethodStateV1 contract
+# Arc42MethodStateV1-sopimus
 
-## Purpose
+## Tarkoitus
 
-Define the bounded shared runtime State used by every arc42 Loop. State coordinates work; Markdown remains the long-lived project truth.
+Tämä tiedosto määrittää kaikkien arc42 Loopsien käyttämän rajatun jaetun runtime Staten. State koordinoi nykyistä työtä vakailla viitteillä; Markdown säilyy pitkäikäisenä project truthina.
 
-## Status
+## Tila
 
-Version 1 is accepted by `adr-011` and implemented as the structurally identical initial value of all arc42 Loops.
+Versio 1 on accepted päätöksillä `adr-011` ja `adr-015`. Sama rakenteellinen initial value on materialisoitu kaikkiin arc42 Loopseihin. Tämän dokumentaatiomuutoksen proosan suomennos ei muuta `Arc42MethodStateV1`-JSONia, kenttiä, arvoja tai runtime-sopimusta.
 
-## Initial value
+## Alkuarvo
 
 <!-- arc42-state-initial:start -->
 ```json
@@ -72,41 +72,46 @@ Version 1 is accepted by `adr-011` and implemented as the structurally identical
 ```
 <!-- arc42-state-initial:end -->
 
-## Field ownership
+## Kenttien omistajuus
 
-| Area | Content | Prohibited content |
+| Alue | Sallittu sisältö | Kielletty sisältö |
 | --- | --- | --- |
-| `initiative` | Selected initiative, BRIEF path, Goal IDs, open-question IDs | Full BRIEF text or invented WHAT/WHY |
-| `architecture` | Status and stable QS/ADR/BB/RISK references | Copied arc42 sections or hidden reasoning |
-| `delivery` | PLAN path, changed paths, check and conformance IDs | Source diffs, test logs or secrets |
-| `release` | Request status, exact human authorization reference, evidence IDs | Credentials or implicit permission |
-| `evaluation` | Evidence/finding IDs and health update time | Unreferenced model opinions |
-| `handoff` | Concise summary, next Loop/action and patch evidence | Continuation or return-target choice |
+| `initiative` | Valittu initiative, BRIEF-polku, Goal ID:t ja open question ID:t. | Koko BRIEF-teksti tai keksitty WHAT/WHY. |
+| `architecture` | Status sekä vakaat QS/ADR/BB/RISK-viitteet. | Kopioidut arc42-osiot tai hidden reasoning. |
+| `delivery` | PLAN-polku, muuttuneet polut, check- ja conformance-ID:t. | Source-diffit, testilogit tai salaisuudet. |
+| `release` | Request-status, exact human authorization -viite ja evidence ID:t. | Credentialit tai implisiittinen lupa. |
+| `evaluation` | Evidence/finding-ID:t ja health update -aika. | Viitteettömät model opinionit. |
+| `handoff` | Tiivis summary, seuraava Loop/action ja patch-evidenssi. | Continuation- tai return-target-valinta. |
 
-## Patch obligations
+## Patch-velvoitteet
 
-- Work completed and Validation OK may propose only `add`, `remove` and `replace` operations allowed by ADR-015.
-- Each patch is bounded to the fields owned by the current Node's task. It must not replace the whole State or copy document bodies.
-- Patch evidence updates `handoff.changedArtifactPaths`, `handoff.stableIds` and `handoff.checks`. A check entry records a stable check ID, command or observation, status and evidence reference.
-- Validation FAIL never patches State. Local retry feedback or an Orchestrator Repair Request carries the correction need.
-- The model never writes continuation, return target, repair edge, permission or network policy into State as a control instruction.
+- Valmistunut Work ja Validation OK voivat ehdottaa vain ADR-015:n sallimia `add`, `remove` ja `replace` -operaatioita.
+- Patch rajataan nykyisen Noden tehtävän omistamiin kenttiin. Se ei korvaa koko Statea eikä kopioi dokumenttirunkoja.
+- Patch-evidenssi päivittää `handoff.changedArtifactPaths`, `handoff.stableIds` ja `handoff.checks`. Check-entry sisältää stable check ID:n, komennon tai havainnon, statuksen ja evidence-viitteen.
+- Validation FAIL ei patchaa Statea. Local retry -feedback tai Orchestrator Repair Request kuljettaa korjaustarpeen.
+- Model ei kirjoita continuationia, return targetia, repair edgeä, permissionia tai network policya Stateen control instructionina.
+- Runtime soveltaa patchin vain current revisioniin ja committoi uuden revisionin atomisesti outcome/control-flow-evidenssin kanssa.
 
-## Canonical sources
+## Miksi State on rajattu
 
-`adr-015` owns atomic State revision semantics. `adr-011` owns this project-local shape. Task Envelope V3 and role output schema V3 remain the runtime transport contracts.
+Rajattu State vähentää stale copy -riskiä ja estää runtime-kenttiä muuttumasta rinnakkaiseksi arkkitehtuuridokumentiksi. Pitkä teksti säilyy Markdownissa, tarkka runtime-historia SQLitessä ja State pitää vain nykyisen rajatun coordination contextin sekä stable references. Continuation, repair routing ja permission kuuluvat runtime-engineen, eivät agentin muokattavaan JSONiin.
 
-## Relevant decisions
+## Kanoniset lähteet
 
-`adr-006`, `adr-010` (superseded history), `adr-011`, `adr-015`.
+`adr-015` omistaa atomic State revision -semantiikan. `adr-011` omistaa tämän project-local-shapen. `TaskEnvelopeV3` ja role output schema V3 säilyvät runtime-transport-sopimuksina.
 
-## Evidence
+## Relevantit päätökset
 
-`npm run validate:arc42` compares every arc42 Loop initial value structurally with this contract and with every other arc42 Loop.
+`adr-006`, `adr-010` (superseded-historia), `adr-011` ja `adr-015`.
 
-## Open questions
+## Evidenssi
 
-- Whether a future measured need justifies a version 2 field. No field is added from model preference alone.
+`npm run validate:arc42` vertaa jokaisen arc42 Loopin initial valuea rakenteellisesti tähän sopimukseen ja kaikkiin muihin arc42 Loopseihin. JSON-markerit säilytetään koneellista validointia varten.
 
-## Next review basis
+## Avoimet kysymykset
 
-Review only after a pilot produces a repeated, evidenced coordination gap that cannot be expressed with existing stable references.
+- Tuleva version 2 -kenttä vaatii toistuvan, mitatun coordination gapin. Kenttää ei lisätä model-preferenssistä tai dokumentaatiotyön sivuvaikutuksena.
+
+## Seuraava katselmointiperuste
+
+Katselmoi vain, jos pilotti osoittaa toistuvan evidenssipohjaisen koordinointivajeen, jota ei voi ilmaista nykyisillä stable references -kentillä.

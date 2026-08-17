@@ -3,12 +3,12 @@ id: goal-010
 title: Asennettavat ja vietävät yhden Loopin moduulit
 status: accepted
 createdAt: '2026-08-16T00:00:00.000Z'
-updatedAt: '2026-08-16T00:00:00.000Z'
+updatedAt: '2026-08-17T00:00:00.000Z'
 tags:
   - tavoite
   - loop-moduulit
   - siirrettavyys
-version: 1
+version: 2
 ---
 
 # Asennettavat ja vietävät yhden Loopin moduulit
@@ -30,7 +30,7 @@ Yhden Loopin paketti tekee toistettavan toimintakyvyn jaettavaksi ilman, että p
 - Turvallinen project-local materialisointi, provenance/ownership-metadata ja sisällöstä laskettu `exact | modified | missing-resources` -status.
 - Loopin ja sen transitiivisesti viittaamien instructionien ja skillsien kanoninen export ilman ExecutionProfileja tai konekohtaista tilaa.
 - Provenance-aware remove, joka ei poista aktiivista Loopia eikä jaettua resurssia.
-- All Loops -näkymän Loop Library -polku ilman erillistä marketplace-pääaluetta.
+- Loop Engineerin composition-tason Loop Library -polku ilman erillistä marketplace-pääaluetta.
 - Seitsemän itsenäisesti asennettavaa arc42 Method -starter-moduulia.
 
 ## Rajaukset

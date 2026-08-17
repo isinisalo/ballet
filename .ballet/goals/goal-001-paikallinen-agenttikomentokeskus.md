@@ -3,12 +3,12 @@ id: goal-001
 title: Paikallinen agenttikomentokeskus
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-07-19T05:44:00.000Z'
+updatedAt: '2026-08-17T00:00:00.000Z'
 tags:
   - tavoite
   - paikallinen-käyttö
   - komentokeskus
-version: 2
+version: 3
 ---
 
 # Paikallinen agenttikomentokeskus
@@ -17,7 +17,7 @@ version: 2
 
 Ballet tarjoaa yhden Git-checkoutin paikallisen selainkäyttöisen komentokeskuksen projektimääritysten, Work Loop -suoritusten ja seurannan hallintaan.
 
-Käyttäjän pitää voida käynnistää Ballet checkoutin juuresta ja hallita saman projektikontekstin Goals- ja ADR-dokumentteja, Looppeja, Stepejä, ExecutionProfileja, instructioneita, skillsejä, ajoympäristön valmiutta ja Runeja yhdestä käyttöliittymästä.
+Käyttäjän pitää voida käynnistää Ballet checkoutin juuresta ja hallita saman projektikontekstin Goals- ja ADR-dokumentteja, Looppeja, Work Loop Nodeja, Edgejä ja LoopEdgejä, ExecutionProfileja, instructioneita, skillsejä, ajoympäristön valmiutta ja Runeja yhdestä käyttöliittymästä.
 
 ## Tarkoitus
 
