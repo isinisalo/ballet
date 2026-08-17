@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import {
   defaultLoopTheme,
@@ -9,6 +10,7 @@ import { RunLoopMap } from "../src/workspace/automation/loops/RunLoopMap.js";
 import { RunStatePanel } from "../src/workspace/automation/loops/RunStatePanel.js";
 import { RunStatusSummary } from "../src/workspace/automation/loops/RunStatusSummary.js";
 import { RunTimeline } from "../src/workspace/automation/loops/RunTimeline.js";
+import { RunVisualWorkspace, runMissionNarration } from "../src/workspace/automation/loops/RunVisualWorkspace.js";
 
 describe("Run canonical runtime panels", () => {
   it("renders persisted position, repair route, timeline, and State evidence", () => {
@@ -24,6 +26,23 @@ describe("Run canonical runtime panels", () => {
     expect(screen.getByText("Validation completed · FAIL")).toBeInTheDocument();
     expect(screen.getByText(/"count": 1/)).toBeInTheDocument();
     expect(screen.getByText(/Validation · main-loop:work:validation/)).toBeInTheDocument();
+  });
+
+  it("switches between the focused All Loops map and playful mission canvas without inventing telemetry", async () => {
+    const user = userEvent.setup();
+    const root = runDetail();
+    render(<RunVisualWorkspace root={root}><div data-testid="canonical-loop-canvas">Canvas</div></RunVisualWorkspace>);
+
+    expect(screen.getByRole("tab", { name: "All Loops" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "All Loops · focused Run map" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Live Run inspector")).toHaveTextContent("waiting_for_input");
+    expect(screen.getByLabelText("Live Run inspector")).toHaveTextContent("r1");
+
+    await user.click(screen.getByRole("tab", { name: "Mission" }));
+    expect(screen.getByTestId("canonical-loop-canvas")).toBeInTheDocument();
+    expect(screen.getByText("Validating “Composite work.”")).toBeInTheDocument();
+    expect(runMissionNarration(root)).toBe("Validating “Composite work.”");
+    expect(screen.queryByText(/elapsed|percent|ETA/i)).not.toBeInTheDocument();
   });
 });
 

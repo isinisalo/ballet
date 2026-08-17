@@ -12,11 +12,11 @@ import { Button } from "@/components/ui/button";
 import { LoopCanvas } from "./LoopCanvas";
 import { LoopRunStartPanel } from "./LoopRunStartPanel";
 import { NodeRunResponsePanel } from "./NodeRunResponsePanel";
-import { RunLoopMap } from "./RunLoopMap";
 import { RunStatePanel } from "./RunStatePanel";
 import { RunStatusSummary } from "./RunStatusSummary";
 import { RunTaskConsole } from "./RunTaskConsole";
 import { RunTimeline } from "./RunTimeline";
+import { RunVisualWorkspace } from "./RunVisualWorkspace";
 import { loopRunStatusVariant } from "./loopRunState";
 import { resolveLoopRunView } from "./loopRunViewModel";
 import type { useLoopRun } from "./useLoopRun";
@@ -67,20 +67,30 @@ export function LoopRunView({
         <Alert className="m-4 mb-0"><AlertDescription>{startDisabledReason}</AlertDescription></Alert>
       ) : null}
       {error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}
-      {rootDetail ? <>
-        <RunStatusSummary root={rootDetail} />
-        <RunLoopMap root={rootDetail} />
-      </> : null}
-      <div className="grid min-h-[28rem] min-w-0 overflow-hidden">
-        <LoopCanvas
-          config={view.canvasConfig}
-          loop={view.canvasLoop}
-          executionProfiles={view.canvasProfiles}
-          theme={view.canvasTheme}
-          run={details}
-          readOnly
-        />
-      </div>
+      {rootDetail ? <RunStatusSummary root={rootDetail} /> : null}
+      {rootDetail ? (
+        <RunVisualWorkspace root={rootDetail}>
+          <LoopCanvas
+            config={view.canvasConfig}
+            loop={view.canvasLoop}
+            executionProfiles={view.canvasProfiles}
+            theme={view.canvasTheme}
+            run={details}
+            readOnly
+          />
+        </RunVisualWorkspace>
+      ) : (
+        <div className="grid min-h-[28rem] min-w-0 overflow-hidden">
+          <LoopCanvas
+            config={view.canvasConfig}
+            loop={view.canvasLoop}
+            executionProfiles={view.canvasProfiles}
+            theme={view.canvasTheme}
+            run={details}
+            readOnly
+          />
+        </div>
+      )}
       {responseNode ? (
         <NodeRunResponsePanel
           key={responseNode.nodeRunId}

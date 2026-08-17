@@ -61,6 +61,7 @@ export function LoopCompositionWorkspace({
 }) {
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<"loop" | "orchestrator">(selectedLoopId ? "loop" : "orchestrator");
   const selectedLoop = config.loops.find((loop) => loop.id === selectedLoopId);
   const selectedModule = installedModules.find((module) => module.loopId === selectedLoopId);
   const incoming = config.loopEdges.filter((edge) => edge.target === selectedLoopId);
@@ -70,22 +71,25 @@ export function LoopCompositionWorkspace({
   ));
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 767px)");
+    const media = window.matchMedia("(max-width: 1023px)");
     const update = () => setNarrow(media.matches);
     update();
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+  useEffect(() => setInspectorTab(selectedLoopId ? "loop" : "orchestrator"), [selectedLoopId]);
 
   const selectLoop = (loopId: string) => {
+    setInspectorTab("loop");
     onSelectLoop(loopId);
     if (narrow) setMobileInspectorOpen(true);
   };
   const selectEdge = (edge: ProjectLoopEdge) => {
+    setInspectorTab("loop");
     onSelectLoop(edge.source);
     if (narrow) setMobileInspectorOpen(true);
   };
-  const inspector = selectedLoop ? (
+  const loopInspector = selectedLoop ? (
     <LoopCompositionInspector
       config={config}
       loopId={selectedLoop.id}
@@ -101,30 +105,53 @@ export function LoopCompositionWorkspace({
         : () => onDeleteLoop(selectedLoop.id)}
     />
   ) : <div className="p-4 text-sm text-muted-foreground">Select a Loop Node to inspect its project-global connections. Press Enter on a selected canvas node to open Level 2.</div>;
+  const orchestratorInspector = <div className="p-4"><LoopOrchestratorEditor
+    value={config.orchestrator}
+    profiles={executionProfiles}
+    instructions={instructions}
+    skills={skills}
+    runtime={runtime}
+    disabled={disabled}
+    onChange={(orchestrator) => onConfigChange({ ...config, orchestrator })}
+  /></div>;
+  const inspector = inspectorTab === "loop" ? loopInspector : orchestratorInspector;
+  const openOrchestrator = () => {
+    setInspectorTab("orchestrator");
+    setMobileInspectorOpen(true);
+  };
 
   return (
-    <div className="grid min-w-0 gap-4 p-4">
-      <div className="grid min-w-0 overflow-hidden md:grid-cols-[minmax(0,1fr)_22rem]">
-        <LoopCompositionCanvas projection={projection} selectedLoopId={selectedLoopId} theme={theme} onSelectLoop={selectLoop} onOpenLoop={onOpenLoop} onSelectEdge={selectEdge} />
-        <aside aria-label="Level 1 selected Loop inspector" className="hidden max-h-[calc(100svh-12rem)] overflow-y-auto border-y border-r border-divider-strong bg-popover md:block">{inspector}</aside>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3 sm:p-4 md:overflow-hidden">
+      <div className="grid min-h-[34rem] min-w-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <LoopCompositionCanvas projection={projection} selectedLoopId={selectedLoopId} theme={theme} onSelectLoop={selectLoop} onOpenLoop={onOpenLoop} onSelectEdge={selectEdge} onOpenOrchestrator={openOrchestrator} />
+        <aside aria-label="Level 1 Loop and Orchestrator inspector" className="hidden min-h-0 flex-col overflow-hidden border-y border-r border-divider-strong bg-popover lg:flex">
+          <InspectorTabs selected={inspectorTab} loopAvailable={Boolean(selectedLoop)} onSelect={setInspectorTab} />
+          <div className="min-h-0 flex-1 overflow-y-auto">{inspector}</div>
+        </aside>
       </div>
-      <details className="rounded-lg border border-divider-strong bg-card">
-        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 font-mono text-xs font-semibold uppercase tracking-[0.08em]"><Settings2 className="size-4 text-primary" /> Orchestrator settings</summary>
-        <div className="border-t border-divider-strong p-4">
-          <LoopOrchestratorEditor value={config.orchestrator} profiles={executionProfiles} instructions={instructions} skills={skills} runtime={runtime} disabled={disabled} onChange={(orchestrator) => onConfigChange({ ...config, orchestrator })} />
-        </div>
-      </details>
-      {narrow ? <Sheet open={mobileInspectorOpen && Boolean(selectedLoop)} onOpenChange={setMobileInspectorOpen}>
+      {narrow ? <Sheet open={mobileInspectorOpen} onOpenChange={setMobileInspectorOpen}>
         <SheetContent className="overflow-x-hidden overflow-y-auto p-0 data-[side=right]:w-[calc(100%-1rem)] data-[side=right]:max-w-md">
           <SheetHeader className="border-b border-divider-strong pr-12">
-            <SheetTitle>Level 1 Loop inspector</SheetTitle>
-            <SheetDescription>Project-global Loop Edges and black box metadata.</SheetDescription>
+            <SheetTitle>Level 1 inspector</SheetTitle>
+            <SheetDescription>{inspectorTab === "loop" ? "Project-global Loop Edges and black box metadata." : "Project-global repair routing settings."}</SheetDescription>
           </SheetHeader>
+          <InspectorTabs selected={inspectorTab} loopAvailable={Boolean(selectedLoop)} onSelect={setInspectorTab} />
           {inspector}
         </SheetContent>
       </Sheet> : null}
     </div>
   );
+}
+
+function InspectorTabs({ selected, loopAvailable, onSelect }: {
+  selected: "loop" | "orchestrator";
+  loopAvailable: boolean;
+  onSelect: (tab: "loop" | "orchestrator") => void;
+}) {
+  return <div role="tablist" aria-label="Level 1 inspector sections" className="grid shrink-0 grid-cols-2 border-b border-divider-strong bg-card p-1">
+    <Button type="button" role="tab" size="sm" variant={selected === "loop" ? "secondary" : "ghost"} aria-selected={selected === "loop"} disabled={!loopAvailable} onClick={() => onSelect("loop")}><Route /> Selected Loop</Button>
+    <Button type="button" role="tab" size="sm" variant={selected === "orchestrator" ? "secondary" : "ghost"} aria-selected={selected === "orchestrator"} onClick={() => onSelect("orchestrator")}><Settings2 /> Orchestrator</Button>
+  </div>;
 }
 
 function LoopCompositionInspector({ config, loopId, installed, incoming, outgoing, disabled, onOpen, onConfigChange, onExport, onDelete }: {

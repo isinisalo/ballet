@@ -19,12 +19,19 @@ describe("Loop Engineer workspace", () => {
   it("shows the active Context level in navigation and breadcrumb and opens Level 1", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
-    renderView({ level: "context", navigate });
+    const view = renderView({ level: "context", navigate });
 
     expect(screen.getByRole("heading", { name: "Loop Engineer" })).toBeInTheDocument();
+    const header = view.container.querySelector("[data-loop-engineer-header]");
+    expect(header).toBeInTheDocument();
+    expect(header?.querySelectorAll("[data-loop-engineer-row]")).toHaveLength(2);
+    expect(header).toHaveTextContent("Read-only project intent, Loop system summary, and declared outcomes.");
+    expect(screen.getByLabelText("Loop Engineer actions")).toContainElement(screen.getByRole("button", { name: "Open Level 1" }));
     expect(screen.getByRole("button", { name: "Context" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("navigation", { name: "Loop Engineer breadcrumb" })).toHaveTextContent("Context");
-    expect(screen.getByLabelText("Context level read-only Loop system canvas")).toBeInTheDocument();
+    expect(screen.getByLabelText("Context level read-only Loop system planet canvas")).toBeInTheDocument();
+    expect(view.container.querySelectorAll("[data-context-planet]")).toHaveLength(3);
+    expect(view.container.querySelector("[data-context-planet='Ballet Loop system'] [data-loop-node-artwork='terra']")).toBeInTheDocument();
     expect(screen.queryByText("Execute work.")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open Level 1" }));
     expect(navigate).toHaveBeenCalledWith("/automation/loops?level=1");
@@ -47,8 +54,24 @@ describe("Loop Engineer workspace", () => {
     expect(screen.queryByText("Execute work.")).not.toBeInTheDocument();
   });
 
+  it("keeps the Loop Orchestrator in the Level 1 inspector instead of below the canvas", async () => {
+    const user = userEvent.setup();
+    const view = renderView({ level: "composition", selectedId: "source-loop", navigate: vi.fn() });
+
+    const rail = screen.getByLabelText("Level 1 Loop and Orchestrator inspector");
+    const orchestratorTab = screen.getByRole("tab", { name: "Orchestrator" });
+    expect(rail).toContainElement(orchestratorTab);
+    await user.click(orchestratorTab);
+    expect(orchestratorTab).toHaveAttribute("aria-selected", "true");
+    expect(rail).toContainElement(screen.getByRole("heading", { name: "Loop Orchestrator" }));
+    expect(screen.queryByText("Orchestrator settings")).not.toBeInTheDocument();
+    expect(view.container.querySelector("[data-loop-canvas] + details")).not.toBeInTheDocument();
+  });
+
   it("keeps Level 2 limited to the selected Loop and labels visible edges as internal", () => {
-    renderView({ level: "detail", selectedId: "source-loop", navigate: vi.fn() });
+    const view = renderView({ level: "detail", selectedId: "source-loop", navigate: vi.fn() });
+    expect(view.container.querySelector("[data-loop-engineer-header]")).toHaveTextContent("source-loop");
+    expect(view.container.querySelector("[data-loop-engineer-header]")).toHaveTextContent("Design one selected Loop's Work Loop Nodes and internal Edges.");
     expect(screen.getByRole("button", { name: /Level 2 · Detail · source-loop/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByLabelText("Level 2 · Detail internal Edge canvas")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Work Loop Node work" })).toBeInTheDocument();
@@ -80,7 +103,9 @@ describe("Loop Engineer workspace", () => {
     expect(screen.getByRole("button", { name: "Add first Work Loop Node" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add node" })).toBeInTheDocument();
   });
+});
 
+describe("Loop Engineer module and runtime integration", () => {
   it("awaits authoritative workspace refresh before selecting an installed Loop on Level 1", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();

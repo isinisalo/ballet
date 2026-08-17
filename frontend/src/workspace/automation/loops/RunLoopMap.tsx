@@ -1,56 +1,91 @@
-import type { ProjectLoopEdge, RootRunDetail } from "@shared/api/workspace-contracts";
-import { ArrowRight, BriefcaseBusiness, Network, RotateCcw, ShieldCheck, Wrench } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  defaultLoopNodeStyle,
+  type ProjectLoop,
+  type ProjectLoopEdge,
+  type RootRunDetail
+} from "@shared/api/workspace-contracts";
+import { ArrowRight, BriefcaseBusiness, GitBranch, Network, RotateCcw, ShieldCheck, Wrench } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { LoopNodeArtwork } from "./LoopNodeArtwork";
+import { loopThemeCssProperties } from "./loopTheme";
 
 export function RunLoopMap({ root }: { root: RootRunDetail }) {
   const activeLoopId = root.current?.loopId;
-  const activeNodeId = root.current?.workLoopNodeId;
   const activeEdgeId = root.repair.pendingRepair ? root.repair.routedTarget?.loopEdgeId : undefined;
+  const flowEdges = root.executionSnapshot.loopEdges.filter(({ kind }) => kind === "flow");
+  const activeRepairEdge = root.executionSnapshot.loopEdges.find(({ id }) => id === activeEdgeId);
   return (
-    <section className="grid gap-3 border-b border-divider-strong bg-panel p-3" aria-labelledby="run-loop-map-heading">
-      <header className="flex items-center justify-between gap-2">
-        <h2 id="run-loop-map-heading" className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">All Loops · immutable Run graph</h2>
-        <span className="font-mono text-[0.58rem] text-muted-foreground">root {root.executionSnapshot.rootLoopId}</span>
+    <section
+      className="grid min-h-[28rem] content-start gap-4 overflow-hidden bg-background p-4"
+      aria-labelledby="run-loop-map-heading"
+      style={loopThemeCssProperties(root.executionSnapshot.theme)}
+    >
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 id="run-loop-map-heading" className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.05em]">All Loops · focused Run map</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">Immutable topology with the active Loop and repair route brought forward.</p>
+        </div>
+        <span className="font-mono text-[0.58rem] text-muted-foreground">{root.executionSnapshot.loops.length} Loops · {root.executionSnapshot.loopEdges.length} routes</span>
       </header>
-      <div className={cn("flex flex-wrap items-center gap-2 border bg-card px-3 py-2 font-mono text-[0.6rem]", root.current?.nodeRole === "orchestrator" ? "border-tertiary text-tertiary ring-2 ring-tertiary/20" : "border-divider-strong text-muted-foreground")} data-active-orchestrator={root.current?.nodeRole === "orchestrator" || undefined}>
-        <Network className="size-3.5" /> Loop Orchestrator
+      <div className={cn(
+        "flex flex-wrap items-center gap-2 border bg-card px-3 py-2 font-mono text-[0.6rem]",
+        root.current?.nodeRole === "orchestrator" ? "border-tertiary text-tertiary ring-2 ring-tertiary/20" : "border-divider-strong text-muted-foreground"
+      )} data-active-orchestrator={root.current?.nodeRole === "orchestrator" || undefined}>
+        <span className="flex size-8 items-center justify-center rounded-full border border-tertiary/40 bg-background text-tertiary"><Network className="size-4" /></span>
+        <span className="font-semibold text-foreground">Loop Orchestrator</span>
         <span>repair allowlist · max depth {root.executionSnapshot.orchestrator.maxRepairDepth}</span>
-        {root.repair.routedTarget ? <span>→ {root.repair.routedTarget.targetLoopId}</span> : null}
+        {root.repair.routedTarget ? <span className="ml-auto">→ {root.repair.routedTarget.targetLoopId}</span> : null}
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
         {root.executionSnapshot.loops.map((loop) => (
-          <article key={loop.id} data-active-loop={loop.id === activeLoopId || undefined} className={cn("grid gap-2 border bg-card p-3", loop.id === activeLoopId ? "border-secondary ring-2 ring-secondary/20" : "border-divider-strong")}>
-            <header><strong className="font-mono text-[0.68rem]">{loop.id}</strong><p className="line-clamp-2 text-xs text-muted-foreground">{loop.description}</p></header>
-            <div className="grid gap-1.5">
-              {loop.nodes.map((node) => <CompositePhase key={node.id} nodeId={node.id} active={loop.id === activeLoopId && node.id === activeNodeId} role={root.current?.nodeRole} />)}
-            </div>
-            <div className="grid gap-1">{root.executionSnapshot.loopEdges.filter(({ source }) => source === loop.id).map((edge) => <RuntimeEdge key={edge.id} edge={edge} active={edge.id === activeEdgeId} />)}</div>
-          </article>
+          <LoopPlanet key={loop.id} loop={loop} root={root} active={loop.id === activeLoopId} />
         ))}
       </div>
+      <RouteStrip title="Flow routes" icon={<GitBranch className="size-3.5" />} edges={flowEdges} />
+      {activeRepairEdge ? <RouteStrip title="Active repair route" icon={<Wrench className="size-3.5" />} edges={[activeRepairEdge]} active /> : null}
       <ReturnPath root={root} />
     </section>
   );
 }
 
-function CompositePhase({ nodeId, active, role }: {
-  nodeId: string; active: boolean; role?: "work" | "validation" | "orchestrator";
-}) {
-  return <div className={cn("grid gap-1 border-l-2 bg-background/60 p-2", active ? "border-secondary" : "border-divider-strong")} data-active-work-loop-node={active || undefined}>
-    <span className="font-mono text-[0.61rem]">{nodeId}</span>
-    <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 text-[0.58rem]">
-      <span className={cn("flex items-center gap-1 border px-1.5 py-1 text-primary", active && role === "work" ? "border-primary ring-1 ring-primary/30" : "border-primary/30")}><BriefcaseBusiness className="size-3" /> Work</span>
-      <ArrowRight className="size-3 text-muted-foreground" aria-label="Fixed Work completed to Validation edge" />
-      <span className={cn("flex items-center gap-1 border px-1.5 py-1 text-secondary", active && role === "validation" ? "border-secondary ring-1 ring-secondary/30" : "border-secondary/30")}><ShieldCheck className="size-3" /> Validation</span>
-    </span>
-  </div>;
+function LoopPlanet({ loop, root, active }: { loop: ProjectLoop; root: RootRunDetail; active: boolean }) {
+  const startNode = loop.nodes.find(({ id }) => id === loop.startNodeId) ?? loop.nodes[0];
+  const role = active ? root.current?.nodeRole : undefined;
+  const RoleIcon = role === "validation" ? ShieldCheck : role === "work" ? BriefcaseBusiness : Network;
+  return (
+    <article
+      data-active-loop={active || undefined}
+      className={cn("grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] gap-3 border bg-card p-3", active ? "border-secondary ring-2 ring-secondary/20" : "border-divider-strong")}
+    >
+      <span aria-hidden="true" className="loop-artwork-node relative block size-12 rounded-full" data-loop-node-size="medium">
+        <LoopNodeArtwork nodeStyle={startNode?.work.nodeStyle ?? defaultLoopNodeStyle} />
+      </span>
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <strong className="truncate font-mono text-[0.68rem]" title={loop.id}>{loop.id}</strong>
+          {active ? <Badge variant="secondary" className="shrink-0">Active</Badge> : null}
+        </div>
+        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{loop.description}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[0.57rem] text-muted-foreground">
+          <span>{loop.nodes.length} composite {loop.nodes.length === 1 ? "node" : "nodes"}</span>
+          {active && root.current?.workLoopNodeId ? <span className="flex min-w-0 items-center gap-1 text-foreground"><RoleIcon className={cn("size-3", role === "validation" ? "text-secondary" : role === "orchestrator" ? "text-tertiary" : "text-primary")} /> <span className="truncate">{root.current.workLoopNodeId} · {roleLabel(role)}</span></span> : null}
+        </div>
+      </div>
+    </article>
+  );
 }
 
-function RuntimeEdge({ edge, active }: { edge: ProjectLoopEdge; active: boolean }) {
-  const Icon = edge.kind === "repair" ? Wrench : ArrowRight;
-  return <span className={cn("flex items-center gap-1.5 border-t pt-1 font-mono text-[0.58rem]", active ? "border-tertiary text-tertiary" : "border-divider-strong text-muted-foreground")} data-active-repair-edge={active || undefined}>
-    <Icon className="size-3" /> {edge.kind} · {edge.source} → {edge.target}{active ? " · active" : ""}
-  </span>;
+function RouteStrip({ title, icon, edges, active = false }: { title: string; icon: ReactNode; edges: ProjectLoopEdge[]; active?: boolean }) {
+  return (
+    <div className={cn("grid gap-2 border bg-card px-3 py-2", active ? "border-tertiary/60 text-tertiary" : "border-divider-strong text-muted-foreground")}>
+      <span className="flex items-center gap-1.5 font-mono text-[0.58rem] uppercase tracking-[0.05em]">{icon} {title}</span>
+      <div className="flex flex-wrap gap-2">
+        {edges.length ? edges.map((edge) => <span key={edge.id} data-active-repair-edge={active || undefined} className="flex items-center gap-1 font-mono text-[0.6rem]"><span>{edge.source}</span><ArrowRight className="size-3" /><span>{edge.target}</span>{active ? <span>· {edge.id}</span> : null}</span>) : <span className="font-mono text-[0.6rem]">No routes</span>}
+      </div>
+    </div>
+  );
 }
 
 function ReturnPath({ root }: { root: RootRunDetail }) {
@@ -65,3 +100,6 @@ function ReturnPath({ root }: { root: RootRunDetail }) {
     {chain.length === 0 && destination ? <span>→ {destination.loopId}/{destination.workLoopNodeId}/Validation</span> : null}
   </div>;
 }
+
+const roleLabel = (role?: NonNullable<RootRunDetail["current"]>["nodeRole"]): string =>
+  role === "work" ? "Work" : role === "validation" ? "Validation" : role === "orchestrator" ? "Orchestrator" : "—";

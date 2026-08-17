@@ -137,7 +137,7 @@ export function AutomationView({
   if (level === "context") {
     const projection = buildLoopContextProjection({ project: data.project, config: draft, installedModules: moduleStatuses, activeLoopIds: lockedLoopIds });
     actions = <Button type="button" size="sm" onClick={() => draft.loops.length ? navigate(automationCompositionPath()) : openLibraryOrCreate()}>{draft.loops.length ? "Open Level 1" : "Add first Loop"}</Button>;
-    content = <>{notices}<div className="p-4"><LoopContextCanvas projection={projection} /></div></>;
+    content = <>{notices}<div className="flex min-h-0 flex-1 items-stretch p-4"><LoopContextCanvas projection={projection} theme={data.loopTheme} /></div></>;
   } else if (level === "composition") {
     const projection = buildLoopCompositionProjection({ config: draft, installedModules: moduleStatuses, lockedLoopIds });
     actions = <>

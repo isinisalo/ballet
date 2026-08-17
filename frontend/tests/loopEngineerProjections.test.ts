@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { InstalledLoopModuleStatus } from "@shared/api/workspace-contracts";
 import { calculateLoopCompositionLayout } from "../src/workspace/automation/loops/loopCompositionLayout";
 import {
+  buildLoopCompositionFocus,
   buildLoopCompositionProjection,
   buildLoopContextProjection,
   buildLoopDetailProjection
@@ -57,6 +58,41 @@ describe("Loop Engineer projections", () => {
     expect(projection.nodes[1]).toMatchObject({ title: "Sample module", loopId: second.id, kind: "installed", workLoopNodeCount: 1 });
     expect(projection.edges.map(({ id, kind }) => ({ id, kind }))).toEqual([{ id: "forward", kind: "flow" }, { id: "back", kind: "repair" }]);
     expect(projection.nodes[0]).not.toHaveProperty("nodes");
+  });
+
+  it("uses a deterministic three-column snake so larger Loop systems remain legible", () => {
+    const loops = Array.from({ length: 8 }, (_, index) => v10Loop(`loop-${index + 1}`));
+    const projection = buildLoopCompositionProjection({ config: v10Automation(...loops) });
+    const layout = calculateLoopCompositionLayout(projection);
+
+    expect(new Set(layout.map(({ y }) => y))).toHaveLength(3);
+    expect(layout.slice(0, 3).map(({ x }) => x)).toEqual([48, 336, 624]);
+    expect(layout.slice(3, 6).map(({ x }) => x)).toEqual([624, 336, 48]);
+    expect(layout.slice(6).map(({ x }) => x)).toEqual([48, 336]);
+  });
+
+  it("keeps every flow route but focuses repair routes on the selected Loop", () => {
+    const first = v10Loop("first-loop");
+    const second = v10Loop("second-loop");
+    const third = v10Loop("third-loop");
+    const config = v10Automation(first, second, third);
+    config.loopEdges = [
+      { id: "flow", source: first.id, target: second.id, kind: "flow", description: "Continue." },
+      { id: "selected-repair", source: third.id, target: second.id, kind: "repair", description: "Repair selected." },
+      { id: "hidden-repair", source: first.id, target: third.id, kind: "repair", description: "Repair elsewhere." }
+    ];
+    const projection = buildLoopCompositionProjection({ config });
+
+    expect(buildLoopCompositionFocus(projection, second.id)).toEqual({
+      edges: [config.loopEdges[0], config.loopEdges[1]],
+      visibleRepairCount: 1,
+      hiddenRepairCount: 1
+    });
+    expect(buildLoopCompositionFocus(projection)).toEqual({
+      edges: [config.loopEdges[0]],
+      visibleRepairCount: 0,
+      hiddenRepairCount: 2
+    });
   });
 
   it("projects Level 2 from only the selected Loop and reports unknown ids", () => {

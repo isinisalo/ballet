@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { defaultLoopTheme } from "@shared/api/workspace-contracts";
-import { LoopNodeVisual } from "../src/workspace/automation/loops/LoopNodeVisual";
+import { LoopNodeVisual, runCharacterMood } from "../src/workspace/automation/loops/LoopNodeVisual";
 import type { LoopNodeContext } from "../src/workspace/automation/loops/LoopCanvasTypes";
 import type { LoopNodeRecord } from "../src/workspace/automation/loops/loopGraph";
 import { v10Loop } from "./v10Fixtures";
@@ -41,6 +41,15 @@ describe("single Loop canvas node visual", () => {
     expect(node).toHaveClass("loop-run-node-pulse--waiting");
     expect(screen.getByRole("img", { name: "Active Validation" })).toHaveAttribute("data-active-node-role", "validation");
     expect(container.querySelectorAll("[data-loop-node-artwork]")).toHaveLength(1);
+    expect(container.querySelector("[data-run-character-mood='waiting']")).toBeInTheDocument();
+  });
+
+  it("derives character mood only from canonical Run status", () => {
+    expect(runCharacterMood("running")).toBe("focused");
+    expect(runCharacterMood("waiting_for_input")).toBe("waiting");
+    expect(runCharacterMood("completed")).toBe("happy");
+    expect(runCharacterMood("failed")).toBe("sad");
+    expect(runCharacterMood()).toBe("quiet");
   });
 });
 

@@ -16,6 +16,7 @@ export function loopThemeNodeGlow(theme: LoopTheme) {
 
 export function loopThemeCssProperties(theme: LoopTheme): CSSProperties {
   return {
+    "--loop-node-glow-color": theme.node.glowColor,
     "--loop-theme-node-label": theme.node.labelColor,
     "--loop-theme-edge-color": theme.edge.color,
     "--loop-theme-edge-label": theme.edge.labelColor,

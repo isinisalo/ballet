@@ -1,11 +1,13 @@
-import type {
-  InstalledLoopModuleStatus,
-  Project,
-  ProjectAutomationConfig,
-  ProjectLoop,
-  ProjectLoopEdge,
-  ProjectNodeEdge,
-  ProjectWorkLoopNode
+import {
+  defaultLoopNodeStyle,
+  type LoopNodeStyle,
+  type InstalledLoopModuleStatus,
+  type Project,
+  type ProjectAutomationConfig,
+  type ProjectLoop,
+  type ProjectLoopEdge,
+  type ProjectNodeEdge,
+  type ProjectWorkLoopNode
 } from "@shared/api/workspace-contracts";
 
 export interface LoopContextProjection {
@@ -36,12 +38,19 @@ export interface LoopCompositionNode {
   provenanceStatus?: InstalledLoopModuleStatus["status"];
   workLoopNodeCount: number;
   capabilities: string[];
+  artworkStyle: LoopNodeStyle;
   locked: boolean;
 }
 
 export interface LoopCompositionProjection {
   nodes: LoopCompositionNode[];
   edges: ProjectLoopEdge[];
+}
+
+export interface LoopCompositionFocus {
+  edges: ProjectLoopEdge[];
+  visibleRepairCount: number;
+  hiddenRepairCount: number;
 }
 
 export interface LoopDetailProjection {
@@ -111,6 +120,7 @@ export function buildLoopCompositionProjection({
   return {
     nodes: config.loops.map((loop) => {
       const installed = installedByLoopId.get(loop.id);
+      const startNode = loop.nodes.find((node) => node.id === loop.startNodeId);
       return {
         loopId: loop.id,
         title: installed?.title ?? loop.id,
@@ -120,10 +130,27 @@ export function buildLoopCompositionProjection({
         provenanceStatus: installed?.status,
         workLoopNodeCount: loop.nodes.length,
         capabilities: installed?.capabilities.provides.slice(0, 2) ?? [],
+        artworkStyle: startNode?.work.nodeStyle ?? defaultLoopNodeStyle,
         locked: lockedLoopIds.has(loop.id)
       };
     }),
     edges: config.loopEdges.map((edge) => ({ ...edge }))
+  };
+}
+
+export function buildLoopCompositionFocus(
+  projection: LoopCompositionProjection,
+  selectedLoopId?: string
+): LoopCompositionFocus {
+  const flowEdges = projection.edges.filter((edge) => edge.kind === "flow");
+  const repairEdges = projection.edges.filter((edge) => edge.kind === "repair");
+  const visibleRepairEdges = selectedLoopId
+    ? repairEdges.filter((edge) => edge.source === selectedLoopId || edge.target === selectedLoopId)
+    : [];
+  return {
+    edges: [...flowEdges, ...visibleRepairEdges],
+    visibleRepairCount: visibleRepairEdges.length,
+    hiddenRepairCount: repairEdges.length - visibleRepairEdges.length
   };
 }
 

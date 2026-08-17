@@ -20,8 +20,8 @@ export function LoopOrchestratorEditor({ value, profiles, instructions, skills, 
   onChange: (value: ProjectLoopOrchestrator) => void;
 }) {
   return (
-    <section aria-labelledby="orchestrator-heading" className="grid gap-4 rounded-lg border border-divider-strong bg-card p-4 lg:grid-cols-[minmax(12rem,0.7fr)_minmax(20rem,1.3fr)]">
-      <div className="grid content-start gap-3 border-b border-divider-strong pb-4 lg:border-r lg:border-b-0 lg:pr-4 lg:pb-0">
+    <section aria-labelledby="orchestrator-heading" className="grid gap-4">
+      <div className="grid content-start gap-3 border-b border-divider-strong pb-4">
         <div className="flex items-center gap-2">
           <LoopRouteArtwork size={28} className="text-primary" />
           <div><h2 id="orchestrator-heading" className="font-mono text-sm font-semibold">Loop Orchestrator</h2><span className="font-mono text-[0.62rem] uppercase text-muted-foreground">Routing component</span></div>

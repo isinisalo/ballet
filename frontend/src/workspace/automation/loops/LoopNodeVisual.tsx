@@ -91,10 +91,32 @@ function InteractiveNodeVisual({ context, record, records, state }: {
       >
         <span aria-hidden="true" className="loop-node-reasoning-glow" />
         <LoopNodeArtwork nodeStyle={state.nodeStyle} />
+        {context.readOnly && !state.terminal ? <RunCharacterFace mood={runCharacterMood(state.status)} /> : null}
       </button>
       {state.activeRole ? <ActiveRoleMark role={state.activeRole} /> : null}
       <NodeLabel title={state.title} />
     </div>
+  );
+}
+
+export type RunCharacterMood = "ready" | "focused" | "waiting" | "happy" | "sad" | "quiet";
+
+export function runCharacterMood(status?: string): RunCharacterMood {
+  if (status === "running") return "focused";
+  if (status === "waiting_for_input") return "waiting";
+  if (status === "completed") return "happy";
+  if (status === "blocked" || status === "failed" || status === "cancelled") return "sad";
+  if (status === "queued") return "ready";
+  return "quiet";
+}
+
+function RunCharacterFace({ mood }: { mood: RunCharacterMood }) {
+  return (
+    <span aria-hidden="true" className="loop-run-character-face" data-run-character data-run-character-mood={mood}>
+      <span className="loop-run-character-eye loop-run-character-eye--left" />
+      <span className="loop-run-character-eye loop-run-character-eye--right" />
+      <span className="loop-run-character-mouth" />
+    </span>
   );
 }
 
