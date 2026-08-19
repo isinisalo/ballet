@@ -3,8 +3,8 @@ id: arc42-section-05
 title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 8
+updatedAt: '2026-08-20'
+version: 9
 tags:
   - arc42
   - building-blocks
@@ -19,7 +19,7 @@ Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vast
 
 ## Tila
 
-BB-001–BB-009 säilyvät vakaina. BB-003/004/009 käyttävät strict-v11 Graph/capability-sopimusta, BB-005:n Orchestrator-dispatch on toteutettu ja BB-001 käyttää vain Graph/Loop-authoring-reittejä. Graph Engineeringin Orchestrator-control-noden visualisointi on vielä pending. Muutos ei lisää Graph-, LoopNode- tai Orchestrator-runtime-entiteettiä.
+BB-001–BB-009 säilyvät vakaina. BB-003/004/009 käyttävät strict-v11 Graph/capability-sopimusta, BB-005:n Orchestrator-dispatch on toteutettu ja BB-001 käyttää vain Graph/Loop-authoring-reittejä. Graph Engineeringin Orchestrator-control-node ja route-presentation projisoidaan olemassa olevista config-, snapshot- ja runtime-lähteistä. Muutos ei lisää Graph-, LoopNode- tai Orchestrator-runtime-entiteettiä.
 
 ## Taso 1: Balletin rakennusosat
 
@@ -72,7 +72,7 @@ flowchart LR
 
 | Target-elementti | Vastuu | Omistava rakennusosa | Toteutustila |
 | --- | --- | --- | --- |
-| Graph Engineering projection | Projisoi v11 `ProjectAutomationConfig`-aggregaatista yhden `LoopNode`-näkymän per `ProjectLoop` ja graphin route-policyn ilman sisäisiä Work/Validation-nodeja. | BB-001 lukee BB-002/003:n shared DTO:n. | route/projection/canvas toteutettu; erillinen Orchestrator-control-node pending `GLE-EVID-006` |
+| Graph Engineering projection | Projisoi v11 `ProjectAutomationConfig`-aggregaatista yhden `LoopNode`-näkymän per `ProjectLoop`, yhden Orchestrator-control-noden sekä graphin route-policyn ja canonical active Root Run -evidenssin ilman sisäisiä Work/Validation-nodeja. | BB-001 lukee BB-002/003:n shared DTO:n; runtime-tila pysyy serverin read modelissa. | projection/layout/canvas/inspector toteutettu ja todennettu `GLE-EVID-006`:ssa |
 | Loop Engineering projection | Projisoi vain valitun `ProjectLoop`in `ProjectWorkLoopNode`-rakenteet, sisäiset Edget ja terminal targetit. | BB-001 | toteutettu; `GLE-EVID-007` |
 | Strict-v11 graph/capability catalog | Parsii first-class Loop capability metadatan ja project-global flow/repair route-candidatet ilman v10 readeria tai silent defaultia. | BB-003 | toteutettu; `GLE-EVID-002` |
 | Immutable graph snapshot | Snapshottaa eksplisiittisestä entry Loopista reachable route/capability/resource closuren. | BB-004 | toteutettu v4-snapshot-sopimuksessa; `GLE-EVID-003` |

@@ -1,18 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import {
-  defaultLoopTheme,
-  type AppData,
-  type InstalledLoopModuleStatus,
-  type LoopModuleInstallPlan,
-  type LoopModulePackageV1,
-  type ProjectInstruction
-} from "@shared/api/workspace-contracts";
+import { defaultLoopTheme, type AppData, type InstalledLoopModuleStatus, type LoopModuleInstallPlan, type LoopModulePackageV1 } from "@shared/api/workspace-contracts";
 import { AutomationView } from "../src/workspace/automation/AutomationView";
 import type { LoopModuleActions } from "../src/workspace/automation/loops/LoopLibraryDialog";
 import { emptyData } from "../src/workspace/types";
+import { rootEvidence, routeEvidence, targetRunEvidence } from "./graphEngineeringRuntimeFixtures";
 import { localRuntime } from "./runtimeFixtures";
+import { projectInstruction } from "./projectInstructionFixture";
 import { v11Automation, v11Loop } from "./v11Fixtures";
 
 describe("Graph and Loop Engineering workspace", () => {
@@ -45,7 +40,7 @@ describe("Graph and Loop Engineering workspace", () => {
     node.focus();
     await user.keyboard("{Enter}");
     expect(navigate).toHaveBeenCalledWith("/automation/loops?view=loop&id=source-loop");
-    expect(screen.getByLabelText(/Graph Engineering canvas/)).toHaveAccessibleName(/Loop Edges/);
+    expect(screen.getByLabelText(/Graph Engineering canvas/)).toHaveAccessibleName(/route policies/);
     expect(screen.queryByText("Execute work.")).not.toBeInTheDocument();
   });
 
@@ -58,26 +53,36 @@ describe("Graph and Loop Engineering workspace", () => {
     expect(navigate).toHaveBeenLastCalledWith("/automation/loops?view=loop&id=source-loop");
   });
 
-  it("keeps the Loop Orchestrator in the Graph Engineering inspector instead of below the canvas", async () => {
+  it("shows exactly one selectable Loop Orchestrator control node and opens its canonical inspector", async () => {
     const user = userEvent.setup();
     const rendered = renderView({ view: "graph", navigate: vi.fn() });
-    await user.click(screen.getByRole("button", { name: /Custom Loop source-loop/ }));
+    const controlNodes = screen.getAllByRole("button", { name: /Loop Orchestrator control node/ });
+    expect(controlNodes).toHaveLength(1);
+    await user.click(controlNodes[0]!);
 
     const rail = screen.getByLabelText("Graph Engineering Loop and Orchestrator inspector");
     const orchestratorTab = screen.getByRole("tab", { name: "Orchestrator" });
     expect(rail).toContainElement(orchestratorTab);
-    await user.click(orchestratorTab);
     expect(orchestratorTab).toHaveAttribute("aria-selected", "true");
     expect(rail).toContainElement(screen.getByRole("heading", { name: "Loop Orchestrator" }));
     expect(screen.queryByText("Orchestrator settings")).not.toBeInTheDocument();
     expect(rendered.container.querySelector("[data-loop-canvas] + details")).not.toBeInTheDocument();
   });
 
+  it("keeps persisted route labels keyboard-focusable with exact source, target, kind, and capability semantics", async () => {
+    const user = userEvent.setup();
+    renderView({ view: "graph", navigate: vi.fn() });
+    await user.click(screen.getByRole("button", { name: /Custom Loop source-loop/ }));
+    const labels = screen.getAllByRole("button", { name: /flow route source-loop to target-loop via Loop Orchestrator, capability test:loop.transfer, persisted policy source-target-flow/ });
+    expect(labels.length).toBeGreaterThanOrEqual(1);
+    labels[0]!.focus();
+    await user.keyboard(" ");
+    expect(screen.getByRole("heading", { name: "source-loop" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/flow allowlist candidate source-loop to target-loop, capability test:loop.transfer/)).toBeInTheDocument();
+  });
+
   it("opens the Graph Engineering inspector in a narrow viewport without replacing the canvas", async () => {
-    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-      matches: query.includes("max-width"), media: query, onchange: null,
-      addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn()
-    } as MediaQueryList));
+    const media = mockNarrowViewport();
     const user = userEvent.setup();
     renderView({ view: "graph", navigate: vi.fn() });
 
@@ -85,6 +90,19 @@ describe("Graph and Loop Engineering workspace", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("Graph Engineering inspector");
     expect(screen.getByRole("dialog")).toHaveClass("overflow-x-hidden");
     expect(screen.getByLabelText(/Graph Engineering canvas/)).toBeInTheDocument();
+    media.mockImplementation(matchMedia(false));
+  });
+
+  it("opens the Orchestrator inspector Sheet from the narrow control node", async () => {
+    const media = mockNarrowViewport();
+    const user = userEvent.setup();
+    renderView({ view: "graph", navigate: vi.fn() });
+
+    await user.click(screen.getByRole("button", { name: /Loop Orchestrator control node/ }));
+    const sheet = screen.getByRole("dialog");
+    expect(sheet).toHaveTextContent("Loop Orchestrator");
+    expect(screen.getByLabelText(/Graph Engineering canvas/)).toBeInTheDocument();
+    media.mockImplementation(matchMedia(false));
   });
 
   it("keeps Loop Engineering limited to the selected Loop and labels visible edges as internal", () => {
@@ -121,6 +139,40 @@ describe("Graph and Loop Engineering workspace", () => {
 
     expect(screen.getByRole("button", { name: "Add first Work Loop Node" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add node" })).toBeInTheDocument();
+  });
+});
+
+describe("Graph Engineering canonical Run evidence", () => {
+  it("marks only the immutable-snapshot-authorized active canonical Run route", () => {
+    const data = loopEngineerData();
+    const source = v11Loop("source-loop");
+    const target = v11Loop("target-loop");
+    data.automation = v11Automation(source, target);
+    const edge = { id: "active-flow", source: source.id, target: target.id, kind: "flow" as const, capability: "test:loop.transfer", description: "Dispatch completed work." };
+    data.automation.graph.loopEdges = [edge];
+    const route = routeEvidence(edge.id, source.id, target.id);
+    data.activeRootRuns = [rootEvidence(data.automation)];
+    data.orchestratorRoutes = [route];
+    data.loopRuns = [targetRunEvidence(target, route)];
+    render(<AutomationView data={data} view="graph" saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /Custom Loop target-loop.*live Run status running/ })).toHaveAttribute("data-live-run-status", "running");
+    expect(screen.getByRole("button", { name: /active canonical Run route/ })).toHaveAttribute("data-graph-edge-keyboard", edge.id);
+    expect(screen.getByLabelText(/Graph Engineering canvas/)).toHaveAccessibleName(/1 canonical Run routes active/);
+  });
+
+  it("shows forged out-of-allowlist route evidence as blocked in the Orchestrator inspector", async () => {
+    const user = userEvent.setup();
+    const data = loopEngineerData();
+    const target = v11Loop("target-loop");
+    data.automation = v11Automation(data.automation.loops[0]!, target);
+    data.activeRootRuns = [rootEvidence(data.automation)];
+    data.orchestratorRoutes = [routeEvidence("outside-route", "source-loop", target.id)];
+    render(<AutomationView data={data} view="graph" saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /Loop Orchestrator control node/ }));
+
+    expect(screen.getByText(/blocked route evidence · outside-route/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /active canonical Run route/ })).not.toBeInTheDocument();
   });
 });
 
@@ -213,33 +265,34 @@ function renderView({ view, selectedId, navigate }: {
   target.edges[0] = { ...target.edges[0]!, source: "target-work" };
   const data = loopEngineerData();
   data.automation = v11Automation(source, target);
+  data.automation.graph.loopEdges = [
+    { id: "source-target-flow", source: source.id, target: target.id, kind: "flow", capability: "test:loop.transfer", description: "Dispatch completed work." },
+    { id: "target-source-repair", source: target.id, target: source.id, kind: "repair", capability: "test:loop.transfer", description: "Escalate missing evidence." }
+  ];
   return render(<AutomationView data={data} view={view} selectedId={selectedId} saveAutomation={vi.fn(async (config) => config)} navigate={navigate} setNavigationBlocker={vi.fn()} />);
 }
+
+function mockNarrowViewport() {
+  return vi.spyOn(window, "matchMedia").mockImplementation(matchMedia(true));
+}
+
+const matchMedia = (matches: boolean) => (query: string) => ({
+    matches, media: query, onchange: null,
+    addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn()
+  } as MediaQueryList);
 
 function loopEngineerData(): AppData {
   return {
     ...emptyData,
     project: { ...emptyData.project, id: "ballet", name: "Ballet", description: "Coordinate verified Loop work." },
     executionProfiles: [{ id: "codex-test", name: "Codex test", provider: "codex", model: "gpt-test", reasoningEffort: "high", networkAccess: false }],
-    instructions: [instruction("project:architect"), instruction("project:worker")],
+    instructions: [projectInstruction("project:architect"), projectInstruction("project:worker")],
     automation: v11Automation(v11Loop("source-loop")),
     automationIssues: [],
     loopTheme: structuredClone(defaultLoopTheme),
     runtime: localRuntime()
   };
 }
-
-const instruction = (id: string): ProjectInstruction => ({
-  id,
-  title: id,
-  body: "Instruction body.",
-  relativePath: `.ballet/instructions/${id}.md`,
-  origin: "project",
-  valid: true,
-  sourceSha256: "a".repeat(64),
-  contentSha256: "b".repeat(64),
-  sizeBytes: 17
-});
 
 const modulePackage: LoopModulePackageV1 = {
   format: "ballet-loop-module",

@@ -17,6 +17,7 @@ import { RuntimeDatabase } from "../runtime-db.js";
 import { LocalRunService } from "../runs/LocalRunService.js";
 import { LocalRunTargetService } from "../runs/LocalRunTargetService.js";
 import { RootRunStore } from "../runs/RootRunStore.js";
+import { isActiveRootStatus } from "../runs/RunReadProjection.js";
 import { WorkspaceInvalidationBroadcaster } from "../runs/WorkspaceInvalidationBroadcaster.js";
 import { LoopScheduler } from "../scheduling/LoopScheduler.js";
 import { MarkdownStore } from "../store.js";
@@ -70,8 +71,12 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   runHolder.service = runs;
   store.setWorkspaceEnricher(async (content) => {
     const configurationResolution = await configurations.resolveAll(content.executionProfiles);
+    const activeRootRuns = roots.list().filter((root) => isActiveRootStatus(root.status));
     return {
       ...content,
+      activeRootRuns,
+      orchestratorRoutes: activeRootRuns.flatMap((root) =>
+        database.readRootRuntime(root.rootRunId).orchestration.routes),
       runtime: await runtime.snapshot(),
       runtimeConfigurationIssues: [
         ...configurationResolution.globalIssues,

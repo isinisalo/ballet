@@ -26,9 +26,10 @@ export function LoopOrchestratorEditor({ value, profiles, instructions, skills, 
           <LoopRouteArtwork size={28} className="text-primary" />
           <div><h2 id="orchestrator-heading" className="font-mono text-sm font-semibold">Loop Orchestrator</h2><span className="font-mono text-[0.62rem] uppercase text-muted-foreground">Routing component</span></div>
         </div>
-        <p className="text-xs leading-5 text-muted-foreground">Routes external repair requests only through Repair Loop Edge allowlists. It is not a Work Loop Node.</p>
+        <p className="text-xs leading-5 text-muted-foreground">Validates normal completion dispatch and repair escalation only through persisted Graph allowlists and immutable Run capabilities. It is not a Work Loop Node.</p>
         <div className="grid gap-1 font-mono text-[0.65rem] text-muted-foreground">
           <span className="flex items-center gap-1"><Wrench className="size-3" /> Validation FAIL / ORCHESTRATOR_REPAIR</span>
+          <span className="flex items-center gap-1"><Route className="size-3" /> Loop completed / flow dispatch</span>
           <span className="flex items-center gap-1"><Route className="size-3" /> allowed target Loop → persisted continuation</span>
         </div>
       </div>

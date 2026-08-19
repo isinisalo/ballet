@@ -3,8 +3,8 @@ id: arc42-initiative-graph-and-loop-engineering-plan
 title: Graph and Loop Engineering PLAN
 status: draft
 createdAt: '2026-08-19'
-updatedAt: '2026-08-19'
-version: 4
+updatedAt: '2026-08-20'
+version: 5
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Tila
 
-GLE-step-001–004, GLE-step-006 ja GLE-step-007:n package capability/peer-target -raja on toteutettu. Snapshot säilyy immutable JSONina ja runtime orchestration käyttää hard-cut SQLite schema v7:ää. GLE-step-005 on osittain toteutettu nykyisen project-global graph-projektion varaan, mutta erillinen Orchestrator-control-node ja lopullinen edge-presentation ovat `pending`. Koko GLE-step-008 ja ihmisacceptance ovat `pending`.
+GLE-step-001–007 on toteutettu. Snapshot säilyy immutable JSONina ja runtime orchestration käyttää hard-cut SQLite schema v7:ää. GLE-step-005:n project-global Graph-projektio sisältää yhden Orchestrator-control-noden, persisted policy -edge-presentationin ja canonical Run -evidenssin. GLE-step-008:n ihmisacceptance on `pending`.
 
 | Step ID | Vaihe | Goal/REQ | QS | ADR/CON | BB | RT/DEP | Files/interfaces | Test/monitor | Completion evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

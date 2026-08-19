@@ -3,8 +3,8 @@ id: arc42-section-04
 title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 7
+updatedAt: '2026-08-20'
+version: 8
 tags:
   - arc42
   - solution-strategy
@@ -19,7 +19,7 @@ Tämä osio kokoaa perustavat ratkaisut, joilla Ballet vastaa Goaleihin, laatuta
 
 ## Tila
 
-STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. STRAT-009:n strict-v11 domain/config/snapshot/module/runtime sekä Graph/Loop-authoring routing- ja selected-Loop-rajat on toteutettu. Graph Engineeringin erillinen Orchestrator-control-node, lopullinen edge-presentation ja ihmisacceptance ovat pending. Menetelmän vaikuttavuuden tuotantokaltainen baseline ja UI:n pidempiaikainen tulkintavirheiden seuranta ovat vielä avointa evidenssiä.
+STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. STRAT-009:n strict-v11 domain/config/snapshot/module/runtime, Graph/Loop-authoring routing, selected-Loop-raja sekä Graph Engineeringin Orchestrator-control-node ja canonical edge-presentation on toteutettu. Ihmisacceptance, menetelmän vaikuttavuuden tuotantokaltainen baseline ja UI:n pidempiaikainen tulkintavirheiden seuranta ovat vielä avointa evidenssiä.
 
 ## Strategiat ja jäljitettävyys
 
@@ -33,7 +33,7 @@ STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. STRAT-009:n s
 | STRAT-006 | arc42 on pitkäikäinen totuus ja 6+1 Ballet Loops jatkuva menetelmä. | goal-009 / REQ-009 | QS-005, QS-006, QS-008 | adr-011, CTR-006, CTR-007 | Muutos etenee clarificationista evidenssiin vakaiden ID:iden kautta ilman runtime-logien kopiointia dokumentteihin. |
 | STRAT-007 | Intentio, merkittävä päätös ja ulkoinen kirjoitus pysähtyvät eksplisiittiseen ihmisrajaan. | goal-005, goal-009 / REQ-005, REQ-009 | QS-004, QS-006 | adr-011, CTR-007, CTR-008 | Agentti palauttaa `needs_input` tai odottaa valtuutusta eikä päättele lupaa testituloksesta. |
 | STRAT-008 | Yhden Loopin strict authoring package materialisoidaan inspect/plan/commit-vaiheissa olemassa oleviksi project-local-primitiveiksi. | goal-010, goal-011 / REQ-010, REQ-011 | QS-009, QS-010 | adr-016, adr-017, CTR-011 | Reuse ei lisää live registry- tai runtime-riippuvuutta; authoring-projektiot säilyttävät runtime-semantikan. |
-| STRAT-009 | Strict-v11 graph erottaa project-global Graph Engineeringin selected-Loop-only Loop Engineeringistä ja ohjaa kaikki cross-Loop-flow/repair-valinnat snapshotattujen route-candidatejen sekä capabilityjen kautta Orchestratorille. | goal-012 / REQ-012 | QS-014 | adr-018 | V11 hard cut on poistanut Context/numeric-route/compatibility-polut; ambiguity tai ihmisvaltuutus tuottaa `needs_input`, ja UI projisoi vain persisted policy/runtime-evidenssiä. Orchestrator-control-noden visualisointi odottaa seuraavaa vaihetta. |
+| STRAT-009 | Strict-v11 graph erottaa project-global Graph Engineeringin selected-Loop-only Loop Engineeringistä ja ohjaa kaikki cross-Loop-flow/repair-valinnat snapshotattujen route-candidatejen sekä capabilityjen kautta Orchestratorille. | goal-012 / REQ-012 | QS-014 | adr-018 | V11 hard cut on poistanut Context/numeric-route/compatibility-polut; ambiguity tai ihmisvaltuutus tuottaa `needs_input`, ja UI projisoi yhden Orchestrator-control-noden, persisted policyt ja canonical Run -evidenssin ilman client-owned topologiaa. |
 
 ## Keskeiset trade-offit
 
@@ -62,7 +62,7 @@ Hyväksytyt ADR:t omistavat päätökset; tämä osio omistaa niiden strategisen
 
 ## Evidenssi
 
-Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä Graph/Loop-authoring hard cutin. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v11 Graph/capability-sopimuksen. Module-testit todentavat STRAT-008:n target-riippumattoman materialisointirajan. STRAT-009:n osittainen evidenssi on `GLE-EVID-002`–`GLE-EVID-005`, `GLE-EVID-007` ja `GLE-EVID-008`; koko `EVID-014` on pending. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
+Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä Graph/Loop-authoring hard cutin. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v11 Graph/capability-sopimuksen. Module-testit todentavat STRAT-008:n target-riippumattoman materialisointirajan. STRAT-009:n tekninen evidenssi on `GLE-EVID-002`–`GLE-EVID-008`; koko `EVID-014` odottaa ihmisreview'ta. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
 
 ## Avoimet kysymykset
 

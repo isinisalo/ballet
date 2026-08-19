@@ -141,7 +141,7 @@ export function AutomationView({
   let actions: ReactNode;
   let content: ReactNode;
   if (view === "graph") {
-    const projection = buildGraphEngineeringProjection({ config: draft, installedModules: moduleStatuses, lockedLoopIds });
+    const projection = graphProjection(data, draft, moduleStatuses, lockedLoopIds);
     actions = <>
       <Button type="button" size="sm" onClick={openLibraryOrCreate}><Library /> Add Loop</Button>
       <Button type="button" size="sm" variant="outline" onClick={() => navigate(automationThemePath())}><Palette /> Edit theme</Button>
@@ -220,3 +220,17 @@ const downloadJson = (source: string, filename: string) => {
   anchor.click();
   URL.revokeObjectURL(url);
 };
+
+const graphProjection = (
+  data: AppData,
+  config: ProjectAutomationConfig,
+  installedModules: InstalledLoopModuleStatus[],
+  lockedLoopIds: ReadonlySet<string>
+) => buildGraphEngineeringProjection({
+  config,
+  installedModules,
+  lockedLoopIds,
+  activeRootRuns: data.activeRootRuns,
+  loopRuns: data.loopRuns,
+  orchestratorRoutes: data.orchestratorRoutes
+});

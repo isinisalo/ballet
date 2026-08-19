@@ -3,8 +3,8 @@ id: arc42-project-status
 title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 11
+updatedAt: '2026-08-20'
+version: 12
 tags:
   - arc42
   - status
@@ -24,7 +24,7 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 - Strict-v11 project configuration, geneerinen Work Loop runtime, kuusi Codex-ExecutionProfilea, kahdeksan capability-metadatalla varustettua Loopia ja 20 Work Loop Nodea ovat nykyinen project-local-baseline.
 - Yhden Loopin package inspection, project-local install/export/remove, Loop Library, content-derived provenance sekä yhdeksän starter-pakettia on toteutettu ilman runtime-aikaista package-riippuvuutta.
 - Graph Engineering on default project-global authoring-näkymä ja Loop Engineering selected-Loop-only sisäinen editori. Context-komponentti/projektio, numeric level -reitit, compatibility-aliakset ja vanha käyttäjäcopy on poistettu tuotantokoodista.
-- `goal-012` / `adr-018`:n first-class capability-, Graph-, snapshot-, target-riippumaton Loop module-, flow/repair Orchestrator-dispatch- ja authoring-routing-raja on toteutettu. Graph Engineeringin erillinen Orchestrator-control-node ja lopullinen edge-presentation ovat pending.
+- `goal-012` / `adr-018`:n first-class capability-, Graph-, snapshot-, target-riippumaton Loop module-, flow/repair Orchestrator-dispatch-, authoring-routing- ja Graph-control-raja on toteutettu. Graph Engineering näyttää yhden Orchestrator-control-noden, yhden LoopNoden per ProjectLoop sekä vain persisted policyyn ja canonical Run -evidenssiin perustuvat yhteydet.
 - Run mission controlin Mission / All Loops / live inspector projisoi immutable snapshotin, canonical State/control flow’n ja finalizationin lisäämättä keksittyä progress- tai provider-derived-statea.
 - Suomenkielinen kattava arc42-korpus ja `QS-011`–`QS-013` ovat `comprehensive-arc42-documentation`-draft-initiativen arvioitavana.
 - Tech Stack Canvas, Architecture Communication Canvas ja retrospektiivinen Architecture Inception Canvas ovat `architecture-canvases`-draft-initiativen Markdown + Mermaid -korttiprojektioita; v1:n proosapainotteinen esitys palautettiin ja v2 korjattiin visuaaliseksi muuttamatta Goal-, ADR- tai runtime-omistajuutta.
@@ -36,8 +36,8 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 | --- | --- |
 | Hyväksytty päätös | Goal/ADR-status yllä; nykyinen baseline noudattaa ADR-011/015/016/017:ää ja v11-vaiheen rajaus ADR-018:aa. |
 | Toteutettu fakta | Strict-v11 config/domain/snapshot/module/runtime-raja, persisted generic Orchestration Request/route, Graph/Loop-authoring routing, selected-Loop-only editor ja Run mission control löytyvät työpuusta. |
-| Paikallinen evidenssi | EVID-011–EVID-013, ARCDOC-EVID-001–005 ja CANVAS-EVID-001–008/010–012 ovat verified/passed 2026-08-17 paikallisissa tarkistuksissa. GLE-EVID-002–005/007/008 todentavat 2026-08-19 strict-v11 data/snapshot/module/runtime/routing/Loop UI -vaiheet; EVID-014 on pending. CANVAS-EVID-009 säilyttää v1:n ihmisreview'n `failed`-tuloksen; v2:n uusi ihmisarvio sekä pilot/release-evidenssi puuttuvat. |
-| Avoin riski | RISK-001:n pilot gap, RISK-011:n 14 lint warningin baseline, RISK-012:n Run-visualisoinnin tulkintariski ja RISK-013:n puuttuva Graph Orchestrator-control-node ennen hard cut -acceptancea. |
+| Paikallinen evidenssi | EVID-011–EVID-013, ARCDOC-EVID-001–005 ja CANVAS-EVID-001–008/010–012 ovat verified/passed 2026-08-17 paikallisissa tarkistuksissa. GLE-EVID-002–008 todentavat 2026-08-20 mennessä strict-v11 data/snapshot/module/runtime/routing/Graph/Loop UI -vaiheet; EVID-014:n ihmisacceptance on pending. CANVAS-EVID-009 säilyttää v1:n ihmisreview'n `failed`-tuloksen; v2:n uusi ihmisarvio sekä pilot/release-evidenssi puuttuvat. |
+| Avoin riski | RISK-001:n pilot gap, RISK-011:n lint warning -baseline, RISK-012:n Run-visualisoinnin tulkintariski ja RISK-013:n Graph-controlin puuttuva ihmisacceptance/pidempiaikainen tulkintaevidenssi. |
 
 ## Kanoniset lähteet
 
@@ -52,7 +52,7 @@ Osioindeksi on [README](README.md), trace-suhteet ovat [TRACEABILITYssa](TRACEAB
 - `.ballet/project.json` on strict v11 ja määrittää 8 Loopia capabilityineen, 20 Work Loop Nodea, 6 Human Validation -porttia ja `graph.loopEdges`-rakenteessa 35 capability-reittiä.
 - `.ballet/loop-library/arc42/` sisältää seitsemän itsenäisesti asennettavaa pakettia ja `.ballet/loop-library/software-delivery/` kaksi implementation-pakettia.
 - Aiempi module-evidenssi on `installable-loop-modules`-initiativessa ja historiallinen ADR-017-authoring-evidenssi `loop-engineer-three-level-canvas`-initiativessa.
-- `graph-and-loop-engineering` sisältää v11-päätösrajan sekä domain/config/snapshot/module/runtime/routing/Loop UI -toteutusevidenssin; Graph-control-node- ja kokonaisacceptance-evidenssi ovat pending.
+- `graph-and-loop-engineering` sisältää v11-päätösrajan sekä domain/config/snapshot/module/runtime/routing/Graph/Loop UI -toteutusevidenssin; kokonaisacceptancen ihmisreview on pending.
 - `comprehensive-arc42-documentation`-BRIEF/PLAN/EVIDENCE/REVIEW indeksoi tämän dokumentaatiomuutoksen.
 - `architecture-canvases`-BRIEF/PLAN/EVIDENCE/REVIEW indeksoi canvasien lähteet, acceptance-kriteerit, tarkistukset ja ihmisarvion.
 - `npm run validate:arc42` on deterministinen repository-conformance-gate.
@@ -66,10 +66,10 @@ Osioindeksi on [README](README.md), trace-suhteet ovat [TRACEABILITYssa](TRACEAB
 ## Nykyinen handoff
 
 - Initiative: `graph-and-loop-engineering`.
-- Status: `draft`; `goal-012` ja `adr-018` ovat accepted. GLE-step-001–004, GLE-step-006 sekä GLE-step-007:n package-raja on toteutettu, mutta GLE-step-005:n Graph-control-node ja koko `EVID-014` ovat pending. Aiemmat `architecture-canvases`- ja `comprehensive-arc42-documentation`-draftit säilyvät erillisinä hyväksymättöminä initiativeina.
-- Muuttunut stable evidenssi: `GLE-EVID-005` ja `GLE-EVID-007` ovat passed, `GLE-EVID-006` partial; accepted `goal-012`, `adr-018`, `REQ-012`, `QS-014` ja muut päätös-ID:t säilyivät semanttisesti muuttumattomina.
-- Seuraava hyväksytty toimi: projektin omistaja katselmoi frontend information architecture -evidenssin ja päättää erikseen GLE-step-005:n Orchestrator-control-node- ja edge-presentation-vaiheen valtuutuksesta.
-- Stop condition: Graph-control-node-/edge-presentation- tai ulkoinen commit/release/deploy/rollback/merge/push-työ vaatii oman täsmällisen valtuutuksensa.
+- Status: `draft`; `goal-012` ja `adr-018` ovat accepted. GLE-step-001–007 on toteutettu, mutta koko `EVID-014`:n ihmisacceptance on pending. Aiemmat `architecture-canvases`- ja `comprehensive-arc42-documentation`-draftit säilyvät erillisinä hyväksymättöminä initiativeina.
+- Muuttunut stable evidenssi: `GLE-EVID-006` on passed; accepted `goal-012`, `adr-018`, `REQ-012`, `QS-014` ja muut päätös-ID:t säilyivät semanttisesti muuttumattomina.
+- Seuraava hyväksytty toimi: projektin omistaja katselmoi GLE-EVID-002–008:n teknisen evidenssin ja hyväksyy tai palauttaa koko `EVID-014`-ketjun.
+- Stop condition: initiative-acceptance tai ulkoinen commit/release/deploy/rollback/merge/push-työ vaatii oman täsmällisen valtuutuksensa.
 
 ## Seuraava katselmointiperuste
 

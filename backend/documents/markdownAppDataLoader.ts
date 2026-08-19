@@ -7,7 +7,8 @@ import { projectFromDocument } from "./documentMappers.js";
 import { loadProjectResources } from "./projectResourceCatalog.js";
 
 export type WorkspaceContentData = Omit<AppData,
-  "runtime" | "runtimeConfigurationIssues" | "runTargets" | "loopRuns" | "scheduleStates">;
+  "runtime" | "runtimeConfigurationIssues" | "runTargets" | "loopRuns" | "activeRootRuns"
+  | "orchestratorRoutes" | "scheduleStates">;
 
 export const loadMarkdownAppData = async (root: string): Promise<WorkspaceContentData> => {
   const [projectDocs, projectDocumentTree, resources] = await Promise.all([

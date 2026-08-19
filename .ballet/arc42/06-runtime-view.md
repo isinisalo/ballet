@@ -3,8 +3,8 @@ id: arc42-section-06
 title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 7
+updatedAt: '2026-08-20'
+version: 8
 tags:
   - arc42
   - runtime
@@ -19,7 +19,7 @@ Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaik
 
 ## Tila
 
-RT-001–RT-003 ja RT-006–RT-010 ovat toteutettua platform-käyttäytymistä. Niiden config ja immutable snapshot ovat strict v11, mutta cross-Loop-control flow säilyy ennallaan. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella. RT-011:n Graph/capability snapshot -edellytys on toteutettu; Orchestrator-dispatch ei vielä ole runtime-fakta.
+RT-001–RT-003 ja RT-006–RT-011 ovat toteutettua platform-käyttäytymistä. Config ja immutable snapshot ovat strict v11, ja RT-011:n cross-Loop flow/repair kulkee persisted Graph/capability-allowlistan kautta Orchestratorille. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -168,7 +168,7 @@ ADR-015 ja runtime-lähde omistavat nykyisen geneerisen control-semanticsin. ADR
 
 ## Evidenssi
 
-Runtime-, State-, persistence-, scheduler-, queue-, adapter-, worktree- ja Run UI -testit kattavat toteutetut skenaariot. RT-008–RT-010:n hyväksymisevidenssi on `EVID-011`–`EVID-013`. RT-011:n runtime-, routing- ja selected-Loop-UI-evidenssi on `GLE-EVID-004/005/007`; Graph-control-noden ja ihmisacceptancen sisältävä `EVID-014` on pending. Scheduled learning ja release pysyvät pending-tilassa, kunnes todellinen ajo/valtuutus on olemassa.
+Runtime-, State-, persistence-, scheduler-, queue-, adapter-, worktree- ja Run UI -testit kattavat toteutetut skenaariot. RT-008–RT-010:n hyväksymisevidenssi on `EVID-011`–`EVID-013`. RT-011:n runtime-, routing-, Graph-control- ja selected-Loop-UI-evidenssi on `GLE-EVID-004`–`GLE-EVID-007`; ihmisacceptancen sisältävä koko `EVID-014` on pending. Scheduled learning ja release pysyvät pending-tilassa, kunnes todellinen ajo/valtuutus on olemassa.
 
 ## Avoimet kysymykset
 

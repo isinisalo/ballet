@@ -3,8 +3,8 @@ id: arc42-section-12
 title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 6
+updatedAt: '2026-08-20'
+version: 7
 tags:
   - arc42
   - glossary
@@ -126,7 +126,7 @@ Sanasto kuvaa toteutetun strict-v11 config/domain/snapshot/module/runtime-rajan 
 | Termi | Määritelmä |
 | --- | --- |
 | Loop Engineer | Historiallinen ADR-017:n authoring workspace -nimi; superseded aktiivisessa UI:ssa Graph Engineeringillä ja Loop Engineeringillä. |
-| Graph Engineering | Default authoring-näkymä: kaikki `ProjectLoop`→`LoopNode`-projektiot ja persisted project-global route-policy ilman sisäisiä Work/Validation-nodeja. Orchestrator-editori on inspectorissa; erillinen control-node on pending. |
+| Graph Engineering | Default authoring-näkymä: kaikki `ProjectLoop`→`LoopNode`-projektiot, yksi Orchestrator-control sekä persisted project-global route-policy ja canonical Run -evidenssi ilman sisäisiä Work/Validation-nodeja. |
 | Loop Engineering | Selected-Loop-only authoring-näkymä: valitun Loopin `ProjectWorkLoopNode`-kompositio, sisäiset Edget ja terminal targetit ilman project-global routeja tai Orchestrator-controlia. |
 | Mission | Run mission control -välilehti, joka korostaa nykyisen tavoitteen, aktiivisen canonical-polun ja operaattorin seuraavan merkityksellisen havainnon. |
 | All Loops | Run-näkymä immutable snapshotin koko Loop-topologiasta; ei authoring-editori eikä legacy-nimitys yhdelle konfiguraatiolistalle. |

@@ -3,8 +3,8 @@ id: arc42-section-11
 title: Riskit ja tekninen velka
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 7
+updatedAt: '2026-08-20'
+version: 8
 tags:
   - arc42
   - risks
@@ -20,7 +20,7 @@ Tämä osio ylläpitää arkkitehtuurin kannalta merkittävät riskit, teknisen 
 
 ## Tila
 
-RISK-001–RISK-010 ovat aiemman baselinen riskit. RISK-011 ja RISK-012 perustuvat dokumentaatio-, lint- ja Run UI -evidenssiin. RISK-013 seuraa toteutetun strict-v11 data/snapshot/module/runtime/routing-rajan ja vielä puuttuvan Graph Orchestrator-control-noden välistä rajattua presentation-driftiä. `controlled` tarkoittaa, että arkkitehtuurivaste on olemassa; se ei tarkoita riskin mahdottomuutta.
+RISK-001–RISK-010 ovat aiemman baselinen riskit. RISK-011 ja RISK-012 perustuvat dokumentaatio-, lint- ja Run UI -evidenssiin. RISK-013 seuraa toteutetun strict-v11 data/snapshot/module/runtime/routing/Graph UI -rajan ihmisacceptance- ja pidempiaikaisen tulkintaevidenssin vajetta. `controlled` tarkoittaa, että arkkitehtuurivaste on olemassa; se ei tarkoita riskin mahdottomuutta.
 
 ## Riskirekisteri
 
@@ -38,7 +38,7 @@ RISK-001–RISK-010 ovat aiemman baselinen riskit. RISK-011 ja RISK-012 perustuv
 | RISK-010 | provenance drift | Tallennettu metadata voisi väittää asennetun Loopin olevan muuttumaton, vaikka sisältö on muuttunut. | keskisuuri / todennäköinen ajan myötä | Johda `exact`/`modified`/`missing-resources` nykyisestä Loop/resource-sisällöstä; älä persistoi statusta totuutena. | controlled |
 | RISK-011 | ylläpidettävyysvelka | Paikallisen lint-baselinen 14 warningia ovat tunnettu tekninen velka core- ja testitiedostoissa; dokumentaation kasvu lisää lisäksi stale source anchor -riskiä. | keskisuuri / havaittu | Hyväksymisraja: lint error = 0 ja warning-määrä ≤ 14; uusi warning estää handoffin. Nimeä baseline EVIDENCEssä, pidä lähdeankkurit arkkitehtuuritasolla ja avaa erillinen velanpoistoaloite ennen tuotantoa. | open |
 | RISK-012 | UI:n väärintulkinta | Run-kartan artwork, orbit, glow tai reittikorostus voidaan tulkita prosentiksi, ETA:ksi tai provider-tekstistä johdetuksi runtime-tilaksi. | korkea / mahdollinen operaattorivirhe | Mission / All Loops / live inspector johtavat semantiikan vain immutable snapshotista ja canonical persistencestä; ei keksittyä telemetriaa. QS-013/EVID-013 ja UI copy erottavat ornamentin faktasta. | controlled; monitor usability |
-| RISK-013 | arkkitehtuuridrift | Strict-v11 config/snapshot/runtime ja Graph/Loop-sanasto ovat käytössä, mutta Graph Engineering ei vielä piirrä Orchestratoria erillisenä control-nodena. | keskisuuri / rajattu | ADR-018:n vaiheistettu PLAN ja QS-014/TEST-014: Context/numeric routing on poistettu, runtime dispatch ja selected-Loop-raja on todennettu; seuraava Graph-vaihe lisää control-noden vain canonical policy/evidence -lähteistä. | open until GLE-EVID-006/EVID-014 |
+| RISK-013 | arkkitehtuuridrift | Strict-v11 config/snapshot/runtime ja Graph/Loop-sanasto ovat käytössä; Graph-control projisoi canonical policy/Run-evidenssin, mutta ihmisreview ja pidempiaikainen tulkintaevidenssi puuttuvat. | keskisuuri / rajattu | ADR-018:n vaiheistettu PLAN ja QS-014/TEST-014: Context/numeric routing on poistettu, runtime dispatch, selected-Loop-raja ja canonical Graph-control on todennettu; ihmisreview tarkistaa, ettei esitys vihjaa client-owned orchestrationia. | open until EVID-014 human acceptance |
 
 ## Riskien arviointiperiaate
 
@@ -81,7 +81,7 @@ Migration-findingit, validoinnit, Root Run -outcomet, lint-outputit ja initiativ
 - RISK-001, RISK-005 ja RISK-006 tarvitsevat ensimmäisen pilotin evidenssin.
 - Milloin RISK-011:n warning-baseline poistetaan kokonaan ennen production-readiness-arviota?
 - Tarvitaanko QS-013:n lisäksi käyttäjätesti RISK-012:n todellisen tulkintataajuuden mittaamiseen?
-- RISK-013 pysyy auki, kunnes strict-v11 implementation- ja ihmisacceptance-evidenssi EVID-014 on olemassa.
+- RISK-013 pysyy auki, kunnes strict-v11-ihmisacceptance-evidenssi EVID-014 on olemassa.
 
 ## Seuraava katselmointiperuste
 

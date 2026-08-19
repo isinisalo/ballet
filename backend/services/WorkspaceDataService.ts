@@ -7,7 +7,8 @@ import type { LoopThemeRepository } from "../loop-themes/LoopThemeRepository.js"
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 
 export class WorkspaceDataService {
-  private enrich?: (data: WorkspaceContentData & Pick<AppData, "loopRuns" | "scheduleStates">) => Promise<AppData>;
+  private enrich?: (data: WorkspaceContentData & Pick<AppData,
+    "loopRuns" | "activeRootRuns" | "orchestratorRoutes" | "scheduleStates">) => Promise<AppData>;
   private readonly projectConfigurations = new ProjectConfigurationRepository();
 
   constructor(
@@ -16,7 +17,8 @@ export class WorkspaceDataService {
     private readonly loopThemeRepository: LoopThemeRepository
   ) {}
 
-  setEnricher(enrich: (data: WorkspaceContentData & Pick<AppData, "loopRuns" | "scheduleStates">) => Promise<AppData>): void {
+  setEnricher(enrich: (data: WorkspaceContentData & Pick<AppData,
+    "loopRuns" | "activeRootRuns" | "orchestratorRoutes" | "scheduleStates">) => Promise<AppData>): void {
     this.enrich = enrich;
   }
 
@@ -42,6 +44,8 @@ export class WorkspaceDataService {
     const content = {
       ...data,
       loopRuns: this.runtimeDatabaseProvider.runtimeDatabase().listLoopRuns(),
+      activeRootRuns: [],
+      orchestratorRoutes: [],
       scheduleStates: this.runtimeDatabaseProvider.runtimeDatabase().listLoopScheduleStates()
     };
     if (!this.enrich) throw new Error("Workspace runtime enrichment is not configured.");

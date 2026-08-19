@@ -3,8 +3,8 @@ id: arc42-section-09
 title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 7
+updatedAt: '2026-08-20'
+version: 8
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-19. ADR-018 on accepted; strict-v11 data/snapshot/module/runtime-raja sekä Graph/Loop-routing ja selected-Loop-only UI on toteutettu. Graphin Orchestrator-control-node ja koko ihmisacceptance ovat pending.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-018 on accepted; strict-v11 data/snapshot/module/runtime-raja sekä Graph/Loop-routing, Graph-control ja selected-Loop-only UI on toteutettu. Koko initiative-tason ihmisacceptance on pending.
 
 ## Päätösindeksi
 

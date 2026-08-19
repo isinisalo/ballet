@@ -85,12 +85,14 @@ import type {
   LocalRuntime,
   LoopRun,
   LoopRunDetails,
+  LoopRunStatus,
   LoopStateRevision,
   LoopStateRevisionMetadata,
   LoopRuntimePreflight,
   LoopScheduleState,
   NodeRun,
   NodeRunRole,
+  NodeRunStatus,
   OrchestrationFrame,
   OrchestrationRequest,
   OrchestratorRoute,
@@ -165,6 +167,8 @@ export interface WorkspaceDataDto {
   skills: Skill[];
   resourceIssues: ProjectResourceIssue[];
   loopRuns: LoopRunDetails[];
+  activeRootRuns: RootRun[];
+  orchestratorRoutes: OrchestratorRoute[];
   scheduleStates: LoopScheduleState[];
   automation: ProjectAutomationConfig;
   automationIssues: ProjectAutomationIssue[];
@@ -270,9 +274,9 @@ export type {
   LoopNodeSize, LoopNodeSizeDefinition, LoopNodeStyle, LoopNodeStyleDefinition, LoopNodeStyleGroup,
   LoopTheme, LoopThemeIssue,
   LoopEdgeLineStyle, LoopConnectionPointStyle, ProjectOnceWorkSchedule, ProjectRecurringWorkSchedule,
-  ProjectScheduleCadence, ProjectScheduleWeekday, ProjectWorkSchedule, LoopRun, LoopRunDetails,
+  ProjectScheduleCadence, ProjectScheduleWeekday, ProjectWorkSchedule, LoopRun, LoopRunDetails, LoopRunStatus,
   LoopScheduleState, LoopRuntimePreflight,
-  CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, LoopStateRevisionMetadata, NodeRun, NodeRunRole,
+  CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, LoopStateRevisionMetadata, NodeRun, NodeRunRole, NodeRunStatus,
   OrchestrationFrame, OrchestrationRequest, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RepairResult, RootRun, RunCheck,
   StatePatch, ValidationNodeOutcome, WorkLoopNodeRun, WorkNodeOutcome,
   OrchestratorTaskEnvelopeV4, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,

@@ -3,8 +3,8 @@ id: arc42-section-08
 title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 7
+updatedAt: '2026-08-20'
+version: 8
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-014 / ADR-018:n strict-v11 graph/capability-raja on toteutettu configissa, shared contracteissa, snapshotissa, module materialisoinnissa, persisted Orchestrator-dispatchissa ja Graph/Loop-authoring-reiteissä muuttamatta concept-ID:itä; Graphin Orchestrator-control-node ja ihmisacceptance ovat pending.
+CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-014 / ADR-018:n strict-v11 graph/capability-raja on toteutettu configissa, shared contracteissa, snapshotissa, module materialisoinnissa, persisted Orchestrator-dispatchissa ja Graph/Loop-authoring-projektioissa muuttamatta concept-ID:itä; ihmisacceptance on pending.
 
 ## Konseptikartta
 

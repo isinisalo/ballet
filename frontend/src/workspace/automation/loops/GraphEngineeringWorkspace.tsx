@@ -17,8 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { GraphEngineeringCanvas } from "./GraphEngineeringCanvas";
+import { GraphOrchestratorInspector } from "./GraphOrchestratorInspector";
 import { LoopEdgesEditor } from "./LoopEdgesEditor";
-import { LoopOrchestratorEditor } from "./LoopOrchestratorEditor";
 import type { GraphEngineeringProjection } from "./engineeringProjections";
 import { addLoopEdge, removeLoopEdge, updateLoopEdge } from "./loopEditorState";
 
@@ -69,7 +69,6 @@ export function GraphEngineeringWorkspace({
   const connectionLocked = Boolean(selectedLoopId && (
     lockedLoopIds.has(selectedLoopId) || [...incoming, ...outgoing].some((edge) => lockedLoopIds.has(edge.source) || lockedLoopIds.has(edge.target))
   ));
-
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1023px)");
     const update = () => setNarrow(media.matches);
@@ -105,25 +104,24 @@ export function GraphEngineeringWorkspace({
         : () => onDeleteLoop(selectedLoop.id)}
     />
   ) : <div className="p-4 text-sm text-muted-foreground">Select a LoopNode to inspect its project-global connections. Press Enter on a selected canvas node to open Loop Engineering.</div>;
-  const orchestratorInspector = <div className="p-4"><LoopOrchestratorEditor
-    value={config.orchestrator}
-    profiles={executionProfiles}
-    instructions={instructions}
-    skills={skills}
-    runtime={runtime}
-    disabled={disabled}
-    onChange={(orchestrator) => onConfigChange({ ...config, orchestrator })}
-  /></div>;
+  const orchestratorInspector = <GraphOrchestratorInspector
+    config={config} projection={projection} profiles={executionProfiles} instructions={instructions}
+    skills={skills} runtime={runtime} disabled={disabled} onConfigChange={onConfigChange}
+  />;
   const inspector = inspectorTab === "loop" ? loopInspector : orchestratorInspector;
-  const openOrchestrator = () => {
+  const selectOrchestrator = () => {
     setInspectorTab("orchestrator");
-    setMobileInspectorOpen(true);
+    if (narrow) setMobileInspectorOpen(true);
   };
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3 sm:p-4 md:overflow-hidden">
       <div className="grid min-h-[34rem] min-w-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <GraphEngineeringCanvas projection={projection} selectedLoopId={selectedLoopId} theme={theme} onSelectLoop={selectLoop} onOpenLoop={onOpenLoop} onSelectEdge={selectEdge} onOpenOrchestrator={openOrchestrator} />
+        <GraphEngineeringCanvas
+          projection={projection} selectedLoopId={selectedLoopId} orchestratorSelected={inspectorTab === "orchestrator"}
+          theme={theme} onSelectLoop={selectLoop} onOpenLoop={onOpenLoop}
+          onSelectEdge={selectEdge} onSelectOrchestrator={selectOrchestrator}
+        />
         <aside aria-label="Graph Engineering Loop and Orchestrator inspector" className="hidden min-h-0 flex-col overflow-hidden border-y border-r border-divider-strong bg-popover lg:flex">
           <InspectorTabs selected={inspectorTab} loopAvailable={Boolean(selectedLoop)} onSelect={setInspectorTab} />
           <div className="min-h-0 flex-1 overflow-y-auto">{inspector}</div>
@@ -133,7 +131,7 @@ export function GraphEngineeringWorkspace({
         <SheetContent className="overflow-x-hidden overflow-y-auto p-0 data-[side=right]:w-[calc(100%-1rem)] data-[side=right]:max-w-md">
           <SheetHeader className="border-b border-divider-strong pr-12">
             <SheetTitle>Graph Engineering inspector</SheetTitle>
-            <SheetDescription>{inspectorTab === "loop" ? "Project-global Loop Edges and black box metadata." : "Project-global repair routing settings."}</SheetDescription>
+            <SheetDescription>{inspectorTab === "loop" ? "Project-global Loop Edges and black box metadata." : "Project-global flow and repair policy settings."}</SheetDescription>
           </SheetHeader>
           <InspectorTabs selected={inspectorTab} loopAvailable={Boolean(selectedLoop)} onSelect={setInspectorTab} />
           {inspector}
@@ -188,8 +186,8 @@ function GraphLoopInspector({ config, loopId, installed, incoming, outgoing, dis
           <DeleteAction deleteLabel={`${installed ? "Remove installed" : "Delete custom"} Loop ${loop.id}`} deleteType="Loop" resourceName={loop.id} disabled={disabled} onDelete={onDelete} />
         </div>
       </header>
-      <ConnectionSummary title="Incoming Loop Edges" icon={<ArrowDownLeft />} edges={incoming} empty="No incoming Loop Edges." />
-      <ConnectionSummary title="Outgoing Loop Edges" icon={<ArrowUpRight />} edges={outgoing} empty="No outgoing Loop Edges." />
+      <ConnectionSummary title="Incoming route policy" icon={<ArrowDownLeft />} edges={incoming} empty="No incoming persisted route policy." />
+      <ConnectionSummary title="Allowed flow and repair candidates" icon={<ArrowUpRight />} edges={outgoing} empty="No outgoing persisted route candidates." />
       <div className="border-t border-divider-strong p-4">
         <LoopEdgesEditor
           config={config}
@@ -208,7 +206,7 @@ function ConnectionSummary({ title, icon, edges, empty }: { title: string; icon:
   return (
     <section className="grid gap-2 border-t border-divider-strong p-4">
       <h3 className="flex items-center gap-2 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground"><span className="[&_svg]:size-3">{icon}</span>{title}</h3>
-      {edges.length ? <ul className="grid min-w-0 gap-1.5">{edges.map((edge) => <li key={edge.id} className="min-w-0 rounded border border-divider-strong bg-background px-2 py-1.5 text-xs"><div className="flex min-w-0 items-center gap-2"><span className={cn("shrink-0 font-mono", edge.kind === "repair" ? "text-tertiary" : "text-loop-flow")}>{edge.kind}</span><span className="min-w-0 flex-1 truncate text-right font-mono text-[0.65rem] text-muted-foreground" title={`${edge.source} → ${edge.target}`}>{edge.source} → {edge.target}</span></div><p className="mt-1 break-words text-muted-foreground">{edge.description}</p></li>)}</ul> : <p className="text-xs text-muted-foreground">{empty}</p>}
+      {edges.length ? <ul className="grid min-w-0 gap-1.5">{edges.map((edge) => <li key={edge.id} className="min-w-0 rounded border border-divider-strong bg-background px-2 py-1.5 text-xs" aria-label={`${edge.kind} allowlist candidate ${edge.source} to ${edge.target}, capability ${edge.capability}`}><div className="flex min-w-0 items-center gap-2"><span className={cn("shrink-0 font-mono", edge.kind === "repair" ? "text-tertiary" : "text-loop-flow")}>{edge.kind}</span><span className="min-w-0 flex-1 truncate text-right font-mono text-[0.65rem] text-muted-foreground" title={`${edge.source} → ${edge.target}`}>{edge.source} → {edge.target}</span></div><p className="mt-1 break-words font-mono text-[0.65rem] text-foreground">{edge.capability}</p><p className="mt-1 break-words text-muted-foreground">{edge.description}</p><span className="mt-1 block font-mono text-[0.58rem] uppercase text-muted-foreground">persisted graph allowlist · {edge.id}</span></li>)}</ul> : <p className="text-xs text-muted-foreground">{empty}</p>}
     </section>
   );
 }

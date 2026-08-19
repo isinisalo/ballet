@@ -145,7 +145,7 @@ The visual system uses **Modern Minimalism** fused with **Technical Industrialis
 
 ## Implementation Status Boundary
 
-The config/domain/snapshot/module/runtime baseline is strict v11, and the implemented authoring information architecture now exposes exactly **Graph Engineering** and **Loop Engineering** through URL-owned `graph | loop` routes. Context and numeric level routes are removed, while Loop Engineering retains the selected-Loop-only editor. Graph Engineering currently projects LoopNodes and persisted route policy with the Orchestrator editor in its inspector; the distinct visual Orchestrator control node and final edge presentation remain a later implementation phase and must not be implied by decorative canvas state.
+The config/domain/snapshot/module/runtime baseline is strict v11, and the implemented authoring information architecture exposes exactly **Graph Engineering** and **Loop Engineering** through URL-owned `graph | loop` routes. Context and numeric level routes are removed, while Loop Engineering retains the selected-Loop-only editor. Graph Engineering projects exactly one LoopNode per ProjectLoop, one distinct Orchestrator control node, persisted project-global policy, and canonical live Run evidence. Its deterministic 24px-grid layout, route labels, inspector, keyboard behavior, and narrow Sheet are implemented without client-owned topology or decorative runtime state.
 
 ## Colors
 The palette is rooted in a deep, multi-layered dark mode.

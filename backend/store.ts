@@ -54,7 +54,8 @@ export class MarkdownStore {
   }
 
   setWorkspaceEnricher(
-    enrich: (data: WorkspaceContentData & Pick<AppData, "loopRuns" | "scheduleStates">) => Promise<AppData>
+    enrich: (data: WorkspaceContentData & Pick<AppData,
+      "loopRuns" | "activeRootRuns" | "orchestratorRoutes" | "scheduleStates">) => Promise<AppData>
   ): void {
     this.workspaceDataService.setEnricher(enrich);
   }

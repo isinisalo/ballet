@@ -3,8 +3,8 @@ id: ballet-architecture-entrypoint
 title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 8
+updatedAt: '2026-08-20'
+version: 9
 tags:
   - architecture
   - arc42
@@ -24,7 +24,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - `goal-009` ja `adr-011` hyväksyvät 6+1 Ballet Methodin.
 - `goal-010` ja `adr-016` hyväksyvät yhden Loopin authoring package -rajan: paketti materialisoidaan project-local-runtime-resursseiksi eikä ole live runtime dependency.
 - Nykyinen project config-, shared contract-, immutable snapshot- ja Loop module -baseline on strict v11: `graph.loopEdges` omistaa peer-reitit ja jokainen Loop ilmoittaa namespaced `accepts`/`provides`-capabilityt.
-- Cross-Loop-runtime toteuttaa `goal-012` / `adr-018`:n Orchestrator-owned flow/repair-dispatchin immutable snapshotista ja SQLite schema v7:n canonical request/route-evidenssistä. Authoring-UI käyttää vain URL-ohjattuja Graph Engineering- ja selected-Loop-only Loop Engineering -näkymiä; Context ja numeric level -reitit on poistettu. Graph Engineeringin erillinen Orchestrator-control-node ja lopullinen edge-presentation kuuluvat vielä myöhempään visualisointivaiheeseen.
+- Cross-Loop-runtime toteuttaa `goal-012` / `adr-018`:n Orchestrator-owned flow/repair-dispatchin immutable snapshotista ja SQLite schema v7:n canonical request/route-evidenssistä. Authoring-UI käyttää vain URL-ohjattuja Graph Engineering- ja selected-Loop-only Loop Engineering -näkymiä; Context ja numeric level -reitit on poistettu. Graph Engineering projisoi täsmälleen yhden Orchestrator-control-noden, yhden LoopNoden per `ProjectLoop` sekä persisted policyyn ja canonical Run -evidenssiin sidotut flow/repair-reitit lisäämättä runtime-entiteettiä.
 - Root Runin Mission / All Loops / live inspector on canonical snapshot/persistence -projektio; se ei muodosta uutta control statea.
 - `comprehensive-arc42-documentation` on draft-initiative, kunnes projektin omistaja arvioi sen EVIDENCE/REVIEW-ketjun.
 
@@ -61,7 +61,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 - Mikä rajattu initiative toimii ensimmäisenä 6+1-menetelmän end-to-end-pilottina?
 - Mitkä lähtöarvot ensimmäinen pilotti tuottaa METHOD-HEALTH-mittareille?
-- Milloin projektin omistaja valtuuttaa `graph-and-loop-engineering`-PLANin Graph Engineeringin Orchestrator-control-node- ja edge-presentation-vaiheen?
+- Hyväksyykö projektin omistaja `graph-and-loop-engineering`-initiativen koko `EVID-014`-ketjun paikallisen implementation-evidenssin ja erillisen ihmisreview'n jälkeen?
 - Hyväksyykö projektin omistaja `comprehensive-arc42-documentation`-draftin lopputarkistuksen jälkeen?
 
 ## Seuraava katselmointiperuste

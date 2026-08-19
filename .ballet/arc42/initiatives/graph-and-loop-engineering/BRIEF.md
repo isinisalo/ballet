@@ -3,8 +3,8 @@ id: arc42-initiative-graph-and-loop-engineering-brief
 title: Graph and Loop Engineering BRIEF
 status: draft
 createdAt: '2026-08-19'
-updatedAt: '2026-08-19'
-version: 3
+updatedAt: '2026-08-20'
+version: 4
 tags:
   - arc42
   - initiative
@@ -27,7 +27,7 @@ tags:
 - Nykyinen data-baseline on strict v11 ja Root Execution Snapshot v4. URL-ohjattu authoring-UI hyväksyy vain `graph | loop` -näkymät; Context, numeric level -reitit ja compatibility-aliakset puuttuvat tuotantokoodista.
 - Nykyinen repair kulkee Orchestratorin kautta ja palaa durable call framella samaan Validationiin.
 - Top-level flow ja repair dispatchataan snapshotin route-policy/capability-allowlistan kautta `LoopOrchestrator`ille; automaattinen `followFlow` on poistettu.
-- Graph Engineering näyttää `ProjectLoop`it LoopNodeina ja `ProjectLoopEdge`-yhteydet, mutta Orchestrator on vielä inspectorissa eikä control-nodena canvasilla.
+- Graph Engineering näyttää yhden LoopNoden per `ProjectLoop`, yhden Orchestrator-control-noden ja persisted `ProjectLoopEdge` -policyt; canonical active Root Run -evidenssi rikastaa näkymää lisäämättä uutta runtime-entiteettiä.
 
 ## Decision
 
@@ -78,7 +78,7 @@ Tuote siirtyy kahteen authoring-näkymään: default **Graph Engineering** ja se
 
 `QS-014` toteutuu vasta, kun strict v11 hylkää v10:n ilman compatibility-polkuja, Graph/Loop-reitit ovat ainoat authoring-reitit, Context-legacy on poistettu, Graph näyttää kaikki LoopNode-projektiot ja yhden Orchestrator-controlin, Loop Engineering säilyttää selected-Loop-only sisäosan ja runtime-testit osoittavat sekä flow- että repair-dispatchin snapshot/capability/allowlist/`needs_input`-semantiikan.
 
-Täysi acceptance vaatii `TEST-014` / `EVID-014`-ketjun sekä projektin omistajan review'n. Toteutetut osavaiheet todentavat domain/config/snapshot/module/runtime-, routing- ja selected-Loop-rajat; Graphin Orchestrator-control-node ja ihmisacceptance ovat avoinna.
+Täysi acceptance vaatii `TEST-014` / `EVID-014`-ketjun sekä projektin omistajan review'n. Toteutetut osavaiheet todentavat domain/config/snapshot/module/runtime-, routing-, Graph-control- ja selected-Loop-rajat; ihmisacceptance on avoinna.
 
 ## Assumption, Hypothesis ja Finding
 

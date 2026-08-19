@@ -3,8 +3,8 @@ id: arc42-section-01
 title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-19'
-version: 5
+updatedAt: '2026-08-20'
+version: 6
 tags:
   - arc42
   - requirements
@@ -20,8 +20,8 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 ## Tila ja väitteiden luokittelu
 
 - **Hyväksytty päätös:** `goal-001`–`goal-012` määrittävät tuotteen tarkoituksen ja laajuuden.
-- **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, Loop Engineer -authoring-näkymät ja Root Runin Mission / All Loops / live inspector -näkymän.
-- **Hyväksytty target:** `goal-012` / `adr-018` muuttaa authoringin myöhemmin Graph Engineering / Loop Engineering -malliksi ja cross-Loop-flow'n Orchestrator-dispatchiksi; v11-toteutus on pending.
+- **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v11 Graph Engineering / Loop Engineering -authoring-näkymät, Orchestrator-owned cross-Loop-dispatchin ja Root Runin Mission / All Loops / live inspector -näkymän.
+- **Hyväksytty target:** `goal-012` / `adr-018` määrittää toteutetun Graph Engineering / Loop Engineering -mallin ja cross-Loop-flow/repair Orchestrator-dispatchin; initiative-tason ihmisacceptance on pending.
 - **Paikallinen evidenssi:** toteutuksen ajantasaisuus osoitetaan testeillä, buildilla ja `validate:arc42`-tarkistuksella; yksittäisen initiative-työn tulokset kirjataan sen EVIDENCE-tiedostoon.
 - **Avoin riski:** ensimmäisen tuotantokaltaisen pilotin mitatut menetelmä- ja palautumisarvot puuttuvat vielä; katso [osio 11](11-risks-and-technical-debt.md).
 

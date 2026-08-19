@@ -44,6 +44,8 @@ export const emptyData: AppData = {
   skills: [],
   resourceIssues: [],
   loopRuns: [],
+  activeRootRuns: [],
+  orchestratorRoutes: [],
   scheduleStates: [],
   automation: defaultProjectAutomationConfig(),
   automationIssues: [],
