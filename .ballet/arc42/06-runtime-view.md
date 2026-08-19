@@ -3,8 +3,8 @@ id: arc42-section-06
 title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 3
+updatedAt: '2026-08-19'
+version: 4
 tags:
   - arc42
   - runtime
@@ -19,7 +19,7 @@ Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaik
 
 ## Tila
 
-RT-001–RT-003 ja RT-006–RT-010 ovat toteutettua platform-käyttäytymistä. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella.
+RT-001–RT-003 ja RT-006–RT-010 ovat toteutettua strict-v10-platform-käyttäytymistä. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella. RT-011 on ADR-018:n hyväksytty strict-v11-target eikä vielä toteutettu runtime-fakta.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -99,7 +99,28 @@ flowchart TD
 
 Restart ei tee oletusta provider-prosessin elossaolosta. `queued`-työ säilyy, mutta ennen restartia `running`-tilassa ollut tehtävä merkitään keskeytyneeksi eikä sitä replayata automaattisesti. Runtime jatkaa vain täysin commitoidusta State/control-flow-faktasta. Cancellation on persistentoitu barrier: sen jälkeen saapuva adapter-payload ei saa luoda outcomea, State-revisiota tai uutta continuationia.
 
-## Skenaarioindeksi RT-001–RT-010
+## RT-011: strict-v11 Graph Orchestrator dispatch (target)
+
+```mermaid
+flowchart TD
+  entry["Eksplisiittisesti valittu entry Loop"] --> snapshot["Snapshottaa reachable graph + capability + route policy"]
+  snapshot --> run["Aja Loopin Work/Validation sisäinen control flow"]
+  run --> terminal{"Loop invocation terminal"}
+  terminal -->|"completed, no flow candidate"| done["Root Run completed"]
+  terminal -->|"completed, one or more flow candidates"| dispatch["LoopOrchestrator flow dispatch"]
+  dispatch --> validate{"Snapshot allowlist + capability + permission valid?"}
+  validate -->|"one unambiguous"| next["Start target Loop; same State; no repair frame"]
+  validate -->|"ambiguous / human authority"| input["needs_input; no target or permission guess"]
+  run -->|"Validation repair request"| repair["LoopOrchestrator repair dispatch"]
+  repair --> frame["Push durable frame; call target with same State"]
+  frame --> return["Target completed → caller same Validation"]
+  next --> run
+  return --> run
+```
+
+RT-011 korvaa v11-toteutuksessa vain top-level completed-flow'n automaattisen `followFlow`-kohdan. Nolla outgoing flow candidatea päättää Root Runin. Yksi tai useampi candidate kulkee Orchestrator-dispatchin kautta; flow ei luo repair-framea. Repair säilyttää RT-003:n durable call/returnin. Jokainen valinta perustuu immutable snapshotin graph-allowlistiin ja targetin capability metadataan. Puuttuva/ristiriitainen capability, ambiguity tai ihmisvaltuutus pysähtyy ennen target invocationia.
+
+## Skenaarioindeksi RT-001–RT-011
 
 | ID | Trigger ja vuorovaikutus | Rakennusosat | Tulos ja evidenssi |
 | --- | --- | --- | --- |
@@ -113,6 +134,7 @@ Restart ei tee oletusta provider-prosessin elossaolosta. `queued`-työ säilyy, 
 | RT-008 | Runtime muodostaa Node-roolille exact compositionin immutable snapshotista ja `TaskEnvelope`:sta, laskee hashin ja jonottaa sen eksplisiittisen providerin FIFO-kaistaan. | BB-003–BB-006 | Sama input → samat tavut, hash, resurssijärjestys ja output schema; composition-virhe → 0 jonotettua tehtävää ja 0 fallbackia. |
 | RT-009 | Palvelu restarttaa tai Run peruutetaan kesken provider-työn; queue/store reconciliation soveltaa viimeistä commitoitua faktaa. | BB-002, BB-004–BB-006 | Queued säilyy, running → interrupted ilman replayta, committed State/control flow ei monistu ja post-cancel-payload vaikuttaa 0 kertaa. |
 | RT-010 | Operaattori avaa Run mission controlin ja vastaa tarvittaessa Human Nodeen; UI johtaa roolin, profilen, attemptin, revisionin, repairin, returnin ja finalizationin snapshotista/read storesta. | BB-001, BB-002, BB-004, BB-005 | Mission / All Loops / inspector vastaavat canonical dataa; ei keksittyä prosenttia, ETA:a tai provider-tekstistä johdettua tilaa. |
+| RT-011 | V11 Root Run alkaa eksplisiittisestä entry Loopista tai completed/repair-outcome tuottaa cross-Loop-candidatet; Orchestrator validoi graph-allowlistin, capabilityn ja permission-rajan. | BB-001, BB-003–BB-006, BB-009 | Zero-flow päättää Runin; yksi/yksi paras target dispatchataan; ambiguity/ihmisvaltuutus → `needs_input`; repair palaa samaan Validationiin, flow-frameja 0. `EVID-014` pending. |
 
 ## Samanaikaisuusmalli
 
@@ -138,15 +160,15 @@ Restart ei tee oletusta provider-prosessin elossaolosta. `queued`-työ säilyy, 
 
 ## Kanoniset lähteet
 
-ADR-015 ja runtime-lähde omistavat geneerisen control-semanticsin. `.ballet/project.json` omistaa project-local Loop-topologian, schedule-konfiguraation ja tehtävät. UI lukee `RootRuntimeReadStore`/Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
+ADR-015 ja runtime-lähde omistavat nykyisen geneerisen v10-control-semanticsin. ADR-018 omistaa tulevan v11 cross-Loop-dispatch-rajan. `.ballet/project.json` omistaa nykyisen project-local Loop-topologian, schedule-konfiguraation ja tehtävät; v11-migraatio on pending. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015` ja `adr-016`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016` ja `adr-018`.
 
 ## Evidenssi
 
-Runtime-, State-, persistence-, scheduler-, queue-, adapter-, worktree- ja Run UI -testit kattavat toteutetut skenaariot. RT-008–RT-010:n hyväksymisevidenssi on `EVID-011`–`EVID-013`. Scheduled learning ja release pysyvät pending-tilassa, kunnes todellinen ajo/valtuutus on olemassa.
+Runtime-, State-, persistence-, scheduler-, queue-, adapter-, worktree- ja Run UI -testit kattavat toteutetut skenaariot. RT-008–RT-010:n hyväksymisevidenssi on `EVID-011`–`EVID-013`. RT-011:n `EVID-014` on pending. Scheduled learning ja release pysyvät pending-tilassa, kunnes todellinen ajo/valtuutus on olemassa.
 
 ## Avoimet kysymykset
 

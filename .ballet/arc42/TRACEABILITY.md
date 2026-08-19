@@ -3,8 +3,8 @@ id: arc42-traceability
 title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 4
+updatedAt: '2026-08-19'
+version: 5
 tags:
   - arc42
   - traceability
@@ -15,11 +15,11 @@ tags:
 
 ## Tarkoitus
 
-Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-011` / `REQ-001`–`REQ-011` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
+Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-012` / `REQ-001`–`REQ-012` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
 
 ## Tila
 
-Matriisi sisältää 13 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. Pilot/release-pending-statuksia ei tulkita verifiediksi.
+Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. QS-014:n päätös on accepted mutta implementation evidence pending; pilot/release/implementation-pending-statuksia ei tulkita verifiediksi.
 
 ## Trace-matriisi
 
@@ -39,6 +39,7 @@ Matriisi sisältää 13 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | goal-009 / REQ-009 | QS-008 | adr-011 / CON-006 | BB-003 / BB-008 | RT-004 / DEP-001 | TEST-008 | EVID-008 | pending pilot |
 | goal-010 / REQ-010 | QS-009 | adr-016 / CON-007 | BB-001 / BB-002 / BB-003 / BB-009 | RT-006 / RT-007 / DEP-001 | TEST-009 | EVID-009 | implementation verified; full gate pending |
 | goal-011 / REQ-011 | QS-010 | adr-017 / CON-005 | BB-001 / BB-009 | RT-006 / DEP-001 | TEST-010 | EVID-010 | verified |
+| goal-012 / REQ-012 | QS-014 | adr-018 / CON-002 / CON-005 | BB-001 / BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-011 / DEP-001 / DEP-002 | TEST-014 | EVID-014 | decision accepted; implementation pending |
 <!-- traceability:end -->
 
 ## Testi- ja monitorikatalogi
@@ -58,6 +59,7 @@ Matriisi sisältää 13 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | TEST-011 | `ExecutionComposition`, `TaskEnvelopeV3` sekä Codex/Copilot-adapteritestit: exact bytes/hash/order/schema, blocking composition ja no fallback. | execution/integration test suites |
 | TEST-012 | `ExecutionStore.local`, `LocalExecutionQueue`, `LoopOrchestratorRecovery` ja `RootRunCancellationBarrier.persistence`: queued/running recovery, no replay/duplicate ja post-cancel barrier. | execution/runtime/run persistence test suites |
 | TEST-013 | `loopRunViewModel` ja `runRuntimePanels`: snapshot/canonical mapping, repair/return/human/finalization ja forbidden invented telemetry. | frontend Run UI test suite |
+| TEST-014 | Strict-v11 domain/schema/snapshot/persistence/runtime/API/module/routing/projection/UI hard cut -matriisi: zero/one/many flow, repair return, capability/allowlist, ambiguity/permission `needs_input`, Graph/Loop-datarajat, legacy-poisto, full test/lint/build/smoke/visual gate. | `graph-and-loop-engineering` initiative |
 
 ## Evidenssikatalogi
 
@@ -76,6 +78,7 @@ Matriisi sisältää 13 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | EVID-011 | Exact composition/Task Envelope/adapter -testitulokset ja dokumentoitu no-fallback-invariantti. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-011-output |
 | EVID-012 | Restart/reconciliation/cancellation-testitulokset: queued säilyy, running ei replaya, committed vaikutus ei duplikoidu. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-012-output |
 | EVID-013 | Run view-model/panel -testitulokset ja canonical source -katselmointi ilman keksittyä telemetriaa. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-013-output |
+| EVID-014 | Graph Engineering / Loop Engineering strict-v11 implementation-, conformance- ja ihmisacceptance-evidenssi. | `.ballet/arc42/initiatives/graph-and-loop-engineering/EVIDENCE.md`; pending |
 
 ## Ketjun tulkinta
 
@@ -87,7 +90,7 @@ Goalit, laatuskenaariot, ADR:t/konseptit, building blockit, runtime/deployment-s
 
 ## Relevantit päätökset
 
-`adr-011`, `adr-015`, `adr-016` ja `adr-017`.
+`adr-011`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
 
 ## Evidenssi
 

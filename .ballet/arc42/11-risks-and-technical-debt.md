@@ -3,8 +3,8 @@ id: arc42-section-11
 title: Riskit ja tekninen velka
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 3
+updatedAt: '2026-08-19'
+version: 4
 tags:
   - arc42
   - risks
@@ -20,7 +20,7 @@ Tämä osio ylläpitää arkkitehtuurin kannalta merkittävät riskit, teknisen 
 
 ## Tila
 
-RISK-001–RISK-010 ovat aiemman baselinen riskit. RISK-011 ja RISK-012 on lisätty nykyisen dokumentaatio-, lint- ja Run UI -evidenssin perusteella. `controlled` tarkoittaa, että arkkitehtuurivaste on olemassa; se ei tarkoita riskin mahdottomuutta.
+RISK-001–RISK-010 ovat aiemman baselinen riskit. RISK-011 ja RISK-012 perustuvat dokumentaatio-, lint- ja Run UI -evidenssiin. RISK-013 seuraa hyväksytyn v11-targetin ja nykyisen v10-toteutuksen väliaikaista cross-layer-drift-riskiä. `controlled` tarkoittaa, että arkkitehtuurivaste on olemassa; se ei tarkoita riskin mahdottomuutta.
 
 ## Riskirekisteri
 
@@ -38,6 +38,7 @@ RISK-001–RISK-010 ovat aiemman baselinen riskit. RISK-011 ja RISK-012 on lisä
 | RISK-010 | provenance drift | Tallennettu metadata voisi väittää asennetun Loopin olevan muuttumaton, vaikka sisältö on muuttunut. | keskisuuri / todennäköinen ajan myötä | Johda `exact`/`modified`/`missing-resources` nykyisestä Loop/resource-sisällöstä; älä persistoi statusta totuutena. | controlled |
 | RISK-011 | ylläpidettävyysvelka | Paikallisen lint-baselinen 14 warningia ovat tunnettu tekninen velka core- ja testitiedostoissa; dokumentaation kasvu lisää lisäksi stale source anchor -riskiä. | keskisuuri / havaittu | Hyväksymisraja: lint error = 0 ja warning-määrä ≤ 14; uusi warning estää handoffin. Nimeä baseline EVIDENCEssä, pidä lähdeankkurit arkkitehtuuritasolla ja avaa erillinen velanpoistoaloite ennen tuotantoa. | open |
 | RISK-012 | UI:n väärintulkinta | Run-kartan artwork, orbit, glow tai reittikorostus voidaan tulkita prosentiksi, ETA:ksi tai provider-tekstistä johdetuksi runtime-tilaksi. | korkea / mahdollinen operaattorivirhe | Mission / All Loops / live inspector johtavat semantiikan vain immutable snapshotista ja canonical persistencestä; ei keksittyä telemetriaa. QS-013/EVID-013 ja UI copy erottavat ornamentin faktasta. | controlled; monitor usability |
+| RISK-013 | arkkitehtuuridrift | Hyväksytty Graph Engineering -UI voidaan toteuttaa tai nimetä ennen kuin v11 capability-, snapshot-, persistence- ja Orchestrator-flow-semanttiikka on valmis, jolloin canvas väittäisi eri control flow'ta kuin runtime suorittaa. | korkea / väliaikaisesti todennäköinen | ADR-018:n yksi hard cut, vaiheistettu PLAN ja QS-014/TEST-014: Graph UI acceptance vasta runtime dispatch -vaiheen jälkeen; v10/v11 parseri-, route-, topology- ja legacy-haut; ei compatibility-polkuja. | open until EVID-014 |
 
 ## Riskien arviointiperiaate
 
@@ -61,6 +62,7 @@ RISK-011 ei valtuuta sivutehtävänä tehtävää laajaa refaktorointia. Warning
 | RISK-008–RISK-010 | Loop module package/service/API/UI/smoke-testit | Package-skeema, registry-scope tai provenance muuttuu. |
 | RISK-011 | `npm run lint`, warning-count ja source anchor -conformance | Warning-baseline kasvaa tai lähdepolku rikkoutuu. |
 | RISK-012 | QS-013-testit ja usability-havainto | UI lisää progress/ETA/elapsed/state-ornamenttia tai käyttäjä raportoi väärintulkinnan. |
+| RISK-013 | TEST-014, EVID-014 ja Graph UI ↔ runtime conformance review | V11 cross-layer-vaihe valmistuu, fake/direct flow havaitaan tai compatibility-polku ehdotetaan. |
 
 ## Kanoniset lähteet
 
@@ -68,7 +70,7 @@ Tämä osio omistaa project-level-arkkitehtuuririskit. Initiative-kohtaiset risk
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016` ja `adr-017`.
+`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
 
 ## Evidenssi
 
@@ -79,6 +81,7 @@ Migration-findingit, validoinnit, Root Run -outcomet, lint-outputit ja initiativ
 - RISK-001, RISK-005 ja RISK-006 tarvitsevat ensimmäisen pilotin evidenssin.
 - Milloin RISK-011:n warning-baseline poistetaan kokonaan ennen production-readiness-arviota?
 - Tarvitaanko QS-013:n lisäksi käyttäjätesti RISK-012:n todellisen tulkintataajuuden mittaamiseen?
+- RISK-013 pysyy auki, kunnes strict-v11 implementation- ja ihmisacceptance-evidenssi EVID-014 on olemassa.
 
 ## Seuraava katselmointiperuste
 

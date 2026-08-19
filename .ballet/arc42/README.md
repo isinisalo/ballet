@@ -3,8 +3,8 @@ id: arc42-index
 title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 5
+updatedAt: '2026-08-19'
+version: 6
 tags:
   - arc42
   - architecture
@@ -19,7 +19,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 
 ## Tila
 
-12-osioinen baseline on hyväksytty. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi. Todennettu tieto sijoitetaan sen omistavaan osioon, ja puuttuva tieto kirjataan avoimeksi kysymykseksi eikä keksitä.
+12-osioinen baseline on hyväksytty. Toteutettu runtime- ja UI-baseline on strict v10; `goal-012` / `adr-018` määrittää erikseen tulevan strict-v11 Graph Engineering / Loop Engineering -targetin. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi. Todennettu tieto sijoitetaan sen omistavaan osioon, ja puuttuva tieto kirjataan avoimeksi kysymykseksi eikä keksitä.
 
 ## Osiot
 
@@ -54,6 +54,7 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Initiative template](initiatives/TEMPLATE/BRIEF.md): uuden rajatun työn rakenne.
 - [Comprehensive documentation initiative](initiatives/comprehensive-arc42-documentation/BRIEF.md): tämän suomenkielisen kattavan dokumentaation draft-ketju.
 - [Architecture canvases initiative](initiatives/architecture-canvases/BRIEF.md): kolmen canvas-projektion draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju.
+- [Graph and Loop Engineering initiative](initiatives/graph-and-loop-engineering/BRIEF.md): accepted v11-päätöksen draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju; toteutusevidenssi on pending.
 
 ## Kanoninen omistajuus
 
@@ -74,7 +75,7 @@ Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `
 
 ## Relevantit päätökset
 
-`goal-009`, `goal-010`, `goal-011`, `adr-011`, `adr-013`, `adr-014`, `adr-015`, `adr-016` ja `adr-017`.
+`goal-009`, `goal-010`, `goal-011`, `goal-012`, `adr-011`, `adr-013`, `adr-014`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
 
 ## Evidenssi
 

@@ -3,8 +3,8 @@ id: arc42-section-09
 title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 4
+updatedAt: '2026-08-19'
+version: 5
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn tilaa 2026-08-17. Dokumentaatioinitiative ei muuta ADR-päätösten semantiikkaa eikä hyväksyntätilaa.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-19. ADR-018 on accepted, mutta sen strict-v11-toteutus on pending; nykyinen toteutettu baseline säilyy v10:nä.
 
 ## Päätösindeksi
 
@@ -42,6 +42,7 @@ Indeksi vastaa repositoryn tilaa 2026-08-17. Dokumentaatioinitiative ei muuta AD
 | adr-015 | accepted | Strict-v10 runtime domain | [Work Loop, State ja Loop Orchestrator](../adr/adr-015-work-loop-state-ja-loop-orchestrator.md) |
 | adr-016 | accepted | Loop module boundary | [Yhden Loopin moduulipaketti ja project-local-materialisointi](../adr/adr-016-yhden-loopin-moduulipaketti-ja-project-local-materialisointi.md) |
 | adr-017 | accepted | Authoring projections | [Loop Engineer authoring-projektiot](../adr/adr-017-loop-engineer-authoring-projektiot.md) |
+| adr-018 | accepted | Graph/Loop projections and v11 orchestration | [Graph Engineering, Loop Engineering ja Orchestrator-ohjattu v11-graafi](../adr/adr-018-graph-ja-loop-engineering.md) |
 
 ## Supersession-suhteet
 
@@ -51,6 +52,14 @@ adr-004 ── kokonaan superseded by ──▶ adr-015 ◀── kokonaan super
 adr-014:n “ei pakettimuotoa V1:ssä” -raja
         └── osittain superseded by ──▶ adr-016
             muu project-local-omistajuus säilyy hyväksyttynä
+
+adr-017:n Context / numeric level / composition -malli
+        └── osittain superseded by ──▶ adr-018
+            selected-Loop-only sisäinen projektio ja Edge-omistajuus säilyvät
+
+adr-015:n automaattinen followFlow
+        └── osittain superseded by ──▶ adr-018
+            State, retry, repair-frame, continuation ja recovery säilyvät
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -58,6 +67,8 @@ adr-014:n “ei pakettimuotoa V1:ssä” -raja
 | adr-004 | adr-015 | Koko legacy Loop/Step/Transition-runtime-domain korvautuu strict-v10 `Loop` / `WorkLoopNode` / `WorkNode` / `ValidationNode` / `State` / `Edge` / `LoopEdge` -mallilla. Historiallista ADR:ää ei kirjoiteta uudelleen. |
 | adr-010 | adr-015 | Legacy `StepResult`-rajauksen tilalle tulee roolikohtainen strict outcome, revisionoitu State ja runtime-owned control flow. |
 | adr-014, vain V1:n no-package-raja | adr-016 | Yhden Loopin authoring package hyväksytään inspect/plan/commit-materialisointiin. ADR-014:n project-local-data- ja no-live-dependency-periaate jää voimaan. |
+| adr-017, Context/numeric level/Level 1 composition | adr-018 | Tuleva v11 hard cut korvaa kolme authoring-tasoa Graph Engineering / Loop Engineering -unionilla ja poistaa Contextin sekä numeric route -mallin. Selected-Loop-only sisäinen projektio säilyy. Historiallista ADR:ää ei kirjoiteta uudelleen. |
+| adr-015, automaattinen yhden flow-edgen `followFlow` | adr-018 | Tuleva v11 ohjaa nolla/yksi/usea flow candidatea Orchestrator-dispatchin, snapshot-allowlistin, capabilityn ja `needs_input`-rajan kautta. Repairin call/return-, State- ja recovery-periaatteet säilyvät. |
 
 ## Päätösten käyttö
 

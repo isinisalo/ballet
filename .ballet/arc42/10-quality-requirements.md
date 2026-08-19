@@ -3,8 +3,8 @@ id: arc42-section-10
 title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 4
+updatedAt: '2026-08-19'
+version: 5
 tags:
   - arc42
   - quality
@@ -20,7 +20,7 @@ Tämä osio määrittää arkkitehtuurin suunnitteluun, hyväksymiseen ja evalua
 
 ## Tila
 
-QS-001–QS-010 sekä niiden prioriteetit perustuvat hyväksyttyihin Goaleihin ja `goal-009`:n valtuutukseen. Käyttäjä hyväksyi 2026-08-17 QS-011–QS-013:n prioriteetin 1. Evidenssistatus on erillinen: pending pilot tai pending verification ei ole onnistumisväite.
+QS-001–QS-010 sekä niiden prioriteetit perustuvat hyväksyttyihin Goaleihin ja `goal-009`:n valtuutukseen. Käyttäjä hyväksyi 2026-08-17 QS-011–QS-013:n prioriteetin 1. `goal-012`:n acceptance intent ja käyttäjän 2026-08-19 päätösvaltuutus tekevät QS-014:stä prioriteetin 1 v11-acceptance-rajan. Evidenssistatus on erillinen: pending implementation tai verification ei ole onnistumisväite.
 
 ## Laatupuu
 
@@ -43,6 +43,7 @@ flowchart TD
   usability --> q9["QS-009 module trust"]
   usability --> q10["QS-010 authoring"]
   usability --> q13["QS-013 Run projection"]
+  integrity --> q14["QS-014 Graph/Loop v11"]
 ```
 
 Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voivat estää toiminnon, vaikka käytettävyys kärsisi. UI:n ymmärrettävyys ei oikeuta keksittyä runtime-telemetriaa.
@@ -65,6 +66,7 @@ Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voi
 | QS-011 | goal-003 | Sama immutable Root Run -snapshot ja sama `TaskEnvelope` koostetaan toistuvasti, minkä lisäksi yksi required resource rikotaan. | Provider-task preflight Codex- ja Copilot-adapterirajojen edessä. | BB-003, BB-004, BB-006, RT-008, CON-003 | Tuota validille inputille tavutasolla sama provider-payload ja estä invalidi composition ilman fallbackia. | Validin inputin prompt-bytes, composition hash, resolved resource -järjestys ja output schema ovat 100 % identtiset jokaisessa toistossa ja molempien adapterien inputissa; invalidi composition jonottaa 0 taskia ja provider/model/profile-fallbackien määrä on 0. | 1 | EVID-011 | verified |
 | QS-012 | goal-006 | Palvelu restarttaa, kun task on queued tai running, ja cancellation commitoidaan ennen myöhäistä provider-payloadia. | Checkout-local SQLite, queue reconciliation ja active Root Run. | BB-004–BB-006, RT-009, DEP-001, DEP-002, CON-002 | Säilytä queued-työ, merkitse running-työ keskeytyneeksi ilman replayta ja estä duplicate/post-cancel-vaikutus. | Restartin jälkeen 100 % queued-tehtävistä säilyy; 100 % aiemmin running-tehtävistä on täsmälleen kerran `interrupted` eikä automaattista replayta synny; commitoituja State-revisioita/control-flow-eventtejä monistuu 0; cancellationin jälkeinen payload luo 0 state/outcome/continuation-muutosta. | 1 | EVID-012 | verified |
 | QS-013 | goal-007 | Operaattori tarkastaa aktiivista, repairissa olevaa, palannutta ja finalisoitua Runia sekä vastaa Human Nodeen. | Run mission control paikallisessa selaimessa immutable snapshotin ja canonical persistencen päällä. | BB-001, BB-002, BB-005, RT-010, CON-005 | Johda position, role, profile, attempt, revision, repair, return ja finalization vain snapshotista/read storesta; älä keksi telemetriaa. | View-model/panel-testit osoittavat 100 % nimetyistä kentistä canonical DTO -lähteeseen; provider-tekstistä johdettuja state-kenttiä on 0; UI näyttää 0 keksittyä prosenttia, ETA:a tai elapsed-arvoa; repair/return/human/finalization-fixtureiden expected projectionit läpäisevät. | 1 | EVID-013 | verified |
+| QS-014 | goal-012 | Operaattori authoroi project-global graphin tai avaa yhden Loopin, ja runtime kohtaa nolla, yhden tai usean flow/repair route candidaten. | Strict-v11 config, immutable Root Run snapshot ja paikallinen selain desktop/narrow-viewportissa. | BB-001, BB-003–BB-006, BB-009, RT-011, CON-002, CON-005 | Näytä täsmälleen Graph Engineering / Loop Engineering, validoi jokainen cross-Loop-valinta graph-allowlistilla ja capabilityllä sekä pysähdy ambiguityssa tai ihmisvaltuutuksessa `needs_input`-tilaan. | V11 parseri hylkää 100 % v10-, unknown-, silent-default- ja dual-write-fixtureistä; Context/numeric route/legacy-mallin aktiivisia polkuja on 0; Graph-projektiossa on täsmälleen yksi LoopNode per ProjectLoop ja yksi Orchestrator-control sekä 0 sisäistä Work/Validation-nodea; Loop-projektiossa on 0 project-global route/control-nodea; runtime-testit osoittavat zero-flow completionin, kaikki flow/repair-dispatchit Orchestratorin kautta, capability/allowlist-rejectionin, ambiguity/permission `needs_input`-tilan, repair-returnin samaan Validationiin ja flow framejen määrän 0. | 1 | EVID-014 | decision accepted; implementation pending |
 <!-- quality-scenarios:end -->
 
 ## Priorisoinnin tulkinta
@@ -79,11 +81,11 @@ Goalit omistavat quality intention. Tämä osio omistaa mitattavat skenaariot; [
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016` ja `adr-017`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
 
 ## Evidenssi
 
-EVID-001–EVID-013 ratkaistaan TRACEABILITYssa. EVID-011–EVID-013 on merkitty verifiediksi 2026-08-17 ajettujen nimettyjen testien ja conformance-katselmoinnin jälkeen. Pending- tai failed-evidenssiä ei käsitellä onnistumisena.
+EVID-001–EVID-014 ratkaistaan TRACEABILITYssa. EVID-011–EVID-013 on merkitty verifiediksi 2026-08-17 ajettujen nimettyjen testien ja conformance-katselmoinnin jälkeen. EVID-014 on pending, kunnes koko strict-v11-initiative on toteutettu ja arvioitu. Pending- tai failed-evidenssiä ei käsitellä onnistumisena.
 
 ## Avoimet kysymykset
 

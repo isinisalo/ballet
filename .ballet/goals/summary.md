@@ -3,8 +3,8 @@ id: ballet-goals-summary
 title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
-updatedAt: '2026-08-17'
-version: 5
+updatedAt: '2026-08-19'
+version: 6
 tags:
   - yhteenveto
   - tavoitteet
@@ -34,7 +34,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 | Osa | Tehtävä |
 | --- | --- |
-| React/Vite-käyttöliittymä | Configure- ja Run-työtilat, kolmitasoinen Loop Engineer, editorit, runtime- ja Run-näkymät |
+| React/Vite-käyttöliittymä | Configure- ja Run-työtilat, nykyinen kolmitasoinen Loop Engineer, editorit, runtime- ja Run-näkymät; hyväksytty v11-target on Graph Engineering / Loop Engineering |
 | Paikallinen Express-palvelu | Loopback-API, validointi, orkestrointi, ajastus ja tapahtumavirrat |
 | Provider-adapterit | Codex CLI ja GitHub Copilot CLI yhteisen tehtävä-, tapahtuma- ja tulosmallin takana |
 | SQLite-tila | Root Runien, Loop/Work Loop Node/roolikohtaisten Runien, State-revisioiden, jonojen, tapahtumien ja ajastusten kestävä paikallinen historia |
@@ -44,9 +44,10 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 ## Nykytila tämän repositoryn perusteella
 
 - Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v10** -skeemaa.
-- Projektissa on **11 hyväksyttyä Goalia** ja **17 ADR:ää**, joista ADR-004 ja ADR-010 ovat superseded-tilassa ja ADR-014:n V1-rajaus on osittain superseded ADR-016:lla.
+- Projektissa on **12 hyväksyttyä Goalia** ja **18 ADR:ää**, joista ADR-004 ja ADR-010 ovat superseded-tilassa, ADR-014:n V1-rajaus on osittain superseded ADR-016:lla ja ADR-018 rajaa ADR-015/017:n osittaiset tulevat korvaukset.
 - Paikallinen Loop Library, yhden Loopin package/install/export ja content-derived provenance on toteutettu ilman strict-v10-runtimen package-riippuvuutta.
-- Loop Engineer erottaa read-only Contextin, Looppien välisen Level 1 -compositionin ja valitun Loopin sisäisen Level 2 -detailin samoista strict-v10-lähteistä.
+- Toteutettu strict-v10 Loop Engineer erottaa read-only Contextin, Looppien välisen Level 1 -compositionin ja valitun Loopin sisäisen Level 2 -detailin samoista lähteistä.
+- Hyväksytty mutta toteuttamaton strict-v11-target poistaa Contextin ja numeric level -reitit, nimeää näkymät Graph Engineeringiksi ja Loop Engineeringiksi sekä siirtää kaikki cross-Loop-valinnat Orchestrator-dispatchiin.
 - Balletin oma kehitysautomaatio käyttää arc42 Templatea ja 6+1 Method -Loopia sekä erillistä, ketjuttamatonta `release-validation`-tukilooppia.
 - Konfiguraatiossa on **20 Work Loop Nodea**, **6 Human Validation -porttia**, **6 Codex-ExecutionProfilea** ja viikoittainen continuous-learning-schedule.
 - Project-local menettelyt on jaettu **10 arc42-skilliin**; execution composition ei enää käytä `migrated-*`-instructioneita.
@@ -57,6 +58,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 **Todentamatta end-to-end:**
 
+- `graph-and-loop-engineering`-initiative on päätös- ja suunnitteluvaiheen draft; v11-domainia, schemaa, runtimea, API:a, module materialisointia tai UI:ta ei ole vielä toteutettu tai todennettu.
 - Ensimmäistä arc42-initiativea ei ole vielä viety clarify → structures → concepts → communicate → implementation → evaluate -polun läpi.
 - Method-healthin runtime-baselinet ja scheduled learning -ajon evidenssi puuttuvat ensimmäiseen pilottiin asti.
 - Konfiguraatiossa ei ole Copilot-ExecutionProfilea tai Copilot-Nodea, vaikka platform-adapteri on toteutettu.
@@ -77,4 +79,4 @@ Balletin vahvin idea ei ole “agenttien määrä”, vaan **todennettava suorit
 
 `versionhallittu intentio → immutable snapshot → eristetty työtila → strukturoitu tulos → pysyvä evidenssi`
 
-Seuraava hyödyllinen kypsyysaskel on yksi rajattu pilotti Root Loopilla `arc42-clarify-requirements`. Se todentaa yhteisen Staten, initiative-handoffin, traceabilityn, capability-repairit ja menetelmäterveyden ennen erikseen päätettävää alpha-julkaisua.
+Seuraava hyväksyntäraja on `graph-and-loop-engineering`-draft-PLANin katselmointi ja erillinen lupa aloittaa strict-v11 domain/schema -vaihe. Menetelmäterveyden erillinen seuraava kypsyysaskel säilyy rajattuna pilottina Root Loopilla `arc42-clarify-requirements` ennen erikseen päätettävää alpha-julkaisua.

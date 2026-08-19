@@ -3,8 +3,8 @@ id: arc42-section-05
 title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 4
+updatedAt: '2026-08-19'
+version: 5
 tags:
   - arc42
   - building-blocks
@@ -19,7 +19,7 @@ Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vast
 
 ## Tila
 
-BB-001–BB-009 säilyvät vakaina. Näkymä vastaa nykyistä työpuuta; se ei määritä uusia runtime-entiteettejä tai API-sopimuksia.
+BB-001–BB-009 säilyvät vakaina. Nykyiset whiteboxit vastaavat strict-v10-työpuuta. ADR-018:n v11-target muuttaa niiden rajapintoja koordinoidusti mutta ei lisää Graph-, LoopNode- tai Orchestrator-runtime-entiteettiä; muutos on vielä pending.
 
 ## Taso 1: Balletin rakennusosat
 
@@ -68,6 +68,19 @@ flowchart LR
 | Detail projection | Näyttää valitun Loopin `WorkLoopNode`-rakenteet, internal `Edge` -yhteydet ja terminal targetit. | Detail omistaa Loopin sisäisen määrittelyn eikä näytä tai kirjoita `LoopEdge`:jä. | `LoopEditor.tsx`, `LoopCanvas.tsx`, `loopLayout.ts` |
 | Run mission control | Johtaa Mission-/All Loops -näkymän, aktiivisen reitin, repair/return-polun ja inspectorin immutable snapshotista sekä canonical runtime read -datasta. | Ei johda tilaa provider-tekstistä eikä keksi prosenttia, ETA:a tai elapsed-arvoa. | `RunVisualWorkspace.tsx`, `RunLoopMap.tsx`, `loopRunViewModel.ts`, `RunStatePanel.tsx` |
 | Module handoff | Tarkastaa paketin, näyttää suunnitelman ja valitsee commitin jälkeen materialisoidun Loopin. | BB-009 API; recommended connections ovat neuvoa antavia. | `AutomationView.tsx`, `LoopLibraryDialog.tsx` |
+
+### ADR-018:n v11-target BB-001/003/004/005/009-rajalle
+
+| Target-elementti | Vastuu | Omistava rakennusosa | Toteutustila |
+| --- | --- | --- | --- |
+| Graph Engineering projection | Projisoi v11 `ProjectAutomationConfig`-aggregaatista yhden `LoopNode`-näkymän per `ProjectLoop`, yhden Orchestrator-controlin ja graphin route-policyn ilman sisäisiä Work/Validation-nodeja. | BB-001 lukee BB-002/003:n shared DTO:n. | accepted target; pending |
+| Loop Engineering projection | Projisoi vain valitun `ProjectLoop`in `ProjectWorkLoopNode`-rakenteet, sisäiset Edget ja terminal targetit. | BB-001 | Nykyinen v10 Level 2 on säilyvä baseline; v11 route/copy hard cut pending. |
+| Strict-v11 graph/capability catalog | Parsii first-class Loop capability metadatan ja project-global flow/repair route-candidatet ilman v10 readeria tai silent defaultia. | BB-003 | accepted target; pending |
+| Immutable graph snapshot | Snapshottaa eksplisiittisestä entry Loopista reachable route/capability/resource closuren. | BB-004 | accepted target; pending |
+| Cross-Loop dispatch | Validoi zero/one/many flow ja repair candidatea snapshot-allowlistilla/capabilityllä; ambiguity/permission → `needs_input`, repair käyttää framea ja flow ei. | BB-005, BB-006 | accepted target; pending |
+| V11 module materialization | Materialisoi yhden target-riippumattoman Loopin capabilityineen ja jättää kaikki peer-route-päätökset project-global graphiin. | BB-009, BB-003 | accepted target; pending |
+
+Graph UI:n route-edget ovat persisted policy- ja runtime-evidenssin projektio. Layout, valinta tai canvasin piirretty yhteys ei muodosta uutta BB-001:n client topology statea. Nykyiset Context/composition/detail-elementit poistetaan vasta v11-frontend-vaiheessa; tämä dokumentti ei väitä niiden jo puuttuvan lähdekoodista.
 
 ## BB-002 whitebox: HTTP ja application-palvelut
 
@@ -129,7 +142,7 @@ Lähdehakemistot ja shared contracts ovat toteutuksen totuus. ADR:t omistavat va
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-008` ja `adr-011`–`adr-017`.
+`adr-001`–`adr-003`, `adr-005`–`adr-008` ja `adr-011`–`adr-018`.
 
 ## Evidenssi
 

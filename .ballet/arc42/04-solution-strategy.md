@@ -3,8 +3,8 @@ id: arc42-section-04
 title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 3
+updatedAt: '2026-08-19'
+version: 4
 tags:
   - arc42
   - solution-strategy
@@ -19,7 +19,7 @@ Tämä osio kokoaa perustavat ratkaisut, joilla Ballet vastaa Goaleihin, laatuta
 
 ## Tila
 
-STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. Menetelmän vaikuttavuuden tuotantokaltainen baseline ja UI:n pidempiaikainen tulkintavirheiden seuranta ovat vielä avointa evidenssiä.
+STRAT-001–STRAT-008 ovat toteutetun strict-v10-arkkitehtuurin strategioita. STRAT-009 on hyväksytty strict-v11-target, jonka implementation evidence on pending. Menetelmän vaikuttavuuden tuotantokaltainen baseline ja UI:n pidempiaikainen tulkintavirheiden seuranta ovat vielä avointa evidenssiä.
 
 ## Strategiat ja jäljitettävyys
 
@@ -33,6 +33,7 @@ STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. Menetelmän v
 | STRAT-006 | arc42 on pitkäikäinen totuus ja 6+1 Ballet Loops jatkuva menetelmä. | goal-009 / REQ-009 | QS-005, QS-006, QS-008 | adr-011, CTR-006, CTR-007 | Muutos etenee clarificationista evidenssiin vakaiden ID:iden kautta ilman runtime-logien kopiointia dokumentteihin. |
 | STRAT-007 | Intentio, merkittävä päätös ja ulkoinen kirjoitus pysähtyvät eksplisiittiseen ihmisrajaan. | goal-005, goal-009 / REQ-005, REQ-009 | QS-004, QS-006 | adr-011, CTR-007, CTR-008 | Agentti palauttaa `needs_input` tai odottaa valtuutusta eikä päättele lupaa testituloksesta. |
 | STRAT-008 | Yhden Loopin strict authoring package materialisoidaan inspect/plan/commit-vaiheissa olemassa oleviksi project-local-primitiveiksi. | goal-010, goal-011 / REQ-010, REQ-011 | QS-009, QS-010 | adr-016, adr-017, CTR-011 | Reuse ei lisää live registry- tai runtime-riippuvuutta; authoring-projektiot säilyttävät runtime-semantikan. |
+| STRAT-009 | Strict-v11 graph erottaa project-global Graph Engineeringin selected-Loop-only Loop Engineeringistä ja ohjaa kaikki cross-Loop-flow/repair-valinnat snapshotattujen route-candidatejen sekä capabilityjen kautta Orchestratorille. | goal-012 / REQ-012 | QS-014 | adr-018 | V11 hard cut poistaa Context/numeric-route/compatibility-polut; ambiguity tai ihmisvaltuutus tuottaa `needs_input`, ja UI projisoi vain persisted policy/runtime-evidenssiä. Implementation pending. |
 
 ## Keskeiset trade-offit
 
@@ -45,6 +46,7 @@ STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. Menetelmän v
 | Immutable snapshot | Run on selitettävissä myöhemmistä checkout-muutoksista riippumatta. | Käynnissä oleva Run ei omaksu config-muutosta ilman uutta Runia. |
 | Project-local method | Workflow on versionhallittu, muokattava ja irti platform-releaseistä. | Jokainen projekti vastaa oman menetelmädatansa laadusta ja validoinnista. |
 | Kanoniseen dataan perustuva UI | Operaattorin tulkinta vastaa runtime-faktoja. | Koristeellista progressia, ETA:a tai provider-tekstistä pääteltyä tilaa ei näytetä. |
+| V11 hard cut | Graph-, capability-, runtime- ja UI-semanttiikalle jää yksi strict totuus ilman compatibility-matriisia. | Domain, snapshot, persistence, API, module-data ja UI on muutettava yhdessä ennen acceptancea. |
 
 ## Arkkitehtuurin toteutusjärjestys
 
@@ -56,11 +58,11 @@ Hyväksytyt ADR:t omistavat päätökset; tämä osio omistaa niiden strategisen
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-009` ja `adr-011`–`adr-017`.
+`adr-001`–`adr-003`, `adr-005`–`adr-009` ja `adr-011`–`adr-018`.
 
 ## Evidenssi
 
-Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä authoring-projektiot. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v10-graafin. Module-testit todentavat STRAT-008:n materialisointirajan. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
+Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä v10-authoring-projektiot. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v10-graafin. Module-testit todentavat STRAT-008:n materialisointirajan. STRAT-009:llä on accepted päätös mutta EVID-014 on pending. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
 
 ## Avoimet kysymykset
 

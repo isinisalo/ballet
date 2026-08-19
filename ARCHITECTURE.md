@@ -3,8 +3,8 @@ id: ballet-architecture-entrypoint
 title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 4
+updatedAt: '2026-08-19'
+version: 5
 tags:
   - architecture
   - arc42
@@ -19,11 +19,12 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Tila
 
-- `goal-001`–`goal-011` omistavat hyväksytyn WHAT/WHY:n.
+- `goal-001`–`goal-012` omistavat hyväksytyn WHAT/WHY:n.
 - Virallisen [arc42-rakenteen 12 osiota](https://docs.arc42.org/home/) ovat kanonisesti `.ballet/arc42/`-hakemistossa.
 - `goal-009` ja `adr-011` hyväksyvät 6+1 Ballet Methodin.
 - `goal-010` ja `adr-016` hyväksyvät yhden Loopin authoring package -rajan: paketti materialisoidaan project-local-runtime-resursseiksi eikä ole live runtime dependency.
-- `goal-011` ja `adr-017` hyväksyvät Loop Engineerin Context-, composition- ja selected-Loop detail -projektiot lisäämättä runtime-entiteettejä.
+- Nykyinen toteutettu authoring-baseline on `goal-011` / `adr-017`: strict-v10 Context-, composition- ja selected-Loop detail -projektiot ilman uusia runtime-entiteettejä.
+- `goal-012` ja `adr-018` hyväksyvät tulevan strict-v11 hard cut -tavoitteen: täsmälleen Graph Engineering ja Loop Engineering, first-class Loop capability metadata sekä kaikki cross-Loop-valinnat Orchestratorin kautta. Päätös ei vielä ole runtime- tai UI-toteutus.
 - Root Runin Mission / All Loops / live inspector on canonical snapshot/persistence -projektio; se ei muodosta uutta control statea.
 - `comprehensive-arc42-documentation` on draft-initiative, kunnes projektin omistaja arvioi sen EVIDENCE/REVIEW-ketjun.
 
@@ -50,7 +51,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Relevantit päätökset
 
-`adr-011` määrittää source-of-truth- ja menetelmärajan. `adr-015` määrittää Work/Validation-rakenteen, State-revisiot, repairin ja continuationin. `adr-016` supersedoi vain ADR-014:n no-package-V1-rajan. `adr-017` määrittää authoring-projektiot ja tasokohtaisen Edge-omistajuuden.
+`adr-011` määrittää source-of-truth- ja menetelmärajan. `adr-015` määrittää Work/Validation-rakenteen, State-revisiot, repairin ja continuationin. `adr-016` supersedoi vain ADR-014:n no-package-V1-rajan. `adr-017` määrittää nykyisen v10-authoring-baselinen. `adr-018` supersedoi osittain ADR-017:n Context/numeric-level-mallin sekä ADR-015:n automaattisen `followFlow`-kohdan säilyttäen selected-Loop-only- ja repair/State/continuation-invariantit.
 
 ## Evidenssi
 
@@ -60,6 +61,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 - Mikä rajattu initiative toimii ensimmäisenä 6+1-menetelmän end-to-end-pilottina?
 - Mitkä lähtöarvot ensimmäinen pilotti tuottaa METHOD-HEALTH-mittareille?
+- Milloin projektin omistaja valtuuttaa `graph-and-loop-engineering`-draft-PLANin ensimmäisen strict-v11-toteutusvaiheen?
 - Hyväksyykö projektin omistaja `comprehensive-arc42-documentation`-draftin lopputarkistuksen jälkeen?
 
 ## Seuraava katselmointiperuste

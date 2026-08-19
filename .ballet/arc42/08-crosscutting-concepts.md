@@ -3,8 +3,8 @@ id: arc42-section-08
 title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 3
+updatedAt: '2026-08-19'
+version: 4
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. Uudet QS-011–QS-013 tarkentavat niiden mitattavia vasteita muuttamatta concept-ID:itä.
+CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-011–QS-013 tarkentavat toteutettua strict-v10-baselinea. QS-014 / ADR-018 laajentaa CON-002:n ja CON-005:n tulevaan strict-v11 graph/capability/Orchestrator-rajaan muuttamatta concept-ID:itä; implementation evidence on pending.
 
 ## Konseptikartta
 
@@ -50,7 +50,7 @@ Authentication-palvelua ei lisätä loopback-arkkitehtuuriin implisiittisesti. T
 
 | Raja | Validointi | Virheen muoto | Sivuvaikutus |
 | --- | --- | --- | --- |
-| Project config/resources | Strict-v10 schema, uniikit ID:t, referenssit, capability/edge-säännöt. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
+| Project config/resources | Nykyinen strict-v10 schema; v11-targetissa strict graph/capability/routes ilman v10 readeria, dual-writeä tai silent defaultia. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
 | HTTP/API | Shared request/response schema ja application precondition. | 4xx odotetulle inputille, 5xx vain odottamattomalle virheelle. | Service-transaktio ei ala malformed-inputilla. |
 | Composition | Profiili, instructionit, skillit, order, envelope ja output schema. | `ExecutionCompositionError` tai vastaava blocking outcome. | Nolla jonotettua taskia ja nolla fallbackia. |
 | Runtime outcome | Roolikohtainen strict schema, current revision ja rajat. | Failed/needs_input/interrupted/terminal outcome. | Vain atomisesti commitoitu fakta näkyy. |
@@ -96,7 +96,8 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 ## UI:n totuusperiaate
 
 - `DESIGN.md` omistaa värit, typografian, spacingin, radius-säännöt ja visuaalisen periaatteen.
-- Context, composition ja detail ovat authoring-projektioita; vain omistetut `LoopEdge`/`Edge`-entiteetit ovat muokattavaa domain-dataa.
+- Nykyisessä v10-baselinessa Context, composition ja detail ovat authoring-projektioita; vain omistetut `LoopEdge`/`Edge`-entiteetit ovat muokattavaa domain-dataa.
+- Hyväksytyssä v11-targetissa authoring-projektiot ovat vain `graph | loop`: Graph Engineering näyttää `ProjectLoop`→`LoopNode`-projektiot, yhden Orchestrator-controlin ja persisted route-policyn, Loop Engineering vain valitun Loopin sisäisen komposition. Client layout/selection ei omista topologiaa.
 - Mission kokoaa nykyisen tavoitteen ja aktiivisen polun; All Loops näyttää immutable snapshotin koko topologian.
 - Position, role, profile, attempt, revision, repair, return ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
 - Visuaalinen artwork, orbit, glow tai reittikorostus auttaa lukemista mutta ei muodosta uutta runtime-tilaa.
@@ -104,7 +105,8 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 
 ## Versiointi ja yhteensopivuus
 
-- `.ballet/project.json` käyttää strict-v10-skeemaa; vanhan termin näyttäminen dokumentaatiossa ei muuta runtime-versiota ja on korjattava aktiivisesta lähteestä.
+- `.ballet/project.json` käyttää tällä hetkellä strict-v10-skeemaa. ADR-018 hyväksyy strict-v11 hard cutin, mutta dokumentaatio ei muuta runtime-versiota ennen koordinoitua toteutusta.
+- V11-toteutus ei säilytä v10-parseria, compatibility-readeria, numeric route -aliasta, dual-writeä tai silent defaultia.
 - Shared API/TypeScript-sopimuksen semanttinen muutos vaatii toteutuksen ja kuluttajien koordinoidun päivityksen sekä testit.
 - SQLite-schema muuttuu numeroiduilla migraatioilla; dokumentaatiotyö ei muuta schema versionia.
 - Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
@@ -116,7 +118,7 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008` ja `adr-011`–`adr-017`.
+`adr-002`, `adr-005`–`adr-008` ja `adr-011`–`adr-018`.
 
 ## Evidenssi
 

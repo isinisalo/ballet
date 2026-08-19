@@ -3,8 +3,8 @@ id: arc42-section-12
 title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 3
+updatedAt: '2026-08-19'
+version: 4
 tags:
   - arc42
   - glossary
@@ -19,7 +19,7 @@ Tämä osio määrittää project-, authoring-, runtime-, provider-, persistence
 
 ## Tila
 
-Sanasto vastaa hyväksyttyä strict-v10-domainia, arc42-menetelmää, Loop module -rajaa ja kolmitasoista Loop Engineer / Run mission control -käyttöliittymää. Legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime-domainin termejä.
+Sanasto erottaa nykyisen toteutetun strict-v10-domainin ja kolmitasoisen Loop Engineer -baselinen hyväksytystä mutta toteuttamattomasta strict-v11 Graph Engineering / Loop Engineering -targetista. Legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime-domainin termejä.
 
 ## Project ja authoring
 
@@ -42,6 +42,11 @@ Sanasto vastaa hyväksyttyä strict-v10-domainia, arc42-menetelmää, Loop modul
 | Skill | Project-local resurssi, joka tuo rajatun workflow- tai domain-ohjeen execution compositioniin vakaassa järjestyksessä. |
 | Resource closure | Kaikki target Loopin/Node-roolin deterministisesti tarvitsemat profiili-, instruction-, skill- ja schema-resurssit. |
 | Strict-v10 | Nykyinen project schema/runtime-domain, joka käyttää Loop-, WorkLoopNode-, WorkNode-, ValidationNode-, State-, Edge- ja LoopEdge-käsitteitä legacy Step/Transition-mallin sijaan. |
+| Strict-v11 | ADR-018:n hyväksytty hard cut -target: project-global graph, first-class Loop capability metadata ja Orchestrator-owned flow/repair-route selection ilman v10 readeria tai rinnakkaista topology-mallia. Ei vielä nykyinen `.ballet/project.json`- tai runtime-versio. |
+| Graph | V11 `ProjectAutomationConfig`-aggregaatin project-global route-policy-projektio, joka omistaa flow- ja repair-allowlistat. Ei client state eikä erillinen runtime-entiteetti. |
+| Loop capability metadata | V11:n koneellisesti validoitava, geneerinen kuvaus Loopin tarjoamista ja tarvitsemista capabilityistä; project-workflow'n nimiä ei kovakoodata platformiin. |
+| Route candidate | Graphissa persisted source/target/kind/capability/description-yhteys, jonka Orchestrator voi valita vain immutable snapshotin allowlistista. |
+| LoopNode | Graph Engineeringin näkymänode yhdelle `ProjectLoop`ille. Ei uusi runtime-entiteetti eikä `ProjectWorkLoopNode`. |
 
 ## Runtime ja control flow
 
@@ -60,6 +65,7 @@ Sanasto vastaa hyväksyttyä strict-v10-domainia, arc42-menetelmää, Loop modul
 | Repair allowlist | Lähde-Loopin `repair` LoopEdgeistä muodostuva sallittu Orchestrator-target-joukko. |
 | Repair frame | Persistoitu call-frame, joka säilyttää caller Loopin/Validationin ja mahdollistaa LIFO-returnin repair-targetista. |
 | Continuation | Runtime-owned paluuosoite tai seuraava control-flow-askel; agentti tai State patch ei valitse sitä. |
+| Flow dispatch | V11-targetin Orchestrator-valinta completed top-level Loopin outgoing flow candidateista. Nolla candidatea päättää Root Runin; flow ei luo repair-framea. |
 | LIFO return | Sisäkkäisen repairin paluu viimeksi avattuun frameen ja samaan caller Validationiin. |
 | `needs_input` | Pysähtymistila, jossa puuttuva WHAT/WHY, prioriteetti, merkittävä päätös tai ambiguous repair-target vaatii ihmisen valinnan. |
 | Finalization | Root Runin terminal-tilan, viimeisen canonical control-faktan ja worktree-evidenssin commitointi; ei automaattinen merge/push. |
@@ -120,6 +126,8 @@ Sanasto vastaa hyväksyttyä strict-v10-domainia, arc42-menetelmää, Loop modul
 | Termi | Määritelmä |
 | --- | --- |
 | Loop Engineer | Configure-puolen authoring workspace, joka jakaa Loopsit Context-, composition- ja selected-Loop detail -projektioihin. |
+| Graph Engineering | V11-targetin default authoring-näkymä: kaikki `ProjectLoop`→`LoopNode`-projektiot, yksi Orchestrator-control ja persisted project-global route-policy ilman sisäisiä Work/Validation-nodeja. |
+| Loop Engineering | V11-targetin selected-Loop-only authoring-näkymä: valitun Loopin `ProjectWorkLoopNode`-kompositio, sisäiset Edget ja terminal targetit ilman project-global routeja tai Orchestrator-controlia. |
 | Mission | Run mission control -välilehti, joka korostaa nykyisen tavoitteen, aktiivisen canonical-polun ja operaattorin seuraavan merkityksellisen havainnon. |
 | All Loops | Run-näkymä immutable snapshotin koko Loop-topologiasta; ei authoring-editori eikä legacy-nimitys yhdelle konfiguraatiolistalle. |
 | Live inspector | Canonical Run/read-model-dataan sidottu paneeli position-, role-, profile-, attempt-, revision-, repair-, return- ja finalization-tiedoille. |
@@ -154,7 +162,7 @@ Hyväksytyt Goalit/ADR:t, shared domain -terminologia ja runtime-sopimukset mene
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016` ja `adr-017`.
+`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
 
 ## Evidenssi
 

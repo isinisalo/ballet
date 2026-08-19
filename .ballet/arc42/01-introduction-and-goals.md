@@ -3,8 +3,8 @@ id: arc42-section-01
 title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 4
+updatedAt: '2026-08-19'
+version: 5
 tags:
   - arc42
   - requirements
@@ -19,8 +19,9 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 
 ## Tila ja väitteiden luokittelu
 
-- **Hyväksytty päätös:** `goal-001`–`goal-011` määrittävät tuotteen tarkoituksen ja laajuuden.
+- **Hyväksytty päätös:** `goal-001`–`goal-012` määrittävät tuotteen tarkoituksen ja laajuuden.
 - **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, Loop Engineer -authoring-näkymät ja Root Runin Mission / All Loops / live inspector -näkymän.
+- **Hyväksytty target:** `goal-012` / `adr-018` muuttaa authoringin myöhemmin Graph Engineering / Loop Engineering -malliksi ja cross-Loop-flow'n Orchestrator-dispatchiksi; v11-toteutus on pending.
 - **Paikallinen evidenssi:** toteutuksen ajantasaisuus osoitetaan testeillä, buildilla ja `validate:arc42`-tarkistuksella; yksittäisen initiative-työn tulokset kirjataan sen EVIDENCE-tiedostoon.
 - **Avoin riski:** ensimmäisen tuotantokaltaisen pilotin mitatut menetelmä- ja palautumisarvot puuttuvat vielä; katso [osio 11](11-risks-and-technical-debt.md).
 
@@ -39,6 +40,7 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 | REQ-009 | goal-009 | Käytä arc42:ta jaettuna arkkitehtuuritotuutena ja Ballet Loopseja jatkuvana evidenssipohjaisena menetelmänä. | 12 kanonista osiota, 6+1 Loop -menetelmä ja vakaat trace-ketjut. | QS-005, QS-006, QS-008 |
 | REQ-010 | goal-010 | Tarkasta, asenna, vie ja poista siirrettäviä yhden Loopin moduuleja ilman runtime-aikaista pakettiriippuvuutta. | Rajattu JSON-paketti sekä inspect/plan/commit-materialisointi project-local-resursseiksi. | QS-009 |
 | REQ-011 | goal-011 | Authoroi Loopsit erillisten Context-, composition- ja selected-Loop-detail-projektioiden kautta yksiselitteisellä Edge-omistajuudella. | Kolmitasoinen authoring-projektio, joka ei lisää runtime-entiteettejä. | QS-010 |
+| REQ-012 | goal-012 | Authoroi project-global graph ja yhden Loopin sisäinen rakenne täsmälleen Graph Engineering / Loop Engineering -näkymissä sekä reititä kaikki cross-Loop-valinnat capabilityn ja snapshot-allowlistin kautta Orchestratorilla. | Strict-v11 graph/capability hard cut, `LoopNode`- ja Orchestrator-control-projektiot sekä selected-Loop-only Loop Engineering. | QS-014 |
 
 Täydelliset mitattavat skenaariot ja evidenssistatukset ovat [osiossa 10](10-quality-requirements.md), ja päästä päähän -ketjut ovat [TRACEABILITYssa](TRACEABILITY.md).
 
@@ -76,7 +78,7 @@ Ballet omistaa yleiset Loop-, runtime-, provider-, persistence- ja authoring-pri
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016` ja `adr-017`.
+`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
 
 ## Evidenssi
 
