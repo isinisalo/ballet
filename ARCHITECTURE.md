@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 5
+version: 6
 tags:
   - architecture
   - arc42
@@ -23,8 +23,8 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - Virallisen [arc42-rakenteen 12 osiota](https://docs.arc42.org/home/) ovat kanonisesti `.ballet/arc42/`-hakemistossa.
 - `goal-009` ja `adr-011` hyväksyvät 6+1 Ballet Methodin.
 - `goal-010` ja `adr-016` hyväksyvät yhden Loopin authoring package -rajan: paketti materialisoidaan project-local-runtime-resursseiksi eikä ole live runtime dependency.
-- Nykyinen toteutettu authoring-baseline on `goal-011` / `adr-017`: strict-v10 Context-, composition- ja selected-Loop detail -projektiot ilman uusia runtime-entiteettejä.
-- `goal-012` ja `adr-018` hyväksyvät tulevan strict-v11 hard cut -tavoitteen: täsmälleen Graph Engineering ja Loop Engineering, first-class Loop capability metadata sekä kaikki cross-Loop-valinnat Orchestratorin kautta. Päätös ei vielä ole runtime- tai UI-toteutus.
+- Nykyinen project config-, shared contract-, immutable snapshot- ja Loop module -baseline on strict v11: `graph.loopEdges` omistaa peer-reitit ja jokainen Loop ilmoittaa namespaced `accepts`/`provides`-capabilityt.
+- Nykyinen authoring-UI ja cross-Loop-runtime säilyvät vielä `goal-011` / `adr-017` -baselinessa: Context-, composition- ja selected-Loop detail -projektiot sekä vanha dispatch-käyttäytyminen. `goal-012` / `adr-018`:n Graph/Loop-UI ja Orchestrator-owned dispatch eivät kuulu valmistuneeseen vaiheeseen.
 - Root Runin Mission / All Loops / live inspector on canonical snapshot/persistence -projektio; se ei muodosta uutta control statea.
 - `comprehensive-arc42-documentation` on draft-initiative, kunnes projektin omistaja arvioi sen EVIDENCE/REVIEW-ketjun.
 
@@ -55,13 +55,13 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Evidenssi
 
-`npm run validate:arc42` tarkistaa dokumentit, traceabilityn, project-resurssit ja strict-v10 Loop-graafin. Runtime-, module-, provider-, recovery- ja UI-testit tarkistavat toteutuksen. Aktiivisen Root Runin execution truth tulee immutable snapshotista ja canonical SQLite -faktoista; pitkäikäinen hyväksymisevidenssi indeksoidaan initiative-EVIDENCEen.
+`npm run validate:arc42` tarkistaa dokumentit, traceabilityn, project-resurssit ja strict-v11 Graph/capability-sopimuksen. Runtime-, module-, provider-, recovery- ja UI-testit tarkistavat toteutuksen. Aktiivisen Root Runin execution truth tulee immutable snapshotista ja canonical SQLite -faktoista; pitkäikäinen hyväksymisevidenssi indeksoidaan initiative-EVIDENCEen.
 
 ## Avoimet kysymykset
 
 - Mikä rajattu initiative toimii ensimmäisenä 6+1-menetelmän end-to-end-pilottina?
 - Mitkä lähtöarvot ensimmäinen pilotti tuottaa METHOD-HEALTH-mittareille?
-- Milloin projektin omistaja valtuuttaa `graph-and-loop-engineering`-draft-PLANin ensimmäisen strict-v11-toteutusvaiheen?
+- Milloin projektin omistaja valtuuttaa `graph-and-loop-engineering`-PLANin seuraavan runtime-dispatch-vaiheen?
 - Hyväksyykö projektin omistaja `comprehensive-arc42-documentation`-draftin lopputarkistuksen jälkeen?
 
 ## Seuraava katselmointiperuste

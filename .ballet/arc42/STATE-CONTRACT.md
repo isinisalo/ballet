@@ -3,8 +3,8 @@ id: arc42-state-contract-v1
 title: Arc42MethodStateV1-sopimus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 2
+updatedAt: '2026-08-19'
+version: 3
 tags:
   - arc42
   - state
@@ -19,7 +19,7 @@ Tämä tiedosto määrittää kaikkien arc42 Loopsien käyttämän rajatun jaetu
 
 ## Tila
 
-Versio 1 on accepted päätöksillä `adr-011` ja `adr-015`. Sama rakenteellinen initial value on materialisoitu kaikkiin arc42 Loopseihin. Tämän dokumentaatiomuutoksen proosan suomennos ei muuta `Arc42MethodStateV1`-JSONia, kenttiä, arvoja tai runtime-sopimusta.
+Versio 1 on accepted päätöksillä `adr-011`, `adr-015` ja `adr-018`. Sama rakenteellinen initial value on materialisoitu kaikkiin arc42 Loopseihin. Strict-v11 hard cut poisti `handoff.nextLoopId`-kentän: peer-target ja continuation kuuluvat project-local Graphille eivätkä portable Loopille tai Staten model-ohjattavaan sisältöön.
 
 ## Alkuarvo
 
@@ -62,7 +62,6 @@ Versio 1 on accepted päätöksillä `adr-011` ja `adr-015`. Sama rakenteellinen
   "handoff": {
     "status": "pending",
     "summary": null,
-    "nextLoopId": null,
     "nextAction": null,
     "changedArtifactPaths": [],
     "stableIds": [],
@@ -81,7 +80,7 @@ Versio 1 on accepted päätöksillä `adr-011` ja `adr-015`. Sama rakenteellinen
 | `delivery` | PLAN-polku, muuttuneet polut, check- ja conformance-ID:t. | Source-diffit, testilogit tai salaisuudet. |
 | `release` | Request-status, exact human authorization -viite ja evidence ID:t. | Credentialit tai implisiittinen lupa. |
 | `evaluation` | Evidence/finding-ID:t ja health update -aika. | Viitteettömät model opinionit. |
-| `handoff` | Tiivis summary, seuraava Loop/action ja patch-evidenssi. | Continuation- tai return-target-valinta. |
+| `handoff` | Tiivis summary, seuraava action ja patch-evidenssi. | Peer Loop-, continuation- tai return-target-valinta. |
 
 ## Patch-velvoitteet
 
@@ -98,11 +97,11 @@ Rajattu State vähentää stale copy -riskiä ja estää runtime-kenttiä muuttu
 
 ## Kanoniset lähteet
 
-`adr-015` omistaa atomic State revision -semantiikan. `adr-011` omistaa tämän project-local-shapen. `TaskEnvelopeV3` ja role output schema V3 säilyvät runtime-transport-sopimuksina.
+`adr-015` omistaa atomic State revision -semantiikan. `adr-011` omistaa tämän project-local-shapen. `adr-018` omistaa capability-reitityksen ja Graphin peer-targetit. `TaskEnvelopeV3` ja role output schema V3 säilyvät runtime-transport-sopimuksina.
 
 ## Relevantit päätökset
 
-`adr-006`, `adr-010` (superseded-historia), `adr-011` ja `adr-015`.
+`adr-006`, `adr-010` (superseded-historia), `adr-011`, `adr-015` ja `adr-018`.
 
 ## Evidenssi
 

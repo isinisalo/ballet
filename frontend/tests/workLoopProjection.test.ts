@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { calculateDetailLoopCanvasLayout } from "../src/workspace/automation/loops/loopDetailLayout";
 import { calculateCompositeLoopCanvasLayout } from "../src/workspace/automation/loops/loopLayout";
 import { buildLoopVisualProjection, visualNodeKey } from "../src/workspace/automation/loops/loopVisualProjection";
-import { v10Automation, v10Loop } from "./v10Fixtures";
+import { v11Automation, v11Loop } from "./v11Fixtures";
 
-describe("strict-v10 graph projection", () => {
+describe("strict-v11 graph projection", () => {
   it("projects Validation OK node edges and explicit terminals", () => {
-    const loop = v10Loop();
-    const projection = buildLoopVisualProjection(v10Automation(loop), loop);
+    const loop = v11Loop();
+    const projection = buildLoopVisualProjection(v11Automation(loop), loop);
     const records = projection.recordsByLoopId.get(loop.id)!;
     expect(projection.config.loops[0]?.start).toBe(visualNodeKey(loop.id, loop.startNodeId));
     expect(records[0]?.outputTargets).toEqual([expect.objectContaining({
@@ -18,8 +18,8 @@ describe("strict-v10 graph projection", () => {
   });
 
   it("lays out single Work-owned artwork nodes deterministically without changing domain order", () => {
-    const loop = v10Loop();
-    const config = v10Automation(loop);
+    const loop = v11Loop();
+    const config = v11Automation(loop);
     const projection = buildLoopVisualProjection(config, loop);
     const input = {
       config: projection.config,
@@ -36,10 +36,10 @@ describe("strict-v10 graph projection", () => {
   });
 
   it("uses Work nodeSize and ignores Validation appearance in canvas geometry", () => {
-    const loop = v10Loop();
+    const loop = v11Loop();
     loop.nodes[0]!.work.nodeSize = "tiny";
     loop.nodes[0]!.validation.nodeSize = "large";
-    const projection = buildLoopVisualProjection(v10Automation(loop), loop);
+    const projection = buildLoopVisualProjection(v11Automation(loop), loop);
 
     const layout = calculateCompositeLoopCanvasLayout({
       config: projection.config,
@@ -52,10 +52,10 @@ describe("strict-v10 graph projection", () => {
   });
 
   it("lays out Level 2 from selected-Loop records without compact linked Loops", () => {
-    const selected = v10Loop("selected-loop");
-    const linked = v10Loop("linked-loop");
-    const config = v10Automation(selected, linked);
-    config.loopEdges = [{ id: "global", source: selected.id, target: linked.id, kind: "flow", description: "Continue." }];
+    const selected = v11Loop("selected-loop");
+    const linked = v11Loop("linked-loop");
+    const config = v11Automation(selected, linked);
+    config.graph.loopEdges = [{ id: "global", source: selected.id, target: linked.id, kind: "flow", capability: "test:loop.transfer", description: "Continue." }];
     const projection = buildLoopVisualProjection(config, selected);
     const records = projection.recordsByLoopId.get(selected.id)!;
 

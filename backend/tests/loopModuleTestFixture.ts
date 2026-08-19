@@ -26,7 +26,12 @@ export const testLoopModulePackage = (overrides: Partial<LoopModulePackageV1> = 
     initial: { complete: false },
     requiredKeys: ["complete"]
   },
-  capabilities: { requires: [], provides: ["sample.complete"], recommendedConnections: [] },
+  capabilities: {
+    requires: [],
+    accepts: ["sample:task.requested"],
+    provides: ["sample:task.completed"],
+    recommendedConnections: []
+  },
   resources: [
     { kind: "instruction", key: "worker", title: "Sample worker", metadata: {}, body: "Perform the sample work.\n" },
     { kind: "skill", key: "sample", name: "sample", description: "Complete sample work.", metadata: {}, body: "# Sample\n\nComplete the sample work.\n" }

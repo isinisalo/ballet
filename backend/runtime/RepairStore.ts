@@ -172,7 +172,7 @@ export class RepairStore {
         throw new Error(`Repair Request ${input.repairRequestId} is not owned by Orchestrator ${input.orchestratorNodeRunId}.`);
       }
       const snapshot = this.snapshots.require(request.rootRunId);
-      const edge = snapshot.loopEdges.find((candidate) => candidate.id === input.loopEdgeId);
+      const edge = snapshot.graph.loopEdges.find((candidate) => candidate.id === input.loopEdgeId);
       if (!edge || edge.kind !== "repair" || edge.source !== input.sourceLoopId || edge.target !== input.targetLoopId) {
         throw new Error(`Loop Edge ${input.loopEdgeId} is not an allowed repair route from ${input.sourceLoopId} to ${input.targetLoopId}.`);
       }

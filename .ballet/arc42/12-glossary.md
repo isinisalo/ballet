@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 4
+version: 5
 tags:
   - arc42
   - glossary
@@ -19,14 +19,14 @@ Tämä osio määrittää project-, authoring-, runtime-, provider-, persistence
 
 ## Tila
 
-Sanasto erottaa nykyisen toteutetun strict-v10-domainin ja kolmitasoisen Loop Engineer -baselinen hyväksytystä mutta toteuttamattomasta strict-v11 Graph Engineering / Loop Engineering -targetista. Legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime-domainin termejä.
+Sanasto erottaa toteutetun strict-v11 config/domain/snapshot/module-rajan nykyisestä kolmitasoisesta Loop Engineer -UI:sta sekä pending Orchestrator-dispatchista ja Graph/Loop-authoring-targetista. Legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime-domainin termejä.
 
 ## Project ja authoring
 
 | Termi | Määritelmä |
 | --- | --- |
 | Project truth | Versionhallittu, ihmis- ja agenttikatselmoitava tieto checkoutissa: Goalit, ADR:t, arc42, `.ballet/project.json`, instructionit, skillit, source ja design. Eri asia kuin machine-local runtime state. |
-| Project Loop | `.ballet/project.json`:ssa materialisoitu strict-v10 `Loop`, joka sisältää entry `WorkLoopNode` -viitteen, compositen ja sisäiset Edget. |
+| Project Loop | `.ballet/project.json`:ssa materialisoitu strict-v11 `Loop`, joka sisältää `accepts`/`provides`-capabilityt, entry `WorkLoopNode` -viitteen, compositen ja sisäiset Edget. |
 | Loop | Nimetty runtime- ja authoring-raja, joka koostuu `WorkLoopNode`-rakenteista ja jonka välillä `LoopEdge` määrittää flow/repair-yhteyksiä. |
 | Work Loop Node | Yksi tavoite, joka koostuu täsmälleen yhdestä `WorkNode`- ja yhdestä `ValidationNode`-vaiheesta. |
 | WorkNode | Rooli, joka tuottaa rajatun työn ja voi ehdottaa State patchia strict output -sopimuksella. |
@@ -41,8 +41,8 @@ Sanasto erottaa nykyisen toteutetun strict-v10-domainin ja kolmitasoisen Loop En
 | Primary instruction | Yksi Node-roolille valittu pääohje, joka sijoitetaan compositioniin System-tekstin jälkeen. |
 | Skill | Project-local resurssi, joka tuo rajatun workflow- tai domain-ohjeen execution compositioniin vakaassa järjestyksessä. |
 | Resource closure | Kaikki target Loopin/Node-roolin deterministisesti tarvitsemat profiili-, instruction-, skill- ja schema-resurssit. |
-| Strict-v10 | Nykyinen project schema/runtime-domain, joka käyttää Loop-, WorkLoopNode-, WorkNode-, ValidationNode-, State-, Edge- ja LoopEdge-käsitteitä legacy Step/Transition-mallin sijaan. |
-| Strict-v11 | ADR-018:n hyväksytty hard cut -target: project-global graph, first-class Loop capability metadata ja Orchestrator-owned flow/repair-route selection ilman v10 readeria tai rinnakkaista topology-mallia. Ei vielä nykyinen `.ballet/project.json`- tai runtime-versio. |
+| Strict-v10 | Poistettu project schema -versio, jota strict-v11 repository ei lue, muunna eikä oletusarvoista. Historialliset dokumentit voivat kuvata sen aikaista baselinea. |
+| Strict-v11 | Nykyinen project config/domain/snapshot/module hard cut: project-global graph ja first-class Loop capability metadata ilman v10 readeria tai rinnakkaista topology-mallia. Orchestrator-owned dispatch ja Graph/Loop-UI valmistuvat myöhemmissä vaiheissa. |
 | Graph | V11 `ProjectAutomationConfig`-aggregaatin project-global route-policy-projektio, joka omistaa flow- ja repair-allowlistat. Ei client state eikä erillinen runtime-entiteetti. |
 | Loop capability metadata | V11:n koneellisesti validoitava, geneerinen kuvaus Loopin tarjoamista ja tarvitsemista capabilityistä; project-workflow'n nimiä ei kovakoodata platformiin. |
 | Route candidate | Graphissa persisted source/target/kind/capability/description-yhteys, jonka Orchestrator voi valita vain immutable snapshotin allowlistista. |
@@ -114,7 +114,7 @@ Sanasto erottaa nykyisen toteutetun strict-v10-domainin ja kolmitasoisen Loop En
 | Install plan | Current project stateen sidottu deterministic ehdotus namespacesta, profile mappingista, resurssikirjoituksista, Loopista ja recommended connections -tiedosta. |
 | Materialisointi | Pakettidatan kirjoittaminen olemassa oleviksi project-local Loop-, profile-, instruction- ja skill-primitiveiksi. |
 | Config-last commit | Mutaatioperiaate, jossa uudet resurssit/provenance kirjoitetaan ennen project configia, jotta config ei viittaa puuttuvaan sisältöön. |
-| Installed Loop | Materialisoitu strict-v10 Project Loop ja sen project resources sekä non-runtime provenance/ownership metadata. |
+| Installed Loop | Materialisoitu strict-v11 Project Loop capabilityineen ja sen project resources sekä non-runtime provenance/ownership metadata. |
 | Profile slot | Paketin paikallinen execution-vaatimus, joka mapitetaan installissa olemassa olevaan yhteensopivaan `ExecutionProfile`:en. |
 | Recommended connection | Paketin neuvoa antava cross-Loop-yhteys, jota ei materialisoida automaattisesti authoritative `LoopEdge`:ksi. |
 | Canonical export | Loopin resource closuresta vakaasti järjestetty JSON ja SHA-256, joka ei sisällä runtime-tilaa tai jaon ulkopuolista dataa. |
@@ -166,7 +166,7 @@ Hyväksytyt Goalit/ADR:t, shared domain -terminologia ja runtime-sopimukset mene
 
 ## Evidenssi
 
-Termit esiintyvät project configissa, source/shared contracts -rajapinnoissa, instructioneissa, skilleissä ja State-sopimuksessa. Legacy-termihaku tarkistaa aktiivisten Goalien ja nykytiladokumenttien strict-v10-yhdenmukaisuuden.
+Termit esiintyvät project configissa, source/shared contracts -rajapinnoissa, instructioneissa, skilleissä ja State-sopimuksessa. Legacy-termihaku tarkistaa aktiivisten lähteiden strict-v11-yhdenmukaisuuden muuttamatta historiallista evidenssiä.
 
 ## Avoimet kysymykset
 

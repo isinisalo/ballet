@@ -69,7 +69,7 @@ describe("Markdown parsing", () => {
 });
 
 describe("Markdown collection loading", () => {
-  it("loads fixture content and its strict-v10 project configuration without fallback data", async () => {
+  it("loads fixture content and its strict-v11 project configuration without fallback data", async () => {
     const [data, automation, theme] = await Promise.all([
       loadMarkdownAppData(fixtureRoot),
       loadProjectAutomationConfigWithIssues(fixtureRoot),
@@ -126,13 +126,13 @@ describe("Markdown collection loading", () => {
     expect(data.project.relativePath).toBe(".ballet/project.md");
     expect(automation).toEqual({
       config: {
-        version: 10,
+        version: 11,
         orchestrator: expect.objectContaining({
           executionProfileId: "codex-gpt-5-6-luna-high-network-off",
           primaryInstructionId: "project:architect",
           skillIds: ["project:fixture-skill"]
         }),
-        loopEdges: [],
+        graph: { loopEdges: [] },
         loops: [expect.objectContaining({
           id: "adr-review",
           startNodeId: "review",

@@ -14,8 +14,8 @@ import { loopThemeCssProperties } from "./loopTheme";
 export function RunLoopMap({ root }: { root: RootRunDetail }) {
   const activeLoopId = root.current?.loopId;
   const activeEdgeId = root.repair.pendingRepair ? root.repair.routedTarget?.loopEdgeId : undefined;
-  const flowEdges = root.executionSnapshot.loopEdges.filter(({ kind }) => kind === "flow");
-  const activeRepairEdge = root.executionSnapshot.loopEdges.find(({ id }) => id === activeEdgeId);
+  const flowEdges = root.executionSnapshot.graph.loopEdges.filter(({ kind }) => kind === "flow");
+  const activeRepairEdge = root.executionSnapshot.graph.loopEdges.find(({ id }) => id === activeEdgeId);
   return (
     <section
       className="grid min-h-[28rem] content-start gap-4 overflow-hidden bg-background p-4"
@@ -27,7 +27,7 @@ export function RunLoopMap({ root }: { root: RootRunDetail }) {
           <h3 id="run-loop-map-heading" className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.05em]">All Loops · focused Run map</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">Immutable topology with the active Loop and repair route brought forward.</p>
         </div>
-        <span className="font-mono text-[0.58rem] text-muted-foreground">{root.executionSnapshot.loops.length} Loops · {root.executionSnapshot.loopEdges.length} routes</span>
+        <span className="font-mono text-[0.58rem] text-muted-foreground">{root.executionSnapshot.loops.length} Loops · {root.executionSnapshot.graph.loopEdges.length} routes</span>
       </header>
       <div className={cn(
         "flex flex-wrap items-center gap-2 border bg-card px-3 py-2 font-mono text-[0.6rem]",

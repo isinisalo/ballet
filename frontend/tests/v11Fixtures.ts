@@ -1,8 +1,9 @@
 import type { ProjectAutomationConfig, ProjectLoop } from "@shared/api/workspace-contracts";
 
-export const v10Loop = (id = "main-loop"): ProjectLoop => ({
+export const v11Loop = (id = "main-loop"): ProjectLoop => ({
   id,
   description: `Work Loop ${id}.`,
+  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   state: { description: `State for ${id}.`, initial: {} },
   startNodeId: "work",
   nodes: [{
@@ -28,8 +29,8 @@ export const v10Loop = (id = "main-loop"): ProjectLoop => ({
   edges: [{ id: `${id}-completed`, source: "work", target: { terminal: "completed" } }]
 });
 
-export const v10Automation = (...loops: ProjectLoop[]): ProjectAutomationConfig => ({
-  version: 10,
+export const v11Automation = (...loops: ProjectLoop[]): ProjectAutomationConfig => ({
+  version: 11,
   orchestrator: {
     executionProfileId: "codex-test",
     primaryInstructionId: "project:architect",
@@ -37,6 +38,6 @@ export const v10Automation = (...loops: ProjectLoop[]): ProjectAutomationConfig 
     maxRepairDepth: 4,
     maxRepairAttempts: 3
   },
-  loops: loops.length > 0 ? loops : [v10Loop()],
-  loopEdges: []
+  graph: { loopEdges: [] },
+  loops: loops.length > 0 ? loops : [v11Loop()]
 });

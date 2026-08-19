@@ -29,7 +29,7 @@ const resourceSchema = z.object({
 }).strict();
 
 export const rootExecutionSnapshotSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   rootLoopId: z.string(),
   project: z.object({
     checkoutRoot: z.string(),
@@ -39,7 +39,7 @@ export const rootExecutionSnapshotSchema = z.object({
   }).strict(),
   orchestrator: automationConfigSchema.shape.orchestrator,
   loops: automationConfigSchema.shape.loops,
-  loopEdges: automationConfigSchema.shape.loopEdges,
+  graph: automationConfigSchema.shape.graph,
   terminals: z.array(z.enum(loopTerminals)).length(loopTerminals.length),
   theme: loopThemeSchema,
   executionProfiles: z.array(executionProfileSchema),
@@ -51,10 +51,10 @@ export const rootExecutionSnapshotSchema = z.object({
   createdAt: z.string()
 }).strict().superRefine((snapshot, context) => {
   const automationIssues = validateProjectAutomationConfig({
-    version: 10,
+    version: 11,
     orchestrator: snapshot.orchestrator,
-    loops: snapshot.loops,
-    loopEdges: snapshot.loopEdges
+    graph: snapshot.graph,
+    loops: snapshot.loops
   }, snapshot.executionProfiles);
   automationIssues.forEach((issue) => context.addIssue({
     code: "custom",
@@ -80,10 +80,10 @@ export const rootExecutionSnapshotSchema = z.object({
       message: `Loop ${loop.id} contains a Work Loop Node that is not reachable by Validation OK Edges.`
     });
   });
-  snapshot.loopEdges.forEach((edge, edgeIndex) => {
+  snapshot.graph.loopEdges.forEach((edge, edgeIndex) => {
     if (!loopIds.has(edge.source) || !loopIds.has(edge.target)) context.addIssue({
       code: "custom",
-      path: ["loopEdges", edgeIndex],
+      path: ["graph", "loopEdges", edgeIndex],
       message: `Loop Edge ${edge.id} has an endpoint outside the execution snapshot.`
     });
   });

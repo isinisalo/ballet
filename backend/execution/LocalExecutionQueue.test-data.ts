@@ -5,7 +5,7 @@ import type { ExecutionSpec, RootExecutionSnapshot, RuntimeProvider } from "../.
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import { serializeTaskEnvelopeV3 } from "../integration/TaskEnvelopeV3.js";
-import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v10TestConfig.js";
+import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v11TestConfig.js";
 
 export const specification = (
   taskId: string,
@@ -107,15 +107,15 @@ const insertRunnableNode = (
 };
 
 const rootExecutionSnapshot = (): RootExecutionSnapshot => ({
-  version: 3,
+  version: 4,
   rootLoopId: "delivery",
   project: {
     checkoutRoot: "/checkout", headSha: "a".repeat(40),
     configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
   },
   orchestrator: testOrchestrator(),
+  graph: { loopEdges: [] },
   loops: [testLoop("delivery")],
-  loopEdges: [],
   terminals: ["completed", "blocked", "failed"],
   theme: defaultLoopTheme,
   executionProfiles: [testExecutionProfile],

@@ -17,9 +17,9 @@ import {
   updateOrchestrator,
   updateLoopAtIndex
 } from "../src/workspace/automation/loops/loopEditorState";
-import { v10Automation, v10Loop } from "./v10Fixtures";
+import { v11Automation, v11Loop } from "./v11Fixtures";
 
-describe("strict-v10 frontend drafts", () => {
+describe("strict-v11 frontend drafts", () => {
   it("creates nested Work/Validation drafts without mutable runtime state", () => {
     const loop = createLoopDraft();
     const node = createWorkLoopNodeDraft();
@@ -31,7 +31,7 @@ describe("strict-v10 frontend drafts", () => {
   });
 
   it("rewrites stable node and Loop Edge references on identifier changes", () => {
-    const loop = addWorkLoopNode(v10Loop(), createWorkLoopNodeDraft("verify"));
+    const loop = addWorkLoopNode(v11Loop(), createWorkLoopNodeDraft("verify"));
     const linked = updateNodeEdgeTarget(loop, "work", { nodeId: "verify" });
     const renamedNode = { ...linked.nodes[1]!, id: "verified" };
     const nodeUpdated = replaceWorkLoopNode(linked, "verify", renamedNode);
@@ -41,20 +41,20 @@ describe("strict-v10 frontend drafts", () => {
       expect.objectContaining({ source: "verified" })
     ]));
 
-    const other = v10Loop("other-loop");
-    const config = v10Automation(loop, other);
-    config.loopEdges = [{ id: "main-flow", source: loop.id, target: other.id, kind: "flow", description: "Continue." }];
+    const other = v11Loop("other-loop");
+    const config = v11Automation(loop, other);
+    config.graph.loopEdges = [{ id: "main-flow", source: loop.id, target: other.id, kind: "flow", capability: "test:loop.transfer", description: "Continue." }];
     const loopUpdated = updateLoopAtIndex(config, 0, { ...loop, id: "renamed-loop" });
-    expect(loopUpdated.loopEdges[0]).toMatchObject({ source: "renamed-loop", target: "other-loop" });
-    expect(removeLoopAtIndex(loopUpdated, 1).loopEdges).toEqual([]);
+    expect(loopUpdated.graph.loopEdges[0]).toMatchObject({ source: "renamed-loop", target: "other-loop" });
+    expect(removeLoopAtIndex(loopUpdated, 1).graph.loopEdges).toEqual([]);
   });
 
   it("allocates a globally unique default node id for the editor", () => {
-    const existing = v10Loop("new-loop");
+    const existing = v11Loop("new-loop");
     existing.nodes[0] = { ...existing.nodes[0]!, id: "new-loop-work" };
     existing.startNodeId = "new-loop-work";
     existing.edges[0] = { ...existing.edges[0]!, source: "new-loop-work" };
-    expect(nextWorkLoopNodeId(v10Automation(existing), createLoopDraft())).toBe("new-loop-work-2");
+    expect(nextWorkLoopNodeId(v11Automation(existing), createLoopDraft())).toBe("new-loop-work-2");
   });
 
   it("adds composite nodes with one OK edge and preserves semantic order on reorder", () => {
@@ -79,16 +79,16 @@ describe("strict-v10 frontend drafts", () => {
   });
 
   it("updates Loop Edges and orchestrator without introducing a parallel draft model", () => {
-    const first = v10Loop();
-    const second = v10Loop("repair-loop");
-    const config = v10Automation(first, second);
+    const first = v11Loop();
+    const second = v11Loop("repair-loop");
+    const config = v11Automation(first, second);
     const added = addLoopEdge(config, first.id);
-    const edge = added.loopEdges[0]!;
-    const repaired = updateLoopEdge(added, edge.id, { ...edge, kind: "repair", description: "Repair capability." });
+    const edge = added.graph.loopEdges[0]!;
+    const repaired = updateLoopEdge(added, edge.id, { ...edge, kind: "repair", capability: "test:loop.transfer", description: "Repair capability." });
     const orchestrated = updateOrchestrator(repaired, { ...repaired.orchestrator, maxRepairDepth: 2 });
-    expect(orchestrated.loopEdges[0]).toMatchObject({ source: first.id, target: second.id, kind: "repair" });
+    expect(orchestrated.graph.loopEdges[0]).toMatchObject({ source: first.id, target: second.id, kind: "repair" });
     expect(orchestrated.orchestrator.maxRepairDepth).toBe(2);
-    expect(removeLoopEdge(orchestrated, edge.id).loopEdges).toEqual([]);
+    expect(removeLoopEdge(orchestrated, edge.id).graph.loopEdges).toEqual([]);
   });
 
   it("changes role types without allowing scheduled Validation", () => {

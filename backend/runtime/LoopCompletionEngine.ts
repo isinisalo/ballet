@@ -165,7 +165,7 @@ export class LoopCompletionEngine {
 
   private followFlow(node: NodeRun, revision: number, callbacks: LoopCompletionCallbacks): boolean {
     const snapshot = this.snapshots.require(node.rootRunId);
-    const edges = snapshot.loopEdges.filter((edge) => edge.kind === "flow" && edge.source === node.loopId);
+    const edges = snapshot.graph.loopEdges.filter((edge) => edge.kind === "flow" && edge.source === node.loopId);
     if (edges.length === 0) return false;
     if (edges.length !== 1) throw new Error(`Loop ${node.loopId} has ${edges.length} outgoing flow Loop Edges.`);
     const loop = this.snapshots.loop(snapshot, edges[0]!.target);

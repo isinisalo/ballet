@@ -49,6 +49,7 @@ describe("Run canonical runtime panels", () => {
 const timestamp = "2026-08-16T06:00:00.000Z";
 const loop: ProjectLoop = {
   id: "main-loop", description: "Main Loop description.",
+  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   state: { description: "Canonical count.", initial: { count: 0 } }, startNodeId: "work",
   nodes: [{
     id: "work", description: "Composite work.",
@@ -70,10 +71,13 @@ const runDetail = (): RootRunDetail => ({
     returnDestination: { loopId: loop.id, workLoopNodeId: "work", validationNodeDefinitionId: "main-loop:work:validation" }
   },
   executionSnapshot: {
-    version: 3, rootLoopId: loop.id,
+    version: 4, rootLoopId: loop.id,
     project: { checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64) },
     orchestrator: { executionProfileId: "profile", primaryInstructionId: "project:orchestrator", skillIds: [], maxRepairDepth: 3, maxRepairAttempts: 3 },
-    loops: [loop], loopEdges: [{ id: "repair-edge", source: loop.id, target: loop.id, kind: "repair", description: "Repair self-route." }],
+    graph: { loopEdges: [{
+      id: "repair-edge", source: loop.id, target: loop.id, kind: "repair",
+      capability: "test:loop.transfer", description: "Repair self-route."
+    }] }, loops: [loop],
     terminals: ["completed", "blocked", "failed"], theme: defaultLoopTheme,
     executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },

@@ -60,27 +60,21 @@ export function automationDraftIssues(
   }))), "Work Loop Node"));
   issues.push(...duplicateIdIssues([
     ...config.loops.flatMap((loop, loopIndex) => loop.edges.map((edge, edgeIndex) => ({ id: edge.id, path: `loops.${loopIndex}.edges.${edgeIndex}.id` }))),
-    ...config.loopEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `loopEdges.${edgeIndex}.id` }))
+    ...config.graph.loopEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.loopEdges.${edgeIndex}.id` }))
   ], "Edge"));
 
   validateComposition(config.orchestrator, "orchestrator", profileById, instructionIds, skillIds, runtime, issues);
   config.loops.forEach((loop, loopIndex) => validateLoop(
     loop, loopIndex, profileById, instructionIds, skillIds, runtime, issues
   ));
-  config.loopEdges.forEach((edge, edgeIndex) => {
-    if (!loopIds.has(edge.source)) issues.push({ path: `loopEdges.${edgeIndex}.source`, message: `Unknown source Loop: ${edge.source}.` });
-    if (!loopIds.has(edge.target)) issues.push({ path: `loopEdges.${edgeIndex}.target`, message: `Unknown target Loop: ${edge.target}.` });
+  config.graph.loopEdges.forEach((edge, edgeIndex) => {
+    if (!loopIds.has(edge.source)) issues.push({ path: `graph.loopEdges.${edgeIndex}.source`, message: `Unknown source Loop: ${edge.source}.` });
+    if (!loopIds.has(edge.target)) issues.push({ path: `graph.loopEdges.${edgeIndex}.target`, message: `Unknown target Loop: ${edge.target}.` });
   });
-  const flowEdges = config.loopEdges.filter((edge) => edge.kind === "flow");
-  issues.push(...duplicateIdIssues(flowEdges.map((edge) => ({
-    id: edge.source,
-    path: `loopEdges.${config.loopEdges.indexOf(edge)}.source`
-  })), "outgoing flow Loop Edge source"));
-  const repairEdges = config.loopEdges.filter((edge) => edge.kind === "repair");
-  issues.push(...duplicateIdIssues(repairEdges.map((edge) => ({
-    id: `${edge.source}→${edge.target}`,
-    path: `loopEdges.${config.loopEdges.indexOf(edge)}.target`
-  })), "repair Loop Edge source/target route"));
+  issues.push(...duplicateIdIssues(config.graph.loopEdges.map((edge, edgeIndex) => ({
+    id: `${edge.source}→${edge.target}:${edge.kind}:${edge.capability}`,
+    path: `graph.loopEdges.${edgeIndex}.capability`
+  })), "Loop Edge route candidate"));
   return issues;
 }
 
@@ -186,17 +180,15 @@ export const loopEdgeIdError = (edge: ProjectLoopEdge, config: ProjectAutomation
   if (!edge.id) return "Loop Edge ID is required.";
   if (!kebabCaseIdPattern.test(edge.id)) return "Loop Edge ID must be lowercase kebab-case.";
   const nodeEdgeHasId = config.loops.some((loop) => loop.edges.some((candidate) => candidate.id === edge.id));
-  const loopEdgeHasId = config.loopEdges.some((candidate) => candidate !== edge && candidate.id === edge.id);
+  const loopEdgeHasId = config.graph.loopEdges.some((candidate) => candidate !== edge && candidate.id === edge.id);
   return nodeEdgeHasId || loopEdgeHasId ? "Edge ID must be unique across Node and Loop Edges." : undefined;
 };
 
 export const loopEdgeRouteError = (edge: ProjectLoopEdge, config: ProjectAutomationConfig): string | undefined => {
-  const duplicate = config.loopEdges.some((candidate) => candidate !== edge && candidate.source === edge.source
-    && (edge.kind === "flow" ? candidate.kind === "flow" : candidate.kind === "repair" && candidate.target === edge.target));
-  if (!duplicate) return undefined;
-  return edge.kind === "flow"
-    ? "A Loop can have only one outgoing flow Edge."
-    : "This repair target is already allowlisted for the source Loop.";
+  const duplicate = config.graph.loopEdges.some((candidate) => candidate !== edge
+    && candidate.source === edge.source && candidate.target === edge.target
+    && candidate.kind === edge.kind && candidate.capability === edge.capability);
+  return duplicate ? "This route candidate already exists." : undefined;
 };
 
 export type InitialStateParseResult = { value: JsonValue; error?: never } | { value?: never; error: string };

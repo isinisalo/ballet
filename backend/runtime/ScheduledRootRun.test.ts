@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testWorkLoopNode } from "../tests/v10TestConfig.js";
+import { testWorkLoopNode } from "../tests/v11TestConfig.js";
 import { createRuntimeStoreFixture } from "./RuntimeStore.test-fixture.js";
 
 describe("scheduled Root Run", () => {
@@ -10,6 +10,7 @@ describe("scheduled Root Run", () => {
     } });
     const fixture = await createRuntimeStoreFixture({ occurrence: null }, { loop: {
       id: "scheduled-loop", description: "Scheduled Loop.",
+      capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
       state: { description: "Scheduled State.", initial: { occurrence: null } },
       startNodeId: node.id, nodes: [node],
       edges: [{ id: "scheduled-done", source: node.id, target: { terminal: "completed" } }]

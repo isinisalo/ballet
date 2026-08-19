@@ -3,6 +3,9 @@ import {
   loopNodeSizes,
   loopNodeStyles,
   loopTerminals,
+  loopCapabilityPattern,
+  maxLoopCapabilities,
+  maxLoopCapabilityLength,
   maxLocalAttemptsLimit,
   maxProjectStateBytes,
   maxRepairAttemptsLimit,
@@ -17,6 +20,7 @@ import {
   type LoopTheme
 } from "../domain/loopThemes.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
+import { validateProjectConfigSchema } from "./project-config-schema-validation.js";
 import { projectWorkScheduleSchema } from "./work-schedule-schema.js";
 
 export { projectWorkScheduleSchema } from "./work-schedule-schema.js";
@@ -128,6 +132,17 @@ const automationEdgeIdSchema = z.string()
   .max(200)
   .regex(kebabCaseIdPattern, "Edge id must be lowercase kebab-case.");
 const kebabLoopIdSchema = automationLoopIdSchema.regex(kebabCaseIdPattern, "Loop id must be lowercase kebab-case.");
+export const loopCapabilitySchema = z.string()
+  .trim()
+  .min(1, "Capability must be non-empty.")
+  .max(maxLoopCapabilityLength, `Capability must not exceed ${maxLoopCapabilityLength} characters.`)
+  .regex(
+    loopCapabilityPattern,
+    "Capability must use a namespaced lowercase id such as namespace:capability.name."
+  );
+const loopCapabilityListSchema = z.array(loopCapabilitySchema)
+  .max(maxLoopCapabilities, `Capability lists must not contain more than ${maxLoopCapabilities} values.`)
+  .refine((values) => new Set(values).size === values.length, "Capabilities must be unique.");
 const loopThemeColorSchema = z.string()
   .regex(/^#[0-9a-f]{6}$/, "Expected a six-digit lowercase hex color.");
 
@@ -209,6 +224,10 @@ const stateInitialSchema = jsonValueSchema.refine((value) =>
 const projectLoopSchema = z.object({
   id: kebabLoopIdSchema,
   description: automationDescriptionSchema,
+  capabilities: z.object({
+    accepts: loopCapabilityListSchema,
+    provides: loopCapabilityListSchema
+  }).strict(),
   state: z.object({
     description: automationDescriptionSchema,
     initial: stateInitialSchema
@@ -232,80 +251,25 @@ const projectLoopEdgeSchema = z.object({
   source: kebabLoopIdSchema,
   target: kebabLoopIdSchema,
   kind: z.enum(["flow", "repair"]),
+  capability: loopCapabilitySchema,
   description: automationDescriptionSchema
 }).strict();
 
-export const automationConfigSchema = z.object({
-  version: z.literal(10),
-  orchestrator: orchestratorSchema,
-  loops: z.array(projectLoopSchema),
+const graphSchema = z.object({
   loopEdges: z.array(projectLoopEdgeSchema)
+}).strict();
+
+export const automationConfigSchema = z.object({
+  version: z.literal(11),
+  orchestrator: orchestratorSchema,
+  graph: graphSchema,
+  loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(10),
+  version: z.literal(11),
   executionProfiles: z.array(executionProfileSchema),
   orchestrator: orchestratorSchema,
-  loops: z.array(projectLoopSchema),
-  loopEdges: z.array(projectLoopEdgeSchema)
-}).strict().superRefine((config, context) => {
-  const loopIds = new Set<string>();
-  config.loops.forEach((loop, loopIndex) => {
-    if (loopIds.has(loop.id)) context.addIssue({
-      code: "custom",
-      path: ["loops", loopIndex, "id"],
-      message: `Duplicate loop id: ${loop.id}.`
-    });
-    loopIds.add(loop.id);
-  });
-  const profileIds = new Set<string>();
-  config.executionProfiles.forEach((profile, profileIndex) => {
-    if (profileIds.has(profile.id)) context.addIssue({
-      code: "custom",
-      path: ["executionProfiles", profileIndex, "id"],
-      message: `Duplicate execution profile id: ${profile.id}.`
-    });
-    profileIds.add(profile.id);
-  });
-  if (config.orchestrator.executionProfileId && !profileIds.has(config.orchestrator.executionProfileId)) context.addIssue({
-    code: "custom",
-    path: ["orchestrator", "executionProfileId"],
-    message: `Orchestrator references unknown execution profile: ${config.orchestrator.executionProfileId}.`
-  });
-  const nodeIds = new Set<string>();
-  const edgeIds = new Set<string>();
-  config.loops.forEach((loop, loopIndex) => {
-    loop.nodes.forEach((node, nodeIndex) => {
-      if (nodeIds.has(node.id)) context.addIssue({
-        code: "custom",
-        path: ["loops", loopIndex, "nodes", nodeIndex, "id"],
-        message: `Duplicate node id: ${node.id}.`
-      });
-      nodeIds.add(node.id);
-      for (const [partName, part] of [["work", node.work], ["validation", node.validation]] as const) {
-        if (part.type === "human" || profileIds.has(part.executionProfileId)) continue;
-        context.addIssue({
-          code: "custom",
-          path: ["loops", loopIndex, "nodes", nodeIndex, partName, "executionProfileId"],
-          message: `${partName === "work" ? "Work" : "Validation"} Node references unknown execution profile: ${part.executionProfileId}.`
-        });
-      }
-    });
-    loop.edges.forEach((edge, edgeIndex) => {
-      if (edgeIds.has(edge.id)) context.addIssue({
-        code: "custom",
-        path: ["loops", loopIndex, "edges", edgeIndex, "id"],
-        message: `Duplicate edge id: ${edge.id}.`
-      });
-      edgeIds.add(edge.id);
-    });
-  });
-  config.loopEdges.forEach((edge, edgeIndex) => {
-    if (edgeIds.has(edge.id)) context.addIssue({
-      code: "custom",
-      path: ["loopEdges", edgeIndex, "id"],
-      message: `Duplicate edge id: ${edge.id}.`
-    });
-    edgeIds.add(edge.id);
-  });
-}) satisfies z.ZodType<ProjectConfiguration>;
+  graph: graphSchema,
+  loops: z.array(projectLoopSchema)
+}).strict().superRefine(validateProjectConfigSchema) satisfies z.ZodType<ProjectConfiguration>;

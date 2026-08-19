@@ -12,7 +12,7 @@ export function LoopEdgesEditor({ config, sourceLoopId, disabled, onAdd, onChang
   onChange: (edgeId: string, edge: ProjectLoopEdge) => void;
   onRemove: (edgeId: string) => void;
 }) {
-  const edges = config.loopEdges.filter((edge) => edge.source === sourceLoopId);
+  const edges = config.graph.loopEdges.filter((edge) => edge.source === sourceLoopId);
   const targetOptions = config.loops.map((loop) => ({
     value: loop.id,
     label: `${loop.id} · ${loop.description}`

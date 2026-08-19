@@ -4,7 +4,7 @@ title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 4
+version: 5
 tags:
   - arc42
   - solution-strategy
@@ -19,7 +19,7 @@ Tämä osio kokoaa perustavat ratkaisut, joilla Ballet vastaa Goaleihin, laatuta
 
 ## Tila
 
-STRAT-001–STRAT-008 ovat toteutetun strict-v10-arkkitehtuurin strategioita. STRAT-009 on hyväksytty strict-v11-target, jonka implementation evidence on pending. Menetelmän vaikuttavuuden tuotantokaltainen baseline ja UI:n pidempiaikainen tulkintavirheiden seuranta ovat vielä avointa evidenssiä.
+STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. STRAT-009:n strict-v11 domain/config/snapshot/module-raja on toteutettu; Orchestrator-dispatch sekä Graph/Loop-authoring-UI ovat pending. Menetelmän vaikuttavuuden tuotantokaltainen baseline ja UI:n pidempiaikainen tulkintavirheiden seuranta ovat vielä avointa evidenssiä.
 
 ## Strategiat ja jäljitettävyys
 
@@ -62,7 +62,7 @@ Hyväksytyt ADR:t omistavat päätökset; tämä osio omistaa niiden strategisen
 
 ## Evidenssi
 
-Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä v10-authoring-projektiot. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v10-graafin. Module-testit todentavat STRAT-008:n materialisointirajan. STRAT-009:llä on accepted päätös mutta EVID-014 on pending. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
+Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä nykyiset authoring-projektiot. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v11 Graph/capability-sopimuksen. Module-testit todentavat STRAT-008:n target-riippumattoman materialisointirajan. STRAT-009:n osittainen evidenssi on `GLE-EVID-002`, `GLE-EVID-003` ja `GLE-EVID-008`; koko `EVID-014` on pending. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
 
 ## Avoimet kysymykset
 

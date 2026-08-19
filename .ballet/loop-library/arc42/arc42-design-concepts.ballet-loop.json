@@ -1,30 +1,33 @@
 {
   "capabilities": {
+    "accepts": [
+      "arc42:structures-designed"
+    ],
     "provides": [
-      "arc42.concepts-designed"
+      "arc42:concepts-designed"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42.requirements-clarified",
+        "capability": "arc42:requirements-clarified",
         "description": "Request a missing quality criterion needed to choose a concept.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.structures-designed",
+        "capability": "arc42:structures-designed",
         "description": "Repair a building block or interface exposed by concept design.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.architecture-communicated",
+        "capability": "arc42:architecture-communicated",
         "description": "Continue reviewed concepts to architecture communication.",
         "direction": "outgoing",
         "kind": "flow"
       }
     ],
     "requires": [
-      "arc42.structures-designed"
+      "arc42:structures-designed"
     ]
   },
   "format": "ballet-loop-module",
@@ -129,7 +132,6 @@
           "changedArtifactPaths": [],
           "checks": [],
           "nextAction": null,
-          "nextLoopId": null,
           "stableIds": [],
           "status": "pending",
           "summary": null
@@ -275,7 +277,6 @@
         "changedArtifactPaths": [],
         "checks": [],
         "nextAction": null,
-        "nextLoopId": null,
         "stableIds": [],
         "status": "pending",
         "summary": null

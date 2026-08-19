@@ -3,35 +3,36 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { automationConfigSchema, projectConfigSchema } from "../../shared/api/workspace-schemas.js";
-import { maxProjectStateBytes } from "../../shared/domain/automation.js";
+import { maxLoopCapabilities, maxProjectStateBytes } from "../../shared/domain/automation.js";
 import { validateProjectAutomationConfig } from "../automation/validateAutomationConfig.js";
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
-import { testAutomationConfig, testLoop, testProjectConfiguration, testWorkLoopNode } from "./v10TestConfig.js";
+import { testAutomationConfig, testLoop, testProjectConfiguration, testWorkLoopNode } from "./v11TestConfig.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("strict-v10 project configuration", () => {
-  it("parses the v10 authoring shape and rejects unknown fields", () => {
+describe("strict-v11 project configuration", () => {
+  it("round-trips the v11 authoring shape and rejects unknown fields", () => {
     const value = testProjectConfiguration();
     expect(projectConfigSchema.parse(value)).toEqual(value);
     expect(projectConfigSchema.safeParse({ ...value, steps: [] }).success).toBe(false);
-    expect(automationConfigSchema.safeParse({ ...testAutomationConfig(), version: 9 }).success).toBe(false);
+    expect(projectConfigSchema.safeParse({ ...value, loopEdges: [] }).success).toBe(false);
+    expect(automationConfigSchema.safeParse({ ...testAutomationConfig(), version: 10 }).success).toBe(false);
     expect(automationConfigSchema.safeParse({
       ...testAutomationConfig(),
       loops: [{ ...testLoop(), nodes: [{ ...testWorkLoopNode(), approved: "completed" }] }]
     }).success).toBe(false);
   });
 
-  it("returns the exact hard-cut error for strict-v9 project.json", async () => {
+  it("returns the exact hard-cut error for strict-v10 project.json", async () => {
     const root = await temporaryProject();
-    await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({ version: 9, executionProfiles: [], loops: [] }));
+    await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({ version: 10, executionProfiles: [], loops: [] }));
     const loaded = new ProjectConfigurationRepository().load(root);
     expect(loaded.config).toBeUndefined();
     expect(loaded.issues).toEqual([{
       code: "invalid_schema",
       path: "version",
-      message: "Project configuration version 9 is not supported; update the project to strict v10."
+      message: "Project configuration version 10 is not supported; update the project to strict v11."
     }]);
   });
 
@@ -39,24 +40,29 @@ describe("strict-v10 project configuration", () => {
     const root = await temporaryProject();
     const repository = new ProjectConfigurationRepository();
     const project = testProjectConfiguration();
-    project.loopEdges = [{
+    project.graph.loopEdges = [{
       id: "main-repair",
       source: "main-loop",
       target: "main-loop",
       kind: "repair",
+      capability: "test:loop.transfer",
       description: "Allow bounded self-repair."
     }];
     await writeFile(path.join(root, ".ballet", "project.json"), `${JSON.stringify(project)}\n`);
     repository.putAutomation(root, {
-      version: 10,
+      version: 11,
       orchestrator: project.orchestrator,
-      loops: project.loops,
-      loopEdges: project.loopEdges
+      graph: project.graph,
+      loops: project.loops
     });
     const persisted = JSON.parse(await readFile(path.join(root, ".ballet", "project.json"), "utf8")) as Record<string, unknown>;
-    expect(persisted.version).toBe(10);
+    expect(persisted.version).toBe(11);
     expect(persisted).toHaveProperty("orchestrator.maxRepairDepth", 4);
     expect(persisted).toHaveProperty("loops.0.state.initial");
+    expect(persisted).toHaveProperty("loops.0.capabilities", {
+      accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"]
+    });
+    expect(persisted).toHaveProperty("graph.loopEdges.0.capability", "test:loop.transfer");
     expect(JSON.stringify(persisted)).not.toContain("revision");
     expect(repository.load(root).issues).toEqual([]);
   });
@@ -96,7 +102,7 @@ describe("strict-v10 project configuration", () => {
   });
 });
 
-describe("strict-v10 schema boundaries", () => {
+describe("strict-v11 schema boundaries", () => {
   it("enforces Loop descriptions, Validation variants, and execution profile references", () => {
     const emptyDescription = testAutomationConfig();
     emptyDescription.loops[0]!.description = "   ";
@@ -135,28 +141,62 @@ describe("strict-v10 schema boundaries", () => {
     if (!oversized.success) expect(oversized.error.issues.some((issue) => issue.message.includes("Initial Loop state"))).toBe(true);
   });
 
+  it.each([
+    ["empty", ["   "]],
+    ["duplicate", ["test:loop.transfer", "test:loop.transfer"]],
+    ["too long", [`test:${"x".repeat(196)}`]],
+    ["invalid namespace", ["not-namespaced"]],
+    ["invalid charset", ["Test:loop.transfer"]]
+  ])("rejects %s Loop capabilities", (_case, accepts) => {
+    const config = testAutomationConfig();
+    config.loops[0]!.capabilities.accepts = accepts;
+    expect(automationConfigSchema.safeParse(config).success).toBe(false);
+  });
+
+  it("trims capabilities canonically and enforces the list maximum", () => {
+    const canonical = testAutomationConfig();
+    canonical.loops[0]!.capabilities.accepts = ["  test:loop.transfer  "];
+    expect(automationConfigSchema.parse(canonical).loops[0]!.capabilities.accepts).toEqual(["test:loop.transfer"]);
+
+    const tooMany = testAutomationConfig();
+    tooMany.loops[0]!.capabilities.accepts = Array.from(
+      { length: maxLoopCapabilities + 1 },
+      (_, index) => `test:capability.${index}`
+    );
+    expect(automationConfigSchema.safeParse(tooMany).success).toBe(false);
+  });
+
   it("validates globally unique node and edge ids plus Loop Edge references", () => {
     const config = testAutomationConfig();
     const other = testLoop("other-loop", testWorkLoopNode("work"));
     config.loops.push(other);
-    config.loopEdges = [{ id: config.loops[0]!.edges[0]!.id, source: "main-loop", target: "missing-loop", kind: "repair", description: "Invalid route." }];
+    config.graph.loopEdges = [{
+      id: config.loops[0]!.edges[0]!.id, source: "main-loop", target: "missing-loop",
+      kind: "repair", capability: "test:loop.transfer", description: "Invalid route."
+    }];
     const issues = validateProjectAutomationConfig(config, testProjectConfiguration().executionProfiles);
     expect(issues.some((issue) => issue.message === "Duplicate Work Loop Node id: work.")).toBe(true);
-    expect(issues.some((issue) => issue.message === `Duplicate Edge id: ${config.loopEdges[0]!.id}.`)).toBe(true);
+    expect(issues.some((issue) => issue.message === `Duplicate Edge id: ${config.graph.loopEdges[0]!.id}.`)).toBe(true);
     expect(issues.some((issue) => issue.message === "Loop Edge references an unknown target Loop: missing-loop.")).toBe(true);
   });
 
-  it("requires one unambiguous repair Loop Edge per source and target pair", () => {
+  it("rejects duplicate route candidates and capability-incompatible targets", () => {
     const config = testAutomationConfig();
-    config.loopEdges = [
-      { id: "repair-a", source: "main-loop", target: "main-loop", kind: "repair", description: "First route." },
-      { id: "repair-b", source: "main-loop", target: "main-loop", kind: "repair", description: "Ambiguous route." }
+    config.graph.loopEdges = [
+      { id: "repair-a", source: "main-loop", target: "main-loop", kind: "repair", capability: "test:loop.transfer", description: "First route." },
+      { id: "repair-b", source: "main-loop", target: "main-loop", kind: "repair", capability: "test:loop.transfer", description: "Duplicate route." }
     ];
 
     expect(validateProjectAutomationConfig(config, testProjectConfiguration().executionProfiles)).toContainEqual({
-      path: "loopEdges.1.target",
-      message: "Duplicate repair Loop Edge source/target route id: main-loop→main-loop."
+      path: "graph.loopEdges.1.capability",
+      message: "Duplicate Loop Edge route candidate id: main-loop→main-loop:repair:test:loop.transfer."
     });
+    config.graph.loopEdges[1] = {
+      ...config.graph.loopEdges[1]!, id: "repair-c", capability: "test:missing.capability"
+    };
+    expect(messages(config, testProjectConfiguration().executionProfiles)).toContain(
+      "Repair Loop Edge capability test:missing.capability is not provided by target Loop main-loop."
+    );
   });
 });
 
@@ -164,7 +204,7 @@ const messages = (value: unknown, profiles: ReturnType<typeof testProjectConfigu
   validateProjectAutomationConfig(value, profiles).map((issue) => issue.message);
 
 const temporaryProject = async (): Promise<string> => {
-  const root = await mkdtemp(path.join(tmpdir(), "ballet-v10-"));
+  const root = await mkdtemp(path.join(tmpdir(), "ballet-v11-"));
   roots.push(root);
   await mkdir(path.join(root, ".ballet"));
   return root;

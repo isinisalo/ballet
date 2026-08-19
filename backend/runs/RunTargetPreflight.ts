@@ -48,12 +48,12 @@ export const compositionIssuesForLoop = (
       issues: data.resourceIssues
     }, compositions);
     const snapshot: RootExecutionSnapshot = {
-      version: 3,
+      version: 4,
       rootLoopId,
       project: { checkoutRoot: "", headSha: "", configHash: "", snapshotHash: "" },
       orchestrator: data.automation.orchestrator,
+      graph: graph.graph,
       loops: graph.loops,
-      loopEdges: graph.loopEdges,
       terminals: [...loopTerminals],
       theme: data.loopTheme,
       executionProfiles,

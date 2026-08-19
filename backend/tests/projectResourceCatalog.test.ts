@@ -32,11 +32,13 @@ const writeSkill = async (root: string, id: string, body = "Skill body.") => {
 };
 
 const automationConfig = (composition: ProjectExecutionComposition): ProjectAutomationConfig => ({
-  version: 10,
+  version: 11,
   orchestrator: { ...composition, maxRepairDepth: 4, maxRepairAttempts: 3 },
+  graph: { loopEdges: [] },
   loops: [{
     id: "delivery",
     description: "Complete and validate the work.",
+    capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
     state: { description: "Shared delivery state.", initial: {} },
     startNodeId: "work",
     nodes: [{
@@ -59,8 +61,7 @@ const automationConfig = (composition: ProjectExecutionComposition): ProjectAuto
       maxLocalAttempts: 3
     }],
     edges: [{ id: "work-completed", source: "work", target: { terminal: "completed" } }]
-  }],
-  loopEdges: []
+  }]
 });
 
 describe("project resource catalog", () => {

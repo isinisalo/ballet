@@ -8,7 +8,7 @@ import {
   type RunTarget
 } from "@shared/api/workspace-contracts";
 import { useLoopRun } from "../src/workspace/automation/loops/useLoopRun";
-import { v10Loop } from "./v10Fixtures";
+import { v11Loop } from "./v11Fixtures";
 
 const now = "2026-07-19T10:00:00.000Z";
 const loopId = "archived-loop";
@@ -52,7 +52,7 @@ describe("Loop Run association", () => {
 });
 
 function rootRun(rootRunId: string): RootRunDetail {
-  const snapshot: ProjectLoop = v10Loop(loopId);
+  const snapshot: ProjectLoop = v11Loop(loopId);
   const run: LoopRunDetails = {
     loopRunId: `loop-${rootRunId}`,
     loopId,
@@ -81,7 +81,7 @@ function rootRun(rootRunId: string): RootRunDetail {
     updatedAt: now,
     completedAt: now,
     executionSnapshot: {
-      version: 3,
+      version: 4,
       rootLoopId: loopId,
       project: {
         checkoutRoot: "/workspace/ballet",
@@ -89,8 +89,8 @@ function rootRun(rootRunId: string): RootRunDetail {
         configHash: "b".repeat(64),
         snapshotHash: "c".repeat(64)
       },
+      graph: { loopEdges: [] },
       loops: [snapshot],
-      loopEdges: [],
       terminals: ["completed", "blocked", "failed"],
       orchestrator: {
         executionProfileId: "",

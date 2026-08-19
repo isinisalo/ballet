@@ -14,7 +14,7 @@ import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
 import type { PreparedRootWorkspace } from "../execution/git/LocalWorkspaceManager.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
-import { testLoop, testWorkLoopNode } from "../tests/v10TestConfig.js";
+import { testLoop, testWorkLoopNode } from "../tests/v11TestConfig.js";
 import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
 
 const roots: string[] = [];
@@ -70,7 +70,7 @@ const configuration = (): ProjectConfiguration => {
     "unused-work", "unused-runtime", "project:unused"
   ));
   return {
-    version: 10,
+    version: 11,
     executionProfiles: [profile("zeta-runtime"), profile("unused-runtime"), profile("alpha-runtime")],
     orchestrator: {
       executionProfileId: "zeta-runtime",
@@ -79,14 +79,15 @@ const configuration = (): ProjectConfiguration => {
       maxRepairDepth: 2,
       maxRepairAttempts: 3
     },
-    loops: [unused, repair, root],
-    loopEdges: [{
+    graph: { loopEdges: [{
       id: "root-repair",
       source: "root-loop",
       target: "repair-loop",
       kind: "repair",
+      capability: "test:loop.transfer",
       description: "Allow the repair Loop."
-    }]
+    }] },
+    loops: [unused, repair, root]
   };
 };
 
@@ -99,7 +100,7 @@ describe("LoopExecutionPlanner", () => {
     const snapshot = await planner.create(workspace, "root-loop");
 
     expect(snapshot).toMatchObject({
-      version: 3,
+      version: 4,
       rootLoopId: "root-loop",
       project: {
         checkoutRoot: workspace.path,
@@ -110,7 +111,10 @@ describe("LoopExecutionPlanner", () => {
       terminals: ["completed", "blocked", "failed"]
     });
     expect(snapshot.loops.map((loop) => loop.id)).toEqual(["repair-loop", "root-loop"]);
-    expect(snapshot.loopEdges.map((edge) => edge.id)).toEqual(["root-repair"]);
+    expect(snapshot.graph.loopEdges.map((edge) => edge.id)).toEqual(["root-repair"]);
+    expect(snapshot.graph.loopEdges[0]?.capability).toBe("test:loop.transfer");
+    expect(snapshot.loops.find((loop) => loop.id === "repair-loop")?.capabilities)
+      .toEqual({ accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] });
     expect(snapshot.executionProfiles.map((entry) => entry.id)).toEqual([
       "alpha-runtime", "zeta-runtime"
     ]);
@@ -151,7 +155,7 @@ describe("LoopExecutionPlanner", () => {
     const mutableRoot = config.loops.find((loop) => loop.id === "root-loop")!;
     mutableRoot.description = "Changed after the Root snapshot.";
     mutableRoot.state = { description: "Changed State contract.", initial: { changed: true } };
-    config.loopEdges[0]!.target = "unused-loop";
+    config.graph.loopEdges[0]!.target = "unused-loop";
     config.orchestrator.primaryInstructionId = "project:changed-orchestrator";
     await writeConfiguration(workspace.path, config);
     await writeInstruction(workspace.path, "root-work", "Changed after the Root snapshot.");
@@ -162,7 +166,7 @@ describe("LoopExecutionPlanner", () => {
       .toBe("Perform root Work.");
     expect(first.loops.find((loop) => loop.id === "root-loop")?.state)
       .toEqual({ description: "State for root-loop.", initial: { alpha: { count: 0 }, zeta: true } });
-    expect(first.loopEdges[0]?.target).toBe("repair-loop");
+    expect(first.graph.loopEdges[0]?.target).toBe("repair-loop");
     expect(first.orchestrator.primaryInstructionId).toBe("project:orchestrator");
     expect(first.project.snapshotHash).toBe(workspace.snapshotHash);
   });

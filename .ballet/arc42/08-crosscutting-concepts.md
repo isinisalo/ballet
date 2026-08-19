@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 4
+version: 5
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-011–QS-013 tarkentavat toteutettua strict-v10-baselinea. QS-014 / ADR-018 laajentaa CON-002:n ja CON-005:n tulevaan strict-v11 graph/capability/Orchestrator-rajaan muuttamatta concept-ID:itä; implementation evidence on pending.
+CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-014 / ADR-018:n strict-v11 graph/capability-raja on toteutettu configissa, shared contracteissa, snapshotissa ja module materialisoinnissa muuttamatta concept-ID:itä; Orchestrator-dispatch ja Graph/Loop-authoring-UI ovat pending.
 
 ## Konseptikartta
 
@@ -50,7 +50,7 @@ Authentication-palvelua ei lisätä loopback-arkkitehtuuriin implisiittisesti. T
 
 | Raja | Validointi | Virheen muoto | Sivuvaikutus |
 | --- | --- | --- | --- |
-| Project config/resources | Nykyinen strict-v10 schema; v11-targetissa strict graph/capability/routes ilman v10 readeria, dual-writeä tai silent defaultia. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
+| Project config/resources | Strict-v11 graph/capability/routes ilman v10 readeria, dual-writeä tai silent defaultia. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
 | HTTP/API | Shared request/response schema ja application precondition. | 4xx odotetulle inputille, 5xx vain odottamattomalle virheelle. | Service-transaktio ei ala malformed-inputilla. |
 | Composition | Profiili, instructionit, skillit, order, envelope ja output schema. | `ExecutionCompositionError` tai vastaava blocking outcome. | Nolla jonotettua taskia ja nolla fallbackia. |
 | Runtime outcome | Roolikohtainen strict schema, current revision ja rajat. | Failed/needs_input/interrupted/terminal outcome. | Vain atomisesti commitoitu fakta näkyy. |
@@ -105,10 +105,10 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 
 ## Versiointi ja yhteensopivuus
 
-- `.ballet/project.json` käyttää tällä hetkellä strict-v10-skeemaa. ADR-018 hyväksyy strict-v11 hard cutin, mutta dokumentaatio ei muuta runtime-versiota ennen koordinoitua toteutusta.
-- V11-toteutus ei säilytä v10-parseria, compatibility-readeria, numeric route -aliasta, dual-writeä tai silent defaultia.
+- `.ballet/project.json` käyttää strict-v11-skeemaa: graph omistaa `loopEdges`-reitit, Loop omistaa `accepts`/`provides`-capabilityt ja reitti nimeää capabilityn.
+- V11-toteutus ei säilytä v10-parseria, compatibility-readeria, top-level `loopEdges`-rinnakkaismallia, dual-writeä tai silent defaultia. Numeric route -alias poistetaan vasta rajatussa frontend hard cut -vaiheessa.
 - Shared API/TypeScript-sopimuksen semanttinen muutos vaatii toteutuksen ja kuluttajien koordinoidun päivityksen sekä testit.
-- SQLite-schema muuttuu numeroiduilla migraatioilla; dokumentaatiotyö ei muuta schema versionia.
+- SQLite-schema muuttuu vain numeroiduilla migraatioilla. V11 snapshot tallennetaan nykyiseen snapshot-JSON-kenttään, joten tämä vaihe ei vaatinut uutta SQLite-migraatiota.
 - Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
 - Hyväksytty ADR ei muutu hiljaisesti; uusi päätös supersedoi sen eksplisiittisesti.
 

@@ -236,7 +236,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
   worktreePath: prepared.path, branch: prepared.branch, headSha: prepared.headSha,
   configHash: prepared.configHash, snapshotHash: prepared.snapshotHash,
   executionSnapshot: {
-    version: 3,
+    version: 4,
     rootLoopId: "delivery",
     project: {
       checkoutRoot: prepared.path,
@@ -246,7 +246,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
     },
     loops: projectConfiguration("Test profile").loops,
     orchestrator: projectConfiguration("Test profile").orchestrator,
-    loopEdges: projectConfiguration("Test profile").loopEdges,
+    graph: projectConfiguration("Test profile").graph,
     terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme,
     executionProfiles: projectConfiguration("Test profile").executionProfiles,
@@ -257,7 +257,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
 });
 
 const projectConfiguration = (profileName: string): ProjectConfiguration => ({
-  version: 10,
+  version: 11,
   executionProfiles: [{
     id: "test-profile",
     name: profileName,
@@ -273,9 +273,11 @@ const projectConfiguration = (profileName: string): ProjectConfiguration => ({
     maxRepairDepth: 4,
     maxRepairAttempts: 3
   },
+  graph: { loopEdges: [] },
   loops: [{
     id: "delivery",
     description: "Complete and validate the work.",
+    capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
     state: { description: "Shared delivery state.", initial: {} },
     startNodeId: "work",
     nodes: [{
@@ -299,8 +301,7 @@ const projectConfiguration = (profileName: string): ProjectConfiguration => ({
       maxLocalAttempts: 3
     }],
     edges: [{ id: "work-completed", source: "work", target: { terminal: "completed" } }]
-  }],
-  loopEdges: []
+  }]
 });
 
 const projectJson = (profileName: string): string =>

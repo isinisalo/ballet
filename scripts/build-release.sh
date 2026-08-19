@@ -150,6 +150,8 @@ if (!Array.isArray(entries)
   || entries[0]?.valid !== true
   || entries[0]?.manifest?.title !== "Clarify requirements"
   || entries[0]?.permissions?.externalWrites !== false
+  || entries[0]?.package?.capabilities?.accepts?.[0] !== "arc42:initiative.requested"
+  || entries[0]?.package?.capabilities?.provides?.[0] !== "arc42:requirements.clarified"
   || entries[0]?.package?.loop?.nodes?.length !== 2) {
   throw new Error("packaged Ballet server did not list the fixture Loop Library package");
 }
@@ -169,10 +171,14 @@ const loop = workspace.automation?.loops?.[0];
 const workLoopNode = loop?.nodes?.find((node) => node.id === "review");
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 10
+if (workspace.automation?.version !== 11
   || workspace.automation.loops.length !== 1
   || loop?.id !== "adr-review"
   || loop?.description !== "Review a project change and validate the review result."
+  || loop?.capabilities?.accepts?.[0] !== "ballet:task.requested"
+  || loop?.capabilities?.provides?.[0] !== "ballet:task.completed"
+  || !Array.isArray(workspace.automation.graph?.loopEdges)
+  || workspace.automation.graph.loopEdges.length !== 0
   || loop?.startNodeId !== "review"
   || loop?.state?.description !== "Provider-neutral context shared by the review Work Loop."
   || JSON.stringify(loop?.state?.initial) !== "{}"
@@ -210,7 +216,7 @@ if (workspace.automation?.version !== 10
   || workspace.loopTheme?.version !== 4
   || Object.hasOwn(workspace.loopTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.loopThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v10 fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v11 fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2

@@ -1,11 +1,14 @@
 {
   "capabilities": {
+    "accepts": [
+      "software:backend.requested"
+    ],
     "provides": [
-      "software.backend-implemented"
+      "software:backend-implemented"
     ],
     "recommendedConnections": [
       {
-        "capability": "software.frontend-implemented",
+        "capability": "software:frontend-implemented",
         "description": "Continue an accepted backend contract to a compatible user-interface implementation when the project needs one.",
         "direction": "outgoing",
         "kind": "flow"
@@ -20,17 +23,23 @@
       {
         "key": "analysis-ok",
         "source": "analyze-backend-change",
-        "target": { "node": "implement-backend-change" }
+        "target": {
+          "node": "implement-backend-change"
+        }
       },
       {
         "key": "implementation-ok",
         "source": "implement-backend-change",
-        "target": { "node": "validate-backend-change" }
+        "target": {
+          "node": "validate-backend-change"
+        }
       },
       {
         "key": "validation-ok",
         "source": "validate-backend-change",
-        "target": { "terminal": "completed" }
+        "target": {
+          "terminal": "completed"
+        }
       }
     ],
     "key": "loop",
@@ -121,7 +130,11 @@
     "category": "software-delivery",
     "description": "Analyze, implement, and validate a bounded backend change across domain, API, persistence, and compatibility boundaries.",
     "id": "backend-implementation",
-    "tags": ["backend", "implementation", "validation"],
+    "tags": [
+      "backend",
+      "implementation",
+      "validation"
+    ],
     "title": "Backend implementation",
     "version": "1.0.0"
   },
@@ -134,14 +147,20 @@
       "description": "A provider profile for repository-local backend analysis and implementation.",
       "key": "engineer",
       "network": "forbidden",
-      "providers": ["codex", "copilot"],
+      "providers": [
+        "codex",
+        "copilot"
+      ],
       "title": "Backend engineer"
     },
     {
       "description": "A provider profile for independent repository-local backend validation.",
       "key": "reviewer",
       "network": "forbidden",
-      "providers": ["codex", "copilot"],
+      "providers": [
+        "codex",
+        "copilot"
+      ],
       "title": "Backend reviewer"
     }
   ],
@@ -150,14 +169,24 @@
       "body": "\n# Backend engineer\n\nAnalyze and implement one bounded backend change. Follow the repository's accepted architecture and existing domain, API, persistence, migration, and test patterns. Keep changes minimal, remove replaced code in scope, run relevant checks, and report concrete evidence. Never perform external writes or invent missing product intent.\n",
       "key": "backend-engineer",
       "kind": "instruction",
-      "metadata": { "tags": ["backend", "implementation"] },
+      "metadata": {
+        "tags": [
+          "backend",
+          "implementation"
+        ]
+      },
       "title": "Backend engineer"
     },
     {
       "body": "\n# Backend reviewer\n\nIndependently validate one bounded backend change against its requested behavior, accepted architecture, domain and API contracts, persistence safety, compatibility constraints, and executable evidence. Do not edit the implementation while validating it. Return a precise repair request for every blocking gap.\n",
       "key": "backend-reviewer",
       "kind": "instruction",
-      "metadata": { "tags": ["backend", "validation"] },
+      "metadata": {
+        "tags": [
+          "backend",
+          "validation"
+        ]
+      },
       "title": "Backend reviewer"
     }
   ],
@@ -171,7 +200,13 @@
       "request": null,
       "status": "not_started"
     },
-    "requiredKeys": ["checks", "evidence", "implementationAreas", "request", "status"],
+    "requiredKeys": [
+      "checks",
+      "evidence",
+      "implementationAreas",
+      "request",
+      "status"
+    ],
     "version": "1.0.0"
   },
   "version": 1

@@ -12,6 +12,7 @@ const stateContractSchema = z.object({
 }).strict();
 const capabilitiesSchema = z.object({
   requires: z.array(z.string()),
+  accepts: z.array(z.string()),
   provides: z.array(z.string()),
   recommendedConnections: z.array(z.object({
     kind: z.enum(["flow", "repair"]), direction: z.enum(["incoming", "outgoing"]), capability: z.string(), description: z.string()

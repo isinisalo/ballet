@@ -31,7 +31,7 @@ export const resolveLoopRunView = (
       ...config,
       orchestrator: root.executionSnapshot.orchestrator,
       loops: root.executionSnapshot.loops,
-      loopEdges: root.executionSnapshot.loopEdges
+      loopEdges: root.executionSnapshot.graph.loopEdges
     } : config,
     canvasProfiles: root?.executionSnapshot.executionProfiles ?? executionProfiles,
     canvasTheme: root?.executionSnapshot.theme ?? theme,

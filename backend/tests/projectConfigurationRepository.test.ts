@@ -31,6 +31,7 @@ const profile = (id: string, networkAccess = false): ExecutionProfile => ({
 const loop = (executionProfileId: string): ProjectLoop => ({
   id: "delivery",
   description: "Complete and validate the work.",
+  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   state: { description: "Shared delivery state.", initial: {} },
   startNodeId: "work",
   nodes: [{
@@ -57,7 +58,7 @@ const loop = (executionProfileId: string): ProjectLoop => ({
 });
 
 const automation = (executionProfileId: string): ProjectAutomationConfig => ({
-  version: 10,
+  version: 11,
   orchestrator: {
     executionProfileId,
     primaryInstructionId: "project:primary",
@@ -65,8 +66,8 @@ const automation = (executionProfileId: string): ProjectAutomationConfig => ({
     maxRepairDepth: 4,
     maxRepairAttempts: 3
   },
-  loops: [loop(executionProfileId)],
-  loopEdges: []
+  graph: { loopEdges: [] },
+  loops: [loop(executionProfileId)]
 });
 
 describe("project configuration repository", () => {
@@ -75,7 +76,7 @@ describe("project configuration repository", () => {
     const repository = new ProjectConfigurationRepository();
     expect(repository.load(projectRoot)).toMatchObject({
       exists: false,
-      config: { version: 10, executionProfiles: [], orchestrator: expect.any(Object), loops: [], loopEdges: [] },
+      config: { version: 11, executionProfiles: [], orchestrator: expect.any(Object), graph: { loopEdges: [] }, loops: [] },
       issues: []
     });
     await expect(readFile(repository.path(projectRoot), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
@@ -89,20 +90,20 @@ describe("project configuration repository", () => {
     repository.putAutomation(projectRoot, automation("zeta"));
 
     expect(JSON.parse(await readFile(repository.path(projectRoot), "utf8"))).toEqual({
-      version: 10,
+      version: 11,
       executionProfiles: [profile("alpha"), profile("zeta", true)],
       orchestrator: {
         ...automation("zeta").orchestrator,
         skillIds: ["project:alpha", "project:zeta"]
       },
+      graph: { loopEdges: [] },
       loops: [{
         ...loop("zeta"),
         nodes: [{
           ...loop("zeta").nodes[0]!,
           work: { ...loop("zeta").nodes[0]!.work, skillIds: ["project:alpha", "project:zeta"] }
         }]
-      }],
-      loopEdges: []
+      }]
     });
     expect(await readdir(path.join(projectRoot, ".ballet"))).toEqual(["project.json"]);
   });
@@ -120,11 +121,11 @@ describe("project configuration repository", () => {
     expect(await readFile(repository.path(projectRoot), "utf8")).toBe(before);
   });
 
-  it("rejects strict-v8 source clearly and leaves it unchanged", async () => {
+  it("rejects an unknown config version clearly and leaves it unchanged", async () => {
     const projectRoot = await root();
     const repository = new ProjectConfigurationRepository();
     await mkdir(path.dirname(repository.path(projectRoot)), { recursive: true });
-    const legacySource = `${JSON.stringify({ version: 8, loops: [] }, null, 2)}\n`;
+    const legacySource = `${JSON.stringify({ version: 12, loops: [] }, null, 2)}\n`;
     await writeFile(repository.path(projectRoot), legacySource, "utf8");
 
     expect(repository.load(projectRoot)).toMatchObject({
@@ -133,7 +134,7 @@ describe("project configuration repository", () => {
       issues: [expect.objectContaining({
         code: "invalid_schema",
         path: "version",
-        message: expect.stringContaining("version 10 is required")
+        message: expect.stringContaining("version 11 is required")
       })]
     });
     expect(() => repository.createExecutionProfile(projectRoot, profile("primary")))

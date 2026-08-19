@@ -1,11 +1,14 @@
 {
   "capabilities": {
+    "accepts": [
+      "software:frontend.requested"
+    ],
     "provides": [
-      "software.frontend-implemented"
+      "software:frontend-implemented"
     ],
     "recommendedConnections": [
       {
-        "capability": "software.backend-implemented",
+        "capability": "software:backend-implemented",
         "description": "Use an accepted backend contract as an optional upstream input when the user interface depends on one.",
         "direction": "incoming",
         "kind": "flow"
@@ -20,17 +23,23 @@
       {
         "key": "analysis-ok",
         "source": "analyze-frontend-change",
-        "target": { "node": "implement-frontend-change" }
+        "target": {
+          "node": "implement-frontend-change"
+        }
       },
       {
         "key": "implementation-ok",
         "source": "implement-frontend-change",
-        "target": { "node": "validate-frontend-change" }
+        "target": {
+          "node": "validate-frontend-change"
+        }
       },
       {
         "key": "validation-ok",
         "source": "validate-frontend-change",
-        "target": { "terminal": "completed" }
+        "target": {
+          "terminal": "completed"
+        }
       }
     ],
     "key": "loop",
@@ -121,7 +130,11 @@
     "category": "software-delivery",
     "description": "Analyze, implement, and validate a bounded frontend change across user flow, API contract, design system, accessibility, layout, and build boundaries.",
     "id": "frontend-implementation",
-    "tags": ["frontend", "implementation", "accessibility"],
+    "tags": [
+      "frontend",
+      "implementation",
+      "accessibility"
+    ],
     "title": "Frontend implementation",
     "version": "1.0.0"
   },
@@ -134,14 +147,20 @@
       "description": "A provider profile for repository-local frontend analysis and implementation.",
       "key": "engineer",
       "network": "forbidden",
-      "providers": ["codex", "copilot"],
+      "providers": [
+        "codex",
+        "copilot"
+      ],
       "title": "Frontend engineer"
     },
     {
       "description": "A provider profile for independent repository-local frontend validation.",
       "key": "reviewer",
       "network": "forbidden",
-      "providers": ["codex", "copilot"],
+      "providers": [
+        "codex",
+        "copilot"
+      ],
       "title": "Frontend reviewer"
     }
   ],
@@ -150,14 +169,24 @@
       "body": "\n# Frontend engineer\n\nAnalyze and implement one bounded frontend change. Follow the repository's accepted architecture, design system, API, routing, state, component, accessibility, responsive layout, and test patterns. Keep changes minimal, remove replaced code in scope, verify real viewport behavior, and report concrete evidence. Never perform external writes or invent missing product intent.\n",
       "key": "frontend-engineer",
       "kind": "instruction",
-      "metadata": { "tags": ["frontend", "implementation"] },
+      "metadata": {
+        "tags": [
+          "frontend",
+          "implementation"
+        ]
+      },
       "title": "Frontend engineer"
     },
     {
       "body": "\n# Frontend reviewer\n\nIndependently validate one bounded frontend change against its requested user journey, accepted architecture, design system, API contract, accessibility semantics, keyboard behavior, responsive layouts, and executable evidence. Do not edit the implementation while validating it. Return a precise repair request for every blocking gap.\n",
       "key": "frontend-reviewer",
       "kind": "instruction",
-      "metadata": { "tags": ["frontend", "validation"] },
+      "metadata": {
+        "tags": [
+          "frontend",
+          "validation"
+        ]
+      },
       "title": "Frontend reviewer"
     }
   ],
@@ -171,7 +200,13 @@
       "userFlow": null,
       "status": "not_started"
     },
-    "requiredKeys": ["checks", "evidence", "status", "surfaces", "userFlow"],
+    "requiredKeys": [
+      "checks",
+      "evidence",
+      "status",
+      "surfaces",
+      "userFlow"
+    ],
     "version": "1.0.0"
   },
   "version": 1

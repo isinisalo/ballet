@@ -7,7 +7,7 @@ import type { JsonValue, ProjectLoop, ProjectLoopEdge } from "../../shared/domai
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import { RootRunStore } from "../runs/RootRunStore.js";
 import { LocalDatabase } from "../storage/LocalDatabase.js";
-import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v10TestConfig.js";
+import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v11TestConfig.js";
 import { ControlFlowStore } from "./ControlFlowStore.js";
 import { LoopRunStore } from "./LoopRunStore.js";
 import { LoopStateStore } from "./LoopStateStore.js";
@@ -50,17 +50,18 @@ export const createRuntimeStoreFixture = async (
   let connection = () => database.connection();
   const loop = { ...(options.loop ?? testLoop()), state: { description: "Test state.", initial } };
   const snapshot: RootExecutionSnapshot = {
-    version: 3,
+    version: 4,
     rootLoopId: loop.id,
     project: {
       checkoutRoot: "/workspace", headSha: "a".repeat(40),
       configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
     },
     orchestrator: options.orchestrator ?? testOrchestrator(),
+    graph: { loopEdges: options.loopEdges ?? [{
+      id: "self-repair", source: loop.id, target: loop.id, kind: "repair",
+      capability: "test:loop.transfer", description: "Self repair."
+    }] },
     loops: [loop, ...(options.loops ?? []).filter((candidate) => candidate.id !== loop.id)],
-    loopEdges: options.loopEdges ?? [{
-      id: "self-repair", source: loop.id, target: loop.id, kind: "repair", description: "Self repair."
-    }],
     terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme,
     executionProfiles: [testExecutionProfile],

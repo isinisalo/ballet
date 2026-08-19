@@ -17,6 +17,7 @@ import { defaultOnceSchedule } from "./loopSchedulePresentation";
 export const createLoopDraft = (): ProjectLoop => ({
   id: "new-loop",
   description: "",
+  capabilities: { accepts: [], provides: [] },
   state: { description: "", initial: {} },
   startNodeId: "work",
   nodes: [],
@@ -76,11 +77,13 @@ export const updateLoopAtIndex = (
   return {
     ...config,
     loops: config.loops.map((candidate, candidateIndex) => candidateIndex === index ? loop : candidate),
-    loopEdges: previous.id === loop.id ? config.loopEdges : config.loopEdges.map((edge) => ({
-      ...edge,
-      source: edge.source === previous.id ? loop.id : edge.source,
-      target: edge.target === previous.id ? loop.id : edge.target
-    }))
+    graph: {
+      loopEdges: previous.id === loop.id ? config.graph.loopEdges : config.graph.loopEdges.map((edge) => ({
+        ...edge,
+        source: edge.source === previous.id ? loop.id : edge.source,
+        target: edge.target === previous.id ? loop.id : edge.target
+      }))
+    }
   };
 };
 
@@ -93,7 +96,7 @@ export const removeLoopAtIndex = (
   return {
     ...config,
     loops: config.loops.filter((_, candidateIndex) => candidateIndex !== index),
-    loopEdges: config.loopEdges.filter((edge) => edge.source !== removed.id && edge.target !== removed.id)
+    graph: { loopEdges: config.graph.loopEdges.filter((edge) => edge.source !== removed.id && edge.target !== removed.id) }
   };
 };
 export const replaceWorkLoopNode = (
@@ -169,25 +172,30 @@ export const updateLoopEdge = (
   edge: ProjectLoopEdge
 ): ProjectAutomationConfig => ({
   ...config,
-  loopEdges: config.loopEdges.map((candidate) => candidate.id === edgeId ? edge : candidate)
+  graph: { loopEdges: config.graph.loopEdges.map((candidate) => candidate.id === edgeId ? edge : candidate) }
 });
 export const addLoopEdge = (
   config: ProjectAutomationConfig,
   sourceLoopId: string
 ): ProjectAutomationConfig => {
-  const hasFlow = config.loopEdges.some((edge) => edge.source === sourceLoopId && edge.kind === "flow");
+  const hasFlow = config.graph.loopEdges.some((edge) => edge.source === sourceLoopId && edge.kind === "flow");
   const kind = hasFlow ? "repair" : "flow";
   const target = config.loops.find((loop) => loop.id !== sourceLoopId
-    && (kind === "flow" || !config.loopEdges.some((edge) => edge.kind === "repair"
+    && (kind === "flow" || !config.graph.loopEdges.some((edge) => edge.kind === "repair"
       && edge.source === sourceLoopId && edge.target === loop.id)))?.id ?? sourceLoopId;
+  const targetLoop = config.loops.find((loop) => loop.id === target);
+  const compatibleCapabilities = kind === "flow"
+    ? targetLoop?.capabilities.accepts ?? []
+    : targetLoop?.capabilities.provides ?? [];
   const edge: ProjectLoopEdge = {
-    id: uniqueId(config.loopEdges.map((candidate) => candidate.id), `${sourceLoopId}-${kind}`),
+    id: uniqueId(config.graph.loopEdges.map((candidate) => candidate.id), `${sourceLoopId}-${kind}`),
     source: sourceLoopId,
     target,
     kind,
+    capability: compatibleCapabilities.length === 1 ? compatibleCapabilities[0]! : "",
     description: kind === "flow" ? "Continue to the target Loop." : "Allow repair routing to the target Loop."
   };
-  return { ...config, loopEdges: [...config.loopEdges, edge] };
+  return { ...config, graph: { loopEdges: [...config.graph.loopEdges, edge] } };
 };
 
 export const removeLoopEdge = (
@@ -195,7 +203,7 @@ export const removeLoopEdge = (
   edgeId: string
 ): ProjectAutomationConfig => ({
   ...config,
-  loopEdges: config.loopEdges.filter((edge) => edge.id !== edgeId)
+  graph: { loopEdges: config.graph.loopEdges.filter((edge) => edge.id !== edgeId) }
 });
 
 export const updateOrchestrator = (

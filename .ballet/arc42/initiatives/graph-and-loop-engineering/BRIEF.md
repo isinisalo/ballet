@@ -4,7 +4,7 @@ title: Graph and Loop Engineering BRIEF
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-19'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -20,11 +20,11 @@ tags:
 - Owner: projektin omistaja ja päävastuullinen repository-arkkitehti.
 - Goal / Requirement: `goal-012` / `REQ-012`.
 - Decision: `goal-012` hyväksyy WHAT/WHY-rajan ja `adr-018` HOW-rajan.
-- Status: `draft`; tämä BRIEF ei väitä v11-toteutusta valmiiksi eikä valtuuta ulkoista kirjoitusta.
+- Status: `draft`; strict-v11 data/config/snapshot/module-vaihe on toteutettu, mutta tämä BRIEF ei väitä koko initiativea valmiiksi eikä valtuuta ulkoista kirjoitusta.
 
 ## Fact
 
-- Nykyinen toteutettu baseline on strict v10, Root Execution Snapshot v3 ja URL-ohjattu Context / Level 1 / Level 2 -Loop Engineer.
+- Nykyinen data-baseline on strict v11 ja Root Execution Snapshot v4. URL-ohjattu Context / Level 1 / Level 2 -Loop Engineer sekä nykyinen cross-Loop-control flow säilyvät vielä muuttumattomina.
 - Nykyinen repair kulkee Orchestratorin kautta ja palaa durable call framella samaan Validationiin.
 - Nykyinen top-level flow seuraa automaattisesti enintään yhtä lähtevää `flow`-LoopEdgeä `LoopCompletionEngine.followFlow`-polussa.
 - Nykyinen Graphia vastaava Level 1 näyttää `ProjectLoop`it ja `ProjectLoopEdge`-yhteydet, mutta Orchestrator on inspectorissa eikä control-nodena canvasilla.
@@ -78,7 +78,7 @@ Tuote siirtyy kahteen authoring-näkymään: default **Graph Engineering** ja se
 
 `QS-014` toteutuu vasta, kun strict v11 hylkää v10:n ilman compatibility-polkuja, Graph/Loop-reitit ovat ainoat authoring-reitit, Context-legacy on poistettu, Graph näyttää kaikki LoopNode-projektiot ja yhden Orchestrator-controlin, Loop Engineering säilyttää selected-Loop-only sisäosan ja runtime-testit osoittavat sekä flow- että repair-dispatchin snapshot/capability/allowlist/`needs_input`-semantiikan.
 
-Täysi acceptance vaatii `TEST-014` / `EVID-014`-ketjun sekä projektin omistajan review'n. Tämä päätösvaihe voi todentaa vain dokumentaatio- ja stable-ID-conformancen.
+Täysi acceptance vaatii `TEST-014` / `EVID-014`-ketjun sekä projektin omistajan review'n. Tämä rajattu vaihe todentaa domain/config/snapshot/module-rajat, ei runtime-dispatchia tai authoring-UI:ta.
 
 ## Assumption, Hypothesis ja Finding
 
@@ -92,4 +92,4 @@ Täysi acceptance vaatii `TEST-014` / `EVID-014`-ketjun sekä projektin omistaja
 
 ## Evidenssi ja seuraava hyväksyntäraja
 
-Lähteet: `goal-012`, `adr-018`, ADR-015/017, nykyinen strict-v10-koodi ja testit sekä käyttäjän 2026-08-19 päätösvaltuutus. Seuraava toimi vaatii projektin omistajan eksplisiittisen luvan aloittaa PLANin toteutusvaiheet.
+Lähteet: `goal-012`, `adr-018`, ADR-015/017, strict-v11 data/snapshot/module-koodi ja testit sekä käyttäjän 2026-08-19 vaihevaltuutus. Seuraava runtime- tai UI-vaihe vaatii projektin omistajan eksplisiittisen luvan.

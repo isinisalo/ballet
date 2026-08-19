@@ -19,7 +19,7 @@ Queued work survives a Ballet restart. Work that was running when the process ex
 
 Portable, version-controlled automation remains in the checkout:
 
-- `.ballet/project.json` — strict project configuration v10, containing only `version`, `executionProfiles`, `orchestrator`, `loops`, and `loopEdges`; composite Work Loop Nodes own their Work and Validation definitions, while mutable State remains runtime-only;
+- `.ballet/project.json` — strict project configuration v11, containing only `version`, `executionProfiles`, `orchestrator`, `graph`, and `loops`; `graph.loopEdges` owns capability-routed peer topology, each Loop owns `accepts`/`provides`, composite Work Loop Nodes own their Work and Validation definitions, and mutable State remains runtime-only;
 - `.ballet/theme.json` — the strict-v4 single project-wide Loop visualization theme;
 - `.ballet/instructions/**/*.md` — selectable Project primary instructions identified by frontmatter `id`;
 - `.ballet/loop-library/**/*.ballet-loop.json` — version-controlled one-Loop authoring packages listed by the local Loop Library;
@@ -29,7 +29,7 @@ Portable, version-controlled automation remains in the checkout:
 
 There is no top-level Agent execution entity in v10. `agent` is a Work or Validation Node type, while `ExecutionProfile` is the only runtime authoring entity. Project instructions and skills are Node-selected resources; `.codex/agents` is not project configuration or a runtime source.
 
-`LoopModulePackageV1` is a portable authoring artifact, not a project-config field or runtime entity. `Add Loop` can inspect and materialize one package into a strict-v10 Loop plus namespaced project instructions and skills. Profile slots map to existing ExecutionProfiles during install; project-global `loopEdges`, the Orchestrator and machine-local settings remain operator-owned. Root Runs snapshot only the materialized project resources.
+`LoopModulePackageV1` is a portable authoring artifact, not a project-config field or runtime entity. `Add Loop` can inspect and materialize one package into a strict-v11 Loop plus namespaced project instructions and skills. Profile slots map to existing ExecutionProfiles during install; project-global `graph.loopEdges`, the Orchestrator and machine-local settings remain operator-owned. Packages carry capability metadata but never peer Loop IDs or authoritative routes. Root Runs snapshot only the materialized project resources.
 
 Machine-local state belongs to this clone's Git directory and never appears in Git status:
 
@@ -274,4 +274,4 @@ npx @google/design.md lint DESIGN.md
 git diff --check
 ```
 
-The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v10 fixture checkout, verifies the fixture ExecutionProfile, Work Loop composition, Project instruction, Orchestrator, and strict-v4 theme through `GET /api/data`, checks `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.
+The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v11 fixture checkout, verifies the fixture ExecutionProfile, Work Loop composition and capabilities, Project instruction, Orchestrator, Graph routes, and strict-v4 theme through `GET /api/data`, checks `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.

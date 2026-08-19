@@ -64,8 +64,8 @@ export function LoopCompositionWorkspace({
   const [inspectorTab, setInspectorTab] = useState<"loop" | "orchestrator">(selectedLoopId ? "loop" : "orchestrator");
   const selectedLoop = config.loops.find((loop) => loop.id === selectedLoopId);
   const selectedModule = installedModules.find((module) => module.loopId === selectedLoopId);
-  const incoming = config.loopEdges.filter((edge) => edge.target === selectedLoopId);
-  const outgoing = config.loopEdges.filter((edge) => edge.source === selectedLoopId);
+  const incoming = config.graph.loopEdges.filter((edge) => edge.target === selectedLoopId);
+  const outgoing = config.graph.loopEdges.filter((edge) => edge.source === selectedLoopId);
   const connectionLocked = Boolean(selectedLoopId && (
     lockedLoopIds.has(selectedLoopId) || [...incoming, ...outgoing].some((edge) => lockedLoopIds.has(edge.source) || lockedLoopIds.has(edge.target))
   ));

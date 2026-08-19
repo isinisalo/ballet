@@ -261,8 +261,8 @@ export class LoopModuleService {
     if (!loaded.config) throw new LoopModuleConflictError("Project configuration is invalid.");
     if (!loaded.config.loops.some((loop) => loop.id === loopId)) throw new LoopModuleNotFoundError(`Loop ${loopId} was not found.`);
     const nextLoops = loaded.config.loops.filter((loop) => loop.id !== loopId);
-    const nextEdges = loaded.config.loopEdges.filter((edge) => edge.source !== loopId && edge.target !== loopId);
-    const next = { ...automationOf(loaded.config), loops: nextLoops, loopEdges: nextEdges };
+    const nextEdges = loaded.config.graph.loopEdges.filter((edge) => edge.source !== loopId && edge.target !== loopId);
+    const next = { ...automationOf(loaded.config), loops: nextLoops, graph: { loopEdges: nextEdges } };
     this.projects.putAutomation(root, next);
     await this.provenance.remove(root, loopId);
     const referenced = referencedResourceIds(next);
@@ -283,7 +283,7 @@ export class LoopModuleService {
     const allLoopIds = project.loops.map((loop) => loop.id);
     const loopId = uniqueId(allLoopIds, pkg.manifest.id, 101);
     const allNodeIds = project.loops.flatMap((loop) => loop.nodes.map((node) => node.id));
-    const allEdgeIds = [...project.loops.flatMap((loop) => loop.edges.map((edge) => edge.id)), ...project.loopEdges.map((edge) => edge.id)];
+    const allEdgeIds = [...project.loops.flatMap((loop) => loop.edges.map((edge) => edge.id)), ...project.graph.loopEdges.map((edge) => edge.id)];
     const nodeMap: Record<string, string> = {};
     for (const node of pkg.loop.nodes) nodeMap[node.key] = uniqueId([...allNodeIds, ...Object.values(nodeMap)], `${loopId}-${node.key}`, 160);
     const edgeMap: Record<string, string> = {};
@@ -367,6 +367,7 @@ export class LoopModuleService {
       .sort(compareLoopModuleText);
     const missingRequires = pkg.capabilities.requires.filter((capability) => !availableCapabilities.includes(capability));
     const issues = [
+      ...peerLoopReferenceIssues(pkg, project.loops),
       ...profileMappings.flatMap((mapping) => mapping.issue ? [mapping.issue] : []),
       ...(stateCompatibility.compatibility === "incompatible" ? [issue(
         "STATE_CONTRACT_INCOMPATIBLE",
@@ -387,6 +388,7 @@ export class LoopModuleService {
       stateContract: { contract: pkg.stateContract, compatibility: stateCompatibility.compatibility, comparedWith: stateCompatibility.comparedWith },
       capabilities: {
         requires: pkg.capabilities.requires,
+        accepts: pkg.capabilities.accepts,
         provides: pkg.capabilities.provides,
         recommendedConnections: pkg.capabilities.recommendedConnections,
         available: availableCapabilities,
@@ -425,6 +427,10 @@ const materializeLoop = (
 ): ProjectLoop => ({
   id: loopId,
   description: pkg.loop.description,
+  capabilities: {
+    accepts: [...pkg.capabilities.accepts].sort(compareLoopModuleText),
+    provides: [...pkg.capabilities.provides].sort(compareLoopModuleText)
+  },
   state: structuredClone(pkg.loop.state),
   startNodeId: nodes[pkg.loop.startNode]!,
   nodes: pkg.loop.nodes.map((node) => ({
@@ -611,7 +617,12 @@ const exportPackage = (
       id: `${slug(loop.id)}-state`, version: "1.0.0", description: loop.state.description,
       initial: structuredClone(loop.state.initial), requiredKeys: initialObject
     },
-    capabilities: { requires: [], provides: [slug(loop.id)], recommendedConnections: [] },
+    capabilities: {
+      requires: provenance?.capabilities.requires ?? [],
+      accepts: [...loop.capabilities.accepts],
+      provides: [...loop.capabilities.provides],
+      recommendedConnections: provenance?.capabilities.recommendedConnections ?? []
+    },
     resources,
     loop: {
       key: "loop", description: loop.description, state: structuredClone(loop.state),
@@ -694,7 +705,7 @@ const contentHash = (loop: ProjectLoop, resources: Array<{ relativePath: string;
   }));
 
 const automationOf = (config: ProjectConfiguration): ProjectAutomationConfig => ({
-  version: 10, orchestrator: config.orchestrator, loops: config.loops, loopEdges: config.loopEdges
+  version: 11, orchestrator: config.orchestrator, graph: config.graph, loops: config.loops
 });
 
 const walkLibrary = async (root: string, relativeDirectory: string): Promise<string[]> => {
@@ -714,18 +725,13 @@ const walkLibrary = async (root: string, relativeDirectory: string): Promise<str
 };
 
 const forbiddenPackageIssue = (value: unknown, currentPath = "$", key?: string): LoopModuleIssue | undefined => {
+  if (key && /^(?:graph|loopEdges|targetLoopId|peerLoopId|nextLoopId|repairTargetLoopId|continuationLoopId)$/i.test(key)) {
+    return issue("FORBIDDEN_CONTENT", currentPath, `Project-global routing and target selection metadata is forbidden (${key}).`);
+  }
   if (key && /^(?:password|secret|token|credential|credentials|history|consoleHistory|command|commands|script|scripts|hook|hooks|postInstall|post-install|symlink)$/i.test(key)) {
     return issue("FORBIDDEN_CONTENT", currentPath, `Executable, credential, and runtime-history metadata is forbidden (${key}).`);
   }
-  if (typeof value === "string") {
-    if (value.includes("\0")) return issue("FORBIDDEN_CONTENT", currentPath, "NUL characters are forbidden.");
-    if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Private key material is forbidden.");
-    if (/\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16})\b/.test(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Credential-like secret material is forbidden.");
-    if (/(?:^|[\s`'"/])\.git\/ballet(?:[\s`'"/]|$)/.test(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Checkout-local .git/ballet runtime data is forbidden.");
-    if (/(?:^|[\s`'"])(?:\/Users\/|\/home\/|\/var\/folders\/|[A-Za-z]:\\)/.test(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Absolute filesystem roots are forbidden.");
-    if (key && /(?:path|root|file)$/i.test(key) && path.isAbsolute(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Absolute paths are forbidden.");
-    return undefined;
-  }
+  if (typeof value === "string") return forbiddenStringIssue(value, currentPath, key);
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
       const found = forbiddenPackageIssue(value[index], `${currentPath}[${index}]`);
@@ -740,6 +746,51 @@ const forbiddenPackageIssue = (value: unknown, currentPath = "$", key?: string):
   }
   return undefined;
 };
+
+const forbiddenStringIssue = (value: string, currentPath: string, key?: string): LoopModuleIssue | undefined => {
+  if (/\b(?:targetLoopId|peerLoopId|nextLoopId|repairTargetLoopId|continuationLoopId)\b/i.test(value)
+    || /\b(?:target|peer|next|repair target)\s+Loop\s+ID\b/i.test(value)) {
+    return issue("FORBIDDEN_CONTENT", currentPath, "Loop packages and resources must not select or name a peer Loop target.");
+  }
+  if (value.includes("\0")) return issue("FORBIDDEN_CONTENT", currentPath, "NUL characters are forbidden.");
+  if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Private key material is forbidden.");
+  if (/\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16})\b/.test(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Credential-like secret material is forbidden.");
+  if (/(?:^|[\s`'"/])\.git\/ballet(?:[\s`'"/]|$)/.test(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Checkout-local .git/ballet runtime data is forbidden.");
+  if (/(?:^|[\s`'"])(?:\/Users\/|\/home\/|\/var\/folders\/|[A-Za-z]:\\)/.test(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Absolute filesystem roots are forbidden.");
+  if (key && /(?:path|root|file)$/i.test(key) && path.isAbsolute(value)) return issue("FORBIDDEN_CONTENT", currentPath, "Absolute paths are forbidden.");
+  return undefined;
+};
+
+const peerLoopReferenceIssues = (
+  pkg: LoopModulePackageV1,
+  projectLoops: readonly ProjectLoop[]
+): LoopModuleIssue[] => {
+  const peers = projectLoops.map((loop) => loop.id)
+    .filter((loopId) => loopId !== pkg.manifest.id && loopId !== pkg.loop.key);
+  if (peers.length === 0) return [];
+  const stack: Array<{ value: unknown; path: string }> = [{ value: pkg, path: "$" }];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (typeof current.value === "string") {
+      const peer = peers.find((loopId) => new RegExp(`(^|[^a-z0-9-])${escapeRegExp(loopId)}([^a-z0-9-]|$)`, "i").test(current.value as string));
+      if (peer) return [issue(
+        "FORBIDDEN_CONTENT",
+        current.path,
+        `Reusable Loop content must not name peer Loop id ${peer}.`
+      )];
+      continue;
+    }
+    if (Array.isArray(current.value)) {
+      current.value.forEach((child, index) => stack.push({ value: child, path: `${current.path}[${index}]` }));
+      continue;
+    }
+    if (isRecord(current.value)) Object.entries(current.value).forEach(([childKey, child]) =>
+      stack.push({ value: child, path: `${current.path}.${childKey}` }));
+  }
+  return [];
+};
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const zodIssue = (value: z.core.$ZodIssue): LoopModuleIssue => issue(
   value.code === "unrecognized_keys" ? "UNKNOWN_FIELD"

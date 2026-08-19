@@ -1,11 +1,14 @@
 {
   "capabilities": {
+    "accepts": [
+      "arc42:initiative.requested"
+    ],
     "provides": [
-      "arc42.requirements-clarified"
+      "arc42:requirements-clarified"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42.structures-designed",
+        "capability": "arc42:structures-designed",
         "description": "Continue from an approved BRIEF and measurable quality scenarios to structural design.",
         "direction": "outgoing",
         "kind": "flow"
@@ -115,7 +118,6 @@
           "changedArtifactPaths": [],
           "checks": [],
           "nextAction": null,
-          "nextLoopId": null,
           "stableIds": [],
           "status": "pending",
           "summary": null
@@ -269,7 +271,6 @@
         "changedArtifactPaths": [],
         "checks": [],
         "nextAction": null,
-        "nextLoopId": null,
         "stableIds": [],
         "status": "pending",
         "summary": null

@@ -3,7 +3,7 @@ import type {
   LoopRunDetails, NodeRun, OrchestratorNodeOutcome, ValidationNodeOutcome, WorkNodeOutcome
 } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testLoop, testOrchestrator, testWorkLoopNode } from "../tests/v10TestConfig.js";
+import { testLoop, testOrchestrator, testWorkLoopNode } from "../tests/v11TestConfig.js";
 import { createRuntimeStoreFixture } from "./RuntimeStore.test-fixture.js";
 
 export interface OrchestrationHarness {
@@ -28,7 +28,7 @@ export const createOrchestrationHarness = async (options: {
   ];
   const edges = options.edges ?? targets.map((target, index) => ({
     id: `repair-edge-${index + 1}`, source: caller.id, target: target.id,
-    kind: "repair" as const, description: `Allow ${target.id}.`
+    kind: "repair" as const, capability: "test:loop.transfer", description: `Allow ${target.id}.`
   }));
   const fixture = await createRuntimeStoreFixture(options.initial ?? { repaired: false }, {
     loop: caller, loops: targets, loopEdges: edges,
@@ -58,7 +58,7 @@ export const requestExternalRepair = (
     ? { mode: "ORCHESTRATOR_REPAIR" as const, reason: "External repair is required.",
         requestedOutcome: options.requestedOutcome, evidenceRefs: ["check:caller"] }
     : { mode: "ORCHESTRATOR_REPAIR" as const, reason: "External repair is required.",
-        requestedCapability: options.requestedCapability ?? "repair capability", evidenceRefs: ["check:caller"] };
+        requestedCapability: options.requestedCapability ?? "test:loop.transfer", evidenceRefs: ["check:caller"] };
   runtime.applyNodeOutcome("root-run", validation.nodeRunId, {
     role: "validation", state: "completed", decision: "FAIL",
     summary: options.summary ?? "Caller validation found a repairable problem.",

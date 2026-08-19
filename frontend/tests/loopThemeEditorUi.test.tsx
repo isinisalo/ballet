@@ -13,14 +13,14 @@ import { LoopThemeEditorView } from "../src/workspace/automation/themes/LoopThem
 import { LoopThemePreview } from "../src/workspace/automation/themes/LoopThemePreview";
 import { useLoopThemeEditor } from "../src/workspace/automation/themes/useLoopThemeEditor";
 import { installThemeApi } from "./loopThemeEditorTestApi";
-import { v10Automation, v10Loop } from "./v10Fixtures";
+import { v11Automation, v11Loop } from "./v11Fixtures";
 
-const loop = v10Loop("delivery");
+const loop = v11Loop("delivery");
 
 const theme = () => structuredClone(defaultLoopTheme);
 const data = (): AppData => ({
   ...emptyData,
-  automation: v10Automation(structuredClone(loop)),
+  automation: v11Automation(structuredClone(loop)),
   automationIssues: [],
   scheduleStates: [],
   loopTheme: theme(),

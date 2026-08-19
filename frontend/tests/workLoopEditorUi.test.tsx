@@ -5,7 +5,7 @@ import { defaultLoopTheme, type AppData, type ProjectInstruction } from "@shared
 import { AutomationView } from "../src/workspace/automation/AutomationView";
 import { emptyData } from "../src/workspace/types";
 import { localRuntime } from "./runtimeFixtures";
-import { v10Automation, v10Loop } from "./v10Fixtures";
+import { v11Automation, v11Loop } from "./v11Fixtures";
 
 const instruction = (id: string): ProjectInstruction => ({
   id,
@@ -30,13 +30,13 @@ const workspace = (): AppData => ({
   ...emptyData,
   executionProfiles: [profile],
   instructions: [instruction("project:architect"), instruction("project:worker")],
-  automation: v10Automation(v10Loop("existing-loop")),
+  automation: v11Automation(v11Loop("existing-loop")),
   automationIssues: [],
   loopTheme: structuredClone(defaultLoopTheme),
   runtime: localRuntime()
 });
 
-describe("strict-v10 Work Loop editor", () => {
+describe("strict-v11 Work Loop editor", () => {
   it("creates a Loop with state, composite roles, fixed edges, and an explicit OK target", async () => {
     const user = userEvent.setup();
     const saveAutomation = vi.fn(async (config) => config);
@@ -69,7 +69,7 @@ describe("strict-v10 Work Loop editor", () => {
     await user.click(screen.getByRole("button", { name: "Save Loop" }));
     await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
     const saved = saveAutomation.mock.calls[0]?.[0];
-    expect(saved).toMatchObject({ version: 10 });
+    expect(saved).toMatchObject({ version: 11 });
     expect(saved?.loops.find((loop) => loop.id === "new-loop")).toMatchObject({
       id: "new-loop",
       state: { initial: { count: 0 } },
@@ -79,10 +79,10 @@ describe("strict-v10 Work Loop editor", () => {
   });
 
   it("shows each Loop as one box and keeps internal nodes, State, and Edges in the detailed editor", () => {
-    const first = v10Loop("source-loop");
-    const target = v10Loop("target-loop");
-    const config = v10Automation(first, target);
-    config.loopEdges = [{ id: "source-repair", source: first.id, target: target.id, kind: "repair", description: "Repair generic work." }];
+    const first = v11Loop("source-loop");
+    const target = v11Loop("target-loop");
+    const config = v11Automation(first, target);
+    config.graph.loopEdges = [{ id: "source-repair", source: first.id, target: target.id, kind: "repair", capability: "test:loop.transfer", description: "Repair generic work." }];
     const data = workspace();
     data.automation = config;
     render(<AutomationView data={data} level="composition" saveAutomation={vi.fn(async (value) => value)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
@@ -99,13 +99,13 @@ describe("strict-v10 Work Loop editor", () => {
 
   it("edits Validation OK and repair Loop Edges without exposing fixed internal edges", async () => {
     const user = userEvent.setup();
-    const source = v10Loop("source-loop");
-    const target = v10Loop("target-loop");
+    const source = v11Loop("source-loop");
+    const target = v11Loop("target-loop");
     target.nodes[0] = { ...target.nodes[0]!, id: "target-work" };
     target.startNodeId = "target-work";
     target.edges[0] = { ...target.edges[0]!, source: "target-work" };
     const data = workspace();
-    data.automation = v10Automation(source, target);
+    data.automation = v11Automation(source, target);
     const saveAutomation = vi.fn(async (config) => config);
     render(<AutomationView data={data} level="detail" selectedId={source.id} saveAutomation={saveAutomation} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
 
@@ -125,11 +125,11 @@ describe("strict-v10 Work Loop editor", () => {
     expect(screen.queryByLabelText(/Work completed target/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save Loop composition" }));
     await waitFor(() => expect(compositionSave).toHaveBeenCalled());
-    expect(compositionSave.mock.calls[0]?.[0].loopEdges[0]).toMatchObject({ source: source.id, target: target.id, kind: "repair" });
+    expect(compositionSave.mock.calls[0]?.[0].graph.loopEdges[0]).toMatchObject({ source: source.id, target: target.id, kind: "repair" });
   });
 
   it("updates explicit orchestrator limits from the Level 1 routing component", () => {
-    const config = v10Automation(v10Loop("orchestrated-loop"));
+    const config = v11Automation(v11Loop("orchestrated-loop"));
     const data = workspace(); data.automation = config;
     render(<AutomationView data={data} level="composition" saveAutomation={vi.fn(async (value) => value)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
 
@@ -139,7 +139,7 @@ describe("strict-v10 Work Loop editor", () => {
 
   it("does not offer Scheduled for non-start Work or any Validation Node", async () => {
     const user = userEvent.setup();
-    const loop = v10Loop("restriction-loop");
+    const loop = v11Loop("restriction-loop");
     const second = structuredClone(loop.nodes[0]!);
     second.id = "validate-more";
     second.description = "Second composite node.";
@@ -147,7 +147,7 @@ describe("strict-v10 Work Loop editor", () => {
     loop.edges[0] = { ...loop.edges[0]!, target: { nodeId: second.id } };
     loop.edges.push({ id: "validate-more-ok", source: second.id, target: { terminal: "completed" } });
     const data = workspace();
-    data.automation = v10Automation(loop);
+    data.automation = v11Automation(loop);
     render(<AutomationView data={data} level="detail" selectedId={loop.id} saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: `Edit Work Loop Node ${second.id}` }));

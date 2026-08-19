@@ -72,10 +72,10 @@ export function buildLoopContextProjection({
   installedModules?: InstalledLoopModuleStatus[];
   activeLoopIds?: ReadonlySet<string>;
 }): LoopContextProjection {
-  const incomingFlowTargets = new Set(config.loopEdges
+  const incomingFlowTargets = new Set(config.graph.loopEdges
     .filter((edge) => edge.kind === "flow")
     .map((edge) => edge.target));
-  const outgoingFlowSources = new Set(config.loopEdges
+  const outgoingFlowSources = new Set(config.graph.loopEdges
     .filter((edge) => edge.kind === "flow")
     .map((edge) => edge.source));
   const installedByLoopId = new Map(installedModules.map((module) => [module.loopId, module]));
@@ -98,8 +98,8 @@ export function buildLoopContextProjection({
       loopCount: config.loops.length,
       installedModuleCount: config.loops.filter((loop) => installedByLoopId.has(loop.id)).length,
       customLoopCount: config.loops.filter((loop) => !installedByLoopId.has(loop.id)).length,
-      flowConnectionCount: config.loopEdges.filter((edge) => edge.kind === "flow").length,
-      repairConnectionCount: config.loopEdges.filter((edge) => edge.kind === "repair").length,
+      flowConnectionCount: config.graph.loopEdges.filter((edge) => edge.kind === "flow").length,
+      repairConnectionCount: config.graph.loopEdges.filter((edge) => edge.kind === "repair").length,
       activeRunCount: config.loops.filter((loop) => activeLoopIds.has(loop.id)).length
     },
     declaredOutcomes: outcomeCandidates.slice(0, 5),
@@ -134,7 +134,7 @@ export function buildLoopCompositionProjection({
         locked: lockedLoopIds.has(loop.id)
       };
     }),
-    edges: config.loopEdges.map((edge) => ({ ...edge }))
+    edges: config.graph.loopEdges.map((edge) => ({ ...edge }))
   };
 }
 

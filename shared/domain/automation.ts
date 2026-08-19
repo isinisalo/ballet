@@ -1,8 +1,11 @@
-export const projectConfigurationVersion = 10 as const;
+export const projectConfigurationVersion = 11 as const;
 export const maxProjectStateBytes = 262_144;
 export const maxLocalAttemptsLimit = 100;
 export const maxRepairDepthLimit = 32;
 export const maxRepairAttemptsLimit = 100;
+export const maxLoopCapabilities = 64;
+export const maxLoopCapabilityLength = 200;
+export const loopCapabilityPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:[a-z][a-z0-9]*(?:[._/-][a-z0-9]+)*$/;
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
@@ -168,7 +171,17 @@ export interface ProjectLoopEdge {
   source: string;
   target: string;
   kind: ProjectLoopEdgeKind;
+  capability: string;
   description: string;
+}
+
+export interface ProjectGraph {
+  loopEdges: ProjectLoopEdge[];
+}
+
+export interface ProjectLoopCapabilities {
+  accepts: string[];
+  provides: string[];
 }
 
 export interface ProjectLoopState {
@@ -179,6 +192,7 @@ export interface ProjectLoopState {
 export interface ProjectLoop {
   id: string;
   description: string;
+  capabilities: ProjectLoopCapabilities;
   state: ProjectLoopState;
   startNodeId: string;
   nodes: ProjectWorkLoopNode[];
@@ -193,8 +207,8 @@ export interface ProjectLoopOrchestrator extends ProjectExecutionComposition {
 export interface ProjectAutomationConfig {
   version: typeof projectConfigurationVersion;
   orchestrator: ProjectLoopOrchestrator;
+  graph: ProjectGraph;
   loops: ProjectLoop[];
-  loopEdges: ProjectLoopEdge[];
 }
 
 export const defaultProjectLoopOrchestrator = (): ProjectLoopOrchestrator => ({
@@ -208,8 +222,8 @@ export const defaultProjectLoopOrchestrator = (): ProjectLoopOrchestrator => ({
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: projectConfigurationVersion,
   orchestrator: defaultProjectLoopOrchestrator(),
+  graph: { loopEdges: [] },
   loops: [],
-  loopEdges: []
 });
 
 export const isProjectProviderWorkNode = (node: ProjectWorkNode): node is ProjectProviderWorkNode =>
@@ -244,15 +258,15 @@ export const getProjectNodeEdges = (
   : loop.edges.filter((edge) => edge.source === sourceNodeId);
 
 export const getProjectLoopEdges = (
-  config: Pick<ProjectAutomationConfig, "loopEdges">,
+  config: Pick<ProjectAutomationConfig, "graph">,
   sourceLoopId?: string,
   kind?: ProjectLoopEdgeKind
-): ProjectLoopEdge[] => config.loopEdges.filter((edge) =>
+): ProjectLoopEdge[] => config.graph.loopEdges.filter((edge) =>
   (sourceLoopId === undefined || edge.source === sourceLoopId)
   && (kind === undefined || edge.kind === kind));
 
 export const isAllowedProjectRepairRoute = (
-  config: Pick<ProjectAutomationConfig, "loopEdges">,
+  config: Pick<ProjectAutomationConfig, "graph">,
   sourceLoopId: string,
   loopEdgeId: string
 ): boolean => getProjectLoopEdges(config, sourceLoopId, "repair")
@@ -277,7 +291,7 @@ export const getReachableProjectNodeIds = (loop: ProjectLoop): Set<string> => {
 };
 
 export const getReachableProjectLoopIds = (
-  config: Pick<ProjectAutomationConfig, "loopEdges">,
+  config: Pick<ProjectAutomationConfig, "graph">,
   startLoopId: string,
   maxRepairDepth: number
 ): Set<string> => getReachableProjectLoopGraph(config, startLoopId, maxRepairDepth).loopIds;
@@ -294,7 +308,7 @@ export interface ReachableProjectLoopGraph {
  * can still be revisited at a shallower, more permissive depth.
  */
 export const getReachableProjectLoopGraph = (
-  config: Pick<ProjectAutomationConfig, "loopEdges">,
+  config: Pick<ProjectAutomationConfig, "graph">,
   startLoopId: string,
   maxRepairDepth: number
 ): ReachableProjectLoopGraph => {

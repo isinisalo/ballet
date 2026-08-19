@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -57,6 +57,290 @@
     "maxRepairDepth": 6,
     "maxRepairAttempts": 4
   },
+  "graph": {
+    "loopEdges": [
+      {
+        "id": "flow-clarify-structures",
+        "source": "arc42-clarify-requirements",
+        "target": "arc42-design-structures",
+        "kind": "flow",
+        "description": "An approved initiative BRIEF and measurable quality scenarios enable structural design.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "flow-structures-concepts",
+        "source": "arc42-design-structures",
+        "target": "arc42-design-concepts",
+        "kind": "flow",
+        "description": "Approved structural views enable quality-driven crosscutting concept design.",
+        "capability": "arc42:structures.designed"
+      },
+      {
+        "id": "flow-concepts-communicate",
+        "source": "arc42-design-concepts",
+        "target": "arc42-communicate-document",
+        "kind": "flow",
+        "description": "Reviewed concepts and decision status enable architecture communication and handoff.",
+        "capability": "arc42:concepts.designed"
+      },
+      {
+        "id": "flow-communicate-implementation",
+        "source": "arc42-communicate-document",
+        "target": "arc42-accompany-implementation",
+        "kind": "flow",
+        "description": "An approved architecture handoff enables bounded implementation.",
+        "capability": "arc42:architecture.communicated"
+      },
+      {
+        "id": "flow-implementation-evaluate",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-analyze-evaluate",
+        "kind": "flow",
+        "description": "Accepted implementation evidence enables architecture analysis and evaluation.",
+        "capability": "arc42:implementation.accepted"
+      },
+      {
+        "id": "repair-structures-clarify",
+        "source": "arc42-design-structures",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Clarify an unresolved goal, stakeholder, scope, constraint or measurable quality scenario required by structural design.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-structures-structures",
+        "source": "arc42-design-structures",
+        "target": "arc42-design-structures",
+        "kind": "repair",
+        "description": "Repair solution strategy, building blocks, interfaces or significant runtime/deployment views.",
+        "capability": "arc42:structures.designed"
+      },
+      {
+        "id": "repair-concepts-clarify",
+        "source": "arc42-design-concepts",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Clarify a requirement or quality criterion needed to choose a crosscutting concept.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-concepts-structures",
+        "source": "arc42-design-concepts",
+        "target": "arc42-design-structures",
+        "kind": "repair",
+        "description": "Repair a building block, interface, runtime or deployment structure required by a concept.",
+        "capability": "arc42:structures.designed"
+      },
+      {
+        "id": "repair-concepts-concepts",
+        "source": "arc42-design-concepts",
+        "target": "arc42-design-concepts",
+        "kind": "repair",
+        "description": "Repair a crosscutting concept or architecture-significant ADR proposal.",
+        "capability": "arc42:concepts.designed"
+      },
+      {
+        "id": "repair-communicate-clarify",
+        "source": "arc42-communicate-document",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Clarify stakeholder intent, scope, constraint or quality scenario exposed during communication.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-communicate-structures",
+        "source": "arc42-communicate-document",
+        "target": "arc42-design-structures",
+        "kind": "repair",
+        "description": "Repair an unclear or inconsistent building block, interface, runtime or deployment view.",
+        "capability": "arc42:structures.designed"
+      },
+      {
+        "id": "repair-communicate-concepts",
+        "source": "arc42-communicate-document",
+        "target": "arc42-design-concepts",
+        "kind": "repair",
+        "description": "Repair an unclear crosscutting concept or significant decision record.",
+        "capability": "arc42:concepts.designed"
+      },
+      {
+        "id": "repair-communicate-communicate",
+        "source": "arc42-communicate-document",
+        "target": "arc42-communicate-document",
+        "kind": "repair",
+        "description": "Repair documentation ownership, glossary, traceability, status, handoff or stakeholder review evidence.",
+        "capability": "arc42:architecture.communicated"
+      },
+      {
+        "id": "repair-implementation-clarify",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Clarify missing scope, acceptance intent, constraint or measurable quality scenario discovered during implementation.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-implementation-structures",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-design-structures",
+        "kind": "repair",
+        "description": "Repair a building block, interface, runtime or deployment design exposed by implementation.",
+        "capability": "arc42:structures.designed"
+      },
+      {
+        "id": "repair-implementation-concepts",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-design-concepts",
+        "kind": "repair",
+        "description": "Repair a crosscutting concept or significant architecture decision exposed by implementation.",
+        "capability": "arc42:concepts.designed"
+      },
+      {
+        "id": "repair-implementation-communicate",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-communicate-document",
+        "kind": "repair",
+        "description": "Repair architecture documentation, traceability, handoff or review communication needed by implementation.",
+        "capability": "arc42:architecture.communicated"
+      },
+      {
+        "id": "repair-implementation-implementation",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-accompany-implementation",
+        "kind": "repair",
+        "description": "Repair code, tests, migration, conformance or acceptance evidence within the bounded initiative.",
+        "capability": "arc42:implementation.accepted"
+      },
+      {
+        "id": "repair-evaluate-clarify",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Clarify intent, scope, constraint or quality criteria required to evaluate the result.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-evaluate-structures",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-design-structures",
+        "kind": "repair",
+        "description": "Repair a structural architecture gap identified by quality, risk or drift evidence.",
+        "capability": "arc42:structures.designed"
+      },
+      {
+        "id": "repair-evaluate-concepts",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-design-concepts",
+        "kind": "repair",
+        "description": "Repair a crosscutting concept or reassess a significant decision from evidence.",
+        "capability": "arc42:concepts.designed"
+      },
+      {
+        "id": "repair-evaluate-communicate",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-communicate-document",
+        "kind": "repair",
+        "description": "Repair stale, contradictory or incomplete documentation, traceability, glossary, status or handoff.",
+        "capability": "arc42:architecture.communicated"
+      },
+      {
+        "id": "repair-evaluate-implementation",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-accompany-implementation",
+        "kind": "repair",
+        "description": "Repair code, tests, migration, conformance or acceptance gaps identified by evaluation.",
+        "capability": "arc42:implementation.accepted"
+      },
+      {
+        "id": "repair-evaluate-evaluate",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-analyze-evaluate",
+        "kind": "repair",
+        "description": "Repair quality evidence, risk, technical debt, architecture drift or decision-fitness analysis.",
+        "capability": "arc42:evaluation.completed"
+      },
+      {
+        "id": "repair-learning-clarify",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Clarify requirement or quality impact made material by authoritative learning evidence.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-learning-structures",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-design-structures",
+        "kind": "repair",
+        "description": "Assess a material learning finding affecting building blocks, interfaces, runtime or deployment.",
+        "capability": "arc42:structures.designed"
+      },
+      {
+        "id": "repair-learning-concepts",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-design-concepts",
+        "kind": "repair",
+        "description": "Assess a material learning finding affecting a crosscutting concept or significant decision.",
+        "capability": "arc42:concepts.designed"
+      },
+      {
+        "id": "repair-learning-communicate",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-communicate-document",
+        "kind": "repair",
+        "description": "Repair material documentation drift, traceability, glossary or handoff findings.",
+        "capability": "arc42:architecture.communicated"
+      },
+      {
+        "id": "repair-learning-evaluate",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-analyze-evaluate",
+        "kind": "repair",
+        "description": "Evaluate material technology or method evidence against quality, risk, debt and drift.",
+        "capability": "arc42:evaluation.completed"
+      },
+      {
+        "id": "repair-learning-learning",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-continuous-learning",
+        "kind": "repair",
+        "description": "Repair incomplete authoritative research, source evidence or method-health measurement.",
+        "capability": "arc42:research.findings"
+      },
+      {
+        "id": "repair-release-communicate",
+        "source": "release-validation",
+        "target": "arc42-communicate-document",
+        "kind": "repair",
+        "description": "Repair release documentation, traceability, stakeholder handoff or authorization evidence.",
+        "capability": "arc42:architecture.communicated"
+      },
+      {
+        "id": "repair-release-implementation",
+        "source": "release-validation",
+        "target": "arc42-accompany-implementation",
+        "kind": "repair",
+        "description": "Repair implementation, test, migration, conformance or acceptance readiness before release.",
+        "capability": "arc42:implementation.accepted"
+      },
+      {
+        "id": "repair-release-evaluate",
+        "source": "release-validation",
+        "target": "arc42-analyze-evaluate",
+        "kind": "repair",
+        "description": "Evaluate release quality evidence, risk, debt, drift or rollback implications.",
+        "capability": "arc42:evaluation.completed"
+      },
+      {
+        "id": "repair-release-release",
+        "source": "release-validation",
+        "target": "release-validation",
+        "kind": "repair",
+        "description": "Repair an explicitly authorized release, deploy, verification or rollback outcome within the approved external-write boundary.",
+        "capability": "release:validation.completed"
+      }
+    ]
+  },
   "loops": [
     {
       "id": "arc42-clarify-requirements",
@@ -100,7 +384,6 @@
           "handoff": {
             "status": "pending",
             "summary": null,
-            "nextLoopId": null,
             "nextAction": null,
             "changedArtifactPaths": [],
             "stableIds": [],
@@ -177,7 +460,15 @@
             "terminal": "completed"
           }
         }
-      ]
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:initiative.requested"
+        ],
+        "provides": [
+          "arc42:requirements.clarified"
+        ]
+      }
     },
     {
       "id": "arc42-design-structures",
@@ -221,7 +512,6 @@
           "handoff": {
             "status": "pending",
             "summary": null,
-            "nextLoopId": null,
             "nextAction": null,
             "changedArtifactPaths": [],
             "stableIds": [],
@@ -338,7 +628,15 @@
             "terminal": "completed"
           }
         }
-      ]
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:requirements.clarified"
+        ],
+        "provides": [
+          "arc42:structures.designed"
+        ]
+      }
     },
     {
       "id": "arc42-design-concepts",
@@ -382,7 +680,6 @@
           "handoff": {
             "status": "pending",
             "summary": null,
-            "nextLoopId": null,
             "nextAction": null,
             "changedArtifactPaths": [],
             "stableIds": [],
@@ -459,7 +756,15 @@
             "terminal": "completed"
           }
         }
-      ]
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:structures.designed"
+        ],
+        "provides": [
+          "arc42:concepts.designed"
+        ]
+      }
     },
     {
       "id": "arc42-communicate-document",
@@ -503,7 +808,6 @@
           "handoff": {
             "status": "pending",
             "summary": null,
-            "nextLoopId": null,
             "nextAction": null,
             "changedArtifactPaths": [],
             "stableIds": [],
@@ -582,7 +886,15 @@
             "terminal": "completed"
           }
         }
-      ]
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:concepts.designed"
+        ],
+        "provides": [
+          "arc42:architecture.communicated"
+        ]
+      }
     },
     {
       "id": "arc42-accompany-implementation",
@@ -626,7 +938,6 @@
           "handoff": {
             "status": "pending",
             "summary": null,
-            "nextLoopId": null,
             "nextAction": null,
             "changedArtifactPaths": [],
             "stableIds": [],
@@ -739,7 +1050,15 @@
             "terminal": "completed"
           }
         }
-      ]
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:architecture.communicated"
+        ],
+        "provides": [
+          "arc42:implementation.accepted"
+        ]
+      }
     },
     {
       "id": "arc42-analyze-evaluate",
@@ -783,7 +1102,6 @@
           "handoff": {
             "status": "pending",
             "summary": null,
-            "nextLoopId": null,
             "nextAction": null,
             "changedArtifactPaths": [],
             "stableIds": [],
@@ -900,7 +1218,15 @@
             "terminal": "completed"
           }
         }
-      ]
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:implementation.accepted"
+        ],
+        "provides": [
+          "arc42:evaluation.completed"
+        ]
+      }
     },
     {
       "id": "arc42-continuous-learning",
@@ -944,7 +1270,6 @@
           "handoff": {
             "status": "pending",
             "summary": null,
-            "nextLoopId": null,
             "nextAction": null,
             "changedArtifactPaths": [],
             "stableIds": [],
@@ -1037,7 +1362,15 @@
             "terminal": "completed"
           }
         }
-      ]
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:research.requested"
+        ],
+        "provides": [
+          "arc42:research.findings"
+        ]
+      }
     },
     {
       "id": "release-validation",
@@ -1081,7 +1414,6 @@
           "handoff": {
             "status": "pending",
             "summary": null,
-            "nextLoopId": null,
             "nextAction": null,
             "changedArtifactPaths": [],
             "stableIds": [],
@@ -1187,254 +1519,15 @@
             "terminal": "completed"
           }
         }
-      ]
-    }
-  ],
-  "loopEdges": [
-    {
-      "id": "flow-clarify-structures",
-      "source": "arc42-clarify-requirements",
-      "target": "arc42-design-structures",
-      "kind": "flow",
-      "description": "An approved initiative BRIEF and measurable quality scenarios enable structural design."
-    },
-    {
-      "id": "flow-structures-concepts",
-      "source": "arc42-design-structures",
-      "target": "arc42-design-concepts",
-      "kind": "flow",
-      "description": "Approved structural views enable quality-driven crosscutting concept design."
-    },
-    {
-      "id": "flow-concepts-communicate",
-      "source": "arc42-design-concepts",
-      "target": "arc42-communicate-document",
-      "kind": "flow",
-      "description": "Reviewed concepts and decision status enable architecture communication and handoff."
-    },
-    {
-      "id": "flow-communicate-implementation",
-      "source": "arc42-communicate-document",
-      "target": "arc42-accompany-implementation",
-      "kind": "flow",
-      "description": "An approved architecture handoff enables bounded implementation."
-    },
-    {
-      "id": "flow-implementation-evaluate",
-      "source": "arc42-accompany-implementation",
-      "target": "arc42-analyze-evaluate",
-      "kind": "flow",
-      "description": "Accepted implementation evidence enables architecture analysis and evaluation."
-    },
-    {
-      "id": "repair-structures-clarify",
-      "source": "arc42-design-structures",
-      "target": "arc42-clarify-requirements",
-      "kind": "repair",
-      "description": "Clarify an unresolved goal, stakeholder, scope, constraint or measurable quality scenario required by structural design."
-    },
-    {
-      "id": "repair-structures-structures",
-      "source": "arc42-design-structures",
-      "target": "arc42-design-structures",
-      "kind": "repair",
-      "description": "Repair solution strategy, building blocks, interfaces or significant runtime/deployment views."
-    },
-    {
-      "id": "repair-concepts-clarify",
-      "source": "arc42-design-concepts",
-      "target": "arc42-clarify-requirements",
-      "kind": "repair",
-      "description": "Clarify a requirement or quality criterion needed to choose a crosscutting concept."
-    },
-    {
-      "id": "repair-concepts-structures",
-      "source": "arc42-design-concepts",
-      "target": "arc42-design-structures",
-      "kind": "repair",
-      "description": "Repair a building block, interface, runtime or deployment structure required by a concept."
-    },
-    {
-      "id": "repair-concepts-concepts",
-      "source": "arc42-design-concepts",
-      "target": "arc42-design-concepts",
-      "kind": "repair",
-      "description": "Repair a crosscutting concept or architecture-significant ADR proposal."
-    },
-    {
-      "id": "repair-communicate-clarify",
-      "source": "arc42-communicate-document",
-      "target": "arc42-clarify-requirements",
-      "kind": "repair",
-      "description": "Clarify stakeholder intent, scope, constraint or quality scenario exposed during communication."
-    },
-    {
-      "id": "repair-communicate-structures",
-      "source": "arc42-communicate-document",
-      "target": "arc42-design-structures",
-      "kind": "repair",
-      "description": "Repair an unclear or inconsistent building block, interface, runtime or deployment view."
-    },
-    {
-      "id": "repair-communicate-concepts",
-      "source": "arc42-communicate-document",
-      "target": "arc42-design-concepts",
-      "kind": "repair",
-      "description": "Repair an unclear crosscutting concept or significant decision record."
-    },
-    {
-      "id": "repair-communicate-communicate",
-      "source": "arc42-communicate-document",
-      "target": "arc42-communicate-document",
-      "kind": "repair",
-      "description": "Repair documentation ownership, glossary, traceability, status, handoff or stakeholder review evidence."
-    },
-    {
-      "id": "repair-implementation-clarify",
-      "source": "arc42-accompany-implementation",
-      "target": "arc42-clarify-requirements",
-      "kind": "repair",
-      "description": "Clarify missing scope, acceptance intent, constraint or measurable quality scenario discovered during implementation."
-    },
-    {
-      "id": "repair-implementation-structures",
-      "source": "arc42-accompany-implementation",
-      "target": "arc42-design-structures",
-      "kind": "repair",
-      "description": "Repair a building block, interface, runtime or deployment design exposed by implementation."
-    },
-    {
-      "id": "repair-implementation-concepts",
-      "source": "arc42-accompany-implementation",
-      "target": "arc42-design-concepts",
-      "kind": "repair",
-      "description": "Repair a crosscutting concept or significant architecture decision exposed by implementation."
-    },
-    {
-      "id": "repair-implementation-communicate",
-      "source": "arc42-accompany-implementation",
-      "target": "arc42-communicate-document",
-      "kind": "repair",
-      "description": "Repair architecture documentation, traceability, handoff or review communication needed by implementation."
-    },
-    {
-      "id": "repair-implementation-implementation",
-      "source": "arc42-accompany-implementation",
-      "target": "arc42-accompany-implementation",
-      "kind": "repair",
-      "description": "Repair code, tests, migration, conformance or acceptance evidence within the bounded initiative."
-    },
-    {
-      "id": "repair-evaluate-clarify",
-      "source": "arc42-analyze-evaluate",
-      "target": "arc42-clarify-requirements",
-      "kind": "repair",
-      "description": "Clarify intent, scope, constraint or quality criteria required to evaluate the result."
-    },
-    {
-      "id": "repair-evaluate-structures",
-      "source": "arc42-analyze-evaluate",
-      "target": "arc42-design-structures",
-      "kind": "repair",
-      "description": "Repair a structural architecture gap identified by quality, risk or drift evidence."
-    },
-    {
-      "id": "repair-evaluate-concepts",
-      "source": "arc42-analyze-evaluate",
-      "target": "arc42-design-concepts",
-      "kind": "repair",
-      "description": "Repair a crosscutting concept or reassess a significant decision from evidence."
-    },
-    {
-      "id": "repair-evaluate-communicate",
-      "source": "arc42-analyze-evaluate",
-      "target": "arc42-communicate-document",
-      "kind": "repair",
-      "description": "Repair stale, contradictory or incomplete documentation, traceability, glossary, status or handoff."
-    },
-    {
-      "id": "repair-evaluate-implementation",
-      "source": "arc42-analyze-evaluate",
-      "target": "arc42-accompany-implementation",
-      "kind": "repair",
-      "description": "Repair code, tests, migration, conformance or acceptance gaps identified by evaluation."
-    },
-    {
-      "id": "repair-evaluate-evaluate",
-      "source": "arc42-analyze-evaluate",
-      "target": "arc42-analyze-evaluate",
-      "kind": "repair",
-      "description": "Repair quality evidence, risk, technical debt, architecture drift or decision-fitness analysis."
-    },
-    {
-      "id": "repair-learning-clarify",
-      "source": "arc42-continuous-learning",
-      "target": "arc42-clarify-requirements",
-      "kind": "repair",
-      "description": "Clarify requirement or quality impact made material by authoritative learning evidence."
-    },
-    {
-      "id": "repair-learning-structures",
-      "source": "arc42-continuous-learning",
-      "target": "arc42-design-structures",
-      "kind": "repair",
-      "description": "Assess a material learning finding affecting building blocks, interfaces, runtime or deployment."
-    },
-    {
-      "id": "repair-learning-concepts",
-      "source": "arc42-continuous-learning",
-      "target": "arc42-design-concepts",
-      "kind": "repair",
-      "description": "Assess a material learning finding affecting a crosscutting concept or significant decision."
-    },
-    {
-      "id": "repair-learning-communicate",
-      "source": "arc42-continuous-learning",
-      "target": "arc42-communicate-document",
-      "kind": "repair",
-      "description": "Repair material documentation drift, traceability, glossary or handoff findings."
-    },
-    {
-      "id": "repair-learning-evaluate",
-      "source": "arc42-continuous-learning",
-      "target": "arc42-analyze-evaluate",
-      "kind": "repair",
-      "description": "Evaluate material technology or method evidence against quality, risk, debt and drift."
-    },
-    {
-      "id": "repair-learning-learning",
-      "source": "arc42-continuous-learning",
-      "target": "arc42-continuous-learning",
-      "kind": "repair",
-      "description": "Repair incomplete authoritative research, source evidence or method-health measurement."
-    },
-    {
-      "id": "repair-release-communicate",
-      "source": "release-validation",
-      "target": "arc42-communicate-document",
-      "kind": "repair",
-      "description": "Repair release documentation, traceability, stakeholder handoff or authorization evidence."
-    },
-    {
-      "id": "repair-release-implementation",
-      "source": "release-validation",
-      "target": "arc42-accompany-implementation",
-      "kind": "repair",
-      "description": "Repair implementation, test, migration, conformance or acceptance readiness before release."
-    },
-    {
-      "id": "repair-release-evaluate",
-      "source": "release-validation",
-      "target": "arc42-analyze-evaluate",
-      "kind": "repair",
-      "description": "Evaluate release quality evidence, risk, debt, drift or rollback implications."
-    },
-    {
-      "id": "repair-release-release",
-      "source": "release-validation",
-      "target": "release-validation",
-      "kind": "repair",
-      "description": "Repair an explicitly authorized release, deploy, verification or rollback outcome within the approved external-write boundary."
+      ],
+      "capabilities": {
+        "accepts": [
+          "release:validation.requested"
+        ],
+        "provides": [
+          "release:validation.completed"
+        ]
+      }
     }
   ]
 }

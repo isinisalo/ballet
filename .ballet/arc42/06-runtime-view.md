@@ -4,7 +4,7 @@ title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 4
+version: 5
 tags:
   - arc42
   - runtime
@@ -19,7 +19,7 @@ Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaik
 
 ## Tila
 
-RT-001–RT-003 ja RT-006–RT-010 ovat toteutettua strict-v10-platform-käyttäytymistä. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella. RT-011 on ADR-018:n hyväksytty strict-v11-target eikä vielä toteutettu runtime-fakta.
+RT-001–RT-003 ja RT-006–RT-010 ovat toteutettua platform-käyttäytymistä. Niiden config ja immutable snapshot ovat strict v11, mutta cross-Loop-control flow säilyy ennallaan. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella. RT-011:n Graph/capability snapshot -edellytys on toteutettu; Orchestrator-dispatch ei vielä ole runtime-fakta.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -53,7 +53,7 @@ Järjestys ja invariantit:
 1. Request ja kaikki reachable config/resource -viitteet validoidaan ennen Runin luontia.
 2. Snapshot sekä Root Run -identiteetti commitoidaan ennen ensimmäistä provider-tehtävää.
 3. Branch/worktree on Node-kirjoitusten ainoa työalue; active checkout säilyy muuttumattomana.
-4. Root Run ajaa yhden roolin/outcomen kerrallaan. Seuraava rooli määräytyy strict-v10-control flow’sta, ei providerin vapaasta tekstistä.
+4. Root Run ajaa yhden roolin/outcomen kerrallaan. Seuraava rooli määräytyy nykyisestä control flow’sta, ei providerin vapaasta tekstistä; v11 Orchestrator-owned flow-dispatch on erillinen pending-vaihe.
 5. Outcome, State patch/revision, attempt ja control-flow-tapahtuma kuuluvat samaan atomiseen vaikutukseen silloin, kun ne muuttavat samaa runtime-siirtymää.
 6. Finalization tekee terminal-tilan näkyväksi mutta ei mergeä tai pushaa worktreetä.
 
@@ -160,7 +160,7 @@ RT-011 korvaa v11-toteutuksessa vain top-level completed-flow'n automaattisen `f
 
 ## Kanoniset lähteet
 
-ADR-015 ja runtime-lähde omistavat nykyisen geneerisen v10-control-semanticsin. ADR-018 omistaa tulevan v11 cross-Loop-dispatch-rajan. `.ballet/project.json` omistaa nykyisen project-local Loop-topologian, schedule-konfiguraation ja tehtävät; v11-migraatio on pending. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
+ADR-015 ja runtime-lähde omistavat nykyisen geneerisen control-semanticsin. ADR-018 omistaa strict-v11 cross-Loop-dispatch-rajan. `.ballet/project.json` omistaa strict-v11 project-local Graphin, Loop capabilityt, schedule-konfiguraation ja tehtävät. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
 
 ## Relevantit päätökset
 

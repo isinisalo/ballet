@@ -4,7 +4,7 @@ import { defaultLoopTheme } from "@shared/api/workspace-contracts";
 import { LoopNodeVisual, runCharacterMood } from "../src/workspace/automation/loops/LoopNodeVisual";
 import type { LoopNodeContext } from "../src/workspace/automation/loops/LoopCanvasTypes";
 import type { LoopNodeRecord } from "../src/workspace/automation/loops/loopGraph";
-import { v10Loop } from "./v10Fixtures";
+import { v11Loop } from "./v11Fixtures";
 
 describe("single Loop canvas node visual", () => {
   it("renders one selectable Work-owned artwork without phase cards", () => {
@@ -76,7 +76,7 @@ function nodeContext(overrides: Partial<LoopNodeContext> = {}): LoopNodeContext 
 }
 
 function nodeRecord(activeRole?: "work" | "validation", status?: "running" | "waiting_for_input"): LoopNodeRecord {
-  const loop = v10Loop();
+  const loop = v11Loop();
   const definition = loop.nodes[0]!;
   return {
     nodeKey: `${loop.id}::${definition.id}`,

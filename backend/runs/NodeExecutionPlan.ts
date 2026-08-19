@@ -87,7 +87,7 @@ export const createNodeTaskEnvelope = (input: NodeExecutionPlanInput): TaskEnvel
       run: { rootRunId: root.rootRunId, loopRunId: run.loopRunId, nodeRunId: node.nodeRunId },
       task: LOOP_ORCHESTRATOR_TASK,
       repairRequest: requestProjection(request),
-      allowedTargetLoops: root.executionSnapshot.loopEdges
+      allowedTargetLoops: root.executionSnapshot.graph.loopEdges
         .filter((edge) => edge.kind === "repair" && edge.source === loop.id)
         .map((edge) => {
           const target = requireLoop(root.executionSnapshot, edge.target);

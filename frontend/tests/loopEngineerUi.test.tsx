@@ -13,7 +13,7 @@ import { AutomationView } from "../src/workspace/automation/AutomationView";
 import type { LoopModuleActions } from "../src/workspace/automation/loops/LoopLibraryDialog";
 import { emptyData } from "../src/workspace/types";
 import { localRuntime } from "./runtimeFixtures";
-import { v10Automation, v10Loop } from "./v10Fixtures";
+import { v11Automation, v11Loop } from "./v11Fixtures";
 
 describe("Loop Engineer workspace", () => {
   it("shows the active Context level in navigation and breadcrumb and opens Level 1", async () => {
@@ -83,7 +83,7 @@ describe("Loop Engineer workspace", () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
     const data = loopEngineerData();
-    data.automation = { ...data.automation, loops: [], loopEdges: [] };
+    data.automation = { ...data.automation, loops: [], graph: { loopEdges: [] } };
     render(<AutomationView data={data} level="context" saveAutomation={vi.fn(async (config) => config)} navigate={navigate} setNavigationBlocker={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "Add first Loop" }));
@@ -91,12 +91,12 @@ describe("Loop Engineer workspace", () => {
   });
 
   it("offers Add first Work Loop Node for an empty selected Loop", () => {
-    const emptyLoop = v10Loop("empty-loop");
+    const emptyLoop = v11Loop("empty-loop");
     emptyLoop.nodes = [];
     emptyLoop.edges = [];
     emptyLoop.startNodeId = "";
     const data = loopEngineerData();
-    data.automation = v10Automation(emptyLoop);
+    data.automation = v11Automation(emptyLoop);
 
     render(<AutomationView data={data} level="detail" selectedId={emptyLoop.id} saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
 
@@ -134,7 +134,7 @@ describe("Loop Engineer module and runtime integration", () => {
   it("exports an installed Loop from the Level 1 inspector", async () => {
     const user = userEvent.setup();
     const data = loopEngineerData();
-    data.automation = v10Automation(v10Loop(installedStatus.loopId));
+    data.automation = v11Automation(v11Loop(installedStatus.loopId));
     const loopModules = loopModuleActions();
     vi.mocked(loopModules.exportLoop).mockResolvedValue({ canonicalJson: "{}\n", filename: "installed-loop.ballet-loop.json" });
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:loop-module");
@@ -184,13 +184,13 @@ function renderView({ level, selectedId, navigate }: {
   selectedId?: string;
   navigate: ReturnType<typeof vi.fn>;
 }) {
-  const source = v10Loop("source-loop");
-  const target = v10Loop("target-loop");
+  const source = v11Loop("source-loop");
+  const target = v11Loop("target-loop");
   target.nodes[0] = { ...target.nodes[0]!, id: "target-work" };
   target.startNodeId = "target-work";
   target.edges[0] = { ...target.edges[0]!, source: "target-work" };
   const data = loopEngineerData();
-  data.automation = v10Automation(source, target);
+  data.automation = v11Automation(source, target);
   return render(<AutomationView data={data} level={level} selectedId={selectedId} saveAutomation={vi.fn(async (config) => config)} navigate={navigate} setNavigationBlocker={vi.fn()} />);
 }
 
@@ -200,7 +200,7 @@ function loopEngineerData(): AppData {
     project: { ...emptyData.project, id: "ballet", name: "Ballet", description: "Coordinate verified Loop work." },
     executionProfiles: [{ id: "codex-test", name: "Codex test", provider: "codex", model: "gpt-test", reasoningEffort: "high", networkAccess: false }],
     instructions: [instruction("project:architect"), instruction("project:worker")],
-    automation: v10Automation(v10Loop("source-loop")),
+    automation: v11Automation(v11Loop("source-loop")),
     automationIssues: [],
     loopTheme: structuredClone(defaultLoopTheme),
     runtime: localRuntime()
@@ -226,7 +226,10 @@ const modulePackage: LoopModulePackageV1 = {
   permissions: { network: "forbidden", externalWrites: false },
   profileSlots: [],
   stateContract: { id: "installed-state", version: "1.0.0", description: "Installed state.", initial: {}, requiredKeys: [] },
-  capabilities: { requires: [], provides: ["installed.complete"], recommendedConnections: [] },
+  capabilities: {
+    requires: [], accepts: ["installed:task.requested"],
+    provides: ["installed:task.completed"], recommendedConnections: []
+  },
   resources: [],
   loop: {
     key: "loop", description: "Installed module.", state: { description: "Installed state.", initial: {} }, startNode: "work",

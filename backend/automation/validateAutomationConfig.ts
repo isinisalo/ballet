@@ -133,35 +133,40 @@ export const validateProjectAutomationConfig = (
       id: edge.id,
       path: `loops.${loopIndex}.edges.${edgeIndex}.id`
     }))),
-    ...config.loopEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `loopEdges.${edgeIndex}.id` }))
+    ...config.graph.loopEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.loopEdges.${edgeIndex}.id` }))
   ], "Edge"));
   if (profileIds && !profileIds.has(config.orchestrator.executionProfileId)) issues.push({
     path: "orchestrator.executionProfileId",
     message: `Orchestrator references unknown execution profile: ${config.orchestrator.executionProfileId}.`
   });
   config.loops.forEach((loop, index) => issues.push(...validateLoop(loop, index, profileIds)));
-  config.loopEdges.forEach((edge, index) => {
+  const loopsById = new Map(config.loops.map((loop) => [loop.id, loop]));
+  config.graph.loopEdges.forEach((edge, index) => {
     if (!loopIds.has(edge.source)) issues.push({
-      path: `loopEdges.${index}.source`,
+      path: `graph.loopEdges.${index}.source`,
       message: `Loop Edge references an unknown source Loop: ${edge.source}.`
     });
     if (!loopIds.has(edge.target)) issues.push({
-      path: `loopEdges.${index}.target`,
+      path: `graph.loopEdges.${index}.target`,
       message: `Loop Edge references an unknown target Loop: ${edge.target}.`
     });
+    const target = loopsById.get(edge.target);
+    const compatible = edge.kind === "repair"
+      ? target?.capabilities.provides.includes(edge.capability)
+      : target?.capabilities.accepts.includes(edge.capability);
+    if (target && !compatible) issues.push({
+      path: `graph.loopEdges.${index}.capability`,
+      message: edge.kind === "repair"
+        ? `Repair Loop Edge capability ${edge.capability} is not provided by target Loop ${edge.target}.`
+        : `Flow Loop Edge capability ${edge.capability} is not accepted by target Loop ${edge.target}.`
+    });
   });
-  const flowSources = config.loopEdges.filter((edge) => edge.kind === "flow");
   issues.push(...duplicateIssues(
-    flowSources.map((edge) => ({ id: edge.source, path: `loopEdges.${config.loopEdges.indexOf(edge)}.source` })),
-    "outgoing flow Loop Edge source"
-  ));
-  const repairRoutes = config.loopEdges.filter((edge) => edge.kind === "repair");
-  issues.push(...duplicateIssues(
-    repairRoutes.map((edge) => ({
-      id: `${edge.source}→${edge.target}`,
-      path: `loopEdges.${config.loopEdges.indexOf(edge)}.target`
+    config.graph.loopEdges.map((edge, index) => ({
+      id: `${edge.source}→${edge.target}:${edge.kind}:${edge.capability}`,
+      path: `graph.loopEdges.${index}.capability`
     })),
-    "repair Loop Edge source/target route"
+    "Loop Edge route candidate"
   ));
   return issues;
 };

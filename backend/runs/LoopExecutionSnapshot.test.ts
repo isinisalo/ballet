@@ -10,7 +10,7 @@ import {
   testLoop,
   testOrchestrator,
   testWorkLoopNode
-} from "../tests/v10TestConfig.js";
+} from "../tests/v11TestConfig.js";
 
 const configuration = (): ProjectConfiguration => {
   const root = testLoop("root-loop");
@@ -21,9 +21,16 @@ const configuration = (): ProjectConfiguration => {
     { id: "work-to-verify", source: "work", target: { nodeId: "verify" } }
   ];
   return {
-    version: 10,
+    version: 11,
     executionProfiles: [testExecutionProfile],
     orchestrator: { ...testOrchestrator(), maxRepairDepth: 2 },
+    graph: { loopEdges: [
+      { id: "repair-to-nested", source: "repair-loop", target: "nested-repair", kind: "repair", capability: "test:loop.transfer", description: "Nested repair." },
+      { id: "root-to-repair", source: "root-loop", target: "repair-loop", kind: "repair", capability: "test:loop.transfer", description: "Allowed repair." },
+      { id: "root-to-flow", source: "root-loop", target: "flow-loop", kind: "flow", capability: "test:loop.transfer", description: "Normal flow." },
+      { id: "nested-too-deep", source: "nested-repair", target: "unused-loop", kind: "repair", capability: "test:loop.transfer", description: "Exceeds depth." },
+      { id: "repair-normal-flow", source: "repair-loop", target: "repair-flow", kind: "flow", capability: "test:loop.transfer", description: "Repair target flow closure." }
+    ] },
     loops: [
       testLoop("unused-loop"),
       testLoop("nested-repair"),
@@ -31,13 +38,6 @@ const configuration = (): ProjectConfiguration => {
       root,
       testLoop("repair-loop"),
       testLoop("flow-loop")
-    ],
-    loopEdges: [
-      { id: "repair-to-nested", source: "repair-loop", target: "nested-repair", kind: "repair", description: "Nested repair." },
-      { id: "root-to-repair", source: "root-loop", target: "repair-loop", kind: "repair", description: "Allowed repair." },
-      { id: "root-to-flow", source: "root-loop", target: "flow-loop", kind: "flow", description: "Normal flow." },
-      { id: "nested-too-deep", source: "nested-repair", target: "unused-loop", kind: "repair", description: "Exceeds depth." },
-      { id: "repair-normal-flow", source: "repair-loop", target: "repair-flow", kind: "flow", description: "Repair target flow closure." }
     ]
   };
 };
@@ -53,7 +53,7 @@ describe("reachable Root execution snapshot graph", () => {
       .toEqual(["verify", "work"]);
     expect(graph.loops.find((loop) => loop.id === "root-loop")?.edges.map((edge) => edge.id))
       .toEqual(["verify-completed", "work-to-verify"]);
-    expect(graph.loopEdges.map((edge) => edge.id)).toEqual([
+    expect(graph.graph.loopEdges.map((edge) => edge.id)).toEqual([
       "repair-normal-flow", "repair-to-nested", "root-to-flow", "root-to-repair"
     ]);
   });
@@ -66,7 +66,7 @@ describe("reachable Root execution snapshot graph", () => {
     expect(graph.minimumRepairDepthByLoopId.get("repair-flow")).toBe(1);
     expect(graph.minimumRepairDepthByLoopId.get("nested-repair")).toBe(2);
     expect(graph.minimumRepairDepthByLoopId.has("unused-loop")).toBe(false);
-    expect(graph.loopEdges.some((edge) => edge.id === "nested-too-deep")).toBe(false);
+    expect(graph.graph.loopEdges.some((edge) => edge.id === "nested-too-deep")).toBe(false);
   });
 
   it("excludes the complete repair catalog when maxRepairDepth is zero", () => {
@@ -75,7 +75,7 @@ describe("reachable Root execution snapshot graph", () => {
     const graph = reachableExecutionGraph(config, "root-loop");
 
     expect(graph.loops.map((loop) => loop.id)).toEqual(["flow-loop", "root-loop"]);
-    expect(graph.loopEdges.map((edge) => edge.id)).toEqual(["root-to-flow"]);
+    expect(graph.graph.loopEdges.map((edge) => edge.id)).toEqual(["root-to-flow"]);
   });
 
   it("snapshots provider compositions only from reachable Work and Validation Nodes", () => {

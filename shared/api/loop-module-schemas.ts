@@ -16,10 +16,10 @@ import {
   type LoopModulePackageV1
 } from "../domain/loopModules.js";
 import { projectWorkScheduleSchema } from "./work-schedule-schema.js";
+import { loopCapabilitySchema } from "./workspace-schemas.js";
 
 const localKey = z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Expected a lowercase kebab-case module-local key.");
 const stateKey = z.string().min(1).max(100).regex(/^[A-Za-z][A-Za-z0-9_-]*$/, "Expected a bounded top-level State key.");
-const capability = z.string().trim().min(1).max(200).regex(/^[a-z0-9]+(?:[.:/-][a-z0-9]+)*$/, "Expected a stable lowercase capability id.");
 const shortText = z.string().trim().min(1).max(2_000);
 const taskText = z.string().trim().min(1).max(maxLoopModuleStringLength);
 const semver = z.string().regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/, "Expected semantic version x.y.z.");
@@ -125,12 +125,13 @@ export const loopModulePackageV1Schema = z.object({
     requiredKeys: z.array(stateKey).max(64).refine(unique, "Required State keys must be unique.")
   }).strict(),
   capabilities: z.object({
-    requires: z.array(capability).max(64).refine(unique, "Required capabilities must be unique."),
-    provides: z.array(capability).max(64).refine(unique, "Provided capabilities must be unique."),
+    requires: z.array(loopCapabilitySchema).max(64).refine(unique, "Required capabilities must be unique."),
+    accepts: z.array(loopCapabilitySchema).max(64).refine(unique, "Accepted capabilities must be unique."),
+    provides: z.array(loopCapabilitySchema).max(64).refine(unique, "Provided capabilities must be unique."),
     recommendedConnections: z.array(z.object({
       kind: z.enum(["flow", "repair"]),
       direction: z.enum(["incoming", "outgoing"]),
-      capability,
+      capability: loopCapabilitySchema,
       description: shortText
     }).strict()).max(64)
   }).strict(),

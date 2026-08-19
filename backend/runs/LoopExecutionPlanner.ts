@@ -67,7 +67,7 @@ export class LoopExecutionPlanner {
     const runtimes = await this.preflightRuntimes(executionProfiles);
 
     const snapshot = rootExecutionSnapshotSchema.parse({
-      version: 3,
+      version: 4,
       rootLoopId,
       project: {
         checkoutRoot: workspace.path,
@@ -76,8 +76,8 @@ export class LoopExecutionPlanner {
         snapshotHash: workspace.snapshotHash
       },
       orchestrator,
+      graph: graph.graph,
       loops: graph.loops,
-      loopEdges: graph.loopEdges,
       terminals: [...loopTerminals],
       theme: theme.theme,
       executionProfiles,
@@ -95,7 +95,7 @@ export class LoopExecutionPlanner {
     const issue = loaded.issues[0];
     throw new LoopRunStateError(issue
       ? `Project configuration is invalid at ${issue.path}: ${issue.message}`
-      : "The prepared Run workspace has no valid strict v10 project configuration.");
+      : "The prepared Run workspace has no valid strict v11 project configuration.");
   }
 
   private async preflightRuntimes(
@@ -125,10 +125,10 @@ export class LoopExecutionPlanner {
 }
 
 const automationOf = (config: ProjectConfiguration): ProjectAutomationConfig => ({
-  version: 10,
+  version: 11,
   orchestrator: config.orchestrator,
-  loops: config.loops,
-  loopEdges: config.loopEdges
+  graph: config.graph,
+  loops: config.loops
 });
 const normalizeOrchestrator = (orchestrator: ProjectLoopOrchestrator): ProjectLoopOrchestrator => ({
   ...orchestrator,

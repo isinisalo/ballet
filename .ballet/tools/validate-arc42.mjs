@@ -247,7 +247,12 @@ if (!parsedConfig.success) {
   for (const issue of parsedConfig.error.issues) addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`);
 } else {
   config = parsedConfig.data;
-  const automation = { version: 10, orchestrator: config.orchestrator, loops: config.loops, loopEdges: config.loopEdges };
+  const automation = {
+    version: 11,
+    orchestrator: config.orchestrator,
+    graph: config.graph,
+    loops: config.loops
+  };
   for (const issue of validateProjectAutomationConfig(automation, config.executionProfiles)) addIssue(`Automation ${issue.path}: ${issue.message}`);
   const resources = await loadProjectResources(root);
   for (const issue of resources.issues) addIssue(`Resource ${issue.relativePath}: ${issue.message}`);
@@ -258,10 +263,10 @@ if (!parsedConfig.success) {
     if (outgoing.length !== 1) addIssue(`${loop.id}/${node.id} has ${outgoing.length} Validation OK edges; expected 1.`);
   }
 
-  const flow = config.loopEdges.filter((edge) => edge.kind === "flow").map((edge) => `${edge.source}→${edge.target}`);
+  const flow = config.graph.loopEdges.filter((edge) => edge.kind === "flow").map((edge) => `${edge.source}→${edge.target}`);
   if (JSON.stringify(flow) !== JSON.stringify(expectedFlow)) addIssue(`Default flow mismatch: ${flow.join(", ")}`);
 
-  const repairPairs = new Set(config.loopEdges.filter((edge) => edge.kind === "repair").map((edge) => `${edge.source}→${edge.target}`));
+  const repairPairs = new Set(config.graph.loopEdges.filter((edge) => edge.kind === "repair").map((edge) => `${edge.source}→${edge.target}`));
   for (const [source, targets] of Object.entries(requiredRepairs)) for (const target of targets) {
     if (!repairPairs.has(`${source}→${target}`)) addIssue(`Missing repair capability ${source}→${target}.`);
   }
@@ -336,5 +341,5 @@ if (issues.length > 0) {
   for (const issue of issues) process.stderr.write(`- ${issue}\n`);
   process.exitCode = 1;
 } else {
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${config?.loops.length ?? 0} Loops, ${config?.loopEdges.length ?? 0} Loop Edges.\n`);
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${config?.loops.length ?? 0} Loops, ${config?.graph.loopEdges.length ?? 0} Loop Edges.\n`);
 }

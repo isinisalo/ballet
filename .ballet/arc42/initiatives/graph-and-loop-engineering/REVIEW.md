@@ -4,7 +4,7 @@ title: Graph and Loop Engineering REVIEW
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-19'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Tila
 
-`draft`. Päätöspakettia ei ole vielä katselmoitu tämän vaiheen validointituloksia vasten, eikä v11-toteutusta ole aloitettu tai hyväksytty.
+`draft`. Strict-v11 data/config/snapshot/module-vaihe on toteutettu ja paikallinen tekninen evidenssi kerätty. Koko initiativea ei hyväksytä ennen runtime-dispatchia, Graph/Loop-authoring hard cutia ja ihmisreview'ta.
 
 ## Review scope
 
@@ -24,9 +24,9 @@ Tuleva review vertaa `goal-012` / `REQ-012` / `QS-014` -aikomusta ADR-018:aan, P
 
 ## Fact
 
-- Nykyinen baseline on strict v10 ja kolmitasoinen Loop Engineer.
+- Nykyinen config/domain/snapshot/module-baseline on strict v11; authoring-UI on edelleen kolmitasoinen Loop Engineer ja cross-Loop-runtime käyttää aiempaa käyttäytymistä.
 - ADR-018 ja initiative-artefaktit muodostavat päätös- ja muutosrajan.
-- GLE-EVID-002–009 ovat pending; tulevaa toteutusta ei ole todistettu.
+- GLE-EVID-002/003/008 ovat passed; GLE-EVID-004–007/009 ovat pending.
 
 ## Decision
 
@@ -34,24 +34,31 @@ Ei uutta review-päätöstä. `adr-018` on hyväksytty käyttäjän eksplisiitti
 
 ## Assumption, Hypothesis ja Finding
 
-- AS-GLE-001 ja HYP-GLE-001 odottavat toteutusevidenssiä.
-- FIND-GLE-001 on päätösrajassa käsitelty v11-targetiksi; nykyisen v10-koodin olemassaolo ei ole tämän vaiheen conformance failure.
+- AS-GLE-001:n data/snapshot/module-osa on todennettu; HYP-GLE-001:n käyttöliittymävaikutus odottaa myöhempää evidenssiä.
+- FIND-GLE-001:n cross-layer drift on poistettu tämän vaiheen data/config/snapshot/module-rajasta, mutta UI/runtime-dispatch-raja on tarkoituksella kesken.
 
 ## Per-QS verdict
 
 | QS | Criterion | Evidence | Verdict |
 | --- | --- | --- | --- |
-| QS-014 | Strict-v11 hard cut, Orchestrator-owned flow/repair ja täsmälleen Graph/Loop-authoring | EVID-014 / GLE-EVID-002–009 | pending |
+| QS-014 | Strict-v11 hard cut, Orchestrator-owned flow/repair ja täsmälleen Graph/Loop-authoring | EVID-014 / GLE-EVID-002–009 | partial: data/snapshot/module passed; dispatch/UI pending |
 
 ## Risk, trace ja method health
 
-RISK-013 ja TRACEABILITY päivitetään päätösvaiheessa planned/pending-tilaan. METHOD-HEALTH ei muutu ilman runtime- tai menetelmäevidenssiä.
+RISK-013 ja TRACEABILITY erottavat läpäistyn data/snapshot/module-osavaiheen koko EVID-014:n pending-tilasta. METHOD-HEALTH ei muutu ilman runtime- tai menetelmäevidenssiä.
+
+## Rajatun vaiheen conformance review
+
+- **Implementation defect:** ei havaittu domain/config/snapshot/module-rajassa. Strict-v10 lukupolkuja, rinnakkaista top-level `loopEdges`-mallia, package Graphia/target-ID:tä tai platformiin vuotanutta project-workflow'ta löytyi 0.
+- **Documentation drift:** TRACEABILITY ja RISK-013 kuvasivat koko implementationin pending-tilana erottelematta läpäistyä GLE-EVID-002/003/008-osavaihetta; korjattu säilyttäen EVID-014 pending-tilassa.
+- **Acceptance coverage:** capability-listan max- ja trim-invarianteille lisättiin eksplisiittinen schema-testi. Koko dispatch/UI/ihmisacceptance pysyy avoimena eikä tätä review'ta tulkita initiative-acceptanceksi.
+- **Open question:** ei uutta tämän rajatun vaiheen WHAT/WHY- tai vaikeasti peruttavaa HOW-kysymystä.
 
 ## Handoff
 
-- Current status: decision boundary drafted; implementation pending.
-- Next approved action: projektin omistaja katselmoi päätösvaiheen ja valtuuttaa tai palauttaa GLE-step-001:n.
-- Requested capability/outcome: strict-v11 domain/schema/capability hard cut ADR-018:n mukaisesti.
+- Current status: strict-v11 domain/schema/capability/snapshot/module-raja toteutettu; koko initiative draft.
+- Next approved action: projektin omistaja katselmoi rajatun vaiheen ja valtuuttaa tai palauttaa erikseen GLE-step-003:n.
+- Requested capability/outcome: Orchestrator-owned cross-Loop-dispatch ADR-018:n mukaisesti, jos seuraava vaihe valtuutetaan.
 - Stop condition: release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat erillisen täsmällisen ihmisvaltuutuksen.
 
 ## Avoimet kysymykset

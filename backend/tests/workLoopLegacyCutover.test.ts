@@ -30,8 +30,8 @@ describe("Work Loop hard cut architecture", () => {
     const project = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as unknown;
     const fixture = JSON.parse(await readFile(path.join(root, ".fixture-ballet-project/.ballet/project.json"), "utf8")) as unknown;
     const theme = JSON.parse(await readFile(path.join(root, ".ballet/theme.json"), "utf8")) as unknown;
-    expect(project).toMatchObject({ version: 10 });
-    expect(fixture).toMatchObject({ version: 10 });
+    expect(project).toMatchObject({ version: 11, graph: { loopEdges: expect.any(Array) } });
+    expect(fixture).toMatchObject({ version: 11, graph: { loopEdges: expect.any(Array) } });
     expect(theme).toMatchObject({ version: 4, edge: { repairStyle: expect.any(String) } });
     expect(JSON.stringify(theme)).not.toContain("rejectedStyle");
   });

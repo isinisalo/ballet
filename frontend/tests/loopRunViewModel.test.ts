@@ -8,6 +8,7 @@ import { resolveLoopRunView } from "../src/workspace/automation/loops/loopRunVie
 const loop: ProjectLoop = {
   id: "human-loop",
   description: "Human Loop.",
+  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   state: { description: "State.", initial: {} },
   startNodeId: "work",
   nodes: [{
@@ -21,13 +22,13 @@ const loop: ProjectLoop = {
 };
 
 const automation: ProjectAutomationConfig = {
-  version: 10,
+  version: 11,
   orchestrator: {
     executionProfileId: "profile", primaryInstructionId: "project:orchestrator",
     skillIds: [], maxRepairDepth: 3, maxRepairAttempts: 3
   },
-  loops: [loop],
-  loopEdges: []
+  graph: { loopEdges: [] },
+  loops: [loop]
 };
 
 describe("loopRunViewModel", () => {
@@ -73,16 +74,18 @@ describe("loopRunViewModel", () => {
     root.executionSnapshot.loops.push(repairLoop);
     root.loopRuns.push(repairDetails);
     root.current = { ...root.current, loopRunId: repairDetails.loopRunId, loopId: repairLoop.id };
-    const liveConfig = { ...automation, loopEdges: [{
-      id: "mutable-edge", source: loop.id, target: repairLoop.id, kind: "flow" as const, description: "Mutable edge."
-    }] };
-    root.executionSnapshot.loopEdges = [{
-      id: "repair-edge", source: loop.id, target: repairLoop.id, kind: "repair", description: "Snapshotted allowlist."
+    const liveConfig = { ...automation, graph: { loopEdges: [{
+      id: "mutable-edge", source: loop.id, target: repairLoop.id, kind: "flow" as const,
+      capability: "test:loop.transfer", description: "Mutable edge."
+    }] } };
+    root.executionSnapshot.graph.loopEdges = [{
+      id: "repair-edge", source: loop.id, target: repairLoop.id, kind: "repair",
+      capability: "test:loop.transfer", description: "Snapshotted allowlist."
     }];
 
     const view = resolveLoopRunView(liveConfig, loop, [], defaultLoopTheme, repairDetails, root);
     expect(view.canvasLoop.id).toBe("repair-loop");
-    expect(view.canvasConfig.loopEdges).toEqual(root.executionSnapshot.loopEdges);
+    expect(view.canvasConfig.loopEdges).toEqual(root.executionSnapshot.graph.loopEdges);
   });
 });
 
@@ -113,11 +116,11 @@ const rootDetail = (details: LoopRunDetails): RootRunDetail => ({
     workLoopNodeRunId: "composite", workLoopNodeId: "work", nodeRunId: "work-node", nodeRole: "work"
   },
   executionSnapshot: {
-    version: 3,
+    version: 4,
     rootLoopId: loop.id,
     project: { checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64) },
     orchestrator: automation.orchestrator,
-    loops: [loop], loopEdges: [], terminals: ["completed", "blocked", "failed"],
+    graph: { loopEdges: [] }, loops: [loop], terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme, executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },
   loopRuns: [details],

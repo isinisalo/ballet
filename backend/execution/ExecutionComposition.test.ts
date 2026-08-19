@@ -7,7 +7,7 @@ import type {
   OrchestratorTaskEnvelopeV3, ValidationTaskEnvelopeV3, WorkTaskEnvelopeV3
 } from "../../shared/domain/taskEnvelope.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
-import { testExecutionProfile, testLoop, testOrchestrator, testWorkLoopNode } from "../tests/v10TestConfig.js";
+import { testExecutionProfile, testLoop, testOrchestrator, testWorkLoopNode } from "../tests/v11TestConfig.js";
 import {
   composeExecutionPrompt, NODE_OUTCOME_SCHEMA_SHA256, systemExecutionResourceSnapshot
 } from "./ExecutionComposition.js";
@@ -23,15 +23,15 @@ const providerNode = (): ProjectWorkLoopNode => {
 const snapshot = (): RootExecutionSnapshot => {
   const loop = testLoop("main-loop", providerNode());
   return {
-    version: 3,
+    version: 4,
     rootLoopId: loop.id,
     project: {
       checkoutRoot: "/workspace", headSha: "a".repeat(40),
       configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
     },
     orchestrator: testOrchestrator(),
+    graph: { loopEdges: [] },
     loops: [loop],
-    loopEdges: [],
     terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme,
     executionProfiles: [testExecutionProfile],
@@ -113,8 +113,9 @@ describe("ExecutionComposition V4", () => {
 
     const orchestratorSnapshot = snapshot();
     orchestratorSnapshot.loops.push(testLoop("repair-loop"));
-    orchestratorSnapshot.loopEdges.push({
+    orchestratorSnapshot.graph.loopEdges.push({
       id: "main-to-repair", source: "main-loop", target: "repair-loop", kind: "repair",
+      capability: "test:loop.transfer",
       description: "Allow a bounded repair."
     });
     const orchestrator: OrchestratorTaskEnvelopeV3 = {

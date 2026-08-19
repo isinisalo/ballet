@@ -1,36 +1,39 @@
 {
   "capabilities": {
+    "accepts": [
+      "arc42:implementation-accompanied"
+    ],
     "provides": [
-      "arc42.architecture-evaluated"
+      "arc42:architecture-evaluated"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42.requirements-clarified",
+        "capability": "arc42:requirements-clarified",
         "description": "Clarify criteria required for evaluation.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.structures-designed",
+        "capability": "arc42:structures-designed",
         "description": "Repair architecture drift in structures.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.concepts-designed",
+        "capability": "arc42:concepts-designed",
         "description": "Repair a concept or reassess a decision.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.implementation-accompanied",
+        "capability": "arc42:implementation-accompanied",
         "description": "Repair implementation or evidence gaps.",
         "direction": "outgoing",
         "kind": "repair"
       }
     ],
     "requires": [
-      "arc42.implementation-accompanied"
+      "arc42:implementation-accompanied"
     ]
   },
   "format": "ballet-loop-module",
@@ -175,7 +178,6 @@
           "changedArtifactPaths": [],
           "checks": [],
           "nextAction": null,
-          "nextLoopId": null,
           "stableIds": [],
           "status": "pending",
           "summary": null
@@ -329,7 +331,6 @@
         "changedArtifactPaths": [],
         "checks": [],
         "nextAction": null,
-        "nextLoopId": null,
         "stableIds": [],
         "status": "pending",
         "summary": null

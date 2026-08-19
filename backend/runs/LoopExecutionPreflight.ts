@@ -30,7 +30,7 @@ export const preflightExecutionPrompts = (snapshot: RootExecutionSnapshot): void
       }
     }
   }
-  const sources = snapshot.loops.filter((loop) => snapshot.loopEdges.some((edge) =>
+  const sources = snapshot.loops.filter((loop) => snapshot.graph.loopEdges.some((edge) =>
     edge.kind === "repair" && edge.source === loop.id));
   for (const loop of sources.length > 0 ? sources : [rootLoop]) {
     composeExecutionPrompt(snapshot, orchestratorEnvelope(snapshot, loop, stateEnvelope));
@@ -105,7 +105,7 @@ const orchestratorEnvelope = (
     stateRevisionAtRequest: 0,
     nestingDepth: 0
   },
-  allowedTargetLoops: snapshot.loopEdges
+  allowedTargetLoops: snapshot.graph.loopEdges
     .filter((edge) => edge.kind === "repair" && edge.source === loop.id)
     .map((edge) => {
       const target = requireLoop(snapshot, edge.target);

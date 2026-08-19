@@ -60,6 +60,9 @@ describe("Loop module install/export service", () => {
     expect(plan.loop.id).toBe("sample-loop-2");
     expect(plan.loop.nodes[0]?.id).toBe("sample-loop-2-work");
     expect(plan.loop.edges[0]?.id).toBe("sample-loop-2-completed");
+    expect(plan.loop.capabilities).toEqual({
+      accepts: ["sample:task.requested"], provides: ["sample:task.completed"]
+    });
     expect(plan.idRemapping.instructions.worker).toBe("project:module-sample-loop-2-worker");
     expect(plan.idRemapping.skills.sample).toBe("project:modules/sample-loop-2/sample");
     expect(plan.conflicts).toContainEqual(expect.objectContaining({ code: "ID_CONFLICT", blocking: false }));
@@ -110,23 +113,6 @@ describe("Loop module install/export service", () => {
     expect(secondPlan.canInstall).toBe(false);
   });
 
-  it("reports hard capability requirements without preventing independent installation", async () => {
-    const root = await project();
-    const modules = service(root);
-    const dependent = testLoopModulePackage({
-      manifest: { ...testLoopModulePackage().manifest, id: "dependent-loop", title: "Dependent Loop" },
-      capabilities: { requires: ["sample.complete"], provides: ["dependent.complete"], recommendedConnections: [] }
-    });
-    const before = await modules.plan({ package: dependent, source: "test:dependent" });
-    expect(before.capabilities.missingRequires).toEqual(["sample.complete"]);
-    expect(before.canInstall).toBe(true);
-    const provider = testLoopModulePackage();
-    const providerPlan = await modules.plan({ package: provider, source: "test:provider" });
-    await modules.commit({ package: provider, source: "test:provider", expectedPlanHash: providerPlan.planHash });
-    const after = await modules.plan({ package: dependent, source: "test:dependent" });
-    expect(after.capabilities).toMatchObject({ available: ["sample.complete"], missingRequires: [] });
-  });
-
   it("cleans newly written resources and provenance when the final config write fails", async () => {
     const root = await project();
     const modules = service(root);
@@ -170,6 +156,7 @@ describe("Loop module install/export service", () => {
     const exported = await modules.exportLoop({ loopId: plan.loop.id });
     expect(exported.package.loop).toEqual(pkg.loop);
     expect(exported.package.stateContract).toEqual(pkg.stateContract);
+    expect(exported.package.capabilities).toEqual(pkg.capabilities);
     expect(exported.package.permissions).toEqual(pkg.permissions);
     expect(exported.package.resources.map(({ kind, body }) => ({ kind, body })))
       .toEqual(pkg.resources.map(({ kind, body }) => ({ kind, body })));
@@ -209,7 +196,7 @@ describe("Loop module install/export service", () => {
       skillIds: [plan.idRemapping.skills.sample!]
     };
     repository.putAutomation(root, {
-      version: 10, orchestrator: loaded.orchestrator, loops: [...loaded.loops, shared], loopEdges: loaded.loopEdges
+      version: 11, orchestrator: loaded.orchestrator, graph: loaded.graph, loops: [...loaded.loops, shared]
     });
     await modules.remove(plan.loop.id);
     expect(await readFile(path.join(root, ".ballet/instructions/modules/sample-loop/worker.md"), "utf8")).toContain("Sample worker");
@@ -234,21 +221,22 @@ describe("Loop module install/export service", () => {
     const loaded = repository.load(root).config!;
     const [sourceLoopId, targetLoopId] = packages.map((pkg) => pkg.manifest.id);
     const automation = {
-      version: 10 as const,
+      version: 11 as const,
       orchestrator: loaded.orchestrator,
-      loops: loaded.loops,
-      loopEdges: [{
+      graph: { loopEdges: [{
         id: "operator-flow-clarify-structures",
         source: sourceLoopId!,
         target: targetLoopId!,
         kind: "flow" as const,
+        capability: packages[1]!.capabilities.accepts[0]!,
         description: "Operator-owned flow between independently installed modules."
-      }]
+      }] },
+      loops: loaded.loops,
     };
     const resources = await loadProjectResources(root);
     expect(validateProjectAutomationConfig(automation, loaded.executionProfiles)).toEqual([]);
     expect(validateProjectExecutionResources(automation, resources)).toEqual([]);
-    expect(automation.loopEdges).toHaveLength(1);
+    expect(automation.graph.loopEdges).toHaveLength(1);
   });
 
   it("installs, exports, and removes each software-delivery starter without implicit Loop Edges", async () => {
@@ -276,7 +264,7 @@ describe("Loop module install/export service", () => {
       const loaded = new ProjectConfigurationRepository().load(root).config!;
       expect(loaded.loops).toHaveLength(1);
       expect(loaded.loops[0]?.nodes).toHaveLength(3);
-      expect(loaded.loopEdges).toEqual([]);
+      expect(loaded.graph.loopEdges).toEqual([]);
       const exported = await modules.exportLoop({ loopId: installed.loopId });
       expect(loopModulePackageV1Schema.parse(exported.package).loop.nodes).toHaveLength(3);
       await modules.remove(installed.loopId);
@@ -301,11 +289,11 @@ const project = async ({ loops = [], extraProfiles = [] }: { loops?: ProjectLoop
   await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
   await writeFile(path.join(root, ".ballet/instructions/architect.md"), "---\nid: architect\ntitle: Architect\n---\nRoute project repair work.\n", "utf8");
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 10,
+    version: 11,
     executionProfiles: [profile(), ...extraProfiles],
     orchestrator: { executionProfileId: "codex-test", primaryInstructionId: "project:architect", skillIds: [], maxRepairDepth: 4, maxRepairAttempts: 3 },
-    loops,
-    loopEdges: []
+    graph: { loopEdges: [] },
+    loops
   }, null, 2), "utf8");
   return root;
 };
@@ -313,6 +301,7 @@ const project = async ({ loops = [], extraProfiles = [] }: { loops?: ProjectLoop
 const existingLoop = (id = "sample-loop"): ProjectLoop => ({
   id,
   description: `Existing ${id}.`,
+  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   state: { description: "Existing state.", initial: {} },
   startNodeId: `${id}-work`,
   nodes: [{

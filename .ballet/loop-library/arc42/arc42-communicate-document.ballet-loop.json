@@ -1,36 +1,39 @@
 {
   "capabilities": {
+    "accepts": [
+      "arc42:concepts-designed"
+    ],
     "provides": [
-      "arc42.architecture-communicated"
+      "arc42:architecture-communicated"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42.requirements-clarified",
+        "capability": "arc42:requirements-clarified",
         "description": "Clarify intent exposed during communication.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.structures-designed",
+        "capability": "arc42:structures-designed",
         "description": "Repair an unclear architecture view.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.concepts-designed",
+        "capability": "arc42:concepts-designed",
         "description": "Repair an unclear concept or decision.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.implementation-accompanied",
+        "capability": "arc42:implementation-accompanied",
         "description": "Continue an approved handoff to bounded implementation.",
         "direction": "outgoing",
         "kind": "flow"
       }
     ],
     "requires": [
-      "arc42.concepts-designed"
+      "arc42:concepts-designed"
     ]
   },
   "format": "ballet-loop-module",
@@ -137,7 +140,6 @@
           "changedArtifactPaths": [],
           "checks": [],
           "nextAction": null,
-          "nextLoopId": null,
           "stableIds": [],
           "status": "pending",
           "summary": null
@@ -283,7 +285,6 @@
         "changedArtifactPaths": [],
         "checks": [],
         "nextAction": null,
-        "nextLoopId": null,
         "stableIds": [],
         "status": "pending",
         "summary": null

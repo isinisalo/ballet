@@ -102,12 +102,12 @@ const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskE
     `Task Envelope Loop ${envelope.loop.id} does not match the immutable Root execution snapshot.`
   );
   if (envelope.role === "orchestrator") {
-    const expectedTargets = snapshot.loopEdges
+    const expectedTargets = snapshot.graph.loopEdges
       .filter((edge) => edge.kind === "repair" && edge.source === loop.id)
       .map((edge) => snapshot.loops.find((candidate) => candidate.id === edge.target))
       .filter((candidate) => candidate !== undefined)
       .map(({ id, description }) => {
-        const edge = snapshot.loopEdges.find((candidate) =>
+        const edge = snapshot.graph.loopEdges.find((candidate) =>
           candidate.kind === "repair" && candidate.source === loop.id && candidate.target === id);
         if (!edge) throw new ExecutionCompositionError("missing_resource", `Repair route to ${id} is missing.`);
         return { id, description, loopEdgeId: edge.id, routingDescription: edge.description };

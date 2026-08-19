@@ -67,6 +67,7 @@ export const testWorkLoopNode = (
 export const testLoop = (id = "main-loop", node = testWorkLoopNode()): ProjectLoop => ({
   id,
   description: `Test Loop ${id}.`,
+  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   state: { description: `State for ${id}.`, initial: {} },
   startNodeId: node.id,
   nodes: [node],
@@ -74,10 +75,10 @@ export const testLoop = (id = "main-loop", node = testWorkLoopNode()): ProjectLo
 });
 
 export const testAutomationConfig = (loop = testLoop()): ProjectAutomationConfig => ({
-  version: 10,
+  version: 11,
   orchestrator: testOrchestrator(),
-  loops: [loop],
-  loopEdges: []
+  graph: { loopEdges: [] },
+  loops: [loop]
 });
 
 export const testProjectConfiguration = (loop = testLoop()): ProjectConfiguration => ({

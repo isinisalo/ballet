@@ -121,6 +121,7 @@ export interface LoopModuleRecommendedConnectionV1 {
 
 export interface LoopModuleCapabilitiesV1 {
   requires: string[];
+  accepts: string[];
   provides: string[];
   recommendedConnections: LoopModuleRecommendedConnectionV1[];
 }

@@ -60,7 +60,7 @@ describe("LoopOrchestrator call and return", () => {
       repairRequest: {
         id: requested.request.repairRequestId,
         validationSummary: "Caller validation found a repairable problem.",
-        requestedCapability: "repair capability",
+        requestedCapability: "test:loop.transfer",
         evidence: { validation: { finding: "caller" }, refs: ["check:caller"] }
       },
       allowedTargetLoops: [
@@ -122,10 +122,10 @@ describe("LoopOrchestrator route rejection", () => {
     const harness = await createOrchestrationHarness({
       targets: targetLoopId === "not-allowed" ? [harnesslessLoop("repair-a"), notAllowed] : [harnesslessLoop("repair-a")],
       edges: [
-        { id: "allowed", source: "caller-loop", target: "repair-a", kind: "repair", description: "Allowed." },
+        { id: "allowed", source: "caller-loop", target: "repair-a", kind: "repair", capability: "test:loop.transfer", description: "Allowed." },
         ...(targetLoopId === "not-allowed" ? [{
           id: "reachable-not-allowed", source: "repair-a", target: "not-allowed",
-          kind: "flow" as const, description: "Reachable but not a caller repair target."
+          kind: "flow" as const, capability: "test:loop.transfer", description: "Reachable but not a caller repair target."
         }] : [])
       ]
     });
@@ -153,7 +153,7 @@ describe("LoopOrchestrator route rejection", () => {
 describe("LoopOrchestrator self and flow precedence", () => {
   it("allows an explicit repair self-edge as a nested invocation", async () => {
     const harness = await createOrchestrationHarness({ targets: [], edges: [{
-      id: "self", source: "caller-loop", target: "caller-loop", kind: "repair", description: "Self repair."
+      id: "self", source: "caller-loop", target: "caller-loop", kind: "repair", capability: "test:loop.transfer", description: "Self repair."
     }] });
     const { runtime } = harness;
     runtime.startLoopRun("root-run");
@@ -169,8 +169,8 @@ describe("LoopOrchestrator self and flow precedence", () => {
     const repairA = harnesslessLoop("repair-a");
     const repairB = harnesslessLoop("repair-b");
     const harness = await createOrchestrationHarness({ targets: [repairA, repairB], edges: [
-      { id: "caller-a", source: "caller-loop", target: "repair-a", kind: "repair", description: "Repair in A." },
-      { id: "a-b-flow", source: "repair-a", target: "repair-b", kind: "flow", description: "Normal A to B flow." }
+      { id: "caller-a", source: "caller-loop", target: "repair-a", kind: "repair", capability: "test:loop.transfer", description: "Repair in A." },
+      { id: "a-b-flow", source: "repair-a", target: "repair-b", kind: "flow", capability: "test:loop.transfer", description: "Normal A to B flow." }
     ] });
     const { runtime } = harness;
     runtime.startLoopRun("root-run");
@@ -227,6 +227,7 @@ describe("LoopOrchestrator terminal outcomes", () => {
 
 const harnesslessLoop = (id: string) => ({
   id, description: `Test Loop ${id}.`, state: { description: "Ignored nested initial State.", initial: {} },
+  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   startNodeId: `${id}-work`, nodes: [{
     id: `${id}-work`, description: "Work.",
     work: { type: "human" as const, task: "Work.", nodeStyle: "terra" as const, nodeSize: "medium" as const },

@@ -74,24 +74,24 @@ export class ProjectConfigurationRepository {
         issues: [sourceIssue("invalid_json", ".ballet/project.json", error instanceof Error ? error.message : "Project config is not valid JSON.")]
       };
     }
-    if (isRecord(value) && value.version === 9) return {
+    if (isRecord(value) && value.version === 10) return {
       path: filename,
       exists: true,
       source,
       issues: [sourceIssue(
         "invalid_schema",
         "version",
-        "Project configuration version 9 is not supported; update the project to strict v10."
+        "Project configuration version 10 is not supported; update the project to strict v11."
       )]
     };
-    if (isRecord(value) && value.version !== 10) return {
+    if (isRecord(value) && value.version !== 11) return {
       path: filename,
       exists: true,
       source,
       issues: [sourceIssue(
         "invalid_schema",
         "version",
-        `Strict project config version 10 is required; version ${String(value.version)} is not supported.`
+        `Strict project config version 11 is required; version ${String(value.version)} is not supported.`
       )]
     };
     const parsed = projectConfigSchema.safeParse(value);
@@ -106,10 +106,10 @@ export class ProjectConfigurationRepository {
     assertWritable(loaded);
     const config = normalize({
       ...loaded.config,
-      version: 10,
+      version: 11,
       orchestrator: automation.orchestrator,
-      loops: automation.loops,
-      loopEdges: automation.loopEdges
+      graph: automation.graph,
+      loops: automation.loops
     });
     this.write(root, config);
     return config;
@@ -123,7 +123,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 10,
+      version: 11,
       executionProfiles: [...loaded.config.executionProfiles, profile]
     });
     this.write(root, config);
@@ -138,7 +138,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 10,
+      version: 11,
       executionProfiles: loaded.config.executionProfiles.map((candidate) =>
         candidate.id === profile.id ? profile : candidate)
     });
@@ -152,7 +152,7 @@ export class ProjectConfigurationRepository {
     if (!loaded.config!.executionProfiles.some((profile) => profile.id === executionProfileId)) return loaded.config!;
     const config = normalize({
       ...loaded.config!,
-      version: 10,
+      version: 11,
       executionProfiles: loaded.config!.executionProfiles.filter((profile) => profile.id !== executionProfileId)
     });
     this.write(root, config);
@@ -186,7 +186,7 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 10,
+  version: 11,
   executionProfiles: config.executionProfiles
     .map((profile) => ({
       id: profile.id,
@@ -198,15 +198,21 @@ const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
     }))
     .sort((left, right) => compareIds(left.id, right.id)),
   orchestrator: normalizeComposition(config.orchestrator),
+  graph: {
+    loopEdges: config.graph.loopEdges.map((edge) => ({ ...edge }))
+  },
   loops: config.loops.map((loop) => ({
     ...loop,
+    capabilities: {
+      accepts: [...loop.capabilities.accepts].sort(compareIds),
+      provides: [...loop.capabilities.provides].sort(compareIds)
+    },
     nodes: loop.nodes.map((node) => ({
       ...node,
       work: node.work.type === "human" ? node.work : normalizeComposition(node.work),
       validation: node.validation.type === "human" ? node.validation : normalizeComposition(node.validation)
     }))
-  })),
-  loopEdges: config.loopEdges.map((edge) => ({ ...edge }))
+  }))
 });
 
 const normalizeComposition = <T extends ProjectExecutionComposition>(composition: T): T => ({

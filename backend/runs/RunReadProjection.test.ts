@@ -3,7 +3,7 @@ import { workNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { ExecutionTask, LoopRunDetails, NodeRun, WorkLoopNodeRun } from "../../shared/domain/runtime.js";
 import type { RootRunRepairProjection } from "../../shared/domain/runs.js";
-import { testLoop } from "../tests/v10TestConfig.js";
+import { testLoop } from "../tests/v11TestConfig.js";
 import { currentPosition } from "./RunReadProjection.js";
 import type { StoredRootRun } from "./RootRunStore.js";
 
@@ -19,7 +19,7 @@ const root = (overrides: Partial<StoredRootRun> = {}): StoredRootRun => ({
   configHash: "b".repeat(64), snapshotHash: "c".repeat(64), transitionCount: 0,
   activeLoopRunId: "loop-run", activeNodeRunId: "node-run",
   executionSnapshot: {
-    version: 3, rootLoopId: "main-loop",
+    version: 4, rootLoopId: "main-loop",
     project: {
       checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64),
       snapshotHash: "c".repeat(64)
@@ -28,7 +28,7 @@ const root = (overrides: Partial<StoredRootRun> = {}): StoredRootRun => ({
       executionProfileId: "primary", primaryInstructionId: "project:orchestrator", skillIds: [],
       maxRepairDepth: 4, maxRepairAttempts: 3
     },
-    loops: [testLoop()], loopEdges: [], terminals: ["completed", "blocked", "failed"],
+    graph: { loopEdges: [] }, loops: [testLoop()], terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme, executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },
   createdAt: timestamp, updatedAt: timestamp, ...overrides

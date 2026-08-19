@@ -30,7 +30,7 @@ const node = (id: string, work: ProjectWorkNode): ProjectWorkLoopNode => ({
 });
 
 const previewConfig: ProjectAutomationConfig = {
-  version: 10,
+  version: 11,
   orchestrator: {
     executionProfileId: profileId,
     primaryInstructionId: instructionId,
@@ -38,9 +38,11 @@ const previewConfig: ProjectAutomationConfig = {
     maxRepairDepth: 4,
     maxRepairAttempts: 3
   },
+  graph: { loopEdges: [] },
   loops: [{
     id: previewLoopId,
     description: "Theme preview Work Loop.",
+    capabilities: { accepts: ["ballet:theme.preview"], provides: ["ballet:theme.previewed"] },
     state: { description: "Theme preview state.", initial: {} },
     startNodeId: "luna",
     nodes: [
@@ -63,8 +65,7 @@ const previewConfig: ProjectAutomationConfig = {
       { id: "terra-ok", source: "terra", target: { nodeId: "sol" } },
       { id: "sol-ok", source: "sol", target: { terminal: "completed" } }
     ]
-  }],
-  loopEdges: []
+  }]
 };
 
 const previewExecutionProfiles = [{

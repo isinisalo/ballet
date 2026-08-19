@@ -75,7 +75,10 @@ const pkg: LoopModulePackageV1 = {
   permissions: { network: "forbidden", externalWrites: false },
   profileSlots: [{ key: "worker", title: "Worker", description: "Worker profile.", providers: ["codex"], network: "forbidden" }],
   stateContract: { id: "sample-state", version: "1.0.0", description: "Sample state.", initial: {}, requiredKeys: [] },
-  capabilities: { requires: [], provides: ["sample.complete"], recommendedConnections: [] },
+  capabilities: {
+    requires: [], accepts: ["sample:task.requested"],
+    provides: ["sample:task.completed"], recommendedConnections: []
+  },
   resources: [],
   loop: {
     key: "loop", description: "One portable sample Loop.", state: { description: "Sample state.", initial: {} }, startNode: "work",

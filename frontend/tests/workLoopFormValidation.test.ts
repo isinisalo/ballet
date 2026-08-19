@@ -3,7 +3,7 @@ import type { ExecutionProfile, ProjectInstruction, Skill } from "@shared/api/wo
 import { updateNodeEdgeTarget } from "../src/workspace/automation/loops/loopEditorState";
 import { automationDraftIssues, parseInitialState } from "../src/workspace/automation/loops/loopFormValidation";
 import { localRuntime } from "./runtimeFixtures";
-import { v10Automation, v10Loop } from "./v10Fixtures";
+import { v11Automation, v11Loop } from "./v11Fixtures";
 
 const profile: ExecutionProfile = {
   id: "codex-test",
@@ -42,7 +42,7 @@ const resources = [instruction("project:architect"), instruction("project:worker
 
 describe("Work Loop form validation", () => {
   it("accepts a complete v10 draft and rejects missing profiles and resources", () => {
-    const config = v10Automation(v10Loop());
+    const config = v11Automation(v11Loop());
     expect(automationDraftIssues(config, [profile], resources, [skill], localRuntime())).toEqual([]);
     const missing = automationDraftIssues(config, [], [], [], localRuntime());
     expect(missing.map((issue) => issue.path)).toEqual(expect.arrayContaining([
@@ -54,7 +54,7 @@ describe("Work Loop form validation", () => {
   });
 
   it("enforces scheduled start placement and a reachable exit", () => {
-    const loop = v10Loop();
+    const loop = v11Loop();
     const second = structuredClone(loop.nodes[0]!);
     loop.nodes.push({
       ...second,
@@ -71,31 +71,29 @@ describe("Work Loop form validation", () => {
       }
     });
     const cycle = updateNodeEdgeTarget(updateNodeEdgeTarget(loop, "work", { nodeId: "work-2" }), "work-2", { nodeId: "work" });
-    const issues = automationDraftIssues(v10Automation(cycle), [profile], resources, [], localRuntime());
+    const issues = automationDraftIssues(v11Automation(cycle), [profile], resources, [], localRuntime());
     expect(issues.map((issue) => issue.message)).toEqual(expect.arrayContaining([
       "Scheduled Work is allowed only in the start Work Loop Node.",
       "Loop needs a reachable terminal target."
     ]));
   });
 
-  it("enforces one flow edge per source and one repair edge per source-target route", () => {
-    const first = v10Loop("first-loop");
-    const second = v10Loop("second-loop");
+  it("permits multiple flow candidates and rejects a duplicate route candidate", () => {
+    const first = v11Loop("first-loop");
+    const second = v11Loop("second-loop");
     second.nodes[0] = { ...second.nodes[0]!, id: "second-work" };
     second.startNodeId = "second-work";
     second.edges[0] = { ...second.edges[0]!, source: "second-work" };
-    const config = v10Automation(first, second);
-    config.loopEdges = [
-      { id: "flow-1", source: first.id, target: first.id, kind: "flow", description: "Repeat." },
-      { id: "flow-2", source: first.id, target: second.id, kind: "flow", description: "Continue." },
-      { id: "repair-1", source: first.id, target: second.id, kind: "repair", description: "Repair." },
-      { id: "repair-2", source: first.id, target: second.id, kind: "repair", description: "Repair again." }
+    const config = v11Automation(first, second);
+    config.graph.loopEdges = [
+      { id: "flow-1", source: first.id, target: first.id, kind: "flow", capability: "test:loop.transfer", description: "Repeat." },
+      { id: "flow-2", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Continue." },
+      { id: "repair-1", source: first.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair." },
+      { id: "repair-2", source: first.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair again." }
     ];
     const messages = automationDraftIssues(config, [profile], resources, [], localRuntime()).map((issue) => issue.message);
-    expect(messages).toEqual(expect.arrayContaining([
-      `Duplicate outgoing flow Loop Edge source id: ${first.id}.`,
-      `Duplicate repair Loop Edge source/target route id: ${first.id}→${second.id}.`
-    ]));
+    expect(messages).toContain(`Duplicate Loop Edge route candidate id: ${first.id}→${second.id}:repair:test:loop.transfer.`);
+    expect(messages.some((message) => message.includes("outgoing flow"))).toBe(false);
   });
 
   it("validates initial state JSON without truncation", () => {

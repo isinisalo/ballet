@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testWorkLoopNode } from "../tests/v10TestConfig.js";
+import { testWorkLoopNode } from "../tests/v11TestConfig.js";
 import { createRuntimeStoreFixture } from "./RuntimeStore.test-fixture.js";
 
 describe("WorkLoopEngine", () => {
@@ -38,6 +38,7 @@ describe("WorkLoopEngine", () => {
     };
     const fixture = await createRuntimeStoreFixture({}, { loop: {
       id: "main-loop", description: "Human Work Loop.", state: { description: "State.", initial: {} },
+      capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
       startNodeId: node.id, nodes: [node],
       edges: [{ id: "done", source: node.id, target: { terminal: "completed" } }]
     } });
@@ -89,6 +90,7 @@ describe("WorkLoopEngine normal and local routing", () => {
     const second = testWorkLoopNode("second");
     const fixture = await createRuntimeStoreFixture({}, { loop: {
       id: "main-loop", description: "Two-node Loop.", state: { description: "State.", initial: {} },
+      capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
       startNodeId: first.id, nodes: [first, second], edges: [
         { id: "first-next", source: first.id, target: { nodeId: second.id } },
         { id: "second-done", source: second.id, target: { terminal: "completed" } }
@@ -121,6 +123,7 @@ describe("WorkLoopEngine retry and suspension", () => {
     const node = { ...testWorkLoopNode(), maxLocalAttempts: 1 };
     const fixture = await createRuntimeStoreFixture({}, { loop: {
       id: "main-loop", description: "Limited Loop.", state: { description: "State.", initial: {} },
+      capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
       startNodeId: node.id, nodes: [node],
       edges: [{ id: "done", source: node.id, target: { terminal: "completed" } }]
     } });

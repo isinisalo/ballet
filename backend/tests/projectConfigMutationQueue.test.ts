@@ -6,7 +6,7 @@ import type { ProjectAutomationConfig } from "../../shared/domain/automation.js"
 import { RuntimeDatabase } from "../runtime-db.js";
 import { AutomationService } from "../services/AutomationService.js";
 import { MarkdownStore } from "../store.js";
-import { testExecutionProfile, testLoop, testOrchestrator, testWorkLoopNode } from "./v10TestConfig.js";
+import { testExecutionProfile, testLoop, testOrchestrator, testWorkLoopNode } from "./v11TestConfig.js";
 
 const roots: string[] = [];
 const stores: MarkdownStore[] = [];
@@ -84,11 +84,11 @@ const createProject = async (): Promise<string> => {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 10,
+  version: 11,
   orchestrator: testOrchestrator(),
+  graph: { loopEdges: [] },
   loops: [
     testLoop("first-loop", testWorkLoopNode("first-work")),
     testLoop("second-loop", testWorkLoopNode("second-work"))
-  ],
-  loopEdges: []
+  ]
 });

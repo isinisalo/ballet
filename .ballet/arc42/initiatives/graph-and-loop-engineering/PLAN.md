@@ -4,7 +4,7 @@ title: Graph and Loop Engineering PLAN
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-19'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Tila
 
-Kaikki alla olevat toteutusvaiheet ovat `pending`. Tämä PLAN kuvaa ADR-018:n myöhemmän hard cut -toteutuksen eikä väitä domainia, runtimea, API:a tai UI:ta muuttuneeksi. Toteutus alkaa vasta erillisellä ihmisvaltuutuksella.
+GLE-step-001 on toteutettu. GLE-step-002:n tämän toimeksiannon snapshot-, repository- ja module-osuus on toteutettu; SQLite tallentaa snapshotin olemassa olevaan JSON-kenttään, joten schema migrationia ei tarvittu. GLE-step-007:n package capability/peer-target -raja on toteutettu, mutta vaiheen UI- ja koko release-acceptance odottavat myöhempiä vaiheita. GLE-step-003–006 ja koko GLE-step-008 ovat `pending`.
 
 | Step ID | Vaihe | Goal/REQ | QS | ADR/CON | BB | RT/DEP | Files/interfaces | Test/monitor | Completion evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -32,11 +32,11 @@ Kaikki alla olevat toteutusvaiheet ovat `pending`. Tämä PLAN kuvaa ADR-018:n m
 ## Järjestys ja riippuvuudet
 
 1. V11 domain/schema lukitsee capability- ja graph-route-muodon ennen snapshotin tai UI:n muuttamista.
-2. Snapshot/persistence/module-raja valmistuu ennen runtime-dispatchia, jotta Orchestrator lukee vain canonical v11 -evidenssiä.
+2. Snapshot/persistence/module-raja on valmis ennen runtime-dispatchia, joten tuleva Orchestrator lukee canonical v11 -evidenssiä.
 3. Runtime flow/repair semantics valmistuu ennen Graph UI:n väitettä Orchestrator-controlista.
 4. Context- ja numeric-route-legacy poistetaan samassa frontend hard cutissa, jossa Graph/Loop-route otetaan käyttöön.
 5. Loop Engineering säilyttää sisäisen editorin, mutta v11 DTO:t ja module handoff koordinoidaan ennen acceptancea.
-6. Koko verification-matriisi ajetaan vasta kaikkien cross-layer-muutosten ja project-local-data-migraation jälkeen.
+6. Jokainen rajattu vaihe ajaa oman verification-matriisinsa. Koko EVID-014-acceptance ajetaan vasta kaikkien cross-layer-muutosten jälkeen.
 
 ## Migration, compatibility ja legacy removal
 

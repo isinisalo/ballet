@@ -13,9 +13,9 @@ import {
   isProjectScheduledWorkNode,
   resolveProjectLoopStartNode
 } from "../../shared/domain/automation.js";
-import { testAutomationConfig, testLoop, testWorkLoopNode } from "./v10TestConfig.js";
+import { testAutomationConfig, testLoop, testWorkLoopNode } from "./v11TestConfig.js";
 
-describe("strict-v10 Work Loop domain helpers", () => {
+describe("strict-v11 Work Loop domain helpers", () => {
   it("resolves start nodes, node edges, and explicit terminal targets", () => {
     const loop = testLoop();
     expect(resolveProjectLoopStartNode(loop)?.id).toBe("work");
@@ -38,9 +38,9 @@ describe("strict-v10 Work Loop domain helpers", () => {
 
   it("uses repair Loop Edges as the orchestrator route allowlist, including self-routes", () => {
     const config = testAutomationConfig();
-    config.loopEdges = [
-      { id: "self-repair", source: "main-loop", target: "main-loop", kind: "repair", description: "Retry via orchestrator." },
-      { id: "self-flow", source: "main-loop", target: "main-loop", kind: "flow", description: "Repeat normal flow." }
+    config.graph.loopEdges = [
+      { id: "self-repair", source: "main-loop", target: "main-loop", kind: "repair", capability: "test:loop.transfer", description: "Retry via orchestrator." },
+      { id: "self-flow", source: "main-loop", target: "main-loop", kind: "flow", capability: "test:loop.transfer", description: "Repeat normal flow." }
     ];
     expect(getProjectLoopEdges(config, "main-loop", "repair")).toHaveLength(1);
     expect(isAllowedProjectRepairRoute(config, "main-loop", "self-repair")).toBe(true);

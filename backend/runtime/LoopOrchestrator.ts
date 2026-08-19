@@ -225,7 +225,7 @@ export class LoopOrchestrator {
     if (!snapshot.loops.some((loop) => loop.id === targetLoopId)) {
       return `Orchestrator selected unknown snapshot Loop ${targetLoopId}.`;
     }
-    const edges = snapshot.loopEdges.filter((edge) =>
+    const edges = snapshot.graph.loopEdges.filter((edge) =>
       edge.kind === "repair" && edge.source === node.loopId && edge.target === targetLoopId);
     if (edges.length !== 1) {
       return `Loop ${targetLoopId} is not an unambiguous allowed repair target from ${node.loopId}.`;
@@ -235,7 +235,7 @@ export class LoopOrchestrator {
 
   private allowedEdge(node: NodeRun, targetLoopId: string) {
     const snapshot = this.snapshots.require(node.rootRunId);
-    const edge = snapshot.loopEdges.find((candidate) =>
+    const edge = snapshot.graph.loopEdges.find((candidate) =>
       candidate.kind === "repair" && candidate.source === node.loopId && candidate.target === targetLoopId);
     if (!edge) throw new LoopRunIntegrityError(`Repair route ${node.loopId} -> ${targetLoopId} disappeared.`);
     return edge;

@@ -18,7 +18,7 @@ const scheduledWork = (schedule: ProjectWorkSchedule): ProjectScheduledWorkNode 
   schedule
 });
 
-describe("strict-v10 Work Node schedules", () => {
+describe("strict-v11 Work Node schedules", () => {
   it("hashes normalized provider composition and schedule deterministically", () => {
     const schedule: ProjectWorkSchedule = {
       kind: "recurring",

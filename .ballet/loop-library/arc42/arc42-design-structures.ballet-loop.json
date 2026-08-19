@@ -1,24 +1,27 @@
 {
   "capabilities": {
+    "accepts": [
+      "arc42:requirements-clarified"
+    ],
     "provides": [
-      "arc42.structures-designed"
+      "arc42:structures-designed"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42.requirements-clarified",
+        "capability": "arc42:requirements-clarified",
         "description": "Request clarification when a structural decision lacks intent or a measurable quality target.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42.concepts-designed",
+        "capability": "arc42:concepts-designed",
         "description": "Continue from reviewed structures to cross-cutting concepts.",
         "direction": "outgoing",
         "kind": "flow"
       }
     ],
     "requires": [
-      "arc42.requirements-clarified"
+      "arc42:requirements-clarified"
     ]
   },
   "format": "ballet-loop-module",
@@ -163,7 +166,6 @@
           "changedArtifactPaths": [],
           "checks": [],
           "nextAction": null,
-          "nextLoopId": null,
           "stableIds": [],
           "status": "pending",
           "summary": null
@@ -309,7 +311,6 @@
         "changedArtifactPaths": [],
         "checks": [],
         "nextAction": null,
-        "nextLoopId": null,
         "stableIds": [],
         "status": "pending",
         "summary": null

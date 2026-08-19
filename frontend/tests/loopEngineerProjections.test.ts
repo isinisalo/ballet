@@ -7,17 +7,17 @@ import {
   buildLoopContextProjection,
   buildLoopDetailProjection
 } from "../src/workspace/automation/loops/loopEngineerProjections";
-import { v10Automation, v10Loop } from "./v10Fixtures";
+import { v11Automation, v11Loop } from "./v11Fixtures";
 
 describe("Loop Engineer projections", () => {
   it("derives Context entry, leaf, module outcomes, and counts without Work Loop Nodes", () => {
-    const first = v10Loop("first-loop");
-    const second = v10Loop("second-loop");
+    const first = v11Loop("first-loop");
+    const second = v11Loop("second-loop");
     second.description = "Deliver the reviewed project outcome.";
-    const config = v10Automation(first, second);
-    config.loopEdges = [
-      { id: "first-flow", source: first.id, target: second.id, kind: "flow", description: "Continue." },
-      { id: "second-repair", source: second.id, target: first.id, kind: "repair", description: "Repair." }
+    const config = v11Automation(first, second);
+    config.graph.loopEdges = [
+      { id: "first-flow", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Continue." },
+      { id: "second-repair", source: second.id, target: first.id, kind: "repair", capability: "test:loop.transfer", description: "Repair." }
     ];
     const projection = buildLoopContextProjection({
       project: { name: "Ballet", description: "Coordinate verified Loop work." },
@@ -28,27 +28,27 @@ describe("Loop Engineer projections", () => {
 
     expect(projection.projectIntent).toMatchObject({ name: "Ballet", entryLoopCount: 1, missingDescription: false });
     expect(projection.system).toEqual({ loopCount: 2, installedModuleCount: 1, customLoopCount: 1, flowConnectionCount: 1, repairConnectionCount: 1, activeRunCount: 1 });
-    expect(projection.declaredOutcomes).toEqual(["software.sample-delivered", "Sample module"]);
+    expect(projection.declaredOutcomes).toEqual(["software:sample.delivered", "Sample module"]);
     expect(projection).not.toHaveProperty("nodes");
   });
 
   it("treats repair as neither incoming flow nor outgoing outcome flow", () => {
-    const first = v10Loop("first-loop");
-    const second = v10Loop("second-loop");
-    const config = v10Automation(first, second);
-    config.loopEdges = [{ id: "repair", source: first.id, target: second.id, kind: "repair", description: "Repair." }];
+    const first = v11Loop("first-loop");
+    const second = v11Loop("second-loop");
+    const config = v11Automation(first, second);
+    config.graph.loopEdges = [{ id: "repair", source: first.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair." }];
     const projection = buildLoopContextProjection({ project: { name: "Project", description: "" }, config });
     expect(projection.projectIntent).toMatchObject({ entryLoopCount: 2, missingDescription: true });
     expect(projection.declaredOutcomes).toEqual([first.description, second.description]);
   });
 
   it("projects exactly one Level 1 black box per Loop and only ProjectLoopEdges, including cycles", () => {
-    const first = v10Loop("first-loop");
-    const second = v10Loop("second-loop");
-    const config = v10Automation(first, second);
-    config.loopEdges = [
-      { id: "forward", source: first.id, target: second.id, kind: "flow", description: "Forward." },
-      { id: "back", source: second.id, target: first.id, kind: "repair", description: "Back." }
+    const first = v11Loop("first-loop");
+    const second = v11Loop("second-loop");
+    const config = v11Automation(first, second);
+    config.graph.loopEdges = [
+      { id: "forward", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Forward." },
+      { id: "back", source: second.id, target: first.id, kind: "repair", capability: "test:loop.transfer", description: "Back." }
     ];
     const projection = buildLoopCompositionProjection({ config, installedModules: [installed(second.id)] });
     const firstLayout = calculateLoopCompositionLayout(projection);
@@ -61,8 +61,8 @@ describe("Loop Engineer projections", () => {
   });
 
   it("uses a deterministic three-column snake so larger Loop systems remain legible", () => {
-    const loops = Array.from({ length: 8 }, (_, index) => v10Loop(`loop-${index + 1}`));
-    const projection = buildLoopCompositionProjection({ config: v10Automation(...loops) });
+    const loops = Array.from({ length: 8 }, (_, index) => v11Loop(`loop-${index + 1}`));
+    const projection = buildLoopCompositionProjection({ config: v11Automation(...loops) });
     const layout = calculateLoopCompositionLayout(projection);
 
     expect(new Set(layout.map(({ y }) => y))).toHaveLength(3);
@@ -72,37 +72,37 @@ describe("Loop Engineer projections", () => {
   });
 
   it("keeps every flow route but focuses repair routes on the selected Loop", () => {
-    const first = v10Loop("first-loop");
-    const second = v10Loop("second-loop");
-    const third = v10Loop("third-loop");
-    const config = v10Automation(first, second, third);
-    config.loopEdges = [
-      { id: "flow", source: first.id, target: second.id, kind: "flow", description: "Continue." },
-      { id: "selected-repair", source: third.id, target: second.id, kind: "repair", description: "Repair selected." },
-      { id: "hidden-repair", source: first.id, target: third.id, kind: "repair", description: "Repair elsewhere." }
+    const first = v11Loop("first-loop");
+    const second = v11Loop("second-loop");
+    const third = v11Loop("third-loop");
+    const config = v11Automation(first, second, third);
+    config.graph.loopEdges = [
+      { id: "flow", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Continue." },
+      { id: "selected-repair", source: third.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair selected." },
+      { id: "hidden-repair", source: first.id, target: third.id, kind: "repair", capability: "test:loop.transfer", description: "Repair elsewhere." }
     ];
     const projection = buildLoopCompositionProjection({ config });
 
     expect(buildLoopCompositionFocus(projection, second.id)).toEqual({
-      edges: [config.loopEdges[0], config.loopEdges[1]],
+      edges: [config.graph.loopEdges[0], config.graph.loopEdges[1]],
       visibleRepairCount: 1,
       hiddenRepairCount: 1
     });
     expect(buildLoopCompositionFocus(projection)).toEqual({
-      edges: [config.loopEdges[0]],
+      edges: [config.graph.loopEdges[0]],
       visibleRepairCount: 0,
       hiddenRepairCount: 2
     });
   });
 
   it("projects Level 2 from only the selected Loop and reports unknown ids", () => {
-    const first = v10Loop("first-loop");
-    const second = v10Loop("second-loop");
+    const first = v11Loop("first-loop");
+    const second = v11Loop("second-loop");
     second.nodes[0] = { ...second.nodes[0]!, id: "second-work" };
     second.startNodeId = "second-work";
     second.edges[0] = { ...second.edges[0]!, source: "second-work", target: { terminal: "failed" } };
-    const config = v10Automation(first, second);
-    config.loopEdges = [{ id: "global", source: first.id, target: second.id, kind: "flow", description: "Global." }];
+    const config = v11Automation(first, second);
+    config.graph.loopEdges = [{ id: "global", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Global." }];
 
     const projection = buildLoopDetailProjection(config, second.id);
     expect(projection).toMatchObject({ startNodeId: "second-work", terminals: ["failed"] });
@@ -126,7 +126,10 @@ function installed(loopId: string): InstalledLoopModuleStatus {
     profileMappings: {},
     idRemapping: { loop: {}, nodes: {}, edges: {}, instructions: {}, skills: {} },
     stateContract: { id: "sample", version: "1.0.0", description: "Sample.", initial: {}, requiredKeys: [] },
-    capabilities: { requires: [], provides: ["software.sample-delivered"], recommendedConnections: [] },
+    capabilities: {
+      requires: [], accepts: ["software:sample.requested"],
+      provides: ["software:sample.delivered"], recommendedConnections: []
+    },
     ownedResources: [],
     installedContentSha256: "b".repeat(64),
     status: "exact",

@@ -15,7 +15,7 @@ import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 
 type ReachableConfiguration = Pick<
   ProjectConfiguration,
-  "loops" | "loopEdges" | "orchestrator"
+  "loops" | "graph" | "orchestrator"
 >;
 
 export interface ReachableProviderComposition {
@@ -28,7 +28,7 @@ export interface ReachableProviderComposition {
 
 export interface ReachableExecutionGraph {
   loops: ProjectLoop[];
-  loopEdges: ProjectLoopEdge[];
+  graph: { loopEdges: ProjectLoopEdge[] };
   minimumRepairDepthByLoopId: ReadonlyMap<string, number>;
 }
 
@@ -51,7 +51,7 @@ export const reachableExecutionGraph = (
     return snapshotLoop(loop);
   }).sort((left, right) => compareUtf8(left.id, right.id));
   const reachableLoopIds = new Set(loops.map((loop) => loop.id));
-  const loopEdges = config.loopEdges
+  const loopEdges = config.graph.loopEdges
     .filter((edge) => reachability.loopEdgeIds.has(edge.id))
     .map((edge) => {
       if (!reachableLoopIds.has(edge.source) || !reachableLoopIds.has(edge.target)) {
@@ -60,7 +60,7 @@ export const reachableExecutionGraph = (
       return { ...edge };
     })
     .sort((left, right) => compareUtf8(left.id, right.id));
-  return { loops, loopEdges, minimumRepairDepthByLoopId: reachability.minimumRepairDepthByLoopId };
+  return { loops, graph: { loopEdges }, minimumRepairDepthByLoopId: reachability.minimumRepairDepthByLoopId };
 };
 
 export const reachableProviderCompositions = (
@@ -100,6 +100,10 @@ const snapshotLoop = (loop: ProjectLoop): ProjectLoop => {
   return {
     id: loop.id,
     description: loop.description,
+    capabilities: {
+      accepts: [...loop.capabilities.accepts].sort(compareUtf8),
+      provides: [...loop.capabilities.provides].sort(compareUtf8)
+    },
     state: {
       description: loop.state.description,
       initial: canonicalClone(loop.state.initial)
