@@ -4,7 +4,7 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-17'
-version: 5
+version: 7
 tags:
   - arc42
   - status
@@ -26,6 +26,7 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 - Loop Engineerin Context-, composition- ja selected-Loop detail -projektiot on toteutettu muuttamatta strict-v10-runtime-entiteettejä.
 - Run mission controlin Mission / All Loops / live inspector projisoi immutable snapshotin, canonical State/control flow’n ja finalizationin lisäämättä keksittyä progress- tai provider-derived-statea.
 - Suomenkielinen kattava arc42-korpus ja `QS-011`–`QS-013` ovat `comprehensive-arc42-documentation`-draft-initiativen arvioitavana.
+- Tech Stack Canvas, Architecture Communication Canvas ja retrospektiivinen Architecture Inception Canvas ovat `architecture-canvases`-draft-initiativen Markdown + Mermaid -korttiprojektioita; v1:n proosapainotteinen esitys palautettiin ja v2 korjattiin visuaaliseksi muuttamatta Goal-, ADR- tai runtime-omistajuutta.
 - 6+1 project-local Method on hyväksytty, mutta ensimmäinen end-to-end-pilotti ei ole vielä tuottanut operatiivisia METHOD-HEALTH-baselineja.
 
 ## Toteutettu fakta, evidenssi ja avoin riski
@@ -34,7 +35,7 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 | --- | --- |
 | Hyväksytty päätös | Goal/ADR-status yllä; architecture ownership noudattaa ADR-011/015/016/017:ää. |
 | Toteutettu fakta | Strict-v10 runtime, module materialization, Loop Engineer ja Run mission control löytyvät nykyisestä työpuusta. |
-| Paikallinen evidenssi | EVID-011–EVID-013 sekä ARCDOC-EVID-001–005 ovat verified/passed 2026-08-17 paikallisissa tarkistuksissa; pilot/release-evidenssin pending-tilat säilyvät. |
+| Paikallinen evidenssi | EVID-011–EVID-013, ARCDOC-EVID-001–005 ja CANVAS-EVID-001–008/010–012 ovat verified/passed 2026-08-17 paikallisissa tarkistuksissa. CANVAS-EVID-009 säilyttää v1:n ihmisreview'n `failed`-tuloksen; v2:n uusi ihmisarvio sekä pilot/release-evidenssi puuttuvat. |
 | Avoin riski | RISK-001:n pilot gap, RISK-011:n 14 lint warningin baseline ja RISK-012:n Run-visualisoinnin tulkintariski. |
 
 ## Kanoniset lähteet
@@ -51,19 +52,21 @@ Osioindeksi on [README](README.md), trace-suhteet ovat [TRACEABILITYssa](TRACEAB
 - `.ballet/loop-library/arc42/` sisältää seitsemän itsenäisesti asennettavaa pakettia ja `.ballet/loop-library/software-delivery/` kaksi implementation-pakettia.
 - Aiempi module-evidenssi on `installable-loop-modules`-initiativessa ja Loop Engineer -evidenssi `loop-engineer-three-level-canvas`-initiativessa.
 - `comprehensive-arc42-documentation`-BRIEF/PLAN/EVIDENCE/REVIEW indeksoi tämän dokumentaatiomuutoksen.
+- `architecture-canvases`-BRIEF/PLAN/EVIDENCE/REVIEW indeksoi canvasien lähteet, acceptance-kriteerit, tarkistukset ja ihmisarvion.
 - `npm run validate:arc42` on deterministinen repository-conformance-gate.
 
 ## Avoimet kysymykset
 
 - `OQ-002`: ensimmäisen pilotin Validation FAIL-, retry-, repair route- ja evidence gap -baselinet puuttuvat.
 - Projektin omistajan arvio ratkaisee, hyväksytäänkö `comprehensive-arc42-documentation`-initiative.
+- Projektin omistajan arvio ratkaisee, hyväksytäänkö kolme `architecture-canvases`-draft-projektiota; inception-hypoteesien hyöty- ja usability-evidenssi jää avoimeksi.
 
 ## Nykyinen handoff
 
-- Initiative: `comprehensive-arc42-documentation`.
-- Status: `draft`; dokumentaatiototeutus ja paikallinen conformance review ovat valmiit, ihmisarvio puuttuu.
-- Muuttuneet stable ID:t: nykyiset REQ-001–REQ-011, BB-001–BB-009, CON-001–CON-007 ja QS-001–QS-010 säilyvät; lisäykset ovat RT-008–RT-010, QS-011–QS-013, TEST-011–TEST-013, EVID-011–EVID-013, RISK-011 ja RISK-012.
-- Seuraava hyväksytty toimi: projektin omistaja arvioi BRIEF/PLAN/EVIDENCE/REVIEW-ketjun ja hyväksyy tai palauttaa draftin.
+- Initiative: `architecture-canvases`.
+- Status: `draft`; v1 palautettiin ja kolmen canvasin v2 Mermaid-kortit, initiative-ketju sekä paikallinen `conformant with notes` -review ovat valmiit, mutta korjatun version ihmisarvio puuttuu. `comprehensive-arc42-documentation` säilyy erillisenä hyväksymättömänä draftina.
+- Muuttuneet stable ID:t: dokumentti-ID:t säilyvät `ballet-tech-stack-canvas`, `ballet-architecture-communication-canvas`, `ballet-architecture-inception-canvas` ja `arc42-initiative-architecture-canvases-{brief,plan,evidence,review}`; v2-lisäykset ovat DEC-CANVAS-002, ACPT-CANVAS-006, CANVAS-step-007, CANVAS-EVID-009–012 ja FIND-CANVAS-003. Olemassa olevat Goal/REQ/QS/ADR/BB/RT/DEP/CON/RISK-ID:t eivät muutu.
+- Seuraava hyväksytty toimi: projektin omistaja arvioi kolme canvasia sekä BRIEF/PLAN/EVIDENCE/REVIEW-ketjun ja hyväksyy tai palauttaa draftin.
 - Stop condition: commit, release, deploy, merge ja push vaativat erillisen täsmällisen ihmisvaltuutuksen.
 
 ## Seuraava katselmointiperuste

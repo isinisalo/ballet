@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-17'
-version: 3
+version: 5
 tags:
   - arc42
   - architecture
@@ -36,6 +36,14 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 11. [Riskit ja tekninen velka](11-risks-and-technical-debt.md)
 12. [Sanasto](12-glossary.md)
 
+## Canvasit
+
+- [Tech Stack Canvas](canvases/TECH-STACK-CANVAS.md): 12 Mermaid-kortin pikayhteenveto teknologiapinosta, sizingistä, integraatioista, laadunvarmistuksesta ja tunnetuista stack-aukoista.
+- [Architecture Communication Canvas](canvases/ARCHITECTURE-COMMUNICATION-CANVAS.md): yhdeksän Mermaid-kortin yhteenveto arvolupauksesta, sidosryhmistä, toiminnoista, vastuista, päätösten trade-offeista ja riskeistä.
+- [Architecture Inception Canvas](canvases/ARCHITECTURE-INCEPTION-CANVAS.md): kahdeksan Mermaid-kortin retrospektiivinen business case, aloitusrajat, top-3-laatu, hypoteesit ja tekniset haasteet.
+
+Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko on pikayhteenveto ja sen alla oleva Markdown jäljitettävä tarkennus. Ne eivät omista WHAT/WHY:tä, hyväksyttyä päätöstä, arkkitehtuuriosion yksityiskohtaa tai toteutuksen totuutta; ristiriidassa kanoninen lähde voittaa.
+
 ## Tukilähteet
 
 - [STATUS](STATUS.md): persistent project status ja yksi seuraava handoff.
@@ -45,6 +53,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 - [Migration assessment](migration/ASSESSMENT.md): historiallinen lähtötilan evidenssi, jota ei uudelleenkirjoiteta.
 - [Initiative template](initiatives/TEMPLATE/BRIEF.md): uuden rajatun työn rakenne.
 - [Comprehensive documentation initiative](initiatives/comprehensive-arc42-documentation/BRIEF.md): tämän suomenkielisen kattavan dokumentaation draft-ketju.
+- [Architecture canvases initiative](initiatives/architecture-canvases/BRIEF.md): kolmen canvas-projektion draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju.
 
 ## Kanoninen omistajuus
 
@@ -53,6 +62,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 | `.ballet/goals/**` | WHAT/WHY, rajaus ja hyväksymisaie | Arkkitehtuuripäätöksen koko perustelu |
 | `.ballet/adr/**` | Hyväksytyt arkkitehtuuripäätökset ja supersession | Runtime-logi tai initiative-evidenssi |
 | Osiot 1–12 | Pitkäikäiset arkkitehtuurinäkymät ja selitykset | Goal/ADR-tekstin kopio |
+| `canvases/**` | Tiivis teknologia-, kommunikaatio- tai inception-projektio | Uusi WHAT/WHY, päätös tai rinnakkainen arkkitehtuuritotuus |
 | `initiatives/<id>/**` | Rajatun muutoksen BRIEF/PLAN/EVIDENCE/REVIEW | Koko projektin rinnakkainen arkkitehtuurikorpus |
 | `STATUS` / `TRACEABILITY` / `METHOD-HEALTH` | Persistent handoff, suhteet ja mitattu menetelmätila | Runtime-logidumppi |
 | `DESIGN.md` | UI-designjärjestelmä | Runtime-control semantics |
