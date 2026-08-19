@@ -5,7 +5,7 @@ import {
 import type {
   CanonicalNodeOutcome, ExecutionEvent, ExecutionSpec, ExecutionTask
 } from "../../shared/domain/runtime.js";
-import { parseSerializedTaskEnvelopeV3 } from "../integration/TaskEnvelopeV3.js";
+import { parseSerializedTaskEnvelopeV4 } from "../integration/TaskEnvelopeV4.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import type { ExecutionEventRow, ExecutionTaskRow } from "./ExecutionDbTypes.js";
 import { executionSpecSchema } from "./ExecutionSpecSchema.js";
@@ -35,8 +35,8 @@ export const assertExecutionSpecEvidence = (spec: ExecutionSpec): void => {
   if (sha256(spec.evidence.prompt) !== spec.evidence.promptSha256) {
     throw new Error(`Execution task ${spec.taskId} has invalid prompt evidence.`);
   }
-  const taskEnvelope = parseSerializedTaskEnvelopeV3(promptSection(
-    spec.evidence.prompt, "TASK-ENVELOPE", "v3", spec.taskId
+  const taskEnvelope = parseSerializedTaskEnvelopeV4(promptSection(
+    spec.evidence.prompt, "TASK-ENVELOPE", "v4", spec.taskId
   ));
   if (taskEnvelope.sha256 !== spec.evidence.taskEnvelopeSha256
     || taskEnvelope.envelope.role !== spec.evidence.nodeRole
@@ -53,7 +53,7 @@ export const assertExecutionSpecEvidence = (spec: ExecutionSpec): void => {
   const expectedSchema = canonicalJson(nodeOutcomeJsonSchemaForRole(spec.evidence.nodeRole));
   if (spec.evidence.outputSchemaSha256 !== sha256(schemaJson)
     || schemaJson !== expectedSchema
-    || promptSection(spec.evidence.prompt, "OUTPUT-SCHEMA", "v3", spec.taskId) !== schemaJson
+    || promptSection(spec.evidence.prompt, "OUTPUT-SCHEMA", "v4", spec.taskId) !== schemaJson
     || spec.evidence.outputSchemaId !== nodeOutcomeSchemaIds[spec.evidence.nodeRole]) {
     throw new Error(`Execution task ${spec.taskId} has invalid output schema evidence.`);
   }
@@ -95,7 +95,7 @@ const parseEventData = (source: string, taskId: string): Record<string, unknown>
 const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
 
 const promptSection = (prompt: string, kind: string, id: string, taskId: string): string => {
-  const opening = `<<< BALLET EXECUTION COMPOSITION V4 · ${kind} · ${id} >>>\n`;
+  const opening = `<<< BALLET EXECUTION COMPOSITION V5 · ${kind} · ${id} >>>\n`;
   const closing = `\n<<< END BALLET ${kind} >>>`;
   const start = prompt.indexOf(opening);
   if (start < 0 || prompt.indexOf(opening, start + opening.length) >= 0) {

@@ -13,6 +13,7 @@ export const runtimeSchemaInvariants = `
   CREATE INDEX idx_node_runs_composite ON node_runs(work_loop_node_run_id, created_at);
   CREATE INDEX idx_state_revisions_latest ON state_revisions(root_run_id, revision DESC);
   CREATE INDEX idx_repair_requests_pending ON repair_requests(root_run_id, status, created_at);
+  CREATE INDEX idx_orchestration_requests_pending ON orchestration_requests(root_run_id, status, created_at);
   CREATE INDEX idx_repair_results_root ON repair_results(root_run_id, created_at);
   CREATE INDEX idx_frames_open ON orchestration_frames(root_run_id, status, created_at);
   CREATE UNIQUE INDEX idx_one_open_frame_per_caller
@@ -100,16 +101,40 @@ export const runtimeSchemaInvariants = `
       AND root_run_id = NEW.root_run_id AND loop_run_id = NEW.requester_loop_run_id AND role = 'orchestrator'
   )
   BEGIN SELECT RAISE(ABORT, 'repair orchestrator must be an Orchestrator Node Run of the requester Loop Run'); END;
+  CREATE TRIGGER orchestration_request_owner BEFORE INSERT ON orchestration_requests
+  WHEN NOT EXISTS (
+    SELECT 1 FROM loop_invocations loop
+    JOIN node_runs node ON node.node_run_id = NEW.source_node_run_id
+    WHERE loop.loop_run_id = NEW.source_loop_run_id AND loop.root_run_id = NEW.root_run_id
+      AND loop.loop_id = NEW.source_loop_id AND node.root_run_id = NEW.root_run_id
+      AND node.loop_run_id = NEW.source_loop_run_id AND node.loop_id = NEW.source_loop_id
+  )
+  BEGIN SELECT RAISE(ABORT, 'orchestration request source does not match its Root Run and Loop invocation'); END;
+  CREATE TRIGGER orchestration_request_identity_is_immutable
+  BEFORE UPDATE OF root_run_id, kind, source_loop_run_id, source_loop_id, source_node_run_id,
+    state_revision_at_request, completion_summary, completion_evidence_json,
+    requested_capability, expected_outcome_json, repair_request_id ON orchestration_requests
+  BEGIN SELECT RAISE(ABORT, 'orchestration request identity and evidence are immutable'); END;
+  CREATE TRIGGER orchestration_orchestrator_must_be_orchestrator
+  BEFORE UPDATE OF orchestrator_node_run_id ON orchestration_requests
+  WHEN NEW.orchestrator_node_run_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM node_runs node WHERE node.node_run_id = NEW.orchestrator_node_run_id
+      AND node.root_run_id = NEW.root_run_id AND node.loop_run_id = NEW.source_loop_run_id
+      AND node.loop_id = NEW.source_loop_id AND node.role = 'orchestrator'
+  )
+  BEGIN SELECT RAISE(ABORT, 'orchestration request orchestrator must belong to its source Loop invocation'); END;
   CREATE TRIGGER orchestration_frame_owner BEFORE INSERT ON orchestration_frames
   WHEN NOT EXISTS (
     SELECT 1 FROM repair_requests request
+    JOIN orchestration_requests orchestration ON orchestration.repair_request_id = request.repair_request_id
     JOIN orchestrator_routes route ON route.route_id = NEW.route_id
     JOIN loop_invocations caller ON caller.loop_run_id = NEW.caller_loop_run_id
     JOIN loop_invocations callee ON callee.loop_run_id = NEW.callee_loop_run_id
     WHERE request.repair_request_id = NEW.repair_request_id
       AND request.root_run_id = NEW.root_run_id AND request.status = 'routed'
       AND request.requester_loop_run_id = NEW.caller_loop_run_id
-      AND route.repair_request_id = request.repair_request_id
+      AND route.orchestration_request_id = orchestration.orchestration_request_id
+      AND route.kind = 'repair'
       AND caller.root_run_id = NEW.root_run_id AND caller.loop_id = route.source_loop_id
       AND caller.status = 'waiting_for_input'
       AND callee.root_run_id = NEW.root_run_id AND callee.loop_id = route.target_loop_id
@@ -142,6 +167,9 @@ export const runtimeSchemaInvariants = `
   CREATE TRIGGER repair_request_terminal_is_final BEFORE UPDATE OF status ON repair_requests
   WHEN OLD.status IN ('repaired','failed','cancelled') AND NEW.status <> OLD.status
   BEGIN SELECT RAISE(ABORT, 'terminal Repair Request status is immutable'); END;
+  CREATE TRIGGER orchestration_request_terminal_is_final BEFORE UPDATE OF status ON orchestration_requests
+  WHEN OLD.status IN ('dispatched','failed','cancelled') AND NEW.status <> OLD.status
+  BEGIN SELECT RAISE(ABORT, 'terminal orchestration request status is immutable'); END;
   CREATE TRIGGER orchestration_frame_terminal_is_final BEFORE UPDATE OF status ON orchestration_frames
   WHEN OLD.status IN ('returned','failed','cancelled') AND NEW.status <> OLD.status
   BEGIN SELECT RAISE(ABORT, 'terminal orchestration frame status is immutable'); END;

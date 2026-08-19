@@ -59,6 +59,13 @@ describe("Repair runtime stores", () => {
       returnValidationNodeDefinitionId: "main-loop:work:validation", nestingDepth: 1,
       createdAt: runtimeTestTimestamp
     });
+    const orchestrationRequest = fixture.orchestration.create({
+      orchestrationRequestId: "orchestration-request", rootRunId: "root-run", kind: "repair",
+      sourceLoopRunId: loopRun.loopRunId, sourceLoopId: fixture.loop.id,
+      sourceNodeRunId: validation.nodeRunId, stateRevisionAtRequest: 0,
+      completionSummary: "Repairable mismatch.", completionEvidence: { check: "failed" },
+      requestedCapability: "test:loop.transfer", repairRequestId: request.repairRequestId, createdAt: runtimeTestTimestamp
+    });
     fixture.connection().prepare(`
       UPDATE node_runs SET status = 'completed', outcome_json = ?, state_revision_after = 0,
         completed_at = ?, updated_at = ? WHERE node_run_id = ?
@@ -78,22 +85,24 @@ describe("Repair runtime stores", () => {
       nodeDefinitionId: "root:orchestrator", attempt: 1
     });
     fixture.repairs.bindOrchestrator(request.repairRequestId, orchestrator.nodeRunId);
-    expect(() => fixture.repairs.routeRequest({
-      repairRequestId: request.repairRequestId, loopEdgeId: "not-allowlisted",
-      sourceLoopId: fixture.loop.id, targetLoopId: fixture.loop.id,
-      orchestratorNodeRunId: orchestrator.nodeRunId
-    })).toThrow(/not an allowed repair route/);
-    fixture.repairs.routeRequest({
-      repairRequestId: request.repairRequestId, loopEdgeId: "self-repair",
-      sourceLoopId: fixture.loop.id, targetLoopId: fixture.loop.id,
-      orchestratorNodeRunId: orchestrator.nodeRunId, evidence: { route: "allowlisted" }
+    fixture.orchestration.bindOrchestrator(orchestrationRequest.orchestrationRequestId, orchestrator.nodeRunId);
+    expect(() => fixture.orchestration.route({
+      orchestrationRequestId: orchestrationRequest.orchestrationRequestId,
+      targetLoopId: "not-allowlisted", orchestratorNodeRunId: orchestrator.nodeRunId,
+      routeReason: "Invalid.", expectedOutcome: {}
+    })).toThrow(/not an unambiguous allowed repair target/);
+    const route = fixture.orchestration.route({
+      orchestrationRequestId: orchestrationRequest.orchestrationRequestId,
+      targetLoopId: fixture.loop.id, orchestratorNodeRunId: orchestrator.nodeRunId,
+      routeReason: "Allowlisted.", expectedOutcome: { repaired: true }
     });
+    fixture.repairs.markRouted(request.repairRequestId, route.loopEdgeId, route.targetLoopId);
     fixture.connection().prepare(`
       UPDATE node_runs SET status = 'completed', outcome_json = ?, state_revision_after = 0,
         completed_at = ?, updated_at = ? WHERE node_run_id = ?
     `).run(JSON.stringify({
       role: "orchestrator", state: "completed", targetLoopId: fixture.loop.id,
-      routeReason: "Allowlisted.", repairInput: {}, expectedOutcome: {}
+      routeReason: "Allowlisted.", dispatchInput: {}, expectedOutcome: {}
     }), runtimeTestTimestamp, runtimeTestTimestamp, orchestrator.nodeRunId);
     fixture.connection().prepare(`
       UPDATE loop_invocations SET status = 'waiting_for_input' WHERE loop_run_id = ?
@@ -101,11 +110,12 @@ describe("Repair runtime stores", () => {
     const callee = fixture.loops.createLoopRun({
       loopRunId: "callee-loop-run", rootRunId: "root-run", loop: fixture.loop,
       parentLoopRunId: loopRun.loopRunId, source: "repair",
+      orchestrationRequestId: orchestrationRequest.orchestrationRequestId,
       repairRequestId: request.repairRequestId, nestingDepth: 1
     });
     const frame = fixture.repairs.createFrame({
       frameId: "frame", rootRunId: "root-run", repairRequestId: request.repairRequestId,
-      routeId: fixture.repairs.routeForRequest(request.repairRequestId)!.routeId,
+      routeId: fixture.orchestration.routeForRequest(orchestrationRequest.orchestrationRequestId)!.routeId,
       callerLoopRunId: loopRun.loopRunId, calleeLoopRunId: callee.loopRunId,
       returnLoopId: fixture.loop.id, returnWorkLoopNodeId: fixture.loop.startNodeId,
       returnValidationNodeDefinitionId: "main-loop:work:validation",
@@ -134,11 +144,12 @@ describe("Repair runtime stores", () => {
     expect(reopened.repairs.openFrames("root-run")).toEqual([expect.objectContaining({
       frameId: "frame", callerLoopRunId: "caller-loop-run", calleeLoopRunId: "callee-loop-run"
     })]);
-    expect(reopened.repairs.routeForRequest("repair-request")).toMatchObject({
-      rootRunId: "root-run", repairRequestId: "repair-request", loopEdgeId: "self-repair",
-      sourceLoopId: "main-loop", targetLoopId: "main-loop", evidence: { route: "allowlisted" }
+    expect(reopened.orchestration.routeForRequest("orchestration-request")).toMatchObject({
+      rootRunId: "root-run", orchestrationRequestId: "orchestration-request",
+      repairRequestId: "repair-request", loopEdgeId: "self-repair",
+      sourceLoopId: "main-loop", targetLoopId: "main-loop",
+      evidence: { routeReason: "Allowlisted.", expectedOutcome: { repaired: true } }
     });
-    expect(reopened.states.current("root-run")).toMatchObject({ revision: 0, state: { repaired: false } });
     assertRepairReadProjection(fixture, reopened);
     await fixture.close();
   });
@@ -148,8 +159,9 @@ type RuntimeFixture = Awaited<ReturnType<typeof createRuntimeStoreFixture>>;
 type ReopenedStores = ReturnType<RuntimeFixture["reopen"]>;
 
 const assertRepairReadProjection = (fixture: RuntimeFixture, stores: ReopenedStores): void => {
+  expect(stores.states.current("root-run")).toMatchObject({ revision: 0, state: { repaired: false } });
   const projection = new RootRuntimeReadStore(
-    () => fixture.connection(), stores.states, stores.repairs,
+    () => fixture.connection(), stores.states, stores.orchestration, stores.repairs,
     new RepairResultStore(() => fixture.connection()), stores.control
   ).read("root-run");
   expect(projection.repair).toMatchObject({

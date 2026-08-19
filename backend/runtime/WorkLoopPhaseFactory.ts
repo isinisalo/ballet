@@ -5,7 +5,7 @@ import {
   isProjectHumanValidationNode, isProjectHumanWorkNode, resolveProjectLoopStartNode
 } from "../../shared/domain/automation.js";
 import type {
-  LoopRunSource, NodeRun, OrchestrationFrame, RepairRequest
+  LoopRunSource, NodeRun, OrchestrationFrame, OrchestrationRequest, RepairRequest
 } from "../../shared/domain/runtime.js";
 import type { TaskEnvelopeRepairReturn } from "../../shared/domain/taskEnvelope.js";
 import { LoopRunIntegrityError, LoopRunStateError } from "./LoopRunErrors.js";
@@ -37,19 +37,23 @@ export class WorkLoopPhaseFactory {
     return this.startInvocation(rootRunId, loop, source, 0, { input, schedule });
   }
 
-  startFlow(loop: ProjectLoop, rootRunId: string, revision: number) {
-    return this.startInvocation(rootRunId, loop, "flow", revision);
+  startFlow(loop: ProjectLoop, request: OrchestrationRequest, input: JsonValue, revision: number) {
+    return this.startInvocation(request.rootRunId, loop, "flow", revision, {
+      input, orchestrationRequestId: request.orchestrationRequestId
+    });
   }
 
   startRepair(
     loop: ProjectLoop,
     callerLoopRunId: string,
     request: RepairRequest,
+    orchestrationRequest: OrchestrationRequest,
     input: JsonValue,
     revision: number
   ) {
     return this.startInvocation(request.rootRunId, loop, "repair", revision, {
       input, parentLoopRunId: callerLoopRunId,
+      orchestrationRequestId: orchestrationRequest.orchestrationRequestId,
       repairRequestId: request.repairRequestId, nestingDepth: request.nestingDepth
     });
   }
@@ -64,7 +68,7 @@ export class WorkLoopPhaseFactory {
     context?: JsonValue
   ): NodeRun {
     const value: unknown = context === undefined
-      ? { repairRequestId: requestId }
+      ? { orchestrationRequestId: requestId }
       : mergeContext(requestId, context);
     assertJsonValue(value, { label: `Orchestrator Node context for ${requestId}` });
     return this.loops.createNodeRun({
@@ -129,6 +133,7 @@ export class WorkLoopPhaseFactory {
       input?: JsonValue;
       schedule?: { workLoopNodeId: string; scheduledFor: string };
       parentLoopRunId?: string;
+      orchestrationRequestId?: string;
       repairRequestId?: string;
       nestingDepth?: number;
     } = {}
@@ -137,6 +142,7 @@ export class WorkLoopPhaseFactory {
     const run = this.loops.createLoopRun({
       rootRunId, loop, source, input: options.input, schedule: options.schedule,
       parentLoopRunId: options.parentLoopRunId, repairRequestId: options.repairRequestId,
+      orchestrationRequestId: options.orchestrationRequestId,
       entryStateRevision: revision, nestingDepth: options.nestingDepth ?? 0
     });
     const composite = this.loops.createWorkLoopNodeRun({
@@ -154,9 +160,9 @@ export class WorkLoopPhaseFactory {
   }
 }
 
-const mergeContext = (repairRequestId: string, context: JsonValue): JsonValue => {
+const mergeContext = (orchestrationRequestId: string, context: JsonValue): JsonValue => {
   if (!context || typeof context !== "object" || Array.isArray(context)) {
-    throw new LoopRunIntegrityError(`Orchestrator ${repairRequestId} resume context must be an object.`);
+    throw new LoopRunIntegrityError(`Orchestrator ${orchestrationRequestId} resume context must be an object.`);
   }
-  return { repairRequestId, ...context };
+  return { orchestrationRequestId, ...context };
 };

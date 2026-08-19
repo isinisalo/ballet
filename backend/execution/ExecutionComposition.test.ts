@@ -4,7 +4,7 @@ import type { ProjectWorkLoopNode } from "../../shared/domain/automation.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV3, ValidationTaskEnvelopeV3, WorkTaskEnvelopeV3
+  OrchestratorTaskEnvelopeV4, ValidationTaskEnvelopeV4, WorkTaskEnvelopeV4
 } from "../../shared/domain/taskEnvelope.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 import { testExecutionProfile, testLoop, testOrchestrator, testWorkLoopNode } from "../tests/v11TestConfig.js";
@@ -57,8 +57,8 @@ const resource = (kind: "primary" | "skill", id: string, content: string) => ({
   content
 });
 
-const envelope = (): WorkTaskEnvelopeV3 => ({
-  version: 3,
+const envelope = (): WorkTaskEnvelopeV4 => ({
+  version: 4,
   role: "work",
   run: {
     rootRunId: "root-run", loopRunId: "loop-run", nodeRunId: "node-run",
@@ -77,10 +77,10 @@ describe("ExecutionComposition V4", () => {
     const evidence = composeExecutionPrompt(snapshot(), envelope());
 
     expect(evidence).toMatchObject({
-      compositionVersion: 4,
-      taskEnvelopeVersion: 3,
-      outputSchemaVersion: 3,
-      outputSchemaId: "work-node-outcome-v3",
+      compositionVersion: 5,
+      taskEnvelopeVersion: 4,
+      outputSchemaVersion: 4,
+      outputSchemaId: "work-node-outcome-v4",
       outputSchemaSha256: NODE_OUTCOME_SCHEMA_SHA256.work,
       nodeRole: "work"
     });
@@ -88,10 +88,10 @@ describe("ExecutionComposition V4", () => {
       "system:execution-contract-v3", "project:worker", "project:a-skill", "project:z-skill"
     ]);
     expect(evidence.prompt.indexOf("project:a-skill")).toBeLessThan(evidence.prompt.indexOf("project:z-skill"));
-    expect(evidence.prompt).toContain("TASK-ENVELOPE · v3");
-    expect(evidence.prompt).toContain("OUTPUT-SCHEMA · v3");
+    expect(evidence.prompt).toContain("TASK-ENVELOPE · v4");
+    expect(evidence.prompt).toContain("OUTPUT-SCHEMA · v4");
     expect(evidence.promptSha256).toBe(sha256(evidence.prompt));
-    expect(evidence.promptSha256).toBe("748f2817bee02a4a4a24057b985e58366e9bac847db29846b4f28dc8b9fbb145");
+    expect(evidence.promptSha256).toBe("515ff4a44d30653997a2c6e921607fe988b1240f453fb04d028f6c2b32746174");
   });
 
   it("rejects an envelope that diverges from the immutable snapshot", () => {
@@ -101,13 +101,13 @@ describe("ExecutionComposition V4", () => {
   });
 
   it("selects Validation and Orchestrator schemas from immutable Node role", () => {
-    const validation: ValidationTaskEnvelopeV3 = {
+    const validation: ValidationTaskEnvelopeV4 = {
       ...envelope(), role: "validation", task: "Validate produce.",
       workOutcome: { role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: [] }
     };
     expect(composeExecutionPrompt(snapshot(), validation)).toMatchObject({
       nodeRole: "validation",
-      outputSchemaId: "validation-node-outcome-v3",
+      outputSchemaId: "validation-node-outcome-v4",
       outputSchemaSha256: NODE_OUTCOME_SCHEMA_SHA256.validation
     });
 
@@ -118,32 +118,32 @@ describe("ExecutionComposition V4", () => {
       capability: "test:loop.transfer",
       description: "Allow a bounded repair."
     });
-    const orchestrator: OrchestratorTaskEnvelopeV3 = {
-      version: 3, role: "orchestrator",
+    const orchestrator: OrchestratorTaskEnvelopeV4 = {
+      version: 4, role: "orchestrator",
       run: { rootRunId: "root-run", loopRunId: "loop-run", nodeRunId: "orchestrator-run" },
       loop: { id: "main-loop", description: "Test Loop main-loop." },
       task: "Route the persisted Repair Request.",
       state: { revision: 0, value: {}, sha256: jsonSha256({}) },
-      repairRequest: {
-        id: "repair-request", requesterLoopRunId: "loop-run",
-        requesterWorkLoopNodeRunId: "work-loop-node-run", requesterValidationNodeRunId: "validation-run",
-        attempt: 1, validationSummary: "A repair is required.",
-        reason: "A repair capability is required.", requestedCapability: "repair state",
-        stateRevisionAtRequest: 0, nestingDepth: 0
+      orchestrationRequest: {
+        id: "orchestration-request", kind: "repair", sourceLoopId: "main-loop",
+        sourceLoopRunId: "loop-run", sourceNodeRunId: "validation-run",
+        stateRevisionAtRequest: 0, completionSummary: "A repair is required.",
+        completionEvidence: {}, requestedCapability: "test:loop.transfer"
       },
-      allowedTargetLoops: [{
+      allowedCandidates: [{
         id: "repair-loop", description: "Test Loop repair-loop.",
-        loopEdgeId: "main-to-repair", routingDescription: "Allow a bounded repair."
+        capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
+        route: { kind: "repair", capability: "test:loop.transfer", description: "Allow a bounded repair." }
       }],
       relevantHistory: []
     };
     expect(composeExecutionPrompt(orchestratorSnapshot, orchestrator)).toMatchObject({
       nodeRole: "orchestrator",
       workLoopNodeId: undefined,
-      outputSchemaId: "orchestrator-node-outcome-v3",
+      outputSchemaId: "orchestrator-node-outcome-v4",
       outputSchemaSha256: NODE_OUTCOME_SCHEMA_SHA256.orchestrator
     });
-    orchestrator.allowedTargetLoops[0]!.loopEdgeId = "forged-edge";
+    orchestrator.allowedCandidates[0]!.route.capability = "forged-capability";
     expect(() => composeExecutionPrompt(orchestratorSnapshot, orchestrator)).toThrow(/repair allowlist/);
   });
 

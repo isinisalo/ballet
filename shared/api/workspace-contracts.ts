@@ -4,11 +4,13 @@ export {
   controlFlowEventSchema,
   loopStateRevisionMetadataSchema,
   orchestrationFrameSchema,
+  orchestrationRequestSchema,
   orchestratorRouteSchema,
   repairRequestSchema,
   repairResultSchema,
   respondToNodeRunBodySchema,
   rootRunListQuerySchema,
+  rootRunOrchestrationProjectionSchema,
   rootRunRepairProjectionSchema,
   rootRunReturnDestinationSchema,
   rootRunStateProjectionSchema,
@@ -90,6 +92,7 @@ import type {
   NodeRun,
   NodeRunRole,
   OrchestrationFrame,
+  OrchestrationRequest,
   OrchestratorRoute,
   OrchestratorNodeOutcome,
   RepairRequest,
@@ -106,26 +109,28 @@ import type {
   WorkLoopNodeRun
 } from "../domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV3,
+  OrchestratorTaskEnvelopeV4,
   TaskEnvelopeHistoryEntry,
   TaskEnvelopeLoopIdentity,
+  TaskEnvelopeOrchestrationRequest,
   TaskEnvelopeProviderRunIdentity,
   TaskEnvelopeRepairRequest,
   TaskEnvelopeRepairReturn,
   TaskEnvelopeResumeContext,
   TaskEnvelopeRunIdentity,
   TaskEnvelopeState,
-  TaskEnvelopeTargetLoop,
-  TaskEnvelopeV3,
+  TaskEnvelopeRouteCandidate,
+  TaskEnvelopeV4,
   TaskEnvelopeWorkLoopNodeIdentity,
-  ValidationTaskEnvelopeV3,
-  WorkTaskEnvelopeV3
+  ValidationTaskEnvelopeV4,
+  WorkTaskEnvelopeV4
 } from "../domain/taskEnvelope.js";
 import type {
   BalletMode,
   DashboardRunStatus,
   RootRunDetail,
   RootRunRepairProjection,
+  RootRunOrchestrationProjection,
   RootRunReturnDestination,
   RootRunStateProjection,
   RootRunKind,
@@ -249,7 +254,7 @@ export {
   maxRuntimeJsonDepth, maxStatePatchBytes, maxStatePatchOperations
 } from "../domain/runtime.js";
 export {
-  maxRelevantHistoryBytes, maxRelevantHistoryEntries, maxRepairRequestEnvelopeBytes,
+  maxOrchestrationRequestEnvelopeBytes, maxRelevantHistoryBytes, maxRelevantHistoryEntries,
   maxResumeContextBytes, maxTaskEnvelopeBytes, taskEnvelopeVersion
 } from "../domain/taskEnvelope.js";
 export { automationConfigSchema, kebabCaseIdPattern } from "./workspace-schemas.js";
@@ -268,17 +273,18 @@ export type {
   ProjectScheduleCadence, ProjectScheduleWeekday, ProjectWorkSchedule, LoopRun, LoopRunDetails,
   LoopScheduleState, LoopRuntimePreflight,
   CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, LoopStateRevisionMetadata, NodeRun, NodeRunRole,
-  OrchestrationFrame, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RepairResult, RootRun, RunCheck,
+  OrchestrationFrame, OrchestrationRequest, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RepairResult, RootRun, RunCheck,
   StatePatch, ValidationNodeOutcome, WorkLoopNodeRun, WorkNodeOutcome,
-  OrchestratorTaskEnvelopeV3, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
-  TaskEnvelopeProviderRunIdentity, TaskEnvelopeRepairRequest, TaskEnvelopeRepairReturn, TaskEnvelopeResumeContext,
-  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeTargetLoop, TaskEnvelopeV3,
+  OrchestratorTaskEnvelopeV4, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
+  TaskEnvelopeOrchestrationRequest, TaskEnvelopeProviderRunIdentity, TaskEnvelopeRepairRequest,
+  TaskEnvelopeRepairReturn, TaskEnvelopeResumeContext, TaskEnvelopeRouteCandidate,
+  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeV4,
   TaskEnvelopeWorkLoopNodeIdentity,
-  ValidationTaskEnvelopeV3, WorkTaskEnvelopeV3,
+  ValidationTaskEnvelopeV4, WorkTaskEnvelopeV4,
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot,
   ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,
-  BalletMode, DashboardRunStatus, RootRunDetail, RootRunRepairProjection, RootRunReturnDestination,
+  BalletMode, DashboardRunStatus, RootRunDetail, RootRunOrchestrationProjection, RootRunRepairProjection, RootRunReturnDestination,
   RootRunStateProjection, RootRunKind, RootRunListResponse, RootRunListState,
   RootRunSource, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, RespondToNodeRunRequest, StartRootRunRequest,
   WorkspaceInvalidationEvent, WorkspaceInvalidationInput, Skill

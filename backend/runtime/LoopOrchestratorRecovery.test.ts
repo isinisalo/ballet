@@ -18,7 +18,7 @@ describe("LoopOrchestrator nesting and limits", () => {
     runtime.startLoopRun("root-run");
     const outerRequest = requestExternalRepair(runtime);
     const repairARun = routeRepair(runtime, outerRequest.orchestrator, "repair-a");
-    const innerRequest = requestExternalRepair(runtime, { requestedCapability: "nested capability" });
+    const innerRequest = requestExternalRepair(runtime, { requestedCapability: "test:loop.transfer" });
     const repairBRun = routeRepair(runtime, innerRequest.orchestrator, "repair-b");
 
     expect(runtime.readRootRuntime("root-run").repair).toMatchObject({
@@ -134,7 +134,7 @@ describe("LoopOrchestrator input, recovery, and cancellation", () => {
       nodeRunId: requested.orchestrator.nodeRunId, role: "orchestrator", attempt: 2, status: "queued"
     });
     expect(resumed.context).toEqual({
-      repairRequestId: requested.request.repairRequestId,
+      orchestrationRequestId: requested.orchestrationRequest.orchestrationRequestId,
       resume: {
         question: "Which capability is authoritative?", context: "Choose a repair specialization.",
         response: "Use the repair-a specialization."
@@ -274,7 +274,7 @@ const externalFailure = (summary: string) => ({
   role: "validation" as const, state: "completed" as const, decision: "FAIL" as const,
   summary, evidence: {}, checks: [], repair: {
     mode: "ORCHESTRATOR_REPAIR" as const, reason: "Another repair is required.",
-    requestedCapability: "another repair capability", evidenceRefs: []
+    requestedCapability: "test:loop.transfer", evidenceRefs: []
   }
 });
 

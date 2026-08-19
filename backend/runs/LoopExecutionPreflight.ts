@@ -1,20 +1,21 @@
 import {
   isProjectAgentValidationNode,
   isProjectProviderWorkNode,
-  type ProjectLoop
+  type ProjectLoop,
+  type ProjectLoopEdgeKind
 } from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV3,
-  ValidationTaskEnvelopeV3,
-  WorkTaskEnvelopeV3
+  OrchestratorTaskEnvelopeV4,
+  ValidationTaskEnvelopeV4,
+  WorkTaskEnvelopeV4
 } from "../../shared/domain/taskEnvelope.js";
 import { composeExecutionPrompt } from "../execution/ExecutionComposition.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 import { validateState } from "../runtime/state/StatePatch.js";
 
 export const loopOrchestratorTask =
-  "Route the persisted Repair Request to one allowed target Loop.";
+  "Route the persisted Orchestration Request to one allowed candidate Loop.";
 
 export const preflightExecutionPrompts = (snapshot: RootExecutionSnapshot): void => {
   const rootLoop = requireLoop(snapshot, snapshot.rootLoopId);
@@ -30,21 +31,27 @@ export const preflightExecutionPrompts = (snapshot: RootExecutionSnapshot): void
       }
     }
   }
-  const sources = snapshot.loops.filter((loop) => snapshot.graph.loopEdges.some((edge) =>
-    edge.kind === "repair" && edge.source === loop.id));
-  for (const loop of sources.length > 0 ? sources : [rootLoop]) {
-    composeExecutionPrompt(snapshot, orchestratorEnvelope(snapshot, loop, stateEnvelope));
+  const routes = snapshot.graph.loopEdges.map((edge) => ({ source: edge.source, kind: edge.kind }));
+  const uniqueRoutes = routes.filter((route, index) => routes.findIndex((candidate) =>
+    candidate.source === route.source && candidate.kind === route.kind) === index);
+  for (const route of uniqueRoutes.length > 0
+    ? uniqueRoutes
+    : [{ source: rootLoop.id, kind: "repair" as const }]) {
+    composeExecutionPrompt(
+      snapshot,
+      orchestratorEnvelope(snapshot, requireLoop(snapshot, route.source), route.kind, stateEnvelope)
+    );
   }
 };
 
 const workEnvelope = (
   loop: ProjectLoop,
   nodeId: string,
-  state: WorkTaskEnvelopeV3["state"]
-): WorkTaskEnvelopeV3 => {
+  state: WorkTaskEnvelopeV4["state"]
+): WorkTaskEnvelopeV4 => {
   const node = requireNode(loop, nodeId);
   return {
-    version: 3,
+    version: 4,
     role: "work",
     run: providerRunIdentity,
     loop: { id: loop.id, description: loop.description },
@@ -59,11 +66,11 @@ const workEnvelope = (
 const validationEnvelope = (
   loop: ProjectLoop,
   nodeId: string,
-  state: ValidationTaskEnvelopeV3["state"]
-): ValidationTaskEnvelopeV3 => {
+  state: ValidationTaskEnvelopeV4["state"]
+): ValidationTaskEnvelopeV4 => {
   const node = requireNode(loop, nodeId);
   return {
-    version: 3,
+    version: 4,
     role: "validation",
     run: providerRunIdentity,
     loop: { id: loop.id, description: loop.description },
@@ -85,34 +92,37 @@ const validationEnvelope = (
 const orchestratorEnvelope = (
   snapshot: RootExecutionSnapshot,
   loop: ProjectLoop,
-  state: OrchestratorTaskEnvelopeV3["state"]
-): OrchestratorTaskEnvelopeV3 => ({
-  version: 3,
+  kind: ProjectLoopEdgeKind,
+  state: OrchestratorTaskEnvelopeV4["state"]
+): OrchestratorTaskEnvelopeV4 => ({
+  version: 4,
   role: "orchestrator",
   run: orchestratorRunIdentity,
   loop: { id: loop.id, description: loop.description },
   task: loopOrchestratorTask,
   state,
-  repairRequest: {
-    id: "preflight-repair-request",
-    requesterLoopRunId: "preflight-loop-run",
-    requesterWorkLoopNodeRunId: "preflight-work-loop-node-run",
-    requesterValidationNodeRunId: "preflight-validation-node-run",
-    attempt: 1,
-    validationSummary: "Preflight Validation finding.",
-    reason: "Preflight the immutable Orchestrator composition.",
-    requestedCapability: "Preflight routing capability.",
+  orchestrationRequest: {
+    id: "preflight-orchestration-request",
+    kind,
+    sourceLoopId: loop.id,
+    sourceLoopRunId: "preflight-loop-run",
+    sourceNodeRunId: "preflight-source-node-run",
     stateRevisionAtRequest: 0,
-    nestingDepth: 0
+    completionSummary: "Preflight source completion.",
+    completionEvidence: {}
   },
-  allowedTargetLoops: snapshot.graph.loopEdges
-    .filter((edge) => edge.kind === "repair" && edge.source === loop.id)
-    .map((edge) => {
+  allowedCandidates: snapshot.graph.loopEdges
+    .filter((edge) => edge.kind === kind && edge.source === loop.id)
+    .flatMap((edge) => {
       const target = requireLoop(snapshot, edge.target);
-      return {
+      const compatible = edge.kind === "repair"
+        ? target.capabilities.provides.includes(edge.capability)
+        : target.capabilities.accepts.includes(edge.capability);
+      return compatible ? [{
         id: target.id, description: target.description,
-        loopEdgeId: edge.id, routingDescription: edge.description
-      };
+        capabilities: target.capabilities,
+        route: { kind: edge.kind, capability: edge.capability, description: edge.description }
+      }] : [];
     }),
   relevantHistory: []
 });

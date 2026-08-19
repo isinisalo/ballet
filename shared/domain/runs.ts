@@ -4,6 +4,7 @@ import type {
   LoopRunDetails,
   LoopStateRevisionMetadata,
   OrchestrationFrame,
+  OrchestrationRequest,
   OrchestratorRoute,
   RepairRequest,
   RepairResult,
@@ -78,6 +79,13 @@ export interface RootRunRepairProjection {
   returnDestination?: RootRunReturnDestination;
 }
 
+export interface RootRunOrchestrationProjection {
+  requests: OrchestrationRequest[];
+  routes: OrchestratorRoute[];
+  pendingRequest?: OrchestrationRequest;
+  selectedRoute?: OrchestratorRoute;
+}
+
 export interface RootRunFinalization {
   status: "finalizing" | "completed" | "failed";
   success: boolean;
@@ -109,6 +117,7 @@ export interface RootRunDetail extends RootRunSummary {
   loopRuns: LoopRunDetails[];
   tasks: ExecutionTask[];
   state: RootRunStateProjection;
+  orchestration: RootRunOrchestrationProjection;
   repair: RootRunRepairProjection;
   controlFlowEvents: ControlFlowEvent[];
 }

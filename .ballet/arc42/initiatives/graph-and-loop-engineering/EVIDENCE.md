@@ -4,7 +4,7 @@ title: Graph and Loop Engineering EVIDENCE
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-19'
-version: 3
+version: 4
 tags:
   - arc42
   - initiative
@@ -16,14 +16,14 @@ tags:
 
 ## Tila
 
-Strict-v11 domain, schema, project repository, immutable snapshot ja Loop module -materialisointi on toteutettu ja testattu. Capabilityt ovat namespaced `accepts`/`provides`-merkkijonoja, Graph omistaa kaikki peer-reitit ja portable package ei saa sisältää Graphia tai peer-targetia. Cross-Loop-dispatch ja authoring-UI:n Graph/Loop hard cut eivät kuulu tähän vaiheeseen ja ovat edelleen pending.
+Strict-v11 domain, schema, project repository, immutable snapshot, Loop module -materialisointi ja cross-Loop runtime dispatch on toteutettu ja testattu. Capabilityt ovat namespaced `accepts`/`provides`-merkkijonoja, Graph omistaa kaikki peer-reitit ja portable package ei saa sisältää Graphia tai peer-targetia. Authoring-UI:n Graph/Loop hard cut on edelleen pending.
 
 | Evidence ID | QS/requirement | Check or observation | Artifact paths/stable IDs | Result | Timestamp/source | Limitations |
 | --- | --- | --- | --- | --- | --- | --- |
 | GLE-EVID-001 | REQ-012 / QS-005 | Päätöspaketin, stable ID:iden, linkkien ja dokumentaation conformance | `goal-012`, `adr-018`, `REQ-012`, `QS-014`, initiative BRIEF/PLAN/EVIDENCE/REVIEW | passed | 2026-08-19 local | Todentaa vain päätös-/dokumentaatiovaiheen; ei strict-v11-toteutusta. |
 | GLE-EVID-002 | REQ-012 / QS-014 | Strict-v11 domain/schema/capability hard cut ja v10 rejection | `shared/domain/automation.ts`, `shared/api/workspace-schemas.ts`, `backend/project-config/ProjectConfigurationRepository.ts`, `.ballet/project.json` | passed | 2026-08-19 local tests | Todentaa data/config/API-sopimuksen; ei cross-Loop-dispatchia tai authoring-routeja. |
 | GLE-EVID-003 | REQ-012 / QS-014 | Snapshot/repository/module v11 -closure ja recovery | Root Execution Snapshot v4, `backend/runs/`, `backend/runtime/RootExecutionSnapshotSchema.ts`, `backend/loop-modules/` | passed | 2026-08-19 local tests | Snapshot tallentuu nykyiseen SQLite JSON-kenttään; uusi SQLite-schema migration ei ollut tarpeen. Dispatch-semantics ei muuttunut. |
-| GLE-EVID-004 | REQ-012 / QS-003, QS-014 | Flow/repair Orchestrator-dispatch, call frame, ambiguity ja permission boundary | GLE-step-003 | pending | future implementation | Nykyinen v10 repair-evidenssi ei todista v11 flow-dispatchia. |
+| GLE-EVID-004 | REQ-012 / QS-003, QS-014 | Flow/repair Orchestrator-dispatch, call frame, ambiguity ja permission boundary | SQLite schema v7; Task Envelope V4; `LoopOrchestrator`, `OrchestrationStore`, `LoopCompletionEngine`; runtime/integration tests | passed | 2026-08-19 local tests | Todentaa runtime- ja persistence-rajan; Graph/Loop-authoring-UI ja ihmisacceptance eivät kuulu tähän osaevidenssiin. |
 | GLE-EVID-005 | REQ-012 / QS-014 | Context/numeric routing -legacy removal ja `graph | loop` hard cut | GLE-step-004 | pending | future implementation | Nykyinen UI toteuttaa yhä Context / Level 1 / Level 2 -reitit. |
 | GLE-EVID-006 | REQ-007, REQ-012 / QS-013, QS-014 | Graph Engineering projection/UI/visual/accessibility | GLE-step-005 | pending | future implementation | Graph UI:ta tai Orchestrator-control-nodea ei ole toteutettu. |
 | GLE-EVID-007 | REQ-011, REQ-012 / QS-010, QS-014 | Loop Engineering selected-Loop-only regressiosuoja | GLE-step-006 | pending | future implementation | Nykyinen Level 2 -evidenssi on baseline, ei v11 acceptance. |
@@ -33,10 +33,26 @@ Strict-v11 domain, schema, project repository, immutable snapshot ja Loop module
 ## Muutos- ja päätösevidenssi
 
 - Käyttäjän 2026-08-19 toimeksianto käsittelee `goal-012`:n listatut WHAT/WHY-päätökset hyväksyttyinä ja valtuuttaa `adr-018`:n accepted-päätöspaketin.
-- Strict-v11 tuotantokoodi ja testit osoittavat Graph/capability-datan, immutable snapshotin ja target-riippumattoman package/materialisointirajan. Nykyiset Context/composition/detail-reitit, repair call/return ja automaattinen `followFlow` säilyivät tarkoituksella muuttumattomina.
+- Strict-v11 tuotantokoodi ja testit osoittavat Graph/capability-datan, immutable snapshotin, target-riippumattoman package/materialisointirajan sekä persisted Orchestration Request/route/dispatch -polun. Automaattinen `followFlow` on poistettu; flow ja repair kulkevat saman generic Orchestrator-rajan kautta, mutta vain repair luo framen ja palaa samaan Validationiin. Context/composition/detail-UI-reitit säilyivät tarkoituksella muuttumattomina.
 - Historialliset `goal-011`, `adr-015`, `adr-017` ja `loop-engineer-three-level-canvas` säilyvät muuttumattomina evidenssilähteinä.
 
 ## Vaiheen tarkistukset
+
+### GLE-step-003 runtime orchestration
+
+- `npm run test -- backend/runtime/LoopOrchestrator.test.ts backend/runtime/LoopOrchestratorRecovery.test.ts backend/runtime/WorkLoopEngine.test.ts` — alkuperäinen baseline passed 3 tiedostoa / 34 testiä; toteutuksen kaksi ensimmäistä uusinta-ajoa paljasti vanhat `repairInput`/Task Envelope -fixturet ja capability-mismatchin, korjausten jälkeinen sama komento passed 3/34.
+- `npm run test -- backend/runtime/LoopOrchestratorFlow.test.ts backend/runtime/LoopOrchestrator.test.ts backend/runtime/LoopOrchestratorRecovery.test.ts backend/runtime/WorkLoopEngine.test.ts backend/runtime/RuntimeStores.test.ts backend/integration/TaskEnvelopeV4.test.ts backend/execution/ExecutionComposition.test.ts backend/execution/NodeOutcomeContract.test.ts` — passed: 8 tiedostoa, 89 testiä. Mukana zero/one/many flow, exact Root Run completion, ambiguity, allowlist/kind/capability/source fail-closed, bounded dispatch, permission boundary, repair return ja restart-idempotenssi.
+- `npm run test` — passed: 89 tiedostoa + 1 skipped; 460 testiä + 2 skipped.
+- `npm run lint` — passed: 0 erroria ja tunnettu 14 warningin baseline; runtime-muutos ei kasvattanut baselinea.
+- `npm run build` — passed: TypeScript build ja Vite production bundle, 2628 modulea transformed.
+- `npx tsc -b --pretty false` — passed ilman outputia viimeisen source-muutoksen jälkeen.
+- `npm run validate:arc42` — passed: 12 sections, 48 unique document IDs, 8 Loops ja 35 Loop Edges.
+- Platform/project-boundary-haku — passed ilman project-workflow-osumia `backend`, `frontend` tai `shared` -hakemistoissa.
+- `rg -n 'followFlow|TaskEnvelopeV3|allowedTargetLoops|repairInput' backend frontend shared` — 0 osumaa.
+- Target-selection-haku config-/Loop-/Validation-rajalta — tuotantodomainissa, workspace-skeemassa ja project configissa 0 `targetLoopId`-osumaa; vain generic Orchestrator-instruction nimeää providerin sallitun target-ehdotuksen.
+- Frontend UI -tiedostoja ei muutettu; shared runtime read contractiin lisättiin vain canonical orchestration-projektio.
+
+### Aiempi data/snapshot/module-osavaihe
 
 - `npm run validate:arc42` — passed: 12 sections, 48 unique document IDs, 8 Loops ja 35 Loop Edges.
 - `npx @google/design.md lint DESIGN.md` — passed: 0 errors, 0 warnings ja 1 token-summary info.
@@ -54,7 +70,7 @@ Ensimmäinen argumentiton `npm run release:build` pysähtyi odotetusti usage-koo
 
 ## Avoimet evidenssivajeet
 
-GLE-EVID-004–007 ja GLE-EVID-009 ovat blocking-pending ennen koko v11-implementation acceptancea. GLE-EVID-002/003/008 eivät todista dispatchia tai authoring-UI:ta.
+GLE-EVID-005–007 ja GLE-EVID-009 ovat blocking-pending ennen koko v11-implementation acceptancea. GLE-EVID-004 todistaa runtime dispatchin, mutta ei authoring-UI:ta tai ihmisacceptancea.
 
 ## Seuraava review basis
 

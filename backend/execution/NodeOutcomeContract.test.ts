@@ -48,7 +48,7 @@ describe("role-specific Node outcome contracts", () => {
   it.each([
     {
       role: "orchestrator", state: "completed", targetLoopId: "repair-loop",
-      routeReason: "Capability match.", repairInput: { value: 1 }, expectedOutcome: { repaired: true }
+      routeReason: "Capability match.", dispatchInput: { value: 1 }, expectedOutcome: { repaired: true }
     },
     {
       role: "orchestrator", state: "needs_input", summary: "Clarify route.",
@@ -73,6 +73,14 @@ describe("role-specific Node outcome contracts", () => {
       repair: { mode: "LOCAL_RETRY", feedback: "x", expectedCorrection: "y" },
       statePatch: [{ op: "add", path: "/invalid", value: true }]
     }],
+    ["Repair Request with provider-selected target", validationNodeOutcomeSchema, {
+      role: "validation", state: "completed", decision: "FAIL", summary: "Invalid target selection.",
+      evidence: {}, checks,
+      repair: {
+        mode: "ORCHESTRATOR_REPAIR", reason: "Another capability is required.",
+        requestedCapability: "repair structured state", targetLoopId: "repair-loop", evidenceRefs: []
+      }
+    }],
     ["Work decision", workNodeOutcomeSchema, {
       role: "work", state: "completed", decision: "OK", summary: "Invalid.", artifacts: {}, checks
     }],
@@ -82,11 +90,11 @@ describe("role-specific Node outcome contracts", () => {
     }],
     ["Orchestrator continuation", orchestratorNodeOutcomeSchema, {
       role: "orchestrator", state: "completed", targetLoopId: "repair-loop", routeReason: "Invalid.",
-      repairInput: {}, expectedOutcome: {}, returnWorkLoopNodeId: "caller"
+      dispatchInput: {}, expectedOutcome: {}, returnWorkLoopNodeId: "caller"
     }],
     ["Orchestrator State patch", orchestratorNodeOutcomeSchema, {
       role: "orchestrator", state: "completed", targetLoopId: "repair-loop", routeReason: "Invalid.",
-      repairInput: {}, expectedOutcome: {}, statePatch: [{ op: "add", path: "/invalid", value: true }]
+      dispatchInput: {}, expectedOutcome: {}, statePatch: [{ op: "add", path: "/invalid", value: true }]
     }]
   ])("rejects invalid union combination: %s", (_label, schema, outcome) => {
     expect(schema.safeParse(outcome).success).toBe(false);

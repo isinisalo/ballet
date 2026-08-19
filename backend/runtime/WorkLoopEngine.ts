@@ -12,6 +12,7 @@ import { LoopOrchestrator, type LoopOrchestratorCallbacks } from "./LoopOrchestr
 import { LoopRunIntegrityError, LoopRunStateError } from "./LoopRunErrors.js";
 import { LoopRunStore } from "./LoopRunStore.js";
 import { LoopStateStore } from "./LoopStateStore.js";
+import { OrchestrationStore } from "./OrchestrationStore.js";
 import { RepairResultStore } from "./RepairResultStore.js";
 import { RepairStore } from "./RepairStore.js";
 import { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
@@ -26,6 +27,7 @@ export class WorkLoopEngine {
   private readonly completion: LoopCompletionEngine;
   private readonly localRetry: LocalRetryEngine;
   private readonly orchestrator: LoopOrchestrator;
+  private readonly orchestration: OrchestrationStore;
 
   constructor(
     private readonly connection: () => Database.Database,
@@ -35,13 +37,14 @@ export class WorkLoopEngine {
   ) {
     this.snapshots = new RootExecutionSnapshotStore(connection);
     this.progress = new WorkLoopProgressStore(connection);
+    this.orchestration = new OrchestrationStore(connection);
     this.phases = new WorkLoopPhaseFactory(loops, this.snapshots, this.progress);
     this.completion = new LoopCompletionEngine(
-      connection, loops, repairs, new RepairResultStore(connection), this.snapshots, this.progress
+      connection, loops, repairs, new RepairResultStore(connection), this.progress
     );
     this.localRetry = new LocalRetryEngine(loops, states, repairs, this.progress);
     this.orchestrator = new LoopOrchestrator(
-      connection, loops, states, repairs, this.snapshots, this.progress, this.completion
+      connection, loops, states, repairs, this.orchestration, this.snapshots, this.progress, this.completion
     );
   }
 
@@ -62,6 +65,13 @@ export class WorkLoopEngine {
       const node = this.requireActiveNode(rootRunId, nodeRunId);
       const outcome = parseNodeOutcomeForRole(node.role, input);
       if (outcome.state === "needs_input") {
+        if (node.role === "orchestrator") {
+          const request = this.orchestration.forOrchestrator(node.nodeRunId);
+          if (!request) throw new LoopRunIntegrityError(
+            `Orchestrator Node Run ${node.nodeRunId} has no Orchestration Request.`
+          );
+          this.orchestration.markWaiting(request.orchestrationRequestId);
+        }
         this.states.pauseNodeOutcome({ rootRunId, nodeRunId, baseRevision: node.stateRevisionBefore, outcome });
         return this.requireDetails(node.loopRunId);
       }
@@ -85,11 +95,12 @@ export class WorkLoopEngine {
       }
       const context = resumeContext(node, node.outcome.question, node.outcome.context, response);
       if (node.role === "orchestrator") {
-        const request = this.repairs.requestForOrchestrator(node.nodeRunId);
-        if (!request) throw new LoopRunIntegrityError(`Orchestrator Node Run ${node.nodeRunId} has no Repair Request.`);
+        const request = this.orchestration.forOrchestrator(node.nodeRunId);
+        if (!request) throw new LoopRunIntegrityError(`Orchestrator Node Run ${node.nodeRunId} has no Orchestration Request.`);
+        this.orchestration.markPending(request.orchestrationRequestId);
         this.loops.resumeOrchestratorNode(
           node.nodeRunId, node.attempt + 1, this.states.current(rootRunId).revision,
-          { repairRequestId: request.repairRequestId, ...context }
+          { orchestrationRequestId: request.orchestrationRequestId, ...context }
         );
         return this.requireDetails(node.loopRunId);
       }
@@ -117,10 +128,10 @@ export class WorkLoopEngine {
       if (!node || !["blocked", "interrupted", "failed", "cancelled"].includes(node.status)) return;
       const revision = this.states.current(node.rootRunId).revision;
       const request = node.role === "orchestrator"
-        ? this.repairs.requestForOrchestrator(node.nodeRunId)
+        ? this.orchestration.forOrchestrator(node.nodeRunId)
         : undefined;
-      if (request && ["pending", "routed"].includes(request.status)) {
-        this.completion.failPendingRequest(
+      if (request && ["pending", "waiting_for_input", "routed"].includes(request.status)) {
+        this.orchestrator.failRequest(
           request, node, node.status === "blocked" ? "blocked" : "failed", revision, node.outcome,
           node.errorCode ?? "orchestrator_interrupted",
           node.errorMessage ?? `Orchestrator Node Run ${node.nodeRunId} was interrupted.`
@@ -181,7 +192,7 @@ export class WorkLoopEngine {
       if (outcome.repair.mode !== "ORCHESTRATOR_REPAIR") {
         throw new LoopRunIntegrityError("Validation repair mode changed during control-flow dispatch.");
       }
-      this.orchestrator.request(
+      this.orchestrator.requestRepair(
         node, outcome, loop, definition, compositeId, details.nestingDepth, this.callbacks(node.rootRunId)
       );
     }
@@ -252,9 +263,11 @@ export class WorkLoopEngine {
     return {
       createOrchestrator: (loop, loopRunId, requestId, attempt, revision, context) =>
         this.phases.createOrchestrator(loop, rootRunId, loopRunId, requestId, attempt, revision, context),
-      startRepair: (loop, callerLoopRunId, request, input, revision) =>
-        this.phases.startRepair(loop, callerLoopRunId, request, input, revision),
-      startFlow: (loop, _sourceLoopRunId, revision) => this.phases.startFlow(loop, rootRunId, revision),
+      startRepair: (loop, callerLoopRunId, repairRequest, orchestrationRequest, input, revision) =>
+        this.phases.startRepair(loop, callerLoopRunId, repairRequest, orchestrationRequest, input, revision),
+      startFlow: (loop, request, input, revision) => this.phases.startFlow(loop, request, input, revision),
+      requestFlow: (node, revision, outcome) =>
+        this.orchestrator.requestFlow(node, revision, outcome, this.callbacks(rootRunId)),
       returnValidation: (frame, context, revision) => {
         const node = this.phases.returnValidation(frame, context, revision);
         return { nodeRunId: node.nodeRunId, workLoopNodeRunId: node.workLoopNodeRunId! };

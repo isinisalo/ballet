@@ -1,34 +1,33 @@
 import { randomUUID } from "node:crypto";
 import type { JsonValue, ProjectLoop, ProjectWorkLoopNode } from "../../shared/domain/automation.js";
-import type {
-  NodeRun, OrchestratorNodeOutcome, RepairRequest, ValidationNodeOutcome
+import {
+  maxOrchestratorDispatchValueBytes, type CanonicalNodeOutcome, type NodeRun, type OrchestrationRequest,
+  type OrchestratorNodeOutcome, type RepairRequest, type ValidationNodeOutcome
 } from "../../shared/domain/runtime.js";
 import type { LoopCompletionCallbacks, LoopCompletionEngine } from "./LoopCompletionEngine.js";
 import { LoopRunIntegrityError } from "./LoopRunErrors.js";
 import type { LoopRunStore } from "./LoopRunStore.js";
 import type { LoopStateStore } from "./LoopStateStore.js";
+import type { OrchestrationStore } from "./OrchestrationStore.js";
 import type { RepairStore } from "./RepairStore.js";
 import type { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
 import type { WorkLoopProgressStore } from "./WorkLoopProgressStore.js";
 import { requireOutcome } from "./WorkLoopEngineSupport.js";
+import { assertJsonValue } from "./state/CanonicalJson.js";
 
 type ValidationFailOutcome = ValidationNodeOutcome & { state: "completed"; decision: "FAIL" };
 
 export interface LoopOrchestratorCallbacks extends LoopCompletionCallbacks {
   createOrchestrator(
-    loop: ProjectLoop,
-    loopRunId: string,
-    requestId: string,
-    attempt: number,
-    revision: number,
+    loop: ProjectLoop, loopRunId: string, requestId: string, attempt: number, revision: number,
     context?: JsonValue
   ): NodeRun;
   startRepair(
-    loop: ProjectLoop,
-    callerLoopRunId: string,
-    request: RepairRequest,
-    input: JsonValue,
-    revision: number
+    loop: ProjectLoop, callerLoopRunId: string, repairRequest: RepairRequest,
+    orchestrationRequest: OrchestrationRequest, input: JsonValue, revision: number
+  ): { loopRunId: string; workLoopNodeRunId: string };
+  startFlow(
+    loop: ProjectLoop, request: OrchestrationRequest, input: JsonValue, revision: number
   ): { loopRunId: string; workLoopNodeRunId: string };
 }
 
@@ -38,12 +37,13 @@ export class LoopOrchestrator {
     private readonly loops: LoopRunStore,
     private readonly states: LoopStateStore,
     private readonly repairs: RepairStore,
+    private readonly orchestration: OrchestrationStore,
     private readonly snapshots: RootExecutionSnapshotStore,
     private readonly progress: WorkLoopProgressStore,
     private readonly completion: LoopCompletionEngine
   ) {}
 
-  request(
+  requestRepair(
     node: NodeRun,
     outcome: ValidationFailOutcome,
     loop: ProjectLoop,
@@ -74,14 +74,13 @@ export class LoopOrchestrator {
       );
       return;
     }
-    const requestId = randomUUID();
     const committed = this.states.commitNodeOutcome({
       rootRunId: node.rootRunId, nodeRunId: node.nodeRunId, baseRevision: node.stateRevisionBefore,
       outcome, workLoopNodeStatus: "waiting_for_input",
       control: { kind: "validation_fail_orchestrator" }
     });
-    const request = this.repairs.createRequest({
-      repairRequestId: requestId,
+    const repairRequest = this.repairs.createRequest({
+      repairRequestId: randomUUID(),
       rootRunId: node.rootRunId, requesterLoopRunId: node.loopRunId,
       requesterWorkLoopNodeRunId: compositeId, requesterValidationNodeRunId: node.nodeRunId,
       mode: "orchestrator", attempt, validationSummary: outcome.summary,
@@ -93,102 +92,157 @@ export class LoopOrchestrator {
       returnLoopId: node.loopId, returnWorkLoopNodeId: definition.id,
       returnValidationNodeDefinitionId: node.nodeDefinitionId, nestingDepth: requestDepth
     });
+    const orchestrationRequest = this.orchestration.create({
+      rootRunId: node.rootRunId, kind: "repair", sourceLoopRunId: node.loopRunId,
+      sourceLoopId: node.loopId, sourceNodeRunId: node.nodeRunId,
+      stateRevisionAtRequest: committed.revision.revision,
+      completionSummary: outcome.summary, completionEvidence: outcome as unknown as JsonValue,
+      requestedCapability: outcome.repair.requestedCapability,
+      expectedOutcome: outcome.repair.requestedOutcome,
+      repairRequestId: repairRequest.repairRequestId
+    });
     this.connection().prepare(`
-      UPDATE control_flow_events SET repair_request_id = ? WHERE id = ?
-    `).run(request.repairRequestId, committed.controlFlowEventId);
+      UPDATE control_flow_events SET repair_request_id = ?, orchestration_request_id = ? WHERE id = ?
+    `).run(repairRequest.repairRequestId, orchestrationRequest.orchestrationRequestId, committed.controlFlowEventId);
     const persisted = requireOutcome(this.loops.getNodeRun(node.nodeRunId), "validation", "completed");
     const orchestrator = callbacks.createOrchestrator(
-      loop, node.loopRunId, request.repairRequestId, 1,
+      loop, node.loopRunId, orchestrationRequest.orchestrationRequestId, 1,
       persisted.stateRevisionAfter ?? node.stateRevisionBefore
     );
-    this.repairs.bindOrchestrator(request.repairRequestId, orchestrator.nodeRunId);
+    this.repairs.bindOrchestrator(repairRequest.repairRequestId, orchestrator.nodeRunId);
+    this.orchestration.bindOrchestrator(orchestrationRequest.orchestrationRequestId, orchestrator.nodeRunId);
   }
 
-  apply(
+  requestFlow(
     node: NodeRun,
-    outcome: OrchestratorNodeOutcome,
+    revision: number,
+    outcome: CanonicalNodeOutcome,
     callbacks: LoopOrchestratorCallbacks
-  ): void {
-    const request = this.repairs.requestForOrchestrator(node.nodeRunId);
+  ): boolean {
+    const snapshot = this.snapshots.require(node.rootRunId);
+    if (!snapshot.graph.loopEdges.some((edge) => edge.kind === "flow" && edge.source === node.loopId)) return false;
+    const request = this.orchestration.create({
+      rootRunId: node.rootRunId, kind: "flow", sourceLoopRunId: node.loopRunId,
+      sourceLoopId: node.loopId, sourceNodeRunId: node.nodeRunId,
+      stateRevisionAtRequest: revision,
+      completionSummary: summaryOf(outcome, `Loop ${node.loopId} completed.`),
+      completionEvidence: outcome as unknown as JsonValue
+    });
+    const orchestrator = callbacks.createOrchestrator(
+      this.snapshots.loop(snapshot, node.loopId), node.loopRunId,
+      request.orchestrationRequestId, 1, revision
+    );
+    this.orchestration.bindOrchestrator(request.orchestrationRequestId, orchestrator.nodeRunId);
+    return true;
+  }
+
+  apply(node: NodeRun, outcome: OrchestratorNodeOutcome, callbacks: LoopOrchestratorCallbacks): void {
+    const request = this.orchestration.forOrchestrator(node.nodeRunId);
     if (!request) throw new LoopRunIntegrityError(
-      `Orchestrator Node Run ${node.nodeRunId} has no persisted Repair Request.`
+      `Orchestrator Node Run ${node.nodeRunId} has no persisted Orchestration Request.`
     );
     if (outcome.state !== "completed") {
       if (outcome.state === "needs_input") throw new LoopRunIntegrityError("Paused Orchestrator reached terminal flow.");
-      this.failOutcome(node, request, outcome, callbacks);
+      this.failOutcome(node, request, outcome);
       return;
     }
+    assertJsonValue(outcome.dispatchInput,
+      { label: "Orchestrator dispatch input", maxBytes: maxOrchestratorDispatchValueBytes });
+    assertJsonValue(outcome.expectedOutcome,
+      { label: "Orchestrator expected outcome", maxBytes: maxOrchestratorDispatchValueBytes });
     const committed = this.states.commitNodeOutcome({
       rootRunId: node.rootRunId, nodeRunId: node.nodeRunId, baseRevision: node.stateRevisionBefore,
-      outcome, control: { kind: "repair_call", repairRequestId: request.repairRequestId }
+      outcome,
+      control: {
+        kind: request.kind === "repair" ? "repair_call" : "flow_transition",
+        orchestrationRequestId: request.orchestrationRequestId,
+        repairRequestId: request.repairRequestId
+      }
     });
     const persisted = requireOutcome(this.loops.getNodeRun(node.nodeRunId), "orchestrator", "completed");
     const persistedOutcome = requireCompletedOrchestratorOutcome(persisted.outcome);
     const issue = this.routeIssue(node, request, persistedOutcome.targetLoopId);
     if (issue) {
-      this.connection().prepare(`
-        UPDATE control_flow_events SET kind = 'orchestrator_terminal' WHERE id = ?
-      `).run(committed.controlFlowEventId);
-      this.completion.failPendingRequest(
+      this.connection().prepare(`UPDATE control_flow_events SET kind = 'orchestrator_terminal' WHERE id = ?`)
+        .run(committed.controlFlowEventId);
+      this.failRequest(
         request, persisted, "failed", persisted.stateRevisionAfter ?? node.stateRevisionBefore,
         persisted.outcome, "invalid_orchestrator_route", issue
       );
       return;
     }
-    const edge = this.allowedEdge(node, persistedOutcome.targetLoopId);
-    const routeId = randomUUID();
-    this.repairs.routeRequest({
-      repairRequestId: request.repairRequestId, loopEdgeId: edge.id,
-      sourceLoopId: node.loopId, targetLoopId: persistedOutcome.targetLoopId,
-      orchestratorNodeRunId: node.nodeRunId,
-      evidence: { routeReason: persistedOutcome.routeReason, expectedOutcome: persistedOutcome.expectedOutcome },
-      routeId
+    const route = this.orchestration.route({
+      orchestrationRequestId: request.orchestrationRequestId,
+      orchestratorNodeRunId: node.nodeRunId, targetLoopId: persistedOutcome.targetLoopId,
+      routeReason: persistedOutcome.routeReason, expectedOutcome: persistedOutcome.expectedOutcome
     });
-    const route = this.repairs.routeForRequest(request.repairRequestId);
-    if (!route || route.routeId !== routeId || route.targetLoopId !== persistedOutcome.targetLoopId) {
-      throw new LoopRunIntegrityError(`Repair Request ${request.repairRequestId} has no canonical persisted route.`);
-    }
     const revision = persisted.stateRevisionAfter ?? node.stateRevisionBefore;
+    const targetLoop = this.snapshots.loop(this.snapshots.require(node.rootRunId), route.targetLoopId);
+    if (request.kind === "flow") {
+      const target = callbacks.startFlow(targetLoop, request, persistedOutcome.dispatchInput, revision);
+      this.orchestration.markDispatched(request.orchestrationRequestId, target.loopRunId);
+      this.bindControlTarget(committed.controlFlowEventId, target, request.orchestrationRequestId);
+      return;
+    }
+    const repairRequest = this.requireRepairRequest(request);
+    this.repairs.markRouted(repairRequest.repairRequestId, route.loopEdgeId, route.targetLoopId);
     const parentFrame = this.repairs.openFrameForCallee(node.loopRunId);
     this.progress.suspendLoop(node.loopRunId);
-    const targetLoop = this.snapshots.loop(this.snapshots.require(node.rootRunId), route.targetLoopId);
     const target = callbacks.startRepair(
-      targetLoop, node.loopRunId, this.repairs.requireRequest(request.repairRequestId),
-      persistedOutcome.repairInput, revision
+      targetLoop, node.loopRunId, repairRequest, request,
+      persistedOutcome.dispatchInput, revision
     );
     const frame = this.repairs.createFrame({
-      rootRunId: node.rootRunId, repairRequestId: request.repairRequestId, routeId,
-      callerLoopRunId: node.loopRunId, calleeLoopRunId: target.loopRunId,
-      parentFrameId: parentFrame?.frameId,
-      returnLoopId: request.returnLoopId, returnWorkLoopNodeId: request.returnWorkLoopNodeId,
-      returnValidationNodeDefinitionId: request.returnValidationNodeDefinitionId,
-      stateRevisionAtCall: revision, nestingDepth: request.nestingDepth
+      rootRunId: node.rootRunId, repairRequestId: repairRequest.repairRequestId,
+      routeId: route.routeId, callerLoopRunId: node.loopRunId, calleeLoopRunId: target.loopRunId,
+      parentFrameId: parentFrame?.frameId, returnLoopId: repairRequest.returnLoopId,
+      returnWorkLoopNodeId: repairRequest.returnWorkLoopNodeId,
+      returnValidationNodeDefinitionId: repairRequest.returnValidationNodeDefinitionId,
+      stateRevisionAtCall: revision, nestingDepth: repairRequest.nestingDepth
     });
     this.loops.bindOrchestrationFrame(target.loopRunId, frame.frameId);
-    this.connection().prepare(`
-      UPDATE control_flow_events SET target_loop_run_id = ?, target_work_loop_node_run_id = ?,
-        orchestration_frame_id = ? WHERE id = ?
-    `).run(target.loopRunId, target.workLoopNodeRunId, frame.frameId, committed.controlFlowEventId);
+    this.orchestration.markDispatched(request.orchestrationRequestId, target.loopRunId);
+    this.bindControlTarget(committed.controlFlowEventId, target, request.orchestrationRequestId, frame.frameId);
+  }
+
+  failRequest(
+    request: OrchestrationRequest,
+    node: NodeRun,
+    terminal: "blocked" | "failed",
+    revision: number,
+    outcome: CanonicalNodeOutcome | undefined,
+    errorCode: string,
+    errorMessage: string
+  ): void {
+    this.orchestration.fail(request.orchestrationRequestId, "failed");
+    if (request.kind === "repair") {
+      this.completion.failPendingRequest(
+        this.requireRepairRequest(request), node, terminal, revision, outcome, errorCode, errorMessage
+      );
+      return;
+    }
+    this.progress.finishRoot(request.rootRunId, outcome, { code: errorCode, message: errorMessage });
   }
 
   private failOutcome(
     node: NodeRun,
-    request: RepairRequest,
-    outcome: Extract<OrchestratorNodeOutcome, { state: "blocked" | "failed" }>,
-    callbacks: LoopCompletionCallbacks
+    request: OrchestrationRequest,
+    outcome: Extract<OrchestratorNodeOutcome, { state: "blocked" | "failed" }>
   ): void {
     this.states.commitNodeOutcome({
       rootRunId: node.rootRunId, nodeRunId: node.nodeRunId, baseRevision: node.stateRevisionBefore,
       outcome, nodeStatus: outcome.state,
       errorCode: `orchestrator_${outcome.state}`, errorMessage: outcome.summary,
-      control: { kind: "orchestrator_terminal", repairRequestId: request.repairRequestId }
+      control: {
+        kind: "orchestrator_terminal", orchestrationRequestId: request.orchestrationRequestId,
+        repairRequestId: request.repairRequestId
+      }
     });
     const persisted = requireOutcome(this.loops.getNodeRun(node.nodeRunId), "orchestrator", outcome.state);
-    this.completion.failPendingRequest(
-      request, node, outcome.state, persisted.stateRevisionAfter ?? node.stateRevisionBefore,
+    this.failRequest(
+      request, persisted, outcome.state, persisted.stateRevisionAfter ?? node.stateRevisionBefore,
       persisted.outcome, `orchestrator_${outcome.state}`, outcome.summary
     );
-    void callbacks;
   }
 
   private rejectRequestLimit(
@@ -211,42 +265,50 @@ export class LoopOrchestrator {
     );
   }
 
-  private routeIssue(node: NodeRun, request: RepairRequest, targetLoopId: string): string | undefined {
+  private routeIssue(node: NodeRun, request: OrchestrationRequest, targetLoopId: string): string | undefined {
+    if (request.status !== "pending") return `Orchestration Request ${request.orchestrationRequestId} is not pending.`;
+    if (request.rootRunId !== node.rootRunId || request.sourceLoopRunId !== node.loopRunId
+      || request.sourceLoopId !== node.loopId) {
+      return `Orchestration Request ${request.orchestrationRequestId} source does not match its Orchestrator Node Run.`;
+    }
     const snapshot = this.snapshots.require(node.rootRunId);
-    if (request.status !== "pending" || request.mode !== "orchestrator") {
-      return `Repair Request ${request.repairRequestId} is not pending.`;
-    }
-    if (request.nestingDepth > snapshot.orchestrator.maxRepairDepth) {
-      return `Repair Request depth ${request.nestingDepth} exceeds limit ${snapshot.orchestrator.maxRepairDepth}.`;
-    }
-    if (request.attempt > snapshot.orchestrator.maxRepairAttempts) {
-      return `Repair Request attempt ${request.attempt} exceeds limit ${snapshot.orchestrator.maxRepairAttempts}.`;
-    }
     if (!snapshot.loops.some((loop) => loop.id === targetLoopId)) {
       return `Orchestrator selected unknown snapshot Loop ${targetLoopId}.`;
     }
-    const edges = snapshot.graph.loopEdges.filter((edge) =>
-      edge.kind === "repair" && edge.source === node.loopId && edge.target === targetLoopId);
-    if (edges.length !== 1) {
-      return `Loop ${targetLoopId} is not an unambiguous allowed repair target from ${node.loopId}.`;
-    }
-    return undefined;
+    const edges = this.orchestration.allowedCandidates(request).filter((edge) => edge.target === targetLoopId);
+    return edges.length === 1
+      ? undefined
+      : `Loop ${targetLoopId} is not an unambiguous allowed ${request.kind} target from ${request.sourceLoopId}.`;
   }
 
-  private allowedEdge(node: NodeRun, targetLoopId: string) {
-    const snapshot = this.snapshots.require(node.rootRunId);
-    const edge = snapshot.graph.loopEdges.find((candidate) =>
-      candidate.kind === "repair" && candidate.source === node.loopId && candidate.target === targetLoopId);
-    if (!edge) throw new LoopRunIntegrityError(`Repair route ${node.loopId} -> ${targetLoopId} disappeared.`);
-    return edge;
+  private requireRepairRequest(request: OrchestrationRequest): RepairRequest {
+    if (request.kind !== "repair" || !request.repairRequestId) {
+      throw new LoopRunIntegrityError(`Orchestration Request ${request.orchestrationRequestId} is not a repair request.`);
+    }
+    return this.repairs.requireRequest(request.repairRequestId);
+  }
+
+  private bindControlTarget(
+    controlFlowEventId: number,
+    target: { loopRunId: string; workLoopNodeRunId: string },
+    orchestrationRequestId: string,
+    frameId?: string
+  ): void {
+    this.connection().prepare(`
+      UPDATE control_flow_events SET target_loop_run_id = ?, target_work_loop_node_run_id = ?,
+        orchestration_request_id = ?, orchestration_frame_id = ? WHERE id = ?
+    `).run(target.loopRunId, target.workLoopNodeRunId, orchestrationRequestId, frameId ?? null, controlFlowEventId);
   }
 }
 
 const requireCompletedOrchestratorOutcome = (
-  outcome: import("../../shared/domain/runtime.js").CanonicalNodeOutcome
+  outcome: CanonicalNodeOutcome
 ): Extract<OrchestratorNodeOutcome, { state: "completed" }> => {
   if (outcome.role !== "orchestrator" || outcome.state !== "completed") {
     throw new LoopRunIntegrityError("Persisted completed Orchestrator outcome is unavailable.");
   }
   return outcome;
 };
+
+const summaryOf = (outcome: CanonicalNodeOutcome | undefined, fallback: string): string =>
+  outcome && "summary" in outcome && outcome.summary.trim() ? outcome.summary : fallback;

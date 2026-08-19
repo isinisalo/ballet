@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { orchestratorRouteSchema } from "./runtime-orchestration-schemas.js";
+export {
+  orchestrationRequestSchema, orchestratorRouteSchema, rootRunOrchestrationProjectionSchema
+} from "./runtime-orchestration-schemas.js";
 import type { JsonValue } from "../domain/automation.js";
 import type {
   CanonicalNodeOutcome, NodeRunRole, OrchestratorNodeOutcome, ValidationNodeOutcome,
@@ -117,7 +121,7 @@ export const orchestratorNodeOutcomeSchema = z.union([
   z.object({
     role: z.literal("orchestrator"), state: z.literal("completed"),
     targetLoopId: z.string().trim().min(1).max(200), routeReason: nonEmptyText,
-    repairInput: z.json(), expectedOutcome: z.json()
+    dispatchInput: z.json(), expectedOutcome: z.json()
   }).strict(),
   z.object({
     role: z.literal("orchestrator"), state: z.literal("needs_input"),
@@ -194,18 +198,6 @@ export const repairRequestSchema = z.object({
   message: "Repair Request requires exactly one requested capability or requested outcome."
 });
 
-export const orchestratorRouteSchema = z.object({
-  routeId: idSchema,
-  rootRunId: idSchema,
-  repairRequestId: idSchema,
-  orchestratorNodeRunId: idSchema,
-  loopEdgeId: z.string().min(1),
-  sourceLoopId: z.string().min(1),
-  targetLoopId: z.string().min(1),
-  evidence: z.json().optional(),
-  createdAt: z.string()
-}).strict();
-
 export const orchestrationFrameSchema = z.object({
   frameId: idSchema,
   rootRunId: idSchema,
@@ -266,6 +258,7 @@ export const controlFlowEventSchema = z.object({
   sourceNodeRunId: idSchema.optional(),
   targetLoopRunId: idSchema.optional(),
   targetWorkLoopNodeRunId: idSchema.optional(),
+  orchestrationRequestId: idSchema.optional(),
   repairRequestId: idSchema.optional(),
   orchestrationFrameId: idSchema.optional(),
   createdAt: z.string()
@@ -296,9 +289,9 @@ export const validationNodeOutcomeJsonSchema = jsonSchema(validationNodeOutcomeS
 export const orchestratorNodeOutcomeJsonSchema = jsonSchema(orchestratorNodeOutcomeSchema);
 
 export const nodeOutcomeSchemaIds = {
-  work: "work-node-outcome-v3",
-  validation: "validation-node-outcome-v3",
-  orchestrator: "orchestrator-node-outcome-v3"
+  work: "work-node-outcome-v4",
+  validation: "validation-node-outcome-v4",
+  orchestrator: "orchestrator-node-outcome-v4"
 } as const;
 
 export const nodeOutcomeJsonSchemaForRole = (role: NodeRunRole): Record<string, JsonValue> => {

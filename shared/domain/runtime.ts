@@ -8,6 +8,7 @@ export * from "./executionRuntime.js";
 export * from "./runtimeOrchestration.js";
 
 export const maxStatePatchBytes = 65_536;
+export const maxOrchestratorDispatchValueBytes = 65_536;
 export const maxStatePatchOperations = 128;
 export const maxRuntimeJsonDepth = 64;
 export const maxControlFlowTransitions = 256;
@@ -137,7 +138,7 @@ export type OrchestratorNodeOutcome =
       state: "completed";
       targetLoopId: string;
       routeReason: string;
-      repairInput: JsonValue;
+      dispatchInput: JsonValue;
       expectedOutcome: JsonValue;
     }
   | OutcomeSummary & {
@@ -207,6 +208,7 @@ export interface LoopRun {
   snapshot: ProjectLoop;
   themeSnapshot: LoopTheme;
   schedule?: LoopScheduleOccurrence;
+  orchestrationRequestId?: string;
   repairRequestId?: string;
   orchestrationFrameId?: string;
   entryStateRevision: number;

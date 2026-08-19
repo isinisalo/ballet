@@ -20,6 +20,7 @@ export interface CreateLoopRunInput {
   source: LoopRunSource;
   input?: JsonValue;
   schedule?: { workLoopNodeId: string; scheduledFor: string };
+  orchestrationRequestId?: string;
   repairRequestId?: string;
   entryStateRevision?: number;
   nestingDepth?: number;
@@ -121,17 +122,21 @@ export class LoopRunStore {
     }
     const revision = input.entryStateRevision ?? this.currentRevision(input.rootRunId);
     const inputJson = input.input === undefined ? null : canonicalJson(validateState(input.input));
+    if (["flow", "repair"].includes(input.source) !== Boolean(input.orchestrationRequestId)) {
+      throw new Error("A flow or repair Loop Run requires exactly one Orchestration Request identity.");
+    }
     if ((input.source === "repair") !== Boolean(input.repairRequestId)) {
       throw new Error("A repair Loop Run requires exactly one Repair Request identity.");
     }
     this.connection().prepare(`
       INSERT INTO loop_invocations (
         loop_run_id, root_run_id, loop_id, parent_loop_run_id, source, status, input_json,
-        repair_request_id, schedule_work_loop_node_id, scheduled_for, entry_state_revision,
-        nesting_depth, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?)
+        orchestration_request_id, repair_request_id, schedule_work_loop_node_id, scheduled_for,
+        entry_state_revision, nesting_depth, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(loopRunId, input.rootRunId, input.loop.id, input.parentLoopRunId ?? null, input.source, inputJson,
-      input.repairRequestId ?? null, input.schedule?.workLoopNodeId ?? null, input.schedule?.scheduledFor ?? null,
+      input.orchestrationRequestId ?? null, input.repairRequestId ?? null,
+      input.schedule?.workLoopNodeId ?? null, input.schedule?.scheduledFor ?? null,
       revision, nestingDepth, timestamp, timestamp);
     this.connection().prepare(`
       UPDATE root_runs SET active_loop_run_id = ?, status = 'running', updated_at = ? WHERE root_run_id = ?
@@ -204,8 +209,9 @@ export class LoopRunStore {
         WHERE work_loop_node_run_id = ?
       `).run(id, status === "waiting_for_input" ? "waiting_for_input" : "running", timestamp, input.workLoopNodeRunId);
       this.connection().prepare(`
-        UPDATE root_runs SET active_node_run_id = ?, updated_at = ? WHERE root_run_id = ?
-      `).run(id, timestamp, input.rootRunId);
+        UPDATE root_runs SET active_loop_run_id = ?, active_node_run_id = ?, updated_at = ?
+        WHERE root_run_id = ?
+      `).run(input.loopRunId, id, timestamp, input.rootRunId);
     });
     transaction();
     return this.requireNodeRun(id);

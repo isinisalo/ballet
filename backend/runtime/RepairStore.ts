@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import type { JsonValue } from "../../shared/domain/automation.js";
 import type {
-  OrchestrationFrame, OrchestratorRoute, RepairRequest
+  OrchestrationFrame, RepairRequest
 } from "../../shared/domain/runtime.js";
 import {
-  orchestrationFrameRowSchema, orchestratorRouteRowSchema, repairRequestRowSchema
+  orchestrationFrameRowSchema, repairRequestRowSchema
 } from "./RuntimeDbTypes.js";
 import {
-  toOrchestrationFrame, toOrchestratorRoute, toRepairRequest
+  toOrchestrationFrame, toRepairRequest
 } from "./RuntimeRowMappers.js";
 import { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
 import { assertOrchestrationFrameInput } from "./OrchestrationFrameValidation.js";
@@ -88,12 +88,6 @@ export class RepairStore {
     `).all(rootRunId).map((row) => toRepairRequest(repairRequestRowSchema.parse(row)));
   }
 
-  listRoutes(rootRunId: string): OrchestratorRoute[] {
-    return this.connection().prepare(`
-      SELECT * FROM orchestrator_routes WHERE root_run_id = ? ORDER BY created_at, rowid
-    `).all(rootRunId).map((row) => toOrchestratorRoute(orchestratorRouteRowSchema.parse(row)));
-  }
-
   listFrames(rootRunId: string): OrchestrationFrame[] {
     return this.connection().prepare(`
       SELECT * FROM orchestration_frames WHERE root_run_id = ? ORDER BY created_at, rowid
@@ -132,6 +126,16 @@ export class RepairStore {
     return value ? toRepairRequest(repairRequestRowSchema.parse(value)) : undefined;
   }
 
+  markRouted(repairRequestId: string, loopEdgeId: string, targetLoopId: string): RepairRequest {
+    const result = this.connection().prepare(`
+      UPDATE repair_requests SET status = 'routed', routed_loop_edge_id = ?,
+        routed_target_loop_id = ?, updated_at = ?
+      WHERE repair_request_id = ? AND mode = 'orchestrator' AND status = 'pending'
+    `).run(loopEdgeId, targetLoopId, new Date().toISOString(), repairRequestId);
+    if (result.changes !== 1) throw new Error(`Repair Request ${repairRequestId} is not pending.`);
+    return this.requireRequest(repairRequestId);
+  }
+
   orchestratorAttemptCount(workLoopNodeRunId: string): number {
     const value = this.connection().prepare(`
       SELECT COUNT(*) AS count FROM repair_requests
@@ -140,64 +144,6 @@ export class RepairStore {
     if (typeof value === "object" && value !== null && "count" in value
       && typeof value.count === "number" && Number.isSafeInteger(value.count)) return value.count;
     throw new Error(`Repair Request count for Work Loop Node Run ${workLoopNodeRunId} is invalid.`);
-  }
-
-  getRoute(routeId: string): OrchestratorRoute | undefined {
-    const value = this.connection().prepare("SELECT * FROM orchestrator_routes WHERE route_id = ?").get(routeId);
-    return value ? toOrchestratorRoute(orchestratorRouteRowSchema.parse(value)) : undefined;
-  }
-
-  routeForRequest(repairRequestId: string): OrchestratorRoute | undefined {
-    const value = this.connection().prepare(`
-      SELECT * FROM orchestrator_routes WHERE repair_request_id = ?
-    `).get(repairRequestId);
-    return value ? toOrchestratorRoute(orchestratorRouteRowSchema.parse(value)) : undefined;
-  }
-
-  routeRequest(input: {
-    repairRequestId: string;
-    loopEdgeId: string;
-    sourceLoopId: string;
-    targetLoopId: string;
-    orchestratorNodeRunId: string;
-    evidence?: JsonValue;
-    routeId?: string;
-    routedAt?: string;
-  }): RepairRequest {
-    const timestamp = input.routedAt ?? new Date().toISOString();
-    const routeId = input.routeId ?? randomUUID();
-    this.connection().transaction(() => {
-      const request = this.requireRequest(input.repairRequestId);
-      if (request.mode !== "orchestrator" || request.orchestratorNodeRunId !== input.orchestratorNodeRunId) {
-        throw new Error(`Repair Request ${input.repairRequestId} is not owned by Orchestrator ${input.orchestratorNodeRunId}.`);
-      }
-      const snapshot = this.snapshots.require(request.rootRunId);
-      const edge = snapshot.graph.loopEdges.find((candidate) => candidate.id === input.loopEdgeId);
-      if (!edge || edge.kind !== "repair" || edge.source !== input.sourceLoopId || edge.target !== input.targetLoopId) {
-        throw new Error(`Loop Edge ${input.loopEdgeId} is not an allowed repair route from ${input.sourceLoopId} to ${input.targetLoopId}.`);
-      }
-      const orchestrator = this.connection().prepare(`
-        SELECT role, root_run_id FROM node_runs WHERE node_run_id = ?
-      `).get(input.orchestratorNodeRunId);
-      if (readString(orchestrator, "role") !== "orchestrator"
-        || readString(orchestrator, "root_run_id") !== request.rootRunId) {
-        throw new Error(`Node Run ${input.orchestratorNodeRunId} is not the Root Run orchestrator.`);
-      }
-      const result = this.connection().prepare(`
-        UPDATE repair_requests SET status = 'routed', routed_loop_edge_id = ?, routed_target_loop_id = ?, updated_at = ?
-        WHERE repair_request_id = ? AND status = 'pending'
-      `).run(input.loopEdgeId, input.targetLoopId, timestamp, input.repairRequestId);
-      if (result.changes !== 1) throw new Error(`Repair Request ${input.repairRequestId} is not pending.`);
-      this.connection().prepare(`
-        INSERT INTO orchestrator_routes (
-          route_id, root_run_id, repair_request_id, orchestrator_node_run_id, loop_edge_id,
-          source_loop_id, target_loop_id, route_evidence_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(routeId, request.rootRunId, input.repairRequestId,
-        input.orchestratorNodeRunId, input.loopEdgeId, input.sourceLoopId, input.targetLoopId,
-        jsonOrNull(input.evidence, "Orchestrator route evidence"), timestamp);
-    })();
-    return this.requireRequest(input.repairRequestId);
   }
 
   createFrame(input: CreateOrchestrationFrameInput): OrchestrationFrame {
@@ -274,11 +220,4 @@ const jsonOrNull = (value: JsonValue | undefined, label: string): string | null 
   if (value === undefined) return null;
   assertJsonValue(value, { label });
   return canonicalJson(value);
-};
-const readString = (value: unknown, key: string): string => {
-  if (typeof value === "object" && value !== null && key in value) {
-    const field = Reflect.get(value, key);
-    if (typeof field === "string") return field;
-  }
-  throw new Error(`Runtime database returned an invalid ${key} value.`);
 };

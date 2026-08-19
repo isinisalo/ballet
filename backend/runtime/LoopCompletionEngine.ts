@@ -1,4 +1,3 @@
-import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type {
   CanonicalNodeOutcome, NodeRun, OrchestrationFrame, RepairRequest, RepairResultStatus
 } from "../../shared/domain/runtime.js";
@@ -7,16 +6,12 @@ import { ControlFlowTransitionStore } from "./ControlFlowTransitionStore.js";
 import type { LoopRunStore } from "./LoopRunStore.js";
 import type { RepairResultStore } from "./RepairResultStore.js";
 import type { RepairStore } from "./RepairStore.js";
-import type { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
 import type { WorkLoopProgressStore } from "./WorkLoopProgressStore.js";
 
 type LoopTerminalStatus = "completed" | "blocked" | "failed";
 
 export interface LoopCompletionCallbacks {
-  startFlow(loop: ProjectLoop, sourceLoopRunId: string, revision: number): {
-    loopRunId: string;
-    workLoopNodeRunId: string;
-  };
+  requestFlow(node: NodeRun, revision: number, outcome: CanonicalNodeOutcome): boolean;
   returnValidation(frame: OrchestrationFrame, context: TaskEnvelopeRepairReturn, revision: number): {
     nodeRunId: string;
     workLoopNodeRunId: string;
@@ -31,7 +26,6 @@ export class LoopCompletionEngine {
     private readonly loops: LoopRunStore,
     private readonly repairs: RepairStore,
     private readonly results: RepairResultStore,
-    private readonly snapshots: RootExecutionSnapshotStore,
     private readonly progress: WorkLoopProgressStore
   ) {
     this.transitions = new ControlFlowTransitionStore(connection);
@@ -55,7 +49,7 @@ export class LoopCompletionEngine {
       else this.failRepair(frame, terminal, revision, outcome, node.nodeRunId, failure);
       return;
     }
-    if (terminal === "completed" && this.followFlow(node, revision, callbacks)) return;
+    if (terminal === "completed" && callbacks.requestFlow(node, revision, outcome)) return;
     this.progress.finishRoot(node.rootRunId, outcome, failure);
   }
 
@@ -163,20 +157,6 @@ export class LoopCompletionEngine {
     });
   }
 
-  private followFlow(node: NodeRun, revision: number, callbacks: LoopCompletionCallbacks): boolean {
-    const snapshot = this.snapshots.require(node.rootRunId);
-    const edges = snapshot.graph.loopEdges.filter((edge) => edge.kind === "flow" && edge.source === node.loopId);
-    if (edges.length === 0) return false;
-    if (edges.length !== 1) throw new Error(`Loop ${node.loopId} has ${edges.length} outgoing flow Loop Edges.`);
-    const loop = this.snapshots.loop(snapshot, edges[0]!.target);
-    const target = callbacks.startFlow(loop, node.loopRunId, revision);
-    this.transitions.append({
-      rootRunId: node.rootRunId, kind: "flow_transition", stateRevision: revision,
-      sourceLoopRunId: node.loopRunId, sourceNodeRunId: node.nodeRunId,
-      targetLoopRunId: target.loopRunId, targetWorkLoopNodeRunId: target.workLoopNodeRunId
-    });
-    return true;
-  }
 }
 
 const requestProjection = (request: RepairRequest) => ({

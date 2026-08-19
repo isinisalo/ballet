@@ -11,6 +11,7 @@ export interface AppendControlFlowInput {
   sourceNodeRunId?: string;
   targetLoopRunId?: string;
   targetWorkLoopNodeRunId?: string;
+  orchestrationRequestId?: string;
   repairRequestId?: string;
   orchestrationFrameId?: string;
   createdAt?: string;
@@ -34,12 +35,14 @@ export class ControlFlowTransitionStore {
       INSERT INTO control_flow_events (
         root_run_id, sequence, kind, state_revision, source_loop_run_id,
         source_work_loop_node_run_id, source_node_run_id, target_loop_run_id,
-        target_work_loop_node_run_id, repair_request_id, orchestration_frame_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        target_work_loop_node_run_id, orchestration_request_id, repair_request_id,
+        orchestration_frame_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(input.rootRunId, sequence, input.kind, input.stateRevision,
       input.sourceLoopRunId ?? null, input.sourceWorkLoopNodeRunId ?? null,
       input.sourceNodeRunId ?? null, input.targetLoopRunId ?? null,
-      input.targetWorkLoopNodeRunId ?? null, input.repairRequestId ?? null,
+      input.targetWorkLoopNodeRunId ?? null, input.orchestrationRequestId ?? null,
+      input.repairRequestId ?? null,
       input.orchestrationFrameId ?? null, timestamp);
     this.connection().prepare(`
       UPDATE root_runs SET transition_count = ?, updated_at = ? WHERE root_run_id = ?

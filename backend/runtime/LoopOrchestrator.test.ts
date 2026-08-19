@@ -53,19 +53,19 @@ describe("LoopOrchestrator call and return", () => {
     const envelope = createNodeTaskEnvelope({
       root, run: callerRun, node: requested.orchestrator,
       state: runtime.state.current("root-run"), events: runtime.listControlFlowEvents("root-run"),
-      repairRequest: requested.request
+      orchestrationRequest: requested.orchestrationRequest
     });
     expect(envelope).toMatchObject({
       role: "orchestrator",
-      repairRequest: {
-        id: requested.request.repairRequestId,
-        validationSummary: "Caller validation found a repairable problem.",
+      orchestrationRequest: {
+        id: requested.orchestrationRequest.orchestrationRequestId,
+        kind: "repair",
+        completionSummary: "Caller validation found a repairable problem.",
         requestedCapability: "test:loop.transfer",
-        evidence: { validation: { finding: "caller" }, refs: ["check:caller"] }
       },
-      allowedTargetLoops: [
-        { id: "repair-a", loopEdgeId: "repair-edge-1", routingDescription: "Allow repair-a." },
-        { id: "repair-b", loopEdgeId: "repair-edge-2", routingDescription: "Allow repair-b." }
+      allowedCandidates: [
+        { id: "repair-a", route: { kind: "repair", capability: "test:loop.transfer", description: "Allow repair-a." } },
+        { id: "repair-b", route: { kind: "repair", capability: "test:loop.transfer", description: "Allow repair-b." } }
       ]
     });
 
@@ -134,7 +134,7 @@ describe("LoopOrchestrator route rejection", () => {
     const { orchestrator, request } = requestExternalRepair(runtime);
     const caller = runtime.applyNodeOutcome("root-run", orchestrator.nodeRunId, {
       role: "orchestrator", state: "completed", targetLoopId,
-      routeReason: "Invalid selection.", repairInput: {}, expectedOutcome: {}
+      routeReason: "Invalid selection.", dispatchInput: {}, expectedOutcome: {}
     });
 
     expect(caller).toMatchObject({ status: "failed" });

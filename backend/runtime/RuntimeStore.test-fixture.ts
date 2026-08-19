@@ -11,6 +11,7 @@ import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v11Te
 import { ControlFlowStore } from "./ControlFlowStore.js";
 import { LoopRunStore } from "./LoopRunStore.js";
 import { LoopStateStore } from "./LoopStateStore.js";
+import { OrchestrationStore } from "./OrchestrationStore.js";
 import { RepairStore } from "./RepairStore.js";
 
 export const runtimeTestTimestamp = "2026-01-01T00:00:00.000Z";
@@ -19,6 +20,7 @@ interface RuntimeStores {
   roots: RootRunStore;
   loops: LoopRunStore;
   states: LoopStateStore;
+  orchestration: OrchestrationStore;
   repairs: RepairStore;
   control: ControlFlowStore;
 }
@@ -81,6 +83,7 @@ export const createRuntimeStoreFixture = async (
     roots: new RootRunStore(connection),
     loops: new LoopRunStore(connection),
     states: new LoopStateStore(connection),
+    orchestration: new OrchestrationStore(connection),
     repairs: new RepairStore(connection),
     control: new ControlFlowStore(connection)
   });

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { statePatchSchema } from "../../shared/api/runtime-schemas.js";
 import type {
-  RootRunRepairProjection, RootRunStateProjection
+  RootRunOrchestrationProjection, RootRunRepairProjection, RootRunStateProjection
 } from "../../shared/domain/runs.js";
 import {
   maxReadStatePatchEvidenceBytes, maxReadStateRevisionMetadata
@@ -9,6 +9,7 @@ import {
 import type { ControlFlowEvent } from "../../shared/domain/runtime.js";
 import type { ControlFlowStore } from "./ControlFlowStore.js";
 import type { LoopStateStore } from "./LoopStateStore.js";
+import type { OrchestrationStore } from "./OrchestrationStore.js";
 import type { RepairResultStore } from "./RepairResultStore.js";
 import type { RepairStore } from "./RepairStore.js";
 import { canonicalJson } from "./state/CanonicalJson.js";
@@ -32,6 +33,7 @@ const countRowSchema = z.object({ count: z.number().int().nonnegative() }).stric
 
 export interface RootRuntimeReadProjection {
   state: RootRunStateProjection;
+  orchestration: RootRunOrchestrationProjection;
   repair: RootRunRepairProjection;
   controlFlowEvents: ControlFlowEvent[];
 }
@@ -40,6 +42,7 @@ export class RootRuntimeReadStore {
   constructor(
     private readonly connection: () => Database.Database,
     private readonly states: LoopStateStore,
+    private readonly orchestration: OrchestrationStore,
     private readonly repairs: RepairStore,
     private readonly repairResults: RepairResultStore,
     private readonly control: ControlFlowStore
@@ -48,8 +51,26 @@ export class RootRuntimeReadStore {
   read(rootRunId: string): RootRuntimeReadProjection {
     return {
       state: this.stateProjection(rootRunId),
+      orchestration: this.orchestrationProjection(rootRunId),
       repair: this.repairProjection(rootRunId),
       controlFlowEvents: this.control.listByRoot(rootRunId)
+    };
+  }
+
+  orchestrationProjection(rootRunId: string): RootRunOrchestrationProjection {
+    const requests = this.orchestration.list(rootRunId);
+    const routes = this.orchestration.listRoutes(rootRunId);
+    const pendingRequest = requests.filter(({ status }) =>
+      ["pending", "waiting_for_input", "routed"].includes(status)).at(-1);
+    const focus = pendingRequest ?? requests.at(-1);
+    return {
+      requests,
+      routes,
+      pendingRequest,
+      selectedRoute: focus
+        ? routes.find(({ orchestrationRequestId }) =>
+          orchestrationRequestId === focus.orchestrationRequestId)
+        : routes.at(-1)
     };
   }
 
@@ -93,7 +114,7 @@ export class RootRuntimeReadStore {
 
   repairProjection(rootRunId: string): RootRunRepairProjection {
     const requests = this.repairs.listRequests(rootRunId);
-    const routes = this.repairs.listRoutes(rootRunId);
+    const routes = this.orchestration.listRoutes(rootRunId).filter((route) => route.kind === "repair");
     const continuations = this.repairs.listFrames(rootRunId);
     const activeContinuationChain = continuations
       .filter(({ status }) => status === "open")

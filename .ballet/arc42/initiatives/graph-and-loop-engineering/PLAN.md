@@ -4,7 +4,7 @@ title: Graph and Loop Engineering PLAN
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-19'
-version: 2
+version: 3
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Tila
 
-GLE-step-001 on toteutettu. GLE-step-002:n tämän toimeksiannon snapshot-, repository- ja module-osuus on toteutettu; SQLite tallentaa snapshotin olemassa olevaan JSON-kenttään, joten schema migrationia ei tarvittu. GLE-step-007:n package capability/peer-target -raja on toteutettu, mutta vaiheen UI- ja koko release-acceptance odottavat myöhempiä vaiheita. GLE-step-003–006 ja koko GLE-step-008 ovat `pending`.
+GLE-step-001 on toteutettu. GLE-step-002:n snapshot-, repository- ja module-osuus on toteutettu; snapshot säilyy immutable JSONina ja runtime orchestration käyttää hard-cut SQLite schema v7:ää. GLE-step-003:n runtime orchestration on toteutettu ja `GLE-EVID-004` passed. GLE-step-007:n package capability/peer-target -raja on toteutettu, mutta vaiheen UI- ja koko release-acceptance odottavat myöhempiä vaiheita. GLE-step-004–006 ja koko GLE-step-008 ovat `pending`.
 
 | Step ID | Vaihe | Goal/REQ | QS | ADR/CON | BB | RT/DEP | Files/interfaces | Test/monitor | Completion evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

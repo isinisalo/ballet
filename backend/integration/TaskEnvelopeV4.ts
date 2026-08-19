@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import {
-  orchestratorTaskEnvelopeV3Schema, validationTaskEnvelopeV3Schema,
-  workTaskEnvelopeV3Schema
+  orchestratorTaskEnvelopeV4Schema, validationTaskEnvelopeV4Schema,
+  workTaskEnvelopeV4Schema
 } from "../../shared/api/task-envelope-schemas.js";
 import type { JsonValue } from "../../shared/domain/automation.js";
 import {
-  maxRelevantHistoryBytes, maxRelevantHistoryEntries, maxRepairRequestEnvelopeBytes,
+  maxOrchestrationRequestEnvelopeBytes, maxRelevantHistoryBytes, maxRelevantHistoryEntries,
   maxResumeContextBytes, maxTaskEnvelopeBytes, type TaskEnvelopeHistoryEntry,
-  type TaskEnvelopeV3
+  type TaskEnvelopeV4
 } from "../../shared/domain/taskEnvelope.js";
 import { assertJsonValue, canonicalJson, jsonSha256 } from "../runtime/state/CanonicalJson.js";
 import { validateState } from "../runtime/state/StatePatch.js";
@@ -19,17 +19,18 @@ export class TaskEnvelopeValidationError extends Error {
   }
 }
 
-export interface SerializedTaskEnvelopeV3 {
-  envelope: TaskEnvelopeV3;
+export interface SerializedTaskEnvelopeV4 {
+  envelope: TaskEnvelopeV4;
   serialized: string;
   sha256: string;
   sizeBytes: number;
 }
 
-export const serializeTaskEnvelopeV3 = (input: TaskEnvelopeV3): SerializedTaskEnvelopeV3 => {
+export const serializeTaskEnvelopeV4 = (input: TaskEnvelopeV4): SerializedTaskEnvelopeV4 => {
   const relevantHistory = selectRelevantHistory(input.relevantHistory);
   const normalized = input.role === "orchestrator"
-    ? { ...input, relevantHistory, allowedTargetLoops: [...input.allowedTargetLoops].sort((left, right) => compareUtf8(left.id, right.id)) }
+    ? { ...input, relevantHistory, allowedCandidates: [...input.allowedCandidates].sort((left, right) =>
+      compareUtf8(left.id, right.id) || compareUtf8(left.route.capability, right.route.capability)) }
     : { ...input, relevantHistory };
   const parsed = parseEnvelope(normalized);
   const state = validateState(parsed.state.value);
@@ -39,8 +40,12 @@ export const serializeTaskEnvelopeV3 = (input: TaskEnvelopeV3): SerializedTaskEn
   assertBoundedJson(relevantHistory, "Task Envelope relevant history", maxRelevantHistoryBytes);
   if (parsed.resume) assertBoundedJson(parsed.resume, "Task Envelope resume context", maxResumeContextBytes);
   if (parsed.role === "orchestrator") {
-    assertBoundedJson(parsed.repairRequest, "Task Envelope Repair Request", maxRepairRequestEnvelopeBytes);
-    assertUniqueTargets(parsed.allowedTargetLoops);
+    assertBoundedJson(
+      parsed.orchestrationRequest,
+      "Task Envelope Orchestration Request",
+      maxOrchestrationRequestEnvelopeBytes
+    );
+    assertUniqueCandidates(parsed.allowedCandidates);
   }
   const envelopeValue = jsonValue(parsed, "Task Envelope");
   const serialized = canonicalJson(envelopeValue);
@@ -56,7 +61,7 @@ export const serializeTaskEnvelopeV3 = (input: TaskEnvelopeV3): SerializedTaskEn
   };
 };
 
-export const parseSerializedTaskEnvelopeV3 = (serialized: string): SerializedTaskEnvelopeV3 => {
+export const parseSerializedTaskEnvelopeV4 = (serialized: string): SerializedTaskEnvelopeV4 => {
   let value: unknown;
   try { value = JSON.parse(serialized); }
   catch (error) {
@@ -64,9 +69,9 @@ export const parseSerializedTaskEnvelopeV3 = (serialized: string): SerializedTas
       `Task Envelope is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  const result = serializeTaskEnvelopeV3(parseEnvelope(value));
+  const result = serializeTaskEnvelopeV4(parseEnvelope(value));
   if (result.serialized !== serialized) throw new TaskEnvelopeValidationError(
-    "Task Envelope is not in canonical V3 serialization order."
+    "Task Envelope is not in canonical V4 serialization order."
   );
   return result;
 };
@@ -77,14 +82,14 @@ export const selectRelevantHistory = (
   .sort((left, right) => left.sequence - right.sequence || compareUtf8(left.nodeRunId, right.nodeRunId))
   .slice(-maxRelevantHistoryEntries);
 
-const parseEnvelope = (input: unknown): TaskEnvelopeV3 => {
+const parseEnvelope = (input: unknown): TaskEnvelopeV4 => {
   if (typeof input !== "object" || input === null || !("role" in input)) {
     throw new TaskEnvelopeValidationError("Task Envelope must declare a Node role.");
   }
   try {
-    if (input.role === "work") return workTaskEnvelopeV3Schema.parse(input);
-    if (input.role === "validation") return validationTaskEnvelopeV3Schema.parse(input);
-    if (input.role === "orchestrator") return orchestratorTaskEnvelopeV3Schema.parse(input);
+    if (input.role === "work") return workTaskEnvelopeV4Schema.parse(input);
+    if (input.role === "validation") return validationTaskEnvelopeV4Schema.parse(input);
+    if (input.role === "orchestrator") return orchestratorTaskEnvelopeV4Schema.parse(input);
     throw new TaskEnvelopeValidationError(`Task Envelope has unsupported Node role ${String(input.role)}.`);
   } catch (error) {
     if (error instanceof TaskEnvelopeValidationError) throw error;
@@ -94,13 +99,16 @@ const parseEnvelope = (input: unknown): TaskEnvelopeV3 => {
   }
 };
 
-const assertUniqueTargets = (targets: Array<{ id: string }>): void => {
+const assertUniqueCandidates = (
+  targets: Array<{ id: string; route: { kind: string; capability: string } }>
+): void => {
   const ids = new Set<string>();
   for (const target of targets) {
-    if (ids.has(target.id)) throw new TaskEnvelopeValidationError(
-      `Task Envelope contains duplicate allowed target Loop ${target.id}.`
+    const key = `${target.id}\u0000${target.route.kind}\u0000${target.route.capability}`;
+    if (ids.has(key)) throw new TaskEnvelopeValidationError(
+      `Task Envelope contains duplicate allowed candidate ${target.id}:${target.route.capability}.`
     );
-    ids.add(target.id);
+    ids.add(key);
   }
 };
 

@@ -5,10 +5,10 @@ import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   CanonicalNodeOutcome, ControlFlowEvent, LoopRun, LoopStateRevision, NodeRun,
-  OrchestrationFrame, OrchestratorRoute, RepairRequest, RepairResult, StatePatch, WorkLoopNodeRun
+  OrchestrationFrame, OrchestrationRequest, OrchestratorRoute, RepairRequest, RepairResult, StatePatch, WorkLoopNodeRun
 } from "../../shared/domain/runtime.js";
 import type {
-  ControlFlowEventRow, LoopRunRow, NodeRunRow, OrchestrationFrameRow,
+  ControlFlowEventRow, LoopRunRow, NodeRunRow, OrchestrationFrameRow, OrchestrationRequestRow,
   OrchestratorRouteRow, RepairRequestRow, RepairResultRow, StateRevisionRow, WorkLoopNodeRunRow
 } from "./RuntimeDbTypes.js";
 import { parseJsonValue } from "./state/CanonicalJson.js";
@@ -22,6 +22,7 @@ export const toLoopRun = (row: LoopRunRow, loop: ProjectLoop, theme: LoopTheme):
   source: row.source,
   status: row.status,
   input: row.input_json ? parseJsonValue(row.input_json, `Loop Run ${row.loop_run_id} input`) : undefined,
+  orchestrationRequestId: row.orchestration_request_id ?? undefined,
   repairRequestId: row.repair_request_id ?? undefined,
   orchestrationFrameId: row.orchestration_frame_id ?? undefined,
   snapshot: loop,
@@ -123,6 +124,34 @@ export const toRepairRequest = (row: RepairRequestRow): RepairRequest => ({
   createdAt: row.created_at, updatedAt: row.updated_at, completedAt: row.completed_at ?? undefined
 });
 
+export const toOrchestrationRequest = (row: OrchestrationRequestRow): OrchestrationRequest => ({
+  orchestrationRequestId: row.orchestration_request_id,
+  rootRunId: row.root_run_id,
+  kind: row.kind,
+  sourceLoopRunId: row.source_loop_run_id,
+  sourceLoopId: row.source_loop_id,
+  sourceNodeRunId: row.source_node_run_id,
+  stateRevisionAtRequest: row.state_revision_at_request,
+  completionSummary: row.completion_summary,
+  completionEvidence: parseJsonValue(
+    row.completion_evidence_json,
+    `Orchestration Request ${row.orchestration_request_id} completion evidence`
+  ),
+  requestedCapability: row.requested_capability ?? undefined,
+  expectedOutcome: row.expected_outcome_json
+    ? parseJsonValue(row.expected_outcome_json, `Orchestration Request ${row.orchestration_request_id} expected outcome`)
+    : undefined,
+  repairRequestId: row.repair_request_id ?? undefined,
+  orchestratorNodeRunId: row.orchestrator_node_run_id ?? undefined,
+  routedLoopEdgeId: row.routed_loop_edge_id ?? undefined,
+  routedTargetLoopId: row.routed_target_loop_id ?? undefined,
+  targetLoopRunId: row.target_loop_run_id ?? undefined,
+  status: row.status,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  completedAt: row.completed_at ?? undefined
+});
+
 export const toOrchestrationFrame = (row: OrchestrationFrameRow): OrchestrationFrame => ({
   frameId: row.frame_id, rootRunId: row.root_run_id, repairRequestId: row.repair_request_id,
   routeId: row.route_id,
@@ -145,7 +174,9 @@ export const toRepairResult = (row: RepairResultRow): RepairResult => ({
 });
 
 export const toOrchestratorRoute = (row: OrchestratorRouteRow): OrchestratorRoute => ({
-  routeId: row.route_id, rootRunId: row.root_run_id, repairRequestId: row.repair_request_id,
+  routeId: row.route_id, rootRunId: row.root_run_id,
+  orchestrationRequestId: row.orchestration_request_id, kind: row.kind,
+  repairRequestId: row.repair_request_id ?? undefined,
   orchestratorNodeRunId: row.orchestrator_node_run_id, loopEdgeId: row.loop_edge_id,
   sourceLoopId: row.source_loop_id, targetLoopId: row.target_loop_id,
   evidence: row.route_evidence_json
@@ -160,6 +191,7 @@ export const toControlFlowEvent = (row: ControlFlowEventRow): ControlFlowEvent =
   sourceNodeRunId: row.source_node_run_id ?? undefined,
   targetLoopRunId: row.target_loop_run_id ?? undefined,
   targetWorkLoopNodeRunId: row.target_work_loop_node_run_id ?? undefined,
+  orchestrationRequestId: row.orchestration_request_id ?? undefined,
   repairRequestId: row.repair_request_id ?? undefined,
   orchestrationFrameId: row.orchestration_frame_id ?? undefined, createdAt: row.created_at
 });

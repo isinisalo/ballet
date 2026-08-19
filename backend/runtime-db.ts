@@ -1,12 +1,13 @@
 import type Database from "better-sqlite3";
 import type {
   CanonicalNodeOutcome, ControlFlowEvent, LoopRunDetails, LoopRunSource, LoopScheduleState, NodeRun,
-  OrchestrationFrame, OrchestratorRoute, RepairRequest, RepairResult, WorkLoopNodeRun
+  OrchestrationFrame, OrchestrationRequest, OrchestratorRoute, RepairRequest, RepairResult, WorkLoopNodeRun
 } from "../shared/domain/runtime.js";
 import { maxControlFlowTransitions } from "../shared/domain/runtime.js";
 import { ControlFlowStore } from "./runtime/ControlFlowStore.js";
 import { LoopRunStore } from "./runtime/LoopRunStore.js";
 import { LoopStateStore } from "./runtime/LoopStateStore.js";
+import { OrchestrationStore } from "./runtime/OrchestrationStore.js";
 import {
   LoopScheduleStateStore, type CompleteScheduleOccurrenceInput, type ScheduleDefinitionState
 } from "./runtime/LoopScheduleStateStore.js";
@@ -29,6 +30,7 @@ export class RuntimeDatabase {
   private readonly loopRunStore: LoopRunStore;
   private readonly workLoopEngine: WorkLoopEngine;
   readonly state: LoopStateStore;
+  readonly orchestration: OrchestrationStore;
   readonly repair: RepairStore;
   readonly repairResults: RepairResultStore;
   readonly control: ControlFlowStore;
@@ -40,11 +42,14 @@ export class RuntimeDatabase {
     const connection = () => this.connection();
     this.loopRunStore = new LoopRunStore(connection);
     this.state = new LoopStateStore(connection);
+    this.orchestration = new OrchestrationStore(connection);
     this.repair = new RepairStore(connection);
     this.repairResults = new RepairResultStore(connection);
     this.workLoopEngine = new WorkLoopEngine(connection, this.loopRunStore, this.state, this.repair);
     this.control = new ControlFlowStore(connection);
-    this.reads = new RootRuntimeReadStore(connection, this.state, this.repair, this.repairResults, this.control);
+    this.reads = new RootRuntimeReadStore(
+      connection, this.state, this.orchestration, this.repair, this.repairResults, this.control
+    );
     this.loopScheduleStateStore = new LoopScheduleStateStore(connection);
   }
 
@@ -80,11 +85,14 @@ export class RuntimeDatabase {
   getRepairRequest(repairRequestId: string): RepairRequest | undefined {
     return this.repair.getRequest(repairRequestId);
   }
+  getOrchestrationRequest(orchestrationRequestId: string): OrchestrationRequest | undefined {
+    return this.orchestration.get(orchestrationRequestId);
+  }
   getOrchestrationFrame(frameId: string): OrchestrationFrame | undefined {
     return this.repair.getFrame(frameId);
   }
   getOrchestratorRoute(routeId: string): OrchestratorRoute | undefined {
-    return this.repair.getRoute(routeId);
+    return this.orchestration.getRoute(routeId);
   }
   getRepairResult(repairResultId: string): RepairResult | undefined {
     return this.repairResults.get(repairResultId);
@@ -208,6 +216,10 @@ export class RuntimeDatabase {
         WHERE root_run_id = ? AND status IN ('pending','routed')
       `).run(repairStatus, completedAt, completedAt, rootRunId);
       this.connection().prepare(`
+        UPDATE orchestration_requests SET status = ?, completed_at = ?, updated_at = ?
+        WHERE root_run_id = ? AND status IN ('pending','waiting_for_input','routed')
+      `).run(repairStatus, completedAt, completedAt, rootRunId);
+      this.connection().prepare(`
         UPDATE root_runs SET transition_count = ?, active_loop_run_id = NULL,
           active_node_run_id = NULL, updated_at = ? WHERE root_run_id = ?
       `).run(recordTransition ? sequence : transitionCount, completedAt, rootRunId);
@@ -228,8 +240,10 @@ export class RuntimeDatabase {
       JOIN node_runs node ON node.root_run_id = root.root_run_id
       JOIN loop_invocations loop ON loop.loop_run_id = node.loop_run_id
       WHERE root.root_run_id = ? AND root.status IN ('queued','running','waiting_for_input')
-        AND loop.status = 'running' AND node.node_run_id = ? AND node.status = 'queued'
-        AND node.execution_task_id = ? AND root.active_loop_run_id = loop.loop_run_id
+        AND (loop.status = 'running' OR (node.role = 'orchestrator' AND loop.status = 'completed'))
+        AND node.node_run_id = ? AND node.status = 'queued'
+        AND node.execution_task_id = ?
+        AND (root.active_loop_run_id = loop.loop_run_id OR node.role = 'orchestrator')
         AND root.active_node_run_id = node.node_run_id LIMIT 1
     `).get(rootRunId, nodeRunId, taskId));
   }

@@ -7,7 +7,8 @@ export const loopRunRowSchema = z.object({
   loop_run_id: z.string(), root_run_id: z.string(), loop_id: z.string(), parent_loop_run_id: nullableString,
   source: z.enum(["manual", "flow", "repair", "schedule"]),
   status: z.enum(["queued", "running", "waiting_for_input", "completed", "blocked", "failed", "cancelled"]),
-  input_json: nullableString, repair_request_id: nullableString, orchestration_frame_id: nullableString,
+  input_json: nullableString, orchestration_request_id: nullableString,
+  repair_request_id: nullableString, orchestration_frame_id: nullableString,
   schedule_work_loop_node_id: nullableString, scheduled_for: nullableString,
   entry_state_revision: z.number().int(), completion_state_revision: nullableInteger,
   nesting_depth: z.number().int(), created_at: z.string(), updated_at: z.string(), completed_at: nullableString
@@ -53,6 +54,18 @@ export const repairRequestRowSchema = z.object({
   nesting_depth: z.number().int(), created_at: z.string(), updated_at: z.string(), completed_at: nullableString
 }).strict();
 
+export const orchestrationRequestRowSchema = z.object({
+  orchestration_request_id: z.string(), root_run_id: z.string(), kind: z.enum(["flow", "repair"]),
+  source_loop_run_id: z.string(), source_loop_id: z.string(), source_node_run_id: z.string(),
+  state_revision_at_request: z.number().int(), completion_summary: z.string(),
+  completion_evidence_json: z.string(), requested_capability: nullableString,
+  expected_outcome_json: nullableString, repair_request_id: nullableString,
+  orchestrator_node_run_id: nullableString, routed_loop_edge_id: nullableString,
+  routed_target_loop_id: nullableString, target_loop_run_id: nullableString,
+  status: z.enum(["pending", "waiting_for_input", "routed", "dispatched", "failed", "cancelled"]),
+  created_at: z.string(), updated_at: z.string(), completed_at: nullableString
+}).strict();
+
 export const orchestrationFrameRowSchema = z.object({
   frame_id: z.string(), root_run_id: z.string(), repair_request_id: z.string(), route_id: z.string(),
   caller_loop_run_id: z.string(),
@@ -71,7 +84,8 @@ export const repairResultRowSchema = z.object({
 }).strict();
 
 export const orchestratorRouteRowSchema = z.object({
-  route_id: z.string(), root_run_id: z.string(), repair_request_id: z.string(),
+  route_id: z.string(), root_run_id: z.string(), orchestration_request_id: z.string(),
+  kind: z.enum(["flow", "repair"]), repair_request_id: nullableString,
   orchestrator_node_run_id: z.string(), loop_edge_id: z.string(), source_loop_id: z.string(),
   target_loop_id: z.string(), route_evidence_json: nullableString, created_at: z.string()
 }).strict();
@@ -87,6 +101,7 @@ export const controlFlowEventRowSchema = z.object({
   state_revision: z.number().int(), source_loop_run_id: nullableString,
   source_work_loop_node_run_id: nullableString, source_node_run_id: nullableString,
   target_loop_run_id: nullableString, target_work_loop_node_run_id: nullableString,
+  orchestration_request_id: nullableString,
   repair_request_id: nullableString, orchestration_frame_id: nullableString, created_at: z.string()
 }).strict();
 
@@ -101,6 +116,7 @@ export type WorkLoopNodeRunRow = z.infer<typeof workLoopNodeRunRowSchema>;
 export type NodeRunRow = z.infer<typeof nodeRunRowSchema>;
 export type StateRevisionRow = z.infer<typeof stateRevisionRowSchema>;
 export type RepairRequestRow = z.infer<typeof repairRequestRowSchema>;
+export type OrchestrationRequestRow = z.infer<typeof orchestrationRequestRowSchema>;
 export type OrchestrationFrameRow = z.infer<typeof orchestrationFrameRowSchema>;
 export type OrchestratorRouteRow = z.infer<typeof orchestratorRouteRowSchema>;
 export type RepairResultRow = z.infer<typeof repairResultRowSchema>;

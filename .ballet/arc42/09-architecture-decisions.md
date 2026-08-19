@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 5
+version: 6
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-19. ADR-018 on accepted, mutta sen strict-v11-toteutus on pending; nykyinen toteutettu baseline säilyy v10:nä.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-19. ADR-018 on accepted; strict-v11 data/snapshot/module/runtime-raja on toteutettu, mutta Graph/Loop-authoring-UI ja koko ihmisacceptance ovat pending.
 
 ## Päätösindeksi
 

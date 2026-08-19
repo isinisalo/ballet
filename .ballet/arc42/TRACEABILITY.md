@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 6
+version: 7
 tags:
   - arc42
   - traceability
@@ -19,7 +19,7 @@ Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioima
 
 ## Tila
 
-Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. QS-014:n päätös on accepted ja sen data/config/snapshot/module-osavaiheella on GLE-EVID-002/003/008; koko implementation- ja ihmisacceptance-evidenssi on pending.
+Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. QS-014:n päätös on accepted ja sen data/config/snapshot/module/runtime-osavaiheilla on GLE-EVID-002/003/004/008; UI- ja ihmisacceptance-evidenssi on pending.
 
 ## Trace-matriisi
 
@@ -39,7 +39,7 @@ Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | goal-009 / REQ-009 | QS-008 | adr-011 / CON-006 | BB-003 / BB-008 | RT-004 / DEP-001 | TEST-008 | EVID-008 | pending pilot |
 | goal-010 / REQ-010 | QS-009 | adr-016 / CON-007 | BB-001 / BB-002 / BB-003 / BB-009 | RT-006 / RT-007 / DEP-001 | TEST-009 | EVID-009 | implementation verified; full gate pending |
 | goal-011 / REQ-011 | QS-010 | adr-017 / CON-005 | BB-001 / BB-009 | RT-006 / DEP-001 | TEST-010 | EVID-010 | verified |
-| goal-012 / REQ-012 | QS-014 | adr-018 / CON-002 / CON-005 | BB-001 / BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-011 / DEP-001 / DEP-002 | TEST-014 | EVID-014 | data/config/snapshot/module passed; dispatch/UI/human acceptance pending |
+| goal-012 / REQ-012 | QS-014 | adr-018 / CON-002 / CON-005 | BB-001 / BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-011 / DEP-001 / DEP-002 | TEST-014 | EVID-014 | data/config/snapshot/module/runtime passed; UI/human acceptance pending |
 <!-- traceability:end -->
 
 ## Testi- ja monitorikatalogi
@@ -56,7 +56,7 @@ Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | TEST-008 | METHOD-HEALTH-vertailu ensimmäisen pilotin baselineen. | continuous learning / evaluate Loops |
 | TEST-009 | Loop module package/service/API/UI-testit, strict build gatet ja packaged Loop Library smoke. | module platform test suite |
 | TEST-010 | Loop Engineer typed routing, pure projection, keyboard/UI sekä desktop/narrow browser -tarkistukset. | frontend ja module test suites |
-| TEST-011 | `ExecutionComposition`, `TaskEnvelopeV3` sekä Codex/Copilot-adapteritestit: exact bytes/hash/order/schema, blocking composition ja no fallback. | execution/integration test suites |
+| TEST-011 | `ExecutionComposition`, `TaskEnvelopeV4` sekä Codex/Copilot-adapteritestit: exact bytes/hash/order/schema, blocking composition ja no fallback. | execution/integration test suites |
 | TEST-012 | `ExecutionStore.local`, `LocalExecutionQueue`, `LoopOrchestratorRecovery` ja `RootRunCancellationBarrier.persistence`: queued/running recovery, no replay/duplicate ja post-cancel barrier. | execution/runtime/run persistence test suites |
 | TEST-013 | `loopRunViewModel` ja `runRuntimePanels`: snapshot/canonical mapping, repair/return/human/finalization ja forbidden invented telemetry. | frontend Run UI test suite |
 | TEST-014 | Strict-v11 domain/schema/snapshot/persistence/runtime/API/module/routing/projection/UI hard cut -matriisi: zero/one/many flow, repair return, capability/allowlist, ambiguity/permission `needs_input`, Graph/Loop-datarajat, legacy-poisto, full test/lint/build/smoke/visual gate. | `graph-and-loop-engineering` initiative |

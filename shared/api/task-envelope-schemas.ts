@@ -40,7 +40,7 @@ const historyEntrySchema = z.object({
 const relevantHistorySchema = z.array(historyEntrySchema).max(8);
 
 const commonProviderFields = {
-  version: z.literal(3),
+  version: z.literal(4),
   run: providerRunIdentitySchema,
   loop: loopIdentitySchema,
   workLoopNode: workLoopNodeIdentitySchema,
@@ -51,7 +51,7 @@ const commonProviderFields = {
   relevantHistory: relevantHistorySchema
 };
 
-export const workTaskEnvelopeV3Schema = z.object({
+export const workTaskEnvelopeV4Schema = z.object({
   role: z.literal("work"),
   ...commonProviderFields,
   previousValidationFeedback: z.object({
@@ -90,7 +90,7 @@ export const taskEnvelopeRepairReturnSchema = z.object({
   }).strict()
 }).strict();
 
-export const validationTaskEnvelopeV3Schema = z.object({
+export const validationTaskEnvelopeV4Schema = z.object({
   role: z.literal("validation"),
   ...commonProviderFields,
   workOutcome: workCompletedOutcomeSchema,
@@ -100,25 +100,45 @@ export const validationTaskEnvelopeV3Schema = z.object({
 const targetLoopSchema = z.object({
   id: identifier,
   description: nonEmptyText,
-  loopEdgeId: identifier,
-  routingDescription: nonEmptyText
+  capabilities: z.object({
+    accepts: z.array(nonEmptyText).max(64),
+    provides: z.array(nonEmptyText).max(64)
+  }).strict(),
+  route: z.object({
+    kind: z.enum(["flow", "repair"]),
+    capability: nonEmptyText,
+    description: nonEmptyText
+  }).strict()
 }).strict();
 
-export const orchestratorTaskEnvelopeV3Schema = z.object({
-  version: z.literal(3),
+const orchestrationRequestSchema = z.object({
+  id: identifier,
+  kind: z.enum(["flow", "repair"]),
+  sourceLoopId: identifier,
+  sourceLoopRunId: identifier,
+  sourceNodeRunId: identifier,
+  stateRevisionAtRequest: z.number().int().nonnegative(),
+  completionSummary: boundedText,
+  completionEvidence: z.json(),
+  requestedCapability: nonEmptyText.optional(),
+  expectedOutcome: z.json().optional()
+}).strict();
+
+export const orchestratorTaskEnvelopeV4Schema = z.object({
+  version: z.literal(4),
   role: z.literal("orchestrator"),
   run: orchestratorRunIdentitySchema,
   loop: loopIdentitySchema,
   task: nonEmptyText,
   state: stateSchema,
-  repairRequest: taskEnvelopeRepairRequestSchema,
-  allowedTargetLoops: z.array(targetLoopSchema).max(100),
+  orchestrationRequest: orchestrationRequestSchema,
+  allowedCandidates: z.array(targetLoopSchema).max(100),
   resume: resumeSchema.optional(),
   relevantHistory: relevantHistorySchema
 }).strict();
 
-export const taskEnvelopeV3Schema = z.union([
-  workTaskEnvelopeV3Schema,
-  validationTaskEnvelopeV3Schema,
-  orchestratorTaskEnvelopeV3Schema
+export const taskEnvelopeV4Schema = z.union([
+  workTaskEnvelopeV4Schema,
+  validationTaskEnvelopeV4Schema,
+  orchestratorTaskEnvelopeV4Schema
 ]);

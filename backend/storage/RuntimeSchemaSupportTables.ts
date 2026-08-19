@@ -68,6 +68,35 @@ export const runtimeSchemaSupportTables = `
     CHECK((mode = 'local' AND orchestrator_node_run_id IS NULL AND routed_loop_edge_id IS NULL)
       OR mode = 'orchestrator')
   );
+  CREATE TABLE orchestration_requests (
+    orchestration_request_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK(kind IN ('flow','repair')),
+    source_loop_run_id TEXT NOT NULL REFERENCES loop_invocations(loop_run_id),
+    source_loop_id TEXT NOT NULL,
+    source_node_run_id TEXT NOT NULL REFERENCES node_runs(node_run_id),
+    state_revision_at_request INTEGER NOT NULL CHECK(state_revision_at_request >= 0),
+    completion_summary TEXT NOT NULL CHECK(length(trim(completion_summary)) > 0),
+    completion_evidence_json TEXT NOT NULL CHECK(json_valid(completion_evidence_json)),
+    requested_capability TEXT,
+    expected_outcome_json TEXT CHECK(expected_outcome_json IS NULL OR json_valid(expected_outcome_json)),
+    repair_request_id TEXT UNIQUE REFERENCES repair_requests(repair_request_id),
+    orchestrator_node_run_id TEXT UNIQUE REFERENCES node_runs(node_run_id) DEFERRABLE INITIALLY DEFERRED,
+    routed_loop_edge_id TEXT,
+    routed_target_loop_id TEXT,
+    target_loop_run_id TEXT UNIQUE REFERENCES loop_invocations(loop_run_id) DEFERRABLE INITIALLY DEFERRED,
+    status TEXT NOT NULL CHECK(status IN ('pending','waiting_for_input','routed','dispatched','failed','cancelled')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    FOREIGN KEY(root_run_id, state_revision_at_request) REFERENCES state_revisions(root_run_id, revision),
+    UNIQUE(kind, source_node_run_id),
+    CHECK((kind = 'repair') = (repair_request_id IS NOT NULL)),
+    CHECK((routed_loop_edge_id IS NULL) = (routed_target_loop_id IS NULL)),
+    CHECK((status IN ('routed','dispatched')) = (routed_loop_edge_id IS NOT NULL)),
+    CHECK((status = 'dispatched') = (target_loop_run_id IS NOT NULL)),
+    CHECK((status IN ('dispatched','failed','cancelled')) = (completed_at IS NOT NULL))
+  );
   CREATE TABLE orchestration_frames (
     frame_id TEXT PRIMARY KEY,
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
@@ -91,7 +120,8 @@ export const runtimeSchemaSupportTables = `
   CREATE TABLE orchestrator_routes (
     route_id TEXT PRIMARY KEY,
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    repair_request_id TEXT NOT NULL UNIQUE REFERENCES repair_requests(repair_request_id),
+    orchestration_request_id TEXT NOT NULL UNIQUE REFERENCES orchestration_requests(orchestration_request_id),
+    kind TEXT NOT NULL CHECK(kind IN ('flow','repair')),
     orchestrator_node_run_id TEXT NOT NULL REFERENCES node_runs(node_run_id),
     loop_edge_id TEXT NOT NULL,
     source_loop_id TEXT NOT NULL,
@@ -128,6 +158,7 @@ export const runtimeSchemaSupportTables = `
     source_node_run_id TEXT REFERENCES node_runs(node_run_id),
     target_loop_run_id TEXT REFERENCES loop_invocations(loop_run_id),
     target_work_loop_node_run_id TEXT REFERENCES work_loop_node_runs(work_loop_node_run_id),
+    orchestration_request_id TEXT REFERENCES orchestration_requests(orchestration_request_id),
     repair_request_id TEXT REFERENCES repair_requests(repair_request_id),
     orchestration_frame_id TEXT REFERENCES orchestration_frames(frame_id),
     created_at TEXT NOT NULL,

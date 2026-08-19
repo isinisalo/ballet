@@ -4,7 +4,7 @@ title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 5
+version: 6
 tags:
   - arc42
   - solution-strategy
@@ -62,7 +62,7 @@ Hyväksytyt ADR:t omistavat päätökset; tämä osio omistaa niiden strategisen
 
 ## Evidenssi
 
-Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä nykyiset authoring-projektiot. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v11 Graph/capability-sopimuksen. Module-testit todentavat STRAT-008:n target-riippumattoman materialisointirajan. STRAT-009:n osittainen evidenssi on `GLE-EVID-002`, `GLE-EVID-003` ja `GLE-EVID-008`; koko `EVID-014` on pending. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
+Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-005:n sekä nykyiset authoring-projektiot. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v11 Graph/capability-sopimuksen. Module-testit todentavat STRAT-008:n target-riippumattoman materialisointirajan. STRAT-009:n osittainen evidenssi on `GLE-EVID-002`, `GLE-EVID-003`, `GLE-EVID-004` ja `GLE-EVID-008`; koko `EVID-014` on pending. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
 
 ## Avoimet kysymykset
 

@@ -4,7 +4,7 @@ import { workNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import type { ExecutionSpec, RootExecutionSnapshot, RuntimeProvider } from "../../shared/domain/runtime.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
-import { serializeTaskEnvelopeV3 } from "../integration/TaskEnvelopeV3.js";
+import { serializeTaskEnvelopeV4 } from "../integration/TaskEnvelopeV4.js";
 import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v11TestConfig.js";
 
 export const specification = (
@@ -13,7 +13,7 @@ export const specification = (
   provider: RuntimeProvider = "codex",
   createdAt = "2026-01-01T00:00:00.000Z"
 ): ExecutionSpec => ({
-  version: 5,
+  version: 6,
   taskId,
   kind: "node_execution",
   rootRunId,
@@ -21,7 +21,7 @@ export const specification = (
   workLoopNodeRunId: `work-loop-${taskId}`,
   nodeRunId: `node-${taskId}`,
   evidence: {
-    compositionVersion: 4,
+    compositionVersion: 5,
     loopId: "delivery",
     workLoopNodeId: taskId,
     nodeRole: "work",
@@ -37,8 +37,8 @@ export const specification = (
       relativePath: ".ballet/instructions/test-instruction.md", sourceSha256: "c".repeat(64)
     }],
     ...workPromptEvidence(taskId, rootRunId),
-    outputSchemaVersion: 3,
-    outputSchemaId: "work-node-outcome-v3",
+    outputSchemaVersion: 4,
+    outputSchemaId: "work-node-outcome-v4",
     outputSchema: workNodeOutcomeJsonSchema,
     outputSchemaSha256: sha256(canonicalJson(workNodeOutcomeJsonSchema))
   },
@@ -125,8 +125,8 @@ const rootExecutionSnapshot = (): RootExecutionSnapshot => ({
 });
 
 const workPromptEvidence = (taskId: string, rootRunId: string) => {
-  const envelope = serializeTaskEnvelopeV3({
-    version: 3, role: "work",
+  const envelope = serializeTaskEnvelopeV4({
+    version: 4, role: "work",
     run: {
       rootRunId, loopRunId: `loop-${rootRunId}`, nodeRunId: `node-${taskId}`,
       workLoopNodeRunId: `work-loop-${taskId}`
@@ -140,18 +140,18 @@ const workPromptEvidence = (taskId: string, rootRunId: string) => {
   });
   const schema = canonicalJson(workNodeOutcomeJsonSchema);
   const prompt = [
-    section("TASK-ENVELOPE", "v3", envelope.serialized),
-    section("OUTPUT-SCHEMA", "v3", schema)
+    section("TASK-ENVELOPE", "v4", envelope.serialized),
+    section("OUTPUT-SCHEMA", "v4", schema)
   ].join("\n\n");
   return {
     prompt,
     promptSha256: sha256(prompt),
-    taskEnvelopeVersion: 3 as const,
+    taskEnvelopeVersion: 4 as const,
     taskEnvelopeSha256: envelope.sha256
   };
 };
 
 const section = (kind: string, id: string, content: string): string =>
-  `<<< BALLET EXECUTION COMPOSITION V4 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
+  `<<< BALLET EXECUTION COMPOSITION V5 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
 
 const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");

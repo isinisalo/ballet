@@ -88,7 +88,11 @@ const loopOwner = (connection: Database.Database, loopRunId: string): LoopOwner 
 
 const routeOwner = (connection: Database.Database, routeId: string) => {
   const value = connection.prepare(`
-    SELECT repair_request_id, source_loop_id, target_loop_id FROM orchestrator_routes WHERE route_id = ?
+    SELECT request.repair_request_id, route.source_loop_id, route.target_loop_id
+    FROM orchestrator_routes route
+    JOIN orchestration_requests request
+      ON request.orchestration_request_id = route.orchestration_request_id
+    WHERE route.route_id = ? AND route.kind = 'repair'
   `).get(routeId);
   return {
     repairRequestId: readString(value, "repair_request_id"),

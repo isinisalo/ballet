@@ -69,7 +69,12 @@ export const requestExternalRepair = (
     SELECT repair_request_id FROM repair_requests WHERE orchestrator_node_run_id = ?
   `).pluck().get(orchestrator.nodeRunId);
   if (typeof requestId !== "string") throw new Error("Test Repair Request was not created.");
-  return { work, validation, orchestrator, request: runtime.getRepairRequest(requestId)! };
+  const orchestrationRequest = runtime.orchestration.forOrchestrator(orchestrator.nodeRunId);
+  if (!orchestrationRequest) throw new Error("Test Orchestration Request was not created.");
+  return {
+    work, validation, orchestrator,
+    request: runtime.getRepairRequest(requestId)!, orchestrationRequest
+  };
 };
 
 export const routeRepair = (
@@ -81,7 +86,7 @@ export const routeRepair = (
   runtime.applyNodeOutcome("root-run", orchestrator.nodeRunId, {
     role: "orchestrator", state: "completed", targetLoopId,
     routeReason: "The target matches the requested capability.",
-    repairInput: { instruction: "Repair the caller finding." },
+    dispatchInput: { instruction: "Repair the caller finding." },
     expectedOutcome: { repaired: true }, ...overrides
   });
   const run = runtime.listRootLoopRuns("root-run").at(-1);

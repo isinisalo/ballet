@@ -4,7 +4,7 @@ title: Riskit ja tekninen velka
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 5
+version: 6
 tags:
   - arc42
   - risks
@@ -38,7 +38,7 @@ RISK-001–RISK-010 ovat aiemman baselinen riskit. RISK-011 ja RISK-012 perustuv
 | RISK-010 | provenance drift | Tallennettu metadata voisi väittää asennetun Loopin olevan muuttumaton, vaikka sisältö on muuttunut. | keskisuuri / todennäköinen ajan myötä | Johda `exact`/`modified`/`missing-resources` nykyisestä Loop/resource-sisällöstä; älä persistoi statusta totuutena. | controlled |
 | RISK-011 | ylläpidettävyysvelka | Paikallisen lint-baselinen 14 warningia ovat tunnettu tekninen velka core- ja testitiedostoissa; dokumentaation kasvu lisää lisäksi stale source anchor -riskiä. | keskisuuri / havaittu | Hyväksymisraja: lint error = 0 ja warning-määrä ≤ 14; uusi warning estää handoffin. Nimeä baseline EVIDENCEssä, pidä lähdeankkurit arkkitehtuuritasolla ja avaa erillinen velanpoistoaloite ennen tuotantoa. | open |
 | RISK-012 | UI:n väärintulkinta | Run-kartan artwork, orbit, glow tai reittikorostus voidaan tulkita prosentiksi, ETA:ksi tai provider-tekstistä johdetuksi runtime-tilaksi. | korkea / mahdollinen operaattorivirhe | Mission / All Loops / live inspector johtavat semantiikan vain immutable snapshotista ja canonical persistencestä; ei keksittyä telemetriaa. QS-013/EVID-013 ja UI copy erottavat ornamentin faktasta. | controlled; monitor usability |
-| RISK-013 | arkkitehtuuridrift | Strict-v11 config/snapshot on käytössä ennen Orchestrator-flow-semanttiikan ja Graph Engineering -UI:n valmistumista; UI:n ennenaikainen uudelleennimeäminen väittäisi eri control flow'ta kuin runtime suorittaa. | korkea / väliaikaisesti todennäköinen | ADR-018:n hard cut, vaiheistettu PLAN ja QS-014/TEST-014: Graph UI acceptance vasta runtime dispatch -vaiheen jälkeen; v10/v11 parseri-, route-, topology- ja legacy-haut; ei compatibility-polkuja. | open until EVID-014; data boundary passed |
+| RISK-013 | arkkitehtuuridrift | Strict-v11 config/snapshot/runtime on käytössä ennen Graph Engineering -UI:n valmistumista; nykyinen UI-sanasto ei vielä projisoi hyväksyttyä Graph/Loop-mallia. | korkea / väliaikaisesti mahdollinen | ADR-018:n hard cut, vaiheistettu PLAN ja QS-014/TEST-014: runtime dispatch on todennettu ennen Graph UI -acceptancea; v10/v11 parseri-, route-, topology- ja legacy-haut; ei compatibility-polkuja. | open until EVID-014; data/runtime boundary passed |
 
 ## Riskien arviointiperiaate
 

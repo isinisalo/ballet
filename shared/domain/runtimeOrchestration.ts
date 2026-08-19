@@ -31,10 +31,39 @@ export interface RepairRequest {
   completedAt?: string;
 }
 
+export type OrchestrationRequestKind = "flow" | "repair";
+export type OrchestrationRequestStatus =
+  | "pending" | "waiting_for_input" | "routed" | "dispatched" | "failed" | "cancelled";
+
+export interface OrchestrationRequest {
+  orchestrationRequestId: string;
+  rootRunId: string;
+  kind: OrchestrationRequestKind;
+  sourceLoopRunId: string;
+  sourceLoopId: string;
+  sourceNodeRunId: string;
+  stateRevisionAtRequest: number;
+  completionSummary: string;
+  completionEvidence: JsonValue;
+  requestedCapability?: string;
+  expectedOutcome?: JsonValue;
+  repairRequestId?: string;
+  orchestratorNodeRunId?: string;
+  routedLoopEdgeId?: string;
+  routedTargetLoopId?: string;
+  targetLoopRunId?: string;
+  status: OrchestrationRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
 export interface OrchestratorRoute {
   routeId: string;
   rootRunId: string;
-  repairRequestId: string;
+  orchestrationRequestId: string;
+  kind: OrchestrationRequestKind;
+  repairRequestId?: string;
   orchestratorNodeRunId: string;
   loopEdgeId: string;
   sourceLoopId: string;
@@ -97,6 +126,7 @@ export interface ControlFlowEvent {
   sourceNodeRunId?: string;
   targetLoopRunId?: string;
   targetWorkLoopNodeRunId?: string;
+  orchestrationRequestId?: string;
   repairRequestId?: string;
   orchestrationFrameId?: string;
   createdAt: string;

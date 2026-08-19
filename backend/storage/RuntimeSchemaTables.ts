@@ -62,6 +62,7 @@ export const runtimeSchemaTables = `
     source TEXT NOT NULL CHECK(source IN ('manual','flow','repair','schedule')),
     status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
     input_json TEXT CHECK(input_json IS NULL OR json_valid(input_json)),
+    orchestration_request_id TEXT REFERENCES orchestration_requests(orchestration_request_id) DEFERRABLE INITIALLY DEFERRED,
     repair_request_id TEXT REFERENCES repair_requests(repair_request_id) DEFERRABLE INITIALLY DEFERRED,
     orchestration_frame_id TEXT REFERENCES orchestration_frames(frame_id) DEFERRABLE INITIALLY DEFERRED,
     schedule_work_loop_node_id TEXT,
@@ -75,6 +76,7 @@ export const runtimeSchemaTables = `
     FOREIGN KEY(root_run_id, entry_state_revision) REFERENCES state_revisions(root_run_id, revision),
     FOREIGN KEY(root_run_id, completion_state_revision) REFERENCES state_revisions(root_run_id, revision),
     CHECK((source = 'schedule') = (schedule_work_loop_node_id IS NOT NULL AND scheduled_for IS NOT NULL)),
+    CHECK((source IN ('flow','repair')) = (orchestration_request_id IS NOT NULL)),
     CHECK((source = 'repair') = (repair_request_id IS NOT NULL)),
     CHECK((status IN ('completed','blocked','failed','cancelled')) = (completed_at IS NOT NULL))
   );

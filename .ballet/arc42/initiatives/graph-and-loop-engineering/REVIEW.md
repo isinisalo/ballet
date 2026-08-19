@@ -4,7 +4,7 @@ title: Graph and Loop Engineering REVIEW
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-19'
-version: 2
+version: 3
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Tila
 
-`draft`. Strict-v11 data/config/snapshot/module-vaihe on toteutettu ja paikallinen tekninen evidenssi kerätty. Koko initiativea ei hyväksytä ennen runtime-dispatchia, Graph/Loop-authoring hard cutia ja ihmisreview'ta.
+`draft`. Strict-v11 data/config/snapshot/module- ja runtime-dispatch-vaiheet on toteutettu ja paikallinen tekninen evidenssi kerätty. Koko initiativea ei hyväksytä ennen Graph/Loop-authoring hard cutia ja ihmisreview'ta.
 
 ## Review scope
 
@@ -24,9 +24,9 @@ Tuleva review vertaa `goal-012` / `REQ-012` / `QS-014` -aikomusta ADR-018:aan, P
 
 ## Fact
 
-- Nykyinen config/domain/snapshot/module-baseline on strict v11; authoring-UI on edelleen kolmitasoinen Loop Engineer ja cross-Loop-runtime käyttää aiempaa käyttäytymistä.
+- Nykyinen config/domain/snapshot/module/runtime-baseline on strict v11; authoring-UI on edelleen kolmitasoinen Loop Engineer.
 - ADR-018 ja initiative-artefaktit muodostavat päätös- ja muutosrajan.
-- GLE-EVID-002/003/008 ovat passed; GLE-EVID-004–007/009 ovat pending.
+- GLE-EVID-002/003/004/008 ovat passed; GLE-EVID-005–007/009 ovat pending.
 
 ## Decision
 
@@ -35,13 +35,13 @@ Ei uutta review-päätöstä. `adr-018` on hyväksytty käyttäjän eksplisiitti
 ## Assumption, Hypothesis ja Finding
 
 - AS-GLE-001:n data/snapshot/module-osa on todennettu; HYP-GLE-001:n käyttöliittymävaikutus odottaa myöhempää evidenssiä.
-- FIND-GLE-001:n cross-layer drift on poistettu tämän vaiheen data/config/snapshot/module-rajasta, mutta UI/runtime-dispatch-raja on tarkoituksella kesken.
+- FIND-GLE-001:n automaattinen `followFlow` on poistettu ja runtime dispatch vastaa ADR-018:aa; UI/runtime-sanastoraja on tarkoituksella kesken.
 
 ## Per-QS verdict
 
 | QS | Criterion | Evidence | Verdict |
 | --- | --- | --- | --- |
-| QS-014 | Strict-v11 hard cut, Orchestrator-owned flow/repair ja täsmälleen Graph/Loop-authoring | EVID-014 / GLE-EVID-002–009 | partial: data/snapshot/module passed; dispatch/UI pending |
+| QS-014 | Strict-v11 hard cut, Orchestrator-owned flow/repair ja täsmälleen Graph/Loop-authoring | EVID-014 / GLE-EVID-002–009 | partial: data/snapshot/module/runtime passed; UI/human acceptance pending |
 
 ## Risk, trace ja method health
 
@@ -56,9 +56,9 @@ RISK-013 ja TRACEABILITY erottavat läpäistyn data/snapshot/module-osavaiheen k
 
 ## Handoff
 
-- Current status: strict-v11 domain/schema/capability/snapshot/module-raja toteutettu; koko initiative draft.
-- Next approved action: projektin omistaja katselmoi rajatun vaiheen ja valtuuttaa tai palauttaa erikseen GLE-step-003:n.
-- Requested capability/outcome: Orchestrator-owned cross-Loop-dispatch ADR-018:n mukaisesti, jos seuraava vaihe valtuutetaan.
+- Current status: strict-v11 domain/schema/capability/snapshot/module/runtime-raja toteutettu; koko initiative draft.
+- Next approved action: projektin omistaja katselmoi GLE-step-003:n evidenssin ja valtuuttaa tai palauttaa erikseen GLE-step-004:n Context/routing hard cutin.
+- Requested capability/outcome: canonical `graph | loop` frontend-routing hard cut ilman Context/numeric-route-compatibilitya, jos seuraava vaihe valtuutetaan.
 - Stop condition: release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat erillisen täsmällisen ihmisvaltuutuksen.
 
 ## Avoimet kysymykset

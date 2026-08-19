@@ -60,18 +60,18 @@ const loopRun = (
 const executionTask = (nodeRunId = "agent-node-run"): ExecutionTask => ({
   id: "agent-task", kind: "node_execution", rootRunId: "root-run", status: "succeeded",
   spec: {
-    version: 5, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
+    version: 6, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
     loopRunId: "loop-run", workLoopNodeRunId: "work-loop-node-run", nodeRunId,
     evidence: {
-      compositionVersion: 4, loopId: "main-loop", workLoopNodeId: "work", nodeRole: "work",
+      compositionVersion: 5, loopId: "main-loop", workLoopNodeId: "work", nodeRole: "work",
       nodeDefinitionId: "main-loop:work:work",
       executionProfile: {
         id: "primary", name: "Primary", provider: "codex", model: "gpt-5",
         reasoningEffort: "high", networkAccess: false
       },
       resources: [], prompt: "prompt", promptSha256: "a".repeat(64),
-      taskEnvelopeVersion: 3, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 3,
-      outputSchemaId: "work-node-outcome-v3", outputSchema: workNodeOutcomeJsonSchema,
+      taskEnvelopeVersion: 4, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 4,
+      outputSchemaId: "work-node-outcome-v4", outputSchema: workNodeOutcomeJsonSchema,
       outputSchemaSha256: "c".repeat(64)
     },
     runtime: {

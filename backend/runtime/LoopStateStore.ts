@@ -24,6 +24,7 @@ export interface CommitNodeOutcomeInput {
     kind: ControlFlowEventKind;
     targetLoopRunId?: string;
     targetWorkLoopNodeRunId?: string;
+    orchestrationRequestId?: string;
     repairRequestId?: string;
     orchestrationFrameId?: string;
   };
@@ -126,11 +127,13 @@ export class LoopStateStore {
         INSERT INTO control_flow_events (
           root_run_id, sequence, kind, state_revision, source_loop_run_id,
           source_work_loop_node_run_id, source_node_run_id, target_loop_run_id,
-          target_work_loop_node_run_id, repair_request_id, orchestration_frame_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          target_work_loop_node_run_id, orchestration_request_id, repair_request_id,
+          orchestration_frame_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(input.rootRunId, sequence, input.control.kind, nextRevision, node.loop_run_id,
         node.work_loop_node_run_id, input.nodeRunId, input.control.targetLoopRunId ?? null,
-        input.control.targetWorkLoopNodeRunId ?? null, input.control.repairRequestId ?? null,
+        input.control.targetWorkLoopNodeRunId ?? null, input.control.orchestrationRequestId ?? null,
+        input.control.repairRequestId ?? null,
         input.control.orchestrationFrameId ?? null, committedAt);
       const revision = this.require(input.rootRunId, nextRevision);
       return { revision: { ...revision, controlFlowEventId: Number(result.lastInsertRowid) },

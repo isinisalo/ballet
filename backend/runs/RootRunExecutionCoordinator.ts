@@ -65,6 +65,19 @@ export class RootRunExecutionCoordinator {
 
   async sync(rootRunId: string): Promise<void> {
     const runs = this.options.database.listRootLoopRuns(rootRunId);
+    const root = this.options.roots.require(rootRunId);
+    const activeNode = root.activeNodeRunId
+      ? this.options.database.getNodeRun(root.activeNodeRunId)
+      : undefined;
+    if (activeNode && ["queued", "running"].includes(activeNode.status)) {
+      const queued = this.options.executions.listByRoot(rootRunId).some((task) => task.status === "queued");
+      this.options.roots.setStatus(rootRunId, queued ? "queued" : "running");
+      return;
+    }
+    if (activeNode?.status === "waiting_for_input") {
+      this.options.roots.setStatus(rootRunId, "waiting_for_input");
+      return;
+    }
     if (runs.some((run) => ["queued", "running"].includes(run.status))) {
       const queued = this.options.executions.listByRoot(rootRunId).some((task) => task.status === "queued");
       this.options.roots.setStatus(rootRunId, queued ? "queued" : "running");
@@ -74,7 +87,10 @@ export class RootRunExecutionCoordinator {
       this.options.roots.setStatus(rootRunId, "waiting_for_input");
       return;
     }
-    const status = runs.some((run) => run.status === "failed") ? "failed"
+    const persistedRoot = this.options.roots.require(rootRunId);
+    const status = persistedRoot.errorCode === "orchestrator_blocked" ? "blocked"
+      : persistedRoot.errorCode ? "failed"
+      : runs.some((run) => run.status === "failed") ? "failed"
       : runs.some((run) => run.status === "blocked") ? "blocked"
         : runs.some((run) => run.status === "cancelled") ? "cancelled" : "completed";
     await this.options.finalizer.finalize(rootRunId, status);
@@ -195,11 +211,12 @@ export class RootRunExecutionCoordinator {
     const composite = node.workLoopNodeRunId
       ? this.options.database.getWorkLoopNodeRun(node.workLoopNodeRunId)
       : undefined;
-    if (!run || run.status !== "running" || (node.role !== "orchestrator" && !composite)) return undefined;
-    const repairRequest = node.role === "orchestrator"
-      ? this.options.database.repair.requestForOrchestrator(node.nodeRunId)
+    if (!run || (run.status !== "running" && !(node.role === "orchestrator" && run.status === "completed"))
+      || (node.role !== "orchestrator" && !composite)) return undefined;
+    const orchestrationRequest = node.role === "orchestrator"
+      ? this.options.database.orchestration.forOrchestrator(node.nodeRunId)
       : undefined;
-    return { root, run, composite, node, repairRequest };
+    return { root, run, composite, node, orchestrationRequest };
   }
 
   private async terminalizeRoot(rootRunId: string, detail: RootTerminalization): Promise<void> {
