@@ -76,7 +76,7 @@ export function LoopCanvas({
     <div className="relative min-w-0">
       <LoopCanvasSurface
         layout={layout}
-        ariaLabel={run ? "Run selected Loop internal Edge canvas" : "Level 2 · Detail internal Edge canvas"}
+        ariaLabel={run ? "Run selected Loop internal Edge canvas" : "Loop Engineering internal Edge canvas"}
         theme={theme}
         selectedLoopId={loop.id}
         nodeByKey={projection.nodeByKey}

@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 6
+version: 7
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-014 / ADR-018:n strict-v11 graph/capability-raja on toteutettu configissa, shared contracteissa, snapshotissa, module materialisoinnissa ja persisted Orchestrator-dispatchissa muuttamatta concept-ID:itä; Graph/Loop-authoring-UI on pending.
+CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-014 / ADR-018:n strict-v11 graph/capability-raja on toteutettu configissa, shared contracteissa, snapshotissa, module materialisoinnissa, persisted Orchestrator-dispatchissa ja Graph/Loop-authoring-reiteissä muuttamatta concept-ID:itä; Graphin Orchestrator-control-node ja ihmisacceptance ovat pending.
 
 ## Konseptikartta
 
@@ -29,7 +29,7 @@ CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-014 /
 | CON-002 | Durable canonical control: strict role outcomes, atomiset State patchit, append-only revisionit, bounded retry, repair-frame ja runtime-owned continuation. | BB-004–BB-006 | QS-003, QS-012 | ADR-015, runtime/state/queue-storet |
 | CON-003 | Deterministinen execution composition: System → primary → vakaasti järjestetyt skillit → `TaskEnvelope` → role/output schema, kaikki snapshotattuna ja hashattuna. | BB-003, BB-004, BB-006 | QS-002, QS-004, QS-011 | ADR-012, ADR-013, `ExecutionComposition` |
 | CON-004 | Siirrettävät project resources: repository-polut omistavat configin, dokumentit, instructionit ja skillit; machine state jää `.git/ballet`-hakemistoon. | BB-003, BB-008, BB-009 | QS-002, QS-005, QS-009 | ADR-002, ADR-014, ADR-016, resource catalog |
-| CON-005 | Cyber-industrial operator UI ja canonical projection: dense, accessible, token-driven React/Tailwind/shadcn-pinnat näyttävät vain nimetyn runtime/project-totuuden. | BB-001, BB-002, BB-005 | QS-001, QS-010, QS-013 | [DESIGN.md](../../DESIGN.md), `loopEngineerProjections.ts`, `loopRunViewModel.ts` |
+| CON-005 | Cyber-industrial operator UI ja canonical projection: dense, accessible, token-driven React/Tailwind/shadcn-pinnat näyttävät vain nimetyn runtime/project-totuuden. | BB-001, BB-002, BB-005 | QS-001, QS-010, QS-013, QS-014 | [DESIGN.md](../../DESIGN.md), `engineeringProjections.ts`, `loopRunViewModel.ts` |
 | CON-006 | Evidenssipohjainen arc42 Method: stable ID:t, väitetyypit, initiative handoff, traceability, conformance ja mitattu method health. | BB-003–BB-005, BB-008 | QS-005, QS-006, QS-008 | goal-009, ADR-011, project-local arc42-resurssit |
 | CON-007 | Copy-to-project module trust: strict rajattu JSON, canonical hash, deterministic namespace, compatible profile slots, revalidated plan, config-last commit ja content-derived provenance. | BB-001–BB-003, BB-009 | QS-002, QS-004, QS-009 | ADR-016, Loop module schemas/service/tests |
 

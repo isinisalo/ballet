@@ -1,48 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { InstalledLoopModuleStatus } from "@shared/api/workspace-contracts";
-import { calculateLoopCompositionLayout } from "../src/workspace/automation/loops/loopCompositionLayout";
+import { calculateGraphEngineeringLayout } from "../src/workspace/automation/loops/graphEngineeringLayout";
 import {
-  buildLoopCompositionFocus,
-  buildLoopCompositionProjection,
-  buildLoopContextProjection,
-  buildLoopDetailProjection
-} from "../src/workspace/automation/loops/loopEngineerProjections";
+  buildGraphEngineeringFocus,
+  buildGraphEngineeringProjection,
+  buildLoopEngineeringProjection
+} from "../src/workspace/automation/loops/engineeringProjections";
 import { v11Automation, v11Loop } from "./v11Fixtures";
 
-describe("Loop Engineer projections", () => {
-  it("derives Context entry, leaf, module outcomes, and counts without Work Loop Nodes", () => {
-    const first = v11Loop("first-loop");
-    const second = v11Loop("second-loop");
-    second.description = "Deliver the reviewed project outcome.";
-    const config = v11Automation(first, second);
-    config.graph.loopEdges = [
-      { id: "first-flow", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Continue." },
-      { id: "second-repair", source: second.id, target: first.id, kind: "repair", capability: "test:loop.transfer", description: "Repair." }
-    ];
-    const projection = buildLoopContextProjection({
-      project: { name: "Ballet", description: "Coordinate verified Loop work." },
-      config,
-      installedModules: [installed(second.id)],
-      activeLoopIds: new Set([first.id])
-    });
-
-    expect(projection.projectIntent).toMatchObject({ name: "Ballet", entryLoopCount: 1, missingDescription: false });
-    expect(projection.system).toEqual({ loopCount: 2, installedModuleCount: 1, customLoopCount: 1, flowConnectionCount: 1, repairConnectionCount: 1, activeRunCount: 1 });
-    expect(projection.declaredOutcomes).toEqual(["software:sample.delivered", "Sample module"]);
-    expect(projection).not.toHaveProperty("nodes");
-  });
-
-  it("treats repair as neither incoming flow nor outgoing outcome flow", () => {
-    const first = v11Loop("first-loop");
-    const second = v11Loop("second-loop");
-    const config = v11Automation(first, second);
-    config.graph.loopEdges = [{ id: "repair", source: first.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair." }];
-    const projection = buildLoopContextProjection({ project: { name: "Project", description: "" }, config });
-    expect(projection.projectIntent).toMatchObject({ entryLoopCount: 2, missingDescription: true });
-    expect(projection.declaredOutcomes).toEqual([first.description, second.description]);
-  });
-
-  it("projects exactly one Level 1 black box per Loop and only ProjectLoopEdges, including cycles", () => {
+describe("Graph and Loop Engineering projections", () => {
+  it("projects exactly one Graph Engineering black box per Loop and only ProjectLoopEdges, including cycles", () => {
     const first = v11Loop("first-loop");
     const second = v11Loop("second-loop");
     const config = v11Automation(first, second);
@@ -50,9 +17,9 @@ describe("Loop Engineer projections", () => {
       { id: "forward", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Forward." },
       { id: "back", source: second.id, target: first.id, kind: "repair", capability: "test:loop.transfer", description: "Back." }
     ];
-    const projection = buildLoopCompositionProjection({ config, installedModules: [installed(second.id)] });
-    const firstLayout = calculateLoopCompositionLayout(projection);
-    expect(calculateLoopCompositionLayout(projection)).toEqual(firstLayout);
+    const projection = buildGraphEngineeringProjection({ config, installedModules: [installed(second.id)] });
+    const firstLayout = calculateGraphEngineeringLayout(projection);
+    expect(calculateGraphEngineeringLayout(projection)).toEqual(firstLayout);
     expect(new Set(firstLayout.map(({ x, y }) => `${x}:${y}`))).toHaveLength(2);
     expect(projection.nodes).toHaveLength(2);
     expect(projection.nodes[1]).toMatchObject({ title: "Sample module", loopId: second.id, kind: "installed", workLoopNodeCount: 1 });
@@ -62,8 +29,8 @@ describe("Loop Engineer projections", () => {
 
   it("uses a deterministic three-column snake so larger Loop systems remain legible", () => {
     const loops = Array.from({ length: 8 }, (_, index) => v11Loop(`loop-${index + 1}`));
-    const projection = buildLoopCompositionProjection({ config: v11Automation(...loops) });
-    const layout = calculateLoopCompositionLayout(projection);
+    const projection = buildGraphEngineeringProjection({ config: v11Automation(...loops) });
+    const layout = calculateGraphEngineeringLayout(projection);
 
     expect(new Set(layout.map(({ y }) => y))).toHaveLength(3);
     expect(layout.slice(0, 3).map(({ x }) => x)).toEqual([48, 336, 624]);
@@ -81,21 +48,21 @@ describe("Loop Engineer projections", () => {
       { id: "selected-repair", source: third.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair selected." },
       { id: "hidden-repair", source: first.id, target: third.id, kind: "repair", capability: "test:loop.transfer", description: "Repair elsewhere." }
     ];
-    const projection = buildLoopCompositionProjection({ config });
+    const projection = buildGraphEngineeringProjection({ config });
 
-    expect(buildLoopCompositionFocus(projection, second.id)).toEqual({
+    expect(buildGraphEngineeringFocus(projection, second.id)).toEqual({
       edges: [config.graph.loopEdges[0], config.graph.loopEdges[1]],
       visibleRepairCount: 1,
       hiddenRepairCount: 1
     });
-    expect(buildLoopCompositionFocus(projection)).toEqual({
+    expect(buildGraphEngineeringFocus(projection)).toEqual({
       edges: [config.graph.loopEdges[0]],
       visibleRepairCount: 0,
       hiddenRepairCount: 2
     });
   });
 
-  it("projects Level 2 from only the selected Loop and reports unknown ids", () => {
+  it("projects Loop Engineering from only the selected Loop and reports unknown ids", () => {
     const first = v11Loop("first-loop");
     const second = v11Loop("second-loop");
     second.nodes[0] = { ...second.nodes[0]!, id: "second-work" };
@@ -104,13 +71,13 @@ describe("Loop Engineer projections", () => {
     const config = v11Automation(first, second);
     config.graph.loopEdges = [{ id: "global", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Global." }];
 
-    const projection = buildLoopDetailProjection(config, second.id);
+    const projection = buildLoopEngineeringProjection(config, second.id);
     expect(projection).toMatchObject({ startNodeId: "second-work", terminals: ["failed"] });
     expect(projection?.nodes.map((node) => node.id)).toEqual(["second-work"]);
     expect(projection?.edges.map((edge) => edge.id)).toEqual([second.edges[0]?.id]);
     expect(JSON.stringify(projection)).not.toContain(first.id);
     expect(JSON.stringify(projection)).not.toContain("global");
-    expect(buildLoopDetailProjection(config, "missing-loop")).toBeUndefined();
+    expect(buildLoopEngineeringProjection(config, "missing-loop")).toBeUndefined();
   });
 });
 

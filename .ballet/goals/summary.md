@@ -4,7 +4,7 @@ title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-19'
-version: 6
+version: 7
 tags:
   - yhteenveto
   - tavoitteet
@@ -34,7 +34,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 | Osa | Tehtävä |
 | --- | --- |
-| React/Vite-käyttöliittymä | Configure- ja Run-työtilat, nykyinen kolmitasoinen Loop Engineer, editorit, runtime- ja Run-näkymät; hyväksytty v11-target on Graph Engineering / Loop Engineering |
+| React/Vite-käyttöliittymä | Configure- ja Run-työtilat, URL-ohjatut Graph Engineering / Loop Engineering -authoring-näkymät, editorit sekä runtime- ja Run-näkymät |
 | Paikallinen Express-palvelu | Loopback-API, validointi, orkestrointi, ajastus ja tapahtumavirrat |
 | Provider-adapterit | Codex CLI ja GitHub Copilot CLI yhteisen tehtävä-, tapahtuma- ja tulosmallin takana |
 | SQLite-tila | Root Runien, Loop/Work Loop Node/roolikohtaisten Runien, State-revisioiden, jonojen, tapahtumien ja ajastusten kestävä paikallinen historia |
@@ -43,11 +43,11 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 ## Nykytila tämän repositoryn perusteella
 
-- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v10** -skeemaa.
+- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v11** -skeemaa.
 - Projektissa on **12 hyväksyttyä Goalia** ja **18 ADR:ää**, joista ADR-004 ja ADR-010 ovat superseded-tilassa, ADR-014:n V1-rajaus on osittain superseded ADR-016:lla ja ADR-018 rajaa ADR-015/017:n osittaiset tulevat korvaukset.
-- Paikallinen Loop Library, yhden Loopin package/install/export ja content-derived provenance on toteutettu ilman strict-v10-runtimen package-riippuvuutta.
-- Toteutettu strict-v10 Loop Engineer erottaa read-only Contextin, Looppien välisen Level 1 -compositionin ja valitun Loopin sisäisen Level 2 -detailin samoista lähteistä.
-- Hyväksytty mutta toteuttamaton strict-v11-target poistaa Contextin ja numeric level -reitit, nimeää näkymät Graph Engineeringiksi ja Loop Engineeringiksi sekä siirtää kaikki cross-Loop-valinnat Orchestrator-dispatchiin.
+- Paikallinen Loop Library, yhden Loopin package/install/export ja content-derived provenance on toteutettu ilman strict-v11-runtimen package-riippuvuutta.
+- Toteutettu strict-v11 authoring-UI erottaa project-global Graph Engineeringin ja selected-Loop-only Loop Engineeringin; Context-, compatibility- ja numeric level -reitit puuttuvat tuotantokoodista.
+- Kaikki cross-Loop-flow- ja repair-valinnat kulkevat immutable snapshotin allowlist/capability-evidenssiä käyttävän Orchestrator-dispatchin kautta. Graph Engineeringin erillinen visuaalinen Orchestrator-control-node on vielä pending.
 - Balletin oma kehitysautomaatio käyttää arc42 Templatea ja 6+1 Method -Loopia sekä erillistä, ketjuttamatonta `release-validation`-tukilooppia.
 - Konfiguraatiossa on **20 Work Loop Nodea**, **6 Human Validation -porttia**, **6 Codex-ExecutionProfilea** ja viikoittainen continuous-learning-schedule.
 - Project-local menettelyt on jaettu **10 arc42-skilliin**; execution composition ei enää käytä `migrated-*`-instructioneita.
@@ -58,7 +58,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 **Todentamatta end-to-end:**
 
-- `graph-and-loop-engineering`-initiative on päätös- ja suunnitteluvaiheen draft; v11-domainia, schemaa, runtimea, API:a, module materialisointia tai UI:ta ei ole vielä toteutettu tai todennettu.
+- `graph-and-loop-engineering`-initiative on draft: v11-domain/schema/snapshot/module/runtime sekä authoring routing- ja Loop Engineering -osat on toteutettu ja paikallisesti todennettu; Graphin visualisoinnin Orchestrator-control-node ja ihmisacceptance ovat pending.
 - Ensimmäistä arc42-initiativea ei ole vielä viety clarify → structures → concepts → communicate → implementation → evaluate -polun läpi.
 - Method-healthin runtime-baselinet ja scheduled learning -ajon evidenssi puuttuvat ensimmäiseen pilottiin asti.
 - Konfiguraatiossa ei ole Copilot-ExecutionProfilea tai Copilot-Nodea, vaikka platform-adapteri on toteutettu.

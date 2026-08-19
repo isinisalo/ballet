@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 6
+version: 7
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-19. ADR-018 on accepted; strict-v11 data/snapshot/module/runtime-raja on toteutettu, mutta Graph/Loop-authoring-UI ja koko ihmisacceptance ovat pending.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-19. ADR-018 on accepted; strict-v11 data/snapshot/module/runtime-raja sekä Graph/Loop-routing ja selected-Loop-only UI on toteutettu. Graphin Orchestrator-control-node ja koko ihmisacceptance ovat pending.
 
 ## Päätösindeksi
 
@@ -67,7 +67,7 @@ adr-015:n automaattinen followFlow
 | adr-004 | adr-015 | Koko legacy Loop/Step/Transition-runtime-domain korvautuu strict-v10 `Loop` / `WorkLoopNode` / `WorkNode` / `ValidationNode` / `State` / `Edge` / `LoopEdge` -mallilla. Historiallista ADR:ää ei kirjoiteta uudelleen. |
 | adr-010 | adr-015 | Legacy `StepResult`-rajauksen tilalle tulee roolikohtainen strict outcome, revisionoitu State ja runtime-owned control flow. |
 | adr-014, vain V1:n no-package-raja | adr-016 | Yhden Loopin authoring package hyväksytään inspect/plan/commit-materialisointiin. ADR-014:n project-local-data- ja no-live-dependency-periaate jää voimaan. |
-| adr-017, Context/numeric level/Level 1 composition | adr-018 | Tuleva v11 hard cut korvaa kolme authoring-tasoa Graph Engineering / Loop Engineering -unionilla ja poistaa Contextin sekä numeric route -mallin. Selected-Loop-only sisäinen projektio säilyy. Historiallista ADR:ää ei kirjoiteta uudelleen. |
+| adr-017, Context/numeric level/Level 1 composition | adr-018 | Toteutettu v11 hard cut korvaa kolme authoring-tasoa Graph Engineering / Loop Engineering -unionilla ja poistaa Contextin sekä numeric route -mallin. Selected-Loop-only sisäinen projektio säilyy. Historiallista ADR:ää ei kirjoiteta uudelleen. |
 | adr-015, automaattinen yhden flow-edgen `followFlow` | adr-018 | Tuleva v11 ohjaa nolla/yksi/usea flow candidatea Orchestrator-dispatchin, snapshot-allowlistin, capabilityn ja `needs_input`-rajan kautta. Repairin call/return-, State- ja recovery-periaatteet säilyvät. |
 
 ## Päätösten käyttö

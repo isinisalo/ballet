@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 7
+version: 8
 tags:
   - arc42
   - architecture
@@ -19,7 +19,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 
 ## Tila
 
-12-osioinen baseline on hyväksytty. Project config, shared contract, snapshot ja Loop module -materialisointi käyttävät strict v11 -Graph/capability-sopimusta; authoring-UI ja cross-Loop-dispatch säilyvät vielä aiemmassa baselinessa. `goal-012` / `adr-018` määrittää koko Graph Engineering / Loop Engineering -targetin. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi. Todennettu tieto sijoitetaan sen omistavaan osioon, ja puuttuva tieto kirjataan avoimeksi kysymykseksi eikä keksitä.
+12-osioinen baseline on hyväksytty. Project config, shared contract, snapshot, Loop module -materialisointi ja cross-Loop-dispatch käyttävät strict v11 -Graph/capability-sopimusta. Authoring-UI:n Context/numeric-route hard cut on toteutettu: käytössä ovat Graph Engineering ja selected-Loop-only Loop Engineering. Graphin erillinen Orchestrator-control-node, lopullinen edge-presentation ja ihmisacceptance ovat vielä pending. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi. Todennettu tieto sijoitetaan sen omistavaan osioon, ja puuttuva tieto kirjataan avoimeksi kysymykseksi eikä keksitä.
 
 ## Osiot
 
@@ -54,7 +54,7 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Initiative template](initiatives/TEMPLATE/BRIEF.md): uuden rajatun työn rakenne.
 - [Comprehensive documentation initiative](initiatives/comprehensive-arc42-documentation/BRIEF.md): tämän suomenkielisen kattavan dokumentaation draft-ketju.
 - [Architecture canvases initiative](initiatives/architecture-canvases/BRIEF.md): kolmen canvas-projektion draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju.
-- [Graph and Loop Engineering initiative](initiatives/graph-and-loop-engineering/BRIEF.md): accepted v11-päätöksen BRIEF/PLAN/EVIDENCE/REVIEW-ketju; domain/config/snapshot/module-vaiheen evidenssi on kerätty, runtime- ja UI-vaiheet ovat pending.
+- [Graph and Loop Engineering initiative](initiatives/graph-and-loop-engineering/BRIEF.md): accepted v11-päätöksen BRIEF/PLAN/EVIDENCE/REVIEW-ketju; domain/config/snapshot/module/runtime sekä routing/Loop Engineering -evidenssi on kerätty, Graph-control-node ja ihmisacceptance ovat pending.
 
 ## Kanoninen omistajuus
 

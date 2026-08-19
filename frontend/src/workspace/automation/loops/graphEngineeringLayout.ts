@@ -1,8 +1,8 @@
-import type { LoopCompositionProjection } from "./loopEngineerProjections";
+import type { GraphEngineeringProjection } from "./engineeringProjections";
 
-export const loopCompositionNodeSize = { width: 216, height: 88 } as const;
+export const graphEngineeringNodeSize = { width: 216, height: 88 } as const;
 
-export interface LoopCompositionLayoutNode {
+export interface GraphEngineeringLayoutNode {
   loopId: string;
   x: number;
   y: number;
@@ -13,9 +13,9 @@ const horizontalGap = 72;
 const verticalGap = 112;
 const canvasInset = 48;
 
-export function calculateLoopCompositionLayout(
-  projection: LoopCompositionProjection
-): LoopCompositionLayoutNode[] {
+export function calculateGraphEngineeringLayout(
+  projection: GraphEngineeringProjection
+): GraphEngineeringLayoutNode[] {
   const columns = Math.min(maxColumns, Math.max(1, projection.nodes.length));
   return projection.nodes.map((node, index) => {
     const row = Math.floor(index / columns);
@@ -24,8 +24,8 @@ export function calculateLoopCompositionLayout(
     const column = row % 2 === 0 ? indexInRow : nodesInRow - indexInRow - 1;
     return {
       loopId: node.loopId,
-      x: canvasInset + column * (loopCompositionNodeSize.width + horizontalGap),
-      y: canvasInset + row * (loopCompositionNodeSize.height + verticalGap)
+      x: canvasInset + column * (graphEngineeringNodeSize.width + horizontalGap),
+      y: canvasInset + row * (graphEngineeringNodeSize.height + verticalGap)
     };
   });
 }

@@ -14,7 +14,7 @@ export type View =
   | "run";
 
 export type SaveCollection = "skills";
-export type LoopEngineerLevel = "context" | "composition" | "detail";
+export type EngineeringView = "graph" | "loop";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
@@ -23,7 +23,8 @@ export interface RouteState {
   documentPath?: string;
   executionProfileId?: string;
   automationEntityId?: string;
-  automationLevel?: LoopEngineerLevel;
+  automationView?: EngineeringView;
+  automationRouteIssue?: "invalid-view" | "missing-loop-id" | "non-canonical-graph";
   runTargetKind?: "loop";
   runTargetId?: string;
   rootRunId?: string;

@@ -2,7 +2,7 @@ import { Activity, ChevronRight, Route } from "lucide-react";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem } from "@/components/ui/sidebar";
-import { automationContextPath, automationLoopPath } from "../routing";
+import { automationGraphPath, automationLoopPath } from "../routing";
 import type { RouteState } from "../types";
 import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
@@ -25,8 +25,8 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
         } />
         <CollapsibleContent>
           <SidebarMenuSub className="gap-0.5">
-            <SidebarNavLinkItem path={automationContextPath()} isActive={route.view === "automation"} navigate={navigate}>
-              <Activity /> <span>Loop Engineer</span>
+            <SidebarNavLinkItem path={automationGraphPath()} isActive={route.view === "automation" && route.automationView === "graph"} navigate={navigate}>
+              <Activity /> <span>Graph Engineering</span>
             </SidebarNavLinkItem>
             {automation.loops.length === 0 ? (
               <SidebarMenuSubItem><span className="block px-2 py-1 text-xs text-muted-foreground">No loops.</span></SidebarMenuSubItem>
@@ -35,7 +35,7 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
               <SidebarNavLinkItem
                 key={loop.id}
                 path={automationLoopPath(loop.id)}
-                isActive={route.view === "automation" && route.automationEntityId === loop.id}
+                isActive={route.view === "automation" && route.automationView === "loop" && route.automationEntityId === loop.id}
                 navigate={navigate}
                 className="h-6 min-w-0 pl-7 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
               >

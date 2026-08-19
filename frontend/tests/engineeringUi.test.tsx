@@ -15,65 +15,84 @@ import { emptyData } from "../src/workspace/types";
 import { localRuntime } from "./runtimeFixtures";
 import { v11Automation, v11Loop } from "./v11Fixtures";
 
-describe("Loop Engineer workspace", () => {
-  it("shows the active Context level in navigation and breadcrumb and opens Level 1", async () => {
-    const user = userEvent.setup();
+describe("Graph and Loop Engineering workspace", () => {
+  it("shows Graph Engineering as the active default authoring view", () => {
     const navigate = vi.fn();
-    const view = renderView({ level: "context", navigate });
+    const rendered = renderView({ view: "graph", navigate });
 
-    expect(screen.getByRole("heading", { name: "Loop Engineer" })).toBeInTheDocument();
-    const header = view.container.querySelector("[data-loop-engineer-header]");
+    expect(screen.getByRole("heading", { name: "Graph Engineering" })).toBeInTheDocument();
+    const header = rendered.container.querySelector("[data-engineering-header]");
     expect(header).toBeInTheDocument();
-    expect(header?.querySelectorAll("[data-loop-engineer-row]")).toHaveLength(2);
-    expect(header).toHaveTextContent("Read-only project intent, Loop system summary, and declared outcomes.");
-    expect(screen.getByLabelText("Loop Engineer actions")).toContainElement(screen.getByRole("button", { name: "Open Level 1" }));
-    expect(screen.getByRole("button", { name: "Context" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("navigation", { name: "Loop Engineer breadcrumb" })).toHaveTextContent("Context");
-    expect(screen.getByLabelText("Context level read-only Loop system planet canvas")).toBeInTheDocument();
-    expect(view.container.querySelectorAll("[data-context-planet]")).toHaveLength(3);
-    expect(view.container.querySelector("[data-context-planet='Ballet Loop system'] [data-loop-node-artwork='terra']")).toBeInTheDocument();
+    expect(header?.querySelectorAll("[data-engineering-row]")).toHaveLength(2);
+    expect(header).toHaveTextContent("Compose project-global LoopNodes and route policy.");
+    expect(screen.getByLabelText("Graph Engineering actions")).toContainElement(screen.getByRole("button", { name: "Add Loop" }));
+    expect(screen.getByRole("button", { name: "Graph Engineering" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("navigation", { name: "Engineering breadcrumb" })).toHaveTextContent("Graph Engineering");
+    expect(screen.getByLabelText(/Graph Engineering canvas/)).toBeInTheDocument();
     expect(screen.queryByText("Execute work.")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Open Level 1" }));
-    expect(navigate).toHaveBeenCalledWith("/automation/loops?level=1");
   });
 
-  it("selects a Level 1 Loop with Space and opens Level 2 with Enter", async () => {
+  it("selects a Graph Engineering LoopNode with Space and opens Loop Engineering with Enter", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
-    renderView({ level: "composition", navigate });
+    renderView({ view: "graph", navigate });
     const node = screen.getByRole("button", { name: /Custom Loop source-loop/ });
 
     node.focus();
     await user.keyboard(" ");
-    expect(navigate).toHaveBeenLastCalledWith("/automation/loops?level=1&id=source-loop", { bypassBlocker: true });
-    navigate.mockClear();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "source-loop" })).toBeInTheDocument();
     node.focus();
     await user.keyboard("{Enter}");
-    expect(navigate).toHaveBeenCalledWith("/automation/loops?level=2&id=source-loop");
-    expect(screen.getByLabelText(/Level 1 · Loops composition canvas/)).toHaveAccessibleName(/Loop Edges/);
+    expect(navigate).toHaveBeenCalledWith("/automation/loops?view=loop&id=source-loop");
+    expect(screen.getByLabelText(/Graph Engineering canvas/)).toHaveAccessibleName(/Loop Edges/);
     expect(screen.queryByText("Execute work.")).not.toBeInTheDocument();
   });
 
-  it("keeps the Loop Orchestrator in the Level 1 inspector instead of below the canvas", async () => {
+  it("opens Loop Engineering from a Graph LoopNode double-click", async () => {
     const user = userEvent.setup();
-    const view = renderView({ level: "composition", selectedId: "source-loop", navigate: vi.fn() });
+    const navigate = vi.fn();
+    renderView({ view: "graph", navigate });
 
-    const rail = screen.getByLabelText("Level 1 Loop and Orchestrator inspector");
+    await user.dblClick(screen.getByRole("button", { name: /Custom Loop source-loop/ }));
+    expect(navigate).toHaveBeenLastCalledWith("/automation/loops?view=loop&id=source-loop");
+  });
+
+  it("keeps the Loop Orchestrator in the Graph Engineering inspector instead of below the canvas", async () => {
+    const user = userEvent.setup();
+    const rendered = renderView({ view: "graph", navigate: vi.fn() });
+    await user.click(screen.getByRole("button", { name: /Custom Loop source-loop/ }));
+
+    const rail = screen.getByLabelText("Graph Engineering Loop and Orchestrator inspector");
     const orchestratorTab = screen.getByRole("tab", { name: "Orchestrator" });
     expect(rail).toContainElement(orchestratorTab);
     await user.click(orchestratorTab);
     expect(orchestratorTab).toHaveAttribute("aria-selected", "true");
     expect(rail).toContainElement(screen.getByRole("heading", { name: "Loop Orchestrator" }));
     expect(screen.queryByText("Orchestrator settings")).not.toBeInTheDocument();
-    expect(view.container.querySelector("[data-loop-canvas] + details")).not.toBeInTheDocument();
+    expect(rendered.container.querySelector("[data-loop-canvas] + details")).not.toBeInTheDocument();
   });
 
-  it("keeps Level 2 limited to the selected Loop and labels visible edges as internal", () => {
-    const view = renderView({ level: "detail", selectedId: "source-loop", navigate: vi.fn() });
-    expect(view.container.querySelector("[data-loop-engineer-header]")).toHaveTextContent("source-loop");
-    expect(view.container.querySelector("[data-loop-engineer-header]")).toHaveTextContent("Design one selected Loop's Work Loop Nodes and internal Edges.");
-    expect(screen.getByRole("button", { name: /Level 2 · Detail · source-loop/ })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByLabelText("Level 2 · Detail internal Edge canvas")).toBeInTheDocument();
+  it("opens the Graph Engineering inspector in a narrow viewport without replacing the canvas", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+      matches: query.includes("max-width"), media: query, onchange: null,
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn()
+    } as MediaQueryList));
+    const user = userEvent.setup();
+    renderView({ view: "graph", navigate: vi.fn() });
+
+    await user.click(screen.getByRole("button", { name: /Custom Loop source-loop/ }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Graph Engineering inspector");
+    expect(screen.getByRole("dialog")).toHaveClass("overflow-x-hidden");
+    expect(screen.getByLabelText(/Graph Engineering canvas/)).toBeInTheDocument();
+  });
+
+  it("keeps Loop Engineering limited to the selected Loop and labels visible edges as internal", () => {
+    const rendered = renderView({ view: "loop", selectedId: "source-loop", navigate: vi.fn() });
+    expect(rendered.container.querySelector("[data-engineering-header]")).toHaveTextContent("source-loop");
+    expect(rendered.container.querySelector("[data-engineering-header]")).toHaveTextContent("Design one selected Loop's Work Loop Nodes and internal Edges.");
+    expect(screen.getByRole("button", { name: /Loop Engineering · source-loop/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("Loop Engineering internal Edge canvas")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Work Loop Node work" })).toBeInTheDocument();
     expect(screen.queryByText("target-loop")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add Loop Edge" })).not.toBeInTheDocument();
@@ -84,10 +103,10 @@ describe("Loop Engineer workspace", () => {
     const navigate = vi.fn();
     const data = loopEngineerData();
     data.automation = { ...data.automation, loops: [], graph: { loopEdges: [] } };
-    render(<AutomationView data={data} level="context" saveAutomation={vi.fn(async (config) => config)} navigate={navigate} setNavigationBlocker={vi.fn()} />);
+    render(<AutomationView data={data} view="graph" saveAutomation={vi.fn(async (config) => config)} navigate={navigate} setNavigationBlocker={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "Add first Loop" }));
-    expect(navigate).toHaveBeenCalledWith("/automation/loops?level=2&new=1");
+    await user.click(screen.getByRole("button", { name: "Add Loop" }));
+    expect(navigate).toHaveBeenCalledWith("/automation/loops?view=loop&new=1");
   });
 
   it("offers Add first Work Loop Node for an empty selected Loop", () => {
@@ -98,22 +117,22 @@ describe("Loop Engineer workspace", () => {
     const data = loopEngineerData();
     data.automation = v11Automation(emptyLoop);
 
-    render(<AutomationView data={data} level="detail" selectedId={emptyLoop.id} saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
+    render(<AutomationView data={data} view="loop" selectedId={emptyLoop.id} saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "Add first Work Loop Node" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add node" })).toBeInTheDocument();
   });
 });
 
-describe("Loop Engineer module and runtime integration", () => {
-  it("awaits authoritative workspace refresh before selecting an installed Loop on Level 1", async () => {
+describe("Graph and Loop Engineering module and runtime integration", () => {
+  it("awaits authoritative workspace refresh before selecting an installed Loop in Graph Engineering", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
     const refreshWorkspace = vi.fn(async () => undefined);
     const loopModules = loopModuleActions();
     render(<AutomationView
       data={loopEngineerData()}
-      level="composition"
+      view="graph"
       saveAutomation={vi.fn(async (config) => config)}
       refreshWorkspace={refreshWorkspace}
       loopModules={loopModules}
@@ -125,13 +144,13 @@ describe("Loop Engineer module and runtime integration", () => {
     await user.click(await screen.findByRole("button", { name: "Add", exact: true }));
     await user.click(await screen.findByRole("button", { name: "Install module" }));
 
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith("/automation/loops?level=1&id=installed-loop", { bypassBlocker: true }));
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith("/automation/loops?view=graph", { bypassBlocker: true }));
     expect(refreshWorkspace).toHaveBeenCalledOnce();
     expect(vi.mocked(loopModules.statuses).mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(refreshWorkspace.mock.invocationCallOrder[0]).toBeLessThan(navigate.mock.invocationCallOrder.at(-1)!);
   });
 
-  it("exports an installed Loop from the Level 1 inspector", async () => {
+  it("exports an installed Loop from the Graph Engineering inspector", async () => {
     const user = userEvent.setup();
     const data = loopEngineerData();
     data.automation = v11Automation(v11Loop(installedStatus.loopId));
@@ -143,19 +162,20 @@ describe("Loop Engineer module and runtime integration", () => {
 
     render(<AutomationView
       data={data}
-      level="composition"
-      selectedId={installedStatus.loopId}
+      view="graph"
       saveAutomation={vi.fn(async (config) => config)}
       loopModules={loopModules}
       navigate={vi.fn()}
       setNavigationBlocker={vi.fn()}
     />);
 
+    await user.click(await screen.findByRole("button", { name: /Installed module Installed Loop/ }));
     await user.click(await screen.findByRole("button", { name: `Export Loop ${installedStatus.loopId}` }));
     await vi.waitFor(() => expect(loopModules.exportLoop).toHaveBeenCalledWith({ loopId: installedStatus.loopId }));
   });
 
-  it("keeps relevant Level 1 and Level 2 mutations locked for an active Run", () => {
+  it("keeps relevant Graph and Loop Engineering mutations locked for an active Run", async () => {
+    const user = userEvent.setup();
     const data = loopEngineerData();
     const loop = data.automation.loops[0]!;
     data.loopRuns = [{
@@ -163,24 +183,26 @@ describe("Loop Engineer module and runtime integration", () => {
       snapshot: structuredClone(loop), themeSnapshot: structuredClone(defaultLoopTheme), entryStateRevision: 0, nestingDepth: 0,
       createdAt: "2026-08-16T00:00:00.000Z", updatedAt: "2026-08-16T00:00:00.000Z", workLoopNodeRuns: [], nodeRuns: []
     }];
-    const composition = render(<AutomationView data={data} level="composition" selectedId={loop.id} saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
+    const graph = render(<AutomationView data={data} view="graph" saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: /Custom Loop source-loop.*editing locked by active Run/ })).toBeInTheDocument();
+    const lockedNode = screen.getByRole("button", { name: /Custom Loop source-loop.*editing locked by active Run/ });
+    expect(lockedNode).toBeInTheDocument();
+    await user.click(lockedNode);
     expect(screen.getByRole("button", { name: "Add Loop Edge" })).toBeDisabled();
-    composition.unmount();
-    render(<AutomationView data={data} level="detail" selectedId={loop.id} saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
+    graph.unmount();
+    render(<AutomationView data={data} view="loop" selectedId={loop.id} saveAutomation={vi.fn(async (config) => config)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Save Loop" })).toBeDisabled();
   });
 
-  it("shows an explicit state for an unknown Level 2 deep link", () => {
-    renderView({ level: "detail", selectedId: "missing-loop", navigate: vi.fn() });
+  it("shows an explicit state for an unknown Loop Engineering deep link", () => {
+    renderView({ view: "loop", selectedId: "missing-loop", navigate: vi.fn() });
     expect(screen.getByText("Loop not found.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back to Level 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to Graph Engineering" })).toBeInTheDocument();
   });
 });
 
-function renderView({ level, selectedId, navigate }: {
-  level: "context" | "composition" | "detail";
+function renderView({ view, selectedId, navigate }: {
+  view: "graph" | "loop";
   selectedId?: string;
   navigate: ReturnType<typeof vi.fn>;
 }) {
@@ -191,7 +213,7 @@ function renderView({ level, selectedId, navigate }: {
   target.edges[0] = { ...target.edges[0]!, source: "target-work" };
   const data = loopEngineerData();
   data.automation = v11Automation(source, target);
-  return render(<AutomationView data={data} level={level} selectedId={selectedId} saveAutomation={vi.fn(async (config) => config)} navigate={navigate} setNavigationBlocker={vi.fn()} />);
+  return render(<AutomationView data={data} view={view} selectedId={selectedId} saveAutomation={vi.fn(async (config) => config)} navigate={navigate} setNavigationBlocker={vi.fn()} />);
 }
 
 function loopEngineerData(): AppData {

@@ -1,5 +1,5 @@
 import type { BalletMode } from "@shared/api/workspace-contracts";
-import { automationCompositionPath, automationContextPath, automationLoopPath, runLoopPath, runOverviewPath } from "./routing";
+import { automationGraphPath, automationLoopPath, runLoopPath, runOverviewPath } from "./routing";
 import type { RouteState } from "./types";
 
 export function pathForBalletMode({
@@ -17,7 +17,7 @@ export function pathForBalletMode({
 
   if (route.view !== "run") return configureRoutePath(route);
   if (route.runTargetKind === "loop" && route.runTargetId) return automationLoopPath(route.runTargetId);
-  return automationContextPath();
+  return automationGraphPath();
 }
 
 const runRoutePath = (route: RouteState) => {
@@ -27,9 +27,8 @@ const runRoutePath = (route: RouteState) => {
 
 const configureRoutePath = (route: RouteState) => {
   if (route.view === "automation") {
-    if (route.automationLevel === "detail" && route.automationEntityId) return automationLoopPath(route.automationEntityId);
-    if (route.automationLevel === "composition") return automationCompositionPath(route.automationEntityId);
-    return automationContextPath();
+    if (route.automationView === "loop" && route.automationEntityId) return automationLoopPath(route.automationEntityId);
+    return automationGraphPath();
   }
   return windowPath();
 };

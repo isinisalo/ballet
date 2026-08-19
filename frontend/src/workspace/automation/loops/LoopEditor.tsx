@@ -20,7 +20,7 @@ import { parseInitialState } from "./loopFormValidation";
 
 export function LoopEditor({
   config, loop, executionProfiles, instructions, skills, runtime, theme, scheduleStates,
-  locked, disabled = false, onLoopChange, onLocalValidityChange, onBackToComposition
+  locked, disabled = false, onLoopChange, onLocalValidityChange, onBackToGraph
 }: {
   config: ProjectAutomationConfig;
   loop: ProjectLoop;
@@ -34,7 +34,7 @@ export function LoopEditor({
   disabled?: boolean;
   onLoopChange: (loop: ProjectLoop) => void;
   onLocalValidityChange: (valid: boolean) => void;
-  onBackToComposition: () => void;
+  onBackToGraph: () => void;
 }) {
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const initialFingerprint = JSON.stringify(loop.state.initial);
@@ -126,7 +126,7 @@ export function LoopEditor({
               onLoopChange={onLoopChange}
               onInitialStateTextChange={updateInitialState}
               onNodeSelect={setSelectedNodeId}
-              onBackToComposition={onBackToComposition}
+              onBackToGraph={onBackToGraph}
             />
           )}
         </aside>

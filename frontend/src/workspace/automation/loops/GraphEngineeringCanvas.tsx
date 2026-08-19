@@ -20,29 +20,29 @@ import { ArrowRight, LockKeyhole, PackageCheck, Settings2, Wrench } from "lucide
 import type { LoopTheme, ProjectLoopEdge } from "@shared/api/workspace-contracts";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { calculateLoopCompositionLayout, loopCompositionNodeSize } from "./loopCompositionLayout";
+import { calculateGraphEngineeringLayout, graphEngineeringNodeSize } from "./graphEngineeringLayout";
 import { LoopNodeArtwork } from "./LoopNodeArtwork";
-import { buildLoopCompositionFocus } from "./loopEngineerProjections";
-import type { LoopCompositionNode, LoopCompositionProjection } from "./loopEngineerProjections";
+import { buildGraphEngineeringFocus } from "./engineeringProjections";
+import type { GraphEngineeringNode, GraphEngineeringProjection } from "./engineeringProjections";
 import { loopEdgeDasharray, loopThemeCssProperties } from "./loopTheme";
 import { loopSmartEdgeRoutingOptions } from "./loopSmartEdgeRouting";
 
-type CompositionNodeData = Record<string, unknown> & {
-  node: LoopCompositionNode;
+type GraphNodeData = Record<string, unknown> & {
+  node: GraphEngineeringNode;
   selected: boolean;
   repairCount: number;
   onSelect: (loopId: string) => void;
   onOpen: (loopId: string) => void;
 };
-type CompositionFlowNode = Node<CompositionNodeData, "compositionLoop">;
-type CompositionEdgeData = Record<string, unknown> & { edge: ProjectLoopEdge };
-type CompositionFlowEdge = Edge<CompositionEdgeData, "compositionEdge">;
+type GraphFlowNode = Node<GraphNodeData, "graphLoop">;
+type GraphEdgeData = Record<string, unknown> & { edge: ProjectLoopEdge };
+type GraphFlowEdge = Edge<GraphEdgeData, "graphEdge">;
 
-const nodeTypes = { compositionLoop: LoopCompositionNodeView } satisfies NodeTypes;
-const edgeTypes = { compositionEdge: LoopCompositionEdgeView } satisfies EdgeTypes;
+const nodeTypes = { graphLoop: GraphEngineeringNodeView } satisfies NodeTypes;
+const edgeTypes = { graphEdge: GraphEngineeringEdgeView } satisfies EdgeTypes;
 
-export function LoopCompositionCanvas({ projection, selectedLoopId, theme, onSelectLoop, onOpenLoop, onSelectEdge, onOpenOrchestrator }: {
-  projection: LoopCompositionProjection;
+export function GraphEngineeringCanvas({ projection, selectedLoopId, theme, onSelectLoop, onOpenLoop, onSelectEdge, onOpenOrchestrator }: {
+  projection: GraphEngineeringProjection;
   selectedLoopId?: string;
   theme: LoopTheme;
   onSelectLoop: (loopId: string) => void;
@@ -50,20 +50,20 @@ export function LoopCompositionCanvas({ projection, selectedLoopId, theme, onSel
   onSelectEdge: (edge: ProjectLoopEdge) => void;
   onOpenOrchestrator: () => void;
 }) {
-  const focus = useMemo(() => buildLoopCompositionFocus(projection, selectedLoopId), [projection, selectedLoopId]);
-  const layout = useMemo(() => calculateLoopCompositionLayout(projection), [projection]);
-  const nodes = useMemo<CompositionFlowNode[]>(() => layout.map((position) => {
+  const focus = useMemo(() => buildGraphEngineeringFocus(projection, selectedLoopId), [projection, selectedLoopId]);
+  const layout = useMemo(() => calculateGraphEngineeringLayout(projection), [projection]);
+  const nodes = useMemo<GraphFlowNode[]>(() => layout.map((position) => {
     const node = projection.nodes.find((candidate) => candidate.loopId === position.loopId);
-    if (!node) throw new Error(`Missing composition node ${position.loopId}.`);
+    if (!node) throw new Error(`Missing Graph Engineering node ${position.loopId}.`);
     return {
       id: node.loopId,
-      type: "compositionLoop",
+      type: "graphLoop",
       position: { x: position.x, y: position.y },
-      width: loopCompositionNodeSize.width,
-      height: loopCompositionNodeSize.height,
-      initialWidth: loopCompositionNodeSize.width,
-      initialHeight: loopCompositionNodeSize.height,
-      measured: loopCompositionNodeSize,
+      width: graphEngineeringNodeSize.width,
+      height: graphEngineeringNodeSize.height,
+      initialWidth: graphEngineeringNodeSize.width,
+      initialHeight: graphEngineeringNodeSize.height,
+      measured: graphEngineeringNodeSize,
       draggable: false,
       selectable: false,
       focusable: false,
@@ -74,15 +74,15 @@ export function LoopCompositionCanvas({ projection, selectedLoopId, theme, onSel
         onSelect: onSelectLoop,
         onOpen: onOpenLoop
       },
-      style: { width: loopCompositionNodeSize.width, height: loopCompositionNodeSize.height, pointerEvents: "all" }
+      style: { width: graphEngineeringNodeSize.width, height: graphEngineeringNodeSize.height, pointerEvents: "all" }
     };
   }), [layout, onOpenLoop, onSelectLoop, projection.edges, projection.nodes, selectedLoopId]);
-  const edges = useMemo<CompositionFlowEdge[]>(() => focus.edges.map((edge) => {
+  const edges = useMemo<GraphFlowEdge[]>(() => focus.edges.map((edge) => {
     const reverse = focus.edges.find((candidate) => candidate.source === edge.target && candidate.target === edge.source);
     const outsideCycleRoute = edge.source === edge.target || Boolean(reverse && edge.id.localeCompare(reverse.id) > 0);
     return {
       id: edge.id,
-      type: "compositionEdge",
+      type: "graphEdge",
       source: edge.source,
       target: edge.target,
       sourceHandle: outsideCycleRoute ? "bottom-source" : "right-source",
@@ -102,8 +102,8 @@ export function LoopCompositionCanvas({ projection, selectedLoopId, theme, onSel
   return (
     <div
       data-loop-canvas
-      data-loop-engineer-level="composition"
-      aria-label={`Level 1 · Loops composition canvas; ${focus.edges.filter((edge) => edge.kind === "flow").length} flow Loop Edges and ${focus.visibleRepairCount} focused repair Loop Edges visible; ${focus.hiddenRepairCount} repair Loop Edges hidden`}
+      data-engineering-view="graph"
+      aria-label={`Graph Engineering canvas; ${focus.edges.filter((edge) => edge.kind === "flow").length} flow Loop Edges and ${focus.visibleRepairCount} focused repair Loop Edges visible; ${focus.hiddenRepairCount} repair Loop Edges hidden`}
       className="relative h-full min-h-[34rem] min-w-0 overflow-hidden border border-divider-strong bg-background"
       style={loopThemeCssProperties(theme)}
     >
@@ -114,7 +114,7 @@ export function LoopCompositionCanvas({ projection, selectedLoopId, theme, onSel
         <span data-hidden-repair-count={focus.hiddenRepairCount} className="truncate">{focus.hiddenRepairCount} hidden</span>
         <Button type="button" size="xs" variant="ghost" className="pointer-events-auto ml-auto lg:hidden" onClick={onOpenOrchestrator}><Settings2 /> Orchestrator</Button>
       </div>
-      <ReactFlow<CompositionFlowNode, CompositionFlowEdge>
+      <ReactFlow<GraphFlowNode, GraphFlowEdge>
         className="loop-react-flow relative z-10 h-full min-h-[34rem] w-full"
         nodes={nodes}
         edges={edges}
@@ -143,7 +143,7 @@ export function LoopCompositionCanvas({ projection, selectedLoopId, theme, onSel
   );
 }
 
-function LoopCompositionNodeView({ data }: NodeProps<CompositionFlowNode>) {
+function GraphEngineeringNodeView({ data }: NodeProps<GraphFlowNode>) {
   const { node } = data;
   return (
     <div className="relative h-full w-full">
@@ -153,7 +153,7 @@ function LoopCompositionNodeView({ data }: NodeProps<CompositionFlowNode>) {
       <Handle id="bottom-source" type="source" position={Position.Bottom} isConnectable={false} className="loop-react-flow-handle" />
       <button
         type="button"
-        data-loop-composition-node={node.loopId}
+        data-graph-loop-node={node.loopId}
         aria-label={`${node.kind === "installed" ? "Installed module" : "Custom Loop"} ${node.title}, Loop ID ${node.loopId}, ${node.workLoopNodeCount} Work Loop Nodes${node.locked ? ", editing locked by active Run" : ""}`}
         title={node.loopId}
         className={cn(
@@ -185,8 +185,8 @@ function LoopCompositionNodeView({ data }: NodeProps<CompositionFlowNode>) {
   );
 }
 
-function LoopCompositionEdgeView({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, data }: EdgeProps<CompositionFlowEdge>) {
-  const nodes = useNodes<CompositionFlowNode>();
+function GraphEngineeringEdgeView({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, data }: EdgeProps<GraphFlowEdge>) {
+  const nodes = useNodes<GraphFlowNode>();
   const [fallbackPath, fallbackLabelX, fallbackLabelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 4, offset: 28 });
   const smartEdge = getSmartEdge({
     sourceX,

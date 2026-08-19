@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 7
+version: 8
 tags:
   - arc42
   - building-blocks
@@ -19,7 +19,7 @@ Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vast
 
 ## Tila
 
-BB-001–BB-009 säilyvät vakaina. BB-003/004/009 käyttävät strict-v11 Graph/capability-sopimusta; BB-001:n Graph/Loop-authoring hard cut ja BB-005:n Orchestrator-dispatch ovat vielä pending. Muutos ei lisää Graph-, LoopNode- tai Orchestrator-runtime-entiteettiä.
+BB-001–BB-009 säilyvät vakaina. BB-003/004/009 käyttävät strict-v11 Graph/capability-sopimusta, BB-005:n Orchestrator-dispatch on toteutettu ja BB-001 käyttää vain Graph/Loop-authoring-reittejä. Graph Engineeringin Orchestrator-control-noden visualisointi on vielä pending. Muutos ei lisää Graph-, LoopNode- tai Orchestrator-runtime-entiteettiä.
 
 ## Taso 1: Balletin rakennusosat
 
@@ -39,7 +39,7 @@ flowchart LR
 
 | ID | Rakennusosa ja vastuu | Rajapinnat | Laatuvaikutus | Lähdekoodiankkurit | REQ | Avoin riski |
 | --- | --- | --- | --- | --- | --- | --- |
-| BB-001 | Frontend operator workspace: Configure/Run-navigaatio, kolmitasoinen Loop Engineer, editorit, Mission / All Loops ja live inspector. | Loopback HTTP JSON/SSE, shared DTO:t ja URL-route state. | Yksiselitteinen, saavutettava ja canonical-dataan sidottu operointi. | `frontend/src/workspace/`, `frontend/src/workspace/automation/loops/` | REQ-001, REQ-007, REQ-011 | Read-model-drift tai koristeen tulkitseminen runtime-faktaksi. |
+| BB-001 | Frontend operator workspace: Configure/Run-navigaatio, Graph Engineering, selected-Loop-only Loop Engineering, editorit, Mission / All Loops ja live inspector. | Loopback HTTP JSON/SSE, shared DTO:t ja URL-route state. | Yksiselitteinen, saavutettava ja canonical-dataan sidottu operointi. | `frontend/src/workspace/`, `frontend/src/workspace/automation/loops/` | REQ-001, REQ-007, REQ-011, REQ-012 | Read-model-drift tai koristeen tulkitseminen runtime-faktaksi. |
 | BB-002 | Local HTTP service ja application services: validoi pyynnöt, orkestroi käyttötapaukset ja muuntaa domain-tulokset API-vastauksiksi. | Express router, service-rajapinnat ja shared API schemas. | Suljettu paikallinen raja, fail-closed-validointi ja transaktion omistajuus. | `backend/http/`, `backend/server/`, `backend/services/`, `shared/api/` | REQ-001, REQ-006, REQ-010 | Originless local client kuuluu dokumentoituun loopback trust boundaryyn. |
 | BB-003 | Project document/config catalog: lukee strict-v11 Graph/capability-konfiguraation, Markdown-lähteet, instructionit ja skillit. | Repositoryt, resource catalog ja workspace DTO:t. | Siirrettävä, katselmoitava ja deterministisesti ratkaistu project truth. | `backend/project-config/`, `backend/documents/`, `shared/api/workspace-schemas.ts` | REQ-002, REQ-003, REQ-009 | Puuttuvan/duplikaatin resurssin on pysyttävä blocking-virheenä. |
 | BB-004 | Root Run planner/coordinator: ratkaisee reachable automationin, snapshottaa, luo worktreen ja omistaa lifecycle/finalizationin. | Run service, execution coordinator, worktree manager ja runtime engine. | Toistettavuus, eristys ja turvallinen finalization. | `backend/runs/` | REQ-004, REQ-005, REQ-006 | Snapshot-koko, cancel/finalize-kilpailut ja stale worktree. |
@@ -62,10 +62,9 @@ flowchart LR
 
 | Elementti | Vastuu | Rajapinta ja omistajuus | Lähdeankkuri |
 | --- | --- | --- | --- |
-| Workspace shell ja route state | Jäsentää ja muodostaa canonical Configure/Run- sekä `context | composition | detail` -reitit. | URL on aktiivisen projection-tason totuus; navigointi ei mutatoi domain-dataa. | `frontend/src/workspace/WorkspaceShell.tsx`, `frontend/src/workspace/routing.ts`, `LoopEngineerShell.tsx` |
-| Context projection | Tiivistää Project intention, Loop systemin ja observable outcomes ilman runtime-entiteettien keksimistä. | Read-only-projektio `WorkspaceDataDto`:sta; käsitteelliset nuolet eivät ole persistoiduja Edgejä. | `loopEngineerProjections.ts`, `LoopContextCanvas.tsx` |
-| Composition projection | Näyttää yhden black-box-solmun per `ProjectLoop` ja täsmälleen project-global `ProjectLoopEdge` -topologian. | Level 1 omistaa cross-Loop-yhteydet; `LoopEdgesEditor` on ainoa niiden editori. | `LoopCompositionCanvas.tsx`, `LoopCompositionWorkspace.tsx` |
-| Detail projection | Näyttää valitun Loopin `WorkLoopNode`-rakenteet, internal `Edge` -yhteydet ja terminal targetit. | Detail omistaa Loopin sisäisen määrittelyn eikä näytä tai kirjoita `LoopEdge`:jä. | `LoopEditor.tsx`, `LoopCanvas.tsx`, `loopLayout.ts` |
+| Workspace shell ja route state | Jäsentää ja muodostaa canonical Configure/Run- sekä `graph | loop` -reitit. | URL on aktiivisen authoring-näkymän ja Loop Engineeringissä valitun Loopin totuus; Graph-inspectorin valinta on ephemeral UI-statea eikä mutatoi domainia tai topologiaa. | `frontend/src/workspace/WorkspaceShell.tsx`, `frontend/src/workspace/routing.ts`, `EngineeringShell.tsx` |
+| Graph Engineering projection | Näyttää yhden black-box-LoopNoden per `ProjectLoop` ja project-global `ProjectLoopEdge` -topologian. | Graph omistaa cross-Loop-yhteydet; `LoopEdgesEditor` on ainoa niiden editori. Valinta ei luo client-owned topologiaa. | `engineeringProjections.ts`, `GraphEngineeringCanvas.tsx`, `GraphEngineeringWorkspace.tsx` |
+| Loop Engineering projection | Näyttää valitun Loopin `WorkLoopNode`-rakenteet, internal `Edge` -yhteydet ja terminal targetit. | Loop Engineering omistaa Loopin sisäisen määrittelyn eikä näytä tai kirjoita `LoopEdge`:jä. | `LoopEditor.tsx`, `LoopCanvas.tsx`, `loopLayout.ts` |
 | Run mission control | Johtaa Mission-/All Loops -näkymän, aktiivisen reitin, repair/return-polun ja inspectorin immutable snapshotista sekä canonical runtime read -datasta. | Ei johda tilaa provider-tekstistä eikä keksi prosenttia, ETA:a tai elapsed-arvoa. | `RunVisualWorkspace.tsx`, `RunLoopMap.tsx`, `loopRunViewModel.ts`, `RunStatePanel.tsx` |
 | Module handoff | Tarkastaa paketin, näyttää suunnitelman ja valitsee commitin jälkeen materialisoidun Loopin. | BB-009 API; recommended connections ovat neuvoa antavia. | `AutomationView.tsx`, `LoopLibraryDialog.tsx` |
 
@@ -73,14 +72,14 @@ flowchart LR
 
 | Target-elementti | Vastuu | Omistava rakennusosa | Toteutustila |
 | --- | --- | --- | --- |
-| Graph Engineering projection | Projisoi v11 `ProjectAutomationConfig`-aggregaatista yhden `LoopNode`-näkymän per `ProjectLoop`, yhden Orchestrator-controlin ja graphin route-policyn ilman sisäisiä Work/Validation-nodeja. | BB-001 lukee BB-002/003:n shared DTO:n. | accepted target; pending |
-| Loop Engineering projection | Projisoi vain valitun `ProjectLoop`in `ProjectWorkLoopNode`-rakenteet, sisäiset Edget ja terminal targetit. | BB-001 | Nykyinen v10 Level 2 on säilyvä baseline; v11 route/copy hard cut pending. |
+| Graph Engineering projection | Projisoi v11 `ProjectAutomationConfig`-aggregaatista yhden `LoopNode`-näkymän per `ProjectLoop` ja graphin route-policyn ilman sisäisiä Work/Validation-nodeja. | BB-001 lukee BB-002/003:n shared DTO:n. | route/projection/canvas toteutettu; erillinen Orchestrator-control-node pending `GLE-EVID-006` |
+| Loop Engineering projection | Projisoi vain valitun `ProjectLoop`in `ProjectWorkLoopNode`-rakenteet, sisäiset Edget ja terminal targetit. | BB-001 | toteutettu; `GLE-EVID-007` |
 | Strict-v11 graph/capability catalog | Parsii first-class Loop capability metadatan ja project-global flow/repair route-candidatet ilman v10 readeria tai silent defaultia. | BB-003 | toteutettu; `GLE-EVID-002` |
 | Immutable graph snapshot | Snapshottaa eksplisiittisestä entry Loopista reachable route/capability/resource closuren. | BB-004 | toteutettu v4-snapshot-sopimuksessa; `GLE-EVID-003` |
 | Cross-Loop dispatch | Validoi zero/one/many flow ja repair candidatea snapshot-allowlistilla/capabilityllä; ambiguity/permission → `needs_input`, repair käyttää framea ja flow ei. | BB-005, BB-006 | toteutettu; `GLE-EVID-004` |
 | V11 module materialization | Materialisoi yhden target-riippumattoman Loopin capabilityineen ja jättää kaikki peer-route-päätökset project-global graphiin. | BB-009, BB-003 | toteutettu; `GLE-EVID-008` |
 
-Graph UI:n route-edget ovat persisted policy- ja runtime-evidenssin projektio. Layout, valinta tai canvasin piirretty yhteys ei muodosta uutta BB-001:n client topology statea. Nykyiset Context/composition/detail-elementit poistetaan vasta v11-frontend-vaiheessa; tämä dokumentti ei väitä niiden jo puuttuvan lähdekoodista.
+Graph UI:n route-edget ovat persisted policy- ja runtime-evidenssin projektio. Layout, valinta tai canvasin piirretty yhteys ei muodosta uutta BB-001:n client topology statea. Context-komponentti/projektio sekä numeric route -malli puuttuvat tuotantokoodista; historialliset ADR-017- ja EVID-010-lähteet säilyvät auditointia varten.
 
 ## BB-002 whitebox: HTTP ja application-palvelut
 

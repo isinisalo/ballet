@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 5
+version: 6
 tags:
   - arc42
   - glossary
@@ -19,7 +19,7 @@ Tämä osio määrittää project-, authoring-, runtime-, provider-, persistence
 
 ## Tila
 
-Sanasto erottaa toteutetun strict-v11 config/domain/snapshot/module-rajan nykyisestä kolmitasoisesta Loop Engineer -UI:sta sekä pending Orchestrator-dispatchista ja Graph/Loop-authoring-targetista. Legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime-domainin termejä.
+Sanasto kuvaa toteutetun strict-v11 config/domain/snapshot/module/runtime-rajan ja Graph/Loop-authoring-mallin. Historiallinen Loop Engineer -termi sekä legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime- tai UI-domainin termejä.
 
 ## Project ja authoring
 
@@ -125,9 +125,9 @@ Sanasto erottaa toteutetun strict-v11 config/domain/snapshot/module-rajan nykyis
 
 | Termi | Määritelmä |
 | --- | --- |
-| Loop Engineer | Configure-puolen authoring workspace, joka jakaa Loopsit Context-, composition- ja selected-Loop detail -projektioihin. |
-| Graph Engineering | V11-targetin default authoring-näkymä: kaikki `ProjectLoop`→`LoopNode`-projektiot, yksi Orchestrator-control ja persisted project-global route-policy ilman sisäisiä Work/Validation-nodeja. |
-| Loop Engineering | V11-targetin selected-Loop-only authoring-näkymä: valitun Loopin `ProjectWorkLoopNode`-kompositio, sisäiset Edget ja terminal targetit ilman project-global routeja tai Orchestrator-controlia. |
+| Loop Engineer | Historiallinen ADR-017:n authoring workspace -nimi; superseded aktiivisessa UI:ssa Graph Engineeringillä ja Loop Engineeringillä. |
+| Graph Engineering | Default authoring-näkymä: kaikki `ProjectLoop`→`LoopNode`-projektiot ja persisted project-global route-policy ilman sisäisiä Work/Validation-nodeja. Orchestrator-editori on inspectorissa; erillinen control-node on pending. |
+| Loop Engineering | Selected-Loop-only authoring-näkymä: valitun Loopin `ProjectWorkLoopNode`-kompositio, sisäiset Edget ja terminal targetit ilman project-global routeja tai Orchestrator-controlia. |
 | Mission | Run mission control -välilehti, joka korostaa nykyisen tavoitteen, aktiivisen canonical-polun ja operaattorin seuraavan merkityksellisen havainnon. |
 | All Loops | Run-näkymä immutable snapshotin koko Loop-topologiasta; ei authoring-editori eikä legacy-nimitys yhdelle konfiguraatiolistalle. |
 | Live inspector | Canonical Run/read-model-dataan sidottu paneeli position-, role-, profile-, attempt-, revision-, repair-, return- ja finalization-tiedoille. |

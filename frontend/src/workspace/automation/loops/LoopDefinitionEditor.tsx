@@ -6,7 +6,7 @@ import { addWorkLoopNode, createWorkLoopNodeDraft, nextWorkLoopNodeId, updateNod
 import { loopIdError } from "./loopFormValidation";
 import { NodeEdgesEditor } from "./NodeEdgesEditor";
 
-export function LoopDefinitionEditor({ config, loop, initialStateText, initialStateError, disabled, onLoopChange, onInitialStateTextChange, onNodeSelect, onBackToComposition }: {
+export function LoopDefinitionEditor({ config, loop, initialStateText, initialStateError, disabled, onLoopChange, onInitialStateTextChange, onNodeSelect, onBackToGraph }: {
   config: ProjectAutomationConfig;
   loop: ProjectLoop;
   initialStateText: string;
@@ -15,7 +15,7 @@ export function LoopDefinitionEditor({ config, loop, initialStateText, initialSt
   onLoopChange: (loop: ProjectLoop) => void;
   onInitialStateTextChange: (text: string) => void;
   onNodeSelect: (nodeId: string) => void;
-  onBackToComposition: () => void;
+  onBackToGraph: () => void;
 }) {
   const updateLoop = (next: ProjectLoop) => onLoopChange(next);
   const addNode = () => {
@@ -47,8 +47,8 @@ export function LoopDefinitionEditor({ config, loop, initialStateText, initialSt
       </section>
       <NodeEdgesEditor loop={loop} disabled={disabled} onChange={(sourceNodeId: string, target: ProjectNodeEdgeTarget) => updateLoop(updateNodeEdgeTarget(loop, sourceNodeId, target))} />
       <div className="flex items-center gap-2 border-t border-divider-strong pt-3 text-xs text-muted-foreground">
-        <span className="flex-1">Connections to other Loops are edited in Level 1.</span>
-        <Button type="button" size="xs" variant="link" onClick={onBackToComposition}><ArrowLeft /> Open Level 1</Button>
+        <span className="flex-1">Connections to other Loops are edited in Graph Engineering.</span>
+        <Button type="button" size="xs" variant="link" onClick={onBackToGraph}><ArrowLeft /> Open Graph Engineering</Button>
       </div>
     </form>
   );

@@ -4,7 +4,7 @@ import { useWorkspaceNavigation } from "../src/workspace/useWorkspaceNavigation"
 
 describe("workspace navigation blocker", () => {
   beforeEach(() => {
-    window.history.replaceState({}, "", "/automation/loops?level=1");
+    window.history.replaceState({}, "", "/automation/loops?view=graph");
   });
 
   it("confirms and blocks internal navigation while the workspace is dirty", () => {
@@ -16,7 +16,7 @@ describe("workspace navigation blocker", () => {
 
     expect(confirm).toHaveBeenCalledWith("Discard theme changes?");
     expect(window.location.pathname).toBe("/automation/loops");
-    expect(result.current.route).toEqual({ view: "automation", automationLevel: "composition", automationEntityId: undefined, creating: undefined });
+    expect(result.current.route).toEqual({ view: "automation", automationView: "graph" });
 
     confirm.mockReturnValue(true);
     act(() => result.current.navigate("/execution-profiles"));
@@ -33,6 +33,26 @@ describe("workspace navigation blocker", () => {
 
     expect(confirm).not.toHaveBeenCalled();
     expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
+  });
+
+  it("restores Graph and Loop Engineering through browser back and forward", async () => {
+    const { result } = renderHook(() => useWorkspaceNavigation());
+    act(() => result.current.navigate("/automation/loops?view=loop&id=release"));
+    expect(result.current.route).toMatchObject({ view: "automation", automationView: "loop", automationEntityId: "release" });
+
+    await act(async () => {
+      const traversed = waitForPopStates(1);
+      window.history.back();
+      await traversed;
+    });
+    expect(result.current.route).toEqual({ view: "automation", automationView: "graph" });
+
+    await act(async () => {
+      const traversed = waitForPopStates(1);
+      window.history.forward();
+      await traversed;
+    });
+    expect(result.current.route).toMatchObject({ view: "automation", automationView: "loop", automationEntityId: "release" });
   });
 
   it("restores a cancelled history traversal without losing the back/forward stack", async () => {

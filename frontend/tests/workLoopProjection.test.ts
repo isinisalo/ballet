@@ -51,7 +51,7 @@ describe("strict-v11 graph projection", () => {
     expect(layout.nodes.find((node) => node.kind === "work-loop-node")).toMatchObject({ width: 24, height: 24 });
   });
 
-  it("lays out Level 2 from selected-Loop records without compact linked Loops", () => {
+  it("lays out Loop Engineering from selected-Loop records without compact linked Loops", () => {
     const selected = v11Loop("selected-loop");
     const linked = v11Loop("linked-loop");
     const config = v11Automation(selected, linked);
