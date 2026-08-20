@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 10
+version: 11
 tags:
   - arc42
   - traceability
@@ -19,7 +19,7 @@ Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioima
 
 ## Tila
 
-Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. QS-014:n päätökset ovat accepted ja data/config/snapshot/module/runtime/routing/Graph/Loop UI sekä Phase 6 project-local responsibility/library -evidenssi on GLE-EVID-002–008A; ihmisacceptance on pending.
+Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. QS-014:n päätökset ovat accepted ja data/config/snapshot/module/runtime/routing/Graph/Loop UI sekä Phase 6 project-local responsibility/library -evidenssi on GLE-EVID-002–008A; GLE-EVID-006B lisää nykyisen 11 Loopin browser/conformance-ketjun ja korjatun narrow-control-evidenssin. Ihmisacceptance on pending.
 
 ## Trace-matriisi
 
@@ -78,7 +78,7 @@ Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | EVID-011 | Exact composition/Task Envelope/adapter -testitulokset ja dokumentoitu no-fallback-invariantti. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-011-output |
 | EVID-012 | Restart/reconciliation/cancellation-testitulokset: queued säilyy, running ei replaya, committed vaikutus ei duplikoidu. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-012-output |
 | EVID-013 | Run view-model/panel -testitulokset ja canonical source -katselmointi ilman keksittyä telemetriaa. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-013-output |
-| EVID-014 | Graph Engineering / Loop Engineering strict-v11 implementation-, Phase 6 responsibility/library-, conformance- ja ihmisacceptance-evidenssi. | `.ballet/arc42/initiatives/graph-and-loop-engineering/EVIDENCE.md`; GLE-EVID-002–008A passed, human acceptance pending |
+| EVID-014 | Graph Engineering / Loop Engineering strict-v11 implementation-, Phase 6 responsibility/library-, conformance- ja ihmisacceptance-evidenssi. | `.ballet/arc42/initiatives/graph-and-loop-engineering/EVIDENCE.md`; GLE-EVID-002–008A ja current-baseline-audit GLE-EVID-006B passed, human acceptance pending |
 
 ## Ketjun tulkinta
 

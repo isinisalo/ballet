@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 9
+version: 10
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-018 ja ADR-019 ovat accepted; strict-v11 data/snapshot/module/runtime-raja sekä Graph/Loop-routing, Graph-control ja selected-Loop-only UI on toteutettu. ADR-019:n project-local yhden vastuun Loop -refaktorointi on käynnissä. Koko initiative-tason ihmisacceptance on pending.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-018 ja ADR-019 ovat accepted; strict-v11 data/snapshot/module/runtime-raja, Graph/Loop-routing, Graph-control, selected-Loop-only UI sekä ADR-019:n project-local yhden vastuun Loop -refaktorointi on toteutettu. Koko initiative-tason ihmisacceptance on pending.
 
 ## Päätösindeksi
 
@@ -73,7 +73,7 @@ adr-011:n kiinteä kuuden nimetyn arc42-Loopin topologia
 | adr-010 | adr-015 | Legacy `StepResult`-rajauksen tilalle tulee roolikohtainen strict outcome, revisionoitu State ja runtime-owned control flow. |
 | adr-014, vain V1:n no-package-raja | adr-016 | Yhden Loopin authoring package hyväksytään inspect/plan/commit-materialisointiin. ADR-014:n project-local-data- ja no-live-dependency-periaate jää voimaan. |
 | adr-017, Context/numeric level/Level 1 composition | adr-018 | Toteutettu v11 hard cut korvaa kolme authoring-tasoa Graph Engineering / Loop Engineering -unionilla ja poistaa Contextin sekä numeric route -mallin. Selected-Loop-only sisäinen projektio säilyy. Historiallista ADR:ää ei kirjoiteta uudelleen. |
-| adr-015, automaattinen yhden flow-edgen `followFlow` | adr-018 | Tuleva v11 ohjaa nolla/yksi/usea flow candidatea Orchestrator-dispatchin, snapshot-allowlistin, capabilityn ja `needs_input`-rajan kautta. Repairin call/return-, State- ja recovery-periaatteet säilyvät. |
+| adr-015, automaattinen yhden flow-edgen `followFlow` | adr-018 | Toteutettu v11 ohjaa nolla/yksi/usea flow candidatea Orchestrator-dispatchin, snapshot-allowlistin, capabilityn ja `needs_input`-rajan kautta. Repairin call/return-, State- ja recovery-periaatteet säilyvät. |
 | adr-011, kiinteä kuuden nimetyn arc42-aktiviteetti-Loopin lista ja koarse structures/concepts-flow | adr-019 | Project-local vastuut erotetaan itsenäisiksi capability-Loopeiksi ja yhden Loopin paketeiksi. ADR-011:n dokumenttiomistajuus, State-, repair-, ihmis- ja jatkuvan oppimisen rajat säilyvät. |
 
 ## Päätösten käyttö

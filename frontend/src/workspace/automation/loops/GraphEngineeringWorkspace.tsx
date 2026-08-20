@@ -147,8 +147,8 @@ function InspectorTabs({ selected, loopAvailable, onSelect }: {
   onSelect: (tab: "loop" | "orchestrator") => void;
 }) {
   return <div role="tablist" aria-label="Graph Engineering inspector sections" className="grid shrink-0 grid-cols-2 border-b border-divider-strong bg-card p-1">
-    <Button type="button" role="tab" size="sm" variant={selected === "loop" ? "secondary" : "ghost"} aria-selected={selected === "loop"} disabled={!loopAvailable} onClick={() => onSelect("loop")}><Route /> Selected Loop</Button>
-    <Button type="button" role="tab" size="sm" variant={selected === "orchestrator" ? "secondary" : "ghost"} aria-selected={selected === "orchestrator"} onClick={() => onSelect("orchestrator")}><Settings2 /> Orchestrator</Button>
+    <Button type="button" role="tab" size="sm" className="max-sm:h-10" variant={selected === "loop" ? "secondary" : "ghost"} aria-selected={selected === "loop"} disabled={!loopAvailable} onClick={() => onSelect("loop")}><Route /> Selected Loop</Button>
+    <Button type="button" role="tab" size="sm" className="max-sm:h-10" variant={selected === "orchestrator" ? "secondary" : "ghost"} aria-selected={selected === "orchestrator"} onClick={() => onSelect("orchestrator")}><Settings2 /> Orchestrator</Button>
   </div>;
 }
 

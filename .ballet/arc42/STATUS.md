@@ -4,7 +4,7 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 13
+version: 14
 tags:
   - arc42
   - status
@@ -36,7 +36,7 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 | --- | --- |
 | Hyväksytty päätös | Goal/ADR-status yllä; nykyinen baseline noudattaa ADR-011/015/016/017:ää, v11-raja ADR-018:aa ja project-local responsibility-granulariteetti ADR-019:ää. |
 | Toteutettu fakta | Strict-v11 config/domain/snapshot/module/runtime-raja, persisted generic Orchestration Request/route, Graph/Loop-authoring routing, selected-Loop-only editor ja Run mission control löytyvät työpuusta. |
-| Paikallinen evidenssi | EVID-011–EVID-013, ARCDOC-EVID-001–005 ja CANVAS-EVID-001–008/010–012 ovat verified/passed 2026-08-17 paikallisissa tarkistuksissa. GLE-EVID-002–008A todentavat 2026-08-20 mennessä strict-v11 data/snapshot/module/runtime/routing/Graph/Loop UI- ja Phase 6 responsibility/library -vaiheet; EVID-014:n ihmisacceptance on pending. CANVAS-EVID-009 säilyttää v1:n ihmisreview'n `failed`-tuloksen; v2:n uusi ihmisarvio sekä pilot/release-evidenssi puuttuvat. |
+| Paikallinen evidenssi | EVID-011–EVID-013, ARCDOC-EVID-001–005 ja CANVAS-EVID-001–008/010–012 ovat verified/passed 2026-08-17 paikallisissa tarkistuksissa. GLE-EVID-002–008A todentavat 2026-08-20 mennessä strict-v11 data/snapshot/module/runtime/routing/Graph/Loop UI- ja Phase 6 responsibility/library -vaiheet; GLE-EVID-006B todentaa current 11-Loop -browser-projektion ja korjatut 40 px narrow-ohjaimet. EVID-014:n ihmisacceptance on pending. CANVAS-EVID-009 säilyttää v1:n ihmisreview'n `failed`-tuloksen; v2:n uusi ihmisarvio sekä pilot/release-evidenssi puuttuvat. |
 | Avoin riski | RISK-001:n pilot gap, RISK-011:n lint warning -baseline, RISK-012:n Run-visualisoinnin tulkintariski ja RISK-013:n Graph-controlin puuttuva ihmisacceptance/pidempiaikainen tulkintaevidenssi. |
 
 ## Kanoniset lähteet
@@ -67,7 +67,7 @@ Osioindeksi on [README](README.md), trace-suhteet ovat [TRACEABILITYssa](TRACEAB
 
 - Initiative: `graph-and-loop-engineering`.
 - Status: `draft`; `goal-012` ja `adr-018` ovat accepted. GLE-step-001–007 on toteutettu, mutta koko `EVID-014`:n ihmisacceptance on pending. Aiemmat `architecture-canvases`- ja `comprehensive-arc42-documentation`-draftit säilyvät erillisinä hyväksymättöminä initiativeina.
-- Muuttunut stable evidenssi: `GLE-EVID-006` on passed; accepted `goal-012`, `adr-018`, `REQ-012`, `QS-014` ja muut päätös-ID:t säilyivät semanttisesti muuttumattomina.
+- Muuttunut stable evidenssi: `GLE-EVID-006B` on passed current-baseline-auditista; accepted `goal-012`, `adr-018`, `REQ-012`, `QS-014` ja muut päätös-ID:t säilyivät semanttisesti muuttumattomina.
 - Seuraava hyväksytty toimi: projektin omistaja katselmoi GLE-EVID-002–008A:n teknisen evidenssin ja hyväksyy tai palauttaa koko `EVID-014`-ketjun.
 - Stop condition: initiative-acceptance tai ulkoinen commit/release/deploy/rollback/merge/push-työ vaatii oman täsmällisen valtuutuksensa.
 

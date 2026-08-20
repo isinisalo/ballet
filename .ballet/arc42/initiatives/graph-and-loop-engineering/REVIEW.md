@@ -4,7 +4,7 @@ title: Graph and Loop Engineering REVIEW
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-20'
-version: 6
+version: 8
 tags:
   - arc42
   - initiative
@@ -55,6 +55,14 @@ RISK-013 ja TRACEABILITY erottavat läpäistyn data/snapshot/module-osavaiheen k
 - **Phase 6 conformance:** passed. Jokaisella project Loopilla ja paketilla on yksi eksplisiittinen done-condition sekä yksi accepts/provides-raja; split-vastuut ovat omia paketteja, package/state/capability/provenance/hash-roundtrip ja capability-swap on testattu, graph on ainoa peer-topologialähde ja target-ID package-resurssissa hylätään.
 - **Platform boundary:** passed. Project-workflow-ID:t ovat `.ballet/**`-datassa, generatorissa ja project-local testissä; `backend`, `frontend` ja `shared` -tuotantokoodiin ei lisätty workflow-nimiä tai target-reititystä.
 - **Open question:** ei uutta tämän rajatun vaiheen WHAT/WHY- tai vaikeasti peruttavaa HOW-kysymystä.
+
+## Riippumaton current-baseline conformance review
+
+- **Implementation defect, korjattu:** 390×844 Graph inspector -Sheetin tabit, compact Select-triggerit ja close-ohjain olivat 28 px korkeita vastoin `DESIGN.md`:n 40 px narrow-control-rajaa. Shared Select-triggerin mobile-first size, Sheet close -touch target ja Graph inspector -tabit korjattiin ilman domain-, route- tai runtime-muutosta.
+- **Conformance evidence:** GLE-EVID-006B todentaa nykyiset 11 LoopNodea, yhden Orchestratorin, Graphin 0 sisäistä nodea, persisted policy -projektion, Loop Engineeringin selected-Loop-only-rajan, URL/back/forward-käyttäytymisen, 390 px overflow-rajan ja korjatut 40 px ohjaimet.
+- **Evidence limitation:** selain kirjasi Graph→Loop-siirtymässä hetkellisiä React Flow parent-size -varoituksia. Renderöity Loop Engineering -canvas, deep-link ja history toimivat; warning jää vähäiseksi visual-lifecycle-riskiksi eikä sitä tulkita hyväksytyksi ihmisarvioksi.
+- **Documentation drift, korjattu:** `09-architecture-decisions.md` kuvasi toteutettua ADR-019-refaktorointia yhä käynnissä olevaksi ja v11 flow-dispatchia tulevaksi. Indeksi synkronoitiin nykyiseen toteutusevidenssiin muuttamatta accepted ADR-018/019-päätöksiä.
+- **Acceptance boundary:** review pysyy `draft`-tilassa ja GLE-EVID-009 pending-tilassa. Auditointi ei myönnä release-, deploy-, merge-, push- tai muuta ulkoisen kirjoituksen valtuutusta.
 
 ## Handoff
 

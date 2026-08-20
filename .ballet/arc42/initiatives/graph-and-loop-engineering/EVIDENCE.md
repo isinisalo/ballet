@@ -4,7 +4,7 @@ title: Graph and Loop Engineering EVIDENCE
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-20'
-version: 9
+version: 10
 tags:
   - arc42
   - initiative
@@ -26,6 +26,7 @@ Strict-v11 domain, schema, project repository, immutable snapshot, Loop module -
 | GLE-EVID-004 | REQ-012 / QS-003, QS-014 | Flow/repair Orchestrator-dispatch, call frame, ambiguity ja permission boundary | SQLite schema v7; Task Envelope V4; `LoopOrchestrator`, `OrchestrationStore`, `LoopCompletionEngine`; runtime/integration tests | passed | 2026-08-19 local tests | Todentaa runtime- ja persistence-rajan; Graph/Loop-authoring-UI ja ihmisacceptance eivät kuulu tähän osaevidenssiin. |
 | GLE-EVID-005 | REQ-012 / QS-014 | Context/numeric routing -legacy removal ja `graph | loop` hard cut | frontend route union/parser/generators, `EngineeringShell`, Context-tiedostojen poisto | passed | 2026-08-19 local tests/search | Todentaa routing- ja information-architecture-rajan; Graphin control-node ei kuulu tähän osaevidenssiin. |
 | GLE-EVID-006 | REQ-007, REQ-012 / QS-013, QS-014 | Graph Engineering projection/UI/visual/accessibility | `GraphEngineeringWorkspace`, `GraphEngineeringCanvas`, `GraphEngineeringElements`, `GraphOrchestratorInspector`, `engineeringProjections`; `output/playwright/graph-engineering-*.png` | passed | 2026-08-20 local tests/browser | Täsmälleen yksi Orchestrator, yksi LoopNode per ProjectLoop, 0 sisäistä Work/Validation-nodea, persisted flow/repair-policy, capability/allowlist-rejection, canonical active route, keyboard, inspector, deterministic 24px-grid ja 390×844 Sheet todennettu. Ihmisacceptance kuuluu GLE-EVID-009:ään. |
+| GLE-EVID-006B | REQ-007, REQ-012 / QS-013, QS-014 | Riippumaton nykybaseline-auditointi: 11 LoopNodea, yksi Orchestrator, 0 sisäistä nodea Graphissa, URL/back/forward, current desktop/narrow-renderöinti ja 40 px narrow-ohjaimet | `frontend/src/components/ui/select.tsx`, `frontend/src/components/ui/sheet.tsx`, `GraphEngineeringWorkspace`, `frontend/tests/engineeringUi.test.tsx`; `output/playwright/graph-engineering-audit-*.jpg` | passed | 2026-08-20 local tests/browser | Auditointi löysi ja korjasi 28 px narrow-tabien, -selectien ja Sheet close -ohjaimen DESIGN.md-poikkeaman. React Flow raportoi hetkellisen parent-size-varoituksen Graph→Loop-siirtymässä, mutta selected-Loop-canvas renderöityi ja history-palautus toimi; ihmisacceptance kuuluu GLE-EVID-009:ään. |
 | GLE-EVID-007 | REQ-011, REQ-012 / QS-010, QS-014 | Loop Engineering selected-Loop-only regressiosuoja | `LoopEditor`, `LoopCanvas`, routing/deep-link/module handoff | passed | 2026-08-19 local tests | Todentaa selected-Loop-only Work/Validation-editorin, active Run -lukituksen ja URL-owned näkymän; ei Graph-control-nodea. |
 | GLE-EVID-008 | REQ-010, REQ-012 / QS-009, QS-014 | Project-local Loop Libraryn v11 capability- ja peer-target-riippumattomuus | `.ballet/loop-library/**`, `shared/api/loop-module-schemas.ts`, `backend/loop-modules/LoopModuleService.ts` | passed | 2026-08-19 local package/install/export/API/release checks | Todentaa package/materialisointirajan; Graph/Loop-authoring-UI:n lopullinen module handoff kuuluu myöhempään UI-vaiheeseen. |
 | GLE-EVID-008A | REQ-010, REQ-012 / QS-009, QS-014 | Phase 6: yhden vastuun project-local Loopit, starter library, exact capability/state/provenance/hash-roundtrip, graph-only topology, capability swap ja target-ID conformance | GLE-step-007a / GLE-AUDIT-001 / adr-019 | passed | 2026-08-20 local tests and smoke | 11 project Loopia / 20 Work Loop Nodea / 62 Graph edgeä; 10 arc42-, 7 software-engineering- ja 2 capability-compatible implementation-pakettia. Package-hash/provenance todennettiin install/export-testissä; repositoryllä ei ole tracked installed-provenancea, koska starterit ovat library-dataa eivätkä installoituja runtime-riippuvuuksia. |
@@ -36,6 +37,14 @@ Strict-v11 domain, schema, project repository, immutable snapshot, Loop module -
 - Käyttäjän 2026-08-19 toimeksianto käsittelee `goal-012`:n listatut WHAT/WHY-päätökset hyväksyttyinä ja valtuuttaa `adr-018`:n accepted-päätöspaketin.
 - Strict-v11 tuotantokoodi ja testit osoittavat Graph/capability-datan, immutable snapshotin, target-riippumattoman package/materialisointirajan sekä persisted Orchestration Request/route/dispatch -polun. Automaattinen `followFlow` on poistettu; flow ja repair kulkevat saman generic Orchestrator-rajan kautta, mutta vain repair luo framen ja palaa samaan Validationiin. Frontend hyväksyy vain Graph Engineering / Loop Engineering -mallin ja näyttää eksplisiittisen virheen invalidista `view`-arvosta tai puuttuvasta Loop-ID:stä.
 - Historialliset `goal-011`, `adr-015`, `adr-017` ja `loop-engineer-three-level-canvas` säilyvät muuttumattomina evidenssilähteinä.
+
+### GLE-EVID-006B · riippumaton current-baseline-auditointi
+
+- Rajattu 18 tiedoston domain/snapshot/runtime/module/routing/projection/UI-matriisi läpäisi 133/133 testiä ennen muutosta.
+- Current browser -projektio näytti 1440×900-koossa 11 LoopNodea, yhden Orchestrator-control-noden, 0 sisäistä Work/Validation-nodea ja 8 näkyvää persisted flow-policyä ilman sivutason vaakaylivuotoa.
+- 390×844 Sheetissä havaittiin alle `DESIGN.md`:n 40 px narrow-rajan jäävät 28 px inspector-tab-, select- ja close-ohjaimet. Pienin korjaus palautti mobile-first Select-triggerin 40 px korkeuden, kasvatti Sheet close -touch targetin ja Graph inspector -tabit 40 px:iin sekä lisäsi regressioassertiot.
+- Korjauksen jälkeinen `npx vitest run frontend/tests/engineeringUi.test.tsx frontend/tests/workspaceSurfaceTokens.test.ts` läpäisi 18/18 testiä. Selaimen mitattu näkyvien narrow-ohjainten koko oli 40 px, `body.scrollWidth === body.clientWidth === 390`, Enter avasi `view=loop&id=arc42-clarify-requirements`-deep-linkin ja back/forward palautti Graph/Loop-näkymät.
+- Tuoreet artifactit ovat `output/playwright/graph-engineering-audit-desktop.jpg` ja `output/playwright/graph-engineering-audit-narrow-orchestrator.jpg`. Aiemmat `graph-engineering-*.png`-kuvat säilyvät historiallisena kahdeksan Loopin GLE-step-005-evidenssinä.
 
 ### GLE-step-007a · Phase 6 project-local Loops ja starter library
 

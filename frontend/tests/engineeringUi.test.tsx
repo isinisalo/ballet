@@ -102,6 +102,7 @@ describe("Graph and Loop Engineering workspace", () => {
     const sheet = screen.getByRole("dialog");
     expect(sheet).toHaveTextContent("Loop Orchestrator");
     expect(screen.getByLabelText(/Graph Engineering canvas/)).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").concat(screen.getAllByRole("combobox"), [screen.getByRole("button", { name: "Close" })]).every((control) => /max-sm:(?:h-10|size-10)|data-\[size=sm\]:h-10/.test(control.className))).toBe(true);
     media.mockImplementation(matchMedia(false));
   });
 
