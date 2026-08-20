@@ -7,14 +7,14 @@ export function RunStatusSummary({ root }: { root: RootRunDetail }) {
   const destination = firstDefined(current?.returnDestination, repair.returnDestination);
   const fields = [
     ["Active Loop", value(current?.loopId, current?.loopDescription)],
-    ["Work Loop Node", value(current?.workLoopNodeId, current?.workLoopNodeDescription)],
+    ["Job Node", value(current?.jobNodeId, current?.jobNodeDescription)],
     ["Active role", orDash(current?.nodeRole ? roleLabel(current.nodeRole) : undefined)],
-    ["Local attempt", orDash(current?.localRetryAttempt?.toString())],
+    ["Job attempt", orDash(current?.jobAttempt?.toString())],
     ["State revision", `r${root.state.currentRevision}`],
     ["Pending Repair Request", orDash(repair.pendingRepair?.repairRequestId)],
     ["Orchestrator target", orDash(firstDefined(repair.routedTarget?.targetLoopId, current?.routedTargetLoopId))],
     ["Repair depth", orZero(current?.repairDepth?.toString())],
-    ["Return destination", destination ? `${destination.loopId}/${destination.workLoopNodeId}/Validation` : "—"],
+    ["Return destination", destination ? `${destination.loopId}/${destination.jobNodeId}/Validation` : "—"],
     ["Finalization", finalizationLabel(root)]
   ];
   return <section className="border-b border-divider-strong bg-card p-3" aria-labelledby="run-position-heading">
@@ -29,7 +29,7 @@ export function RunStatusSummary({ root }: { root: RootRunDetail }) {
 }
 
 const value = (id?: string, description?: string): string => id ? `${id}${description ? ` · ${description}` : ""}` : "—";
-const roleLabel = (role: NonNullable<RootRunDetail["current"]>["nodeRole"]): string => role === "work" ? "Work" : role === "validation" ? "Validation" : "Orchestrator";
+const roleLabel = (role: NonNullable<RootRunDetail["current"]>["nodeRole"]): string => role === "job" ? "Job" : role === "validation" ? "Validation" : "Orchestrator";
 const firstDefined = <Value,>(first?: Value, second?: Value): Value | undefined => first === undefined ? second : first;
 const orDash = (value?: string): string => value === undefined ? "—" : value;
 const orZero = (value?: string): string => value === undefined ? "0" : value;

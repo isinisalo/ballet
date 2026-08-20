@@ -4,7 +4,7 @@ title: Arc42MethodStateV1-sopimus
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-19'
-version: 3
+version: 4
 tags:
   - arc42
   - state
@@ -19,7 +19,7 @@ Tämä tiedosto määrittää kaikkien arc42 Loopsien käyttämän rajatun jaetu
 
 ## Tila
 
-Versio 1 on accepted päätöksillä `adr-011`, `adr-015` ja `adr-018`. Sama rakenteellinen initial value on materialisoitu kaikkiin arc42 Loopseihin. Strict-v11 hard cut poisti `handoff.nextLoopId`-kentän: peer-target ja continuation kuuluvat project-local Graphille eivätkä portable Loopille tai Staten model-ohjattavaan sisältöön.
+Versio 1 on accepted päätöksillä `adr-011`, `adr-015`, `adr-018` ja `adr-020`. Sama rakenteellinen initial value on materialisoitu kaikkiin arc42 Loopseihin. Strict-v12 säilyttää aiemman `handoff.nextLoopId`-poiston: peer-target ja continuation kuuluvat project-local Graphille eivätkä portable Loopille tai Staten model-ohjattavaan sisältöön.
 
 ## Alkuarvo
 
@@ -84,7 +84,7 @@ Versio 1 on accepted päätöksillä `adr-011`, `adr-015` ja `adr-018`. Sama rak
 
 ## Patch-velvoitteet
 
-- Valmistunut Work ja Validation OK voivat ehdottaa vain ADR-015:n sallimia `add`, `remove` ja `replace` -operaatioita.
+- Valmistunut Job ja Validation PASS voivat ehdottaa vain ADR-015:n säilyttämiä `add`, `remove` ja `replace` -operaatioita. Validation FAIL ei voi ehdottaa State patchia.
 - Patch rajataan nykyisen Noden tehtävän omistamiin kenttiin. Se ei korvaa koko Statea eikä kopioi dokumenttirunkoja.
 - Patch-evidenssi päivittää `handoff.changedArtifactPaths`, `handoff.stableIds` ja `handoff.checks`. Check-entry sisältää stable check ID:n, komennon tai havainnon, statuksen ja evidence-viitteen.
 - Validation FAIL ei patchaa Statea. Local retry -feedback tai Orchestrator Repair Request kuljettaa korjaustarpeen.

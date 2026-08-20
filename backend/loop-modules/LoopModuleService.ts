@@ -2,21 +2,21 @@ import { constants, type Dirent } from "node:fs";
 import { mkdir, open, readdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import type { z } from "zod";
-import { loopModulePackageV1Schema } from "../../shared/api/loop-module-schemas.js";
+import { loopModulePackageV2Schema } from "../../shared/api/loop-module-schemas.js";
 import {
   isProjectAgentValidationNode,
-  isProjectProviderWorkNode,
+  isProjectProviderJobNode,
   type ProjectAutomationConfig,
   type ProjectExecutionComposition,
+  type ProjectJobNode,
   type ProjectLoop,
-  type ProjectValidationNode,
-  type ProjectWorkNode
+  type ProjectValidationNode
 } from "../../shared/domain/automation.js";
 import type { ProjectResourceCatalog } from "../../shared/domain/documents.js";
 import {
   maxLoopModulePackageBytes,
   type InstalledLoopModuleStatus,
-  type InstalledLoopModuleV1,
+  type InstalledLoopModuleV2,
   type LoopModuleErrorCode,
   type LoopModuleExportResult,
   type LoopModuleIdRemapping,
@@ -25,13 +25,13 @@ import {
   type LoopModuleIssue,
   type LoopModuleLibraryEntry,
   type LoopModuleNetworkRequirement,
-  type LoopModulePackageV1,
+  type LoopModulePackageV2,
   type LoopModuleProfileMappingPlan,
-  type LoopModuleResourceV1,
+  type LoopModuleJobNodeV2,
+  type LoopModuleResourceV2,
   type LoopModuleResourceWritePlan,
   type LoopModuleStateCompatibility,
-  type LoopModuleValidationNodeV1,
-  type LoopModuleWorkNodeV1
+  type LoopModuleValidationNodeV2
 } from "../../shared/domain/loopModules.js";
 import type { ExecutionProfile, ProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
@@ -62,12 +62,12 @@ export class LoopModuleService {
     if (sizeBytes > maxLoopModulePackageBytes) return invalidInspection(source, sizeBytes, issue(
       "PACKAGE_TOO_LARGE", "$", `Package exceeds ${maxLoopModulePackageBytes} UTF-8 bytes.`
     ));
-    if (isRecord(input) && input.version !== 1) return invalidInspection(source, sizeBytes, issue(
-      "SCHEMA_DOWNGRADE", "version", `Loop module package version 1 is required; received ${String(input.version)}.`
+    if (isRecord(input) && input.version !== 2) return invalidInspection(source, sizeBytes, issue(
+      "SCHEMA_DOWNGRADE", "version", `Loop module package version 2 is required; received ${String(input.version)}.`
     ));
     const forbidden = forbiddenPackageIssue(input);
     if (forbidden) return invalidInspection(source, sizeBytes, forbidden);
-    const parsed = loopModulePackageV1Schema.safeParse(input);
+    const parsed = loopModulePackageV2Schema.safeParse(input);
     if (!parsed.success) return {
       valid: false, source, sizeBytes,
       issues: parsed.error.issues.map(zodIssue)
@@ -172,7 +172,7 @@ export class LoopModuleService {
       const installedContentSha256 = contentHash(plan.loop, ownedResources.map((resource) => ({
         relativePath: resource.relativePath, sha256: resource.installedSha256
       })));
-      const record: InstalledLoopModuleV1 = {
+      const record: InstalledLoopModuleV2 = {
         moduleId: pkg.manifest.id,
         moduleVersion: pkg.manifest.version,
         title: pkg.manifest.title,
@@ -238,7 +238,7 @@ export class LoopModuleService {
     const statuses = await this.statuses();
     const provenance = statuses.find((record) => record.loopId === loop.id);
     const pkg = exportPackage(loop, loaded.config.executionProfiles, resources, provenance, input);
-    const parsed = loopModulePackageV1Schema.parse(pkg);
+    const parsed = loopModulePackageV2Schema.parse(pkg);
     const inspection = this.inspect(parsed, `export:${loop.id}`);
     if (!inspection.valid || !inspection.package || !inspection.canonicalJson || !inspection.sha256) {
       throw new LoopModuleValidationError("Loop export contains forbidden or invalid content.", inspection.issues);
@@ -272,22 +272,35 @@ export class LoopModuleService {
   }
 
   private createPlan(
-    pkg: LoopModulePackageV1,
+    pkg: LoopModulePackageV2,
     packageSha256: string,
     source: string,
     requestedMappings: Record<string, string>,
     project: ProjectConfiguration,
     catalog: ProjectResourceCatalog,
-    installed: InstalledLoopModuleV1[]
+    installed: InstalledLoopModuleV2[]
   ): LoopModuleInstallPlan {
     const allLoopIds = project.loops.map((loop) => loop.id);
     const loopId = uniqueId(allLoopIds, pkg.manifest.id, 101);
-    const allNodeIds = project.loops.flatMap((loop) => loop.nodes.map((node) => node.id));
-    const allEdgeIds = [...project.loops.flatMap((loop) => loop.edges.map((edge) => edge.id)), ...project.graph.loopEdges.map((edge) => edge.id)];
+    const allNodeIds = project.loops.flatMap((loop) => [
+      ...loop.workflow.jobNodes.map((node) => node.id),
+      ...loop.workflow.validationNodes.map((node) => node.id)
+    ]);
+    const allEdgeIds = [
+      ...project.loops.flatMap((loop) => [
+        ...loop.workflow.passEdges.map((edge) => edge.id),
+        ...loop.workflow.failEdges.map((edge) => edge.id)
+      ]),
+      ...project.graph.loopEdges.map((edge) => edge.id)
+    ];
     const nodeMap: Record<string, string> = {};
-    for (const node of pkg.loop.nodes) nodeMap[node.key] = uniqueId([...allNodeIds, ...Object.values(nodeMap)], `${loopId}-${node.key}`, 160);
+    for (const node of [...pkg.loop.workflow.jobNodes, ...pkg.loop.workflow.validationNodes]) {
+      nodeMap[node.key] = uniqueId([...allNodeIds, ...Object.values(nodeMap)], `${loopId}-${node.key}`, 160);
+    }
     const edgeMap: Record<string, string> = {};
-    for (const edge of pkg.loop.edges) edgeMap[edge.key] = uniqueId([...allEdgeIds, ...Object.values(edgeMap)], `${loopId}-${edge.key}`, 200);
+    for (const edge of [...pkg.loop.workflow.passEdges, ...pkg.loop.workflow.failEdges]) {
+      edgeMap[edge.key] = uniqueId([...allEdgeIds, ...Object.values(edgeMap)], `${loopId}-${edge.key}`, 200);
+    }
     const instructionMap: Record<string, string> = {};
     const skillMap: Record<string, string> = {};
     const resources: LoopModuleResourceWritePlan[] = [];
@@ -417,7 +430,7 @@ export class LoopModuleService {
 }
 
 const materializeLoop = (
-  pkg: LoopModulePackageV1,
+  pkg: LoopModulePackageV2,
   loopId: string,
   nodes: Record<string, string>,
   edges: Record<string, string>,
@@ -432,60 +445,83 @@ const materializeLoop = (
     provides: [...pkg.capabilities.provides].sort(compareLoopModuleText)
   },
   state: structuredClone(pkg.loop.state),
-  startNodeId: nodes[pkg.loop.startNode]!,
-  nodes: pkg.loop.nodes.map((node) => ({
-    id: nodes[node.key]!, description: node.description, maxLocalAttempts: node.maxLocalAttempts,
-    work: materializeWork(node.work, profiles, instructions, skills),
-    validation: materializeValidation(node.validation, profiles, instructions, skills)
-  })),
-  edges: pkg.loop.edges.map((edge) => ({
-    id: edges[edge.key]!, source: nodes[edge.source]!,
-    target: "node" in edge.target ? { nodeId: nodes[edge.target.node]! } : { terminal: edge.target.terminal }
-  }))
+  workflow: {
+    startJobNodeId: nodes[pkg.loop.workflow.startJobNode]!,
+    jobNodes: pkg.loop.workflow.jobNodes.map((node) => materializeJob(
+      node, nodes[node.key]!, nodes[node.validationNode]!, profiles, instructions, skills
+    )),
+    validationNodes: pkg.loop.workflow.validationNodes.map((node) => materializeValidation(
+      node, nodes[node.key]!, profiles, instructions, skills
+    )),
+    passEdges: pkg.loop.workflow.passEdges.map((edge) => ({
+      id: edges[edge.key]!,
+      sourceValidationNodeId: nodes[edge.sourceValidationNode]!,
+      target: "jobNode" in edge.target
+        ? { jobNodeId: nodes[edge.target.jobNode]! }
+        : { workflowResult: "PASS" as const }
+    })),
+    failEdges: pkg.loop.workflow.failEdges.map((edge) => ({
+      id: edges[edge.key]!,
+      sourceValidationNodeId: nodes[edge.sourceValidationNode]!,
+      target: { workflowResult: "FAIL" as const }
+    }))
+  }
 });
 
-const materializeWork = (
-  node: LoopModuleWorkNodeV1,
+const materializeJob = (
+  node: LoopModuleJobNodeV2,
+  id: string,
+  validationNodeId: string,
   profiles: Record<string, string>,
   instructions: Record<string, string>,
   skills: Record<string, string>
-): ProjectWorkNode => {
-  if (node.type === "human") return { ...node };
+): ProjectJobNode => {
+  const base = {
+    id,
+    validationNodeId,
+    description: node.description,
+    task: node.task,
+    maxRetries: node.maxRetries,
+    nodeStyle: node.nodeStyle,
+    nodeSize: node.nodeSize
+  };
+  if (node.type === "human") return { ...base, type: "human" };
   const composition = {
     executionProfileId: profiles[node.profileSlot]!,
     primaryInstructionId: instructions[node.primaryInstruction]!,
     skillIds: node.skills.map((key) => skills[key]!).sort(compareLoopModuleText)
   };
-  if (node.type === "scheduled") return { ...withoutModuleComposition(node), ...composition, type: "scheduled", schedule: node.schedule };
-  return { ...withoutModuleComposition(node), ...composition, type: "agent" };
+  if (node.type === "scheduled") return {
+    ...base, id, validationNodeId, ...composition, type: "scheduled", schedule: node.schedule
+  };
+  return { ...base, id, validationNodeId, ...composition, type: "agent" };
 };
 
 const materializeValidation = (
-  node: LoopModuleValidationNodeV1,
+  node: LoopModuleValidationNodeV2,
+  id: string,
   profiles: Record<string, string>,
   instructions: Record<string, string>,
   skills: Record<string, string>
-): ProjectValidationNode => node.type === "human" ? { ...node } : ({
-  ...withoutModuleComposition(node),
+): ProjectValidationNode => node.type === "human" ? {
+  id, description: node.description, task: node.task,
+  nodeStyle: node.nodeStyle, nodeSize: node.nodeSize, type: "human"
+} : ({
+  id, description: node.description, task: node.task,
+  nodeStyle: node.nodeStyle, nodeSize: node.nodeSize,
   type: "agent",
   executionProfileId: profiles[node.profileSlot]!,
   primaryInstructionId: instructions[node.primaryInstruction]!,
   skillIds: node.skills.map((key) => skills[key]!).sort(compareLoopModuleText)
 });
 
-const withoutModuleComposition = <T extends { profileSlot: string; primaryInstruction: string; skills: string[] }>(value: T) => {
-  const { profileSlot, primaryInstruction, skills, ...rest } = value;
-  void profileSlot; void primaryInstruction; void skills;
-  return rest;
-};
-
-const materializedResourceSources = (pkg: LoopModulePackageV1, remapping: LoopModuleIdRemapping): Map<string, string> =>
+const materializedResourceSources = (pkg: LoopModulePackageV2, remapping: LoopModuleIdRemapping): Map<string, string> =>
   new Map(pkg.resources.map((resource) => [resource.key, materializedResourceSource(
     resource,
     resource.kind === "instruction" ? remapping.instructions[resource.key]! : remapping.skills[resource.key]!
   )]));
 
-const materializedResourceSource = (resource: LoopModuleResourceV1, resourceId: string): string => {
+const materializedResourceSource = (resource: LoopModuleResourceV2, resourceId: string): string => {
   if (resource.kind === "instruction") return markdownSource({
     ...resource.metadata,
     id: resourceId.replace(/^project:/, ""),
@@ -524,11 +560,11 @@ const exportPackage = (
   catalog: ProjectResourceCatalog,
   provenance: InstalledLoopModuleStatus | undefined,
   input: ExportInput
-): LoopModulePackageV1 => {
-  const compositions = loop.nodes.flatMap((node) => [
-    ...(isProjectProviderWorkNode(node.work) ? [node.work] : []),
-    ...(isProjectAgentValidationNode(node.validation) ? [node.validation] : [])
-  ]);
+): LoopModulePackageV2 => {
+  const compositions = [
+    ...loop.workflow.jobNodes.filter(isProjectProviderJobNode),
+    ...loop.workflow.validationNodes.filter(isProjectAgentValidationNode)
+  ];
   const profileIds = [...new Set(compositions.map((composition) => composition.executionProfileId))];
   const provenanceSlots = provenance ? Object.entries(provenance.profileMappings) : undefined;
   const slotEntries = provenanceSlots?.length
@@ -561,7 +597,7 @@ const exportPackage = (
     const key = uniqueId([...usedKeys], base, 100);
     usedKeys.add(key); resourceKeyById.set(id, key); return key;
   };
-  const resources: LoopModuleResourceV1[] = [
+  const resources: LoopModuleResourceV2[] = [
     ...instructionIds.map((id) => {
       const resource = catalog.instructions.find((candidate) => candidate.id === id);
       if (!resource?.valid) throw missingExportResource(id);
@@ -588,8 +624,14 @@ const exportPackage = (
   ];
   const originalNodeKeys = provenance ? inverse(provenance.idRemapping.nodes) : {};
   const originalEdgeKeys = provenance ? inverse(provenance.idRemapping.edges) : {};
-  const nodeKeys = Object.fromEntries(loop.nodes.map((node) => [node.id, originalNodeKeys[node.id] ?? localKeyFromMaterialized(loop.id, node.id)]));
-  const edgeKeys = Object.fromEntries(loop.edges.map((edge) => [edge.id, originalEdgeKeys[edge.id] ?? localKeyFromMaterialized(loop.id, edge.id)]));
+  const workflowNodes = [...loop.workflow.jobNodes, ...loop.workflow.validationNodes];
+  const workflowEdges = [...loop.workflow.passEdges, ...loop.workflow.failEdges];
+  const nodeKeys = Object.fromEntries(workflowNodes.map((node) => [
+    node.id, originalNodeKeys[node.id] ?? localKeyFromMaterialized(loop.id, node.id)
+  ]));
+  const edgeKeys = Object.fromEntries(workflowEdges.map((edge) => [
+    edge.id, originalEdgeKeys[edge.id] ?? localKeyFromMaterialized(loop.id, edge.id)
+  ]));
   const toModuleComposition = (composition: ProjectExecutionComposition) => ({
     profileSlot: slotByProfile[composition.executionProfileId]!,
     primaryInstruction: resourceKeyById.get(composition.primaryInstructionId)!,
@@ -602,7 +644,7 @@ const exportPackage = (
     : networkSet.size === 1 ? [...networkSet][0]! : "optional";
   return {
     format: "ballet-loop-module",
-    version: 1,
+    version: 2,
     manifest: {
       id: slug(input.loopId),
       title: input.title ?? provenance?.title ?? loop.id,
@@ -626,55 +668,81 @@ const exportPackage = (
     resources,
     loop: {
       key: "loop", description: loop.description, state: structuredClone(loop.state),
-      startNode: nodeKeys[loop.startNodeId]!,
-      nodes: loop.nodes.map((node): LoopModulePackageV1["loop"]["nodes"][number] => ({
-        key: nodeKeys[node.id]!, description: node.description, maxLocalAttempts: node.maxLocalAttempts,
-        work: exportWork(node.work, toModuleComposition),
-        validation: exportValidation(node.validation, toModuleComposition)
-      })),
-      edges: loop.edges.map((edge) => ({
-        key: edgeKeys[edge.id]!, source: nodeKeys[edge.source]!,
-        target: "nodeId" in edge.target ? { node: nodeKeys[edge.target.nodeId]! } : { terminal: edge.target.terminal }
-      }))
+      workflow: {
+        startJobNode: nodeKeys[loop.workflow.startJobNodeId]!,
+        jobNodes: loop.workflow.jobNodes.map((node) => exportJob(
+          node, nodeKeys[node.id]!, nodeKeys[node.validationNodeId]!, toModuleComposition
+        )),
+        validationNodes: loop.workflow.validationNodes.map((node) => exportValidation(
+          node, nodeKeys[node.id]!, toModuleComposition
+        )),
+        passEdges: loop.workflow.passEdges.map((edge) => ({
+          key: edgeKeys[edge.id]!,
+          sourceValidationNode: nodeKeys[edge.sourceValidationNodeId]!,
+          target: "jobNodeId" in edge.target
+            ? { jobNode: nodeKeys[edge.target.jobNodeId]! }
+            : { workflowResult: "PASS" as const }
+        })),
+        failEdges: loop.workflow.failEdges.map((edge) => ({
+          key: edgeKeys[edge.id]!,
+          sourceValidationNode: nodeKeys[edge.sourceValidationNodeId]!,
+          target: { workflowResult: "FAIL" as const }
+        }))
+      }
     }
   };
 };
 
-const exportWork = (
-  node: ProjectWorkNode,
+const exportJob = (
+  node: ProjectJobNode,
+  key: string,
+  validationNode: string,
   composition: (value: ProjectExecutionComposition) => {
     profileSlot: string; primaryInstruction: string; skills: string[]
   }
-): LoopModuleWorkNodeV1 => {
-  if (node.type === "human") return { ...node };
-  if (node.type === "scheduled") return { ...stripProjectComposition(node), ...composition(node), type: "scheduled", schedule: node.schedule };
-  return { ...stripProjectComposition(node), ...composition(node), type: "agent" };
+): LoopModuleJobNodeV2 => {
+  const base = {
+    key,
+    validationNode,
+    description: node.description,
+    task: node.task,
+    maxRetries: node.maxRetries,
+    nodeStyle: node.nodeStyle,
+    nodeSize: node.nodeSize
+  };
+  if (node.type === "human") return { ...base, type: "human" };
+  if (node.type === "scheduled") return {
+    ...base, ...composition(node), type: "scheduled", schedule: node.schedule
+  };
+  return { ...base, ...composition(node), type: "agent" };
 };
 
 const exportValidation = (
   node: ProjectValidationNode,
+  key: string,
   composition: (value: ProjectExecutionComposition) => {
     profileSlot: string; primaryInstruction: string; skills: string[]
   }
-): LoopModuleValidationNodeV1 => node.type === "human"
-  ? { ...node }
-  : { ...stripProjectComposition(node), ...composition(node), type: "agent" };
-
-const stripProjectComposition = <T extends ProjectExecutionComposition>(value: T) => {
-  const { executionProfileId, primaryInstructionId, skillIds, ...rest } = value;
-  void executionProfileId; void primaryInstructionId; void skillIds;
-  return rest;
-};
+): LoopModuleValidationNodeV2 => node.type === "human"
+  ? {
+      key, description: node.description, task: node.task,
+      nodeStyle: node.nodeStyle, nodeSize: node.nodeSize, type: "human"
+    }
+  : {
+      key, description: node.description, task: node.task,
+      nodeStyle: node.nodeStyle, nodeSize: node.nodeSize,
+      ...composition(node), type: "agent"
+    };
 
 const missingExportResource = (id: string) => new LoopModuleValidationError("Loop export closure is incomplete.", [
   issue("INVALID_SCHEMA", "resources", `Referenced project resource is missing or invalid: ${id}.`)
 ]);
 
-const profileCompatible = (profile: ExecutionProfile, slot: LoopModulePackageV1["profileSlots"][number]): boolean =>
+const profileCompatible = (profile: ExecutionProfile, slot: LoopModulePackageV2["profileSlots"][number]): boolean =>
   slot.providers.includes(profile.provider)
   && (slot.network === "optional" || profile.networkAccess === (slot.network === "required"));
 
-const stateCompatibilityWith = (pkg: LoopModulePackageV1, installed: InstalledLoopModuleV1[]): {
+const stateCompatibilityWith = (pkg: LoopModulePackageV2, installed: InstalledLoopModuleV2[]): {
   compatibility: LoopModuleStateCompatibility; comparedWith: string[]
 } => {
   const comparable = installed.filter((record) => record.stateContract.id === pkg.stateContract.id);
@@ -692,10 +760,12 @@ const stateCompatibilityWith = (pkg: LoopModulePackageV1, installed: InstalledLo
 
 const referencedResourceIds = (config: ProjectAutomationConfig): Set<string> => new Set([
   config.orchestrator.primaryInstructionId, ...config.orchestrator.skillIds,
-  ...config.loops.flatMap((loop) => loop.nodes.flatMap((node) => [
-    ...(isProjectProviderWorkNode(node.work) ? [node.work.primaryInstructionId, ...node.work.skillIds] : []),
-    ...(isProjectAgentValidationNode(node.validation) ? [node.validation.primaryInstructionId, ...node.validation.skillIds] : [])
-  ]))
+  ...config.loops.flatMap((loop) => [
+    ...loop.workflow.jobNodes.flatMap((node) =>
+      isProjectProviderJobNode(node) ? [node.primaryInstructionId, ...node.skillIds] : []),
+    ...loop.workflow.validationNodes.flatMap((node) =>
+      isProjectAgentValidationNode(node) ? [node.primaryInstructionId, ...node.skillIds] : [])
+  ])
 ].filter(Boolean));
 
 const contentHash = (loop: ProjectLoop, resources: Array<{ relativePath: string; sha256: string }>): string =>
@@ -705,7 +775,7 @@ const contentHash = (loop: ProjectLoop, resources: Array<{ relativePath: string;
   }));
 
 const automationOf = (config: ProjectConfiguration): ProjectAutomationConfig => ({
-  version: 11, orchestrator: config.orchestrator, graph: config.graph, loops: config.loops
+  version: 12, orchestrator: config.orchestrator, graph: config.graph, loops: config.loops
 });
 
 const walkLibrary = async (root: string, relativeDirectory: string): Promise<string[]> => {
@@ -762,7 +832,7 @@ const forbiddenStringIssue = (value: string, currentPath: string, key?: string):
 };
 
 const peerLoopReferenceIssues = (
-  pkg: LoopModulePackageV1,
+  pkg: LoopModulePackageV2,
   projectLoops: readonly ProjectLoop[]
 ): LoopModuleIssue[] => {
   const peers = projectLoops.map((loop) => loop.id)

@@ -1,7 +1,7 @@
 import type { JsonValue } from "./automation.js";
-import type { CanonicalNodeOutcome, WorkCompletedOutcome } from "./runtime.js";
+import type { CanonicalNodeOutcome, JobCompletedOutcome } from "./runtime.js";
 
-export const taskEnvelopeVersion = 4 as const;
+export const taskEnvelopeVersion = 5 as const;
 export const maxTaskEnvelopeBytes = 384 * 1024;
 export const maxRelevantHistoryEntries = 8;
 export const maxRelevantHistoryBytes = 64 * 1024;
@@ -15,7 +15,7 @@ export interface TaskEnvelopeRunIdentity {
 }
 
 export interface TaskEnvelopeProviderRunIdentity extends TaskEnvelopeRunIdentity {
-  workLoopNodeRunId: string;
+  jobRunId: string;
 }
 
 export interface TaskEnvelopeLoopIdentity {
@@ -23,7 +23,7 @@ export interface TaskEnvelopeLoopIdentity {
   description: string;
 }
 
-export interface TaskEnvelopeWorkLoopNodeIdentity {
+export interface TaskEnvelopeWorkflowNodeIdentity {
   id: string;
   description: string;
 }
@@ -43,7 +43,7 @@ export interface TaskEnvelopeResumeContext {
 export interface TaskEnvelopeHistoryEntry {
   sequence: number;
   nodeRunId: string;
-  role: "work" | "validation" | "orchestrator";
+  role: "job" | "validation" | "orchestrator";
   state: "completed" | "needs_input" | "blocked" | "failed";
   summary: string;
   stateRevision: number;
@@ -52,7 +52,7 @@ export interface TaskEnvelopeHistoryEntry {
 interface TaskEnvelopeRepairRequestBase {
   id: string;
   requesterLoopRunId: string;
-  requesterWorkLoopNodeRunId: string;
+  requesterJobRunId: string;
   requesterValidationNodeRunId: string;
   attempt: number;
   validationSummary: string;
@@ -116,34 +116,35 @@ interface TaskEnvelopeBase {
   relevantHistory: TaskEnvelopeHistoryEntry[];
 }
 
-export interface WorkTaskEnvelopeV4 extends TaskEnvelopeBase {
-  role: "work";
+export interface JobTaskEnvelopeV5 extends TaskEnvelopeBase {
+  role: "job";
   run: TaskEnvelopeProviderRunIdentity;
-  workLoopNode: TaskEnvelopeWorkLoopNodeIdentity;
-  localAttempt: number;
+  jobNode: TaskEnvelopeWorkflowNodeIdentity;
+  jobAttempt: number;
   previousValidationFeedback?: {
     feedback: string;
     expectedCorrection: string;
   };
 }
 
-export interface ValidationTaskEnvelopeV4 extends TaskEnvelopeBase {
+export interface ValidationTaskEnvelopeV5 extends TaskEnvelopeBase {
   role: "validation";
   run: TaskEnvelopeProviderRunIdentity;
-  workLoopNode: TaskEnvelopeWorkLoopNodeIdentity;
-  localAttempt: number;
-  workOutcome: WorkCompletedOutcome;
+  jobNode: TaskEnvelopeWorkflowNodeIdentity;
+  validationNode: TaskEnvelopeWorkflowNodeIdentity;
+  jobAttempt: number;
+  jobOutcome: JobCompletedOutcome;
   repairReturn?: TaskEnvelopeRepairReturn;
 }
 
-export interface OrchestratorTaskEnvelopeV4 extends TaskEnvelopeBase {
+export interface OrchestratorTaskEnvelopeV5 extends TaskEnvelopeBase {
   role: "orchestrator";
   run: TaskEnvelopeRunIdentity;
   orchestrationRequest: TaskEnvelopeOrchestrationRequest;
   allowedCandidates: TaskEnvelopeRouteCandidate[];
 }
 
-export type TaskEnvelopeV4 =
-  | WorkTaskEnvelopeV4
-  | ValidationTaskEnvelopeV4
-  | OrchestratorTaskEnvelopeV4;
+export type TaskEnvelopeV5 =
+  | JobTaskEnvelopeV5
+  | ValidationTaskEnvelopeV5
+  | OrchestratorTaskEnvelopeV5;

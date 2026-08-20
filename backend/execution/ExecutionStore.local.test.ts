@@ -39,7 +39,7 @@ describe("ExecutionStore", () => {
     fixture.insertRoot("root-1", "orchestrator");
     const firstSpec = specification("orchestrator", "root-1");
     fixture.store.create(firstSpec);
-    fixture.store.finish(firstSpec.taskId, "succeeded", { outcome: completedWorkOutcome });
+    fixture.store.finish(firstSpec.taskId, "succeeded", { outcome: completedJobOutcome });
     fixture.connection().prepare(`
       UPDATE node_runs SET execution_task_id = NULL WHERE node_run_id = ?
     `).run(firstSpec.nodeRunId);
@@ -69,7 +69,7 @@ describe("ExecutionStore", () => {
 
     const queued = fixture.store.requestCancel("queued");
     const requested = fixture.store.requestCancel("running");
-    const finished = fixture.store.finish("running", "succeeded", { outcome: completedWorkOutcome });
+    const finished = fixture.store.finish("running", "succeeded", { outcome: completedJobOutcome });
 
     expect(queued).toMatchObject({ status: "cancelled", cancelRequestedAt: expect.any(String) });
     expect(requested).toMatchObject({ status: "running", cancelRequestedAt: expect.any(String) });
@@ -118,7 +118,7 @@ describe("ExecutionStore", () => {
       SELECT status, state_revision_after FROM node_runs WHERE node_run_id = 'node-running'
     `).get()).toEqual({ status: "interrupted", state_revision_after: 0 });
     expect(fixture.connection().prepare(`
-      SELECT status, state_revision_after FROM work_loop_node_runs WHERE work_loop_node_run_id = 'work-loop-running'
+      SELECT status, state_revision_after FROM job_runs WHERE job_run_id = 'job-running'
     `).get()).toEqual({ status: "failed", state_revision_after: 0 });
     expect(fixture.connection().prepare("SELECT current_state_revision FROM root_runs WHERE root_run_id = 'root-1'").pluck().get())
       .toBe(0);
@@ -157,7 +157,7 @@ describe("ExecutionStore outcome contracts", () => {
     fixture.insertRoot("root-1", "task");
     fixture.store.create(specification("task", "root-1"));
 
-    const completed = fixture.store.finish("task", "succeeded", { outcome: completedWorkOutcome });
+    const completed = fixture.store.finish("task", "succeeded", { outcome: completedJobOutcome });
     const replayed = fixture.store.finish("task", "failed", { errorCode: "late", errorMessage: "late failure" });
 
     expect(replayed).toEqual(completed);
@@ -172,18 +172,18 @@ describe("ExecutionStore outcome contracts", () => {
     fixture.store.create(specification("task", "root-1"));
 
     expect(() => fixture.store.finish("task", "succeeded", { outcome: {
-      role: "validation", state: "completed", decision: "OK", summary: "Wrong role.", evidence: {}, checks: []
+      role: "validation", state: "completed", decision: "PASS", summary: "Wrong role.", evidence: {}, checks: []
     } })).toThrow();
     expect(fixture.store.require("task").status).toBe("queued");
 
     const completed = fixture.store.finish("task", "succeeded", { outcome: {
-      role: "work", state: "completed", summary: "Canonical.", artifacts: { z: 1, a: 2 }, checks: []
+      role: "job", state: "completed", summary: "Canonical.", artifacts: { z: 1, a: 2 }, checks: []
     } });
-    expect(completed.outcome).toMatchObject({ role: "work", state: "completed" });
+    expect(completed.outcome).toMatchObject({ role: "job", state: "completed" });
     expect(fixture.connection().prepare(
       "SELECT outcome_json FROM execution_tasks WHERE task_id = 'task'"
     ).pluck().get()).toBe(
-      '{"artifacts":{"a":2,"z":1},"checks":[],"role":"work","state":"completed","summary":"Canonical."}'
+      '{"artifacts":{"a":2,"z":1},"checks":[],"role":"job","state":"completed","summary":"Canonical."}'
     );
     fixture.close();
   });
@@ -193,7 +193,7 @@ describe("ExecutionStore outcome contracts", () => {
     fixture.insertRoot("root-1", "task");
     const invalid = specification("task", "root-1");
     invalid.evidence.outputSchema = validationNodeOutcomeJsonSchema;
-    invalid.evidence.outputSchemaId = "validation-node-outcome-v4";
+    invalid.evidence.outputSchemaId = "validation-node-outcome-v5";
     invalid.evidence.outputSchemaSha256 = sha256(canonicalJson(validationNodeOutcomeJsonSchema));
     expect(() => fixture.store.create(invalid)).toThrow(/output schema evidence/);
     fixture.close();
@@ -209,8 +209,8 @@ describe("ExecutionStore outcome contracts", () => {
   });
 });
 
-const completedWorkOutcome = {
-  role: "work" as const,
+const completedJobOutcome = {
+  role: "job" as const,
   state: "completed" as const,
   summary: "Completed.",
   artifacts: {},
@@ -259,19 +259,19 @@ const createFixture = async () => {
         ) VALUES (?, ?, 'delivery', 'manual', 'running', 0, 0, ?, ?)
       `).run(`loop-${rootRunId}`, rootRunId, timestamp, timestamp);
       connection().prepare(`
-        INSERT INTO work_loop_node_runs (
-          work_loop_node_run_id, root_run_id, loop_run_id, loop_id, work_loop_node_id,
-          attempt, status, state_revision_before, created_at, updated_at
+        INSERT INTO job_runs (
+          job_run_id, root_run_id, loop_run_id, loop_id, job_node_id,
+          job_attempt, status, state_revision_before, created_at, updated_at
         ) VALUES (?, ?, ?, 'delivery', ?, 1, 'running', 0, ?, ?)
-      `).run(`work-loop-${taskId}`, rootRunId, `loop-${rootRunId}`, taskId, timestamp, timestamp);
+      `).run(`job-${taskId}`, rootRunId, `loop-${rootRunId}`, taskId, timestamp, timestamp);
       connection().prepare(`
         INSERT INTO node_runs (
-          node_run_id, root_run_id, loop_run_id, work_loop_node_run_id, role, loop_id,
-          work_loop_node_id, node_definition_id, status, attempt, state_revision_before,
+          node_run_id, root_run_id, loop_run_id, job_run_id, role, loop_id,
+          job_node_id, workflow_node_id, node_definition_id, status, attempt, state_revision_before,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, 'work', 'delivery', ?, ?, 'queued', 1, 0, ?, ?)
-      `).run(`node-${taskId}`, rootRunId, `loop-${rootRunId}`, `work-loop-${taskId}`,
-        taskId, `delivery:${taskId}:work`, timestamp, timestamp);
+        ) VALUES (?, ?, ?, ?, 'job', 'delivery', ?, ?, ?, 'queued', 1, 0, ?, ?)
+      `).run(`node-${taskId}`, rootRunId, `loop-${rootRunId}`, `job-${taskId}`,
+        taskId, taskId, taskId, timestamp, timestamp);
       connection().prepare(`
         UPDATE root_runs SET active_loop_run_id = ?, active_node_run_id = ? WHERE root_run_id = ?
       `).run(`loop-${rootRunId}`, `node-${taskId}`, rootRunId);

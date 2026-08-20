@@ -152,7 +152,9 @@ if (!Array.isArray(entries)
   || entries[0]?.permissions?.externalWrites !== false
   || entries[0]?.package?.capabilities?.accepts?.[0] !== "arc42:initiative.requested"
   || entries[0]?.package?.capabilities?.provides?.[0] !== "arc42:requirements.clarified"
-  || entries[0]?.package?.loop?.nodes?.length !== 2) {
+  || entries[0]?.package?.version !== 2
+  || entries[0]?.package?.loop?.workflow?.jobNodes?.length !== 2
+  || entries[0]?.package?.loop?.workflow?.validationNodes?.length !== 2) {
   throw new Error("packaged Ballet server did not list the fixture Loop Library package");
 }
 ' "$SMOKE_ROOT/loop-library.json"
@@ -168,10 +170,11 @@ const expectedProfile = {
   networkAccess: false
 };
 const loop = workspace.automation?.loops?.[0];
-const workLoopNode = loop?.nodes?.find((node) => node.id === "review");
+const jobNode = loop?.workflow?.jobNodes?.find((node) => node.id === "review");
+const validationNode = loop?.workflow?.validationNodes?.find((node) => node.id === "review-validation");
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 11
+if (workspace.automation?.version !== 12
   || workspace.automation.loops.length !== 1
   || loop?.id !== "adr-review"
   || loop?.description !== "Review a project change and validate the review result."
@@ -179,25 +182,28 @@ if (workspace.automation?.version !== 11
   || loop?.capabilities?.provides?.[0] !== "ballet:task.completed"
   || !Array.isArray(workspace.automation.graph?.loopEdges)
   || workspace.automation.graph.loopEdges.length !== 0
-  || loop?.startNodeId !== "review"
-  || loop?.state?.description !== "Provider-neutral context shared by the review Work Loop."
+  || loop?.workflow?.startJobNodeId !== "review"
+  || loop?.state?.description !== "Provider-neutral context shared by the review Workflow."
   || JSON.stringify(loop?.state?.initial) !== "{}"
   || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
   || workspace.automation.orchestrator?.executionProfileId !== expectedProfile.id
   || workspace.automation.orchestrator?.primaryInstructionId !== "project:architect"
-  || workLoopNode?.description !== "Run and validate the project review."
-  || workLoopNode?.work?.type !== "agent"
-  || workLoopNode?.work?.task !== "Review the project changes and surface concrete risks."
-  || workLoopNode?.work?.executionProfileId !== expectedProfile.id
-  || workLoopNode?.work?.primaryInstructionId !== "project:reviewer"
-  || !Array.isArray(workLoopNode?.work?.skillIds)
-  || workLoopNode.work.skillIds.length !== 0
-  || workLoopNode?.validation?.type !== "agent"
-  || workLoopNode?.validation?.task !== "Confirm that the review is complete and actionable."
-  || workLoopNode?.maxLocalAttempts !== 3
-  || loop?.edges?.[0]?.source !== "review"
-  || loop?.edges?.[0]?.target?.terminal !== "completed"
-  || Object.hasOwn(workLoopNode, "state")
+  || jobNode?.description !== "Run and validate the project review."
+  || jobNode?.type !== "agent"
+  || jobNode?.task !== "Review the project changes and surface concrete risks."
+  || jobNode?.executionProfileId !== expectedProfile.id
+  || jobNode?.primaryInstructionId !== "project:reviewer"
+  || !Array.isArray(jobNode?.skillIds)
+  || jobNode.skillIds.length !== 0
+  || jobNode?.validationNodeId !== "review-validation"
+  || jobNode?.maxRetries !== 3
+  || validationNode?.type !== "agent"
+  || validationNode?.task !== "Confirm that the review is complete and actionable."
+  || loop?.workflow?.passEdges?.[0]?.sourceValidationNodeId !== "review-validation"
+  || loop?.workflow?.passEdges?.[0]?.target?.workflowResult !== "PASS"
+  || loop?.workflow?.failEdges?.[0]?.sourceValidationNodeId !== "review-validation"
+  || loop?.workflow?.failEdges?.[0]?.target?.workflowResult !== "FAIL"
+  || Object.hasOwn(jobNode, "state")
   || workspace.instructions?.length !== 2
   || architect?.valid !== true
   || architect?.relativePath !== ".ballet/instructions/architect.md"
@@ -216,7 +222,7 @@ if (workspace.automation?.version !== 11
   || workspace.loopTheme?.version !== 4
   || Object.hasOwn(workspace.loopTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.loopThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v11 fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v12 Workflow fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2

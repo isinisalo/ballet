@@ -12,6 +12,14 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 - Päivitä `DESIGN.md`, kun tarkoituksellinen design-muutos vaikuttaa väreihin, typografiaan, spacingiin, radius-sääntöihin, komponenttikäytäntöihin tai käyttöliittymän visuaaliseen periaatteeseen.
 - Jos nykyinen toteutus poikkeaa `DESIGN.md`-ohjeesta, älä tee laajaa uudelleenmuotoilua sivutehtävänä. Kohdista muutos pyydettyyn osaan ja vältä riippumattomia refaktorointeja.
 
+## Workflow Engineering -näkymän visuaalinen vakaus
+
+- Workflow Engineering -canvasin avaruusteema on suojattu visuaalinen sopimus. Säilytä tumma tekninen ruudukko, planeettamaiset Job-artworkit, niiden konfiguroidut koot ja tyylit, hehkut, amber-ID-labelit, ohuet mintunväriset yhteydet sekä kirkkaat yhteyspisteet. Validation on Job-artworkin sisäinen vastuu eikä erillinen canvas-node.
+- Workflow Engineering -canvasissa näytetään vain JobNodet ja persisted PassEdge/FailEdge-yhteydet. PASS/FAIL-resultit eivät ole nodeja, kiinteitä validate/retry-runtime-siirtymiä ei piirretä Edgeinä ja Edge-geometria saa olla vain `straight` tai deterministisesti reititetty smart `smoothstep`; älä lisää muita Edge-tyylejä.
+- Domain-, runtime-, schema-, reititys- tai terminologiamuutos ei oikeuta muuttamaan Workflow Engineeringin ulkoasua. Sovita uudet toiminnalliset käsitteet olemassa olevaan visuaaliseen kieleen.
+- Älä muuta Workflow Engineering -näkymää ulkonäöllisesti ilman käyttäjän eksplisiittistä pyyntöä tai dokumentoitua painavaa syytä. Painava syy on esimerkiksi saavutettavuusongelma, todistettu käytettävyysvika tai uuden pakollisen semantiikan mahdottomuus nykyisellä esityksellä.
+- Jos painava syy vaatii visuaalisen muutoksen, kirjaa perustelu ennen toteutusta, päivitä tarvittaessa `DESIGN.md` ja liitä muutokseen desktop- ja narrow-viewportin ennen/jälkeen-selain-QA. Älä korvaa avaruusteemaa toisella shape- tai artwork-kielellä sivuvaikutuksena.
+
 ## Validointi
 
 - Aja `npm run validate:arc42`, kun muutos vaikuttaa `.ballet/arc42/**`, `.ballet/project.json`, `.ballet/instructions/**`, `.agents/skills/**` tai arkkitehtuurin source-of-truth-sopimukseen.
@@ -25,7 +33,7 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 
 ## Platformin ja projektin raja
 
-- Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Loop, WorkLoopNode, WorkNode, ValidationNode, State, Edge, LoopEdge, RepairRequest, LoopOrchestrator, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Root Run snapshot, provider-suoritus ja runtime state.
+- Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Loop, ProjectWorkflow, JobNode, ValidationNode, PassEdge, FailEdge, State, Edge, LoopEdge, RepairRequest, LoopOrchestrator, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Root Run snapshot, provider-suoritus ja runtime state.
 - Roadmap-, milestone-, issue-, acceptance-, staging-, release-, deploy- ja arc42-menettelyt kuuluvat project-local dataan tiedostoissa `.ballet/project.json`, `.ballet/instructions/**`, `.agents/skills/**` ja `.ballet/arc42/**`.
 - Loop-module package-, katalogi-, install-, export- ja provenance-primitiveet ovat geneerisiä platform-ominaisuuksia. Moduulien nimet, capabilityt, instructionit, skillsit ja recommended connectionit ovat `.ballet/loop-library/**`-dataa; runtime lukee vain materialisoitua project-local dataa.
 - Älä kovakoodaa project-workflow'ta `backend/`, `frontend/` tai `shared/`-koodiin tai Balletin pakolliseen System instructioniin.
@@ -45,7 +53,7 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 - State sisältää vain rajatun `Arc42MethodStateV1`-nykytilan ja vakaat viitteet. Markdown sisältää pitkäikäisen projektitotuuden. Älä kopioi dokumentteja, diffejä tai runtime-lokeja Stateen.
 - Pysähdy `needs_input`-tilaan, kun WHAT/WHY, laatutavoitteen prioriteetti/mitta, merkittävä ADR tai usean yhtä hyvän repair-targetin valinta vaatii ihmistä.
 - Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat täsmällisen ihmisvaltuutuksen. `release-validation` ei kuulu oletus-flow'hun, eikä Ballet mergeä tai pushaa tuloksia automaattisesti.
-- Continuous-learning-schedule on `.ballet/project.json`-tiedoston `learning-authoritative-research` Work Nodessa. Schedule-, topology-, permission-, network-, instruction- ja skill-käyttäytymismuutokset ovat aina katselmoitavia ja hyväksyttäviä ennen soveltamista.
+- Continuous-learning-schedule on `.ballet/project.json`-tiedoston `learning-authoritative-research` Job Nodessa. Schedule-, topology-, permission-, network-, instruction- ja skill-käyttäytymismuutokset ovat aina katselmoitavia ja hyväksyttäviä ennen soveltamista.
 - Päivitä `STATUS.md`, `TRACEABILITY.md`, initiative-handoff ja `METHOD-HEALTH.md` vain uuden evidenssin tai päätöksen perusteella; älä tee semanttista dokumenttichurnia.
 
 ## Tärkeää

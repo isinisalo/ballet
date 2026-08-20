@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loopModulePackageV1Schema } from "../../shared/api/loop-module-schemas.js";
+import { loopModulePackageV2Schema } from "../../shared/api/loop-module-schemas.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
 import { LoopModuleService } from "../loop-modules/LoopModuleService.js";
 import { canonicalLoopModuleJson } from "../loop-modules/canonicalLoopModule.js";
@@ -18,10 +18,10 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("LoopModulePackageV1", () => {
+describe("LoopModulePackageV2", () => {
   it("round-trips a strict canonical package", () => {
-    const parsed = loopModulePackageV1Schema.parse(testLoopModulePackage());
-    expect(loopModulePackageV1Schema.parse(JSON.parse(canonicalLoopModuleJson(parsed)))).toEqual(parsed);
+    const parsed = loopModulePackageV2Schema.parse(testLoopModulePackage());
+    expect(loopModulePackageV2Schema.parse(JSON.parse(canonicalLoopModuleJson(parsed)))).toEqual(parsed);
   });
 
   it("rejects malformed UTF-8, oversized content, schema downgrade, and unknown fields", async () => {
@@ -58,8 +58,10 @@ describe("Loop module install/export service", () => {
     const root = await project({ loops: [existingLoop()] });
     const plan = await service(root).plan({ package: testLoopModulePackage(), source: "test" });
     expect(plan.loop.id).toBe("sample-loop-2");
-    expect(plan.loop.nodes[0]?.id).toBe("sample-loop-2-work");
-    expect(plan.loop.edges[0]?.id).toBe("sample-loop-2-completed");
+    expect(plan.loop.workflow.jobNodes[0]?.id).toBe("sample-loop-2-job");
+    expect(plan.loop.workflow.validationNodes[0]?.id).toBe("sample-loop-2-job-validation");
+    expect(plan.loop.workflow.passEdges[0]?.id).toBe("sample-loop-2-job-pass");
+    expect(plan.loop.workflow.failEdges[0]?.id).toBe("sample-loop-2-job-fail");
     expect(plan.loop.capabilities).toEqual({
       accepts: ["sample:task.requested"], provides: ["sample:task.completed"]
     });
@@ -77,7 +79,7 @@ describe("Loop module install/export service", () => {
     expect(first.issues[0]?.code).toBe("PROFILE_MAPPING_REQUIRED");
     const mapped = await service(root).plan({ package: testLoopModulePackage(), source: "test", profileMappings: { worker: "codex-second" } });
     expect(mapped.canInstall).toBe(true);
-    expect(mapped.loop.nodes[0]?.work).toMatchObject({ executionProfileId: "codex-second" });
+    expect(mapped.loop.workflow.jobNodes[0]).toMatchObject({ executionProfileId: "codex-second" });
   });
 
   it("fails closed on network mismatch and instruction/skill path conflicts", async () => {
@@ -138,7 +140,10 @@ describe("Loop module install/export service", () => {
     expect(exported.package.profileSlots).toHaveLength(1);
     expect(exported.package.resources.map((resource) => resource.kind).sort()).toEqual(["instruction", "skill"]);
     expect(exported.canonicalJson).not.toContain("executionProfiles");
-    expect(exported.package.loop).toEqual(expect.objectContaining({ key: "loop", startNode: "work" }));
+    expect(exported.package.loop).toEqual(expect.objectContaining({
+      key: "loop",
+      workflow: expect.objectContaining({ startJobNode: "job" })
+    }));
 
     const instructionPath = path.join(root, ".ballet/instructions/modules/sample-loop/worker.md");
     await writeFile(instructionPath, `${await readFile(instructionPath, "utf8")}\nModified.\n`, "utf8");
@@ -188,15 +193,15 @@ describe("Loop module install/export service", () => {
     const repository = new ProjectConfigurationRepository();
     const loaded = repository.load(root).config!;
     const shared = existingLoop("consumer-loop");
-    shared.nodes[0]!.work = {
-      ...shared.nodes[0]!.work,
+    shared.workflow.jobNodes[0] = {
+      ...shared.workflow.jobNodes[0]!,
       type: "agent",
       executionProfileId: "codex-test",
       primaryInstructionId: plan.idRemapping.instructions.worker!,
       skillIds: [plan.idRemapping.skills.sample!]
     };
     repository.putAutomation(root, {
-      version: 11, orchestrator: loaded.orchestrator, graph: loaded.graph, loops: [...loaded.loops, shared]
+      version: 12, orchestrator: loaded.orchestrator, graph: loaded.graph, loops: [...loaded.loops, shared]
     });
     await modules.remove(plan.loop.id);
     expect(await readFile(path.join(root, ".ballet/instructions/modules/sample-loop/worker.md"), "utf8")).toContain("Sample worker");
@@ -221,7 +226,7 @@ describe("Loop module install/export service", () => {
     const loaded = repository.load(root).config!;
     const [sourceLoopId, targetLoopId] = packages.map((pkg) => pkg.manifest.id);
     const automation = {
-      version: 11 as const,
+      version: 12 as const,
       orchestrator: loaded.orchestrator,
       graph: { loopEdges: [{
         id: "operator-flow-clarify-structures",
@@ -250,8 +255,9 @@ describe("Loop module install/export service", () => {
     for (const filename of packageFiles) {
       const root = await project();
       const modules = service(root);
-      const pkg = loopModulePackageV1Schema.parse(JSON.parse(await readFile(path.join(packageRoot, filename), "utf8")));
-      expect(pkg.loop.nodes).toHaveLength(3);
+      const pkg = loopModulePackageV2Schema.parse(JSON.parse(await readFile(path.join(packageRoot, filename), "utf8")));
+      expect(pkg.loop.workflow.jobNodes).toHaveLength(3);
+      expect(pkg.loop.workflow.validationNodes).toHaveLength(3);
       expect(pkg.capabilities.requires).toEqual([]);
       expect(pkg.capabilities.provides).toHaveLength(1);
       const source = `project-library:software-delivery/${filename}`;
@@ -263,10 +269,11 @@ describe("Loop module install/export service", () => {
       expect(installed).toMatchObject({ loopId: pkg.manifest.id, status: "exact" });
       const loaded = new ProjectConfigurationRepository().load(root).config!;
       expect(loaded.loops).toHaveLength(1);
-      expect(loaded.loops[0]?.nodes).toHaveLength(3);
+      expect(loaded.loops[0]?.workflow.jobNodes).toHaveLength(3);
+      expect(loaded.loops[0]?.workflow.validationNodes).toHaveLength(3);
       expect(loaded.graph.loopEdges).toEqual([]);
       const exported = await modules.exportLoop({ loopId: installed.loopId });
-      expect(loopModulePackageV1Schema.parse(exported.package).loop.nodes).toHaveLength(3);
+      expect(loopModulePackageV2Schema.parse(exported.package).loop.workflow.jobNodes).toHaveLength(3);
       await modules.remove(installed.loopId);
       expect(new ProjectConfigurationRepository().load(root).config?.loops).toEqual([]);
       expect(await modules.statuses()).toEqual([]);
@@ -289,7 +296,7 @@ const project = async ({ loops = [], extraProfiles = [] }: { loops?: ProjectLoop
   await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
   await writeFile(path.join(root, ".ballet/instructions/architect.md"), "---\nid: architect\ntitle: Architect\n---\nRoute project repair work.\n", "utf8");
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 11,
+    version: 12,
     executionProfiles: [profile(), ...extraProfiles],
     orchestrator: { executionProfileId: "codex-test", primaryInstructionId: "project:architect", skillIds: [], maxRepairDepth: 4, maxRepairAttempts: 3 },
     graph: { loopEdges: [] },
@@ -303,12 +310,21 @@ const existingLoop = (id = "sample-loop"): ProjectLoop => ({
   description: `Existing ${id}.`,
   capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   state: { description: "Existing state.", initial: {} },
-  startNodeId: `${id}-work`,
-  nodes: [{
-    id: `${id}-work`, description: "Existing Work and Validation.",
-    work: { type: "human", task: "Work.", nodeStyle: "terra", nodeSize: "medium" },
-    validation: { type: "human", task: "Validate.", nodeStyle: "luna", nodeSize: "small" },
-    maxLocalAttempts: 3
-  }],
-  edges: [{ id: `${id}-completed`, source: `${id}-work`, target: { terminal: "completed" } }]
+  workflow: {
+    startJobNodeId: `${id}-job`,
+    jobNodes: [{
+      id: `${id}-job`, description: "Existing Job.", validationNodeId: `${id}-job-validation`,
+      type: "human", task: "Work.", nodeStyle: "terra", nodeSize: "medium", maxRetries: 3
+    }],
+    validationNodes: [{
+      id: `${id}-job-validation`, description: "Existing Validation.",
+      type: "human", task: "Validate.", nodeStyle: "luna", nodeSize: "small"
+    }],
+    passEdges: [{
+      id: `${id}-job-pass`, sourceValidationNodeId: `${id}-job-validation`, target: { workflowResult: "PASS" }
+    }],
+    failEdges: [{
+      id: `${id}-job-fail`, sourceValidationNodeId: `${id}-job-validation`, target: { workflowResult: "FAIL" }
+    }]
+  }
 });

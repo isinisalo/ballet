@@ -23,17 +23,17 @@ describe("LoopStateStore", () => {
 
   it("commits patch, canonical outcome, revision, and control flow atomically", async () => {
     const fixture = await createRuntimeStoreFixture({ count: 0, items: [] });
-    const { nodeRunId } = createActiveWorkNode(fixture);
+    const { nodeRunId } = createActiveJobNode(fixture);
     const result = fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 0,
       outcome: {
-        role: "work", state: "completed", summary: "Work finished.", artifacts: {}, checks: [],
+        role: "job", state: "completed", summary: "Work finished.", artifacts: {}, checks: [],
         statePatch: [
           { op: "replace", path: "/count", value: 1 },
           { op: "add", path: "/items/-", value: "artifact" }
         ]
       },
-      control: { kind: "work_completed" },
+      control: { kind: "job_completed" },
       committedAt: runtimeTestTimestamp
     });
 
@@ -42,7 +42,7 @@ describe("LoopStateStore", () => {
       parentRevision: 0,
       state: { count: 1, items: ["artifact"] },
       sourceNodeRunId: nodeRunId,
-      outcome: { role: "work", state: "completed", summary: "Work finished." }
+      outcome: { role: "job", state: "completed", summary: "Work finished." }
     });
     expect(result.revision.stateSha256).toBe(jsonSha256({ count: 1, items: ["artifact"] }));
     expect(fixture.roots.require("root-run")).toMatchObject({ stateRevision: 1, transitionCount: 1 });
@@ -50,31 +50,31 @@ describe("LoopStateStore", () => {
       status: "completed", stateRevisionAfter: 1, patch: { patchSha256: expect.stringMatching(/^[0-9a-f]{64}$/) }
     });
     expect(fixture.control.listByRoot("root-run")).toEqual([expect.objectContaining({
-      kind: "work_completed", stateRevision: 1, sourceNodeRunId: nodeRunId
+      kind: "job_completed", stateRevision: 1, sourceNodeRunId: nodeRunId
     })]);
     await fixture.close();
   });
 
   it("rejects stale and invalid patches without changing state or Node Run", async () => {
     const fixture = await createRuntimeStoreFixture({ count: 0 });
-    const { nodeRunId } = createActiveWorkNode(fixture);
+    const { nodeRunId } = createActiveJobNode(fixture);
 
     expect(() => fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 1,
       outcome: {
-        role: "work", state: "completed", summary: "Invalid.", artifacts: {}, checks: [],
+        role: "job", state: "completed", summary: "Invalid.", artifacts: {}, checks: [],
         statePatch: [{ op: "replace", path: "/missing", value: true }]
       },
-      control: { kind: "work_completed" }
+      control: { kind: "job_completed" }
     })).toThrow(/stale/);
 
     expect(() => fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 0,
       outcome: {
-        role: "work", state: "completed", summary: "Invalid.", artifacts: {}, checks: [],
+        role: "job", state: "completed", summary: "Invalid.", artifacts: {}, checks: [],
         statePatch: [{ op: "replace", path: "/missing", value: true }]
       },
-      control: { kind: "work_completed" }
+      control: { kind: "job_completed" }
     })).toThrow(/does not exist/);
     expect(fixture.states.list("root-run")).toHaveLength(1);
     expect(fixture.states.current("root-run").state).toEqual({ count: 0 });
@@ -85,7 +85,7 @@ describe("LoopStateStore", () => {
 
   it("rolls back outcome and revision when the control-flow write fails", async () => {
     const fixture = await createRuntimeStoreFixture({ count: 0 });
-    const { nodeRunId } = createActiveWorkNode(fixture);
+    const { nodeRunId } = createActiveJobNode(fixture);
     fixture.connection().exec(`
       CREATE TRIGGER reject_test_control_event BEFORE INSERT ON control_flow_events
       BEGIN SELECT RAISE(ABORT, 'test control event failure'); END;
@@ -94,10 +94,10 @@ describe("LoopStateStore", () => {
     expect(() => fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 0,
       outcome: {
-        role: "work", state: "completed", summary: "Must roll back.", artifacts: {}, checks: [],
+        role: "job", state: "completed", summary: "Must roll back.", artifacts: {}, checks: [],
         statePatch: [{ op: "replace", path: "/count", value: 1 }]
       },
-      control: { kind: "work_completed" }
+      control: { kind: "job_completed" }
     })).toThrow("test control event failure");
 
     expect(fixture.states.list("root-run")).toHaveLength(1);
@@ -108,14 +108,14 @@ describe("LoopStateStore", () => {
 
   it("recovers the last fully committed revision after reopen", async () => {
     const fixture = await createRuntimeStoreFixture({ count: 0 });
-    const { nodeRunId } = createActiveWorkNode(fixture);
+    const { nodeRunId } = createActiveJobNode(fixture);
     fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 0,
       outcome: {
-        role: "work", state: "completed", summary: "Committed.", artifacts: {}, checks: [],
+        role: "job", state: "completed", summary: "Committed.", artifacts: {}, checks: [],
         statePatch: [{ op: "replace", path: "/count", value: 1 }]
       },
-      control: { kind: "work_completed" }
+      control: { kind: "job_completed" }
     });
 
     const reopened = fixture.reopen();
@@ -132,17 +132,17 @@ describe("LoopStateStore outcome evidence", () => {
     const result = fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 0,
       outcome: {
-        role: "validation", state: "completed", decision: "OK", summary: "Validation passed.",
+        role: "validation", state: "completed", decision: "PASS", summary: "Validation passed.",
         evidence: { reference: "check:validation" }, checks: [],
         statePatch: [{ op: "replace", path: "/validated", value: true }]
       },
-      control: { kind: "validation_ok" }
+      control: { kind: "validation_pass" }
     });
 
     expect(result.revision).toMatchObject({ revision: 1, state: { validated: true } });
     expect(fixture.loops.getNodeRun(nodeRunId)).toMatchObject({
       role: "validation", stateRevisionAfter: 1,
-      outcome: { role: "validation", state: "completed", decision: "OK" }
+      outcome: { role: "validation", state: "completed", decision: "PASS" }
     });
     await fixture.close();
   });
@@ -153,11 +153,11 @@ describe("LoopStateStore outcome evidence", () => {
     expect(() => fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 0,
       outcome: {
-        role: "validation", state: "completed", decision: "OK", summary: "Invalid patch.",
+        role: "validation", state: "completed", decision: "PASS", summary: "Invalid patch.",
         evidence: {}, checks: [],
         statePatch: [{ op: "add", path: "/large", value: "x".repeat(maxStatePatchBytes) }]
       },
-      control: { kind: "validation_ok" }
+      control: { kind: "validation_pass" }
     })).toThrow(/maximum is 65536 bytes/);
     expect(fixture.states.current("root-run")).toMatchObject({ revision: 0, state: { validated: false } });
     expect(fixture.loops.getNodeRun(nodeRunId)).toMatchObject({ status: "queued", outcome: undefined });
@@ -167,18 +167,18 @@ describe("LoopStateStore outcome evidence", () => {
 
   it("records an outcome and control event without creating a revision when there is no patch", async () => {
     const fixture = await createRuntimeStoreFixture({ count: 0 });
-    const { nodeRunId } = createActiveWorkNode(fixture);
+    const { nodeRunId } = createActiveJobNode(fixture);
     const result = fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 0,
-      outcome: { role: "work", state: "completed", summary: "No state change.", artifacts: {}, checks: [] },
-      control: { kind: "work_completed" }, committedAt: runtimeTestTimestamp
+      outcome: { role: "job", state: "completed", summary: "No state change.", artifacts: {}, checks: [] },
+      control: { kind: "job_completed" }, committedAt: runtimeTestTimestamp
     });
 
     expect(result.revision.revision).toBe(0);
     expect(fixture.states.list("root-run")).toHaveLength(1);
     expect(fixture.loops.getNodeRun(nodeRunId)).toMatchObject({
       status: "completed", stateRevisionAfter: 0,
-      outcome: { role: "work", state: "completed", summary: "No state change." }
+      outcome: { role: "job", state: "completed", summary: "No state change." }
     });
     expect(fixture.roots.require("root-run")).toMatchObject({ stateRevision: 0, transitionCount: 1 });
     await fixture.close();
@@ -198,14 +198,14 @@ describe("LoopStateStore outcome evidence", () => {
 
   it("detects persisted patch hash tampering on readback", async () => {
     const fixture = await createRuntimeStoreFixture({ count: 0 });
-    const { nodeRunId } = createActiveWorkNode(fixture);
+    const { nodeRunId } = createActiveJobNode(fixture);
     fixture.states.commitNodeOutcome({
       rootRunId: "root-run", nodeRunId, baseRevision: 0,
       outcome: {
-        role: "work", state: "completed", summary: "Patched.", artifacts: {}, checks: [],
+        role: "job", state: "completed", summary: "Patched.", artifacts: {}, checks: [],
         statePatch: [{ op: "replace", path: "/count", value: 1 }]
       },
-      control: { kind: "work_completed" }
+      control: { kind: "job_completed" }
     });
     fixture.connection().exec("DROP TRIGGER state_revision_is_immutable");
     fixture.connection().prepare(`
@@ -280,24 +280,26 @@ const nestedValue = (depth: number): unknown => {
   return value;
 };
 
-const createActiveWorkNode = (fixture: Awaited<ReturnType<typeof createRuntimeStoreFixture>>) => {
-  return createActiveNode(fixture, "work");
+const createActiveJobNode = (fixture: Awaited<ReturnType<typeof createRuntimeStoreFixture>>) => {
+  return createActiveNode(fixture, "job");
 };
 
 const createActiveNode = (
   fixture: Awaited<ReturnType<typeof createRuntimeStoreFixture>>,
-  role: "work" | "validation"
+  role: "job" | "validation"
 ) => {
   const loop = fixture.loops.createLoopRun({
     loopRunId: "loop-run", rootRunId: "root-run", loop: fixture.loop, source: "manual"
   });
-  const composite = fixture.loops.createWorkLoopNodeRun({
-    workLoopNodeRunId: "work-loop-node-run", rootRunId: "root-run", loopRunId: loop.loopRunId,
-    loopId: fixture.loop.id, workLoopNodeId: fixture.loop.startNodeId, attempt: 1
+  const job = fixture.loops.createJobRun({
+    jobRunId: "job-run", rootRunId: "root-run", loopRunId: loop.loopRunId,
+    loopId: fixture.loop.id, jobNodeId: fixture.loop.workflow.startJobNodeId, jobAttempt: 1
   });
   return fixture.loops.createNodeRun({
     nodeRunId: `${role}-node-run`, rootRunId: "root-run", loopRunId: loop.loopRunId,
-    workLoopNodeRunId: composite.workLoopNodeRunId, role, loopId: fixture.loop.id,
-    workLoopNodeId: fixture.loop.startNodeId, nodeDefinitionId: `main-loop:work:${role}`, attempt: 1
+    jobRunId: job.jobRunId, role, loopId: fixture.loop.id,
+    jobNodeId: fixture.loop.workflow.startJobNodeId,
+    workflowNodeId: role === "job" ? fixture.loop.workflow.startJobNodeId : fixture.loop.workflow.jobNodes[0]!.validationNodeId,
+    nodeDefinitionId: role === "job" ? "main-loop:job:job" : "main-loop:job-validation:validation", attempt: 1
   });
 };

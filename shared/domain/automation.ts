@@ -1,7 +1,21 @@
-export const projectConfigurationVersion = 11 as const;
+export const projectConfigurationVersion = 12 as const;
 export const maxProjectStateBytes = 262_144;
-export const maxLocalAttemptsLimit = 100;
-export const maxRepairDepthLimit = 32;
+export const maxJobRetriesLimit = 100;
+export {
+  getProjectFailEdges,
+  getProjectLoopEdges,
+  getProjectPassEdges,
+  getProjectPassTargetJobId,
+  getProjectValidationNode,
+  getReachableProjectJobNodeIds,
+  getReachableProjectLoopGraph,
+  getReachableProjectLoopIds,
+  hasReachableProjectWorkflowPass,
+  isAllowedProjectRepairRoute,
+  maxRepairDepthLimit,
+  resolveProjectWorkflowStartJob,
+  type ReachableProjectLoopGraph
+} from "./automationReachability.js";
 export const maxRepairAttemptsLimit = 100;
 export const maxLoopCapabilities = 64;
 export const maxLoopCapabilityLength = 200;
@@ -10,8 +24,8 @@ export const loopCapabilityPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:[a-z][a-
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
-export const loopTerminals = ["completed", "blocked", "failed"] as const;
-export type LoopTerminal = (typeof loopTerminals)[number];
+export const workflowResults = ["PASS", "FAIL"] as const;
+export type WorkflowResult = (typeof workflowResults)[number];
 
 export const loopNodeSizes = ["tiny", "small", "medium", "large"] as const;
 export type LoopNodeSize = (typeof loopNodeSizes)[number];
@@ -64,71 +78,78 @@ export interface ProjectExecutionComposition {
 export type ProjectScheduleWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type ProjectScheduleCadence = "daily" | "weekdays" | "weekly" | "monthly";
 
-interface ProjectWorkScheduleBase {
+interface ProjectJobScheduleBase {
   time: string;
   timeZone: string;
 }
 
-export interface ProjectOnceWorkSchedule extends ProjectWorkScheduleBase {
+export interface ProjectOnceJobSchedule extends ProjectJobScheduleBase {
   kind: "once";
   date: string;
 }
 
-interface ProjectRecurringWorkScheduleBase extends ProjectWorkScheduleBase {
+interface ProjectRecurringJobScheduleBase extends ProjectJobScheduleBase {
   kind: "recurring";
   startsOn: string;
 }
 
-export interface ProjectDailyWorkSchedule extends ProjectRecurringWorkScheduleBase {
+export interface ProjectDailyJobSchedule extends ProjectRecurringJobScheduleBase {
   cadence: "daily";
 }
 
-export interface ProjectWeekdaysWorkSchedule extends ProjectRecurringWorkScheduleBase {
+export interface ProjectWeekdaysJobSchedule extends ProjectRecurringJobScheduleBase {
   cadence: "weekdays";
 }
 
-export interface ProjectWeeklyWorkSchedule extends ProjectRecurringWorkScheduleBase {
+export interface ProjectWeeklyJobSchedule extends ProjectRecurringJobScheduleBase {
   cadence: "weekly";
   weekdays: ProjectScheduleWeekday[];
 }
 
-export interface ProjectMonthlyWorkSchedule extends ProjectRecurringWorkScheduleBase {
+export interface ProjectMonthlyJobSchedule extends ProjectRecurringJobScheduleBase {
   cadence: "monthly";
   dayOfMonth: number;
 }
 
-export type ProjectRecurringWorkSchedule =
-  | ProjectDailyWorkSchedule
-  | ProjectWeekdaysWorkSchedule
-  | ProjectWeeklyWorkSchedule
-  | ProjectMonthlyWorkSchedule;
+export type ProjectRecurringJobSchedule =
+  | ProjectDailyJobSchedule
+  | ProjectWeekdaysJobSchedule
+  | ProjectWeeklyJobSchedule
+  | ProjectMonthlyJobSchedule;
 
-export type ProjectWorkSchedule = ProjectOnceWorkSchedule | ProjectRecurringWorkSchedule;
+export type ProjectJobSchedule = ProjectOnceJobSchedule | ProjectRecurringJobSchedule;
 
-interface ProjectWorkNodeBase extends ProjectNodeAppearance {
+interface ProjectJobNodeBase extends ProjectNodeAppearance {
+  id: string;
+  description: string;
   task: string;
+  validationNodeId: string;
+  /** Additional local executions after the first Job execution. */
+  maxRetries: number;
 }
 
-export interface ProjectAgentWorkNode extends ProjectWorkNodeBase, ProjectExecutionComposition {
+export interface ProjectAgentJobNode extends ProjectJobNodeBase, ProjectExecutionComposition {
   type: "agent";
 }
 
-export interface ProjectHumanWorkNode extends ProjectWorkNodeBase {
+export interface ProjectHumanJobNode extends ProjectJobNodeBase {
   type: "human";
   executionProfileId?: never;
   primaryInstructionId?: never;
   skillIds?: never;
 }
 
-export interface ProjectScheduledWorkNode extends ProjectWorkNodeBase, ProjectExecutionComposition {
+export interface ProjectScheduledJobNode extends ProjectJobNodeBase, ProjectExecutionComposition {
   type: "scheduled";
-  schedule: ProjectWorkSchedule;
+  schedule: ProjectJobSchedule;
 }
 
-export type ProjectProviderWorkNode = ProjectAgentWorkNode | ProjectScheduledWorkNode;
-export type ProjectWorkNode = ProjectProviderWorkNode | ProjectHumanWorkNode;
+export type ProjectProviderJobNode = ProjectAgentJobNode | ProjectScheduledJobNode;
+export type ProjectJobNode = ProjectProviderJobNode | ProjectHumanJobNode;
 
 interface ProjectValidationNodeBase extends ProjectNodeAppearance {
+  id: string;
+  description: string;
   task: string;
 }
 
@@ -145,23 +166,28 @@ export interface ProjectHumanValidationNode extends ProjectValidationNodeBase {
 
 export type ProjectValidationNode = ProjectAgentValidationNode | ProjectHumanValidationNode;
 
-export interface ProjectWorkLoopNode {
+export type ProjectPassEdgeTarget =
+  | { jobNodeId: string }
+  | { workflowResult: "PASS" };
+
+export interface ProjectPassEdge {
   id: string;
-  description: string;
-  work: ProjectWorkNode;
-  validation: ProjectValidationNode;
-  /** Total Work/Validation attempts, including the initial attempt. */
-  maxLocalAttempts: number;
+  sourceValidationNodeId: string;
+  target: ProjectPassEdgeTarget;
 }
 
-export type ProjectNodeEdgeTarget =
-  | { nodeId: string }
-  | { terminal: LoopTerminal };
-
-export interface ProjectNodeEdge {
+export interface ProjectFailEdge {
   id: string;
-  source: string;
-  target: ProjectNodeEdgeTarget;
+  sourceValidationNodeId: string;
+  target: { workflowResult: "FAIL" };
+}
+
+export interface ProjectWorkflow {
+  startJobNodeId: string;
+  jobNodes: ProjectJobNode[];
+  validationNodes: ProjectValidationNode[];
+  passEdges: ProjectPassEdge[];
+  failEdges: ProjectFailEdge[];
 }
 
 export type ProjectLoopEdgeKind = "flow" | "repair";
@@ -194,9 +220,7 @@ export interface ProjectLoop {
   description: string;
   capabilities: ProjectLoopCapabilities;
   state: ProjectLoopState;
-  startNodeId: string;
-  nodes: ProjectWorkLoopNode[];
-  edges: ProjectNodeEdge[];
+  workflow: ProjectWorkflow;
 }
 
 export interface ProjectLoopOrchestrator extends ProjectExecutionComposition {
@@ -226,13 +250,13 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   loops: [],
 });
 
-export const isProjectProviderWorkNode = (node: ProjectWorkNode): node is ProjectProviderWorkNode =>
+export const isProjectProviderJobNode = (node: ProjectJobNode): node is ProjectProviderJobNode =>
   node.type === "agent" || node.type === "scheduled";
 
-export const isProjectHumanWorkNode = (node: ProjectWorkNode): node is ProjectHumanWorkNode =>
+export const isProjectHumanJobNode = (node: ProjectJobNode): node is ProjectHumanJobNode =>
   node.type === "human";
 
-export const isProjectScheduledWorkNode = (node: ProjectWorkNode): node is ProjectScheduledWorkNode =>
+export const isProjectScheduledJobNode = (node: ProjectJobNode): node is ProjectScheduledJobNode =>
   node.type === "scheduled";
 
 export const isProjectAgentValidationNode = (
@@ -242,107 +266,6 @@ export const isProjectAgentValidationNode = (
 export const isProjectHumanValidationNode = (
   node: ProjectValidationNode
 ): node is ProjectHumanValidationNode => node.type === "human";
-
-export const isProjectNodeTerminalTarget = (
-  target: ProjectNodeEdgeTarget
-): target is { terminal: LoopTerminal } => "terminal" in target;
-
-export const resolveProjectLoopStartNode = (loop: ProjectLoop): ProjectWorkLoopNode | undefined =>
-  loop.nodes.find((node) => node.id === loop.startNodeId);
-
-export const getProjectNodeEdges = (
-  loop: ProjectLoop,
-  sourceNodeId?: string
-): ProjectNodeEdge[] => sourceNodeId === undefined
-  ? [...loop.edges]
-  : loop.edges.filter((edge) => edge.source === sourceNodeId);
-
-export const getProjectLoopEdges = (
-  config: Pick<ProjectAutomationConfig, "graph">,
-  sourceLoopId?: string,
-  kind?: ProjectLoopEdgeKind
-): ProjectLoopEdge[] => config.graph.loopEdges.filter((edge) =>
-  (sourceLoopId === undefined || edge.source === sourceLoopId)
-  && (kind === undefined || edge.kind === kind));
-
-export const isAllowedProjectRepairRoute = (
-  config: Pick<ProjectAutomationConfig, "graph">,
-  sourceLoopId: string,
-  loopEdgeId: string
-): boolean => getProjectLoopEdges(config, sourceLoopId, "repair")
-  .some((edge) => edge.id === loopEdgeId);
-
-export const getProjectNodeTargetId = (target: ProjectNodeEdgeTarget): string | undefined =>
-  "nodeId" in target ? target.nodeId : undefined;
-
-export const getReachableProjectNodeIds = (loop: ProjectLoop): Set<string> => {
-  const reachable = new Set<string>();
-  const pending = [loop.startNodeId];
-  while (pending.length > 0) {
-    const nodeId = pending.shift();
-    if (!nodeId || reachable.has(nodeId)) continue;
-    reachable.add(nodeId);
-    for (const edge of getProjectNodeEdges(loop, nodeId)) {
-      const targetNodeId = getProjectNodeTargetId(edge.target);
-      if (targetNodeId && !reachable.has(targetNodeId)) pending.push(targetNodeId);
-    }
-  }
-  return reachable;
-};
-
-export const getReachableProjectLoopIds = (
-  config: Pick<ProjectAutomationConfig, "graph">,
-  startLoopId: string,
-  maxRepairDepth: number
-): Set<string> => getReachableProjectLoopGraph(config, startLoopId, maxRepairDepth).loopIds;
-
-export interface ReachableProjectLoopGraph {
-  loopIds: Set<string>;
-  loopEdgeIds: Set<string>;
-  minimumRepairDepthByLoopId: Map<string, number>;
-}
-
-/**
- * Computes every statically usable Loop route. Flow Edges preserve the repair
- * depth and Repair Edges consume one level, so cycles terminate while a Loop
- * can still be revisited at a shallower, more permissive depth.
- */
-export const getReachableProjectLoopGraph = (
-  config: Pick<ProjectAutomationConfig, "graph">,
-  startLoopId: string,
-  maxRepairDepth: number
-): ReachableProjectLoopGraph => {
-  if (!Number.isInteger(maxRepairDepth) || maxRepairDepth < 0 || maxRepairDepth > maxRepairDepthLimit) {
-    throw new Error(`maxRepairDepth must be an integer between 0 and ${maxRepairDepthLimit}.`);
-  }
-  const minimumRepairDepthByLoopId = new Map<string, number>([[startLoopId, 0]]);
-  const loopEdgeIds = new Set<string>();
-  const pending: Array<{ loopId: string; repairDepth: number }> = [{ loopId: startLoopId, repairDepth: 0 }];
-  while (pending.length > 0) {
-    const current = pending.shift();
-    if (!current || minimumRepairDepthByLoopId.get(current.loopId) !== current.repairDepth) continue;
-    for (const edge of getProjectLoopEdges(config, current.loopId)) {
-      if (edge.kind === "repair" && current.repairDepth >= maxRepairDepth) continue;
-      const targetDepth = current.repairDepth + (edge.kind === "repair" ? 1 : 0);
-      loopEdgeIds.add(edge.id);
-      const previousDepth = minimumRepairDepthByLoopId.get(edge.target);
-      if (previousDepth === undefined || targetDepth < previousDepth) {
-        minimumRepairDepthByLoopId.set(edge.target, targetDepth);
-        pending.push({ loopId: edge.target, repairDepth: targetDepth });
-      }
-    }
-  }
-  return {
-    loopIds: new Set(minimumRepairDepthByLoopId.keys()),
-    loopEdgeIds,
-    minimumRepairDepthByLoopId
-  };
-};
-
-export const hasReachableProjectLoopTerminal = (loop: ProjectLoop): boolean => {
-  const reachable = getReachableProjectNodeIds(loop);
-  return loop.edges.some((edge) => reachable.has(edge.source) && isProjectNodeTerminalTarget(edge.target));
-};
 
 export const clockTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 

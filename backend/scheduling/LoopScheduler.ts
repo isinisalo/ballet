@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
-import { isProjectScheduledWorkNode, type ProjectScheduledWorkNode } from "../../shared/domain/automation.js";
+import { isProjectScheduledJobNode, type ProjectScheduledJobNode } from "../../shared/domain/automation.js";
 import type { DispatchLoopScheduleResult, RuntimeDatabase } from "../runtime-db.js";
 import {
   latestScheduleOccurrenceBefore,
@@ -14,7 +14,7 @@ import {
 interface ScheduledDefinition {
   loopId: string;
   nodeId: string;
-  work: ProjectScheduledWorkNode;
+  job: ProjectScheduledJobNode;
   definitionHash: string;
 }
 
@@ -23,7 +23,7 @@ export interface LoopSchedulerOptions {
   database: () => RuntimeDatabase;
   dispatch: (input: {
     loopId: string;
-    workLoopNodeId: string;
+    jobNodeId: string;
     definitionHash: string;
     scheduledFor: string;
     nextRunAt?: string;
@@ -115,9 +115,9 @@ export class LoopScheduler {
     const definitionStates = definitions.map((definition) => {
       return {
         loopId: definition.loopId,
-        workLoopNodeId: definition.nodeId,
+        jobNodeId: definition.nodeId,
         definitionHash: definition.definitionHash,
-        nextRunAt: initialCursor(definition.work, minuteStart, now)
+        nextRunAt: initialCursor(definition.job, minuteStart, now)
       };
     });
     const changed = database.syncLoopScheduleDefinitions(definitionStates, nowIso);
@@ -130,17 +130,17 @@ export class LoopScheduler {
     for (const state of database.listLoopScheduleStates()) {
       if (this.isPaused(generation)) return;
       if (!state.nextRunAt) continue;
-      const definition = definitionsByKey.get(`${state.loopId}\0${state.workLoopNodeId}`);
+      const definition = definitionsByKey.get(`${state.loopId}\0${state.jobNodeId}`);
       if (!definition) continue;
       let scheduledFor = state.nextRunAt;
       let due = Temporal.Instant.from(scheduledFor);
       if (Temporal.Instant.compare(due, minuteStart) < 0) {
-        const nextRunAt = scheduleOccurrenceAtOrAfter(definition.work.schedule, minuteStart);
-        const lastScheduledAt = latestScheduleOccurrenceBefore(definition.work.schedule, minuteStart)
+        const nextRunAt = scheduleOccurrenceAtOrAfter(definition.job.schedule, minuteStart);
+        const lastScheduledAt = latestScheduleOccurrenceBefore(definition.job.schedule, minuteStart)
           ?? scheduledFor;
         const completed = database.completeLoopScheduleOccurrence({
           loopId: state.loopId,
-          workLoopNodeId: state.workLoopNodeId,
+          jobNodeId: state.jobNodeId,
           definitionHash: definition.definitionHash,
           scheduledFor,
           lastScheduledAt,
@@ -155,11 +155,11 @@ export class LoopScheduler {
         due = Temporal.Instant.from(scheduledFor);
       }
       if (Temporal.Instant.compare(due, now) > 0) continue;
-      const nextRunAt = nextScheduleOccurrence(definition.work.schedule, due);
+      const nextRunAt = nextScheduleOccurrence(definition.job.schedule, due);
       if (this.isPaused(generation)) return;
       await this.options.dispatch({
         loopId: state.loopId,
-        workLoopNodeId: state.workLoopNodeId,
+        jobNodeId: state.jobNodeId,
         definitionHash: definition.definitionHash,
         scheduledFor,
         nextRunAt,
@@ -175,17 +175,17 @@ export class LoopScheduler {
 }
 
 const scheduledDefinitions = (data: AppData): ScheduledDefinition[] => data.automation.loops.flatMap((loop) => {
-  const node = loop.nodes.find((candidate) => candidate.id === loop.startNodeId);
-  return node && isProjectScheduledWorkNode(node.work)
-    ? [{ loopId: loop.id, nodeId: node.id, work: node.work, definitionHash: scheduleDefinitionHash(node.work) }]
+  const node = loop.workflow.jobNodes.find((candidate) => candidate.id === loop.workflow.startJobNodeId);
+  return node && isProjectScheduledJobNode(node)
+    ? [{ loopId: loop.id, nodeId: node.id, job: node, definitionHash: scheduleDefinitionHash(node) }]
     : [];
 });
 
 const initialCursor = (
-  work: ProjectScheduledWorkNode,
+  job: ProjectScheduledJobNode,
   minuteStart: Temporal.Instant,
   now: Temporal.Instant
-): string | undefined => scheduleOccurrenceAtOrAfter(work.schedule, minuteStart)
-  ?? (work.schedule.kind === "once" ? latestScheduleOccurrenceBefore(work.schedule, now.add({ nanoseconds: 1 })) : undefined);
+): string | undefined => scheduleOccurrenceAtOrAfter(job.schedule, minuteStart)
+  ?? (job.schedule.kind === "once" ? latestScheduleOccurrenceBefore(job.schedule, now.add({ nanoseconds: 1 })) : undefined);
 
 const iso = (instant: Temporal.Instant): string => instant.toString({ smallestUnit: "millisecond" });

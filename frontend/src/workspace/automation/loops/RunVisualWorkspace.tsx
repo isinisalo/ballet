@@ -68,15 +68,15 @@ function MissionBrief({ root }: { root: RootRunDetail }) {
 
 function RunLiveRail({ root }: { root: RootRunDetail }) {
   const current = root.current;
-  const latestOutcome = current?.lastWorkOutcome?.summary
+  const latestOutcome = current?.lastJobOutcome?.summary
     ?? (current?.lastValidationDecision ? `Validation · ${current.lastValidationDecision}` : undefined)
     ?? rootOutcomeSummary(root);
   const fields = [
-    ["Active node", current?.workLoopNodeId ?? "—"],
+    ["Active node", current?.jobNodeId ?? "—"],
     ["Role", current?.nodeRole ? roleLabel(current.nodeRole) : "—"],
     ["Profile", current?.executionProfileId ?? "—"],
     ["State", `r${root.state.currentRevision}`],
-    ["Local attempt", current?.localRetryAttempt?.toString() ?? "0"],
+    ["Job attempt", current?.jobAttempt?.toString() ?? "0"],
     ["Repair depth", current?.repairDepth?.toString() ?? "0"]
   ];
   return (
@@ -104,20 +104,20 @@ function SignalEvidence({ label, value, tone }: { label: string; value?: string;
 
 export function runMissionNarration(root: RootRunDetail): string {
   const current = root.current;
-  const subject = current?.workLoopNodeDescription ?? current?.workLoopNodeId ?? current?.loopDescription ?? current?.loopId;
+  const subject = current?.jobNodeDescription ?? current?.jobNodeId ?? current?.loopDescription ?? current?.loopId;
   if (current?.nodeRole === "orchestrator") {
     return root.repair.pendingRepair
       ? `Routing ${root.repair.pendingRepair.repairRequestId} through the explicit repair allowlist.`
       : "Resolving the next explicit repair route.";
   }
-  if (current?.nodeRole === "validation") return subject ? sentenceWithSubject("Validating", subject) : "Validating the current Work outcome.";
-  if (current?.nodeRole === "work") return subject ? sentenceWithSubject("Working on", subject) : "Executing the current Work phase.";
+  if (current?.nodeRole === "validation") return subject ? sentenceWithSubject("Validating", subject) : "Validating the current Job outcome.";
+  if (current?.nodeRole === "job") return subject ? sentenceWithSubject("Executing", subject) : "Executing the current Job.";
   if (root.status === "finalizing") return "Finalizing canonical Run evidence.";
   if (["completed", "blocked", "failed", "cancelled"].includes(root.status)) return `Run ${root.status}.`;
   return "Waiting for the Run to claim its next canonical position.";
 }
 
-const roleLabel = (role: NonNullable<RootRunDetail["current"]>["nodeRole"]): string => role === "work" ? "Work" : role === "validation" ? "Validation" : "Orchestrator";
+const roleLabel = (role: NonNullable<RootRunDetail["current"]>["nodeRole"]): string => role === "job" ? "Job" : role === "validation" ? "Validation" : "Orchestrator";
 
 const sentenceWithSubject = (verb: string, subject: string): string => `${verb} “${subject}”${/[.!?]$/.test(subject) ? "" : "."}`;
 

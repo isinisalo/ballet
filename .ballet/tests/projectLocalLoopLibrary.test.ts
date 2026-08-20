@@ -2,10 +2,10 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loopModulePackageV1Schema } from "../../shared/api/loop-module-schemas.js";
+import { loopModulePackageV2Schema } from "../../shared/api/loop-module-schemas.js";
 import { projectConfigSchema } from "../../shared/api/workspace-schemas.js";
 import type { ProjectAutomationConfig, ProjectLoop } from "../../shared/domain/automation.js";
-import type { LoopModulePackageV1 } from "../../shared/domain/loopModules.js";
+import type { LoopModulePackageV2 } from "../../shared/domain/loopModules.js";
 import { validateProjectAutomationConfig } from "../../backend/automation/validateAutomationConfig.js";
 import { LoopModuleService } from "../../backend/loop-modules/LoopModuleService.js";
 import type { RuntimeDatabaseProvider } from "../../backend/services/RuntimeDatabaseProvider.js";
@@ -35,7 +35,7 @@ describe("Phase 6 project-local Loop responsibility and starter library", () => 
       expect(loop.capabilities.accepts, loop.id).toHaveLength(1);
       expect(loop.capabilities.provides, loop.id).toHaveLength(1);
     }
-    for (const loopId of splitIds) expect(config.loops.find((loop) => loop.id === loopId)?.nodes).toHaveLength(1);
+    for (const loopId of splitIds) expect(config.loops.find((loop) => loop.id === loopId)?.workflow.jobNodes).toHaveLength(1);
 
     const loops = new Map(config.loops.map((loop) => [loop.id, loop]));
     for (const edge of config.graph.loopEdges) {
@@ -47,12 +47,12 @@ describe("Phase 6 project-local Loop responsibility and starter library", () => 
       }
     }
     const projection = buildGraphEngineeringProjection({
-      config: { version: 11, orchestrator: config.orchestrator, graph: config.graph, loops: config.loops }
+      config: { version: 12, orchestrator: config.orchestrator, graph: config.graph, loops: config.loops }
     });
     expect(projection.orchestrator.id).toBe("loop-orchestrator");
     expect(projection.nodes).toHaveLength(config.loops.length);
     expect(projection.edges).toHaveLength(config.graph.loopEdges.length);
-    expect(projection.nodes.reduce((count, node) => count + node.workLoopNodeCount, 0)).toBe(20);
+    expect(projection.nodes.reduce((count, node) => count + node.jobCount, 0)).toBe(20);
   });
 
   it("keeps every starter as one strict-valid, target-independent Loop package", async () => {
@@ -82,8 +82,9 @@ describe("Phase 6 project-local Loop responsibility and starter library", () => 
       expect(pkg.loop.state.initial, pkg.manifest.id).toEqual(pkg.stateContract.initial);
       expect(forbiddenTopologyKeys(pkg), pkg.manifest.id).toEqual([]);
       const reusableContent = [
-        ...pkg.resources.flatMap((resource) => [resource.title, resource.description, resource.body]),
-        ...pkg.loop.nodes.flatMap((node) => [node.description, node.work.task, node.validation.task])
+        ...pkg.resources.flatMap((resource) => [resource.kind === "instruction" ? resource.title : resource.description, resource.body]),
+        ...pkg.loop.workflow.jobNodes.flatMap((node) => [node.description, node.task]),
+        ...pkg.loop.workflow.validationNodes.flatMap((node) => [node.description, node.task])
       ];
       expect(peerReferences(reusableContent, peerIds.filter((id) => id !== pkg.manifest.id)), pkg.manifest.id).toEqual([]);
     }
@@ -147,7 +148,7 @@ describe("Phase 6 Loop package lifecycle and capability substitution", () => {
     const profile = executionProfile();
     for (const target of targets) {
       const automation: ProjectAutomationConfig = {
-        version: 11,
+        version: 12,
         orchestrator: { executionProfileId: profile.id, primaryInstructionId: "project:orchestrator", skillIds: [], maxRepairDepth: 4, maxRepairAttempts: 3 },
         graph: { loopEdges: [{
           id: `implementation-route-${target.id}`,
@@ -166,7 +167,7 @@ describe("Phase 6 Loop package lifecycle and capability substitution", () => {
   });
 });
 
-const readPackages = async (): Promise<LoopModulePackageV1[]> => {
+const readPackages = async (): Promise<LoopModulePackageV2[]> => {
   const library = path.resolve(".ballet/loop-library");
   const categories = await readdir(library, { withFileTypes: true });
   const files = (await Promise.all(categories.filter((entry) => entry.isDirectory()).map(async (entry) => {
@@ -174,7 +175,7 @@ const readPackages = async (): Promise<LoopModulePackageV1[]> => {
     return (await readdir(directory)).filter((name) => name.endsWith(".ballet-loop.json"))
       .map((name) => path.join(directory, name));
   }))).flat().sort();
-  return Promise.all(files.map(async (file) => loopModulePackageV1Schema.parse(JSON.parse(await readFile(file, "utf8")))));
+  return Promise.all(files.map(async (file) => loopModulePackageV2Schema.parse(JSON.parse(await readFile(file, "utf8")))));
 };
 
 const forbiddenTopologyKeys = (value: unknown, currentPath = "$"): string[] => {
@@ -201,7 +202,7 @@ const emptyProject = async (): Promise<string> => {
   await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
   await writeFile(path.join(root, ".ballet/instructions/orchestrator.md"), "---\nid: orchestrator\ntitle: Orchestrator\n---\nRoute by capability.\n");
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 11,
+    version: 12,
     executionProfiles: [executionProfile()],
     orchestrator: { executionProfileId: "codex-test", primaryInstructionId: "project:orchestrator", skillIds: [], maxRepairDepth: 4, maxRepairAttempts: 3 },
     graph: { loopEdges: [] },
@@ -228,15 +229,7 @@ const implementationSource = (): ProjectLoop => ({
   description: "Produce one implementation request for a capability-compatible target.",
   capabilities: { accepts: ["test:entry.requested"], provides: ["implementation:change.requested"] },
   state: { description: "Swap test State.", initial: {} },
-  startNodeId: "request",
-  nodes: [{
-    id: "request",
-    description: "Produce an implementation request.",
-    work: { type: "human", task: "Produce the request.", nodeStyle: "terra", nodeSize: "small" },
-    validation: { type: "human", task: "Validate the request.", nodeStyle: "luna", nodeSize: "small" },
-    maxLocalAttempts: 3
-  }],
-  edges: [{ id: "request-completed", source: "request", target: { terminal: "completed" } }]
+  workflow: workflow("request", "Produce an implementation request.")
 });
 
 const targetLoop = (id: string): ProjectLoop => ({
@@ -244,13 +237,22 @@ const targetLoop = (id: string): ProjectLoop => ({
   description: `Capability-compatible ${id}.`,
   capabilities: { accepts: ["implementation:change.requested"], provides: ["implementation:change.ready"] },
   state: { description: "Swap test State.", initial: {} },
-  startNodeId: `${id}-task`,
-  nodes: [{
-    id: `${id}-task`,
-    description: "Implement the request.",
-    work: { type: "human", task: "Implement.", nodeStyle: "terra", nodeSize: "small" },
-    validation: { type: "human", task: "Validate.", nodeStyle: "luna", nodeSize: "small" },
-    maxLocalAttempts: 3
-  }],
-  edges: [{ id: `${id}-completed`, source: `${id}-task`, target: { terminal: "completed" } }]
+  workflow: workflow(`${id}-task`, "Implement the request.")
 });
+
+const workflow = (jobId: string, description: string): ProjectLoop["workflow"] => {
+  const validationId = `${jobId}-validation`;
+  return {
+    startJobNodeId: jobId,
+    jobNodes: [{
+      id: jobId, description, validationNodeId: validationId, maxRetries: 3,
+      type: "human", task: description, nodeStyle: "terra", nodeSize: "small"
+    }],
+    validationNodes: [{
+      id: validationId, description: `Validate ${description}`, type: "human",
+      task: "Validate.", nodeStyle: "luna", nodeSize: "small"
+    }],
+    passEdges: [{ id: `${jobId}-pass`, sourceValidationNodeId: validationId, target: { workflowResult: "PASS" } }],
+    failEdges: [{ id: `${jobId}-fail`, sourceValidationNodeId: validationId, target: { workflowResult: "FAIL" } }]
+  };
+};

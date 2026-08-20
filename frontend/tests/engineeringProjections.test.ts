@@ -11,15 +11,15 @@ import { calculateGraphEngineeringLayout } from "../src/workspace/automation/loo
 import {
   buildGraphEngineeringFocus,
   buildGraphEngineeringProjection,
-  buildLoopEngineeringProjection
+  buildWorkflowEngineeringProjection
 } from "../src/workspace/automation/loops/engineeringProjections";
-import { v11Automation, v11Loop } from "./v11Fixtures";
+import { workflowAutomation, workflowLoop } from "./workflowFixtures";
 
-describe("Graph and Loop Engineering projections", () => {
+describe("Graph and Workflow Engineering projections", () => {
   it("projects exactly one Graph Engineering black box per Loop and only ProjectLoopEdges, including cycles", () => {
-    const first = v11Loop("first-loop");
-    const second = v11Loop("second-loop");
-    const config = v11Automation(first, second);
+    const first = workflowLoop("first-loop");
+    const second = workflowLoop("second-loop");
+    const config = workflowAutomation(first, second);
     config.graph.loopEdges = [
       { id: "forward", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Forward." },
       { id: "back", source: second.id, target: first.id, kind: "repair", capability: "test:loop.transfer", description: "Back." }
@@ -30,15 +30,15 @@ describe("Graph and Loop Engineering projections", () => {
     expect(new Set(firstLayout.map(({ x, y }) => `${x}:${y}`))).toHaveLength(3);
     expect(projection.nodes).toHaveLength(2);
     expect(projection.orchestrator).toMatchObject({ id: "loop-orchestrator", title: "Loop Orchestrator" });
-    expect(projection.nodes[1]).toMatchObject({ title: "Sample module", loopId: second.id, kind: "installed", workLoopNodeCount: 1 });
+    expect(projection.nodes[1]).toMatchObject({ title: "Sample module", loopId: second.id, kind: "installed", jobCount: 1 });
     expect(projection.edges.map(({ id, kind }) => ({ id, kind }))).toEqual([{ id: "forward", kind: "flow" }, { id: "back", kind: "repair" }]);
     expect(projection.nodes[0]).not.toHaveProperty("nodes");
     expect(JSON.stringify(projection.nodes)).not.toContain("Execute work.");
   });
 
   it("uses a deterministic three-column snake so larger Loop systems remain legible", () => {
-    const loops = Array.from({ length: 8 }, (_, index) => v11Loop(`loop-${index + 1}`));
-    const projection = buildGraphEngineeringProjection({ config: v11Automation(...loops) });
+    const loops = Array.from({ length: 8 }, (_, index) => workflowLoop(`loop-${index + 1}`));
+    const projection = buildGraphEngineeringProjection({ config: workflowAutomation(...loops) });
     const layout = calculateGraphEngineeringLayout(projection);
 
     expect(layout).toHaveLength(9);
@@ -50,10 +50,10 @@ describe("Graph and Loop Engineering projections", () => {
   });
 
   it("keeps every flow route but focuses repair routes on the selected Loop", () => {
-    const first = v11Loop("first-loop");
-    const second = v11Loop("second-loop");
-    const third = v11Loop("third-loop");
-    const config = v11Automation(first, second, third);
+    const first = workflowLoop("first-loop");
+    const second = workflowLoop("second-loop");
+    const third = workflowLoop("third-loop");
+    const config = workflowAutomation(first, second, third);
     config.graph.loopEdges = [
       { id: "flow", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Continue." },
       { id: "selected-repair", source: third.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair selected." },
@@ -73,28 +73,27 @@ describe("Graph and Loop Engineering projections", () => {
     });
   });
 
-  it("projects Loop Engineering from only the selected Loop and reports unknown ids", () => {
-    const first = v11Loop("first-loop");
-    const second = v11Loop("second-loop");
-    second.nodes[0] = { ...second.nodes[0]!, id: "second-work" };
-    second.startNodeId = "second-work";
-    second.edges[0] = { ...second.edges[0]!, source: "second-work", target: { terminal: "failed" } };
-    const config = v11Automation(first, second);
+  it("projects Workflow Engineering from only the selected Loop and reports unknown ids", () => {
+    const first = workflowLoop("first-loop");
+    const second = workflowLoop("second-loop");
+    const config = workflowAutomation(first, second);
     config.graph.loopEdges = [{ id: "global", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Global." }];
 
-    const projection = buildLoopEngineeringProjection(config, second.id);
-    expect(projection).toMatchObject({ startNodeId: "second-work", terminals: ["failed"] });
-    expect(projection?.nodes.map((node) => node.id)).toEqual(["second-work"]);
-    expect(projection?.edges.map((edge) => edge.id)).toEqual([second.edges[0]?.id]);
+    const projection = buildWorkflowEngineeringProjection(config, second.id);
+    expect(projection).toMatchObject({ startJobNodeId: "job" });
+    expect(projection?.jobNodes.map((node) => node.id)).toEqual(["job"]);
+    expect(projection?.validationNodes.map((node) => node.id)).toEqual(["job-validation"]);
+    expect(projection?.passEdges.map((edge) => edge.id)).toEqual([second.workflow.passEdges[0]?.id]);
+    expect(projection?.failEdges.map((edge) => edge.id)).toEqual([second.workflow.failEdges[0]?.id]);
     expect(JSON.stringify(projection)).not.toContain(first.id);
     expect(JSON.stringify(projection)).not.toContain("global");
-    expect(buildLoopEngineeringProjection(config, "missing-loop")).toBeUndefined();
+    expect(buildWorkflowEngineeringProjection(config, "missing-loop")).toBeUndefined();
   });
 
   it("highlights only a canonical persisted route accepted by the active immutable snapshot", () => {
-    const source = v11Loop("source-loop");
-    const target = v11Loop("target-loop");
-    const config = v11Automation(source, target);
+    const source = workflowLoop("source-loop");
+    const target = workflowLoop("target-loop");
+    const config = workflowAutomation(source, target);
     const edge = { id: "flow-route", source: source.id, target: target.id, kind: "flow" as const, capability: "test:loop.transfer", description: "Dispatch completed work." };
     config.graph.loopEdges = [edge];
     const root = activeRoot(config);
@@ -114,9 +113,9 @@ describe("Graph and Loop Engineering projections", () => {
   });
 
   it("reports out-of-allowlist and capability-mismatched route evidence as blocked, never active", () => {
-    const source = v11Loop("source-loop");
-    const target = v11Loop("target-loop");
-    const config = v11Automation(source, target);
+    const source = workflowLoop("source-loop");
+    const target = workflowLoop("target-loop");
+    const config = workflowAutomation(source, target);
     const allowed = { id: "repair-route", source: source.id, target: target.id, kind: "repair" as const, capability: "test:loop.transfer", description: "Repair missing evidence." };
     config.graph.loopEdges = [allowed];
     const root = activeRoot(config);
@@ -144,10 +143,10 @@ function activeRoot(config: ProjectAutomationConfig): RootRun {
     stateRevision: 0, worktreePath: "/tmp/worktree", branch: "codex/test", headSha: "a".repeat(40),
     configHash: "b".repeat(64), snapshotHash: "c".repeat(64), transitionCount: 1,
     executionSnapshot: {
-      version: 4, rootLoopId: config.loops[0]!.id,
+      version: 5, rootLoopId: config.loops[0]!.id,
       project: { checkoutRoot: "/tmp/worktree", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64) },
       orchestrator: structuredClone(config.orchestrator), graph: structuredClone(config.graph), loops: structuredClone(config.loops),
-      terminals: ["completed", "blocked", "failed"], theme: structuredClone(defaultLoopTheme), executionProfiles: [], runtimes: [], resources: [],
+      theme: structuredClone(defaultLoopTheme), executionProfiles: [], runtimes: [], resources: [],
       createdAt: "2026-08-20T08:00:00.000Z"
     },
     createdAt: "2026-08-20T08:00:00.000Z", updatedAt: "2026-08-20T08:00:01.000Z"
@@ -168,12 +167,12 @@ function orchestratorRoute(
   };
 }
 
-function liveTargetRun(loop: ReturnType<typeof v11Loop>, route: OrchestratorRoute): LoopRunDetails {
+function liveTargetRun(loop: ReturnType<typeof workflowLoop>, route: OrchestratorRoute): LoopRunDetails {
   return {
     loopRunId: "target-loop-run", loopId: loop.id, rootRunId: route.rootRunId, source: route.kind,
     status: "running", snapshot: structuredClone(loop), themeSnapshot: structuredClone(defaultLoopTheme),
     orchestrationRequestId: route.orchestrationRequestId, entryStateRevision: 0, nestingDepth: route.kind === "repair" ? 1 : 0,
-    createdAt: "2026-08-20T08:00:01.000Z", updatedAt: "2026-08-20T08:00:02.000Z", workLoopNodeRuns: [], nodeRuns: []
+    createdAt: "2026-08-20T08:00:01.000Z", updatedAt: "2026-08-20T08:00:02.000Z", jobRuns: [], nodeRuns: []
   };
 }
 

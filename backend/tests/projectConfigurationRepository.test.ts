@@ -33,32 +33,36 @@ const loop = (executionProfileId: string): ProjectLoop => ({
   description: "Complete and validate the work.",
   capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
   state: { description: "Shared delivery state.", initial: {} },
-  startNodeId: "work",
-  nodes: [{
-    id: "work",
-    description: "Complete the work.",
-    work: {
+  workflow: {
+    startJobNodeId: "job",
+    jobNodes: [{
+      id: "job",
+      description: "Complete the work.",
+      validationNodeId: "job-validation",
       type: "agent",
       task: "Complete the work.",
       executionProfileId,
       primaryInstructionId: "project:primary",
       skillIds: ["project:zeta", "project:alpha"],
       nodeStyle: "terra",
-      nodeSize: "medium"
-    },
-    validation: {
+      nodeSize: "medium",
+      maxRetries: 3
+    }],
+    validationNodes: [{
+      id: "job-validation",
+      description: "Validate the completed work.",
       type: "human",
       task: "Validate the completed work.",
       nodeStyle: "luna",
       nodeSize: "small"
-    },
-    maxLocalAttempts: 3
-  }],
-  edges: [{ id: "work-completed", source: "work", target: { terminal: "completed" } }]
+    }],
+    passEdges: [{ id: "job-pass", sourceValidationNodeId: "job-validation", target: { workflowResult: "PASS" } }],
+    failEdges: [{ id: "job-fail", sourceValidationNodeId: "job-validation", target: { workflowResult: "FAIL" } }]
+  }
 });
 
 const automation = (executionProfileId: string): ProjectAutomationConfig => ({
-  version: 11,
+  version: 12,
   orchestrator: {
     executionProfileId,
     primaryInstructionId: "project:primary",
@@ -76,7 +80,7 @@ describe("project configuration repository", () => {
     const repository = new ProjectConfigurationRepository();
     expect(repository.load(projectRoot)).toMatchObject({
       exists: false,
-      config: { version: 11, executionProfiles: [], orchestrator: expect.any(Object), graph: { loopEdges: [] }, loops: [] },
+      config: { version: 12, executionProfiles: [], orchestrator: expect.any(Object), graph: { loopEdges: [] }, loops: [] },
       issues: []
     });
     await expect(readFile(repository.path(projectRoot), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
@@ -90,7 +94,7 @@ describe("project configuration repository", () => {
     repository.putAutomation(projectRoot, automation("zeta"));
 
     expect(JSON.parse(await readFile(repository.path(projectRoot), "utf8"))).toEqual({
-      version: 11,
+      version: 12,
       executionProfiles: [profile("alpha"), profile("zeta", true)],
       orchestrator: {
         ...automation("zeta").orchestrator,
@@ -99,10 +103,13 @@ describe("project configuration repository", () => {
       graph: { loopEdges: [] },
       loops: [{
         ...loop("zeta"),
-        nodes: [{
-          ...loop("zeta").nodes[0]!,
-          work: { ...loop("zeta").nodes[0]!.work, skillIds: ["project:alpha", "project:zeta"] }
-        }]
+        workflow: {
+          ...loop("zeta").workflow,
+          jobNodes: [{
+            ...loop("zeta").workflow.jobNodes[0]!,
+            skillIds: ["project:alpha", "project:zeta"]
+          }]
+        }
       }]
     });
     expect(await readdir(path.join(projectRoot, ".ballet"))).toEqual(["project.json"]);
@@ -125,7 +132,7 @@ describe("project configuration repository", () => {
     const projectRoot = await root();
     const repository = new ProjectConfigurationRepository();
     await mkdir(path.dirname(repository.path(projectRoot)), { recursive: true });
-    const legacySource = `${JSON.stringify({ version: 12, loops: [] }, null, 2)}\n`;
+    const legacySource = `${JSON.stringify({ version: 11, loops: [] }, null, 2)}\n`;
     await writeFile(repository.path(projectRoot), legacySource, "utf8");
 
     expect(repository.load(projectRoot)).toMatchObject({
@@ -134,7 +141,7 @@ describe("project configuration repository", () => {
       issues: [expect.objectContaining({
         code: "invalid_schema",
         path: "version",
-        message: expect.stringContaining("version 11 is required")
+        message: expect.stringContaining("version 12 is required")
       })]
     });
     expect(() => repository.createExecutionProfile(projectRoot, profile("primary")))
@@ -262,7 +269,7 @@ describe("project configuration repository source safety", () => {
     expect(await readFile(balletPath, "utf8")).toBe("preserve me");
   });
 
-  it("cannot remove an ExecutionProfile still referenced by v10 compositions", async () => {
+  it("cannot remove an ExecutionProfile still referenced by Workflow compositions", async () => {
     const projectRoot = await root();
     const repository = new ProjectConfigurationRepository();
     repository.createExecutionProfile(projectRoot, profile("primary"));

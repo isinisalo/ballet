@@ -13,14 +13,14 @@ import { LoopThemeEditorView } from "../src/workspace/automation/themes/LoopThem
 import { LoopThemePreview } from "../src/workspace/automation/themes/LoopThemePreview";
 import { useLoopThemeEditor } from "../src/workspace/automation/themes/useLoopThemeEditor";
 import { installThemeApi } from "./loopThemeEditorTestApi";
-import { v11Automation, v11Loop } from "./v11Fixtures";
+import { workflowAutomation, workflowLoop } from "./workflowFixtures";
 
-const loop = v11Loop("delivery");
+const loop = workflowLoop("delivery");
 
 const theme = () => structuredClone(defaultLoopTheme);
 const data = (): AppData => ({
   ...emptyData,
-  automation: v11Automation(structuredClone(loop)),
+  automation: workflowAutomation(structuredClone(loop)),
   automationIssues: [],
   scheduleStates: [],
   loopTheme: theme(),
@@ -61,33 +61,35 @@ describe("singleton Loop theme editor", () => {
 
   it("previews the complete grouped artwork catalog and a compact edge canvas", () => {
     render(<LoopThemePreview theme={theme()} />);
-    const canvas = screen.getByLabelText("Theme preview loop canvas");
+    const canvas = screen.getByLabelText("Run selected Workflow internal Edge canvas");
     const gallery = screen.getByLabelText("Node artwork catalog");
 
-    expect(canvas).toHaveAttribute("data-loop-canvas-preview", "true");
+    expect(canvas).toHaveClass("overflow-x-auto");
     loopNodeStyles.forEach((style) => {
       const preview = gallery.querySelector(`[data-loop-artwork-preview='${style}']`);
       expect(preview).toBeInTheDocument();
-      expect(preview?.querySelector(`[data-loop-node-style='${style}']`)).toBeInTheDocument();
+      expect(preview?.querySelector(`[data-loop-node-artwork='${style}']`)).toBeInTheDocument();
     });
-    expect(gallery.querySelector("[data-loop-route-preview] [data-loop-route-artwork]")).toBeInTheDocument();
-    expect(gallery.querySelectorAll("[data-loop-artwork-gallery-group]")).toHaveLength(3);
+    expect(gallery.querySelector("[data-loop-route-artwork]")).toBeInTheDocument();
+    expect(gallery.querySelectorAll("[data-loop-artwork-gallery-group]")).toHaveLength(2);
     expect(gallery.querySelector("[data-loop-artwork-gallery-group='ship']")).not.toBeInTheDocument();
     expect(gallery.querySelector("[data-loop-artwork-gallery-group='monster']")).not.toBeInTheDocument();
-    expect(canvas.querySelector("[data-loop-edge-style='solid']")).toBeInTheDocument();
-    expect(canvas.querySelector("[data-loop-edge-output-slot-kind='normal']")).toHaveAttribute("data-loop-edge-style", "solid");
-    expect(canvas.querySelector("[data-loop-node-kind='terminal'] [data-loop-node-label='completed']")).toBeInTheDocument();
-    expect(within(canvas).queryByRole("button")).not.toBeInTheDocument();
+    expect(canvas).toHaveTextContent("✓ PASS");
+    expect(canvas).toHaveTextContent("✕ FAIL · escalate");
+    expect(canvas.querySelector("[data-workflow-endpoint]")).not.toBeInTheDocument();
+    expect(canvas.querySelector("[data-workflow-node='validation']")).not.toBeInTheDocument();
+    expect([...canvas.querySelectorAll("[data-workflow-edge]")].every((edge) =>
+      ["straight", "smoothstep"].includes(edge.getAttribute("data-edge-geometry") ?? ""))).toBe(true);
+    expect(within(canvas).getAllByRole("button").every((button) => button.hasAttribute("disabled"))).toBe(true);
     expect(within(gallery).queryByRole("button")).not.toBeInTheDocument();
     expect(gallery.querySelector("img")).not.toBeInTheDocument();
-    expect([...canvas.querySelectorAll<HTMLElement>(".react-flow__node")].every((node) => node.style.pointerEvents === "none")).toBe(true);
-    expect(canvas.querySelector("[data-loop-edge-animated='true']")).not.toBeInTheDocument();
+    expect(canvas.querySelector(".react-flow__node")).not.toBeInTheDocument();
   });
 
   it("applies node, edge, and connection controls to the live preview and save payload", async () => {
     const user = userEvent.setup();
     const props = renderEditor();
-    const canvas = screen.getByLabelText("Theme preview loop canvas");
+    const canvas = screen.getByLabelText("Run selected Workflow internal Edge canvas");
     const nodeSection = controlSection("Node");
     const edgeSection = controlSection("Edge");
     const connectionSection = controlSection("Connection point");
@@ -119,7 +121,7 @@ describe("singleton Loop theme editor", () => {
   it("keeps the last valid preview color and disables Save for an invalid hex value", async () => {
     const user = userEvent.setup();
     const props = renderEditor();
-    const canvas = screen.getByLabelText("Theme preview loop canvas");
+    const canvas = screen.getByLabelText("Run selected Workflow internal Edge canvas");
     const input = within(controlSection("Edge")).getByLabelText("Color");
 
     await replaceValue(user, input, "#123456");

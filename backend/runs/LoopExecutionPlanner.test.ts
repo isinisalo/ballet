@@ -2,7 +2,6 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProjectWorkLoopNode } from "../../shared/domain/automation.js";
 import type { ExecutionProfile, ProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import type { ResolvedExecutionProfile } from "../../shared/domain/runtime.js";
 import {
@@ -14,7 +13,7 @@ import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
 import type { PreparedRootWorkspace } from "../execution/git/LocalWorkspaceManager.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
-import { testLoop, testWorkLoopNode } from "../tests/v11TestConfig.js";
+import { testJobPair, testLoop, type TestJobPair } from "../tests/v12TestConfig.js";
 import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
 
 const roots: string[] = [];
@@ -37,12 +36,12 @@ const providerNode = (
   executionProfileId: string,
   primaryInstructionId: string,
   validation: "agent" | "human" = "human"
-): ProjectWorkLoopNode => {
-  const node = testWorkLoopNode(id, { validation });
-  if (node.work.type !== "human") {
-    node.work.executionProfileId = executionProfileId;
-    node.work.primaryInstructionId = primaryInstructionId;
-    node.work.skillIds = ["project:z-check", "project:a-check"];
+): TestJobPair => {
+  const node = testJobPair(id, { validation });
+  if (node.job.type !== "human") {
+    node.job.executionProfileId = executionProfileId;
+    node.job.primaryInstructionId = primaryInstructionId;
+    node.job.skillIds = ["project:z-check", "project:a-check"];
   }
   if (node.validation.type === "agent") {
     node.validation.executionProfileId = executionProfileId;
@@ -59,7 +58,11 @@ const configuration = (): ProjectConfiguration => {
   const repairNode = providerNode(
     "repair-work", "alpha-runtime", "project:repair-validation", "agent"
   );
-  repairNode.work = {
+  repairNode.job = {
+    id: repairNode.job.id,
+    description: repairNode.job.description,
+    validationNodeId: repairNode.job.validationNodeId,
+    maxRetries: repairNode.job.maxRetries,
     type: "human",
     task: "Perform the requested repair.",
     nodeStyle: "terra",
@@ -70,7 +73,7 @@ const configuration = (): ProjectConfiguration => {
     "unused-work", "unused-runtime", "project:unused"
   ));
   return {
-    version: 11,
+    version: 12,
     executionProfiles: [profile("zeta-runtime"), profile("unused-runtime"), profile("alpha-runtime")],
     orchestrator: {
       executionProfileId: "zeta-runtime",
@@ -100,15 +103,14 @@ describe("LoopExecutionPlanner", () => {
     const snapshot = await planner.create(workspace, "root-loop");
 
     expect(snapshot).toMatchObject({
-      version: 4,
+      version: 5,
       rootLoopId: "root-loop",
       project: {
         checkoutRoot: workspace.path,
         headSha: workspace.headSha,
         configHash: workspace.configHash,
         snapshotHash: workspace.snapshotHash
-      },
-      terminals: ["completed", "blocked", "failed"]
+      }
     });
     expect(snapshot.loops.map((loop) => loop.id)).toEqual(["repair-loop", "root-loop"]);
     expect(snapshot.graph.loopEdges.map((edge) => edge.id)).toEqual(["root-repair"]);
@@ -128,7 +130,7 @@ describe("LoopExecutionPlanner", () => {
       "skill:project:a-check",
       "skill:project:route",
       "skill:project:z-check",
-      "system:system:execution-contract-v3"
+      "system:system:execution-contract-v4"
     ]);
     expect(canonicalJson(snapshot.loops.find((loop) => loop.id === "root-loop")!.state.initial))
       .toBe('{"alpha":{"count":0},"zeta":true}');
@@ -163,7 +165,7 @@ describe("LoopExecutionPlanner", () => {
     expect(first.loops.find((loop) => loop.id === "root-loop")?.description)
       .toBe("Test Loop root-loop.");
     expect(first.resources.find((resource) => resource.id === "project:root-work")?.content)
-      .toBe("Perform root Work.");
+      .toBe("Perform root Job.");
     expect(first.loops.find((loop) => loop.id === "root-loop")?.state)
       .toEqual({ description: "State for root-loop.", initial: { alpha: { count: 0 }, zeta: true } });
     expect(first.graph.loopEdges[0]?.target).toBe("repair-loop");
@@ -173,9 +175,9 @@ describe("LoopExecutionPlanner", () => {
 
   it("fails closed for a missing reachable profile or resource", async () => {
     const missingProfile = configuration();
-    const rootWork = missingProfile.loops.find((loop) => loop.id === "root-loop")!.nodes[0]!.work;
-    if (rootWork.type === "human") throw new Error("Expected a provider Work Node.");
-    rootWork.executionProfileId = "missing-runtime";
+    const rootJob = missingProfile.loops.find((loop) => loop.id === "root-loop")!.workflow.jobNodes[0]!;
+    if (rootJob.type === "human") throw new Error("Expected a provider Job Node.");
+    rootJob.executionProfileId = "missing-runtime";
     const profileWorkspace = await writeProject(missingProfile);
     const profileHarness = runtimeHarness();
     await expect(new LoopExecutionPlanner(profileHarness.configurations, profileHarness.runtime)
@@ -184,9 +186,9 @@ describe("LoopExecutionPlanner", () => {
     expect(profileHarness.requireProfile).not.toHaveBeenCalled();
 
     const missingResource = configuration();
-    const resourceWork = missingResource.loops.find((loop) => loop.id === "root-loop")!.nodes[0]!.work;
-    if (resourceWork.type === "human") throw new Error("Expected a provider Work Node.");
-    resourceWork.primaryInstructionId = "project:missing";
+    const resourceJob = missingResource.loops.find((loop) => loop.id === "root-loop")!.workflow.jobNodes[0]!;
+    if (resourceJob.type === "human") throw new Error("Expected a provider Job Node.");
+    resourceJob.primaryInstructionId = "project:missing";
     const resourceWorkspace = await writeProject(missingResource);
     const resourceHarness = runtimeHarness();
     await expect(new LoopExecutionPlanner(resourceHarness.configurations, resourceHarness.runtime)
@@ -263,7 +265,7 @@ const writeProject = async (config: ProjectConfiguration): Promise<PreparedRootW
   await writeConfiguration(root, config);
   await Promise.all([
     writeInstruction(root, "orchestrator", "Route repairs within the immutable allowlist."),
-    writeInstruction(root, "root-work", "Perform root Work."),
+    writeInstruction(root, "root-work", "Perform root Job."),
     writeInstruction(root, "repair-validation", "Validate the repair."),
     writeSkill(root, "route", "Route only to an allowed repair Loop."),
     writeSkill(root, "a-check", "Run check A."),

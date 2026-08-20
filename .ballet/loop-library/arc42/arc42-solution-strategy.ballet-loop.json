@@ -27,47 +27,7 @@
   "format": "ballet-loop-module",
   "loop": {
     "description": "Define one quality-driven solution strategy for an approved initiative. Done when the bounded strategy and unresolved significant choices are explicit and validated against the BRIEF, constraints and priority quality scenarios.",
-    "edges": [
-      {
-        "key": "completed",
-        "source": "solution-strategy",
-        "target": {
-          "terminal": "completed"
-        }
-      }
-    ],
     "key": "loop",
-    "nodes": [
-      {
-        "description": "Create and validate the initiative's bounded solution strategy.",
-        "key": "solution-strategy",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "arc42-reviewer",
-          "profileSlot": "slot-2",
-          "skills": [
-            "conformance-review"
-          ],
-          "task": "Validate that one bounded solution strategy is source-linked, internally coherent and sufficient for the approved BRIEF, constraints and measurable priority quality scenarios. Reject completion when a significant choice is hidden or lacks human authority; do not edit the strategy.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "arc42-solution-strategy-agent",
-          "profileSlot": "slot-1",
-          "skills": [
-            "architecture-views",
-            "traceability"
-          ],
-          "task": "Update arc42 section 4 and initiative planning references with the smallest solution strategy that satisfies the approved BRIEF, constraints and priority quality scenarios. Done means the chosen approach, rejected material alternatives and every unresolved significant choice are explicit and source-linked.",
-          "type": "agent"
-        }
-      }
-    ],
-    "startNode": "solution-strategy",
     "state": {
       "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
       "initial": {
@@ -113,6 +73,60 @@
           "status": "not_requested"
         }
       }
+    },
+    "workflow": {
+      "failEdges": [
+        {
+          "key": "solution-strategy-fail",
+          "sourceValidationNode": "solution-strategy-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        }
+      ],
+      "jobNodes": [
+        {
+          "description": "Create and validate the initiative's bounded solution strategy.",
+          "key": "solution-strategy",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-solution-strategy-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "architecture-views",
+            "traceability"
+          ],
+          "task": "Update arc42 section 4 and initiative planning references with the smallest solution strategy that satisfies the approved BRIEF, constraints and priority quality scenarios. Done means the chosen approach, rejected material alternatives and every unresolved significant choice are explicit and source-linked.",
+          "type": "agent",
+          "validationNode": "solution-strategy-validation"
+        }
+      ],
+      "passEdges": [
+        {
+          "key": "completed",
+          "sourceValidationNode": "solution-strategy-validation",
+          "target": {
+            "workflowResult": "PASS"
+          }
+        }
+      ],
+      "startJobNode": "solution-strategy",
+      "validationNodes": [
+        {
+          "description": "Validate Create and validate the initiative's bounded solution strategy.",
+          "key": "solution-strategy-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "arc42-reviewer",
+          "profileSlot": "slot-2",
+          "skills": [
+            "conformance-review"
+          ],
+          "task": "Validate that one bounded solution strategy is source-linked, internally coherent and sufficient for the approved BRIEF, constraints and measurable priority quality scenarios. Reject completion when a significant choice is hidden or lacks human authority; do not edit the strategy.",
+          "type": "agent"
+        }
+      ]
     }
   },
   "manifest": {
@@ -166,7 +180,7 @@
       "title": "arc42 Solution Strategy Agent"
     },
     {
-      "body": "\n# arc42 Independent Reviewer\n\n## Role\n\nIndependently validate one Work Loop Node goal against its task, canonical State, accepted sources, latest Work outcome and measurable criteria.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical architecture/initiative sources → Validation task and current State → Work summary/provider prose.\n\n## Writes\n\nDo not modify the implementation or artifacts being evaluated. A Validation OK may propose only a bounded State reference patch; a Validation FAIL proposes repair, never a document/code fix. Do not write externally or change decisions, topology, permissions, network, instructions or skills.\n\n## Sources and evidence\n\nInspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.\n\n## State patch\n\nOnly `decision: OK` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must choose `LOCAL_RETRY` or request a capability/outcome for Orchestrator repair without naming continuation/return target.\n\n## Stop rules\n\nReturn only valid `completed`, `needs_input`, `blocked` or `failed` Validation outcomes. `completed` contains exactly `OK` or `FAIL` plus the required repair payload. Stop for human input at all stated decision/authorization boundaries. Never return hidden chain-of-thought.\n",
+      "body": "\n# arc42 Independent Reviewer\n\n## Role\n\nIndependently validate one paired Job Node goal against its task, canonical State, accepted sources, latest Job outcome and measurable criteria.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical architecture/initiative sources → Validation task and current State → Job summary/provider prose.\n\n## Writes\n\nDo not modify the implementation or artifacts being evaluated. A Validation PASS may propose only a bounded State reference patch; a Validation FAIL proposes correction feedback and capability/outcome escalation, never a document/code fix. Do not write externally or change decisions, topology, permissions, network, instructions or skills.\n\n## Sources and evidence\n\nInspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.\n\n## State patch\n\nOnly `decision: PASS` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must always include `feedback`, `expectedCorrection`, and exactly one target-free `requestedCapability` or `requestedOutcome`. Runtime owns the local retry budget and escalates through the FailEdge only after it is exhausted.\n\n## Stop rules\n\nReturn only valid `completed`, `needs_input`, `blocked` or `failed` Validation outcomes. `completed` contains exactly `PASS` or `FAIL` plus the required role-specific payload. Stop for human input at all stated decision/authorization boundaries. Never return hidden chain-of-thought.\n",
       "key": "arc42-reviewer",
       "kind": "instruction",
       "metadata": {
@@ -260,5 +274,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 1
+  "version": 2
 }

@@ -3,10 +3,10 @@ import {
   isCalendarDate,
   isIanaTimeZone,
   type ProjectScheduleWeekday,
-  type ProjectWorkSchedule
+  type ProjectJobSchedule
 } from "@shared/api/workspace-contracts";
 
-export type RecurringWorkSchedule = Extract<ProjectWorkSchedule, { kind: "recurring" }>;
+export type RecurringJobSchedule = Extract<ProjectJobSchedule, { kind: "recurring" }>;
 export type ScheduleField = "date" | "startsOn" | "time" | "timeZone" | "weekdays" | "dayOfMonth";
 export type ScheduleErrors = Partial<Record<ScheduleField, string>>;
 
@@ -22,7 +22,7 @@ const weekdayLabels: Record<ProjectScheduleWeekday, string> = {
 
 export const scheduleWeekdays = Object.keys(weekdayLabels) as ProjectScheduleWeekday[];
 
-export function defaultOnceSchedule(now = new Date()): ProjectWorkSchedule {
+export function defaultOnceSchedule(now = new Date()): ProjectJobSchedule {
   const nextHour = new Date(now);
   nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
   return {
@@ -33,7 +33,7 @@ export function defaultOnceSchedule(now = new Date()): ProjectWorkSchedule {
   };
 }
 
-export function changeScheduleKind(schedule: ProjectWorkSchedule, kind: ProjectWorkSchedule["kind"]): ProjectWorkSchedule {
+export function changeScheduleKind(schedule: ProjectJobSchedule, kind: ProjectJobSchedule["kind"]): ProjectJobSchedule {
   if (schedule.kind === kind) return schedule;
   if (kind === "once") {
     return { kind: "once", date: schedule.kind === "recurring" ? schedule.startsOn : "", time: schedule.time, timeZone: schedule.timeZone };
@@ -47,14 +47,14 @@ export function changeScheduleKind(schedule: ProjectWorkSchedule, kind: ProjectW
   };
 }
 
-export function changeScheduleCadence(schedule: RecurringWorkSchedule, cadence: RecurringWorkSchedule["cadence"]): RecurringWorkSchedule {
+export function changeScheduleCadence(schedule: RecurringJobSchedule, cadence: RecurringJobSchedule["cadence"]): RecurringJobSchedule {
   const base = { kind: "recurring" as const, startsOn: schedule.startsOn, time: schedule.time, timeZone: schedule.timeZone };
   if (cadence === "weekly") return { ...base, cadence, weekdays: schedule.cadence === "weekly" ? schedule.weekdays : ["mon"] };
   if (cadence === "monthly") return { ...base, cadence, dayOfMonth: schedule.cadence === "monthly" ? schedule.dayOfMonth : 1 };
   return { ...base, cadence };
 }
 
-export function validateSchedule(schedule: ProjectWorkSchedule): ScheduleErrors {
+export function validateSchedule(schedule: ProjectJobSchedule): ScheduleErrors {
   const errors: ScheduleErrors = {};
   if (schedule.kind === "once" && !isCalendarDate(schedule.date)) errors.date = "Enter a valid start date.";
   if (schedule.kind === "recurring" && !isCalendarDate(schedule.startsOn)) errors.startsOn = "Enter a valid start date.";
@@ -69,7 +69,7 @@ export function validateSchedule(schedule: ProjectWorkSchedule): ScheduleErrors 
   return errors;
 }
 
-export function scheduleSummary(schedule: ProjectWorkSchedule): string {
+export function scheduleSummary(schedule: ProjectJobSchedule): string {
   if (schedule.kind === "once") return `Once ${schedule.date} · ${schedule.time} · ${schedule.timeZone}`;
   if (schedule.cadence === "daily") return `Daily · ${schedule.time} · ${schedule.timeZone}`;
   if (schedule.cadence === "weekdays") return `Weekdays · ${schedule.time} · ${schedule.timeZone}`;

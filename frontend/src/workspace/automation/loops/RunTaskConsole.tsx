@@ -24,4 +24,4 @@ export function RunTaskConsole({ root }: { root: RootRunDetail }) {
   </section>;
 }
 
-const roleLabel = (role: "work" | "validation" | "orchestrator"): string => role === "work" ? "Work" : role === "validation" ? "Validation" : "Orchestrator";
+const roleLabel = (role: "job" | "validation" | "orchestrator"): string => role === "job" ? "Job" : role === "validation" ? "Validation" : "Orchestrator";

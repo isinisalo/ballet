@@ -1,15 +1,15 @@
 import {
   validationNodeOutcomeSchema,
-  workNodeOutcomeSchema,
+  jobNodeOutcomeSchema,
   type RespondToNodeRunRequest
 } from "@shared/api/workspace-contracts";
 
-export type HumanWorkState = "completed" | "blocked" | "failed";
-export type HumanValidationState = "OK" | "FAIL" | "blocked" | "failed";
-export type HumanRepairMode = "LOCAL_RETRY" | "ORCHESTRATOR_REPAIR";
+export type HumanJobState = "completed" | "blocked" | "failed";
+export type HumanValidationState = "PASS" | "FAIL" | "blocked" | "failed";
+export type HumanEscalationKind = "capability" | "outcome";
 
-export interface HumanWorkResponseFields {
-  state: HumanWorkState;
+export interface HumanJobResponseFields {
+  state: HumanJobState;
   summary: string;
   artifacts: string;
   checks: string;
@@ -22,19 +22,20 @@ export interface HumanValidationResponseFields {
   evidence: string;
   checks: string;
   statePatch: string;
-  repairMode: HumanRepairMode;
   feedback: string;
   expectedCorrection: string;
+  escalationKind: HumanEscalationKind;
   reason: string;
   requestedCapability: string;
+  requestedOutcome: string;
   evidenceRefs: string;
 }
 
-export const buildHumanWorkResponse = (
-  fields: HumanWorkResponseFields
+export const buildHumanJobResponse = (
+  fields: HumanJobResponseFields
 ): RespondToNodeRunRequest => {
   const common = {
-    role: "work" as const,
+    role: "job" as const,
     state: fields.state,
     summary: requireText(fields.summary, "Summary"),
     checks: parseJson(fields.checks, "Checks", [])
@@ -44,7 +45,7 @@ export const buildHumanWorkResponse = (
     artifacts: parseJson(fields.artifacts, "Artifacts", {}),
     ...optionalJson(fields.statePatch, "State patch")
   } : common;
-  return { kind: "work", outcome: workNodeOutcomeSchema.parse(value) };
+  return { kind: "job", outcome: jobNodeOutcomeSchema.parse(value) };
 };
 
 export const buildHumanValidationResponse = (
@@ -52,7 +53,7 @@ export const buildHumanValidationResponse = (
 ): RespondToNodeRunRequest => {
   const common = {
     role: "validation" as const,
-    state: fields.state === "OK" || fields.state === "FAIL" ? "completed" as const : fields.state,
+    state: fields.state === "PASS" || fields.state === "FAIL" ? "completed" as const : fields.state,
     summary: requireText(fields.summary, "Summary"),
     checks: parseJson(fields.checks, "Checks", [])
   };
@@ -64,20 +65,19 @@ export const buildHumanValidationResponse = (
     decision: fields.state,
     evidence: parseJson(fields.evidence, "Evidence", {})
   };
-  const value = fields.state === "OK" ? {
+  const value = fields.state === "PASS" ? {
     ...completed,
     ...optionalJson(fields.statePatch, "State patch")
   } : {
     ...completed,
-    repair: fields.repairMode === "LOCAL_RETRY" ? {
-      mode: "LOCAL_RETRY",
-      feedback: requireText(fields.feedback, "Feedback"),
-      expectedCorrection: requireText(fields.expectedCorrection, "Expected correction")
-    } : {
-      mode: "ORCHESTRATOR_REPAIR",
-      reason: requireText(fields.reason, "Repair reason"),
-      requestedCapability: requireText(fields.requestedCapability, "Requested capability"),
-      evidenceRefs: parseJson(fields.evidenceRefs, "Evidence references", [])
+    feedback: requireText(fields.feedback, "Feedback"),
+    expectedCorrection: requireText(fields.expectedCorrection, "Expected correction"),
+    escalation: {
+      reason: requireText(fields.reason, "Escalation reason"),
+      evidenceRefs: parseJson(fields.evidenceRefs, "Evidence references", []),
+      ...(fields.escalationKind === "capability"
+        ? { requestedCapability: requireText(fields.requestedCapability, "Requested capability") }
+        : { requestedOutcome: parseJson(fields.requestedOutcome, "Requested outcome", {}) })
     }
   };
   return { kind: "validation", outcome: validationNodeOutcomeSchema.parse(value) };

@@ -38,9 +38,9 @@ describe("global Ballet mode", () => {
   });
 
   it("preserves selected Loops and sends Configure-only views to the Run overview", () => {
-    expect(pathForBalletMode({ route: { view: "automation", automationView: "loop", automationEntityId: "release" }, nextMode: "run" })).toBe("/run/loops/release");
+    expect(pathForBalletMode({ route: { view: "automation", automationView: "workflow", automationEntityId: "release" }, nextMode: "run" })).toBe("/run/loops/release");
     expect(pathForBalletMode({ route: { view: "loop-theme" }, nextMode: "run" })).toBe("/run");
-    expect(pathForBalletMode({ route: { view: "run", runTargetKind: "loop", runTargetId: "release", rootRunId: "root-1" }, nextMode: "configure" })).toBe("/automation/loops?view=loop&id=release");
+    expect(pathForBalletMode({ route: { view: "run", runTargetKind: "loop", runTargetId: "release", rootRunId: "root-1" }, nextMode: "configure" })).toBe("/automation/loops?view=workflow&id=release");
     expect(pathForBalletMode({ route: { view: "execution-profiles", executionProfileId: "reviewer" }, nextMode: "run" })).toBe("/run");
     expect(pathForBalletMode({ route: { view: "skills" }, nextMode: "run" })).toBe("/run");
   });

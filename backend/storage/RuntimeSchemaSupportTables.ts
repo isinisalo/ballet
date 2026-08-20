@@ -40,9 +40,8 @@ export const runtimeSchemaSupportTables = `
     repair_request_id TEXT PRIMARY KEY,
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     requester_loop_run_id TEXT NOT NULL REFERENCES loop_invocations(loop_run_id),
-    requester_work_loop_node_run_id TEXT NOT NULL REFERENCES work_loop_node_runs(work_loop_node_run_id),
+    requester_job_run_id TEXT NOT NULL REFERENCES job_runs(job_run_id),
     requester_validation_node_run_id TEXT NOT NULL REFERENCES node_runs(node_run_id),
-    mode TEXT NOT NULL CHECK(mode IN ('local','orchestrator')),
     attempt INTEGER NOT NULL CHECK(attempt > 0),
     validation_summary TEXT NOT NULL CHECK(length(trim(validation_summary)) > 0),
     requested_capability TEXT,
@@ -55,7 +54,7 @@ export const runtimeSchemaSupportTables = `
     routed_target_loop_id TEXT,
     status TEXT NOT NULL CHECK(status IN ('pending','routed','repaired','failed','cancelled')),
     return_loop_id TEXT NOT NULL,
-    return_work_loop_node_id TEXT NOT NULL,
+    return_job_node_id TEXT NOT NULL,
     return_validation_node_definition_id TEXT NOT NULL,
     nesting_depth INTEGER NOT NULL CHECK(nesting_depth >= 0),
     created_at TEXT NOT NULL,
@@ -64,9 +63,7 @@ export const runtimeSchemaSupportTables = `
     FOREIGN KEY(root_run_id, state_revision_at_request) REFERENCES state_revisions(root_run_id, revision),
     CHECK((requested_capability IS NULL) <> (requested_outcome_json IS NULL)),
     CHECK((routed_loop_edge_id IS NULL) = (routed_target_loop_id IS NULL)),
-    CHECK((status IN ('repaired','failed','cancelled')) = (completed_at IS NOT NULL)),
-    CHECK((mode = 'local' AND orchestrator_node_run_id IS NULL AND routed_loop_edge_id IS NULL)
-      OR mode = 'orchestrator')
+    CHECK((status IN ('repaired','failed','cancelled')) = (completed_at IS NOT NULL))
   );
   CREATE TABLE orchestration_requests (
     orchestration_request_id TEXT PRIMARY KEY,
@@ -106,7 +103,7 @@ export const runtimeSchemaSupportTables = `
     callee_loop_run_id TEXT NOT NULL REFERENCES loop_invocations(loop_run_id),
     parent_frame_id TEXT REFERENCES orchestration_frames(frame_id),
     return_loop_id TEXT NOT NULL,
-    return_work_loop_node_id TEXT NOT NULL,
+    return_job_node_id TEXT NOT NULL,
     return_validation_node_definition_id TEXT NOT NULL,
     state_revision_at_call INTEGER NOT NULL CHECK(state_revision_at_call >= 0),
     nesting_depth INTEGER NOT NULL CHECK(nesting_depth >= 0),
@@ -148,16 +145,16 @@ export const runtimeSchemaSupportTables = `
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     sequence INTEGER NOT NULL CHECK(sequence BETWEEN 1 AND 256),
     kind TEXT NOT NULL CHECK(kind IN (
-      'work_completed','work_needs_input','work_terminal','validation_ok','validation_fail_local',
-      'validation_fail_orchestrator','validation_terminal','repair_call','repair_return','repair_terminal',
+      'job_completed','job_needs_input','job_terminal','validation_pass','validation_fail_retry',
+      'validation_fail_escalated','validation_terminal','repair_call','repair_return','repair_terminal',
       'flow_transition','orchestrator_terminal','root_cancelled','root_terminal','execution_interrupted'
     )),
     state_revision INTEGER NOT NULL CHECK(state_revision >= 0),
     source_loop_run_id TEXT REFERENCES loop_invocations(loop_run_id),
-    source_work_loop_node_run_id TEXT REFERENCES work_loop_node_runs(work_loop_node_run_id),
+    source_job_run_id TEXT REFERENCES job_runs(job_run_id),
     source_node_run_id TEXT REFERENCES node_runs(node_run_id),
     target_loop_run_id TEXT REFERENCES loop_invocations(loop_run_id),
-    target_work_loop_node_run_id TEXT REFERENCES work_loop_node_runs(work_loop_node_run_id),
+    target_job_run_id TEXT REFERENCES job_runs(job_run_id),
     orchestration_request_id TEXT REFERENCES orchestration_requests(orchestration_request_id),
     repair_request_id TEXT REFERENCES repair_requests(repair_request_id),
     orchestration_frame_id TEXT REFERENCES orchestration_frames(frame_id),
@@ -167,7 +164,7 @@ export const runtimeSchemaSupportTables = `
   );
   CREATE TABLE loop_schedule_state (
     loop_id TEXT NOT NULL,
-    work_loop_node_id TEXT NOT NULL,
+    job_node_id TEXT NOT NULL,
     definition_hash TEXT NOT NULL,
     next_run_at TEXT,
     last_scheduled_at TEXT,
@@ -175,6 +172,6 @@ export const runtimeSchemaSupportTables = `
     last_loop_run_id TEXT REFERENCES loop_invocations(loop_run_id) ON DELETE SET NULL,
     last_error TEXT,
     updated_at TEXT NOT NULL,
-    PRIMARY KEY(loop_id, work_loop_node_id)
+    PRIMARY KEY(loop_id, job_node_id)
   );
 `;

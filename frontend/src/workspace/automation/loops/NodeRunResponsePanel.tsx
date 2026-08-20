@@ -4,7 +4,7 @@ import { TextAreaField } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { HumanValidationResponseForm } from "./HumanValidationResponseForm";
-import { HumanWorkResponseForm } from "./HumanWorkResponseForm";
+import { HumanJobResponseForm } from "./HumanJobResponseForm";
 import { buildResumeResponse } from "./humanNodeResponse";
 
 export function NodeRunResponsePanel({
@@ -26,7 +26,7 @@ export function NodeRunResponsePanel({
         <p className="mt-1 text-xs text-muted-foreground">Only the role-specific validated payload can advance control flow.</p>
       </div>
       {needsInput ? <ResumeForm question={needsInput.question} context={needsInput.context} pending={pending} onRespond={onRespond} />
-        : node.role === "work" ? <HumanWorkResponseForm pending={pending} onRespond={onRespond} />
+        : node.role === "job" ? <HumanJobResponseForm pending={pending} onRespond={onRespond} />
           : node.role === "validation" ? <HumanValidationResponseForm pending={pending} onRespond={onRespond} />
             : <Alert><AlertDescription>Orchestrator routing is provider-controlled. A human response is accepted only when this Node requests input.</AlertDescription></Alert>}
     </section>
@@ -51,4 +51,4 @@ function ResumeForm({ question, context, pending, onRespond }: {
   </form>;
 }
 
-const title = (role: NodeRun["role"]): string => role === "work" ? "Work" : role === "validation" ? "Validation" : "Orchestrator";
+const title = (role: NodeRun["role"]): string => role === "job" ? "Job" : role === "validation" ? "Validation" : "Orchestrator";

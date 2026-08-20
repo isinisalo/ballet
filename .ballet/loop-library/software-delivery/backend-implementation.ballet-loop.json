@@ -12,102 +12,7 @@
   "format": "ballet-loop-module",
   "loop": {
     "description": "Implement one bounded backend change. Done when requested domain, API and persistence behavior, compatibility, tests and concrete check evidence are independently validated.",
-    "edges": [
-      {
-        "key": "analysis-ok",
-        "source": "analyze-backend-change",
-        "target": {
-          "node": "implement-backend-change"
-        }
-      },
-      {
-        "key": "implementation-ok",
-        "source": "implement-backend-change",
-        "target": {
-          "node": "validate-backend-change"
-        }
-      },
-      {
-        "key": "validation-ok",
-        "source": "validate-backend-change",
-        "target": {
-          "terminal": "completed"
-        }
-      }
-    ],
     "key": "loop",
-    "nodes": [
-      {
-        "description": "Clarify the requested backend behavior, affected contracts, persistence implications, and acceptance evidence.",
-        "key": "analyze-backend-change",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "backend-reviewer",
-          "profileSlot": "reviewer",
-          "skills": [],
-          "task": "Validate that the analysis identifies the bounded behavior, affected domain and API contracts, persistence or migration implications, compatibility constraints, and executable acceptance checks. Return a precise repair request when evidence is missing.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "terra",
-          "primaryInstruction": "backend-engineer",
-          "profileSlot": "engineer",
-          "skills": [],
-          "task": "Inspect the repository and describe the smallest backend change that satisfies the requested behavior. Identify domain, API, persistence, migration, compatibility, and test boundaries without implementing yet.",
-          "type": "agent"
-        }
-      },
-      {
-        "description": "Implement the approved backend behavior with explicit contracts and minimal architectural scope.",
-        "key": "implement-backend-change",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "backend-reviewer",
-          "profileSlot": "reviewer",
-          "skills": [],
-          "task": "Review the implementation against the requested behavior, repository architecture, API and persistence contracts, compatibility constraints, and security boundaries. Do not modify the implementation while validating it.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "terra",
-          "primaryInstruction": "backend-engineer",
-          "profileSlot": "engineer",
-          "skills": [],
-          "task": "Implement the bounded backend change using the repository's existing domain, API, persistence, and test patterns. Remove replaced code in scope and preserve unrelated behavior.",
-          "type": "agent"
-        }
-      },
-      {
-        "description": "Run and evaluate backend tests, contract checks, migrations, and compatibility evidence.",
-        "key": "validate-backend-change",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "backend-reviewer",
-          "profileSlot": "reviewer",
-          "skills": [],
-          "task": "Independently confirm that the named tests and contract checks passed, migrations are safe where applicable, no blocking architecture drift remains, and the evidence supports completion.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "terra",
-          "primaryInstruction": "backend-engineer",
-          "profileSlot": "engineer",
-          "skills": [],
-          "task": "Run the repository's relevant backend tests, API contract checks, persistence or migration checks, lint, and build gates. Fix in-scope failures and summarize exact evidence and limitations.",
-          "type": "agent"
-        }
-      }
-    ],
-    "startNode": "analyze-backend-change",
     "state": {
       "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
       "initial": {
@@ -118,6 +23,131 @@
         "request": null,
         "status": "not_started"
       }
+    },
+    "workflow": {
+      "failEdges": [
+        {
+          "key": "analyze-backend-change-fail",
+          "sourceValidationNode": "analyze-backend-change-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        },
+        {
+          "key": "implement-backend-change-fail",
+          "sourceValidationNode": "implement-backend-change-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        },
+        {
+          "key": "validate-backend-change-fail",
+          "sourceValidationNode": "validate-backend-change-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        }
+      ],
+      "jobNodes": [
+        {
+          "description": "Clarify the requested backend behavior, affected contracts, persistence implications, and acceptance evidence.",
+          "key": "analyze-backend-change",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Inspect the repository and describe the smallest backend change that satisfies the requested behavior. Identify domain, API, persistence, migration, compatibility, and test boundaries without implementing yet.",
+          "type": "agent",
+          "validationNode": "analyze-backend-change-validation"
+        },
+        {
+          "description": "Implement the approved backend behavior with explicit contracts and minimal architectural scope.",
+          "key": "implement-backend-change",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Implement the bounded backend change using the repository's existing domain, API, persistence, and test patterns. Remove replaced code in scope and preserve unrelated behavior.",
+          "type": "agent",
+          "validationNode": "implement-backend-change-validation"
+        },
+        {
+          "description": "Run and evaluate backend tests, contract checks, migrations, and compatibility evidence.",
+          "key": "validate-backend-change",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Run the repository's relevant backend tests, API contract checks, persistence or migration checks, lint, and build gates. Fix in-scope failures and summarize exact evidence and limitations.",
+          "type": "agent",
+          "validationNode": "validate-backend-change-validation"
+        }
+      ],
+      "passEdges": [
+        {
+          "key": "analysis-ok",
+          "sourceValidationNode": "analyze-backend-change-validation",
+          "target": {
+            "jobNode": "implement-backend-change"
+          }
+        },
+        {
+          "key": "implementation-ok",
+          "sourceValidationNode": "implement-backend-change-validation",
+          "target": {
+            "jobNode": "validate-backend-change"
+          }
+        },
+        {
+          "key": "validation-ok",
+          "sourceValidationNode": "validate-backend-change-validation",
+          "target": {
+            "workflowResult": "PASS"
+          }
+        }
+      ],
+      "startJobNode": "analyze-backend-change",
+      "validationNodes": [
+        {
+          "description": "Validate Clarify the requested backend behavior, affected contracts, persistence implications, and acceptance evidence.",
+          "key": "analyze-backend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Validate that the analysis identifies the bounded behavior, affected domain and API contracts, persistence or migration implications, compatibility constraints, and executable acceptance checks. Return a precise repair request when evidence is missing.",
+          "type": "agent"
+        },
+        {
+          "description": "Validate Implement the approved backend behavior with explicit contracts and minimal architectural scope.",
+          "key": "implement-backend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Review the implementation against the requested behavior, repository architecture, API and persistence contracts, compatibility constraints, and security boundaries. Do not modify the implementation while validating it.",
+          "type": "agent"
+        },
+        {
+          "description": "Validate Run and evaluate backend tests, contract checks, migrations, and compatibility evidence.",
+          "key": "validate-backend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Independently confirm that the named tests and contract checks passed, migrations are safe where applicable, no blocking architecture drift remains, and the evidence supports completion.",
+          "type": "agent"
+        }
+      ]
     }
   },
   "manifest": {
@@ -205,5 +235,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 1
+  "version": 2
 }

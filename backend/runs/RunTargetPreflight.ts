@@ -1,5 +1,4 @@
 import type { AppData } from "../../shared/api/workspace-contracts.js";
-import { loopTerminals } from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type { RunTargetIssue } from "../../shared/domain/runs.js";
 import {
@@ -48,13 +47,12 @@ export const compositionIssuesForLoop = (
       issues: data.resourceIssues
     }, compositions);
     const snapshot: RootExecutionSnapshot = {
-      version: 4,
+      version: 5,
       rootLoopId,
       project: { checkoutRoot: "", headSha: "", configHash: "", snapshotHash: "" },
       orchestrator: data.automation.orchestrator,
       graph: graph.graph,
       loops: graph.loops,
-      terminals: [...loopTerminals],
       theme: data.loopTheme,
       executionProfiles,
       runtimes: [],

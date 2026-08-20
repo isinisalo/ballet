@@ -8,7 +8,7 @@ import {
   type RunTarget
 } from "@shared/api/workspace-contracts";
 import { useLoopRun } from "../src/workspace/automation/loops/useLoopRun";
-import { v11Loop } from "./v11Fixtures";
+import { workflowLoop } from "./workflowFixtures";
 
 const now = "2026-07-19T10:00:00.000Z";
 const loopId = "archived-loop";
@@ -52,7 +52,7 @@ describe("Loop Run association", () => {
 });
 
 function rootRun(rootRunId: string): RootRunDetail {
-  const snapshot: ProjectLoop = v11Loop(loopId);
+  const snapshot: ProjectLoop = workflowLoop(loopId);
   const run: LoopRunDetails = {
     loopRunId: `loop-${rootRunId}`,
     loopId,
@@ -66,7 +66,7 @@ function rootRun(rootRunId: string): RootRunDetail {
     createdAt: now,
     updatedAt: now,
     completedAt: now,
-    workLoopNodeRuns: [],
+    jobRuns: [],
     nodeRuns: []
   };
   return {

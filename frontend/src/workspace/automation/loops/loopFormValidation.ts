@@ -1,11 +1,9 @@
 import {
   automationConfigSchema,
-  getProjectNodeEdges,
-  getReachableProjectNodeIds,
-  hasReachableProjectLoopTerminal,
+  getReachableProjectJobNodeIds,
+  hasReachableProjectWorkflowPass,
   isProjectAgentValidationNode,
-  isProjectNodeTerminalTarget,
-  isProjectProviderWorkNode,
+  isProjectProviderJobNode,
   kebabCaseIdPattern,
   maxProjectStateBytes,
   type ExecutionProfile,
@@ -14,10 +12,13 @@ import {
   type ProjectAutomationConfig,
   type ProjectAutomationIssue,
   type ProjectExecutionComposition,
+  type ProjectFailEdge,
   type ProjectInstruction,
+  type ProjectJobNode,
   type ProjectLoop,
   type ProjectLoopEdge,
-  type ProjectWorkLoopNode,
+  type ProjectPassEdge,
+  type ProjectValidationNode,
   type Skill
 } from "@shared/api/workspace-contracts";
 import { executionProfileBlockingReason } from "../../executionProfiles/executionProfileOptions";
@@ -47,38 +48,31 @@ export function automationDraftIssues(
   }));
 
   const profileById = new Map(executionProfiles.map((profile) => [profile.id, profile]));
-  const instructionIds = new Set(instructions.flatMap((instruction) =>
-    instruction.valid && instruction.id ? [instruction.id] : []));
+  const instructionIds = new Set(instructions.flatMap((instruction) => instruction.valid && instruction.id ? [instruction.id] : []));
   const skillIds = new Set(skills.flatMap((skill) => skill.valid ? [skill.id] : []));
   const loopIds = new Set(config.loops.map((loop) => loop.id));
   const issues: ProjectAutomationIssue[] = [];
 
   issues.push(...duplicateIdIssues(config.loops.map((loop, index) => ({ id: loop.id, path: `loops.${index}.id` })), "Loop"));
-  issues.push(...duplicateIdIssues(config.loops.flatMap((loop, loopIndex) => loop.nodes.map((node, nodeIndex) => ({
-    id: node.id,
-    path: `loops.${loopIndex}.nodes.${nodeIndex}.id`
-  }))), "Work Loop Node"));
+  issues.push(...duplicateIdIssues(config.loops.flatMap((loop, loopIndex) => loop.workflow.jobNodes.map((node, nodeIndex) => ({ id: node.id, path: `loops.${loopIndex}.workflow.jobNodes.${nodeIndex}.id` }))), "Job Node"));
+  issues.push(...duplicateIdIssues(config.loops.flatMap((loop, loopIndex) => loop.workflow.validationNodes.map((node, nodeIndex) => ({ id: node.id, path: `loops.${loopIndex}.workflow.validationNodes.${nodeIndex}.id` }))), "Validation Node"));
   issues.push(...duplicateIdIssues([
-    ...config.loops.flatMap((loop, loopIndex) => loop.edges.map((edge, edgeIndex) => ({ id: edge.id, path: `loops.${loopIndex}.edges.${edgeIndex}.id` }))),
+    ...config.loops.flatMap((loop, loopIndex) => loop.workflow.passEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `loops.${loopIndex}.workflow.passEdges.${edgeIndex}.id` }))),
+    ...config.loops.flatMap((loop, loopIndex) => loop.workflow.failEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `loops.${loopIndex}.workflow.failEdges.${edgeIndex}.id` }))),
     ...config.graph.loopEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.loopEdges.${edgeIndex}.id` }))
   ], "Edge"));
 
   validateComposition(config.orchestrator, "orchestrator", profileById, instructionIds, skillIds, runtime, issues);
-  config.loops.forEach((loop, loopIndex) => validateLoop(
-    loop, loopIndex, profileById, instructionIds, skillIds, runtime, issues
-  ));
+  config.loops.forEach((loop, loopIndex) => validateWorkflow(loop, loopIndex, profileById, instructionIds, skillIds, runtime, issues));
   config.graph.loopEdges.forEach((edge, edgeIndex) => {
     if (!loopIds.has(edge.source)) issues.push({ path: `graph.loopEdges.${edgeIndex}.source`, message: `Unknown source Loop: ${edge.source}.` });
     if (!loopIds.has(edge.target)) issues.push({ path: `graph.loopEdges.${edgeIndex}.target`, message: `Unknown target Loop: ${edge.target}.` });
   });
-  issues.push(...duplicateIdIssues(config.graph.loopEdges.map((edge, edgeIndex) => ({
-    id: `${edge.source}→${edge.target}:${edge.kind}:${edge.capability}`,
-    path: `graph.loopEdges.${edgeIndex}.capability`
-  })), "Loop Edge route candidate"));
+  issues.push(...duplicateIdIssues(config.graph.loopEdges.map((edge, edgeIndex) => ({ id: `${edge.source}→${edge.target}:${edge.kind}:${edge.capability}`, path: `graph.loopEdges.${edgeIndex}.capability` })), "Loop Edge route candidate"));
   return issues;
 }
 
-function validateLoop(
+function validateWorkflow(
   loop: ProjectLoop,
   loopIndex: number,
   profiles: ReadonlyMap<string, ExecutionProfile>,
@@ -87,40 +81,42 @@ function validateLoop(
   runtime: LocalRuntime,
   issues: ProjectAutomationIssue[]
 ) {
-  const base = `loops.${loopIndex}`;
-  const nodeIds = new Set(loop.nodes.map((node) => node.id));
-  if (!nodeIds.has(loop.startNodeId)) issues.push({ path: `${base}.startNodeId`, message: `Unknown start Work Loop Node: ${loop.startNodeId}.` });
-  loop.nodes.forEach((node, nodeIndex) => {
-    const nodeBase = `${base}.nodes.${nodeIndex}`;
-    const outgoing = getProjectNodeEdges(loop, node.id);
-    if (outgoing.length !== 1) issues.push({
-      path: `${base}.edges`,
-      message: `Validation OK for ${node.id} must have exactly one target; found ${outgoing.length}.`
-    });
-    if (node.work.type === "scheduled" && node.id !== loop.startNodeId) issues.push({
-      path: `${nodeBase}.work.type`,
-      message: "Scheduled Work is allowed only in the start Work Loop Node."
-    });
-    if (isProjectProviderWorkNode(node.work)) {
-      validateComposition(node.work, `${nodeBase}.work`, profiles, instructions, skills, runtime, issues);
-    }
-    if (isProjectAgentValidationNode(node.validation)) {
-      validateComposition(node.validation, `${nodeBase}.validation`, profiles, instructions, skills, runtime, issues);
-    }
+  const base = `loops.${loopIndex}.workflow`;
+  const jobIds = new Set(loop.workflow.jobNodes.map((job) => job.id));
+  const validationIds = new Set(loop.workflow.validationNodes.map((validation) => validation.id));
+  if (!jobIds.has(loop.workflow.startJobNodeId)) issues.push({ path: `${base}.startJobNodeId`, message: `Unknown start Job Node: ${loop.workflow.startJobNodeId}.` });
+
+  loop.workflow.jobNodes.forEach((job, jobIndex) => {
+    const jobBase = `${base}.jobNodes.${jobIndex}`;
+    const pairedValidationCount = loop.workflow.validationNodes.filter((validation) => validation.id === job.validationNodeId).length;
+    if (pairedValidationCount !== 1) issues.push({ path: `${jobBase}.validationNodeId`, message: `Job ${job.id} must own exactly one Validation Node; found ${pairedValidationCount}.` });
+    if (loop.workflow.jobNodes.filter((candidate) => candidate.validationNodeId === job.validationNodeId).length !== 1) issues.push({ path: `${jobBase}.validationNodeId`, message: `Validation Node ${job.validationNodeId} cannot be shared.` });
+    if (job.type === "scheduled" && job.id !== loop.workflow.startJobNodeId) issues.push({ path: `${jobBase}.type`, message: "Scheduled Job is allowed only as the Workflow start." });
+    if (isProjectProviderJobNode(job)) validateComposition(job, jobBase, profiles, instructions, skills, runtime, issues);
   });
-  loop.edges.forEach((edge, edgeIndex) => {
-    if (!nodeIds.has(edge.source)) issues.push({ path: `${base}.edges.${edgeIndex}.source`, message: `Unknown source Work Loop Node: ${edge.source}.` });
-    if (!isProjectNodeTerminalTarget(edge.target) && !nodeIds.has(edge.target.nodeId)) issues.push({
-      path: `${base}.edges.${edgeIndex}.target.nodeId`,
-      message: `Unknown target Work Loop Node: ${edge.target.nodeId}.`
-    });
+  loop.workflow.validationNodes.forEach((validation, validationIndex) => {
+    const validationBase = `${base}.validationNodes.${validationIndex}`;
+    if (!loop.workflow.jobNodes.some((job) => job.validationNodeId === validation.id)) issues.push({ path: `${validationBase}.id`, message: `Orphan Validation Node: ${validation.id}.` });
+    const passCount = loop.workflow.passEdges.filter((edge) => edge.sourceValidationNodeId === validation.id).length;
+    const failCount = loop.workflow.failEdges.filter((edge) => edge.sourceValidationNodeId === validation.id).length;
+    if (passCount !== 1) issues.push({ path: `${base}.passEdges`, message: `Validation ${validation.id} must have exactly one Pass Edge; found ${passCount}.` });
+    if (failCount !== 1) issues.push({ path: `${base}.failEdges`, message: `Validation ${validation.id} must have exactly one Fail Edge; found ${failCount}.` });
+    if (isProjectAgentValidationNode(validation)) validateComposition(validation, validationBase, profiles, instructions, skills, runtime, issues);
   });
-  if (nodeIds.has(loop.startNodeId)) {
-    const reachable = getReachableProjectNodeIds(loop);
-    loop.nodes.forEach((node, nodeIndex) => {
-      if (!reachable.has(node.id)) issues.push({ path: `${base}.nodes.${nodeIndex}.id`, message: `Unreachable Work Loop Node: ${node.id}.` });
+  loop.workflow.passEdges.forEach((edge, edgeIndex) => {
+    if (!validationIds.has(edge.sourceValidationNodeId)) issues.push({ path: `${base}.passEdges.${edgeIndex}.sourceValidationNodeId`, message: `Unknown source Validation Node: ${edge.sourceValidationNodeId}.` });
+    if ("jobNodeId" in edge.target && !jobIds.has(edge.target.jobNodeId)) issues.push({ path: `${base}.passEdges.${edgeIndex}.target.jobNodeId`, message: `Unknown target Job Node: ${edge.target.jobNodeId}.` });
+  });
+  loop.workflow.failEdges.forEach((edge, edgeIndex) => {
+    if (!validationIds.has(edge.sourceValidationNodeId)) issues.push({ path: `${base}.failEdges.${edgeIndex}.sourceValidationNodeId`, message: `Unknown source Validation Node: ${edge.sourceValidationNodeId}.` });
+  });
+
+  if (jobIds.has(loop.workflow.startJobNodeId)) {
+    const reachable = getReachableProjectJobNodeIds(loop);
+    loop.workflow.jobNodes.forEach((job, jobIndex) => {
+      if (!reachable.has(job.id)) issues.push({ path: `${base}.jobNodes.${jobIndex}.id`, message: `Unreachable Job Node: ${job.id}.` });
     });
-    if (!hasReachableProjectLoopTerminal(loop)) issues.push({ path: `${base}.edges`, message: "Loop needs a reachable terminal target." });
+    if (!hasReachableProjectWorkflowPass(loop)) issues.push({ path: `${base}.passEdges`, message: "Workflow needs a reachable PASS endpoint." });
   }
 }
 
@@ -139,9 +135,7 @@ function validateComposition(
     const blockingReason = executionProfileBlockingReason(profile, runtime);
     if (blockingReason) issues.push({ path: `${path}.executionProfileId`, message: blockingReason });
   }
-  if (!instructions.has(composition.primaryInstructionId)) issues.push({
-    path: `${path}.primaryInstructionId`, message: "Select an existing primary instruction."
-  });
+  if (!instructions.has(composition.primaryInstructionId)) issues.push({ path: `${path}.primaryInstructionId`, message: "Select an existing primary instruction." });
   composition.skillIds.forEach((skillId, index) => {
     if (!skills.has(skillId)) issues.push({ path: `${path}.skillIds.${index}`, message: `Missing or invalid skill: ${skillId}.` });
   });
@@ -163,31 +157,37 @@ export const loopIdError = (loop: ProjectLoop, loops: readonly ProjectLoop[]): s
   return undefined;
 };
 
-export const workLoopNodeIdError = (
-  node: ProjectWorkLoopNode,
-  loop: ProjectLoop,
-  loops: readonly ProjectLoop[] = [loop]
-): string | undefined => {
-  if (!node.id) return "Work Loop Node ID is required.";
-  if (!kebabCaseIdPattern.test(node.id)) return "Work Loop Node ID must be lowercase kebab-case.";
-  if (loops.some((candidateLoop) => candidateLoop.nodes.some((candidate) => candidate !== node && candidate.id === node.id))) {
-    return "Work Loop Node ID must be unique.";
-  }
+export const jobNodeIdError = (node: ProjectJobNode, loop: ProjectLoop, loops: readonly ProjectLoop[] = [loop]): string | undefined => {
+  if (!node.id) return "Job Node ID is required.";
+  if (!kebabCaseIdPattern.test(node.id)) return "Job Node ID must be lowercase kebab-case.";
+  if (loops.some((candidateLoop) => candidateLoop.workflow.jobNodes.some((candidate) => candidate !== node && candidate.id === node.id))) return "Job Node ID must be unique.";
   return undefined;
+};
+
+export const validationNodeIdError = (node: ProjectValidationNode, loop: ProjectLoop, loops: readonly ProjectLoop[] = [loop]): string | undefined => {
+  if (!node.id) return "Validation Node ID is required.";
+  if (!kebabCaseIdPattern.test(node.id)) return "Validation Node ID must be lowercase kebab-case.";
+  if (loops.some((candidateLoop) => candidateLoop.workflow.validationNodes.some((candidate) => candidate !== node && candidate.id === node.id))) return "Validation Node ID must be unique.";
+  return undefined;
+};
+
+export const workflowEdgeIdError = (edge: ProjectPassEdge | ProjectFailEdge, loop: ProjectLoop): string | undefined => {
+  if (!edge.id) return "Workflow Edge ID is required.";
+  if (!kebabCaseIdPattern.test(edge.id)) return "Workflow Edge ID must be lowercase kebab-case.";
+  const duplicate = [...loop.workflow.passEdges, ...loop.workflow.failEdges].some((candidate) => candidate !== edge && candidate.id === edge.id);
+  return duplicate ? "Workflow Edge ID must be unique." : undefined;
 };
 
 export const loopEdgeIdError = (edge: ProjectLoopEdge, config: ProjectAutomationConfig): string | undefined => {
   if (!edge.id) return "Loop Edge ID is required.";
   if (!kebabCaseIdPattern.test(edge.id)) return "Loop Edge ID must be lowercase kebab-case.";
-  const nodeEdgeHasId = config.loops.some((loop) => loop.edges.some((candidate) => candidate.id === edge.id));
+  const workflowEdgeHasId = config.loops.some((loop) => [...loop.workflow.passEdges, ...loop.workflow.failEdges].some((candidate) => candidate.id === edge.id));
   const loopEdgeHasId = config.graph.loopEdges.some((candidate) => candidate !== edge && candidate.id === edge.id);
-  return nodeEdgeHasId || loopEdgeHasId ? "Edge ID must be unique across Node and Loop Edges." : undefined;
+  return workflowEdgeHasId || loopEdgeHasId ? "Edge ID must be unique across Workflow and Loop Edges." : undefined;
 };
 
 export const loopEdgeRouteError = (edge: ProjectLoopEdge, config: ProjectAutomationConfig): string | undefined => {
-  const duplicate = config.graph.loopEdges.some((candidate) => candidate !== edge
-    && candidate.source === edge.source && candidate.target === edge.target
-    && candidate.kind === edge.kind && candidate.capability === edge.capability);
+  const duplicate = config.graph.loopEdges.some((candidate) => candidate !== edge && candidate.source === edge.source && candidate.target === edge.target && candidate.kind === edge.kind && candidate.capability === edge.capability);
   return duplicate ? "This route candidate already exists." : undefined;
 };
 
@@ -198,13 +198,11 @@ export const parseInitialState = (text: string): InitialStateParseResult => {
   try {
     value = JSON.parse(text);
   } catch {
-    return { error: "Initial state must be valid JSON." };
+    return { error: "Initial State must be valid JSON." };
   }
-  if (!isJsonValue(value)) return { error: "Initial state must contain only JSON values." };
+  if (!isJsonValue(value)) return { error: "Initial State must contain only JSON values." };
   const bytes = new TextEncoder().encode(JSON.stringify(value)).byteLength;
-  return bytes > maxProjectStateBytes
-    ? { error: `Initial state must not exceed ${maxProjectStateBytes} bytes.` }
-    : { value };
+  return bytes > maxProjectStateBytes ? { error: `Initial State must not exceed ${maxProjectStateBytes} bytes.` } : { value };
 };
 
 const isJsonValue = (value: unknown): value is JsonValue => {

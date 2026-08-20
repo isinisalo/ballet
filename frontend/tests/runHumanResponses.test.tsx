@@ -5,39 +5,40 @@ import type { NodeRun } from "../../shared/api/workspace-contracts.js";
 import { NodeRunResponsePanel } from "../src/workspace/automation/loops/NodeRunResponsePanel.js";
 import {
   buildHumanValidationResponse,
-  buildHumanWorkResponse
+  buildHumanJobResponse
 } from "../src/workspace/automation/loops/humanNodeResponse.js";
 
 describe("role-specific Human Node responses", () => {
-  it("builds strict Work and Validation outcomes without a shared decision field", () => {
-    const work = buildHumanWorkResponse({
+  it("builds strict Job and Validation outcomes without a shared decision field", () => {
+    const job = buildHumanJobResponse({
       state: "completed", summary: "Implemented.", artifacts: "{}", checks: "[]", statePatch: ""
     });
-    expect(work).toEqual({ kind: "work", outcome: {
-      role: "work", state: "completed", summary: "Implemented.", artifacts: {}, checks: []
+    expect(job).toEqual({ kind: "job", outcome: {
+      role: "job", state: "completed", summary: "Implemented.", artifacts: {}, checks: []
     } });
-    expect(work.outcome).not.toHaveProperty("decision");
+    expect(job.outcome).not.toHaveProperty("decision");
 
     const validation = buildHumanValidationResponse({
       state: "FAIL", summary: "Missing check.", evidence: "{}", checks: "[]", statePatch: "",
-      repairMode: "LOCAL_RETRY", feedback: "Add the check.", expectedCorrection: "Check passes.",
-      reason: "", requestedCapability: "", evidenceRefs: "[]"
+      feedback: "Add the check.", expectedCorrection: "Check passes.", escalationKind: "capability",
+      reason: "A repair capability is required.", requestedCapability: "repair-check", requestedOutcome: "{}", evidenceRefs: "[]"
     });
     expect(validation).toMatchObject({ kind: "validation", outcome: {
       role: "validation", state: "completed", decision: "FAIL",
-      repair: { mode: "LOCAL_RETRY", feedback: "Add the check." }
+      feedback: "Add the check.", expectedCorrection: "Check passes.",
+      escalation: { requestedCapability: "repair-check" }
     } });
   });
 
-  it("renders labeled Human Work fields and submits only a Work response", async () => {
+  it("renders labeled Human Job fields and submits only a Job response", async () => {
     const user = userEvent.setup();
     const onRespond = vi.fn(async () => true);
-    render(<NodeRunResponsePanel node={node("work")} pending={false} onRespond={onRespond} />);
+    render(<NodeRunResponsePanel node={node("job")} pending={false} onRespond={onRespond} />);
 
-    expect(screen.getByRole("form", { name: "Human Work response" })).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "Human Job response" })).toBeInTheDocument();
     await user.type(screen.getByLabelText("Summary"), "Completed by operator.");
-    await user.click(screen.getByRole("button", { name: "Submit Work outcome" }));
-    expect(onRespond).toHaveBeenCalledWith(expect.objectContaining({ kind: "work" }));
+    await user.click(screen.getByRole("button", { name: "Submit Job outcome" }));
+    expect(onRespond).toHaveBeenCalledWith(expect.objectContaining({ kind: "job" }));
   });
 
   it("accepts an Orchestrator input response only through resume", async () => {
@@ -60,9 +61,10 @@ describe("role-specific Human Node responses", () => {
 const timestamp = "2026-01-01T00:00:00.000Z";
 const node = (role: NodeRun["role"]): NodeRun => ({
   nodeRunId: `${role}-node`, rootRunId: "root-run", loopRunId: "loop-run",
-  workLoopNodeRunId: role === "orchestrator" ? undefined : "composite", role,
-  loopId: "main", workLoopNodeId: role === "orchestrator" ? undefined : "work",
-  nodeDefinitionId: role === "orchestrator" ? "project:orchestrator" : `main:work:${role}`,
+  jobRunId: role === "orchestrator" ? undefined : "job-run", role,
+  loopId: "main", jobNodeId: role === "orchestrator" ? undefined : "job",
+  workflowNodeId: role === "orchestrator" ? undefined : role === "job" ? "job" : "job-validation",
+  nodeDefinitionId: role === "orchestrator" ? "project:orchestrator" : role === "job" ? "job" : "job-validation",
   status: "waiting_for_input", attempt: 1, stateRevisionBefore: 0,
   createdAt: timestamp, updatedAt: timestamp
 });

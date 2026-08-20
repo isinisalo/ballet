@@ -208,15 +208,15 @@ export class RootRunExecutionCoordinator {
     if (!node || node.rootRunId !== rootRunId || node.status !== "queued") return undefined;
     const run = this.options.database.listRootLoopRuns(rootRunId)
       .find((candidate) => candidate.loopRunId === node.loopRunId);
-    const composite = node.workLoopNodeRunId
-      ? this.options.database.getWorkLoopNodeRun(node.workLoopNodeRunId)
+    const jobRun = node.jobRunId
+      ? this.options.database.getJobRun(node.jobRunId)
       : undefined;
     if (!run || (run.status !== "running" && !(node.role === "orchestrator" && run.status === "completed"))
-      || (node.role !== "orchestrator" && !composite)) return undefined;
+      || (node.role !== "orchestrator" && !jobRun)) return undefined;
     const orchestrationRequest = node.role === "orchestrator"
       ? this.options.database.orchestration.forOrchestrator(node.nodeRunId)
       : undefined;
-    return { root, run, composite, node, orchestrationRequest };
+    return { root, run, jobRun, node, orchestrationRequest };
   }
 
   private async terminalizeRoot(rootRunId: string, detail: RootTerminalization): Promise<void> {

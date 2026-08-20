@@ -31,13 +31,13 @@ export const resolveLoopRunView = (
       ...config,
       orchestrator: root.executionSnapshot.orchestrator,
       loops: root.executionSnapshot.loops,
-      loopEdges: root.executionSnapshot.graph.loopEdges
+      graph: root.executionSnapshot.graph
     } : config,
     canvasProfiles: root?.executionSnapshot.executionProfiles ?? executionProfiles,
     canvasTheme: root?.executionSnapshot.theme ?? theme,
     responseNode: activeNode && canRespond(canvasLoop, activeNode) ? activeNode : undefined,
     displayStatus: root?.status ?? details?.status,
-    bypassesSchedule: canvasLoop.nodes.find((node) => node.id === canvasLoop.startNodeId)?.work.type === "scheduled"
+    bypassesSchedule: canvasLoop.workflow.jobNodes.find((node) => node.id === canvasLoop.workflow.startJobNodeId)?.type === "scheduled"
   };
 };
 
@@ -48,8 +48,7 @@ const responseNode = (details?: LoopRunDetails | null, root?: RootRunDetail): No
 
 const canRespond = (loop: ProjectLoop, nodeRun: NodeRun): boolean => {
   if (nodeRun.outcome?.state === "needs_input") return true;
-  const definition = loop.nodes.find((node) => node.id === nodeRun.workLoopNodeId);
-  return nodeRun.role === "work"
-    ? definition?.work.type === "human"
-    : nodeRun.role === "validation" && definition?.validation.type === "human";
+  if (nodeRun.role === "job") return loop.workflow.jobNodes.find((node) => node.id === nodeRun.workflowNodeId)?.type === "human";
+  if (nodeRun.role !== "validation") return false;
+  return loop.workflow.validationNodes.find((node) => node.id === nodeRun.workflowNodeId)?.type === "human";
 };

@@ -69,7 +69,7 @@ describe("Markdown parsing", () => {
 });
 
 describe("Markdown collection loading", () => {
-  it("loads fixture content and its strict-v11 project configuration without fallback data", async () => {
+  it("loads fixture content and its strict-v12 project configuration without fallback data", async () => {
     const [data, automation, theme] = await Promise.all([
       loadMarkdownAppData(fixtureRoot),
       loadProjectAutomationConfigWithIssues(fixtureRoot),
@@ -126,7 +126,7 @@ describe("Markdown collection loading", () => {
     expect(data.project.relativePath).toBe(".ballet/project.md");
     expect(automation).toEqual({
       config: {
-        version: 11,
+        version: 12,
         orchestrator: expect.objectContaining({
           executionProfileId: "codex-gpt-5-6-luna-high-network-off",
           primaryInstructionId: "project:architect",
@@ -135,21 +135,22 @@ describe("Markdown collection loading", () => {
         graph: { loopEdges: [] },
         loops: [expect.objectContaining({
           id: "adr-review",
-          startNodeId: "review",
-          nodes: expect.arrayContaining([expect.objectContaining({
-            id: "review",
-            work: expect.objectContaining({
+          workflow: expect.objectContaining({
+            startJobNodeId: "review",
+            jobNodes: expect.arrayContaining([expect.objectContaining({
+              id: "review",
               type: "agent",
               executionProfileId: "codex-gpt-5-6-luna-high-network-off",
               primaryInstructionId: "project:reviewer",
               skillIds: []
-            }),
-            validation: expect.objectContaining({
+            })]),
+            validationNodes: expect.arrayContaining([expect.objectContaining({
+              id: "review-validation",
               type: "agent",
               executionProfileId: "codex-gpt-5-6-luna-high-network-off",
               primaryInstructionId: "project:reviewer"
-            })
-          })])
+            })])
+          })
         })]
       },
       issues: []

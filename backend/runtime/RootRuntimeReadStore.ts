@@ -126,7 +126,7 @@ export class RootRuntimeReadStore {
       : routes.at(-1);
     const returnDestination = focusRequest ? {
       loopId: focusRequest.returnLoopId,
-      workLoopNodeId: focusRequest.returnWorkLoopNodeId,
+      jobNodeId: focusRequest.returnJobNodeId,
       validationNodeDefinitionId: focusRequest.returnValidationNodeDefinitionId
     } : undefined;
     return {

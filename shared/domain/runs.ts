@@ -14,7 +14,7 @@ import type {
   CanonicalNodeOutcome,
   NodeRunRole,
   ValidationNodeOutcome,
-  WorkNodeOutcome
+  JobNodeOutcome
 } from "./runtime.js";
 import type { JsonValue } from "./automation.js";
 
@@ -35,19 +35,19 @@ export type RootRunListState = "active" | "recent";
 export interface RootRunCurrentPosition {
   loopRunId?: string;
   loopId?: string;
-  workLoopNodeRunId?: string;
-  workLoopNodeId?: string;
+  jobRunId?: string;
+  jobNodeId?: string;
   nodeRunId?: string;
   nodeRole?: NodeRunRole;
   taskId?: string;
   executionProfileId?: string;
   taskStatus?: ExecutionTask["status"];
   loopDescription?: string;
-  workLoopNodeDescription?: string;
-  localRetryAttempt?: number;
+  jobNodeDescription?: string;
+  jobAttempt?: number;
   repairDepth?: number;
-  lastWorkOutcome?: WorkNodeOutcome;
-  lastValidationDecision?: "OK" | "FAIL";
+  lastJobOutcome?: JobNodeOutcome;
+  lastValidationDecision?: "PASS" | "FAIL";
   repairRequestId?: string;
   routedTargetLoopId?: string;
   returnDestination?: RootRunReturnDestination;
@@ -55,7 +55,7 @@ export interface RootRunCurrentPosition {
 
 export interface RootRunReturnDestination {
   loopId: string;
-  workLoopNodeId: string;
+  jobNodeId: string;
   validationNodeDefinitionId: string;
 }
 
@@ -137,7 +137,7 @@ export interface StartRootRunRequest {
 }
 
 export type RespondToNodeRunRequest =
-  | { kind: "work"; outcome: WorkNodeOutcome }
+  | { kind: "job"; outcome: JobNodeOutcome }
   | { kind: "validation"; outcome: ValidationNodeOutcome }
   | { kind: "resume"; response: string };
 

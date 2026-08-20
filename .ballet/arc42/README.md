@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 10
+version: 11
 tags:
   - arc42
   - architecture
@@ -19,7 +19,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 
 ## Tila
 
-12-osioinen baseline on hyväksytty. Project config, shared contract, snapshot, Loop module -materialisointi ja cross-Loop-dispatch käyttävät strict v11 -Graph/capability-sopimusta. Authoring-UI:n Context/numeric-route hard cut on toteutettu: käytössä ovat Graph Engineering ja selected-Loop-only Loop Engineering. Graphin Orchestrator-control-node ja canonical policy/Run-evidenssiin sidottu edge-presentation on toteutettu; ihmisacceptance on vielä pending. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi. Todennettu tieto sijoitetaan sen omistavaan osioon, ja puuttuva tieto kirjataan avoimeksi kysymykseksi eikä keksitä.
+12-osioinen baseline on hyväksytty. Project config käyttää strict v12 -Workflow/Graph/capability-sopimusta, Loop Module v2:ta, snapshot v5:tä ja SQLite schema v8:aa. Authoring-UI:ssa käytetään Graph Engineeringiä ja selected-Loop-only Workflow Engineeringiä; `view=loop`-aliasta ei ole. Graphin Orchestrator-control-node ja canonical policy/Run-evidenssiin sidottu edge-presentation säilyvät. Workflow Engineeringin tekninen toteutus on paikallisesti testattu, mutta lopulliset gatet ja ihmisacceptance ovat pending. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi. Todennettu tieto sijoitetaan sen omistavaan osioon, ja puuttuva tieto kirjataan avoimeksi kysymykseksi eikä keksitä.
 
 ## Osiot
 
@@ -55,6 +55,7 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Comprehensive documentation initiative](initiatives/comprehensive-arc42-documentation/BRIEF.md): tämän suomenkielisen kattavan dokumentaation draft-ketju.
 - [Architecture canvases initiative](initiatives/architecture-canvases/BRIEF.md): kolmen canvas-projektion draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju.
 - [Graph and Loop Engineering initiative](initiatives/graph-and-loop-engineering/BRIEF.md): accepted v11-päätöksen BRIEF/PLAN/EVIDENCE/REVIEW-ketju; domain/config/snapshot/module/runtime sekä routing/Graph/Loop Engineering -tekninen evidenssi on kerätty, ihmisacceptance on pending.
+- [Workflow Engineering initiative](initiatives/workflow-engineering/BRIEF.md): accepted `goal-013` / `adr-020` / `adr-021` -päätösrajan draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju; strict-v12/v2-tekninen evidenssi ja Job-only canvas-korjaus arvioidaan erikseen, final gate ja ihmisacceptance ovat pending.
 
 ## Kanoninen omistajuus
 
@@ -75,7 +76,7 @@ Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `
 
 ## Relevantit päätökset
 
-`goal-009`, `goal-010`, `goal-011`, `goal-012`, `adr-011`, `adr-013`, `adr-014`, `adr-015`, `adr-016`, `adr-017`, `adr-018` ja `adr-019`.
+`goal-009`, `goal-010`, `goal-011`, `goal-012`, `goal-013`, `adr-011`, `adr-013`, `adr-014`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019`, `adr-020` ja `adr-021`.
 
 ## Evidenssi
 

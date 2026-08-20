@@ -46,18 +46,18 @@ export class RepairStore {
     }
     this.connection().prepare(`
       INSERT INTO repair_requests (
-        repair_request_id, root_run_id, requester_loop_run_id, requester_work_loop_node_run_id,
-        requester_validation_node_run_id, mode, attempt, validation_summary, requested_capability,
+        repair_request_id, root_run_id, requester_loop_run_id, requester_job_run_id,
+        requester_validation_node_run_id, attempt, validation_summary, requested_capability,
         requested_outcome_json, reason, evidence_json, state_revision_at_request, status,
-        return_loop_id, return_work_loop_node_id, return_validation_node_definition_id,
+        return_loop_id, return_job_node_id, return_validation_node_definition_id,
         nesting_depth, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
-    `).run(id, input.rootRunId, input.requesterLoopRunId, input.requesterWorkLoopNodeRunId,
-      input.requesterValidationNodeRunId, input.mode, input.attempt, input.validationSummary,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+    `).run(id, input.rootRunId, input.requesterLoopRunId, input.requesterJobRunId,
+      input.requesterValidationNodeRunId, input.attempt, input.validationSummary,
       input.requestedCapability ?? null,
       jsonOrNull(input.requestedOutcome, "Repair Request requested outcome"), input.reason,
       jsonOrNull(input.evidence, "Repair Request evidence"), input.stateRevisionAtRequest,
-      input.returnLoopId, input.returnWorkLoopNodeId, input.returnValidationNodeDefinitionId,
+      input.returnLoopId, input.returnJobNodeId, input.returnValidationNodeDefinitionId,
       input.nestingDepth, timestamp, timestamp);
     return this.requireRequest(id);
   }
@@ -112,7 +112,7 @@ export class RepairStore {
   bindOrchestrator(repairRequestId: string, nodeRunId: string): RepairRequest {
     const result = this.connection().prepare(`
       UPDATE repair_requests SET orchestrator_node_run_id = ?, updated_at = ?
-      WHERE repair_request_id = ? AND mode = 'orchestrator' AND status = 'pending'
+      WHERE repair_request_id = ? AND status = 'pending'
         AND orchestrator_node_run_id IS NULL
     `).run(nodeRunId, new Date().toISOString(), repairRequestId);
     if (result.changes !== 1) throw new Error(`Repair Request ${repairRequestId} cannot bind Orchestrator ${nodeRunId}.`);
@@ -130,20 +130,20 @@ export class RepairStore {
     const result = this.connection().prepare(`
       UPDATE repair_requests SET status = 'routed', routed_loop_edge_id = ?,
         routed_target_loop_id = ?, updated_at = ?
-      WHERE repair_request_id = ? AND mode = 'orchestrator' AND status = 'pending'
+      WHERE repair_request_id = ? AND status = 'pending'
     `).run(loopEdgeId, targetLoopId, new Date().toISOString(), repairRequestId);
     if (result.changes !== 1) throw new Error(`Repair Request ${repairRequestId} is not pending.`);
     return this.requireRequest(repairRequestId);
   }
 
-  orchestratorAttemptCount(workLoopNodeRunId: string): number {
+  orchestratorAttemptCount(jobRunId: string): number {
     const value = this.connection().prepare(`
       SELECT COUNT(*) AS count FROM repair_requests
-      WHERE requester_work_loop_node_run_id = ? AND mode = 'orchestrator'
-    `).get(workLoopNodeRunId);
+      WHERE requester_job_run_id = ?
+    `).get(jobRunId);
     if (typeof value === "object" && value !== null && "count" in value
       && typeof value.count === "number" && Number.isSafeInteger(value.count)) return value.count;
-    throw new Error(`Repair Request count for Work Loop Node Run ${workLoopNodeRunId} is invalid.`);
+    throw new Error(`Repair Request count for Job Run ${jobRunId} is invalid.`);
   }
 
   createFrame(input: CreateOrchestrationFrameInput): OrchestrationFrame {
@@ -160,13 +160,13 @@ export class RepairStore {
     this.connection().prepare(`
       INSERT INTO orchestration_frames (
         frame_id, root_run_id, repair_request_id, route_id, caller_loop_run_id, callee_loop_run_id,
-        parent_frame_id, return_loop_id, return_work_loop_node_id,
+        parent_frame_id, return_loop_id, return_job_node_id,
         return_validation_node_definition_id, state_revision_at_call, nesting_depth,
         status, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
     `).run(id, input.rootRunId, input.repairRequestId, input.routeId, input.callerLoopRunId,
       input.calleeLoopRunId, input.parentFrameId ?? null, input.returnLoopId,
-      input.returnWorkLoopNodeId, input.returnValidationNodeDefinitionId,
+      input.returnJobNodeId, input.returnValidationNodeDefinitionId,
       input.stateRevisionAtCall, input.nestingDepth, timestamp, timestamp);
     return this.requireFrame(id);
   }

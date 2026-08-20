@@ -3,8 +3,8 @@ id: ballet-tech-stack-canvas
 title: Ballet Tech Stack Canvas
 status: draft
 createdAt: '2026-08-17'
-updatedAt: '2026-08-17'
-version: 3
+updatedAt: '2026-08-20'
+version: 4
 tags:
   - architecture
   - canvas
@@ -94,7 +94,7 @@ Rakenne perustuu viralliseen [Tech Stack Canvasiin](https://techstackcanvas.io/)
 | Snapshot | 32 MiB / tiedosto; 256 MiB / configuration snapshot | Root Run pysyy paikallisesti käsiteltävänä ja liian suuri snapshot estyy ennen suoritusta. | `LocalWorkspaceManager.ts` |
 | Event/log retention | Non-terminal console 1 MiB / task; application log 20 MiB ja 5 backupia | Diagnostiikka on rajattu; terminal events ja truncation-status säilyvät. | `ExecutionStore.ts`, `RotatingFileLogger.ts`, `README.md` |
 | Tuettu release-matriisi | macOS `arm64` ja `x64`; Node 22 release CI:ssä | Native `better-sqlite3` paketoidaan ja smoke-testataan per arkkitehtuuri. | DEP-003, `.github/workflows/release.yml` |
-| Nykyinen Ballet-project-topologia | 11 Loopia, 20 Work Loop Nodea, 6 Human Validation -porttia, 62 LoopEdgeä | Tämä on ADR-019:n yhden vastuun project-data-baseline, ei platformin kovakoodattu maksimi. | `.ballet/project.json`, `validate:arc42` |
+| Nykyinen Ballet-project-topologia | 11 Loopia, 20 JobNode/ValidationNode-paria, 6 Human Validation -porttia, 62 LoopEdgeä | Tämä on ADR-019/020:n project-data-baseline, ei platformin kovakoodattu maksimi. | `.ballet/project.json`, `validate:arc42` |
 
 ## Major Quality Attributes
 

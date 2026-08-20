@@ -1,6 +1,4 @@
-import type {
-  JsonValue, LoopTerminal, ProjectGraph, ProjectLoop, ProjectLoopOrchestrator
-} from "./automation.js";
+import type { JsonValue, ProjectGraph, ProjectLoop, ProjectLoopOrchestrator } from "./automation.js";
 import type { LoopTheme } from "./loopThemes.js";
 import type { ExecutionPolicy, RuntimeProvider } from "./localRuntime.js";
 import type { ExecutionProfile } from "./projectConfig.js";
@@ -48,13 +46,12 @@ export interface ExecutionRuntimeBinding {
 }
 
 export interface RootExecutionSnapshot {
-  version: 4;
+  version: 5;
   rootLoopId: string;
   project: ExecutionProjectSnapshot;
   orchestrator: ProjectLoopOrchestrator;
   graph: ProjectGraph;
   loops: ProjectLoop[];
-  terminals: LoopTerminal[];
   theme: LoopTheme;
   executionProfiles: ExecutionProfile[];
   runtimes: ExecutionRuntimeBinding[];
@@ -66,22 +63,23 @@ export type ExecutionResourceEvidence = Omit<ExecutionResourceSnapshot, "content
 
 /** Attempt-specific evidence. The exact composed prompt and output schema are immutable. */
 export interface ExecutionPromptEvidence {
-  compositionVersion: 5;
+  compositionVersion: 6;
   loopId: string;
-  workLoopNodeId?: string;
+  jobNodeId?: string;
+  workflowNodeId?: string;
   nodeRole: NodeRunRole;
   nodeDefinitionId: string;
   executionProfile: ExecutionProfile;
   resources: ExecutionResourceEvidence[];
   prompt: string;
   promptSha256: string;
-  taskEnvelopeVersion: 4;
+  taskEnvelopeVersion: 5;
   taskEnvelopeSha256: string;
-  outputSchemaVersion: 4;
+  outputSchemaVersion: 5;
   outputSchemaId:
-    | "work-node-outcome-v4"
-    | "validation-node-outcome-v4"
-    | "orchestrator-node-outcome-v4";
+    | "job-node-outcome-v5"
+    | "validation-node-outcome-v5"
+    | "orchestrator-node-outcome-v5";
   outputSchema: { [key: string]: JsonValue };
   outputSchemaSha256: string;
 }
@@ -90,12 +88,12 @@ export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" 
 export type ExecutionTaskKind = "node_execution";
 
 export interface ExecutionSpec {
-  version: 6;
+  version: 7;
   taskId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;
   loopRunId: string;
-  workLoopNodeRunId?: string;
+  jobRunId?: string;
   nodeRunId: string;
   evidence: ExecutionPromptEvidence;
   runtime: ExecutionRuntimeSnapshot;

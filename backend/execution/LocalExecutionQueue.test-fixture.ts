@@ -93,7 +93,7 @@ class ControlledAdapter implements CliRuntimeAdapter {
         output: "done",
         structuredOutput: this.validOutcome
           ? completedWorkOutcome
-          : { role: "work", state: "completed" }
+          : { role: "job", state: "completed" }
       };
     } finally {
       this.active -= 1;
@@ -107,7 +107,7 @@ class ControlledAdapter implements CliRuntimeAdapter {
 }
 
 const completedWorkOutcome = {
-  role: "work" as const,
+  role: "job" as const,
   state: "completed" as const,
   summary: "Completed.",
   artifacts: {},

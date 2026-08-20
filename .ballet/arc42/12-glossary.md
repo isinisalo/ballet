@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 8
+version: 10
 tags:
   - arc42
   - glossary
@@ -19,34 +19,38 @@ Tämä osio määrittää project-, authoring-, runtime-, provider-, persistence
 
 ## Tila
 
-Sanasto kuvaa toteutetun strict-v11 config/domain/snapshot/module/runtime-rajan ja Graph/Loop-authoring-mallin. Historiallinen Loop Engineer -termi sekä legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime- tai UI-domainin termejä.
+Sanasto kuvaa toteutetun strict-v12/v2 config/domain/snapshot/module/runtime-rajan ja Graph/Workflow-authoring-mallin. Historialliset Loop Engineer-, Loop Engineering-, WorkLoopNode- ja WorkNode-termit sekä legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime- tai UI-domainin termejä.
 
 ## Project ja authoring
 
 | Termi | Määritelmä |
 | --- | --- |
 | Project truth | Versionhallittu, ihmis- ja agenttikatselmoitava tieto checkoutissa: Goalit, ADR:t, arc42, `.ballet/project.json`, instructionit, skillit, source ja design. Eri asia kuin machine-local runtime state. |
-| Project Loop | `.ballet/project.json`:ssa materialisoitu strict-v11 `Loop`, joka sisältää `accepts`/`provides`-capabilityt, entry `WorkLoopNode` -viitteen, compositen ja sisäiset Edget. |
-| Loop | Nimetty runtime- ja authoring-raja, joka koostuu `WorkLoopNode`-rakenteista ja jonka välillä `LoopEdge` määrittää flow/repair-yhteyksiä. |
-| Work Loop Node | Yksi tavoite, joka koostuu täsmälleen yhdestä `WorkNode`- ja yhdestä `ValidationNode`-vaiheesta. |
-| WorkNode | Rooli, joka tuottaa rajatun työn ja voi ehdottaa State patchia strict output -sopimuksella. |
-| ValidationNode | Rooli, joka arvioi Work-tuloksen ja palauttaa PASS-, LOCAL_RETRY-, ORCHESTRATOR_REPAIR-, needs_input- tai terminal-failure-semantikan strict outputissa. |
-| Edge | Valitun Loopin sisäinen, detail-tasolla omistettu yhteys composite-rakenteen ja terminal targetin välillä. |
+| Project Loop | `.ballet/project.json`:ssa materialisoitu strict-v12 `ProjectLoop`, joka sisältää identityn, `accepts`/`provides`-capabilityt, Staten ja yhden `ProjectWorkflow`-rakenteen. |
+| Loop | Nimetty runtime- ja authoring-raja, jonka sisäinen Workflow tuottaa PASS/FAIL-tuloksen ja jonka välillä project-global `LoopEdge` määrittää flow/repair-candidateja. |
+| ProjectWorkflow | Valitun Loopin sisäinen rakenne: start Job, erilliset Job/Validation-kokoelmat sekä Pass/Fail Edget. |
+| JobNode | Rooli, joka tuottaa rajatun työn, omistaa täsmälleen yhden ValidationNoden ja siirtyy valmistuttuaan kiinteästi siihen. |
+| ValidationNode | Rooli, joka arvioi paired Jobin tuloksen ja palauttaa strict PASS- tai FAIL-päätöksen tai jatkaa samaa nodea `needs_input`-tilassa. |
+| PassEdge | ValidationNoden täsmälleen yksi onnistumisyhteys seuraavaan JobNodeen tai kiinteään Workflow PASS -endpointiin. |
+| FailEdge | ValidationNoden täsmälleen yksi eskalointiyhteys kiinteään Workflow FAIL -endpointiin; sitä seurataan vasta retryrajan täytyttyä. |
+| Fixed Workflow transition | Job → paired Validation ja retryrajan sisäinen Validation FAIL → paired Job; ei authoroitava eikä kolmas Edge-laji. |
+| Work Loop Node / WorkNode | Historiallinen ADR-015:n strict-v10/v11 composite-malli, jonka ADR-020 supersedoi. Ei aktiivinen domain-termi. |
 | LoopEdge | Project-global yhteys Loopien välillä. `flow` määrittää normaalin Loop-jatkumon ja `repair` lähdekohtaisen repair allowlistin. |
 | Context projection | Loop Engineerin read-only-taso, joka näyttää Project intention, Loop systemin ja observable outcomes lisäämättä runtime-entiteettejä. |
 | Composition projection | Loop Engineerin taso, joka näyttää yhden black-box-solmun per Loop sekä täsmälleen project-global `LoopEdge` -topologian. |
-| Detail projection | Valitun Loopin sisäinen authoring-taso, joka näyttää sen `WorkLoopNode`-rakenteet, `Edge`-yhteydet ja node-editorit. |
-| Edge ownership | Sääntö, jonka mukaan composition omistaa `LoopEdge`:t ja detail omistaa valitun Loopin sisäiset `Edge`:t; tasot eivät kirjoita toistensa yhteyksiä. |
+| Detail projection | Historiallinen ADR-017:n selected-Loop-projektio; nykyinen vastine on Workflow Engineering. |
+| Edge ownership | Graph omistaa project-global `LoopEdge`:t ja Workflow valitun Loopin `PassEdge`/`FailEdge`:t; näkymät eivät kirjoita toistensa yhteyksiä. |
 | ExecutionProfile | Project-local provider/model/reasoning/permission-kokoonpano, joka on erotettu Node-roolin primary instruction- ja skill-valinnoista. |
 | Primary instruction | Yksi Node-roolille valittu pääohje, joka sijoitetaan compositioniin System-tekstin jälkeen. |
 | Skill | Project-local resurssi, joka tuo rajatun workflow- tai domain-ohjeen execution compositioniin vakaassa järjestyksessä. |
 | Resource closure | Kaikki target Loopin/Node-roolin deterministisesti tarvitsemat profiili-, instruction-, skill- ja schema-resurssit. |
-| Strict-v10 | Poistettu project schema -versio, jota strict-v11 repository ei lue, muunna eikä oletusarvoista. Historialliset dokumentit voivat kuvata sen aikaista baselinea. |
-| Strict-v11 | Nykyinen project config/domain/snapshot/module hard cut: project-global graph ja first-class Loop capability metadata ilman v10 readeria tai rinnakkaista topology-mallia. Orchestrator-owned dispatch ja Graph/Loop-UI valmistuvat myöhemmissä vaiheissa. |
-| Graph | V11 `ProjectAutomationConfig`-aggregaatin project-global route-policy-projektio, joka omistaa flow- ja repair-allowlistat. Ei client state eikä erillinen runtime-entiteetti. |
-| Loop capability metadata | V11:n koneellisesti validoitava, geneerinen kuvaus Loopin tarjoamista ja tarvitsemista capabilityistä; project-workflow'n nimiä ei kovakoodata platformiin. |
+| Strict-v10 | Poistettu project schema -versio. Historialliset dokumentit voivat kuvata sen aikaista baselinea. |
+| Strict-v11 | Poistettu project config/module/runtime-baseline, jota strict-v12 repository ei lue, muunna eikä oletusarvoista. Historialliset dokumentit ja EVID-014 säilyvät. |
+| Strict-v12 | Nykyinen project config hard cut: `ProjectWorkflow`, erilliset Job/Validation-nodet, Pass/Fail Edget ja first-class Loop capability metadata ilman v11 readeria tai rinnakkaista mallia. |
+| Graph | Strict-v12 `ProjectAutomationConfig`-aggregaatin project-global route-policy-projektio, joka omistaa flow- ja repair-allowlistat. Ei client state eikä erillinen runtime-entiteetti. |
+| Loop capability metadata | Koneellisesti validoitava, geneerinen kuvaus Loopin tarjoamista ja tarvitsemista capabilityistä; project-workflow'n nimiä ei kovakoodata platformiin. |
 | Route candidate | Graphissa persisted source/target/kind/capability/description-yhteys, jonka Orchestrator voi valita vain immutable snapshotin allowlistista. |
-| LoopNode | Graph Engineeringin näkymänode yhdelle `ProjectLoop`ille. Ei uusi runtime-entiteetti eikä `ProjectWorkLoopNode`. |
+| LoopNode | Graph Engineeringin näkymänode yhdelle `ProjectLoop`ille. Ei uusi runtime-entiteetti eikä Workflow'n JobNode. |
 
 ## Runtime ja control flow
 
@@ -56,16 +60,16 @@ Sanasto kuvaa toteutetun strict-v11 config/domain/snapshot/module/runtime-rajan 
 | Immutable snapshot | Root Runin alussa jäädytetty reachable automation, resource closure ja display/runtime metadata, jota checkoutin myöhempi muutos ei muuta. |
 | State | Root Runin omistama, rajattu canonical JSON -koordinaatioarvo; ei dokumenttien, diffien tai runtime-lokien kopio. |
 | `Arc42MethodStateV1` | Project-local arc42-menetelmän versionoitu State-sopimus, joka säilyttää nykytilan ja vakaat viitteet ilman pitkäikäisen dokumentaation kopiointia. |
-| State patch | Work/Validation-outcomen schema-validi ehdotus State-muutokseksi, jonka runtime soveltaa vain current revision -ehdon ja sallittujen polkujen mukaisesti. |
+| State patch | Job- tai Validation PASS -outcomen schema-validi ehdotus State-muutokseksi, jonka runtime soveltaa vain current revision -ehdon ja sallittujen polkujen mukaisesti. Validation FAIL ei voi sisältää patchia. |
 | State revision | Immutable patchin jälkeinen State, jolla on monotoninen revision-numero, hash ja outcome/control-evidenssi. |
 | Outcome | Roolikohtaisen strict output -skeeman läpäissyt tulos, jonka runtime voi commitoida; providerin vapaa teksti ei ole outcome. |
-| Attempt | Rajatun Work/Validation-suorituksen laskuri, jota runtime kasvattaa eikä UI päättele lokista. |
-| Local retry | Validationin rajattu pyyntö ajaa sama Work-vaihe uudelleen nykyisellä Statella ilman user-authored retry-edgeä. |
+| Job attempt | JobRunin laskuri: ensimmäinen ajo on 0 ja jokainen kiinteä paikallinen retry kasvattaa arvoa yhdellä. Uusi PassEdge → Job aloittaa arvosta 0. |
+| Local retry | Runtime-invariantti, joka palauttaa Validation FAILin paired Jobiin, kun Job attempt on `maxRetries`-rajan alapuolella. Validation ei valitse retry-moodia. |
 | Repair Request | Immutable Validation-finding, joka kuvaa tarvittavan capabilityn/outcomen valitsematta target Loopia. |
 | Repair allowlist | Lähde-Loopin `repair` LoopEdgeistä muodostuva sallittu Orchestrator-target-joukko. |
 | Repair frame | Persistoitu call-frame, joka säilyttää caller Loopin/Validationin ja mahdollistaa LIFO-returnin repair-targetista. |
 | Continuation | Runtime-owned paluuosoite tai seuraava control-flow-askel; agentti tai State patch ei valitse sitä. |
-| Flow dispatch | V11-targetin Orchestrator-valinta completed top-level Loopin outgoing flow candidateista. Nolla candidatea päättää Root Runin; flow ei luo repair-framea. |
+| Flow dispatch | Orchestrator-valinta Workflow PASSin jälkeen outgoing flow candidateista. Nolla candidatea päättää Root Runin; flow ei luo repair-framea. |
 | LIFO return | Sisäkkäisen repairin paluu viimeksi avattuun frameen ja samaan caller Validationiin. |
 | `needs_input` | Pysähtymistila, jossa puuttuva WHAT/WHY, prioriteetti, merkittävä päätös tai ambiguous repair-target vaatii ihmisen valinnan. |
 | Finalization | Root Runin terminal-tilan, viimeisen canonical control-faktan ja worktree-evidenssin commitointi; ei automaattinen merge/push. |
@@ -114,7 +118,7 @@ Sanasto kuvaa toteutetun strict-v11 config/domain/snapshot/module/runtime-rajan 
 | Install plan | Current project stateen sidottu deterministic ehdotus namespacesta, profile mappingista, resurssikirjoituksista, Loopista ja recommended connections -tiedosta. |
 | Materialisointi | Pakettidatan kirjoittaminen olemassa oleviksi project-local Loop-, profile-, instruction- ja skill-primitiveiksi. |
 | Config-last commit | Mutaatioperiaate, jossa uudet resurssit/provenance kirjoitetaan ennen project configia, jotta config ei viittaa puuttuvaan sisältöön. |
-| Installed Loop | Materialisoitu strict-v11 Project Loop capabilityineen ja sen project resources sekä non-runtime provenance/ownership metadata. |
+| Installed Loop | V2-paketista materialisoitu strict-v12 Project Loop Workflow-rakenteineen, capabilityineen ja project resources -sisältöineen sekä non-runtime provenance/ownership metadata. |
 | Profile slot | Paketin paikallinen execution-vaatimus, joka mapitetaan installissa olemassa olevaan yhteensopivaan `ExecutionProfile`:en. |
 | Recommended connection | Paketin neuvoa antava cross-Loop-yhteys, jota ei materialisoida automaattisesti authoritative `LoopEdge`:ksi. |
 | Canonical export | Loopin resource closuresta vakaasti järjestetty JSON ja SHA-256, joka ei sisällä runtime-tilaa tai jaon ulkopuolista dataa. |
@@ -125,15 +129,16 @@ Sanasto kuvaa toteutetun strict-v11 config/domain/snapshot/module/runtime-rajan 
 
 | Termi | Määritelmä |
 | --- | --- |
-| Loop Engineer | Historiallinen ADR-017:n authoring workspace -nimi; superseded aktiivisessa UI:ssa Graph Engineeringillä ja Loop Engineeringillä. |
-| Graph Engineering | Default authoring-näkymä: kaikki `ProjectLoop`→`LoopNode`-projektiot, yksi Orchestrator-control sekä persisted project-global route-policy ja canonical Run -evidenssi ilman sisäisiä Work/Validation-nodeja. |
-| Loop Engineering | Selected-Loop-only authoring-näkymä: valitun Loopin `ProjectWorkLoopNode`-kompositio, sisäiset Edget ja terminal targetit ilman project-global routeja tai Orchestrator-controlia. |
+| Loop Engineer | Historiallinen ADR-017:n authoring workspace -nimi; ei aktiivinen UI-termi. |
+| Graph Engineering | Default authoring-näkymä: kaikki `ProjectLoop`→`LoopNode`-projektiot, yksi Orchestrator-control sekä persisted project-global route-policy ja canonical Run -evidenssi ilman sisäisiä Job/Validation-nodeja. |
+| Loop Engineering | Historiallinen ADR-018:n selected-Loop-nimi ja `view=loop`-reitti, jotka ADR-020 supersedoi. |
+| Workflow Engineering | Canonical selected-Loop-only authoring-näkymä: domainissa valitun Loopin erilliset Job/Validation-roolit ja Pass/Fail Edget; canvasilla yksi Job-artwork per pari ja vain persisted `straight | smoothstep` Edget ilman Validation- tai PASS/FAIL-nodeja, validate/retry-viivoja, project-global routeja tai Orchestrator-controlia. |
 | Mission | Run mission control -välilehti, joka korostaa nykyisen tavoitteen, aktiivisen canonical-polun ja operaattorin seuraavan merkityksellisen havainnon. |
 | All Loops | Run-näkymä immutable snapshotin koko Loop-topologiasta; ei authoring-editori eikä legacy-nimitys yhdelle konfiguraatiolistalle. |
 | Live inspector | Canonical Run/read-model-dataan sidottu paneeli position-, role-, profile-, attempt-, revision-, repair-, return- ja finalization-tiedoille. |
 | Active route | Snapshotin ja commitoidun control flow’n perusteella korostettu kuljettu/aktiivinen reitti. |
 | Decorative visualization | Artwork, orbit, glow, väri tai liike, joka tukee lukemista mutta ei ole prosentti, ETA, elapsed-aika tai uusi runtime-state. |
-| Human Node response | Operaattorin schema-validi Work- tai Validation-vastaus, joka kulkee saman application/runtime-rajan kautta kuin provider-outcome. |
+| Human Node response | Operaattorin schema-validi Job- tai Validation-vastaus, joka kulkee saman application/runtime-rajan kautta kuin provider-outcome. |
 | Canonical projection | UI-esitys, jonka jokainen semanttinen kenttä on jäljitettävissä project truthiin, immutable snapshottiin tai canonical persistenceen. |
 
 ## Menetelmä ja evidenssi
@@ -162,11 +167,11 @@ Hyväksytyt Goalit/ADR:t, shared domain -terminologia ja runtime-sopimukset mene
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
+`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019` ja `adr-020`.
 
 ## Evidenssi
 
-Termit esiintyvät project configissa, source/shared contracts -rajapinnoissa, instructioneissa, skilleissä ja State-sopimuksessa. Legacy-termihaku tarkistaa aktiivisten lähteiden strict-v11-yhdenmukaisuuden muuttamatta historiallista evidenssiä.
+Termit esiintyvät project configissa, source/shared contracts -rajapinnoissa, instructioneissa, skilleissä ja State-sopimuksessa. Legacy-termihaku tarkistaa aktiivisten lähteiden strict-v12-yhdenmukaisuuden muuttamatta historiallista evidenssiä.
 
 ## Avoimet kysymykset
 

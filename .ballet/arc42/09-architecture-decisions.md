@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 10
+version: 12
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-018 ja ADR-019 ovat accepted; strict-v11 data/snapshot/module/runtime-raja, Graph/Loop-routing, Graph-control, selected-Loop-only UI sekä ADR-019:n project-local yhden vastuun Loop -refaktorointi on toteutettu. Koko initiative-tason ihmisacceptance on pending.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-020:n strict-v12/v2 Workflow hard cut ja ADR-021:n Job-only canvas-projektio ovat accepted. ADR-021 supersedoi vain ADR-020:n erillisten canvas-artworkien, validate/retry-viivojen ja endpoint-nodejen vaatimuksen; erillinen Job/Validation-domain, runtime, editorit sekä Graph-, State-, Orchestrator-, Loop Module- ja project/platform-rajat säilyvät. Initiative-tason ihmisacceptance on pending.
 
 ## Päätösindeksi
 
@@ -39,11 +39,13 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-018 ja ADR-019 ovat ac
 | adr-012 | accepted | Execution profile | [ExecutionProfile erotetaan instruction- ja skill-valinnoista](../adr/adr-012-execution-profile-erotetaan-stepin-instructions-ja-skills-valinnoista.md) |
 | adr-013 | accepted | Workflow ownership | [Workflow-yksityiskohdat kuuluvat skilleihin](../adr/adr-013-workflow-yksityiskohdat-kuuluvat-skillsiin.md) |
 | adr-014 | accepted; V1-raja osittain superseded by adr-016 | Project-local workflow templates | [Workflow-templatet ovat project-local-dataa](../adr/adr-014-workflow-templatet-ovat-project-local-dataa.md) |
-| adr-015 | accepted | Strict-v10 runtime domain | [Work Loop, State ja Loop Orchestrator](../adr/adr-015-work-loop-state-ja-loop-orchestrator.md) |
+| adr-015 | accepted; composite model partly superseded by adr-020 | Historical strict-v10 runtime and surviving State/repair invariants | [Work Loop, State ja Loop Orchestrator](../adr/adr-015-work-loop-state-ja-loop-orchestrator.md) |
 | adr-016 | accepted | Loop module boundary | [Yhden Loopin moduulipaketti ja project-local-materialisointi](../adr/adr-016-yhden-loopin-moduulipaketti-ja-project-local-materialisointi.md) |
 | adr-017 | accepted | Authoring projections | [Loop Engineer authoring-projektiot](../adr/adr-017-loop-engineer-authoring-projektiot.md) |
-| adr-018 | accepted | Graph/Loop projections and v11 orchestration | [Graph Engineering, Loop Engineering ja Orchestrator-ohjattu v11-graafi](../adr/adr-018-graph-ja-loop-engineering.md) |
+| adr-018 | accepted; selected-Loop name/route partly superseded by adr-020 | Graph projection and orchestration | [Graph Engineering, Loop Engineering ja Orchestrator-ohjattu v11-graafi](../adr/adr-018-graph-ja-loop-engineering.md) |
 | adr-019 | accepted | Project-local Loop responsibility and package granularity | [Project-local Loopin yhden vastuun ja yhden onnistumisrajan sopimus](../adr/adr-019-project-local-loop-vastuuraja.md) |
+| adr-020 | accepted; canvas projection partly superseded by adr-021 | Strict-v12 Workflow domain, runtime, persistence and UI | [Workflow Engineering ja erilliset Job- ja Validation-nodet](../adr/adr-020-workflow-engineering.md) |
+| adr-021 | accepted | Workflow Engineering canvas projection | [Workflow-canvas projisoi Validationin JobNoden sisään](../adr/adr-021-workflow-canvas-job-projektio.md) |
 
 ## Supersession-suhteet
 
@@ -65,6 +67,18 @@ adr-015:n automaattinen followFlow
 adr-011:n kiinteä kuuden nimetyn arc42-Loopin topologia
         └── osittain superseded by ──▶ adr-019
             kanoniset polut, State, ihmisrajat, source-of-truth ja continuous learning säilyvät
+
+adr-015:n composite WorkLoopNode / WorkNode -malli
+        └── osittain superseded by ──▶ adr-020
+            State, revisionit, repair-frame, continuation, rajat, cancellation ja recovery säilyvät
+
+adr-018:n Loop Engineering -nimi ja view=loop-reitti
+        └── osittain superseded by ──▶ adr-020
+            Graph Engineering, LoopNode, LoopEdge, capability-allowlist ja Orchestrator-dispatch säilyvät
+
+adr-020:n erilliset Job/Validation-canvas-artworkit, validate/retry-polut ja endpoint-nodet
+        └── osittain superseded by ──▶ adr-021
+            erillinen Job/Validation-domain, runtime, authorointi ja editorit säilyvät
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -75,6 +89,9 @@ adr-011:n kiinteä kuuden nimetyn arc42-Loopin topologia
 | adr-017, Context/numeric level/Level 1 composition | adr-018 | Toteutettu v11 hard cut korvaa kolme authoring-tasoa Graph Engineering / Loop Engineering -unionilla ja poistaa Contextin sekä numeric route -mallin. Selected-Loop-only sisäinen projektio säilyy. Historiallista ADR:ää ei kirjoiteta uudelleen. |
 | adr-015, automaattinen yhden flow-edgen `followFlow` | adr-018 | Toteutettu v11 ohjaa nolla/yksi/usea flow candidatea Orchestrator-dispatchin, snapshot-allowlistin, capabilityn ja `needs_input`-rajan kautta. Repairin call/return-, State- ja recovery-periaatteet säilyvät. |
 | adr-011, kiinteä kuuden nimetyn arc42-aktiviteetti-Loopin lista ja koarse structures/concepts-flow | adr-019 | Project-local vastuut erotetaan itsenäisiksi capability-Loopeiksi ja yhden Loopin paketeiksi. ADR-011:n dokumenttiomistajuus, State-, repair-, ihmis- ja jatkuvan oppimisen rajat säilyvät. |
+| adr-015, composite `WorkLoopNode` / `WorkNode` ja Validation `OK` / mode | adr-020 | Strict-v12 `ProjectWorkflow` käyttää erillisiä Job/Validation-nodeja sekä Pass/Fail Edgejä. State-, repair-frame-, continuation-, raja-, cancellation- ja recovery-periaatteet säilyvät. |
+| adr-018, **Loop Engineering** ja `view=loop` | adr-020 | Selected-Loop-projektio on **Workflow Engineering** reitillä `view=workflow`. Graph Engineering, `ProjectLoop` / `LoopNode`, project-global `LoopEdge` ja Orchestrator-ohjattu cross-Loop-flow säilyvät. |
+| adr-020, erilliset Job/Validation-canvas-artworkit, validate/retry-polut ja PASS/FAIL-endpoint-nodet | adr-021 | Workflow-canvas näyttää yhden Job-artworkin per pari, projisoi Validationin sen sisään ja piirtää vain persisted Pass/Fail Edget `straight | smoothstep` -geometrialla. Domain-, runtime- ja editorirajat säilyvät. |
 
 ## Päätösten käyttö
 

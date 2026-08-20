@@ -21,7 +21,7 @@ export class LocalRunTargetService {
   ): RunTargetsResponse {
     const profiles = new Map(data.executionProfiles.map((profile) => [profile.id, profile]));
     const globalAutomationIssues = data.automationIssues.filter((issue) =>
-      !isStepResourceReferenceIssue(issue.path));
+      !isNodeResourceReferenceIssue(issue.path));
     const loops = data.automation.loops.map((loop): RunTarget => {
       const issues: RunTarget["issues"] = [
         ...globalAutomationIssues.map((issue) => ({
@@ -87,5 +87,5 @@ const target = (
   latestRootRunId: roots.latest("loop", id)?.rootRunId
 });
 
-const isStepResourceReferenceIssue = (path: string): boolean =>
-  /^(?:orchestrator|loops\.\d+\.nodes\.\d+\.(?:work|validation))\.(?:primaryInstructionId|skillIds(?:\.\d+)?)$/.test(path);
+const isNodeResourceReferenceIssue = (path: string): boolean =>
+  /^(?:orchestrator|loops\.\d+\.workflow\.(?:jobNodes|validationNodes)\.\d+)\.(?:primaryInstructionId|skillIds(?:\.\d+)?)$/.test(path);

@@ -4,7 +4,7 @@ title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 8
+version: 9
 tags:
   - arc42
   - runtime
@@ -19,7 +19,7 @@ Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaik
 
 ## Tila
 
-RT-001–RT-003 ja RT-006–RT-011 ovat toteutettua platform-käyttäytymistä. Config ja immutable snapshot ovat strict v11, ja RT-011:n cross-Loop flow/repair kulkee persisted Graph/capability-allowlistan kautta Orchestratorille. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella.
+RT-001–RT-003 ja RT-006–RT-011 ovat toteutettua platform-käyttäytymistä. Config on strict v12, immutable snapshot v5 ja SQLite schema v8. RT-002 toteuttaa Workflow'n Job/Validation-retryrajan ja RT-011:n cross-Loop flow/repair kulkee persisted Graph/capability-allowlistan kautta Orchestratorille. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -53,9 +53,24 @@ Järjestys ja invariantit:
 1. Request ja kaikki reachable config/resource -viitteet validoidaan ennen Runin luontia.
 2. Snapshot sekä Root Run -identiteetti commitoidaan ennen ensimmäistä provider-tehtävää.
 3. Branch/worktree on Node-kirjoitusten ainoa työalue; active checkout säilyy muuttumattomana.
-4. Root Run ajaa yhden roolin/outcomen kerrallaan. Seuraava rooli määräytyy nykyisestä control flow’sta, ei providerin vapaasta tekstistä; v11 Orchestrator-owned flow-dispatch on erillinen pending-vaihe.
+4. Root Run ajaa yhden Job-, Validation- tai Orchestrator-roolin kerrallaan. Seuraava rooli määräytyy strict-v12 Workflow'sta ja runtime-invarianteista, ei providerin vapaasta tekstistä.
 5. Outcome, State patch/revision, attempt ja control-flow-tapahtuma kuuluvat samaan atomiseen vaikutukseen silloin, kun ne muuttavat samaa runtime-siirtymää.
 6. Finalization tekee terminal-tilan näkyväksi mutta ei mergeä tai pushaa worktreetä.
+
+## RT-002: Job, Validation ja rajattu retry
+
+```mermaid
+flowchart LR
+  job["Job run; attempt n"] -->|"completed / validate"| validation["Paired ValidationNode"]
+  validation -->|"PASS / PassEdge"| next{"Pass target"}
+  next -->|"JobNode"| nextJob["New JobRun; attempt 0"]
+  next -->|"Workflow PASS"| pass["Loop invocation successful"]
+  validation -->|"FAIL and n < maxRetries"| retry["Paired Job; attempt n+1"]
+  retry --> job
+  validation -->|"FAIL and n >= maxRetries / FailEdge"| fail["Workflow FAIL + Repair Request"]
+```
+
+Jobin valmistuminen ja retry ovat kiinteitä runtime-siirtymiä, eivät authoroitavia Edgejä. Oletus `maxRetries = 3` tarkoittaa ensimmäistä Job-ajoa ja kolmea paikallista retryä. PASS voi päivittää Statea atomisesti ja seuraa yhtä PassEdgeä. FAIL ei päivitä Statea; retryrajan jälkeen se sisältää korjauspalautteen ja capability/outcome-eskaloinnin sekä seuraa yhtä FailEdgeä. Tekniset `blocked | failed` -tilat terminaalisoivat Runin ennen FailEdgeä.
 
 ## RT-003: capability repair call/return
 
@@ -64,13 +79,13 @@ sequenceDiagram
   participant Validation as ValidationNode
   participant Runtime as LoopOrchestrator
   participant State as State + repair frames
-  participant Repair as Target WorkLoopNode
-  Validation-->>Runtime: FAIL / ORCHESTRATOR_REPAIR + capability
+  participant Repair as Target Workflow
+  Validation-->>Runtime: Workflow FAIL + requested capability/outcome
   Runtime->>Runtime: Rajaa source allowlist ja ratkaise target
   alt Yksi yksiselitteinen target
     Runtime->>State: Push frame + commit repair request
     Runtime->>Repair: Call shared Statella
-    Repair-->>Runtime: Terminal PASS tai FAIL
+    Repair-->>Runtime: Workflow PASS
     Runtime->>State: Pop frame + commit return
     Runtime->>Validation: Palaa samaan ValidationNodeen
   else Ei targetia tai useita yhtä hyviä
@@ -78,7 +93,7 @@ sequenceDiagram
   end
 ```
 
-Repair ei ole vapaamuotoinen hyppy. Validation pyytää capabilitya, Orchestrator valitsee vain lähteen allowlistista, frame tallentaa callerin ja paluu tapahtuu LIFO-järjestyksessä samaan Validation Nodeen. Repair-target ei valitse callerin continuationia. Depth-, attempt- ja transition-rajat estävät rajattoman kutsuketjun.
+Repair ei ole vapaamuotoinen hyppy. Validation pyytää capabilitya tai outcomea ilman target-ID:tä, Orchestrator valitsee vain lähteen allowlistista, frame tallentaa callerin ja paluu tapahtuu LIFO-järjestyksessä samaan ValidationNodeen uusimmalla Statella. Jobia ei ajeta uudelleen eikä retry-laskuria nollata; uusi FAIL eskaloituu heti. Repair-target ei valitse callerin continuationia. Depth-, attempt- ja transition-rajat estävät rajattoman kutsuketjun.
 
 ## RT-009: restart, reconciliation ja cancellation
 
@@ -99,34 +114,34 @@ flowchart TD
 
 Restart ei tee oletusta provider-prosessin elossaolosta. `queued`-työ säilyy, mutta ennen restartia `running`-tilassa ollut tehtävä merkitään keskeytyneeksi eikä sitä replayata automaattisesti. Runtime jatkaa vain täysin commitoidusta State/control-flow-faktasta. Cancellation on persistentoitu barrier: sen jälkeen saapuva adapter-payload ei saa luoda outcomea, State-revisiota tai uutta continuationia.
 
-## RT-011: strict-v11 Graph Orchestrator dispatch (target)
+## RT-011: strict-v12 Workflow ja Graph Orchestrator dispatch
 
 ```mermaid
 flowchart TD
   entry["Eksplisiittisesti valittu entry Loop"] --> snapshot["Snapshottaa reachable graph + capability + route policy"]
-  snapshot --> run["Aja Loopin Work/Validation sisäinen control flow"]
-  run --> terminal{"Loop invocation terminal"}
-  terminal -->|"completed, no flow candidate"| done["Root Run completed"]
-  terminal -->|"completed, one or more flow candidates"| dispatch["LoopOrchestrator flow dispatch"]
+  snapshot --> run["Aja Loopin ProjectWorkflow"]
+  run --> terminal{"Workflow endpoint"}
+  terminal -->|"PASS, no flow candidate"| done["Root Run completed"]
+  terminal -->|"PASS, one or more flow candidates"| dispatch["LoopOrchestrator flow dispatch"]
   dispatch --> validate{"Snapshot allowlist + capability + permission valid?"}
   validate -->|"one unambiguous"| next["Start target Loop; same State; no repair frame"]
   validate -->|"ambiguous / human authority"| input["needs_input; no target or permission guess"]
-  run -->|"Validation repair request"| repair["LoopOrchestrator repair dispatch"]
+  terminal -->|"FAIL + Repair Request"| repair["LoopOrchestrator repair dispatch"]
   repair --> frame["Push durable frame; call target with same State"]
-  frame --> return["Target completed → caller same Validation"]
+  frame --> return["Target PASS → caller same Validation"]
   next --> run
   return --> run
 ```
 
-RT-011 korvaa v11-toteutuksessa vain top-level completed-flow'n automaattisen `followFlow`-kohdan. Nolla outgoing flow candidatea päättää Root Runin. Yksi tai useampi candidate kulkee Orchestrator-dispatchin kautta; flow ei luo repair-framea. Repair säilyttää RT-003:n durable call/returnin. Jokainen valinta perustuu immutable snapshotin graph-allowlistiin ja targetin capability metadataan. Puuttuva/ristiriitainen capability, ambiguity tai ihmisvaltuutus pysähtyy ennen target invocationia.
+Workflow PASS on ainoa sisäinen tulos, joka käynnistää top-level Graph flow'n. Nolla outgoing flow candidatea päättää Root Runin. Yksi tai useampi candidate kulkee Orchestrator-dispatchin kautta; flow ei luo repair-framea. Workflow FAIL käynnistää RT-003:n durable repair call/returnin. Jokainen valinta perustuu immutable snapshotin graph-allowlistiin ja targetin capability metadataan. Puuttuva/ristiriitainen capability, ambiguity tai ihmisvaltuutus pysähtyy ennen target invocationia.
 
 ## Skenaarioindeksi RT-001–RT-011
 
 | ID | Trigger ja vuorovaikutus | Rakennusosat | Tulos ja evidenssi |
 | --- | --- | --- | --- |
 | RT-001 | Operaattori käynnistää Root Runin; planner snapshottaa reachable automationin ja runtime ajaa Node-roolit sekventiaalisesti. | BB-003–BB-007 | Active checkout säilyy; snapshot, revisionit, terminal-tila ja worktree ovat tarkastettavia. |
-| RT-002 | Validation palauttaa `FAIL/LOCAL_RETRY`. Runtime tallentaa feedbackin, kasvattaa rajattua attemptia ja palaa saman Work-vaiheen suoritukseen nykyisellä Statella. | BB-005, BB-006 | Ei user-authored retry-edgeä; attemptit ja evidenssi säilyvät append-only. |
-| RT-003 | Validation palauttaa `FAIL/ORCHESTRATOR_REPAIR`; capability ratkaistaan allowlistista, frame pushataan, target ajetaan ja paluu tapahtuu LIFO samaan Validationiin. | BB-004–BB-006, BB-008 | Ambiguous/puuttuva target → `needs_input`; provider ei valitse continuationia. |
+| RT-002 | Job valmistuu paired Validationiin; Validation PASS seuraa PassEdgeä ja FAIL palaa retryrajan sisällä paired Jobiin tai seuraa FailEdgeä Workflow FAILiin. | BB-005, BB-006 | Ensimmäinen ajo + kolme oletusretryä; ei authoroitavaa retry-edgeä; technical failure ohittaa FailEdgen. |
+| RT-003 | Workflow FAIL tuottaa target-ID:stä vapaan Repair Requestin; capability/outcome ratkaistaan allowlistista, frame pushataan, target ajetaan ja paluu tapahtuu LIFO samaan Validationiin. | BB-004–BB-006, BB-008 | Ambiguous/puuttuva target → `needs_input`; Jobia ei ajeta uudelleen eikä retryä nollata. |
 | RT-004 | Maanantain 09:00 Europe/Helsinki scheduled learning käynnistää `research-authoritative-change`-työn ja voi pyytää capability repairia. | BB-004–BB-006, BB-008 | Ei dokumenttichurnia tai ulkoista kirjoitusta, jos materiaalista löydöstä ei ole. |
 | RT-005 | Ihminen valtuuttaa rajatun release-toimenpiteen, minkä jälkeen `release-validation` voi käyttää network-enabled-profiilia ulkoisen evidenssin luontiin. | BB-004, BB-006–BB-008 | Toimi traceytyy täsmälliseen valtuutukseen; oletus-flow ei käynnistä sitä. |
 | RT-006 | Operaattori valitsee local/library-paketin; inspect ja plan näyttävät hashin, trustin, diff/polut ja profile mappingin, minkä jälkeen commit re-plannaa ja kirjoittaa configin viimeisenä. | BB-001–BB-003, BB-009 | Stale/conflict/active-run -tilanne failaa suljetusti; config ei viittaa puuttuvaan resurssiin. |
@@ -150,7 +165,7 @@ RT-011 korvaa v11-toteutuksessa vain top-level completed-flow'n automaattisen `f
 | Virhe | Omistaja | Fail-closed-vaste | Jatkaminen |
 | --- | --- | --- | --- |
 | Config/resource/schema-invalidi | BB-003/BB-004 | Root Runia tai provider-tehtävää ei luoda. | Korjaa project truth ja käynnistä uusi suunnitelma. |
-| Work/Validation local failure | BB-005 | Commitoi outcome ja rajattu retry/terminal failure. | Runtime-sääntö tai ihmisvastaus. |
+| Job/Validation technical failure | BB-005 | Commitoi terminal `blocked | failed`; FailEdgeä ei seurata. | Korjaa tekninen syy ja käynnistä valtuutettu uusi ajo. |
 | Ambiguous repair | BB-005 | `needs_input`, ei target-arvausta. | Ihmispäätös tai project-local topology -korjaus. |
 | Provider preflight/protocol failure | BB-006 | Tehtävä failed/interrupted, ei provider-fallbackia. | Korjaa profiili/provider tai käynnistä uusi valtuutettu yritys. |
 | Persistence-transaction failure | BB-005/store | Rollback; osittaista revisionia/control flow’ta ei näy. | Restart/retry viimeisestä commitista. |
@@ -160,11 +175,11 @@ RT-011 korvaa v11-toteutuksessa vain top-level completed-flow'n automaattisen `f
 
 ## Kanoniset lähteet
 
-ADR-015 ja runtime-lähde omistavat nykyisen geneerisen control-semanticsin. ADR-018 omistaa strict-v11 cross-Loop-dispatch-rajan. `.ballet/project.json` omistaa strict-v11 project-local Graphin, Loop capabilityt, schedule-konfiguraation ja tehtävät. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
+ADR-020 ja runtime-lähde omistavat nykyisen Workflow-control-semanticsin. ADR-018 omistaa cross-Loop-dispatch-rajan. `.ballet/project.json` omistaa strict-v12 project-local Workflow't, Graphin, Loop capabilityt, schedule-konfiguraation ja tehtävät. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016` ja `adr-018`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-018` ja `adr-020`.
 
 ## Evidenssi
 

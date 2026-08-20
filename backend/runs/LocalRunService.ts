@@ -68,7 +68,7 @@ export class LocalRunService {
   async start(
     input: StartRootRunRequest,
     source: "manual" | "schedule" = "manual",
-    schedule?: { workLoopNodeId: string; scheduledFor: string }
+    schedule?: { jobNodeId: string; scheduledFor: string }
   ): Promise<RootRunDetail> {
     const rootRunId = randomUUID();
     let workspace;
@@ -119,7 +119,7 @@ export class LocalRunService {
 
   async dispatchScheduled(input: {
     loopId: string;
-    workLoopNodeId: string;
+    jobNodeId: string;
     definitionHash: string;
     scheduledFor: string;
     nextRunAt?: string;
@@ -129,7 +129,7 @@ export class LocalRunService {
     if (!input.canDispatch()) return { status: "stale" };
     const occurrence = {
       loopId: input.loopId,
-      workLoopNodeId: input.workLoopNodeId,
+      jobNodeId: input.jobNodeId,
       definitionHash: input.definitionHash,
       scheduledFor: input.scheduledFor,
       nextRunAt: input.nextRunAt,
@@ -142,13 +142,13 @@ export class LocalRunService {
       const detail = await this.start(
         { kind: "loop", targetId: input.loopId },
         "schedule",
-        { workLoopNodeId: input.workLoopNodeId, scheduledFor: input.scheduledFor }
+        { jobNodeId: input.jobNodeId, scheduledFor: input.scheduledFor }
       );
       const run = detail.loopRuns[0];
       if (!run) throw new Error("Scheduled Root Run did not create a Loop Run.");
       const completed = this.options.database.finishReservedScheduleOccurrence({
         loopId: input.loopId,
-        workLoopNodeId: input.workLoopNodeId,
+        jobNodeId: input.jobNodeId,
         scheduledFor: input.scheduledFor,
         status: "started",
         loopRunId: run.loopRunId,
@@ -159,7 +159,7 @@ export class LocalRunService {
       const message = error instanceof Error ? error.message : String(error);
       const completed = this.options.database.finishReservedScheduleOccurrence({
         loopId: input.loopId,
-        workLoopNodeId: input.workLoopNodeId,
+        jobNodeId: input.jobNodeId,
         scheduledFor: input.scheduledFor,
         status: "skipped",
         error: message,
@@ -272,14 +272,14 @@ export class LocalRunService {
 
 const assertScheduledStart = (
   snapshot: Awaited<ReturnType<LoopExecutionPlanner["create"]>>,
-  schedule?: { workLoopNodeId: string }
+  schedule?: { jobNodeId: string }
 ): void => {
   if (!schedule) return;
   const loop = snapshot.loops.find((candidate) => candidate.id === snapshot.rootLoopId);
-  const start = loop?.nodes.find((candidate) => candidate.id === loop.startNodeId);
-  if (!loop || start?.work.type !== "scheduled" || start.id !== schedule.workLoopNodeId) {
+  const start = loop?.workflow.jobNodes.find((candidate) => candidate.id === loop.workflow.startJobNodeId);
+  if (!loop || start?.type !== "scheduled" || start.id !== schedule.jobNodeId) {
     throw new LoopRunStateError(
-      `Scheduled Work Node ${schedule.workLoopNodeId} is not the immutable start of Loop ${snapshot.rootLoopId}.`
+      `Scheduled Job Node ${schedule.jobNodeId} is not the immutable start of Loop ${snapshot.rootLoopId}.`
     );
   }
 };
@@ -287,11 +287,12 @@ const assertScheduledStart = (
 const assertHumanNodeResponse = (
   root: StoredRootRun,
   node: NonNullable<ReturnType<RuntimeDatabase["getNodeRun"]>>,
-  role: "work" | "validation"
+  role: "job" | "validation"
 ): void => {
   const loop = root.executionSnapshot.loops.find((candidate) => candidate.id === node.loopId);
-  const definition = loop?.nodes.find((candidate) => candidate.id === node.workLoopNodeId);
-  const human = role === "work" ? definition?.work.type === "human" : definition?.validation.type === "human";
+  const job = loop?.workflow.jobNodes.find((candidate) => candidate.id === node.jobNodeId);
+  const validation = loop?.workflow.validationNodes.find((candidate) => candidate.id === job?.validationNodeId);
+  const human = role === "job" ? job?.type === "human" : validation?.type === "human";
   if (node.role !== role || !human || node.executionTaskId) {
     throw new LoopRunConflictError(`Node Run ${node.nodeRunId} is not a Human ${role} Node awaiting this outcome.`);
   }

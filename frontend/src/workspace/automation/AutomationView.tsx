@@ -14,7 +14,7 @@ import { useAutomationDraft } from "./useAutomationDraft";
 import { GraphEngineeringWorkspace } from "./loops/GraphEngineeringWorkspace";
 import { LoopEditor } from "./loops/LoopEditor";
 import { LoopLibraryDialog, type LoopModuleActions } from "./loops/LoopLibraryDialog";
-import { buildGraphEngineeringProjection, buildLoopEngineeringProjection } from "./loops/engineeringProjections";
+import { buildGraphEngineeringProjection, buildWorkflowEngineeringProjection } from "./loops/engineeringProjections";
 import { createLoopDraft, removeLoopAtIndex, updateLoopAtIndex } from "./loops/loopEditorState";
 import { automationDraftIssues } from "./loops/loopFormValidation";
 import { isActiveLoopRun } from "./loops/loopRunState";
@@ -50,7 +50,7 @@ export function AutomationView({
   const [moduleStatuses, setModuleStatuses] = useState<InstalledLoopModuleStatus[]>([]);
   const [moduleError, setModuleError] = useState("");
   const operationRef = useRef(false);
-  const isCreatingLoop = view === "loop" && creating;
+  const isCreatingLoop = view === "workflow" && creating;
   const savedIndex = data.automation.loops.findIndex((loop) => loop.id === selectedId);
   const selectedIndex = savedIndex >= 0 ? savedIndex : draft.loops.findIndex((loop) => loop.id === selectedId);
   const selectedLoop = selectedIndex >= 0 ? draft.loops[selectedIndex] : undefined;
@@ -65,7 +65,7 @@ export function AutomationView({
   const activeLoop = view === "graph" ? selectedGraphLoop : displayedLoop;
   const selectedModule = moduleStatuses.find((module) => module.loopId === activeLoop?.id);
 
-  useWorkspaceNavigationBlocker(setNavigationBlocker, isDirty || createDirty, "Discard unsaved Work Loop changes?");
+  useWorkspaceNavigationBlocker(setNavigationBlocker, isDirty || createDirty, "Discard unsaved Workflow changes?");
   useEffect(() => {
     if (!isCreatingLoop) setCreateDraft(createLoopDraft());
     setLocalEditorValid(true);
@@ -136,7 +136,7 @@ export function AutomationView({
     }
   };
   const openLibraryOrCreate = () => loopModules ? setLibraryOpen(true) : navigate(automationCreateLoopPath());
-  const notices = <><AutomationIssueBanner issues={issues} />{routeIssue ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{routeIssue === "missing-loop-id" ? "Loop Engineering requires a Loop ID." : routeIssue === "non-canonical-graph" ? "Graph Engineering does not accept an ID or create parameter." : "Unknown engineering view. Use view=graph or view=loop."}</AlertDescription></Alert> : null}{error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}{moduleError ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{moduleError}</AlertDescription></Alert> : null}</>;
+  const notices = <><AutomationIssueBanner issues={issues} />{routeIssue ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{routeIssue === "missing-loop-id" ? "Workflow Engineering requires a Loop ID." : routeIssue === "non-canonical-graph" ? "Graph Engineering does not accept an ID or create parameter." : "Unknown engineering view. Use view=graph or view=workflow."}</AlertDescription></Alert> : null}{error ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}{moduleError ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{moduleError}</AlertDescription></Alert> : null}</>;
 
   let actions: ReactNode;
   let content: ReactNode;
@@ -167,7 +167,7 @@ export function AutomationView({
       onRemoveInstalledLoop={loopModules ? removeInstalled : undefined}
     /> : <div className="p-4"><EmptyState title="No Loops yet." action="Use Add Loop to install a module, import a package, or create a blank Loop." /></div>}</>;
   } else {
-    const loopProjection = displayedLoop ? buildLoopEngineeringProjection(candidateConfig, displayedLoop.id) : undefined;
+    const loopProjection = displayedLoop ? buildWorkflowEngineeringProjection(candidateConfig, displayedLoop.id) : undefined;
     actions = <>
       <Button type="button" size="sm" variant="outline" onClick={() => navigate(automationGraphPath())}><ArrowLeft /> Back to Graph Engineering</Button>
       {loopProjection ? <EditorActions saveLabel="Save Loop" onSave={saveLoop} dirty={createDirty || isDirty} valid={valid && !lockedLoopIds.has(loopProjection.loop.id)} pending={saving} /> : null}

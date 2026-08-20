@@ -32,7 +32,7 @@ const writeSkill = async (root: string, id: string, body = "Skill body.") => {
 };
 
 const automationConfig = (composition: ProjectExecutionComposition): ProjectAutomationConfig => ({
-  version: 11,
+  version: 12,
   orchestrator: { ...composition, maxRepairDepth: 4, maxRepairAttempts: 3 },
   graph: { loopEdges: [] },
   loops: [{
@@ -40,27 +40,31 @@ const automationConfig = (composition: ProjectExecutionComposition): ProjectAuto
     description: "Complete and validate the work.",
     capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
     state: { description: "Shared delivery state.", initial: {} },
-    startNodeId: "work",
-    nodes: [{
-      id: "work",
-      description: "Complete the work.",
-      work: {
+    workflow: {
+      startJobNodeId: "job",
+      jobNodes: [{
+        id: "job",
+        description: "Complete the work.",
+        validationNodeId: "job-validation",
         type: "agent",
         task: "Complete the work.",
         ...composition,
         nodeStyle: "terra",
-        nodeSize: "medium"
-      },
-      validation: {
+        nodeSize: "medium",
+        maxRetries: 3
+      }],
+      validationNodes: [{
+        id: "job-validation",
+        description: "Validate the work.",
         type: "agent",
         task: "Validate the work.",
         ...composition,
         nodeStyle: "luna",
         nodeSize: "small"
-      },
-      maxLocalAttempts: 3
-    }],
-    edges: [{ id: "work-completed", source: "work", target: { terminal: "completed" } }]
+      }],
+      passEdges: [{ id: "job-pass", sourceValidationNodeId: "job-validation", target: { workflowResult: "PASS" } }],
+      failEdges: [{ id: "job-fail", sourceValidationNodeId: "job-validation", target: { workflowResult: "FAIL" } }]
+    }
   }]
 });
 
@@ -221,10 +225,10 @@ describe("project resource selection validation", () => {
     });
 
     expect(validateProjectExecutionResources(config, catalog)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: "loops.0.nodes.0.work.primaryInstructionId" }),
-      expect.objectContaining({ path: "loops.0.nodes.0.work.skillIds.0" }),
-      expect.objectContaining({ path: "loops.0.nodes.0.work.skillIds.1" }),
-      expect.objectContaining({ path: "loops.0.nodes.0.validation.primaryInstructionId" }),
+      expect.objectContaining({ path: "loops.0.workflow.jobNodes.0.primaryInstructionId" }),
+      expect.objectContaining({ path: "loops.0.workflow.jobNodes.0.skillIds.0" }),
+      expect.objectContaining({ path: "loops.0.workflow.jobNodes.0.skillIds.1" }),
+      expect.objectContaining({ path: "loops.0.workflow.validationNodes.0.primaryInstructionId" }),
       expect.objectContaining({ path: expect.stringContaining(".ballet/instructions/") }),
       expect.objectContaining({ path: ".agents/skills/invalid/SKILL.md" })
     ]));

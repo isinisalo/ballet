@@ -16,7 +16,7 @@ export interface ExecutionProfile {
 }
 
 export interface ProjectConfiguration {
-  version: 11;
+  version: 12;
   executionProfiles: ExecutionProfile[];
   orchestrator: ProjectLoopOrchestrator;
   graph: ProjectGraph;

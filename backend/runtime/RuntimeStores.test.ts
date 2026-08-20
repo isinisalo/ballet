@@ -4,20 +4,19 @@ import { createRuntimeStoreFixture, runtimeTestTimestamp } from "./RuntimeStore.
 import { RepairResultStore } from "./RepairResultStore.js";
 import { RootRuntimeReadStore } from "./RootRuntimeReadStore.js";
 
-describe("Work Loop runtime stores", () => {
-  it("round-trips Root, Loop, Work Loop Node, and role-specific Node Runs", async () => {
+describe("Workflow runtime stores", () => {
+  it("round-trips Root, Loop, Job, and role-specific Node Runs", async () => {
     const fixture = await createRuntimeStoreFixture({ count: 0 });
-    const loopRun = fixture.loops.createLoopRun({
-      loopRunId: "loop-run", rootRunId: "root-run", loop: fixture.loop, source: "manual"
-    });
-    const workLoopNodeRun = fixture.loops.createWorkLoopNodeRun({
-      workLoopNodeRunId: "work-loop-node-run", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
-      loopId: fixture.loop.id, workLoopNodeId: fixture.loop.startNodeId, attempt: 1
+    const loopRun = fixture.loops.createLoopRun({ loopRunId: "loop-run", rootRunId: "root-run", loop: fixture.loop, source: "manual" });
+    const jobRun = fixture.loops.createJobRun({
+      jobRunId: "job-run", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
+      loopId: fixture.loop.id, jobNodeId: fixture.loop.workflow.startJobNodeId, jobAttempt: 1
     });
     const work = fixture.loops.createNodeRun({
       nodeRunId: "work-node-run", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
-      workLoopNodeRunId: workLoopNodeRun.workLoopNodeRunId, role: "work", loopId: fixture.loop.id,
-      workLoopNodeId: fixture.loop.startNodeId, nodeDefinitionId: "main-loop:work:work",
+      jobRunId: jobRun.jobRunId, role: "job", loopId: fixture.loop.id,
+      jobNodeId: fixture.loop.workflow.startJobNodeId, workflowNodeId: fixture.loop.workflow.startJobNodeId,
+      nodeDefinitionId: "main-loop:job:job",
       input: { instruction: "execute" }, context: { stateRevision: 0 }, attempt: 1
     });
 
@@ -25,8 +24,8 @@ describe("Work Loop runtime stores", () => {
     expect(fixture.states.current("root-run")).toMatchObject({ revision: 0, state: { count: 0 } });
     expect(fixture.loops.details("loop-run")).toMatchObject({
       loopRunId: "loop-run", entryStateRevision: 0,
-      workLoopNodeRuns: [{ workLoopNodeRunId: "work-loop-node-run", activeNodeRunId: "work-node-run" }],
-      nodeRuns: [{ nodeRunId: "work-node-run", role: "work", input: { instruction: "execute" } }]
+      jobRuns: [{ jobRunId: "job-run", activeNodeRunId: "work-node-run" }],
+      nodeRuns: [{ nodeRunId: "work-node-run", role: "job", input: { instruction: "execute" } }]
     });
     expect(work).toMatchObject({ status: "queued", stateRevisionBefore: 0 });
     await fixture.close();
@@ -39,24 +38,26 @@ describe("Repair runtime stores", () => {
     const loopRun = fixture.loops.createLoopRun({
       loopRunId: "caller-loop-run", rootRunId: "root-run", loop: fixture.loop, source: "manual"
     });
-    const composite = fixture.loops.createWorkLoopNodeRun({
-      workLoopNodeRunId: "work-loop-node-run", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
-      loopId: fixture.loop.id, workLoopNodeId: fixture.loop.startNodeId, attempt: 1
+    const composite = fixture.loops.createJobRun({
+      jobRunId: "job-run", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
+      loopId: fixture.loop.id, jobNodeId: fixture.loop.workflow.startJobNodeId, jobAttempt: 1
     });
     const validation = fixture.loops.createNodeRun({
       nodeRunId: "validation-node-run", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
-      workLoopNodeRunId: composite.workLoopNodeRunId, role: "validation", loopId: fixture.loop.id,
-      workLoopNodeId: fixture.loop.startNodeId, nodeDefinitionId: "main-loop:work:validation", attempt: 1
+      jobRunId: composite.jobRunId, role: "validation", loopId: fixture.loop.id,
+      jobNodeId: fixture.loop.workflow.startJobNodeId,
+      workflowNodeId: fixture.loop.workflow.jobNodes[0]!.validationNodeId,
+      nodeDefinitionId: "main-loop:job-validation:validation", attempt: 1
     });
     const request = fixture.repairs.createRequest({
       repairRequestId: "repair-request", rootRunId: "root-run", requesterLoopRunId: loopRun.loopRunId,
-      requesterWorkLoopNodeRunId: composite.workLoopNodeRunId,
+      requesterJobRunId: composite.jobRunId,
       requesterValidationNodeRunId: validation.nodeRunId,
-      mode: "orchestrator", attempt: 1, validationSummary: "Repairable mismatch.",
+      attempt: 1, validationSummary: "Repairable mismatch.",
       requestedOutcome: { repaired: true }, reason: "Validation found a repairable mismatch.",
       evidence: { check: "failed" }, stateRevisionAtRequest: 0, returnLoopId: fixture.loop.id,
-      returnWorkLoopNodeId: fixture.loop.startNodeId,
-      returnValidationNodeDefinitionId: "main-loop:work:validation", nestingDepth: 1,
+      returnJobNodeId: fixture.loop.workflow.startJobNodeId,
+      returnValidationNodeDefinitionId: "main-loop:job-validation:validation", nestingDepth: 1,
       createdAt: runtimeTestTimestamp
     });
     const orchestrationRequest = fixture.orchestration.create({
@@ -71,14 +72,12 @@ describe("Repair runtime stores", () => {
         completed_at = ?, updated_at = ? WHERE node_run_id = ?
     `).run(JSON.stringify({
       role: "validation", state: "completed", decision: "FAIL", summary: "Repairable mismatch.",
-      evidence: {}, checks: [], repair: {
-        mode: "ORCHESTRATOR_REPAIR", reason: "Repair.",
-        requestedCapability: "repair-state", evidenceRefs: []
-      }
+      evidence: {}, checks: [], feedback: "Fix it.", expectedCorrection: "Correct it.",
+      escalation: { reason: "Repair.", requestedCapability: "repair-state", evidenceRefs: [] }
     }), runtimeTestTimestamp, runtimeTestTimestamp, validation.nodeRunId);
     fixture.connection().prepare(`
-      UPDATE work_loop_node_runs SET status = 'waiting_for_input' WHERE work_loop_node_run_id = ?
-    `).run(composite.workLoopNodeRunId);
+      UPDATE job_runs SET status = 'waiting_for_input' WHERE job_run_id = ?
+    `).run(composite.jobRunId);
     const orchestrator = fixture.loops.createNodeRun({
       nodeRunId: "orchestrator-node-run", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
       role: "orchestrator", loopId: fixture.loop.id,
@@ -117,20 +116,20 @@ describe("Repair runtime stores", () => {
       frameId: "frame", rootRunId: "root-run", repairRequestId: request.repairRequestId,
       routeId: fixture.orchestration.routeForRequest(orchestrationRequest.orchestrationRequestId)!.routeId,
       callerLoopRunId: loopRun.loopRunId, calleeLoopRunId: callee.loopRunId,
-      returnLoopId: fixture.loop.id, returnWorkLoopNodeId: fixture.loop.startNodeId,
-      returnValidationNodeDefinitionId: "main-loop:work:validation",
+      returnLoopId: fixture.loop.id, returnJobNodeId: fixture.loop.workflow.startJobNodeId,
+      returnValidationNodeDefinitionId: "main-loop:job-validation:validation",
       stateRevisionAtCall: 0, nestingDepth: 1, createdAt: runtimeTestTimestamp
     });
     fixture.loops.bindOrchestrationFrame(callee.loopRunId, frame.frameId);
     fixture.repairs.createRequest({
       repairRequestId: "pending-repair", rootRunId: "root-run", requesterLoopRunId: loopRun.loopRunId,
-      requesterWorkLoopNodeRunId: composite.workLoopNodeRunId,
+      requesterJobRunId: composite.jobRunId,
       requesterValidationNodeRunId: validation.nodeRunId,
-      mode: "orchestrator", attempt: 2, validationSummary: "Another repair is required.",
+      attempt: 2, validationSummary: "Another repair is required.",
       reason: "Awaiting a route.", requestedCapability: "repair-state",
       stateRevisionAtRequest: 0, returnLoopId: fixture.loop.id,
-      returnWorkLoopNodeId: fixture.loop.startNodeId,
-      returnValidationNodeDefinitionId: "main-loop:work:validation", nestingDepth: 1
+      returnJobNodeId: fixture.loop.workflow.startJobNodeId,
+      returnValidationNodeDefinitionId: "main-loop:job-validation:validation", nestingDepth: 1
     });
 
     const reopened = fixture.reopen();
@@ -174,33 +173,44 @@ const assertRepairReadProjection = (fixture: RuntimeFixture, stores: ReopenedSto
     activeContinuationChain: [{ frameId: "frame", status: "open", nestingDepth: 1 }],
     pendingRepair: { repairRequestId: "pending-repair" },
     returnDestination: {
-      loopId: "main-loop", workLoopNodeId: "work",
-      validationNodeDefinitionId: "main-loop:work:validation"
+      loopId: "main-loop", jobNodeId: "job",
+      validationNodeDefinitionId: "main-loop:job-validation:validation"
     }
   });
   expect(projection.repair.routedTarget).toBeUndefined();
 };
 
-describe("Work Loop runtime invariants", () => {
-  it("enforces one active phase for each Work Loop Node Run", async () => {
+const assertCancelledRuntimeProjection = (runtime: RuntimeDatabase): void => {
+  expect(runtime.readRootRuntime("root-run")).toMatchObject({
+    state: { currentRevision: 0, currentState: { committed: true } }, repair: {
+      requests: [{ repairRequestId: "pending-repair", status: "cancelled" }]
+    }, controlFlowEvents: [{ kind: "root_cancelled", stateRevision: 0 }]
+  });
+};
+
+describe("Workflow runtime invariants", () => {
+  it("enforces one active phase for each Job Run", async () => {
     const fixture = await createRuntimeStoreFixture();
     const loop = fixture.loops.createLoopRun({
       loopRunId: "loop-run", rootRunId: "root-run", loop: fixture.loop, source: "manual"
     });
-    const composite = fixture.loops.createWorkLoopNodeRun({
-      workLoopNodeRunId: "composite", rootRunId: "root-run", loopRunId: loop.loopRunId,
-      loopId: fixture.loop.id, workLoopNodeId: fixture.loop.startNodeId, attempt: 1
+    const composite = fixture.loops.createJobRun({
+      jobRunId: "composite", rootRunId: "root-run", loopRunId: loop.loopRunId,
+      loopId: fixture.loop.id, jobNodeId: fixture.loop.workflow.startJobNodeId, jobAttempt: 1
     });
     fixture.loops.createNodeRun({
       nodeRunId: "phase-one", rootRunId: "root-run", loopRunId: loop.loopRunId,
-      workLoopNodeRunId: composite.workLoopNodeRunId, role: "work", loopId: fixture.loop.id,
-      workLoopNodeId: fixture.loop.startNodeId, nodeDefinitionId: "main-loop:work:work", attempt: 1
+      jobRunId: composite.jobRunId, role: "job", loopId: fixture.loop.id,
+      jobNodeId: fixture.loop.workflow.startJobNodeId, workflowNodeId: fixture.loop.workflow.startJobNodeId,
+      nodeDefinitionId: "main-loop:job:job", attempt: 1
     });
 
     expect(() => fixture.loops.createNodeRun({
       nodeRunId: "phase-two", rootRunId: "root-run", loopRunId: loop.loopRunId,
-      workLoopNodeRunId: composite.workLoopNodeRunId, role: "validation", loopId: fixture.loop.id,
-      workLoopNodeId: fixture.loop.startNodeId, nodeDefinitionId: "main-loop:work:validation", attempt: 1
+      jobRunId: composite.jobRunId, role: "validation", loopId: fixture.loop.id,
+      jobNodeId: fixture.loop.workflow.startJobNodeId,
+      workflowNodeId: fixture.loop.workflow.jobNodes[0]!.validationNodeId,
+      nodeDefinitionId: "main-loop:job-validation:validation", attempt: 1
     })).toThrow(/UNIQUE constraint failed/);
     await fixture.close();
   });
@@ -210,20 +220,21 @@ describe("Work Loop runtime invariants", () => {
     const loop = fixture.loops.createLoopRun({
       loopRunId: "loop-run", rootRunId: "root-run", loop: fixture.loop, source: "manual"
     });
-    const composite = fixture.loops.createWorkLoopNodeRun({
-      workLoopNodeRunId: "composite", rootRunId: "root-run", loopRunId: loop.loopRunId,
-      loopId: fixture.loop.id, workLoopNodeId: fixture.loop.startNodeId, attempt: 1
+    const composite = fixture.loops.createJobRun({
+      jobRunId: "composite", rootRunId: "root-run", loopRunId: loop.loopRunId,
+      loopId: fixture.loop.id, jobNodeId: fixture.loop.workflow.startJobNodeId, jobAttempt: 1
     });
     const node = fixture.loops.createNodeRun({
       nodeRunId: "node", rootRunId: "root-run", loopRunId: loop.loopRunId,
-      workLoopNodeRunId: composite.workLoopNodeRunId, role: "work", loopId: fixture.loop.id,
-      workLoopNodeId: fixture.loop.startNodeId, nodeDefinitionId: "main-loop:work:work", attempt: 1
+      jobRunId: composite.jobRunId, role: "job", loopId: fixture.loop.id,
+      jobNodeId: fixture.loop.workflow.startJobNodeId, workflowNodeId: fixture.loop.workflow.startJobNodeId,
+      nodeDefinitionId: "main-loop:job:job", attempt: 1
     });
     fixture.connection().prepare(`
       UPDATE node_runs SET status = 'failed', completed_at = ?, updated_at = ? WHERE node_run_id = ?
     `).run(runtimeTestTimestamp, runtimeTestTimestamp, node.nodeRunId);
 
-    expect(fixture.loops.getWorkLoopNodeRun(composite.workLoopNodeRunId)?.activeNodeRunId).toBeUndefined();
+    expect(fixture.loops.getJobRun(composite.jobRunId)?.activeNodeRunId).toBeUndefined();
     expect(() => fixture.connection().prepare(`
       UPDATE node_runs SET status = 'running', completed_at = NULL WHERE node_run_id = ?
     `).run(node.nodeRunId)).toThrow("terminal Node Run status is immutable");
@@ -251,24 +262,26 @@ describe("Work Loop runtime invariants", () => {
     const loopRun = fixture.loops.createLoopRun({
       loopRunId: "loop-run", rootRunId: "root-run", loop: fixture.loop, source: "manual"
     });
-    const composite = fixture.loops.createWorkLoopNodeRun({
-      workLoopNodeRunId: "composite", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
-      loopId: fixture.loop.id, workLoopNodeId: fixture.loop.startNodeId, attempt: 1
+    const composite = fixture.loops.createJobRun({
+      jobRunId: "composite", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
+      loopId: fixture.loop.id, jobNodeId: fixture.loop.workflow.startJobNodeId, jobAttempt: 1
     });
     const validation = fixture.loops.createNodeRun({
       nodeRunId: "validation", rootRunId: "root-run", loopRunId: loopRun.loopRunId,
-      workLoopNodeRunId: composite.workLoopNodeRunId, role: "validation", loopId: fixture.loop.id,
-      workLoopNodeId: fixture.loop.startNodeId, nodeDefinitionId: "main-loop:work:validation", attempt: 1
+      jobRunId: composite.jobRunId, role: "validation", loopId: fixture.loop.id,
+      jobNodeId: fixture.loop.workflow.startJobNodeId,
+      workflowNodeId: fixture.loop.workflow.jobNodes[0]!.validationNodeId,
+      nodeDefinitionId: "main-loop:job-validation:validation", attempt: 1
     });
     fixture.repairs.createRequest({
       repairRequestId: "pending-repair", rootRunId: "root-run", requesterLoopRunId: loopRun.loopRunId,
-      requesterWorkLoopNodeRunId: composite.workLoopNodeRunId,
+      requesterJobRunId: composite.jobRunId,
       requesterValidationNodeRunId: validation.nodeRunId,
-      mode: "orchestrator", attempt: 1, validationSummary: "Repair required.",
+      attempt: 1, validationSummary: "Repair required.",
       reason: "Pending at cancellation.", requestedCapability: "repair-state",
       stateRevisionAtRequest: 0, returnLoopId: fixture.loop.id,
-      returnWorkLoopNodeId: fixture.loop.startNodeId,
-      returnValidationNodeDefinitionId: "main-loop:work:validation", nestingDepth: 1
+      returnJobNodeId: fixture.loop.workflow.startJobNodeId,
+      returnValidationNodeDefinitionId: "main-loop:job-validation:validation", nestingDepth: 1
     });
     fixture.release();
 
@@ -277,7 +290,7 @@ describe("Work Loop runtime invariants", () => {
       runtime.terminalizeActiveRootRuns("root-run", "cancelled", undefined, runtimeTestTimestamp);
     })();
     expect(runtime.getNodeRun("validation")).toMatchObject({ status: "cancelled" });
-    expect(runtime.getWorkLoopNodeRun("composite")).toMatchObject({ status: "cancelled", terminal: "cancelled" });
+    expect(runtime.getJobRun("composite")).toMatchObject({ status: "cancelled", terminal: "cancelled" });
     expect(runtime.listRootLoopRuns("root-run")).toEqual([
       expect.objectContaining({ loopRunId: "loop-run", status: "cancelled", completionStateRevision: 0 })
     ]);
@@ -287,17 +300,13 @@ describe("Work Loop runtime invariants", () => {
       UPDATE loop_invocations SET status = 'running', completed_at = NULL WHERE loop_run_id = 'loop-run'
     `).run()).toThrow("terminal loop run status is immutable");
     expect(() => runtime.connection().prepare(`
-      UPDATE work_loop_node_runs SET status = 'running', terminal = NULL, completed_at = NULL
-      WHERE work_loop_node_run_id = 'composite'
-    `).run()).toThrow("terminal Work Loop Node Run status is immutable");
+      UPDATE job_runs SET status = 'running', terminal = NULL, completed_at = NULL
+      WHERE job_run_id = 'composite'
+    `).run()).toThrow("terminal Job Run status is immutable");
     expect(runtime.listControlFlowEvents("root-run")).toEqual([
       expect.objectContaining({ kind: "root_cancelled", stateRevision: 0, sourceNodeRunId: "validation" })
     ]);
-    expect(runtime.readRootRuntime("root-run")).toMatchObject({
-      state: { currentRevision: 0, currentState: { committed: true } },
-      repair: { requests: [{ repairRequestId: "pending-repair", status: "cancelled" }] },
-      controlFlowEvents: [{ kind: "root_cancelled", stateRevision: 0 }]
-    });
+    assertCancelledRuntimeProjection(runtime);
     runtime.close();
     await fixture.close();
   });

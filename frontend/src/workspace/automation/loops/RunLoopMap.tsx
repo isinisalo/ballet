@@ -51,16 +51,16 @@ export function RunLoopMap({ root }: { root: RootRunDetail }) {
 }
 
 function LoopPlanet({ loop, root, active }: { loop: ProjectLoop; root: RootRunDetail; active: boolean }) {
-  const startNode = loop.nodes.find(({ id }) => id === loop.startNodeId) ?? loop.nodes[0];
+  const startNode = loop.workflow.jobNodes.find(({ id }) => id === loop.workflow.startJobNodeId) ?? loop.workflow.jobNodes[0];
   const role = active ? root.current?.nodeRole : undefined;
-  const RoleIcon = role === "validation" ? ShieldCheck : role === "work" ? BriefcaseBusiness : Network;
+  const RoleIcon = role === "validation" ? ShieldCheck : role === "job" ? BriefcaseBusiness : Network;
   return (
     <article
       data-active-loop={active || undefined}
       className={cn("grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] gap-3 border bg-card p-3", active ? "border-secondary ring-2 ring-secondary/20" : "border-divider-strong")}
     >
       <span aria-hidden="true" className="loop-artwork-node relative block size-12 rounded-full" data-loop-node-size="medium">
-        <LoopNodeArtwork nodeStyle={startNode?.work.nodeStyle ?? defaultLoopNodeStyle} />
+        <LoopNodeArtwork nodeStyle={startNode?.nodeStyle ?? defaultLoopNodeStyle} />
       </span>
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
@@ -69,8 +69,8 @@ function LoopPlanet({ loop, root, active }: { loop: ProjectLoop; root: RootRunDe
         </div>
         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{loop.description}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[0.57rem] text-muted-foreground">
-          <span>{loop.nodes.length} composite {loop.nodes.length === 1 ? "node" : "nodes"}</span>
-          {active && root.current?.workLoopNodeId ? <span className="flex min-w-0 items-center gap-1 text-foreground"><RoleIcon className={cn("size-3", role === "validation" ? "text-secondary" : role === "orchestrator" ? "text-tertiary" : "text-primary")} /> <span className="truncate">{root.current.workLoopNodeId} · {roleLabel(role)}</span></span> : null}
+          <span>{loop.workflow.jobNodes.length} {loop.workflow.jobNodes.length === 1 ? "Job" : "Jobs"}</span>
+          {active && root.current?.jobNodeId ? <span className="flex min-w-0 items-center gap-1 text-foreground"><RoleIcon className={cn("size-3", role === "validation" ? "text-secondary" : role === "orchestrator" ? "text-tertiary" : "text-primary")} /> <span className="truncate">{root.current.jobNodeId} · {roleLabel(role)}</span></span> : null}
         </div>
       </div>
     </article>
@@ -96,10 +96,10 @@ function ReturnPath({ root }: { root: RootRunDetail }) {
   if (chain.length === 0 && !destination) return null;
   return <div className="flex flex-wrap items-center gap-2 border border-tertiary/40 bg-card px-3 py-2 font-mono text-[0.6rem] text-tertiary">
     <RotateCcw className="size-3.5" /> Return path (LIFO)
-    {chain.slice().reverse().map((frame) => <span key={frame.frameId}>depth {frame.nestingDepth} → {frame.returnLoopId}/{frame.returnWorkLoopNodeId}/Validation</span>)}
-    {chain.length === 0 && destination ? <span>→ {destination.loopId}/{destination.workLoopNodeId}/Validation</span> : null}
+    {chain.slice().reverse().map((frame) => <span key={frame.frameId}>depth {frame.nestingDepth} → {frame.returnLoopId}/{frame.returnJobNodeId}/Validation</span>)}
+    {chain.length === 0 && destination ? <span>→ {destination.loopId}/{destination.jobNodeId}/Validation</span> : null}
   </div>;
 }
 
 const roleLabel = (role?: NonNullable<RootRunDetail["current"]>["nodeRole"]): string =>
-  role === "work" ? "Work" : role === "validation" ? "Validation" : role === "orchestrator" ? "Orchestrator" : "—";
+  role === "job" ? "Job" : role === "validation" ? "Validation" : role === "orchestrator" ? "Orchestrator" : "—";

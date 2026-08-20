@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testLoop, testWorkLoopNode } from "../tests/v11TestConfig.js";
+import { testJobPair, testLoop } from "../tests/v12TestConfig.js";
 import {
   activeNode, completeActiveLoop, createOrchestrationHarness,
-  requestExternalRepair, routeRepair, validationOk
+  requestExternalRepair, routeRepair, validationPass
 } from "./LoopOrchestrator.test-support.js";
 
 describe("LoopOrchestrator nesting and limits", () => {
   it("returns nested repairs in LIFO order", async () => {
-    const repairA = testLoop("repair-a", testWorkLoopNode("repair-a-work"));
-    const repairB = testLoop("repair-b", testWorkLoopNode("repair-b-work"));
+    const repairA = testLoop("repair-a", testJobPair("repair-a-job"));
+    const repairB = testLoop("repair-b", testJobPair("repair-b-job"));
     const harness = await createOrchestrationHarness({ targets: [repairA, repairB], edges: [
       { id: "caller-a", source: "caller-loop", target: "repair-a", kind: "repair", capability: "test:loop.transfer", description: "Caller to A." },
       { id: "a-b", source: "repair-a", target: "repair-b", kind: "repair", capability: "test:loop.transfer", description: "A to B." }
@@ -25,8 +25,8 @@ describe("LoopOrchestrator nesting and limits", () => {
       pendingRepair: { repairRequestId: innerRequest.request.repairRequestId, nestingDepth: 2 },
       routedTarget: { targetLoopId: "repair-b" },
       returnDestination: {
-        loopId: "repair-a", workLoopNodeId: "repair-a-work",
-        validationNodeDefinitionId: "repair-a:repair-a-work:validation"
+        loopId: "repair-a", jobNodeId: "repair-a-job",
+        validationNodeDefinitionId: "repair-a:repair-a-job-validation:validation"
       },
       activeContinuationChain: [
         { repairRequestId: outerRequest.request.repairRequestId, nestingDepth: 1 },
@@ -40,10 +40,10 @@ describe("LoopOrchestrator nesting and limits", () => {
     expect(runtime.repair.openFrames("root-run")).toEqual([
       expect.objectContaining({ calleeLoopRunId: repairARun.loopRunId, status: "open" })
     ]);
-    runtime.applyNodeOutcome("root-run", returnedToA.nodeRunId, validationOk("Nested repair accepted."));
+    runtime.applyNodeOutcome("root-run", returnedToA.nodeRunId, validationPass("Nested repair accepted."));
     const returnedToCaller = activeNode(runtime);
     expect(returnedToCaller).toMatchObject({
-      role: "validation", loopId: "caller-loop", workLoopNodeRunId: outerRequest.validation.workLoopNodeRunId
+      role: "validation", loopId: "caller-loop", jobRunId: outerRequest.validation.jobRunId
     });
     expect(runtime.listRepairResults("root-run").map(({ targetLoopRunId }) => targetLoopRunId))
       .toEqual([repairBRun.loopRunId, repairARun.loopRunId]);
@@ -51,7 +51,7 @@ describe("LoopOrchestrator nesting and limits", () => {
       SELECT status FROM orchestration_frames ORDER BY nesting_depth DESC
     `).pluck().all()).toEqual(["returned", "returned"]);
     expect(runtime.listControlFlowEvents("root-run").filter(({ kind }) => kind === "repair_return")
-      .map(({ targetLoopRunId }) => targetLoopRunId)).toEqual([repairARun.loopRunId, outerRequest.work.loopRunId]);
+      .map(({ targetLoopRunId }) => targetLoopRunId)).toEqual([repairARun.loopRunId, outerRequest.job.loopRunId]);
     runtime.close();
     await harness.close();
   });
@@ -62,9 +62,9 @@ describe("LoopOrchestrator nesting and limits", () => {
     runtime.startLoopRun("root-run");
     const outer = requestExternalRepair(runtime);
     routeRepair(runtime, outer.orchestrator, "repair-a");
-    const work = activeNode(runtime);
-    runtime.applyNodeOutcome("root-run", work.nodeRunId, {
-      role: "work", state: "completed", summary: "Repair A work.", artifacts: {}, checks: []
+    const job = activeNode(runtime);
+    runtime.applyNodeOutcome("root-run", job.nodeRunId, {
+      role: "job", state: "completed", summary: "Repair A Job.", artifacts: {}, checks: []
     });
     const validation = activeNode(runtime);
     runtime.applyNodeOutcome("root-run", validation.nodeRunId, externalFailure("Nested repair requested."));
@@ -164,7 +164,7 @@ describe("LoopOrchestrator input, recovery, and cancellation", () => {
     runtime.close();
 
     runtime = new RuntimeDatabase(harness.filename);
-    expect(activeNode(runtime)).toMatchObject({ loopRunId: target.loopRunId, role: "work" });
+    expect(activeNode(runtime)).toMatchObject({ loopRunId: target.loopRunId, role: "job" });
     completeActiveLoop(runtime);
     const returnedId = activeNode(runtime).nodeRunId;
     runtime.close();
@@ -196,9 +196,9 @@ describe("LoopOrchestrator interruption and cancellation recovery", () => {
         WHERE node_run_id = ?
       `).run(timestamp, timestamp, node.nodeRunId);
       runtime.connection().prepare(`
-        UPDATE work_loop_node_runs SET status = 'failed', terminal = 'failed', state_revision_after = 0,
-          active_node_run_id = NULL, completed_at = ?, updated_at = ? WHERE work_loop_node_run_id = ?
-      `).run(timestamp, timestamp, node.workLoopNodeRunId);
+        UPDATE job_runs SET status = 'failed', terminal = 'failed', state_revision_after = 0,
+          active_node_run_id = NULL, completed_at = ?, updated_at = ? WHERE job_run_id = ?
+      `).run(timestamp, timestamp, node.jobRunId);
       runtime.connection().prepare(`
         UPDATE loop_invocations SET status = 'failed', completion_state_revision = 0,
           completed_at = ?, updated_at = ? WHERE loop_run_id = ?
@@ -244,8 +244,8 @@ describe("LoopOrchestrator interruption and cancellation recovery", () => {
   });
 
   it("cancels every open nested frame and persists failure evidence atomically", async () => {
-    const repairA = testLoop("repair-a", testWorkLoopNode("repair-a-work"));
-    const repairB = testLoop("repair-b", testWorkLoopNode("repair-b-work"));
+    const repairA = testLoop("repair-a", testJobPair("repair-a-job"));
+    const repairB = testLoop("repair-b", testJobPair("repair-b-job"));
     const harness = await createOrchestrationHarness({ targets: [repairA, repairB], edges: [
       { id: "caller-a", source: "caller-loop", target: "repair-a", kind: "repair", capability: "test:loop.transfer", description: "Caller to A." },
       { id: "a-b", source: "repair-a", target: "repair-b", kind: "repair", capability: "test:loop.transfer", description: "A to B." }
@@ -272,10 +272,8 @@ describe("LoopOrchestrator interruption and cancellation recovery", () => {
 
 const externalFailure = (summary: string) => ({
   role: "validation" as const, state: "completed" as const, decision: "FAIL" as const,
-  summary, evidence: {}, checks: [], repair: {
-    mode: "ORCHESTRATOR_REPAIR" as const, reason: "Another repair is required.",
-    requestedCapability: "test:loop.transfer", evidenceRefs: []
-  }
+  summary, evidence: {}, checks: [], feedback: "Repair again.", expectedCorrection: "Make Validation pass.",
+  escalation: { reason: "Another repair is required.", requestedCapability: "test:loop.transfer", evidenceRefs: [] }
 });
 
 const rootError = (runtime: RuntimeDatabase): string => {

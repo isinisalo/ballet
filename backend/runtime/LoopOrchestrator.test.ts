@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createNodeTaskEnvelope } from "../runs/NodeExecutionPlan.js";
 import { RootRunStore } from "../runs/RootRunStore.js";
+import { testJobPair, testLoop } from "../tests/v12TestConfig.js";
 import {
   activeNode, completeActiveLoop, createOrchestrationHarness,
-  requestExternalRepair, routeRepair, validationOk
+  requestExternalRepair, routeRepair, validationPass
 } from "./LoopOrchestrator.test-support.js";
 
 describe("LoopOrchestrator call and return", () => {
@@ -11,19 +12,17 @@ describe("LoopOrchestrator call and return", () => {
     const harness = await createOrchestrationHarness();
     const { runtime } = harness;
     runtime.startLoopRun("root-run");
-    const work = activeNode(runtime);
-    runtime.applyNodeOutcome("root-run", work.nodeRunId, {
-      role: "work", state: "completed", summary: "Caller work updated State.", artifacts: {}, checks: [],
+    const job = activeNode(runtime);
+    runtime.applyNodeOutcome("root-run", job.nodeRunId, {
+      role: "job", state: "completed", summary: "Caller Job updated State.", artifacts: {}, checks: [],
       statePatch: [{ op: "replace", path: "/repaired", value: true }]
     });
     const validation = activeNode(runtime);
     runtime.applyNodeOutcome("root-run", validation.nodeRunId, {
       role: "validation", state: "completed", decision: "FAIL",
       summary: "Caller validation found a repairable problem.", evidence: {}, checks: [],
-      repair: {
-        mode: "ORCHESTRATOR_REPAIR", reason: "External repair is required.",
-        requestedCapability: "repair capability", evidenceRefs: []
-      }
+      feedback: "Fix it.", expectedCorrection: "Correct it.",
+      escalation: { reason: "External repair is required.", requestedCapability: "repair capability", evidenceRefs: [] }
     });
     const orchestrator = activeNode(runtime);
     const requestId = runtime.connection().prepare(`
@@ -35,7 +34,7 @@ describe("LoopOrchestrator call and return", () => {
     expect(request).toMatchObject({ stateRevisionAtRequest: 1 });
     expect(runtime.state.current("root-run")).toMatchObject({ revision: 1, state: { repaired: true } });
     expect(runtime.listControlFlowEvents("root-run").at(-1)).toMatchObject({
-      kind: "validation_fail_orchestrator", stateRevision: 1,
+      kind: "validation_fail_escalated", stateRevision: 1,
       repairRequestId: request.repairRequestId
     });
     runtime.close();
@@ -76,17 +75,17 @@ describe("LoopOrchestrator call and return", () => {
     });
     expect(runtime.getOrchestrationFrame(target.orchestrationFrameId!)).toMatchObject({
       callerLoopRunId: callerRun.loopRunId, calleeLoopRunId: target.loopRunId,
-      returnLoopId: "caller-loop", returnWorkLoopNodeId: "caller-work", nestingDepth: 1, status: "open"
+      returnLoopId: "caller-loop", returnJobNodeId: "caller-job", nestingDepth: 1, status: "open"
     });
 
     completeActiveLoop(runtime, { patch: {
-      role: "work", state: "completed", summary: "Repair changed shared State.", artifacts: {}, checks: [],
+      role: "job", state: "completed", summary: "Repair changed shared State.", artifacts: {}, checks: [],
       statePatch: [{ op: "replace", path: "/repaired", value: true }]
     } });
     const returned = activeNode(runtime);
     expect(returned).toMatchObject({
-      role: "validation", loopId: "caller-loop", workLoopNodeId: "caller-work",
-      workLoopNodeRunId: requested.validation.workLoopNodeRunId,
+      role: "validation", loopId: "caller-loop", jobNodeId: "caller-job",
+      jobRunId: requested.validation.jobRunId,
       stateRevisionBefore: 1, attempt: 2
     });
     expect(returned.context).toMatchObject({
@@ -102,11 +101,11 @@ describe("LoopOrchestrator call and return", () => {
     expect(runtime.getRepairRequest(requested.request.repairRequestId)).toMatchObject({ status: "repaired" });
     expect(runtime.getOrchestrationFrame(target.orchestrationFrameId!)).toMatchObject({ status: "returned" });
 
-    runtime.applyNodeOutcome("root-run", returned.nodeRunId, validationOk("Caller accepts repaired State."));
+    runtime.applyNodeOutcome("root-run", returned.nodeRunId, validationPass("Caller accepts repaired State."));
     expect(runtime.listRootLoopRuns("root-run")[0]).toMatchObject({ status: "completed" });
     expect(runtime.listControlFlowEvents("root-run").map(({ kind }) => kind)).toEqual([
-      "work_completed", "validation_fail_orchestrator", "repair_call",
-      "work_completed", "validation_ok", "repair_return", "validation_ok"
+      "job_completed", "validation_fail_escalated", "repair_call",
+      "job_completed", "validation_pass", "repair_return", "validation_pass"
     ]);
     runtime.close();
     await harness.close();
@@ -208,9 +207,9 @@ describe("LoopOrchestrator terminal outcomes", () => {
     runtime.startLoopRun("root-run");
     const { orchestrator, request } = requestExternalRepair(runtime);
     const target = routeRepair(runtime, orchestrator, "repair-a");
-    const work = activeNode(runtime);
-    runtime.applyNodeOutcome("root-run", work.nodeRunId, {
-      role: "work", state, summary: `Target ${state}.`, checks: []
+    const job = activeNode(runtime);
+    runtime.applyNodeOutcome("root-run", job.nodeRunId, {
+      role: "job", state, summary: `Target ${state}.`, checks: []
     });
     const runs = runtime.listRootLoopRuns("root-run");
     expect(runs.find(({ loopRunId }) => loopRunId === target.loopRunId)).toMatchObject({ status: state });
@@ -225,16 +224,7 @@ describe("LoopOrchestrator terminal outcomes", () => {
   });
 });
 
-const harnesslessLoop = (id: string) => ({
-  id, description: `Test Loop ${id}.`, state: { description: "Ignored nested initial State.", initial: {} },
-  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
-  startNodeId: `${id}-work`, nodes: [{
-    id: `${id}-work`, description: "Work.",
-    work: { type: "human" as const, task: "Work.", nodeStyle: "terra" as const, nodeSize: "medium" as const },
-    validation: { type: "human" as const, task: "Validate.", nodeStyle: "luna" as const, nodeSize: "small" as const },
-    maxLocalAttempts: 3
-  }], edges: [{ id: `${id}-done`, source: `${id}-work`, target: { terminal: "completed" as const } }]
-});
+const harnesslessLoop = (id: string) => testLoop(id, testJobPair(`${id}-job`, { maxRetries: 0 }));
 
 const activeError = (runtime: import("../runtime-db.js").RuntimeDatabase): string => {
   const value = runtime.connection().prepare(`

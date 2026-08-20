@@ -103,7 +103,7 @@ export function GraphEngineeringWorkspace({
         ? () => onRemoveInstalledLoop(selectedLoop.id)
         : () => onDeleteLoop(selectedLoop.id)}
     />
-  ) : <div className="p-4 text-sm text-muted-foreground">Select a LoopNode to inspect its project-global connections. Press Enter on a selected canvas node to open Loop Engineering.</div>;
+  ) : <div className="p-4 text-sm text-muted-foreground">Select a LoopNode to inspect its project-global connections. Press Enter on a selected canvas node to open Workflow Engineering.</div>;
   const orchestratorInspector = <GraphOrchestratorInspector
     config={config} projection={projection} profiles={executionProfiles} instructions={instructions}
     skills={skills} runtime={runtime} disabled={disabled} onConfigChange={onConfigChange}
@@ -175,13 +175,13 @@ function GraphLoopInspector({ config, loopId, installed, incoming, outgoing, dis
         <div className="flex flex-wrap gap-1.5">
           <Badge variant="outline">{installed ? "Installed module" : "Custom Loop"}</Badge>
           {installed ? <><Badge variant="outline">v{installed.moduleVersion}</Badge><Badge variant="secondary">{installed.status}</Badge></> : null}
-          <Badge variant="outline">{loop.nodes.length} Work Loop Nodes</Badge>
+          <Badge variant="outline">{loop.workflow.jobNodes.length} Jobs</Badge>
         </div>
         {installed?.capabilities.requires.length ? <Metadata label="Requires" values={installed.capabilities.requires} /> : null}
         {installed?.capabilities.provides.length ? <Metadata label="Provides" values={installed.capabilities.provides} /> : null}
         {disabled ? <Alert className="border-tertiary/40 text-tertiary"><LockKeyhole /><AlertDescription>A connected Loop has an active Run. Relevant Loop and Loop Edge mutations are locked.</AlertDescription></Alert> : null}
         <div className="flex items-center gap-2">
-          <Button type="button" size="sm" className="flex-1" onClick={onOpen}><PanelTopOpen /> Open Loop Engineering</Button>
+          <Button type="button" size="sm" className="flex-1" onClick={onOpen}><PanelTopOpen /> Open Workflow Engineering</Button>
           {onExport ? <Button type="button" size="icon-sm" variant="outline" disabled={disabled} aria-label={`Export Loop ${loop.id}`} title="Export" onClick={() => void onExport()}><Download /></Button> : null}
           <DeleteAction deleteLabel={`${installed ? "Remove installed" : "Delete custom"} Loop ${loop.id}`} deleteType="Loop" resourceName={loop.id} disabled={disabled} onDelete={onDelete} />
         </div>

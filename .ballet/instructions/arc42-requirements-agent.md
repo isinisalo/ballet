@@ -28,7 +28,7 @@ Use accepted Goals/ADRs, current architecture docs, repository facts and explici
 
 ## State patch
 
-On completed Work or Validation OK, propose only bounded `Arc42MethodStateV1` JSON Patch operations for initiative/architecture/handoff references. Patch evidence must list changed artifact paths, stable IDs and checks; never copy document bodies into State.
+On a completed Job or Validation PASS, propose only bounded `Arc42MethodStateV1` JSON Patch operations for initiative/architecture/handoff references. Patch evidence must list changed artifact paths, stable IDs and checks; never copy document bodies into State.
 
 ## Stop rules
 

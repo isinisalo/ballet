@@ -65,7 +65,7 @@ export const runtimeSchemaTables = `
     orchestration_request_id TEXT REFERENCES orchestration_requests(orchestration_request_id) DEFERRABLE INITIALLY DEFERRED,
     repair_request_id TEXT REFERENCES repair_requests(repair_request_id) DEFERRABLE INITIALLY DEFERRED,
     orchestration_frame_id TEXT REFERENCES orchestration_frames(frame_id) DEFERRABLE INITIALLY DEFERRED,
-    schedule_work_loop_node_id TEXT,
+    schedule_job_node_id TEXT,
     scheduled_for TEXT,
     entry_state_revision INTEGER NOT NULL CHECK(entry_state_revision >= 0),
     completion_state_revision INTEGER CHECK(completion_state_revision >= entry_state_revision),
@@ -75,18 +75,18 @@ export const runtimeSchemaTables = `
     completed_at TEXT,
     FOREIGN KEY(root_run_id, entry_state_revision) REFERENCES state_revisions(root_run_id, revision),
     FOREIGN KEY(root_run_id, completion_state_revision) REFERENCES state_revisions(root_run_id, revision),
-    CHECK((source = 'schedule') = (schedule_work_loop_node_id IS NOT NULL AND scheduled_for IS NOT NULL)),
+    CHECK((source = 'schedule') = (schedule_job_node_id IS NOT NULL AND scheduled_for IS NOT NULL)),
     CHECK((source IN ('flow','repair')) = (orchestration_request_id IS NOT NULL)),
     CHECK((source = 'repair') = (repair_request_id IS NOT NULL)),
     CHECK((status IN ('completed','blocked','failed','cancelled')) = (completed_at IS NOT NULL))
   );
-  CREATE TABLE work_loop_node_runs (
-    work_loop_node_run_id TEXT PRIMARY KEY,
+  CREATE TABLE job_runs (
+    job_run_id TEXT PRIMARY KEY,
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     loop_run_id TEXT NOT NULL REFERENCES loop_invocations(loop_run_id) ON DELETE CASCADE,
     loop_id TEXT NOT NULL,
-    work_loop_node_id TEXT NOT NULL,
-    attempt INTEGER NOT NULL CHECK(attempt > 0),
+    job_node_id TEXT NOT NULL,
+    job_attempt INTEGER NOT NULL CHECK(job_attempt BETWEEN 1 AND 101),
     status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
     state_revision_before INTEGER NOT NULL CHECK(state_revision_before >= 0),
     state_revision_after INTEGER CHECK(state_revision_after >= state_revision_before),
@@ -107,10 +107,11 @@ export const runtimeSchemaTables = `
     node_run_id TEXT PRIMARY KEY,
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     loop_run_id TEXT NOT NULL REFERENCES loop_invocations(loop_run_id) ON DELETE CASCADE,
-    work_loop_node_run_id TEXT REFERENCES work_loop_node_runs(work_loop_node_run_id) ON DELETE CASCADE,
-    role TEXT NOT NULL CHECK(role IN ('work','validation','orchestrator')),
+    job_run_id TEXT REFERENCES job_runs(job_run_id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('job','validation','orchestrator')),
     loop_id TEXT NOT NULL,
-    work_loop_node_id TEXT,
+    job_node_id TEXT,
+    workflow_node_id TEXT,
     node_definition_id TEXT NOT NULL,
     execution_task_id TEXT UNIQUE,
     input_json TEXT CHECK(input_json IS NULL OR json_valid(input_json)),
@@ -132,8 +133,8 @@ export const runtimeSchemaTables = `
     FOREIGN KEY(root_run_id, state_revision_after) REFERENCES state_revisions(root_run_id, revision),
     FOREIGN KEY(execution_task_id) REFERENCES execution_tasks(task_id) DEFERRABLE INITIALLY DEFERRED,
     CHECK(
-      (role = 'orchestrator' AND work_loop_node_run_id IS NULL AND work_loop_node_id IS NULL)
-      OR (role IN ('work','validation') AND work_loop_node_run_id IS NOT NULL AND work_loop_node_id IS NOT NULL)
+      (role = 'orchestrator' AND job_run_id IS NULL AND job_node_id IS NULL AND workflow_node_id IS NULL)
+      OR (role IN ('job','validation') AND job_run_id IS NOT NULL AND job_node_id IS NOT NULL AND workflow_node_id IS NOT NULL)
     ),
     CHECK((patch_json IS NULL) = (patch_hash IS NULL)),
     CHECK((status IN ('completed','blocked','failed','cancelled','interrupted')) = (completed_at IS NOT NULL))

@@ -29,7 +29,7 @@ const automationRoute = (url: URL): RouteState => {
   }
   const automationView: EngineeringView | undefined = requestedView === null || requestedView === "graph"
     ? "graph"
-    : requestedView === "loop" ? "loop" : undefined;
+    : requestedView === "workflow" ? "workflow" : undefined;
   if (!automationView) return { view: "automation", automationRouteIssue: "invalid-view" };
   if (automationView === "graph") return url.searchParams.has("id") || url.searchParams.has("new")
     ? { view: "automation", automationView, automationRouteIssue: "non-canonical-graph" }
@@ -95,10 +95,10 @@ export const skillDocumentPath = (relativePath: string) => `/skills?path=${encod
 export const skillCreatePath = () => "/skills?new=1";
 export const automationGraphPath = () => "/automation/loops?view=graph";
 export const automationLoopPath = (id: string) => {
-  const params = new URLSearchParams({ view: "loop", id });
+  const params = new URLSearchParams({ view: "workflow", id });
   return `/automation/loops?${params.toString()}`;
 };
-export const automationCreateLoopPath = () => "/automation/loops?view=loop&new=1";
+export const automationCreateLoopPath = () => "/automation/loops?view=workflow&new=1";
 export const automationThemePath = () => "/automation/theme";
 export const runtimePath = () => "/runtimes";
 export const runOverviewPath = (rootRunId?: string) => `/run${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;

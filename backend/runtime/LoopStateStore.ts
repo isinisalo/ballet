@@ -2,7 +2,7 @@ import type Database from "better-sqlite3";
 import { parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
 import type {
   CanonicalNodeOutcome, ControlFlowEventKind, LoopStateRevision, NodeRunStatus,
-  WorkLoopNodeRunStatus
+  JobRunStatus
 } from "../../shared/domain/runtime.js";
 import { maxControlFlowTransitions } from "../../shared/domain/runtime.js";
 import { nodeRunRowSchema, stateRevisionRowSchema } from "./RuntimeDbTypes.js";
@@ -16,14 +16,14 @@ export interface CommitNodeOutcomeInput {
   baseRevision: number;
   outcome: CanonicalNodeOutcome;
   nodeStatus?: Extract<NodeRunStatus, "completed" | "blocked" | "failed">;
-  workLoopNodeStatus?: WorkLoopNodeRunStatus;
-  workLoopNodeTerminal?: "completed" | "blocked" | "failed" | "cancelled";
+  jobRunStatus?: JobRunStatus;
+  jobRunTerminal?: "completed" | "blocked" | "failed" | "cancelled";
   errorCode?: string;
   errorMessage?: string;
   control: {
     kind: ControlFlowEventKind;
     targetLoopRunId?: string;
-    targetWorkLoopNodeRunId?: string;
+    targetJobRunId?: string;
     orchestrationRequestId?: string;
     repairRequestId?: string;
     orchestrationFrameId?: string;
@@ -108,8 +108,8 @@ export class LoopStateStore {
         applied?.patchSha256 ?? null, input.errorCode ?? null, input.errorMessage ?? null,
         committedAt, committedAt, input.nodeRunId);
 
-      if (node.work_loop_node_run_id) this.updateWorkLoopNode(
-        node.work_loop_node_run_id,
+      if (node.job_run_id) this.updateJobRun(
+        node.job_run_id,
         input,
         nextRevision,
         committedAt
@@ -126,13 +126,13 @@ export class LoopStateStore {
       const result = this.connection().prepare(`
         INSERT INTO control_flow_events (
           root_run_id, sequence, kind, state_revision, source_loop_run_id,
-          source_work_loop_node_run_id, source_node_run_id, target_loop_run_id,
-          target_work_loop_node_run_id, orchestration_request_id, repair_request_id,
+          source_job_run_id, source_node_run_id, target_loop_run_id,
+          target_job_run_id, orchestration_request_id, repair_request_id,
           orchestration_frame_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(input.rootRunId, sequence, input.control.kind, nextRevision, node.loop_run_id,
-        node.work_loop_node_run_id, input.nodeRunId, input.control.targetLoopRunId ?? null,
-        input.control.targetWorkLoopNodeRunId ?? null, input.control.orchestrationRequestId ?? null,
+        node.job_run_id, input.nodeRunId, input.control.targetLoopRunId ?? null,
+        input.control.targetJobRunId ?? null, input.control.orchestrationRequestId ?? null,
         input.control.repairRequestId ?? null,
         input.control.orchestrationFrameId ?? null, committedAt);
       const revision = this.require(input.rootRunId, nextRevision);
@@ -162,10 +162,10 @@ export class LoopStateStore {
         UPDATE node_runs SET status = 'waiting_for_input', outcome_json = ?,
           state_revision_after = ?, updated_at = ? WHERE node_run_id = ?
       `).run(canonicalJson(outcomeValue), currentRevision, pausedAt, input.nodeRunId);
-      if (node.work_loop_node_run_id) this.connection().prepare(`
-        UPDATE work_loop_node_runs SET status = 'waiting_for_input', state_revision_after = ?,
-          updated_at = ? WHERE work_loop_node_run_id = ?
-      `).run(currentRevision, pausedAt, node.work_loop_node_run_id);
+      if (node.job_run_id) this.connection().prepare(`
+        UPDATE job_runs SET status = 'waiting_for_input', state_revision_after = ?,
+          updated_at = ? WHERE job_run_id = ?
+      `).run(currentRevision, pausedAt, node.job_run_id);
       this.connection().prepare(`
         UPDATE loop_invocations SET status = 'waiting_for_input', updated_at = ?
         WHERE loop_run_id = ? AND status = 'running'
@@ -176,24 +176,24 @@ export class LoopStateStore {
     })();
   }
 
-  private updateWorkLoopNode(
-    workLoopNodeRunId: string,
+  private updateJobRun(
+    jobRunId: string,
     input: CommitNodeOutcomeInput,
     revision: number,
     timestamp: string
   ): void {
-    const status = input.workLoopNodeStatus ?? "running";
+    const status = input.jobRunStatus ?? "running";
     const terminal = ["completed", "blocked", "failed", "cancelled"].includes(status);
-    if (terminal !== Boolean(input.workLoopNodeTerminal)) {
-      throw new Error("A terminal Work Loop Node Run status requires the matching terminal value.");
+    if (terminal !== Boolean(input.jobRunTerminal)) {
+      throw new Error("A terminal Job Run status requires the matching terminal value.");
     }
     this.connection().prepare(`
-      UPDATE work_loop_node_runs SET status = ?, state_revision_after = ?, active_node_run_id = NULL,
+      UPDATE job_runs SET status = ?, state_revision_after = ?, active_node_run_id = NULL,
         terminal = ?, error_code = ?, error_message = ?,
         completed_at = CASE WHEN ? THEN ? ELSE NULL END, updated_at = ?
-      WHERE work_loop_node_run_id = ?
-    `).run(status, revision, input.workLoopNodeTerminal ?? null, input.errorCode ?? null,
-      input.errorMessage ?? null, terminal ? 1 : 0, timestamp, timestamp, workLoopNodeRunId);
+      WHERE job_run_id = ?
+    `).run(status, revision, input.jobRunTerminal ?? null, input.errorCode ?? null,
+      input.errorMessage ?? null, terminal ? 1 : 0, timestamp, timestamp, jobRunId);
   }
 
   private requireActiveNode(nodeRunId: string, rootRunId: string, baseRevision: number) {

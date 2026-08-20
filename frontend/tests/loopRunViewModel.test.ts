@@ -4,41 +4,21 @@ import type {
 } from "../../shared/api/workspace-contracts.js";
 import { defaultLoopTheme } from "../../shared/api/workspace-contracts.js";
 import { resolveLoopRunView } from "../src/workspace/automation/loops/loopRunViewModel.js";
+import { workflowAutomation, workflowLoop } from "./workflowFixtures.js";
 
-const loop: ProjectLoop = {
-  id: "human-loop",
-  description: "Human Loop.",
-  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
-  state: { description: "State.", initial: {} },
-  startNodeId: "work",
-  nodes: [{
-    id: "work",
-    description: "Human Work Loop Node.",
-    work: { type: "human", task: "Do work.", nodeStyle: "terra", nodeSize: "medium" },
-    validation: { type: "human", task: "Validate.", nodeStyle: "luna", nodeSize: "small" },
-    maxLocalAttempts: 3
-  }],
-  edges: [{ id: "done", source: "work", target: { terminal: "completed" } }]
-};
+const loop: ProjectLoop = workflowLoop("human-loop");
+loop.workflow.jobNodes[0] = { ...loop.workflow.jobNodes[0]!, type: "human" };
 
-const automation: ProjectAutomationConfig = {
-  version: 11,
-  orchestrator: {
-    executionProfileId: "profile", primaryInstructionId: "project:orchestrator",
-    skillIds: [], maxRepairDepth: 3, maxRepairAttempts: 3
-  },
-  graph: { loopEdges: [] },
-  loops: [loop]
-};
+const automation: ProjectAutomationConfig = workflowAutomation(loop);
 
 describe("loopRunViewModel", () => {
-  it("selects a waiting Human Work Node for a role-specific response", () => {
+  it("selects a waiting Human Job Node for a role-specific response", () => {
     const details = loopRunDetails();
     const root = rootDetail(details);
     const view = resolveLoopRunView(automation, loop, [], defaultLoopTheme, details, root);
 
     expect(view).toMatchObject({ rootActive: true, terminal: false, responseNode: {
-      nodeRunId: "work-node", role: "work", status: "waiting_for_input"
+      nodeRunId: "work-node", role: "job", status: "waiting_for_input"
     } });
   });
 
@@ -47,14 +27,13 @@ describe("loopRunViewModel", () => {
     details.nodeRuns[0] = {
       ...details.nodeRuns[0]!,
       role: "validation",
-      nodeDefinitionId: "human-loop:work:validation",
+      workflowNodeId: "job-validation",
+      nodeDefinitionId: "job-validation",
       status: "completed",
       outcome: {
         role: "validation", state: "completed", decision: "FAIL", summary: "Repair required.",
-        evidence: {}, checks: [], repair: {
-          mode: "ORCHESTRATOR_REPAIR", reason: "Specialist required.",
-          requestedCapability: "repair", evidenceRefs: []
-        }
+        evidence: {}, checks: [], feedback: "Repair the value.", expectedCorrection: "Validation passes.",
+        escalation: { reason: "Specialist required.", requestedCapability: "repair", evidenceRefs: [] }
       },
       stateRevisionAfter: 0,
       completedAt: timestamp
@@ -85,7 +64,7 @@ describe("loopRunViewModel", () => {
 
     const view = resolveLoopRunView(liveConfig, loop, [], defaultLoopTheme, repairDetails, root);
     expect(view.canvasLoop.id).toBe("repair-loop");
-    expect(view.canvasConfig.loopEdges).toEqual(root.executionSnapshot.graph.loopEdges);
+    expect(view.canvasConfig.graph.loopEdges).toEqual(root.executionSnapshot.graph.loopEdges);
   });
 });
 
@@ -95,15 +74,15 @@ const loopRunDetails = (): LoopRunDetails => ({
   loopRunId: "loop-run", loopId: loop.id, rootRunId: "root-run", source: "manual",
   status: "waiting_for_input", snapshot: loop, themeSnapshot: defaultLoopTheme,
   entryStateRevision: 0, nestingDepth: 0, createdAt: timestamp, updatedAt: timestamp,
-  workLoopNodeRuns: [{
-    workLoopNodeRunId: "composite", rootRunId: "root-run", loopRunId: "loop-run",
-    loopId: loop.id, workLoopNodeId: "work", attempt: 1, status: "waiting_for_input",
+  jobRuns: [{
+    jobRunId: "composite", rootRunId: "root-run", loopRunId: "loop-run",
+    loopId: loop.id, jobNodeId: "job", jobAttempt: 1, status: "waiting_for_input",
     stateRevisionBefore: 0, activeNodeRunId: "work-node", createdAt: timestamp, updatedAt: timestamp
   }],
   nodeRuns: [{
     nodeRunId: "work-node", rootRunId: "root-run", loopRunId: "loop-run",
-    workLoopNodeRunId: "composite", role: "work", loopId: loop.id, workLoopNodeId: "work",
-    nodeDefinitionId: "human-loop:work:work", status: "waiting_for_input", attempt: 1,
+    jobRunId: "composite", role: "job", loopId: loop.id, jobNodeId: "job",
+    workflowNodeId: "job", nodeDefinitionId: "job", status: "waiting_for_input", attempt: 1,
     stateRevisionBefore: 0, createdAt: timestamp, updatedAt: timestamp
   }]
 });
@@ -113,14 +92,14 @@ const rootDetail = (details: LoopRunDetails): RootRunDetail => ({
   status: "waiting_for_input", stateRevision: 0, createdAt: timestamp, updatedAt: timestamp,
   current: {
     loopRunId: details.loopRunId, loopId: details.loopId,
-    workLoopNodeRunId: "composite", workLoopNodeId: "work", nodeRunId: "work-node", nodeRole: "work"
+    jobRunId: "composite", jobNodeId: "job", nodeRunId: "work-node", nodeRole: "job"
   },
   executionSnapshot: {
-    version: 4,
+    version: 5,
     rootLoopId: loop.id,
     project: { checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64) },
     orchestrator: automation.orchestrator,
-    graph: { loopEdges: [] }, loops: [loop], terminals: ["completed", "blocked", "failed"],
+    graph: { loopEdges: [] }, loops: [loop],
     theme: defaultLoopTheme, executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },
   loopRuns: [details],

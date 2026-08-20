@@ -5,11 +5,11 @@ import type { ProjectLoop } from "../../shared/domain/automation.js";
 import type { LoopTheme } from "../../shared/domain/loopThemes.js";
 import type {
   CanonicalNodeOutcome, ControlFlowEvent, LoopRun, LoopStateRevision, NodeRun,
-  OrchestrationFrame, OrchestrationRequest, OrchestratorRoute, RepairRequest, RepairResult, StatePatch, WorkLoopNodeRun
+  OrchestrationFrame, OrchestrationRequest, OrchestratorRoute, RepairRequest, RepairResult, StatePatch, JobRun
 } from "../../shared/domain/runtime.js";
 import type {
   ControlFlowEventRow, LoopRunRow, NodeRunRow, OrchestrationFrameRow, OrchestrationRequestRow,
-  OrchestratorRouteRow, RepairRequestRow, RepairResultRow, StateRevisionRow, WorkLoopNodeRunRow
+  OrchestratorRouteRow, RepairRequestRow, RepairResultRow, StateRevisionRow, JobRunRow
 } from "./RuntimeDbTypes.js";
 import { parseJsonValue } from "./state/CanonicalJson.js";
 import { statePatchSha256, validateStatePatch } from "./state/StatePatch.js";
@@ -27,8 +27,8 @@ export const toLoopRun = (row: LoopRunRow, loop: ProjectLoop, theme: LoopTheme):
   orchestrationFrameId: row.orchestration_frame_id ?? undefined,
   snapshot: loop,
   themeSnapshot: theme,
-  schedule: row.schedule_work_loop_node_id && row.scheduled_for
-    ? { workLoopNodeId: row.schedule_work_loop_node_id, scheduledFor: row.scheduled_for }
+  schedule: row.schedule_job_node_id && row.scheduled_for
+    ? { jobNodeId: row.schedule_job_node_id, scheduledFor: row.scheduled_for }
     : undefined,
   entryStateRevision: row.entry_state_revision,
   completionStateRevision: row.completion_state_revision ?? undefined,
@@ -38,13 +38,13 @@ export const toLoopRun = (row: LoopRunRow, loop: ProjectLoop, theme: LoopTheme):
   completedAt: row.completed_at ?? undefined
 });
 
-export const toWorkLoopNodeRun = (row: WorkLoopNodeRunRow): WorkLoopNodeRun => ({
-  workLoopNodeRunId: row.work_loop_node_run_id,
+export const toJobRun = (row: JobRunRow): JobRun => ({
+  jobRunId: row.job_run_id,
   rootRunId: row.root_run_id,
   loopRunId: row.loop_run_id,
   loopId: row.loop_id,
-  workLoopNodeId: row.work_loop_node_id,
-  attempt: row.attempt,
+  jobNodeId: row.job_node_id,
+  jobAttempt: row.job_attempt,
   status: row.status,
   stateRevisionBefore: row.state_revision_before,
   stateRevisionAfter: row.state_revision_after ?? undefined,
@@ -61,10 +61,11 @@ export const toNodeRun = (row: NodeRunRow): NodeRun => ({
   nodeRunId: row.node_run_id,
   rootRunId: row.root_run_id,
   loopRunId: row.loop_run_id,
-  workLoopNodeRunId: row.work_loop_node_run_id ?? undefined,
+  jobRunId: row.job_run_id ?? undefined,
   role: row.role,
   loopId: row.loop_id,
-  workLoopNodeId: row.work_loop_node_id ?? undefined,
+  jobNodeId: row.job_node_id ?? undefined,
+  workflowNodeId: row.workflow_node_id ?? undefined,
   nodeDefinitionId: row.node_definition_id,
   executionTaskId: row.execution_task_id ?? undefined,
   input: row.input_json ? parseJsonValue(row.input_json, `Node Run ${row.node_run_id} input`) : undefined,
@@ -102,9 +103,8 @@ export const toStateRevision = (row: StateRevisionRow): LoopStateRevision => ({
 export const toRepairRequest = (row: RepairRequestRow): RepairRequest => ({
   repairRequestId: row.repair_request_id, rootRunId: row.root_run_id,
   requesterLoopRunId: row.requester_loop_run_id,
-  requesterWorkLoopNodeRunId: row.requester_work_loop_node_run_id,
+  requesterJobRunId: row.requester_job_run_id,
   requesterValidationNodeRunId: row.requester_validation_node_run_id,
-  mode: row.mode,
   attempt: row.attempt,
   validationSummary: row.validation_summary,
   requestedCapability: row.requested_capability ?? undefined,
@@ -118,7 +118,7 @@ export const toRepairRequest = (row: RepairRequestRow): RepairRequest => ({
   routedTargetLoopId: row.routed_target_loop_id ?? undefined,
   status: row.status,
   returnLoopId: row.return_loop_id,
-  returnWorkLoopNodeId: row.return_work_loop_node_id,
+  returnJobNodeId: row.return_job_node_id,
   returnValidationNodeDefinitionId: row.return_validation_node_definition_id,
   nestingDepth: row.nesting_depth,
   createdAt: row.created_at, updatedAt: row.updated_at, completedAt: row.completed_at ?? undefined
@@ -157,7 +157,7 @@ export const toOrchestrationFrame = (row: OrchestrationFrameRow): OrchestrationF
   routeId: row.route_id,
   callerLoopRunId: row.caller_loop_run_id, calleeLoopRunId: row.callee_loop_run_id,
   parentFrameId: row.parent_frame_id ?? undefined, returnLoopId: row.return_loop_id,
-  returnWorkLoopNodeId: row.return_work_loop_node_id,
+  returnJobNodeId: row.return_job_node_id,
   returnValidationNodeDefinitionId: row.return_validation_node_definition_id,
   stateRevisionAtCall: row.state_revision_at_call, nestingDepth: row.nesting_depth,
   status: row.status, createdAt: row.created_at, updatedAt: row.updated_at,
@@ -187,10 +187,10 @@ export const toOrchestratorRoute = (row: OrchestratorRouteRow): OrchestratorRout
 export const toControlFlowEvent = (row: ControlFlowEventRow): ControlFlowEvent => ({
   id: row.id, rootRunId: row.root_run_id, sequence: row.sequence, kind: row.kind,
   stateRevision: row.state_revision, sourceLoopRunId: row.source_loop_run_id ?? undefined,
-  sourceWorkLoopNodeRunId: row.source_work_loop_node_run_id ?? undefined,
+  sourceJobRunId: row.source_job_run_id ?? undefined,
   sourceNodeRunId: row.source_node_run_id ?? undefined,
   targetLoopRunId: row.target_loop_run_id ?? undefined,
-  targetWorkLoopNodeRunId: row.target_work_loop_node_run_id ?? undefined,
+  targetJobRunId: row.target_job_run_id ?? undefined,
   orchestrationRequestId: row.orchestration_request_id ?? undefined,
   repairRequestId: row.repair_request_id ?? undefined,
   orchestrationFrameId: row.orchestration_frame_id ?? undefined, createdAt: row.created_at

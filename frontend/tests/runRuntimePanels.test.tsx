@@ -11,6 +11,7 @@ import { RunStatePanel } from "../src/workspace/automation/loops/RunStatePanel.j
 import { RunStatusSummary } from "../src/workspace/automation/loops/RunStatusSummary.js";
 import { RunTimeline } from "../src/workspace/automation/loops/RunTimeline.js";
 import { RunVisualWorkspace, runMissionNarration } from "../src/workspace/automation/loops/RunVisualWorkspace.js";
+import { workflowLoop } from "./workflowFixtures.js";
 
 describe("Run canonical runtime panels", () => {
   it("renders persisted position, repair route, timeline, and State evidence", () => {
@@ -22,10 +23,10 @@ describe("Run canonical runtime panels", () => {
     expect(screen.getByText("repair-request")).toBeInTheDocument();
     expect(screen.getAllByText("main-loop").length).toBeGreaterThan(0);
     expect(screen.getByText("Return path (LIFO)")).toBeInTheDocument();
-    expect(screen.getByText("Work completed")).toBeInTheDocument();
+    expect(screen.getByText("Job completed")).toBeInTheDocument();
     expect(screen.getByText("Validation completed · FAIL")).toBeInTheDocument();
     expect(screen.getByText(/"count": 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Validation · main-loop:work:validation/)).toBeInTheDocument();
+    expect(screen.getByText(/Validation · job-validation/)).toBeInTheDocument();
   });
 
   it("switches between the focused All Loops map and playful mission canvas without inventing telemetry", async () => {
@@ -40,69 +41,62 @@ describe("Run canonical runtime panels", () => {
 
     await user.click(screen.getByRole("tab", { name: "Mission" }));
     expect(screen.getByTestId("canonical-loop-canvas")).toBeInTheDocument();
-    expect(screen.getByText("Validating “Composite work.”")).toBeInTheDocument();
-    expect(runMissionNarration(root)).toBe("Validating “Composite work.”");
+    expect(screen.getByText("Validating “Execute the Job.”")).toBeInTheDocument();
+    expect(runMissionNarration(root)).toBe("Validating “Execute the Job.”");
     expect(screen.queryByText(/elapsed|percent|ETA/i)).not.toBeInTheDocument();
   });
 });
 
 const timestamp = "2026-08-16T06:00:00.000Z";
-const loop: ProjectLoop = {
-  id: "main-loop", description: "Main Loop description.",
-  capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
-  state: { description: "Canonical count.", initial: { count: 0 } }, startNodeId: "work",
-  nodes: [{
-    id: "work", description: "Composite work.",
-    work: { type: "human", task: "Work.", nodeStyle: "terra", nodeSize: "medium" },
-    validation: { type: "human", task: "Validate.", nodeStyle: "luna", nodeSize: "small" },
-    maxLocalAttempts: 3
-  }],
-  edges: [{ id: "done", source: "work", target: { terminal: "completed" } }]
-};
+const loop: ProjectLoop = workflowLoop("main-loop");
+loop.description = "Main Loop description.";
+loop.state = { description: "Canonical count.", initial: { count: 0 } };
+loop.workflow.jobNodes[0] = { ...loop.workflow.jobNodes[0]!, type: "human" };
 
 const runDetail = (): RootRunDetail => ({
   rootRunId: "root-run", kind: "loop", targetId: loop.id, source: "manual",
   status: "waiting_for_input", stateRevision: 1, createdAt: timestamp, updatedAt: timestamp,
   current: {
     loopRunId: "loop-run", loopId: loop.id, loopDescription: loop.description,
-    workLoopNodeRunId: "composite", workLoopNodeId: "work", workLoopNodeDescription: "Composite work.",
-    nodeRunId: "validation", nodeRole: "validation", localRetryAttempt: 1, repairDepth: 1,
+    jobRunId: "job-run", jobNodeId: "job", jobNodeDescription: "Execute the Job.",
+    nodeRunId: "validation", nodeRole: "validation", jobAttempt: 1, repairDepth: 1,
     repairRequestId: "repair-request", routedTargetLoopId: loop.id,
-    returnDestination: { loopId: loop.id, workLoopNodeId: "work", validationNodeDefinitionId: "main-loop:work:validation" }
+    returnDestination: { loopId: loop.id, jobNodeId: "job", validationNodeDefinitionId: "job-validation" }
   },
   executionSnapshot: {
-    version: 4, rootLoopId: loop.id,
+    version: 5, rootLoopId: loop.id,
     project: { checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64) },
     orchestrator: { executionProfileId: "profile", primaryInstructionId: "project:orchestrator", skillIds: [], maxRepairDepth: 3, maxRepairAttempts: 3 },
     graph: { loopEdges: [{
       id: "repair-edge", source: loop.id, target: loop.id, kind: "repair",
       capability: "test:loop.transfer", description: "Repair self-route."
     }] }, loops: [loop],
-    terminals: ["completed", "blocked", "failed"], theme: defaultLoopTheme,
+    theme: defaultLoopTheme,
     executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },
   loopRuns: [{
     loopRunId: "loop-run", loopId: loop.id, rootRunId: "root-run", source: "manual",
     status: "waiting_for_input", snapshot: loop, themeSnapshot: defaultLoopTheme,
     entryStateRevision: 0, nestingDepth: 0, createdAt: timestamp, updatedAt: timestamp,
-    workLoopNodeRuns: [{
-      workLoopNodeRunId: "composite", rootRunId: "root-run", loopRunId: "loop-run", loopId: loop.id,
-      workLoopNodeId: "work", attempt: 1, status: "waiting_for_input", stateRevisionBefore: 0,
+    jobRuns: [{
+      jobRunId: "job-run", rootRunId: "root-run", loopRunId: "loop-run", loopId: loop.id,
+      jobNodeId: "job", jobAttempt: 1, status: "waiting_for_input", stateRevisionBefore: 0,
       stateRevisionAfter: 1, activeNodeRunId: "validation", createdAt: timestamp, updatedAt: timestamp
     }],
     nodeRuns: [{
-      nodeRunId: "work-node", rootRunId: "root-run", loopRunId: "loop-run", workLoopNodeRunId: "composite",
-      role: "work", loopId: loop.id, workLoopNodeId: "work", nodeDefinitionId: "main-loop:work:work",
+      nodeRunId: "job-node", rootRunId: "root-run", loopRunId: "loop-run", jobRunId: "job-run",
+      role: "job", loopId: loop.id, jobNodeId: "job", workflowNodeId: "job", nodeDefinitionId: "job",
       status: "completed", attempt: 1, stateRevisionBefore: 0, stateRevisionAfter: 1,
-      outcome: { role: "work", state: "completed", summary: "Work completed.", artifacts: {}, checks: [] },
+      outcome: { role: "job", state: "completed", summary: "Job completed.", artifacts: {}, checks: [] },
       createdAt: timestamp, updatedAt: timestamp, completedAt: timestamp
     }, {
-      nodeRunId: "validation", rootRunId: "root-run", loopRunId: "loop-run", workLoopNodeRunId: "composite",
-      role: "validation", loopId: loop.id, workLoopNodeId: "work", nodeDefinitionId: "main-loop:work:validation",
+      nodeRunId: "validation", rootRunId: "root-run", loopRunId: "loop-run", jobRunId: "job-run",
+      role: "validation", loopId: loop.id, jobNodeId: "job", workflowNodeId: "job-validation", nodeDefinitionId: "job-validation",
       status: "completed", attempt: 1, stateRevisionBefore: 1, stateRevisionAfter: 1,
-      outcome: { role: "validation", state: "completed", decision: "FAIL", summary: "External repair.", evidence: {}, checks: [], repair: {
-        mode: "ORCHESTRATOR_REPAIR", reason: "Repair required.", requestedCapability: "repair", evidenceRefs: []
-      } }, createdAt: timestamp, updatedAt: timestamp, completedAt: timestamp
+      outcome: { role: "validation", state: "completed", decision: "FAIL", summary: "External repair.", evidence: {}, checks: [],
+        feedback: "Repair the state.", expectedCorrection: "Validation passes.",
+        escalation: { reason: "Repair required.", requestedCapability: "repair", evidenceRefs: [] }
+      }, createdAt: timestamp, updatedAt: timestamp, completedAt: timestamp
     }]
   }], tasks: [],
   state: {
@@ -117,19 +111,19 @@ const runDetail = (): RootRunDetail => ({
 const repairProjection = (): RootRunDetail["repair"] => {
   const request = {
     repairRequestId: "repair-request", rootRunId: "root-run", requesterLoopRunId: "loop-run",
-    requesterWorkLoopNodeRunId: "composite", requesterValidationNodeRunId: "validation", mode: "orchestrator" as const,
+    requesterJobRunId: "job-run", requesterValidationNodeRunId: "validation",
     attempt: 1, validationSummary: "External repair.", requestedCapability: "repair", reason: "Repair required.",
     stateRevisionAtRequest: 1, routedLoopEdgeId: "repair-edge", routedTargetLoopId: "main-loop", status: "routed" as const,
-    returnLoopId: "main-loop", returnWorkLoopNodeId: "work", returnValidationNodeDefinitionId: "main-loop:work:validation",
+    returnLoopId: "main-loop", returnJobNodeId: "job", returnValidationNodeDefinitionId: "job-validation",
     nestingDepth: 1, createdAt: timestamp, updatedAt: timestamp
   };
   const route = { routeId: "route", rootRunId: "root-run", repairRequestId: request.repairRequestId,
     orchestratorNodeRunId: "orchestrator", loopEdgeId: "repair-edge", sourceLoopId: "main-loop", targetLoopId: "main-loop", createdAt: timestamp };
   const frame = { frameId: "frame", rootRunId: "root-run", repairRequestId: request.repairRequestId, routeId: route.routeId,
-    callerLoopRunId: "loop-run", calleeLoopRunId: "repair-run", returnLoopId: "main-loop", returnWorkLoopNodeId: "work",
-    returnValidationNodeDefinitionId: "main-loop:work:validation", stateRevisionAtCall: 1, nestingDepth: 1,
+    callerLoopRunId: "loop-run", calleeLoopRunId: "repair-run", returnLoopId: "main-loop", returnJobNodeId: "job",
+    returnValidationNodeDefinitionId: "job-validation", stateRevisionAtCall: 1, nestingDepth: 1,
     status: "open" as const, createdAt: timestamp, updatedAt: timestamp };
   return { requests: [request], routes: [route], continuations: [frame], results: [], activeContinuationChain: [frame],
     pendingRepair: request, routedTarget: route,
-    returnDestination: { loopId: "main-loop", workLoopNodeId: "work", validationNodeDefinitionId: "main-loop:work:validation" } };
+    returnDestination: { loopId: "main-loop", jobNodeId: "job", validationNodeDefinitionId: "job-validation" } };
 };

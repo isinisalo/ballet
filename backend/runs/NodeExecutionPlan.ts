@@ -2,16 +2,16 @@ import { randomUUID } from "node:crypto";
 import { taskEnvelopeRepairReturnSchema } from "../../shared/api/task-envelope-schemas.js";
 import {
   isProjectAgentValidationNode,
-  isProjectProviderWorkNode,
+  isProjectProviderJobNode,
   type JsonValue
 } from "../../shared/domain/automation.js";
 import type {
   ControlFlowEvent, ExecutionSpec, LoopRunDetails, LoopStateRevision, NodeRun,
-  OrchestrationRequest, RootExecutionSnapshot, WorkCompletedOutcome, WorkLoopNodeRun
+  OrchestrationRequest, RootExecutionSnapshot, JobCompletedOutcome, JobRun
 } from "../../shared/domain/runtime.js";
 import type {
   TaskEnvelopeHistoryEntry, TaskEnvelopeOrchestrationRequest, TaskEnvelopeRepairReturn,
-  TaskEnvelopeResumeContext, TaskEnvelopeV4
+  TaskEnvelopeResumeContext, TaskEnvelopeV5
 } from "../../shared/domain/taskEnvelope.js";
 import { composeExecutionPrompt, runtimeForNode } from "../execution/ExecutionComposition.js";
 import { LoopRunIntegrityError } from "../runtime/LoopRunErrors.js";
@@ -23,7 +23,7 @@ export const LOOP_ORCHESTRATOR_TASK =
 export interface NodeExecutionPlanInput {
   root: StoredRootRun;
   run: LoopRunDetails;
-  composite?: WorkLoopNodeRun;
+  jobRun?: JobRun;
   node: NodeRun;
   state: LoopStateRevision;
   events: ControlFlowEvent[];
@@ -31,21 +31,24 @@ export interface NodeExecutionPlanInput {
 }
 
 export const createNodeExecutionSpec = (input: NodeExecutionPlanInput): ExecutionSpec => {
-  const { root, run, composite, node } = input;
+  const { root, run, jobRun, node } = input;
   const loop = requireLoop(root.executionSnapshot, node.loopId);
   let profileId: string | undefined;
   if (node.role === "orchestrator") {
     requireOrchestratorRequest(node, input.orchestrationRequest);
     profileId = root.executionSnapshot.orchestrator.executionProfileId;
   } else {
-    const definition = loop.nodes.find((candidate) => candidate.id === node.workLoopNodeId);
-    if (!definition || !composite) throw new LoopRunIntegrityError(
+    const job = loop.workflow.jobNodes.find((candidate) => candidate.id === node.jobNodeId);
+    const validation = node.role === "validation"
+      ? loop.workflow.validationNodes.find((candidate) => candidate.id === node.workflowNodeId)
+      : undefined;
+    if (!job || (node.role === "validation" && !validation) || !jobRun) throw new LoopRunIntegrityError(
       `Provider execution definition is missing for Node Run ${node.nodeRunId}.`
     );
-    profileId = node.role === "work" && isProjectProviderWorkNode(definition.work)
-      ? definition.work.executionProfileId
-      : node.role === "validation" && isProjectAgentValidationNode(definition.validation)
-        ? definition.validation.executionProfileId
+    profileId = node.role === "job" && isProjectProviderJobNode(job)
+      ? job.executionProfileId
+      : node.role === "validation" && validation && isProjectAgentValidationNode(validation)
+        ? validation.executionProfileId
         : undefined;
   }
   if (!profileId) throw new LoopRunIntegrityError(`Node Run ${node.nodeRunId} is not provider-executable.`);
@@ -55,12 +58,12 @@ export const createNodeExecutionSpec = (input: NodeExecutionPlanInput): Executio
   );
   const taskId = randomUUID();
   return {
-    version: 6,
+    version: 7,
     taskId,
     kind: "node_execution",
     rootRunId: root.rootRunId,
     loopRunId: run.loopRunId,
-    workLoopNodeRunId: composite?.workLoopNodeRunId,
+    jobRunId: jobRun?.jobRunId,
     nodeRunId: node.nodeRunId,
     evidence,
     runtime: runtimeForNode(root.executionSnapshot, profileId),
@@ -69,11 +72,11 @@ export const createNodeExecutionSpec = (input: NodeExecutionPlanInput): Executio
   };
 };
 
-export const createNodeTaskEnvelope = (input: NodeExecutionPlanInput): TaskEnvelopeV4 => {
-  const { root, run, composite, node, state } = input;
+export const createNodeTaskEnvelope = (input: NodeExecutionPlanInput): TaskEnvelopeV5 => {
+  const { root, run, jobRun, node, state } = input;
   const loop = requireLoop(root.executionSnapshot, node.loopId);
   const common = {
-    version: 4 as const,
+    version: 5 as const,
     loop: { id: loop.id, description: loop.description },
     state: { revision: state.revision, value: state.state, sha256: state.stateSha256 },
     resume: readResume(node.context),
@@ -104,26 +107,27 @@ export const createNodeTaskEnvelope = (input: NodeExecutionPlanInput): TaskEnvel
         })
     };
   }
-  const definition = loop.nodes.find((candidate) => candidate.id === node.workLoopNodeId);
-  if (!definition || !composite) throw new LoopRunIntegrityError(
-    `Work Loop Node ${node.loopId}:${node.workLoopNodeId} is missing.`
+  const job = loop.workflow.jobNodes.find((candidate) => candidate.id === node.jobNodeId);
+  const validation = loop.workflow.validationNodes.find((candidate) => candidate.id === job?.validationNodeId);
+  if (!job || !validation || !jobRun) throw new LoopRunIntegrityError(
+    `JobNode ${node.loopId}:${node.jobNodeId} or its ValidationNode is missing.`
   );
   const base = {
     ...common,
     run: {
       rootRunId: root.rootRunId, loopRunId: run.loopRunId,
-      workLoopNodeRunId: composite.workLoopNodeRunId, nodeRunId: node.nodeRunId
+      jobRunId: jobRun.jobRunId, nodeRunId: node.nodeRunId
     },
-    workLoopNode: { id: definition.id, description: definition.description },
-    localAttempt: composite.attempt
+    jobNode: { id: job.id, description: job.description },
+    jobAttempt: jobRun.jobAttempt
   };
-  if (node.role === "work") return {
-    ...base, role: "work", task: definition.work.task,
+  if (node.role === "job") return {
+    ...base, role: "job", task: job.task,
     previousValidationFeedback: readFeedback(node.context)
   };
   return {
-    ...base, role: "validation", task: definition.validation.task,
-    workOutcome: requireWorkOutcome(run, composite.workLoopNodeRunId),
+    ...base, role: "validation", validationNode: { id: validation.id, description: validation.description }, task: validation.task,
+    jobOutcome: requireJobOutcome(run, jobRun.jobRunId),
     repairReturn: readRepairReturn(node.context)
   };
 };
@@ -166,12 +170,12 @@ const requireOrchestratorRequest = (
   return request;
 };
 
-const requireWorkOutcome = (run: LoopRunDetails, compositeId: string): WorkCompletedOutcome => {
+const requireJobOutcome = (run: LoopRunDetails, jobRunId: string): JobCompletedOutcome => {
   const outcome = [...run.nodeRuns].reverse().find((candidate) =>
-    candidate.workLoopNodeRunId === compositeId && candidate.role === "work"
-    && candidate.outcome?.role === "work" && candidate.outcome.state === "completed")?.outcome;
-  if (!outcome || outcome.role !== "work" || outcome.state !== "completed") {
-    throw new LoopRunIntegrityError("Validation Node has no canonical completed Work outcome.");
+    candidate.jobRunId === jobRunId && candidate.role === "job"
+    && candidate.outcome?.role === "job" && candidate.outcome.state === "completed")?.outcome;
+  if (!outcome || outcome.role !== "job" || outcome.state !== "completed") {
+    throw new LoopRunIntegrityError("ValidationNode has no canonical completed Job outcome.");
   }
   return outcome;
 };

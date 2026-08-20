@@ -14,7 +14,7 @@ export type View =
   | "run";
 
 export type SaveCollection = "skills";
-export type EngineeringView = "graph" | "loop";
+export type EngineeringView = "graph" | "workflow";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {

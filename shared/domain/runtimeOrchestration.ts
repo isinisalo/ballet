@@ -1,16 +1,14 @@
 import type { JsonValue } from "./automation.js";
 import type { CanonicalNodeOutcome } from "./runtime.js";
 
-export type RepairRequestMode = "local" | "orchestrator";
 export type RepairRequestStatus = "pending" | "routed" | "repaired" | "failed" | "cancelled";
 
 export interface RepairRequest {
   repairRequestId: string;
   rootRunId: string;
   requesterLoopRunId: string;
-  requesterWorkLoopNodeRunId: string;
+  requesterJobRunId: string;
   requesterValidationNodeRunId: string;
-  mode: RepairRequestMode;
   attempt: number;
   validationSummary: string;
   requestedCapability?: string;
@@ -23,7 +21,7 @@ export interface RepairRequest {
   routedTargetLoopId?: string;
   status: RepairRequestStatus;
   returnLoopId: string;
-  returnWorkLoopNodeId: string;
+  returnJobNodeId: string;
   returnValidationNodeDefinitionId: string;
   nestingDepth: number;
   createdAt: string;
@@ -83,7 +81,7 @@ export interface OrchestrationFrame {
   calleeLoopRunId: string;
   parentFrameId?: string;
   returnLoopId: string;
-  returnWorkLoopNodeId: string;
+  returnJobNodeId: string;
   returnValidationNodeDefinitionId: string;
   stateRevisionAtCall: number;
   nestingDepth: number;
@@ -110,8 +108,8 @@ export interface RepairResult {
 }
 
 export type ControlFlowEventKind =
-  | "work_completed" | "work_needs_input" | "work_terminal"
-  | "validation_ok" | "validation_fail_local" | "validation_fail_orchestrator" | "validation_terminal"
+  | "job_completed" | "job_needs_input" | "job_terminal"
+  | "validation_pass" | "validation_fail_retry" | "validation_fail_escalated" | "validation_terminal"
   | "repair_call" | "repair_return" | "repair_terminal" | "flow_transition"
   | "orchestrator_terminal" | "root_cancelled" | "root_terminal" | "execution_interrupted";
 
@@ -122,10 +120,10 @@ export interface ControlFlowEvent {
   kind: ControlFlowEventKind;
   stateRevision: number;
   sourceLoopRunId?: string;
-  sourceWorkLoopNodeRunId?: string;
+  sourceJobRunId?: string;
   sourceNodeRunId?: string;
   targetLoopRunId?: string;
-  targetWorkLoopNodeRunId?: string;
+  targetJobRunId?: string;
   orchestrationRequestId?: string;
   repairRequestId?: string;
   orchestrationFrameId?: string;

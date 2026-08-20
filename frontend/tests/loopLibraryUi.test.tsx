@@ -5,7 +5,7 @@ import type {
   InstalledLoopModuleStatus,
   LoopModuleInstallPlan,
   LoopModuleLibraryEntry,
-  LoopModulePackageV1
+  LoopModulePackageV2
 } from "@shared/api/workspace-contracts";
 import { LoopLibraryDialog, type LoopModuleActions } from "../src/workspace/automation/loops/LoopLibraryDialog";
 
@@ -25,7 +25,7 @@ describe("Loop Library dialog", () => {
     );
     expect(screen.getByLabelText("Search Loop Library")).toHaveFocus();
     expect(screen.getByRole("heading", { name: "Sample module" })).toBeInTheDocument();
-    expect(screen.queryByText("Internal Work Loop Node")).not.toBeInTheDocument();
+    expect(screen.queryByText("Internal Job Node")).not.toBeInTheDocument();
     expect(screen.getAllByText("arc42")).toHaveLength(2);
 
     await user.type(screen.getByLabelText("Search Loop Library"), "missing");
@@ -69,8 +69,8 @@ describe("Loop Library dialog", () => {
   });
 });
 
-const pkg: LoopModulePackageV1 = {
-  format: "ballet-loop-module", version: 1,
+const pkg: LoopModulePackageV2 = {
+  format: "ballet-loop-module", version: 2,
   manifest: { id: "sample-loop", title: "Sample module", description: "One portable sample Loop.", version: "1.0.0", category: "arc42", tags: ["sample"] },
   permissions: { network: "forbidden", externalWrites: false },
   profileSlots: [{ key: "worker", title: "Worker", description: "Worker profile.", providers: ["codex"], network: "forbidden" }],
@@ -81,9 +81,20 @@ const pkg: LoopModulePackageV1 = {
   },
   resources: [],
   loop: {
-    key: "loop", description: "One portable sample Loop.", state: { description: "Sample state.", initial: {} }, startNode: "work",
-    nodes: [{ key: "work", description: "Internal Work Loop Node", work: { type: "human", task: "Work.", nodeStyle: "terra", nodeSize: "medium" }, validation: { type: "human", task: "Validate.", nodeStyle: "luna", nodeSize: "small" }, maxLocalAttempts: 3 }],
-    edges: [{ key: "done", source: "work", target: { terminal: "completed" } }]
+    key: "loop", description: "One portable sample Loop.", state: { description: "Sample state.", initial: {} },
+    workflow: {
+      startJobNode: "job",
+      jobNodes: [{
+        key: "job", description: "Internal Job Node", validationNode: "job-validation", maxRetries: 3,
+        type: "human", task: "Run the Job.", nodeStyle: "terra", nodeSize: "medium"
+      }],
+      validationNodes: [{
+        key: "job-validation", description: "Internal Validation Node", type: "human",
+        task: "Validate the Job.", nodeStyle: "luna", nodeSize: "small"
+      }],
+      passEdges: [{ key: "done", sourceValidationNode: "job-validation", target: { workflowResult: "PASS" } }],
+      failEdges: [{ key: "fail", sourceValidationNode: "job-validation", target: { workflowResult: "FAIL" } }]
+    }
   }
 };
 
@@ -114,7 +125,11 @@ const mappingPlan = (selected: boolean): LoopModuleInstallPlan => planBase({
 
 const planBase = (overrides: Partial<LoopModuleInstallPlan>): LoopModuleInstallPlan => ({
   planHash: "a".repeat(64), packageSha256: "b".repeat(64), source: entry.source, module: pkg.manifest,
-  loop: { id: "sample-loop", description: pkg.loop.description, state: pkg.loop.state, startNodeId: "sample-loop-work", nodes: [], edges: [] },
+  loop: {
+    id: "sample-loop", description: pkg.loop.description, state: pkg.loop.state,
+    capabilities: { accepts: ["sample:task.requested"], provides: ["sample:task.completed"] },
+    workflow: { startJobNodeId: "sample-loop-job", jobNodes: [], validationNodes: [], passEdges: [], failEdges: [] }
+  },
   idRemapping: { loop: { loop: "sample-loop" }, nodes: {}, edges: {}, instructions: {}, skills: {} },
   resources: [], profileMappings: [], permissions: { externalWrites: false, network: "forbidden", compatible: true },
   stateContract: { contract: pkg.stateContract, compatibility: "compatible", comparedWith: [] },

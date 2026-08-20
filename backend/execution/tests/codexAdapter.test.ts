@@ -24,7 +24,7 @@ const expectedPrompt = ${JSON.stringify(distinctivePrompt)};
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\\n");
 const finish = () => {
   const text = JSON.stringify({
-    role: "work", state: "completed", summary: "Codex done.", artifacts: {}, checks: []
+    role: "job", state: "completed", summary: "Codex done.", artifacts: {}, checks: []
   });
   send({ method: "item/completed", params: { item: { id: "message-1", type: "agentMessage", phase: "final_answer", text } } });
   send({ method: "turn/completed", params: { turn: { id: "turn-1", status: "completed" } } });
@@ -83,7 +83,7 @@ describe("CodexAppServerAdapter", () => {
         type: "object",
         required: ["role", "state", "summary", "artifacts", "checks"],
         properties: {
-          role: { type: "string", const: "work" },
+          role: { type: "string", const: "job" },
           state: { type: "string", const: "completed" },
           summary: { type: "string" },
           artifacts: { type: "object" },
@@ -96,7 +96,7 @@ describe("CodexAppServerAdapter", () => {
     expect(events).toContainEqual(expect.objectContaining({
       type: "execution.completed",
       structuredOutput: {
-        role: "work",
+        role: "job",
         state: "completed",
         summary: "Codex done.",
         artifacts: {},

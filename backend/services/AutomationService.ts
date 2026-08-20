@@ -1,6 +1,6 @@
 import {
   isProjectAgentValidationNode,
-  isProjectProviderWorkNode,
+  isProjectProviderJobNode,
   type ProjectAutomationConfig,
   type ProjectExecutionComposition
 } from "../../shared/domain/automation.js";
@@ -68,12 +68,14 @@ export class AutomationService {
         loaded.issues.map((issue) => ({ path: issue.path, message: issue.message }))
       );
     }
-    const references = loaded.config.loops.flatMap((loop) => loop.nodes.flatMap((node) => [
-      ...(isProjectProviderWorkNode(node.work) && node.work.executionProfileId === executionProfileId
-        ? [`${loop.id}:${node.id}:work`] : []),
-      ...(isProjectAgentValidationNode(node.validation) && node.validation.executionProfileId === executionProfileId
-        ? [`${loop.id}:${node.id}:validation`] : [])
-    ]));
+    const references = loaded.config.loops.flatMap((loop) => [
+      ...loop.workflow.jobNodes.flatMap((node) =>
+        isProjectProviderJobNode(node) && node.executionProfileId === executionProfileId
+          ? [`${loop.id}:${node.id}:job`] : []),
+      ...loop.workflow.validationNodes.flatMap((node) =>
+        isProjectAgentValidationNode(node) && node.executionProfileId === executionProfileId
+          ? [`${loop.id}:${node.id}:validation`] : [])
+    ]);
     if (loaded.config.orchestrator.executionProfileId === executionProfileId) references.push("orchestrator");
     if (references.length > 0) throw new AutomationConflictError(
       `Execution profile ${executionProfileId} is referenced by execution compositions: ${references.join(", ")}.`
@@ -85,12 +87,14 @@ export class AutomationService {
     if (automation.issues.length > 0) {
       throw new AutomationValidationError("Automation config is invalid.", automation.issues);
     }
-    const references = automation.config.loops.flatMap((loop) => loop.nodes.flatMap((node) => [
-      ...(isProjectProviderWorkNode(node.work) && compositionReferences(node.work, resourceId)
-        ? [`${loop.id}:${node.id}:work`] : []),
-      ...(isProjectAgentValidationNode(node.validation) && compositionReferences(node.validation, resourceId)
-        ? [`${loop.id}:${node.id}:validation`] : [])
-    ]));
+    const references = automation.config.loops.flatMap((loop) => [
+      ...loop.workflow.jobNodes.flatMap((node) =>
+        isProjectProviderJobNode(node) && compositionReferences(node, resourceId)
+          ? [`${loop.id}:${node.id}:job`] : []),
+      ...loop.workflow.validationNodes.flatMap((node) =>
+        isProjectAgentValidationNode(node) && compositionReferences(node, resourceId)
+          ? [`${loop.id}:${node.id}:validation`] : [])
+    ]);
     if (compositionReferences(automation.config.orchestrator, resourceId)) references.push("orchestrator");
     if (references.length > 0) {
       throw new AutomationConflictError(

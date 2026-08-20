@@ -7,11 +7,11 @@ import {
   loopNodeStyles,
   type ProjectAutomationConfig
 } from "../../shared/domain/automation.js";
-import { testAutomationConfig } from "./v11TestConfig.js";
+import { testAutomationConfig } from "./v12TestConfig.js";
 
 const config = (): ProjectAutomationConfig => testAutomationConfig();
 
-describe("v10 Work and Validation Node appearance catalogs", () => {
+describe("Job and Validation Node appearance catalogs", () => {
   it("defines six ordered styles with group metadata and four explicit sizes", () => {
     expect(loopNodeStyles).toEqual([
       "flat", "luna", "mars", "terra", "sol", "vector-planet"
@@ -34,17 +34,18 @@ describe("v10 Work and Validation Node appearance catalogs", () => {
 
   it("accepts every style and size combination for both inner node roles", () => {
     const base = config();
-    const source = base.loops[0]!.nodes[0]!;
+    const sourceJob = base.loops[0]!.workflow.jobNodes[0]!;
+    const sourceValidation = base.loops[0]!.workflow.validationNodes[0]!;
     for (const nodeStyle of loopNodeStyles) {
       for (const nodeSize of loopNodeSizes) {
-        const node = {
-          ...source,
-          work: { ...source.work, nodeStyle, nodeSize },
-          validation: { ...source.validation, nodeStyle, nodeSize }
-        };
+        const job = { ...sourceJob, nodeStyle, nodeSize };
+        const validation = { ...sourceValidation, nodeStyle, nodeSize };
         expect(automationConfigSchema.safeParse({
           ...base,
-          loops: [{ ...base.loops[0]!, nodes: [node] }]
+          loops: [{
+            ...base.loops[0]!,
+            workflow: { ...base.loops[0]!.workflow, jobNodes: [job], validationNodes: [validation] }
+          }]
         }).success, `${nodeStyle}/${nodeSize}`).toBe(true);
       }
     }
@@ -52,24 +53,38 @@ describe("v10 Work and Validation Node appearance catalogs", () => {
 
   it("rejects removed styles, missing sizes, legacy theme fields, and reserved node ids", () => {
     const base = config();
-    const source = base.loops[0]!.nodes[0]!;
+    const sourceJob = base.loops[0]!.workflow.jobNodes[0]!;
     expect(automationConfigSchema.safeParse({
       ...base,
-      loops: [{ ...base.loops[0]!, nodes: [{
-        ...source,
-        work: { ...source.work, nodeStyle: "black-hole" }
-      }] }]
+      loops: [{
+        ...base.loops[0]!,
+        workflow: {
+          ...base.loops[0]!.workflow,
+          jobNodes: [{ ...sourceJob, nodeStyle: "black-hole" }]
+        }
+      }]
     }).success).toBe(false);
 
-    const workWithoutSize: Record<string, unknown> = { ...source.work };
-    delete workWithoutSize.nodeSize;
+    const jobWithoutSize: Record<string, unknown> = { ...sourceJob };
+    delete jobWithoutSize.nodeSize;
     expect(automationConfigSchema.safeParse({
       ...base,
-      loops: [{ ...base.loops[0]!, theme: "legacy", nodes: [{ ...source, work: workWithoutSize }] }]
+      loops: [{
+        ...base.loops[0]!,
+        theme: "legacy",
+        workflow: { ...base.loops[0]!.workflow, jobNodes: [jobWithoutSize] }
+      }]
     }).success).toBe(false);
     expect(automationConfigSchema.safeParse({
       ...base,
-      loops: [{ ...base.loops[0]!, startNodeId: "completed", nodes: [{ ...source, id: "completed" }] }]
+      loops: [{
+        ...base.loops[0]!,
+        workflow: {
+          ...base.loops[0]!.workflow,
+          startJobNodeId: "PASS",
+          jobNodes: [{ ...sourceJob, id: "PASS" }]
+        }
+      }]
     }).success).toBe(false);
   });
 });

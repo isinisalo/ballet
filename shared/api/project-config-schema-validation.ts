@@ -16,19 +16,28 @@ export const validateProjectConfigSchema = (
   const edgeIds = new Set<string>();
   const nodeIds = new Set<string>();
   config.loops.forEach((loop, loopIndex) => {
-    loop.nodes.forEach((node, nodeIndex) => {
-      addDuplicateIssue(nodeIds, node.id, ["loops", loopIndex, "nodes", nodeIndex, "id"], "node", context);
-      for (const [partName, part] of [["work", node.work], ["validation", node.validation]] as const) {
-        if (part.type === "human" || profileIds.has(part.executionProfileId)) continue;
+    loop.workflow.jobNodes.forEach((node, nodeIndex) => {
+      addDuplicateIssue(nodeIds, node.id, ["loops", loopIndex, "workflow", "jobNodes", nodeIndex, "id"], "node", context);
+      if (node.type !== "human" && !profileIds.has(node.executionProfileId)) {
         context.addIssue({
           code: "custom",
-          path: ["loops", loopIndex, "nodes", nodeIndex, partName, "executionProfileId"],
-          message: `${partName === "work" ? "Work" : "Validation"} Node references unknown execution profile: ${part.executionProfileId}.`
+          path: ["loops", loopIndex, "workflow", "jobNodes", nodeIndex, "executionProfileId"],
+          message: `JobNode references unknown execution profile: ${node.executionProfileId}.`
         });
       }
     });
-    loop.edges.forEach((edge, edgeIndex) =>
-      addDuplicateIssue(edgeIds, edge.id, ["loops", loopIndex, "edges", edgeIndex, "id"], "edge", context));
+    loop.workflow.validationNodes.forEach((node, nodeIndex) => {
+      addDuplicateIssue(nodeIds, node.id, ["loops", loopIndex, "workflow", "validationNodes", nodeIndex, "id"], "node", context);
+      if (node.type !== "human" && !profileIds.has(node.executionProfileId)) context.addIssue({
+        code: "custom",
+        path: ["loops", loopIndex, "workflow", "validationNodes", nodeIndex, "executionProfileId"],
+        message: `ValidationNode references unknown execution profile: ${node.executionProfileId}.`
+      });
+    });
+    loop.workflow.passEdges.forEach((edge, edgeIndex) =>
+      addDuplicateIssue(edgeIds, edge.id, ["loops", loopIndex, "workflow", "passEdges", edgeIndex, "id"], "edge", context));
+    loop.workflow.failEdges.forEach((edge, edgeIndex) =>
+      addDuplicateIssue(edgeIds, edge.id, ["loops", loopIndex, "workflow", "failEdges", edgeIndex, "id"], "edge", context));
   });
 
   const routeCandidates = new Set<string>();

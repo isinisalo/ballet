@@ -1,9 +1,9 @@
 import { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
-import { scheduleWeekdayLabel, scheduleWeekdays, type RecurringWorkSchedule } from "./loopSchedulePresentation";
+import { scheduleWeekdayLabel, scheduleWeekdays, type RecurringJobSchedule } from "./loopSchedulePresentation";
 
-type Weekday = Extract<RecurringWorkSchedule, { cadence: "weekly" }>["weekdays"][number];
+type Weekday = Extract<RecurringJobSchedule, { cadence: "weekly" }>["weekdays"][number];
 
 export function LoopScheduleWeekdays({ value, disabled, error, onChange }: {
   value: Weekday[];

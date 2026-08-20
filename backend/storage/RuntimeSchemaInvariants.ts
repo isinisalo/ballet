@@ -1,16 +1,16 @@
 export const runtimeSchemaInvariants = `
   CREATE UNIQUE INDEX idx_loop_schedule_occurrence
-    ON loop_invocations(loop_id, schedule_work_loop_node_id, scheduled_for) WHERE source = 'schedule';
+    ON loop_invocations(loop_id, schedule_job_node_id, scheduled_for) WHERE source = 'schedule';
   CREATE UNIQUE INDEX idx_one_active_node_phase
-    ON node_runs(work_loop_node_run_id)
-    WHERE work_loop_node_run_id IS NOT NULL AND status IN ('queued','running','waiting_for_input');
+    ON node_runs(job_run_id)
+    WHERE job_run_id IS NOT NULL AND status IN ('queued','running','waiting_for_input');
   CREATE UNIQUE INDEX idx_one_active_root_node
     ON node_runs(root_run_id) WHERE status IN ('queued','running','waiting_for_input');
   CREATE UNIQUE INDEX idx_one_running_loop_invocation
     ON loop_invocations(root_run_id) WHERE status = 'running';
   CREATE INDEX idx_loop_invocations_root ON loop_invocations(root_run_id, created_at);
-  CREATE INDEX idx_work_loop_node_runs_loop ON work_loop_node_runs(loop_run_id, created_at);
-  CREATE INDEX idx_node_runs_composite ON node_runs(work_loop_node_run_id, created_at);
+  CREATE INDEX idx_job_runs_loop ON job_runs(loop_run_id, created_at);
+  CREATE INDEX idx_node_runs_job ON node_runs(job_run_id, created_at);
   CREATE INDEX idx_state_revisions_latest ON state_revisions(root_run_id, revision DESC);
   CREATE INDEX idx_repair_requests_pending ON repair_requests(root_run_id, status, created_at);
   CREATE INDEX idx_orchestration_requests_pending ON orchestration_requests(root_run_id, status, created_at);
@@ -40,28 +40,28 @@ export const runtimeSchemaInvariants = `
   CREATE TRIGGER root_run_execution_snapshot_is_immutable
   BEFORE UPDATE OF target_id, source, worktree_path, branch, head_sha, config_hash, snapshot_hash, execution_snapshot_json ON root_runs
   BEGIN SELECT RAISE(ABORT, 'root run execution snapshot is immutable'); END;
-  CREATE TRIGGER active_node_must_belong_to_composite BEFORE UPDATE OF active_node_run_id ON work_loop_node_runs
+  CREATE TRIGGER active_node_must_belong_to_job_run BEFORE UPDATE OF active_node_run_id ON job_runs
   WHEN NEW.active_node_run_id IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM node_runs WHERE node_run_id = NEW.active_node_run_id
-      AND work_loop_node_run_id = NEW.work_loop_node_run_id
+      AND job_run_id = NEW.job_run_id
       AND status IN ('queued','running','waiting_for_input')
   )
-  BEGIN SELECT RAISE(ABORT, 'active node run must be an active phase of its Work Loop Node Run'); END;
-  CREATE TRIGGER work_loop_node_run_owner BEFORE INSERT ON work_loop_node_runs
+  BEGIN SELECT RAISE(ABORT, 'active node run must be an active phase of its Job Run'); END;
+  CREATE TRIGGER job_run_owner BEFORE INSERT ON job_runs
   WHEN NOT EXISTS (
     SELECT 1 FROM loop_invocations WHERE loop_run_id = NEW.loop_run_id
       AND root_run_id = NEW.root_run_id AND loop_id = NEW.loop_id
   )
-  BEGIN SELECT RAISE(ABORT, 'Work Loop Node Run owner does not match its Loop Run'); END;
+  BEGIN SELECT RAISE(ABORT, 'Job Run owner does not match its Loop Run'); END;
   CREATE TRIGGER node_run_owner BEFORE INSERT ON node_runs
   WHEN NOT EXISTS (
     SELECT 1 FROM loop_invocations WHERE loop_run_id = NEW.loop_run_id
       AND root_run_id = NEW.root_run_id AND loop_id = NEW.loop_id
   ) OR (
-    NEW.work_loop_node_run_id IS NOT NULL AND NOT EXISTS (
-      SELECT 1 FROM work_loop_node_runs WHERE work_loop_node_run_id = NEW.work_loop_node_run_id
+    NEW.job_run_id IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM job_runs WHERE job_run_id = NEW.job_run_id
         AND root_run_id = NEW.root_run_id AND loop_run_id = NEW.loop_run_id
-        AND loop_id = NEW.loop_id AND work_loop_node_id = NEW.work_loop_node_id
+        AND loop_id = NEW.loop_id AND job_node_id = NEW.job_node_id
     )
   )
   BEGIN SELECT RAISE(ABORT, 'Node Run owner does not match its runtime parent'); END;
@@ -80,8 +80,8 @@ export const runtimeSchemaInvariants = `
   CREATE TRIGGER terminal_node_clears_active_phase AFTER UPDATE OF status ON node_runs
   WHEN NEW.status IN ('completed','blocked','failed','cancelled','interrupted')
   BEGIN
-    UPDATE work_loop_node_runs SET active_node_run_id = NULL
-      WHERE work_loop_node_run_id = NEW.work_loop_node_run_id AND active_node_run_id = NEW.node_run_id;
+    UPDATE job_runs SET active_node_run_id = NULL
+      WHERE job_run_id = NEW.job_run_id AND active_node_run_id = NEW.node_run_id;
     UPDATE root_runs SET active_node_run_id = NULL
       WHERE root_run_id = NEW.root_run_id AND active_node_run_id = NEW.node_run_id;
   END;
@@ -91,10 +91,10 @@ export const runtimeSchemaInvariants = `
     JOIN loop_invocations loop ON loop.loop_run_id = node.loop_run_id
     WHERE node.node_run_id = NEW.requester_validation_node_run_id
       AND node.root_run_id = NEW.root_run_id AND node.role = 'validation'
-      AND node.work_loop_node_run_id = NEW.requester_work_loop_node_run_id
+      AND node.job_run_id = NEW.requester_job_run_id
       AND node.loop_run_id = NEW.requester_loop_run_id AND node.loop_id = NEW.return_loop_id
   )
-  BEGIN SELECT RAISE(ABORT, 'repair requester must be the Validation Node Run of its Work Loop Node Run'); END;
+  BEGIN SELECT RAISE(ABORT, 'repair requester must be the Validation Node Run of its Job Run'); END;
   CREATE TRIGGER repair_orchestrator_must_be_orchestrator BEFORE UPDATE OF orchestrator_node_run_id ON repair_requests
   WHEN NEW.orchestrator_node_run_id IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM node_runs WHERE node_run_id = NEW.orchestrator_node_run_id
@@ -158,9 +158,9 @@ export const runtimeSchemaInvariants = `
   CREATE TRIGGER loop_invocation_terminal_is_final BEFORE UPDATE OF status ON loop_invocations
   WHEN OLD.status IN ('completed','blocked','failed','cancelled') AND NEW.status <> OLD.status
   BEGIN SELECT RAISE(ABORT, 'terminal loop run status is immutable'); END;
-  CREATE TRIGGER work_loop_node_run_terminal_is_final BEFORE UPDATE OF status ON work_loop_node_runs
+  CREATE TRIGGER job_run_terminal_is_final BEFORE UPDATE OF status ON job_runs
   WHEN OLD.status IN ('completed','blocked','failed','cancelled') AND NEW.status <> OLD.status
-  BEGIN SELECT RAISE(ABORT, 'terminal Work Loop Node Run status is immutable'); END;
+  BEGIN SELECT RAISE(ABORT, 'terminal Job Run status is immutable'); END;
   CREATE TRIGGER node_run_terminal_is_final BEFORE UPDATE OF status ON node_runs
   WHEN OLD.status IN ('completed','blocked','failed','cancelled','interrupted') AND NEW.status <> OLD.status
   BEGIN SELECT RAISE(ABORT, 'terminal Node Run status is immutable'); END;

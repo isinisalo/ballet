@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { workNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
+import { jobNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
-import type { ExecutionTask, LoopRunDetails, NodeRun, WorkLoopNodeRun } from "../../shared/domain/runtime.js";
+import type { ExecutionTask, LoopRunDetails, NodeRun, JobRun } from "../../shared/domain/runtime.js";
 import type { RootRunRepairProjection } from "../../shared/domain/runs.js";
-import { testLoop } from "../tests/v11TestConfig.js";
+import { testLoop } from "../tests/v12TestConfig.js";
 import { currentPosition } from "./RunReadProjection.js";
 import type { StoredRootRun } from "./RootRunStore.js";
 
@@ -19,7 +19,7 @@ const root = (overrides: Partial<StoredRootRun> = {}): StoredRootRun => ({
   configHash: "b".repeat(64), snapshotHash: "c".repeat(64), transitionCount: 0,
   activeLoopRunId: "loop-run", activeNodeRunId: "node-run",
   executionSnapshot: {
-    version: 4, rootLoopId: "main-loop",
+    version: 5, rootLoopId: "main-loop",
     project: {
       checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64),
       snapshotHash: "c".repeat(64)
@@ -28,50 +28,50 @@ const root = (overrides: Partial<StoredRootRun> = {}): StoredRootRun => ({
       executionProfileId: "primary", primaryInstructionId: "project:orchestrator", skillIds: [],
       maxRepairDepth: 4, maxRepairAttempts: 3
     },
-    graph: { loopEdges: [] }, loops: [testLoop()], terminals: ["completed", "blocked", "failed"],
+    graph: { loopEdges: [] }, loops: [testLoop()],
     theme: defaultLoopTheme, executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },
   createdAt: timestamp, updatedAt: timestamp, ...overrides
 });
 
-const composite = (overrides: Partial<WorkLoopNodeRun> = {}): WorkLoopNodeRun => ({
-  workLoopNodeRunId: "work-loop-node-run", rootRunId: "root-run", loopRunId: "loop-run",
-  loopId: "main-loop", workLoopNodeId: "work", attempt: 1, status: "running",
+const jobRun = (overrides: Partial<JobRun> = {}): JobRun => ({
+  jobRunId: "job-run", rootRunId: "root-run", loopRunId: "loop-run",
+  loopId: "main-loop", jobNodeId: "job", jobAttempt: 1, status: "running",
   stateRevisionBefore: 0, createdAt: timestamp, updatedAt: timestamp, ...overrides
 });
 
 const node = (overrides: Partial<NodeRun> = {}): NodeRun => ({
   nodeRunId: "node-run", rootRunId: "root-run", loopRunId: "loop-run",
-  workLoopNodeRunId: "work-loop-node-run", role: "work", loopId: "main-loop",
-  workLoopNodeId: "work", nodeDefinitionId: "main-loop:work:work", status: "queued",
+  jobRunId: "job-run", role: "job", loopId: "main-loop",
+  jobNodeId: "job", workflowNodeId: "job", nodeDefinitionId: "main-loop:job:job", status: "queued",
   attempt: 1, stateRevisionBefore: 0, createdAt: timestamp, updatedAt: timestamp, ...overrides
 });
 
 const loopRun = (
-  workLoopNodeRuns: WorkLoopNodeRun[],
+  jobRuns: JobRun[],
   nodeRuns: NodeRun[],
   status: LoopRunDetails["status"] = "running"
 ): LoopRunDetails => ({
   loopRunId: "loop-run", loopId: "main-loop", rootRunId: "root-run", source: "manual", status,
   snapshot: testLoop(), themeSnapshot: defaultLoopTheme, entryStateRevision: 0, nestingDepth: 0,
-  createdAt: timestamp, updatedAt: timestamp, workLoopNodeRuns, nodeRuns
+  createdAt: timestamp, updatedAt: timestamp, jobRuns, nodeRuns
 });
 
 const executionTask = (nodeRunId = "agent-node-run"): ExecutionTask => ({
   id: "agent-task", kind: "node_execution", rootRunId: "root-run", status: "succeeded",
   spec: {
-    version: 6, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
-    loopRunId: "loop-run", workLoopNodeRunId: "work-loop-node-run", nodeRunId,
+    version: 7, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
+    loopRunId: "loop-run", jobRunId: "job-run", nodeRunId,
     evidence: {
-      compositionVersion: 5, loopId: "main-loop", workLoopNodeId: "work", nodeRole: "work",
-      nodeDefinitionId: "main-loop:work:work",
+      compositionVersion: 6, loopId: "main-loop", jobNodeId: "job", workflowNodeId: "job", nodeRole: "job",
+      nodeDefinitionId: "main-loop:job:job",
       executionProfile: {
         id: "primary", name: "Primary", provider: "codex", model: "gpt-5",
         reasoningEffort: "high", networkAccess: false
       },
       resources: [], prompt: "prompt", promptSha256: "a".repeat(64),
-      taskEnvelopeVersion: 4, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 4,
-      outputSchemaId: "work-node-outcome-v4", outputSchema: workNodeOutcomeJsonSchema,
+      taskEnvelopeVersion: 5, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 5,
+      outputSchemaId: "job-node-outcome-v5", outputSchema: jobNodeOutcomeJsonSchema,
       outputSchemaSha256: "c".repeat(64)
     },
     runtime: {
@@ -92,14 +92,14 @@ describe("currentPosition", () => {
       nodeRunId: "agent-node-run", executionTaskId: "agent-task", status: "completed",
       stateRevisionAfter: 0, completedAt: timestamp
     });
-    const current = node({ nodeRunId: "human-node-run", role: "validation", nodeDefinitionId: "main-loop:work:validation" });
+    const current = node({ nodeRunId: "human-node-run", role: "validation", workflowNodeId: "job-validation", nodeDefinitionId: "main-loop:job-validation:validation" });
 
     expect(currentPosition(
       root({ activeNodeRunId: "human-node-run" }),
-      [loopRun([composite()], [previous, current])], [executionTask()], noRepair
+      [loopRun([jobRun()], [previous, current])], [executionTask()], noRepair
     )).toMatchObject({
-      loopRunId: "loop-run", loopId: "main-loop", workLoopNodeRunId: "work-loop-node-run",
-      workLoopNodeId: "work", nodeRunId: "human-node-run", nodeRole: "validation",
+      loopRunId: "loop-run", loopId: "main-loop", jobRunId: "job-run",
+      jobNodeId: "job", nodeRunId: "human-node-run", nodeRole: "validation",
       taskId: undefined, executionProfileId: undefined, taskStatus: undefined
     });
   });
@@ -110,41 +110,39 @@ describe("currentPosition", () => {
 
     expect(currentPosition(
       root({ activeNodeRunId: "agent-node-run", status: "waiting_for_input" }),
-      [loopRun([composite({ status: "waiting_for_input" })], [waiting])], [task], noRepair
+      [loopRun([jobRun({ status: "waiting_for_input" })], [waiting])], [task], noRepair
     )).toMatchObject({
-      nodeRunId: "agent-node-run", workLoopNodeId: "work", taskId: "agent-task", executionProfileId: "primary"
+      nodeRunId: "agent-node-run", jobNodeId: "job", taskId: "agent-task", executionProfileId: "primary"
     });
   });
 
   it("keeps the requester Validation identity while a Repair Request is pending", () => {
     const validation = node({
       nodeRunId: "validation-node-run", role: "validation",
-      nodeDefinitionId: "main-loop:work:validation", status: "completed",
+      workflowNodeId: "job-validation", nodeDefinitionId: "main-loop:job-validation:validation", status: "completed",
       outcome: {
         role: "validation", state: "completed", decision: "FAIL", summary: "Repair required.",
-        evidence: {}, checks: [], repair: {
-          mode: "ORCHESTRATOR_REPAIR", reason: "Specialist required.",
-          requestedCapability: "repair", evidenceRefs: []
-        }
+        evidence: {}, checks: [], feedback: "Fix it.", expectedCorrection: "Correct it.",
+        escalation: { reason: "Specialist required.", requestedCapability: "repair", evidenceRefs: [] }
       },
       stateRevisionAfter: 0, completedAt: timestamp
     });
 
     const request = {
       repairRequestId: "repair-request", rootRunId: "root-run", requesterLoopRunId: "loop-run",
-      requesterWorkLoopNodeRunId: "work-loop-node-run", requesterValidationNodeRunId: "validation-node-run",
-      mode: "orchestrator" as const, attempt: 1, validationSummary: "Repair required.",
+      requesterJobRunId: "job-run", requesterValidationNodeRunId: "validation-node-run",
+      attempt: 1, validationSummary: "Repair required.",
       requestedCapability: "repair", reason: "Specialist required.", stateRevisionAtRequest: 0,
-      status: "pending" as const, returnLoopId: "main-loop", returnWorkLoopNodeId: "work",
-      returnValidationNodeDefinitionId: "main-loop:work:validation", nestingDepth: 0,
+      status: "pending" as const, returnLoopId: "main-loop", returnJobNodeId: "job",
+      returnValidationNodeDefinitionId: "main-loop:job-validation:validation", nestingDepth: 0,
       createdAt: timestamp, updatedAt: timestamp
     };
     expect(currentPosition(
       root({ activeNodeRunId: undefined, status: "waiting_for_input" }),
-      [loopRun([composite({ status: "waiting_for_input", activeNodeRunId: undefined })], [validation], "waiting_for_input")],
+      [loopRun([jobRun({ status: "waiting_for_input", activeNodeRunId: undefined })], [validation], "waiting_for_input")],
       [], { ...noRepair, requests: [request], pendingRepair: request }
     )).toMatchObject({
-      workLoopNodeRunId: "work-loop-node-run", nodeRunId: "validation-node-run", nodeRole: "validation"
+      jobRunId: "job-run", nodeRunId: "validation-node-run", nodeRole: "validation"
     });
   });
 });

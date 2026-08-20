@@ -26,7 +26,7 @@ class FakeSession implements CopilotSessionLike {
     this.prompts.push(options.prompt);
     this.handler?.({ type: "assistant.message_delta", data: { deltaContent: "stream" } });
     const content = JSON.stringify({
-      role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: []
+      role: "job", state: "completed", summary: "Done.", artifacts: {}, checks: []
     });
     return { type: "assistant.message", data: { content } };
   }
@@ -94,7 +94,7 @@ describe("CopilotSdkAdapter", () => {
         additionalProperties: false,
         required: ["role", "state", "summary", "artifacts", "checks"],
         properties: {
-          role: { type: "string", const: "work" },
+          role: { type: "string", const: "job" },
           state: { type: "string", const: "completed" },
           summary: { type: "string" },
           artifacts: { type: "object" },
@@ -108,7 +108,7 @@ describe("CopilotSdkAdapter", () => {
     expect(events).toContainEqual(expect.objectContaining({ type: "assistant.delta", text: "stream" }));
     expect(events).toContainEqual(expect.objectContaining({
       type: "execution.completed",
-      structuredOutput: { role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: [] }
+      structuredOutput: { role: "job", state: "completed", summary: "Done.", artifacts: {}, checks: [] }
     }));
     expect(client.session.optionUpdates).toContainEqual(expect.objectContaining({
       sandboxConfig: expect.objectContaining({ enabled: true, addCurrentWorkingDirectory: false })

@@ -3,12 +3,12 @@ import type { ProjectLoop, ProjectLoopEdge } from "../../shared/domain/automatio
 import { RuntimeDatabase } from "../runtime-db.js";
 import { RootRunExecutionCoordinator } from "../runs/RootRunExecutionCoordinator.js";
 import { RootRunStore } from "../runs/RootRunStore.js";
-import { testLoop, testWorkLoopNode } from "../tests/v11TestConfig.js";
+import { testJobPair, testLoop } from "../tests/v12TestConfig.js";
 import {
   activeNode, completeActiveLoop, createOrchestrationHarness, requestExternalRepair
 } from "./LoopOrchestrator.test-support.js";
 
-const flowLoop = (id: string): ProjectLoop => testLoop(id, testWorkLoopNode(`${id}-work`));
+const flowLoop = (id: string): ProjectLoop => testLoop(id, testJobPair(`${id}-job`));
 
 const flowEdge = (source: string, target: string, id = `${source}-${target}`): ProjectLoopEdge => ({
   id, source, target, kind: "flow", capability: "test:loop.transfer", description: `Flow to ${target}.`

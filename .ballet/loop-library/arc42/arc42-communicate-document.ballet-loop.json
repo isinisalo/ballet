@@ -27,79 +27,7 @@
   "format": "ballet-loop-module",
   "loop": {
     "description": "Communicate the accepted architecture baseline and bounded implementation handoff. Done when canonical indexes, traceability, glossary, status and initiative handoff are synchronized and the next action has focused stakeholder review.",
-    "edges": [
-      {
-        "key": "communicate-sync-ok",
-        "source": "communicate-synchronize-docs",
-        "target": {
-          "node": "communicate-stakeholder-review"
-        }
-      },
-      {
-        "key": "communicate-completed",
-        "source": "communicate-stakeholder-review",
-        "target": {
-          "terminal": "completed"
-        }
-      }
-    ],
     "key": "loop",
-    "nodes": [
-      {
-        "description": "Synchronize indexes, traceability, glossary, persistent status and initiative handoff without duplication.",
-        "key": "communicate-synchronize-docs",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "arc42-reviewer",
-          "profileSlot": "slot-1",
-          "skills": [
-            "conformance-review",
-            "traceability"
-          ],
-          "task": "Validate canonical ownership, frontmatter, stable IDs, links, trace completeness and absence of duplicated active sources. Do not edit the documents.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "medium",
-          "nodeStyle": "terra",
-          "primaryInstruction": "arc42-documentation-agent",
-          "profileSlot": "slot-1",
-          "skills": [
-            "document-maintenance",
-            "initiative-handoff",
-            "traceability"
-          ],
-          "task": "Synchronize arc42 indexes, TRACEABILITY, glossary, STATUS and the initiative handoff. Resolve links and statuses from canonical owners, update only changed facts and avoid duplicating Goal/ADR/DESIGN or runtime content.",
-          "type": "agent"
-        }
-      },
-      {
-        "description": "Prepare and review a concise stakeholder summary and implementation handoff.",
-        "key": "communicate-stakeholder-review",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "tiny",
-          "nodeStyle": "luna",
-          "task": "Review the architecture summary and handoff. Approve the next action or identify the exact capability/decision needing repair; do not approve unresolved WHAT/WHY or priority-1 evidence gaps.",
-          "type": "human"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "arc42-documentation-agent",
-          "profileSlot": "slot-2",
-          "skills": [
-            "document-maintenance",
-            "initiative-handoff"
-          ],
-          "task": "Prepare an initiative review summary listing changes, Decisions, Assumptions, Findings, risks, Open questions, evidence and the next approved action. Link canonical sources instead of copying them.",
-          "type": "agent"
-        }
-      }
-    ],
-    "startNode": "communicate-synchronize-docs",
     "state": {
       "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
       "initial": {
@@ -145,6 +73,100 @@
           "status": "not_requested"
         }
       }
+    },
+    "workflow": {
+      "failEdges": [
+        {
+          "key": "communicate-synchronize-docs-fail",
+          "sourceValidationNode": "communicate-synchronize-docs-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        },
+        {
+          "key": "communicate-stakeholder-review-fail",
+          "sourceValidationNode": "communicate-stakeholder-review-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        }
+      ],
+      "jobNodes": [
+        {
+          "description": "Synchronize indexes, traceability, glossary, persistent status and initiative handoff without duplication.",
+          "key": "communicate-synchronize-docs",
+          "maxRetries": 3,
+          "nodeSize": "medium",
+          "nodeStyle": "terra",
+          "primaryInstruction": "arc42-documentation-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "document-maintenance",
+            "initiative-handoff",
+            "traceability"
+          ],
+          "task": "Synchronize arc42 indexes, TRACEABILITY, glossary, STATUS and the initiative handoff. Resolve links and statuses from canonical owners, update only changed facts and avoid duplicating Goal/ADR/DESIGN or runtime content.",
+          "type": "agent",
+          "validationNode": "communicate-synchronize-docs-validation"
+        },
+        {
+          "description": "Prepare and review a concise stakeholder summary and implementation handoff.",
+          "key": "communicate-stakeholder-review",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-documentation-agent",
+          "profileSlot": "slot-2",
+          "skills": [
+            "document-maintenance",
+            "initiative-handoff"
+          ],
+          "task": "Prepare an initiative review summary listing changes, Decisions, Assumptions, Findings, risks, Open questions, evidence and the next approved action. Link canonical sources instead of copying them.",
+          "type": "agent",
+          "validationNode": "communicate-stakeholder-review-validation"
+        }
+      ],
+      "passEdges": [
+        {
+          "key": "communicate-sync-ok",
+          "sourceValidationNode": "communicate-synchronize-docs-validation",
+          "target": {
+            "jobNode": "communicate-stakeholder-review"
+          }
+        },
+        {
+          "key": "communicate-completed",
+          "sourceValidationNode": "communicate-stakeholder-review-validation",
+          "target": {
+            "workflowResult": "PASS"
+          }
+        }
+      ],
+      "startJobNode": "communicate-synchronize-docs",
+      "validationNodes": [
+        {
+          "description": "Validate Synchronize indexes, traceability, glossary, persistent status and initiative handoff without duplication.",
+          "key": "communicate-synchronize-docs-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "arc42-reviewer",
+          "profileSlot": "slot-1",
+          "skills": [
+            "conformance-review",
+            "traceability"
+          ],
+          "task": "Validate canonical ownership, frontmatter, stable IDs, links, trace completeness and absence of duplicated active sources. Do not edit the documents.",
+          "type": "agent"
+        },
+        {
+          "description": "Validate Prepare and review a concise stakeholder summary and implementation handoff.",
+          "key": "communicate-stakeholder-review-validation",
+          "nodeSize": "tiny",
+          "nodeStyle": "luna",
+          "task": "Review the architecture summary and handoff. Approve the next action or identify the exact capability/decision needing repair; do not approve unresolved WHAT/WHY or priority-1 evidence gaps.",
+          "type": "human"
+        }
+      ]
     }
   },
   "manifest": {
@@ -198,7 +220,7 @@
       "title": "arc42 Documentation Agent"
     },
     {
-      "body": "\n# arc42 Independent Reviewer\n\n## Role\n\nIndependently validate one Work Loop Node goal against its task, canonical State, accepted sources, latest Work outcome and measurable criteria.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical architecture/initiative sources → Validation task and current State → Work summary/provider prose.\n\n## Writes\n\nDo not modify the implementation or artifacts being evaluated. A Validation OK may propose only a bounded State reference patch; a Validation FAIL proposes repair, never a document/code fix. Do not write externally or change decisions, topology, permissions, network, instructions or skills.\n\n## Sources and evidence\n\nInspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.\n\n## State patch\n\nOnly `decision: OK` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must choose `LOCAL_RETRY` or request a capability/outcome for Orchestrator repair without naming continuation/return target.\n\n## Stop rules\n\nReturn only valid `completed`, `needs_input`, `blocked` or `failed` Validation outcomes. `completed` contains exactly `OK` or `FAIL` plus the required repair payload. Stop for human input at all stated decision/authorization boundaries. Never return hidden chain-of-thought.\n",
+      "body": "\n# arc42 Independent Reviewer\n\n## Role\n\nIndependently validate one paired Job Node goal against its task, canonical State, accepted sources, latest Job outcome and measurable criteria.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical architecture/initiative sources → Validation task and current State → Job summary/provider prose.\n\n## Writes\n\nDo not modify the implementation or artifacts being evaluated. A Validation PASS may propose only a bounded State reference patch; a Validation FAIL proposes correction feedback and capability/outcome escalation, never a document/code fix. Do not write externally or change decisions, topology, permissions, network, instructions or skills.\n\n## Sources and evidence\n\nInspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.\n\n## State patch\n\nOnly `decision: PASS` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must always include `feedback`, `expectedCorrection`, and exactly one target-free `requestedCapability` or `requestedOutcome`. Runtime owns the local retry budget and escalates through the FailEdge only after it is exhausted.\n\n## Stop rules\n\nReturn only valid `completed`, `needs_input`, `blocked` or `failed` Validation outcomes. `completed` contains exactly `PASS` or `FAIL` plus the required role-specific payload. Stop for human input at all stated decision/authorization boundaries. Never return hidden chain-of-thought.\n",
       "key": "arc42-reviewer",
       "kind": "instruction",
       "metadata": {
@@ -300,5 +322,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 1
+  "version": 2
 }

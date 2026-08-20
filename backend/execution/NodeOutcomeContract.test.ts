@@ -4,7 +4,7 @@ import {
   orchestratorNodeOutcomeSchema,
   parseNodeOutcomeForRole,
   validationNodeOutcomeSchema,
-  workNodeOutcomeSchema
+  jobNodeOutcomeSchema
 } from "../../shared/api/runtime-schemas.js";
 import {
   NODE_OUTCOME_SCHEMA_IDS, NODE_OUTCOME_SCHEMA_SHA256
@@ -14,29 +14,28 @@ const checks = [{ name: "contract", status: "passed" as const }];
 
 describe("role-specific Node outcome contracts", () => {
   it.each([
-    { role: "work", state: "completed", summary: "Done.", artifacts: {}, checks },
-    { role: "work", state: "needs_input", summary: "Paused.", question: "Choose.", context: "Two choices.", checks },
-    { role: "work", state: "blocked", summary: "Blocked.", checks },
-    { role: "work", state: "failed", summary: "Failed.", checks }
-  ])("accepts Work outcome $state", (outcome) => {
-    expect(workNodeOutcomeSchema.parse(outcome)).toEqual(outcome);
+    { role: "job", state: "completed", summary: "Done.", artifacts: {}, checks },
+    { role: "job", state: "needs_input", summary: "Paused.", question: "Choose.", context: "Two choices.", checks },
+    { role: "job", state: "blocked", summary: "Blocked.", checks },
+    { role: "job", state: "failed", summary: "Failed.", checks }
+  ])("accepts Job outcome $state", (outcome) => {
+    expect(jobNodeOutcomeSchema.parse(outcome)).toEqual(outcome);
   });
 
   it.each([
     {
-      role: "validation", state: "completed", decision: "OK", summary: "Valid.", evidence: {}, checks,
+      role: "validation", state: "completed", decision: "PASS", summary: "Valid.", evidence: {}, checks,
       statePatch: [{ op: "add", path: "/validated", value: true }]
     },
     {
       role: "validation", state: "completed", decision: "FAIL", summary: "Retry.", evidence: {}, checks,
-      repair: { mode: "LOCAL_RETRY", feedback: "Correct the value.", expectedCorrection: "Set it to one." }
+      feedback: "Correct the value.", expectedCorrection: "Set it to one.",
+      escalation: { reason: "Validation failed.", requestedCapability: "repair structured state", evidenceRefs: [] }
     },
     {
       role: "validation", state: "completed", decision: "FAIL", summary: "Route repair.", evidence: {}, checks,
-      repair: {
-        mode: "ORCHESTRATOR_REPAIR", reason: "Another capability is required.",
-        requestedCapability: "repair structured state", evidenceRefs: ["check:contract"]
-      }
+      feedback: "Correct the value.", expectedCorrection: "Set it to one.",
+      escalation: { reason: "Another capability is required.", requestedCapability: "repair structured state", evidenceRefs: ["check:contract"] }
     },
     { role: "validation", state: "needs_input", summary: "Clarify.", question: "Expected value?", context: "Validation input.", checks },
     { role: "validation", state: "blocked", summary: "Blocked.", checks },
@@ -61,36 +60,39 @@ describe("role-specific Node outcome contracts", () => {
   });
 
   it.each([
-    ["FAIL without repair", validationNodeOutcomeSchema, {
-      role: "validation", state: "completed", decision: "FAIL", summary: "No repair.", evidence: {}, checks
+    ["FAIL without escalation", validationNodeOutcomeSchema, {
+      role: "validation", state: "completed", decision: "FAIL", summary: "No escalation.", evidence: {}, checks,
+      feedback: "x", expectedCorrection: "y"
     }],
-    ["OK with repair", validationNodeOutcomeSchema, {
-      role: "validation", state: "completed", decision: "OK", summary: "Contradiction.", evidence: {}, checks,
-      repair: { mode: "LOCAL_RETRY", feedback: "x", expectedCorrection: "y" }
+    ["PASS with escalation", validationNodeOutcomeSchema, {
+      role: "validation", state: "completed", decision: "PASS", summary: "Contradiction.", evidence: {}, checks,
+      escalation: { reason: "x", requestedCapability: "y", evidenceRefs: [] }
     }],
     ["FAIL with State patch", validationNodeOutcomeSchema, {
       role: "validation", state: "completed", decision: "FAIL", summary: "Contradiction.", evidence: {}, checks,
-      repair: { mode: "LOCAL_RETRY", feedback: "x", expectedCorrection: "y" },
+      feedback: "x", expectedCorrection: "y",
+      escalation: { reason: "x", requestedCapability: "y", evidenceRefs: [] },
       statePatch: [{ op: "add", path: "/invalid", value: true }]
     }],
     ["Repair Request with provider-selected target", validationNodeOutcomeSchema, {
       role: "validation", state: "completed", decision: "FAIL", summary: "Invalid target selection.",
       evidence: {}, checks,
-      repair: {
-        mode: "ORCHESTRATOR_REPAIR", reason: "Another capability is required.",
+      feedback: "x", expectedCorrection: "y",
+      escalation: {
+        reason: "Another capability is required.",
         requestedCapability: "repair structured state", targetLoopId: "repair-loop", evidenceRefs: []
       }
     }],
-    ["Work decision", workNodeOutcomeSchema, {
-      role: "work", state: "completed", decision: "OK", summary: "Invalid.", artifacts: {}, checks
+    ["Job decision", jobNodeOutcomeSchema, {
+      role: "job", state: "completed", decision: "PASS", summary: "Invalid.", artifacts: {}, checks
     }],
-    ["Work patch while waiting", workNodeOutcomeSchema, {
-      role: "work", state: "needs_input", summary: "Invalid.", question: "Question?", context: "Context.", checks,
+    ["Job patch while waiting", jobNodeOutcomeSchema, {
+      role: "job", state: "needs_input", summary: "Invalid.", question: "Question?", context: "Context.", checks,
       statePatch: [{ op: "add", path: "/invalid", value: true }]
     }],
     ["Orchestrator continuation", orchestratorNodeOutcomeSchema, {
       role: "orchestrator", state: "completed", targetLoopId: "repair-loop", routeReason: "Invalid.",
-      dispatchInput: {}, expectedOutcome: {}, returnWorkLoopNodeId: "caller"
+      dispatchInput: {}, expectedOutcome: {}, returnJobNodeId: "caller"
     }],
     ["Orchestrator State patch", orchestratorNodeOutcomeSchema, {
       role: "orchestrator", state: "completed", targetLoopId: "repair-loop", routeReason: "Invalid.",
@@ -100,11 +102,12 @@ describe("role-specific Node outcome contracts", () => {
     expect(schema.safeParse(outcome).success).toBe(false);
   });
 
-  it("rejects an Orchestrator repair that declares both requested forms", () => {
+  it("rejects a Validation escalation that declares both requested forms", () => {
     expect(validationNodeOutcomeSchema.safeParse({
       role: "validation", state: "completed", decision: "FAIL", summary: "Ambiguous.", evidence: {}, checks,
-      repair: {
-        mode: "ORCHESTRATOR_REPAIR", reason: "Ambiguous request.", requestedCapability: "one",
+      feedback: "x", expectedCorrection: "y",
+      escalation: {
+        reason: "Ambiguous request.", requestedCapability: "one",
         requestedOutcome: { two: true }, evidenceRefs: []
       }
     }).success).toBe(false);
@@ -112,19 +115,19 @@ describe("role-specific Node outcome contracts", () => {
 
   it("parses only the schema selected by immutable Node role", () => {
     const validation = {
-      role: "validation", state: "completed", decision: "OK", summary: "Valid.", evidence: {}, checks
+      role: "validation", state: "completed", decision: "PASS", summary: "Valid.", evidence: {}, checks
     };
-    expect(() => parseNodeOutcomeForRole("work", validation)).toThrow();
+    expect(() => parseNodeOutcomeForRole("job", validation)).toThrow();
     expect(parseNodeOutcomeForRole("validation", validation)).toEqual(validation);
   });
 
   it("generates one traceable JSON Schema and hash per role", () => {
-    expect(Object.keys(NODE_OUTCOME_SCHEMA_IDS)).toEqual(["work", "validation", "orchestrator"]);
+    expect(Object.keys(NODE_OUTCOME_SCHEMA_IDS)).toEqual(["job", "validation", "orchestrator"]);
     expect(new Set(Object.values(NODE_OUTCOME_SCHEMA_SHA256))).toHaveLength(3);
     expect(Object.values(NODE_OUTCOME_SCHEMA_SHA256)).toEqual(
       expect.arrayContaining([expect.stringMatching(/^[0-9a-f]{64}$/)])
     );
-    expect(nodeOutcomeJsonSchemaForRole("work")).not.toEqual(nodeOutcomeJsonSchemaForRole("validation"));
+    expect(nodeOutcomeJsonSchemaForRole("job")).not.toEqual(nodeOutcomeJsonSchemaForRole("validation"));
     expect(nodeOutcomeJsonSchemaForRole("validation")).not.toEqual(nodeOutcomeJsonSchemaForRole("orchestrator"));
   });
 });

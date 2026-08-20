@@ -1,8 +1,4 @@
-import {
-  loopTerminals,
-  type ProjectAutomationConfig,
-  type ProjectLoopOrchestrator
-} from "../../shared/domain/automation.js";
+import type { ProjectAutomationConfig, ProjectLoopOrchestrator } from "../../shared/domain/automation.js";
 import type { ExecutionProfile, ProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import { validateProjectAutomationConfig } from "../automation.js";
@@ -67,7 +63,7 @@ export class LoopExecutionPlanner {
     const runtimes = await this.preflightRuntimes(executionProfiles);
 
     const snapshot = rootExecutionSnapshotSchema.parse({
-      version: 4,
+      version: 5,
       rootLoopId,
       project: {
         checkoutRoot: workspace.path,
@@ -78,7 +74,6 @@ export class LoopExecutionPlanner {
       orchestrator,
       graph: graph.graph,
       loops: graph.loops,
-      terminals: [...loopTerminals],
       theme: theme.theme,
       executionProfiles,
       runtimes,
@@ -95,7 +90,7 @@ export class LoopExecutionPlanner {
     const issue = loaded.issues[0];
     throw new LoopRunStateError(issue
       ? `Project configuration is invalid at ${issue.path}: ${issue.message}`
-      : "The prepared Run workspace has no valid strict v11 project configuration.");
+      : "The prepared Run workspace has no valid strict v12 project configuration.");
   }
 
   private async preflightRuntimes(
@@ -125,7 +120,7 @@ export class LoopExecutionPlanner {
 }
 
 const automationOf = (config: ProjectConfiguration): ProjectAutomationConfig => ({
-  version: 11,
+  version: 12,
   orchestrator: config.orchestrator,
   graph: config.graph,
   loops: config.loops

@@ -35,10 +35,10 @@ describe("workspace navigation blocker", () => {
     expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
   });
 
-  it("restores Graph and Loop Engineering through browser back and forward", async () => {
+  it("restores Graph and Workflow Engineering through browser back and forward", async () => {
     const { result } = renderHook(() => useWorkspaceNavigation());
-    act(() => result.current.navigate("/automation/loops?view=loop&id=release"));
-    expect(result.current.route).toMatchObject({ view: "automation", automationView: "loop", automationEntityId: "release" });
+    act(() => result.current.navigate("/automation/loops?view=workflow&id=release"));
+    expect(result.current.route).toMatchObject({ view: "automation", automationView: "workflow", automationEntityId: "release" });
 
     await act(async () => {
       const traversed = waitForPopStates(1);
@@ -52,7 +52,7 @@ describe("workspace navigation blocker", () => {
       window.history.forward();
       await traversed;
     });
-    expect(result.current.route).toMatchObject({ view: "automation", automationView: "loop", automationEntityId: "release" });
+    expect(result.current.route).toMatchObject({ view: "automation", automationView: "workflow", automationEntityId: "release" });
   });
 
   it("restores a cancelled history traversal without losing the back/forward stack", async () => {

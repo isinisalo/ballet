@@ -4,7 +4,7 @@ import {
 } from "../../shared/api/runtime-schemas.js";
 import {
   isProjectAgentValidationNode,
-  isProjectProviderWorkNode,
+  isProjectProviderJobNode,
   type JsonValue,
   type ProjectExecutionComposition
 } from "../../shared/domain/automation.js";
@@ -12,8 +12,8 @@ import type {
   ExecutionPromptEvidence, ExecutionResourceEvidence, ExecutionResourceSnapshot,
   NodeRunRole, RootExecutionSnapshot
 } from "../../shared/domain/runtime.js";
-import type { TaskEnvelopeV4 } from "../../shared/domain/taskEnvelope.js";
-import { serializeTaskEnvelopeV4 } from "../integration/TaskEnvelopeV4.js";
+import type { TaskEnvelopeV5 } from "../../shared/domain/taskEnvelope.js";
+import { serializeTaskEnvelopeV5 } from "../integration/TaskEnvelopeV5.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import { ExecutionCompositionError } from "./ExecutionCompositionError.js";
 import { SYSTEM_EXECUTION_INSTRUCTION_ID } from "./SystemExecutionContract.js";
@@ -25,27 +25,30 @@ export {
 } from "./ExecutionResourceCatalog.js";
 export { SYSTEM_EXECUTION_INSTRUCTION, SYSTEM_EXECUTION_INSTRUCTION_ID } from "./SystemExecutionContract.js";
 
-export const EXECUTION_COMPOSITION_VERSION = 5 as const;
-export const NODE_OUTCOME_SCHEMA_VERSION = 4 as const;
+export const EXECUTION_COMPOSITION_VERSION = 6 as const;
+export const NODE_OUTCOME_SCHEMA_VERSION = 5 as const;
 export const MAX_EXECUTION_PROMPT_BYTES = 512 * 1024;
 
 export const NODE_OUTCOME_SCHEMA_IDS = nodeOutcomeSchemaIds;
 
 export const NODE_OUTCOME_SCHEMA_SHA256: Readonly<Record<NodeRunRole, string>> = {
-  work: schemaHash("work"),
+  job: schemaHash("job"),
   validation: schemaHash("validation"),
   orchestrator: schemaHash("orchestrator")
 };
 
 export const composeExecutionPrompt = (
   snapshot: RootExecutionSnapshot,
-  envelopeInput: TaskEnvelopeV4
+  envelopeInput: TaskEnvelopeV5
 ): ExecutionPromptEvidence => {
   assertEnvelopeSnapshot(snapshot, envelopeInput);
-  const envelope = serializeTaskEnvelopeV4(envelopeInput);
+  const envelope = serializeTaskEnvelopeV5(envelopeInput);
   const { role, loop } = envelope.envelope;
-  const workLoopNodeId = role === "orchestrator" ? undefined : envelope.envelope.workLoopNode.id;
-  const composition = resolveComposition(snapshot, loop.id, workLoopNodeId, role);
+  const workflowNodeId = role === "orchestrator"
+    ? undefined
+    : role === "job" ? envelope.envelope.jobNode.id : envelope.envelope.validationNode.id;
+  const jobNodeId = role === "orchestrator" ? undefined : envelope.envelope.jobNode.id;
+  const composition = resolveComposition(snapshot, loop.id, workflowNodeId, role);
   const profile = snapshot.executionProfiles.find((candidate) => candidate.id === composition.executionProfileId);
   if (!profile) throw new ExecutionCompositionError(
     "missing_resource",
@@ -60,25 +63,26 @@ export const composeExecutionPrompt = (
     section("SYSTEM", system.id, system.content),
     section("PRIMARY", primary.id, primary.content),
     ...skills.map((skill) => section("SKILL", skill.id, skill.content)),
-    section("TASK-ENVELOPE", "v4", envelope.serialized),
-    section("OUTPUT-SCHEMA", "v4", outputSchemaJson)
+    section("TASK-ENVELOPE", "v5", envelope.serialized),
+    section("OUTPUT-SCHEMA", "v5", outputSchemaJson)
   ].join("\n\n");
   const promptBytes = Buffer.byteLength(prompt, "utf8");
   if (promptBytes > MAX_EXECUTION_PROMPT_BYTES) throw new ExecutionCompositionError(
     "prompt_too_large",
-    `Execution prompt for ${loop.id}:${workLoopNodeId ?? "orchestrator"}:${role} is ${promptBytes} bytes; the maximum is ${MAX_EXECUTION_PROMPT_BYTES} bytes.`
+    `Execution prompt for ${loop.id}:${jobNodeId ?? "orchestrator"}:${role} is ${promptBytes} bytes; the maximum is ${MAX_EXECUTION_PROMPT_BYTES} bytes.`
   );
   return {
     compositionVersion: EXECUTION_COMPOSITION_VERSION,
     loopId: loop.id,
-    workLoopNodeId,
+    jobNodeId,
+    workflowNodeId,
     nodeRole: role,
-    nodeDefinitionId: `${loop.id}:${workLoopNodeId ?? "root"}:${role}`,
+    nodeDefinitionId: `${loop.id}:${workflowNodeId ?? "root"}:${role}`,
     executionProfile: profile,
     resources: [system, primary, ...skills].map(resourceEvidence),
     prompt,
     promptSha256: sha256(prompt),
-    taskEnvelopeVersion: 4,
+    taskEnvelopeVersion: 5,
     taskEnvelopeSha256: envelope.sha256,
     outputSchemaVersion: NODE_OUTCOME_SCHEMA_VERSION,
     outputSchemaId: NODE_OUTCOME_SCHEMA_IDS[role],
@@ -96,7 +100,7 @@ export const runtimeForNode = (snapshot: RootExecutionSnapshot, executionProfile
   return binding.runtime;
 };
 
-const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskEnvelopeV4): void => {
+const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskEnvelopeV5): void => {
   const loop = snapshot.loops.find((candidate) => candidate.id === envelope.loop.id);
   if (!loop || loop.description !== envelope.loop.description) throw new ExecutionCompositionError(
     "missing_resource",
@@ -137,12 +141,17 @@ const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskE
     }
     return;
   }
-  const node = loop.nodes.find((candidate) => candidate.id === envelope.workLoopNode.id);
-  const definition = envelope.role === "work" ? node?.work : node?.validation;
-  if (!node || node.description !== envelope.workLoopNode.description || definition?.task !== envelope.task) {
+  const job = loop.workflow.jobNodes.find((candidate) => candidate.id === envelope.jobNode.id);
+  const definition = envelope.role === "job"
+    ? job
+    : loop.workflow.validationNodes.find((candidate) => candidate.id === envelope.validationNode.id);
+  const identity = envelope.role === "job" ? envelope.jobNode : envelope.validationNode;
+  if (!job || job.description !== envelope.jobNode.description
+    || job.validationNodeId !== (envelope.role === "validation" ? envelope.validationNode.id : job.validationNodeId)
+    || !definition || definition.description !== identity.description || definition.task !== envelope.task) {
     throw new ExecutionCompositionError(
       "missing_resource",
-      `Task Envelope ${envelope.role} Node does not match ${loop.id}:${envelope.workLoopNode.id} in the immutable snapshot.`
+      `Task Envelope ${envelope.role} Node does not match ${loop.id}:${identity.id} in the immutable snapshot.`
     );
   }
 };
@@ -150,17 +159,18 @@ const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskE
 const resolveComposition = (
   snapshot: RootExecutionSnapshot,
   loopId: string,
-  workLoopNodeId: string | undefined,
+  workflowNodeId: string | undefined,
   role: NodeRunRole
 ): ProjectExecutionComposition => {
   if (role === "orchestrator") return snapshot.orchestrator;
   const loop = snapshot.loops.find((candidate) => candidate.id === loopId);
-  const node = loop?.nodes.find((candidate) => candidate.id === workLoopNodeId);
-  if (role === "work" && node && isProjectProviderWorkNode(node.work)) return node.work;
-  if (role === "validation" && node && isProjectAgentValidationNode(node.validation)) return node.validation;
+  const job = loop?.workflow.jobNodes.find((candidate) => candidate.id === workflowNodeId);
+  const validation = loop?.workflow.validationNodes.find((candidate) => candidate.id === workflowNodeId);
+  if (role === "job" && job && isProjectProviderJobNode(job)) return job;
+  if (role === "validation" && validation && isProjectAgentValidationNode(validation)) return validation;
   throw new ExecutionCompositionError(
     "missing_resource",
-    `Root execution snapshot has no executable ${role} composition for ${loopId}:${workLoopNodeId ?? "missing"}.`
+    `Root execution snapshot has no executable ${role} composition for ${loopId}:${workflowNodeId ?? "missing"}.`
   );
 };
 
@@ -178,7 +188,7 @@ const resourceEvidence = (resource: ExecutionResourceSnapshot): ExecutionResourc
   relativePath: resource.relativePath, sourceSha256: resource.sourceSha256
 });
 const section = (kind: string, id: string, content: string): string =>
-  `<<< BALLET EXECUTION COMPOSITION V5 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
+  `<<< BALLET EXECUTION COMPOSITION V6 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
 const compareUtf8 = (left: string, right: string): number => Buffer.compare(Buffer.from(left), Buffer.from(right));
 const sortedIds = (ids: readonly string[]): string[] => [...ids].sort(compareUtf8);
 const sortedTargets = <T extends { id: string; route: { capability: string } }>(targets: readonly T[]): T[] =>

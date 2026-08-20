@@ -27,7 +27,7 @@ const runRoutePath = (route: RouteState) => {
 
 const configureRoutePath = (route: RouteState) => {
   if (route.view === "automation") {
-    if (route.automationView === "loop" && route.automationEntityId) return automationLoopPath(route.automationEntityId);
+    if (route.automationView === "workflow" && route.automationEntityId) return automationLoopPath(route.automationEntityId);
     return automationGraphPath();
   }
   return windowPath();

@@ -4,7 +4,7 @@ title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 8
+version: 10
 tags:
   - arc42
   - quality
@@ -20,7 +20,7 @@ Tämä osio määrittää arkkitehtuurin suunnitteluun, hyväksymiseen ja evalua
 
 ## Tila
 
-QS-001–QS-010 sekä niiden prioriteetit perustuvat hyväksyttyihin Goaleihin ja `goal-009`:n valtuutukseen. Käyttäjä hyväksyi 2026-08-17 QS-011–QS-013:n prioriteetin 1. `goal-012`:n acceptance intent ja käyttäjän 2026-08-19 päätösvaltuutus tekevät QS-014:stä prioriteetin 1 v11-acceptance-rajan. Evidenssistatus on erillinen: pending implementation tai verification ei ole onnistumisväite.
+QS-001–QS-010 sekä niiden prioriteetit perustuvat hyväksyttyihin Goaleihin ja `goal-009`:n valtuutukseen. Käyttäjä hyväksyi 2026-08-17 QS-011–QS-013:n ja 2026-08-19 QS-014:n prioriteetin 1. `goal-013`:n acceptance intent ja käyttäjän 2026-08-20 päätösvaltuutus tekevät QS-015:stä prioriteetin 1 strict-v12 Workflow -acceptance-rajan. Evidenssistatus on erillinen: pending implementation tai verification ei ole onnistumisväite.
 
 ## Laatupuu
 
@@ -44,6 +44,7 @@ flowchart TD
   usability --> q10["QS-010 authoring"]
   usability --> q13["QS-013 Run projection"]
   integrity --> q14["QS-014 Graph/Loop v11"]
+  integrity --> q15["QS-015 Workflow v12"]
 ```
 
 Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voivat estää toiminnon, vaikka käytettävyys kärsisi. UI:n ymmärrettävyys ei oikeuta keksittyä runtime-telemetriaa.
@@ -67,6 +68,7 @@ Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voi
 | QS-012 | goal-006 | Palvelu restarttaa, kun task on queued tai running, ja cancellation commitoidaan ennen myöhäistä provider-payloadia. | Checkout-local SQLite, queue reconciliation ja active Root Run. | BB-004–BB-006, RT-009, DEP-001, DEP-002, CON-002 | Säilytä queued-työ, merkitse running-työ keskeytyneeksi ilman replayta ja estä duplicate/post-cancel-vaikutus. | Restartin jälkeen 100 % queued-tehtävistä säilyy; 100 % aiemmin running-tehtävistä on täsmälleen kerran `interrupted` eikä automaattista replayta synny; commitoituja State-revisioita/control-flow-eventtejä monistuu 0; cancellationin jälkeinen payload luo 0 state/outcome/continuation-muutosta. | 1 | EVID-012 | verified |
 | QS-013 | goal-007 | Operaattori tarkastaa aktiivista, repairissa olevaa, palannutta ja finalisoitua Runia sekä vastaa Human Nodeen. | Run mission control paikallisessa selaimessa immutable snapshotin ja canonical persistencen päällä. | BB-001, BB-002, BB-005, RT-010, CON-005 | Johda position, role, profile, attempt, revision, repair, return ja finalization vain snapshotista/read storesta; älä keksi telemetriaa. | View-model/panel-testit osoittavat 100 % nimetyistä kentistä canonical DTO -lähteeseen; provider-tekstistä johdettuja state-kenttiä on 0; UI näyttää 0 keksittyä prosenttia, ETA:a tai elapsed-arvoa; repair/return/human/finalization-fixtureiden expected projectionit läpäisevät. | 1 | EVID-013 | verified |
 | QS-014 | goal-012 | Operaattori authoroi project-global graphin tai avaa yhden Loopin, ja runtime kohtaa nolla, yhden tai usean flow/repair route candidaten. | Strict-v11 config, immutable Root Run snapshot ja paikallinen selain desktop/narrow-viewportissa. | BB-001, BB-003–BB-006, BB-009, RT-011, CON-002, CON-005 | Näytä täsmälleen Graph Engineering / Loop Engineering, validoi jokainen cross-Loop-valinta graph-allowlistilla ja capabilityllä sekä pysähdy ambiguityssa tai ihmisvaltuutuksessa `needs_input`-tilaan. | V11 parseri hylkää 100 % v10-, unknown-, silent-default- ja dual-write-fixtureistä; Context/numeric route/legacy-mallin aktiivisia polkuja on 0; Graph-projektiossa on täsmälleen yksi LoopNode per ProjectLoop ja yksi Orchestrator-control sekä 0 sisäistä Work/Validation-nodea; Loop-projektiossa on 0 project-global route/control-nodea; runtime-testit osoittavat zero-flow completionin, kaikki flow/repair-dispatchit Orchestratorin kautta, capability/allowlist-rejectionin, ambiguity/permission `needs_input`-tilan, repair-returnin samaan Validationiin ja flow framejen määrän 0. | 1 | EVID-014 | technical implementation passed GLE-EVID-002–008; human acceptance pending |
+| QS-015 | goal-013 | Repositoryn Loop authoroidaan tai suoritetaan, Validation palauttaa PASS/FAIL-tuloksen, palvelu avaa runtime-kannan tai käyttäjä navigoi selected-Loop-näkymään. | Strict-v12 config, v2 module, v5 snapshot/envelope/outcome, v7/v6 execution, SQLite v8 ja paikallinen selain desktop/narrow-viewportissa. | BB-001, BB-003–BB-006, BB-009, RT-002, RT-003, RT-011, CON-002, CON-005, CON-008 | Säilytä 1:1 Job/Validation-paritus ja exact Pass/Fail Edget; suorita ensimmäinen Job + kolme retryä, eskaloi neljäs FAIL, palaa repairista samaan Validationiin ja projisoi Workflow-canvasille yksi Job-artwork per pari sekä vain persisted Edget. | Parseri hylkää 100 % v11/v1/unknown/invalid-pairing/edge/reachability-fixtureistä; aktiivisia `WorkLoopNode`, `WorkNode`, `LOCAL_RETRY`, `ORCHESTRATOR_REPAIR`, `view=loop` tai `work_loop_node_runs` -polkuja on 0; runtime-testit osoittavat Job→Validation, PASS→Job/PASS, kolme retryä, neljännen FAIL-eskaloinnin, same-Validation repair-returnin ilman Job rerunia/retry resetiä, technical failure bypassin sekä State/restart/cancellation/recoveryn; UI-testit osoittavat atomisen parin create/delete-guardin, erilliset editorit, canvasilla vain JobNodet ja persisted Edget, edge-geometriat vain `straight` tai `smoothstep`, nolla endpoint-nodea/validate/retry-viivaa, canonical URL/back-forwardin, keyboard/a11y:n ja desktop/narrow-layoutin; v7-kanta failaa suljetusti täsmäohjeella. | 1 | EVID-015 | technical implementation, ADR-021 canvas correction and final gates passed; human visual acceptance pending |
 <!-- quality-scenarios:end -->
 
 ## Priorisoinnin tulkinta
@@ -81,11 +83,11 @@ Goalit omistavat quality intention. Tämä osio omistaa mitattavat skenaariot; [
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019` ja `adr-020`.
 
 ## Evidenssi
 
-EVID-001–EVID-014 ratkaistaan TRACEABILITYssa. EVID-011–EVID-013 on merkitty verifiediksi 2026-08-17 ajettujen nimettyjen testien ja conformance-katselmoinnin jälkeen. EVID-014 on pending, kunnes koko strict-v11-initiative on toteutettu ja arvioitu. Pending- tai failed-evidenssiä ei käsitellä onnistumisena.
+EVID-001–EVID-015 ratkaistaan TRACEABILITYssa. EVID-011–EVID-013 on merkitty verifiediksi 2026-08-17 ajettujen nimettyjen testien ja conformance-katselmoinnin jälkeen. EVID-014 säilyttää v11-historian, ja EVID-015 kerää nykyisen strict-v12 Workflow -hard cutin teknisen ja ihmisacceptance-evidenssin. Pending- tai failed-evidenssiä ei käsitellä onnistumisena.
 
 ## Avoimet kysymykset
 

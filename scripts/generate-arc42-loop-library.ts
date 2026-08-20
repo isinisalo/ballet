@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loopModulePackageV1Schema } from "../shared/api/loop-module-schemas.js";
-import type { LoopModuleCapabilitiesV1 } from "../shared/domain/loopModules.js";
+import { loopModulePackageV2Schema } from "../shared/api/loop-module-schemas.js";
+import type { LoopModuleCapabilitiesV2 } from "../shared/domain/loopModules.js";
 import { canonicalLoopModuleJson } from "../backend/loop-modules/canonicalLoopModule.js";
 import { LoopModuleService } from "../backend/loop-modules/LoopModuleService.js";
 import type { RuntimeDatabaseProvider } from "../backend/services/RuntimeDatabaseProvider.js";
@@ -16,8 +16,8 @@ const service = new LoopModuleService(() => root, inactiveRuntime);
 const capabilities = (
   accepts: string,
   provides: string,
-  recommendedConnections: LoopModuleCapabilitiesV1["recommendedConnections"] = []
-): LoopModuleCapabilitiesV1 => ({
+  recommendedConnections: LoopModuleCapabilitiesV2["recommendedConnections"] = []
+): LoopModuleCapabilitiesV2 => ({
   requires: accepts.endsWith(".requested") ? [] : [accepts],
   accepts: [accepts],
   provides: [provides],
@@ -27,7 +27,7 @@ const capabilities = (
 const definitions: Array<{
   loopId: string;
   title: string;
-  capabilities: LoopModuleCapabilitiesV1;
+  capabilities: LoopModuleCapabilitiesV2;
 }> = [
   {
     loopId: "arc42-clarify-requirements",
@@ -117,7 +117,7 @@ for (const definition of definitions) {
     category: "arc42",
     tags: ["arc42", "method"]
   });
-  const pkg = loopModulePackageV1Schema.parse({
+  const pkg = loopModulePackageV2Schema.parse({
     ...exported.package,
     stateContract: {
       id: "arc42-method-state",

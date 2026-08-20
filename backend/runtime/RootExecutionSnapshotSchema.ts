@@ -2,8 +2,7 @@ import { z } from "zod";
 import { automationConfigSchema, executionProfileSchema, loopThemeSchema } from "../../shared/api/workspace-schemas.js";
 import {
   getReachableProjectLoopGraph,
-  getReachableProjectNodeIds,
-  loopTerminals
+  getReachableProjectJobNodeIds
 } from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import { validateProjectAutomationConfig } from "../automation.js";
@@ -29,7 +28,7 @@ const resourceSchema = z.object({
 }).strict();
 
 export const rootExecutionSnapshotSchema = z.object({
-  version: z.literal(4),
+  version: z.literal(5),
   rootLoopId: z.string(),
   project: z.object({
     checkoutRoot: z.string(),
@@ -40,7 +39,6 @@ export const rootExecutionSnapshotSchema = z.object({
   orchestrator: automationConfigSchema.shape.orchestrator,
   loops: automationConfigSchema.shape.loops,
   graph: automationConfigSchema.shape.graph,
-  terminals: z.array(z.enum(loopTerminals)).length(loopTerminals.length),
   theme: loopThemeSchema,
   executionProfiles: z.array(executionProfileSchema),
   runtimes: z.array(z.object({
@@ -51,7 +49,7 @@ export const rootExecutionSnapshotSchema = z.object({
   createdAt: z.string()
 }).strict().superRefine((snapshot, context) => {
   const automationIssues = validateProjectAutomationConfig({
-    version: 11,
+    version: 12,
     orchestrator: snapshot.orchestrator,
     graph: snapshot.graph,
     loops: snapshot.loops
@@ -67,17 +65,12 @@ export const rootExecutionSnapshotSchema = z.object({
     path: ["rootLoopId"],
     message: `Root Loop ${snapshot.rootLoopId} is missing from the execution snapshot.`
   });
-  if (snapshot.terminals.some((terminal, index) => terminal !== loopTerminals[index])) context.addIssue({
-    code: "custom",
-    path: ["terminals"],
-    message: "Execution snapshot Loop terminals are not in canonical order."
-  });
   snapshot.loops.forEach((loop, loopIndex) => {
-    const reachableNodeIds = getReachableProjectNodeIds(loop);
-    if (loop.nodes.some((node) => !reachableNodeIds.has(node.id))) context.addIssue({
+    const reachableNodeIds = getReachableProjectJobNodeIds(loop);
+    if (loop.workflow.jobNodes.some((node) => !reachableNodeIds.has(node.id))) context.addIssue({
       code: "custom",
-      path: ["loops", loopIndex, "nodes"],
-      message: `Loop ${loop.id} contains a Work Loop Node that is not reachable by Validation OK Edges.`
+      path: ["loops", loopIndex, "workflow", "jobNodes"],
+      message: `Loop ${loop.id} contains a JobNode that is not reachable by PassEdges.`
     });
   });
   snapshot.graph.loopEdges.forEach((edge, edgeIndex) => {

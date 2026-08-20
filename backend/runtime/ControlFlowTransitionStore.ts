@@ -7,10 +7,10 @@ export interface AppendControlFlowInput {
   kind: ControlFlowEventKind;
   stateRevision: number;
   sourceLoopRunId?: string;
-  sourceWorkLoopNodeRunId?: string;
+  sourceJobRunId?: string;
   sourceNodeRunId?: string;
   targetLoopRunId?: string;
-  targetWorkLoopNodeRunId?: string;
+  targetJobRunId?: string;
   orchestrationRequestId?: string;
   repairRequestId?: string;
   orchestrationFrameId?: string;
@@ -34,14 +34,14 @@ export class ControlFlowTransitionStore {
     const result = this.connection().prepare(`
       INSERT INTO control_flow_events (
         root_run_id, sequence, kind, state_revision, source_loop_run_id,
-        source_work_loop_node_run_id, source_node_run_id, target_loop_run_id,
-        target_work_loop_node_run_id, orchestration_request_id, repair_request_id,
+        source_job_run_id, source_node_run_id, target_loop_run_id,
+        target_job_run_id, orchestration_request_id, repair_request_id,
         orchestration_frame_id, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(input.rootRunId, sequence, input.kind, input.stateRevision,
-      input.sourceLoopRunId ?? null, input.sourceWorkLoopNodeRunId ?? null,
+      input.sourceLoopRunId ?? null, input.sourceJobRunId ?? null,
       input.sourceNodeRunId ?? null, input.targetLoopRunId ?? null,
-      input.targetWorkLoopNodeRunId ?? null, input.orchestrationRequestId ?? null,
+      input.targetJobRunId ?? null, input.orchestrationRequestId ?? null,
       input.repairRequestId ?? null,
       input.orchestrationFrameId ?? null, timestamp);
     this.connection().prepare(`

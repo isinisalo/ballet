@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loopModulePackageV1Schema } from "../shared/api/loop-module-schemas.js";
+import { loopModulePackageV2Schema } from "../shared/api/loop-module-schemas.js";
 import type { JsonValue } from "../shared/domain/automation.js";
-import type { LoopModulePackageV1 } from "../shared/domain/loopModules.js";
+import type { LoopModulePackageV2 } from "../shared/domain/loopModules.js";
 import { canonicalLoopModuleJson } from "../backend/loop-modules/canonicalLoopModule.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,7 +17,7 @@ const initialState = {
   checks: [],
   evidence: []
 } satisfies JsonValue;
-const stateContract: LoopModulePackageV1["stateContract"] = {
+const stateContract: LoopModulePackageV2["stateContract"] = {
   id: "software-engineering-state",
   version: "1.0.0",
   description: "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
@@ -108,7 +108,7 @@ const starters: Starter[] = [
   {
     id: "deploy-dev",
     title: "Deploy to dev environment",
-    description: "Perform one exactly authorized deployment to a named development environment through Human Work. Done when authorization, target, deployment result, health checks and rollback status are explicitly validated.",
+    description: "Perform one exactly authorized deployment to a named development environment through a Human Job. Done when authorization, target, deployment result, health checks and rollback status are explicitly validated.",
     accepts: "deployment:dev.requested",
     provides: "deployment:dev.completed",
     task: "After an exact human authorization names the development environment, version, actions and limits, perform only that authorized deployment manually and record non-secret evidence. If authorization is missing or incomplete, return needs_input without acting.",
@@ -119,20 +119,24 @@ const starters: Starter[] = [
   }
 ];
 
-const agentPackage = (starter: Starter): LoopModulePackageV1 => {
-  const resources: LoopModulePackageV1["resources"] = starter.human ? [] : [
+const agentPackage = (starter: Starter): LoopModulePackageV2 => {
+  const resources: LoopModulePackageV2["resources"] = starter.human ? [] : [
     { kind: "instruction", key: "worker", title: `${starter.title} worker`, metadata: {}, body: `${starter.instruction}\n` },
     { kind: "skill", key: "task", name: `${starter.id}-task`, description: `Complete and verify the ${starter.title} responsibility.`, metadata: {}, body: `# ${starter.title}\n\n${starter.skill}\n` }
   ];
-  const work: LoopModulePackageV1["loop"]["nodes"][number]["work"] = starter.human
-    ? { type: "human", task: starter.task, nodeStyle: "terra", nodeSize: "medium" }
+  const job: LoopModulePackageV2["loop"]["workflow"]["jobNodes"][number] = starter.human
+    ? {
+        key: "task", validationNode: "task-validation", description: starter.description,
+        type: "human", task: starter.task, nodeStyle: "terra", nodeSize: "medium", maxRetries: 3
+      }
     : {
+        key: "task", validationNode: "task-validation", description: starter.description,
         type: "agent", task: starter.task, profileSlot: "worker", primaryInstruction: "worker",
-        skills: ["task"], nodeStyle: "terra", nodeSize: "medium"
+        skills: ["task"], nodeStyle: "terra", nodeSize: "medium", maxRetries: 3
       };
   return {
     format: "ballet-loop-module",
-    version: 1,
+    version: 2,
     manifest: { id: starter.id, title: starter.title, description: starter.description, version: "1.0.0", category: "software-engineering", tags: ["software-engineering", "starter"] },
     permissions: { network: "forbidden", externalWrites: false },
     profileSlots: starter.human ? [] : [{ key: "worker", title: "Worker", description: "Network-off implementation profile.", providers: ["codex", "copilot"], network: "forbidden" }],
@@ -143,28 +147,29 @@ const agentPackage = (starter: Starter): LoopModulePackageV1 => {
       key: "loop",
       description: starter.description,
       state: { description: stateContract.description, initial: initialState },
-      startNode: "task",
-      nodes: [{
-        key: "task", description: starter.description, work,
-        validation: starter.human
-          ? { type: "human", task: starter.validation, nodeStyle: "luna", nodeSize: "small" }
-          : { type: "human", task: starter.validation, nodeStyle: "luna", nodeSize: "small" },
-        maxLocalAttempts: 3
-      }],
-      edges: [{ key: "completed", source: "task", target: { terminal: "completed" } }]
+      workflow: {
+        startJobNode: "task",
+        jobNodes: [job],
+        validationNodes: [{
+          key: "task-validation", description: `Validate ${starter.title}.`,
+          type: "human", task: starter.validation, nodeStyle: "luna", nodeSize: "small"
+        }],
+        passEdges: [{ key: "task-pass", sourceValidationNode: "task-validation", target: { workflowResult: "PASS" } }],
+        failEdges: [{ key: "task-fail", sourceValidationNode: "task-validation", target: { workflowResult: "FAIL" } }]
+      }
     }
   };
 };
 
 await mkdir(target, { recursive: true });
 for (const starter of starters) {
-  const parsed = loopModulePackageV1Schema.parse(agentPackage(starter));
+  const parsed = loopModulePackageV2Schema.parse(agentPackage(starter));
   await writeFile(path.join(target, `${starter.id}.ballet-loop.json`), canonicalLoopModuleJson(parsed), "utf8");
 }
 
 for (const filename of ["backend-implementation.ballet-loop.json", "frontend-implementation.ballet-loop.json"]) {
   const source = path.join(softwareDelivery, filename);
-  const pkg = JSON.parse(await readFile(source, "utf8")) as LoopModulePackageV1;
+  const pkg = JSON.parse(await readFile(source, "utf8")) as LoopModulePackageV2;
   const description = filename.startsWith("backend-")
     ? "Implement one bounded backend change. Done when requested domain, API and persistence behavior, compatibility, tests and concrete check evidence are independently validated."
     : "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.";
@@ -179,6 +184,6 @@ for (const filename of ["backend-implementation.ballet-loop.json", "frontend-imp
     provides: ["implementation:change.ready"],
     recommendedConnections: []
   };
-  const parsed = loopModulePackageV1Schema.parse(pkg);
+  const parsed = loopModulePackageV2Schema.parse(pkg);
   await writeFile(source, canonicalLoopModuleJson(parsed), "utf8");
 }

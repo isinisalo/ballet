@@ -27,42 +27,7 @@
   "format": "ballet-loop-module",
   "loop": {
     "description": "Resolve architecture-significant choices for an approved concept baseline. Done when every significant choice has an explicit accepted, rejected or no-ADR-needed status and no accepted ADR was changed silently.",
-    "edges": [
-      {
-        "key": "completed",
-        "source": "architecture-decision",
-        "target": {
-          "terminal": "completed"
-        }
-      }
-    ],
     "key": "loop",
-    "nodes": [
-      {
-        "description": "Propose and obtain the explicit status of architecture-significant decisions.",
-        "key": "architecture-decision",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "tiny",
-          "nodeStyle": "luna",
-          "task": "Accept or reject each new architecture-significant ADR proposal, or explicitly confirm with evidence that no new ADR is required. Never approve an implicit change to an accepted ADR.",
-          "type": "human"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "arc42-decision-agent",
-          "profileSlot": "slot-1",
-          "skills": [
-            "decision-records",
-            "initiative-handoff"
-          ],
-          "task": "Assess unresolved architecture-significant choices against accepted Goals, quality scenarios, concepts and existing ADRs. Create or update only justified draft/review ADR proposals. Done means every significant choice is linked to its decision drivers and has an explicit proposal, existing-decision or no-ADR-needed status.",
-          "type": "agent"
-        }
-      }
-    ],
-    "startNode": "architecture-decision",
     "state": {
       "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
       "initial": {
@@ -108,6 +73,55 @@
           "status": "not_requested"
         }
       }
+    },
+    "workflow": {
+      "failEdges": [
+        {
+          "key": "architecture-decision-fail",
+          "sourceValidationNode": "architecture-decision-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        }
+      ],
+      "jobNodes": [
+        {
+          "description": "Propose and obtain the explicit status of architecture-significant decisions.",
+          "key": "architecture-decision",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-decision-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "decision-records",
+            "initiative-handoff"
+          ],
+          "task": "Assess unresolved architecture-significant choices against accepted Goals, quality scenarios, concepts and existing ADRs. Create or update only justified draft/review ADR proposals. Done means every significant choice is linked to its decision drivers and has an explicit proposal, existing-decision or no-ADR-needed status.",
+          "type": "agent",
+          "validationNode": "architecture-decision-validation"
+        }
+      ],
+      "passEdges": [
+        {
+          "key": "completed",
+          "sourceValidationNode": "architecture-decision-validation",
+          "target": {
+            "workflowResult": "PASS"
+          }
+        }
+      ],
+      "startJobNode": "architecture-decision",
+      "validationNodes": [
+        {
+          "description": "Validate Propose and obtain the explicit status of architecture-significant decisions.",
+          "key": "architecture-decision-validation",
+          "nodeSize": "tiny",
+          "nodeStyle": "luna",
+          "task": "Accept or reject each new architecture-significant ADR proposal, or explicitly confirm with evidence that no new ADR is required. Never approve an implicit change to an accepted ADR.",
+          "type": "human"
+        }
+      ]
     }
   },
   "manifest": {
@@ -224,5 +238,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 1
+  "version": 2
 }

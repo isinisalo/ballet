@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 8
+version: 10
 tags:
   - arc42
   - concepts
@@ -19,19 +19,20 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-007 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. QS-014 / ADR-018:n strict-v11 graph/capability-raja on toteutettu configissa, shared contracteissa, snapshotissa, module materialisoinnissa, persisted Orchestrator-dispatchissa ja Graph/Loop-authoring-projektioissa muuttamatta concept-ID:itä; ihmisacceptance on pending.
+CON-001–CON-008 ovat hyväksytyn arkkitehtuurin yhteisiä konsepteja. CON-008 kokoaa QS-015 / ADR-020:n strict-v12 Workflow-invariantit configin, shared contractien, snapshotin, module materialisoinnin, persistenssin, runtimen ja Graph/Workflow-authoring-projektioiden yhteiseksi rajaksi; ihmisacceptance on pending.
 
 ## Konseptikartta
 
 | ID | Konsepti | Soveltuu | QS | Toteutusankkurit |
 | --- | --- | --- | --- | --- |
 | CON-001 | Least-authority local execution: loopback API, eksplisiittinen Origin-politiikka, worktree-only Node-kirjoitukset, network-off-oletus ja ihmisen external-write-valtuutus. | BB-002, BB-004, BB-006, BB-007 | QS-001, QS-004, QS-007 | ADR-006, ADR-008, workspace permission policy |
-| CON-002 | Durable canonical control: strict role outcomes, atomiset State patchit, append-only revisionit, bounded retry, repair-frame ja runtime-owned continuation. | BB-004–BB-006 | QS-003, QS-012 | ADR-015, runtime/state/queue-storet |
+| CON-002 | Durable canonical control: strict role outcomes, atomiset State patchit, append-only revisionit, bounded retry, repair-frame ja runtime-owned continuation. | BB-004–BB-006 | QS-003, QS-012, QS-015 | ADR-015, ADR-020, runtime/state/queue-storet |
 | CON-003 | Deterministinen execution composition: System → primary → vakaasti järjestetyt skillit → `TaskEnvelope` → role/output schema, kaikki snapshotattuna ja hashattuna. | BB-003, BB-004, BB-006 | QS-002, QS-004, QS-011 | ADR-012, ADR-013, `ExecutionComposition` |
 | CON-004 | Siirrettävät project resources: repository-polut omistavat configin, dokumentit, instructionit ja skillit; machine state jää `.git/ballet`-hakemistoon. | BB-003, BB-008, BB-009 | QS-002, QS-005, QS-009 | ADR-002, ADR-014, ADR-016, resource catalog |
 | CON-005 | Cyber-industrial operator UI ja canonical projection: dense, accessible, token-driven React/Tailwind/shadcn-pinnat näyttävät vain nimetyn runtime/project-totuuden. | BB-001, BB-002, BB-005 | QS-001, QS-010, QS-013, QS-014 | [DESIGN.md](../../DESIGN.md), `engineeringProjections.ts`, `loopRunViewModel.ts` |
 | CON-006 | Evidenssipohjainen arc42 Method: stable ID:t, väitetyypit, initiative handoff, traceability, conformance ja mitattu method health. | BB-003–BB-005, BB-008 | QS-005, QS-006, QS-008 | goal-009, ADR-011, project-local arc42-resurssit |
 | CON-007 | Copy-to-project module trust: strict rajattu JSON, canonical hash, deterministic namespace, compatible profile slots, revalidated plan, config-last commit ja content-derived provenance. | BB-001–BB-003, BB-009 | QS-002, QS-004, QS-009 | ADR-016, Loop module schemas/service/tests |
+| CON-008 | Workflow structural integrity: jokainen Job omistaa yhden Validationin, jokaisella Validationilla on yksi PassEdge ja FailEdge, Jobit ovat saavutettavia ja vähintään yksi PASS-tulos saavutetaan; validate/retry ovat kiinteitä runtime-siirtymiä. Canvas projisoi parin yhdeksi Job-artworkiksi ja vain persisted Edget. | BB-001, BB-003–BB-006, BB-009 | QS-003, QS-009, QS-015 | ADR-020, ADR-021, project/workflow schema, Workflow runtime ja canvas |
 
 ## Turvallisuus ja auktorisointi
 
@@ -50,7 +51,7 @@ Authentication-palvelua ei lisätä loopback-arkkitehtuuriin implisiittisesti. T
 
 | Raja | Validointi | Virheen muoto | Sivuvaikutus |
 | --- | --- | --- | --- |
-| Project config/resources | Strict-v11 graph/capability/routes ilman v10 readeria, dual-writeä tai silent defaultia. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
+| Project config/resources | Strict-v12 Workflow/graph/capability/routes ilman v11 readeria, dual-writeä tai silent defaultia. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
 | HTTP/API | Shared request/response schema ja application precondition. | 4xx odotetulle inputille, 5xx vain odottamattomalle virheelle. | Service-transaktio ei ala malformed-inputilla. |
 | Composition | Profiili, instructionit, skillit, order, envelope ja output schema. | `ExecutionCompositionError` tai vastaava blocking outcome. | Nolla jonotettua taskia ja nolla fallbackia. |
 | Runtime outcome | Roolikohtainen strict schema, current revision ja rajat. | Failed/needs_input/interrupted/terminal outcome. | Vain atomisesti commitoitu fakta näkyy. |
@@ -96,8 +97,7 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 ## UI:n totuusperiaate
 
 - `DESIGN.md` omistaa värit, typografian, spacingin, radius-säännöt ja visuaalisen periaatteen.
-- Nykyisessä v10-baselinessa Context, composition ja detail ovat authoring-projektioita; vain omistetut `LoopEdge`/`Edge`-entiteetit ovat muokattavaa domain-dataa.
-- Hyväksytyssä v11-targetissa authoring-projektiot ovat vain `graph | loop`: Graph Engineering näyttää `ProjectLoop`→`LoopNode`-projektiot, yhden Orchestrator-controlin ja persisted route-policyn, Loop Engineering vain valitun Loopin sisäisen komposition. Client layout/selection ei omista topologiaa.
+- Aktiiviset authoring-projektiot ovat vain `graph | workflow`: Graph Engineering näyttää `ProjectLoop`→`LoopNode`-projektiot, yhden Orchestrator-controlin ja persisted route-policyn; Workflow Engineering näyttää vain valitun Loopin Job-artworkit ja persisted Pass/Fail Edget. Paired Validationin tila kuuluu Job-artworkiin, terminaalitulokset eivät ole nodeja ja client layout/selection ei omista topologiaa.
 - Mission kokoaa nykyisen tavoitteen ja aktiivisen polun; All Loops näyttää immutable snapshotin koko topologian.
 - Position, role, profile, attempt, revision, repair, return ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
 - Visuaalinen artwork, orbit, glow tai reittikorostus auttaa lukemista mutta ei muodosta uutta runtime-tilaa.
@@ -105,10 +105,10 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 
 ## Versiointi ja yhteensopivuus
 
-- `.ballet/project.json` käyttää strict-v11-skeemaa: graph omistaa `loopEdges`-reitit, Loop omistaa `accepts`/`provides`-capabilityt ja reitti nimeää capabilityn.
-- V11-toteutus ei säilytä v10-parseria, compatibility-readeria, top-level `loopEdges`-rinnakkaismallia, dual-writeä tai silent defaultia. Numeric route -alias poistetaan vasta rajatussa frontend hard cut -vaiheessa.
+- `.ballet/project.json` käyttää strict-v12-skeemaa: Loop omistaa `ProjectWorkflow`-rakenteen ja `accepts`/`provides`-capabilityt; graph omistaa project-global `loopEdges`-reitit ja reitti nimeää capabilityn.
+- V12-toteutus ei säilytä v11-parseria, WorkLoopNode/WorkNode-compatibility-readeria, `view=loop`-aliasta, dual-writeä tai silent defaultia.
 - Shared API/TypeScript-sopimuksen semanttinen muutos vaatii toteutuksen ja kuluttajien koordinoidun päivityksen sekä testit.
-- SQLite-schema muuttuu vain numeroiduilla migraatioilla. V11 snapshot tallennetaan nykyiseen snapshot-JSON-kenttään, joten tämä vaihe ei vaatinut uutta SQLite-migraatiota.
+- SQLite schema v8 käyttää `job_runs`-mallia. V7-tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen archive/remediation-ohjeen ja epäonnistuu suljetusti.
 - Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
 - Hyväksytty ADR ei muutu hiljaisesti; uusi päätös supersedoi sen eksplisiittisesti.
 
@@ -118,7 +118,7 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008` ja `adr-011`–`adr-018`.
+`adr-002`, `adr-005`–`adr-008` ja `adr-011`–`adr-020`.
 
 ## Evidenssi
 

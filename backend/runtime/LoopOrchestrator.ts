@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { JsonValue, ProjectLoop, ProjectWorkLoopNode } from "../../shared/domain/automation.js";
+import type { JsonValue, ProjectJobNode, ProjectLoop } from "../../shared/domain/automation.js";
 import {
   maxOrchestratorDispatchValueBytes, type CanonicalNodeOutcome, type NodeRun, type OrchestrationRequest,
   type OrchestratorNodeOutcome, type RepairRequest, type ValidationNodeOutcome
@@ -11,8 +11,8 @@ import type { LoopStateStore } from "./LoopStateStore.js";
 import type { OrchestrationStore } from "./OrchestrationStore.js";
 import type { RepairStore } from "./RepairStore.js";
 import type { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
-import type { WorkLoopProgressStore } from "./WorkLoopProgressStore.js";
-import { requireOutcome } from "./WorkLoopEngineSupport.js";
+import type { WorkflowProgressStore } from "./WorkflowProgressStore.js";
+import { requireOutcome } from "./WorkflowEngineSupport.js";
 import { assertJsonValue } from "./state/CanonicalJson.js";
 
 type ValidationFailOutcome = ValidationNodeOutcome & { state: "completed"; decision: "FAIL" };
@@ -25,10 +25,10 @@ export interface LoopOrchestratorCallbacks extends LoopCompletionCallbacks {
   startRepair(
     loop: ProjectLoop, callerLoopRunId: string, repairRequest: RepairRequest,
     orchestrationRequest: OrchestrationRequest, input: JsonValue, revision: number
-  ): { loopRunId: string; workLoopNodeRunId: string };
+  ): { loopRunId: string; jobRunId: string };
   startFlow(
     loop: ProjectLoop, request: OrchestrationRequest, input: JsonValue, revision: number
-  ): { loopRunId: string; workLoopNodeRunId: string };
+  ): { loopRunId: string; jobRunId: string };
 }
 
 export class LoopOrchestrator {
@@ -39,7 +39,7 @@ export class LoopOrchestrator {
     private readonly repairs: RepairStore,
     private readonly orchestration: OrchestrationStore,
     private readonly snapshots: RootExecutionSnapshotStore,
-    private readonly progress: WorkLoopProgressStore,
+    private readonly progress: WorkflowProgressStore,
     private readonly completion: LoopCompletionEngine
   ) {}
 
@@ -47,20 +47,17 @@ export class LoopOrchestrator {
     node: NodeRun,
     outcome: ValidationFailOutcome,
     loop: ProjectLoop,
-    definition: ProjectWorkLoopNode,
-    compositeId: string,
+    definition: ProjectJobNode,
+    jobRunId: string,
     nestingDepth: number,
     callbacks: LoopOrchestratorCallbacks
   ): void {
-    if (outcome.repair.mode !== "ORCHESTRATOR_REPAIR") {
-      throw new LoopRunIntegrityError("Loop Orchestrator requires an external Repair Request outcome.");
-    }
     const snapshot = this.snapshots.require(node.rootRunId);
-    const attempt = this.repairs.orchestratorAttemptCount(compositeId) + 1;
+    const attempt = this.repairs.orchestratorAttemptCount(jobRunId) + 1;
     if (attempt > snapshot.orchestrator.maxRepairAttempts) {
       this.rejectRequestLimit(
         node, outcome, "repair_attempt_limit",
-        `Work Loop Node ${definition.id} exceeded ${snapshot.orchestrator.maxRepairAttempts} external repair attempts.`,
+        `Job Node ${definition.id} exceeded ${snapshot.orchestrator.maxRepairAttempts} external repair attempts.`,
         callbacks
       );
       return;
@@ -76,20 +73,20 @@ export class LoopOrchestrator {
     }
     const committed = this.states.commitNodeOutcome({
       rootRunId: node.rootRunId, nodeRunId: node.nodeRunId, baseRevision: node.stateRevisionBefore,
-      outcome, workLoopNodeStatus: "waiting_for_input",
-      control: { kind: "validation_fail_orchestrator" }
+      outcome, jobRunStatus: "waiting_for_input",
+      control: { kind: "validation_fail_escalated" }
     });
     const repairRequest = this.repairs.createRequest({
       repairRequestId: randomUUID(),
       rootRunId: node.rootRunId, requesterLoopRunId: node.loopRunId,
-      requesterWorkLoopNodeRunId: compositeId, requesterValidationNodeRunId: node.nodeRunId,
-      mode: "orchestrator", attempt, validationSummary: outcome.summary,
-      requestedCapability: outcome.repair.requestedCapability,
-      requestedOutcome: outcome.repair.requestedOutcome,
-      reason: outcome.repair.reason,
-      evidence: { validation: outcome.evidence, refs: outcome.repair.evidenceRefs },
+      requesterJobRunId: jobRunId, requesterValidationNodeRunId: node.nodeRunId,
+      attempt, validationSummary: outcome.summary,
+      requestedCapability: outcome.escalation.requestedCapability,
+      requestedOutcome: outcome.escalation.requestedOutcome,
+      reason: outcome.escalation.reason,
+      evidence: { validation: outcome.evidence, refs: outcome.escalation.evidenceRefs },
       stateRevisionAtRequest: committed.revision.revision,
-      returnLoopId: node.loopId, returnWorkLoopNodeId: definition.id,
+      returnLoopId: node.loopId, returnJobNodeId: definition.id,
       returnValidationNodeDefinitionId: node.nodeDefinitionId, nestingDepth: requestDepth
     });
     const orchestrationRequest = this.orchestration.create({
@@ -97,8 +94,8 @@ export class LoopOrchestrator {
       sourceLoopId: node.loopId, sourceNodeRunId: node.nodeRunId,
       stateRevisionAtRequest: committed.revision.revision,
       completionSummary: outcome.summary, completionEvidence: outcome as unknown as JsonValue,
-      requestedCapability: outcome.repair.requestedCapability,
-      expectedOutcome: outcome.repair.requestedOutcome,
+      requestedCapability: outcome.escalation.requestedCapability,
+      expectedOutcome: outcome.escalation.requestedOutcome,
       repairRequestId: repairRequest.repairRequestId
     });
     this.connection().prepare(`
@@ -196,7 +193,7 @@ export class LoopOrchestrator {
       rootRunId: node.rootRunId, repairRequestId: repairRequest.repairRequestId,
       routeId: route.routeId, callerLoopRunId: node.loopRunId, calleeLoopRunId: target.loopRunId,
       parentFrameId: parentFrame?.frameId, returnLoopId: repairRequest.returnLoopId,
-      returnWorkLoopNodeId: repairRequest.returnWorkLoopNodeId,
+      returnJobNodeId: repairRequest.returnJobNodeId,
       returnValidationNodeDefinitionId: repairRequest.returnValidationNodeDefinitionId,
       stateRevisionAtCall: revision, nestingDepth: repairRequest.nestingDepth
     });
@@ -254,9 +251,9 @@ export class LoopOrchestrator {
   ): void {
     this.states.commitNodeOutcome({
       rootRunId: node.rootRunId, nodeRunId: node.nodeRunId, baseRevision: node.stateRevisionBefore,
-      outcome, workLoopNodeStatus: "blocked", workLoopNodeTerminal: "blocked",
+      outcome, jobRunStatus: "blocked", jobRunTerminal: "blocked",
       errorCode: code, errorMessage: message,
-      control: { kind: "validation_fail_orchestrator" }
+      control: { kind: "validation_fail_escalated" }
     });
     const persisted = requireOutcome(this.loops.getNodeRun(node.nodeRunId), "validation", "completed");
     this.completion.complete(
@@ -290,14 +287,14 @@ export class LoopOrchestrator {
 
   private bindControlTarget(
     controlFlowEventId: number,
-    target: { loopRunId: string; workLoopNodeRunId: string },
+    target: { loopRunId: string; jobRunId: string },
     orchestrationRequestId: string,
     frameId?: string
   ): void {
     this.connection().prepare(`
-      UPDATE control_flow_events SET target_loop_run_id = ?, target_work_loop_node_run_id = ?,
+      UPDATE control_flow_events SET target_loop_run_id = ?, target_job_run_id = ?,
         orchestration_request_id = ?, orchestration_frame_id = ? WHERE id = ?
-    `).run(target.loopRunId, target.workLoopNodeRunId, orchestrationRequestId, frameId ?? null, controlFlowEventId);
+    `).run(target.loopRunId, target.jobRunId, orchestrationRequestId, frameId ?? null, controlFlowEventId);
   }
 }
 

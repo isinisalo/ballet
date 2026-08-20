@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { canonicalNodeOutcomeSchema, workCompletedOutcomeSchema } from "./runtime-schemas.js";
+import { canonicalNodeOutcomeSchema, jobCompletedOutcomeSchema } from "./runtime-schemas.js";
 
 const boundedText = z.string().max(20_000);
 const nonEmptyText = boundedText.trim().min(1);
@@ -10,7 +10,7 @@ const providerRunIdentitySchema = z.object({
   rootRunId: identifier,
   loopRunId: identifier,
   nodeRunId: identifier,
-  workLoopNodeRunId: identifier
+  jobRunId: identifier
 }).strict();
 const orchestratorRunIdentitySchema = z.object({
   rootRunId: identifier,
@@ -18,7 +18,7 @@ const orchestratorRunIdentitySchema = z.object({
   nodeRunId: identifier
 }).strict();
 const loopIdentitySchema = z.object({ id: identifier, description: nonEmptyText }).strict();
-const workLoopNodeIdentitySchema = z.object({ id: identifier, description: nonEmptyText }).strict();
+const workflowNodeIdentitySchema = z.object({ id: identifier, description: nonEmptyText }).strict();
 const stateSchema = z.object({
   revision: z.number().int().nonnegative(),
   value: z.json(),
@@ -32,7 +32,7 @@ const resumeSchema = z.object({
 const historyEntrySchema = z.object({
   sequence: z.number().int().nonnegative(),
   nodeRunId: identifier,
-  role: z.enum(["work", "validation", "orchestrator"]),
+  role: z.enum(["job", "validation", "orchestrator"]),
   state: z.enum(["completed", "needs_input", "blocked", "failed"]),
   summary: boundedText,
   stateRevision: z.number().int().nonnegative()
@@ -40,19 +40,19 @@ const historyEntrySchema = z.object({
 const relevantHistorySchema = z.array(historyEntrySchema).max(8);
 
 const commonProviderFields = {
-  version: z.literal(4),
+  version: z.literal(5),
   run: providerRunIdentitySchema,
   loop: loopIdentitySchema,
-  workLoopNode: workLoopNodeIdentitySchema,
+  jobNode: workflowNodeIdentitySchema,
   task: nonEmptyText,
   state: stateSchema,
-  localAttempt: z.number().int().min(1).max(100),
+  jobAttempt: z.number().int().min(1).max(101),
   resume: resumeSchema.optional(),
   relevantHistory: relevantHistorySchema
 };
 
-export const workTaskEnvelopeV4Schema = z.object({
-  role: z.literal("work"),
+export const jobTaskEnvelopeV5Schema = z.object({
+  role: z.literal("job"),
   ...commonProviderFields,
   previousValidationFeedback: z.object({
     feedback: nonEmptyText,
@@ -63,7 +63,7 @@ export const workTaskEnvelopeV4Schema = z.object({
 const repairRequestFields = {
   id: identifier,
   requesterLoopRunId: identifier,
-  requesterWorkLoopNodeRunId: identifier,
+  requesterJobRunId: identifier,
   requesterValidationNodeRunId: identifier,
   attempt: z.number().int().min(1).max(100),
   validationSummary: nonEmptyText,
@@ -90,10 +90,11 @@ export const taskEnvelopeRepairReturnSchema = z.object({
   }).strict()
 }).strict();
 
-export const validationTaskEnvelopeV4Schema = z.object({
+export const validationTaskEnvelopeV5Schema = z.object({
   role: z.literal("validation"),
   ...commonProviderFields,
-  workOutcome: workCompletedOutcomeSchema,
+  validationNode: workflowNodeIdentitySchema,
+  jobOutcome: jobCompletedOutcomeSchema,
   repairReturn: taskEnvelopeRepairReturnSchema.optional()
 }).strict();
 
@@ -124,8 +125,8 @@ const orchestrationRequestSchema = z.object({
   expectedOutcome: z.json().optional()
 }).strict();
 
-export const orchestratorTaskEnvelopeV4Schema = z.object({
-  version: z.literal(4),
+export const orchestratorTaskEnvelopeV5Schema = z.object({
+  version: z.literal(5),
   role: z.literal("orchestrator"),
   run: orchestratorRunIdentitySchema,
   loop: loopIdentitySchema,
@@ -137,8 +138,8 @@ export const orchestratorTaskEnvelopeV4Schema = z.object({
   relevantHistory: relevantHistorySchema
 }).strict();
 
-export const taskEnvelopeV4Schema = z.union([
-  workTaskEnvelopeV4Schema,
-  validationTaskEnvelopeV4Schema,
-  orchestratorTaskEnvelopeV4Schema
+export const taskEnvelopeV5Schema = z.union([
+  jobTaskEnvelopeV5Schema,
+  validationTaskEnvelopeV5Schema,
+  orchestratorTaskEnvelopeV5Schema
 ]);

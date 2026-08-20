@@ -13,7 +13,7 @@ const activeRun: RootRunSummary = {
   status: "running",
   stateRevision: 2,
   current: {
-    loopId: "delivery", workLoopNodeId: "implement", nodeRole: "work",
+    loopId: "delivery", jobNodeId: "implement", nodeRole: "job",
     executionProfileId: "developer", taskStatus: "running"
   },
   createdAt: "2026-07-11T10:00:00.000Z",
@@ -84,7 +84,7 @@ describe("Run Overview", () => {
 
     render(<RunOverview dashboard={dashboard} navigate={navigate} />);
 
-    expect(screen.getByText(/delivery · implement · work · developer · root-active/)).toBeInTheDocument();
+    expect(screen.getByText(/delivery · implement · job · developer · root-active/)).toBeInTheDocument();
     expect(screen.getByText("schedule")).toBeInTheDocument();
     expect(screen.getByText(/src\/review\.ts/)).toBeInTheDocument();
     expect(screen.getByText(/No local provider is configured/)).toBeInTheDocument();

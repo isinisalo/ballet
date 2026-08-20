@@ -21,117 +21,7 @@
   "format": "ballet-loop-module",
   "loop": {
     "description": "Evaluate one bounded implementation. Done when every in-scope quality scenario has an evidence-backed verdict and resulting risk, debt, drift, traceability, review and method-health findings are validated.",
-    "edges": [
-      {
-        "key": "evaluate-quality-ok",
-        "source": "evaluate-quality-evidence",
-        "target": {
-          "node": "evaluate-risk-debt-drift"
-        }
-      },
-      {
-        "key": "evaluate-risk-ok",
-        "source": "evaluate-risk-debt-drift",
-        "target": {
-          "node": "evaluate-method-health"
-        }
-      },
-      {
-        "key": "evaluate-completed",
-        "source": "evaluate-method-health",
-        "target": {
-          "terminal": "completed"
-        }
-      }
-    ],
     "key": "loop",
-    "nodes": [
-      {
-        "description": "Evaluate actual evidence against every in-scope measurable quality scenario.",
-        "key": "evaluate-quality-evidence",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "arc42-reviewer",
-          "profileSlot": "slot-2",
-          "skills": [
-            "conformance-review"
-          ],
-          "task": "Validate every QS verdict against its exact measurable criterion and evidence reference. Do not change implementation, tests or verdict sources.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "arc42-evaluation-agent",
-          "profileSlot": "slot-1",
-          "skills": [
-            "evaluation",
-            "traceability"
-          ],
-          "task": "Evaluate the initiative against each in-scope measurable quality scenario. Record pass/fail/blocked/missing evidence separately and update TRACEABILITY plus initiative REVIEW without inferring success from absent evidence.",
-          "type": "agent"
-        }
-      },
-      {
-        "description": "Assess risks, technical debt, architecture drift and decision fitness.",
-        "key": "evaluate-risk-debt-drift",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "arc42-reviewer",
-          "profileSlot": "slot-2",
-          "skills": [
-            "conformance-review"
-          ],
-          "task": "Validate that each retained risk/debt/drift finding has concrete evidence, affected stable IDs, impact and an appropriate capability/outcome. Do not edit findings.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "arc42-evaluation-agent",
-          "profileSlot": "slot-1",
-          "skills": [
-            "conformance-review",
-            "evaluation"
-          ],
-          "task": "Analyze risk, technical debt, architecture drift, stale/contradictory documentation and whether relevant ADRs/concepts still achieve their intended quality response. Update section 11 and REVIEW only for evidence-backed Findings.",
-          "type": "agent"
-        }
-      },
-      {
-        "description": "Update method health and derive only evidence-backed improvement actions and handoff.",
-        "key": "evaluate-method-health",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "arc42-reviewer",
-          "profileSlot": "slot-2",
-          "skills": [
-            "method-health"
-          ],
-          "task": "Validate that method-health changes come from cited evidence, preserve human approval boundaries and contain no preference-only churn. Do not modify evaluated records.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "arc42-evaluation-agent",
-          "profileSlot": "slot-1",
-          "skills": [
-            "initiative-handoff",
-            "method-health"
-          ],
-          "task": "Update METHOD-HEALTH from actual Validation FAILs, retries, repair targets, open questions, drift, evidence gaps and interventions. For any proposed method change record baseline, hypothesis, expected metric and later eval; require human approval for behavior changes.",
-          "type": "agent"
-        }
-      }
-    ],
-    "startNode": "evaluate-quality-evidence",
     "state": {
       "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
       "initial": {
@@ -177,6 +67,146 @@
           "status": "not_requested"
         }
       }
+    },
+    "workflow": {
+      "failEdges": [
+        {
+          "key": "evaluate-quality-evidence-fail",
+          "sourceValidationNode": "evaluate-quality-evidence-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        },
+        {
+          "key": "evaluate-risk-debt-drift-fail",
+          "sourceValidationNode": "evaluate-risk-debt-drift-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        },
+        {
+          "key": "evaluate-method-health-fail",
+          "sourceValidationNode": "evaluate-method-health-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        }
+      ],
+      "jobNodes": [
+        {
+          "description": "Evaluate actual evidence against every in-scope measurable quality scenario.",
+          "key": "evaluate-quality-evidence",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-evaluation-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "evaluation",
+            "traceability"
+          ],
+          "task": "Evaluate the initiative against each in-scope measurable quality scenario. Record pass/fail/blocked/missing evidence separately and update TRACEABILITY plus initiative REVIEW without inferring success from absent evidence.",
+          "type": "agent",
+          "validationNode": "evaluate-quality-evidence-validation"
+        },
+        {
+          "description": "Assess risks, technical debt, architecture drift and decision fitness.",
+          "key": "evaluate-risk-debt-drift",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-evaluation-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "conformance-review",
+            "evaluation"
+          ],
+          "task": "Analyze risk, technical debt, architecture drift, stale/contradictory documentation and whether relevant ADRs/concepts still achieve their intended quality response. Update section 11 and REVIEW only for evidence-backed Findings.",
+          "type": "agent",
+          "validationNode": "evaluate-risk-debt-drift-validation"
+        },
+        {
+          "description": "Update method health and derive only evidence-backed improvement actions and handoff.",
+          "key": "evaluate-method-health",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "arc42-evaluation-agent",
+          "profileSlot": "slot-1",
+          "skills": [
+            "initiative-handoff",
+            "method-health"
+          ],
+          "task": "Update METHOD-HEALTH from actual Validation FAILs, retries, repair targets, open questions, drift, evidence gaps and interventions. For any proposed method change record baseline, hypothesis, expected metric and later eval; require human approval for behavior changes.",
+          "type": "agent",
+          "validationNode": "evaluate-method-health-validation"
+        }
+      ],
+      "passEdges": [
+        {
+          "key": "evaluate-quality-ok",
+          "sourceValidationNode": "evaluate-quality-evidence-validation",
+          "target": {
+            "jobNode": "evaluate-risk-debt-drift"
+          }
+        },
+        {
+          "key": "evaluate-risk-ok",
+          "sourceValidationNode": "evaluate-risk-debt-drift-validation",
+          "target": {
+            "jobNode": "evaluate-method-health"
+          }
+        },
+        {
+          "key": "evaluate-completed",
+          "sourceValidationNode": "evaluate-method-health-validation",
+          "target": {
+            "workflowResult": "PASS"
+          }
+        }
+      ],
+      "startJobNode": "evaluate-quality-evidence",
+      "validationNodes": [
+        {
+          "description": "Validate Evaluate actual evidence against every in-scope measurable quality scenario.",
+          "key": "evaluate-quality-evidence-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "arc42-reviewer",
+          "profileSlot": "slot-2",
+          "skills": [
+            "conformance-review"
+          ],
+          "task": "Validate every QS verdict against its exact measurable criterion and evidence reference. Do not change implementation, tests or verdict sources.",
+          "type": "agent"
+        },
+        {
+          "description": "Validate Assess risks, technical debt, architecture drift and decision fitness.",
+          "key": "evaluate-risk-debt-drift-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "arc42-reviewer",
+          "profileSlot": "slot-2",
+          "skills": [
+            "conformance-review"
+          ],
+          "task": "Validate that each retained risk/debt/drift finding has concrete evidence, affected stable IDs, impact and an appropriate capability/outcome. Do not edit findings.",
+          "type": "agent"
+        },
+        {
+          "description": "Validate Update method health and derive only evidence-backed improvement actions and handoff.",
+          "key": "evaluate-method-health-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "arc42-reviewer",
+          "profileSlot": "slot-2",
+          "skills": [
+            "method-health"
+          ],
+          "task": "Validate that method-health changes come from cited evidence, preserve human approval boundaries and contain no preference-only churn. Do not modify evaluated records.",
+          "type": "agent"
+        }
+      ]
     }
   },
   "manifest": {
@@ -230,7 +260,7 @@
       "title": "arc42 Evaluation Agent"
     },
     {
-      "body": "\n# arc42 Independent Reviewer\n\n## Role\n\nIndependently validate one Work Loop Node goal against its task, canonical State, accepted sources, latest Work outcome and measurable criteria.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical architecture/initiative sources → Validation task and current State → Work summary/provider prose.\n\n## Writes\n\nDo not modify the implementation or artifacts being evaluated. A Validation OK may propose only a bounded State reference patch; a Validation FAIL proposes repair, never a document/code fix. Do not write externally or change decisions, topology, permissions, network, instructions or skills.\n\n## Sources and evidence\n\nInspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.\n\n## State patch\n\nOnly `decision: OK` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must choose `LOCAL_RETRY` or request a capability/outcome for Orchestrator repair without naming continuation/return target.\n\n## Stop rules\n\nReturn only valid `completed`, `needs_input`, `blocked` or `failed` Validation outcomes. `completed` contains exactly `OK` or `FAIL` plus the required repair payload. Stop for human input at all stated decision/authorization boundaries. Never return hidden chain-of-thought.\n",
+      "body": "\n# arc42 Independent Reviewer\n\n## Role\n\nIndependently validate one paired Job Node goal against its task, canonical State, accepted sources, latest Job outcome and measurable criteria.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical architecture/initiative sources → Validation task and current State → Job summary/provider prose.\n\n## Writes\n\nDo not modify the implementation or artifacts being evaluated. A Validation PASS may propose only a bounded State reference patch; a Validation FAIL proposes correction feedback and capability/outcome escalation, never a document/code fix. Do not write externally or change decisions, topology, permissions, network, instructions or skills.\n\n## Sources and evidence\n\nInspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.\n\n## State patch\n\nOnly `decision: PASS` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must always include `feedback`, `expectedCorrection`, and exactly one target-free `requestedCapability` or `requestedOutcome`. Runtime owns the local retry budget and escalates through the FailEdge only after it is exhausted.\n\n## Stop rules\n\nReturn only valid `completed`, `needs_input`, `blocked` or `failed` Validation outcomes. `completed` contains exactly `PASS` or `FAIL` plus the required role-specific payload. Stop for human input at all stated decision/authorization boundaries. Never return hidden chain-of-thought.\n",
       "key": "arc42-reviewer",
       "kind": "instruction",
       "metadata": {
@@ -340,5 +370,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 1
+  "version": 2
 }

@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-high-network-off",
@@ -27,15 +27,25 @@
       "id": "adr-review",
       "description": "Review a project change and validate the review result.",
       "state": {
-        "description": "Provider-neutral context shared by the review Work Loop.",
+      "description": "Provider-neutral context shared by the review Workflow.",
         "initial": {}
       },
-      "startNodeId": "review",
-      "nodes": [
-        {
-          "id": "review",
-          "description": "Run and validate the project review.",
-          "work": {
+      "capabilities": {
+        "accepts": [
+          "ballet:task.requested"
+        ],
+        "provides": [
+          "ballet:task.completed"
+        ]
+      },
+      "workflow": {
+        "startJobNodeId": "review",
+        "jobNodes": [
+          {
+            "id": "review",
+            "description": "Run and validate the project review.",
+            "validationNodeId": "review-validation",
+            "maxRetries": 3,
             "type": "agent",
             "task": "Review the project changes and surface concrete risks.",
             "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
@@ -43,8 +53,12 @@
             "skillIds": [],
             "nodeStyle": "terra",
             "nodeSize": "medium"
-          },
-          "validation": {
+          }
+        ],
+        "validationNodes": [
+          {
+            "id": "review-validation",
+            "description": "Validate Run and validate the project review.",
             "type": "agent",
             "task": "Confirm that the review is complete and actionable.",
             "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
@@ -52,25 +66,25 @@
             "skillIds": [],
             "nodeStyle": "luna",
             "nodeSize": "small"
-          },
-          "maxLocalAttempts": 3
-        }
-      ],
-      "edges": [
-        {
-          "id": "review-ok",
-          "source": "review",
-          "target": {
-            "terminal": "completed"
           }
-        }
-      ],
-      "capabilities": {
-        "accepts": [
-          "ballet:task.requested"
         ],
-        "provides": [
-          "ballet:task.completed"
+        "passEdges": [
+          {
+            "id": "review-ok",
+            "sourceValidationNodeId": "review-validation",
+            "target": {
+              "workflowResult": "PASS"
+            }
+          }
+        ],
+        "failEdges": [
+          {
+            "id": "review-fail",
+            "sourceValidationNodeId": "review-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          }
         ]
       }
     }

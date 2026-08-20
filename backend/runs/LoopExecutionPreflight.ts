@@ -1,14 +1,14 @@
 import {
   isProjectAgentValidationNode,
-  isProjectProviderWorkNode,
+  isProjectProviderJobNode,
   type ProjectLoop,
   type ProjectLoopEdgeKind
 } from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV4,
-  ValidationTaskEnvelopeV4,
-  WorkTaskEnvelopeV4
+  OrchestratorTaskEnvelopeV5,
+  ValidationTaskEnvelopeV5,
+  JobTaskEnvelopeV5
 } from "../../shared/domain/taskEnvelope.js";
 import { composeExecutionPrompt } from "../execution/ExecutionComposition.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
@@ -22,11 +22,12 @@ export const preflightExecutionPrompts = (snapshot: RootExecutionSnapshot): void
   const state = validateState(rootLoop.state.initial);
   const stateEnvelope = { revision: 0, value: state, sha256: jsonSha256(state) };
   for (const loop of snapshot.loops) {
-    for (const node of loop.nodes) {
-      if (isProjectProviderWorkNode(node.work)) {
-        composeExecutionPrompt(snapshot, workEnvelope(loop, node.id, stateEnvelope));
+    for (const node of loop.workflow.jobNodes) {
+      if (isProjectProviderJobNode(node)) {
+        composeExecutionPrompt(snapshot, jobEnvelope(loop, node.id, stateEnvelope));
       }
-      if (isProjectAgentValidationNode(node.validation)) {
+      const validation = loop.workflow.validationNodes.find((candidate) => candidate.id === node.validationNodeId);
+      if (validation && isProjectAgentValidationNode(validation)) {
         composeExecutionPrompt(snapshot, validationEnvelope(loop, node.id, stateEnvelope));
       }
     }
@@ -44,21 +45,21 @@ export const preflightExecutionPrompts = (snapshot: RootExecutionSnapshot): void
   }
 };
 
-const workEnvelope = (
+const jobEnvelope = (
   loop: ProjectLoop,
   nodeId: string,
-  state: WorkTaskEnvelopeV4["state"]
-): WorkTaskEnvelopeV4 => {
+  state: JobTaskEnvelopeV5["state"]
+): JobTaskEnvelopeV5 => {
   const node = requireNode(loop, nodeId);
   return {
-    version: 4,
-    role: "work",
+    version: 5,
+    role: "job",
     run: providerRunIdentity,
     loop: { id: loop.id, description: loop.description },
-    workLoopNode: { id: node.id, description: node.description },
-    task: node.work.task,
+    jobNode: { id: node.id, description: node.description },
+    task: node.task,
     state,
-    localAttempt: 1,
+    jobAttempt: 1,
     relevantHistory: []
   };
 };
@@ -66,22 +67,25 @@ const workEnvelope = (
 const validationEnvelope = (
   loop: ProjectLoop,
   nodeId: string,
-  state: ValidationTaskEnvelopeV4["state"]
-): ValidationTaskEnvelopeV4 => {
+  state: ValidationTaskEnvelopeV5["state"]
+): ValidationTaskEnvelopeV5 => {
   const node = requireNode(loop, nodeId);
+  const validation = loop.workflow.validationNodes.find((candidate) => candidate.id === node.validationNodeId);
+  if (!validation) throw new Error(`ValidationNode ${node.validationNodeId} is missing from Loop ${loop.id}.`);
   return {
-    version: 4,
+    version: 5,
     role: "validation",
     run: providerRunIdentity,
     loop: { id: loop.id, description: loop.description },
-    workLoopNode: { id: node.id, description: node.description },
-    task: node.validation.task,
+    jobNode: { id: node.id, description: node.description },
+    validationNode: { id: validation.id, description: validation.description },
+    task: validation.task,
     state,
-    localAttempt: 1,
-    workOutcome: {
-      role: "work",
+    jobAttempt: 1,
+    jobOutcome: {
+      role: "job",
       state: "completed",
-      summary: "Preflight Work outcome.",
+      summary: "Preflight Job outcome.",
       artifacts: {},
       checks: []
     },
@@ -93,9 +97,9 @@ const orchestratorEnvelope = (
   snapshot: RootExecutionSnapshot,
   loop: ProjectLoop,
   kind: ProjectLoopEdgeKind,
-  state: OrchestratorTaskEnvelopeV4["state"]
-): OrchestratorTaskEnvelopeV4 => ({
-  version: 4,
+  state: OrchestratorTaskEnvelopeV5["state"]
+): OrchestratorTaskEnvelopeV5 => ({
+  version: 5,
   role: "orchestrator",
   run: orchestratorRunIdentity,
   loop: { id: loop.id, description: loop.description },
@@ -130,7 +134,7 @@ const orchestratorEnvelope = (
 const providerRunIdentity = {
   rootRunId: "preflight-root-run",
   loopRunId: "preflight-loop-run",
-  workLoopNodeRunId: "preflight-work-loop-node-run",
+  jobRunId: "preflight-job-run",
   nodeRunId: "preflight-node-run"
 };
 const orchestratorRunIdentity = {
@@ -145,7 +149,7 @@ const requireLoop = (snapshot: RootExecutionSnapshot, loopId: string): ProjectLo
   return loop;
 };
 const requireNode = (loop: ProjectLoop, nodeId: string) => {
-  const node = loop.nodes.find((candidate) => candidate.id === nodeId);
-  if (!node) throw new Error(`Work Loop Node ${loop.id}:${nodeId} is missing from the execution snapshot.`);
+  const node = loop.workflow.jobNodes.find((candidate) => candidate.id === nodeId);
+  if (!node) throw new Error(`JobNode ${loop.id}:${nodeId} is missing from the execution snapshot.`);
   return node;
 };

@@ -1,5 +1,5 @@
 import type {
-  CanonicalNodeOutcome, ExecutionTask, LoopRunDetails, NodeRun, ValidationNodeOutcome, WorkLoopNodeRun
+  CanonicalNodeOutcome, ExecutionTask, LoopRunDetails, NodeRun, ValidationNodeOutcome, JobRun
 } from "../../shared/domain/runtime.js";
 import type {
   RootRunCurrentPosition, RootRunRepairProjection
@@ -31,11 +31,11 @@ export const currentPosition = (
 ): RootRunCurrentPosition | undefined => {
   const selected = selectRuntimePosition(root, runs, repair);
   const task = currentTask(selected.nodeRun, tasks);
-  if (!selected.run && !selected.workLoopNodeRun && !selected.nodeRun && !task) return undefined;
-  const definitions = definitionContext(root, selected.run, selected.nodeRun, selected.workLoopNodeRun);
-  const outcomes = outcomeContext(selected.run, selected.workLoopNodeRun);
+  if (!selected.run && !selected.jobRun && !selected.nodeRun && !task) return undefined;
+  const definitions = definitionContext(root, selected.run, selected.nodeRun, selected.jobRun);
+  const outcomes = outcomeContext(selected.run, selected.jobRun);
   return {
-    ...positionIdentity(selected.run, selected.nodeRun, selected.workLoopNodeRun),
+    ...positionIdentity(selected.run, selected.nodeRun, selected.jobRun),
     ...definitions,
     ...taskContext(task),
     ...outcomes,
@@ -60,28 +60,28 @@ const selectRuntimePosition = (
   const run = runs.find(({ loopRunId }) => loopRunId === root.activeLoopRunId)
     ?? (nodeRun ? runs.find(({ loopRunId }) => loopRunId === nodeRun.loopRunId) : undefined)
     ?? fallbackRun;
-  const workLoopNodeRun = findComposite(run, nodeRun, repair);
-  return { run, nodeRun, workLoopNodeRun };
+  const jobRun = findJobRun(run, nodeRun, repair);
+  return { run, nodeRun, jobRun };
 };
 
 const definitionContext = (
   root: StoredRootRun,
   run: LoopRunDetails | undefined,
   nodeRun: NodeRun | undefined,
-  workLoopNodeRun: WorkLoopNodeRun | undefined
+  jobRun: JobRun | undefined
 ) => {
   const loop = root.executionSnapshot.loops.find(({ id }) => id === (run?.loopId ?? nodeRun?.loopId));
-  const definition = loop?.nodes.find(({ id }) => id === (
-    workLoopNodeRun?.workLoopNodeId ?? nodeRun?.workLoopNodeId
+  const definition = loop?.workflow.jobNodes.find(({ id }) => id === (
+    jobRun?.jobNodeId ?? nodeRun?.jobNodeId
   ));
-  return { loopDescription: loop?.description, workLoopNodeDescription: definition?.description };
+  return { loopDescription: loop?.description, jobNodeDescription: definition?.description };
 };
 
-const outcomeContext = (run: LoopRunDetails | undefined, workLoopNodeRun: WorkLoopNodeRun | undefined) => {
-  const work = lastRoleOutcome(run, workLoopNodeRun, "work");
-  const validation = lastRoleOutcome(run, workLoopNodeRun, "validation");
+const outcomeContext = (run: LoopRunDetails | undefined, jobRun: JobRun | undefined) => {
+  const job = lastRoleOutcome(run, jobRun, "job");
+  const validation = lastRoleOutcome(run, jobRun, "validation");
   return {
-    lastWorkOutcome: work?.role === "work" ? work : undefined,
+    lastJobOutcome: job?.role === "job" ? job : undefined,
     lastValidationDecision: validationDecision(validation?.role === "validation" ? validation : undefined)
   };
 };
@@ -89,15 +89,15 @@ const outcomeContext = (run: LoopRunDetails | undefined, workLoopNodeRun: WorkLo
 const positionIdentity = (
   run: LoopRunDetails | undefined,
   nodeRun: NodeRun | undefined,
-  workLoopNodeRun: WorkLoopNodeRun | undefined
+  jobRun: JobRun | undefined
 ) => ({
   loopRunId: run?.loopRunId,
   loopId: run?.loopId ?? nodeRun?.loopId,
-  workLoopNodeRunId: workLoopNodeRun?.workLoopNodeRunId,
-  workLoopNodeId: workLoopNodeRun?.workLoopNodeId ?? nodeRun?.workLoopNodeId,
+  jobRunId: jobRun?.jobRunId,
+  jobNodeId: jobRun?.jobNodeId ?? nodeRun?.jobNodeId,
   nodeRunId: nodeRun?.nodeRunId,
   nodeRole: nodeRun?.role,
-  localRetryAttempt: workLoopNodeRun?.attempt
+  jobAttempt: jobRun?.jobAttempt
 });
 
 const taskContext = (task: ExecutionTask | undefined) => ({
@@ -111,25 +111,25 @@ const findNode = (runs: LoopRunDetails[], id: string | undefined): NodeRun | und
   return runs.flatMap(({ nodeRuns }) => nodeRuns).find(({ nodeRunId }) => nodeRunId === id);
 };
 
-const findComposite = (
+const findJobRun = (
   run: LoopRunDetails | undefined,
   node: NodeRun | undefined,
   repair: RootRunRepairProjection
-): WorkLoopNodeRun | undefined => {
-  const id = node?.workLoopNodeRunId ?? repair.pendingRepair?.requesterWorkLoopNodeRunId;
-  if (id) return run?.workLoopNodeRuns.find(({ workLoopNodeRunId }) => workLoopNodeRunId === id);
-  return run?.workLoopNodeRuns.at(-1);
+): JobRun | undefined => {
+  const id = node?.jobRunId ?? repair.pendingRepair?.requesterJobRunId;
+  if (id) return run?.jobRuns.find(({ jobRunId }) => jobRunId === id);
+  return run?.jobRuns.at(-1);
 };
 
 const lastRoleOutcome = (
   run: LoopRunDetails | undefined,
-  composite: WorkLoopNodeRun | undefined,
-  role: "work" | "validation"
+  jobRun: JobRun | undefined,
+  role: "job" | "validation"
 ): CanonicalNodeOutcome | undefined => [...(run?.nodeRuns ?? [])].reverse().find((node) =>
-    node.workLoopNodeRunId === composite?.workLoopNodeRunId && node.role === role && node.outcome
+    node.jobRunId === jobRun?.jobRunId && node.role === role && node.outcome
   )?.outcome;
 
-const validationDecision = (outcome: ValidationNodeOutcome | undefined): "OK" | "FAIL" | undefined =>
+const validationDecision = (outcome: ValidationNodeOutcome | undefined): "PASS" | "FAIL" | undefined =>
   outcome?.state === "completed" ? outcome.decision : undefined;
 
 const currentTask = (nodeRun: NodeRun | undefined, tasks: ExecutionTask[]): ExecutionTask | undefined => {

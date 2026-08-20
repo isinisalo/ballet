@@ -60,7 +60,7 @@ export function GraphEngineeringLoopNodeView({ data }: NodeProps<GraphLoopFlowNo
         type="button"
         data-graph-loop-node={node.loopId}
         data-live-run-status={node.liveStatus}
-        aria-label={`${node.kind === "installed" ? "Installed module" : "Custom Loop"} ${node.title}, Loop ID ${node.loopId}, responsibility ${node.description}, ${capabilitySummary}, ${node.workLoopNodeCount} Work Loop Nodes${node.liveStatus ? `, live Run status ${node.liveStatus}` : ""}${node.locked ? ", editing locked by active Run" : ""}`}
+        aria-label={`${node.kind === "installed" ? "Installed module" : "Custom Loop"} ${node.title}, Loop ID ${node.loopId}, responsibility ${node.description}, ${capabilitySummary}, ${node.jobCount} Jobs${node.liveStatus ? `, live Run status ${node.liveStatus}` : ""}${node.locked ? ", editing locked by active Run" : ""}`}
         title={node.loopId}
         className={cn(
           "nodrag nopan grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2.5 overflow-hidden rounded-lg border bg-card px-3 py-2.5 text-left outline-none transition-colors hover:border-primary/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30",
@@ -86,7 +86,7 @@ export function GraphEngineeringLoopNodeView({ data }: NodeProps<GraphLoopFlowNo
         </span>
         <span className="col-span-2 mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 border-t border-divider-strong pt-1.5 font-mono text-[0.6rem] leading-4 text-muted-foreground">
           <span className="min-w-0 truncate">{capabilitySummary}</span>
-          <span>{node.workLoopNodeCount} WorkLoop</span>
+          <span>{node.jobCount} Jobs</span>
           <span className="min-w-0 truncate">{node.kind === "installed" ? `module ${node.moduleVersion ?? ""} · ${node.provenanceStatus ?? "unknown"}` : "Custom Loop"}</span>
           <LiveStatus status={node.liveStatus} />
         </span>

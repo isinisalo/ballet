@@ -61,8 +61,8 @@ describe("Run HTTP contracts", () => {
     const wrongRole = await fetch(`${base}/runs/${rootRunId}/nodes/${nodeRunId}/respond`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        kind: "work",
-        outcome: { role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: [] }
+        kind: "job",
+        outcome: { role: "job", state: "completed", summary: "Done.", artifacts: {}, checks: [] }
       })
     });
     expect(wrongRole.status).toBe(409);

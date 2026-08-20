@@ -6,7 +6,7 @@ import type { ProjectAutomationConfig } from "../../shared/domain/automation.js"
 import { RuntimeDatabase } from "../runtime-db.js";
 import { AutomationService } from "../services/AutomationService.js";
 import { MarkdownStore } from "../store.js";
-import { testExecutionProfile, testLoop, testOrchestrator, testWorkLoopNode } from "./v11TestConfig.js";
+import { testExecutionProfile, testJobPair, testLoop, testOrchestrator } from "./v12TestConfig.js";
 
 const roots: string[] = [];
 const stores: MarkdownStore[] = [];
@@ -41,9 +41,9 @@ describe("MarkdownStore project config mutation queue", () => {
     });
 
     const first = config();
-    first.loops[0]!.nodes[0]!.description = "First queued change.";
+    first.loops[0]!.workflow.jobNodes[0]!.description = "First queued change.";
     const second = structuredClone(first);
-    second.loops[1]!.nodes[0]!.description = "Second queued change.";
+    second.loops[1]!.workflow.jobNodes[0]!.description = "Second queued change.";
 
     const firstSave = store.saveAutomation(first);
     await saveStarted;
@@ -56,8 +56,8 @@ describe("MarkdownStore project config mutation queue", () => {
     expect(saveSpy).toHaveBeenCalledTimes(2);
 
     const persisted = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8")) as ProjectAutomationConfig;
-    expect(persisted.loops[0]!.nodes[0]!.description).toBe("First queued change.");
-    expect(persisted.loops[1]!.nodes[0]!.description).toBe("Second queued change.");
+    expect(persisted.loops[0]!.workflow.jobNodes[0]!.description).toBe("First queued change.");
+    expect(persisted.loops[1]!.workflow.jobNodes[0]!.description).toBe("Second queued change.");
   });
 });
 
@@ -84,11 +84,11 @@ const createProject = async (): Promise<string> => {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 11,
+  version: 12,
   orchestrator: testOrchestrator(),
   graph: { loopEdges: [] },
   loops: [
-    testLoop("first-loop", testWorkLoopNode("first-work")),
-    testLoop("second-loop", testWorkLoopNode("second-work"))
+    testLoop("first-loop", testJobPair("first-job")),
+    testLoop("second-loop", testJobPair("second-job"))
   ]
 });

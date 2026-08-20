@@ -6,7 +6,7 @@ export interface RunTimelineEntry {
   title: string;
   detail: string;
   stateRevision: number;
-  tone: "neutral" | "work" | "validation" | "repair" | "terminal";
+  tone: "neutral" | "job" | "validation" | "repair" | "terminal";
 }
 
 export const buildRunTimeline = (root: RootRunDetail): RunTimelineEntry[] => {
@@ -25,20 +25,20 @@ const nodeEntry = (node: NodeRun): RunTimelineEntry[] => {
   const delta = node.stateRevisionAfter !== undefined && node.stateRevisionAfter !== node.stateRevisionBefore
     ? ` · State r${node.stateRevisionBefore} → r${node.stateRevisionAfter}`
     : ` · State r${revision}`;
-  if (outcome.role === "work") return [workEntry(node, outcome, revision, delta)];
+  if (outcome.role === "job") return [jobEntry(node, outcome, revision, delta)];
   if (outcome.role === "orchestrator") return [orchestratorEntry(node, outcome, revision, delta)];
   return [validationEntry(node, outcome, revision, delta)];
 };
 
-const workEntry = (
+const jobEntry = (
   node: NodeRun,
-  outcome: Extract<NonNullable<NodeRun["outcome"]>, { role: "work" }>,
+  outcome: Extract<NonNullable<NodeRun["outcome"]>, { role: "job" }>,
   revision: number,
   delta: string
 ): RunTimelineEntry => ({
     id: `node:${node.nodeRunId}`, at: node.completedAt ?? node.updatedAt,
-    title: `Work ${outcome.state}`, detail: `${outcome.summary}${delta}`,
-    stateRevision: revision, tone: outcome.state === "blocked" || outcome.state === "failed" ? "terminal" : "work"
+    title: `Job ${outcome.state}`, detail: `${outcome.summary}${delta}`,
+    stateRevision: revision, tone: outcome.state === "blocked" || outcome.state === "failed" ? "terminal" : "job"
   });
 
 const orchestratorEntry = (
@@ -61,15 +61,13 @@ const validationEntry = (
 ): RunTimelineEntry => {
   const decision = outcome.state === "completed" ? ` · ${outcome.decision}` : "";
   const repair = outcome.state === "completed" && outcome.decision === "FAIL"
-    ? outcome.repair.mode === "LOCAL_RETRY"
-      ? ` · Local retry: ${outcome.repair.feedback} · Expected: ${outcome.repair.expectedCorrection}`
-      : ` · External repair: ${outcome.repair.reason}`
+    ? ` · Correction: ${outcome.feedback} · Expected: ${outcome.expectedCorrection} · Escalation: ${outcome.escalation.reason}`
     : "";
   return {
     id: `node:${node.nodeRunId}`, at: node.completedAt ?? node.updatedAt,
     title: `Validation ${outcome.state}${decision}`, detail: `${outcome.summary}${repair}${delta}`,
     stateRevision: revision,
-    tone: outcome.state === "completed" && outcome.decision === "OK" ? "validation"
+    tone: outcome.state === "completed" && outcome.decision === "PASS" ? "validation"
       : outcome.state === "blocked" || outcome.state === "failed" ? "terminal" : "repair"
   };
 };
@@ -101,7 +99,7 @@ const eventLabel = (
   source: NodeRun | undefined
 ): [string, string] | undefined => {
   if (kind === "repair_call") return ["Repair Loop called", `${firstText(request?.returnLoopId, source?.loopId, "unknown")} → ${firstText(targetLoopId, request?.routedTargetLoopId, "pending target")}`];
-  if (kind === "repair_return") return ["Repair returned to Validation", `${firstText(targetLoopId, "repair Loop")} → ${firstText(frame?.returnLoopId, request?.returnLoopId, "caller")}/${firstText(frame?.returnWorkLoopNodeId, request?.returnWorkLoopNodeId, "Validation")}`];
+  if (kind === "repair_return") return ["Repair returned to Validation", `${firstText(targetLoopId, "repair Loop")} → ${firstText(frame?.returnLoopId, request?.returnLoopId, "caller")}/${firstText(frame?.returnJobNodeId, request?.returnJobNodeId, "Validation")}`];
   if (kind === "repair_terminal") return ["Repair Loop terminal", firstText(targetLoopId, request?.routedTargetLoopId, "repair target")];
   if (kind === "root_cancelled") return ["Root Run cancelled", "The active repair chain and Node Runs were cancelled."];
   if (kind === "root_terminal") return ["Root Run terminal", root.status];

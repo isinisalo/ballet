@@ -41,4 +41,4 @@ function JsonEvidence({ label, value, defaultOpen = false }: { label: string; va
 }
 
 const sourceLabel = (node?: NodeRun): string => node ? `${roleLabel(node.role)} · ${node.nodeDefinitionId}` : "Root initialization";
-const roleLabel = (role: NodeRun["role"]): string => role === "work" ? "Work" : role === "validation" ? "Validation" : "Orchestrator";
+const roleLabel = (role: NodeRun["role"]): string => role === "job" ? "Job" : role === "validation" ? "Validation" : "Orchestrator";

@@ -12,8 +12,8 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("LocalDatabase schema v7", () => {
-  it("creates the clean Work Loop runtime table inventory", async () => {
+describe("LocalDatabase schema v8", () => {
+  it("creates the clean Workflow runtime table inventory", async () => {
     const database = await createDatabase();
     const connection = database.connection();
     const tables = connection.prepare(`
@@ -24,7 +24,7 @@ describe("LocalDatabase schema v7", () => {
     expect(tables).not.toContain("step_runs");
     expect(tables).not.toContain("loop_runs");
     expect(connection.pragma("foreign_keys", { simple: true })).toBe(1);
-    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("7");
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("8");
     database.close();
   });
 
@@ -39,8 +39,8 @@ describe("LocalDatabase schema v7", () => {
     expect(columns(connection, "state_revisions")).toEqual(expect.arrayContaining([
       "root_run_id", "revision", "state_json", "state_hash", "patch_json", "source_node_run_id"
     ]));
-    expect(columns(connection, "work_loop_node_runs")).toEqual(expect.arrayContaining([
-      "work_loop_node_run_id", "state_revision_before", "state_revision_after", "active_node_run_id"
+    expect(columns(connection, "job_runs")).toEqual(expect.arrayContaining([
+      "job_run_id", "state_revision_before", "state_revision_after", "active_node_run_id"
     ]));
     expect(columns(connection, "repair_requests")).toEqual(expect.arrayContaining([
       "requester_validation_node_run_id", "orchestrator_node_run_id", "validation_summary", "attempt"
@@ -66,12 +66,12 @@ describe("LocalDatabase schema v7", () => {
 
     expect(indexes).toEqual(expect.arrayContaining([
       "idx_control_flow_root", "idx_events_cursor", "idx_frames_open",
-      "idx_loop_invocations_root", "idx_loop_schedule_occurrence", "idx_node_runs_composite",
+      "idx_loop_invocations_root", "idx_loop_schedule_occurrence", "idx_node_runs_job",
       "idx_one_active_node_phase", "idx_one_active_root_node", "idx_one_open_frame_per_callee",
       "idx_one_open_frame_per_caller", "idx_one_running_loop_invocation",
       "idx_orchestration_requests_pending", "idx_repair_requests_pending", "idx_repair_results_root", "idx_schedule_due",
       "idx_state_revisions_latest", "idx_tasks_node", "idx_tasks_queue", "idx_tasks_root",
-      "idx_work_loop_node_runs_loop"
+      "idx_job_runs_loop"
     ]));
     database.close();
   });
@@ -119,7 +119,7 @@ describe("LocalDatabase schema v7", () => {
     legacy.close();
 
     expect(() => new LocalDatabase(filename).connection())
-      .toThrow("Unsupported Ballet state schema 5; expected 7.");
+      .toThrow("Unsupported Ballet state schema 5; expected 8.");
     const untouched = new Database(filename, { readonly: true });
     expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("5");
     expect(untouched.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").pluck().all())
@@ -127,7 +127,7 @@ describe("LocalDatabase schema v7", () => {
     untouched.close();
   });
 
-  it("rejects incomplete schema v7 instead of silently repairing it", async () => {
+  it("rejects schema v7 with exact archive guidance instead of migrating it", async () => {
     const root = await temporaryRoot();
     const filename = path.join(root, "state.sqlite");
     const partial = new Database(filename);
@@ -137,7 +137,9 @@ describe("LocalDatabase schema v7", () => {
     `);
     partial.close();
 
-    expect(() => new LocalDatabase(filename).connection()).toThrow("schema 7 is incomplete");
+    expect(() => new LocalDatabase(filename).connection()).toThrow(
+      "Unsupported Ballet state schema 7; expected 8."
+    );
   });
 });
 

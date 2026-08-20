@@ -2,11 +2,10 @@ import { z } from "zod";
 import {
   loopNodeSizes,
   loopNodeStyles,
-  loopTerminals,
   loopCapabilityPattern,
   maxLoopCapabilities,
   maxLoopCapabilityLength,
-  maxLocalAttemptsLimit,
+  maxJobRetriesLimit,
   maxProjectStateBytes,
   maxRepairAttemptsLimit,
   maxRepairDepthLimit,
@@ -21,9 +20,9 @@ import {
 } from "../domain/loopThemes.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
 import { validateProjectConfigSchema } from "./project-config-schema-validation.js";
-import { projectWorkScheduleSchema } from "./work-schedule-schema.js";
+import { projectJobScheduleSchema } from "./job-schedule-schema.js";
 
-export { projectWorkScheduleSchema } from "./work-schedule-schema.js";
+export { projectJobScheduleSchema } from "./job-schedule-schema.js";
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -126,7 +125,7 @@ const automationNodeIdSchema = z.string()
   .min(1)
   .max(160)
   .regex(kebabCaseIdPattern, "Node id must be lowercase kebab-case.")
-  .refine((value) => !loopTerminals.includes(value as (typeof loopTerminals)[number]), "Node id is reserved for a Loop terminal.");
+  .refine((value) => value !== "pass" && value !== "fail", "Node id is reserved for a Workflow result.");
 const automationEdgeIdSchema = z.string()
   .min(1)
   .max(200)
@@ -168,8 +167,10 @@ const nodeVisualBase = {
   nodeStyle: z.enum(loopNodeStyles),
   nodeSize: z.enum(loopNodeSizes)
 };
-const workOrValidationNodeBase = {
+const executableNodeBase = {
   ...nodeVisualBase,
+  id: automationNodeIdSchema,
+  description: automationDescriptionSchema,
   task: taskDescriptionSchema
 };
 const executionComposition = {
@@ -180,35 +181,37 @@ const executionComposition = {
     "Skill ids must be unique."
   )
 };
-const projectWorkNodeSchema = z.discriminatedUnion("type", [
-  z.object({ ...workOrValidationNodeBase, ...executionComposition, type: z.literal("agent") }).strict(),
-  z.object({ ...workOrValidationNodeBase, type: z.literal("human") }).strict(),
+const jobNodeFields = {
+  ...executableNodeBase,
+  validationNodeId: automationNodeIdSchema,
+  maxRetries: z.number().int().min(0).max(maxJobRetriesLimit)
+};
+const projectJobNodeSchema = z.discriminatedUnion("type", [
+  z.object({ ...jobNodeFields, ...executionComposition, type: z.literal("agent") }).strict(),
+  z.object({ ...jobNodeFields, type: z.literal("human") }).strict(),
   z.object({
-    ...workOrValidationNodeBase,
+    ...jobNodeFields,
     ...executionComposition,
     type: z.literal("scheduled"),
-    schedule: projectWorkScheduleSchema
+    schedule: projectJobScheduleSchema
   }).strict()
 ]);
 const projectValidationNodeSchema = z.discriminatedUnion("type", [
-  z.object({ ...workOrValidationNodeBase, ...executionComposition, type: z.literal("agent") }).strict(),
-  z.object({ ...workOrValidationNodeBase, type: z.literal("human") }).strict()
+  z.object({ ...executableNodeBase, ...executionComposition, type: z.literal("agent") }).strict(),
+  z.object({ ...executableNodeBase, type: z.literal("human") }).strict()
 ]);
-const projectWorkLoopNodeSchema = z.object({
-  id: automationNodeIdSchema,
-  description: automationDescriptionSchema,
-  work: projectWorkNodeSchema,
-  validation: projectValidationNodeSchema,
-  maxLocalAttempts: z.number().int().min(1).max(maxLocalAttemptsLimit)
-}).strict();
-const nodeEdgeTargetSchema = z.union([
-  z.object({ nodeId: automationNodeIdSchema }).strict(),
-  z.object({ terminal: z.enum(loopTerminals) }).strict()
-]);
-const projectNodeEdgeSchema = z.object({
+const projectPassEdgeSchema = z.object({
   id: automationEdgeIdSchema,
-  source: automationNodeIdSchema,
-  target: nodeEdgeTargetSchema
+  sourceValidationNodeId: automationNodeIdSchema,
+  target: z.union([
+    z.object({ jobNodeId: automationNodeIdSchema }).strict(),
+    z.object({ workflowResult: z.literal("PASS") }).strict()
+  ])
+}).strict();
+const projectFailEdgeSchema = z.object({
+  id: automationEdgeIdSchema,
+  sourceValidationNodeId: automationNodeIdSchema,
+  target: z.object({ workflowResult: z.literal("FAIL") }).strict()
 }).strict();
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
   z.string(),
@@ -232,9 +235,13 @@ const projectLoopSchema = z.object({
     description: automationDescriptionSchema,
     initial: stateInitialSchema
   }).strict(),
-  startNodeId: automationNodeIdSchema,
-  nodes: z.array(projectWorkLoopNodeSchema).min(1),
-  edges: z.array(projectNodeEdgeSchema)
+  workflow: z.object({
+    startJobNodeId: automationNodeIdSchema,
+    jobNodes: z.array(projectJobNodeSchema).min(1),
+    validationNodes: z.array(projectValidationNodeSchema).min(1),
+    passEdges: z.array(projectPassEdgeSchema),
+    failEdges: z.array(projectFailEdgeSchema)
+  }).strict()
 }).strict();
 const orchestratorComposition = {
   executionProfileId: z.union([z.literal(""), executionProfileIdSchema]),
@@ -260,14 +267,14 @@ const graphSchema = z.object({
 }).strict();
 
 export const automationConfigSchema = z.object({
-  version: z.literal(11),
+  version: z.literal(12),
   orchestrator: orchestratorSchema,
   graph: graphSchema,
   loops: z.array(projectLoopSchema)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(11),
+  version: z.literal(12),
   executionProfiles: z.array(executionProfileSchema),
   orchestrator: orchestratorSchema,
   graph: graphSchema,

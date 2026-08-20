@@ -12,9 +12,9 @@ const viewCopy: Record<EngineeringView, { label: string; description: string; ic
     description: "Compose project-global LoopNodes and route policy.",
     icon: Boxes
   },
-  loop: {
-    label: "Loop Engineering",
-    description: "Design one selected Loop's Work Loop Nodes and internal Edges.",
+  workflow: {
+    label: "Workflow Engineering",
+    description: "Design one selected Loop's JobNodes, ValidationNodes, PassEdges and FailEdges.",
     icon: Focus
   }
 };
@@ -45,7 +45,7 @@ export function EngineeringShell({ view, selectedLoopId, selectedLoopTitle, sele
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
             <h1 id="engineering-title" className="shrink-0 font-heading text-lg font-medium leading-6 tracking-tight">{active.label}</h1>
             <p className="min-w-24 flex-1 truncate text-xs text-muted-foreground" title={active.description}>{active.description}</p>
-            {view === "loop" && selectedLoopId ? <div className="hidden min-w-0 items-baseline gap-1.5 lg:flex">
+            {view === "workflow" && selectedLoopId ? <div className="hidden min-w-0 items-baseline gap-1.5 lg:flex">
               <span className="truncate text-xs font-medium" title={selectedLoopTitle ?? selectedLoopId}>{selectedLoopTitle ?? selectedLoopId}</span>
               {selectedLoopTitle && selectedLoopTitle !== selectedLoopId ? <span className="truncate font-mono text-[0.65rem] text-muted-foreground" title={selectedLoopId}>{selectedLoopId}</span> : null}
               {selectedLoopDescription ? <span className="max-w-72 truncate text-xs text-muted-foreground" title={selectedLoopDescription}>· {selectedLoopDescription}</span> : null}
@@ -56,14 +56,14 @@ export function EngineeringShell({ view, selectedLoopId, selectedLoopTitle, sele
         <div data-engineering-row="navigation" className="grid min-w-0 gap-1.5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-3">
           <nav aria-label="Engineering breadcrumb" className="flex min-w-0 items-center gap-1 overflow-hidden font-mono text-[0.65rem] leading-4 text-muted-foreground sm:max-w-72">
             <span>Automation</span><ChevronRight className="size-3 shrink-0" />
-            <span className="truncate text-foreground">{active.label}{view === "loop" && selectedLoopId ? ` · ${selectedLoopTitle ?? selectedLoopId}` : ""}</span>
+            <span className="truncate text-foreground">{active.label}{view === "workflow" && selectedLoopId ? ` · ${selectedLoopTitle ?? selectedLoopId}` : ""}</span>
           </nav>
           <nav ref={viewNavigationRef} aria-label="Engineering views" className="no-scrollbar flex max-w-full gap-1 overflow-x-auto rounded border border-divider-strong bg-background p-0.5">
             {(Object.keys(viewCopy) as EngineeringView[]).map((candidate) => {
               const definition = viewCopy[candidate];
               const Icon = definition.icon;
-              const loopAvailable = Boolean(selectedLoopId) || view === "loop";
-              const disabled = candidate === "loop" && !loopAvailable;
+              const loopAvailable = Boolean(selectedLoopId) || view === "workflow";
+              const disabled = candidate === "workflow" && !loopAvailable;
               return (
                 <Button
                   key={candidate}
@@ -73,13 +73,13 @@ export function EngineeringShell({ view, selectedLoopId, selectedLoopTitle, sele
                   aria-current={candidate === view ? "page" : undefined}
                   disabled={disabled}
                   className={cn("min-w-fit flex-1 max-sm:h-10", candidate === view && "border border-primary/30")}
-                  title={disabled ? "Select a Loop in Graph Engineering before opening Loop Engineering." : definition.description}
+                  title={disabled ? "Select a Loop in Graph Engineering before opening Workflow Engineering." : definition.description}
                   onClick={() => {
                     if (candidate === "graph") navigate(automationGraphPath());
-                    if (candidate === "loop" && selectedLoopId) navigate(automationLoopPath(selectedLoopId));
+                    if (candidate === "workflow" && selectedLoopId) navigate(automationLoopPath(selectedLoopId));
                   }}
                 >
-                  <Icon /> {definition.label}{candidate === "loop" && selectedLoopId ? ` · ${selectedLoopTitle ?? selectedLoopId}` : ""}
+                  <Icon /> {definition.label}{candidate === "workflow" && selectedLoopId ? ` · ${selectedLoopTitle ?? selectedLoopId}` : ""}
                 </Button>
               );
             })}

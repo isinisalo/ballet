@@ -2,8 +2,7 @@ import { z } from "zod";
 import {
   loopNodeSizes,
   loopNodeStyles,
-  loopTerminals,
-  maxLocalAttemptsLimit,
+  maxJobRetriesLimit,
   maxProjectStateBytes,
   type JsonValue
 } from "../domain/automation.js";
@@ -13,9 +12,9 @@ import {
   maxLoopModuleResourceBodyBytes,
   maxLoopModuleResources,
   maxLoopModuleStringLength,
-  type LoopModulePackageV1
+  type LoopModulePackageV2
 } from "../domain/loopModules.js";
-import { projectWorkScheduleSchema } from "./work-schedule-schema.js";
+import { projectJobScheduleSchema } from "./job-schedule-schema.js";
 import { loopCapabilitySchema } from "./workspace-schemas.js";
 
 const localKey = z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Expected a lowercase kebab-case module-local key.");
@@ -57,30 +56,39 @@ const composition = {
   primaryInstruction: localKey,
   skills: z.array(localKey).max(maxLoopModuleResources).refine(unique, "Skill keys must be unique.")
 };
-const appearance = { nodeStyle: z.enum(loopNodeStyles), nodeSize: z.enum(loopNodeSizes), task: taskText };
-const workSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("agent"), ...appearance, ...composition }).strict(),
-  z.object({ type: z.literal("human"), ...appearance }).strict(),
-  z.object({ type: z.literal("scheduled"), ...appearance, ...composition, schedule: projectWorkScheduleSchema }).strict()
-]);
-const validationSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("agent"), ...appearance, ...composition }).strict(),
-  z.object({ type: z.literal("human"), ...appearance }).strict()
-]);
-const moduleNodeSchema = z.object({
+const nodeBase = {
   key: localKey,
   description: shortText,
-  work: workSchema,
-  validation: validationSchema,
-  maxLocalAttempts: z.number().int().min(1).max(maxLocalAttemptsLimit)
-}).strict();
-const moduleEdgeSchema = z.object({
+  nodeStyle: z.enum(loopNodeStyles),
+  nodeSize: z.enum(loopNodeSizes),
+  task: taskText
+};
+const jobFields = {
+  ...nodeBase,
+  validationNode: localKey,
+  maxRetries: z.number().int().min(0).max(maxJobRetriesLimit)
+};
+const jobSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("agent"), ...jobFields, ...composition }).strict(),
+  z.object({ type: z.literal("human"), ...jobFields }).strict(),
+  z.object({ type: z.literal("scheduled"), ...jobFields, ...composition, schedule: projectJobScheduleSchema }).strict()
+]);
+const validationSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("agent"), ...nodeBase, ...composition }).strict(),
+  z.object({ type: z.literal("human"), ...nodeBase }).strict()
+]);
+const passEdgeSchema = z.object({
   key: localKey,
-  source: localKey,
+  sourceValidationNode: localKey,
   target: z.union([
-    z.object({ node: localKey }).strict(),
-    z.object({ terminal: z.enum(loopTerminals) }).strict()
+    z.object({ jobNode: localKey }).strict(),
+    z.object({ workflowResult: z.literal("PASS") }).strict()
   ])
+}).strict();
+const failEdgeSchema = z.object({
+  key: localKey,
+  sourceValidationNode: localKey,
+  target: z.object({ workflowResult: z.literal("FAIL") }).strict()
 }).strict();
 const instructionResourceSchema = z.object({
   kind: z.literal("instruction"),
@@ -98,9 +106,9 @@ const skillResourceSchema = z.object({
   body
 }).strict();
 
-export const loopModulePackageV1Schema = z.object({
+export const loopModulePackageV2Schema = z.object({
   format: z.literal("ballet-loop-module"),
-  version: z.literal(1),
+  version: z.literal(2),
   manifest: z.object({
     id: localKey,
     title: shortText,
@@ -143,38 +151,60 @@ export const loopModulePackageV1Schema = z.object({
       description: shortText,
       initial: jsonValueSchema.refine((value) => new TextEncoder().encode(JSON.stringify(value)).byteLength <= maxProjectStateBytes)
     }).strict(),
-    startNode: localKey,
-    nodes: z.array(moduleNodeSchema).min(1).max(maxLoopModuleNodes),
-    edges: z.array(moduleEdgeSchema).max(maxLoopModuleEdges)
+    workflow: z.object({
+      startJobNode: localKey,
+      jobNodes: z.array(jobSchema).min(1).max(maxLoopModuleNodes),
+      validationNodes: z.array(validationSchema).min(1).max(maxLoopModuleNodes),
+      passEdges: z.array(passEdgeSchema).max(maxLoopModuleEdges),
+      failEdges: z.array(failEdgeSchema).max(maxLoopModuleEdges)
+    }).strict()
   }).strict()
 }).strict().superRefine((pkg, context) => {
   const resourceKeys = pkg.resources.map((resource) => resource.key);
   const slotKeys = pkg.profileSlots.map((slot) => slot.key);
-  const nodeKeys = pkg.loop.nodes.map((node) => node.key);
-  const edgeKeys = pkg.loop.edges.map((edge) => edge.key);
+  const jobKeys = pkg.loop.workflow.jobNodes.map((node) => node.key);
+  const validationKeys = pkg.loop.workflow.validationNodes.map((node) => node.key);
+  const nodeKeys = [...jobKeys, ...validationKeys];
+  const edgeKeys = [...pkg.loop.workflow.passEdges, ...pkg.loop.workflow.failEdges].map((edge) => edge.key);
   for (const [path, values] of [
-    [["resources"], resourceKeys], [["profileSlots"], slotKeys], [["loop", "nodes"], nodeKeys], [["loop", "edges"], edgeKeys]
+    [["resources"], resourceKeys], [["profileSlots"], slotKeys], [["loop", "workflow", "nodes"], nodeKeys], [["loop", "workflow", "edges"], edgeKeys]
   ] as const) if (!unique(values)) context.addIssue({ code: "custom", path: [...path], message: "Module-local keys must be unique." });
   const resources = new Map(pkg.resources.map((resource) => [resource.key, resource]));
   const slots = new Set(slotKeys);
-  const nodes = new Set(nodeKeys);
-  if (!nodes.has(pkg.loop.startNode)) context.addIssue({ code: "custom", path: ["loop", "startNode"], message: "Start node must reference a module node." });
-  pkg.loop.nodes.forEach((node, index) => {
-    for (const [partName, part] of [["work", node.work], ["validation", node.validation]] as const) {
-      if (part.type === "human") continue;
-      if (!slots.has(part.profileSlot)) context.addIssue({ code: "custom", path: ["loop", "nodes", index, partName, "profileSlot"], message: "Unknown profile slot." });
-      if (resources.get(part.primaryInstruction)?.kind !== "instruction") context.addIssue({ code: "custom", path: ["loop", "nodes", index, partName, "primaryInstruction"], message: "Primary instruction must reference an instruction resource." });
-      part.skills.forEach((key, skillIndex) => {
-        if (resources.get(key)?.kind !== "skill") context.addIssue({ code: "custom", path: ["loop", "nodes", index, partName, "skills", skillIndex], message: "Skill must reference a skill resource." });
-      });
-    }
-    if (node.work.type === "scheduled" && node.key !== pkg.loop.startNode) context.addIssue({ code: "custom", path: ["loop", "nodes", index, "work", "type"], message: "Scheduled Work is allowed only on the start node." });
+  const jobs = new Set(jobKeys);
+  const validations = new Set(validationKeys);
+  if (!jobs.has(pkg.loop.workflow.startJobNode)) context.addIssue({ code: "custom", path: ["loop", "workflow", "startJobNode"], message: "Start JobNode must reference a module JobNode." });
+  const ownedValidations = new Set<string>();
+  for (const [kind, nodes] of [["jobNodes", pkg.loop.workflow.jobNodes], ["validationNodes", pkg.loop.workflow.validationNodes]] as const) {
+    nodes.forEach((node, index) => {
+      if (node.type !== "human") {
+        if (!slots.has(node.profileSlot)) context.addIssue({ code: "custom", path: ["loop", "workflow", kind, index, "profileSlot"], message: "Unknown profile slot." });
+        if (resources.get(node.primaryInstruction)?.kind !== "instruction") context.addIssue({ code: "custom", path: ["loop", "workflow", kind, index, "primaryInstruction"], message: "Primary instruction must reference an instruction resource." });
+        node.skills.forEach((key, skillIndex) => {
+          if (resources.get(key)?.kind !== "skill") context.addIssue({ code: "custom", path: ["loop", "workflow", kind, index, "skills", skillIndex], message: "Skill must reference a skill resource." });
+        });
+      }
+      if (kind === "jobNodes") {
+        const job = node as (typeof pkg.loop.workflow.jobNodes)[number];
+        if (!validations.has(job.validationNode)) context.addIssue({ code: "custom", path: ["loop", "workflow", kind, index, "validationNode"], message: "JobNode must reference a ValidationNode." });
+        if (ownedValidations.has(job.validationNode)) context.addIssue({ code: "custom", path: ["loop", "workflow", kind, index, "validationNode"], message: "ValidationNode may be owned by only one JobNode." });
+        ownedValidations.add(job.validationNode);
+        if (job.type === "scheduled" && job.key !== pkg.loop.workflow.startJobNode) context.addIssue({ code: "custom", path: ["loop", "workflow", kind, index, "type"], message: "Scheduled Job is allowed only on the start JobNode." });
+      }
+    });
+  }
+  pkg.loop.workflow.validationNodes.forEach((node, index) => {
+    if (!ownedValidations.has(node.key)) context.addIssue({ code: "custom", path: ["loop", "workflow", "validationNodes", index, "key"], message: "ValidationNode must be owned by one JobNode." });
+    if (pkg.loop.workflow.passEdges.filter((edge) => edge.sourceValidationNode === node.key).length !== 1) context.addIssue({ code: "custom", path: ["loop", "workflow", "passEdges"], message: `ValidationNode ${node.key} must have exactly one PassEdge.` });
+    if (pkg.loop.workflow.failEdges.filter((edge) => edge.sourceValidationNode === node.key).length !== 1) context.addIssue({ code: "custom", path: ["loop", "workflow", "failEdges"], message: `ValidationNode ${node.key} must have exactly one FailEdge.` });
   });
-  pkg.loop.edges.forEach((edge, index) => {
-    if (!nodes.has(edge.source)) context.addIssue({ code: "custom", path: ["loop", "edges", index, "source"], message: "Edge source must reference a module node." });
-    if ("node" in edge.target && !nodes.has(edge.target.node)) context.addIssue({ code: "custom", path: ["loop", "edges", index, "target", "node"], message: "Edge target must reference a module node." });
+  pkg.loop.workflow.passEdges.forEach((edge, index) => {
+    if (!validations.has(edge.sourceValidationNode)) context.addIssue({ code: "custom", path: ["loop", "workflow", "passEdges", index, "sourceValidationNode"], message: "PassEdge source must reference a ValidationNode." });
+    if ("jobNode" in edge.target && !jobs.has(edge.target.jobNode)) context.addIssue({ code: "custom", path: ["loop", "workflow", "passEdges", index, "target", "jobNode"], message: "PassEdge target must reference a JobNode." });
   });
-  for (const node of pkg.loop.nodes) if (pkg.loop.edges.filter((edge) => edge.source === node.key).length !== 1) context.addIssue({ code: "custom", path: ["loop", "edges"], message: `Node ${node.key} must have exactly one outgoing edge.` });
+  pkg.loop.workflow.failEdges.forEach((edge, index) => {
+    if (!validations.has(edge.sourceValidationNode)) context.addIssue({ code: "custom", path: ["loop", "workflow", "failEdges", index, "sourceValidationNode"], message: "FailEdge source must reference a ValidationNode." });
+  });
   if (!jsonValuesEqual(pkg.loop.state.initial, pkg.stateContract.initial)) context.addIssue({ code: "custom", path: ["stateContract", "initial"], message: "State contract initial value must equal Loop state initial value." });
   if (pkg.stateContract.requiredKeys.length > 0) {
     const initial = pkg.stateContract.initial;
@@ -189,7 +219,7 @@ export const loopModulePackageV1Schema = z.object({
   const slotNetwork = new Set(pkg.profileSlots.map((slot) => slot.network));
   if (pkg.permissions.network === "required" && slotNetwork.has("forbidden")) context.addIssue({ code: "custom", path: ["permissions", "network"], message: "Package network summary conflicts with a forbidden profile slot." });
   if (pkg.permissions.network === "forbidden" && slotNetwork.has("required")) context.addIssue({ code: "custom", path: ["permissions", "network"], message: "Package network summary conflicts with a required profile slot." });
-}) satisfies z.ZodType<LoopModulePackageV1>;
+}) satisfies z.ZodType<LoopModulePackageV2>;
 
 export const loopModuleInspectRequestSchema = z.object({
   package: z.unknown(),

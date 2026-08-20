@@ -133,6 +133,12 @@ body {
   outline: none;
 }
 
+.workflow-connection-point {
+  fill: var(--loop-theme-connection-point);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--loop-theme-connection-point) 88%, transparent));
+  pointer-events: none;
+}
+
 .loop-run-node-pulse--running::before,
 .loop-run-node-pulse--waiting::before {
   position: absolute;

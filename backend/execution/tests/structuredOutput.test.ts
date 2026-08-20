@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  validationNodeOutcomeJsonSchema, workNodeOutcomeJsonSchema
+  validationNodeOutcomeJsonSchema, jobNodeOutcomeJsonSchema
 } from "../../../shared/api/runtime-schemas.js";
 import { parseStructuredJson } from "../providers/structuredOutput.js";
 
@@ -26,17 +26,18 @@ describe("structured output validation", () => {
 
   it("validates generated role unions instead of accepting provider prose as control flow", () => {
     const work = JSON.stringify({
-      role: "work", state: "completed", summary: "Done.", artifacts: {}, checks: []
+      role: "job", state: "completed", summary: "Done.", artifacts: {}, checks: []
     });
     const invalidDecision = JSON.stringify({
-      role: "work", state: "completed", decision: "OK", summary: "Invalid.", artifacts: {}, checks: []
+      role: "job", state: "completed", decision: "OK", summary: "Invalid.", artifacts: {}, checks: []
     });
     const validation = JSON.stringify({
       role: "validation", state: "completed", decision: "FAIL", summary: "Retry.", evidence: {}, checks: [],
-      repair: { mode: "LOCAL_RETRY", feedback: "Fix it.", expectedCorrection: "Correct the value." }
+      feedback: "Fix it.", expectedCorrection: "Correct the value.",
+      escalation: { reason: "Validation failed.", requestedCapability: "repair-value", evidenceRefs: [] }
     });
-    expect(parseStructuredJson(work, workNodeOutcomeJsonSchema)).toEqual({ value: JSON.parse(work) });
-    expect(parseStructuredJson(invalidDecision, workNodeOutcomeJsonSchema).error).toContain("anyOf");
+    expect(parseStructuredJson(work, jobNodeOutcomeJsonSchema)).toEqual({ value: JSON.parse(work) });
+    expect(parseStructuredJson(invalidDecision, jobNodeOutcomeJsonSchema).error).toContain("anyOf");
     expect(parseStructuredJson(validation, validationNodeOutcomeJsonSchema)).toEqual({ value: JSON.parse(validation) });
   });
 });

@@ -6,7 +6,7 @@ export {
 import type { JsonValue } from "../domain/automation.js";
 import type {
   CanonicalNodeOutcome, NodeRunRole, OrchestratorNodeOutcome, ValidationNodeOutcome,
-  WorkNodeOutcome
+  JobNodeOutcome
 } from "../domain/runtime.js";
 
 const idSchema = z.string().uuid();
@@ -57,51 +57,48 @@ const checkedSummary = {
   checks: z.array(runCheckSchema).max(500)
 };
 
-export const workCompletedOutcomeSchema = z.object({
-  role: z.literal("work"),
+export const jobCompletedOutcomeSchema = z.object({
+  role: z.literal("job"),
   state: z.literal("completed"),
   ...checkedSummary,
   artifacts: z.record(z.string(), z.json()),
   statePatch: statePatchSchema.optional()
 }).strict();
 
-export const workNodeOutcomeSchema = z.union([
-  workCompletedOutcomeSchema,
+export const jobNodeOutcomeSchema = z.union([
+  jobCompletedOutcomeSchema,
   z.object({
-    role: z.literal("work"), state: z.literal("needs_input"), ...checkedSummary,
+    role: z.literal("job"), state: z.literal("needs_input"), ...checkedSummary,
     question: nonEmptyText, context: boundedText
   }).strict(),
-  z.object({ role: z.literal("work"), state: z.literal("blocked"), ...checkedSummary }).strict(),
-  z.object({ role: z.literal("work"), state: z.literal("failed"), ...checkedSummary }).strict()
+  z.object({ role: z.literal("job"), state: z.literal("blocked"), ...checkedSummary }).strict(),
+  z.object({ role: z.literal("job"), state: z.literal("failed"), ...checkedSummary }).strict()
 ]);
 
-const localRetryRepairSchema = z.object({
-  mode: z.literal("LOCAL_RETRY"),
-  feedback: nonEmptyText,
-  expectedCorrection: nonEmptyText
-}).strict();
-
-const orchestratorRepairFields = {
-  mode: z.literal("ORCHESTRATOR_REPAIR"),
+const validationEscalationFields = {
   reason: nonEmptyText,
   evidenceRefs: z.array(z.string().trim().min(1).max(2_000)).max(500)
 };
-const orchestratorRepairSchema = z.union([
-  z.object({ ...orchestratorRepairFields, requestedCapability: nonEmptyText }).strict(),
-  z.object({ ...orchestratorRepairFields, requestedOutcome: z.json() }).strict()
+const validationEscalationSchema = z.union([
+  z.object({ ...validationEscalationFields, requestedCapability: nonEmptyText }).strict(),
+  z.object({ ...validationEscalationFields, requestedOutcome: z.json() }).strict()
 ]);
 
-const validationCompletedOkSchema = z.object({
-  role: z.literal("validation"), state: z.literal("completed"), decision: z.literal("OK"),
+const validationCompletedPassSchema = z.object({
+  role: z.literal("validation"), state: z.literal("completed"), decision: z.literal("PASS"),
   ...checkedSummary, evidence: z.json(), statePatch: statePatchSchema.optional()
 }).strict();
 const validationCompletedFailSchema = z.object({
   role: z.literal("validation"), state: z.literal("completed"), decision: z.literal("FAIL"),
-  ...checkedSummary, evidence: z.json(), repair: z.union([localRetryRepairSchema, orchestratorRepairSchema])
+  ...checkedSummary,
+  evidence: z.json(),
+  feedback: nonEmptyText,
+  expectedCorrection: nonEmptyText,
+  escalation: validationEscalationSchema
 }).strict();
 
 export const validationNodeOutcomeSchema = z.union([
-  validationCompletedOkSchema,
+  validationCompletedPassSchema,
   validationCompletedFailSchema,
   z.object({
     role: z.literal("validation"), state: z.literal("needs_input"), ...checkedSummary,
@@ -112,7 +109,7 @@ export const validationNodeOutcomeSchema = z.union([
 ]);
 
 export const respondToNodeRunBodySchema = z.union([
-  z.object({ kind: z.literal("work"), outcome: workNodeOutcomeSchema }).strict(),
+  z.object({ kind: z.literal("job"), outcome: jobNodeOutcomeSchema }).strict(),
   z.object({ kind: z.literal("validation"), outcome: validationNodeOutcomeSchema }).strict(),
   z.object({ kind: z.literal("resume"), response: nonEmptyText }).strict()
 ]);
@@ -132,7 +129,7 @@ export const orchestratorNodeOutcomeSchema = z.union([
 ]);
 
 export const canonicalNodeOutcomeSchema = z.union([
-  workNodeOutcomeSchema,
+  jobNodeOutcomeSchema,
   validationNodeOutcomeSchema,
   orchestratorNodeOutcomeSchema
 ]);
@@ -164,7 +161,7 @@ export const rootRunStateProjectionSchema = z.object({
 
 export const rootRunReturnDestinationSchema = z.object({
   loopId: z.string().min(1),
-  workLoopNodeId: z.string().min(1),
+  jobNodeId: z.string().min(1),
   validationNodeDefinitionId: z.string().min(1)
 }).strict();
 
@@ -172,9 +169,8 @@ export const repairRequestSchema = z.object({
   repairRequestId: idSchema,
   rootRunId: idSchema,
   requesterLoopRunId: idSchema,
-  requesterWorkLoopNodeRunId: idSchema,
+  requesterJobRunId: idSchema,
   requesterValidationNodeRunId: idSchema,
-  mode: z.enum(["local", "orchestrator"]),
   attempt: z.number().int().positive(),
   validationSummary: nonEmptyText,
   requestedCapability: nonEmptyText.optional(),
@@ -187,7 +183,7 @@ export const repairRequestSchema = z.object({
   routedTargetLoopId: z.string().min(1).optional(),
   status: z.enum(["pending", "routed", "repaired", "failed", "cancelled"]),
   returnLoopId: z.string().min(1),
-  returnWorkLoopNodeId: z.string().min(1),
+  returnJobNodeId: z.string().min(1),
   returnValidationNodeDefinitionId: z.string().min(1),
   nestingDepth: z.number().int().nonnegative(),
   createdAt: z.string(),
@@ -207,7 +203,7 @@ export const orchestrationFrameSchema = z.object({
   calleeLoopRunId: idSchema,
   parentFrameId: idSchema.optional(),
   returnLoopId: z.string().min(1),
-  returnWorkLoopNodeId: z.string().min(1),
+  returnJobNodeId: z.string().min(1),
   returnValidationNodeDefinitionId: z.string().min(1),
   stateRevisionAtCall: z.number().int().nonnegative(),
   nestingDepth: z.number().int().nonnegative(),
@@ -247,17 +243,17 @@ export const controlFlowEventSchema = z.object({
   rootRunId: idSchema,
   sequence: z.number().int().positive(),
   kind: z.enum([
-    "work_completed", "work_needs_input", "work_terminal", "validation_ok",
-    "validation_fail_local", "validation_fail_orchestrator", "validation_terminal",
+    "job_completed", "job_needs_input", "job_terminal", "validation_pass",
+    "validation_fail_retry", "validation_fail_escalated", "validation_terminal",
     "repair_call", "repair_return", "repair_terminal", "flow_transition",
     "orchestrator_terminal", "root_cancelled", "root_terminal", "execution_interrupted"
   ]),
   stateRevision: z.number().int().nonnegative(),
   sourceLoopRunId: idSchema.optional(),
-  sourceWorkLoopNodeRunId: idSchema.optional(),
+  sourceJobRunId: idSchema.optional(),
   sourceNodeRunId: idSchema.optional(),
   targetLoopRunId: idSchema.optional(),
-  targetWorkLoopNodeRunId: idSchema.optional(),
+  targetJobRunId: idSchema.optional(),
   orchestrationRequestId: idSchema.optional(),
   repairRequestId: idSchema.optional(),
   orchestrationFrameId: idSchema.optional(),
@@ -284,28 +280,28 @@ export const workspaceInvalidationEventSchema = z.discriminatedUnion("type", [
   }).strict()
 ]);
 
-export const workNodeOutcomeJsonSchema = jsonSchema(workNodeOutcomeSchema);
+export const jobNodeOutcomeJsonSchema = jsonSchema(jobNodeOutcomeSchema);
 export const validationNodeOutcomeJsonSchema = jsonSchema(validationNodeOutcomeSchema);
 export const orchestratorNodeOutcomeJsonSchema = jsonSchema(orchestratorNodeOutcomeSchema);
 
 export const nodeOutcomeSchemaIds = {
-  work: "work-node-outcome-v4",
-  validation: "validation-node-outcome-v4",
-  orchestrator: "orchestrator-node-outcome-v4"
+  job: "job-node-outcome-v5",
+  validation: "validation-node-outcome-v5",
+  orchestrator: "orchestrator-node-outcome-v5"
 } as const;
 
 export const nodeOutcomeJsonSchemaForRole = (role: NodeRunRole): Record<string, JsonValue> => {
-  if (role === "work") return workNodeOutcomeJsonSchema;
+  if (role === "job") return jobNodeOutcomeJsonSchema;
   if (role === "validation") return validationNodeOutcomeJsonSchema;
   return orchestratorNodeOutcomeJsonSchema;
 };
 
-export function parseNodeOutcomeForRole(role: "work", input: unknown): WorkNodeOutcome;
+export function parseNodeOutcomeForRole(role: "job", input: unknown): JobNodeOutcome;
 export function parseNodeOutcomeForRole(role: "validation", input: unknown): ValidationNodeOutcome;
 export function parseNodeOutcomeForRole(role: "orchestrator", input: unknown): OrchestratorNodeOutcome;
 export function parseNodeOutcomeForRole(role: NodeRunRole, input: unknown): CanonicalNodeOutcome;
 export function parseNodeOutcomeForRole(role: NodeRunRole, input: unknown): CanonicalNodeOutcome {
-  if (role === "work") return workNodeOutcomeSchema.parse(input);
+  if (role === "job") return jobNodeOutcomeSchema.parse(input);
   if (role === "validation") return validationNodeOutcomeSchema.parse(input);
   return orchestratorNodeOutcomeSchema.parse(input);
 }

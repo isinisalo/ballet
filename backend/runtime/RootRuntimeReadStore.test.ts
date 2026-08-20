@@ -6,20 +6,20 @@ describe("RootRuntimeReadStore", () => {
   it("reconstructs current State and bounded revision evidence after reopen", async () => {
     const fixture = await createRuntimeStoreFixture({ count: 0 });
     const runtimeIds = createComposite(fixture);
-    const node = createWorkNode(fixture, runtimeIds, "work-1", 1);
+    const node = createJobNode(fixture, runtimeIds, "job-1", 1);
     fixture.states.commitNodeOutcome({
       rootRunId: "root-run",
       nodeRunId: node.nodeRunId,
       baseRevision: 0,
       outcome: {
-        role: "work",
+        role: "job",
         state: "completed",
         summary: "Incremented state.",
         artifacts: {},
         checks: [],
         statePatch: [{ op: "replace", path: "/count", value: 1 }]
       },
-      control: { kind: "work_completed" }
+      control: { kind: "job_completed" }
     });
     fixture.release();
 
@@ -32,7 +32,7 @@ describe("RootRuntimeReadStore", () => {
       historyTruncated: false,
       revisions: [
         { revision: 0, patchOmitted: false },
-        { revision: 1, parentRevision: 0, sourceNodeRunId: "work-1", patchOmitted: false }
+        { revision: 1, parentRevision: 0, sourceNodeRunId: "job-1", patchOmitted: false }
       ]
     });
     expect(projection.state.revisions[1]?.patch?.patch).toEqual([
@@ -40,7 +40,7 @@ describe("RootRuntimeReadStore", () => {
     ]);
     expect(projection.state.revisions[1]).not.toHaveProperty("outcome");
     expect(projection.controlFlowEvents).toEqual([
-      expect.objectContaining({ sequence: 1, kind: "work_completed", stateRevision: 1 })
+      expect.objectContaining({ sequence: 1, kind: "job_completed", stateRevision: 1 })
     ]);
     reopened.close();
     await fixture.close();
@@ -50,29 +50,29 @@ describe("RootRuntimeReadStore", () => {
     const fixture = await createRuntimeStoreFixture({ value: "", count: 0 });
     const runtimeIds = createComposite(fixture);
     for (let revision = 1; revision <= 6; revision += 1) {
-      const node = createWorkNode(fixture, runtimeIds, `large-${revision}`, revision);
+      const node = createJobNode(fixture, runtimeIds, `large-${revision}`, revision);
       fixture.states.commitNodeOutcome({
         rootRunId: "root-run",
         nodeRunId: node.nodeRunId,
         baseRevision: revision - 1,
         outcome: {
-          role: "work", state: "completed", summary: `Large patch ${revision}.`, artifacts: {}, checks: [],
+          role: "job", state: "completed", summary: `Large patch ${revision}.`, artifacts: {}, checks: [],
           statePatch: [{ op: "replace", path: "/value", value: String(revision).repeat(60_000) }]
         },
-        control: { kind: "work_completed" }
+        control: { kind: "job_completed" }
       });
     }
     for (let revision = 7; revision <= 65; revision += 1) {
-      const node = createWorkNode(fixture, runtimeIds, `small-${revision}`, revision);
+      const node = createJobNode(fixture, runtimeIds, `small-${revision}`, revision);
       fixture.states.commitNodeOutcome({
         rootRunId: "root-run",
         nodeRunId: node.nodeRunId,
         baseRevision: revision - 1,
         outcome: {
-          role: "work", state: "completed", summary: `Small patch ${revision}.`, artifacts: {}, checks: [],
+          role: "job", state: "completed", summary: `Small patch ${revision}.`, artifacts: {}, checks: [],
           statePatch: [{ op: "replace", path: "/count", value: revision }]
         },
-        control: { kind: "work_completed" }
+        control: { kind: "job_completed" }
       });
     }
     fixture.release();
@@ -100,20 +100,21 @@ const createComposite = (fixture: Fixture) => {
   const loop = fixture.loops.createLoopRun({
     loopRunId: "loop-run", rootRunId: "root-run", loop: fixture.loop, source: "manual"
   });
-  const composite = fixture.loops.createWorkLoopNodeRun({
-    workLoopNodeRunId: "composite", rootRunId: "root-run", loopRunId: loop.loopRunId,
-    loopId: fixture.loop.id, workLoopNodeId: fixture.loop.startNodeId, attempt: 1
+  const job = fixture.loops.createJobRun({
+    jobRunId: "job-run", rootRunId: "root-run", loopRunId: loop.loopRunId,
+    loopId: fixture.loop.id, jobNodeId: fixture.loop.workflow.startJobNodeId, jobAttempt: 1
   });
-  return { loopRunId: loop.loopRunId, workLoopNodeRunId: composite.workLoopNodeRunId };
+  return { loopRunId: loop.loopRunId, jobRunId: job.jobRunId };
 };
 
-const createWorkNode = (
+const createJobNode = (
   fixture: Fixture,
   ids: ReturnType<typeof createComposite>,
   nodeRunId: string,
   attempt: number
 ) => fixture.loops.createNodeRun({
   nodeRunId, rootRunId: "root-run", loopRunId: ids.loopRunId,
-  workLoopNodeRunId: ids.workLoopNodeRunId, role: "work", loopId: fixture.loop.id,
-  workLoopNodeId: fixture.loop.startNodeId, nodeDefinitionId: "main-loop:work:work", attempt
+  jobRunId: ids.jobRunId, role: "job", loopId: fixture.loop.id,
+  jobNodeId: fixture.loop.workflow.startJobNodeId, workflowNodeId: fixture.loop.workflow.startJobNodeId,
+  nodeDefinitionId: "main-loop:job:job", attempt
 });

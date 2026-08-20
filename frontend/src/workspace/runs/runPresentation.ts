@@ -7,7 +7,7 @@ export const cancellableRunStatuses = new Set<DashboardRunStatus>(["queued", "ru
 export const runSummaryPath = (run: RootRunSummary) => runLoopPath(run.targetId, run.rootRunId);
 
 export const currentRunLabel = (run: RootRunSummary) => {
-  const parts = [run.current?.loopId, run.current?.workLoopNodeId, run.current?.nodeRole, run.current?.executionProfileId].filter(Boolean);
+  const parts = [run.current?.loopId, run.current?.jobNodeId, run.current?.nodeRole, run.current?.executionProfileId].filter(Boolean);
   return parts.length > 0 ? parts.join(" · ") : run.targetId;
 };
 

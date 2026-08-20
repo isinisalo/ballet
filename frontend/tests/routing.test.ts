@@ -69,9 +69,10 @@ describe("workspace routing", () => {
     expect(routeFromPath("/automation/loops")).toEqual({ view: "automation", automationView: "graph" });
     expect(routeFromPath("/automation/loops?view=graph")).toEqual({ view: "automation", automationView: "graph" });
     expect(routeFromPath("/automation/loops?view=graph&id=build")).toEqual({ view: "automation", automationView: "graph", automationRouteIssue: "non-canonical-graph" });
-    expect(routeFromPath("/automation/loops?view=loop&id=build")).toEqual({ view: "automation", automationView: "loop", automationEntityId: "build", creating: undefined, automationRouteIssue: undefined });
-    expect(routeFromPath("/automation/loops?view=loop&new=1")).toEqual({ view: "automation", automationView: "loop", automationEntityId: undefined, creating: true, automationRouteIssue: undefined });
-    expect(routeFromPath("/automation/loops?view=loop")).toEqual({ view: "automation", automationView: "loop", automationEntityId: undefined, creating: undefined, automationRouteIssue: "missing-loop-id" });
+    expect(routeFromPath("/automation/loops?view=workflow&id=build")).toEqual({ view: "automation", automationView: "workflow", automationEntityId: "build", creating: undefined, automationRouteIssue: undefined });
+    expect(routeFromPath("/automation/loops?view=workflow&new=1")).toEqual({ view: "automation", automationView: "workflow", automationEntityId: undefined, creating: true, automationRouteIssue: undefined });
+    expect(routeFromPath("/automation/loops?view=workflow")).toEqual({ view: "automation", automationView: "workflow", automationEntityId: undefined, creating: undefined, automationRouteIssue: "missing-loop-id" });
+    expect(routeFromPath("/automation/loops?view=loop&id=build")).toEqual({ view: "automation", automationRouteIssue: "invalid-view" });
     expect(routeFromPath("/automation/loops?view=invalid&id=build")).toEqual({ view: "automation", automationRouteIssue: "invalid-view" });
     expect(routeFromPath("/automation/loops?level=context")).toEqual({ view: "automation", automationRouteIssue: "invalid-view" });
     expect(routeFromPath("/automation/loops?level=1&id=build")).toEqual({ view: "automation", automationRouteIssue: "invalid-view" });
@@ -108,8 +109,8 @@ describe("workspace routing", () => {
     expect(skillDocumentPath(".agents/skills/a/SKILL.md")).toBe("/skills?path=.agents%2Fskills%2Fa%2FSKILL.md");
     expect(skillCreatePath()).toBe("/skills?new=1");
     expect(automationGraphPath()).toBe("/automation/loops?view=graph");
-    expect(automationLoopPath("wf 1")).toBe("/automation/loops?view=loop&id=wf+1");
-    expect(automationCreateLoopPath()).toBe("/automation/loops?view=loop&new=1");
+    expect(automationLoopPath("wf 1")).toBe("/automation/loops?view=workflow&id=wf+1");
+    expect(automationCreateLoopPath()).toBe("/automation/loops?view=workflow&new=1");
     expect(automationThemePath()).toBe("/automation/theme");
     expect(runOverviewPath("root 1")).toBe("/run?run=root%201");
     expect(runLoopPath("wf 1", "root 1")).toBe("/run/loops/wf%201?run=root%201");

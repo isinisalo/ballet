@@ -1,8 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type {
-  ProjectRecurringWorkSchedule,
+  ProjectRecurringJobSchedule,
   ProjectScheduleWeekday,
-  ProjectWorkSchedule
+  ProjectJobSchedule
 } from "../../shared/domain/automation.js";
 import { systemScheduleClock, type ScheduleClock } from "./ScheduleClock.js";
 
@@ -27,7 +27,7 @@ const asIsoString = (instant: Temporal.Instant): string =>
   instant.toString({ smallestUnit: "millisecond" });
 
 const occurrenceInstant = (
-  schedule: ProjectWorkSchedule,
+  schedule: ProjectJobSchedule,
   date: Temporal.PlainDate
 ): Temporal.Instant => date
   .toPlainDateTime(Temporal.PlainTime.from(schedule.time))
@@ -38,7 +38,7 @@ const laterDate = (left: Temporal.PlainDate, right: Temporal.PlainDate): Tempora
   Temporal.PlainDate.compare(left, right) >= 0 ? left : right;
 
 const matchesDate = (
-  schedule: ProjectRecurringWorkSchedule,
+  schedule: ProjectRecurringJobSchedule,
   date: Temporal.PlainDate
 ): boolean => {
   if (Temporal.PlainDate.compare(date, Temporal.PlainDate.from(schedule.startsOn)) < 0) return false;
@@ -51,7 +51,7 @@ const matchesDate = (
 };
 
 const nextMatchingDate = (
-  schedule: ProjectRecurringWorkSchedule,
+  schedule: ProjectRecurringJobSchedule,
   from: Temporal.PlainDate
 ): Temporal.PlainDate => {
   let date = laterDate(from, Temporal.PlainDate.from(schedule.startsOn));
@@ -60,7 +60,7 @@ const nextMatchingDate = (
 };
 
 const previousMatchingDate = (
-  schedule: ProjectRecurringWorkSchedule,
+  schedule: ProjectRecurringJobSchedule,
   from: Temporal.PlainDate
 ): Temporal.PlainDate | undefined => {
   const startsOn = Temporal.PlainDate.from(schedule.startsOn);
@@ -73,7 +73,7 @@ const previousMatchingDate = (
 };
 
 const recurringAtOrAfter = (
-  schedule: ProjectRecurringWorkSchedule,
+  schedule: ProjectRecurringJobSchedule,
   threshold: Temporal.Instant
 ): Temporal.Instant => {
   const localDate = threshold.toZonedDateTimeISO(schedule.timeZone).toPlainDate();
@@ -87,7 +87,7 @@ const recurringAtOrAfter = (
 };
 
 const occurrenceAtOrAfter = (
-  schedule: ProjectWorkSchedule,
+  schedule: ProjectJobSchedule,
   threshold: Temporal.Instant
 ): Temporal.Instant | undefined => {
   if (schedule.kind === "recurring") return recurringAtOrAfter(schedule, threshold);
@@ -97,7 +97,7 @@ const occurrenceAtOrAfter = (
 
 /** Returns the first occurrence whose instant is greater than or equal to `atOrAfter`. */
 export const scheduleOccurrenceAtOrAfter = (
-  schedule: ProjectWorkSchedule,
+  schedule: ProjectJobSchedule,
   atOrAfter: ScheduleInstantInput
 ): string | undefined => {
   const occurrence = occurrenceAtOrAfter(schedule, asInstant(atOrAfter));
@@ -106,13 +106,13 @@ export const scheduleOccurrenceAtOrAfter = (
 
 /** Uses an injectable clock to establish a new schedule cursor. */
 export const initialScheduleOccurrence = (
-  schedule: ProjectWorkSchedule,
+  schedule: ProjectJobSchedule,
   clock: ScheduleClock = systemScheduleClock
 ): string | undefined => scheduleOccurrenceAtOrAfter(schedule, clock.now());
 
 /** Returns the first occurrence strictly later than `after`. */
 export const nextScheduleOccurrence = (
-  schedule: ProjectWorkSchedule,
+  schedule: ProjectJobSchedule,
   after: ScheduleInstantInput
 ): string | undefined => {
   const threshold = asInstant(after).add({ nanoseconds: 1 });
@@ -122,7 +122,7 @@ export const nextScheduleOccurrence = (
 
 /** Returns the most recent occurrence strictly earlier than `before`. */
 export const latestScheduleOccurrenceBefore = (
-  schedule: ProjectWorkSchedule,
+  schedule: ProjectJobSchedule,
   before: ScheduleInstantInput
 ): string | undefined => {
   const threshold = asInstant(before);

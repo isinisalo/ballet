@@ -264,11 +264,11 @@ export class ExecutionStore {
         UPDATE node_runs SET status = 'interrupted', error_code = 'interrupted', error_message = ?,
           state_revision_after = ?, completed_at = ?, updated_at = ? WHERE node_run_id = ?
       `).run(message, node.state_revision_before, timestamp, timestamp, node.node_run_id);
-      if (node.work_loop_node_run_id) this.connection().prepare(`
-        UPDATE work_loop_node_runs SET status = 'failed', terminal = 'failed', active_node_run_id = NULL,
+      if (node.job_run_id) this.connection().prepare(`
+        UPDATE job_runs SET status = 'failed', terminal = 'failed', active_node_run_id = NULL,
           state_revision_after = ?, error_code = 'interrupted', error_message = ?, completed_at = ?, updated_at = ?
-        WHERE work_loop_node_run_id = ? AND status IN ('queued','running','waiting_for_input')
-      `).run(node.state_revision_before, message, timestamp, timestamp, node.work_loop_node_run_id);
+        WHERE job_run_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(node.state_revision_before, message, timestamp, timestamp, node.job_run_id);
       this.connection().prepare(`
         UPDATE loop_invocations SET status = 'failed', completion_state_revision = ?,
           completed_at = ?, updated_at = ?
@@ -288,10 +288,10 @@ export class ExecutionStore {
       if (recordTransition) this.connection().prepare(`
           INSERT INTO control_flow_events (
             root_run_id, sequence, kind, state_revision, source_loop_run_id,
-            source_work_loop_node_run_id, source_node_run_id, created_at
+            source_job_run_id, source_node_run_id, created_at
           ) VALUES (?, ?, 'execution_interrupted', ?, ?, ?, ?, ?)
         `).run(node.root_run_id, sequence, stateRevision, node.loop_run_id,
-          node.work_loop_node_run_id, node.node_run_id, timestamp);
+          node.job_run_id, node.node_run_id, timestamp);
     })();
     return this.require(taskId);
   }

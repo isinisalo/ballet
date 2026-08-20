@@ -7,10 +7,12 @@ import {
   type NodeRunStatus,
   type OrchestratorRoute,
   type ProjectAutomationConfig,
+  type ProjectFailEdge,
+  type ProjectJobNode,
   type ProjectLoop,
   type ProjectLoopEdge,
-  type ProjectNodeEdge,
-  type ProjectWorkLoopNode,
+  type ProjectPassEdge,
+  type ProjectValidationNode,
   type RootRun
 } from "@shared/api/workspace-contracts";
 
@@ -23,7 +25,7 @@ export interface GraphEngineeringNode {
   kind: "installed" | "custom";
   moduleVersion?: string;
   provenanceStatus?: InstalledLoopModuleStatus["status"];
-  workLoopNodeCount: number;
+  jobCount: number;
   accepts: string[];
   provides: string[];
   artworkStyle: LoopNodeStyle;
@@ -62,12 +64,13 @@ export interface GraphEngineeringFocus {
   hiddenRepairCount: number;
 }
 
-export interface LoopEngineeringProjection {
+export interface WorkflowEngineeringProjection {
   loop: ProjectLoop;
-  nodes: ProjectWorkLoopNode[];
-  edges: ProjectNodeEdge[];
-  startNodeId: string;
-  terminals: Array<"completed" | "blocked" | "failed">;
+  jobNodes: ProjectJobNode[];
+  validationNodes: ProjectValidationNode[];
+  passEdges: ProjectPassEdge[];
+  failEdges: ProjectFailEdge[];
+  startJobNodeId: string;
 }
 
 export function buildGraphEngineeringProjection({
@@ -107,7 +110,7 @@ export function buildGraphEngineeringProjection({
     },
     nodes: config.loops.map((loop) => {
       const installed = installedByLoopId.get(loop.id);
-      const startNode = loop.nodes.find((node) => node.id === loop.startNodeId);
+      const startNode = loop.workflow.jobNodes.find((node) => node.id === loop.workflow.startJobNodeId);
       return {
         loopId: loop.id,
         title: installed?.title ?? loop.id,
@@ -115,10 +118,10 @@ export function buildGraphEngineeringProjection({
         kind: installed ? "installed" : "custom",
         moduleVersion: installed?.moduleVersion,
         provenanceStatus: installed?.status,
-        workLoopNodeCount: loop.nodes.length,
+        jobCount: loop.workflow.jobNodes.length,
         accepts: [...loop.capabilities.accepts],
         provides: [...loop.capabilities.provides],
-        artworkStyle: startNode?.work.nodeStyle ?? defaultLoopNodeStyle,
+        artworkStyle: startNode?.nodeStyle ?? defaultLoopNodeStyle,
         locked: lockedLoopIds.has(loop.id),
         liveStatus: latestStatus(liveLoopRuns.filter((run) => run.loopId === loop.id))
       };
@@ -147,20 +150,19 @@ export function buildGraphEngineeringFocus(
   };
 }
 
-export function buildLoopEngineeringProjection(
+export function buildWorkflowEngineeringProjection(
   config: ProjectAutomationConfig,
   selectedLoopId: string
-): LoopEngineeringProjection | undefined {
+): WorkflowEngineeringProjection | undefined {
   const loop = config.loops.find((candidate) => candidate.id === selectedLoopId);
   if (!loop) return undefined;
-  const terminals = uniqueStrings(loop.edges.flatMap((edge) =>
-    "terminal" in edge.target ? [edge.target.terminal] : [])) as LoopEngineeringProjection["terminals"];
   return {
     loop,
-    nodes: loop.nodes.map((node) => ({ ...node })),
-    edges: loop.edges.map((edge) => ({ ...edge })),
-    startNodeId: loop.startNodeId,
-    terminals
+    jobNodes: loop.workflow.jobNodes.map((node) => ({ ...node })),
+    validationNodes: loop.workflow.validationNodes.map((node) => ({ ...node })),
+    passEdges: loop.workflow.passEdges.map((edge) => ({ ...edge })),
+    failEdges: loop.workflow.failEdges.map((edge) => ({ ...edge })),
+    startJobNodeId: loop.workflow.startJobNodeId
   };
 }
 
@@ -211,5 +213,3 @@ const statusPriority = (status: GraphEngineeringLiveStatus) => {
 
 const isLiveStatus = (status: GraphEngineeringLiveStatus) =>
   ["queued", "running", "waiting_for_input", "finalizing"].includes(status);
-
-const uniqueStrings = (values: string[]) => [...new Set(values)];

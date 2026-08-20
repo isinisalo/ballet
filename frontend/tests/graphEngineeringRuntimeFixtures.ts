@@ -5,7 +5,7 @@ import {
   type ProjectAutomationConfig,
   type RootRun
 } from "@shared/api/workspace-contracts";
-import { v11Loop } from "./v11Fixtures";
+import { workflowLoop } from "./workflowFixtures";
 
 export function rootEvidence(config: ProjectAutomationConfig): RootRun {
   return {
@@ -31,11 +31,11 @@ export function routeEvidence(loopEdgeId: string, sourceLoopId: string, targetLo
   };
 }
 
-export function targetRunEvidence(loop: ReturnType<typeof v11Loop>, route: OrchestratorRoute): LoopRunDetails {
+export function targetRunEvidence(loop: ReturnType<typeof workflowLoop>, route: OrchestratorRoute): LoopRunDetails {
   return {
     loopRunId: "target-loop-run", loopId: loop.id, rootRunId: route.rootRunId, source: "flow", status: "running",
     snapshot: structuredClone(loop), themeSnapshot: structuredClone(defaultLoopTheme), orchestrationRequestId: route.orchestrationRequestId,
     entryStateRevision: 0, nestingDepth: 0, createdAt: "2026-08-20T08:00:01.000Z", updatedAt: "2026-08-20T08:00:02.000Z",
-    workLoopNodeRuns: [], nodeRuns: []
+    jobRuns: [], nodeRuns: []
   };
 }

@@ -9,7 +9,7 @@ export interface FrameValidationInput {
   calleeLoopRunId: string;
   parentFrameId?: string;
   returnLoopId: string;
-  returnWorkLoopNodeId: string;
+  returnJobNodeId: string;
   returnValidationNodeDefinitionId: string;
   nestingDepth: number;
 }
@@ -47,7 +47,7 @@ export const assertOrchestrationFrameInput = (
 const continuationMatches = (request: RepairRequest, input: FrameValidationInput): boolean =>
   request.requesterLoopRunId === input.callerLoopRunId
   && request.returnLoopId === input.returnLoopId
-  && request.returnWorkLoopNodeId === input.returnWorkLoopNodeId
+  && request.returnJobNodeId === input.returnJobNodeId
   && request.returnValidationNodeDefinitionId === input.returnValidationNodeDefinitionId;
 
 interface LoopOwner {

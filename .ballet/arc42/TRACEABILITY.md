@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 11
+version: 13
 tags:
   - arc42
   - traceability
@@ -15,11 +15,11 @@ tags:
 
 ## Tarkoitus
 
-Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-012` / `REQ-001`–`REQ-012` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
+Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-013` / `REQ-001`–`REQ-013` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
 
 ## Tila
 
-Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. QS-014:n päätökset ovat accepted ja data/config/snapshot/module/runtime/routing/Graph/Loop UI sekä Phase 6 project-local responsibility/library -evidenssi on GLE-EVID-002–008A; GLE-EVID-006B lisää nykyisen 11 Loopin browser/conformance-ketjun ja korjatun narrow-control-evidenssin. Ihmisacceptance on pending.
+Matriisi sisältää 15 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. QS-014 säilyttää strict-v11-historiallisen evidenssin. QS-015:n strict-v12/v2-tekniset suitet ja final gatet ovat passed; ihmisacceptance on pending.
 
 ## Trace-matriisi
 
@@ -40,6 +40,7 @@ Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | goal-010 / REQ-010 | QS-009 | adr-016 / adr-019 / CON-007 | BB-001 / BB-002 / BB-003 / BB-009 | RT-006 / RT-007 / DEP-001 | TEST-009 | EVID-009 | implementation and Phase 6 package evidence verified; full gate pending |
 | goal-011 / REQ-011 | QS-010 | adr-017 / CON-005 | BB-001 / BB-009 | RT-006 / DEP-001 | TEST-010 | EVID-010 | verified |
 | goal-012 / REQ-012 | QS-014 | adr-018 / adr-019 / CON-002 / CON-005 | BB-001 / BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-011 / DEP-001 / DEP-002 | TEST-014 | EVID-014 | technical implementation including Graph control and one-responsibility Loop library passed; human acceptance pending |
+| goal-013 / REQ-013 | QS-015 | adr-020 / adr-021 / CON-002 / CON-005 / CON-008 | BB-001 / BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-002 / RT-003 / RT-009 / RT-011 / DEP-001 / DEP-002 | TEST-015 | EVID-015 | technical implementation, ADR-021 canvas correction and final gates passed; human visual acceptance pending |
 <!-- traceability:end -->
 
 ## Testi- ja monitorikatalogi
@@ -48,7 +49,7 @@ Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | --- | --- | --- |
 | TEST-001 | Local server-, API security- ja checkout lifecycle -testit. | platform test suite |
 | TEST-002 | Strict project configuration- ja resource catalog -testit. | project configuration tests |
-| TEST-003 | Work Loop-, State patch-, repair allowlist- ja continuation-testit. | runtime test suite |
+| TEST-003 | Workflow-, State patch-, repair allowlist- ja continuation-testit. | runtime test suite |
 | TEST-004 | Git workspace- ja permission-policy-testit. | execution test suite |
 | TEST-005 | `npm run validate:arc42`: rakenne, linkit, stable ID:t, trace ja project resources. | project-local validator |
 | TEST-006 | Ensimmäisen initiativen trace completeness ja handoff review. | arc42 evaluate Loop |
@@ -56,18 +57,19 @@ Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | TEST-008 | METHOD-HEALTH-vertailu ensimmäisen pilotin baselineen. | continuous learning / evaluate Loops |
 | TEST-009 | Loop module package/service/API/UI-testit, one-responsibility/done-condition conformance, install/export State/provenance/hash-roundtrip, capability swap, strict build gatet ja packaged Loop Library smoke. | module platform + project-local test suites |
 | TEST-010 | Loop Engineer typed routing, pure projection, keyboard/UI sekä desktop/narrow browser -tarkistukset. | frontend ja module test suites |
-| TEST-011 | `ExecutionComposition`, `TaskEnvelopeV4` sekä Codex/Copilot-adapteritestit: exact bytes/hash/order/schema, blocking composition ja no fallback. | execution/integration test suites |
+| TEST-011 | `ExecutionComposition`, `TaskEnvelopeV5` sekä Codex/Copilot-adapteritestit: exact bytes/hash/order/schema, blocking composition ja no fallback. | execution/integration test suites |
 | TEST-012 | `ExecutionStore.local`, `LocalExecutionQueue`, `LoopOrchestratorRecovery` ja `RootRunCancellationBarrier.persistence`: queued/running recovery, no replay/duplicate ja post-cancel barrier. | execution/runtime/run persistence test suites |
 | TEST-013 | `loopRunViewModel` ja `runRuntimePanels`: snapshot/canonical mapping, repair/return/human/finalization ja forbidden invented telemetry. | frontend Run UI test suite |
 | TEST-014 | Strict-v11 domain/schema/snapshot/persistence/runtime/API/module/routing/projection/UI hard cut -matriisi: zero/one/many flow, repair return, capability/allowlist, ambiguity/permission `needs_input`, Graph/Loop-datarajat, yhden vastuun project-local Loopit ja starter library, legacy-poisto sekä full test/lint/build/smoke/visual gate. | `graph-and-loop-engineering` initiative |
+| TEST-015 | Strict-v12/v2 Workflow schema/runtime/Orchestrator/persistence/API/module/UI -matriisi: 1:1-paritus, exact Pass/Fail Edget, reachability, Job→Validation, PASS→Job/PASS, kolme retryä ja neljännen FAIL-eskalointi, same-Validation repair return ilman Job rerunia/retry resetiä, technical failure bypass, State/restart/cancel/recovery, atomic authoring, canvasilla vain composite Job-artworkit ja persisted `straight | smoothstep` Edget, nolla endpoint-nodea/validate/retry-viivaa, canonical routing, keyboard/a11y, desktop/narrow QA, v7 fail-closed, active legacy/boundary search ja full gates. | `workflow-engineering` initiative |
 
 ## Evidenssikatalogi
 
 | ID | Evidenssi | Sijainti |
 | --- | --- | --- |
 | EVID-001 | Automatisoidut local service- ja HTTP-testitulokset. | `npm run test` |
-| EVID-002 | Strict-v10 schema- ja resource resolution -tulokset. | `npm run validate:arc42`, `npm run test` |
-| EVID-003 | Work Loop runtime- ja persistence-tulokset. | `npm run test` |
+| EVID-002 | Strict-v12 schema- ja resource resolution -tulokset. | `npm run validate:arc42`, `npm run test` |
+| EVID-003 | Workflow runtime- ja persistence-tulokset. | `npm run test` |
 | EVID-004 | Worktree- ja permission-policy-tulokset. | `npm run test` |
 | EVID-005 | arc42 repository conformance -raportti. | `npm run validate:arc42` |
 | EVID-006 | Initiative BRIEF/PLAN/EVIDENCE/REVIEW-ketju. | pending ensimmäinen end-to-end-initiative |
@@ -79,6 +81,7 @@ Matriisi sisältää 14 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | EVID-012 | Restart/reconciliation/cancellation-testitulokset: queued säilyy, running ei replaya, committed vaikutus ei duplikoidu. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-012-output |
 | EVID-013 | Run view-model/panel -testitulokset ja canonical source -katselmointi ilman keksittyä telemetriaa. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-013-output |
 | EVID-014 | Graph Engineering / Loop Engineering strict-v11 implementation-, Phase 6 responsibility/library-, conformance- ja ihmisacceptance-evidenssi. | `.ballet/arc42/initiatives/graph-and-loop-engineering/EVIDENCE.md`; GLE-EVID-002–008A ja current-baseline-audit GLE-EVID-006B passed, human acceptance pending |
+| EVID-015 | Workflow Engineering strict-v12/v2 implementation-, conformance-, gate- ja ihmisacceptance-evidenssi. | `.ballet/arc42/initiatives/workflow-engineering/EVIDENCE.md`; WFE-EVID-001–007 ja WFE-EVID-009 passed, WFE-EVID-008 pending |
 
 ## Ketjun tulkinta
 
@@ -90,11 +93,11 @@ Goalit, laatuskenaariot, ADR:t/konseptit, building blockit, runtime/deployment-s
 
 ## Relevantit päätökset
 
-`adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-018` ja `adr-019`.
+`adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019`, `adr-020` ja `adr-021`.
 
 ## Evidenssi
 
-Project-local-validator hylkää tuntemattomat trace-ID:t ja puutteelliset quality scenario -kentät. Dokumentaatioinitiativen conformance review tarkistaa lisäksi kaikkien 11 Goal/REQ-parien kattavuuden.
+Project-local-validator hylkää tuntemattomat trace-ID:t ja puutteelliset quality scenario -kentät. Conformance review tarkistaa lisäksi kaikkien 13 Goal/REQ-parien kattavuuden.
 
 ## Avoimet kysymykset
 

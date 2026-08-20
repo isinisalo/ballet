@@ -1,8 +1,8 @@
-import type { LoopModulePackageV1 } from "../../shared/domain/loopModules.js";
+import type { LoopModulePackageV2 } from "../../shared/domain/loopModules.js";
 
-export const testLoopModulePackage = (overrides: Partial<LoopModulePackageV1> = {}): LoopModulePackageV1 => ({
+export const testLoopModulePackage = (overrides: Partial<LoopModulePackageV2> = {}): LoopModulePackageV2 => ({
   format: "ballet-loop-module",
-  version: 1,
+  version: 2,
   manifest: {
     id: "sample-loop",
     title: "Sample Loop",
@@ -40,20 +40,40 @@ export const testLoopModulePackage = (overrides: Partial<LoopModulePackageV1> = 
     key: "loop",
     description: "Perform and validate one portable sample task.",
     state: { description: "Sample state shared by this Loop.", initial: { complete: false } },
-    startNode: "work",
-    nodes: [{
-      key: "work",
-      description: "Perform and validate sample work.",
-      work: {
-        type: "agent", task: "Perform sample work.", profileSlot: "worker", primaryInstruction: "worker",
-        skills: ["sample"], nodeStyle: "terra", nodeSize: "medium"
-      },
-      validation: {
-        type: "human", task: "Validate sample work.", nodeStyle: "luna", nodeSize: "small"
-      },
-      maxLocalAttempts: 3
-    }],
-    edges: [{ key: "completed", source: "work", target: { terminal: "completed" } }]
+    workflow: {
+      startJobNode: "job",
+      jobNodes: [{
+        key: "job",
+        validationNode: "job-validation",
+        description: "Perform sample work.",
+        type: "agent",
+        task: "Perform sample work.",
+        profileSlot: "worker",
+        primaryInstruction: "worker",
+        skills: ["sample"],
+        nodeStyle: "terra",
+        nodeSize: "medium",
+        maxRetries: 3
+      }],
+      validationNodes: [{
+        key: "job-validation",
+        description: "Validate sample work.",
+        type: "human",
+        task: "Validate sample work.",
+        nodeStyle: "luna",
+        nodeSize: "small"
+      }],
+      passEdges: [{
+        key: "job-pass",
+        sourceValidationNode: "job-validation",
+        target: { workflowResult: "PASS" }
+      }],
+      failEdges: [{
+        key: "job-fail",
+        sourceValidationNode: "job-validation",
+        target: { workflowResult: "FAIL" }
+      }]
+    }
   },
   ...overrides
 });

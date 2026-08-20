@@ -1,9 +1,9 @@
 import type { JsonValue, ProjectLoop, ProjectLoopEdge } from "../../shared/domain/automation.js";
 import type {
-  LoopRunDetails, NodeRun, OrchestratorNodeOutcome, ValidationNodeOutcome, WorkNodeOutcome
+  LoopRunDetails, NodeRun, OrchestratorNodeOutcome, ValidationNodeOutcome, JobNodeOutcome
 } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testLoop, testOrchestrator, testWorkLoopNode } from "../tests/v11TestConfig.js";
+import { testJobPair, testLoop, testOrchestrator } from "../tests/v12TestConfig.js";
 import { createRuntimeStoreFixture } from "./RuntimeStore.test-fixture.js";
 
 export interface OrchestrationHarness {
@@ -21,11 +21,16 @@ export const createOrchestrationHarness = async (options: {
   maxRepairDepth?: number;
   maxRepairAttempts?: number;
 } = {}): Promise<OrchestrationHarness> => {
-  const caller = testLoop("caller-loop", testWorkLoopNode("caller-work"));
-  const targets = options.targets ?? [
-    testLoop("repair-a", testWorkLoopNode("repair-a-work")),
-    testLoop("repair-b", testWorkLoopNode("repair-b-work"))
+  const callerPair = testJobPair("caller-job", { maxRetries: 0 });
+  const caller = testLoop("caller-loop", callerPair);
+  const targetSource = options.targets ?? [
+    testLoop("repair-a", testJobPair("repair-a-job", { maxRetries: 0 })),
+    testLoop("repair-b", testJobPair("repair-b-job", { maxRetries: 0 }))
   ];
+  const targets = targetSource.map((loop) => ({
+    ...loop,
+    workflow: { ...loop.workflow, jobNodes: loop.workflow.jobNodes.map((job) => ({ ...job, maxRetries: 0 })) }
+  }));
   const edges = options.edges ?? targets.map((target, index) => ({
     id: `repair-edge-${index + 1}`, source: caller.id, target: target.id,
     kind: "repair" as const, capability: "test:loop.transfer", description: `Allow ${target.id}.`
@@ -51,18 +56,19 @@ export const requestExternalRepair = (
     summary?: string;
   } = {}
 ) => {
-  const work = activeNode(runtime);
-  runtime.applyNodeOutcome("root-run", work.nodeRunId, workCompleted("Caller work completed."));
+  const job = activeNode(runtime);
+  runtime.applyNodeOutcome("root-run", job.nodeRunId, jobCompleted("Caller Job completed."));
   const validation = activeNode(runtime);
-  const repair = options.requestedOutcome
-    ? { mode: "ORCHESTRATOR_REPAIR" as const, reason: "External repair is required.",
+  const escalation = options.requestedOutcome
+    ? { reason: "External repair is required.",
         requestedOutcome: options.requestedOutcome, evidenceRefs: ["check:caller"] }
-    : { mode: "ORCHESTRATOR_REPAIR" as const, reason: "External repair is required.",
+    : { reason: "External repair is required.",
         requestedCapability: options.requestedCapability ?? "test:loop.transfer", evidenceRefs: ["check:caller"] };
   runtime.applyNodeOutcome("root-run", validation.nodeRunId, {
     role: "validation", state: "completed", decision: "FAIL",
     summary: options.summary ?? "Caller validation found a repairable problem.",
-    evidence: { finding: "caller" }, checks: [], repair
+    evidence: { finding: "caller" }, checks: [],
+    feedback: "Repair the caller finding.", expectedCorrection: "Make the caller Validation pass.", escalation
   });
   const orchestrator = activeNode(runtime);
   const requestId = runtime.connection().prepare(`
@@ -72,7 +78,7 @@ export const requestExternalRepair = (
   const orchestrationRequest = runtime.orchestration.forOrchestrator(orchestrator.nodeRunId);
   if (!orchestrationRequest) throw new Error("Test Orchestration Request was not created.");
   return {
-    work, validation, orchestrator,
+    job, validation, orchestrator,
     request: runtime.getRepairRequest(requestId)!, orchestrationRequest
   };
 };
@@ -96,12 +102,12 @@ export const routeRepair = (
 
 export const completeActiveLoop = (
   runtime: RuntimeDatabase,
-  options: { patch?: WorkNodeOutcome & { state: "completed" }; validation?: ValidationNodeOutcome } = {}
+  options: { patch?: JobNodeOutcome & { state: "completed" }; validation?: ValidationNodeOutcome } = {}
 ): LoopRunDetails => {
-  const work = activeNode(runtime);
-  runtime.applyNodeOutcome("root-run", work.nodeRunId, options.patch ?? workCompleted("Repair work completed."));
+  const job = activeNode(runtime);
+  runtime.applyNodeOutcome("root-run", job.nodeRunId, options.patch ?? jobCompleted("Repair Job completed."));
   const validation = activeNode(runtime);
-  return runtime.applyNodeOutcome("root-run", validation.nodeRunId, options.validation ?? validationOk());
+  return runtime.applyNodeOutcome("root-run", validation.nodeRunId, options.validation ?? validationPass());
 };
 
 export const activeNode = (runtime: RuntimeDatabase): NodeRun => {
@@ -114,10 +120,10 @@ export const activeNode = (runtime: RuntimeDatabase): NodeRun => {
   return node;
 };
 
-export const workCompleted = (summary: string): WorkNodeOutcome => ({
-  role: "work", state: "completed", summary, artifacts: {}, checks: []
+export const jobCompleted = (summary: string): JobNodeOutcome => ({
+  role: "job", state: "completed", summary, artifacts: {}, checks: []
 });
 
-export const validationOk = (summary = "Validation accepted the result."): ValidationNodeOutcome => ({
-  role: "validation", state: "completed", decision: "OK", summary, evidence: {}, checks: []
+export const validationPass = (summary = "Validation accepted the result."): ValidationNodeOutcome => ({
+  role: "validation", state: "completed", decision: "PASS", summary, evidence: {}, checks: []
 });

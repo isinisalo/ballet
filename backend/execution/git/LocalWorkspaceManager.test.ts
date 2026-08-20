@@ -236,7 +236,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
   worktreePath: prepared.path, branch: prepared.branch, headSha: prepared.headSha,
   configHash: prepared.configHash, snapshotHash: prepared.snapshotHash,
   executionSnapshot: {
-    version: 4,
+    version: 5,
     rootLoopId: "delivery",
     project: {
       checkoutRoot: prepared.path,
@@ -247,7 +247,6 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
     loops: projectConfiguration("Test profile").loops,
     orchestrator: projectConfiguration("Test profile").orchestrator,
     graph: projectConfiguration("Test profile").graph,
-    terminals: ["completed", "blocked", "failed"],
     theme: defaultLoopTheme,
     executionProfiles: projectConfiguration("Test profile").executionProfiles,
     runtimes: [], resources: [],
@@ -257,7 +256,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
 });
 
 const projectConfiguration = (profileName: string): ProjectConfiguration => ({
-  version: 11,
+  version: 12,
   executionProfiles: [{
     id: "test-profile",
     name: profileName,
@@ -279,28 +278,32 @@ const projectConfiguration = (profileName: string): ProjectConfiguration => ({
     description: "Complete and validate the work.",
     capabilities: { accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] },
     state: { description: "Shared delivery state.", initial: {} },
-    startNodeId: "work",
-    nodes: [{
-      id: "work",
-      description: "Complete the work.",
-      work: {
+    workflow: {
+      startJobNodeId: "job",
+      jobNodes: [{
+        id: "job",
+        description: "Complete the Job.",
+        validationNodeId: "job-validation",
+        maxRetries: 3,
         type: "agent",
-        task: "Complete the work.",
+        task: "Complete the Job.",
         executionProfileId: "test-profile",
         primaryInstructionId: "project:tracked-instruction",
         skillIds: ["project:review"],
         nodeStyle: "flat",
         nodeSize: "medium"
-      },
-      validation: {
+      }],
+      validationNodes: [{
+        id: "job-validation",
+        description: "Validate the completed Job.",
         type: "human",
-        task: "Validate the completed work.",
+        task: "Validate the completed Job.",
         nodeStyle: "luna",
         nodeSize: "small"
-      },
-      maxLocalAttempts: 3
-    }],
-    edges: [{ id: "work-completed", source: "work", target: { terminal: "completed" } }]
+      }],
+      passEdges: [{ id: "job-pass", sourceValidationNodeId: "job-validation", target: { workflowResult: "PASS" } }],
+      failEdges: [{ id: "job-fail", sourceValidationNodeId: "job-validation", target: { workflowResult: "FAIL" } }]
+    }
   }]
 });
 

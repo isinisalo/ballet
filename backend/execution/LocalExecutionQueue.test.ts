@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { workNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
+import { jobNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import { createFixture, specification, waitFor } from "./LocalExecutionQueue.test-fixture.js";
 
 describe("LocalExecutionQueue startup and claim boundaries", () => {
@@ -182,7 +182,7 @@ describe("LocalExecutionQueue outcomes and recovery", () => {
     await fixture.queue.start();
     await waitFor(() => fixture.store.require("schema").status === "succeeded");
 
-    expect(fixture.codex.outputSchemas[0]).toEqual(workNodeOutcomeJsonSchema);
+    expect(fixture.codex.outputSchemas[0]).toEqual(jobNodeOutcomeJsonSchema);
     expect(fixture.codex.prompts.get(spec.taskId)).toBe(spec.evidence.prompt);
     await fixture.close();
   });

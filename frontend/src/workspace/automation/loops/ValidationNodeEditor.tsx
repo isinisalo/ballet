@@ -7,13 +7,17 @@ import {
   type Skill
 } from "@shared/api/workspace-contracts";
 import { Bot, ShieldCheck, UserRound } from "lucide-react";
-import { SelectField, TextAreaField } from "@/components/shared/workspace-ui";
+import type { ProjectLoop } from "@shared/api/workspace-contracts";
+import { SelectField, TextAreaField, TextField } from "@/components/shared/workspace-ui";
 import { ExecutionCompositionFields } from "./ExecutionCompositionFields";
 import { NodeAppearanceFields } from "./NodeAppearanceFields";
 import { changeValidationNodeType } from "./loopEditorState";
+import { validationNodeIdError } from "./loopFormValidation";
 
-export function ValidationNodeEditor({ node, profiles, instructions, skills, runtime, disabled, onChange }: {
+export function ValidationNodeEditor({ node, loop, allLoops, profiles, instructions, skills, runtime, disabled, onChange }: {
   node: ProjectValidationNode;
+  loop: ProjectLoop;
+  allLoops: ProjectLoop[];
   profiles: ExecutionProfile[];
   instructions: ProjectInstruction[];
   skills: Skill[];
@@ -23,7 +27,7 @@ export function ValidationNodeEditor({ node, profiles, instructions, skills, run
 }) {
   const taskError = node.task.trim() ? undefined : "Validation criteria are required.";
   return (
-    <section aria-labelledby="validation-node-heading" className="grid gap-3 rounded-lg border border-divider-strong bg-card p-3">
+    <form aria-label={`Validation Node ${node.id}`} className="grid gap-4 p-4" onSubmit={(event) => event.preventDefault()}>
       <div className="flex items-center gap-2">
         <ShieldCheck className="size-4 text-secondary" aria-hidden="true" />
         <h3 id="validation-node-heading" className="font-mono text-xs font-semibold uppercase tracking-[0.08em]">Validation Node</h3>
@@ -32,6 +36,8 @@ export function ValidationNodeEditor({ node, profiles, instructions, skills, run
           {node.type}
         </span>
       </div>
+      <TextField label="Validation Node ID" value={node.id} error={validationNodeIdError(node, loop, allLoops)} required disabled={disabled} density="compact" maxLength={160} onChange={(id) => onChange({ ...node, id })} />
+      <TextAreaField label="Validation description" value={node.description} error={node.description.trim() ? undefined : "Validation description is required."} required disabled={disabled} density="compact" rows={2} maxLength={2_000} onChange={(description) => onChange({ ...node, description })} />
       <SelectField
         label="Validation node type"
         value={node.type}
@@ -54,6 +60,7 @@ export function ValidationNodeEditor({ node, profiles, instructions, skills, run
         />
       ) : null}
       <NodeAppearanceFields value={node} roleLabel="Validation" disabled={disabled} onChange={(appearance) => onChange({ ...node, ...appearance })} />
-    </section>
+      <p className="rounded-lg border border-divider-strong bg-panel-section p-3 text-xs text-muted-foreground">A completed Validation returns <strong className="text-secondary">PASS</strong> or <strong className="text-destructive">FAIL</strong>. FAIL always includes correction feedback and capability/outcome escalation.</p>
+    </form>
   );
 }

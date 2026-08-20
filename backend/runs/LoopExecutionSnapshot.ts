@@ -1,9 +1,8 @@
 import {
   getReachableProjectLoopGraph,
-  getReachableProjectNodeIds,
+  getReachableProjectJobNodeIds,
   isProjectAgentValidationNode,
-  isProjectNodeTerminalTarget,
-  isProjectProviderWorkNode,
+  isProjectProviderJobNode,
   type JsonValue,
   type ProjectExecutionComposition,
   type ProjectLoop,
@@ -22,7 +21,7 @@ export interface ReachableProviderComposition {
   id: string;
   loopId: string;
   nodeId: string;
-  role: "work" | "validation";
+  role: "job" | "validation";
   composition: ProjectExecutionComposition;
 }
 
@@ -73,22 +72,25 @@ export const reachableProviderCompositions = (
 export const providerCompositionsForLoops = (
   loops: readonly ProjectLoop[]
 ): ReachableProviderComposition[] => loops.flatMap((loop) =>
-  loop.nodes.flatMap((node) => [
-    ...(isProjectProviderWorkNode(node.work) ? [{
-      id: `${loop.id}:${node.id}:work`,
+  loop.workflow.jobNodes.flatMap((node) => {
+    const validation = loop.workflow.validationNodes.find((candidate) => candidate.id === node.validationNodeId);
+    return [
+    ...(isProjectProviderJobNode(node) ? [{
+      id: `${loop.id}:${node.id}:job`,
       loopId: loop.id,
       nodeId: node.id,
-      role: "work" as const,
-      composition: node.work
+      role: "job" as const,
+      composition: node
     }] : []),
-    ...(isProjectAgentValidationNode(node.validation) ? [{
-      id: `${loop.id}:${node.id}:validation`,
+    ...(validation && isProjectAgentValidationNode(validation) ? [{
+      id: `${loop.id}:${validation.id}:validation`,
       loopId: loop.id,
-      nodeId: node.id,
+      nodeId: validation.id,
       role: "validation" as const,
-      composition: node.validation
+      composition: validation
     }] : [])
-  ]));
+  ];
+  }));
 
 export const reachableLoops = (
   config: ReachableConfiguration,
@@ -96,7 +98,10 @@ export const reachableLoops = (
 ): ProjectLoop[] => reachableExecutionGraph(config, rootLoopId).loops;
 
 const snapshotLoop = (loop: ProjectLoop): ProjectLoop => {
-  const reachableNodeIds = getReachableProjectNodeIds(loop);
+  const reachableJobIds = getReachableProjectJobNodeIds(loop);
+  const reachableValidationIds = new Set(loop.workflow.jobNodes
+    .filter((node) => reachableJobIds.has(node.id))
+    .map((node) => node.validationNodeId));
   return {
     id: loop.id,
     description: loop.description,
@@ -108,20 +113,26 @@ const snapshotLoop = (loop: ProjectLoop): ProjectLoop => {
       description: loop.state.description,
       initial: canonicalClone(loop.state.initial)
     },
-    startNodeId: loop.startNodeId,
-    nodes: loop.nodes
-      .filter((node) => reachableNodeIds.has(node.id))
-      .map((node) => ({
-        ...node,
-        work: normalizeComposition(node.work),
-        validation: normalizeComposition(node.validation)
-      }))
-      .sort((left, right) => compareUtf8(left.id, right.id)),
-    edges: loop.edges
-      .filter((edge) => reachableNodeIds.has(edge.source)
-        && (isProjectNodeTerminalTarget(edge.target) || reachableNodeIds.has(edge.target.nodeId)))
-      .map((edge) => ({ ...edge, target: { ...edge.target } }))
-      .sort((left, right) => compareUtf8(left.id, right.id))
+    workflow: {
+      startJobNodeId: loop.workflow.startJobNodeId,
+      jobNodes: loop.workflow.jobNodes
+        .filter((node) => reachableJobIds.has(node.id))
+        .map(normalizeComposition)
+        .sort((left, right) => compareUtf8(left.id, right.id)),
+      validationNodes: loop.workflow.validationNodes
+        .filter((node) => reachableValidationIds.has(node.id))
+        .map(normalizeComposition)
+        .sort((left, right) => compareUtf8(left.id, right.id)),
+      passEdges: loop.workflow.passEdges
+        .filter((edge) => reachableValidationIds.has(edge.sourceValidationNodeId)
+          && ("workflowResult" in edge.target || reachableJobIds.has(edge.target.jobNodeId)))
+        .map((edge) => ({ ...edge, target: { ...edge.target } }))
+        .sort((left, right) => compareUtf8(left.id, right.id)),
+      failEdges: loop.workflow.failEdges
+        .filter((edge) => reachableValidationIds.has(edge.sourceValidationNodeId))
+        .map((edge) => ({ ...edge, target: { ...edge.target } }))
+        .sort((left, right) => compareUtf8(left.id, right.id))
+    }
   };
 };
 

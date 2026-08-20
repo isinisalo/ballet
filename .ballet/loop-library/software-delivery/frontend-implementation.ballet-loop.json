@@ -12,102 +12,7 @@
   "format": "ballet-loop-module",
   "loop": {
     "description": "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.",
-    "edges": [
-      {
-        "key": "analysis-ok",
-        "source": "analyze-frontend-change",
-        "target": {
-          "node": "implement-frontend-change"
-        }
-      },
-      {
-        "key": "implementation-ok",
-        "source": "implement-frontend-change",
-        "target": {
-          "node": "validate-frontend-change"
-        }
-      },
-      {
-        "key": "validation-ok",
-        "source": "validate-frontend-change",
-        "target": {
-          "terminal": "completed"
-        }
-      }
-    ],
     "key": "loop",
-    "nodes": [
-      {
-        "description": "Clarify the user journey, data contract, design-system constraints, accessibility needs, and responsive acceptance evidence.",
-        "key": "analyze-frontend-change",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "frontend-reviewer",
-          "profileSlot": "reviewer",
-          "skills": [],
-          "task": "Validate that the analysis identifies the user journey, relevant API contract, design-system rules, accessibility behavior, viewport expectations, and executable acceptance checks. Return a precise repair request when evidence is missing.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "frontend-engineer",
-          "profileSlot": "engineer",
-          "skills": [],
-          "task": "Inspect the repository and describe the smallest frontend change that satisfies the user journey. Identify API, component, design-system, accessibility, responsive layout, state, and test boundaries without implementing yet.",
-          "type": "agent"
-        }
-      },
-      {
-        "description": "Implement the approved user interface with existing components, tokens, state, and API patterns.",
-        "key": "implement-frontend-change",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "frontend-reviewer",
-          "profileSlot": "reviewer",
-          "skills": [],
-          "task": "Review the implementation against the requested user journey, API contract, repository architecture, design system, accessibility semantics, responsive behavior, and state boundaries. Do not modify the implementation while validating it.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "frontend-engineer",
-          "profileSlot": "engineer",
-          "skills": [],
-          "task": "Implement the bounded frontend change using the repository's existing component, styling, state, routing, API, and test patterns. Preserve semantic accessibility and remove replaced code in scope.",
-          "type": "agent"
-        }
-      },
-      {
-        "description": "Run and evaluate accessibility, behavior, responsive layout, tests, lint, and production build evidence.",
-        "key": "validate-frontend-change",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "small",
-          "nodeStyle": "luna",
-          "primaryInstruction": "frontend-reviewer",
-          "profileSlot": "reviewer",
-          "skills": [],
-          "task": "Independently confirm keyboard and accessibility behavior, desktop and narrow layout evidence, relevant tests, lint, and production build results. Reject completion when a required state or action is hidden, clipped, or unsupported by evidence.",
-          "type": "agent"
-        },
-        "work": {
-          "nodeSize": "large",
-          "nodeStyle": "sol",
-          "primaryInstruction": "frontend-engineer",
-          "profileSlot": "engineer",
-          "skills": [],
-          "task": "Run the repository's relevant UI tests, accessibility checks, responsive browser verification, lint, and production build. Fix in-scope failures and summarize exact viewport and command evidence and limitations.",
-          "type": "agent"
-        }
-      }
-    ],
-    "startNode": "analyze-frontend-change",
     "state": {
       "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
       "initial": {
@@ -118,6 +23,131 @@
         "request": null,
         "status": "not_started"
       }
+    },
+    "workflow": {
+      "failEdges": [
+        {
+          "key": "analyze-frontend-change-fail",
+          "sourceValidationNode": "analyze-frontend-change-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        },
+        {
+          "key": "implement-frontend-change-fail",
+          "sourceValidationNode": "implement-frontend-change-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        },
+        {
+          "key": "validate-frontend-change-fail",
+          "sourceValidationNode": "validate-frontend-change-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        }
+      ],
+      "jobNodes": [
+        {
+          "description": "Clarify the user journey, data contract, design-system constraints, accessibility needs, and responsive acceptance evidence.",
+          "key": "analyze-frontend-change",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "frontend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Inspect the repository and describe the smallest frontend change that satisfies the user journey. Identify API, component, design-system, accessibility, responsive layout, state, and test boundaries without implementing yet.",
+          "type": "agent",
+          "validationNode": "analyze-frontend-change-validation"
+        },
+        {
+          "description": "Implement the approved user interface with existing components, tokens, state, and API patterns.",
+          "key": "implement-frontend-change",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "frontend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Implement the bounded frontend change using the repository's existing component, styling, state, routing, API, and test patterns. Preserve semantic accessibility and remove replaced code in scope.",
+          "type": "agent",
+          "validationNode": "implement-frontend-change-validation"
+        },
+        {
+          "description": "Run and evaluate accessibility, behavior, responsive layout, tests, lint, and production build evidence.",
+          "key": "validate-frontend-change",
+          "maxRetries": 3,
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "frontend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Run the repository's relevant UI tests, accessibility checks, responsive browser verification, lint, and production build. Fix in-scope failures and summarize exact viewport and command evidence and limitations.",
+          "type": "agent",
+          "validationNode": "validate-frontend-change-validation"
+        }
+      ],
+      "passEdges": [
+        {
+          "key": "analysis-ok",
+          "sourceValidationNode": "analyze-frontend-change-validation",
+          "target": {
+            "jobNode": "implement-frontend-change"
+          }
+        },
+        {
+          "key": "implementation-ok",
+          "sourceValidationNode": "implement-frontend-change-validation",
+          "target": {
+            "jobNode": "validate-frontend-change"
+          }
+        },
+        {
+          "key": "validation-ok",
+          "sourceValidationNode": "validate-frontend-change-validation",
+          "target": {
+            "workflowResult": "PASS"
+          }
+        }
+      ],
+      "startJobNode": "analyze-frontend-change",
+      "validationNodes": [
+        {
+          "description": "Validate Clarify the user journey, data contract, design-system constraints, accessibility needs, and responsive acceptance evidence.",
+          "key": "analyze-frontend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "frontend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Validate that the analysis identifies the user journey, relevant API contract, design-system rules, accessibility behavior, viewport expectations, and executable acceptance checks. Return a precise repair request when evidence is missing.",
+          "type": "agent"
+        },
+        {
+          "description": "Validate Implement the approved user interface with existing components, tokens, state, and API patterns.",
+          "key": "implement-frontend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "frontend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Review the implementation against the requested user journey, API contract, repository architecture, design system, accessibility semantics, responsive behavior, and state boundaries. Do not modify the implementation while validating it.",
+          "type": "agent"
+        },
+        {
+          "description": "Validate Run and evaluate accessibility, behavior, responsive layout, tests, lint, and production build evidence.",
+          "key": "validate-frontend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "frontend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Independently confirm keyboard and accessibility behavior, desktop and narrow layout evidence, relevant tests, lint, and production build results. Reject completion when a required state or action is hidden, clipped, or unsupported by evidence.",
+          "type": "agent"
+        }
+      ]
     }
   },
   "manifest": {
@@ -205,5 +235,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 1
+  "version": 2
 }

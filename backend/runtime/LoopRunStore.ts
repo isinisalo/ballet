@@ -3,13 +3,13 @@ import type Database from "better-sqlite3";
 import type { JsonValue, ProjectLoop } from "../../shared/domain/automation.js";
 import type {
   LoopRun, LoopRunDetails, LoopRunSource, NodeRun, NodeRunRole, NodeRunStatus,
-  WorkLoopNodeRun
+  JobRun
 } from "../../shared/domain/runtime.js";
 import { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
 import {
-  loopRunRowSchema, nodeRunRowSchema, now, workLoopNodeRunRowSchema
+  jobRunRowSchema, loopRunRowSchema, nodeRunRowSchema, now
 } from "./RuntimeDbTypes.js";
-import { toLoopRun, toNodeRun, toWorkLoopNodeRun } from "./RuntimeRowMappers.js";
+import { toLoopRun, toNodeRun, toJobRun } from "./RuntimeRowMappers.js";
 import { canonicalJson } from "./state/CanonicalJson.js";
 import { validateState } from "./state/StatePatch.js";
 export interface CreateLoopRunInput {
@@ -19,20 +19,20 @@ export interface CreateLoopRunInput {
   parentLoopRunId?: string;
   source: LoopRunSource;
   input?: JsonValue;
-  schedule?: { workLoopNodeId: string; scheduledFor: string };
+  schedule?: { jobNodeId: string; scheduledFor: string };
   orchestrationRequestId?: string;
   repairRequestId?: string;
   entryStateRevision?: number;
   nestingDepth?: number;
 }
 
-export interface CreateWorkLoopNodeRunInput {
-  workLoopNodeRunId?: string;
+export interface CreateJobRunInput {
+  jobRunId?: string;
   rootRunId: string;
   loopRunId: string;
   loopId: string;
-  workLoopNodeId: string;
-  attempt: number;
+  jobNodeId: string;
+  jobAttempt: number;
   stateRevisionBefore?: number;
 }
 
@@ -40,10 +40,11 @@ export interface CreateNodeRunInput {
   nodeRunId?: string;
   rootRunId: string;
   loopRunId: string;
-  workLoopNodeRunId?: string;
+  jobRunId?: string;
   role: NodeRunRole;
   loopId: string;
-  workLoopNodeId?: string;
+  jobNodeId?: string;
+  workflowNodeId?: string;
   nodeDefinitionId: string;
   input?: JsonValue;
   context?: JsonValue;
@@ -67,11 +68,11 @@ export class LoopRunStore {
     return toLoopRun(row, this.snapshots.loop(snapshot, row.loop_id), snapshot.theme);
   }
 
-  getWorkLoopNodeRun(workLoopNodeRunId: string): WorkLoopNodeRun | undefined {
+  getJobRun(jobRunId: string): JobRun | undefined {
     const value = this.connection().prepare(
-      "SELECT * FROM work_loop_node_runs WHERE work_loop_node_run_id = ?"
-    ).get(workLoopNodeRunId);
-    return value ? toWorkLoopNodeRun(workLoopNodeRunRowSchema.parse(value)) : undefined;
+      "SELECT * FROM job_runs WHERE job_run_id = ?"
+    ).get(jobRunId);
+    return value ? toJobRun(jobRunRowSchema.parse(value)) : undefined;
   }
 
   getNodeRun(nodeRunId: string): NodeRun | undefined {
@@ -84,9 +85,9 @@ export class LoopRunStore {
     if (!run) return undefined;
     return {
       ...run,
-      workLoopNodeRuns: this.connection().prepare(`
-        SELECT * FROM work_loop_node_runs WHERE loop_run_id = ? ORDER BY created_at, rowid
-      `).all(loopRunId).map((row) => toWorkLoopNodeRun(workLoopNodeRunRowSchema.parse(row))),
+      jobRuns: this.connection().prepare(`
+        SELECT * FROM job_runs WHERE loop_run_id = ? ORDER BY created_at, rowid
+      `).all(loopRunId).map((row) => toJobRun(jobRunRowSchema.parse(row))),
       nodeRuns: this.connection().prepare(`
         SELECT * FROM node_runs WHERE loop_run_id = ? ORDER BY created_at, rowid
       `).all(loopRunId).map((row) => toNodeRun(nodeRunRowSchema.parse(row)))
@@ -131,12 +132,12 @@ export class LoopRunStore {
     this.connection().prepare(`
       INSERT INTO loop_invocations (
         loop_run_id, root_run_id, loop_id, parent_loop_run_id, source, status, input_json,
-        orchestration_request_id, repair_request_id, schedule_work_loop_node_id, scheduled_for,
+        orchestration_request_id, repair_request_id, schedule_job_node_id, scheduled_for,
         entry_state_revision, nesting_depth, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(loopRunId, input.rootRunId, input.loop.id, input.parentLoopRunId ?? null, input.source, inputJson,
       input.orchestrationRequestId ?? null, input.repairRequestId ?? null,
-      input.schedule?.workLoopNodeId ?? null, input.schedule?.scheduledFor ?? null,
+      input.schedule?.jobNodeId ?? null, input.schedule?.scheduledFor ?? null,
       revision, nestingDepth, timestamp, timestamp);
     this.connection().prepare(`
       UPDATE root_runs SET active_loop_run_id = ?, status = 'running', updated_at = ? WHERE root_run_id = ?
@@ -153,25 +154,25 @@ export class LoopRunStore {
     return this.requireLoopRun(loopRunId);
   }
 
-  createWorkLoopNodeRun(input: CreateWorkLoopNodeRunInput): WorkLoopNodeRun {
-    const id = input.workLoopNodeRunId ?? randomUUID();
+  createJobRun(input: CreateJobRunInput): JobRun {
+    const id = input.jobRunId ?? randomUUID();
     const timestamp = now();
     const snapshot = this.snapshots.require(input.rootRunId);
     const loop = this.snapshots.loop(snapshot, input.loopId);
-    const node = loop.nodes.find((candidate) => candidate.id === input.workLoopNodeId);
-    if (!node) throw new Error(`Work Loop Node ${input.loopId}:${input.workLoopNodeId} is missing from the Root snapshot.`);
-    if (input.attempt > node.maxLocalAttempts) {
-      throw new Error(`Work Loop Node attempt ${input.attempt} exceeds limit ${node.maxLocalAttempts}.`);
+    const node = loop.workflow.jobNodes.find((candidate) => candidate.id === input.jobNodeId);
+    if (!node) throw new Error(`Job Node ${input.loopId}:${input.jobNodeId} is missing from the Root snapshot.`);
+    if (input.jobAttempt > node.maxRetries + 1) {
+      throw new Error(`Job attempt ${input.jobAttempt} exceeds limit ${node.maxRetries + 1}.`);
     }
     const revision = input.stateRevisionBefore ?? this.currentRevision(input.rootRunId);
     this.connection().prepare(`
-      INSERT INTO work_loop_node_runs (
-        work_loop_node_run_id, root_run_id, loop_run_id, loop_id, work_loop_node_id, attempt,
+      INSERT INTO job_runs (
+        job_run_id, root_run_id, loop_run_id, loop_id, job_node_id, job_attempt,
         status, state_revision_before, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?)
-    `).run(id, input.rootRunId, input.loopRunId, input.loopId, input.workLoopNodeId,
-      input.attempt, revision, timestamp, timestamp);
-    return this.requireWorkLoopNodeRun(id);
+    `).run(id, input.rootRunId, input.loopRunId, input.loopId, input.jobNodeId,
+      input.jobAttempt, revision, timestamp, timestamp);
+    return this.requireJobRun(id);
   }
 
   createNodeRun(input: CreateNodeRunInput): NodeRun {
@@ -179,16 +180,23 @@ export class LoopRunStore {
     const timestamp = now();
     const snapshot = this.snapshots.require(input.rootRunId);
     if (input.role === "orchestrator") {
-      if (input.workLoopNodeRunId || input.workLoopNodeId) {
-        throw new Error("An orchestrator Node Run cannot belong to a Work Loop Node Run.");
+      if (input.jobRunId || input.jobNodeId || input.workflowNodeId) {
+        throw new Error("An orchestrator Node Run cannot belong to a Job Run.");
       }
     } else {
-      if (!input.workLoopNodeRunId || !input.workLoopNodeId) {
-        throw new Error(`A ${input.role} Node Run must belong to a Work Loop Node Run.`);
+      if (!input.jobRunId || !input.jobNodeId || !input.workflowNodeId) {
+        throw new Error(`A ${input.role} Node Run must belong to a Job Run and identify its Workflow Node.`);
       }
       const loop = this.snapshots.loop(snapshot, input.loopId);
-      if (!loop.nodes.some((candidate) => candidate.id === input.workLoopNodeId)) {
-        throw new Error(`Work Loop Node ${input.loopId}:${input.workLoopNodeId} is missing from the Root snapshot.`);
+      const job = loop.workflow.jobNodes.find((candidate) => candidate.id === input.jobNodeId);
+      if (!job) {
+        throw new Error(`Job Node ${input.loopId}:${input.jobNodeId} is missing from the Root snapshot.`);
+      }
+      const expectedWorkflowNodeId = input.role === "job" ? job.id : job.validationNodeId;
+      if (input.workflowNodeId !== expectedWorkflowNodeId) {
+        throw new Error(
+          `${input.role} Workflow Node ${input.workflowNodeId} does not match Job Node ${input.loopId}:${input.jobNodeId}.`
+        );
       }
     }
     const revision = input.stateRevisionBefore ?? this.currentRevision(input.rootRunId);
@@ -196,18 +204,18 @@ export class LoopRunStore {
     const transaction = this.connection().transaction(() => {
       this.connection().prepare(`
         INSERT INTO node_runs (
-          node_run_id, root_run_id, loop_run_id, work_loop_node_run_id, role, loop_id,
-          work_loop_node_id, node_definition_id, input_json, context_json, status, attempt,
+          node_run_id, root_run_id, loop_run_id, job_run_id, role, loop_id,
+          job_node_id, workflow_node_id, node_definition_id, input_json, context_json, status, attempt,
           state_revision_before, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, input.rootRunId, input.loopRunId, input.workLoopNodeRunId ?? null, input.role,
-        input.loopId, input.workLoopNodeId ?? null, input.nodeDefinitionId,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, input.rootRunId, input.loopRunId, input.jobRunId ?? null, input.role,
+        input.loopId, input.jobNodeId ?? null, input.workflowNodeId ?? null, input.nodeDefinitionId,
         jsonOrNull(input.input, "Node Run input"), jsonOrNull(input.context, "Node Run context"),
         status, input.attempt, revision, timestamp, timestamp);
-      if (input.workLoopNodeRunId) this.connection().prepare(`
-        UPDATE work_loop_node_runs SET active_node_run_id = ?, status = ?, updated_at = ?
-        WHERE work_loop_node_run_id = ?
-      `).run(id, status === "waiting_for_input" ? "waiting_for_input" : "running", timestamp, input.workLoopNodeRunId);
+      if (input.jobRunId) this.connection().prepare(`
+        UPDATE job_runs SET active_node_run_id = ?, status = ?, updated_at = ?
+        WHERE job_run_id = ?
+      `).run(id, status === "waiting_for_input" ? "waiting_for_input" : "running", timestamp, input.jobRunId);
       this.connection().prepare(`
         UPDATE root_runs SET active_loop_run_id = ?, active_node_run_id = ?, updated_at = ?
         WHERE root_run_id = ?
@@ -266,9 +274,9 @@ export class LoopRunStore {
     return run;
   }
 
-  private requireWorkLoopNodeRun(id: string): WorkLoopNodeRun {
-    const run = this.getWorkLoopNodeRun(id);
-    if (!run) throw new Error(`Work Loop Node Run ${id} was not found.`);
+  private requireJobRun(id: string): JobRun {
+    const run = this.getJobRun(id);
+    if (!run) throw new Error(`Job Run ${id} was not found.`);
     return run;
   }
 

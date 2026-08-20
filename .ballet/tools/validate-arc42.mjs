@@ -71,10 +71,10 @@ const requiredRepairs = {
 };
 
 const networkAllowed = new Set([
-  "arc42-continuous-learning/learning-authoritative-research/work",
-  "release-validation/release-execute-authorized/work",
-  "release-validation/release-execute-authorized/validation",
-  "release-validation/release-verify-authorized/work"
+  "arc42-continuous-learning/learning-authoritative-research/job",
+  "release-validation/release-execute-authorized/job",
+  "release-validation/release-execute-authorized-validation/validation",
+  "release-validation/release-verify-authorized/job"
 ]);
 
 const addIssue = (message) => issues.push(message);
@@ -254,7 +254,7 @@ if (!parsedConfig.success) {
 } else {
   config = parsedConfig.data;
   const automation = {
-    version: 11,
+    version: 12,
     orchestrator: config.orchestrator,
     graph: config.graph,
     loops: config.loops
@@ -264,11 +264,21 @@ if (!parsedConfig.success) {
   for (const issue of resources.issues) addIssue(`Resource ${issue.relativePath}: ${issue.message}`);
   for (const issue of validateProjectExecutionResources(automation, resources)) addIssue(`Resource reference ${issue.path}: ${issue.message}`);
 
-  for (const loop of config.loops) for (const node of loop.nodes) {
-    const outgoing = loop.edges.filter((edge) => edge.source === node.id);
-    if (outgoing.length !== 1) addIssue(`${loop.id}/${node.id} has ${outgoing.length} Validation OK edges; expected 1.`);
-  }
   for (const loop of config.loops) {
+    const validationOwners = new Map();
+    for (const job of loop.workflow.jobNodes) {
+      const owners = validationOwners.get(job.validationNodeId) ?? [];
+      owners.push(job.id);
+      validationOwners.set(job.validationNodeId, owners);
+    }
+    for (const validation of loop.workflow.validationNodes) {
+      const owners = validationOwners.get(validation.id) ?? [];
+      if (owners.length !== 1) addIssue(`${loop.id}/${validation.id} has ${owners.length} Job owners; expected 1.`);
+      const passEdges = loop.workflow.passEdges.filter((edge) => edge.sourceValidationNodeId === validation.id);
+      const failEdges = loop.workflow.failEdges.filter((edge) => edge.sourceValidationNodeId === validation.id);
+      if (passEdges.length !== 1) addIssue(`${loop.id}/${validation.id} has ${passEdges.length} PassEdges; expected 1.`);
+      if (failEdges.length !== 1) addIssue(`${loop.id}/${validation.id} has ${failEdges.length} FailEdges; expected 1.`);
+    }
     if (loop.capabilities.accepts.length !== 1 || loop.capabilities.provides.length !== 1) {
       addIssue(`${loop.id} must declare exactly one accepted and one provided capability.`);
     }
@@ -307,17 +317,25 @@ if (!parsedConfig.success) {
     if (/(?:high|xhigh|max|pro)/i.test(entry.reasoningEffort) || "reasoning" in entry && entry.reasoning?.mode) addIssue(`Unsupported high/pro reasoning configuration in ${entry.id}.`);
   }
   const observedNetworkOn = new Set();
-  for (const entry of config.loops) for (const item of entry.nodes) for (const [role, part] of [["work", item.work], ["validation", item.validation]]) {
-    if (part.type === "human") continue;
-    if (profiles.get(part.executionProfileId)?.networkAccess) observedNetworkOn.add(`${entry.id}/${item.id}/${role}`);
+  for (const entry of config.loops) {
+    for (const job of entry.workflow.jobNodes) {
+      if (job.type !== "human" && profiles.get(job.executionProfileId)?.networkAccess) {
+        observedNetworkOn.add(`${entry.id}/${job.id}/job`);
+      }
+    }
+    for (const validation of entry.workflow.validationNodes) {
+      if (validation.type !== "human" && profiles.get(validation.executionProfileId)?.networkAccess) {
+        observedNetworkOn.add(`${entry.id}/${validation.id}/validation`);
+      }
+    }
   }
   for (const location of observedNetworkOn) if (!networkAllowed.has(location)) addIssue(`Network-on profile used outside allowlist: ${location}.`);
   for (const location of networkAllowed) if (!observedNetworkOn.has(location)) addIssue(`Expected network-on node is not configured: ${location}.`);
   if (profiles.get(config.orchestrator.executionProfileId)?.networkAccess) addIssue("Orchestrator must use network-off profile.");
 
   const learning = config.loops.find((entry) => entry.id === "arc42-continuous-learning");
-  const learningWork = learning?.nodes.find((entry) => entry.id === learning.startNodeId)?.work;
-  const schedule = learningWork?.type === "scheduled" ? learningWork.schedule : undefined;
+  const learningJob = learning?.workflow.jobNodes.find((entry) => entry.id === learning.workflow.startJobNodeId);
+  const schedule = learningJob?.type === "scheduled" ? learningJob.schedule : undefined;
   if (!schedule || schedule.kind !== "recurring" || schedule.cadence !== "weekly" || schedule.startsOn !== "2026-08-17" || schedule.time !== "09:00" || schedule.timeZone !== "Europe/Helsinki" || JSON.stringify(schedule.weekdays) !== JSON.stringify(["mon"])) {
     addIssue("Continuous-learning schedule must be weekly Monday 09:00 Europe/Helsinki from 2026-08-17.");
   }
@@ -358,5 +376,6 @@ if (issues.length > 0) {
   for (const issue of issues) process.stderr.write(`- ${issue}\n`);
   process.exitCode = 1;
 } else {
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${config?.loops.length ?? 0} Loops, ${config?.graph.loopEdges.length ?? 0} Loop Edges.\n`);
+  const jobs = config?.loops.reduce((total, loop) => total + loop.workflow.jobNodes.length, 0) ?? 0;
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${config?.loops.length ?? 0} Loops, ${jobs} Jobs, ${config?.graph.loopEdges.length ?? 0} Loop Edges.\n`);
 }

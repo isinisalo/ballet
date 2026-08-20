@@ -6,7 +6,7 @@ import { ControlFlowTransitionStore } from "./ControlFlowTransitionStore.js";
 import type { LoopRunStore } from "./LoopRunStore.js";
 import type { RepairResultStore } from "./RepairResultStore.js";
 import type { RepairStore } from "./RepairStore.js";
-import type { WorkLoopProgressStore } from "./WorkLoopProgressStore.js";
+import type { WorkflowProgressStore } from "./WorkflowProgressStore.js";
 
 type LoopTerminalStatus = "completed" | "blocked" | "failed";
 
@@ -14,7 +14,7 @@ export interface LoopCompletionCallbacks {
   requestFlow(node: NodeRun, revision: number, outcome: CanonicalNodeOutcome): boolean;
   returnValidation(frame: OrchestrationFrame, context: TaskEnvelopeRepairReturn, revision: number): {
     nodeRunId: string;
-    workLoopNodeRunId: string;
+    jobRunId: string;
   };
 }
 
@@ -26,7 +26,7 @@ export class LoopCompletionEngine {
     private readonly loops: LoopRunStore,
     private readonly repairs: RepairStore,
     private readonly results: RepairResultStore,
-    private readonly progress: WorkLoopProgressStore
+    private readonly progress: WorkflowProgressStore
   ) {
     this.transitions = new ControlFlowTransitionStore(connection);
   }
@@ -64,7 +64,7 @@ export class LoopCompletionEngine {
   ): void {
     this.repairs.finishRequest(request.repairRequestId, "failed");
     this.progress.terminalizeCaller(
-      request.requesterLoopRunId, request.requesterWorkLoopNodeRunId, request.rootRunId,
+      request.requesterLoopRunId, request.requesterJobRunId, request.rootRunId,
       terminal, revision, errorCode, errorMessage
     );
     const parent = this.repairs.openFrameForCallee(request.requesterLoopRunId);
@@ -100,7 +100,7 @@ export class LoopCompletionEngine {
     this.repairs.finishRequest(request.repairRequestId, "repaired");
     this.repairs.closeFrame(frame.frameId, "returned");
     this.progress.activateCaller(
-      frame.callerLoopRunId, request.requesterWorkLoopNodeRunId, frame.rootRunId
+      frame.callerLoopRunId, request.requesterJobRunId, frame.rootRunId
     );
     const target = callbacks.returnValidation(frame, {
       repairRequest: requestProjection(request),
@@ -114,7 +114,7 @@ export class LoopCompletionEngine {
       rootRunId: frame.rootRunId, kind: "repair_return", stateRevision: revision,
       sourceLoopRunId: frame.calleeLoopRunId, sourceNodeRunId: node.nodeRunId,
       targetLoopRunId: frame.callerLoopRunId,
-      targetWorkLoopNodeRunId: target.workLoopNodeRunId,
+      targetJobRunId: target.jobRunId,
       repairRequestId: request.repairRequestId, orchestrationFrameId: frame.frameId
     });
   }
@@ -141,13 +141,13 @@ export class LoopCompletionEngine {
     this.repairs.finishRequest(request.repairRequestId, terminal === "cancelled" ? "cancelled" : "failed");
     this.repairs.closeFrame(frame.frameId, terminal === "cancelled" ? "cancelled" : "failed");
     this.progress.terminalizeCaller(
-      frame.callerLoopRunId, request.requesterWorkLoopNodeRunId, frame.rootRunId,
+      frame.callerLoopRunId, request.requesterJobRunId, frame.rootRunId,
       terminal, revision, "repair_target_terminal", message
     );
     this.transitions.append({
       rootRunId: frame.rootRunId, kind: "repair_terminal", stateRevision: revision,
       sourceLoopRunId: frame.calleeLoopRunId, sourceNodeRunId,
-      targetLoopRunId: frame.callerLoopRunId, targetWorkLoopNodeRunId: request.requesterWorkLoopNodeRunId,
+      targetLoopRunId: frame.callerLoopRunId, targetJobRunId: request.requesterJobRunId,
       repairRequestId: request.repairRequestId, orchestrationFrameId: frame.frameId
     });
     const parent = this.repairs.openFrameForCallee(frame.callerLoopRunId);
@@ -162,7 +162,7 @@ export class LoopCompletionEngine {
 const requestProjection = (request: RepairRequest) => ({
   id: request.repairRequestId,
   requesterLoopRunId: request.requesterLoopRunId,
-  requesterWorkLoopNodeRunId: request.requesterWorkLoopNodeRunId,
+  requesterJobRunId: request.requesterJobRunId,
   requesterValidationNodeRunId: request.requesterValidationNodeRunId,
   attempt: request.attempt,
   validationSummary: request.validationSummary,
