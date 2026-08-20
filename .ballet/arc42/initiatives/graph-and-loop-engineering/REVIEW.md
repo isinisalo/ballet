@@ -4,7 +4,7 @@ title: Graph and Loop Engineering REVIEW
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-20'
-version: 5
+version: 6
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Tila
 
-`draft`. Strict-v11 data/config/snapshot/module/runtime-, Graph/Loop-routing-, Graph Engineering- ja Loop Engineering -vaiheet on toteutettu ja paikallinen tekninen evidenssi kerätty. Koko initiativea ei hyväksytä ennen lopullista conformance-tarkistusta ja ihmisreview'ta.
+`draft`. Strict-v11 data/config/snapshot/module/runtime-, Graph/Loop-routing-, Graph Engineering-, Loop Engineering- ja Phase 6 project-local responsibility/library -vaiheet on toteutettu ja paikallinen tekninen evidenssi kerätty. Rajattu conformance-tarkistus on passed; koko initiativea ei hyväksytä ennen ihmisreview'ta.
 
 ## Review scope
 
@@ -25,12 +25,12 @@ Tuleva review vertaa `goal-012` / `REQ-012` / `QS-014` -aikomusta ADR-018:aan, P
 ## Fact
 
 - Nykyinen config/domain/snapshot/module/runtime-baseline on strict v11; authoring-UI:ssa on vain Graph Engineering ja Loop Engineering.
-- ADR-018 ja initiative-artefaktit muodostavat päätös- ja muutosrajan.
-- GLE-EVID-002–008 ovat passed; GLE-EVID-009 on pending.
+- ADR-018, ADR-019 ja initiative-artefaktit muodostavat päätös- ja muutosrajan.
+- GLE-EVID-002–008A ovat passed; GLE-EVID-009 on pending.
 
 ## Decision
 
-Ei uutta review-päätöstä. `adr-018` on hyväksytty käyttäjän eksplisiittisellä päätösvaltuutuksella, mutta initiative implementation acceptance ja lupa aloittaa seuraava vaihe ovat erilliset ihmisrajat.
+Ei uutta review-päätöstä. `adr-018` ja Phase 6:n `adr-019` on hyväksytty käyttäjän eksplisiittisellä päätösvaltuutuksella, mutta initiative implementation acceptance ja lupa aloittaa seuraava vaihe ovat erilliset ihmisrajat.
 
 ## Assumption, Hypothesis ja Finding
 
@@ -52,12 +52,14 @@ RISK-013 ja TRACEABILITY erottavat läpäistyn data/snapshot/module-osavaiheen k
 - **Implementation defect:** ei havaittu domain/config/snapshot/module-rajassa. Strict-v10 lukupolkuja, rinnakkaista top-level `loopEdges`-mallia, package Graphia/target-ID:tä tai platformiin vuotanutta project-workflow'ta löytyi 0.
 - **Documentation drift:** TRACEABILITY ja RISK-013 kuvasivat koko implementationin pending-tilana erottelematta läpäistyä GLE-EVID-002/003/008-osavaihetta; korjattu säilyttäen EVID-014 pending-tilassa.
 - **Acceptance coverage:** capability-listan max- ja trim-invarianteille lisättiin eksplisiittinen schema-testi. Koko dispatch/UI/ihmisacceptance pysyy avoimena eikä tätä review'ta tulkita initiative-acceptanceksi.
+- **Phase 6 conformance:** passed. Jokaisella project Loopilla ja paketilla on yksi eksplisiittinen done-condition sekä yksi accepts/provides-raja; split-vastuut ovat omia paketteja, package/state/capability/provenance/hash-roundtrip ja capability-swap on testattu, graph on ainoa peer-topologialähde ja target-ID package-resurssissa hylätään.
+- **Platform boundary:** passed. Project-workflow-ID:t ovat `.ballet/**`-datassa, generatorissa ja project-local testissä; `backend`, `frontend` ja `shared` -tuotantokoodiin ei lisätty workflow-nimiä tai target-reititystä.
 - **Open question:** ei uutta tämän rajatun vaiheen WHAT/WHY- tai vaikeasti peruttavaa HOW-kysymystä.
 
 ## Handoff
 
-- Current status: strict-v11 domain/schema/capability/snapshot/module/runtime-raja toteutettu; koko initiative draft.
-- Next approved action: projektin omistaja katselmoi GLE-EVID-002–008:n teknisen evidenssin ja hyväksyy tai palauttaa EVID-014-ketjun.
+- Current status: strict-v11 domain/schema/capability/snapshot/module/runtime- ja Phase 6 responsibility/library -rajat toteutettu; koko initiative draft.
+- Next approved action: projektin omistaja katselmoi GLE-EVID-002–008A:n teknisen evidenssin ja hyväksyy tai palauttaa EVID-014-ketjun.
 - Requested capability/outcome: Graph/Loop strict-v11 implementationin ihmisacceptance ilman release-, deploy-, merge- tai push-valtuutusta.
 - Stop condition: release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat erillisen täsmällisen ihmisvaltuutuksen.
 

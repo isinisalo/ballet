@@ -75,6 +75,14 @@ export default defineConfig({
           include: ["frontend/tests/**/*.test.{ts,tsx}"],
           setupFiles: ["frontend/tests/setup.ts"]
         }
+      },
+      {
+        extends: true,
+        test: {
+          name: "project-local",
+          environment: "node",
+          include: [".ballet/tests/**/*.test.ts"]
+        }
       }
     ]
   }

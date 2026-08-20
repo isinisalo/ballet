@@ -4,30 +4,12 @@
       "arc42:research.requested"
     ],
     "provides": [
-      "arc42:authoritative-learning"
+      "arc42:research.findings"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42:requirements-clarified",
-        "description": "Clarify the quality impact of authoritative evidence.",
-        "direction": "outgoing",
-        "kind": "repair"
-      },
-      {
-        "capability": "arc42:structures-designed",
-        "description": "Assess a material structural technology finding.",
-        "direction": "outgoing",
-        "kind": "repair"
-      },
-      {
-        "capability": "arc42:concepts-designed",
-        "description": "Assess a material cross-cutting technology or method finding.",
-        "direction": "outgoing",
-        "kind": "repair"
-      },
-      {
-        "capability": "arc42:architecture-evaluated",
-        "description": "Evaluate material learning evidence against quality, risk and debt.",
+        "capability": "arc42:evaluation.completed",
+        "description": "Request evaluation of material authoritative evidence.",
         "direction": "outgoing",
         "kind": "repair"
       }
@@ -36,7 +18,7 @@
   },
   "format": "ballet-loop-module",
   "loop": {
-    "description": "Research authoritative technology and method evidence on schedule, record only material findings and route them through existing approval boundaries.",
+    "description": "Research one bounded set of authoritative technology and method changes on schedule. Done when material findings or an explicit no-material-finding result are validated and any action is expressed only as a capability request.",
     "edges": [
       {
         "key": "learning-research-ok",
@@ -173,7 +155,7 @@
   },
   "manifest": {
     "category": "arc42",
-    "description": "Research authoritative technology and method evidence on schedule, record only material findings and route them through existing approval boundaries.",
+    "description": "Research one bounded set of authoritative technology and method changes on schedule. Done when material findings or an explicit no-material-finding result are validated and any action is expressed only as a capability request.",
     "id": "arc42-continuous-learning",
     "tags": [
       "arc42",

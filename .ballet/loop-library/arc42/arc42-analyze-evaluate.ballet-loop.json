@@ -1,44 +1,26 @@
 {
   "capabilities": {
     "accepts": [
-      "arc42:implementation-accompanied"
+      "arc42:implementation.accepted"
     ],
     "provides": [
-      "arc42:architecture-evaluated"
+      "arc42:evaluation.completed"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42:requirements-clarified",
-        "description": "Clarify criteria required for evaluation.",
-        "direction": "outgoing",
-        "kind": "repair"
-      },
-      {
-        "capability": "arc42:structures-designed",
-        "description": "Repair architecture drift in structures.",
-        "direction": "outgoing",
-        "kind": "repair"
-      },
-      {
-        "capability": "arc42:concepts-designed",
-        "description": "Repair a concept or reassess a decision.",
-        "direction": "outgoing",
-        "kind": "repair"
-      },
-      {
-        "capability": "arc42:implementation-accompanied",
-        "description": "Repair implementation or evidence gaps.",
+        "capability": "arc42:implementation.accepted",
+        "description": "Request corrected implementation or acceptance evidence.",
         "direction": "outgoing",
         "kind": "repair"
       }
     ],
     "requires": [
-      "arc42:implementation-accompanied"
+      "arc42:implementation.accepted"
     ]
   },
   "format": "ballet-loop-module",
   "loop": {
-    "description": "Evaluate implementation against measurable quality evidence and update risks, debt, drift, traceability, review and method health.",
+    "description": "Evaluate one bounded implementation. Done when every in-scope quality scenario has an evidence-backed verdict and resulting risk, debt, drift, traceability, review and method-health findings are validated.",
     "edges": [
       {
         "key": "evaluate-quality-ok",
@@ -199,7 +181,7 @@
   },
   "manifest": {
     "category": "arc42",
-    "description": "Evaluate implementation against measurable quality evidence and update risks, debt, drift, traceability, review and method health.",
+    "description": "Evaluate one bounded implementation. Done when every in-scope quality scenario has an evidence-backed verdict and resulting risk, debt, drift, traceability, review and method-health findings are validated.",
     "id": "arc42-analyze-evaluate",
     "tags": [
       "arc42",

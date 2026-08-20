@@ -4,7 +4,7 @@ title: Ballet Architecture Inception Canvas
 status: draft
 createdAt: '2026-08-17'
 updatedAt: '2026-08-17'
-version: 2
+version: 3
 tags:
   - architecture
   - canvas
@@ -124,7 +124,7 @@ Järjestelmäraja ja tekniset kanavat ovat [arc42-osiossa 3](../03-context-and-s
 | Merkittävä, kallis tai vaikeasti peruttava arkkitehtuurivalinta vaatii ihmisarvioidun ADR:n. | Hyväksyttyä päätöstä ei muuteta canvasissa, koodissa tai dokumenttichurnilla hiljaisesti. |
 | Merge, push, release, deploy, rollback ja muu ulkoinen kirjoitus vaativat täsmällisen valtuutuksen. | Testien läpäisy tai Validation-tulos ei itsessään anna julkaisulupaa. |
 | Roadmap-, milestone-, delivery- ja arc42-workflow on project-local-dataa. | Platform-koodi toteuttaa vain yleisiä Loop/runtime/provider/persistence-primitivejä. |
-| Oletusmenetelmä on clarify → structures → concepts → communicate → implementation → evaluate. | Validation saa pyytää allowlistatun repairin; flow ei ole vesiputous eikä automaattinen julkaisuputki. |
+| Oletusmenetelmä koostaa yhden vastuun specification-, strategy-, structure-, runtime/deployment-, concept-, decision-, communication-, implementation- ja evaluation-Loopit. | Validation saa pyytää allowlistatun capability repairin; flow ei ole vesiputous eikä automaattinen julkaisuputki. |
 | Aktiivinen arkkitehtuurikorpus on suomeksi; stable ID:t ja lähdekooditermit pysyvät muuttumattomina. | Dokumentointi palvelee paikallista yleisöä rikkomatta koneellisia sopimuksia. |
 
 ## Technical Constraints — tekniset rajoitteet

@@ -1,0 +1,128 @@
+{
+  "capabilities": {
+    "accepts": [
+      "architecture:strategy.requested"
+    ],
+    "provides": [
+      "architecture:solution-strategy.ready"
+    ],
+    "recommendedConnections": [],
+    "requires": []
+  },
+  "format": "ballet-loop-module",
+  "loop": {
+    "description": "Define one bounded solution strategy. Done when the approach, decision drivers, material alternatives and unresolved significant choices are explicit and validated.",
+    "edges": [
+      {
+        "key": "completed",
+        "source": "task",
+        "target": {
+          "terminal": "completed"
+        }
+      }
+    ],
+    "key": "loop",
+    "nodes": [
+      {
+        "description": "Define one bounded solution strategy. Done when the approach, decision drivers, material alternatives and unresolved significant choices are explicit and validated.",
+        "key": "task",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "task": "Validate that the strategy is bounded, evidence-linked and sufficient for its stated drivers without hiding a significant decision. Do not edit it.",
+          "type": "human"
+        },
+        "work": {
+          "nodeSize": "medium",
+          "nodeStyle": "terra",
+          "primaryInstruction": "worker",
+          "profileSlot": "worker",
+          "skills": [
+            "task"
+          ],
+          "task": "Define the smallest solution strategy for the bounded request. Link decision drivers, constraints and measurable quality criteria; record material alternatives and unresolved significant choices. Done means implementation direction is explicit without designing unrelated detail.",
+          "type": "agent"
+        }
+      }
+    ],
+    "startNode": "task",
+    "state": {
+      "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+      "initial": {
+        "artifacts": [],
+        "checks": [],
+        "contractVersion": "SoftwareEngineeringStateV1",
+        "evidence": [],
+        "request": null,
+        "status": "not_started"
+      }
+    }
+  },
+  "manifest": {
+    "category": "software-engineering",
+    "description": "Define one bounded solution strategy. Done when the approach, decision drivers, material alternatives and unresolved significant choices are explicit and validated.",
+    "id": "solution-strategy",
+    "tags": [
+      "software-engineering",
+      "starter"
+    ],
+    "title": "Solution strategy",
+    "version": "1.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [
+    {
+      "description": "Network-off implementation profile.",
+      "key": "worker",
+      "network": "forbidden",
+      "providers": [
+        "codex",
+        "copilot"
+      ],
+      "title": "Worker"
+    }
+  ],
+  "resources": [
+    {
+      "body": "Design one quality-driven solution strategy. Do not expand into detailed component, runtime, UI or deployment design unless the bounded request requires it.\n",
+      "key": "worker",
+      "kind": "instruction",
+      "metadata": {},
+      "title": "Solution strategy worker"
+    },
+    {
+      "body": "# Solution strategy\n\nTrace one strategy from explicit drivers to the chosen approach, alternatives, consequences and open significant choices.\n",
+      "description": "Complete and verify the Solution strategy responsibility.",
+      "key": "task",
+      "kind": "skill",
+      "metadata": {},
+      "name": "solution-strategy-task"
+    }
+  ],
+  "stateContract": {
+    "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+    "id": "software-engineering-state",
+    "initial": {
+      "artifacts": [],
+      "checks": [],
+      "contractVersion": "SoftwareEngineeringStateV1",
+      "evidence": [],
+      "request": null,
+      "status": "not_started"
+    },
+    "requiredKeys": [
+      "artifacts",
+      "checks",
+      "contractVersion",
+      "evidence",
+      "request",
+      "status"
+    ],
+    "version": "1.0.0"
+  },
+  "version": 1
+}

@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 9
+version: 10
 tags:
   - arc42
   - architecture
@@ -71,11 +71,11 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 
 ## Työskentelysääntö
 
-Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. Oletus-flow on clarify → structures → concepts → communicate → implementation → evaluate. Validation voi pyytää allowlistattua capability repairia, mutta epäselvä WHAT/WHY, prioriteetti tai merkittävä valinta pysähtyy `needs_input`-tilaan. Release/deploy/merge/push eivät sisälly oletus-flow’hun.
+Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. Oletus-flow on specification clarification → solution strategy → Building Block View → architecture-significant runtime/deployment → crosscutting concepts → architecture decision → communication → implementation → evaluation. Validation voi pyytää allowlistattua capability repairia, mutta epäselvä WHAT/WHY, prioriteetti tai merkittävä valinta pysähtyy `needs_input`-tilaan. Release/deploy/merge/push eivät sisälly oletus-flow’hun.
 
 ## Relevantit päätökset
 
-`goal-009`, `goal-010`, `goal-011`, `goal-012`, `adr-011`, `adr-013`, `adr-014`, `adr-015`, `adr-016`, `adr-017` ja `adr-018`.
+`goal-009`, `goal-010`, `goal-011`, `goal-012`, `adr-011`, `adr-013`, `adr-014`, `adr-015`, `adr-016`, `adr-017`, `adr-018` ja `adr-019`.
 
 ## Evidenssi
 

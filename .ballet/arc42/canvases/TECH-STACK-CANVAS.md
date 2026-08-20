@@ -4,7 +4,7 @@ title: Ballet Tech Stack Canvas
 status: draft
 createdAt: '2026-08-17'
 updatedAt: '2026-08-17'
-version: 2
+version: 3
 tags:
   - architecture
   - canvas
@@ -94,7 +94,7 @@ Rakenne perustuu viralliseen [Tech Stack Canvasiin](https://techstackcanvas.io/)
 | Snapshot | 32 MiB / tiedosto; 256 MiB / configuration snapshot | Root Run pysyy paikallisesti käsiteltävänä ja liian suuri snapshot estyy ennen suoritusta. | `LocalWorkspaceManager.ts` |
 | Event/log retention | Non-terminal console 1 MiB / task; application log 20 MiB ja 5 backupia | Diagnostiikka on rajattu; terminal events ja truncation-status säilyvät. | `ExecutionStore.ts`, `RotatingFileLogger.ts`, `README.md` |
 | Tuettu release-matriisi | macOS `arm64` ja `x64`; Node 22 release CI:ssä | Native `better-sqlite3` paketoidaan ja smoke-testataan per arkkitehtuuri. | DEP-003, `.github/workflows/release.yml` |
-| Nykyinen Ballet-project-topologia | 8 Loopia, 20 Work Loop Nodea, 6 Human Validation -porttia, 35 LoopEdgeä | Tämä on nykyinen project-data-baseline, ei platformin kovakoodattu maksimi. | `.ballet/project.json`, `validate:arc42` |
+| Nykyinen Ballet-project-topologia | 11 Loopia, 20 Work Loop Nodea, 6 Human Validation -porttia, 62 LoopEdgeä | Tämä on ADR-019:n yhden vastuun project-data-baseline, ei platformin kovakoodattu maksimi. | `.ballet/project.json`, `validate:arc42` |
 
 ## Major Quality Attributes
 
@@ -170,7 +170,7 @@ Kanoninen deployment-kuvaus: [osio 7](../07-deployment-view.md), DEP-001–DEP-0
 
 - Git-diffiin perustuva versionhallittu project truth ja conventional commit -käytäntö.
 - npm + `package-lock.json`; paikallinen `npm run dev`, `build`, `test`, `lint` ja `validate:arc42`.
-- 6+1 project-local Ballet Method: clarify → structures → concepts → communicate → implementation → evaluate sekä continuous learning.
+- Yhden vastuun project-local Ballet Method: specification clarification → solution strategy → Building Block View → runtime/deployment → crosscutting concepts → architecture decision → communication → implementation → evaluation sekä continuous learning.
 - BRIEF/PLAN/EVIDENCE/REVIEW per bounded initiative; ihmisrajat WHAT/WHY:lle, ADR:lle ja external writeille.
 - ESLint 9 + typescript-eslint; tunnettu baseline 0 erroria / 14 warningia (RISK-011).
 - `DESIGN.md` ja design.md-lint UI-designjärjestelmän ylläpitoon.

@@ -1,0 +1,128 @@
+{
+  "capabilities": {
+    "accepts": [
+      "ui:design.requested"
+    ],
+    "provides": [
+      "ui:design.ready"
+    ],
+    "recommendedConnections": [],
+    "requires": []
+  },
+  "format": "ballet-loop-module",
+  "loop": {
+    "description": "Specify one bounded production UI design. Done when components, tokens, states, accessibility and responsive behavior are explicit and validated against the user flow.",
+    "edges": [
+      {
+        "key": "completed",
+        "source": "task",
+        "target": {
+          "terminal": "completed"
+        }
+      }
+    ],
+    "key": "loop",
+    "nodes": [
+      {
+        "description": "Specify one bounded production UI design. Done when components, tokens, states, accessibility and responsive behavior are explicit and validated against the user flow.",
+        "key": "task",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "task": "Validate the design against the user flow, canonical tokens, component conventions, accessibility semantics and desktop/narrow behavior. Do not edit the design.",
+          "type": "human"
+        },
+        "work": {
+          "nodeSize": "medium",
+          "nodeStyle": "terra",
+          "primaryInstruction": "worker",
+          "profileSlot": "worker",
+          "skills": [
+            "task"
+          ],
+          "task": "Design one production UI slice using the project's canonical design system and component patterns. Specify states, interactions, accessibility, responsive behavior and implementation boundaries. Done means the design is implementable without ad hoc visual decisions.",
+          "type": "agent"
+        }
+      }
+    ],
+    "startNode": "task",
+    "state": {
+      "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+      "initial": {
+        "artifacts": [],
+        "checks": [],
+        "contractVersion": "SoftwareEngineeringStateV1",
+        "evidence": [],
+        "request": null,
+        "status": "not_started"
+      }
+    }
+  },
+  "manifest": {
+    "category": "software-engineering",
+    "description": "Specify one bounded production UI design. Done when components, tokens, states, accessibility and responsive behavior are explicit and validated against the user flow.",
+    "id": "ui-design",
+    "tags": [
+      "software-engineering",
+      "starter"
+    ],
+    "title": "UI design",
+    "version": "1.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [
+    {
+      "description": "Network-off implementation profile.",
+      "key": "worker",
+      "network": "forbidden",
+      "providers": [
+        "codex",
+        "copilot"
+      ],
+      "title": "Worker"
+    }
+  ],
+  "resources": [
+    {
+      "body": "Design one bounded production UI slice from canonical design tokens and existing component patterns. Do not create a parallel visual language.\n",
+      "key": "worker",
+      "kind": "instruction",
+      "metadata": {},
+      "title": "UI design worker"
+    },
+    {
+      "body": "# UI design\n\nCheck component reuse, token use, interaction states, keyboard and semantic accessibility, responsive behavior and implementation handoff.\n",
+      "description": "Complete and verify the UI design responsibility.",
+      "key": "task",
+      "kind": "skill",
+      "metadata": {},
+      "name": "ui-design-task"
+    }
+  ],
+  "stateContract": {
+    "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+    "id": "software-engineering-state",
+    "initial": {
+      "artifacts": [],
+      "checks": [],
+      "contractVersion": "SoftwareEngineeringStateV1",
+      "evidence": [],
+      "request": null,
+      "status": "not_started"
+    },
+    "requiredKeys": [
+      "artifacts",
+      "checks",
+      "contractVersion",
+      "evidence",
+      "request",
+      "status"
+    ],
+    "version": "1.0.0"
+  },
+  "version": 1
+}

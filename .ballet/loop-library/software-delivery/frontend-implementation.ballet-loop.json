@@ -1,24 +1,17 @@
 {
   "capabilities": {
     "accepts": [
-      "software:frontend.requested"
+      "implementation:change.requested"
     ],
     "provides": [
-      "software:frontend-implemented"
+      "implementation:change.ready"
     ],
-    "recommendedConnections": [
-      {
-        "capability": "software:backend-implemented",
-        "description": "Use an accepted backend contract as an optional upstream input when the user interface depends on one.",
-        "direction": "incoming",
-        "kind": "flow"
-      }
-    ],
+    "recommendedConnections": [],
     "requires": []
   },
   "format": "ballet-loop-module",
   "loop": {
-    "description": "Analyze, implement, and validate a bounded frontend change across user flow, API contract, design system, accessibility, layout, and build boundaries.",
+    "description": "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.",
     "edges": [
       {
         "key": "analysis-ok",
@@ -116,19 +109,20 @@
     ],
     "startNode": "analyze-frontend-change",
     "state": {
-      "description": "Bounded frontend delivery state containing the user flow, changed surfaces, checks, and visual evidence references.",
+      "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
       "initial": {
+        "artifacts": [],
         "checks": [],
+        "contractVersion": "SoftwareEngineeringStateV1",
         "evidence": [],
-        "surfaces": [],
-        "userFlow": null,
+        "request": null,
         "status": "not_started"
       }
     }
   },
   "manifest": {
     "category": "software-delivery",
-    "description": "Analyze, implement, and validate a bounded frontend change across user flow, API contract, design system, accessibility, layout, and build boundaries.",
+    "description": "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.",
     "id": "frontend-implementation",
     "tags": [
       "frontend",
@@ -136,7 +130,7 @@
       "accessibility"
     ],
     "title": "Frontend implementation",
-    "version": "1.0.0"
+    "version": "2.0.0"
   },
   "permissions": {
     "externalWrites": false,
@@ -191,21 +185,23 @@
     }
   ],
   "stateContract": {
-    "description": "Bounded frontend delivery state containing the user flow, changed surfaces, checks, and visual evidence references.",
-    "id": "frontend-delivery-state",
+    "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+    "id": "software-engineering-state",
     "initial": {
+      "artifacts": [],
       "checks": [],
+      "contractVersion": "SoftwareEngineeringStateV1",
       "evidence": [],
-      "surfaces": [],
-      "userFlow": null,
+      "request": null,
       "status": "not_started"
     },
     "requiredKeys": [
+      "artifacts",
       "checks",
+      "contractVersion",
       "evidence",
-      "status",
-      "surfaces",
-      "userFlow"
+      "request",
+      "status"
     ],
     "version": "1.0.0"
   },

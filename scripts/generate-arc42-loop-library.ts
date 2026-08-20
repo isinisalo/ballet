@@ -13,6 +13,16 @@ const inactiveRuntime = {
   runtimeDatabase: () => ({ activeLoopIds: () => [] })
 } as unknown as RuntimeDatabaseProvider;
 const service = new LoopModuleService(() => root, inactiveRuntime);
+const capabilities = (
+  accepts: string,
+  provides: string,
+  recommendedConnections: LoopModuleCapabilitiesV1["recommendedConnections"] = []
+): LoopModuleCapabilitiesV1 => ({
+  requires: accepts.endsWith(".requested") ? [] : [accepts],
+  accepts: [accepts],
+  provides: [provides],
+  recommendedConnections
+});
 
 const definitions: Array<{
   loopId: string;
@@ -21,86 +31,80 @@ const definitions: Array<{
 }> = [
   {
     loopId: "arc42-clarify-requirements",
-    title: "Clarify requirements",
-    capabilities: {
-      requires: [], provides: ["arc42.requirements-clarified"],
-      recommendedConnections: [{ kind: "flow", direction: "outgoing", capability: "arc42.structures-designed", description: "Continue from an approved BRIEF and measurable quality scenarios to structural design." }]
-    }
+    title: "Clarify specification",
+    capabilities: capabilities("arc42:initiative.requested", "arc42:requirements.clarified", [
+      { kind: "flow", direction: "outgoing", capability: "arc42:requirements.clarified", description: "A clarified specification can satisfy a compatible downstream input." }
+    ])
   },
   {
-    loopId: "arc42-design-structures",
-    title: "Design structures",
-    capabilities: {
-      requires: ["arc42.requirements-clarified"], provides: ["arc42.structures-designed"],
-      recommendedConnections: [
-        { kind: "repair", direction: "outgoing", capability: "arc42.requirements-clarified", description: "Request clarification when a structural decision lacks intent or a measurable quality target." },
-        { kind: "flow", direction: "outgoing", capability: "arc42.concepts-designed", description: "Continue from reviewed structures to cross-cutting concepts." }
-      ]
-    }
+    loopId: "arc42-solution-strategy",
+    title: "Solution strategy",
+    capabilities: capabilities("arc42:requirements.clarified", "arc42:solution-strategy.designed", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:requirements.clarified", description: "Request clarified intent or a measurable quality target." },
+      { kind: "flow", direction: "outgoing", capability: "arc42:solution-strategy.designed", description: "A validated strategy can satisfy a compatible downstream input." }
+    ])
   },
   {
-    loopId: "arc42-design-concepts",
-    title: "Design cross-cutting concepts",
-    capabilities: {
-      requires: ["arc42.structures-designed"], provides: ["arc42.concepts-designed"],
-      recommendedConnections: [
-        { kind: "repair", direction: "outgoing", capability: "arc42.requirements-clarified", description: "Request a missing quality criterion needed to choose a concept." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.structures-designed", description: "Repair a building block or interface exposed by concept design." },
-        { kind: "flow", direction: "outgoing", capability: "arc42.architecture-communicated", description: "Continue reviewed concepts to architecture communication." }
-      ]
-    }
+    loopId: "arc42-building-block-view",
+    title: "Building Block View",
+    capabilities: capabilities("arc42:solution-strategy.designed", "arc42:building-block-view.designed", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:solution-strategy.designed", description: "Request a strategy correction when block ownership cannot be resolved." },
+      { kind: "flow", direction: "outgoing", capability: "arc42:building-block-view.designed", description: "A validated Building Block View can satisfy a compatible downstream input." }
+    ])
+  },
+  {
+    loopId: "arc42-runtime-deployment",
+    title: "Runtime and deployment",
+    capabilities: capabilities("arc42:building-block-view.designed", "arc42:runtime-deployment.designed", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:building-block-view.designed", description: "Request a static-structure correction exposed by a significant scenario." },
+      { kind: "flow", direction: "outgoing", capability: "arc42:runtime-deployment.designed", description: "Validated significant scenarios can satisfy a compatible downstream input." }
+    ])
+  },
+  {
+    loopId: "arc42-crosscutting-concepts",
+    title: "Crosscutting concepts",
+    capabilities: capabilities("arc42:runtime-deployment.designed", "arc42:concepts.designed", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:runtime-deployment.designed", description: "Request a structural scenario correction exposed by concept design." },
+      { kind: "flow", direction: "outgoing", capability: "arc42:concepts.designed", description: "Validated concepts can satisfy a compatible downstream input." }
+    ])
+  },
+  {
+    loopId: "arc42-architecture-decision",
+    title: "Architecture decision",
+    capabilities: capabilities("arc42:concepts.designed", "arc42:architecture-decision.recorded", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:concepts.designed", description: "Request concept clarification required by a significant decision." },
+      { kind: "flow", direction: "outgoing", capability: "arc42:architecture-decision.recorded", description: "An explicit decision status can satisfy a compatible downstream input." }
+    ])
   },
   {
     loopId: "arc42-communicate-document",
     title: "Communicate and document",
-    capabilities: {
-      requires: ["arc42.concepts-designed"], provides: ["arc42.architecture-communicated"],
-      recommendedConnections: [
-        { kind: "repair", direction: "outgoing", capability: "arc42.requirements-clarified", description: "Clarify intent exposed during communication." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.structures-designed", description: "Repair an unclear architecture view." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.concepts-designed", description: "Repair an unclear concept or decision." },
-        { kind: "flow", direction: "outgoing", capability: "arc42.implementation-accompanied", description: "Continue an approved handoff to bounded implementation." }
-      ]
-    }
+    capabilities: capabilities("arc42:architecture-decision.recorded", "arc42:architecture.communicated", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:architecture-decision.recorded", description: "Request an explicit decision status exposed by communication." },
+      { kind: "flow", direction: "outgoing", capability: "arc42:architecture.communicated", description: "An approved handoff can satisfy a compatible downstream input." }
+    ])
   },
   {
     loopId: "arc42-accompany-implementation",
     title: "Accompany implementation",
-    capabilities: {
-      requires: ["arc42.architecture-communicated"], provides: ["arc42.implementation-accompanied"],
-      recommendedConnections: [
-        { kind: "repair", direction: "outgoing", capability: "arc42.requirements-clarified", description: "Clarify scope or acceptance discovered during implementation." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.structures-designed", description: "Repair a structural gap exposed by code." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.concepts-designed", description: "Repair a cross-cutting concept exposed by code." },
-        { kind: "flow", direction: "outgoing", capability: "arc42.architecture-evaluated", description: "Continue accepted implementation evidence to evaluation." }
-      ]
-    }
+    capabilities: capabilities("arc42:architecture.communicated", "arc42:implementation.accepted", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:architecture.communicated", description: "Request a corrected implementation handoff." },
+      { kind: "flow", direction: "outgoing", capability: "arc42:implementation.accepted", description: "Accepted implementation evidence can satisfy a compatible downstream input." }
+    ])
   },
   {
     loopId: "arc42-analyze-evaluate",
     title: "Analyze and evaluate",
-    capabilities: {
-      requires: ["arc42.implementation-accompanied"], provides: ["arc42.architecture-evaluated"],
-      recommendedConnections: [
-        { kind: "repair", direction: "outgoing", capability: "arc42.requirements-clarified", description: "Clarify criteria required for evaluation." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.structures-designed", description: "Repair architecture drift in structures." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.concepts-designed", description: "Repair a concept or reassess a decision." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.implementation-accompanied", description: "Repair implementation or evidence gaps." }
-      ]
-    }
+    capabilities: capabilities("arc42:implementation.accepted", "arc42:evaluation.completed", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:implementation.accepted", description: "Request corrected implementation or acceptance evidence." }
+    ])
   },
   {
     loopId: "arc42-continuous-learning",
     title: "Continuous learning",
-    capabilities: {
-      requires: [], provides: ["arc42.authoritative-learning"],
-      recommendedConnections: [
-        { kind: "repair", direction: "outgoing", capability: "arc42.requirements-clarified", description: "Clarify the quality impact of authoritative evidence." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.structures-designed", description: "Assess a material structural technology finding." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.concepts-designed", description: "Assess a material cross-cutting technology or method finding." },
-        { kind: "repair", direction: "outgoing", capability: "arc42.architecture-evaluated", description: "Evaluate material learning evidence against quality, risk and debt." }
-      ]
-    }
+    capabilities: capabilities("arc42:research.requested", "arc42:research.findings", [
+      { kind: "repair", direction: "outgoing", capability: "arc42:evaluation.completed", description: "Request evaluation of material authoritative evidence." }
+    ])
   }
 ];
 

@@ -1,44 +1,32 @@
 {
   "capabilities": {
     "accepts": [
-      "arc42:architecture-communicated"
+      "arc42:architecture.communicated"
     ],
     "provides": [
-      "arc42:implementation-accompanied"
+      "arc42:implementation.accepted"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42:requirements-clarified",
-        "description": "Clarify scope or acceptance discovered during implementation.",
+        "capability": "arc42:architecture.communicated",
+        "description": "Request a corrected implementation handoff.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42:structures-designed",
-        "description": "Repair a structural gap exposed by code.",
-        "direction": "outgoing",
-        "kind": "repair"
-      },
-      {
-        "capability": "arc42:concepts-designed",
-        "description": "Repair a cross-cutting concept exposed by code.",
-        "direction": "outgoing",
-        "kind": "repair"
-      },
-      {
-        "capability": "arc42:architecture-evaluated",
-        "description": "Continue accepted implementation evidence to evaluation.",
+        "capability": "arc42:implementation.accepted",
+        "description": "Accepted implementation evidence can satisfy a compatible downstream input.",
         "direction": "outgoing",
         "kind": "flow"
       }
     ],
     "requires": [
-      "arc42:architecture-communicated"
+      "arc42:architecture.communicated"
     ]
   },
   "format": "ballet-loop-module",
   "loop": {
-    "description": "Plan and implement one bounded initiative, compare the diff with architecture and collect acceptance/conformance evidence.",
+    "description": "Implement one bounded initiative. Done when its traced plan, in-scope code and tests, conformance review and acceptance evidence are complete without granting release authority.",
     "edges": [
       {
         "key": "implementation-plan-ok",
@@ -195,7 +183,7 @@
   },
   "manifest": {
     "category": "arc42",
-    "description": "Plan and implement one bounded initiative, compare the diff with architecture and collect acceptance/conformance evidence.",
+    "description": "Implement one bounded initiative. Done when its traced plan, in-scope code and tests, conformance review and acceptance evidence are complete without granting release authority.",
     "id": "arc42-accompany-implementation",
     "tags": [
       "arc42",

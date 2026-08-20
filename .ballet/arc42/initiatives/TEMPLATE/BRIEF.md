@@ -3,8 +3,8 @@ id: arc42-initiative-brief-template
 title: Initiative brief template
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-16'
-version: 1
+updatedAt: '2026-08-20'
+version: 2
 tags:
   - arc42
   - initiative
@@ -53,4 +53,4 @@ List unresolved questions with owner, impact and next decision point.
 
 ## Next review basis
 
-Ready for `arc42-design-structures` only when scope and all priority-1 acceptance measures are explicit.
+Ready for the `arc42:requirements.clarified` → solution-strategy capability only when scope and all priority-1 acceptance measures are explicit.

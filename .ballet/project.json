@@ -60,31 +60,55 @@
   "graph": {
     "loopEdges": [
       {
-        "id": "flow-clarify-structures",
+        "id": "flow-clarify-requirements-solution-strategy",
         "source": "arc42-clarify-requirements",
-        "target": "arc42-design-structures",
+        "target": "arc42-solution-strategy",
         "kind": "flow",
-        "description": "An approved initiative BRIEF and measurable quality scenarios enable structural design.",
+        "description": "A clarified specification enables a bounded solution strategy.",
         "capability": "arc42:requirements.clarified"
       },
       {
-        "id": "flow-structures-concepts",
-        "source": "arc42-design-structures",
-        "target": "arc42-design-concepts",
+        "id": "flow-solution-strategy-building-block-view",
+        "source": "arc42-solution-strategy",
+        "target": "arc42-building-block-view",
         "kind": "flow",
-        "description": "Approved structural views enable quality-driven crosscutting concept design.",
-        "capability": "arc42:structures.designed"
+        "description": "An approved solution strategy enables the source-mapped Building Block View.",
+        "capability": "arc42:solution-strategy.designed"
       },
       {
-        "id": "flow-concepts-communicate",
-        "source": "arc42-design-concepts",
-        "target": "arc42-communicate-document",
+        "id": "flow-building-block-view-runtime-deployment",
+        "source": "arc42-building-block-view",
+        "target": "arc42-runtime-deployment",
         "kind": "flow",
-        "description": "Reviewed concepts and decision status enable architecture communication and handoff.",
+        "description": "A validated Building Block View enables architecture-significant runtime/deployment scenarios.",
+        "capability": "arc42:building-block-view.designed"
+      },
+      {
+        "id": "flow-runtime-deployment-crosscutting-concepts",
+        "source": "arc42-runtime-deployment",
+        "target": "arc42-crosscutting-concepts",
+        "kind": "flow",
+        "description": "Validated runtime/deployment structures enable necessary crosscutting concepts.",
+        "capability": "arc42:runtime-deployment.designed"
+      },
+      {
+        "id": "flow-crosscutting-concepts-architecture-decision",
+        "source": "arc42-crosscutting-concepts",
+        "target": "arc42-architecture-decision",
+        "kind": "flow",
+        "description": "Reviewed crosscutting concepts expose architecture-significant choices for explicit decision.",
         "capability": "arc42:concepts.designed"
       },
       {
-        "id": "flow-communicate-implementation",
+        "id": "flow-architecture-decision-communicate-document",
+        "source": "arc42-architecture-decision",
+        "target": "arc42-communicate-document",
+        "kind": "flow",
+        "description": "Recorded architecture decisions enable canonical communication and handoff.",
+        "capability": "arc42:architecture-decision.recorded"
+      },
+      {
+        "id": "flow-communicate-document-accompany-implementation",
         "source": "arc42-communicate-document",
         "target": "arc42-accompany-implementation",
         "kind": "flow",
@@ -92,7 +116,7 @@
         "capability": "arc42:architecture.communicated"
       },
       {
-        "id": "flow-implementation-evaluate",
+        "id": "flow-accompany-implementation-analyze-evaluate",
         "source": "arc42-accompany-implementation",
         "target": "arc42-analyze-evaluate",
         "kind": "flow",
@@ -100,243 +124,435 @@
         "capability": "arc42:implementation.accepted"
       },
       {
-        "id": "repair-structures-clarify",
-        "source": "arc42-design-structures",
+        "id": "repair-solution-strategy-clarify-requirements",
+        "source": "arc42-solution-strategy",
         "target": "arc42-clarify-requirements",
         "kind": "repair",
-        "description": "Clarify an unresolved goal, stakeholder, scope, constraint or measurable quality scenario required by structural design.",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-solution-strategy cannot meet its done-condition locally.",
         "capability": "arc42:requirements.clarified"
       },
       {
-        "id": "repair-structures-structures",
-        "source": "arc42-design-structures",
-        "target": "arc42-design-structures",
+        "id": "repair-solution-strategy-solution-strategy",
+        "source": "arc42-solution-strategy",
+        "target": "arc42-solution-strategy",
         "kind": "repair",
-        "description": "Repair solution strategy, building blocks, interfaces or significant runtime/deployment views.",
-        "capability": "arc42:structures.designed"
+        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-solution-strategy cannot meet its done-condition locally.",
+        "capability": "arc42:solution-strategy.designed"
       },
       {
-        "id": "repair-concepts-clarify",
-        "source": "arc42-design-concepts",
+        "id": "repair-building-block-view-clarify-requirements",
+        "source": "arc42-building-block-view",
         "target": "arc42-clarify-requirements",
         "kind": "repair",
-        "description": "Clarify a requirement or quality criterion needed to choose a crosscutting concept.",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-building-block-view cannot meet its done-condition locally.",
         "capability": "arc42:requirements.clarified"
       },
       {
-        "id": "repair-concepts-structures",
-        "source": "arc42-design-concepts",
-        "target": "arc42-design-structures",
+        "id": "repair-building-block-view-solution-strategy",
+        "source": "arc42-building-block-view",
+        "target": "arc42-solution-strategy",
         "kind": "repair",
-        "description": "Repair a building block, interface, runtime or deployment structure required by a concept.",
-        "capability": "arc42:structures.designed"
+        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-building-block-view cannot meet its done-condition locally.",
+        "capability": "arc42:solution-strategy.designed"
       },
       {
-        "id": "repair-concepts-concepts",
-        "source": "arc42-design-concepts",
-        "target": "arc42-design-concepts",
+        "id": "repair-building-block-view-building-block-view",
+        "source": "arc42-building-block-view",
+        "target": "arc42-building-block-view",
         "kind": "repair",
-        "description": "Repair a crosscutting concept or architecture-significant ADR proposal.",
+        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-building-block-view cannot meet its done-condition locally.",
+        "capability": "arc42:building-block-view.designed"
+      },
+      {
+        "id": "repair-runtime-deployment-clarify-requirements",
+        "source": "arc42-runtime-deployment",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-runtime-deployment cannot meet its done-condition locally.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-runtime-deployment-solution-strategy",
+        "source": "arc42-runtime-deployment",
+        "target": "arc42-solution-strategy",
+        "kind": "repair",
+        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-runtime-deployment cannot meet its done-condition locally.",
+        "capability": "arc42:solution-strategy.designed"
+      },
+      {
+        "id": "repair-runtime-deployment-building-block-view",
+        "source": "arc42-runtime-deployment",
+        "target": "arc42-building-block-view",
+        "kind": "repair",
+        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-runtime-deployment cannot meet its done-condition locally.",
+        "capability": "arc42:building-block-view.designed"
+      },
+      {
+        "id": "repair-runtime-deployment-runtime-deployment",
+        "source": "arc42-runtime-deployment",
+        "target": "arc42-runtime-deployment",
+        "kind": "repair",
+        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-runtime-deployment cannot meet its done-condition locally.",
+        "capability": "arc42:runtime-deployment.designed"
+      },
+      {
+        "id": "repair-crosscutting-concepts-clarify-requirements",
+        "source": "arc42-crosscutting-concepts",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-crosscutting-concepts-solution-strategy",
+        "source": "arc42-crosscutting-concepts",
+        "target": "arc42-solution-strategy",
+        "kind": "repair",
+        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
+        "capability": "arc42:solution-strategy.designed"
+      },
+      {
+        "id": "repair-crosscutting-concepts-building-block-view",
+        "source": "arc42-crosscutting-concepts",
+        "target": "arc42-building-block-view",
+        "kind": "repair",
+        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
+        "capability": "arc42:building-block-view.designed"
+      },
+      {
+        "id": "repair-crosscutting-concepts-runtime-deployment",
+        "source": "arc42-crosscutting-concepts",
+        "target": "arc42-runtime-deployment",
+        "kind": "repair",
+        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
+        "capability": "arc42:runtime-deployment.designed"
+      },
+      {
+        "id": "repair-crosscutting-concepts-crosscutting-concepts",
+        "source": "arc42-crosscutting-concepts",
+        "target": "arc42-crosscutting-concepts",
+        "kind": "repair",
+        "description": "Request the project-local arc42:concepts.designed capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
         "capability": "arc42:concepts.designed"
       },
       {
-        "id": "repair-communicate-clarify",
-        "source": "arc42-communicate-document",
+        "id": "repair-architecture-decision-clarify-requirements",
+        "source": "arc42-architecture-decision",
         "target": "arc42-clarify-requirements",
         "kind": "repair",
-        "description": "Clarify stakeholder intent, scope, constraint or quality scenario exposed during communication.",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-architecture-decision cannot meet its done-condition locally.",
         "capability": "arc42:requirements.clarified"
       },
       {
-        "id": "repair-communicate-structures",
-        "source": "arc42-communicate-document",
-        "target": "arc42-design-structures",
+        "id": "repair-architecture-decision-crosscutting-concepts",
+        "source": "arc42-architecture-decision",
+        "target": "arc42-crosscutting-concepts",
         "kind": "repair",
-        "description": "Repair an unclear or inconsistent building block, interface, runtime or deployment view.",
-        "capability": "arc42:structures.designed"
-      },
-      {
-        "id": "repair-communicate-concepts",
-        "source": "arc42-communicate-document",
-        "target": "arc42-design-concepts",
-        "kind": "repair",
-        "description": "Repair an unclear crosscutting concept or significant decision record.",
+        "description": "Request the project-local arc42:concepts.designed capability when arc42-architecture-decision cannot meet its done-condition locally.",
         "capability": "arc42:concepts.designed"
       },
       {
-        "id": "repair-communicate-communicate",
+        "id": "repair-architecture-decision-architecture-decision",
+        "source": "arc42-architecture-decision",
+        "target": "arc42-architecture-decision",
+        "kind": "repair",
+        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-architecture-decision cannot meet its done-condition locally.",
+        "capability": "arc42:architecture-decision.recorded"
+      },
+      {
+        "id": "repair-communicate-document-clarify-requirements",
+        "source": "arc42-communicate-document",
+        "target": "arc42-clarify-requirements",
+        "kind": "repair",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-communicate-document cannot meet its done-condition locally.",
+        "capability": "arc42:requirements.clarified"
+      },
+      {
+        "id": "repair-communicate-document-solution-strategy",
+        "source": "arc42-communicate-document",
+        "target": "arc42-solution-strategy",
+        "kind": "repair",
+        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-communicate-document cannot meet its done-condition locally.",
+        "capability": "arc42:solution-strategy.designed"
+      },
+      {
+        "id": "repair-communicate-document-building-block-view",
+        "source": "arc42-communicate-document",
+        "target": "arc42-building-block-view",
+        "kind": "repair",
+        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-communicate-document cannot meet its done-condition locally.",
+        "capability": "arc42:building-block-view.designed"
+      },
+      {
+        "id": "repair-communicate-document-runtime-deployment",
+        "source": "arc42-communicate-document",
+        "target": "arc42-runtime-deployment",
+        "kind": "repair",
+        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-communicate-document cannot meet its done-condition locally.",
+        "capability": "arc42:runtime-deployment.designed"
+      },
+      {
+        "id": "repair-communicate-document-crosscutting-concepts",
+        "source": "arc42-communicate-document",
+        "target": "arc42-crosscutting-concepts",
+        "kind": "repair",
+        "description": "Request the project-local arc42:concepts.designed capability when arc42-communicate-document cannot meet its done-condition locally.",
+        "capability": "arc42:concepts.designed"
+      },
+      {
+        "id": "repair-communicate-document-architecture-decision",
+        "source": "arc42-communicate-document",
+        "target": "arc42-architecture-decision",
+        "kind": "repair",
+        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-communicate-document cannot meet its done-condition locally.",
+        "capability": "arc42:architecture-decision.recorded"
+      },
+      {
+        "id": "repair-communicate-document-communicate-document",
         "source": "arc42-communicate-document",
         "target": "arc42-communicate-document",
         "kind": "repair",
-        "description": "Repair documentation ownership, glossary, traceability, status, handoff or stakeholder review evidence.",
+        "description": "Request the project-local arc42:architecture.communicated capability when arc42-communicate-document cannot meet its done-condition locally.",
         "capability": "arc42:architecture.communicated"
       },
       {
-        "id": "repair-implementation-clarify",
+        "id": "repair-accompany-implementation-clarify-requirements",
         "source": "arc42-accompany-implementation",
         "target": "arc42-clarify-requirements",
         "kind": "repair",
-        "description": "Clarify missing scope, acceptance intent, constraint or measurable quality scenario discovered during implementation.",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-accompany-implementation cannot meet its done-condition locally.",
         "capability": "arc42:requirements.clarified"
       },
       {
-        "id": "repair-implementation-structures",
+        "id": "repair-accompany-implementation-solution-strategy",
         "source": "arc42-accompany-implementation",
-        "target": "arc42-design-structures",
+        "target": "arc42-solution-strategy",
         "kind": "repair",
-        "description": "Repair a building block, interface, runtime or deployment design exposed by implementation.",
-        "capability": "arc42:structures.designed"
+        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-accompany-implementation cannot meet its done-condition locally.",
+        "capability": "arc42:solution-strategy.designed"
       },
       {
-        "id": "repair-implementation-concepts",
+        "id": "repair-accompany-implementation-building-block-view",
         "source": "arc42-accompany-implementation",
-        "target": "arc42-design-concepts",
+        "target": "arc42-building-block-view",
         "kind": "repair",
-        "description": "Repair a crosscutting concept or significant architecture decision exposed by implementation.",
+        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-accompany-implementation cannot meet its done-condition locally.",
+        "capability": "arc42:building-block-view.designed"
+      },
+      {
+        "id": "repair-accompany-implementation-runtime-deployment",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-runtime-deployment",
+        "kind": "repair",
+        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-accompany-implementation cannot meet its done-condition locally.",
+        "capability": "arc42:runtime-deployment.designed"
+      },
+      {
+        "id": "repair-accompany-implementation-crosscutting-concepts",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-crosscutting-concepts",
+        "kind": "repair",
+        "description": "Request the project-local arc42:concepts.designed capability when arc42-accompany-implementation cannot meet its done-condition locally.",
         "capability": "arc42:concepts.designed"
       },
       {
-        "id": "repair-implementation-communicate",
+        "id": "repair-accompany-implementation-architecture-decision",
+        "source": "arc42-accompany-implementation",
+        "target": "arc42-architecture-decision",
+        "kind": "repair",
+        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-accompany-implementation cannot meet its done-condition locally.",
+        "capability": "arc42:architecture-decision.recorded"
+      },
+      {
+        "id": "repair-accompany-implementation-communicate-document",
         "source": "arc42-accompany-implementation",
         "target": "arc42-communicate-document",
         "kind": "repair",
-        "description": "Repair architecture documentation, traceability, handoff or review communication needed by implementation.",
+        "description": "Request the project-local arc42:architecture.communicated capability when arc42-accompany-implementation cannot meet its done-condition locally.",
         "capability": "arc42:architecture.communicated"
       },
       {
-        "id": "repair-implementation-implementation",
+        "id": "repair-accompany-implementation-accompany-implementation",
         "source": "arc42-accompany-implementation",
         "target": "arc42-accompany-implementation",
         "kind": "repair",
-        "description": "Repair code, tests, migration, conformance or acceptance evidence within the bounded initiative.",
+        "description": "Request the project-local arc42:implementation.accepted capability when arc42-accompany-implementation cannot meet its done-condition locally.",
         "capability": "arc42:implementation.accepted"
       },
       {
-        "id": "repair-evaluate-clarify",
+        "id": "repair-analyze-evaluate-clarify-requirements",
         "source": "arc42-analyze-evaluate",
         "target": "arc42-clarify-requirements",
         "kind": "repair",
-        "description": "Clarify intent, scope, constraint or quality criteria required to evaluate the result.",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
         "capability": "arc42:requirements.clarified"
       },
       {
-        "id": "repair-evaluate-structures",
+        "id": "repair-analyze-evaluate-solution-strategy",
         "source": "arc42-analyze-evaluate",
-        "target": "arc42-design-structures",
+        "target": "arc42-solution-strategy",
         "kind": "repair",
-        "description": "Repair a structural architecture gap identified by quality, risk or drift evidence.",
-        "capability": "arc42:structures.designed"
+        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
+        "capability": "arc42:solution-strategy.designed"
       },
       {
-        "id": "repair-evaluate-concepts",
+        "id": "repair-analyze-evaluate-building-block-view",
         "source": "arc42-analyze-evaluate",
-        "target": "arc42-design-concepts",
+        "target": "arc42-building-block-view",
         "kind": "repair",
-        "description": "Repair a crosscutting concept or reassess a significant decision from evidence.",
+        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
+        "capability": "arc42:building-block-view.designed"
+      },
+      {
+        "id": "repair-analyze-evaluate-runtime-deployment",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-runtime-deployment",
+        "kind": "repair",
+        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
+        "capability": "arc42:runtime-deployment.designed"
+      },
+      {
+        "id": "repair-analyze-evaluate-crosscutting-concepts",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-crosscutting-concepts",
+        "kind": "repair",
+        "description": "Request the project-local arc42:concepts.designed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
         "capability": "arc42:concepts.designed"
       },
       {
-        "id": "repair-evaluate-communicate",
+        "id": "repair-analyze-evaluate-architecture-decision",
+        "source": "arc42-analyze-evaluate",
+        "target": "arc42-architecture-decision",
+        "kind": "repair",
+        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
+        "capability": "arc42:architecture-decision.recorded"
+      },
+      {
+        "id": "repair-analyze-evaluate-communicate-document",
         "source": "arc42-analyze-evaluate",
         "target": "arc42-communicate-document",
         "kind": "repair",
-        "description": "Repair stale, contradictory or incomplete documentation, traceability, glossary, status or handoff.",
+        "description": "Request the project-local arc42:architecture.communicated capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
         "capability": "arc42:architecture.communicated"
       },
       {
-        "id": "repair-evaluate-implementation",
+        "id": "repair-analyze-evaluate-accompany-implementation",
         "source": "arc42-analyze-evaluate",
         "target": "arc42-accompany-implementation",
         "kind": "repair",
-        "description": "Repair code, tests, migration, conformance or acceptance gaps identified by evaluation.",
+        "description": "Request the project-local arc42:implementation.accepted capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
         "capability": "arc42:implementation.accepted"
       },
       {
-        "id": "repair-evaluate-evaluate",
+        "id": "repair-analyze-evaluate-analyze-evaluate",
         "source": "arc42-analyze-evaluate",
         "target": "arc42-analyze-evaluate",
         "kind": "repair",
-        "description": "Repair quality evidence, risk, technical debt, architecture drift or decision-fitness analysis.",
+        "description": "Request the project-local arc42:evaluation.completed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
         "capability": "arc42:evaluation.completed"
       },
       {
-        "id": "repair-learning-clarify",
+        "id": "repair-continuous-learning-clarify-requirements",
         "source": "arc42-continuous-learning",
         "target": "arc42-clarify-requirements",
         "kind": "repair",
-        "description": "Clarify requirement or quality impact made material by authoritative learning evidence.",
+        "description": "Request the project-local arc42:requirements.clarified capability when arc42-continuous-learning cannot meet its done-condition locally.",
         "capability": "arc42:requirements.clarified"
       },
       {
-        "id": "repair-learning-structures",
+        "id": "repair-continuous-learning-solution-strategy",
         "source": "arc42-continuous-learning",
-        "target": "arc42-design-structures",
+        "target": "arc42-solution-strategy",
         "kind": "repair",
-        "description": "Assess a material learning finding affecting building blocks, interfaces, runtime or deployment.",
-        "capability": "arc42:structures.designed"
+        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-continuous-learning cannot meet its done-condition locally.",
+        "capability": "arc42:solution-strategy.designed"
       },
       {
-        "id": "repair-learning-concepts",
+        "id": "repair-continuous-learning-building-block-view",
         "source": "arc42-continuous-learning",
-        "target": "arc42-design-concepts",
+        "target": "arc42-building-block-view",
         "kind": "repair",
-        "description": "Assess a material learning finding affecting a crosscutting concept or significant decision.",
+        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-continuous-learning cannot meet its done-condition locally.",
+        "capability": "arc42:building-block-view.designed"
+      },
+      {
+        "id": "repair-continuous-learning-runtime-deployment",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-runtime-deployment",
+        "kind": "repair",
+        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-continuous-learning cannot meet its done-condition locally.",
+        "capability": "arc42:runtime-deployment.designed"
+      },
+      {
+        "id": "repair-continuous-learning-crosscutting-concepts",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-crosscutting-concepts",
+        "kind": "repair",
+        "description": "Request the project-local arc42:concepts.designed capability when arc42-continuous-learning cannot meet its done-condition locally.",
         "capability": "arc42:concepts.designed"
       },
       {
-        "id": "repair-learning-communicate",
+        "id": "repair-continuous-learning-architecture-decision",
+        "source": "arc42-continuous-learning",
+        "target": "arc42-architecture-decision",
+        "kind": "repair",
+        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-continuous-learning cannot meet its done-condition locally.",
+        "capability": "arc42:architecture-decision.recorded"
+      },
+      {
+        "id": "repair-continuous-learning-communicate-document",
         "source": "arc42-continuous-learning",
         "target": "arc42-communicate-document",
         "kind": "repair",
-        "description": "Repair material documentation drift, traceability, glossary or handoff findings.",
+        "description": "Request the project-local arc42:architecture.communicated capability when arc42-continuous-learning cannot meet its done-condition locally.",
         "capability": "arc42:architecture.communicated"
       },
       {
-        "id": "repair-learning-evaluate",
+        "id": "repair-continuous-learning-analyze-evaluate",
         "source": "arc42-continuous-learning",
         "target": "arc42-analyze-evaluate",
         "kind": "repair",
-        "description": "Evaluate material technology or method evidence against quality, risk, debt and drift.",
+        "description": "Request the project-local arc42:evaluation.completed capability when arc42-continuous-learning cannot meet its done-condition locally.",
         "capability": "arc42:evaluation.completed"
       },
       {
-        "id": "repair-learning-learning",
+        "id": "repair-continuous-learning-continuous-learning",
         "source": "arc42-continuous-learning",
         "target": "arc42-continuous-learning",
         "kind": "repair",
-        "description": "Repair incomplete authoritative research, source evidence or method-health measurement.",
+        "description": "Request the project-local arc42:research.findings capability when arc42-continuous-learning cannot meet its done-condition locally.",
         "capability": "arc42:research.findings"
       },
       {
-        "id": "repair-release-communicate",
+        "id": "repair-release-validation-communicate-document",
         "source": "release-validation",
         "target": "arc42-communicate-document",
         "kind": "repair",
-        "description": "Repair release documentation, traceability, stakeholder handoff or authorization evidence.",
+        "description": "Request the project-local arc42:architecture.communicated capability when release-validation cannot meet its done-condition locally.",
         "capability": "arc42:architecture.communicated"
       },
       {
-        "id": "repair-release-implementation",
+        "id": "repair-release-validation-accompany-implementation",
         "source": "release-validation",
         "target": "arc42-accompany-implementation",
         "kind": "repair",
-        "description": "Repair implementation, test, migration, conformance or acceptance readiness before release.",
+        "description": "Request the project-local arc42:implementation.accepted capability when release-validation cannot meet its done-condition locally.",
         "capability": "arc42:implementation.accepted"
       },
       {
-        "id": "repair-release-evaluate",
+        "id": "repair-release-validation-analyze-evaluate",
         "source": "release-validation",
         "target": "arc42-analyze-evaluate",
         "kind": "repair",
-        "description": "Evaluate release quality evidence, risk, debt, drift or rollback implications.",
+        "description": "Request the project-local arc42:evaluation.completed capability when release-validation cannot meet its done-condition locally.",
         "capability": "arc42:evaluation.completed"
       },
       {
-        "id": "repair-release-release",
+        "id": "repair-release-validation-release-validation",
         "source": "release-validation",
         "target": "release-validation",
         "kind": "repair",
-        "description": "Repair an explicitly authorized release, deploy, verification or rollback outcome within the approved external-write boundary.",
+        "description": "Request the project-local release:validation.completed capability when release-validation cannot meet its done-condition locally.",
         "capability": "release:validation.completed"
       }
     ]
@@ -344,7 +560,7 @@
   "loops": [
     {
       "id": "arc42-clarify-requirements",
-      "description": "Clarify one initiative's human-owned intent, stakeholders, scope, constraints and measurable quality scenarios into an approved BRIEF.",
+      "description": "Clarify one initiative specification. Done when the approved BRIEF makes human-owned intent, stakeholders, scope, constraints, measurable quality scenarios and unresolved decisions explicit.",
       "state": {
         "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
         "initial": {
@@ -471,8 +687,8 @@
       }
     },
     {
-      "id": "arc42-design-structures",
-      "description": "Design solution strategy, building blocks, interfaces and significant runtime/deployment scenarios for an approved initiative.",
+      "id": "arc42-solution-strategy",
+      "description": "Define one quality-driven solution strategy for an approved initiative. Done when the bounded strategy and unresolved significant choices are explicit and validated against the BRIEF, constraints and priority quality scenarios.",
       "state": {
         "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
         "initial": {
@@ -519,16 +735,16 @@
           }
         }
       },
-      "startNodeId": "structures-solution-strategy",
+      "startNodeId": "solution-strategy",
       "nodes": [
         {
-          "id": "structures-solution-strategy",
-          "description": "Update the quality-driven solution strategy for the bounded initiative.",
+          "id": "solution-strategy",
+          "description": "Create and validate the initiative's bounded solution strategy.",
           "work": {
             "type": "agent",
-            "task": "Update arc42 section 4 and initiative planning references with the smallest solution strategy that satisfies the approved BRIEF and priority quality scenarios. Record unresolved significant choices explicitly.",
+            "task": "Update arc42 section 4 and initiative planning references with the smallest solution strategy that satisfies the approved BRIEF, constraints and priority quality scenarios. Done means the chosen approach, rejected material alternatives and every unresolved significant choice are explicit and source-linked.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-structure-agent",
+            "primaryInstructionId": "project:arc42-solution-strategy-agent",
             "skillIds": [
               "project:arc42/architecture-views",
               "project:arc42/traceability"
@@ -538,63 +754,7 @@
           },
           "validation": {
             "type": "agent",
-            "task": "Validate the solution strategy against the BRIEF, constraints and measurable quality scenarios without editing the proposal.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          },
-          "maxLocalAttempts": 3
-        },
-        {
-          "id": "structures-building-blocks",
-          "description": "Maintain the Building Block View with source and interface mappings.",
-          "work": {
-            "type": "agent",
-            "task": "Update arc42 section 5. For every relevant building block state responsibility, interfaces, quality significance, source location, implemented requirements and open risks; map blocks to actual directories and shared interfaces.",
-            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-structure-agent",
-            "skillIds": [
-              "project:arc42/architecture-views",
-              "project:arc42/traceability"
-            ],
-            "nodeStyle": "sol",
-            "nodeSize": "large"
-          },
-          "validation": {
-            "type": "agent",
-            "task": "Validate that building-block ownership, interfaces, source mappings, QS trace and risks match the repository and approved strategy. Do not edit the view.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          },
-          "maxLocalAttempts": 3
-        },
-        {
-          "id": "structures-runtime-deployment",
-          "description": "Update only architecturally significant runtime and deployment scenarios.",
-          "work": {
-            "type": "agent",
-            "task": "Update arc42 sections 6 and 7 only for important, risky or complex runtime/deployment scenarios. Link interactions to building blocks, interfaces, QS IDs, source locations and evidence expectations.",
-            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-structure-agent",
-            "skillIds": [
-              "project:arc42/architecture-views",
-              "project:arc42/initiative-handoff"
-            ],
-            "nodeStyle": "sol",
-            "nodeSize": "large"
-          },
-          "validation": {
-            "type": "agent",
-            "task": "Validate that the selected scenarios are architecture-significant, consistent with building blocks and sufficient for the in-scope quality scenarios. Do not add scenarios.",
+            "task": "Validate that one bounded solution strategy is source-linked, internally coherent and sufficient for the approved BRIEF, constraints and measurable priority quality scenarios. Reject completion when a significant choice is hidden or lacks human authority; do not edit the strategy.",
             "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
             "primaryInstructionId": "project:arc42-reviewer",
             "skillIds": [
@@ -608,22 +768,8 @@
       ],
       "edges": [
         {
-          "id": "structures-strategy-ok",
-          "source": "structures-solution-strategy",
-          "target": {
-            "nodeId": "structures-building-blocks"
-          }
-        },
-        {
-          "id": "structures-blocks-ok",
-          "source": "structures-building-blocks",
-          "target": {
-            "nodeId": "structures-runtime-deployment"
-          }
-        },
-        {
-          "id": "structures-completed",
-          "source": "structures-runtime-deployment",
+          "id": "arc42-solution-strategy-completed",
+          "source": "solution-strategy",
           "target": {
             "terminal": "completed"
           }
@@ -634,13 +780,13 @@
           "arc42:requirements.clarified"
         ],
         "provides": [
-          "arc42:structures.designed"
+          "arc42:solution-strategy.designed"
         ]
       }
     },
     {
-      "id": "arc42-design-concepts",
-      "description": "Design quality-driven crosscutting concepts and propose only architecture-significant decisions for human acceptance.",
+      "id": "arc42-building-block-view",
+      "description": "Maintain the Building Block View for an approved solution strategy. Done when every in-scope block has validated responsibility, interfaces, quality significance, source mapping, implemented requirements and open risks.",
       "state": {
         "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
         "initial": {
@@ -687,18 +833,18 @@
           }
         }
       },
-      "startNodeId": "concepts-crosscutting",
+      "startNodeId": "building-block-view",
       "nodes": [
         {
-          "id": "concepts-crosscutting",
-          "description": "Design the smallest set of crosscutting concepts needed by approved quality scenarios.",
+          "id": "building-block-view",
+          "description": "Create and validate the initiative's source-mapped Building Block View.",
           "work": {
             "type": "agent",
-            "task": "Update arc42 section 8 with concrete crosscutting concepts linked to quality scenarios and building blocks. State applicability, implementation anchors and limits; avoid a generic concept catalog.",
+            "task": "Update arc42 section 5 for the approved strategy. Done means every relevant building block states responsibility, interfaces, quality significance, source location, implemented requirements and open risks, with stable BB/QS/ADR references.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-concepts-agent",
+            "primaryInstructionId": "project:arc42-building-block-agent",
             "skillIds": [
-              "project:arc42/decision-records",
+              "project:arc42/architecture-views",
               "project:arc42/traceability"
             ],
             "nodeStyle": "sol",
@@ -706,7 +852,7 @@
           },
           "validation": {
             "type": "agent",
-            "task": "Validate that each concept is necessary, quality-driven, linked to BB/QS IDs and concrete enough to guide implementation. Do not edit the concepts.",
+            "task": "Validate that Building Block ownership, interfaces, source mappings, implemented requirements, quality-scenario trace and open risks match the repository and approved strategy. Reject any missing responsibility or interface boundary; do not edit the view.",
             "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
             "primaryInstructionId": "project:arc42-reviewer",
             "skillIds": [
@@ -716,15 +862,280 @@
             "nodeSize": "small"
           },
           "maxLocalAttempts": 3
-        },
+        }
+      ],
+      "edges": [
         {
-          "id": "concepts-significant-decisions",
-          "description": "Identify significant decisions, create proposals only when justified and obtain human acceptance.",
+          "id": "arc42-building-block-view-completed",
+          "source": "building-block-view",
+          "target": {
+            "terminal": "completed"
+          }
+        }
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:solution-strategy.designed"
+        ],
+        "provides": [
+          "arc42:building-block-view.designed"
+        ]
+      }
+    },
+    {
+      "id": "arc42-runtime-deployment",
+      "description": "Describe only architecture-significant runtime and deployment scenarios for an approved Building Block View. Done when every selected scenario is justified by risk or quality evidence and validated against the static structure.",
+      "state": {
+        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
+        "initial": {
+          "contractVersion": "Arc42MethodStateV1",
+          "initiative": {
+            "id": null,
+            "status": "unselected",
+            "briefPath": null,
+            "goalIds": [],
+            "openQuestionIds": []
+          },
+          "architecture": {
+            "status": "baseline",
+            "qualityScenarioIds": [],
+            "adrIds": [],
+            "buildingBlockIds": [],
+            "riskIds": []
+          },
+          "delivery": {
+            "status": "not_started",
+            "planPath": null,
+            "changedArtifactPaths": [],
+            "checkIds": [],
+            "conformanceFindingIds": []
+          },
+          "release": {
+            "status": "not_requested",
+            "authorization": null,
+            "evidenceIds": []
+          },
+          "evaluation": {
+            "status": "not_started",
+            "evidenceIds": [],
+            "findingIds": [],
+            "methodHealthUpdatedAt": null
+          },
+          "handoff": {
+            "status": "pending",
+            "summary": null,
+            "nextAction": null,
+            "changedArtifactPaths": [],
+            "stableIds": [],
+            "checks": []
+          }
+        }
+      },
+      "startNodeId": "runtime-deployment",
+      "nodes": [
+        {
+          "id": "runtime-deployment",
+          "description": "Create and validate the architecture-significant runtime/deployment view.",
           "work": {
             "type": "agent",
-            "task": "Assess unresolved design choices. Create or update a draft/review ADR proposal only when a choice is important, risky, expensive, hard to reverse or contentious. Never modify an accepted ADR silently; update section 9 only for actual records.",
+            "task": "Update arc42 sections 6 and 7 only for important, risky, complex or quality-scenario-required runtime/deployment scenarios. Done means every included interaction maps to building blocks, interfaces, QS/ADR IDs, source locations and an explicit evidence expectation; omit decorative scenarios.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-concepts-agent",
+            "primaryInstructionId": "project:arc42-runtime-deployment-agent",
+            "skillIds": [
+              "project:arc42/architecture-views",
+              "project:arc42/initiative-handoff"
+            ],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
+          },
+          "validation": {
+            "type": "agent",
+            "task": "Validate that each selected runtime/deployment scenario is architecture-significant, consistent with the Building Block View and sufficient for the in-scope quality scenarios. Reject decorative, unmapped or unsupported scenarios; do not add or edit scenarios.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:arc42-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
+        }
+      ],
+      "edges": [
+        {
+          "id": "arc42-runtime-deployment-completed",
+          "source": "runtime-deployment",
+          "target": {
+            "terminal": "completed"
+          }
+        }
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:building-block-view.designed"
+        ],
+        "provides": [
+          "arc42:runtime-deployment.designed"
+        ]
+      }
+    },
+    {
+      "id": "arc42-crosscutting-concepts",
+      "description": "Design the smallest quality-driven set of crosscutting concepts for approved structures. Done when every retained concept has validated applicability, building-block and quality-scenario links, implementation anchors and limits.",
+      "state": {
+        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
+        "initial": {
+          "contractVersion": "Arc42MethodStateV1",
+          "initiative": {
+            "id": null,
+            "status": "unselected",
+            "briefPath": null,
+            "goalIds": [],
+            "openQuestionIds": []
+          },
+          "architecture": {
+            "status": "baseline",
+            "qualityScenarioIds": [],
+            "adrIds": [],
+            "buildingBlockIds": [],
+            "riskIds": []
+          },
+          "delivery": {
+            "status": "not_started",
+            "planPath": null,
+            "changedArtifactPaths": [],
+            "checkIds": [],
+            "conformanceFindingIds": []
+          },
+          "release": {
+            "status": "not_requested",
+            "authorization": null,
+            "evidenceIds": []
+          },
+          "evaluation": {
+            "status": "not_started",
+            "evidenceIds": [],
+            "findingIds": [],
+            "methodHealthUpdatedAt": null
+          },
+          "handoff": {
+            "status": "pending",
+            "summary": null,
+            "nextAction": null,
+            "changedArtifactPaths": [],
+            "stableIds": [],
+            "checks": []
+          }
+        }
+      },
+      "startNodeId": "crosscutting-concepts",
+      "nodes": [
+        {
+          "id": "crosscutting-concepts",
+          "description": "Create and validate the initiative's necessary crosscutting concepts.",
+          "work": {
+            "type": "agent",
+            "task": "Update arc42 section 8 with only the crosscutting concepts required by the approved quality scenarios and structures. Done means each concept states applicability, BB/QS links, implementation anchors and limits without making or accepting an ADR.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:arc42-crosscutting-concepts-agent",
+            "skillIds": [
+              "project:arc42/traceability"
+            ],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
+          },
+          "validation": {
+            "type": "agent",
+            "task": "Validate that each concept is necessary, quality-driven, linked to stable BB/QS IDs and concrete enough to guide implementation. Reject generic catalog entries or implicit architecture decisions; do not edit the concepts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:arc42-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          "maxLocalAttempts": 3
+        }
+      ],
+      "edges": [
+        {
+          "id": "arc42-crosscutting-concepts-completed",
+          "source": "crosscutting-concepts",
+          "target": {
+            "terminal": "completed"
+          }
+        }
+      ],
+      "capabilities": {
+        "accepts": [
+          "arc42:runtime-deployment.designed"
+        ],
+        "provides": [
+          "arc42:concepts.designed"
+        ]
+      }
+    },
+    {
+      "id": "arc42-architecture-decision",
+      "description": "Resolve architecture-significant choices for an approved concept baseline. Done when every significant choice has an explicit accepted, rejected or no-ADR-needed status and no accepted ADR was changed silently.",
+      "state": {
+        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
+        "initial": {
+          "contractVersion": "Arc42MethodStateV1",
+          "initiative": {
+            "id": null,
+            "status": "unselected",
+            "briefPath": null,
+            "goalIds": [],
+            "openQuestionIds": []
+          },
+          "architecture": {
+            "status": "baseline",
+            "qualityScenarioIds": [],
+            "adrIds": [],
+            "buildingBlockIds": [],
+            "riskIds": []
+          },
+          "delivery": {
+            "status": "not_started",
+            "planPath": null,
+            "changedArtifactPaths": [],
+            "checkIds": [],
+            "conformanceFindingIds": []
+          },
+          "release": {
+            "status": "not_requested",
+            "authorization": null,
+            "evidenceIds": []
+          },
+          "evaluation": {
+            "status": "not_started",
+            "evidenceIds": [],
+            "findingIds": [],
+            "methodHealthUpdatedAt": null
+          },
+          "handoff": {
+            "status": "pending",
+            "summary": null,
+            "nextAction": null,
+            "changedArtifactPaths": [],
+            "stableIds": [],
+            "checks": []
+          }
+        }
+      },
+      "startNodeId": "architecture-decision",
+      "nodes": [
+        {
+          "id": "architecture-decision",
+          "description": "Propose and obtain the explicit status of architecture-significant decisions.",
+          "work": {
+            "type": "agent",
+            "task": "Assess unresolved architecture-significant choices against accepted Goals, quality scenarios, concepts and existing ADRs. Create or update only justified draft/review ADR proposals. Done means every significant choice is linked to its decision drivers and has an explicit proposal, existing-decision or no-ADR-needed status.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:arc42-decision-agent",
             "skillIds": [
               "project:arc42/decision-records",
               "project:arc42/initiative-handoff"
@@ -734,7 +1145,7 @@
           },
           "validation": {
             "type": "human",
-            "task": "Accept or reject each new architecture-significant ADR proposal, or confirm with evidence that no new ADR is required. Never approve an implicit change to an accepted ADR.",
+            "task": "Accept or reject each new architecture-significant ADR proposal, or explicitly confirm with evidence that no new ADR is required. Never approve an implicit change to an accepted ADR.",
             "nodeStyle": "luna",
             "nodeSize": "tiny"
           },
@@ -743,15 +1154,8 @@
       ],
       "edges": [
         {
-          "id": "concepts-design-ok",
-          "source": "concepts-crosscutting",
-          "target": {
-            "nodeId": "concepts-significant-decisions"
-          }
-        },
-        {
-          "id": "concepts-completed",
-          "source": "concepts-significant-decisions",
+          "id": "arc42-architecture-decision-completed",
+          "source": "architecture-decision",
           "target": {
             "terminal": "completed"
           }
@@ -759,16 +1163,16 @@
       ],
       "capabilities": {
         "accepts": [
-          "arc42:structures.designed"
+          "arc42:concepts.designed"
         ],
         "provides": [
-          "arc42:concepts.designed"
+          "arc42:architecture-decision.recorded"
         ]
       }
     },
     {
       "id": "arc42-communicate-document",
-      "description": "Synchronize architecture indexes, traceability, glossary, status and initiative handoff, then obtain focused stakeholder review.",
+      "description": "Communicate the accepted architecture baseline and bounded implementation handoff. Done when canonical indexes, traceability, glossary, status and initiative handoff are synchronized and the next action has focused stakeholder review.",
       "state": {
         "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
         "initial": {
@@ -889,7 +1293,7 @@
       ],
       "capabilities": {
         "accepts": [
-          "arc42:concepts.designed"
+          "arc42:architecture-decision.recorded"
         ],
         "provides": [
           "arc42:architecture.communicated"
@@ -898,7 +1302,7 @@
     },
     {
       "id": "arc42-accompany-implementation",
-      "description": "Plan and implement one bounded initiative, compare the diff with architecture and collect acceptance/conformance evidence.",
+      "description": "Implement one bounded initiative. Done when its traced plan, in-scope code and tests, conformance review and acceptance evidence are complete without granting release authority.",
       "state": {
         "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
         "initial": {
@@ -1062,7 +1466,7 @@
     },
     {
       "id": "arc42-analyze-evaluate",
-      "description": "Evaluate implementation against measurable quality evidence and update risks, debt, drift, traceability, review and method health.",
+      "description": "Evaluate one bounded implementation. Done when every in-scope quality scenario has an evidence-backed verdict and resulting risk, debt, drift, traceability, review and method-health findings are validated.",
       "state": {
         "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
         "initial": {
@@ -1230,7 +1634,7 @@
     },
     {
       "id": "arc42-continuous-learning",
-      "description": "Research authoritative technology and method evidence on schedule, record only material findings and route them through existing approval boundaries.",
+      "description": "Research one bounded set of authoritative technology and method changes on schedule. Done when material findings or an explicit no-material-finding result are validated and any action is expressed only as a capability request.",
       "state": {
         "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
         "initial": {
@@ -1374,7 +1778,7 @@
     },
     {
       "id": "release-validation",
-      "description": "Prepare, explicitly authorize, execute and verify a bounded release/deploy/rollback action without automatic invocation from development flow.",
+      "description": "Validate one explicitly authorized external release, deployment or rollback action. Done when the exact authorization, execution result, verification evidence and remaining rollback status are human-approved without automatic invocation from development flow.",
       "state": {
         "description": "Arc42MethodStateV1-compatible release and evidence references for a separately authorized Root Run.",
         "initial": {

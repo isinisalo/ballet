@@ -47,20 +47,26 @@ const sections = [
 ];
 
 const expectedFlow = [
-  "arc42-clarify-requirements→arc42-design-structures",
-  "arc42-design-structures→arc42-design-concepts",
-  "arc42-design-concepts→arc42-communicate-document",
+  "arc42-clarify-requirements→arc42-solution-strategy",
+  "arc42-solution-strategy→arc42-building-block-view",
+  "arc42-building-block-view→arc42-runtime-deployment",
+  "arc42-runtime-deployment→arc42-crosscutting-concepts",
+  "arc42-crosscutting-concepts→arc42-architecture-decision",
+  "arc42-architecture-decision→arc42-communicate-document",
   "arc42-communicate-document→arc42-accompany-implementation",
   "arc42-accompany-implementation→arc42-analyze-evaluate"
 ];
 
 const requiredRepairs = {
-  "arc42-design-structures": ["arc42-clarify-requirements", "arc42-design-structures"],
-  "arc42-design-concepts": ["arc42-clarify-requirements", "arc42-design-structures", "arc42-design-concepts"],
-  "arc42-communicate-document": ["arc42-clarify-requirements", "arc42-design-structures", "arc42-design-concepts", "arc42-communicate-document"],
-  "arc42-accompany-implementation": ["arc42-clarify-requirements", "arc42-design-structures", "arc42-design-concepts", "arc42-communicate-document", "arc42-accompany-implementation"],
-  "arc42-analyze-evaluate": ["arc42-clarify-requirements", "arc42-design-structures", "arc42-design-concepts", "arc42-communicate-document", "arc42-accompany-implementation", "arc42-analyze-evaluate"],
-  "arc42-continuous-learning": ["arc42-clarify-requirements", "arc42-design-structures", "arc42-design-concepts", "arc42-communicate-document", "arc42-analyze-evaluate", "arc42-continuous-learning"],
+  "arc42-solution-strategy": ["arc42-clarify-requirements", "arc42-solution-strategy"],
+  "arc42-building-block-view": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view"],
+  "arc42-runtime-deployment": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment"],
+  "arc42-crosscutting-concepts": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts"],
+  "arc42-architecture-decision": ["arc42-clarify-requirements", "arc42-crosscutting-concepts", "arc42-architecture-decision"],
+  "arc42-communicate-document": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts", "arc42-architecture-decision", "arc42-communicate-document"],
+  "arc42-accompany-implementation": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts", "arc42-architecture-decision", "arc42-communicate-document", "arc42-accompany-implementation"],
+  "arc42-analyze-evaluate": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts", "arc42-architecture-decision", "arc42-communicate-document", "arc42-accompany-implementation", "arc42-analyze-evaluate"],
+  "arc42-continuous-learning": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts", "arc42-architecture-decision", "arc42-communicate-document", "arc42-analyze-evaluate", "arc42-continuous-learning"],
   "release-validation": ["arc42-communicate-document", "arc42-accompany-implementation", "arc42-analyze-evaluate", "release-validation"]
 };
 
@@ -262,6 +268,12 @@ if (!parsedConfig.success) {
     const outgoing = loop.edges.filter((edge) => edge.source === node.id);
     if (outgoing.length !== 1) addIssue(`${loop.id}/${node.id} has ${outgoing.length} Validation OK edges; expected 1.`);
   }
+  for (const loop of config.loops) {
+    if (loop.capabilities.accepts.length !== 1 || loop.capabilities.provides.length !== 1) {
+      addIssue(`${loop.id} must declare exactly one accepted and one provided capability.`);
+    }
+    if (!/\bDone when\b/.test(loop.description)) addIssue(`${loop.id} must declare one explicit Done when condition.`);
+  }
 
   const flow = config.graph.loopEdges.filter((edge) => edge.kind === "flow").map((edge) => `${edge.source}→${edge.target}`);
   if (JSON.stringify(flow) !== JSON.stringify(expectedFlow)) addIssue(`Default flow mismatch: ${flow.join(", ")}`);
@@ -322,6 +334,11 @@ const forbidden = [
   "arc42-clarify-requirements",
   "arc42-design-structures",
   "arc42-design-concepts",
+  "arc42-solution-strategy",
+  "arc42-building-block-view",
+  "arc42-runtime-deployment",
+  "arc42-crosscutting-concepts",
+  "arc42-architecture-decision",
   "arc42-communicate-document",
   "arc42-accompany-implementation",
   "arc42-analyze-evaluate",

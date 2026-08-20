@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 7
+version: 8
 tags:
   - arc42
   - glossary
@@ -142,7 +142,7 @@ Sanasto kuvaa toteutetun strict-v11 config/domain/snapshot/module/runtime-rajan 
 | --- | --- |
 | arc42 Template | `.ballet/arc42/`-hakemiston 12-osioinen versionhallittu arkkitehtuurin tietorakenne. |
 | arc42 Method | Kuusi toistuvaa arkkitehtuuriaktiviteettia, jotka Balletissa on toteutettu project-local Loopseina jatkuvalla feedbackilla. |
-| 6+1 | Kuusi arc42-aktiviteetti-Loopia sekä niitä tukeva continuous-learning-Loop. |
+| 6+1 | ADR-011:n historiallinen kuuden arc42-aktiviteetti-Loopin ja continuous-learning-Loopin shorthand. ADR-019 supersedoi kiinteän topologian; menetelmäintention toteuttavat nyt yhden vastuun project-local capability-Loopit. |
 | Initiative | Rajattu muutos, jolla on BRIEF-, PLAN-, EVIDENCE- ja REVIEW-artefaktit. |
 | Stable ID | Sisältöpäivityksissä säilyvä tunniste, jolla Goal/REQ/QS/ADR/CON/BB/RT/DEP/TEST/EVID-ketju pysyy ratkaistavana. |
 | Trace chain | Goal/REQ → QS → ADR/CON → BB/RT/DEP → TEST/monitor → EVID -suhdeketju. |

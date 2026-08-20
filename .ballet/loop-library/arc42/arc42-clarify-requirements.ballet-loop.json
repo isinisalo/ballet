@@ -4,12 +4,12 @@
       "arc42:initiative.requested"
     ],
     "provides": [
-      "arc42:requirements-clarified"
+      "arc42:requirements.clarified"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42:structures-designed",
-        "description": "Continue from an approved BRIEF and measurable quality scenarios to structural design.",
+        "capability": "arc42:requirements.clarified",
+        "description": "A clarified specification can satisfy a compatible downstream input.",
         "direction": "outgoing",
         "kind": "flow"
       }
@@ -18,7 +18,7 @@
   },
   "format": "ballet-loop-module",
   "loop": {
-    "description": "Clarify one initiative's human-owned intent, stakeholders, scope, constraints and measurable quality scenarios into an approved BRIEF.",
+    "description": "Clarify one initiative specification. Done when the approved BRIEF makes human-owned intent, stakeholders, scope, constraints, measurable quality scenarios and unresolved decisions explicit.",
     "edges": [
       {
         "key": "clarify-brief-ok",
@@ -139,13 +139,13 @@
   },
   "manifest": {
     "category": "arc42",
-    "description": "Clarify one initiative's human-owned intent, stakeholders, scope, constraints and measurable quality scenarios into an approved BRIEF.",
+    "description": "Clarify one initiative specification. Done when the approved BRIEF makes human-owned intent, stakeholders, scope, constraints, measurable quality scenarios and unresolved decisions explicit.",
     "id": "arc42-clarify-requirements",
     "tags": [
       "arc42",
       "method"
     ],
-    "title": "Clarify requirements",
+    "title": "Clarify specification",
     "version": "1.0.0"
   },
   "permissions": {

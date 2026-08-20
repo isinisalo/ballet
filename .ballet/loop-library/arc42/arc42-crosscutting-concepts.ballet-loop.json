@@ -1,43 +1,36 @@
 {
   "capabilities": {
     "accepts": [
-      "arc42:architecture-decision.recorded"
+      "arc42:runtime-deployment.designed"
     ],
     "provides": [
-      "arc42:architecture.communicated"
+      "arc42:concepts.designed"
     ],
     "recommendedConnections": [
       {
-        "capability": "arc42:architecture-decision.recorded",
-        "description": "Request an explicit decision status exposed by communication.",
+        "capability": "arc42:runtime-deployment.designed",
+        "description": "Request a structural scenario correction exposed by concept design.",
         "direction": "outgoing",
         "kind": "repair"
       },
       {
-        "capability": "arc42:architecture.communicated",
-        "description": "An approved handoff can satisfy a compatible downstream input.",
+        "capability": "arc42:concepts.designed",
+        "description": "Validated concepts can satisfy a compatible downstream input.",
         "direction": "outgoing",
         "kind": "flow"
       }
     ],
     "requires": [
-      "arc42:architecture-decision.recorded"
+      "arc42:runtime-deployment.designed"
     ]
   },
   "format": "ballet-loop-module",
   "loop": {
-    "description": "Communicate the accepted architecture baseline and bounded implementation handoff. Done when canonical indexes, traceability, glossary, status and initiative handoff are synchronized and the next action has focused stakeholder review.",
+    "description": "Design the smallest quality-driven set of crosscutting concepts for approved structures. Done when every retained concept has validated applicability, building-block and quality-scenario links, implementation anchors and limits.",
     "edges": [
       {
-        "key": "communicate-sync-ok",
-        "source": "communicate-synchronize-docs",
-        "target": {
-          "node": "communicate-stakeholder-review"
-        }
-      },
-      {
-        "key": "communicate-completed",
-        "source": "communicate-stakeholder-review",
+        "key": "completed",
+        "source": "crosscutting-concepts",
         "target": {
           "terminal": "completed"
         }
@@ -46,60 +39,34 @@
     "key": "loop",
     "nodes": [
       {
-        "description": "Synchronize indexes, traceability, glossary, persistent status and initiative handoff without duplication.",
-        "key": "communicate-synchronize-docs",
+        "description": "Create and validate the initiative's necessary crosscutting concepts.",
+        "key": "crosscutting-concepts",
         "maxLocalAttempts": 3,
         "validation": {
           "nodeSize": "small",
           "nodeStyle": "luna",
           "primaryInstruction": "arc42-reviewer",
-          "profileSlot": "slot-1",
+          "profileSlot": "slot-2",
           "skills": [
-            "conformance-review",
-            "traceability"
+            "conformance-review"
           ],
-          "task": "Validate canonical ownership, frontmatter, stable IDs, links, trace completeness and absence of duplicated active sources. Do not edit the documents.",
+          "task": "Validate that each concept is necessary, quality-driven, linked to stable BB/QS IDs and concrete enough to guide implementation. Reject generic catalog entries or implicit architecture decisions; do not edit the concepts.",
           "type": "agent"
-        },
-        "work": {
-          "nodeSize": "medium",
-          "nodeStyle": "terra",
-          "primaryInstruction": "arc42-documentation-agent",
-          "profileSlot": "slot-1",
-          "skills": [
-            "document-maintenance",
-            "initiative-handoff",
-            "traceability"
-          ],
-          "task": "Synchronize arc42 indexes, TRACEABILITY, glossary, STATUS and the initiative handoff. Resolve links and statuses from canonical owners, update only changed facts and avoid duplicating Goal/ADR/DESIGN or runtime content.",
-          "type": "agent"
-        }
-      },
-      {
-        "description": "Prepare and review a concise stakeholder summary and implementation handoff.",
-        "key": "communicate-stakeholder-review",
-        "maxLocalAttempts": 3,
-        "validation": {
-          "nodeSize": "tiny",
-          "nodeStyle": "luna",
-          "task": "Review the architecture summary and handoff. Approve the next action or identify the exact capability/decision needing repair; do not approve unresolved WHAT/WHY or priority-1 evidence gaps.",
-          "type": "human"
         },
         "work": {
           "nodeSize": "large",
           "nodeStyle": "sol",
-          "primaryInstruction": "arc42-documentation-agent",
-          "profileSlot": "slot-2",
+          "primaryInstruction": "arc42-crosscutting-concepts-agent",
+          "profileSlot": "slot-1",
           "skills": [
-            "document-maintenance",
-            "initiative-handoff"
+            "traceability"
           ],
-          "task": "Prepare an initiative review summary listing changes, Decisions, Assumptions, Findings, risks, Open questions, evidence and the next approved action. Link canonical sources instead of copying them.",
+          "task": "Update arc42 section 8 with only the crosscutting concepts required by the approved quality scenarios and structures. Done means each concept states applicability, BB/QS links, implementation anchors and limits without making or accepting an ADR.",
           "type": "agent"
         }
       }
     ],
-    "startNode": "communicate-synchronize-docs",
+    "startNode": "crosscutting-concepts",
     "state": {
       "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
       "initial": {
@@ -149,13 +116,13 @@
   },
   "manifest": {
     "category": "arc42",
-    "description": "Communicate the accepted architecture baseline and bounded implementation handoff. Done when canonical indexes, traceability, glossary, status and initiative handoff are synchronized and the next action has focused stakeholder review.",
-    "id": "arc42-communicate-document",
+    "description": "Design the smallest quality-driven set of crosscutting concepts for approved structures. Done when every retained concept has validated applicability, building-block and quality-scenario links, implementation anchors and limits.",
+    "id": "arc42-crosscutting-concepts",
     "tags": [
       "arc42",
       "method"
     ],
-    "title": "Communicate and document",
+    "title": "Crosscutting concepts",
     "version": "1.0.0"
   },
   "permissions": {
@@ -164,38 +131,38 @@
   },
   "profileSlots": [
     {
-      "description": "Compatible codex profile for Codex GPT-5.6 Luna · Medium · Network off.",
+      "description": "Compatible codex profile for Codex GPT-5.6 Sol · Medium · Network off.",
       "key": "slot-1",
       "network": "forbidden",
       "providers": [
         "codex"
       ],
-      "title": "Codex GPT-5.6 Luna · Medium · Network off"
+      "title": "Codex GPT-5.6 Sol · Medium · Network off"
     },
     {
-      "description": "Compatible codex profile for Codex GPT-5.6 Sol · Medium · Network off.",
+      "description": "Compatible codex profile for Codex GPT-5.6 Luna · Medium · Network off.",
       "key": "slot-2",
       "network": "forbidden",
       "providers": [
         "codex"
       ],
-      "title": "Codex GPT-5.6 Sol · Medium · Network off"
+      "title": "Codex GPT-5.6 Luna · Medium · Network off"
     }
   ],
   "resources": [
     {
-      "body": "\n# arc42 Documentation Agent\n\n## Role\n\nKeep architecture indexes, traceability, glossary, persistent status and initiative handoff synchronized without duplicating canonical content.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical owner documents → Node task → runtime evidence.\n\n## Writes\n\nMay edit `.ballet/arc42/**`, `ARCHITECTURE.md` and superseded pointers within the task. Do not alter source code, accepted decision semantics, DESIGN.md tokens, automation behavior or external systems. Mechanical fixes must preserve semantics.\n\n## Sources and evidence\n\nVerify links and statuses from their owners. Produce a review summary of changes, Decisions, Assumptions, Findings, risks and Open questions. Never present runtime logs as persistent status or invent WHAT/WHY.\n\n## State patch\n\nPatch only bounded handoff/artifact references, stable IDs and check summaries in `Arc42MethodStateV1`; never paste document content.\n\n## Stop rules\n\nUse `completed` when indexes and links are consistent, `needs_input` for conflicting owners or a semantic choice, `blocked` for inaccessible required evidence and `failed` for execution failure. In Validation role, do not change the evaluated implementation/artifact. Return no hidden chain-of-thought.\n",
-      "key": "arc42-documentation-agent",
+      "body": "\n# arc42 Crosscutting Concepts Agent\n\n## Role\n\nDesign the smallest set of crosscutting concepts required by approved structures and quality scenarios.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → approved architecture views and QS → Node task → repository evidence.\n\n## Writes\n\nMay update arc42 section 8 and bounded trace references. Do not create or accept an ADR, redesign structures, implement code, change topology, permissions or external systems.\n\n## Done-condition and evidence\n\nCompletion requires each retained concept to state applicability, BB/QS links, implementation anchors and limits. Generic catalogs and implicit decisions are not complete.\n\n## State patch and stop rules\n\nPatch only bounded architecture/handoff references allowed by `Arc42MethodStateV1`. Return `needs_input` when a concept depends on an unaccepted significant choice. Never expose hidden chain-of-thought.\n",
+      "key": "arc42-crosscutting-concepts-agent",
       "kind": "instruction",
       "metadata": {
-        "createdAt": "2026-08-16",
+        "createdAt": "2026-08-20",
         "tags": [
           "arc42",
-          "documentation"
+          "concepts"
         ],
-        "updatedAt": "2026-08-16"
+        "updatedAt": "2026-08-20"
       },
-      "title": "arc42 Documentation Agent"
+      "title": "arc42 Crosscutting Concepts Agent"
     },
     {
       "body": "\n# arc42 Independent Reviewer\n\n## Role\n\nIndependently validate one Work Loop Node goal against its task, canonical State, accepted sources, latest Work outcome and measurable criteria.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → canonical architecture/initiative sources → Validation task and current State → Work summary/provider prose.\n\n## Writes\n\nDo not modify the implementation or artifacts being evaluated. A Validation OK may propose only a bounded State reference patch; a Validation FAIL proposes repair, never a document/code fix. Do not write externally or change decisions, topology, permissions, network, instructions or skills.\n\n## Sources and evidence\n\nInspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.\n\n## State patch\n\nOnly `decision: OK` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must choose `LOCAL_RETRY` or request a capability/outcome for Orchestrator repair without naming continuation/return target.\n\n## Stop rules\n\nReturn only valid `completed`, `needs_input`, `blocked` or `failed` Validation outcomes. `completed` contains exactly `OK` or `FAIL` plus the required repair payload. Stop for human input at all stated decision/authorization boundaries. Never return hidden chain-of-thought.\n",
@@ -210,22 +177,6 @@
         "updatedAt": "2026-08-16"
       },
       "title": "arc42 Independent Reviewer"
-    },
-    {
-      "body": "\n# Document maintenance\n\n1. Resolve the content owner before editing: Goal for WHAT/WHY, ADR for a decision, arc42 section for an architecture view, DESIGN.md for the UI system, or initiative artifact for bounded delivery.\n2. Classify new statements as Fact, Decision, Assumption, Hypothesis, Finding or Open question. Never promote an unsupported statement to Fact or Decision.\n3. Update the smallest canonical location and link from indexes; do not copy full source content.\n4. Preserve stable IDs and status. Supersede obsolete duplicates with a pointer after all active links move.\n5. Update `updatedAt` and version only for semantic content changes. Avoid churn when evidence is unchanged.\n6. Validate local links and report changed paths, stable IDs and checks for the State patch evidence.\n",
-      "description": "Maintain Ballet arc42 Markdown canonically and without duplication. Use when a Node updates arc42 sections, indexes, status, glossary, migration pointers or initiative documents.",
-      "key": "document-maintenance",
-      "kind": "skill",
-      "metadata": {},
-      "name": "document-maintenance"
-    },
-    {
-      "body": "\n# Initiative handoff\n\n1. State the initiative ID, current status and completed Node goal.\n2. List changed artifact paths, stable IDs and checks/evidence without copying document bodies or logs.\n3. Separate Decisions, Assumptions, Findings and Open questions.\n4. Name exactly one next approved Loop/action when evidence supports it.\n5. Describe a repair need as requested capability/outcome, never as continuation, return target or first-choice fallback.\n6. Return `needs_input` when a human-owned decision or target distinction is missing; update the bounded `handoff` State fields.\n",
-      "description": "Create a concise initiative handoff that exposes current status, evidence, open questions and the next approved action. Use between arc42 Loops and at initiative review boundaries.",
-      "key": "initiative-handoff",
-      "kind": "skill",
-      "metadata": {},
-      "name": "initiative-handoff"
     },
     {
       "body": "\n# Traceability\n\n1. Start from an existing Goal/REQ ID and one measurable QS ID.\n2. Link the smallest relevant ADR/CON, BB and RT/DEP IDs; create no placeholder ID without a canonical definition.\n3. Name an executable test or monitor and a concrete evidence ID with status.\n4. Mark missing links `pending` or as an Open question; never infer passed evidence.\n5. Update `TRACEABILITY.md` only for relationships/status and keep full content in its owner document.\n6. Run `npm run validate:arc42` and include exact unresolved IDs in the outcome.\n",

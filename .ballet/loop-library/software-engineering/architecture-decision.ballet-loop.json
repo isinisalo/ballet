@@ -1,0 +1,128 @@
+{
+  "capabilities": {
+    "accepts": [
+      "architecture:decision.requested"
+    ],
+    "provides": [
+      "architecture:decision.recorded"
+    ],
+    "recommendedConnections": [],
+    "requires": []
+  },
+  "format": "ballet-loop-module",
+  "loop": {
+    "description": "Resolve one architecture-significant choice. Done when its decision drivers, alternatives, decision status, consequences and supersession boundary are explicit and human-approved where required.",
+    "edges": [
+      {
+        "key": "completed",
+        "source": "task",
+        "target": {
+          "terminal": "completed"
+        }
+      }
+    ],
+    "key": "loop",
+    "nodes": [
+      {
+        "description": "Resolve one architecture-significant choice. Done when its decision drivers, alternatives, decision status, consequences and supersession boundary are explicit and human-approved where required.",
+        "key": "task",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "task": "Accept or reject the proposed architecture decision, or explicitly confirm that no new decision is needed. Unmentioned external actions and decision changes remain unauthorized.",
+          "type": "human"
+        },
+        "work": {
+          "nodeSize": "medium",
+          "nodeStyle": "terra",
+          "primaryInstruction": "worker",
+          "profileSlot": "worker",
+          "skills": [
+            "task"
+          ],
+          "task": "Prepare one architecture-significant decision from accepted drivers and evidence. Record alternatives, consequences and any superseded scope; never modify an accepted decision silently. Done requires an explicit accepted, rejected, proposal or no-decision-needed status.",
+          "type": "agent"
+        }
+      }
+    ],
+    "startNode": "task",
+    "state": {
+      "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+      "initial": {
+        "artifacts": [],
+        "checks": [],
+        "contractVersion": "SoftwareEngineeringStateV1",
+        "evidence": [],
+        "request": null,
+        "status": "not_started"
+      }
+    }
+  },
+  "manifest": {
+    "category": "software-engineering",
+    "description": "Resolve one architecture-significant choice. Done when its decision drivers, alternatives, decision status, consequences and supersession boundary are explicit and human-approved where required.",
+    "id": "architecture-decision",
+    "tags": [
+      "software-engineering",
+      "starter"
+    ],
+    "title": "Architecture decision",
+    "version": "1.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [
+    {
+      "description": "Network-off implementation profile.",
+      "key": "worker",
+      "network": "forbidden",
+      "providers": [
+        "codex",
+        "copilot"
+      ],
+      "title": "Worker"
+    }
+  ],
+  "resources": [
+    {
+      "body": "Prepare one architecture decision without inventing WHAT/WHY or acceptance. Accepted status always requires explicit human approval.\n",
+      "key": "worker",
+      "kind": "instruction",
+      "metadata": {},
+      "title": "Architecture decision worker"
+    },
+    {
+      "body": "# Architecture decision\n\nVerify decision significance, drivers, options, consequences, evidence, review trigger and explicit supersession.\n",
+      "description": "Complete and verify the Architecture decision responsibility.",
+      "key": "task",
+      "kind": "skill",
+      "metadata": {},
+      "name": "architecture-decision-task"
+    }
+  ],
+  "stateContract": {
+    "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+    "id": "software-engineering-state",
+    "initial": {
+      "artifacts": [],
+      "checks": [],
+      "contractVersion": "SoftwareEngineeringStateV1",
+      "evidence": [],
+      "request": null,
+      "status": "not_started"
+    },
+    "requiredKeys": [
+      "artifacts",
+      "checks",
+      "contractVersion",
+      "evidence",
+      "request",
+      "status"
+    ],
+    "version": "1.0.0"
+  },
+  "version": 1
+}

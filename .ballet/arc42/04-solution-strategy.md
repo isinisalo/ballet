@@ -4,7 +4,7 @@ title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 8
+version: 9
 tags:
   - arc42
   - solution-strategy
@@ -30,7 +30,7 @@ STRAT-001–STRAT-008 ovat toteutetun arkkitehtuurin strategioita. STRAT-009:n s
 | STRAT-003 | Root Run käyttää immutable snapshotia ja erillistä Git-branch/worktree-paria. | goal-005 / REQ-005 | QS-004 | adr-006, CTR-005, CTR-008 | Active checkout ei muutu Node-suorituksessa eikä tulosta integroida automaattisesti. |
 | STRAT-004 | Provider-neutral adapterit sekä eksplisiittiset `ExecutionProfile`-, instruction- ja skill-resurssit. | goal-003 / REQ-003 | QS-011 | adr-005, adr-012, adr-013, CTR-009 | Sama snapshot ja Task Envelope tuottavat saman tehtävän; fallbackia tai ambient resurssia ei ole. |
 | STRAT-005 | Strict-v10 Work/Validation, revisionoitu State ja capability repair call/return. | goal-004, goal-006 / REQ-004, REQ-006 | QS-003, QS-012 | adr-015 | Ohjausvirta, retry, repair, return ja finalization perustuvat commitoituihin tapahtumiin. |
-| STRAT-006 | arc42 on pitkäikäinen totuus ja 6+1 Ballet Loops jatkuva menetelmä. | goal-009 / REQ-009 | QS-005, QS-006, QS-008 | adr-011, CTR-006, CTR-007 | Muutos etenee clarificationista evidenssiin vakaiden ID:iden kautta ilman runtime-logien kopiointia dokumentteihin. |
+| STRAT-006 | arc42 on pitkäikäinen totuus ja yhden vastuun project-local Ballet Loops jatkuva menetelmä. | goal-009 / REQ-009 | QS-005, QS-006, QS-008 | adr-011, adr-019, CTR-006, CTR-007 | Muutos etenee specification clarificationista erillisten strategy-, structure-, concept-, decision-, communication-, implementation- ja evaluation-capabilityjen kautta evidenssiin ilman runtime-logien kopiointia dokumentteihin. |
 | STRAT-007 | Intentio, merkittävä päätös ja ulkoinen kirjoitus pysähtyvät eksplisiittiseen ihmisrajaan. | goal-005, goal-009 / REQ-005, REQ-009 | QS-004, QS-006 | adr-011, CTR-007, CTR-008 | Agentti palauttaa `needs_input` tai odottaa valtuutusta eikä päättele lupaa testituloksesta. |
 | STRAT-008 | Yhden Loopin strict authoring package materialisoidaan inspect/plan/commit-vaiheissa olemassa oleviksi project-local-primitiveiksi. | goal-010, goal-011 / REQ-010, REQ-011 | QS-009, QS-010 | adr-016, adr-017, CTR-011 | Reuse ei lisää live registry- tai runtime-riippuvuutta; authoring-projektiot säilyttävät runtime-semantikan. |
 | STRAT-009 | Strict-v11 graph erottaa project-global Graph Engineeringin selected-Loop-only Loop Engineeringistä ja ohjaa kaikki cross-Loop-flow/repair-valinnat snapshotattujen route-candidatejen sekä capabilityjen kautta Orchestratorille. | goal-012 / REQ-012 | QS-014 | adr-018 | V11 hard cut on poistanut Context/numeric-route/compatibility-polut; ambiguity tai ihmisvaltuutus tuottaa `needs_input`, ja UI projisoi yhden Orchestrator-control-noden, persisted policyt ja canonical Run -evidenssin ilman client-owned topologiaa. |

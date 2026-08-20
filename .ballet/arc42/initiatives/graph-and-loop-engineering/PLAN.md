@@ -4,7 +4,7 @@ title: Graph and Loop Engineering PLAN
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-20'
-version: 5
+version: 7
 tags:
   - arc42
   - initiative
@@ -16,7 +16,21 @@ tags:
 
 ## Tila
 
-GLE-step-001–007 on toteutettu. Snapshot säilyy immutable JSONina ja runtime orchestration käyttää hard-cut SQLite schema v7:ää. GLE-step-005:n project-global Graph-projektio sisältää yhden Orchestrator-control-noden, persisted policy -edge-presentationin ja canonical Run -evidenssin. GLE-step-008:n ihmisacceptance on `pending`.
+GLE-step-001–007a on toteutettu. Vaihe 6 materialisoi yhden vastuun project-local Loopit, 19 paketin starter/library-kokonaisuuden ja ADR-019:n supersession-rajan ilman platform-workflow-kovakoodausta. Snapshot säilyy immutable JSONina ja runtime orchestration käyttää hard-cut SQLite schema v7:ää. GLE-step-005:n project-global Graph-projektio sisältää yhden Orchestrator-control-noden, persisted policy -edge-presentationin ja canonical Run -evidenssin. GLE-step-008:n ihmisacceptance on `pending`.
+
+## Vaihe 6 auditointi · GLE-AUDIT-001
+
+Auditointi tehtiin ennen `.ballet/project.json`- tai Loop Library -datamuutoksia 2026-08-20. Arviointiperuste on `goal-012`:n yhden vastuun ja yhden rajatun onnistumisrajan sopimus sekä `adr-016` / `adr-018`:n yhden Loopin package- ja peer-riippumattomuus.
+
+| Kohde | Finding | Vaihe 6 -toimi |
+| --- | --- | --- |
+| `arc42-design-structures` project Loop ja package | Yksi Loop tuottaa kolme erillistä canonical outputia: solution strategy, Building Block View ja architecture-significant runtime/deployment. Yksi `arc42:structures.designed`-raja ei osoita, mikä näistä on valmis. | Korvataan kolmella project-local Loopilla ja paketilla, joilla on omat accepts/provides-capabilityt, Work/Validation-kompositiot ja measurable done-conditionit. |
+| Muut nykyiset arc42 Loopit | Usea Work Loop Node voi olla yhden vastuun sisäinen toteutusketju, mutta kuvauksista puuttuu eksplisiittinen yksi done-condition. `arc42-design-concepts` yhdistää lisäksi crosscutting concept -suunnittelun ja ADR-päätösportin. | Täsmennetään jokaisen säilyvän Loopin yksi onnistumisraja; erotetaan architecture decision omaksi starteriksi ja jätetään crosscutting concept -Loopille vain concept-vastuu. |
+| Arc42 Loop Libraryn capabilityt | Packageissa käytetään osin `arc42:*`-tunnisteiden eri `-`-muotoa kuin strict-v11 project datan `.`-muotoa, joten custom ja installed module eivät kuvaa samaa capability metadataa. | Generoidaan package capabilityt samasta project-local määrittelystä ja testataan exact install/export-roundtrip. |
+| Software-delivery starterit | Backend/frontend-paketit ovat yhden bounded implementation -vastuun vaihtoehtoja, mutta niiden capabilityt eivät osoita vaihdettavuutta eikä library sisällä omistajan Phase 6 -pilotiksi nimeämiä specification/strategy/decision/UI/deploy-vastuita. | Lisätään rajatut starterit ja capability-compatible implementation-vaihtoehdon swap-testi ilman source- tai peer-package-muutosta. |
+| Topologia ja target-viitteet | Kaikki nykyiset peer-route-candidatet ovat `.ballet/project.json`-graphissa, mutta conformance-testin pitää osoittaa myös tunnetun target Loop ID:n esiintyminen package-resurssissa virheeksi. | Säilytetään graph ainoana topologialähteenä ja laajennetaan package/conformance-testit explicit target-ID -tapaukseen. |
+
+Auditoinnin rajaus ei muuta platform-schemaa, Orchestrator-runtimea tai hyväksyttyä permission-mallia. Project-local workflow-ID:t saavat muuttua vain `.ballet/**`-, `.agents/**`-, fixture- ja testidatassa.
 
 | Step ID | Vaihe | Goal/REQ | QS | ADR/CON | BB | RT/DEP | Files/interfaces | Test/monitor | Completion evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -27,7 +41,8 @@ GLE-step-001–007 on toteutettu. Snapshot säilyy immutable JSONina ja runtime 
 | GLE-step-005 | Graph Engineering UI | goal-007, goal-012 / REQ-007, REQ-012 | QS-013, QS-014 | adr-018 / CON-005 | BB-001, BB-002, BB-005 | RT-010, RT-011 / DEP-001 | graph projection/layout/canvas, LoopNode, Orchestrator control, route-policy editor ja inspector | projection/UI/keyboard/a11y/desktop/narrow-testit ja visual QA | GLE-EVID-006 |
 | GLE-step-006 | Loop Engineering UI | goal-011, goal-012 / REQ-011, REQ-012 | QS-010, QS-014 | adr-017, adr-018 / CON-005 | BB-001 | RT-011 / DEP-001 | selected-Loop-only canvas/editor, header/actions ja module handoff | sisäisen domain-semanttiikan regressio-, deep-link-, editor- ja viewport-testit | GLE-EVID-007 |
 | GLE-step-007 | Project-local Loop Library | goal-010, goal-012 / REQ-010, REQ-012 | QS-009, QS-014 | adr-016, adr-018 / CON-007 | BB-003, BB-008, BB-009 | RT-006, RT-007, RT-011 / DEP-001 | `.ballet/loop-library/**`, materialisoitu project-local data, instructionit/skillit ja provenance | package/install/export/API/UI/release smoke sekä peer-target/platform-boundary-haku | GLE-EVID-008 |
-| GLE-step-008 | Verification ja acceptance | goal-012 / REQ-012 | QS-014 | adr-011, adr-018 / CON-006 | BB-001–BB-009 | RT-003, RT-011 / DEP-001, DEP-002 | koko diffi, docs, TRACEABILITY, EVIDENCE ja REVIEW | `validate:arc42`, test, lint, build, design lint, boundary/legacy searches, smoke ja `git diff --check` | EVID-014 / GLE-EVID-009 |
+| GLE-step-007a | Vaihe 6 yhden vastuun Loopit ja starter library | goal-010, goal-012 / REQ-010, REQ-012 | QS-009, QS-014 | adr-016, adr-018, adr-019 / CON-007 | BB-003, BB-008, BB-009 | RT-006, RT-007, RT-011 / DEP-001 | `.ballet/project.json`, `.ballet/loop-library/**`, project-local instructionit/skillit, fixturet ja provenance | responsibility/done-condition, strict capability, package cardinality, install/export/hash/provenance, topology-only, swap, module/API/UI/release smoke ja target-ID conformance | GLE-EVID-008A |
+| GLE-step-008 | Verification ja acceptance | goal-012 / REQ-012 | QS-014 | adr-011, adr-018, adr-019 / CON-006 | BB-001–BB-009 | RT-003, RT-011 / DEP-001, DEP-002 | koko diffi, docs, TRACEABILITY, EVIDENCE ja REVIEW | `validate:arc42`, test, lint, build, design lint, boundary/legacy searches, smoke ja `git diff --check` | EVID-014 / GLE-EVID-009 |
 
 ## Järjestys ja riippuvuudet
 

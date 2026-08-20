@@ -4,7 +4,7 @@ title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 6
+version: 7
 tags:
   - arc42
   - requirements
@@ -37,7 +37,7 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 | REQ-006 | goal-006 | Persistoi runtime-tila ja tarjoa restart-safe-evidenssi sekä observability. | SQLite-transaktiot, revisionit, tapahtumat ja recovery/reconciliation. | QS-012 |
 | REQ-007 | goal-007 | Tarjoa tiheä, saavutettava ja yksiselitteinen operaattorikokemus. | Kanoniseen dataan perustuva Loop Engineer ja Run mission control. | QS-013 |
 | REQ-008 | goal-008 | Tue validoitua macOS-paketointia ja checkout-kohtaista lifecycle-hallintaa. | arm64/x64-julkaisu, CLI ja launchd-palvelu. | QS-007 |
-| REQ-009 | goal-009 | Käytä arc42:ta jaettuna arkkitehtuuritotuutena ja Ballet Loopseja jatkuvana evidenssipohjaisena menetelmänä. | 12 kanonista osiota, 6+1 Loop -menetelmä ja vakaat trace-ketjut. | QS-005, QS-006, QS-008 |
+| REQ-009 | goal-009 | Käytä arc42:ta jaettuna arkkitehtuuritotuutena ja Ballet Loopseja jatkuvana evidenssipohjaisena menetelmänä. | 12 kanonista osiota, yhden vastuun project-local capability-Loopit ja vakaat trace-ketjut; ADR-019 säilyttää ADR-011:n menetelmäintention ilman kiinteää 6+1-topologiaa. | QS-005, QS-006, QS-008 |
 | REQ-010 | goal-010 | Tarkasta, asenna, vie ja poista siirrettäviä yhden Loopin moduuleja ilman runtime-aikaista pakettiriippuvuutta. | Rajattu JSON-paketti sekä inspect/plan/commit-materialisointi project-local-resursseiksi. | QS-009 |
 | REQ-011 | goal-011 | Authoroi Loopsit erillisten Context-, composition- ja selected-Loop-detail-projektioiden kautta yksiselitteisellä Edge-omistajuudella. | Kolmitasoinen authoring-projektio, joka ei lisää runtime-entiteettejä. | QS-010 |
 | REQ-012 | goal-012 | Authoroi project-global graph ja yhden Loopin sisäinen rakenne täsmälleen Graph Engineering / Loop Engineering -näkymissä sekä reititä kaikki cross-Loop-valinnat capabilityn ja snapshot-allowlistin kautta Orchestratorilla. | Strict-v11 graph/capability hard cut, `LoopNode`- ja Orchestrator-control-projektiot sekä selected-Loop-only Loop Engineering. | QS-014 |

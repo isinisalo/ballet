@@ -52,8 +52,11 @@ The repository's default development Method is implemented as project-local Ball
 
 ```text
 arc42-clarify-requirements
-  → arc42-design-structures
-  → arc42-design-concepts
+  → arc42-solution-strategy
+  → arc42-building-block-view
+  → arc42-runtime-deployment
+  → arc42-crosscutting-concepts
+  → arc42-architecture-decision
   → arc42-communicate-document
   → arc42-accompany-implementation
   → arc42-analyze-evaluate

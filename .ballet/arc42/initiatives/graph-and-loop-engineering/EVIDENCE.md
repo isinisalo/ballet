@@ -4,7 +4,7 @@ title: Graph and Loop Engineering EVIDENCE
 status: draft
 createdAt: '2026-08-19'
 updatedAt: '2026-08-20'
-version: 6
+version: 9
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Tila
 
-Strict-v11 domain, schema, project repository, immutable snapshot, Loop module -materialisointi, cross-Loop runtime dispatch sekä authoring-UI:n `graph | loop` hard cut on toteutettu ja testattu. Capabilityt ovat namespaced `accepts`/`provides`-merkkijonoja, Graph omistaa kaikki peer-reitit ja portable package ei saa sisältää Graphia tai peer-targetia. Graph Engineeringin Orchestrator-control-node, canonical route-evidenssi ja desktop/narrow-esitys ovat toteutettuja.
+Strict-v11 domain, schema, project repository, immutable snapshot, Loop module -materialisointi, cross-Loop runtime dispatch sekä authoring-UI:n `graph | loop` hard cut on toteutettu ja testattu. Capabilityt ovat namespaced `accepts`/`provides`-merkkijonoja, Graph omistaa kaikki peer-reitit ja portable package ei saa sisältää Graphia tai peer-targetia. Graph Engineeringin Orchestrator-control-node, canonical route-evidenssi ja desktop/narrow-esitys ovat toteutettuja. Vaihe 6:n yhden vastuun Loop- ja starter library -evidenssi GLE-EVID-008A on `passed`; koko initiativen ihmisacceptance pysyy pending-tilassa.
 
 | Evidence ID | QS/requirement | Check or observation | Artifact paths/stable IDs | Result | Timestamp/source | Limitations |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -28,6 +28,7 @@ Strict-v11 domain, schema, project repository, immutable snapshot, Loop module -
 | GLE-EVID-006 | REQ-007, REQ-012 / QS-013, QS-014 | Graph Engineering projection/UI/visual/accessibility | `GraphEngineeringWorkspace`, `GraphEngineeringCanvas`, `GraphEngineeringElements`, `GraphOrchestratorInspector`, `engineeringProjections`; `output/playwright/graph-engineering-*.png` | passed | 2026-08-20 local tests/browser | Täsmälleen yksi Orchestrator, yksi LoopNode per ProjectLoop, 0 sisäistä Work/Validation-nodea, persisted flow/repair-policy, capability/allowlist-rejection, canonical active route, keyboard, inspector, deterministic 24px-grid ja 390×844 Sheet todennettu. Ihmisacceptance kuuluu GLE-EVID-009:ään. |
 | GLE-EVID-007 | REQ-011, REQ-012 / QS-010, QS-014 | Loop Engineering selected-Loop-only regressiosuoja | `LoopEditor`, `LoopCanvas`, routing/deep-link/module handoff | passed | 2026-08-19 local tests | Todentaa selected-Loop-only Work/Validation-editorin, active Run -lukituksen ja URL-owned näkymän; ei Graph-control-nodea. |
 | GLE-EVID-008 | REQ-010, REQ-012 / QS-009, QS-014 | Project-local Loop Libraryn v11 capability- ja peer-target-riippumattomuus | `.ballet/loop-library/**`, `shared/api/loop-module-schemas.ts`, `backend/loop-modules/LoopModuleService.ts` | passed | 2026-08-19 local package/install/export/API/release checks | Todentaa package/materialisointirajan; Graph/Loop-authoring-UI:n lopullinen module handoff kuuluu myöhempään UI-vaiheeseen. |
+| GLE-EVID-008A | REQ-010, REQ-012 / QS-009, QS-014 | Phase 6: yhden vastuun project-local Loopit, starter library, exact capability/state/provenance/hash-roundtrip, graph-only topology, capability swap ja target-ID conformance | GLE-step-007a / GLE-AUDIT-001 / adr-019 | passed | 2026-08-20 local tests and smoke | 11 project Loopia / 20 Work Loop Nodea / 62 Graph edgeä; 10 arc42-, 7 software-engineering- ja 2 capability-compatible implementation-pakettia. Package-hash/provenance todennettiin install/export-testissä; repositoryllä ei ole tracked installed-provenancea, koska starterit ovat library-dataa eivätkä installoituja runtime-riippuvuuksia. |
 | GLE-EVID-009 | REQ-012 / QS-014 | Täysi verification-, conformance- ja ihmisacceptance | GLE-step-008 / TEST-014 / EVID-014 | pending | future implementation | Ei accepted REVIEW'ta eikä external-write-valtuutusta. |
 
 ## Muutos- ja päätösevidenssi
@@ -35,6 +36,24 @@ Strict-v11 domain, schema, project repository, immutable snapshot, Loop module -
 - Käyttäjän 2026-08-19 toimeksianto käsittelee `goal-012`:n listatut WHAT/WHY-päätökset hyväksyttyinä ja valtuuttaa `adr-018`:n accepted-päätöspaketin.
 - Strict-v11 tuotantokoodi ja testit osoittavat Graph/capability-datan, immutable snapshotin, target-riippumattoman package/materialisointirajan sekä persisted Orchestration Request/route/dispatch -polun. Automaattinen `followFlow` on poistettu; flow ja repair kulkevat saman generic Orchestrator-rajan kautta, mutta vain repair luo framen ja palaa samaan Validationiin. Frontend hyväksyy vain Graph Engineering / Loop Engineering -mallin ja näyttää eksplisiittisen virheen invalidista `view`-arvosta tai puuttuvasta Loop-ID:stä.
 - Historialliset `goal-011`, `adr-015`, `adr-017` ja `loop-engineer-three-level-canvas` säilyvät muuttumattomina evidenssilähteinä.
+
+### GLE-step-007a · Phase 6 project-local Loops ja starter library
+
+- `GLE-AUDIT-001` kirjattiin PLANiin ennen data- tai pakettimuutoksia. Se tunnisti kolmen vastuun `arc42-design-structures`-Loopin, concepts/ADR-yhdistelmän, capability-sanaston driftin ja puuttuvan capability-swap-evidenssin.
+- `adr-019` accepted käyttäjän 2026-08-20 eksplisiittisellä Phase 6 -valtuutuksella. Se supersedoi ADR-011:stä vain kiinteän kuuden Loopin topologian; canonical path-, State-, ihmis-, source-of-truth- ja continuous-learning-rajat säilyvät.
+- `.ballet/project.json` materialisoi 11 Loopia, 20 Work Loop Nodea ja 62 graph-owned flow/repair-edgeä. Solution strategy, Building Block View, runtime/deployment, crosscutting concepts ja architecture decision ovat erilliset capability-Loopit.
+- `.ballet/loop-library/` sisältää 19 strict-validia yhden Loopin pakettia. Omistajan seitsemän pilottistarteria ovat `clarify-specification`, `solution-strategy`, `architecture-decision`, `ui-mock`, `ui-design`, `implementation` ja Human Work/Validation -rajattu `deploy-dev`. Backend/frontend/generic implementation jakavat capabilityn ja `SoftwareEngineeringStateV1`-contractin.
+- Lähtöbaseline `npx vitest run backend/tests/loopModules.test.ts backend/tests/loopModuleCapabilities.test.ts backend/tests/projectConfigV11.test.ts` — passed: 3 tiedostoa, 30 testiä.
+- Ensimmäinen Phase 6 narrow run — 1 test failure: uusi assertion sovelsi flow-handshakea virheellisesti repair-edgeen. Assertion korjattiin target `provides` -semantiikkaan; sama neljän tiedoston slice passed: 34/34.
+- `npm run validate:arc42` — ensimmäinen ajo löysi seitsemän platform-boundary-osumaa, koska project-workflow-ID:t sisältänyt testi oli `backend/tests/`-puussa. Testi siirrettiin `.ballet/tests/`-omistajuuteen ja generic Vitest-project lisättiin; uusinta passed: 12 osiota, 48 ID:tä, 11 Loopia ja 62 edgeä.
+- Module/API/UI-smoke `npx vitest run .ballet/tests/projectLocalLoopLibrary.test.ts backend/tests/loopModules.test.ts backend/tests/loopModuleCapabilities.test.ts backend/tests/loopModuleHttp.test.ts frontend/tests/loopLibraryUi.test.tsx frontend/tests/engineeringProjections.test.ts frontend/tests/engineeringUi.test.tsx` — passed: 7 tiedostoa, 45 testiä. Actual project config -testi projisoi lisäksi 11 Graph LoopNodea, yhden Orchestratorin, 62 edgeä ja 20 sisäistä Work Loop Node -viitettä.
+- `npm run test` — passed: 90 tiedostoa + 1 skipped; 471 testiä + 2 skipped.
+- Loppuvalidoinnin kaksi ensimmäistä `npm run test` -ajoa pysähtyivät uuden project-local-testin peer-ID-heuristiikan vääriin positiivisiin osumiin: ensin tavallinen sana `implementation`, sitten oman sisäisen node-avaimen kanssa päällekkäinen `architecture-decision`. Tarkistus rajattiin skeeman tarkoittamaan uudelleenkäytettävään task/resource-sisältöön ja yksiselitteisiin yhdysmerkillisiin peer-ID:ihin; tuotantodata tai runtime ei muuttunut.
+- `npx vitest run .ballet/tests/projectLocalLoopLibrary.test.ts` — korjauksen jälkeen passed: 1 tiedosto, 4 testiä. Lopullinen `npm run test` — passed: 90 tiedostoa + 1 skipped; 471 testiä + 2 skipped.
+- `npm run lint` — ensimmäinen ajo 0 erroria / 15 warningia; uusi testin max-lines warning poistettiin. Uusinta passed 0 erroria / tunnettu 14 warningin baseline.
+- `npm run build` — passed: TypeScript ja Vite production build, 2629 modulea transformed.
+- `sh scripts/build-release.sh 0.1.0-phase6 arm64 /tmp/ballet-phase6-release.vhiNw1` — passed: compiled build, package install ja server/library/API/SQLite/Git smoke; paikallisen julkaisemattoman archiven SHA-256 `2d15cea4b748fd4e4edc84f64bc82bd04cb3ea2518f8ee785038be2bc925c203`.
+- Platform/project-boundary-haku — project-workflow-ID:t tuotantopolkujen `backend`, `frontend` ja `shared` alla 0. Platform domain/schema/runtimea ei muutettu; `vite.config.ts` sai vain generic `.ballet/tests/**/*.test.ts`-testiprojektin.
 
 ### GLE-step-005 Graph Engineering
 
@@ -94,8 +113,8 @@ Ensimmäinen argumentiton `npm run release:build` pysähtyi odotetusti usage-koo
 
 ## Avoimet evidenssivajeet
 
-GLE-EVID-009:n koko conformance- ja ihmisacceptance ovat blocking-pending ennen initiative-acceptancea. GLE-EVID-002–008 todistavat teknisen strict-v11 implementation-ketjun; ne eivät korvaa projektin omistajan review'ta.
+GLE-EVID-009:n koko ihmisacceptance on blocking-pending ennen initiative-acceptancea. GLE-EVID-002–008A todistavat teknisen strict-v11 implementation-ketjun; ne eivät korvaa projektin omistajan review'ta.
 
 ## Seuraava review basis
 
-Projektin omistaja voi katselmoida koko GLE-EVID-002–008-teknisen ketjun sekä tämän vaiheen työpöytä- ja narrow-screenshotit. Implementation-REVIEW ei muutu accepted-tilaan ilman eksplisiittistä ihmisacceptance-päätöstä.
+Projektin omistaja voi katselmoida koko GLE-EVID-002–008A-teknisen ketjun sekä Graph Engineeringin aiemmat työpöytä- ja narrow-screenshotit. Implementation-REVIEW ei muutu accepted-tilaan ilman eksplisiittistä ihmisacceptance-päätöstä.

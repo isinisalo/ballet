@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 8
+version: 9
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-018 on accepted; strict-v11 data/snapshot/module/runtime-raja sekä Graph/Loop-routing, Graph-control ja selected-Loop-only UI on toteutettu. Koko initiative-tason ihmisacceptance on pending.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-018 ja ADR-019 ovat accepted; strict-v11 data/snapshot/module/runtime-raja sekä Graph/Loop-routing, Graph-control ja selected-Loop-only UI on toteutettu. ADR-019:n project-local yhden vastuun Loop -refaktorointi on käynnissä. Koko initiative-tason ihmisacceptance on pending.
 
 ## Päätösindeksi
 
@@ -43,6 +43,7 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-018 on accepted; stric
 | adr-016 | accepted | Loop module boundary | [Yhden Loopin moduulipaketti ja project-local-materialisointi](../adr/adr-016-yhden-loopin-moduulipaketti-ja-project-local-materialisointi.md) |
 | adr-017 | accepted | Authoring projections | [Loop Engineer authoring-projektiot](../adr/adr-017-loop-engineer-authoring-projektiot.md) |
 | adr-018 | accepted | Graph/Loop projections and v11 orchestration | [Graph Engineering, Loop Engineering ja Orchestrator-ohjattu v11-graafi](../adr/adr-018-graph-ja-loop-engineering.md) |
+| adr-019 | accepted | Project-local Loop responsibility and package granularity | [Project-local Loopin yhden vastuun ja yhden onnistumisrajan sopimus](../adr/adr-019-project-local-loop-vastuuraja.md) |
 
 ## Supersession-suhteet
 
@@ -60,6 +61,10 @@ adr-017:n Context / numeric level / composition -malli
 adr-015:n automaattinen followFlow
         └── osittain superseded by ──▶ adr-018
             State, retry, repair-frame, continuation ja recovery säilyvät
+
+adr-011:n kiinteä kuuden nimetyn arc42-Loopin topologia
+        └── osittain superseded by ──▶ adr-019
+            kanoniset polut, State, ihmisrajat, source-of-truth ja continuous learning säilyvät
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -69,6 +74,7 @@ adr-015:n automaattinen followFlow
 | adr-014, vain V1:n no-package-raja | adr-016 | Yhden Loopin authoring package hyväksytään inspect/plan/commit-materialisointiin. ADR-014:n project-local-data- ja no-live-dependency-periaate jää voimaan. |
 | adr-017, Context/numeric level/Level 1 composition | adr-018 | Toteutettu v11 hard cut korvaa kolme authoring-tasoa Graph Engineering / Loop Engineering -unionilla ja poistaa Contextin sekä numeric route -mallin. Selected-Loop-only sisäinen projektio säilyy. Historiallista ADR:ää ei kirjoiteta uudelleen. |
 | adr-015, automaattinen yhden flow-edgen `followFlow` | adr-018 | Tuleva v11 ohjaa nolla/yksi/usea flow candidatea Orchestrator-dispatchin, snapshot-allowlistin, capabilityn ja `needs_input`-rajan kautta. Repairin call/return-, State- ja recovery-periaatteet säilyvät. |
+| adr-011, kiinteä kuuden nimetyn arc42-aktiviteetti-Loopin lista ja koarse structures/concepts-flow | adr-019 | Project-local vastuut erotetaan itsenäisiksi capability-Loopeiksi ja yhden Loopin paketeiksi. ADR-011:n dokumenttiomistajuus, State-, repair-, ihmis- ja jatkuvan oppimisen rajat säilyvät. |
 
 ## Päätösten käyttö
 

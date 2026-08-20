@@ -1,0 +1,96 @@
+{
+  "capabilities": {
+    "accepts": [
+      "deployment:dev.requested"
+    ],
+    "provides": [
+      "deployment:dev.completed"
+    ],
+    "recommendedConnections": [],
+    "requires": []
+  },
+  "format": "ballet-loop-module",
+  "loop": {
+    "description": "Perform one exactly authorized deployment to a named development environment through Human Work. Done when authorization, target, deployment result, health checks and rollback status are explicitly validated.",
+    "edges": [
+      {
+        "key": "completed",
+        "source": "task",
+        "target": {
+          "terminal": "completed"
+        }
+      }
+    ],
+    "key": "loop",
+    "nodes": [
+      {
+        "description": "Perform one exactly authorized deployment to a named development environment through Human Work. Done when authorization, target, deployment result, health checks and rollback status are explicitly validated.",
+        "key": "task",
+        "maxLocalAttempts": 3,
+        "validation": {
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "task": "Validate the named development deployment against the exact authorization, target, version, health checks and rollback readiness. Do not infer permission for rollback, release, merge or push.",
+          "type": "human"
+        },
+        "work": {
+          "nodeSize": "medium",
+          "nodeStyle": "terra",
+          "task": "After an exact human authorization names the development environment, version, actions and limits, perform only that authorized deployment manually and record non-secret evidence. If authorization is missing or incomplete, return needs_input without acting.",
+          "type": "human"
+        }
+      }
+    ],
+    "startNode": "task",
+    "state": {
+      "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+      "initial": {
+        "artifacts": [],
+        "checks": [],
+        "contractVersion": "SoftwareEngineeringStateV1",
+        "evidence": [],
+        "request": null,
+        "status": "not_started"
+      }
+    }
+  },
+  "manifest": {
+    "category": "software-engineering",
+    "description": "Perform one exactly authorized deployment to a named development environment through Human Work. Done when authorization, target, deployment result, health checks and rollback status are explicitly validated.",
+    "id": "deploy-dev",
+    "tags": [
+      "software-engineering",
+      "starter"
+    ],
+    "title": "Deploy to dev environment",
+    "version": "1.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [],
+  "resources": [],
+  "stateContract": {
+    "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
+    "id": "software-engineering-state",
+    "initial": {
+      "artifacts": [],
+      "checks": [],
+      "contractVersion": "SoftwareEngineeringStateV1",
+      "evidence": [],
+      "request": null,
+      "status": "not_started"
+    },
+    "requiredKeys": [
+      "artifacts",
+      "checks",
+      "contractVersion",
+      "evidence",
+      "request",
+      "status"
+    ],
+    "version": "1.0.0"
+  },
+  "version": 1
+}
